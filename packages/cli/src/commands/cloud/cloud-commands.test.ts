@@ -364,6 +364,90 @@ describe("env set of a build-time variable", () => {
     });
 });
 
+/**
+ * `--preview` on `env`: what the project's previews run with instead of
+ * production's values. Every one of these must reach the `previews` function
+ * and never `env-vars`, which is production's environment.
+ */
+describe("env --preview", () => {
+    async function run(action: string, ...args: string[]) {
+        const cap = captureStdout();
+        await envCommand(action, ["node", "rebase", "cloud", "env", action, ...args, "--json"]);
+        cap.restore();
+        return JSON.parse(cap.output().trim());
+    }
+
+    it("set writes a preview override, never production's variable", async () => {
+        const invoke = vi.fn(async () => ({ success: true, var: { key: "STRIPE_KEY", unset: false, secret: true, updatedAt: null }, pendingRedeploy: true }));
+        useClient(fakeClient({ invoke }));
+        const out = await run("set", "STRIPE_KEY=sk_test_1", "--secret", "--preview");
+        expect(invoke).toHaveBeenCalledTimes(1);
+        expect(invoke.mock.calls[0]).toEqual(["previews", { key: "STRIPE_KEY", value: "sk_test_1", secret: true }, { method: "POST", path: "proj_1/env" }]);
+        expect(out).toMatchObject({ success: true, preview: true, key: "STRIPE_KEY", secret: true });
+    });
+
+    it("unset removes the variable from previews, and leaves production's", async () => {
+        const invoke = vi.fn(async () => ({ success: true }));
+        useClient(fakeClient({ invoke }));
+        const out = await run("unset", "STRIPE_KEY", "--preview");
+        expect(invoke.mock.calls[0]).toEqual(["previews", { key: "STRIPE_KEY", unset: true }, { method: "POST", path: "proj_1/env" }]);
+        expect(out).toMatchObject({ preview: true, key: "STRIPE_KEY", unset: true });
+    });
+
+    it("reset hands the variable back to production's value", async () => {
+        const invoke = vi.fn(async () => ({ success: true }));
+        useClient(fakeClient({ invoke }));
+        await run("reset", "STRIPE_KEY", "--preview");
+        expect(invoke.mock.calls[0]).toEqual(["previews", undefined, { method: "DELETE", path: "proj_1/env/STRIPE_KEY" }]);
+    });
+
+    it("reset without --preview is refused before any call", async () => {
+        const invoke = vi.fn(async () => ({}));
+        useClient(fakeClient({ invoke }));
+        const cap = captureStdout();
+        const exit = vi.spyOn(process, "exit").mockImplementation(((): never => {
+            throw new Error("__exit__");
+        }) as never);
+        await expect(envCommand("reset", ["node", "rebase", "cloud", "env", "reset", "STRIPE_KEY", "--json"])).rejects.toThrow("__exit__");
+        cap.restore();
+        exit.mockRestore();
+        expect(invoke).not.toHaveBeenCalled();
+        expect(JSON.parse(cap.output().trim()).error.code).toBe("usage");
+    });
+
+    it("list shows keys and shape, never a value", async () => {
+        const invoke = vi.fn(async () => ({ vars: [
+            { key: "STRIPE_KEY", unset: false, secret: false, value: "sk_test_visible", updatedAt: null },
+            { key: "SENDGRID_KEY", unset: true, secret: false, updatedAt: null }
+        ] }));
+        useClient(fakeClient({ invoke }));
+        const cap = captureStdout();
+        await envCommand("list", ["node", "rebase", "cloud", "env", "list", "--preview", "--json"]);
+        cap.restore();
+        expect(invoke.mock.calls[0]).toEqual(["previews", undefined, { method: "GET", path: "proj_1/env" }]);
+        expect(cap.output()).not.toContain("sk_test_visible");
+        expect(JSON.parse(cap.output().trim()).vars).toEqual([
+            { key: "STRIPE_KEY", unset: false, secret: false, updatedAt: null },
+            { key: "SENDGRID_KEY", unset: true, secret: false, updatedAt: null }
+        ]);
+    });
+
+    it("says previews are unavailable on a control plane without them", async () => {
+        const invoke = vi.fn(async () => {
+            throw Object.assign(new Error("Function not found"), { status: 404, code: "FUNCTION_NOT_FOUND" });
+        });
+        useClient(fakeClient({ invoke }));
+        const cap = captureStdout();
+        const exit = vi.spyOn(process, "exit").mockImplementation(((): never => {
+            throw new Error("__exit__");
+        }) as never);
+        await expect(envCommand("set", ["node", "rebase", "cloud", "env", "set", "A=b", "--preview", "--json"])).rejects.toThrow("__exit__");
+        cap.restore();
+        exit.mockRestore();
+        expect(JSON.parse(cap.output().trim()).error.code).toBe("previews_unavailable");
+    });
+});
+
 /* ── rollback: not offered for an ineligible deploy ─────────────── */
 
 describe("rollback --json", () => {

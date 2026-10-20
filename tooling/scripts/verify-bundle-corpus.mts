@@ -238,14 +238,14 @@ function stageWithDriver(fixtureDir: string, name: string, driverVersion: string
     // listed package wins over whatever the bundle installed, and nothing else
     // is touched — the driver in particular stays the version npm resolved, which
     // is the whole point of this axis. Framework packages come from this
-    // checkout's `packages/`; `zod` is whichever copy `@rebasepro/server` itself
-    // resolves, because that is the one the image ships beside it.
+    // checkout's `packages/`; `zod`, `hono` and the rest are whichever copy
+    // `@rebasepro/server` itself resolves, because that is the one the image
+    // ships beside it.
     for (const pkg of RUNTIME_PROVIDED) {
         const target = path.join(dir, "node_modules", pkg);
         const source = pkg.startsWith("@rebasepro/")
             ? path.join(ROOT, "packages", pkg.slice("@rebasepro/".length))
-            : path.dirname(createRequire(path.join(ROOT, "packages", "server", "package.json"))
-                .resolve(`${pkg}/package.json`));
+            : installedPackageDir(pkg, path.join(ROOT, "packages", "server"));
         if (!fs.existsSync(source)) {
             throw new Error(`RUNTIME_PROVIDED names ${pkg}, but this checkout has nothing at ${source} to stitch in.`);
         }
@@ -258,6 +258,22 @@ function stageWithDriver(fixtureDir: string, name: string, driverVersion: string
 }
 
 /**
+ * The directory `pkg` is installed in, as seen from `fromDir` — found the way
+ * Node walks `node_modules`, not through the package's `exports`.
+ *
+ * Resolving `${pkg}/package.json` only works for a package that exports that
+ * subpath. `hono` does not, so stitching it in threw
+ * ERR_PACKAGE_PATH_NOT_EXPORTED for every driver version on the axis.
+ */
+function installedPackageDir(pkg: string, fromDir: string): string {
+    for (let at = fromDir; ; at = path.dirname(at)) {
+        const candidate = path.join(at, "node_modules", pkg);
+        if (fs.existsSync(path.join(candidate, "package.json"))) return fs.realpathSync(candidate);
+        if (path.dirname(at) === at) return candidate;
+    }
+}
+
+/**
  * What the image supplies on top of a bundle — the entrypoint's list, verbatim.
  * `runtime-provided.test.mjs` fails if this drifts from `infra/docker/entrypoint.mjs`.
  */
@@ -267,7 +283,9 @@ const RUNTIME_PROVIDED = [
     "@rebasepro/client",
     "@rebasepro/common",
     "@rebasepro/utils",
-    "zod"
+    "zod",
+    "hono",
+    "@hono/node-server"
 ];
 
 /**

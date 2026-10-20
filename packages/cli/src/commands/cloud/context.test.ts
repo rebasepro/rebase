@@ -183,6 +183,23 @@ describe("initOutputMode", () => {
         process.env.REBASE_JSON = value;
         expect(initOutputMode(["node", "rebase", "cloud", "env"])).toBe(true);
     });
+
+    /**
+     * `cloud deploy` piped is still a person's report. An agent pipes every
+     * command it runs, so its user only ever saw `{"success":true,…,"hosts":[]}`
+     * — no URL, nothing saying the new version was live.
+     */
+    it("stays human on a pipe for a command that asks to", () => {
+        delete process.env.REBASE_JSON;
+        expect(initOutputMode(["node", "rebase", "cloud", "deploy"], { whenPiped: "human" })).toBe(false);
+    });
+
+    it("still gives that command JSON when the caller asks", () => {
+        delete process.env.REBASE_JSON;
+        expect(initOutputMode(["node", "rebase", "cloud", "deploy", "--json"], { whenPiped: "human" })).toBe(true);
+        process.env.REBASE_JSON = "1";
+        expect(initOutputMode(["node", "rebase", "cloud", "deploy"], { whenPiped: "human" })).toBe(true);
+    });
 });
 
 /**

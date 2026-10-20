@@ -1,24 +1,24 @@
 ---
-sourceHash: 3830846c0457a79f
+sourceHash: fef2eb56c7043526
 title: Disposition du formulaire
 sidebar_label: Disposition du formulaire
-description: Contrôlez la disposition du formulaire d'entité — largeurs de colonnes, sections et rail de métadonnées.
+description: Contrôlez l'agencement du formulaire d'entité — largeurs de colonnes, sections et rail de métadonnées.
 ---
 
 ## Vue d'ensemble
 
-Le formulaire d'entité est généré à partir de vos propriétés. Par défaut, il déduit une disposition sur deux colonnes d'après les types de propriétés, de sorte qu'une collection qui ne spécifie rien au sujet de la disposition obtient tout de même un formulaire lisible plutôt qu'une longue suite de champs occupant toute la largeur :
+<span class="since-badge" data-since="0.26">Depuis 0.26</span>
 
-- l'id et les horodatages `createdAt` / `updatedAt` sont placés dans un rail de métadonnées, en lecture seule
-- les énumérations courtes, les booléens, les dates et les nombres occupent une largeur réduite
-- le texte long, le markdown, les tableaux, les maps et les champs de stockage prennent toute la largeur
-- tout le reste occupe la moitié
+Le formulaire d'entité est généré à partir de vos propriétés :
 
-Utilisez `admin.form` lorsque le comportement déduit ne convient pas à votre domaine.
+- l'identifiant (id) et les horodatages `createdAt` / `updatedAt` sont placés dans un rail de métadonnées, en lecture seule
+- tous les autres champs occupent la pleine largeur de la colonne principale, sauf si deux champs adjacents partagent le même type de petit éditeur — deux nombres, deux interrupteurs, deux dates avec le même mode, deux sélecteurs aux options courtes — auquel cas ils partagent une même ligne
 
-## Largeur de champ
+Un champ doté d'un libellé long, d'un texte d'aide de plus de 60 caractères, de `conditions` ou d'un composant `Field` personnalisé n'est jamais combiné avec un autre, de même que les chaînes de texte libre : rien dans un schéma ne permet de différencier un nom de branche court d'une longue URL. Le formulaire ne cherche jamais à savoir quelle propriété correspond au titre. Toutes les autres colonnes doivent être explicitement demandées par la collection, champ par champ, via `admin.span` — déterminé en fonction du contenu de chaque champ, comme indiqué ci-dessous. Utilisez `admin.form` pour regrouper les champs en sections et les déplacer vers le rail.
 
-La largeur d'un champ est un **span** sur une grille de quatre colonnes. `4` correspond à la pleine largeur de la colonne principale.
+## Largeur des champs
+
+La largeur d'un champ est un **span** défini sur une grille de quatre colonnes. La valeur `4` correspond à la pleine largeur de la colonne principale.
 
 ```typescript
 import { defineCollection } from "@rebasepro/cms-types";
@@ -47,13 +47,15 @@ const productsCollection = defineCollection({
 });
 ```
 
-Les spans s'alignent sur une grille partagée, ce qui permet à deux champs de s'aligner quel que soit l'ordre dans lequel ils ont été déclarés. Ils remplacent `admin.widthPercentage`, dont les pourcentages bruts ne pouvaient s'aligner sur rien ; une collection qui en utilise encore devrait choisir le span le plus proche (≤30 → `1`, ≤55 → `2`, ≤80 → `3`, sinon `4`).
+Les largeurs (spans) s'alignent sur une grille commune, ce qui permet à deux champs de s'aligner quel que soit l'ordre dans lequel ils ont été déclarés. Ils remplacent `admin.widthPercentage`, dont les pourcentages bruts ne s'alignaient sur rien ; une collection utilisant encore cette propriété devrait adopter le span le plus proche (≤30 → `1`, ≤55 → `2`, ≤80 → `3`, sinon `4`).
 
-Sur les mises en page trop étroites pour deux colonnes — le panneau latéral, le volet partagé, un téléphone — la grille se réduit à une seule colonne et les spans sont ignorés.
+Déterminez un span en fonction du contenu du champ, et non de son type. Deux valeurs courtes associées se partagent une ligne — date de début et de fin, ville et pays, fournisseur et région avec un span de `2` chacun, ou une valeur et son qualificatif avec `3` + `1`. Les nombres, les booléens et les codes courts peuvent occuper `1` colonne à côté d'autres champs similaires. Tout élément plus long à la lecture — noms, URLs, e-mails, identifiants, descriptions, markdown, fichiers — conserve `4`. Les lignes se remplissent dans l'ordre de déclaration et rien n'élargit automatiquement un champ pour combler un vide ; déclarez donc les paires côte à côte et veillez à ce que le total de chaque ligne atteigne 4.
+
+Sur les écrans trop étroits pour afficher deux colonnes — le volet latéral, le volet scindé, un smartphone — la grille se réduit à une seule colonne et les spans sont ignorés.
 
 ## Sections
 
-`sections` regroupe la colonne principale sous des en-têtes. Une section dotée d'un titre peut être repliée ; une section sans titre ne le peut pas.
+`sections` permet de regrouper les éléments de la colonne principale sous des titres. Une section pourvue d'un titre peut être repliée ; une section sans titre ne peut pas l'être.
 
 ```typescript
 import { defineCollection } from "@rebasepro/cms-types";
@@ -91,13 +93,13 @@ const ordersCollection = defineCollection({
 });
 ```
 
-Une propriété qui n'apparaît dans aucune section n'est jamais supprimée : elle atterrit dans la dernière section sans titre, ou dans un groupe final sans titre s'il n'en existe aucune. L'ajout d'une colonne à la base de données ne peut donc pas faire disparaître discrètement un champ du formulaire.
+Une propriété qui n'est listée dans aucune section n'est jamais supprimée : elle est placée dans la dernière section sans titre, ou dans un groupe final sans titre s'il n'en existe aucune. Ainsi, l'ajout d'une colonne dans la base de données ne peut pas faire disparaître silencieusement un champ du formulaire.
 
-Une erreur de validation au sein d'une section repliée provoque son déploiement, de sorte qu'une erreur ne puisse jamais rester masquée derrière un en-tête fermé.
+Une erreur de validation survenant à l'intérieur d'une section repliée entraîne son ouverture, garantissant ainsi qu'aucune erreur ne reste dissimulée derrière un volet fermé.
 
 ## Le rail de métadonnées
 
-`sidebar` déplace les champs hors de la colonne principale vers un rail étroit situé à côté — statut, propriétaire, dates de publication, indicateurs.
+`sidebar` permet d'extraire des champs de la colonne principale pour les placer dans un rail étroit à côté — statut, propriétaire, dates de publication, indicateurs.
 
 ```typescript
 import { defineCollection } from "@rebasepro/cms-types";
@@ -122,25 +124,27 @@ const postsCollection = defineCollection({
 });
 ```
 
-Le rail n'utilise pas la grille, donc `span` est ignoré pour les champs qui y figurent. Lorsqu'il n'y a pas assez d'espace pour un rail, il s'affiche comme une section initiale ordinaire, de sorte que rien n'est perdu sur un téléphone ou dans le panneau latéral.
+Le rail n'utilise pas la grille ; `span` est donc ignoré pour les champs qu'il contient. Lorsqu'il n'y a pas assez d'espace pour afficher un rail, il s'affiche sous forme d'une section d'en-tête ordinaire, évitant ainsi toute perte d'information sur smartphone ou dans le volet latéral.
 
-`showRecordMeta` place le bloc d'enregistrement en lecture seule — id, créé, mis à jour — au bas du rail. Sa valeur par défaut est `true` dès qu'un rail est affiché, et il remplace `hideIdFromForm` pour la plupart des collections : l'id cesse d'être un champ au milieu du formulaire pour devenir une ligne de métadonnées que l'on peut copier.
+`showRecordMeta` place le bloc d'enregistrement en lecture seule — id, date de création, date de mise à jour — au bas du rail. Sa valeur par défaut est `true` dès lors qu'un rail est présent, et il remplace `hideIdFromForm` pour la plupart des collections : l'id n'est plus un champ au milieu du formulaire, mais devient une ligne de métadonnées que l'on peut copier.
 
-Définissez `sidebar: []` pour supprimer complètement le rail déduit et conserver tous les champs dans la colonne principale.
+Définissez `sidebar: []` pour désactiver complètement le rail généré et conserver l'intégralité des champs dans la colonne principale.
 
 ## Référence
+
+<span class="since-badge" data-since="0.26">Depuis 0.26</span>
 
 | Propriété | Type | Description |
 |-----------|------|-------------|
 | `admin.span` | `1 \| 2 \| 3 \| 4` | Largeur du champ sur la grille de formulaire à quatre colonnes |
 | `admin.form.sidebar` | `string[]` | Clés des propriétés affichées dans le rail de métadonnées |
 | `admin.form.sections` | `FormSection[]` | Groupes avec titre pour la colonne principale |
-| `admin.form.showRecordMeta` | `boolean` | Afficher id/créé/mis à jour au bas du rail |
+| `admin.form.showRecordMeta` | `boolean` | Affiche id/créé/mis à jour au bas du rail |
 
 `FormSection` correspond à `{ key, title?, properties, collapsed?, collapsible? }`.
 
-## Voir aussi
+## Liens associés
 
-- [Custom Fields](/docs/frontend/custom-fields/) — le champ qu'une disposition organise
-- [Entity Views](/docs/frontend/entity-views/) — un onglet personnalisé complet à côté du formulaire
-- [Properties](/docs/collections/properties/) — les options de propriété lues par une disposition
+- [Custom Fields](/docs/frontend/custom-fields/) — les champs agencés par la disposition
+- [Entity Views](/docs/frontend/entity-views/) — un onglet personnalisé dédié à côté du formulaire
+- [Properties](/docs/collections/properties/) — les options de propriétés lues par la disposition

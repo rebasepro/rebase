@@ -4,6 +4,7 @@ import path from "path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
     buildBundle,
+    bundledNpmrc,
     collectDeclaredDependencies,
     detectDeclaredDepConflicts,
     detectFrameworkDepDrift,
@@ -979,5 +980,34 @@ describe("vendorDependencies", () => {
         });
         expect(result.vendored).toBe(false);
         expect(result.skipped).toContain("no node_modules");
+    });
+});
+
+describe("bundledNpmrc", () => {
+    let root: string;
+    beforeEach(() => { root = fs.mkdtempSync(path.join(os.tmpdir(), "rebase-npmrc-")); });
+    afterEach(() => { fs.rmSync(root, { recursive: true, force: true }); });
+
+    it("returns null when the project has no .npmrc", () => {
+        expect(bundledNpmrc(root)).toBeNull();
+    });
+
+    it("carries registry settings whose credentials are environment references, backend last", () => {
+        fs.writeFileSync(path.join(root, ".npmrc"), "@acme:registry=https://npm.pkg.github.com\n//npm.pkg.github.com/:_authToken=${NPM_TOKEN}\n");
+        fs.mkdirSync(path.join(root, "backend"));
+        fs.writeFileSync(path.join(root, "backend", ".npmrc"), "# a comment\nsave-exact=true\n");
+        const text = bundledNpmrc(root)!;
+        expect(text).toContain("//npm.pkg.github.com/:_authToken=${NPM_TOKEN}");
+        expect(text.indexOf("@acme:registry")).toBeLessThan(text.indexOf("save-exact=true"));
+    });
+
+    it("refuses a literal credential, so a token never travels with the code", () => {
+        fs.writeFileSync(path.join(root, ".npmrc"), "//registry.npmjs.org/:_authToken=npm_abc123\n");
+        expect(() => bundledNpmrc(root)).toThrow(/\.npmrc:1 sets \/\/registry\.npmjs\.org\/:_authToken to a literal value/);
+    });
+
+    it("refuses a bare _auth that is not a reference", () => {
+        fs.writeFileSync(path.join(root, ".npmrc"), "_auth = dXNlcjpwYXNz\n");
+        expect(() => bundledNpmrc(root)).toThrow(/literal value/);
     });
 });

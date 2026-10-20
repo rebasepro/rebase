@@ -19,6 +19,7 @@ import {
     warningPayload,
     ejectWarning,
     resolveDeployTimeout,
+    resolveLiveTimeout,
     billingBlocksDeploy,
     deployedUrl,
     EJECTS_MANAGED_RUNTIME,
@@ -346,6 +347,34 @@ describe("resolveDeployTimeout", () => {
         }) as never);
         expect(() => resolveDeployTimeout(value)).toThrow("__exit__");
         exit.mockRestore();
+    });
+});
+
+/**
+ * `--live-timeout`: how long a deploy waits for its URLs to answer with the new
+ * version. Unlike `--timeout`, 0 is a value — it skips the check.
+ */
+describe("resolveLiveTimeout", () => {
+    afterEach(() => {
+        setJsonModeForTest(false);
+        vi.restoreAllMocks();
+    });
+
+    it("defaults to a minute", () => {
+        expect(resolveLiveTimeout(undefined)).toBe(60_000);
+    });
+
+    it("takes 0 as skip, and reads seconds", () => {
+        expect(resolveLiveTimeout("0")).toBe(0);
+        expect(resolveLiveTimeout("120")).toBe(120_000);
+    });
+
+    it.each([["-1"], ["1m"], ["never"]])("refuses %s", (value) => {
+        vi.spyOn(console, "error").mockImplementation(() => {});
+        vi.spyOn(process, "exit").mockImplementation(((): never => {
+            throw new Error("__exit__");
+        }) as never);
+        expect(() => resolveLiveTimeout(value)).toThrow("__exit__");
     });
 });
 

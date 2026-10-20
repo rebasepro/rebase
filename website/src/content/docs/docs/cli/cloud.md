@@ -13,7 +13,7 @@ act on the linked project in `.rebase/cloud.json`; `--project <id>` operates on
 one without linking.
 
 Three options apply everywhere: `--json` for machine-readable output (also the
-default when piped, or with `REBASE_JSON=1`), `--url <origin>` to target a
+default when piped, except for `deploy`, or with `REBASE_JSON=1`), `--url <origin>` to target a
 specific control plane (or `REBASE_CLOUD_URL`), and `--project, -p <id>`.
 
 ## Auth
@@ -49,6 +49,8 @@ rebase cloud projects delete [id]
 
 ```bash
 rebase cloud deploy [app] [--source .]   # deploy an app and stream build logs
+rebase cloud deploy [app] --preview [--preview-name <name>]  # its own address; production untouched
+rebase cloud previews [list|delete <name>]
 rebase cloud logs [--runtime] [-f]       # build logs, or the running process's
 rebase cloud deployments list [--limit N|--all]
 rebase cloud rollback [id] [-y]          # back to a successful deploy
@@ -64,6 +66,27 @@ deploy also uploads the project's source — what git tracks, never a `.env` —
 platform upgrade can rebuild it; `--no-source` skips that once, and `cloud settings set
 --platform-rebuilds off` stops it and deletes the stored copy. `--allow-downgrade` deploys an older release.
 
+A followed `deploy` ends on a summary: each app it shipped with its URL, the
+deployment id, how long it took, and whether the new version answers there. It
+waits up to `--live-timeout` seconds (default 60; `0` skips the check) for a
+backend's `/api/health` and each static app's address to answer. A failed deploy
+ends on one line naming the app and the reason, and exits non-zero. The summary
+prints even when piped; `--json` (or `REBASE_JSON=1`) prints one object instead,
+with `apps`, `hosts`, `live`, `liveChecks` and `durationMs`.
+
+Before uploading, `deploy` parses the JavaScript of every static app it ships:
+the `.js`/`.mjs`/`.cjs` files in its `output` and the inline `<script>` blocks in
+its HTML. A syntax error stops the deploy with `file:line:column` (code
+`syntax_error` under `--json`), and `--no-verify` skips the check. A successful
+deploy ends with the way back, `rebase cloud rollback`. A static app deployed on
+its own cannot be rolled back yet; see
+[Roll back](/docs/deployment/cloud#roll-back).
+
+`--preview` serves the build at `https://<project>--<name>.rebase.website` and
+leaves production alone. A preview of a static app calls the production backend.
+A preview of the backend runs its own backend, on an empty database of its own.
+See [Preview a change](/docs/deployment/cloud/#preview-a-change).
+
 ## Config
 
 ```bash
@@ -72,6 +95,12 @@ rebase cloud domains list | add <domain> | verify [domain] | remove <domain>
 rebase cloud extensions list | enable | disable
 rebase cloud settings show | set        # name, branch, repo, subdomain, rebuilds
 ```
+
+A backend preview starts from production's variables, live keys included.
+`env set KEY=VALUE --preview` gives previews their own value, `env unset KEY
+--preview` leaves the variable out of them, `env reset KEY --preview` hands
+back production's value, and `env list --preview` shows the differences.
+Production is never changed by any of them.
 
 ## Organizations
 
@@ -113,9 +142,11 @@ rebase cloud compute set        # change it
 ```
 
 `compute set` takes `--cpu`, `--memory`, `--replicas`, `--spot`,
-`--scale-to-zero`, `--db-instances`, `--db-cpu`, `--db-memory`,
+`--db-instances`, `--db-cpu`, `--db-memory`,
 `--storage`, `--autoscale-max`, `--autoscale-cpu-target` and `--no-autoscale`.
-There are no plan tiers: everything is priced per resource. See
+`--scale-to-zero` is retired: every backend runs at least one instance, so
+`true` is refused and `false` is ignored with a warning. There are no plan
+tiers: everything is priced per resource. See
 [Rebase Cloud](/docs/deployment/cloud/).
 
 ## Storage, webhooks, clusters and billing

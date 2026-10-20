@@ -39,6 +39,7 @@ vi.mock("./deployments", () => ({ deploymentsListCommand: vi.fn(), rollbackComma
 vi.mock("./power", () => ({ powerCommand: vi.fn() }));
 vi.mock("./debug", () => ({ debugCommand: vi.fn(), printDebugHelp: vi.fn() }));
 vi.mock("./cron", () => ({ cronCommand: vi.fn() }));
+vi.mock("./previews", () => ({ previewsCommand: vi.fn() }));
 vi.mock("./resources", () => ({
     statusCommand: vi.fn(), metricsCommand: vi.fn(), webhooksCommand: vi.fn(),
     storageCommand: vi.fn(), clustersCommand: vi.fn(), billingCommand: vi.fn(),

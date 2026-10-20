@@ -22,6 +22,9 @@ administrator before the first boot.
 - **[Rebase Cloud](/docs/deployment/cloud/)** — the same Rebase, operated for
   you: `rebase cloud deploy` from your project, a database per project, backups
   and TLS included.
+- **[Managed backend runtime](/docs/deployment/managed-runtime/)** — what a
+  backend with `runtime: "managed"` can do there: packages, memory, timeouts,
+  the filesystem, secrets, storage and outbound network.
 
 ## Run it yourself
 

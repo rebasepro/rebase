@@ -96,7 +96,7 @@ See [Runtime portability](#runtime-portability) for the full contract.
 ## Configuration
 
 :::note[Where this goes]
-**Managed runtime:** nothing to configure — the runtime discovers `backend/functions/` on its own (`entry.functions` in `rebase.json` if you moved it). `REBASE_FUNCTIONS_ONLY` / `REBASE_FUNCTIONS_EXCLUDE` narrow which ones a process serves.
+**Managed runtime:** nothing to configure — the runtime discovers `backend/functions/` on its own (`functions` in the backend app's `rebase.json` entry if you moved it). `REBASE_FUNCTIONS_ONLY` / `REBASE_FUNCTIONS_EXCLUDE` narrow which ones a process serves.
 **Ejected:** `initializeRebaseBackend({ functionsDir })`, or `functions` (below), in `backend/src/index.ts`.
 :::
 
@@ -586,6 +586,11 @@ Two ceilings apply to `/api/functions/*`:
 - **Rate limit** — API-key and signed-in callers share the data API's buckets. Anonymous callers get their own, much looser allowance (3000 per window) because this router is public by default for webhook receivers. Override with `rateLimit.anonymousFunctions`; `null` switches it off.
 
 Unhandled promise rejections are logged rather than fatal: a fire-and-forget call in one function would otherwise end the whole process. Set `REBASE_EXIT_ON_UNHANDLED_REJECTION=1` for Node's default behaviour.
+
+On Rebase Cloud, the edge in front of your functions has limits of its own, and
+module-level state, the filesystem and outbound ports behave in ways worth
+knowing before you design around them. See
+[Managed backend runtime](/docs/deployment/managed-runtime/).
 
 ## Next Steps
 

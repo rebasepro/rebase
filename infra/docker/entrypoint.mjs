@@ -347,13 +347,22 @@ if (!FETCH_MODE && fs.existsSync(bundlePackageJson) && (!fs.existsSync(bundleMod
 // success, and ran zero crons. The image installs zod (see
 // infra/docker/server.Dockerfile); naming it here is what makes the bundle's
 // copy collapse onto it.
+//
+// `hono` and `@hono/node-server` for the reason the framework packages are
+// here. The bundler strips them as image-provided, so nothing installs them
+// into /bundle, and a function written as a plain Hono app —
+// `import { Hono } from "hono"` — failed to load with "Cannot find package"
+// and its route answered 404. Linking the image's copy is also what makes it
+// the SAME hono the server's duck-typing loader checks against.
 const RUNTIME_PROVIDED = [
     "@rebasepro/server",
     "@rebasepro/types",
     "@rebasepro/client",
     "@rebasepro/common",
     "@rebasepro/utils",
-    "zod"
+    "zod",
+    "hono",
+    "@hono/node-server"
 ];
 
 const imageModules = path.join(path.dirname(fileURLToPath(import.meta.url)), "node_modules");

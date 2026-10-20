@@ -168,10 +168,11 @@ function deploy(...flags: string[]): Promise<void> {
 
 /** The body the deploy trigger was sent. */
 function triggered(): Record<string, unknown> {
-    expect(invoke).toHaveBeenCalledTimes(1);
-    const [name, body] = invoke.mock.calls[0] as [string, Record<string, unknown>];
-    expect(name).toBe("deploy");
-    return body;
+    // Only the trigger: the deploy also asks the control plane for its base
+    // domain, to say where the app will answer.
+    const deploys = invoke.mock.calls.filter(([name]) => name === "deploy");
+    expect(deploys).toHaveLength(1);
+    return deploys[0][1] as Record<string, unknown>;
 }
 
 describe("a backend bundle deploy", () => {
@@ -940,6 +941,45 @@ describe("a deploy that declares a hostname", () => {
         expect(JSON.parse(stdout.join("")).hosts).toEqual(HOSTS);
     });
 
+    /**
+     * The control plane's `hosts` names only hostnames an app declares, so a
+     * project served on its own `<slug>.rebase.website` came back `hosts: []` —
+     * a deploy served nowhere, by its own account.
+     */
+    it("lists the project's own host, and where each app answers", async () => {
+        (context.requireClient as unknown as ReturnType<typeof vi.fn>).mockResolvedValue({
+            client: {
+                auth: { getSession: () => ({ accessToken: "tok", expiresAt: Date.now() + 60 * 60_000 }) },
+                data: { collection: () => ({ findById: async () => ({ subdomain: "shop" }), find: async () => ({ data: [] }) }) },
+                functions: {
+                    invoke: vi.fn(async (name: string) => name === "platform-config"
+                        ? { tenantBaseDomain: "rebase.website" }
+                        : { success: true, deployment: { id: "d1" }, managed: true, hosts: [] })
+                }
+            },
+            // Its own URL: the platform config is cached per control plane.
+            url: "https://cp-own-host.example"
+        });
+        context.setJsonModeForTest(true);
+        const stdout: string[] = [];
+        vi.spyOn(process.stdout, "write").mockImplementation(((chunk: string | Uint8Array) => {
+            stdout.push(String(chunk));
+            return true;
+        }) as typeof process.stdout.write);
+
+        try {
+            await deploy();
+        } finally {
+            context.setJsonModeForTest(false);
+        }
+
+        const result = JSON.parse(stdout.join(""));
+        expect(result.hosts).toEqual([{ host: "shop.rebase.website", status: "verified" }]);
+        expect(result.apps).toEqual([
+            { name: "web", type: "static", host: "shop.rebase.website", url: "https://shop.rebase.website" }
+        ]);
+    });
+
     it("says nothing, and adds no field, when the control plane predates hostnames", async () => {
         // The default stand-in answers without `hosts`, as every control plane
         // before this change does. An empty `hosts: []` would claim the deploy
@@ -959,6 +999,146 @@ describe("a deploy that declares a hostname", () => {
 
         expect("hosts" in JSON.parse(stdout.join(""))).toBe(false);
         expect(said.join("\n")).not.toContain("not served until");
+    });
+});
+
+/**
+ * A static app's files are served as they are. A site whose "build" only
+ * copied hand-written `.js` into its output deployed a file that did not parse;
+ * the deploy succeeded and the live page died on load. So the output is parsed
+ * before anything is uploaded, and a deploy that just went live says how to go
+ * back.
+ */
+describe("the syntax check before a static deploy", () => {
+    const BROKEN = "export function connect() {\n    return fetch(\"/api\";\n}\n";
+
+    function staticProject(withBackend = false): void {
+        write(project, "rebase.json", JSON.stringify({
+            rebase: "^1",
+            apps: {
+                ...(withBackend ? { backend: { type: "backend", runtime: "managed" } } : {}),
+                web: { type: "static", root: "web", build: "exit 0", output: "web", path: "/" }
+            }
+        }));
+        write(project, "web/index.html", "<!doctype html>\n<script type=\"module\" src=\"/cloud.js\"></script>\n");
+    }
+
+    it("stops a static app with a syntax error before anything is uploaded", async () => {
+        staticProject();
+        write(project, "web/cloud.js", BROKEN);
+        controlPlane();
+
+        await expect(deployCommand(["node", "rebase", "cloud", "deploy", "web", "--no-follow"], "shop"))
+            .rejects.toMatchObject({ code: 1 });
+
+        const out = said.join("\n");
+        expect(out).toContain("A syntax error in the static output, so nothing was deployed");
+        expect(out).toContain("web/cloud.js:2:24  Unexpected token");
+        expect(out).toContain("--no-verify");
+        expect(requests).toEqual([]);
+        expect(invoke).not.toHaveBeenCalled();
+    });
+
+    it("deploys it anyway with --no-verify", async () => {
+        staticProject();
+        write(project, "web/cloud.js", BROKEN);
+        controlPlane();
+
+        await deployCommand(["node", "rebase", "cloud", "deploy", "web", "--no-verify", "--no-follow"], "shop");
+
+        expect(triggered().bundleId).toBe("b1");
+    });
+
+    it("deploys a static app whose scripts parse, and says it checked them", async () => {
+        staticProject();
+        write(project, "web/cloud.js", "export function connect() {\n    return fetch(\"/api\");\n}\n");
+        controlPlane();
+
+        await deployCommand(["node", "rebase", "cloud", "deploy", "web", "--no-follow"], "shop");
+
+        expect(triggered().bundleId).toBe("b1");
+        expect(said.join("\n")).toContain("Syntax-checked 1 script(s) in the static output.");
+    });
+
+    it("answers with code syntax_error in JSON mode", async () => {
+        staticProject();
+        write(project, "web/cloud.js", BROKEN);
+        controlPlane();
+        context.setJsonModeForTest(true);
+        const stdout: string[] = [];
+        vi.spyOn(process.stdout, "write").mockImplementation(((chunk: string | Uint8Array) => {
+            stdout.push(String(chunk));
+            return true;
+        }) as typeof process.stdout.write);
+
+        try {
+            await expect(deployCommand(["node", "rebase", "cloud", "deploy", "web", "--no-follow"], "shop"))
+                .rejects.toMatchObject({ code: 1 });
+        } finally {
+            context.setJsonModeForTest(false);
+        }
+
+        expect(JSON.parse(stdout.join(""))).toMatchObject({
+            error: { code: "syntax_error", message: expect.stringContaining("web/cloud.js:2:24") }
+        });
+    });
+
+    it("checks a static app folded into the backend's bundle too", async () => {
+        staticProject(true);
+        write(project, "web/cloud.js", BROKEN);
+        bundle("backend");
+        vi.mocked(buildBundle).mockImplementationOnce(async () => ({
+            outDir: bundleDir,
+            manifest: JSON.parse(fs.readFileSync(path.join(bundleDir, "manifest.json"), "utf8")),
+            collectionCount: 0,
+            vendor: { vendored: false, skipped: "the bundle declares no dependencies" }
+        }));
+        controlPlane();
+
+        await expect(deployCommand(["node", "rebase", "cloud", "deploy", "--skip-schema", "--no-source", "--no-follow"], "shop"))
+            .rejects.toMatchObject({ code: 1 });
+
+        expect(said.join("\n")).toContain("web/cloud.js:2:24");
+        expect(requests).toEqual([]);
+    });
+
+    function followedClient(): void {
+        (context.requireClient as unknown as ReturnType<typeof vi.fn>).mockResolvedValue({
+            client: {
+                auth: { getSession: () => ({ accessToken: "tok", expiresAt: Date.now() + 60 * 60_000 }) },
+                data: {
+                    collection: (name: string) => ({
+                        findById: async () => (name === "deployments" ? { status: "success", logs: "" } : undefined),
+                        find: async () => ({ data: [] })
+                    })
+                },
+                functions: { invoke }
+            },
+            url: "https://cp.example"
+        });
+    }
+
+    it("says how to roll back once a backend deploy is live", async () => {
+        bundle("backend");
+        controlPlane();
+        followedClient();
+
+        await deployCommand(["node", "rebase", "cloud", "deploy", "--bundle", "--bundle-dir", bundleDir, "--no-source"], "shop");
+
+        expect(said.join("\n")).toContain("`rebase cloud rollback` puts the previous deployment back");
+    });
+
+    it("does not point a static app deployed on its own at a rollback it does not have", async () => {
+        staticProject();
+        write(project, "web/cloud.js", "export {};\n");
+        controlPlane();
+        followedClient();
+
+        await deployCommand(["node", "rebase", "cloud", "deploy", "web"], "shop");
+
+        const out = said.join("\n");
+        expect(out).toContain("cannot be rolled back yet");
+        expect(out).not.toContain("rebase cloud rollback");
     });
 });
 

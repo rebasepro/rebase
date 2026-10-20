@@ -1,5 +1,5 @@
 ---
-sourceHash: 5bfb7ab1050d263c
+sourceHash: 1d19e29e19f9ce81
 title: Typisiertes SDK — Erste Schritte
 sidebar_label: Erste Schritte
 description: Installieren und konfigurieren Sie das typisierte SDK von Rebase, um von jeder JavaScript- oder TypeScript-Anwendung aus mit Ihrem Backend zu interagieren.
@@ -58,6 +58,17 @@ const client = createRebaseClient({
 | `collections` | `Record<string, string>` | Weist Accessor-Namen den Slugs von Collections zu |
 | `offline` | `boolean \| OfflineConfig` | [Local-First-Synchronisation](/docs/sdk/offline) — standardmäßig deaktiviert |
 | `impersonate` | `string` | Jede Anfrage als dieser Benutzer ausführen (per uid), um zu prüfen, was ein Benutzer sehen kann. Nur mit der Sitzung eines Administrators: Daten-API, Functions und Realtime laufen als dieser Benutzer, jede andere Route lehnt ab |
+| `debug` | `boolean` | Den Fortschritt der Realtime-Verbindung mit `console.debug` protokollieren (Standard `false`) — siehe [Verbindungsprotokoll](#verbindungsprotokoll) |
+
+### Verbindungsprotokoll
+
+Standardmäßig gibt der Client nichts über seine Realtime-Verbindung aus, sodass eine öffentliche Seite in der Konsole eines Besuchers nichts über ihr Backend verrät. Warnungen und Fehler werden immer ausgegeben. Um zu sehen, wie die Verbindung aufgebaut, angemeldet, getrennt und neu gewählt wird, übergeben Sie `debug: true` – oder schalten Sie es in einem einzelnen Browser ein, ohne die Seite zu ändern, indem Sie dies in seiner Konsole ausführen:
+
+```js
+localStorage.setItem("rebase_debug", "1"); // localStorage.removeItem("rebase_debug") zum Beenden
+```
+
+Es gilt ab der nächsten Zeile, die der Client protokolliert; eine bereits verbundene Seite muss nicht neu geladen werden. Außerhalb eines Browsers setzen Sie `globalThis.__REBASE_DEBUG__ = true`. Browser zeigen `console.debug` nur auf der Stufe „Ausführlich“ (Verbose) an.
 
 ## Generierung eines typisierten SDKs
 

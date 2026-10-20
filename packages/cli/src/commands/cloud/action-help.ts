@@ -122,7 +122,10 @@ export const ACTION_HELP: Record<string, ActionHelp> = {
             ["--memory <size>", "Memory per instance, e.g. 512Mi"],
             ["--replicas <n>", "Instance count"],
             ["--spot <true|false>", "Run on preemptible capacity"],
-            ["--scale-to-zero <true|false>", "Stop the instances when idle"],
+            // Still parsed so an old script is told what happened. Documented
+            // here because the parse is: a page silent about a flag the
+            // command accepts is how the two drift.
+            ["--scale-to-zero <false>", "Retired: every backend is always on. `false` is ignored with a warning, `true` refused"],
             ["--db-instances <n>", "Database instance count"],
             ["--db-cpu <n>", "vCPU per database instance"],
             ["--db-memory <size>", "Memory per database instance"],
@@ -206,10 +209,13 @@ export const ACTION_HELP: Record<string, ActionHelp> = {
         usage: "cloud deploy [app] [options]",
         summary:
             "Deploy an app of the linked project and follow the build to a terminal state, exiting "
-            + "non-zero if it failed. With no app named, the repository's backend is deployed.",
+            + "non-zero if it failed. With no app named, the repository's backend is deployed. It ends "
+            + "on a summary: each app shipped and its URL, the deployment id, how long it took, and whether "
+            + "the new version answers on those URLs.",
         flags: [
             ["--wait", "Follow to a terminal state. Already the default; here to be explicit"],
             ["--timeout <seconds>", "Ceiling on the follow. Default: 900"],
+            ["--live-timeout <seconds>", "How long to wait for the new version to answer on its URLs. 0 skips the check. Default: 60"],
             ["--no-follow", "Return as soon as the build is triggered"],
             ["--message, -m <text>", "Label the release"],
             ["--bundle", "Force a managed-bundle deploy (the default for runtime: managed)"],
@@ -219,23 +225,77 @@ export const ACTION_HELP: Record<string, ActionHelp> = {
             ["--skip-schema", "Keep the committed database schema instead of regenerating it"],
             ["--no-static", "Deploy the backend without folding the static apps into its bundle"],
             ["--no-source", "Do not upload the project's source beside a backend bundle"],
+            ["--no-verify", "Skip the syntax check of the static apps' JavaScript"],
             ["--allow-downgrade", "Deploy a bundle built on an older framework release than the project runs"],
+            ["--preview", "Serve this build on an address of its own and leave production untouched"],
+            ["--preview-name <name>", "Name the preview, so deploying the same name again updates the same address. Implies --preview"],
             ["--eject", "Leave the managed runtime on purpose (ejects to a container image)"]
         ],
         examples: [
             "rebase cloud deploy",
             "rebase cloud deploy web --message \"add search\"",
+            "rebase cloud deploy --preview",
+            "rebase cloud deploy --preview-name new-quiz",
             "rebase cloud deploy --timeout 300 --json"
         ],
         notes: [
+            "The summary is printed even when stdout is piped. Pass --json (or set REBASE_JSON=1) for one "
+                + "JSON object instead: apps, hosts, live, liveChecks, durationMs and the deployment id.",
+            "A failed deploy ends on one line naming the app and the reason, and exits non-zero. A deploy "
+                + "that succeeded but could not be confirmed live within --live-timeout exits zero and says so.",
             "A project whose rebase.json declares runtime: managed deploys a bundle without --bundle.",
             "--source on a managed project is refused: it would swap the project onto a container image.",
             "A backend bundle deploy also uploads the project's source (what git tracks, never a .env), so a "
                 + "platform upgrade can rebuild it on a newer release. If it is over 100 MB or the upload fails, "
                 + "the deploy goes on without it and says so.",
             "A bundle older than the release the project runs is refused as FRAMEWORK_DOWNGRADE. Run "
-                + "`rebase upgrade` and deploy again, or pass --allow-downgrade."
+                + "`rebase upgrade` and deploy again, or pass --allow-downgrade.",
+            "Before uploading, every .js/.mjs/.cjs file and inline <script> in each static app's output is "
+                + "parsed. A syntax error stops the deploy with its file:line:column (code syntax_error); "
+                + "--no-verify skips the check.",
+            "Undo a bad deploy with `rebase cloud rollback`: it restores the previous successful backend "
+                + "deployment, static apps folded into it included. A static app deployed on its own "
+                + "(`cloud deploy <app>`) cannot be rolled back yet; deploy its last good version again.",
+            "--preview prints the preview's own address, https://<project>--<name>.rebase.website. A preview of a "
+                + "static app calls the production backend; a preview of the backend runs its own, on an empty "
+                + "database of its own. It uploads no source and registers no apps or hostnames. "
+                + "`rebase cloud previews` lists and deletes previews.",
+            "A control plane without previews refuses --preview with previews_unavailable, and nothing is deployed."
         ]
+    },
+
+    previews: {
+        command: "cloud previews",
+        usage: "cloud previews [list|delete] [options]",
+        summary:
+            "The project's preview deployments: builds made with `rebase cloud deploy --preview`, each served on "
+            + "its own address while production keeps serving what it served before. `list` is the default.",
+        flags: [],
+        examples: [
+            "rebase cloud previews",
+            "rebase cloud previews delete new-quiz --yes"
+        ],
+        notes: [
+            "A preview expires on its own when it has not been deployed to for a while; `list` says when.",
+            "Deleting a preview stops its address answering and, for a backend preview, drops its database. "
+                + "Production is never touched."
+        ]
+    },
+
+    "previews list": {
+        command: "cloud previews list",
+        usage: "cloud previews list",
+        summary: "Every preview of the project: its name, its address, the app it serves, which backend it calls, and when it expires.",
+        flags: [],
+        examples: ["rebase cloud previews list", "rebase cloud previews list --json"]
+    },
+
+    "previews delete": {
+        command: "cloud previews delete",
+        usage: "cloud previews delete <name> [--yes]",
+        summary: "Delete one preview: its address stops answering, and a backend preview's database is dropped. Alias: `rm`.",
+        flags: [],
+        examples: ["rebase cloud previews delete new-quiz --yes"]
     },
 
     logs: {
@@ -428,16 +488,18 @@ export const ACTION_HELP: Record<string, ActionHelp> = {
 
     "env set": {
         command: "cloud env set",
-        usage: "cloud env set KEY=VALUE | KEY VALUE [--secret] [--force]",
+        usage: "cloud env set KEY=VALUE | KEY VALUE [--secret] [--force] [--preview]",
         summary:
             "Set one environment variable on the project. Takes effect on the next deploy — "
             + "a running instance does not pick it up.",
         flags: [
             ["--secret", "Store it encrypted and never return it in a listing"],
-            ["--force", "Set a build-time key (VITE_*, NEXT_PUBLIC_*, …) anyway, for a build that reads it at run time"]
+            ["--force", "Set a build-time key (VITE_*, NEXT_PUBLIC_*, …) anyway, for a build that reads it at run time"],
+            ["--preview", "Set it for the project's previews only; production keeps its value"]
         ],
         examples: [
             "rebase cloud env set STRIPE_KEY=sk_live_… --secret",
+            "rebase cloud env set STRIPE_KEY=sk_test_… --secret --preview",
             "rebase cloud env set LOG_LEVEL debug",
             "rebase cloud env set FEATURE_X= "
         ],
@@ -634,11 +696,10 @@ export const ACTION_HELP: Record<string, ActionHelp> = {
             "Change one or more of a project's dials. At least one is required: a patch with nothing "
             + "in it is a typo, and reporting success for a change nobody made is worse than refusing.",
         flags: [
-            ["--cpu <n>", "App CPU request per instance, e.g. 500m or 2. Default: 250m"],
-            ["--memory <size>", "App memory request per instance, e.g. 512Mi or 2Gi. Default: 512Mi"],
+            ["--cpu <n>", "App CPU request per instance, e.g. 500m or 2. Default: 100m, bursting to 2"],
+            ["--memory <size>", "App memory request per instance, e.g. 512Mi or 2Gi. Default: 384Mi, bursting to 2Gi"],
             ["--replicas <n>", "Instances that always exist — the autoscaler's floor, and what is billed at rest"],
             ["--spot <true|false>", "Preemptible capacity: cheaper, and restarted without notice"],
-            ["--scale-to-zero <true|false>", "Request-billed compute that stops when idle, at the cost of a cold start"],
             ["--db-instances <n>", "1–3. 1 is a single instance with no failover; 2 adds an automatic standby"],
             ["--db-cpu <n>", "Database CPU request per instance. Default: 500m"],
             ["--db-memory <size>", "Database memory request per instance. Default: 2Gi"],
@@ -834,6 +895,9 @@ export const ACTION_HELP: Record<string, ActionHelp> = {
             "rebase cloud rollback 214 --yes"
         ],
         notes: [
+            "A static app deployed on its own (`rebase cloud deploy <app>`) records no bundle, so its "
+                + "deployments are not rollbackable yet: deploy its last good version again. Static apps "
+                + "folded into the backend's bundle (a plain `rebase cloud deploy`) roll back with it.",
             "`rebase cloud deployments list` marks which rows are rollbackable. One that is not is refused here rather than by a 409 from the control plane."
         ]
     },

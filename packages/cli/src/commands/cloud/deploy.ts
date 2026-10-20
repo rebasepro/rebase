@@ -10,6 +10,10 @@
  * this directory as a build context, and the bare form uploads nothing and asks
  * the control plane to rebuild what it already holds. That last one is the
  * dangerous one — see `planBareDeploy`.
+ *
+ * `--preview` is the bundle deploy aimed somewhere else: the same build and
+ * upload, triggered through the `previews` function so it is served on an
+ * address of its own and production is never touched. See `previews.ts`.
  */
 import arg from "arg";
 import chalk from "chalk";
@@ -29,6 +33,7 @@ import {
     warn,
     reportError,
     resolveTimeoutMs,
+    note,
     fetchTenantBaseDomain,
     projectHost,
     type CloudClient,
@@ -47,10 +52,26 @@ import {
     pendingHostNotices,
     type DeployHost
 } from "./bundle-deploy";
+import {
+    bundleApps,
+    sourceBuildApps,
+    deployHosts,
+    checkLive,
+    deploySummaryLines,
+    liveVerdict,
+    failureLine,
+    failureHint,
+    failureReason,
+    DEFAULT_LIVE_TIMEOUT_MS,
+    type DeployedApp,
+    type LiveCheck
+} from "./deploy-summary";
 import { listContextFiles, MAX_SOURCE_UPLOAD_BYTES, packSource, prepareRebuildSource, type RebuildSource } from "./rebuild-source";
+import { PREVIEW_DEPLOYMENTS_COLLECTION, normalizePreviewName, previewLines, triggerPreview, type Preview } from "./previews";
 import { buildBundle } from "../../bundle";
 import { buildAssetApp } from "../build";
-import { foldFrontendIntoBundle } from "../../fold-static";
+import { foldableApps, foldFrontendIntoBundle } from "../../fold-static";
+import { checkStaticSyntax, formatSyntaxErrors, type StaticSyntaxError } from "../../static-syntax-check";
 import { loadManifest, findBackendApp, formatAppAddress, resolveBackendPaths, selectDeployApp } from "../../manifest";
 import { findProjectRoot, requireProjectRoot } from "../../utils/project";
 import { withTempArchive } from "../../utils/temp-archive";
@@ -226,16 +247,22 @@ async function deployBundle(opts: {
     skipSchema?: boolean;
     /** Leave the static apps out of the backend bundle, as `rebase build --no-static` does. */
     noStatic?: boolean;
+    /** Parse the static apps' JavaScript before uploading. Default on; `--no-verify` off. */
+    verify: boolean;
     /** Follow the deployment to a terminal state. Default on; `--no-follow` off. */
     follow: boolean;
     /** Ceiling on the follow, in milliseconds. */
     timeoutMs: number;
+    /** How long to wait for the new version to answer, in milliseconds; 0 skips the check. */
+    liveTimeoutMs: number;
     /** Upload the project's source beside a backend bundle. Default on; `--no-source` off. */
     uploadSource: boolean;
     /** `--allow-downgrade`: deploy a bundle built on an older release than the project runs. */
     allowDowngrade: boolean;
     /** When the command started, for the `cli.deploy` event's duration. */
     startedAt: number;
+    /** `--preview`: serve this build on a preview address instead of production. */
+    preview?: PreviewRequest;
 }): Promise<void> {
     // Nothing here reads client/url/projectId/projectRef any more: everything
     // that needs them is reached through `uploadAndTrigger({ ...opts })`, which
@@ -305,6 +332,8 @@ async function deployBundle(opts: {
                 return;
             }
             bundleDir = staticDir;
+            if (opts.verify) verifyStaticOutput(projectRoot, [{ name: target.name,
+output: target.app.output }]);
             await uploadAndTrigger({ ...opts,
 projectRoot,
 bundleDir,
@@ -382,12 +411,58 @@ app: target.app as RebaseBackendAppConfig };
                     "Fix the frontend build, or pass --no-static to deploy the API alone."
                 );
             }
+            if (opts.verify) verifyStaticOutput(projectRoot, foldableApps(loaded.manifest).apps);
         }
     }
 
     await uploadAndTrigger({ ...opts,
 projectRoot,
 bundleDir });
+}
+
+/** Printed under a successful deploy: the way back, where it is needed. */
+export const ROLLBACK_HINT = "Something wrong? `rebase cloud rollback` puts the previous deployment back.";
+
+/**
+ * The same line for a static app deployed on its own. Its deployment records
+ * no bundle, so the control plane has nothing to roll back to (see the
+ * "Roll back" section of the cloud deployment docs). Pointing at
+ * `rollback` here would restore the backend instead, or refuse.
+ */
+export const STATIC_UNDO_HINT =
+    "Something wrong? A static app deployed on its own cannot be rolled back yet: deploy its last good version again.";
+
+/**
+ * Stop the deploy on a syntax error in a static app's output, before anything
+ * is uploaded. See `checkStaticSyntax`.
+ *
+ * A static app's files are served as they are, so a broken script that no
+ * bundler ever parsed went live and took the page down with it. Nothing on the
+ * way said so: the build "succeeded" by copying it, and the deploy succeeded
+ * by uploading it. `--no-verify` is the way past for a file the check gets
+ * wrong.
+ */
+export function verifyStaticOutput(projectRoot: string, apps: { name: string; output?: string }[]): void {
+    const errors: StaticSyntaxError[] = [];
+    let checked = 0;
+    for (const app of apps) {
+        if (!app.output) continue;
+        const dir = path.join(projectRoot, app.output);
+        if (!fs.existsSync(dir)) continue;
+        const report = checkStaticSyntax(dir, projectRoot);
+        checked += report.checked;
+        errors.push(...report.errors);
+    }
+    if (errors.length > 0) {
+        fail(
+            `${errors.length === 1 ? "A syntax error" : `${errors.length} syntax errors`} in the static output, `
+                + "so nothing was deployed:\n"
+                + formatSyntaxErrors(errors).map(line => `      ${line}`).join("\n"),
+            "Fix it and deploy again, or pass --no-verify to deploy anyway.",
+            "syntax_error"
+        );
+    }
+    if (checked > 0) progress(chalk.gray(`  Syntax-checked ${checked} script(s) in the static output.`));
 }
 
 /**
@@ -416,10 +491,13 @@ async function uploadAndTrigger(opts: {
     appName?: string;
     follow: boolean;
     timeoutMs: number;
+    liveTimeoutMs: number;
     uploadSource: boolean;
     allowDowngrade: boolean;
     /** When the command started, for the `cli.deploy` event's duration. */
     startedAt: number;
+    /** `--preview`: serve this build on a preview address instead of production. */
+    preview?: PreviewRequest;
 }): Promise<void> {
     const { client, url, projectId, projectRef, projectRoot, bundleDir } = opts;
     let manifest: ReturnType<typeof readBundleManifest>;
@@ -475,7 +553,9 @@ async function uploadAndTrigger(opts: {
     // result on this path is printed to stdout too.
     if (!isJsonMode()) {
         console.log("");
-        console.log(`  🚀 Triggering managed deployment for ${chalk.bold(projectRef)} (schema ${manifest.schemaVersion})...`);
+        console.log(opts.preview
+            ? `  🔍 Triggering a preview of ${chalk.bold(projectRef)}${opts.preview.name ? ` named ${chalk.bold(opts.preview.name)}` : ""} (schema ${manifest.schemaVersion}) — production is not touched...`
+            : `  🚀 Triggering managed deployment for ${chalk.bold(projectRef)} (schema ${manifest.schemaVersion})...`);
     }
 
     // Tell the platform about every app this repo declares, not only the one
@@ -488,7 +568,9 @@ async function uploadAndTrigger(opts: {
         // A project with no readable rebase.json still deploys; it just cannot
         // describe its other apps.
     }
-    const declaredApps = declaredAppsFrom(projectManifest);
+    // Not for a preview: registering the declared apps, and the hostnames
+    // they name, is a change to the production project.
+    const declaredApps = opts.preview ? [] : declaredAppsFrom(projectManifest);
 
     // The source this bundle was built from, so a platform upgrade can rebuild
     // it on a newer release. A backend only: a static app's bundle is its
@@ -496,7 +578,11 @@ async function uploadAndTrigger(opts: {
     // Best effort — see `prepareRebuildSource`, which warns and returns null
     // rather than fail a deploy over it.
     let rebuildSource: RebuildSource | null = null;
-    if (opts.uploadSource && manifest.kind !== "static" && await platformRebuildsOff(client, projectId)) {
+    if (opts.preview) {
+        // The stored source is what a platform upgrade rebuilds PRODUCTION
+        // from. A preview's source replacing it would ship the preview to
+        // production on the next rollout — nothing is uploaded for one.
+    } else if (opts.uploadSource && manifest.kind !== "static" && await platformRebuildsOff(client, projectId)) {
         // The owner turned platform rebuilds off: the platform keeps no copy
         // of this app's source, so none leaves the machine. Asked before
         // packing anything; the control plane refuses the upload regardless.
@@ -533,6 +619,11 @@ async function uploadAndTrigger(opts: {
         allowFrameworkDowngrade: opts.allowDowngrade
     });
 
+    if (opts.preview) {
+        await triggerAndFollowPreview({ ...opts, body, record });
+        return;
+    }
+
     let deploymentId: string;
     let managed: boolean;
     let hosts: DeployHost[] | undefined;
@@ -568,20 +659,22 @@ async function uploadAndTrigger(opts: {
     //
     // One rule now: `deploy` follows unless told not to. `--no-follow` is that
     // instruction and keeps the old shape for anyone who wants it.
+    const appsAt = (host: string | undefined): DeployedApp[] => bundleApps(manifest, host);
     if (!opts.follow) {
-        emit(
-            () => {
-                console.log(chalk.green(`  ✓ Managed deploy started (deployment ${deploymentId}).`));
-                console.log(chalk.gray("    Not following (--no-follow). Track it with `rebase cloud logs`."));
-                printPendingHosts(hosts);
-            },
-            { success: true,
+        await reportTriggered({
+            client,
+            url,
+            projectId,
+            deploymentId,
+            appsAt,
+            registeredHosts: hosts,
+            headline: `  ✓ Managed deploy started (deployment ${deploymentId}).`,
+            json: { success: true,
 deploymentId,
 managed,
 sourceUploaded: rebuildSource !== null,
-following: false,
-...(hosts ? { hosts } : {}) }
-        );
+following: false }
+        });
         await record(false, "not_followed");
         return;
     }
@@ -597,21 +690,209 @@ following: false,
         timeoutMs: opts.timeoutMs,
         projectId,
         url,
-        hosts,
+        announce: false,
+        failedApps: appsAt(undefined).map(a => a.name),
         onTerminal: (ended) => record(true, ended)
     });
     // The app is built now, so an unclaimed project's app can mint the key
     // `init` could not: see `mintMissingAppKey`. Never fails the deploy.
     const appKey = await mintMissingAppKey({ url, projectId, root: projectRoot });
     reportMintedAppKey(appKey);
-    emit(() => printPendingHosts(hosts), { success: true,
+    await reportDeployed({
+        undo: manifest.kind === "static" ? STATIC_UNDO_HINT : ROLLBACK_HINT,
+        client,
+        url,
+        projectId,
+        projectRef,
+        deploymentId,
+        startedAt: opts.startedAt,
+        liveTimeoutMs: opts.liveTimeoutMs,
+        appsAt,
+        registeredHosts: hosts,
+        json: { success: true,
 deploymentId,
 managed,
 sourceUploaded: rebuildSource !== null,
 following: true,
 status,
-...(hosts ? { hosts } : {}),
-...(appKey ? { appKey: appKeyPayload(appKey) } : {}) });
+...(appKey ? { appKey: appKeyPayload(appKey) } : {}) }
+    });
+}
+
+/**
+ * The end of a deploy that was followed to success: resolve where each app
+ * answers, check that the new version does, and print the summary — or, in
+ * JSON mode, the one object carrying the same facts.
+ *
+ * The object keeps every key it had and gains `project`, `apps`, `durationMs`,
+ * `live` and `liveChecks`; `hosts` lists the project's own host first.
+ */
+async function reportDeployed(o: {
+    client: CloudClient;
+    url: string;
+    projectId: string;
+    projectRef: string;
+    deploymentId: string;
+    startedAt: number;
+    liveTimeoutMs: number;
+    appsAt: (projectHost: string | undefined) => DeployedApp[];
+    registeredHosts: DeployHost[] | undefined;
+    /** How to undo this deploy, printed under the summary. */
+    undo?: string;
+    json: Record<string, unknown>;
+}): Promise<void> {
+    const host = await deployedUrl(o.client, { projectId: o.projectId, url: o.url });
+    const apps = o.appsAt(host);
+    const hosts = deployHosts(o.registeredHosts, host);
+
+    let live: LiveCheck[] | undefined;
+    if (o.liveTimeoutMs > 0) {
+        progress(chalk.gray("  Checking that the new version answers..."));
+        live = await checkLive(apps, { deploymentId: o.deploymentId, hosts, timeoutMs: o.liveTimeoutMs });
+    }
+    const verdict = liveVerdict(live, o.liveTimeoutMs);
+    const elapsedMs = Date.now() - o.startedAt;
+
+    emit(
+        () => {
+            const lines = deploySummaryLines({
+                projectRef: o.projectRef,
+                deploymentId: o.deploymentId,
+                elapsedMs,
+                apps,
+                live,
+                liveTimeoutMs: o.liveTimeoutMs
+            });
+            // The way back, under the verdict that says whether it is needed.
+            if (o.undo) lines.splice(lines.length - 1, 0, chalk.gray(`  ${o.undo}`));
+            for (const line of lines) console.log(line);
+            printPendingHosts(hosts);
+        },
+        { ...o.json,
+project: o.projectRef,
+apps,
+...hostsField(hosts, o.registeredHosts),
+durationMs: elapsedMs,
+live: verdict.live,
+liveChecks: live ?? [] }
+    );
+}
+
+/**
+ * The end of a `--no-follow` deploy: it was triggered, and here is where it
+ * will answer. No live check — nothing is waiting for it to finish.
+ */
+async function reportTriggered(o: {
+    client: CloudClient;
+    url: string;
+    projectId: string;
+    deploymentId: string;
+    appsAt: (projectHost: string | undefined) => DeployedApp[];
+    registeredHosts: DeployHost[] | undefined;
+    /** Printed first in human mode; empty for none. */
+    headline: string;
+    json: Record<string, unknown>;
+}): Promise<void> {
+    const host = await deployedUrl(o.client, { projectId: o.projectId, url: o.url });
+    const apps = o.appsAt(host);
+    const hosts = deployHosts(o.registeredHosts, host);
+    emit(
+        () => {
+            if (o.headline) console.log(chalk.green(o.headline));
+            console.log(chalk.gray("    Not following (--no-follow). Track it with `rebase cloud logs`."));
+            const addressed = apps.filter(a => a.url);
+            if (addressed.length > 0) {
+                console.log(chalk.gray("    When it finishes it will answer at:"));
+                for (const app of addressed) console.log(`      ${app.name}  ${chalk.cyan(app.url ?? "")}`);
+            }
+            console.log("");
+            printPendingHosts(hosts);
+        },
+        { ...o.json,
+apps,
+...hostsField(hosts, o.registeredHosts),
+live: null }
+    );
+}
+
+/**
+ * `hosts` for the JSON result, or no field at all when there is nothing to say:
+ * a control plane that predates the field and a project host that could not be
+ * resolved. An empty list would claim the deploy looked and found none.
+ */
+function hostsField(hosts: DeployHost[], registered: DeployHost[] | undefined): { hosts?: DeployHost[] } {
+    return hosts.length > 0 || registered !== undefined ? { hosts } : {};
+}
+
+/** What `--preview` and `--preview-name` asked for. */
+export interface PreviewRequest {
+    /** A stable name, so later deploys update the same address; absent, the control plane picks one. */
+    name?: string;
+}
+
+/**
+ * `--preview` / `--preview-name <name>` off the parsed flags, or undefined for
+ * a production deploy. A name alone is a preview: nobody names a production
+ * deploy's address.
+ */
+export function resolvePreviewRequest(flags: { "--preview"?: boolean; "--preview-name"?: string }): PreviewRequest | undefined {
+    if (flags["--preview-name"] !== undefined) return { name: normalizePreviewName(flags["--preview-name"]) };
+    return flags["--preview"] === true ? {} : undefined;
+}
+
+/**
+ * The tail of a preview deploy: trigger it through `previews`, follow its
+ * build, and report the preview's address rather than production's.
+ */
+async function triggerAndFollowPreview(opts: {
+    client: CloudClient;
+    projectId: string;
+    url: string;
+    follow: boolean;
+    timeoutMs: number;
+    preview?: PreviewRequest;
+    body: Record<string, unknown>;
+    record: (followed: boolean, status: string) => Promise<void>;
+}): Promise<void> {
+    const { client, projectId } = opts;
+    const { deploymentId, preview } = await triggerPreview(
+        client,
+        projectId,
+        { ...opts.body, preview: opts.preview?.name ? { name: opts.preview.name } : {} },
+        (e) => {
+            const refusal = intakeRefusal(e);
+            if (refusal) fail(refusal.message, refusal.hint, refusal.code);
+        }
+    );
+
+    if (!opts.follow) {
+        emit(
+            () => {
+                console.log(chalk.green(`  ✓ Preview deploy started (deployment ${deploymentId}).`));
+                for (const line of previewLines(preview)) console.log(`    ${line}`);
+                console.log(chalk.gray("    Not following (--no-follow). Track it with `rebase cloud previews`."));
+            },
+            { success: true, deploymentId, following: false, preview }
+        );
+        await opts.record(false, "not_followed");
+        return;
+    }
+
+    if (!isJsonMode()) {
+        console.log(chalk.green(`  ✓ Preview deploy started (deployment ${deploymentId}).`));
+        console.log(chalk.gray("    Streaming build logs (Ctrl-C to stop watching — the build keeps running):"));
+        console.log("");
+    }
+    const { status } = await streamBuildLogs(client, deploymentId, {
+        quiet: isJsonMode(),
+        timeoutMs: opts.timeoutMs,
+        projectId,
+        url: opts.url,
+        collection: PREVIEW_DEPLOYMENTS_COLLECTION,
+        preview,
+        onTerminal: (ended) => opts.record(true, ended)
+    });
+    emit(() => {}, { success: true, deploymentId, following: true, status, preview });
 }
 
 /**
@@ -1116,6 +1397,9 @@ export const DEPLOY_FLAGS = {
        was a hardcoded 15 minutes, which is the wrong number for a CI step and
        for an overnight build alike. */
     "--timeout": String,
+    /* Seconds. How long a followed deploy waits, after the build succeeds, for
+       each app's address to answer with the new version; 0 skips the check. */
+    "--live-timeout": String,
     "--source": String,
     "--message": String,
     "--bundle": Boolean,
@@ -1130,6 +1414,11 @@ export const DEPLOY_FLAGS = {
        for one that is hand-maintained. */
     "--no-static": Boolean,
     "--skip-schema": Boolean,
+    /* Skip parsing the static apps' JavaScript before the upload. The check
+       exists because a static app's files are served as they are: a syntax
+       error nothing parsed went live and took the page down. This is the way
+       past it for a file the check gets wrong. */
+    "--no-verify": Boolean,
     /* Leave the managed runtime on purpose. The ONLY way to build a container
        image for a project the platform runs as managed — for the bare form and
        for `--source` alike, because neither of those says so by itself. See
@@ -1148,6 +1437,12 @@ export const DEPLOY_FLAGS = {
        runs. The control plane refuses that by default (FRAMEWORK_DOWNGRADE),
        because it is usually a stale checkout, not a decision. */
     "--allow-downgrade": Boolean,
+    /* Serve this build on an address of its own and leave production alone.
+       A bundle deploy only — static apps and managed backends. See previews.ts. */
+    "--preview": Boolean,
+    /* Name the preview, so the next `--preview-name` deploy with the same name
+       updates the same address. Implies `--preview`. */
+    "--preview-name": String,
     "-m": "--message"
 } as const;
 
@@ -1221,6 +1516,13 @@ export async function deployCommand(rawArgs: string[], projectRef: string): Prom
     const startedAt = Date.now();
     const { flags: args, appName } = resolveDeployArgs(rawArgs);
 
+    // A piped deploy printed JSON until it was made to print its summary (see
+    // `initOutputMode`). A script that parsed it now gets prose, so it is told,
+    // on stderr, how to get the object back.
+    if (!isJsonMode() && process.stdout.isTTY !== true) {
+        note(chalk.gray("Printing the deploy summary. For the machine-readable result, pass --json."));
+    }
+
     // Refused rather than resolved in one direction or the other: they are
     // opposite instructions, and either interpretation makes the command do
     // something the line explicitly asked it not to.
@@ -1237,6 +1539,26 @@ export async function deployCommand(rawArgs: string[], projectRef: string): Prom
             "`--source <path>` builds a container image from a directory; `--no-source` skips uploading the source "
                 + "beside a managed bundle. Pass one.",
             "usage"
+        );
+    }
+
+    // A preview is a bundle deploy aimed at another address. The container
+    // build has no preview to aim at, and `--eject` changes the production
+    // project by definition — refused before anything is resolved or built.
+    const preview = resolvePreviewRequest(args);
+    if (preview && (args["--source"] || args["--eject"])) {
+        fail(
+            `--preview cannot be combined with ${args["--source"] ? "--source" : "--eject"}: a preview is built from a managed bundle, `
+                + "and that flag builds a container image for production.",
+            "Drop it to deploy a preview, or drop --preview to deploy production.",
+            "usage"
+        );
+    }
+    if (preview && !args["--bundle"] && !declaresManagedRuntime(appName)) {
+        fail(
+            "Previews are built from managed bundles, and this app builds a container image.",
+            "Preview a static app by name (`rebase cloud deploy <app> --preview`), or declare `runtime: \"managed\"` on the backend in rebase.json.",
+            "preview_unsupported"
         );
     }
 
@@ -1287,11 +1609,14 @@ export async function deployCommand(rawArgs: string[], projectRef: string): Prom
             skipTypeCheck: args["--skip-type-check"] === true,
             skipSchema: args["--skip-schema"] === true,
             noStatic: args["--no-static"] === true,
+            verify: args["--no-verify"] !== true,
             follow: args["--no-follow"] !== true,
             timeoutMs: resolveDeployTimeout(args["--timeout"]),
+            liveTimeoutMs: resolveLiveTimeout(args["--live-timeout"]),
             uploadSource: args["--no-source"] !== true,
             allowDowngrade: args["--allow-downgrade"] === true,
-            startedAt
+            startedAt,
+            preview
         });
         return;
     }
@@ -1389,20 +1714,22 @@ hosts: deployHostsFrom(res) };
         );
     }
 
+    const appsAt = (host: string | undefined): DeployedApp[] => sourceBuildApps(sourceBuildAppName(), host);
     if (args["--no-follow"]) {
-        emit(
-            () => {
-                console.log(chalk.gray("  Not following logs (--no-follow). Check status with `rebase cloud logs`."));
-                console.log("");
-                printPendingHosts(hosts);
-            },
-            { deploymentId,
+        await reportTriggered({
+            client,
+            url,
+            projectId,
+            deploymentId,
+            appsAt,
+            registeredHosts: hosts,
+            headline: "",
+            json: { deploymentId,
 deduplicated,
 frameworkVersion: frameworkVersion ?? null,
 following: false,
-...(hosts ? { hosts } : {}),
 ...warningPayload(warnings) }
-        );
+        });
         await recordDeploy({ followed: false, status: "not_followed", deduplicated, frameworkVersion, startedAt });
         return;
     }
@@ -1425,22 +1752,62 @@ following: false,
         timeoutMs: resolveDeployTimeout(args["--timeout"]),
         projectId,
         url,
-        hosts,
+        announce: false,
+        failedApps: appsAt(undefined).map(a => a.name),
         onTerminal: (ended) => recordDeploy({ followed: true, status: ended, deduplicated, frameworkVersion, startedAt })
     });
     const appKey = await mintMissingAppKey({ url, projectId });
     reportMintedAppKey(appKey);
-    emit(
-        () => printPendingHosts(hosts),
-        { deploymentId,
+    await reportDeployed({
+        undo: ROLLBACK_HINT,
+        client,
+        url,
+        projectId,
+        projectRef,
+        deploymentId,
+        startedAt,
+        liveTimeoutMs: resolveLiveTimeout(args["--live-timeout"]),
+        appsAt,
+        registeredHosts: hosts,
+        json: { deploymentId,
 deduplicated,
 frameworkVersion: frameworkVersion ?? null,
 following: true,
 status,
-...(hosts ? { hosts } : {}),
 ...(appKey ? { appKey: appKeyPayload(appKey) } : {}),
 ...warningPayload(warnings) }
-    );
+    });
+}
+
+/** The backend this repository declares, for naming a source build in its summary. */
+function sourceBuildAppName(): string | undefined {
+    try {
+        const projectRoot = findProjectRoot();
+        return projectRoot ? findBackendApp(loadManifest(projectRoot).manifest)?.name : undefined;
+    } catch {
+        return undefined;
+    }
+}
+
+/**
+ * `--live-timeout <seconds>`: how long a deploy waits for the new version to
+ * answer before saying it could not confirm it. `0` skips the check. Default 60.
+ *
+ * Its own reader rather than `resolveTimeoutMs`, which refuses 0 — right for a
+ * follow, where 0 would mean "give up at once", and wrong here, where it is the
+ * documented way to say "do not check".
+ */
+export function resolveLiveTimeout(value: string | undefined): number {
+    if (value === undefined) return DEFAULT_LIVE_TIMEOUT_MS;
+    const seconds = Number(value);
+    if (!Number.isFinite(seconds) || seconds < 0) {
+        fail(
+            `--live-timeout takes a number of seconds, or 0 to skip the check (got "${value}").`,
+            "Run `rebase cloud deploy --help`.",
+            "usage"
+        );
+    }
+    return seconds * 1000;
 }
 
 /** `--timeout <seconds>` for a deploy, or the 15-minute default. */
@@ -1649,17 +2016,35 @@ async function streamBuildLogs(
         projectId?: string;
         url?: string;
         /**
-         * The hostnames the deploy response named. The verified ones are
-         * printed under the project's own URL on success: an app on a hostname
-         * of its own is not at the project URL, and that address is the one the
-         * person who deployed it is looking for.
+         * Print "Deployment succeeded" and the URL on success. On by default
+         * (`cloud logs --follow`); `deploy` turns it off and prints its own
+         * summary instead, which says the same and more.
          */
-        hosts?: DeployHost[];
+        announce?: boolean;
+        /** The apps this deployment ships, named in the one-line failure. */
+        failedApps?: string[];
         /**
          * Called once with the state the follow ended in (a terminal status, or
          * `timeout`) before anything else happens, a non-zero exit included.
          */
         onTerminal?: (status: string) => Promise<void>;
+        /**
+         * How to undo this deploy, printed under the verdict when it succeeded.
+         * A deploy that has just gone live is the moment somebody finds out it
+         * should not have, and "how do I go back" was a question with no answer
+         * in sight.
+         */
+        undo?: string;
+        /**
+         * Where the deployment row lives: `deployments`, or a preview's
+         * `preview-deployments`. See `PREVIEW_DEPLOYMENTS_COLLECTION`.
+         */
+        collection?: string;
+        /**
+         * A preview being followed. Its address is printed on success instead
+         * of the project's, which is production's and did not change.
+         */
+        preview?: Preview;
     } = {}
 ): Promise<{ status: string; logs: string }> {
     const quiet = opts.quiet === true;
@@ -1682,7 +2067,7 @@ async function streamBuildLogs(
     for (;;) {
         let dep: Deployment | undefined;
         try {
-            dep = (await client.data.collection("deployments").findById(deploymentId)) as Deployment | undefined;
+            dep = (await client.data.collection(opts.collection ?? "deployments").findById(deploymentId)) as Deployment | undefined;
             unreadableSince = undefined;
         } catch (e) {
             // A read that failed says nothing about the build. A control plane
@@ -1714,27 +2099,42 @@ async function streamBuildLogs(
         if (dep.status && dep.status !== "deploying") {
             await opts.onTerminal?.(dep.status);
             if (dep.status !== "success") {
+                const logs = withoutHeartbeat(dep.logs ?? "");
+                const line = failureLine({ apps: opts.failedApps ?? [], status: dep.status, deploymentId, logs });
                 if (quiet) {
                     // The failure still has to be reportable, and in JSON mode
                     // the build log is the only place that says why.
                     printJson({
                         error: {
-                            message: `Deployment ${deploymentId} ${dep.status}.`,
+                            message: line,
                             code: "deploy_failed",
                             status: null,
                             deploymentId,
-                            logs: withoutHeartbeat(dep.logs ?? "")
+                            apps: opts.failedApps ?? [],
+                            reason: failureReason(logs) ?? null,
+                            hint: failureHint(deploymentId),
+                            logs
                         }
                     });
                     process.exit(1);
                 }
+                // One line that says which app and why, under the log it came
+                // from — a person scrolling up through a build log to find the
+                // reason was the whole failure report before.
                 console.log("");
-                console.log(chalk.bold.red(`  ✗ Deployment ${dep.status}`));
+                console.log(chalk.bold.red(`  ✗ ${line}`));
+                console.log(chalk.gray(`    ${failureHint(deploymentId)}`));
                 console.log("");
                 process.exit(1);
             }
-            if (!quiet) {
+            if (!quiet && opts.announce !== false) {
                 console.log("");
+                if (opts.preview) {
+                    console.log(chalk.bold.green("  ✓ Preview deployed"));
+                    for (const line of previewLines(opts.preview)) console.log(`  ${line}`);
+                    console.log("");
+                    return { status: dep.status, logs: withoutHeartbeat(dep.logs ?? "") };
+                }
                 console.log(chalk.bold.green("  ✓ Deployment succeeded"));
                 // The URL. A deploy that says only "succeeded" leaves the one
                 // thing the whole command was for — the address the app now
@@ -1746,9 +2146,7 @@ async function streamBuildLogs(
                 // host is worse than none.
                 const url = await deployedUrl(client, opts);
                 if (url) console.log(`  ${chalk.cyan(`https://${url}`)}`);
-                for (const { host } of (opts.hosts ?? []).filter(h => h.status === "verified")) {
-                    if (host !== url) console.log(`  ${chalk.cyan(`https://${host}`)}`);
-                }
+                if (opts.undo) console.log(chalk.gray(`  ${opts.undo}`));
                 console.log("");
             }
             return { status: dep.status, logs: withoutHeartbeat(dep.logs ?? "") };

@@ -1,6 +1,7 @@
 #!/usr/bin/env node
-import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
-import { dirname, join } from "node:path";
+import { spawn } from "node:child_process";
+import { existsSync, readdirSync, readFileSync, realpathSync, statSync } from "node:fs";
+import { dirname, isAbsolute, join, relative, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -28,6 +29,100 @@ const paint = (code, text) => (useColor ? `\x1b[${code}m${text}\x1b[0m` : text);
 const red = (text) => paint(31, text);
 const yellow = (text) => paint(33, text);
 const dim = (text) => paint(90, text);
+
+/**
+ * Run the project's own CLI when this one is a checkout and the project has one.
+ *
+ * The global `rebase` on a CLI developer's machine is a link to a checkout of
+ * this repo, so a bare `rebase cloud deploy` typed in a customer project ran
+ * the checkout's `dist/` — 280h older than its source, on the machine it was
+ * found on — and not the `@rebasepro/cli` 0.25.1 that project had pinned. Only
+ * `pnpm rebase` used the pinned one. Nothing said so, and a deploy is the
+ * command where the version matters most.
+ *
+ * So, as jest, webpack-cli and gulp do, a checkout hands off to the CLI the project
+ * installed: same argv, same stdio, its exit code. A note naming both versions
+ * was the alternative; it leaves the wrong CLI running and trains people to
+ * skim past a line on stderr. The project's pin is the answer to "which CLI",
+ * and a source checkout is never the release anyone pinned.
+ *
+ * Only a checkout hands off. An install runs itself, which is also what keeps
+ * this from looping: the CLI handed to is always an install. A project whose
+ * `@rebasepro/cli` resolves to a checkout (a workspace or `link:` dependency,
+ * as in this repo's own apps and end-to-end suites) is already running the
+ * build it asked for. `REBASE_CLI_DEV=1` runs the checkout anyway, for testing
+ * a dev build against a project elsewhere.
+ */
+function isInstalled(dir) {
+    return dir.split(sep).includes("node_modules");
+}
+
+function projectCli() {
+    const packageDir = realpathSync(join(here, ".."));
+    if (isInstalled(packageDir) || parseFlag(process.env.REBASE_CLI_DEV)) return null;
+
+    // Node's own lookup: the nearest `node_modules` up from where it was run.
+    let dir = process.cwd();
+    while (!existsSync(join(dir, "node_modules", "@rebasepro", "cli", "package.json"))) {
+        const parent = dirname(dir);
+        if (parent === dir) return null;
+        dir = parent;
+    }
+
+    const installed = realpathSync(join(dir, "node_modules", "@rebasepro", "cli"));
+    if (installed === packageDir || !isInstalled(installed)) return null;
+
+    const manifest = JSON.parse(readFileSync(join(installed, "package.json"), "utf8"));
+    const binPath = typeof manifest.bin === "string" ? manifest.bin : manifest.bin?.rebase;
+    if (typeof binPath !== "string" || !existsSync(join(installed, binPath))) return null;
+    return { bin: join(installed, binPath),
+version: manifest.version,
+packageDir };
+}
+
+function handOff({ bin, version, packageDir }) {
+    if (process.argv.includes("--debug") || parseFlag(process.env.REBASE_DEBUG)) {
+        process.stderr.write(dim(
+            `rebase CLI: running this project's @rebasepro/cli ${version} (${bin}) ` +
+            `instead of ${packageDir}. REBASE_CLI_DEV=1 runs that one.`
+        ) + "\n");
+    }
+
+    const child = spawn(process.execPath, [...process.execArgv, bin, ...process.argv.slice(2)], { stdio: "inherit" });
+
+    // Ctrl+C and a closed terminal reach the child through the process group,
+    // so this process only has to outlive it. A `kill` names this pid alone.
+    const stayUp = () => { /* the child decides */ };
+    const forward = (signal) => child.kill(signal);
+    process.on("SIGINT", stayUp);
+    process.on("SIGHUP", stayUp);
+    process.on("SIGTERM", forward);
+
+    return new Promise(() => {
+        child.on("error", (error) => {
+            process.stderr.write(`${red(`✗ rebase CLI: could not start ${bin}: ${error.message}`)}\n`);
+            process.exit(1);
+        });
+        child.on("exit", (code, signal) => {
+            if (signal) {
+                process.off("SIGINT", stayUp);
+                process.off("SIGHUP", stayUp);
+                process.off("SIGTERM", forward);
+                process.kill(process.pid, signal);
+                return;
+            }
+            process.exit(code ?? 1);
+        });
+    });
+}
+
+let local = null;
+try {
+    local = projectCli();
+} catch {
+    // Looking for another CLI must never stop this one from running.
+}
+if (local) await handOff(local);
 
 /**
  * Refuse to run on a Node older than this CLI's own floor, before anything else.
@@ -95,8 +190,8 @@ assertNodeFloor();
  * the command works, it just silently lacks the subcommand you added, which
  * reads as "my change did nothing" rather than "you forgot to build".
  *
- * Development-only by construction: `src/` is not in the published `files`
- * list, so this is skipped entirely for installed copies.
+ * Development-only, and only for the person developing it — see
+ * `isCliDevelopment`.
  *
  * Writes to **stderr**. Agents parse stdout as JSON under `--json`, and a
  * warning there would corrupt the one guarantee those commands make.
@@ -118,8 +213,52 @@ function newestMtimeMs(dir, deadline) {
     return newest;
 }
 
+/**
+ * Whether the person running this is working on the CLI, which is the only
+ * person a stale build means anything to.
+ *
+ * `src/` alone did not say so. A published install has none — `files` leaves it
+ * out — but the global `rebase` on a CLI developer's machine is usually linked
+ * to the checkout, so a bare `rebase cloud deploy` typed in a customer project
+ * resolved to the monorepo's `bin/` and printed "dist/ is 159h older than src/"
+ * on every run. That project had pinned its own `@rebasepro/cli` 0.25.1, did not
+ * contain the source being compared, and could do nothing about it.
+ *
+ * So the warning needs all of:
+ * - the package is not under `node_modules` — anything there is an install,
+ *   whatever files it happens to carry;
+ * - it sits in a pnpm workspace, which is what a checkout of this repo is;
+ * - the command was run from inside that workspace (a worktree under it
+ *   counts), or `REBASE_CLI_DEV` is set, for testing a dev build against a
+ *   project elsewhere.
+ */
+function isCliDevelopment() {
+    const packageDir = realpathSync(join(here, ".."));
+    if (packageDir.split(sep).includes("node_modules")) return false;
+
+    let root = packageDir;
+    while (!existsSync(join(root, "pnpm-workspace.yaml"))) {
+        const parent = dirname(root);
+        if (parent === root) return false;
+        root = parent;
+    }
+
+    if (parseFlag(process.env.REBASE_CLI_DEV)) return true;
+    const fromRoot = relative(root, realpathSync(process.cwd()));
+    return !fromRoot.startsWith("..") && !isAbsolute(fromRoot);
+}
+
+/**
+ * `parseEnvBoolean` from `@rebasepro/types`, which cannot be imported yet: this
+ * runs before the bundle, and in a fresh clone that package is not built either.
+ */
+function parseFlag(value) {
+    return value !== undefined && /^(1|true|yes|on)$/i.test(value.trim());
+}
+
 function warnIfStale() {
     if (!existsSync(srcDir) || !existsSync(distEntry)) return;
+    if (!isCliDevelopment()) return;
     const builtAt = statSync(distEntry).mtimeMs;
     const editedAt = newestMtimeMs(srcDir, Date.now() + 150);
     // A couple of seconds of slack: a build writes dist while src is being

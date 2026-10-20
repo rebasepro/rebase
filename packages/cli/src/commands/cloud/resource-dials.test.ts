@@ -39,7 +39,15 @@ describe("buildDialPatch", () => {
         // and with the restarts it explicitly declined.
         expect(buildDialPatch(["set", "--spot", "false"]).patch.preemptible).toBe(false);
         expect(buildDialPatch(["set", "--spot", "true"]).patch.preemptible).toBe(true);
-        expect(buildDialPatch(["set", "--scale-to-zero", "true"]).patch.scaleToZero).toBe(true);
+    });
+
+    it("refuses the retired --scale-to-zero true, and drops false with a warning", () => {
+        // The dial never did anything: every backend runs as an always-on pod.
+        expect(buildDialPatch(["set", "--scale-to-zero", "true"]).error).toMatch(/not available/);
+        const off = buildDialPatch(["set", "--scale-to-zero", "false", "--cpu", "500m"]);
+        expect(off.error).toBeUndefined();
+        expect(off.patch).toEqual({ cpu: "500m" });
+        expect(buildDialPatch(["set", "--scale-to-zero"]).error).toMatch(/needs a value/);
     });
 
     it("refuses a yes/no dial given anything else", () => {

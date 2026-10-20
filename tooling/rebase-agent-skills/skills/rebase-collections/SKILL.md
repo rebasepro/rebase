@@ -666,17 +666,34 @@ Rules that keep the result clean:
   collection still has to read well as one column.
 
 ```typescript
-properties: {
-    name:      { name: "Name", type: "string" },                                  // 4
-    subdomain: { name: "Subdomain", type: "string" },                             // 4 — a URL part, not a pair for Name
-    provider:  { name: "Cloud provider", type: "string", enum: providers, admin: { span: 2 } },
-    region:    { name: "Cloud region", type: "string", admin: { span: 2 } },      // provider + region read together
-    startsAt:  { name: "Starts", type: "date", admin: { span: 2 } },
-    endsAt:    { name: "Ends", type: "date", admin: { span: 2 } },
-    seats:     { name: "Seats", type: "number", admin: { span: 1 } },
-    active:    { name: "Active", type: "boolean", admin: { span: 1 } },
-    plan:      { name: "Plan", type: "string", enum: plans, admin: { span: 2 } },
-}
+import { defineCollection } from "@rebasepro/cms-types";
+
+const projectsCollection = defineCollection({
+    slug: "projects",
+    table: "projects",
+    name: "Projects",
+    properties: {
+        name: { name: "Name", type: "string" },               // 4
+        subdomain: { name: "Subdomain", type: "string" },     // 4: a URL part, not a pair for Name
+        provider: {
+            name: "Cloud provider",
+            type: "string",
+            enum: { gcp: "Google Cloud", aws: "AWS" },
+            admin: { span: 2 }
+        },
+        region: { name: "Cloud region", type: "string", admin: { span: 2 } }, // read with provider
+        startsAt: { name: "Starts", type: "date", admin: { span: 2 } },
+        endsAt: { name: "Ends", type: "date", admin: { span: 2 } },
+        seats: { name: "Seats", type: "number", admin: { span: 1 } },
+        active: { name: "Active", type: "boolean", admin: { span: 1 } },
+        plan: {
+            name: "Plan",
+            type: "string",
+            enum: { team: "Team", business: "Business" },
+            admin: { span: 2 }
+        }
+    }
+});
 ```
 
 Reach for `admin.form` to group and move fields:

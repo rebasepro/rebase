@@ -55,18 +55,18 @@ function runtimeProvided(file) {
  * Packages the two lists must agree about, out of everything they name.
  *
  * The lists mean different things and legitimately differ. `bundle.ts` names
- * what a bundle must NOT install; `entrypoint.mjs` names what to collapse onto
- * the image's copy when the bundle installed it anyway. `hono`, `tsx` and
- * `typescript` are in the first and not the second because the bundle never
- * carries them — the image supplies them by being the tree the bundle sits in,
- * so there is nothing to collapse.
+ * what a bundle must NOT install; `entrypoint.mjs` names what to link in from
+ * the image. `tsx` and `typescript` are in the first and not the second: they
+ * are build tools, nothing a deployed function imports, and the image does not
+ * ship them.
  *
- * What must agree is everything a project can install for itself and then load
- * a second copy of: every `@rebasepro/*` package, and `zod`. Comparing the raw
- * lists would fail on the legitimate difference; comparing only `@rebasepro/*`
- * is what let `zod` diverge for four releases.
+ * `hono` used to be excused the same way, on the grounds that the image
+ * "supplies it by being the tree the bundle sits in". It does not: the bundle
+ * is /bundle and the image's modules are /app/node_modules, so a function's
+ * `import { Hono } from "hono"` resolved to nothing and the function never
+ * loaded. Every runtime package a function can import must agree.
  */
-const ALSO_DEDUPED = ["zod"];
+const ALSO_DEDUPED = ["zod", "hono", "@hono/node-server"];
 const mustAgree = names => names.filter(n => n.startsWith("@rebasepro/") || ALSO_DEDUPED.includes(n));
 
 const fromBundler = runtimeProvided("packages/cli/src/bundle.ts");

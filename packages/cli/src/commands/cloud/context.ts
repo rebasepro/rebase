@@ -884,6 +884,12 @@ permissive: true });
      • `REBASE_JSON=1` is set, or
      • stdout is not a TTY (piped/redirected — i.e. a program is reading it).
 
+   One exception to the last rule: `cloud deploy` stays human when piped, and is
+   JSON only on `--json` or `REBASE_JSON=1`. Its reader is nearly always a person,
+   often watching through an agent that pipes everything — and what they need
+   from it (the URL, whether the new version is live) was buried in an object
+   they never asked for. See `initOutputMode`'s `whenPiped`.
+
    In JSON mode a command prints exactly one JSON value to stdout and nothing
    else; errors print `{"error":{...}}` and exit non-zero. The mode is a
    process-global set once, at dispatch, by `initOutputMode` — every helper here
@@ -919,7 +925,18 @@ let JSON_MODE = false;
  * `cloudCommand`, before anything can print or `fail`. Returns the resolved mode
  * (handy for tests, which otherwise leave it at its `false` default).
  */
-export function initOutputMode(rawArgs: string[]): boolean {
+export function initOutputMode(
+    rawArgs: string[],
+    opts: {
+        /**
+         * What a piped run with no explicit choice gets. `json` for the family.
+         * `human` for a command whose output a person needs to read even when a
+         * program is relaying it — `cloud deploy`, whose JSON told an agent's
+         * user neither where the app was nor whether it was live.
+         */
+        whenPiped?: "json" | "human";
+    } = {}
+): boolean {
     const parsed = arg({ "--json": Boolean }, { argv: rawArgs.slice(2),
 permissive: true });
     // Most explicit wins. `REBASE_JSON=0` is the half that was missing: the
@@ -930,7 +947,8 @@ permissive: true });
     // through to the TTY test and set it anyway. Any spelling of yes or no now
     // decides; only an unset or unrecognised value leaves it to the TTY.
     if (parsed["--json"]) JSON_MODE = true;
-    else JSON_MODE = parseEnvBoolean(process.env.REBASE_JSON) ?? process.stdout.isTTY !== true;
+    else JSON_MODE = parseEnvBoolean(process.env.REBASE_JSON)
+        ?? (opts.whenPiped === "human" ? false : process.stdout.isTTY !== true);
     return JSON_MODE;
 }
 

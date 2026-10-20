@@ -85,6 +85,35 @@ bundle`), builds the app into `dist-bundle`, uploads the bundle, runs it on the
 published runtime image, and follows the deployment to a terminal state. The exit
 code is the verdict, so the same line works unattended in CI.
 
+It ends by saying where each app now answers and whether the new version is
+live there:
+
+```text
+  ✓ Deployed songbuzz in 1m 12s  (deployment fb3c7442-9937-4179-8d3c-88a106da149d)
+
+    game     static   https://songbuzz.rebase.website      live
+    backend  backend  https://songbuzz.rebase.website/api  live
+
+  ✓ Live: the new version answers on every address above.
+```
+
+"Live" means the address answered after the build: a backend's `/api/health`
+returned `ok`, and a static app's page loaded (from this deployment, when the
+platform serves it). The check waits up to `--live-timeout` seconds, 60 by
+default; `0` skips it. If an app does not answer in time the deploy still exits
+zero, because the deployment succeeded, and the last line says which app did not
+answer and why. A failed deploy ends on one line instead, naming the app and the
+reason, with `rebase cloud logs` for the full build log.
+
+Scripts pass `--json` for one object carrying the same facts — `apps`, `hosts`,
+`live`, `liveChecks`, `durationMs` and the deployment id. Unlike the rest of
+`rebase cloud`, `deploy` does not switch to JSON on its own when piped.
+
+What that runtime allows — packages and native modules, memory and instances,
+timeouts and body sizes, the filesystem, secrets, storage and outbound
+network — is on its own page:
+[Managed backend runtime](/docs/deployment/managed-runtime/).
+
 To ship an artefact that was built earlier — a CI job that builds once and
 deploys twice, say — point at the directory instead of rebuilding:
 
@@ -100,6 +129,31 @@ least reversible thing the CLI can do under the same word as "overwrite this
 file"; it is an unknown option now rather than an alias, so a script carrying it
 stops instead.
 
+### The syntax check before the upload
+
+A static app's files are served exactly as they are. When its `build` only
+copies hand-written scripts into `output`, nothing has parsed them, and a file
+with a typo in it goes live and stops the page from loading. So before anything
+is uploaded, `deploy` parses every `.js`, `.mjs` and `.cjs` file in each static
+app's `output`, along with every inline `<script>` in its `.html` files. That
+covers a static app deployed on its own and static apps folded into the
+backend's bundle. A syntax error stops the deploy with the file, line and column:
+
+```
+✗ A syntax error in the static output, so nothing was deployed:
+    web/cloud.js:42:23  Unexpected token
+        42 |     return fetch("/api";
+Fix it and deploy again, or pass --no-verify to deploy anyway.
+```
+
+With `--json` the error's `code` is `syntax_error`. Inline scripts a browser
+does not run as JavaScript are skipped: JSON, import maps, templates and any
+other non-JavaScript `type`, a `<script src>`, and a script that still holds
+unrendered template markup such as `{{ }}`. A `.js` file passes if it parses as
+either a classic script or a module, because the page decides which. Nothing
+under `node_modules` is read, and neither is a prebuilt `--bundle-dir`.
+`--no-verify` skips the check for one deploy.
+
 Watch it:
 
 ```bash
@@ -111,6 +165,50 @@ rebase cloud status          # what the platform thinks the project is doing
 `status` reports `blockedOn` and `nextAction`. When `blockedOn` is `null` the
 platform is genuinely working and polling is the right thing to do; when it names
 something, that something is waiting for you.
+
+## Preview a change
+
+<span class="since-badge" data-since="0.26">Since 0.26</span>
+
+```bash
+rebase cloud deploy --preview
+```
+
+This builds and uploads exactly what `deploy` would, but serves it at an address
+of its own, such as `https://shop--k3x9ab.rebase.website`. Production keeps
+serving what it served before. The deploy prints the preview's address when the
+build finishes.
+
+To keep one address across deploys, name the preview. Deploying the same name
+again updates it:
+
+```bash
+rebase cloud deploy --preview-name new-checkout
+```
+
+What a preview talks to depends on what you deployed:
+
+- **`rebase cloud deploy web --preview`** previews one static app. Its pages call
+  the **production** backend: a sign-in there is a real session, and anything
+  written there is production data.
+- **`rebase cloud deploy --preview`** previews the backend, with its static apps
+  folded in, the same way production runs them. It gets a backend of its own on
+  an **empty database of its own**, never production's. Booting against
+  production's database would apply the preview's schema and access rules to it.
+
+A preview uploads no source and registers no apps or hostnames, because each of
+those would change the production project. `--source` and `--eject` cannot be
+combined with `--preview`. Each builds a container image for production.
+
+```bash
+rebase cloud previews                      # name, address, app, backend, expiry
+rebase cloud previews delete new-checkout  # stops serving it and drops its database
+```
+
+A preview expires a week after it was last deployed to.
+
+Previews are rolling out. A control plane that does not serve them yet refuses
+`--preview` with `previews_unavailable` and deploys nothing.
 
 ## Roll back
 
@@ -131,6 +229,15 @@ work:
 | `rebase cloud deploy` (a source build) | The image that build published |
 | `rebase cloud deploy --bundle` (the platform runtime) | The bundle that deploy shipped, on the runtime version the project is running now |
 
+Static apps folded into the backend's bundle (a plain `rebase cloud deploy` on a
+project with a backend) are part of that bundle, so they roll back with it.
+
+A static app deployed on its own (`rebase cloud deploy <app>`) cannot be rolled
+back yet. Its deployment records which app it published, but no bundle, so the
+control plane has nothing to restore it from. The fix is to deploy the last good
+version again, for example from the commit before the bad one. After such a
+deploy, `deploy` says this instead of pointing at `rollback`.
+
 So a rollback needs a deployment that recorded one of the two, which means a
 project that has deployed successfully at least twice. `rebase cloud deployments`
 marks the ones that qualify, and `--json` reports `rollbackable` per row along
@@ -141,6 +248,9 @@ and one from before the platform recorded its artefact. There is nothing to gues
 at in either case — guessing would ship whatever was built or uploaded most
 recently while claiming to restore this one — so deploy the version you want
 instead.
+
+Every successful deploy ends by naming the way back (`rebase cloud rollback`),
+so it is in view at the moment a bad release is noticed.
 
 A rollback appends a new deployment rather than rewinding history, and waits for
 the restored version to serve before reporting success. Follow it with
@@ -268,12 +378,11 @@ rebase cloud compute set --cpu 500m --memory 2Gi
 
 | Dial | Unit, and what it means |
 |---|---|
-| `--cpu`, `--memory` | App request per instance, e.g. `500m` and `2Gi`. Empty means the platform default — `250m` and `512Mi` |
+| `--cpu`, `--memory` | App request per instance, e.g. `500m` and `2Gi`. Empty means the platform default — `100m` and `384Mi`, bursting to 2 CPU and `2Gi` |
 | `--replicas` | Instances that always exist: the autoscaler's floor, and what the project is billed for at rest |
 | `--autoscale-max` | 1–16. The ceiling it may reach, and the worst case it may be billed. `--no-autoscale` turns it off |
 | `--autoscale-cpu-target` | 10–95. The CPU utilisation the autoscaler holds, against the request rather than the limit. Empty means 70 |
 | `--spot` | `true` or `false`. Preemptible capacity: cheaper, and restarted without notice |
-| `--scale-to-zero` | `true` or `false`. Request-billed compute that stops when idle, at the cost of a cold start |
 | `--db-instances` | 1–3. `1` is a single instance with no failover; `2` adds an automatic standby |
 | `--db-cpu`, `--db-memory`, `--storage` | Per database instance. Empty means `500m`, `2Gi` and the default volume |
 
@@ -296,6 +405,7 @@ except one that restarts the database, which waits for a maintenance window.
 | `init` | With `--claim`: a live backend with no account, and a link to claim it. See [A backend with no account](#a-backend-with-no-account) |
 | `projects` | Create, list, inspect, delete |
 | `deploy`, `logs`, `deployments`, `rollback`, `cancel` | Shipping and watching |
+| `previews` | Builds served on their own address by `deploy --preview`, and deleting them. See [Preview a change](#preview-a-change) |
 | `start`, `stop`, `restart` | Pausing a project and bringing it back |
 | `status`, `metrics`, `debug` | What it is doing, and why it is not |
 | `cron` | The deployed app's cron jobs and their recorded runs, read with your `rebase cloud` login. Read-only |
@@ -332,8 +442,9 @@ Stated plainly, because finding out later is worse:
 - **Not self-serve.** Access is granted in batches; there is no sign-up-and-pay.
 - **No published SLA**, and no SOC 2. If you need either, say so when you request
   access rather than assuming.
-- **No preview or branch deploys**, and no first-party GitHub App. Deploy hooks —
-  secret URLs you point a repository webhook at — are the supported automation.
+- **No branch deploys**, and no first-party GitHub App. Deploy hooks — secret URLs
+  you point a repository webhook at — are the supported automation. [Preview
+  deploys](#preview-a-change) are rolling out and are started from the CLI.
 - **Tokens act as a person.** A [token](#ci-and-agents) is minted by an account
   and acts as it; there is no organization-owned machine identity yet. If you
   sign in from CI instead, pass `REBASE_CLOUD_EMAIL` and `REBASE_CLOUD_PASSWORD`

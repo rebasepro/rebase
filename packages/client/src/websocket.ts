@@ -109,18 +109,32 @@ function realtimeDebugOn(): boolean {
 }
 
 /**
- * Connection chatter: the socket opened, signed in, closed, is redialling.
- *
- * `console.debug` where that is a debug level — a browser's console hides it
- * unless Verbose is asked for. Not in Node, where `console.debug` is
- * `console.log`: a script's `listen()` opened its stdout with "Connected to
- * PostgreSQL backend" and "WebSocket auto-authenticated", ahead of what the
- * script prints. There it is written only while realtime debugging is on.
+ * The `localStorage` key that turns connection logging on for one browser,
+ * without a code change or a rebuild: `localStorage.setItem("rebase_debug", "1")`
+ * in its console. For a page that loads the client as a plain script, where
+ * `createRebaseClient({ debug: true })` means editing and redeploying the site.
  */
-function connectionDebug(...args: unknown[]): void {
-    const browser = typeof window !== "undefined" || typeof document !== "undefined";
-    if (!browser && !realtimeDebugOn()) return;
-    console.debug(...args);
+const DEBUG_STORAGE_KEY = "rebase_debug";
+
+/**
+ * Whether connection logging was switched on from outside the code:
+ * `globalThis.__REBASE_DEBUG__`, `globalThis.__REBASE_DEBUG_REALTIME__` (which
+ * also explains refetched rows), or {@link DEBUG_STORAGE_KEY} in this
+ * browser's `localStorage`. Read at each line, so it can be switched on in a
+ * console without reloading a page whose socket is already open.
+ */
+function debugSwitchedOn(): boolean {
+    if (Reflect.get(globalThis, "__REBASE_DEBUG__") === true || realtimeDebugOn()) return true;
+    // Only a browser's: Node 25 has a `localStorage` of its own, which warns
+    // when it is touched without `--localstorage-file`.
+    if (typeof window === "undefined" || typeof localStorage === "undefined") return false;
+    try {
+        const value = localStorage.getItem(DEBUG_STORAGE_KEY);
+        return value === "1" || value === "true";
+    } catch {
+        // Storage refused: a sandboxed frame, blocked site data.
+        return false;
+    }
 }
 
 /**
@@ -201,6 +215,11 @@ export interface RebaseWebSocketConfig {
      * `RebaseClientConfig.impersonate`. Sent with every `AUTHENTICATE`.
      */
     impersonate?: string;
+    /**
+     * Log the connection's progress — opened, signed in, closed, redialling —
+     * with `console.debug`. Off by default. See `CreateRebaseClientOptions.debug`.
+     */
+    debug?: boolean;
 }
 
 
@@ -565,12 +584,30 @@ export class RebaseWebSocketClient {
     public onUnauthorized?: () => Promise<boolean>;
     private refreshInProgress: Promise<boolean> | null = null;
     private readonly impersonate?: string;
+    private readonly debug: boolean;
+
+    /**
+     * Connection chatter: the socket opened, signed in, closed, is redialling.
+     *
+     * Silent unless asked for, with the `debug` option or
+     * {@link debugSwitchedOn}. It used to go to `console.debug` in every
+     * browser: a public page printed "Connected to PostgreSQL backend" and
+     * "WebSocket auto-authenticated" to each visitor's console, naming the
+     * backend on every load. In Node, where `console.debug` is `console.log`,
+     * it opened a script's stdout ahead of what the script prints. Warnings and
+     * errors are not chatter and are always written.
+     */
+    private connectionDebug(...args: unknown[]): void {
+        if (!this.debug && !debugSwitchedOn()) return;
+        console.debug(...args);
+    }
 
     constructor(config: RebaseWebSocketConfig) {
         this.websocketUrl = config.websocketUrl;
         this.getAuthToken = config.getAuthToken;
         this.onUnauthorized = config.onUnauthorized;
         this.impersonate = config.impersonate;
+        this.debug = config.debug === true;
         this.WebSocketConstructor = config.WebSocket || (typeof WebSocket !== "undefined" ? WebSocket : undefined);
 
         // Deliberately does NOT dial here. Constructing the client is not a
@@ -630,7 +667,7 @@ export class RebaseWebSocketClient {
         if (this.connectionState !== "reconnecting" && this.connectionState !== "disconnected") return;
         // A dial is already on its way.
         if (this.ws) return;
-        connectionDebug(`${reason} — retrying the realtime connection`);
+        this.connectionDebug(`${reason} — retrying the realtime connection`);
         if (this.reconnectTimeout) {
             clearTimeout(this.reconnectTimeout);
             this.reconnectTimeout = null;
@@ -758,13 +795,13 @@ export class RebaseWebSocketClient {
                 if (!this.ws) return; // Prevent memory leaks / actions after disconnect
                 if (token) {
                     this.authenticate(token).catch(e => {
-                        if (this.ws) connectionDebug("WebSocket auto-auth skipped:", e?.message || e);
+                        if (this.ws) this.connectionDebug("WebSocket auto-auth skipped:", e?.message || e);
                     });
                 }
             }).catch(e => {
                 // User not logged in or auth still loading — this is expected,
                 // the WebSocket will authenticate on-demand when a request is made.
-                if (this.ws) connectionDebug("WebSocket auto-auth skipped:", e?.message || e);
+                if (this.ws) this.connectionDebug("WebSocket auto-auth skipped:", e?.message || e);
             });
         }
     }
@@ -844,7 +881,7 @@ export class RebaseWebSocketClient {
             this.ws = socket;
 
             this.ws!.onopen = async () => {
-                connectionDebug("Connected to PostgreSQL backend");
+                this.connectionDebug("Connected to PostgreSQL backend");
                 const wasReconnect = this.hadConnection;
                 this.hadConnection = true;
                 this.isConnected = true;
@@ -866,7 +903,7 @@ export class RebaseWebSocketClient {
                         token = await this.getAuthToken();
                         if (token) {
                             await this.authenticate(token);
-                            connectionDebug("WebSocket auto-authenticated");
+                            this.connectionDebug("WebSocket auto-authenticated");
                         }
                     } catch (error) {
                         // A refused session is said as that — once, as a
@@ -875,7 +912,7 @@ export class RebaseWebSocketClient {
                         // loading) is expected: authentication happens on
                         // demand.
                         if (!(token && this.noteSessionRefused(token, error))) {
-                            connectionDebug("WebSocket connected, not signed in yet:", (error as Error)?.message || error);
+                            this.connectionDebug("WebSocket connected, not signed in yet:", (error as Error)?.message || error);
                         }
                     }
                 }
@@ -908,7 +945,7 @@ export class RebaseWebSocketClient {
             };
 
             const onClosed = () => {
-                connectionDebug("Disconnected from PostgreSQL backend");
+                this.connectionDebug("Disconnected from PostgreSQL backend");
                 // The next socket says hello again; nothing agreed for this one carries over.
                 this.stopLivenessWatch();
                 this.forgetServerOptIns();
@@ -1105,7 +1142,7 @@ export class RebaseWebSocketClient {
         // one client in eight on the same millisecond.
         const delay = MIN_RECONNECT_DELAY_MS + Math.floor(Math.random() * (ceiling - MIN_RECONNECT_DELAY_MS));
 
-        connectionDebug(`Attempting to reconnect in ${delay}ms (attempt ${this.reconnectAttempts})`);
+        this.connectionDebug(`Attempting to reconnect in ${delay}ms (attempt ${this.reconnectAttempts})`);
 
         if (this.reconnectTimeout) {
             clearTimeout(this.reconnectTimeout);
@@ -1584,7 +1621,7 @@ export class RebaseWebSocketClient {
                 // same answer, so it is not asked again.
                 if (this.refusedSession?.token === token) throw this.refusedSession.error;
                 await this.authenticate(token);
-                connectionDebug("WebSocket authenticated on demand");
+                this.connectionDebug("WebSocket authenticated on demand");
                 return; // Success
             } catch (error: unknown) {
                 lastError = error;
@@ -1613,7 +1650,7 @@ export class RebaseWebSocketClient {
                 // For other errors, retry with backoff
                 if (attempt < retryCount - 1) {
                     const delay = Math.min(1000 * (attempt + 1), 3000);
-                    connectionDebug(`WebSocket auth attempt ${attempt + 1} failed, retrying in ${delay}ms...`);
+                    this.connectionDebug(`WebSocket auth attempt ${attempt + 1} failed, retrying in ${delay}ms...`);
                     await new Promise(resolve => setTimeout(resolve, delay));
                 }
             }
@@ -1631,7 +1668,7 @@ export class RebaseWebSocketClient {
             const token = await this.getAuthToken();
             if (!token) throw new Error("user not logged in");
             await this.authenticate(token);
-            connectionDebug("WebSocket reauthenticated successfully");
+            this.connectionDebug("WebSocket reauthenticated successfully");
         } catch (error) {
             console.error("WebSocket reauthentication failed:", error);
             throw error;
@@ -2602,7 +2639,7 @@ onError });
      * we need to re-register everything to resume receiving updates.
      */
     private resubscribeAll(): void {
-        connectionDebug(`[WS] Re-subscribing: ${this.collectionSubscriptions.size} collection(s), ${this.singleSubscriptions.size} row(ies)`);
+        this.connectionDebug(`[WS] Re-subscribing: ${this.collectionSubscriptions.size} collection(s), ${this.singleSubscriptions.size} row(ies)`);
 
         // A registration still in flight here had its subscribe sent on this
         // socket already, while it was authenticating: the close clears the

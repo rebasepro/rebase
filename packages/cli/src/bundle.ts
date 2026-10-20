@@ -643,6 +643,57 @@ function resolvesToWorkspacePackage(projectRoot: string, name: string): boolean 
 const BUNDLE_DEP_MANIFESTS = ["package.json", "config/package.json", "backend/package.json"];
 
 /**
+ * Where a project's npm configuration may live, in the order they are joined.
+ * npm reads the last value of a repeated key, so the backend's own file wins.
+ */
+const BUNDLE_NPMRC_FILES = [".npmrc", "backend/.npmrc"];
+
+/** npm keys whose value is a credential, bare or scoped to a registry (`//host/:_authToken`). */
+const NPMRC_CREDENTIAL_KEY = /(^|:)(_authToken|_auth|_password|password|username|email|certfile|keyfile)$/;
+
+/** A value npm expands from the environment at install time: `${NPM_TOKEN}`. */
+const NPMRC_ENV_REFERENCE = /^\$\{[A-Za-z_][A-Za-z0-9_]*\}$/;
+
+/**
+ * The npm configuration a bundle carries, so the runtime's `npm ci` can reach a
+ * private registry — or `null` when the project has none.
+ *
+ * A pod installs the bundle's dependencies when it starts, from the public
+ * registry unless told otherwise, so a dependency published to a private
+ * registry or under a private scope could not install. This hands npm the
+ * project's own `.npmrc`. Credentials stay out of the bundle: every credential
+ * must be a `${VAR}` reference, which npm expands from the pod's environment —
+ * `rebase cloud env set NPM_TOKEN=… --secret`. A literal token would be
+ * uploaded with the code and stored beside every deployment, so it fails the
+ * build instead.
+ */
+export function bundledNpmrc(projectRoot: string): string | null {
+    const parts: string[] = [];
+    for (const relative of BUNDLE_NPMRC_FILES) {
+        const file = path.join(projectRoot, relative);
+        if (!fs.existsSync(file)) continue;
+        const text = fs.readFileSync(file, "utf8");
+        text.split(/\r?\n/).forEach((line, index) => {
+            const trimmed = line.trim();
+            if (trimmed === "" || trimmed.startsWith("#") || trimmed.startsWith(";")) return;
+            const eq = trimmed.indexOf("=");
+            if (eq === -1) return;
+            const key = trimmed.slice(0, eq).trim();
+            const value = trimmed.slice(eq + 1).trim();
+            if (NPMRC_CREDENTIAL_KEY.test(key) && !NPMRC_ENV_REFERENCE.test(value)) {
+                throw new Error(
+                    `${relative}:${index + 1} sets ${key} to a literal value. The bundle would carry it to `
+                    + "the platform with your code. Write it as a reference instead — "
+                    + `${key}=\${NPM_TOKEN} — and set the value with \`rebase cloud env set NPM_TOKEN=… --secret\`.`
+                );
+            }
+        });
+        parts.push(`# from ${relative}\n${text.trimEnd()}\n`);
+    }
+    return parts.length > 0 ? parts.join("\n") : null;
+}
+
+/**
  * Specifiers the registry the managed runtime installs from cannot resolve.
  *
  * `workspace:` is handled separately (it is normal and expected inside this
@@ -1514,6 +1565,11 @@ stdio: toolStdio(options.quietStdout) });
         `${JSON.stringify(manifest, null, 2)}\n`,
         "utf8"
     );
+
+    // The project's registry settings, credentials as `${VAR}` references only,
+    // so a private package installs on the pod as it does on this machine.
+    const npmrc = bundledNpmrc(projectRoot);
+    if (npmrc) fs.writeFileSync(path.join(outDir, ".npmrc"), npmrc, "utf8");
 
     // A package.json beside the bundle lets a deployment install exactly the
     // dependencies the project declared, with no access to the repository.

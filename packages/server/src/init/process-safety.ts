@@ -22,9 +22,10 @@ type GlobalWithHandler = typeof globalThis & {
  * request path is covered — but a fire-and-forget `void syncToCrm(body)`, a
  * `setTimeout(async () => …)`, or an unawaited `.then()` in one custom function
  * rejects outside Hono's frame. The default outcome is that one project's
- * floating promise ends the process; on the managed runtime that process is
- * shared, so every other tenant on the pod goes with it, and the request log
- * points nowhere because the request itself succeeded.
+ * floating promise ends the process, and with it every other route the
+ * project serves — its data API, auth, realtime — and the request log points
+ * nowhere because the request itself succeeded. On the managed runtime a
+ * project usually has one instance, so that is an outage until it restarts.
  *
  * A logged rejection is the better trade here: the process keeps serving, and
  * the stack reaches the operator. `uncaughtException` is deliberately **not**

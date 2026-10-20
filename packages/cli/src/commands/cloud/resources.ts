@@ -27,7 +27,8 @@ import {
     note,
     noteBlank,
     requireCloudRow,
-    billingAccountIdOf
+    billingAccountIdOf,
+    warn
 } from "./context";
 import { DEFAULT_STORAGE_SOURCE_KEY } from "@rebasepro/types";
 import { firstRow, latestDeployment, fmtDate } from "./projects";
@@ -1526,7 +1527,7 @@ const DIAL_FLAGS = {
     "--memory": "memory",
     "--replicas": "replicaCount",
     "--spot": "preemptible",
-    "--scale-to-zero": "scaleToZero",
+    // No `--scale-to-zero`: see RETIRED_SCALE_TO_ZERO.
     // No `--db-mode`. The shared tier was retired, so a managed database is a
     // CloudNativePG cluster of the project's own and there is nothing left to
     // choose — a flag whose only legal value is the default is a flag that
@@ -1563,6 +1564,17 @@ export const COMPUTE_SET_FLAGS: Record<string, unknown> = {
     "--no-autoscale": Boolean
 };
 
+/**
+ * The flag that used to set `scaleToZero`. Still parsed, so a script that passes
+ * it is told what happened rather than failing on an unknown option.
+ *
+ * The dial never did anything: it resolved to a request-billed substrate no
+ * deploy built, and every backend kept running as an always-on pod. The control
+ * plane refuses `true` now; this refuses it before the round trip, and lets
+ * `false` — what every project already gets — through with a warning.
+ */
+export const RETIRED_SCALE_TO_ZERO = "--scale-to-zero";
+
 /** Dials whose column is a number, not the text a flag carries. */
 const NUMERIC_DIALS = new Set([
     "databaseInstances",
@@ -1571,7 +1583,7 @@ const NUMERIC_DIALS = new Set([
     "autoscaleTargetCpuPercent"
 ]);
 /** Dials that are a yes/no. `--spot false` has to reach the row as `false`. */
-const BOOLEAN_DIALS = new Set(["preemptible", "scaleToZero"]);
+const BOOLEAN_DIALS = new Set(["preemptible"]);
 
 /**
  * `rebase cloud compute` — show what a project reserves, and change it.
@@ -1602,7 +1614,9 @@ export async function computeCommand(action: string | undefined, rawArgs: string
     // `--no-autoscale` is value-less. This parse is only the refusal: without
     // it `compute set --cpu-request 500m` set nothing and reported success.
     parseCloudArgs({
-        spec: (action === "set" ? COMPUTE_SET_FLAGS : {}) as Record<string, never>,
+        // The retired flag is parsed but not documented: `buildDialPatch` says
+        // what became of it.
+        spec: (action === "set" ? { ...COMPUTE_SET_FLAGS, [RETIRED_SCALE_TO_ZERO]: String } : {}) as Record<string, never>,
         rawArgs,
         commandWords: 3,
         command: action === "set" ? "cloud compute set" : "cloud compute",
@@ -1647,7 +1661,6 @@ export async function computeCommand(action: string | undefined, rawArgs: string
                     ["App memory", dialLine(project!.memory)],
                     ["App replicas", dialLine(project!.replicaCount)],
                     ["Capacity", dialLine(project!.preemptible, { true: "spot", false: "on demand" })],
-                    ["When idle", dialLine(project!.scaleToZero, { true: "scale to zero", false: "stay warm" })],
                     ["Database instances", dialLine(project!.databaseInstances)],
                     ["Database CPU", dialLine(project!.databaseCpu)],
                     ["Database memory", dialLine(project!.databaseMemory)],
@@ -1676,6 +1689,8 @@ export async function computeCommand(action: string | undefined, rawArgs: string
                 memory: project!.memory ?? null,
                 replicaCount: project!.replicaCount ?? null,
                 preemptible: project!.preemptible ?? null,
+                // Retired: always null since the control plane cleared the
+                // column. Kept so a script reading the field does not break.
                 scaleToZero: project!.scaleToZero ?? null,
                 databaseInstances: project!.databaseInstances ?? null,
                 databaseCpu: project!.databaseCpu ?? null,
@@ -1765,6 +1780,23 @@ export function buildDialPatch(
     if (switchOn(rawArgs, "--no-autoscale")) {
         patch.autoscaleMaxReplicas = null;
         patch.autoscaleTargetCpuPercent = null;
+    }
+
+    const retired = rawArgs.indexOf(RETIRED_SCALE_TO_ZERO);
+    if (retired !== -1) {
+        const value = rawArgs[retired + 1];
+        if (value === undefined || value.startsWith("--")) {
+            return { patch: {}, error: `${RETIRED_SCALE_TO_ZERO} needs a value.` };
+        }
+        if (!/^(false|0|no|off)$/i.test(value.trim())) {
+            return {
+                patch: {},
+                error: "Scale to zero is not available: every backend runs as an always-on pod. "
+                    + "Set the floor with --replicas and a ceiling with --autoscale-max."
+            };
+        }
+        warn(`${RETIRED_SCALE_TO_ZERO} is no longer a setting and was ignored.`,
+            "Every backend runs as an always-on pod; drop the flag.");
     }
 
     for (const [flag, field] of Object.entries(DIAL_FLAGS)) {

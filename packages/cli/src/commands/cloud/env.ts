@@ -7,6 +7,13 @@
  *   env reveal KEY           Release one non-secret value (a secret var 403s)
  *   env pull [--out .env]    Write revealable values to a local dotenv file
  *
+ * With `--preview`, `list`, `set` and `unset` act on what the project's
+ * PREVIEWS run with instead (`rebase cloud deploy --preview`), and `reset KEY
+ * --preview` hands a variable back to production's value. A backend preview
+ * starts from a copy of production's environment, live third-party keys
+ * included; this is how a preview gets a test key instead, or none. Production
+ * is never changed by any of them.
+ *
  * Values are the sharp edge here. The list endpoint returns keys and never
  * values by design (a page load is not consent to spray a customer's secrets
  * through caches and logs), and a `--secret` variable is write-only: it can be
@@ -16,6 +23,7 @@
 import chalk from "chalk";
 import fs from "fs";
 import path from "path";
+import { isMissingRoute } from "./cron";
 import {
     requireClient,
     requireProject,
@@ -70,6 +78,34 @@ async function fetchEnvVars(client: CloudClient, projectId: string): Promise<Env
     });
 }
 
+/** `--preview`: act on what the project's previews run with, not production. */
+export const ENV_PREVIEW_FLAGS = { "--preview": Boolean } as const;
+
+/** The control-plane function that holds preview overrides. */
+const PREVIEWS_FUNCTION = "previews";
+
+/** What the control plane shows of one preview override. */
+interface PreviewEnvVarView {
+    key: string;
+    /** Previews run without this variable. */
+    unset: boolean;
+    secret: boolean;
+    value?: string;
+    updatedAt: string | null;
+}
+
+/** A refusal for a control plane that has no previews, or null for any other error. */
+function previewsUnavailable(e: unknown): void {
+    const err = e as { status?: number; message?: string; code?: string };
+    if (err?.status === 404 && (err.code === "FUNCTION_NOT_FOUND" || isMissingRoute(err.message))) {
+        fail(
+            "This control plane does not serve preview deployments yet, so previews have no variables of their own. Nothing was changed.",
+            "Production's variables are managed without --preview.",
+            "previews_unavailable"
+        );
+    }
+}
+
 export async function envCommand(action: string | undefined, rawArgs: string[]): Promise<void> {
     switch (action) {
         case "list":
@@ -86,6 +122,9 @@ export async function envCommand(action: string | undefined, rawArgs: string[]):
             break;
         case "reveal":
             await revealEnv(rawArgs);
+            break;
+        case "reset":
+            await resetPreviewEnv(rawArgs);
             break;
         case "pull":
             await pullEnv(rawArgs);
@@ -106,7 +145,7 @@ function pendingHint(pending: boolean | null): string | undefined {
 }
 
 async function listEnv(rawArgs: string[]): Promise<void> {
-    parseCloudArgs({ spec: {},
+    const { flags } = parseCloudArgs({ spec: ENV_PREVIEW_FLAGS,
 rawArgs,
 commandWords: 3,
 command: "cloud env",
@@ -114,6 +153,10 @@ maxPositionals: 0 });
     const { client } = await requireClient(rawArgs);
     const projectId = await requireProject(rawArgs, client);
     const projectRef = displayProjectRef(rawArgs);
+    if (flags["--preview"]) {
+        await listPreviewEnv(client, projectId, projectRef);
+        return;
+    }
     try {
         const res = await fetchEnvVars(client, projectId);
         emit(
@@ -163,6 +206,44 @@ maxPositionals: 0 });
     }
 }
 
+/** `env list --preview`: what previews run with instead of production's values. */
+async function listPreviewEnv(client: CloudClient, projectId: string, projectRef: string): Promise<void> {
+    let vars: PreviewEnvVarView[] = [];
+    try {
+        const res = await client.functions.invoke<{ vars: PreviewEnvVarView[] }>(PREVIEWS_FUNCTION, undefined, {
+            method: "GET",
+            path: `${projectId}/env`
+        });
+        vars = res.vars ?? [];
+    } catch (e) {
+        previewsUnavailable(e);
+        reportError(e, "Failed to list preview variables");
+    }
+    emit(
+        () => {
+            console.log("");
+            console.log(chalk.bold(`  🔑 Preview environment — project ${projectRef}`));
+            console.log(chalk.gray("  Previews run with production's variables, except:"));
+            console.log("");
+            if (!vars.length) {
+                console.log(chalk.gray("  Nothing — previews get production's values, live keys included."));
+                console.log(chalk.gray("  Replace one with `rebase cloud env set KEY=VALUE --preview`."));
+                console.log("");
+                return;
+            }
+            for (const v of vars) {
+                const what = v.unset
+                    ? chalk.yellow("not set in previews")
+                    : v.secret ? chalk.magenta("replaced (secret)") : "replaced";
+                console.log(`  ${chalk.bold(v.key)}  ${what}`);
+            }
+            console.log("");
+        },
+        // Keys and shape only, as `env list` — a value is never listed.
+        { projectId, preview: true, vars: vars.map(v => ({ key: v.key, unset: v.unset, secret: v.secret, updatedAt: v.updatedAt })) }
+    );
+}
+
 /** Parse `KEY=VALUE` or `KEY VALUE` from the positional operands. */
 export function parseEnvAssignment(operands: string[]): { key: string; value: string } | null {
     const first = operands[0];
@@ -202,7 +283,8 @@ export function buildTimeEnvPrefix(key: string): string | undefined {
 /** The flags `rebase cloud env set` takes, on top of the global cloud ones. */
 export const ENV_SET_FLAGS = {
     "--secret": Boolean,
-    "--force": Boolean
+    "--force": Boolean,
+    ...ENV_PREVIEW_FLAGS
 } as const;
 
 /**
@@ -270,6 +352,29 @@ async function setEnv(rawArgs: string[]): Promise<void> {
 value: parsed!.value };
     if (args["--secret"]) body.secret = true;
 
+    if (args["--preview"]) {
+        let res: { var: PreviewEnvVarView } | undefined;
+        try {
+            res = await client.functions.invoke<{ success: boolean; var: PreviewEnvVarView; pendingRedeploy: true }>(
+                PREVIEWS_FUNCTION,
+                body,
+                { method: "POST", path: `${projectId}/env` }
+            );
+        } catch (e) {
+            previewsUnavailable(e);
+            reportError(e, "Failed to set the preview variable");
+        }
+        emit(
+            () => {
+                success(`Previews of ${projectRef} now run with their own ${chalk.bold(res!.var.key)}${res!.var.secret ? chalk.magenta(" (secret)") : ""}. Production is unchanged.`);
+                console.log(`  ${chalk.yellow("Pending redeploy")} — each preview takes it at its next \`rebase cloud deploy --preview\`.`);
+                console.log("");
+            },
+            { success: true, preview: true, key: res!.var.key, secret: res!.var.secret, pendingRedeploy: true }
+        );
+        return;
+    }
+
     try {
         const res = await client.functions.invoke<{ success: boolean; var: EnvVarView; pendingRedeploy: true }>(
             "env-vars",
@@ -308,22 +413,48 @@ value: parsed!.value };
  * count of command words is the same for all of them.
  */
 export function resolveEnvKeyArg(rawArgs: string[], action: string): string | undefined {
-    return parseCloudArgs({
-        spec: {},
+    return resolveEnvKeyArgs(rawArgs, action).key;
+}
+
+/** {@link resolveEnvKeyArg}, and whether `--preview` was given (`unset` and `reset` take it). */
+export function resolveEnvKeyArgs(rawArgs: string[], action: string): { key: string | undefined; preview: boolean } {
+    const { flags, positionals } = parseCloudArgs({
+        spec: action === "reveal" ? {} : ENV_PREVIEW_FLAGS,
         rawArgs,
         commandWords: 3, // cloud env <action>
         command: `cloud env ${action}`,
         maxPositionals: 1
-    }).positionals[0];
+    });
+    return { key: positionals[0], preview: (flags as { "--preview"?: boolean })["--preview"] === true };
 }
 
 async function unsetEnv(rawArgs: string[], action: string): Promise<void> {
-    const key = resolveEnvKeyArg(rawArgs, action);
+    const { key, preview } = resolveEnvKeyArgs(rawArgs, action);
     // Refused before the login round-trip: an unusable line is unusable whether
     // or not there is a session behind it.
-    if (!key) fail("Usage: rebase cloud env unset KEY", undefined, "usage");
+    if (!key) fail("Usage: rebase cloud env unset KEY [--preview]", undefined, "usage");
     const { client } = await requireClient(rawArgs);
     const projectId = await requireProject(rawArgs, client);
+
+    if (preview) {
+        // Previews run WITHOUT the variable — an override that removes it —
+        // while production keeps it. `env reset KEY --preview` undoes this.
+        try {
+            await client.functions.invoke(PREVIEWS_FUNCTION, { key, unset: true }, { method: "POST", path: `${projectId}/env` });
+        } catch (e) {
+            previewsUnavailable(e);
+            reportError(e, "Failed to remove the variable from previews");
+        }
+        emit(
+            () => {
+                success(`Previews now run without ${chalk.bold(key!)}. Production is unchanged.`);
+                console.log(`  ${chalk.yellow("Pending redeploy")} — each preview takes it at its next \`rebase cloud deploy --preview\`.`);
+                console.log("");
+            },
+            { success: true, preview: true, key, unset: true, pendingRedeploy: true }
+        );
+        return;
+    }
 
     try {
         const res = await client.functions.invoke<{ success: boolean; pendingRedeploy: true }>("env-vars", undefined, {
@@ -343,6 +474,40 @@ pendingRedeploy: res.pendingRedeploy }
     } catch (e) {
         reportError(e, "Failed to remove environment variable");
     }
+}
+
+/** `env reset KEY --preview`: previews take production's value of KEY again. */
+async function resetPreviewEnv(rawArgs: string[]): Promise<void> {
+    const { key, preview } = resolveEnvKeyArgs(rawArgs, "reset");
+    if (!key || !preview) {
+        fail(
+            "Usage: rebase cloud env reset KEY --preview",
+            "`reset` hands a variable in previews back to production's value; production itself has nothing to reset to.",
+            "usage"
+        );
+    }
+    const { client } = await requireClient(rawArgs);
+    const projectId = await requireProject(rawArgs, client);
+    try {
+        await client.functions.invoke(PREVIEWS_FUNCTION, undefined, {
+            method: "DELETE",
+            path: `${projectId}/env/${encodeURIComponent(key!)}`
+        });
+    } catch (e) {
+        previewsUnavailable(e);
+        if ((e as { status?: number })?.status === 404) {
+            fail(`Previews have no value of their own for ${key}.`, "`rebase cloud env list --preview` lists them.", "not_found");
+        }
+        reportError(e, "Failed to reset the preview variable");
+    }
+    emit(
+        () => {
+            success(`Previews take production's ${chalk.bold(key!)} again.`);
+            console.log(`  ${chalk.yellow("Pending redeploy")} — each preview takes it at its next \`rebase cloud deploy --preview\`.`);
+            console.log("");
+        },
+        { success: true, preview: true, key, reset: true, pendingRedeploy: true }
+    );
 }
 
 async function revealEnv(rawArgs: string[]): Promise<void> {
@@ -510,19 +675,26 @@ export function printEnvHelp(): void {
         title: "Environment variables",
         actions: [
             { action: "list",
-description: "List keys — values are never printed" },
+description: "List keys — values are never printed",
+flags: [["--preview", "What previews run with instead of production's values"]] },
             {
                 action: "set",
                 args: "KEY=VALUE",
                 description: "Create or replace a variable",
                 flags: [
                     ["--secret", "Mark it write-only: it can be set and used, never read back"],
-                    ["--force", "Set a build-time key anyway"]
+                    ["--force", "Set a build-time key anyway"],
+                    ["--preview", "Only for previews: production keeps its value"]
                 ]
             },
             { action: "unset",
 args: "KEY",
-description: "Remove a variable" },
+description: "Remove a variable",
+flags: [["--preview", "Only from previews: production keeps it"]] },
+            { action: "reset",
+args: "KEY --preview",
+description: "Give previews production's value of KEY again",
+flags: [["--preview", "Required: only previews have values to reset"]] },
             { action: "reveal",
 args: "KEY",
 description: "Print one non-secret value" },
@@ -535,7 +707,8 @@ description: "Print one non-secret value" },
         notes: [
             "Values are encrypted at rest (AES-256-GCM) and only decrypted at deploy time.",
             "VITE_* / NEXT_PUBLIC_* / PUBLIC_* / REACT_APP_* are read by your bundler at BUILD time;",
-            "these are applied at rollout, after the image is built, so they never reach the bundle."
+            "these are applied at rollout, after the image is built, so they never reach the bundle.",
+            "A backend preview starts from production's variables, live keys included; --preview changes what previews get."
         ]
     });
 }
