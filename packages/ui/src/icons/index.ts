@@ -92,6 +92,7 @@ export {
     FolderUpIcon,
     FunctionSquareIcon,
     GitBranchIcon,
+    GitMergeIcon,
     GlobeIcon,
     HashIcon,
     Heading1Icon,

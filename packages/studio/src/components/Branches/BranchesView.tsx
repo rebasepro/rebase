@@ -30,6 +30,7 @@ import type { BranchInfo } from "@rebasepro/types";
 import { formatRelativeTime } from "@rebasepro/utils";
 
 import { classifyLoadFailure, type LoadFailure } from "../load-failure";
+import { BranchDiffView } from "./BranchDiffView";
 
 /**
  * The prefix the driver puts on every branch database.
@@ -308,60 +309,63 @@ export function BranchesView() {
                             </div>
                         </div>
 
-                        {/* Info Cards */}
-                        <div className="px-5 py-4 bg-surface-sheet">
-                            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                                <StatCard label="Branch Name" value={selected.name} mono/>
-                                <StatCard label="Source Database" value={selected.parentDatabase} mono/>
-                                <StatCard label="Created" value={formatRelative(selected.createdAt)}/>
-                                <StatCard label="Size" value={formatSize(selected.sizeBytes)}/>
-                            </div>
-                        </div>
-
-                        {/* Usage Info */}
-                        <div className="flex-1 overflow-y-auto px-5 py-4">
-                            <Alert color="info">
-                                <Typography variant="body2" className="text-[13px]">
-                                    <strong>How to use this branch:</strong> point this checkout at it with
-                                    <code className="mx-1 px-1.5 py-0.5 rounded bg-surface-well font-mono text-[12px]">rebase db branch switch {selected.name}</code>
-                                    — every later command uses it, and
-                                    <code className="mx-1 px-1.5 py-0.5 rounded bg-surface-well font-mono text-[12px]">rebase db branch switch --off</code>
-                                    goes back to the main database. Changes made here don&apos;t affect it.
-                                </Typography>
-                            </Alert>
-                            <div className="mt-4 p-4 rounded-lg border bg-surface-sheet border-hairline-strong">
-                                <Typography variant="caption" className="text-[10px] uppercase tracking-wider text-surface-400 mb-2 block font-medium">Connection Details</Typography>
-                                <div className="space-y-2">
-                                    <div className="flex items-center gap-2">
-                                        {/* The *database*, not the branch name. They are not the
-                                            same string — the driver prefixes every branch database
-                                            with `rb_` — and a connection string built from the name
-                                            on this pane pointed at a database that does not
-                                            exist. */}
-                                        <Typography variant="caption" color="secondary" className="w-24 shrink-0 text-[11px]">Database:</Typography>
-                                        <Typography variant="body2" className="font-mono text-[12px]">{`${BRANCH_DB_PREFIX}${selected.name}`}</Typography>
+                        {/* What the branch changed, and the merge; its connection details are the third tab. */}
+                        <BranchDiffView
+                            key={selected.name}
+                            branch={selected}
+                            onMerged={loadBranches}
+                            details={
+                                <div className="space-y-4">
+                                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                                        <StatCard label="Branch Name" value={selected.name} mono/>
+                                        <StatCard label="Source Database" value={selected.parentDatabase} mono/>
+                                        <StatCard label="Created" value={formatRelative(selected.createdAt)}/>
+                                        <StatCard label="Size" value={formatSize(selected.sizeBytes)}/>
                                     </div>
-                                    <div className="flex items-start gap-2">
-                                        <Typography variant="caption" color="secondary" className="w-24 shrink-0 text-[11px]">Connect with:</Typography>
-                                        <Typography variant="body2" className="font-mono text-[12px] break-all">
-                                            {`DATABASE_URL=…/${BRANCH_DB_PREFIX}${selected.name}`}
+                                    <Alert color="info">
+                                        <Typography variant="body2" className="text-[13px]">
+                                            <strong>How to use this branch:</strong> point this checkout at it with
+                                            <code className="mx-1 px-1.5 py-0.5 rounded bg-surface-well font-mono text-[12px]">rebase db branch switch {selected.name}</code>
+                                            — every later command uses it, and
+                                            <code className="mx-1 px-1.5 py-0.5 rounded bg-surface-well font-mono text-[12px]">rebase db branch switch --off</code>
+                                            goes back to the main database. Changes made here don&apos;t affect it.
                                         </Typography>
-                                    </div>
-                                    <div className="flex items-center gap-2">
-                                        <Typography variant="caption" color="secondary" className="w-24 shrink-0 text-[11px]">Branched from:</Typography>
-                                        <Typography variant="body2" className="font-mono text-[12px]">{selected.parentDatabase}</Typography>
-                                    </div>
-                                    <div className="flex items-center gap-2">
-                                        <Typography variant="caption" color="secondary" className="w-24 shrink-0 text-[11px]">Created at:</Typography>
-                                        <Typography variant="body2" className="font-mono text-[12px]">
-                                            {selected.createdAt instanceof Date
-                                                ? selected.createdAt.toLocaleString()
-                                                : new Date(selected.createdAt).toLocaleString()}
-                                        </Typography>
+                                    </Alert>
+                                    <div className="p-4 rounded-lg border bg-surface-sheet border-hairline-strong">
+                                        <Typography variant="caption" className="text-[10px] uppercase tracking-wider text-surface-400 mb-2 block font-medium">Connection Details</Typography>
+                                        <div className="space-y-2">
+                                            <div className="flex items-center gap-2">
+                                                {/* The *database*, not the branch name. They are not the
+                                                    same string — the driver prefixes every branch database
+                                                    with `rb_` — and a connection string built from the name
+                                                    on this pane pointed at a database that does not
+                                                    exist. */}
+                                                <Typography variant="caption" color="secondary" className="w-24 shrink-0 text-[11px]">Database:</Typography>
+                                                <Typography variant="body2" className="font-mono text-[12px]">{`${BRANCH_DB_PREFIX}${selected.name}`}</Typography>
+                                            </div>
+                                            <div className="flex items-start gap-2">
+                                                <Typography variant="caption" color="secondary" className="w-24 shrink-0 text-[11px]">Connect with:</Typography>
+                                                <Typography variant="body2" className="font-mono text-[12px] break-all">
+                                                    {`DATABASE_URL=…/${BRANCH_DB_PREFIX}${selected.name}`}
+                                                </Typography>
+                                            </div>
+                                            <div className="flex items-center gap-2">
+                                                <Typography variant="caption" color="secondary" className="w-24 shrink-0 text-[11px]">Branched from:</Typography>
+                                                <Typography variant="body2" className="font-mono text-[12px]">{selected.parentDatabase}</Typography>
+                                            </div>
+                                            <div className="flex items-center gap-2">
+                                                <Typography variant="caption" color="secondary" className="w-24 shrink-0 text-[11px]">Created at:</Typography>
+                                                <Typography variant="body2" className="font-mono text-[12px]">
+                                                    {selected.createdAt instanceof Date
+                                                        ? selected.createdAt.toLocaleString()
+                                                        : new Date(selected.createdAt).toLocaleString()}
+                                                </Typography>
+                                            </div>
+                                        </div>
                                     </div>
                                 </div>
-                            </div>
-                        </div>
+                            }
+                        />
                     </>
                 )}
             </div>

@@ -1,5 +1,8 @@
 const React = require("react");
 
+/** What a `Tabs` or a `RadioGroup` holds for its items: the value, and how to change it. */
+const SelectionContext = React.createContext(null);
+
 /**
  * The design system, stubbed. Entries below are here because a test asserts on
  * something specific about them — an aria-label, a change handler, a value that
@@ -70,13 +73,33 @@ large: 32 },
     // Real elements, and `Tab` really is a `<button>` — Radix's `TabsTrigger`
     // is one, and the fallback's `<div>` hid a `<button>` nested inside a
     // `<button>` in the SQL console's tab strip for as long as it stood in.
-    Tabs: ({ children, value: _v, onValueChange: _o, variant: _var, className: _c, innerClassName: _i }) =>
-        React.createElement("div", { role: "tablist" }, children),
-    Tab: ({ children, value, className: _c, disabled }) =>
-        React.createElement("button", { type: "button",
+    // Pressing one changes the value, as Radix's does, so a pane's other tabs
+    // can be reached.
+    Tabs: ({ children, value, onValueChange, variant: _var, className: _c, innerClassName: _i }) =>
+        React.createElement(SelectionContext.Provider, { value: { value, onValueChange } },
+            React.createElement("div", { role: "tablist" }, children)),
+    Tab: function Tab({ children, value, className: _c, disabled }) {
+        const selection = React.useContext(SelectionContext);
+        return React.createElement("button", { type: "button",
             role: "tab",
             disabled,
-            "data-value": value }, children),
+            "aria-selected": selection?.value === value,
+            onClick: () => selection?.onValueChange?.(value),
+            "data-value": value }, children);
+    },
+    // Native radios, named by the `Label` whose `htmlFor` is their `id`.
+    RadioGroup: ({ children, value, onValueChange, className: _c }) =>
+        React.createElement(SelectionContext.Provider, { value: { value, onValueChange } },
+            React.createElement("div", { role: "radiogroup" }, children)),
+    RadioGroupItem: function RadioGroupItem({ id, value, disabled, className: _c }) {
+        const selection = React.useContext(SelectionContext);
+        return React.createElement("input", { type: "radio",
+            id,
+            value,
+            disabled,
+            checked: selection?.value === value,
+            onChange: () => selection?.onValueChange?.(value) });
+    },
     Select: ({ value, onValueChange, children, placeholder, ...props }) =>
         React.createElement(
             "select",
