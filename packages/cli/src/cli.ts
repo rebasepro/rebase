@@ -53,7 +53,7 @@ export const ROOT_FLAGS = {
  * literal under this name: `help-coverage.test.ts`, `printed-commands.test.ts`
  * and the docs verifier read it out of this file's source.
  */
-const namespacedCommands = ["init", "schema", "db", "console", "dev", "build", "start", "auth", "doctor", "skills", "api-keys", "storage", "cloud", "apps", "eject", "generate-sdk", "telemetry", "resources", "status", "upgrade", "normalize-imports"];
+const namespacedCommands = ["init", "schema", "db", "console", "dev", "build", "start", "auth", "doctor", "skills", "api-keys", "storage", "cloud", "apps", "eject", "generate", "generate-sdk", "telemetry", "resources", "status", "upgrade", "normalize-imports"];
 
 /** The words a command group dispatches, and the other spellings it accepts for them. */
 interface CommandVocabulary {
@@ -82,6 +82,7 @@ async function commandVocabulary(command: string): Promise<CommandVocabulary> {
         case "storage": return { subcommands: (await import("./commands/storage")).STORAGE_SUBCOMMANDS, aliases: {} };
         case "apps": return { subcommands: (await import("./commands/apps")).APPS_SUBCOMMANDS, aliases: {} };
         case "telemetry": return { subcommands: (await import("./commands/telemetry")).TELEMETRY_SUBCOMMANDS, aliases: {} };
+        case "generate": return { subcommands: (await import("./commands/generate-view")).GENERATE_SUBCOMMANDS, aliases: {} };
         case "cloud": {
             const cloud = await import("./commands/cloud");
             return { subcommands: cloud.CLOUD_GROUP_NAMES, aliases: cloud.GROUP_ALIASES };
@@ -389,6 +390,12 @@ async function dispatch(
             break;
         }
 
+        case "generate": {
+            const { generateCommand } = await import("./commands/generate-view");
+            await generateCommand(effectiveSubcommand, args);
+            break;
+        }
+
         case "eject": {
             const { ejectCommand } = await import("./commands/eject");
             await ejectCommand(args);
@@ -497,7 +504,8 @@ ${chalk.green.bold("Database")}
 ${chalk.green.bold("Explore")}
   ${chalk.blue.bold("console")}                 A REPL with the project's data in scope ${chalk.gray("(-e <code> runs one snippet)")}
 
-${chalk.green.bold("SDK")}
+${chalk.green.bold("Generate")}
+  ${chalk.blue.bold("generate view")} ${chalk.gray("<slug>")}    Scaffold a custom admin screen ${chalk.gray("(--collection: a record tab)")}
   ${chalk.blue.bold("generate-sdk")}            Generate a typed TypeScript SDK from collections
 
 ${chalk.green.bold("Auth")}
