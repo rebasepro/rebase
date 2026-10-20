@@ -64,6 +64,8 @@
         "packages/server-postgres/src/tsx-loader.ts",
         "packages/server-postgres/src/generated-sql.ts",
         "packages/server-postgres/src/branch-*.ts",
+        "packages/server-postgres/src/branching/**",
+        "packages/server/src/api/branch-routes.ts",
         "packages/server-postgres/src/PostgresBootstrapper.ts",
         "packages/server/src/api/schema-drift.ts",
         "packages/cms-types/src/**",

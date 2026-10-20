@@ -35,8 +35,8 @@ export const memoryDriver: DataDriver = {
         db.rows[path] = [...(db.rows[path] ?? []).filter(r => String(r.id) !== String(id)), saved];
         return saved;
     },
-    delete: async ({ path, entity }) => {
-        db.rows[path] = (db.rows[path] ?? []).filter(r => String(r.id) !== String(entity.id));
+    delete: async ({ row }) => {
+        db.rows[row.path] = (db.rows[row.path] ?? []).filter(r => String(r.id) !== String(row.id));
     },
     count: async ({ path }) => (db.rows[path] ?? []).length,
     checkUniqueField: async () => true

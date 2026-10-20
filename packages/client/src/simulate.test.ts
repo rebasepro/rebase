@@ -6,6 +6,7 @@ import {
     SIMULATE_ROLE_HEADER,
     SIMULATE_USER_ID_HEADER
 } from "@rebasepro/types";
+import type { AccessSimulation, RebaseClient } from "@rebasepro/types";
 import { createRebaseClient } from "./index";
 
 /**
@@ -31,11 +32,18 @@ function recordingFetch() {
     return { fetchImpl, calls };
 }
 
+/** `simulate` is optional on `RebaseClient`; the one `createRebaseClient` builds has it. */
+function simulateOf(client: { simulate?: (simulation: AccessSimulation) => RebaseClient<Record<string, unknown>> }) {
+    const { simulate } = client;
+    if (!simulate) throw new Error("createRebaseClient built a client without simulate()");
+    return simulate.bind(client);
+}
+
 describe("simulate", () => {
     it("sends the role and uid on each data request, with the parent client's token", async () => {
         const { fetchImpl, calls } = recordingFetch();
         const parent = createRebaseClient({ baseUrl: "http://localhost:1234", token: "admin-token", realtime: false, fetch: fetchImpl });
-        const simulated = parent.simulate({ role: "customer", userId: "u_1" });
+        const simulated = simulateOf(parent)({ role: "customer", userId: "u_1" });
 
         await simulated.data.collection("tickets").find();
 
@@ -50,7 +58,7 @@ describe("simulate", () => {
     it("leaves the parent client's requests alone, and opens no socket", async () => {
         const { fetchImpl, calls } = recordingFetch();
         const parent = createRebaseClient({ baseUrl: "http://localhost:1234", token: "admin-token", realtime: false, fetch: fetchImpl });
-        const simulated = parent.simulate({ apiKeyId: "key-1" });
+        const simulated = simulateOf(parent)({ apiKeyId: "key-1" });
 
         await parent.data.collection("tickets").find();
         expect(calls[0].headers[SIMULATE_API_KEY_ID_HEADER]).toBeUndefined();
