@@ -21,6 +21,14 @@ export * from "./open-rebase";
 export { assertDbCommandLine } from "./db-command-line";
 
 /**
+ * Whether the migration files still build what the collections declare —
+ * offline, without Atlas or a dev database. `rebase verify` runs it after every
+ * collection edit and in CI.
+ */
+export { findUnmigratedSchema } from "./schema/migration-freshness";
+export type { UnmigratedChange } from "./schema/migration-freshness";
+
+/**
  * The app-role provisioning boot performs, for callers that restore a database
  * outside a boot.
  *
