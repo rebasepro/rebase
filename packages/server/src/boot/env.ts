@@ -599,7 +599,9 @@ export const CORS_EXPOSED_HEADERS: readonly string[] = [
     // A resumable upload: where it lives, how far it got, and what was stored.
     "Location",
     "Upload-Offset",
-    "Rebase-Upload-Result"
+    "Rebase-Upload-Result",
+    // What an administrator's simulated request ran as (the RLS simulator).
+    "X-Rebase-Simulated-Context"
 ];
 
 /** What the runtime hands Hono's `cors()`. */

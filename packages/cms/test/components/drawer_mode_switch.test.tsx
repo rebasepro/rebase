@@ -55,6 +55,8 @@ jest.mock("@rebasepro/app", () => {
         IconForView: () => <svg/>,
         getIcon: () => undefined,
         LanguageToggle: () => null,
+        RlsSimulatorBar: () => null,
+        useCanSimulateAccess: () => false,
         RebaseLogo: () => null
     };
 });

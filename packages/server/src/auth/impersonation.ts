@@ -32,6 +32,7 @@ import type { HonoEnv } from "../api/types";
 import { ApiError, errorHandler } from "../api/errors";
 import { scopeDataDriver } from "./rls-scope";
 import { logger } from "../utils/logger";
+import { carriesSimulation } from "./simulation";
 
 /** How the caller authenticated, as far as impersonation is concerned. */
 export type ImpersonationCredential = "session" | "api-key" | "service-key" | "none";
@@ -231,7 +232,9 @@ export async function applyImpersonation(
 }
 
 /**
- * Refuse {@link IMPERSONATE_HEADER} on every route that does not honour it.
+ * Refuse {@link IMPERSONATE_HEADER} — and the RLS simulator's
+ * `x-rebase-simulate-*` headers (`auth/simulation.ts`) — on every route that
+ * does not honour it.
  *
  * Only the data API and custom functions run a request as another user; the
  * rest — storage, auth, the admin surfaces — authenticate the caller and
@@ -246,20 +249,30 @@ export async function applyImpersonation(
  */
 export function refuseUnhonouredImpersonation(honouredMounts: readonly string[]): MiddlewareHandler<HonoEnv> {
     return async (c, next) => {
-        if (c.req.header(IMPERSONATE_HEADER) === undefined) return next();
+        const impersonating = c.req.header(IMPERSONATE_HEADER) !== undefined;
+        const simulating = carriesSimulation(name => c.req.header(name));
+        if (!impersonating && !simulating) return next();
         const path = c.req.path;
         if (honouredMounts.some(mount => path === mount || path.startsWith(`${mount}/`))) return next();
-        logger.warn("[Security Audit] Refused a request to act as another user", {
-            eventType: "auth.impersonation.refused",
+        logger.warn(impersonating
+            ? "[Security Audit] Refused a request to act as another user"
+            : "[Security Audit] Refused a request to simulate access", {
+            eventType: impersonating ? "auth.impersonation.refused" : "auth.simulation.refused",
             reason: "unsupported-route",
             method: c.req.method,
             path,
             requestId: c.get("requestId")
         });
-        return errorHandler(ApiError.badRequest(
-            `This route cannot run as another user, so it refuses the ${IMPERSONATE_HEADER} header. ` +
-            "Only the data API and custom functions honour it.",
-            "IMPERSONATION_UNSUPPORTED"
-        ), c) as Response;
+        return errorHandler(impersonating
+            ? ApiError.badRequest(
+                `This route cannot run as another user, so it refuses the ${IMPERSONATE_HEADER} header. ` +
+                "Only the data API and custom functions honour it.",
+                "IMPERSONATION_UNSUPPORTED"
+            )
+            : ApiError.badRequest(
+                "This route cannot run with simulated access, so it refuses the x-rebase-simulate-* headers. " +
+                "Only the data API and custom functions honour them.",
+                "SIMULATION_UNSUPPORTED"
+            ), c) as Response;
     };
 }

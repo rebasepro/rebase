@@ -1,5 +1,5 @@
 ---
-sourceHash: fba11bae884a016c
+sourceHash: 5c7b67d88241564a
 title: Index des points de terminaison
 sidebar_label: Index des points de terminaison
 description: Chaque route HTTP montée par un backend Rebase — données, auth, stockage, admin, méta — avec son contrôle d'accès et la page qui l'explique.
@@ -146,6 +146,8 @@ une collection ne peut accéder à rien de tout cela. Voir [Rôles et portées](
 | `GET` | `/api/admin/logs/latest` | `logs:read` | Les entrées les plus récentes |
 | `GET` | `/api/admin/logs/stream` | `logs:read` | Événements envoyés par le serveur (SSE) |
 | `GET` | `/api/admin/rls-audit` | `schema:read` | Le dernier résultat de l'audit planifié |
+| `GET` | `/api/admin/rls-simulator/options` | `schema:read` | Les rôles, ceux que nomment les règles et les clés de service valides qu'un administrateur peut simuler |
+| `POST` | `/api/admin/rls-simulator/preview` | `schema:read` | Chaque collection telle que `{ role?, userId?, apiKeyId? }` l'atteint : lignes visibles face à celles de l'appelant, masquées par la portée ou par la RLS, champs masqués. Session d'un administrateur uniquement |
 | `POST` | `/api/admin/sql/csv` | `database:write` | Diffuse en streaming le résultat complet d'une requête en lecture seule au format CSV — « Télécharger le résultat complet en CSV » de [Studio](/docs/studio/) |
 | `GET` | `/api/admin/schema/status` | `schema:read` | [Édition de schéma en direct](/docs/backend/live-schema-editing/) |
 | `POST` | `/api/admin/schema/plan` | `schema:read` | Planifie une modification ; ne l'applique jamais |

@@ -3,7 +3,7 @@ import { cls, defaultBorderMixin, IconButton, Sheet, Tooltip } from "@rebasepro/
 import { ChevronLeftIcon, ErrorBoundary, MenuIcon } from "@rebasepro/ui";
 import { deepEqual as equal } from "fast-equals"
 
-import { ConnectionLostBanner, useLargeLayout, useTranslation } from "@rebasepro/app";
+import { ConnectionLostBanner, RlsSimulationBanner, useLargeLayout, useTranslation } from "@rebasepro/app";
 import { useUrlController } from "../../hooks/navigation/contexts/UrlContext";
 import { AppContext } from "./useApp";
 
@@ -266,6 +266,13 @@ export const Scaffold = React.memo<PropsWithChildren<ScaffoldProps>>(
                             the realtime connection is down, every live view is
                             showing what it last received. */}
                         <ConnectionLostBanner className={cls("px-2 pt-1", {
+                            "lg:pt-0 lg:pb-2": padding,
+                            "lg:pt-2": !hasAppBar && padding
+                        })}/>
+
+                        {/* While access is simulated, every data view shows
+                            another identity's rows: say so on every screen. */}
+                        <RlsSimulationBanner className={cls("px-2 pt-1", {
                             "lg:pt-0 lg:pb-2": padding,
                             "lg:pt-2": !hasAppBar && padding
                         })}/>

@@ -70,6 +70,7 @@ import { createRoutedRealtimeService } from "../services/routed-realtime-service
 import { RestApiGenerator } from "../api/rest/api-generator";
 import { createAuthMiddleware } from "../auth/middleware";
 import { refuseUnhonouredImpersonation } from "../auth/impersonation";
+import { reportSimulatedContext } from "../auth/simulation";
 import { createAdapterAuthMiddleware } from "../auth/adapter-middleware";
 import { scopeDataDriver, SERVICE_IDENTITY } from "../auth/rls-scope";
 import { createBuiltinAuthAdapter } from "../auth/builtin-auth-adapter";
@@ -3194,6 +3195,27 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
         rlsAuditSurface = rlsAuditRouter;
     }
 
+    // 6b-ii-b. The RLS simulator's overview: what can be simulated, and each
+    // collection as a simulated role, user or key reaches it. The gate admits
+    // `schema:read`; the route itself admits only an administrator's own
+    // session, the rule the data API's simulation headers follow.
+    let rlsSimulatorSurface: Hono<HonoEnv> | undefined;
+    if (surfaces.admin) {
+        const { createRlsSimulatorRoutes } = await import("../auth/rls-simulator-routes");
+        const rlsSimulatorRouter = new Hono<HonoEnv>();
+        applyAdminGate(rlsSimulatorRouter, "RLS simulator", "schema:read");
+        rlsSimulatorRouter.route("/", createRlsSimulatorRoutes({
+            collections: () => collectionRegistry.getRawCollections(),
+            driverFor: (slug) => {
+                const key = keyForCollectionPath(slug);
+                return !key || key === DEFAULT_DRIVER_ID ? defaultDriver : driverRegistry.get(key) ?? defaultDriver;
+            },
+            resolveUser: authAdapter?.resolveUser ? authAdapter.resolveUser.bind(authAdapter) : undefined,
+            apiKeyStore
+        }));
+        rlsSimulatorSurface = rlsSimulatorRouter;
+    }
+
     // 6b-ii-a. The SQL console's "Download full result as CSV".
     //
     // `database:write`: the scope the socket's `EXECUTE_SQL` asks of the same
@@ -3488,6 +3510,7 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
             if (storageMaintenanceSurface) adminGroup.route("/storage", storageMaintenanceSurface);
             if (backupSurface) adminGroup.route("/backups", backupSurface);
             if (rlsAuditSurface) adminGroup.route("/rls-audit", rlsAuditSurface);
+            if (rlsSimulatorSurface) adminGroup.route("/rls-simulator", rlsSimulatorSurface);
             if (sqlExportSurface) adminGroup.route("/sql", sqlExportSurface);
             if (devMailSurface) adminGroup.route("/dev/emails", devMailSurface);
             if (logsSurface) adminGroup.route("/logs", logsSurface);
@@ -3576,6 +3599,9 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
         // else, never answered as the administrator who sent it. See
         // `auth/impersonation.ts`.
         app.use(`${basePath}/*`, refuseUnhonouredImpersonation([`${basePath}/data`, `${basePath}/functions`]));
+        // The other end of the RLS simulator: a simulated request's response
+        // names what it ran as and the fields that identity cannot read.
+        app.use(`${basePath}/*`, reportSimulatedContext());
 
         if (surfaces.admin) app.route(`${basePath}/admin`, groups.admin());
         if (surfaces.auth) app.route(`${basePath}/auth`, groups.auth());

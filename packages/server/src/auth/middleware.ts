@@ -12,6 +12,7 @@ import type { ApiKeyStore } from "./api-keys/api-key-store";
 import { logger } from "../utils/logger";
 import { extractBearerToken } from "./bearer-token";
 import { applyImpersonation, type ImpersonationCredential } from "./impersonation";
+import { applySimulation } from "./simulation";
 // Leaf modules (`@rebasepro/types` only), so these do not close an import cycle
 // with `storage/routes.ts` — which is the point: the route, the public check and
 // both sides of the token comparison derive the object, and the source it
@@ -495,6 +496,11 @@ code: "INTERNAL_ERROR" } }, 500);
         // No `resolveUser` here: this middleware serves a backend with no
         // account store to read another user from, so a request carrying the
         // header is refused — never run as its caller.
+        // Simulated access (the RLS simulator) is decided first: it refuses a
+        // request that also asks to impersonate. Without `resolveUser` an
+        // administrator's roles cannot be re-read, so it is refused too.
+        const refusedSimulation = await applySimulation(c, { credential, driver, apiKeyStore });
+        if (refusedSimulation) return refusedSimulation;
         const refused = await applyImpersonation(c, { credential, driver });
         if (refused) return refused;
 

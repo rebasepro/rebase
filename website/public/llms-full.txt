@@ -4121,6 +4121,24 @@ yet, listed so that nobody reads a promise into them:
   `Collection.View`, `DetailView` and `HomePage`'s drag-and-drop stay
   uncopyable on purpose; the recipes README says why and what to customize
   instead. A test fails when a part that copies stops copying.
+- **"Simulate access" in the app bar: see every collection as a role, a user
+  or a service key.** Pick one and every data view reloads showing only the
+  rows and fields it can read, under a banner that counts the collections it
+  cannot see and the columns masked from it. `client.simulate()` is the client
+  behind it.
+
+##### Server
+
+- **The RLS simulator: an administrator's data request can run as a role, a
+  user or a service key.** `x-rebase-simulate-role`, `x-rebase-simulate-user-id`
+  and `x-rebase-simulate-api-key-id` on the data API and custom functions run
+  the request through the real policies as that identity (`customer` holding
+  uid `u_1` need not be an account), and a key's scopes apply as they would to
+  the key. The response's `x-rebase-simulated-context` names the role, the uid
+  and the fields that identity's roles cannot read. Anyone but an
+  administrator's own session gets `403 SIMULATION_FORBIDDEN`, and every other
+  route refuses the headers. `/api/admin/rls-simulator` lists what can be
+  simulated and previews each collection's visible rows and masked fields.
 
 #### Changed
 
@@ -25570,6 +25588,11 @@ the ID you got. Read the response header.
 | `IMPERSONATION_TARGET_NOT_FOUND` | 404 | `x-rebase-impersonate` names no active user: no account has that uid, or it is disabled. | Check the uid. |
 | `IMPERSONATION_UNAVAILABLE` | 501 | This backend's auth cannot run a request as another user, because its `AuthAdapter` has no `resolveUser`. | Implement `resolveUser` in the adapter, or leave the header out. |
 | `IMPERSONATION_UNSUPPORTED` | 400 | `x-rebase-impersonate` was sent to a route that cannot run as another user. Only the data API and custom functions honour it, and the realtime socket honours `impersonate` on `AUTHENTICATE`. | Send the request without the header. |
+| `SIMULATION_FORBIDDEN` | 403 | A request sent an `x-rebase-simulate-*` header (the RLS simulator), or asked `/api/admin/rls-simulator`, and its caller may not simulate access. Only a signed-in administrator's own session may, never an API key or the service key. | Send it with an administrator's session, or leave the headers out. |
+| `SIMULATION_INVALID` | 400 | The simulation was malformed: a header sent empty, `x-rebase-simulate-api-key-id` combined with a role or user id, or simulation combined with `x-rebase-impersonate`. | Name one role (optionally with a uid), one user id, or one API key id. |
+| `SIMULATION_TARGET_NOT_FOUND` | 404 | The simulation names no active user (a user id sent without a role) or no live API key. | Check the id, or send a role with the uid to simulate a uid that has no account. |
+| `SIMULATION_UNAVAILABLE` | 501 | This backend cannot simulate access: its `AuthAdapter` has no `resolveUser` to confirm an administrator, or a key was named on a backend with no API keys. | Implement `resolveUser`, or leave the headers out. |
+| `SIMULATION_UNSUPPORTED` | 400 | An `x-rebase-simulate-*` header was sent to a route that cannot run with simulated access. Only the data API and custom functions honour them. | Send the request without the headers. |
 | `INVALID_ACCOUNT` | 400 | The account is in a state this operation cannot act on. | See the message. |
 | `INVALID_CHALLENGE` | 400 | The MFA challenge is unknown or expired. | Start a new one. |
 | `INVALID_CODE` | 400 / 401 | The OTP or MFA code is wrong: 400 from the email-code sign-in (`/auth/otp/verify`), 401 from an MFA enrolment or challenge. | Retry with the current code. |
@@ -25971,6 +25994,8 @@ a collection reaches none of this. See [Roles and scopes](/docs/backend/roles-an
 | `GET` | `/api/admin/logs/latest` | `logs:read` | The most recent entries |
 | `GET` | `/api/admin/logs/stream` | `logs:read` | Server-sent events |
 | `GET` | `/api/admin/rls-audit` | `schema:read` | The scheduled audit's latest result |
+| `GET` | `/api/admin/rls-simulator/options` | `schema:read` | Roles, users' rule roles and live service keys an administrator can simulate |
+| `POST` | `/api/admin/rls-simulator/preview` | `schema:read` | Each collection as `{ role?, userId?, apiKeyId? }` reaches it: visible rows against the caller's, hidden by scope or RLS, masked fields. Administrator's session only |
 | `POST` | `/api/admin/sql/csv` | `database:write` | Streams one read-only query's whole result as CSV — [Studio](/docs/studio/)'s "Download full result as CSV" |
 | `GET` | `/api/admin/schema/status` | `schema:read` | [Live schema editing](/docs/backend/live-schema-editing/) |
 | `POST` | `/api/admin/schema/plan` | `schema:read` | Plans a change; never applies one |
@@ -48229,7 +48254,7 @@ bodies sit in per-skill subdirectories and are opened on demand.
 it too; naming both `gemini` and `codex` writes the directory once.
 
 With no `--agent`, the command detects which assistants a project already uses by
-looking for `.cursor/`, `.claude/`, `.windsurf/`, `.agents/`, `.codex/` and
+looking for `.cursor/`, `.claude/skills/`, `.windsurf/`, `.agents/`, `.codex/` and
 `.kiro/`. If it finds none it prompts you to choose, with the assistants installed
 on the machine already ticked.
 
@@ -48476,7 +48501,7 @@ Or run any command without installing it: `pnpm dlx @rebasepro/cli <command>`.
 
 ### Machine-readable output
 
-`--json` is the switch, and outside the `cloud` family it is the only one: `rebase status`, `rebase resources`, `rebase apps list` and `rebase upgrade` then put one JSON value on stdout — the result, or a `{"error": {"message", "code", "hint", "issues"}}` envelope with a non-zero exit — on **every** exit of the command, so a caller can parse stdout unconditionally. Without it they write human text and failures go to stderr. `rebase cloud` uses the same envelope and is the one exception to the switch: it also turns JSON on by itself when stdout is not a TTY, or when `REBASE_JSON=1` is set. So `rebase cloud status | cat` is JSON while `rebase status | cat` is not — in a script, pass `--json` explicitly rather than relying on either rule.
+`--json` is the switch, and outside the `cloud` family it is the only one: `rebase status`, `rebase resources`, `rebase apps list`, `rebase upgrade` and `rebase verify` then put one JSON value on stdout — the result, or a `{"error": {"message", "code", "hint", "issues"}}` envelope with a non-zero exit — on **every** exit of the command, so a caller can parse stdout unconditionally. Without it they write human text and failures go to stderr. `rebase cloud` uses the same envelope and is the one exception to the switch: it also turns JSON on by itself when stdout is not a TTY, or when `REBASE_JSON=1` is set. So `rebase cloud status | cat` is JSON while `rebase status | cat` is not — in a script, pass `--json` explicitly rather than relying on either rule.
 
 ### Commands
 
@@ -48865,6 +48890,32 @@ you set no `DATABASE_URL` is not a failure.
 types — and fails closed, which makes it the form to use as a CI gate against a
 deployed database.
 
+#### `rebase verify`
+
+```bash
+rebase verify
+rebase verify --json
+rebase verify --live
+```
+
+Whether the collections are safe to ship, in one fast command for CI and for an
+AI agent's hooks. Offline by default, and it never changes anything.
+
+| Step | What fails it |
+| --- | --- |
+| Collection config | A file under `config/collections/` that does not load, or that the boot validator rejects — with unknown keys as errors, so a misspelt option or a UI option written outside `admin: { … }` (a top-level `widget`) is caught here rather than silently ignored. |
+| RLS coverage | A collection with no `securityRules` that inherits none, or one with a `user_id`, `owner_id`, `organization_id` or `tenant_id` column that relies on directory defaults instead. A rule that lets a role read every row of such a table is a warning. |
+| Migration freshness | A table or column the collections declare that no file in `backend/drizzle/migrations` creates, or one they dropped that a migration still creates. Skipped for a project with no migrations yet. |
+| Live RLS audit | With `--live`: the [`rls-check`](/docs/rls-check) catalogue against `DATABASE_URL`, and whether every migration has been applied. |
+
+`--json` prints one object — every step, and every finding with its `file`, the
+dotted `path` into the collection config, and the `fix` — so an agent can repair
+what it broke. `--quiet` prints nothing when everything passes. Exits non-zero on
+an error; warnings do not fail.
+
+A scaffolded project runs it for Claude Code after every collection edit: see
+[`rebase skills install`](#rebase-skills-install).
+
 #### `rebase auth`
 
 Authentication management commands:
@@ -48930,9 +48981,16 @@ Install the Rebase reference skills for your AI coding assistants — every `--a
 rebase skills install
 rebase skills install --agent claude,cursor
 rebase skills install --agent all
+rebase skills --hooks
 ```
 
 See [Agent Skills](/docs/ai/skills) for the full list and where files are written.
+
+`--hooks` installs the Claude Code guardrail `rebase init` ships with every
+project: `.claude/hooks/post-edit-collection.sh`, registered as a `PostToolUse`
+hook in `.claude/settings.json`, which runs `rebase verify --quiet` after each edit
+under `config/collections/` and hands any problem back to the agent. Existing
+settings and hooks are kept. `rebase skills --hooks` installs the hook alone.
 
 #### `rebase telemetry`
 
@@ -49966,6 +50024,7 @@ to `host` with the password `pa@ss`. Encoding them anyway is never wrong.
 | Option | Meaning |
 | --- | --- |
 | `--json` | Machine-readable output on stdout, and nothing else on stdout |
+| `--format <name>` | `text` (default), `json` (the same as `--json`) or `agent`: one JSON document for a coding agent, where every finding carries the failing table and policy, the SQL that fixes it and the equivalent Rebase `securityRules` |
 | `--html <path>` | Also write a self-contained HTML report there. One file, no network requests |
 | `--schema <name>` | Restrict the scan to a schema. Repeatable, or comma-separated |
 | `--role <name>` | Treat this role as one an untrusted caller arrives as, on top of `anon`, `authenticated`, `web_anon` and `rebase_user`. Repeatable, or comma-separated |
@@ -50040,6 +50099,16 @@ credentials), `serverVersion`, `platform`, `scannerIsPrivileged`, `exposedRoles`
 `exposedRoles` and `diagnostics` are part of the contract, not extras: every check gates on
 the exposed set, and `diagnostics.degraded` is how a consumer tells "nothing was wrong" from
 "the scan could not look". Reading `findings: []` without both is reading half the answer.
+
+#### Agent output
+
+`--format agent` prints one JSON document for a coding agent that fixes what it finds. Every
+finding names its check id and failing object (`target.table`, `target.policy`, …) and carries
+a `remediation`: `apply` (`sql`; `rebase-config` when Rebase re-makes the policy from a
+collection's `securityRules` at every boot; or `manual`), runnable `sql` written per check, the
+`placeholders` to fill in first, and `rebase` — the same fix as
+`defineCollection({ securityRules: [...] })`, or why rules cannot express it. Each finding's
+`key` is stable across runs, so a re-run shows what was cleared. `--json` is unchanged.
 
 ### Running it on a schedule
 

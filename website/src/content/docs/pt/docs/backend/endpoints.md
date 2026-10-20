@@ -1,5 +1,5 @@
 ---
-sourceHash: fba11bae884a016c
+sourceHash: 5c7b67d88241564a
 title: Índice de endpoints
 sidebar_label: Índice de endpoints
 description: Cada rota HTTP montada por um backend Rebase — dados, autenticação, armazenamento, administração, meta — com a restrição de acesso (gate) de cada uma e a página que a explica.
@@ -146,6 +146,8 @@ uma coleção não acessa nada disso. Consulte [Papéis e escopos](/docs/backend
 | `GET` | `/api/admin/logs/latest` | `logs:read` | As entradas mais recentes |
 | `GET` | `/api/admin/logs/stream` | `logs:read` | Server-sent events |
 | `GET` | `/api/admin/rls-audit` | `schema:read` | O resultado mais recente da auditoria agendada |
+| `GET` | `/api/admin/rls-simulator/options` | `schema:read` | As funções, as que as regras nomeiam e as chaves de serviço válidas que um administrador pode simular |
+| `POST` | `/api/admin/rls-simulator/preview` | `schema:read` | Cada coleção tal como `{ role?, userId?, apiKeyId? }` a alcança: linhas visíveis face às de quem chama, ocultas pelo âmbito ou pela RLS, campos mascarados. Só a sessão de um administrador |
 | `POST` | `/api/admin/sql/csv` | `database:write` | Transmite via stream o resultado completo de uma consulta somente leitura como CSV — "Baixar resultado completo como CSV" do [Studio](/docs/studio/) |
 | `GET` | `/api/admin/schema/status` | `schema:read` | [Live schema editing](/docs/backend/live-schema-editing/) |
 | `POST` | `/api/admin/schema/plan` | `schema:read` | Planeja uma alteração; nunca aplica |

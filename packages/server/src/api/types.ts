@@ -52,6 +52,13 @@ export type HonoEnv = {
          * remains. See `auth/impersonation.ts`.
          */
         impersonator?: { uid: string };
+        /**
+         * What an administrator's simulated request runs as (the RLS
+         * simulator's `x-rebase-simulate-*` headers): the role label, the uid,
+         * the roles, and the key when one was named. Read after the request by
+         * `reportSimulatedContext`. See `auth/simulation.ts`.
+         */
+        simulation?: { role: string; sub: string; roles: string[]; apiKeyId?: string };
         /** Unique request correlation ID (generated or propagated from X-Request-ID header). */
         requestId?: string;
         /**

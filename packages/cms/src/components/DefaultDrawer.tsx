@@ -32,7 +32,7 @@ import {
 } from "@rebasepro/ui";
 import { DrawerNavigationGroup } from "./DrawerNavigationGroup";
 import { DrawerExpansionContext, useDrawerExpansion } from "./drawer_expansion";
-import { LanguageToggle, RebaseLogo } from "@rebasepro/app";
+import { LanguageToggle, RebaseLogo, RlsSimulatorBar, useCanSimulateAccess } from "@rebasepro/app";
 import { useApp } from "./app/useApp";
 
 /**
@@ -498,6 +498,7 @@ export function DrawerFooterActions({
     const showFullContent = drawerOpen || drawerHovered;
     const isFloating = drawerHovered && !drawerOpen;
     const portalRef = React.useRef<HTMLDivElement>(null);
+    const canSimulateAccess = useCanSimulateAccess();
 
     // User avatar
     let avatarComponent: React.ReactElement | null;
@@ -516,6 +517,19 @@ export function DrawerFooterActions({
 
     return (
         <div className="shrink-0 pt-2 pb-0" ref={portalRef}>
+            {/* The RLS simulator: an icon on the collapsed rail, the pill when expanded. */}
+            {canSimulateAccess && (
+                <div className="flex items-center px-[16px] py-1">
+                    {/* The avatar's 44px column, so the icon lines up with it. */}
+                    <div className={cls("flex", { "w-[44px] justify-center": !showFullContent })}>
+                        <RlsSimulatorBar
+                            compact={!showFullContent}
+                            side="right"
+                            align="end"
+                            portalContainer={portalRef.current}/>
+                    </div>
+                </div>
+            )}
             {avatarComponent && (
                 <div className="flex items-center px-[16px] py-1">
                     <Menu

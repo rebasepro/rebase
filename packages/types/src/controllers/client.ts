@@ -9,6 +9,7 @@ import type { ApiKeysAPI, PersonalKeysAPI } from "../types/api_keys";
 import type { RoleSummary } from "../types/scopes";
 import type { StorageSourceDefinition } from "../types/storage_source";
 import type { RegisteredDatabase } from "../types/register";
+import type { AccessSimulation } from "../types/auth_adapter";
 
 
 /**
@@ -501,6 +502,21 @@ export interface RebaseClient<DB = unknown> {
 
     /** Resolve the current auth token */
     resolveToken?(): Promise<string | null>;
+
+    /**
+     * A client whose data requests run with simulated access — as a role, a
+     * uid holding a role, or a service key — for an administrator checking
+     * what row-level security lets that identity read (the admin panel's
+     * "Simulate access" bar).
+     *
+     * Every request carries the `x-rebase-simulate-*` headers and this
+     * client's token; the server honours them on the data API and custom
+     * functions for an administrator's own session and refuses them anywhere
+     * else. The derived client opens no realtime socket (live queries fetch
+     * once), keeps no offline cache, and holds no session: a refusal of its
+     * token is answered by this client. Close it with `close()` when done.
+     */
+    simulate?(simulation: AccessSimulation): RebaseClient<Record<string, unknown>>;
 
     /**
      * POST to an arbitrary path on the backend — the escape hatch, not the way

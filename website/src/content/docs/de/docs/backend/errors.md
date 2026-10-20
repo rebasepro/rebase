@@ -1,5 +1,5 @@
 ---
-sourceHash: 737b37c2bcd33dac
+sourceHash: f9b724608d4cb30c
 title: Fehlercodes
 sidebar_label: Fehlercodes
 description: Jeder Fehlercode, den ein Rebase-Backend zurückgeben kann, mit seinem HTTP-Status, seiner Bedeutung und Lösungsansätzen – plus Response-Envelope, X-Request-ID und den Details-Regeln.
@@ -82,6 +82,11 @@ Einen eigenen Header zu senden stellt sicher, dass ein Trace über Hops hinweg e
 | `IMPERSONATION_TARGET_NOT_FOUND` | 404 | `x-rebase-impersonate` nennt keinen aktiven Benutzer: Kein Konto hat diese uid, oder es ist deaktiviert. | Prüfen Sie die uid. |
 | `IMPERSONATION_UNAVAILABLE` | 501 | Die Authentifizierung dieses Backends kann keine Anfrage als ein anderer Benutzer ausführen, weil ihr `AuthAdapter` kein `resolveUser` hat. | Implementieren Sie `resolveUser` im Adapter oder lassen Sie den Header weg. |
 | `IMPERSONATION_UNSUPPORTED` | 400 | `x-rebase-impersonate` wurde an eine Route gesendet, die nicht als ein anderer Benutzer laufen kann. Nur die Daten-API und Custom Functions beachten ihn, und der Realtime-Socket beachtet `impersonate` bei `AUTHENTICATE`. | Senden Sie die Anfrage ohne den Header. |
+| `SIMULATION_FORBIDDEN` | 403 | Eine Anfrage hat einen `x-rebase-simulate-*`-Header (den RLS-Simulator) gesendet oder `/api/admin/rls-simulator` aufgerufen, und der Aufrufer darf keinen Zugriff simulieren. Das darf nur die eigene Sitzung eines angemeldeten Administrators, nie ein API-Schlüssel oder der Dienstschlüssel. | Mit der Sitzung eines Administrators senden oder die Header weglassen. |
+| `SIMULATION_INVALID` | 400 | Die Simulation war fehlerhaft: ein leer gesendeter Header, `x-rebase-simulate-api-key-id` zusammen mit einer Rolle oder Benutzer-ID, oder Simulation zusammen mit `x-rebase-impersonate`. | Eine Rolle (optional mit einer uid), eine Benutzer-ID oder eine API-Schlüssel-ID angeben. |
+| `SIMULATION_TARGET_NOT_FOUND` | 404 | Die Simulation nennt keinen aktiven Benutzer (eine Benutzer-ID ohne Rolle) und keinen gültigen API-Schlüssel. | Die ID prüfen, oder eine Rolle mit der uid senden, um eine uid ohne Konto zu simulieren. |
+| `SIMULATION_UNAVAILABLE` | 501 | Dieses Backend kann keinen Zugriff simulieren: Sein `AuthAdapter` hat kein `resolveUser`, um einen Administrator zu bestätigen, oder ein Schlüssel wurde auf einem Backend ohne API-Schlüssel genannt. | `resolveUser` implementieren oder die Header weglassen. |
+| `SIMULATION_UNSUPPORTED` | 400 | Ein `x-rebase-simulate-*`-Header wurde an eine Route gesendet, die nicht mit simuliertem Zugriff laufen kann. Nur die Daten-API und eigene Funktionen beachten sie. | Die Anfrage ohne die Header senden. |
 | `INVALID_ACCOUNT` | 400 | Das Konto befindet sich in einem Zustand, auf den diese Operation nicht angewendet werden kann. | Siehe Nachricht. |
 | `INVALID_CHALLENGE` | 400 | Die MFA-Abfrage ist unbekannt oder abgelaufen. | Starten Sie eine neue Abfrage. |
 | `INVALID_CODE` | 400 / 401 | Der OTP- oder MFA-Code ist falsch: 400 bei der Anmeldung per E-Mail-Code (`/auth/otp/verify`), 401 bei einer MFA-Einrichtung oder -Challenge. | Versuchen Sie es mit dem aktuellen Code erneut. |

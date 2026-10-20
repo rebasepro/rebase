@@ -201,6 +201,50 @@ export interface RebaseTranslations {
     realtime_connection_lost_title: string;
     /** Banner body for the same */
     realtime_connection_lost_body: string;
+    /** The app bar pill that opens the RLS simulator */
+    rls_simulate_access: string;
+    /** What the simulator does, at the top of its popover */
+    rls_simulate_access_description: string;
+    /** Simulator tab: simulate a role */
+    rls_simulate_tab_role: string;
+    /** Simulator tab: simulate an existing user */
+    rls_simulate_tab_user: string;
+    /** Simulator tab: simulate a service API key */
+    rls_simulate_tab_api_key: string;
+    /** Optional uid sent with a simulated role */
+    rls_simulate_user_id_optional: string;
+    /** Button starting a role simulation */
+    rls_simulate_apply: string;
+    /** Button ending the simulation */
+    rls_simulate_stop: string;
+    /** Placeholder of the simulator's user search */
+    rls_simulate_search_users: string;
+    /** The user search found nobody */
+    rls_simulate_no_users: string;
+    /** The project has no live service keys */
+    rls_simulate_no_api_keys: string;
+    /** The simulator could not load its options; {{message}} is why */
+    rls_simulate_options_error: string;
+    /** Banner: simulating a role, {{role}} */
+    rls_simulation_viewing_as_role: string;
+    /** Banner: simulating uid {{user}} holding {{role}} */
+    rls_simulation_viewing_as_role_user: string;
+    /** Banner: simulating an existing user, {{user}} */
+    rls_simulation_viewing_as_user: string;
+    /** Banner: simulating a service key, {{name}} and its prefix {{prefix}} */
+    rls_simulation_viewing_as_api_key: string;
+    /** Banner: {{count}} collections show this identity nothing */
+    rls_simulation_hidden_collections: string;
+    /** Same, for one collection */
+    rls_simulation_hidden_collections_one: string;
+    /** Banner: {{count}} fields this identity cannot read */
+    rls_simulation_masked_columns: string;
+    /** Same, for one field */
+    rls_simulation_masked_columns_one: string;
+    /** Banner while the per-collection preview loads */
+    rls_simulation_counting: string;
+    /** Banner body: what the data views show while simulating */
+    rls_simulation_note: string;
     create_index: string;
     value_is_not_reference: string;
     click_to_edit: string;

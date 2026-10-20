@@ -1,5 +1,5 @@
 ---
-sourceHash: 737b37c2bcd33dac
+sourceHash: f9b724608d4cb30c
 title: Códigos de erro
 sidebar_label: Códigos de erro
 description: Todos os códigos de erro que um backend Rebase pode retornar, com seu status HTTP, significado e o que fazer a respeito — além do envelope de resposta, X-Request-ID e as regras de details.
@@ -109,6 +109,11 @@ ID recebido. Leia o cabeçalho de resposta.
 | `IMPERSONATION_TARGET_NOT_FOUND` | 404 | `x-rebase-impersonate` não nomeia nenhum usuário ativo: nenhuma conta tem esse uid, ou ela está desativada. | Verifique o uid. |
 | `IMPERSONATION_UNAVAILABLE` | 501 | A autenticação deste backend não consegue executar uma requisição como outro usuário, porque seu `AuthAdapter` não tem `resolveUser`. | Implemente `resolveUser` no adaptador, ou remova o cabeçalho. |
 | `IMPERSONATION_UNSUPPORTED` | 400 | `x-rebase-impersonate` foi enviado a uma rota que não pode rodar como outro usuário. Só a API de dados e as funções personalizadas o respeitam, e o socket em tempo real respeita `impersonate` no `AUTHENTICATE`. | Envie a requisição sem o cabeçalho. |
+| `SIMULATION_FORBIDDEN` | 403 | Um pedido enviou um cabeçalho `x-rebase-simulate-*` (o simulador de RLS), ou chamou `/api/admin/rls-simulator`, e quem chama não pode simular acesso. Só pode a sessão própria de um administrador com sessão iniciada, nunca uma chave de API nem a chave de serviço. | Envie-o com a sessão de um administrador, ou retire os cabeçalhos. |
+| `SIMULATION_INVALID` | 400 | A simulação estava mal formada: um cabeçalho enviado vazio, `x-rebase-simulate-api-key-id` junto com uma função ou um id de utilizador, ou simulação junto com `x-rebase-impersonate`. | Indique uma função (com um uid opcional), um id de utilizador ou um id de chave de API. |
+| `SIMULATION_TARGET_NOT_FOUND` | 404 | A simulação não indica nenhum utilizador ativo (um id de utilizador sem função) nem nenhuma chave de API válida. | Verifique o id, ou envie uma função com o uid para simular um uid sem conta. |
+| `SIMULATION_UNAVAILABLE` | 501 | Este backend não pode simular acesso: o seu `AuthAdapter` não tem `resolveUser` para confirmar um administrador, ou foi indicada uma chave num backend sem chaves de API. | Implemente `resolveUser`, ou retire os cabeçalhos. |
+| `SIMULATION_UNSUPPORTED` | 400 | Foi enviado um cabeçalho `x-rebase-simulate-*` a uma rota que não pode ser executada com acesso simulado. Só a API de dados e as funções personalizadas os respeitam. | Envie o pedido sem os cabeçalhos. |
 | `INVALID_ACCOUNT` | 400 | A conta está em um estado sobre o qual esta operação não pode atuar. | Veja a mensagem. |
 | `INVALID_CHALLENGE` | 400 | O desafio de MFA é desconhecido ou expirou. | Inicie um novo. |
 | `INVALID_CODE` | 400 / 401 | O código OTP ou MFA está incorreto: 400 no login por código de e-mail (`/auth/otp/verify`), 401 em um cadastro ou desafio de MFA. | Tente novamente com o código atual. |
