@@ -1,5 +1,5 @@
 ---
-sourceHash: 0a17c13d60408e81
+sourceHash: 2f11ac867504684b
 title: Surcharges de composants (Swizzling)
 sidebar_label: Surcharges de composants
 description: Remplacez les composants d'interface utilisateur par défaut par des implémentations personnalisées au niveau de l'application ou de la collection.
@@ -174,10 +174,15 @@ La table des surcharges ne définit pas un type de props par clé — `Component
 par défaut `P` sur `Record<string, unknown>` — vous devez donc typer le paramètre vous-même,
 ou passer un argument de type, lorsque vous souhaitez que les props soient vérifiées.
 Quelques-uns des composants intégrés exportent un type de props que vous pouvez importer et réutiliser :
-`CollectionViewProps` (`@rebasepro/ui`) ; `CollectionEmptyStateProps`, `CollectionActionsProps` et
-`FilterFieldBindingProps` (`@rebasepro/cms-types`) ; `EntityFormProps` et `EntityFormActionsProps`
-(`@rebasepro/cms`). Les autres ne disposent pas d'un type de props exporté — écrivez la structure que
-vous utilisez réellement.
+`CollectionViewProps` (`@rebasepro/ui`) ; `CollectionEmptyStateProps`, `CollectionActionsProps`, `SidePanelBindingProps` et
+`FilterFieldBindingProps` (`@rebasepro/cms-types`) ; `EntityFormProps`, `EntityFormBindingProps`, `EntityFormActionsProps`, `CollectionTableBindingProps`, `DetailViewBindingProps`, `DrawerNavigationItemProps` et
+`DrawerNavigationGroupProps` (`@rebasepro/cms`) ; `LoginViewProps` (`@rebasepro/app`). Les autres ne
+disposent pas d'un type de props exporté — écrivez la structure que vous utilisez réellement.
+
+Pour partir de l'élément intégré plutôt que de rien, copiez son code source dans votre projet et
+enregistrez la copie ici : tous les éléments sauf `Collection.View`, `DetailView` et le glisser-déposer
+de la page d'accueil compilent avec des imports de paquets. Voir
+[Copier un élément intégré](/docs/frontend/customizing#copying-a-built-in-part).
 
 ## En savoir plus
 

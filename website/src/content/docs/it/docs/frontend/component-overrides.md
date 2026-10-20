@@ -1,5 +1,5 @@
 ---
-sourceHash: 0a17c13d60408e81
+sourceHash: 2f11ac867504684b
 title: Override dei componenti (Swizzling)
 sidebar_label: Override dei componenti
 description: Esegui l'override dei componenti UI predefiniti con implementazioni personalizzate a livello di applicazione o di collection.
@@ -167,7 +167,9 @@ Questi componenti possono essere sovrascritti a livello globale (fungendo da imp
 `"Entity.DetailView"`, `"Entity.Preview"` e `"Entity.FormActions"` non fanno parte dell'unione di tipi: generano un errore di tipo e, in plain JavaScript, l'override semplicemente non viene mai applicato.
 :::
 
-Il tuo componente sostitutivo riceve le stesse props fornite al componente integrato. La mappa di override non specifica un tipo di props per chiave — `ComponentOverride<P>` imposta `P` su `Record<string, unknown>` per impostazione predefinita — pertanto, definisci manualmente il tipo del parametro, o passa un argomento di tipo, quando desideri che le props vengano verificate. Alcuni componenti integrati esportano un tipo per le props che puoi importare e riutilizzare: `CollectionViewProps` (`@rebasepro/ui`); `CollectionEmptyStateProps`, `CollectionActionsProps` e `FilterFieldBindingProps` (`@rebasepro/cms-types`); `EntityFormProps` ed `EntityFormActionsProps` (`@rebasepro/cms`). Gli altri non dispongono di un tipo esportato per le props: dichiara la struttura che effettivamente utilizzi.
+Il tuo componente sostitutivo riceve le stesse props fornite al componente integrato. La mappa di override non specifica un tipo di props per chiave — `ComponentOverride<P>` imposta `P` su `Record<string, unknown>` per impostazione predefinita — pertanto, definisci manualmente il tipo del parametro, o passa un argomento di tipo, quando desideri che le props vengano verificate. Alcuni componenti integrati esportano un tipo per le props che puoi importare e riutilizzare: `CollectionViewProps` (`@rebasepro/ui`); `CollectionEmptyStateProps`, `CollectionActionsProps`, `SidePanelBindingProps` e `FilterFieldBindingProps` (`@rebasepro/cms-types`); `EntityFormProps`, `EntityFormBindingProps`, `EntityFormActionsProps`, `CollectionTableBindingProps`, `DetailViewBindingProps`, `DrawerNavigationItemProps` e `DrawerNavigationGroupProps` (`@rebasepro/cms`); `LoginViewProps` (`@rebasepro/app`). Gli altri non dispongono di un tipo esportato per le props: dichiara la struttura che effettivamente utilizzi.
+
+Per partire dall'elemento integrato invece che da zero, copia il suo codice sorgente nel tuo progetto e registra qui la copia: ogni elemento tranne `Collection.View`, `DetailView` e il trascinamento della home page compila con gli import dei pacchetti. Vedi [Copiare un elemento integrato](/docs/frontend/customizing#copying-a-built-in-part).
 
 ## Contenuti correlati
 

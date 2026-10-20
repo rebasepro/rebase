@@ -1,5 +1,5 @@
 ---
-sourceHash: cfdbc982479ba3b1
+sourceHash: fb65c481c6cbc87a
 title: Personalizando o Admin
 sidebar_label: Personalizando o Admin
 description: Como personalizar o admin do Rebase — blocos de construção, hooks e locais, com receitas testadas para singletons, configurações por usuário, ações em massa, visualizações de calendário, painéis e telas de login personalizadas.
@@ -13,7 +13,7 @@ você escreve um componente React comum e o coloca em um local. Esse é o modelo
 - **Locais** para colocar um componente — uma página, um modo de visualização de coleção, um botão de barra de ferramentas, uma aba de registro, um campo, um slot ao lado de uma parte nativa, ou um override que substitui uma.
 
 Se um bloco de construção não fizer o que você precisa, copie seu código-fonte para o seu projeto
-e altere-o. Nada aqui precisa que uma opção de configuração exista previamente.
+e altere-o. Nada aqui precisa que uma opção de configuração exista previamente. Veja [Copiar uma parte nativa](#copiar-uma-parte-nativa).
 
 ## Receitas
 
@@ -88,6 +88,17 @@ página de configurações por usuário.
 | Algo ao lado de uma parte nativa | `<Rebase slots>` — consulte [Slots](/docs/frontend/slots) |
 | Uma substituição para uma parte nativa | `<Rebase components>` — consulte [Substituições de Componentes](/docs/frontend/component-overrides) |
 
+## O que cada local entrega ao seu componente
+
+| Local | Seu componente recebe |
+|---|---|
+| Uma página (`views`) | Nada: leia o que precisar com os hooks. Ela é renderizada dentro do router do admin, então `useUrlController().navigate(…)` (ou `react-router`) funciona. |
+| Um `Builder` de modo de visualização | `CollectionCustomViewParams`: `collection`, `path`, `tableController` (seu `data` são as linhas que a busca e os filtros da barra de ferramentas selecionam, `dataLoading`, …), `onEntityClick(entity)` para abrir uma linha do jeito que a coleção abre linhas, `selectionController`, `emptyComponent`. |
+| `admin.Actions` | `CollectionActionsProps`: `path`, `collection`, `selectionController` (`hasSelection`, `selection`, `clearSelection()`), `tableController`, `openNewDocument(defaults?)`. Transforme `selection` em linhas com `resolveSelection({ selection, accessor: useData().collection(path) })` — ela pode representar "todas as linhas que correspondem ao filtro", não só as marcadas. |
+| `Builder` de `admin.entityViews` | `EntityCustomViewParams`: `collection`, o registro (`entity`, ausente enquanto está sendo criado), seus valores não salvos (`modifiedValues`) e o formulário (`formContext`). |
+| `"Auth.LoginView"` | `{ authController }`. Entre com `authController.emailPasswordLogin?.(email, password)` (opcional: presente quando o login por e-mail está ativado); uma falha lança um erro e também fica em `authController.authProviderError`. Assim que `authController.user` é definido, o admin substitui sua tela sozinho. |
+| Qualquer outro override | As props da parte que ele substitui; com `wrap: true`, essas mais `OriginalComponent`. |
+
 ## Hooks
 
 | Hook | Pacote | Fornece |
@@ -99,3 +110,11 @@ página de configurações por usuário.
 | `useSidePanel` | `@rebasepro/cms` | Abre qualquer registro no painel lateral. |
 | `useUrlController` | `@rebasepro/cms` | URLs e navegação do admin. |
 | `resolveSelection` | `@rebasepro/cms` | Uma seleção da tabela — linhas marcadas ou "todas correspondentes" — como linhas. |
+
+## Copiar uma parte nativa
+
+Quando uma parte nativa está perto do que você quer, copie seu código-fonte do repositório de `@rebasepro/cms` (ou `@rebasepro/app`) para o seu projeto, aponte seus imports relativos para os pacotes, altere-a e registre-a com o seu nome em `<Rebase components>`. Tudo o que uma parte importa é uma exportação pública, então a cópia compila — em todas as partes menos três, e essas três são deliberadas:
+
+- **`Collection.View`** é a composição de todos os modos de visualização — lista, tabela, cards, quadro, dividida — com edição inline, o editor de campo em popup, o diálogo de exclusão e o estado do modo de visualização na URL. O que ela importa são os detalhes internos desses modos. Substitua em vez disso uma de suas partes (`Collection.Table`, `Collection.Card`, `Collection.Actions`, `Collection.EmptyState`, que podem ser copiadas), adicione um [modo de visualização](/docs/frontend/view-modes) próprio ou envolva-a com `wrap: true`.
+- **`DetailView`** é a composição da visualização de um registro: barra de identidade, abas, inspetor e os botões da lista dividida, em torno de ids de aba que são valores da URL. Personalize um registro com [entity views](/docs/frontend/entity-views), [entity actions](/docs/frontend/entity-actions), os [slots](/docs/frontend/slots) `form.*` ou os overrides `Entity.Form` e `EditView.FormActions`, que podem ser copiados.
+- **`HomePage`** pode ser copiada, exceto pela reordenação de cards e grupos por arrastar e soltar, que não tem uma API própria para exportar. Uma página inicial sua compõe `NavigationGroup`, `NavigationCardBinding` e `FavouritesView` sobre `useNavigationStateController().topLevelNavigation`; para acrescentar algo à página padrão, use o slot `home.cards`.

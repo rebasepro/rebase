@@ -1,5 +1,5 @@
 ---
-sourceHash: cfdbc982479ba3b1
+sourceHash: fb65c481c6cbc87a
 title: Personnaliser l'administration
 sidebar_label: Personnaliser l'administration
 description: Comment personnaliser l'administration Rebase — blocs de construction, hooks et emplacements, avec des recettes testées pour les singletons, paramètres par utilisateur, actions groupées, vues calendrier, tableaux de bord et écrans de connexion personnalisés.
@@ -11,7 +11,7 @@ L'interface d'administration est constituée d'éléments que vous pouvez utilis
 - **Hooks** pour les données, l'utilisateur connecté, les notifications (toasts) et la navigation.
 - **Emplacements** où placer un composant — une page, un mode de vue de collection, un bouton de barre d'outils, un onglet d'enregistrement, un champ, un slot à côté d'un élément intégré, ou une surcharge (override) qui en remplace un.
 
-Si un bloc de construction ne répond pas à vos besoins, copiez son code source dans votre projet et modifiez-le. Rien ici ne nécessite l'existence préalable d'une option de configuration.
+Si un bloc de construction ne répond pas à vos besoins, copiez son code source dans votre projet et modifiez-le. Rien ici ne nécessite l'existence préalable d'une option de configuration. Voir [Copier un élément intégré](#copier-un-élément-intégré).
 
 ## Recettes
 
@@ -81,6 +81,17 @@ La même structure avec `entityId={user.uid}` (issu de `useAuthController()`) co
 | Un élément à côté d'une partie intégrée | `<Rebase slots>` — voir [Slots](/docs/frontend/slots) |
 | Un remplacement pour une partie intégrée | `<Rebase components>` — voir [Surcharges de composants](/docs/frontend/component-overrides) |
 
+## Ce que chaque emplacement transmet à votre composant
+
+| Emplacement | Votre composant reçoit |
+|---|---|
+| Une page (`views`) | Rien : lisez ce dont vous avez besoin avec les hooks. Elle s'affiche dans le routeur de l'administration, donc `useUrlController().navigate(…)` (ou `react-router`) fonctionne. |
+| Un `Builder` de mode de vue | `CollectionCustomViewParams` : `collection`, `path`, `tableController` (son `data` contient les lignes que sélectionnent la recherche et les filtres de la barre d'outils, `dataLoading`, …), `onEntityClick(entity)` pour ouvrir une ligne comme la collection ouvre ses lignes, `selectionController`, `emptyComponent`. |
+| `admin.Actions` | `CollectionActionsProps` : `path`, `collection`, `selectionController` (`hasSelection`, `selection`, `clearSelection()`), `tableController`, `openNewDocument(defaults?)`. Transformez `selection` en lignes avec `resolveSelection({ selection, accessor: useData().collection(path) })` — elle peut désigner « toutes les lignes correspondant au filtre », pas seulement celles qui sont cochées. |
+| `Builder` de `admin.entityViews` | `EntityCustomViewParams` : `collection`, l'enregistrement (`entity`, absent pendant sa création), ses valeurs non enregistrées (`modifiedValues`) et le formulaire (`formContext`). |
+| `"Auth.LoginView"` | `{ authController }`. Connectez-vous avec `authController.emailPasswordLogin?.(email, password)` (facultatif : présent lorsque la connexion par e-mail est activée) ; un échec lève une exception et figure aussi dans `authController.authProviderError`. Dès que `authController.user` est défini, l'administration remplace votre écran d'elle-même. |
+| Toute autre surcharge | Les props de l'élément qu'elle remplace ; avec `wrap: true`, celles-ci plus `OriginalComponent`. |
+
 ## Hooks
 
 | Hook | Package | Fournit |
@@ -92,3 +103,11 @@ La même structure avec `entityId={user.uid}` (issu de `useAuthController()`) co
 | `useSidePanel` | `@rebasepro/cms` | Ouvrir n'importe quel enregistrement dans le panneau latéral. |
 | `useUrlController` | `@rebasepro/cms` | Les URL d'administration et la navigation. |
 | `resolveSelection` | `@rebasepro/cms` | Une sélection de table — lignes cochées ou « tous les résultats correspondants » — sous forme de lignes. |
+
+## Copier un élément intégré
+
+Lorsqu'un élément intégré est proche de ce que vous voulez, copiez son code source depuis le dépôt de `@rebasepro/cms` (ou `@rebasepro/app`) dans votre projet, faites pointer ses imports relatifs vers les paquets, modifiez-le et enregistrez-le sous son nom dans `<Rebase components>`. Tout ce qu'un élément importe est un export public, donc la copie compile — pour tous les éléments sauf trois, et ces trois-là sont délibérés :
+
+- **`Collection.View`** assemble tous les modes de vue — liste, tableau, cartes, tableau kanban, vue scindée — avec l'édition en ligne, l'éditeur de champ en popup, la boîte de dialogue de suppression et l'état du mode de vue dans l'URL. Ce qu'elle importe, ce sont les rouages internes de ces modes. Remplacez plutôt l'un de ses éléments (`Collection.Table`, `Collection.Card`, `Collection.Actions`, `Collection.EmptyState`, qui se copient tous), ajoutez votre propre [mode de vue](/docs/frontend/view-modes), ou enveloppez-la avec `wrap: true`.
+- **`DetailView`** assemble la vue d'un enregistrement : barre d'identité, onglets, inspecteur et boutons de la liste scindée, autour d'identifiants d'onglet qui sont des valeurs d'URL. Personnalisez un enregistrement avec les [vues d'entité](/docs/frontend/entity-views), les [actions d'entité](/docs/frontend/entity-actions), les [slots](/docs/frontend/slots) `form.*`, ou les surcharges `Entity.Form` et `EditView.FormActions`, qui se copient.
+- **`HomePage`** se copie, à l'exception du réordonnancement des cartes et des groupes par glisser-déposer, qui n'a pas d'API propre à exporter. Une page d'accueil de votre cru assemble `NavigationGroup`, `NavigationCardBinding` et `FavouritesView` à partir de `useNavigationStateController().topLevelNavigation` ; pour ajouter quelque chose à la page standard, utilisez le slot `home.cards`.

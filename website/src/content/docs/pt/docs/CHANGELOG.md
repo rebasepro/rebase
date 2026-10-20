@@ -11,6 +11,80 @@ A tradução está pendente. O conteúdo abaixo está em inglês.
 
 ## [Unreleased]
 
+### Added
+
+#### Admin (CMS & app)
+
+- **Customization recipes ship with `@rebasepro/cms`.** `node_modules/@rebasepro/cms/recipes`
+  holds tested, copy-ready examples: a site-settings singleton, per-user
+  preferences, a bulk "set status" toolbar action, a calendar view mode, a
+  dashboard page and a custom login screen. They import only package entry
+  points, each has a test in the repository, and their `README.md` is the
+  reference of building blocks, hooks and places an agent reads before
+  customizing. The docs page is [Customizing the Admin](/docs/frontend/customizing),
+  and the `rebase-customize-admin` agent skill points at the recipes.
+- **`EntityFormPanel` creates a record under the id it is given when no record
+  has it yet.** A record kept at a known key — a settings singleton, a profile
+  keyed by its user's uid — said "not found" until something seeded it; now the
+  first save creates it there. Where the collection marks a key property
+  `isId`, the id is that property's value, set and locked.
+- **The leaf parts of two overridable components are exported**, so a copy of
+  the component compiles with package imports: `NavigationCard` and
+  `SmallNavigationCard` (`HomePage.CollectionCard`), and
+  `StringNumberFilterField`, `BooleanFilterField`, `DateTimeFilterField`,
+  `ReferenceFilterField`, `RelationFilterField`, `getDatePropertyMode` and
+  `getDatePropertyTimezone` (`Collection.FilterField`).
+  `pnpm report:override-copyability` lists what still keeps each overridable
+  part from being copied that way.
+- **16 of the 19 overridable parts can be copied into a project and compile
+  with package imports**, up from 5. What a copy reuses is exported:
+  - drawer: `DrawerExpansionContext`, `useDrawerExpansion`,
+    `useDrawerExpandedWhile`, `DrawerExpansion`, `NAVIGATION_DEFAULT_GROUP_NAME`;
+  - collection toolbar and table: `CollectionTableToolbar`,
+    `CollectionTableToolbarProps`, `useToolbarLabels`, `EditorCollectionAction`,
+    `CollectionTableBindingProps`, `EntityTableCell`, `EntityTableCellProps`,
+    `EntityTableCellOpener`, `PropertyTableCell`, `PropertyTableCellProps`,
+    `AdditionalFieldValue`, `AdditionalFieldValueProps`, `propertiesToColumns`,
+    `PropertiesToColumnsParams`, `CustomFieldValidator`;
+  - cards and previews: `resolveCollectionSlotKeys`, `useCollectionSlotKeys`,
+    `useEntitySlots`, `CollectionSlotKeys`, `EntityPreviewSlots`, `PreviewSlot`,
+    `DatePreviewSlot`, `RelationChipSlot`, `RelationChipItem`, `SlotValue`,
+    `SlotValueProps`, `TagChips`, `useEntityTitle`, `UseEntityDisplayParams`,
+    `ResolvedDisplayValue`, `useSearchExplanation`, `MatchExplanation`,
+    `fieldLabel`, `Highlighted`, `NestedEntityPreviewBoundary`,
+    `EntityPreviewLayout`, `isEmptyPreviewValue`;
+  - forms and records: `getParentLinkValues`, `getTouchedPropertyValues`,
+    `getUnappliedLocalChanges`, `overlayEdit`, `unlinkEntityAction`,
+    `entityActionName`, `resolveEntityActionState`, `EntityActionState`,
+    `useSideDialogContext`, `SideDialogController`, `useChildViewSource`,
+    `EditViewBinding`, `EditViewBindingProps`, `DetailViewBinding`,
+    `DetailViewBindingProps`;
+  - home page: `NavigationCardBinding`, `NavigationGroup`, `FavouritesView`;
+  - login screen (`@rebasepro/app`): `startOAuthRedirect`,
+    `consumeOAuthCallback`, `OAuthRedirectRequest`, `OAuthCallbackResult`,
+    `readMfaRequired`, `canAnswerMfa`, `classifyMfaRefusal`, `PendingMfaSignIn`,
+    `authErrorMessage`, `appAddressOfEmailLink`, `emailChangeErrorMessage`.
+
+  `Collection.View`, `DetailView` and `HomePage`'s drag-and-drop stay
+  uncopyable on purpose; the recipes README says why and what to customize
+  instead. A test fails when a part that copies stops copying.
+
+### Changed
+
+#### Admin (CMS & app)
+
+- **Form fields are full width unless they are a pair of like compact
+  fields, or the collection sets `admin.span`.** The form used to guess widths
+  from property types — strings, dates and relations at half, numbers and
+  booleans at a quarter, the title property full — and paired fields that had
+  nothing to do with each other: Namespace beside Custom Domain, Git Branch
+  beside Git Repository URL. Now a field takes the whole row unless it and its
+  neighbour have the same small editor (two numbers, two switches, two dates of
+  the same mode, two selects with short options) and neither has a long label,
+  long help text, `conditions` or a custom `Field`. Free-text strings are never
+  paired, nothing reads the title property, and rows are no longer stretched to
+  close a gap. A span written on a property is used as written.
+
 ### Fixed
 
 #### CLI
@@ -21,6 +95,45 @@ A tradução está pendente. O conteúdo abaixo está em inglês.
   cron job: …" and "Cron jobs scheduled", so `rebase cloud debug boot` showed a
   project's storage and its port and none of the code it runs. Both wordings are
   shown now.
+
+#### Admin (CMS & app)
+
+- **The `"Shell.AppBar"`, `"HomePage.CollectionCard"` and `"Auth.LoginView"`
+  component overrides work.** All three were declared, documented and shown in
+  the `<Rebase components>` example, and nothing resolved them, so setting one
+  did nothing. A `"Shell.AppBar"` override now renders a top bar (a wrapper is
+  handed the default one); an `appBar` element on `<RebaseShell>` still wins,
+  as does `loginView` on `<RebaseAuth>` over `"Auth.LoginView"`. A test now
+  fails when a declared override name is resolved nowhere.
+- **`exportable: false` removes Export from the collection toolbar.** It was
+  ignored; only the object form was read, for its extra fields.
+- **The record form follows field access rules.** A field the user may not
+  write (`access.write`) is shown read-only, and one they may not read
+  (`access.read`, `excludeFromApi`) is left out, label included. Before, both
+  were ordinary inputs and the edit came back as a 400 on save. A new record or
+  a copy no longer sends a default or copied value for a field the user may
+  not write, which made the server refuse the whole save.
+- **A language added through `<Rebase translations>` is in the language
+  menu.** The menu listed the seven shipped languages only, so an app's own
+  language could be set with `locale` and never chosen by the user. A
+  language Rebase does not ship is named by the browser (`nl` → "Nederlands").
+  `useRebaseLocales()` returns the list.
+- **A record created from its parent's tab opens linked to that parent.** A new
+  transaction from a customer's Transactions tab asked for the customer, and a
+  required `belongsTo` could not be saved until the user picked the record they
+  had come from. The server already linked a create under
+  `customers/{id}/transactions` to that customer. The form now opens with the
+  link set and locked while the record is new. Editing it later still works.
+  This covers a `hasMany` whose child has the `belongsTo` back on
+  `foreignKeyOnTarget`. A link keyed on `sourceKey` is not prefilled.
+
+- **"Create" in the side panel opens the saved record instead of asking about
+  unsaved changes.** The save reported the form clean and moved the panel to
+  the new record in the same tick, and the panel's guard still saw it as dirty.
+  It asked "There are unsaved changes" about a record already saved and left
+  the URL on `#new_side`. A dirty record still asks before the panel leaves it.
+  `useUnsavedChangesDialog` now also takes a function for `when`, read at the
+  moment of navigation.
 
 ## [0.25.1] - 2026-10-14
 

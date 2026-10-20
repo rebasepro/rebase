@@ -173,10 +173,18 @@ override map does not name a props type per key — `ComponentOverride<P>` defau
 `P` to `Record<string, unknown>` — so type the parameter yourself, or pass a type
 argument, when you want the props checked. A few of the built-ins do export a
 props type you can import and reuse: `CollectionViewProps` (`@rebasepro/ui`);
-`CollectionEmptyStateProps`, `CollectionActionsProps` and
-`FilterFieldBindingProps` (`@rebasepro/cms-types`); `EntityFormProps` and
-`EntityFormActionsProps` (`@rebasepro/cms`). The rest have no exported props
-type — write the shape you actually read.
+`CollectionEmptyStateProps`, `CollectionActionsProps`, `SidePanelBindingProps`
+and `FilterFieldBindingProps` (`@rebasepro/cms-types`); `EntityFormProps`,
+`EntityFormBindingProps`, `EntityFormActionsProps`, `CollectionTableBindingProps`,
+`DetailViewBindingProps`, `DrawerNavigationItemProps` and
+`DrawerNavigationGroupProps` (`@rebasepro/cms`); `LoginViewProps`
+(`@rebasepro/app`). The rest have no exported props type — write the shape you
+actually read.
+
+To start from the built-in part rather than from nothing, copy its source into
+your project and register the copy here: every part but `Collection.View`,
+`DetailView` and the home page's drag-and-drop compiles with package imports.
+See [Copying a built-in part](/docs/frontend/customizing#copying-a-built-in-part).
 
 ## Related
 

@@ -1,5 +1,5 @@
 ---
-sourceHash: 0a17c13d60408e81
+sourceHash: 2f11ac867504684b
 title: Substituições de Componentes (Swizzling)
 sidebar_label: Substituições de Componentes
 description: Substitua componentes de interface padrão por implementações personalizadas no nível da aplicação ou da coleção.
@@ -174,10 +174,15 @@ mapa de substituição não nomeia um tipo de props por chave — `ComponentOver
 `P` como padrão para `Record<string, unknown>` — portanto, tipifique o parâmetro você mesmo, ou passe um argumento
 de tipo, quando desejar a verificação de tipos das props. Alguns dos componentes integrados exportam um
 tipo de props que você pode importar e reutilizar: `CollectionViewProps` (`@rebasepro/ui`);
-`CollectionEmptyStateProps`, `CollectionActionsProps` e
-`FilterFieldBindingProps` (`@rebasepro/cms-types`); `EntityFormProps` e
-`EntityFormActionsProps` (`@rebasepro/cms`). O restante não possui um tipo de props exportado —
-escreva a estrutura que você realmente lê.
+`CollectionEmptyStateProps`, `CollectionActionsProps`, `SidePanelBindingProps` e
+`FilterFieldBindingProps` (`@rebasepro/cms-types`); `EntityFormProps`, `EntityFormBindingProps`, `EntityFormActionsProps`, `CollectionTableBindingProps`, `DetailViewBindingProps`, `DrawerNavigationItemProps` e
+`DrawerNavigationGroupProps` (`@rebasepro/cms`); `LoginViewProps` (`@rebasepro/app`). O restante
+não possui um tipo de props exportado — escreva a estrutura que você realmente lê.
+
+Para partir da parte nativa em vez do zero, copie seu código-fonte para o seu projeto e registre
+a cópia aqui: todas as partes, exceto `Collection.View`, `DetailView` e o arrastar e soltar da
+página inicial, compilam com imports dos pacotes. Veja
+[Copiar uma parte nativa](/docs/frontend/customizing#copying-a-built-in-part).
 
 ## Relacionados
 

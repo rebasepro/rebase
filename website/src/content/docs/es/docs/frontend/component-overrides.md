@@ -1,5 +1,5 @@
 ---
-sourceHash: 0a17c13d60408e81
+sourceHash: 2f11ac867504684b
 title: Sobrescritura de componentes (Swizzling)
 sidebar_label: Sobrescritura de componentes
 description: Sobrescribe componentes de interfaz de usuario predeterminados con implementaciones personalizadas a nivel de aplicación o colección.
@@ -175,10 +175,15 @@ asigna por defecto `P` a `Record<string, unknown>`), por lo que debes tipar el
 parámetro tú mismo, o pasar un argumento de tipo, cuando desees que las props sean
 verificadas. Algunos de los componentes integrados exportan un tipo de props que
 puedes importar y reutilizar: `CollectionViewProps` (`@rebasepro/ui`);
-`CollectionEmptyStateProps`, `CollectionActionsProps` y
-`FilterFieldBindingProps` (`@rebasepro/cms-types`); `EntityFormProps` y
-`EntityFormActionsProps` (`@rebasepro/cms`). El resto no tiene un tipo de props
-exportado; define la estructura que realmente utilices.
+`CollectionEmptyStateProps`, `CollectionActionsProps`, `SidePanelBindingProps` y
+`FilterFieldBindingProps` (`@rebasepro/cms-types`); `EntityFormProps`, `EntityFormBindingProps`, `EntityFormActionsProps`, `CollectionTableBindingProps`, `DetailViewBindingProps`, `DrawerNavigationItemProps` y
+`DrawerNavigationGroupProps` (`@rebasepro/cms`); `LoginViewProps` (`@rebasepro/app`).
+El resto no tiene un tipo de props exportado; define la estructura que realmente utilices.
+
+Para partir de la parte integrada en lugar de desde cero, copia su código fuente en tu
+proyecto y registra aquí la copia: todas las partes salvo `Collection.View`, `DetailView`
+y el arrastrar y soltar de la página de inicio compilan con imports de los paquetes.
+Consulta [Copiar una parte integrada](/docs/frontend/customizing#copying-a-built-in-part).
 
 ## Relacionado
 

@@ -1,5 +1,5 @@
 ---
-sourceHash: 0a17c13d60408e81
+sourceHash: 2f11ac867504684b
 title: Komponenten-Overrides (Swizzling)
 sidebar_label: Komponenten-Overrides
 description: Überschreiben Sie Standard-UI-Komponenten mit benutzerdefinierten Implementierungen auf Anwendungs- oder Collection-Ebene.
@@ -174,10 +174,16 @@ Override-Map legt keinen Props-Typ pro Schlüssel fest – `ComponentOverride<P>
 `P` standardmäßig `Record<string, unknown>` ein. Typisieren Sie den Parameter daher selbst
 oder übergeben Sie ein Typargument, wenn Sie eine Typprüfung der Props wünschen. Einige der
 integrierten Komponenten exportieren einen Props-Typ, den Sie importieren und wiederverwenden können:
-`CollectionViewProps` (`@rebasepro/ui`); `CollectionEmptyStateProps`, `CollectionActionsProps` und
-`FilterFieldBindingProps` (`@rebasepro/cms-types`); `EntityFormProps` und
-`EntityFormActionsProps` (`@rebasepro/cms`). Die übrigen Komponenten bieten keinen exportierten Props-Typ –
-definieren Sie hier einfach die Struktur, die Sie tatsächlich auslesen.
+`CollectionViewProps` (`@rebasepro/ui`); `CollectionEmptyStateProps`, `CollectionActionsProps`, `SidePanelBindingProps` und
+`FilterFieldBindingProps` (`@rebasepro/cms-types`); `EntityFormProps`, `EntityFormBindingProps`, `EntityFormActionsProps`, `CollectionTableBindingProps`, `DetailViewBindingProps`, `DrawerNavigationItemProps` und
+`DrawerNavigationGroupProps` (`@rebasepro/cms`); `LoginViewProps` (`@rebasepro/app`). Die übrigen
+Komponenten bieten keinen exportierten Props-Typ – definieren Sie hier einfach die Struktur, die Sie
+tatsächlich auslesen.
+
+Um vom eingebauten Teil statt bei null zu beginnen, kopieren Sie seinen Quellcode in Ihr Projekt und
+registrieren die Kopie hier: Jeder Teil außer `Collection.View`, `DetailView` und dem Drag-and-drop der
+Startseite kompiliert mit Paket-Importen. Siehe
+[Einen eingebauten Teil kopieren](/docs/frontend/customizing#copying-a-built-in-part).
 
 ## Verwandte Themen
 

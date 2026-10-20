@@ -1,5 +1,5 @@
 ---
-sourceHash: cfdbc982479ba3b1
+sourceHash: fb65c481c6cbc87a
 title: Admin anpassen
 sidebar_label: Admin anpassen
 description: So passen Sie den Rebase-Admin an – Bausteine, Hooks und Orte, mit getesteten Rezepten für Singletons, benutzerspezifische Einstellungen, Massenaktionen, Kalenderansichten, Dashboards und benutzerdefinierte Login-Masken.
@@ -11,7 +11,7 @@ Der Admin ist aus Bausteinen aufgebaut, die Sie selbst verwenden können. Um ihn
 - **Hooks** für Daten, den angemeldeten Benutzer, Toasts und Navigation.
 - **Orte**, an denen eine Komponente platziert werden kann – eine Seite, ein Ansichtsmodus für eine Collection, eine Schaltfläche in der Toolbar, ein Datensatz-Tab, ein Feld, ein Slot neben einem integrierten Bestandteil oder ein Override, der einen solchen ersetzt.
 
-Wenn ein Baustein nicht das tut, was Sie benötigen, kopieren Sie dessen Quellcode in Ihr Projekt und passen ihn an. Nichts davon erfordert, dass zuvor eine Konfigurationsoption existiert.
+Wenn ein Baustein nicht das tut, was Sie benötigen, kopieren Sie dessen Quellcode in Ihr Projekt und passen ihn an. Nichts davon erfordert, dass zuvor eine Konfigurationsoption existiert. Siehe [Einen eingebauten Teil kopieren](#einen-eingebauten-teil-kopieren).
 
 ## Rezepte
 
@@ -81,6 +81,17 @@ Dasselbe Schema mit `entityId={user.uid}` (aus `useAuthController()`) ergibt ein
 | Ein Element neben einem integrierten Bestandteil | `<Rebase slots>` – siehe [Slots](/docs/frontend/slots) |
 | Einen Ersatz für einen integrierten Bestandteil | `<Rebase components>` – siehe [Component Overrides](/docs/frontend/component-overrides) |
 
+## Was jeder Ort Ihrer Komponente übergibt
+
+| Ort | Ihre Komponente erhält |
+|---|---|
+| Eine Seite (`views`) | Nichts: Lesen Sie, was Sie brauchen, mit den Hooks. Sie wird im Router des Admins gerendert, daher funktioniert `useUrlController().navigate(…)` (oder `react-router`). |
+| Ein Ansichtsmodus-`Builder` | `CollectionCustomViewParams`: `collection`, `path`, `tableController` (sein `data` sind die Zeilen, die Suche und Filter der Toolbar auswählen, `dataLoading`, …), `onEntityClick(entity)`, um eine Zeile so zu öffnen, wie die Collection Zeilen öffnet, `selectionController`, `emptyComponent`. |
+| `admin.Actions` | `CollectionActionsProps`: `path`, `collection`, `selectionController` (`hasSelection`, `selection`, `clearSelection()`), `tableController`, `openNewDocument(defaults?)`. Wandeln Sie `selection` mit `resolveSelection({ selection, accessor: useData().collection(path) })` in Zeilen um – sie kann für „alle Zeilen, die dem Filter entsprechen“ stehen, nicht nur für die markierten. |
+| `admin.entityViews`-`Builder` | `EntityCustomViewParams`: `collection`, den Datensatz (`entity`, fehlt, solange er erstellt wird), seine ungespeicherten Werte (`modifiedValues`) und das Formular (`formContext`). |
+| `"Auth.LoginView"` | `{ authController }`. Melden Sie sich mit `authController.emailPasswordLogin?.(email, password)` an (optional: vorhanden, wenn die E-Mail-Anmeldung aktiviert ist); ein Fehler wird geworfen und steht auch in `authController.authProviderError`. Sobald `authController.user` gesetzt ist, ersetzt der Admin Ihren Bildschirm von selbst. |
+| Jeder andere Override | Die Props des Teils, den er ersetzt; mit `wrap: true` zusätzlich `OriginalComponent`. |
+
 ## Hooks
 
 | Hook | Package | Bietet Ihnen |
@@ -92,3 +103,11 @@ Dasselbe Schema mit `entityId={user.uid}` (aus `useAuthController()`) ergibt ein
 | `useSidePanel` | `@rebasepro/cms` | Öffnet jeden beliebigen Datensatz im Seitenpanel. |
 | `useUrlController` | `@rebasepro/cms` | Admin-URLs und Navigation. |
 | `resolveSelection` | `@rebasepro/cms` | Eine Tabellenauswahl – markierte Zeilen oder „alle passenden“ – als Zeilen. |
+
+## Einen eingebauten Teil kopieren
+
+Wenn ein eingebauter Teil fast dem entspricht, was Sie wollen, kopieren Sie seinen Quellcode aus dem Repository von `@rebasepro/cms` (oder `@rebasepro/app`) in Ihr Projekt, richten seine relativen Importe auf die Pakete aus, ändern ihn und registrieren ihn unter seinem Namen in `<Rebase components>`. Alles, was ein Teil importiert, ist ein öffentlicher Export, daher kompiliert die Kopie – bei jedem Teil außer dreien, und diese drei sind Absicht:
+
+- **`Collection.View`** setzt alle Ansichtsmodi zusammen – Liste, Tabelle, Karten, Board, Split – mit Inline-Bearbeitung, dem Popup-Feldeditor, dem Löschdialog und dem URL-Zustand des Ansichtsmodus. Was sie importiert, sind die Interna dieser Modi. Ersetzen Sie stattdessen einen ihrer Teile (`Collection.Table`, `Collection.Card`, `Collection.Actions`, `Collection.EmptyState`, die sich alle kopieren lassen), fügen Sie einen eigenen [Ansichtsmodus](/docs/frontend/view-modes) hinzu oder umschließen Sie sie mit `wrap: true`.
+- **`DetailView`** setzt die Ansicht eines Datensatzes zusammen: Identitätsleiste, Tabs, Inspektor und die Schaltflächen der geteilten Liste, rund um Tab-IDs, die URL-Werte sind. Passen Sie einen Datensatz mit [Entity Views](/docs/frontend/entity-views), [Entity Actions](/docs/frontend/entity-actions), den `form.*`-[Slots](/docs/frontend/slots) oder den Overrides `Entity.Form` und `EditView.FormActions` an, die sich kopieren lassen.
+- **`HomePage`** lässt sich kopieren, bis auf das Umsortieren von Karten und Gruppen per Drag-and-drop, das keine eigene API zum Exportieren hat. Eine eigene Startseite setzt `NavigationGroup`, `NavigationCardBinding` und `FavouritesView` über `useNavigationStateController().topLevelNavigation` zusammen; um der Standardseite etwas hinzuzufügen, verwenden Sie den Slot `home.cards`.

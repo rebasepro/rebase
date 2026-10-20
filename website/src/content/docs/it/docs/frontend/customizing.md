@@ -1,5 +1,5 @@
 ---
-sourceHash: cfdbc982479ba3b1
+sourceHash: fb65c481c6cbc87a
 title: Personalizzare l'Admin
 sidebar_label: Personalizzare l'Admin
 description: Come personalizzare l'admin di Rebase — componenti di base, hook e posizioni, con ricette testate per singleton, impostazioni per utente, azioni di massa, viste calendario, dashboard e schermate di login personalizzate.
@@ -13,7 +13,7 @@ basta scrivere un normale componente React e inserirlo in una posizione. Questo 
 - **Posizioni** in cui inserire un componente — una pagina, una modalità di visualizzazione di una collection, un pulsante della toolbar, una scheda di un record, un campo, uno slot accanto a un elemento integrato o un override che ne sostituisce uno.
 
 Se un componente di base non fa al caso tuo, copia il suo codice sorgente nel tuo progetto
-e modificalo. Nulla qui richiede l'esistenza preventiva di un'opzione di configurazione.
+e modificalo. Nulla qui richiede l'esistenza preventiva di un'opzione di configurazione. Vedi [Copiare un elemento integrato](#copiare-un-elemento-integrato).
 
 ## Ricette
 
@@ -88,6 +88,17 @@ pagina di impostazioni per utente.
 | Qualcosa accanto a una parte integrata | `<Rebase slots>` — vedi [Slot](/docs/frontend/slots) |
 | Un sostituto per una parte integrata | `<Rebase components>` — vedi [Override dei componenti](/docs/frontend/component-overrides) |
 
+## Cosa riceve il tuo componente in ogni posizione
+
+| Posizione | Il tuo componente riceve |
+|---|---|
+| Una pagina (`views`) | Niente: leggi ciò che ti serve con gli hook. Viene renderizzata dentro il router dell'admin, quindi `useUrlController().navigate(…)` (o `react-router`) funziona. |
+| Un `Builder` di modalità di visualizzazione | `CollectionCustomViewParams`: `collection`, `path`, `tableController` (il suo `data` sono le righe selezionate dalla ricerca e dai filtri della toolbar, `dataLoading`, …), `onEntityClick(entity)` per aprire una riga come la collection apre le righe, `selectionController`, `emptyComponent`. |
+| `admin.Actions` | `CollectionActionsProps`: `path`, `collection`, `selectionController` (`hasSelection`, `selection`, `clearSelection()`), `tableController`, `openNewDocument(defaults?)`. Trasforma `selection` in righe con `resolveSelection({ selection, accessor: useData().collection(path) })`: può indicare "tutte le righe che corrispondono al filtro", non solo quelle spuntate. |
+| `Builder` di `admin.entityViews` | `EntityCustomViewParams`: `collection`, il record (`entity`, assente mentre viene creato), i suoi valori non salvati (`modifiedValues`) e il form (`formContext`). |
+| `"Auth.LoginView"` | `{ authController }`. Accedi con `authController.emailPasswordLogin?.(email, password)` (opzionale: presente quando l'accesso via email è abilitato); un errore viene lanciato ed è anche in `authController.authProviderError`. Appena `authController.user` è impostato, l'admin sostituisce da solo la tua schermata. |
+| Qualsiasi altro override | Le props dell'elemento che sostituisce; con `wrap: true`, queste più `OriginalComponent`. |
+
 ## Hook
 
 | Hook | Pacchetto | Cosa fornisce |
@@ -99,3 +110,11 @@ pagina di impostazioni per utente.
 | `useSidePanel` | `@rebasepro/cms` | Apre qualsiasi record nel pannello laterale. |
 | `useUrlController` | `@rebasepro/cms` | URL dell'admin e navigazione. |
 | `resolveSelection` | `@rebasepro/cms` | La selezione di una tabella — righe spuntate o "tutte le corrispondenti" — sotto forma di righe. |
+
+## Copiare un elemento integrato
+
+Quando un elemento integrato è vicino a ciò che vuoi, copia il suo codice sorgente dal repository di `@rebasepro/cms` (o `@rebasepro/app`) nel tuo progetto, fai puntare i suoi import relativi ai pacchetti, modificalo e registralo con il suo nome in `<Rebase components>`. Tutto ciò che un elemento importa è un export pubblico, quindi la copia compila, per ogni elemento tranne tre, e quei tre sono voluti:
+
+- **`Collection.View`** compone tutte le modalità di visualizzazione (lista, tabella, card, board, split) con la modifica inline, l'editor di campo in popup, la finestra di eliminazione e lo stato della modalità nell'URL. Ciò che importa sono i meccanismi interni di quelle modalità. Sostituisci invece uno dei suoi elementi (`Collection.Table`, `Collection.Card`, `Collection.Actions`, `Collection.EmptyState`, che si possono tutti copiare), aggiungi una tua [modalità di visualizzazione](/docs/frontend/view-modes) o avvolgila con `wrap: true`.
+- **`DetailView`** compone la vista di un record: barra dell'identità, schede, ispettore e i pulsanti della lista divisa, attorno a ID di scheda che sono valori dell'URL. Personalizza un record con le [entity view](/docs/frontend/entity-views), le [entity action](/docs/frontend/entity-actions), gli [slot](/docs/frontend/slots) `form.*` o gli override `Entity.Form` ed `EditView.FormActions`, che si possono copiare.
+- **`HomePage`** si può copiare, tranne il riordino di card e gruppi con il trascinamento, che non ha un'API propria da esportare. Una home page tua compone `NavigationGroup`, `NavigationCardBinding` e `FavouritesView` su `useNavigationStateController().topLevelNavigation`; per aggiungere qualcosa a quella standard, usa lo slot `home.cards`.

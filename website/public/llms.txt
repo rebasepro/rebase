@@ -105,6 +105,7 @@
 - [Custom Server Integration](https://rebase.pro/docs/backend/custom-server): Build the Rebase backend from public pieces in your own server — createRebaseBackend, its route groups, mount, attachRealtime and start — or embed the Postgres driver in Express.
 - [Scripts and the Console](https://rebase.pro/docs/backend/scripts): Open a project's data from a script, a test or a REPL with openRebase, or from the terminal with rebase console. No server, no schema changes.
 - [Frontend Overview](https://rebase.pro/docs/frontend): Build and customize the panel — Rebase CMS and Rebase Studio — with React: controllers, scaffold, routing, and views.
+- [Customizing the Admin](https://rebase.pro/docs/frontend/customizing): How to customize the Rebase admin — building blocks, hooks and places, with tested recipes for singletons, per-user settings, bulk actions, calendar views, dashboards and custom login screens.
 - [Extending Rebase](https://rebase.pro/docs/frontend/extending): A decision guide for choosing the right extension mechanism — plugins, slots, component overrides, entity views, actions, and more.
 - [Styling Custom UI](https://rebase.pro/docs/frontend/styling): Build custom views, home pages and actions out of the same components and theme tokens as the rest of the admin, so they look native and follow the theme.
 - [Translations](https://rebase.pro/docs/frontend/i18n): Change any string in the Rebase admin, add a language, or read the current locale from your own components.

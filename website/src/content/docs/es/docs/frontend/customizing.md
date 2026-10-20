@@ -1,5 +1,5 @@
 ---
-sourceHash: cfdbc982479ba3b1
+sourceHash: fb65c481c6cbc87a
 title: Personalizar el panel de administración
 sidebar_label: Personalizar el panel de administración
 description: "Cómo personalizar el panel de administración de Rebase: bloques de construcción, hooks y ubicaciones, con recetas probadas para singletons, configuraciones por usuario, acciones en lote, vistas de calendario, paneles de control y pantallas de inicio de sesión personalizadas."
@@ -11,7 +11,7 @@ El panel de administración está construido a partir de partes que puedes usar 
 - **Hooks** para datos, el usuario autenticado, notificaciones toast y navegación.
 - **Ubicaciones** donde colocar un componente: una página, un modo de vista de colección, un botón de barra de herramientas, una pestaña de registro, un campo, un slot junto a una parte integrada o un reemplazo que sustituye a una.
 
-Si un bloque de construcción no hace lo que necesitas, copia su código fuente en tu proyecto y modifícalo. Nada aquí requiere que exista previamente una opción de configuración.
+Si un bloque de construcción no hace lo que necesitas, copia su código fuente en tu proyecto y modifícalo. Nada aquí requiere que exista previamente una opción de configuración. Consulta [Copiar una parte integrada](#copiar-una-parte-integrada).
 
 ## Recetas
 
@@ -81,6 +81,17 @@ La misma estructura con `entityId={user.uid}` (de `useAuthController()`) es una 
 | Algo junto a una parte integrada | `<Rebase slots>` — consulta [Slots](/docs/frontend/slots) |
 | Un reemplazo para una parte integrada | `<Rebase components>` — consulta [Reemplazos de componentes](/docs/frontend/component-overrides) |
 
+## Qué recibe tu componente en cada ubicación
+
+| Ubicación | Tu componente recibe |
+|---|---|
+| Una página (`views`) | Nada: lee lo que necesites con los hooks. Se renderiza dentro del router del panel, así que `useUrlController().navigate(…)` (o `react-router`) funciona. |
+| Un `Builder` de modo de vista | `CollectionCustomViewParams`: `collection`, `path`, `tableController` (su `data` son las filas que seleccionan la búsqueda y los filtros de la barra de herramientas, `dataLoading`, …), `onEntityClick(entity)` para abrir una fila como la colección abre las filas, `selectionController`, `emptyComponent`. |
+| `admin.Actions` | `CollectionActionsProps`: `path`, `collection`, `selectionController` (`hasSelection`, `selection`, `clearSelection()`), `tableController`, `openNewDocument(defaults?)`. Convierte `selection` en filas con `resolveSelection({ selection, accessor: useData().collection(path) })`: puede representar "todas las filas que coinciden con el filtro", no solo las marcadas. |
+| `Builder` de `admin.entityViews` | `EntityCustomViewParams`: `collection`, el registro (`entity`, ausente mientras se crea), sus valores sin guardar (`modifiedValues`) y el formulario (`formContext`). |
+| `"Auth.LoginView"` | `{ authController }`. Inicia sesión con `authController.emailPasswordLogin?.(email, password)` (opcional: presente cuando el inicio de sesión por correo está activado); un fallo lanza una excepción y también queda en `authController.authProviderError`. En cuanto `authController.user` tiene valor, el panel sustituye tu pantalla por sí solo. |
+| Cualquier otro reemplazo | Las props de la parte que sustituye; con `wrap: true`, esas más `OriginalComponent`. |
+
 ## Hooks
 
 | Hook | Paquete | Te proporciona |
@@ -92,3 +103,11 @@ La misma estructura con `entityId={user.uid}` (de `useAuthController()`) es una 
 | `useSidePanel` | `@rebasepro/cms` | Abre cualquier registro en el panel lateral. |
 | `useUrlController` | `@rebasepro/cms` | URLs y navegación del panel de administración. |
 | `resolveSelection` | `@rebasepro/cms` | Una selección de tabla (filas marcadas o "todas las coincidentes") como filas. |
+
+## Copiar una parte integrada
+
+Cuando una parte integrada se acerca a lo que quieres, copia su código fuente del repositorio de `@rebasepro/cms` (o `@rebasepro/app`) en tu proyecto, apunta sus imports relativos a los paquetes, modifícala y regístrala con su nombre en `<Rebase components>`. Todo lo que importa una parte es una exportación pública, así que la copia compila, en todas las partes salvo tres, y esas tres son deliberadas:
+
+- **`Collection.View`** es la composición de todos los modos de vista (lista, tabla, tarjetas, tablero, dividida) con edición en línea, el editor de campos emergente, el diálogo de borrado y el estado del modo de vista en la URL. Lo que importa son los detalles internos de esos modos. Sustituye en su lugar una de sus partes (`Collection.Table`, `Collection.Card`, `Collection.Actions`, `Collection.EmptyState`, que se pueden copiar), añade un [modo de vista](/docs/frontend/view-modes) propio o envuélvela con `wrap: true`.
+- **`DetailView`** es la composición de la vista de un registro: barra de identidad, pestañas, inspector y los botones de la lista dividida, en torno a identificadores de pestaña que son valores de la URL. Personaliza un registro con [vistas de entidad](/docs/frontend/entity-views), [acciones de entidad](/docs/frontend/entity-actions), los [slots](/docs/frontend/slots) `form.*` o los reemplazos `Entity.Form` y `EditView.FormActions`, que se pueden copiar.
+- **`HomePage`** se puede copiar salvo por la reordenación de tarjetas y grupos con arrastrar y soltar, que no tiene una API propia que exportar. Una página de inicio propia compone `NavigationGroup`, `NavigationCardBinding` y `FavouritesView` sobre `useNavigationStateController().topLevelNavigation`; para añadir algo a la página estándar, usa el slot `home.cards`.
