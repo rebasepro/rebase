@@ -1,13 +1,17 @@
 ---
-sourceHash: 1d949f9964ea8fd7
+sourceHash: 729b9c62d06bd093
 title: rebase cloud
 sidebar_label: rebase cloud
-description: Los grupos de comandos de rebase cloud — autenticación, vinculación de proyectos, despliegues, configuración, organizaciones, bases de datos, recursos, cómputo, almacenamiento, webhooks, clústeres y facturación.
+description: Los grupos de comandos para Rebase Cloud en la CLI — autenticación, vinculación de proyectos, despliegues, configuración, organizaciones, bases de datos, recursos, cómputo, almacenamiento, webhooks, clústeres y facturación.
 ---
 
-Todo lo relacionado con Rebase Cloud, que se encuentra en fase beta privada. Consulta la [guía de Rebase Cloud](/docs/deployment/cloud/) para saber qué es y qué no incluye la versión beta.
+Todo lo relacionado con Rebase Cloud, que está en beta privada. Consulta la
+[guía de Rebase Cloud](/docs/deployment/cloud/) para saber qué es y qué no
+incluye la versión beta.
 
-Cada grupo responde a `--help`, y `--help` nunca ejecuta el comando. La mayoría de los comandos actúan sobre el proyecto vinculado en `.rebase/cloud.json`; `--project <id>` opera sobre uno sin necesidad de vincularlo.
+Cada grupo responde a `--help`, y `--help` nunca ejecuta el comando. La mayoría de los comandos
+actúan sobre el proyecto vinculado en `.rebase/cloud.json`; `--project <id>` opera sobre
+uno sin vincularlo.
 
 Hay tres opciones aplicables en todas partes: `--json` para salida legible por máquina (también la opción predeterminada en tuberías, salvo para `deploy`, o con `REBASE_JSON=1`), `--url <origin>` para apuntar a un plano de control específico (o `REBASE_CLOUD_URL`), y `--project, -p <id>`.
 
@@ -20,7 +24,7 @@ rebase cloud whoami     # the current session, or what REBASE_TOKEN may do
 rebase cloud tokens create --can deploy,logs   # a token for CI, shown once
 ```
 
-## Vinculación de proyectos
+## Project link
 
 ```bash
 rebase cloud link         # link this directory to a cloud project
@@ -30,7 +34,7 @@ rebase cloud use [org]    # select the active organization
 rebase cloud open         # open the dashboard in a browser
 ```
 
-## Proyectos
+## Projects
 
 ```bash
 rebase cloud projects list
@@ -39,7 +43,7 @@ rebase cloud projects info [id]
 rebase cloud projects delete [id]
 ```
 
-## Despliegue y observabilidad
+## Deploy and observe
 
 ```bash
 rebase cloud deploy [app] [--source .]   # deploy an app and stream build logs
@@ -53,7 +57,10 @@ rebase cloud metrics                     # live CPU / memory / disk
 rebase cloud debug [health|logs|…]       # diagnose a deployment, read-only
 ```
 
-`deploy` sin un nombre de aplicación despliega el backend. El despliegue de un bundle de backend también sube el código fuente del proyecto — lo que git rastrea, nunca un `.env` — para que una actualización de la plataforma pueda recompilarlo; `--no-source` omite esto una vez, y `cloud settings set --platform-rebuilds off` lo detiene y elimina la copia almacenada. `--allow-downgrade` despliega una versión anterior.
+`deploy` sin un nombre de aplicación despliega el backend. El despliegue de un bundle
+de backend también sube el código fuente del proyecto —lo que git rastrea, nunca un `.env`— para que una
+actualización de la plataforma pueda reconstruirlo; `--no-source` omite esto una vez, y `cloud settings set
+--platform-rebuilds off` lo detiene y elimina la copia almacenada. `--allow-downgrade` despliega una versión anterior.
 
 Un `deploy` seguido termina con un resumen: cada aplicación desplegada con su URL, el id del despliegue, cuánto tardó y si la nueva versión responde allí. Espera hasta `--live-timeout` segundos (60 por defecto; `0` omite la comprobación) a que respondan el `/api/health` del backend y la dirección de cada aplicación estática. Un despliegue fallido termina con una línea que nombra la aplicación y el motivo, y sale con un código distinto de cero. El resumen se imprime también en tuberías; `--json` (o `REBASE_JSON=1`) imprime en su lugar un objeto con `apps`, `hosts`, `live`, `liveChecks` y `durationMs`.
 
@@ -68,13 +75,13 @@ rebase cloud extensions list | enable | disable
 rebase cloud settings show | set        # name, branch, repo, subdomain, rebuilds
 ```
 
-## Organizaciones
+## Organizations
 
 ```bash
 rebase cloud orgs list | create | members
 ```
 
-## Bases de datos
+## Databases
 
 ```bash
 rebase cloud db list | create | info | connect | test
@@ -82,20 +89,23 @@ rebase cloud db backup list | create | restore | status | download
 rebase cloud db pitr status | restore | cutover | discard
 ```
 
-`db connect` abre un puerto local que *es* la base de datos gestionada (sin endpoint público) hasta que se presione Ctrl-C; `--reveal` añade la contraseña. Solo para propietario (owner) o administrador.
+`db connect` abre un puerto local que *es* la base de datos administrada (sin
+endpoint público) hasta presionar Ctrl-C; `--reveal` añade la contraseña. Solo propietario o administrador.
 
-## Recursos
+## Resources
 
-Lo que la plataforma mantiene para el proyecto, en comparación con lo que declara su código.
+Lo que la plataforma contiene para el proyecto, en comparación con lo que declara su código.
 
 ```bash
 rebase cloud resources                       # each database and bucket: declared? provisioned?
 rebase cloud resources prune database <key>  # remove one the code no longer declares
 ```
 
-Un despliegue nunca elimina una base de datos aprovisionada cuando su declaración desaparece — eso supondría datos eliminados mediante un push. La mantiene, vincula y factura hasta que alguien la elimine (prune) por su nombre.
+Un despliegue nunca elimina una base de datos aprovisionada cuando su declaración desaparece;
+eso implicaría borrar datos mediante un push. La mantiene, la vincula y la factura hasta que
+alguien la purgue por su nombre.
 
-## Cómputo
+## Compute
 
 Lo que el proyecto reserva y cuánto cuesta.
 
@@ -104,9 +114,15 @@ rebase cloud compute            # the current reservation and its monthly cost
 rebase cloud compute set        # change it
 ```
 
-`compute set` acepta `--cpu`, `--memory`, `--replicas`, `--spot`, `--scale-to-zero`, `--db-instances`, `--db-cpu`, `--db-memory`, `--storage`, `--autoscale-max`, `--autoscale-cpu-target` y `--no-autoscale`. No hay niveles de planes: todo se tarifica por recurso. Consulta [Rebase Cloud](/docs/deployment/cloud/).
+`compute set` acepta `--cpu`, `--memory`, `--replicas`, `--spot`,
+`--db-instances`, `--db-cpu`, `--db-memory`,
+`--storage`, `--autoscale-max`, `--autoscale-cpu-target` y `--no-autoscale`.
+`--scale-to-zero` está retirado: cada backend ejecuta al menos una instancia, por lo
+que `true` se rechaza y `false` se ignora con una advertencia. No hay
+niveles de planes: todo se tarifa por recurso. Consulta
+[Rebase Cloud](/docs/deployment/cloud/).
 
-## Almacenamiento, webhooks, clústeres y facturación
+## Storage, webhooks, clusters and billing
 
 ```bash
 rebase cloud storage             # list storage buckets

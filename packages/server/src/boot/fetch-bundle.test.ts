@@ -779,6 +779,17 @@ describe("dedupeRuntimePackages", () => {
         expect(dedupeRuntimePackages(bundle, image)).toEqual([]);
     });
 
+    it("links hono, which the bundler strips, so a plain Hono function can import it", () => {
+        // `import { Hono } from "hono"` in /bundle/backend/functions/x.js walks
+        // up through /bundle and never reaches the image's /app/node_modules.
+        const image = imageWith("hono");
+        const bundle = path.join(scratch, "bundle");
+        fs.mkdirSync(bundle, { recursive: true });
+
+        expect(dedupeRuntimePackages(bundle, image)).toEqual(["hono"]);
+        expect(fs.realpathSync(path.join(bundle, "node_modules", "hono"))).toBe(fs.realpathSync(path.join(image, "hono")));
+    });
+
     it("does nothing outside a container, where there is no image to link to", () => {
         const bundle = path.join(scratch, "bundle");
         fs.mkdirSync(bundle, { recursive: true });

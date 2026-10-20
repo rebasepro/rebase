@@ -43,9 +43,9 @@ export function resolveFunctionsTimeoutMs(configured?: number): number {
  * Node server is constructed without `requestTimeout`/`headersTimeout`, so a
  * handler awaiting a promise that never settles — a `fetch` to an unreachable
  * third party with no `AbortSignal`, a query on a wedged connection — holds its
- * socket and its request object until the client gives up. On the managed
- * runtime the process is shared between tenants, so that is not only the slow
- * caller's problem.
+ * socket and its request object until the client gives up. The process also
+ * serves the project's data API, auth and realtime, so that is not only the
+ * slow caller's problem.
  *
  * The handler is **not** killed — JavaScript cannot stop a function from the
  * outside. What is bounded is the client-visible request: after `ms` the caller

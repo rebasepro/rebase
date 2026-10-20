@@ -96,7 +96,7 @@ See [Runtime portability](#runtime-portability) for the full contract.
 ## Configuration
 
 :::note[Where this goes]
-**Managed runtime:** nothing to configure — the runtime discovers `backend/functions/` on its own (`entry.functions` in `rebase.json` if you moved it). `REBASE_FUNCTIONS_ONLY` / `REBASE_FUNCTIONS_EXCLUDE` narrow which ones a process serves.
+**Managed runtime:** nothing to configure — the runtime discovers `backend/functions/` on its own (`functions` in the backend app's `rebase.json` entry if you moved it). `REBASE_FUNCTIONS_ONLY` / `REBASE_FUNCTIONS_EXCLUDE` narrow which ones a process serves.
 **Ejected:** `initializeRebaseBackend({ functionsDir })`, or `functions` (below), in `backend/src/index.ts`.
 :::
 

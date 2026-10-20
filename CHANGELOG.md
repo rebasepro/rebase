@@ -72,7 +72,24 @@
   shows what differs. None of them changes production. A control plane without
   previews refuses them with `previews_unavailable`.
 
+- **Private npm packages install on the managed runtime.** A managed pod
+  installs a bundle's dependencies when it starts, from the public registry
+  only, so a package under a private scope or registry never installed.
+  `rebase build` now copies the project's `.npmrc` (and `backend/.npmrc`) into
+  the bundle. Every credential in it must be an environment reference such as
+  `${NPM_TOKEN}`, set with `rebase cloud env set NPM_TOKEN=… --secret`; a
+  literal token fails the build, because the bundle is uploaded with the code.
+
 ### Fixed
+
+#### Runtime
+
+- **A function that imports `hono` itself loads on the managed runtime.** The
+  bundler removes `hono` and `@hono/node-server` from a bundle's dependencies
+  because the image provides them, but nothing linked the image's copy into
+  the bundle, so `import { Hono } from "hono"` failed with "Cannot find
+  package" and the function's route answered 404. Both are now linked in at
+  boot, like `@rebasepro/server` and `zod`.
 
 #### CLI
 
@@ -105,6 +122,14 @@
   gulp do. `--debug` names both. A project that links its CLI to a checkout
   keeps running that checkout, and `REBASE_CLI_DEV=1` runs the checkout
   anyway, for testing a dev build against another project.
+
+- **`rebase cloud compute set --scale-to-zero` is retired.** The dial never did
+  anything: every backend ran as an always-on instance whatever it said. `true`
+  is now refused with a message naming `--replicas` and `--autoscale-max`;
+  `false` is ignored with a warning, so scripts that pass it keep working. The
+  help pages and `rebase cloud compute` no longer show it, and the CPU and
+  memory defaults they print are the platform's: `100m` and `384Mi`, bursting
+  to 2 CPU and `2Gi`.
 
 - **The cloud debug boot view shows the functions and crons a 0.25 runtime
   loaded.** It kept a line only if it said "Loaded function" or "Mounted", the

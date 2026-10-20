@@ -345,9 +345,9 @@ export async function bootFromBundle(options: BootOptions = {}): Promise<BootedR
     // because this process decides two of them itself: what it provisions
     // (from `REBASE_ROLE`) and where its health routes sit around the mount.
     //
-    // The image is one tenant's process — on the managed runtime, a process
-    // shared with others — so one floating promise in a function file must not
-    // end it. See `init/process-safety.ts`.
+    // The image is one project's whole backend — on the managed runtime,
+    // usually its only instance — so one floating promise in a function file
+    // must not end it. See `init/process-safety.ts`.
     installUnhandledRejectionHandler();
 
     const ownsSchema = options.provisionSchema ?? runtimeRole.provisionSchema;

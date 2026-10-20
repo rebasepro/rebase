@@ -22,28 +22,27 @@ a Dockerfile, and you also cannot change what is in the image. This page lists
 what that allows, so you can plan a feature before you build it.
 
 The numbers here come from the runtime and the platform as they are today. Some
-are dials you can change, and the page says which ones. A few things are not
-settled yet; they are marked **Not settled** and collected
-[at the end](#not-settled-yet). Do not build on them without asking.
+are dials you can change, and the page says which ones. The few things that are
+not promised yet are collected [at the end](#not-promised-yet).
 
 ## At a glance
 
 | Question | Answer |
 |---|---|
 | Node version | Node 22, on Debian slim, `linux`/`x64` |
-| npm packages | Yes, pure-JavaScript ones. Installed when each instance starts |
+| npm packages | Yes, from the public registry or a private one. Installed when each instance starts |
 | Native modules (`.node`, node-gyp) | No. `rebase cloud deploy` refuses the bundle |
-| WebAssembly | Not checked or blocked. **Not settled** whether it is supported |
-| Spawn a child process | Not blocked, but there is almost nothing to run. See [Binaries](#binaries-and-child-processes) |
+| WebAssembly | Yes |
+| Spawn a child process | Yes, for a `linux`/`x64` binary an npm package ships. See [Binaries](#binaries-and-child-processes) |
 | Memory and CPU | Set per project with `rebase cloud compute`. See [Compute](#compute-and-instances) |
-| Instances | 1 by default. You can pin up to 5, or let the autoscaler go up to 16 |
-| Function timeout | 30 seconds, then `504 FUNCTION_TIMEOUT`. Configurable |
+| Instances | 1 by default, always on. You can pin up to 5, or let the autoscaler go up to 16 |
+| Function timeout | 30 seconds, then `504 FUNCTION_TIMEOUT`. Configurable up to 10 minutes |
 | Request body | 10 MiB, then `413`. Configurable, up to the 64 MiB the edge accepts |
 | Writable filesystem | Yes, but it is temporary and belongs to one instance |
 | Module-level state (a `Map` cache) | Survives between requests on one instance. Lost on every deploy and restart, and not shared between instances |
 | Environment variables and secrets | `rebase cloud env set`, applied at the next deploy |
 | File storage | A bucket per project, served by your backend at `/api/storage/file/…` |
-| Outbound HTTP | Yes, on ports 80 and 443 (and 465, 587, 993 for mail). Other ports are blocked |
+| Outbound HTTP | Yes, on ports 80 and 443 (and 465, 587, 993 for mail). Other ports are blocked. No fixed outbound IP |
 
 ## Code and packages
 
@@ -53,8 +52,8 @@ settled yet; they are marked **Not settled** and collected
 
 **Dependencies.** The bundle lists the dependencies your `package.json` files
 declare. The upload does not include `node_modules`. Each instance installs the
-dependencies from the public npm registry when it starts, with `npm ci` (or
-`npm install` without a lockfile). Three things follow from that:
+dependencies when it starts, with `npm ci` (or `npm install` without a
+lockfile). Four things follow from that:
 
 - **Install scripts never run.** The install uses `--ignore-scripts`. A package
   that downloads a binary or builds something in `postinstall` installs without
@@ -63,8 +62,23 @@ dependencies from the public npm registry when it starts, with `npm ci` (or
   dependency fails the build, because the runtime has nothing to resolve it
   against.
 - **Some packages come from the image, not from you.** `@rebasepro/*`, `hono`,
-  `zod` and `typescript` are removed from the bundle's dependencies and the
-  image's own copies are used, so your version of them does not apply.
+  `@hono/node-server` and `zod` are removed from the bundle's dependencies and
+  the image's own copies are linked in, so your version of them does not apply.
+  `typescript` and `tsx` are removed too; they are build tools.
+- **Private packages need an `.npmrc`.** `rebase build` copies the project's
+  `.npmrc` (and `backend/.npmrc`) into the bundle, so the install uses the same
+  registry settings as your machine. Every credential in it must be an
+  environment reference, never the token itself; a literal token fails the
+  build, because the bundle is uploaded with your code:
+
+  ```ini title=".npmrc"
+  @acme:registry=https://npm.pkg.github.com
+  //npm.pkg.github.com/:_authToken=${NPM_TOKEN}
+  ```
+
+  ```bash
+  rebase cloud env set NPM_TOKEN=ghp_… --secret
+  ```
 
 The bundle upload is capped at 100 MB, compressed, without dependencies.
 
@@ -84,23 +98,25 @@ for `binding.gyp` or `gypfile`, for install scripts that call `node-gyp` or
 lists the usual ways around it. The short version: do the work at build time,
 call a service, or deploy with `runtime: "custom"`.
 
-**WebAssembly.** Nothing in the build or the runtime looks at `.wasm` files.
-A pure-JavaScript package that loads a `.wasm` file is not refused, and Node 22
-can run it. That it works has not been tested on the managed runtime, so treat
-it as **not settled**. Remember the [memory limit](#compute-and-instances) if
-the module is large, such as a speech or ML model.
+**WebAssembly works.** A package that ships a `.wasm` file and loads it from
+JavaScript is not a native module, and Node 22 runs it. Checked in the
+runtime's base image with the pod's security settings, using `esbuild-wasm`.
+Remember the [memory limit](#compute-and-instances) if the module is large,
+such as a speech or ML model.
 
 ### Binaries and child processes
 
-Nothing blocks `child_process`, but the image has very little to run: `node`,
-`npm`, `sh`, `tar`, and the PostgreSQL client tools (`pg_dump`, `pg_restore`).
-There is no `ffmpeg`, no ImageMagick, no Python and no compiler. You cannot add
+`child_process` works. The image itself has very little to run: `node`, `npm`,
+`sh`, `tar`, and the PostgreSQL client tools (`pg_dump`, `pg_restore`). There is
+no `ffmpeg`, no ImageMagick, no Python and no compiler, and you cannot add
 system packages, because there is no Dockerfile and the process is not root.
 
-A binary that an npm package carries inside its own tarball is installed with
-the package. Whether running one is supported is **not settled**. A binary that
-a package downloads in `postinstall` never arrives, because install scripts do
-not run.
+A binary that an npm package carries **inside its own tarball** installs with
+the package and runs. It must be built for `linux`/`x64` against glibc
+(Debian), and it runs as an unprivileged user with no Linux capabilities.
+Checked with `@esbuild/linux-x64` in the runtime's base image. A binary that a
+package *downloads* in `postinstall` never arrives, because install scripts do
+not run; packages like `ffmpeg-static` work that way.
 
 If a feature needs a binary, use a hosted API for that work, or move the
 backend to `runtime: "custom"`, where you build your own image.
@@ -115,23 +131,22 @@ rebase cloud compute                              # what the project reserves no
 rebase cloud compute set --cpu 500m --memory 1Gi
 ```
 
-A project that never set a dial runs as a burstable pod: it reserves a small
-amount and can burst above it. Run `rebase cloud compute` to see the request
-and the limit your project actually has. The documented default request is
-`250m` CPU and `512Mi` memory; the platform's code currently defaults lower,
-with a burst limit of 2 CPU and 2 GiB, so this number is **not settled**.
+A project that never set a dial runs as a burstable pod: it reserves `100m` CPU
+and `384Mi` memory, and can burst to 2 CPU and 2 GiB. A dialled request keeps
+that ratio between request and limit. Run `rebase cloud compute` to see what
+your project has.
 
 Instances:
 
-- **One by default.** `--replicas` pins between 1 and 5.
+- **One by default, always running.** `--replicas` pins between 1 and 5.
+  Nothing scales a backend to zero.
 - **Autoscaling is opt-in.** `--autoscale-max` sets a ceiling of up to 16, and
   `--autoscale-cpu-target` (default 70) the CPU use the autoscaler aims for.
 - **Deploys roll.** A new instance starts and becomes ready before the old one
   stops, so for a short time two versions serve traffic.
 
-`--spot` and `--scale-to-zero` are both off by default. Spot instances are
-restarted without notice. Whether `--scale-to-zero` currently takes effect is
-**not settled**; plan for an instance that is always running.
+`--spot` is off by default; spot instances are cheaper and restarted without
+notice.
 
 ## Memory and module-level state
 
@@ -177,6 +192,7 @@ deploys or as storage for uploads. That is also why
 | Limit | Default | Change it with |
 |---|---|---|
 | Function timeout | 30 s, then `504` with code `FUNCTION_TIMEOUT` | `REBASE_FUNCTIONS_TIMEOUT_MS` (`0` turns it off) |
+| Waiting on your instance, at the edge | 10 minutes between reads or writes | Fixed |
 | Request body, all `/api/*` routes | 10 MiB, then `413 PAYLOAD_TOO_LARGE` | `REBASE_MAX_BODY_SIZE`, in bytes |
 | Request body at the edge | 64 MiB | Fixed |
 | One file through `POST /api/storage/upload` | 50 MB | `STORAGE_MAX_FILE_SIZE` |
@@ -188,12 +204,12 @@ Some details:
   a `504`, and `getSignal(c)` is aborted. Pass that signal to `fetch` and
   anything else that accepts one, so the work stops too. See
   [Timeouts and Rate Limits](/docs/backend/custom-functions/#timeouts-and-rate-limits).
-- **The edge has its own timeout.** Requests reach your instances through an
-  nginx ingress that sets no read timeout of its own, so the controller's
-  default applies (60 seconds in ingress-nginx). Raising
-  `REBASE_FUNCTIONS_TIMEOUT_MS` past that is **not settled**: the edge may close
-  the connection first. For work that takes minutes, answer at once and do the
-  work in a [job](/docs/backend/jobs/) or in `waitUntil`.
+- **The edge waits longer than the runtime.** The ingress in front of your
+  instances waits up to 10 minutes, so the limit a request hits is the runtime's,
+  which answers JSON and aborts the signal. Raise `REBASE_FUNCTIONS_TIMEOUT_MS`
+  up to that. For work that takes longer, or that must survive a deploy (an
+  instance drains for 15 seconds), answer at once and do the work in a
+  [job](/docs/backend/jobs/).
 - **Uploads larger than 64 MiB** need the resumable (TUS) upload, which sends
   the file in chunks. `client.storage.putObject()` switches to it on its own
   above 8 MiB.
@@ -223,10 +239,10 @@ rebase cloud deploy                              # applies the change
   `REBASE_SERVICE_KEY`, `PORT` and `NODE_ENV` itself, and pins how the process
   runs (`REBASE_ROLE`, `TRUSTED_PROXY_HOPS`, …). Setting one of those is
   refused, and the error lists them all.
-- **`CORS_ORIGINS` comes from your domains.** The platform sets it to the
-  project's host and its verified [custom domains](/docs/deployment/cloud/#the-rest-of-the-surface),
-  and that value wins over one you set. Add an origin with
-  `rebase cloud domains`, not with `env set`.
+- **`CORS_ORIGINS` starts from your domains.** The platform sets it to the
+  project's host and its verified [custom domains](/docs/deployment/cloud/#the-rest-of-the-surface).
+  A `CORS_ORIGINS` you set is added to that list, for a frontend served from
+  somewhere else: `rebase cloud env set CORS_ORIGINS=https://app.example.org`.
 - **The storage variables are defaults.** The platform writes the `STORAGE_*`
   and `S3_*` variables for its bucket, and a value you set wins.
 - **Build-time names are refused.** `VITE_`, `NEXT_PUBLIC_`, `PUBLIC_` and
@@ -361,9 +377,10 @@ The platform adds no proxy and no outbound rate limit; the services you call
 have their own. Pass `getSignal(c)` to `fetch` so a call stops when its request
 times out.
 
-Your traffic leaves through a shared address, not one per project. Whether that
-address is fixed and published, for services that require an allowlist, is
-**not settled**.
+There is **no fixed outbound IP address**. Traffic leaves through an address
+shared by every project, which the cloud provider assigns and can change, so do
+not add it to a third-party allowlist. Authenticate to such a service with a
+key instead.
 
 ## Startup and shutdown
 
@@ -385,8 +402,8 @@ address is fixed and published, for services that require an allowlist, is
 
 Move the backend to `"runtime": "custom"` when it needs:
 
-- a native module or a system binary, such as `sharp`, `ffmpeg` or a local
-  speech engine;
+- a native module, or a system binary no npm package ships, such as `sharp`,
+  ImageMagick or a local speech engine;
 - system packages or a different base image;
 - a long-lived connection to something outside the allowed ports.
 
@@ -394,29 +411,14 @@ A custom runtime builds your own Dockerfile, and you own the image from then
 on. `rebase cloud deploy --eject` makes the switch. See
 [Rebase Cloud](/docs/deployment/cloud/#deploy).
 
-## Not settled yet
+## Not promised yet
 
-These questions have no answer in the platform's code yet. Ask before you
-depend on any of them.
-
-- **WebAssembly.** It is not blocked, but it has not been tested or promised.
-- **Running a binary shipped inside an npm package.** It is not blocked, but it
-  is not supported either.
-- **The default CPU and memory.** The documented default (`250m`, `512Mi`) and
-  the platform's current default (lower request, burst to 2 CPU and 2 GiB) do
-  not agree. `rebase cloud compute` shows what your project has.
-- **Scale to zero.** The `--scale-to-zero` dial is accepted. Whether it
-  currently changes how the project runs is not confirmed.
-- **Requests longer than 60 seconds.** The function timeout can be raised, but
-  the edge in front may close the connection at its own default.
-- **A fixed outbound IP address** that a third-party allowlist can use.
-- **A browser origin that is not one of the project's domains**, such as a
-  frontend hosted elsewhere. The platform's `CORS_ORIGINS` takes precedence over
-  yours.
-- **Private npm registries.** The dependency install reads no `.npmrc` or
-  token, so private packages appear not to install.
-- **Log retention.** `rebase cloud logs --runtime` shows recent output; how long
-  logs are kept is not documented.
+- **Log history.** `rebase cloud logs --runtime` reads from the instances that
+  are running, and `rebase cloud debug logs --previous` from the last run of
+  one that restarted. Output from an instance a deploy replaced is gone. Write
+  anything you need to keep to the database or to a log service of your own.
+- **Scale to zero** is not offered. Every backend runs at least one instance at
+  all times.
 
 ## Related pages
 

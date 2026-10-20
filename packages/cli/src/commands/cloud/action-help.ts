@@ -97,7 +97,10 @@ export const ACTION_HELP: Record<string, ActionHelp> = {
             ["--memory <size>", "Memory per instance, e.g. 512Mi"],
             ["--replicas <n>", "Instance count"],
             ["--spot <true|false>", "Run on preemptible capacity"],
-            ["--scale-to-zero <true|false>", "Stop the instances when idle"],
+            // Still parsed so an old script is told what happened. Documented
+            // here because the parse is: a page silent about a flag the
+            // command accepts is how the two drift.
+            ["--scale-to-zero <false>", "Retired: every backend is always on. `false` is ignored with a warning, `true` refused"],
             ["--db-instances <n>", "Database instance count"],
             ["--db-cpu <n>", "vCPU per database instance"],
             ["--db-memory <size>", "Memory per database instance"],
@@ -668,11 +671,10 @@ export const ACTION_HELP: Record<string, ActionHelp> = {
             "Change one or more of a project's dials. At least one is required: a patch with nothing "
             + "in it is a typo, and reporting success for a change nobody made is worse than refusing.",
         flags: [
-            ["--cpu <n>", "App CPU request per instance, e.g. 500m or 2. Default: 250m"],
-            ["--memory <size>", "App memory request per instance, e.g. 512Mi or 2Gi. Default: 512Mi"],
+            ["--cpu <n>", "App CPU request per instance, e.g. 500m or 2. Default: 100m, bursting to 2"],
+            ["--memory <size>", "App memory request per instance, e.g. 512Mi or 2Gi. Default: 384Mi, bursting to 2Gi"],
             ["--replicas <n>", "Instances that always exist — the autoscaler's floor, and what is billed at rest"],
             ["--spot <true|false>", "Preemptible capacity: cheaper, and restarted without notice"],
-            ["--scale-to-zero <true|false>", "Request-billed compute that stops when idle, at the cost of a cold start"],
             ["--db-instances <n>", "1–3. 1 is a single instance with no failover; 2 adds an automatic standby"],
             ["--db-cpu <n>", "Database CPU request per instance. Default: 500m"],
             ["--db-memory <size>", "Database memory request per instance. Default: 2Gi"],

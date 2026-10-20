@@ -431,6 +431,10 @@ export function imageModulesDir(): string | undefined {
  * and ran zero crons. The image installs zod (see
  * infra/docker/server.Dockerfile); naming it here is what makes the bundle's
  * copy collapse onto it.
+ *
+ * `hono` and `@hono/node-server` likewise: the bundler strips them, so a
+ * function importing `hono` directly found no copy under the bundle and failed
+ * to load. See `infra/docker/entrypoint.mjs`.
  */
 export const RUNTIME_PROVIDED_PACKAGES = [
     "@rebasepro/server",
@@ -438,7 +442,9 @@ export const RUNTIME_PROVIDED_PACKAGES = [
     "@rebasepro/client",
     "@rebasepro/common",
     "@rebasepro/utils",
-    "zod"
+    "zod",
+    "hono",
+    "@hono/node-server"
 ] as const;
 
 /**

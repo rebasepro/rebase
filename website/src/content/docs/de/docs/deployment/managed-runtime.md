@@ -1,8 +1,8 @@
 ---
-sourceHash: 63d8ba53bb0e0c67
-title: Managed Backend-Runtime
+sourceHash: f02c2b6d0bb6de5f
+title: Managed-Backend-Runtime
 sidebar_label: Managed Runtime
-description: Was ein Backend mit der Runtime "managed" auf Rebase Cloud tun und lassen kann — Pakete und Binärdateien, Arbeitsspeicher und CPU, Timeouts und Body-Größen, das Dateisystem, In-Memory-State, Secrets, Speicher für generierte Dateien und ausgehender Netzwerkverkehr.
+description: Was ein Backend mit der Runtime „managed“ auf Rebase Cloud kann und was nicht — Pakete und Binärdateien, Arbeitsspeicher und CPU, Timeouts und Body-Größen, das Dateisystem, In-Memory-Status, Secrets, Speicher für generierte Dateien und ausgehender Netzwerkverkehr.
 ---
 
 Eine Backend-App, die in `rebase.json` wie folgt deklariert ist, läuft auf der **Managed Runtime**:
@@ -15,138 +15,240 @@ Eine Backend-App, die in `rebase.json` wie folgt deklariert ist, läuft auf der 
 }
 ```
 
-„Managed“ bedeutet, dass Sie ein Bundle ausliefern, kein Image. `rebase cloud deploy` baut Ihre Collections, `backend/functions/` und Crons in `dist-bundle`, lädt es hoch und Rebase Cloud startet es auf dem veröffentlichten `rebasepro/server`-Image. Sie schreiben niemals ein Dockerfile und können auch nicht ändern, was sich im Image befindet. Diese Seite listet auf, was dadurch möglich ist, damit Sie ein Feature planen können, bevor Sie es implementieren.
+Managed bedeutet, dass Sie ein Bundle ausliefern, kein Image. `rebase cloud deploy` baut Ihre
+Collections, `backend/functions/` und Crons in `dist-bundle`, lädt es hoch und
+Rebase Cloud startet es auf dem veröffentlichten `rebasepro/server`-Image. Sie schreiben niemals
+ein Dockerfile und können auch nicht ändern, was im Image enthalten ist. Diese Seite listet auf,
+was dadurch möglich ist, damit Sie ein Feature planen können, bevor Sie es entwickeln.
 
-Die Zahlen hier stammen von der Runtime und der Plattform im aktuellen Zustand. Einige davon sind Stellschrauben, die Sie anpassen können, und die Seite gibt an, welche das sind. Einige Dinge sind noch nicht final festgelegt; sie sind als **Noch nicht festgelegt** markiert und [am Ende](#noch-nicht-festgelegt) zusammengefasst. Bauen Sie nicht darauf auf, ohne vorher nachzufragen.
+Die Zahlen hier stammen aus der Runtime und der Plattform im aktuellen Zustand. Einige
+sind Stellschrauben, die Sie anpassen können, und die Seite gibt an, welche das sind. Die wenigen Dinge, die
+noch nicht zugesichert sind, sind [am Ende](#noch-nicht-zugesichert) zusammengefasst.
 
 ## Auf einen Blick
 
 | Frage | Antwort |
 |---|---|
 | Node-Version | Node 22, auf Debian slim, `linux`/`x64` |
-| npm-Pakete | Ja, reine JavaScript-Pakete. Werden installiert, wenn die jeweilige Instanz startet |
+| npm-Pakete | Ja, aus der öffentlichen Registry oder einer privaten. Werden beim Start jeder Instanz installiert |
 | Native Module (`.node`, node-gyp) | Nein. `rebase cloud deploy` lehnt das Bundle ab |
-| WebAssembly | Wird weder geprüft noch blockiert. **Noch nicht festgelegt**, ob es unterstützt wird |
-| Kindprozess starten (child process) | Nicht blockiert, aber es gibt fast nichts auszuführen. Siehe [Binärdateien](#binärdateien-und-kindprozesse) |
-| Arbeitsspeicher und CPU | Wird pro Projekt mit `rebase cloud compute` festgelegt. Siehe [Compute](#compute-und-instanzen) |
-| Instanzen | Standardmäßig 1. Sie können bis zu 5 Instanzen festlegen oder den Autoscaler auf bis zu 16 skalieren lassen |
-| Funktions-Timeout | 30 Sekunden, dann `504 FUNCTION_TIMEOUT`. Konfigurierbar |
-| Request-Body | 10 MiB, dann `413`. Konfigurierbar, bis zu den 64 MiB, die der Edge akzeptiert |
+| WebAssembly | Ja |
+| Einen Child-Process starten | Ja, für eine `linux`/`x64`-Binärdatei, die ein npm-Paket mitbringt. Siehe [Binärdateien](#binärdateien-und-child-processes) |
+| Arbeitsspeicher und CPU | Pro Projekt über `rebase cloud compute` konfigurierbar. Siehe [Compute](#compute-und-instanzen) |
+| Instanzen | Standardmäßig 1, immer aktiv. Sie können bis zu 5 Instanzen festlegen oder den Autoscaler bis auf 16 hochskalieren lassen |
+| Funktions-Timeout | 30 Sekunden, danach `504 FUNCTION_TIMEOUT`. Konfigurierbar bis zu 10 Minuten |
+| Request-Body | 10 MiB, danach `413`. Konfigurierbar, bis zu den 64 MiB, die der Edge-Knoten akzeptiert |
 | Beschreibbares Dateisystem | Ja, aber es ist temporär und gehört zu einer einzelnen Instanz |
-| Status auf Modulebene (ein `Map`-Cache) | Bleibt zwischen Anfragen auf derselben Instanz erhalten. Geht bei jedem Deployment und Neustart verloren und wird nicht zwischen Instanzen geteilt |
-| Umgebungsvariablen und Secrets | `rebase cloud env set`, wird beim nächsten Deployment angewendet |
-| Dateispeicher | Ein Bucket pro Projekt, bereitgestellt durch Ihr Backend unter `/api/storage/file/…` |
-| Ausgehendes HTTP | Ja, auf den Ports 80 und 443 (sowie 465, 587, 993 für E-Mail). Andere Ports sind blockiert |
+| Status auf Modulebene (ein `Map`-Cache) | Bleibt zwischen Requests auf einer Instanz erhalten. Geht bei jedem Deploy und Neustart verloren und wird nicht zwischen Instanzen geteilt |
+| Umgebungsvariablen und Secrets | `rebase cloud env set`, werden beim nächsten Deploy angewendet |
+| Dateispeicher | Ein Bucket pro Projekt, bereitgestellt von Ihrem Backend unter `/api/storage/file/…` |
+| Ausgehendes HTTP | Ja, auf den Ports 80 und 443 (sowie 465, 587, 993 für E-Mail). Andere Ports sind blockiert. Keine feste ausgehende IP |
 
 ## Code und Pakete
 
-**Node und das Image.** Das Runtime-Image basiert auf `node:22-slim` (Debian), und Ihr Bundle läuft auf `linux`/`x64` als Nicht-Root-Benutzer. Ihre `tsconfig` und die Node-Version auf Ihrem Rechner ändern daran nichts.
+**Node und das Image.** Das Runtime-Image basiert auf `node:22-slim`
+(Debian), und Ihr Bundle läuft auf `linux`/`x64` als Nicht-Root-Benutzer. Ihre
+`tsconfig` und die Node-Version auf Ihrem Rechner ändern daran nichts.
 
-**Abhängigkeiten.** Das Bundle listet die Abhängigkeiten auf, die Ihre `package.json`-Dateien deklarieren. Der Upload enthält kein `node_modules`. Jede Instanz installiert die Abhängigkeiten aus der öffentlichen npm-Registry beim Starten mittels `npm ci` (oder `npm install` ohne Lockfile). Daraus ergeben sich drei Dinge:
+**Abhängigkeiten.** Das Bundle listet die Abhängigkeiten auf, die Ihre `package.json`-Dateien
+deklarieren. Der Upload enthält kein `node_modules`. Jede Instanz installiert die
+Abhängigkeiten beim Start mit `npm ci` (oder `npm install` ohne
+Lockfile). Daraus ergeben sich vier Konsequenzen:
 
-- **Installationsskripte werden niemals ausgeführt.** Die Installation verwendet `--ignore-scripts`. Ein Paket, das eine Binärdatei herunterlädt oder in `postinstall` etwas baut, wird ohne diese installiert.
-- **Es werden nur Registry-Versionen installiert.** Eine `file:`, `link:`, `git+…`- oder `github:`-Abhängigkeit lässt den Build fehlschlagen, da die Runtime über nichts verfügt, womit sie aufgelöst werden könnte.
-- **Einige Pakete stammen aus dem Image, nicht von Ihnen.** `@rebasepro/*`, `hono`, `zod` und `typescript` werden aus den Abhängigkeiten des Bundles entfernt, und die Versionen des Images selbst werden verwendet, sodass Ihre Version davon keine Anwendung findet.
+- **Installationsskripte werden niemals ausgeführt.** Die Installation verwendet `--ignore-scripts`. Ein Paket,
+  das eine Binärdatei herunterlädt oder in `postinstall` etwas baut, wird ohne
+  diese Schritte installiert.
+- **Nur Registry-Versionen werden installiert.** Eine `file:`, `link:`, `git+…` oder `github:`-Abhängigkeit
+  führt zum Abbruch des Builds, da die Runtime über keine Quelle verfügt, um sie aufzulösen.
+- **Manche Pakete stammen aus dem Image, nicht von Ihnen.** `@rebasepro/*`, `hono`,
+  `@hono/node-server` und `zod` werden aus den Abhängigkeiten des Bundles entfernt und
+  die Kopien des Images werden verlinkt, sodass Ihre Version davon nicht greift.
+  `typescript` und `tsx` werden ebenfalls entfernt; sie sind Build-Tools.
+- **Private Pakete erfordern eine `.npmrc`.** `rebase build` kopiert die `.npmrc` des Projekts
+  (und `backend/.npmrc`) in das Bundle, sodass die Installation dieselben
+  Registry-Einstellungen verwendet wie Ihr Rechner. Jede Anmeldeinformation darin muss ein
+  Verweis auf eine Umgebungsvariable sein, niemals das Token selbst; ein literales Token lässt den
+  Build fehlschlagen, da das Bundle zusammen mit Ihrem Code hochgeladen wird:
+
+  ```ini title=".npmrc"
+  @acme:registry=https://npm.pkg.github.com
+  //npm.pkg.github.com/:_authToken=${NPM_TOKEN}
+  ```
+
+  ```bash
+  rebase cloud env set NPM_TOKEN=ghp_… --secret
+  ```
 
 Der Bundle-Upload ist auf 100 MB komprimiert ohne Abhängigkeiten begrenzt.
 
-**Native Module werden abgelehnt.** Ein Paket, das eine kompilierte `.node`-Binärdatei mitliefert, kann auf der Managed Runtime nicht geladen werden. `rebase build` warnt davor, und `rebase cloud deploy` bricht vor dem Hochladen ab:
+**Native Module werden abgelehnt.** Ein Paket, das eine kompilierte `.node`-Binärdatei
+mitbringt, kann auf der Managed Runtime nicht geladen werden. `rebase build` warnt davor, und
+`rebase cloud deploy` bricht vor dem Upload ab:
 
 ```text no-verify
 This bundle depends on native modules (sharp), which the managed runtime cannot run
 ```
 
-Die Prüfung sucht nach bekannten nativen Paketen (`sharp`, `canvas`, `bcrypt`, `argon2`, `sqlite3`, `better-sqlite3`, `re2`, `sodium-native`, `pg-native`, …), nach `binding.gyp` oder `gypfile`, nach Installationsskripten, die `node-gyp` oder `prebuild` aufrufen, und nach `.node`-Dateien. Der [Deployment-Leitfaden](/docs/getting-started/deployment/#native-modules-on-the-managed-runtime) listet die üblichen Umgehungsmöglichkeiten auf. Die Kurzfassung: Erledigen Sie die Arbeit zur Build-Zeit, rufen Sie einen externen Dienst auf oder deployen Sie mit `runtime: "custom"`.
+Die Prüfung sucht nach bekannten nativen Paketen (`sharp`, `canvas`, `bcrypt`,
+`argon2`, `sqlite3`, `better-sqlite3`, `re2`, `sodium-native`, `pg-native`, …),
+nach `binding.gyp` oder `gypfile`, nach Installationsskripten, die `node-gyp` oder
+`prebuild` aufrufen, und nach `.node`-Dateien. Der
+[Leitfaden zum Deployment](/docs/getting-started/deployment/#native-modules-on-the-managed-runtime)
+listet die üblichen Auswege auf. Die Kurzfassung: Erledigen Sie die Arbeit zur Build-Zeit,
+rufen Sie einen externen Dienst auf oder deployen Sie mit `runtime: "custom"`.
 
-**WebAssembly.** Nichts im Build oder in der Runtime prüft `.wasm`-Dateien. Ein reines JavaScript-Paket, das eine `.wasm`-Datei lädt, wird nicht abgelehnt, und Node 22 kann es ausführen. Dass dies funktioniert, wurde auf der Managed Runtime bisher nicht getestet; betrachten Sie es daher als **noch nicht festgelegt**. Beachten Sie das [Speicherlimit](#compute-und-instanzen), falls das Modul groß ist, wie etwa ein Sprach- oder ML-Modell.
+**WebAssembly funktioniert.** Ein Paket, das eine `.wasm`-Datei ausliefert und aus
+JavaScript lädt, ist kein natives Modul, und Node 22 führt es aus. Getestet im
+Basis-Image der Runtime mit den Sicherheitseinstellungen des Pods unter Verwendung von `esbuild-wasm`.
+Beachten Sie das [Speicherlimit](#compute-und-instanzen), falls das Modul groß ist,
+wie etwa ein Sprach- oder ML-Modell.
 
-### Binärdateien und Kindprozesse
+### Binärdateien und Child-Processes
 
-Nichts blockiert `child_process`, aber das Image enthält sehr wenig, was ausgeführt werden könnte: `node`, `npm`, `sh`, `tar` und die PostgreSQL-Client-Tools (`pg_dump`, `pg_restore`). Es gibt kein `ffmpeg`, kein ImageMagick, kein Python und keinen Compiler. Sie können keine Systempakete hinzufügen, da es kein Dockerfile gibt und der Prozess nicht als Root läuft.
+`child_process` funktioniert. Das Image selbst enthält nur sehr wenig Ausführbares: `node`, `npm`,
+`sh`, `tar` und die PostgreSQL-Client-Tools (`pg_dump`, `pg_restore`). Es gibt
+kein `ffmpeg`, kein ImageMagick, kein Python und keinen Compiler, und Sie können keine
+Systempakete hinzufügen, da es kein Dockerfile gibt und der Prozess nicht als Root läuft.
 
-Eine Binärdatei, die ein npm-Paket in seinem eigenen Tarball mitführt, wird mit dem Paket installiert. Ob die Ausführung einer solchen unterstützt wird, ist **noch nicht festgelegt**. Eine Binärdatei, die ein Paket im `postinstall` herunterlädt, kommt nie an, da Installationsskripte nicht ausgeführt werden.
+Eine Binärdatei, die ein npm-Paket **im eigenen Tarball** mitführt, wird mit dem
+Paket installiert und ausgeführt. Sie muss für `linux`/`x64` gegen die glibc
+(Debian) gebaut sein und läuft als nicht privilegierter Benutzer ohne Linux-Capabilities.
+Getestet mit `@esbuild/linux-x64` im Basis-Image der Runtime. Eine Binärdatei, die ein
+Paket in `postinstall` *herunterlädt*, wird niemals übertragen, da Installationsskripte
+nicht ausgeführt werden; Pakete wie `ffmpeg-static` funktionieren auf diese Weise.
 
-Wenn ein Feature eine Binärdatei benötigt, nutzen Sie eine gehostete API für diese Aufgabe oder stellen Sie das Backend auf `runtime: "custom"` um, wo Sie Ihr eigenes Image bauen.
+Wenn ein Feature eine Binärdatei benötigt, nutzen Sie eine gehostete API für diese Aufgabe oder stellen Sie
+das Backend auf `runtime: "custom"` um, wo Sie Ihr eigenes Image bauen.
 
 ## Compute und Instanzen
 
-Jedes Projekt läuft in seinen eigenen Pods. Arbeitsspeicher und CPU gelten pro Instanz und werden über die [Compute-Einstellungen](/docs/deployment/cloud/#compute-and-what-it-costs) konfiguriert:
+Jedes Projekt läuft in seinen eigenen Pods. Arbeitsspeicher und CPU gelten pro Instanz und werden
+über die [Compute-Einstellungen](/docs/deployment/cloud/#compute-and-what-it-costs) konfiguriert:
 
 ```bash
-rebase cloud compute                              # what the project reserves now
+rebase cloud compute                              # was das Projekt aktuell reserviert
 rebase cloud compute set --cpu 500m --memory 1Gi
 ```
 
-Ein Projekt, für das nie eine Einstellung vorgenommen wurde, läuft als Burstable-Pod: Es reserviert eine kleine Menge und kann darüber hinaus kurzzeitig mehr Ressourcen nutzen. Führen Sie `rebase cloud compute` aus, um die Request- und Limit-Werte zu sehen, die Ihr Projekt tatsächlich hat. Der dokumentierte Standard-Request beträgt `250m` CPU und `512Mi` Arbeitsspeicher; der Plattformcode setzt den Standard derzeit niedriger an, mit einem Burst-Limit von 2 CPU und 2 GiB, weshalb dieser Wert **noch nicht festgelegt** ist.
+Ein Projekt, für das nie eine Einstellung vorgenommen wurde, läuft als Burstable-Pod: Es reserviert `100m` CPU
+und `384Mi` Arbeitsspeicher und kann bis auf 2 CPUs und 2 GiB bursten. Eine konfigurierte Anforderung behält
+dieses Verhältnis zwischen Anforderung (Request) und Limit bei. Führen Sie `rebase cloud compute` aus, um zu sehen,
+was für Ihr Projekt eingestellt ist.
 
 Instanzen:
 
-- **Standardmäßig eine.** `--replicas` legt eine feste Anzahl zwischen 1 und 5 fest.
-- **Autoscaling ist Opt-in.** `--autoscale-max` legt eine Obergrenze von bis zu 16 fest, und `--autoscale-cpu-target` (Standard: 70) definiert die CPU-Auslastung, die der Autoscaler anstrebt.
-- **Deployments laufen als Rolling Updates.** Eine neue Instanz startet und wird bereit (ready), bevor die alte stoppt, sodass für kurze Zeit zwei Versionen Traffic bedienen.
+- **Standardmäßig eine, immer aktiv.** `--replicas` legt eine feste Zahl zwischen 1 und 5 fest.
+  Es gibt kein Herunterskalieren des Backends auf null.
+- **Autoscaling ist optional (Opt-in).** `--autoscale-max` legt eine Obergrenze von bis zu 16 fest, und
+  `--autoscale-cpu-target` (Standard: 70) die CPU-Auslastung, die der Autoscaler anstrebt.
+- **Deploys erfolgen rollierend (Rolling Updates).** Eine neue Instanz startet und wird betriebsbereit, bevor die alte
+  gestoppt wird, sodass für kurze Zeit zwei Versionen gleichzeitig Traffic verarbeiten.
 
-`--spot` und `--scale-to-zero` sind standardmäßig beide deaktiviert. Spot-Instanzen werden ohne Vorankündigung neu gestartet. Ob `--scale-to-zero` derzeit wirksam ist, ist **noch nicht festgelegt**; planen Sie mit einer Instanz, die immer läuft.
+`--spot` ist standardmäßig deaktiviert; Spot-Instanzen sind günstiger, werden jedoch ohne
+Vorankündigung neu gestartet.
 
-## Speicher und Status auf Modulebene
+## Arbeitsspeicher und Status auf Modulebene
 
-Ein Wert auf Modulebene, wie `const cache = new Map()` am Anfang einer Funktionsdatei, verbleibt im Node-Prozess. Er bleibt von einer Anfrage zur nächsten auf derselben Instanz erhalten. Er geht verloren, sobald dieser Prozess beendet wird:
+Ein Wert auf Modulebene, wie `const cache = new Map()` am Anfang einer Funktionsdatei,
+lebt im Node-Prozess. Er bleibt auf derselben Instanz von einem Request zum nächsten erhalten.
+Er geht jedoch verloren, sobald dieser Prozess beendet wird:
 
-- bei **jedem Deployment**, da bei jedem Deployment neue Instanzen gestartet werden;
+- bei **jedem Deploy**, da jeder Deploy neue Instanzen startet;
 - wenn eine **Umgebungsvariable** geändert und bereitgestellt wird;
 - wenn eine Instanz neu gestartet, neu zugewiesen oder (mit `--spot`) freigegeben wird.
 
-Bei mehr als einer Instanz verfügt jede über ihre eigene Kopie, sodass zwei Anfragen unterschiedliche Caches sehen können.
+Bei mehr als einer Instanz verfügt jede über ihre eigene Kopie, sodass zwei Requests
+unterschiedliche Caches vorfinden können.
 
-Verwenden Sie eine `Map` auf Modulebene als Cache, dessen Verlust Sie verschmerzen können: einen, der die nächste Anfrage beschleunigt, aber nicht die einzige Kopie von irgendetwas ist. Bewahren Sie alles, dessen Erstellung Sie etwas gekostet hat – wie generierte Audiodateien oder eine teure API-Antwort –, in der Datenbank oder im [Storage](#storage-für-generierte-dateien) auf. Für Clients, die Sie nur einmal erstellen, wie etwa ein API-SDK, verwenden Sie `lazyResource`, damit der Client bei der ersten Verwendung aus der Umgebung der Anfrage instanziiert wird. Siehe [Konfiguration und Secrets](/docs/backend/custom-functions/#configuration-and-secrets).
+Nutzen Sie eine `Map` auf Modulebene als Cache, dessen Verlust Sie verschmerzen können: ein Cache, der den
+nächsten Request beschleunigt, aber nicht die einzige Kopie der Daten darstellt. Speichern Sie alles, dessen
+Erzeugung Ressourcen oder Geld gekostet hat – wie generierte Audiodateien oder eine teure API-Antwort –, in der
+Datenbank oder im [Dateispeicher](#dateispeicher-für-generierte-dateien). Für Clients, die Sie nur einmal
+erstellen, wie ein API-SDK, nutzen Sie `lazyResource`, damit der Client bei der ersten Verwendung
+aus der Umgebung des Requests erstellt wird. Siehe
+[Konfiguration und Secrets](/docs/backend/custom-functions/#configuration-and-secrets).
 
-[Ausführen mehrerer Instanzen](/docs/deployment/multiple-instances/) listet den Status auf, den Rebase selbst pro Prozess verwaltet, wie Rate-Limit-Zähler und Realtime-Kanäle.
+Unter [Mehrere Instanzen betreiben](/docs/deployment/multiple-instances/) finden Sie eine Auflistung
+des Status, den Rebase selbst pro Prozess vorhält, wie Rate-Limit-Zähler und
+Realtime-Channels.
 
 ## Das Dateisystem
 
-Das Dateisystem des Containers ist beschreibbar, und `/tmp` funktioniert. Aber alles, was dorthin geschrieben wird:
+Das Dateisystem des Containers ist beschreibbar, und `/tmp` funktioniert. Aber alles,
+was dorthin geschrieben wird:
 
 - gehört zu einer einzelnen Instanz und ist für andere Instanzen nicht sichtbar;
-- wird gelöscht, wenn die Instanz stoppt, also spätestens beim nächsten Deployment;
-- teilt sich ein Limit von 6 GiB an ephemerem Speicher mit dem Bundle und den installierten `node_modules`. Eine Instanz, die dieses Limit überschreitet, wird beendet (evicted).
+- wird gelöscht, wenn die Instanz stoppt, spätestens also beim nächsten Deploy;
+- teilt sich ein Limit von 6 GiB an flüchtigem Speicher (Ephemeral Storage) mit dem Bundle und den installierten
+  `node_modules`. Eine Instanz, die dieses Limit überschreitet, wird beendet (evicted).
 
-Verwenden Sie es für temporäre Arbeitsdateien während einer einzelnen Anfrage. Verwenden Sie es nicht als deployment-übergreifenden Cache oder als Speicher für Uploads. Das ist auch der Grund, warum [`STORAGE_TYPE=local` in der Produktion deaktiviert ist](/docs/backend/storage/#environment-variables).
+Nutzen Sie es für temporäre Arbeitsdateien während eines einzelnen Requests. Verwenden Sie es nicht als Cache über
+Deploys hinweg oder als Speicher für Uploads. Das ist auch der Grund, warum
+[`STORAGE_TYPE=local` in der Produktionsumgebung deaktiviert ist](/docs/backend/storage/#environment-variables).
 
-## Anfragen
+## Requests
 
 | Limit | Standard | Ändern mit |
 |---|---|---|
-| Funktions-Timeout | 30 s, dann `504` mit Code `FUNCTION_TIMEOUT` | `REBASE_FUNCTIONS_TIMEOUT_MS` (`0` schaltet ihn aus) |
-| Request-Body, alle `/api/*`-Routen | 10 MiB, dann `413 PAYLOAD_TOO_LARGE` | `REBASE_MAX_BODY_SIZE`, in Bytes |
+| Funktions-Timeout | 30 s, danach `504` mit Code `FUNCTION_TIMEOUT` | `REBASE_FUNCTIONS_TIMEOUT_MS` (`0` deaktiviert es) |
+| Warten auf Ihre Instanz am Edge | 10 Minuten zwischen Lese- oder Schreibvorgängen | Fest |
+| Request-Body, alle `/api/*`-Routen | 10 MiB, danach `413 PAYLOAD_TOO_LARGE` | `REBASE_MAX_BODY_SIZE`, in Bytes |
 | Request-Body am Edge | 64 MiB | Fest |
-| Eine Datei über `POST /api/storage/upload` | 50 MB | `STORAGE_MAX_FILE_SIZE` |
-| Anonyme Aufrufe an `/api/functions/*` | 3000 pro IP alle 15 Minuten | `rateLimit.anonymousFunctions` |
+| Einzelne Datei über `POST /api/storage/upload` | 50 MB | `STORAGE_MAX_FILE_SIZE` |
+| Anonyme Aufrufe an `/api/functions/*` | 3000 pro IP pro 15 Minuten | `rateLimit.anonymousFunctions` |
 
 Einige Details:
 
-- **Der Timeout beendet das Warten des Aufrufers, nicht die Arbeit.** Nach 30 Sekunden erhält der Aufrufer ein `504`, und `getSignal(c)` wird abgebrochen. Übergeben Sie dieses Signal an `fetch` und alles andere, was ein Signal akzeptiert, damit auch die Hintergrundarbeit stoppt. Siehe [Timeouts und Rate Limits](/docs/backend/custom-functions/#timeouts-and-rate-limits).
-- **Der Edge hat seinen eigenen Timeout.** Anfragen erreichen Ihre Instanzen über einen Nginx-Ingress, der keinen eigenen Read-Timeout festlegt, sodass der Standardwert des Controllers gilt (60 Sekunden in ingress-nginx). Das Erhöhen von `REBASE_FUNCTIONS_TIMEOUT_MS` darüber hinaus ist **noch nicht festgelegt**: Der Edge schließt möglicherweise vorher die Verbindung. Für Arbeiten, die Minuten dauern, antworten Sie sofort und erledigen Sie die Arbeit in einem [Job](/docs/backend/jobs/) oder in `waitUntil`.
-- **Uploads größer als 64 MiB** erfordern den fortsetzbaren (TUS) Upload, der die Datei in Chunks sendet. `client.storage.putObject()` wechselt ab 8 MiB automatisch dazu.
-- **Antwortgröße.** Weder die Runtime noch der Edge setzen ein Limit für die Antwortgröße. Eine große Antwort wird dennoch im Speicher gehalten, wenn Ihr Handler sie an einem Stück erstellt; streamen Sie sie daher oder liefern Sie sie aus dem Storage aus.
+- **Das Timeout bricht den Aufrufer ab, nicht die Arbeit.** Nach 30 Sekunden erhält der Aufrufer
+  ein `504`, und `getSignal(c)` wird abgebrochen (aborted). Übergeben Sie dieses Signal an `fetch` und
+  alles andere, was ein Signal akzeptiert, damit auch die Hintergrundarbeit stoppt. Siehe
+  [Timeouts und Rate-Limits](/docs/backend/custom-functions/#timeouts-and-rate-limits).
+- **Der Edge-Knoten wartet länger als die Runtime.** Der Ingress vor Ihren
+  Instanzen wartet bis zu 10 Minuten. Das Limit, auf das ein Request trifft, ist somit das der Runtime,
+  die mit JSON antwortet und das Signal abbricht. Erhöhen Sie `REBASE_FUNCTIONS_TIMEOUT_MS`
+  bis zu diesem Wert. Für Arbeiten, die länger dauern oder die einen Deploy überstehen müssen (eine
+  Instanz hat eine Drain-Zeit von 15 Sekunden), antworten Sie sofort und führen Sie die Arbeit in einem
+  [Job](/docs/backend/jobs/) aus.
+- **Uploads größer als 64 MiB** erfordern den fortsetzbaren Upload (TUS), der
+  die Datei in Chunks sendet. `client.storage.putObject()` wechselt ab 8 MiB automatisch
+  dorthin.
+- **Response-Größe.** Weder die Runtime noch der Edge setzen ein Limit für die Response-Größe.
+  Eine große Response verbleibt dennoch im Arbeitsspeicher, wenn Ihr Handler sie an einem Stück
+  zusammenbaut; streamen Sie sie daher oder liefern Sie sie direkt aus dem Speicher aus.
 
 ## Umgebungsvariablen und Secrets
 
-Legen Sie sie mit der CLI oder in der Konsole fest. In `rebase.json` gibt es dafür kein Feld.
+Setzen Sie diese über das CLI oder in der Konsole. Es gibt dafür kein Feld in
+`rebase.json`.
 
 ```bash
 rebase cloud env set TTS_API_URL=https://api.example.com/v1/speech
-rebase cloud env set TTS_API_KEY=sk-… --secret   # write-only: never shown again
-rebase cloud env list                            # names only, never values
-rebase cloud deploy                              # applies the change
+rebase cloud env set TTS_API_KEY=sk-… --secret   # write-only: wird nie wieder angezeigt
+rebase cloud env list                            # nur Namen, niemals Werte
+rebase cloud deploy                              # wendet die Änderung an
 ```
 
-- **Eine Änderung wird beim nächsten Deployment wirksam.** Laufende Instanzen behalten die Werte, mit denen sie gestartet wurden. `set` und `unset` erinnern Sie daran (`Pending redeploy`).
-- **Limits:** bis zu 100 Variablen pro Projekt, 32 KiB pro Wert und 256 KiB insgesamt. Namen folgen dem Muster `[A-Za-z_][A-Za-z0-9_]*`.
-- **Einige Namen sind reserviert.** Die Plattform setzt `DATABASE_URL`, `DATABASE_DIRECT_URL`, `DATABASE_READ_URL`, `JWT_SECRET`, `REBASE_SERVICE_KEY`, `PORT` und `NODE_ENV` selbst und legt fest, wie der Prozess ausgeführt wird (`REBASE_ROLE`, `TRUSTED_PROXY_HOPS`, …). Das Setzen eines dieser Werte wird verweigert, und der Fehler listet sie alle auf.
-- **`CORS_ORIGINS` stammt von Ihren Domains.** Die Plattform setzt dies auf den Host des Projekts und dessen verifizierte [benutzerdefinierte Domains](/docs/deployment/cloud/#the-rest-of-the-surface), und dieser Wert hat Vorrang vor einem von Ihnen gesetzten. Fügen Sie einen Origin mit `rebase cloud domains` hinzu, nicht mit `env set`.
-- **Die Storage-Variablen sind Standardwerte.** Die Plattform schreibt die `STORAGE_*`- und `S3_*`-Variablen für ihren Bucket, und ein von Ihnen gesetzter Wert hat Vorrang.
-- **Build-Zeit-Namen werden abgelehnt.** `VITE_`-, `NEXT_PUBLIC_`-, `PUBLIC_`- und `REACT_APP_`-Variablen sind für Frontends zur Build-Zeit gedacht, und das Backend sieht sie niemals rechtzeitig. `--force` speichert sie dennoch.
+- **Eine Änderung wird beim nächsten Deploy wirksam.** Laufende Instanzen behalten die Werte,
+  mit denen sie gestartet wurden. `set` und `unset` weisen Sie darauf hin
+  (`Pending redeploy`).
+- **Limits:** bis zu 100 Variablen pro Projekt, 32 KiB pro Wert und 256 KiB
+  insgesamt. Namen folgen dem Muster `[A-Za-z_][A-Za-z0-9_]*`.
+- **Manche Namen sind reserviert.** Die Plattform setzt `DATABASE_URL`,
+  `DATABASE_DIRECT_URL`, `DATABASE_READ_URL`, `JWT_SECRET`,
+  `REBASE_SERVICE_KEY`, `PORT` und `NODE_ENV` selbst und legt fest, wie der Prozess
+  ausgeführt wird (`REBASE_ROLE`, `TRUSTED_PROXY_HOPS`, …). Das Setzen einer dieser Variablen wird
+  abgelehnt, und die Fehlermeldung listet sie alle auf.
+- **`CORS_ORIGINS` basiert standardmäßig auf Ihren Domains.** Die Plattform setzt diesen Wert auf den
+  Host des Projekts und seine verifizierten [benutzerdefinierten Domains](/docs/deployment/cloud/#the-rest-of-the-surface).
+  Ein von Ihnen gesetztes `CORS_ORIGINS` wird dieser Liste hinzugefügt, falls ein Frontend von
+  woanders ausgeliefert wird: `rebase cloud env set CORS_ORIGINS=https://app.example.org`.
+- **Die Storage-Variablen sind Standardwerte.** Die Plattform schreibt die `STORAGE_*`-
+  und `S3_*`-Variablen für ihren Bucket; ein von Ihnen festgelegter Wert überschreibt diese.
+- **Build-Time-Variablennamen werden abgelehnt.** Variablen mit `VITE_`, `NEXT_PUBLIC_`, `PUBLIC_` und
+  `REACT_APP_` sind für Frontends zur Build-Zeit gedacht, und das Backend
+  sieht sie ohnehin nie rechtzeitig. `--force` speichert sie dennoch.
 
-In einer Funktion lesen Sie diese innerhalb des Handlers aus, niemals am Anfang der Datei:
+Lesen Sie diese in einer Funktion immer innerhalb des Handlers aus, niemals auf Modulebene am Anfang der Datei:
 
 ```typescript
 import { defineFunction, requireEnv } from "@rebasepro/server/functions";
@@ -159,33 +261,55 @@ export default defineFunction((app) => {
 });
 ```
 
-Ein `process.env`-Lesevorgang auf Modulebene, der leer zurückkehrt, führt dazu, dass die gesamte Datei nicht geladen werden kann und ihre Routen mit `404` antworten. Siehe [Konfiguration und Secrets](/docs/backend/custom-functions/#configuration-and-secrets).
+Ein Lesezugriff auf `process.env` im Modul-Scope, der fehlschlägt oder leer ist, führt dazu, dass die gesamte Datei
+nicht geladen werden kann und ihre Routen mit `404` antworten. Siehe
+[Konfiguration und Secrets](/docs/backend/custom-functions/#configuration-and-secrets).
 
-## Storage für generierte Dateien
+## Dateispeicher für generierte Dateien
 
-Ein Cloud-Projekt erhält Dateispeicher, sobald Sie ihn erstellen:
+Ein Cloud-Projekt erhält Dateispeicher, sobald Sie ihn anlegen:
 
 ```bash
-rebase cloud storage create   # a managed bucket and its credentials
-rebase cloud deploy           # the running backend gets the credentials at deploy
+rebase cloud storage create   # ein Managed Bucket und seine Zugangsdaten
+rebase cloud deploy           # das laufende Backend erhält die Zugangsdaten beim Deploy
 ```
 
-Oder verweisen Sie das Projekt mit `rebase cloud storage attach` auf einen Bucket, den Sie bereits besitzen (S3, R2, MinIO, jeder S3-kompatible Bucket). Ohne eines von beiden antworten Uploads mit `501 STORAGE_NOT_CONFIGURED`. Weitere Buckets werden in `config/resources.ts` deklariert; siehe [Mehrere Buckets](/docs/backend/storage/#several-buckets).
+Oder verknüpfen Sie das Projekt über `rebase cloud storage attach` mit einem Bucket, den Sie bereits besitzen
+(S3, R2, MinIO oder jeder S3-kompatible Bucket).
+Ohne eine dieser Optionen antworten Uploads mit `501 STORAGE_NOT_CONFIGURED`. Weitere Buckets werden
+in `config/resources.ts` deklariert; siehe
+[Mehrere Buckets](/docs/backend/storage/#several-buckets).
 
-Ein Deployment mit Storage wird abgelehnt, bis das Projekt festlegt, wer Dateien lesen und schreiben darf. Das `config/storage.ts` des Scaffolds exportiert hierfür einen `storageAuthorize`-Hook. Siehe [Autorisierung pro Objekt](/docs/backend/storage/#per-object-authorization).
+Ein Deploy mit Dateispeicher wird abgewiesen, bis das Projekt festlegt, wer Dateien lesen und schreiben
+darf. Die Gerüstdatei `config/storage.ts` exportiert hierfür einen `storageAuthorize`-Hook.
+Siehe [Autorisierung pro Objekt](/docs/backend/storage/#per-object-authorization).
 
-**Wie Dateien bereitgestellt werden.** Ihr Backend stellt jede Datei unter `GET /api/storage/file/<key>` bereit. Es liest das Objekt aus dem Bucket und streamt es mit `Content-Type`, Range-Requests und Caching-Headern. Es gibt keine direkte Bucket-URL zum Weitergeben.
+**Wie Dateien ausgeliefert werden.** Ihr Backend liefert jede Datei unter
+`GET /api/storage/file/<key>` aus. Es liest das Objekt aus dem Bucket und streamt
+es, inklusive `Content-Type`, Range-Requests und Caching-Headern. Es gibt keine direkte
+Bucket-URL, die herausgegeben werden könnte.
 
-- Ein Key unter **`public/`** wird ohne Token für jeden unter einer URL bereitgestellt, die sich nie ändert. Verwenden Sie dies für Dateien, die jeder Besucher laden darf, wie etwa generierte Audiodateien für ein öffentliches Spiel.
-- Jeder andere Key ist privat. Ein Client fragt `/api/storage/metadata/<key>` nach einer Download-URL ab, die ein Token enthält, das standardmäßig für 300 Sekunden gültig ist (`STORAGE_DOWNLOAD_TOKEN_TTL`, bis zu einer Woche).
+- Ein Schlüssel unter **`public/`** wird für jeden ohne Token unter einer URL
+  ausgeliefert, die sich niemals ändert. Nutzen Sie dies für Dateien, die jeder Besucher laden darf,
+  wie etwa generiertes Audio für ein öffentliches Spiel.
+- Jeder andere Schlüssel ist privat. Ein Client fragt bei `/api/storage/metadata/<key>` nach einer
+  Download-URL an, die ein Token enthält, das standardmäßig für 300 Sekunden gültig ist
+  (`STORAGE_DOWNLOAD_TOKEN_TTL`, konfigurierbar bis zu einer Woche).
 
-Schreiben Sie aus einer Funktion heraus mit `rebase.storage` (der Standard-Bucket) oder `rebase.bucket(…)` (ein benannter Bucket). Ihr `storageAuthorize`-Hook entscheidet weiterhin, ob der Schreibvorgang zulässig ist.
+Aus einer Funktion heraus schreiben Sie mit `rebase.storage` (der Standard-Bucket) oder
+`rebase.bucket(…)` (ein benannter Bucket). Ihr `storageAuthorize`-Hook entscheidet
+nach wie vor, ob der Schreibvorgang erlaubt ist.
 
-Bildtransformationen (`?width=`, `?format=`) erfordern `sharp`, was ein natives Modul ist und sich nicht im Managed Image befindet. Auf der Managed Runtime liefert eine Transformationsanfrage das Originalbild zurück.
+Bildtransformationen (`?width=`, `?format=`) erfordern `sharp`, was ein natives Modul ist
+und sich nicht im Managed-Image befindet. Auf der Managed Runtime liefert eine
+Transformationsanfrage das Originalbild zurück.
 
 ### Beispiel: Generierte Audiodaten cachen
 
-Eine Funktion, die mit einer gehosteten API Text in Sprache umwandelt, jedes Ergebnis einmal speichert und anschließend aus dem Storage bereitstellt. Die `Map` erspart lediglich einen Storage-Lookup auf einer aufgewärmten Instanz; der Bucket ist der eigentliche Cache, sodass bei einem Deployment nichts verloren geht.
+Eine Funktion, die Text über eine gehostete API in Sprache umwandelt, jedes Ergebnis
+einmalig speichert und danach aus dem Dateispeicher ausliefert. Die `Map` erspart lediglich
+eine Speicherabfrage auf einer aktiven Instanz; der Bucket ist der eigentliche Cache, sodass bei einem Deploy
+nichts verloren geht.
 
 ```typescript
 import { defineFunction, getSignal, requireEnv } from "@rebasepro/server/functions";
@@ -228,11 +352,14 @@ export default defineFunction((app, { rebase }) => {
 });
 ```
 
-Die Route ist öffentlich, wie jede Route in `backend/functions/`, bis Sie sie absichern. Eine produktive Route würde prüfen, wer neue Audiodaten erstellen darf, damit keine Fremden Ihr Budget für die Speech-API aufbrauchen können.
+Die Route ist öffentlich, wie jede Route in `backend/functions/`, bis Sie sie
+absichern. Eine produktive Implementierung würde prüfen, wer neue Audiodaten generieren darf,
+damit Fremde nicht Ihr Budget für die Speech-API aufbrauchen.
 
 ## Ausgehendes Netzwerk
 
-Funktionen können externe Dienste aufrufen. Ausgehende Verbindungen von Ihren Instanzen sind zu jeder Internetadresse ausschließlich auf diesen TCP-Ports zulässig:
+Funktionen können externe Dienste aufrufen. Ausgehende Verbindungen von Ihren Instanzen
+sind zu jeder Internetadresse ausschließlich auf diesen TCP-Ports erlaubt:
 
 | Port | Zweck |
 |---|---|
@@ -240,46 +367,66 @@ Funktionen können externe Dienste aufrufen. Ausgehende Verbindungen von Ihren I
 | 465, 587 | E-Mail-Versand über SMTP mit TLS oder STARTTLS |
 | 993 | IMAP über TLS |
 
-Alles andere ist blockiert. Dazu gehören Port 25, unverschlüsseltes IMAP sowie Datenbanken oder Caches auf ihren eigenen Ports: Ein PostgreSQL auf 5432, Redis auf 6379 oder MongoDB auf 27017 außerhalb von Rebase Cloud kann nicht erreicht werden. Die Cloud-Metadatenadresse (`169.254.169.254`) ist ebenfalls blockiert.
+Alles andere ist blockiert. Das umfasst Port 25, einfaches IMAP sowie Datenbanken oder
+Caches auf ihren Standard-Ports: Ein PostgreSQL auf 5432, Redis auf 6379 oder MongoDB auf
+27017 außerhalb von Rebase Cloud kann nicht erreicht werden. Die Cloud-Metadatenadresse
+(`169.254.169.254`) ist ebenfalls blockiert.
 
-Die Plattform fügt keinen Proxy und kein ausgehendes Rate-Limit hinzu; die von Ihnen aufgerufenen Dienste haben ihre eigenen. Übergeben Sie `getSignal(c)` an `fetch`, damit ein Aufruf stoppt, wenn seine Anfrage ein Timeout erreicht.
+Die Plattform fügt keinen Proxy und kein ausgehendes Rate-Limit hinzu; die von Ihnen aufgerufenen Dienste
+haben ihre eigenen Limits. Übergeben Sie `getSignal(c)` an `fetch`, damit ein Aufruf stoppt,
+wenn der zugehörige Request ein Timeout erreicht.
 
-Ihr Datenverkehr verlässt das System über eine geteilte Adresse, nicht über eine separate Adresse pro Projekt. Ob diese Adresse für Dienste, die eine Allowlist erfordern, fest und veröffentlicht ist, ist **noch nicht festgelegt**.
+Es gibt **keine feste ausgehende IP-Adresse**. Der Datenverkehr wird über eine Adresse geleitet,
+die von allen Projekten geteilt wird, vom Cloud-Provider zugewiesen wird und sich ändern kann. Fügen Sie diese
+daher nicht zu einer Allowlist von Drittanbietern hinzu. Authentifizieren Sie sich bei solchen Diensten
+stattdessen mit einem Schlüssel.
 
-## Start und Herunterfahren
+## Start und Shutdown
 
-- **Kaltstart.** Eine neue Instanz lädt das Bundle herunter und installiert ihre Abhängigkeiten, bevor sie Anfragen bedient. Diese Installation macht den Großteil eines Kaltstarts aus, der typischerweise 40 bis 60 Sekunden dauert. Die Plattform wartet bis zu 300 Sekunden darauf, dass eine Instanz hochfährt. Ein großer Abhängigkeitsbaum verlangsamt jedes Deployment und jedes Hochskalieren.
-- **Health.** Die Plattform prüft `/livez` (der Prozess läuft) und `/health` (sie kann die Datenbank erreichen). Beide werden von der Runtime bereitgestellt, sodass Sie diese nicht schreiben müssen.
-- **Herunterfahren.** Bei einem Deployment oder Neustart nimmt die Instanz keine neuen Anfragen mehr an, wartet 5 Sekunden, bis der Datenverkehr umgeleitet wurde, und erhält dann `SIGTERM`. Laufende Anfragen haben bis zu 15 Sekunden Zeit, um abgeschlossen zu werden. Promises, die an `waitUntil` übergeben wurden, erhalten davon bis zu 5 Sekunden. Ein Promise, das Sie nicht an `waitUntil` übergeben haben, wird verworfen. Siehe [Hintergrundarbeit](/docs/backend/custom-functions/#background-work).
+- **Kaltstart.** Eine neue Instanz lädt das Bundle herunter und installiert ihre
+  Abhängigkeiten, bevor sie Requests verarbeitet. Diese Installation macht den Großteil eines Kaltstarts aus,
+  der typischerweise 40 bis 60 Sekunden dauert. Die Plattform wartet bis zu 300 Sekunden darauf, dass eine
+  Instanz hochfährt. Ein großer Abhängigkeitsbaum verlangsamt jeden Deploy und jedes
+  Hochskalieren.
+- **Health-Checks.** Die Plattform prüft `/livez` (der Prozess läuft) und
+  `/health` (die Datenbank ist erreichbar). Beide Endpunkte werden von der Runtime bereitgestellt,
+  Sie müssen sie also nicht selbst implementieren.
+- **Shutdown.** Bei einem Deploy oder Neustart nimmt die Instanz keine neuen Requests mehr an,
+  wartet 5 Sekunden, damit der Traffic umgeleitet werden kann, und empfängt dann `SIGTERM`. Laufende
+  Requests haben bis zu 15 Sekunden Zeit, um abgeschlossen zu werden. Promises, die an `waitUntil` übergeben wurden,
+  erhalten davon bis zu 5 Sekunden. Ein Promise, das nicht an `waitUntil` übergeben wurde, wird abgebrochen.
+  Siehe [Hintergrundarbeit](/docs/backend/custom-functions/#background-work).
 
 ## Wann Managed nicht die richtige Wahl ist
 
-Stellen Sie das Backend auf `"runtime": "custom"` um, wenn es Folgendes benötigt:
+Wechseln Sie für das Backend zu `"runtime": "custom"`, wenn Folgendes benötigt wird:
 
-- ein natives Modul oder eine System-Binärdatei wie `sharp`, `ffmpeg` oder eine lokale Speech-Engine;
+- ein natives Modul oder eine System-Binärdatei, die kein npm-Paket mitbringt, wie etwa `sharp`,
+  ImageMagick oder eine lokale Speech-Engine;
 - Systempakete oder ein anderes Basis-Image;
-- eine langlebige Verbindung zu Zielen außerhalb der zulässigen Ports.
+- eine langlebige Verbindung zu einem Dienst außerhalb der erlaubten Ports.
 
-Eine benutzerdefinierte Runtime baut Ihr eigenes Dockerfile, und Sie verwalten das Image fortan selbst. `rebase cloud deploy --eject` führt den Wechsel durch. Siehe [Rebase Cloud](/docs/deployment/cloud/#deploy).
+Eine Custom Runtime baut Ihr eigenes Dockerfile, und Sie verwalten das Image fortan
+selbst. `rebase cloud deploy --eject` führt den Wechsel durch. Siehe
+[Rebase Cloud](/docs/deployment/cloud/#deploy).
 
-## Noch nicht festgelegt
+## Noch nicht zugesichert
 
-Diese Fragen haben im Code der Plattform noch keine endgültige Antwort. Fragen Sie nach, bevor Sie sich auf eine davon verlassen.
+- **Log-Historie.** `rebase cloud logs --runtime` liest Logdaten von den aktuell laufenden
+  Instanzen und `rebase cloud debug logs --previous` von der letzten Ausführung einer
+  Instanz, die neu gestartet wurde. Die Ausgabe einer Instanz, die durch ein Deploy ersetzt wurde, ist verloren. Schreiben
+  Sie alle Daten, die Sie aufbewahren müssen, in die Datenbank oder in einen eigenen Logging-Dienst.
+- **Skalierung auf null (Scale to zero)** wird nicht angeboten. Jedes Backend betreibt zu jeder Zeit
+  mindestens eine Instanz.
 
-- **WebAssembly.** Es ist nicht blockiert, wurde jedoch weder getestet noch zugesichert.
-- **Ausführen einer Binärdatei, die in einem npm-Paket mitgeliefert wird.** Es ist nicht blockiert, wird aber auch nicht unterstützt.
-- **Standard-CPU und -Arbeitsspeicher.** Der dokumentierte Standard (`250m`, `512Mi`) und der aktuelle Plattformstandard (geringerer Request, Burst auf 2 CPU und 2 GiB) stimmen nicht überein. `rebase cloud compute` zeigt an, was Ihr Projekt hat.
-- **Scale to zero.** Die Option `--scale-to-zero` wird akzeptiert. Ob sie derzeit die Ausführung des Projekts tatsächlich beeinflusst, ist nicht bestätigt.
-- **Anfragen, die länger als 60 Sekunden dauern.** Der Funktions-Timeout kann erhöht werden, aber der vorgeschaltete Edge schließt die Verbindung möglicherweise gemäß seinem eigenen Standardwert.
-- **Eine feste ausgehende IP-Adresse**, die für eine Allowlist von Drittanbietern verwendet werden kann.
-- **Ein Browser-Origin, der keine der Projekt-Domains ist**, wie etwa ein anderweitig gehostetes Frontend. Das `CORS_ORIGINS` der Plattform hat Vorrang vor Ihrem.
-- **Private npm-Registries.** Die Abhängigkeitsinstallation liest keine `.npmrc` oder Tokens aus, weshalb private Pakete anscheinend nicht installiert werden können.
-- **Log-Aufbewahrung.** `rebase cloud logs --runtime` zeigt die letzten Ausgaben; wie lange Logs aufbewahrt werden, ist nicht dokumentiert.
+## Weiterführende Seiten
 
-## Verwandte Seiten
-
-- [Rebase Cloud](/docs/deployment/cloud/): Verknüpfung, Deployment, die Compute-Einstellungen und was die Beta nicht enthält
-- [Benutzerdefinierte Funktionen](/docs/backend/custom-functions/): Schreiben der Routen in `backend/functions/`
-- [Runtime und Bundles](/docs/architecture/runtime-and-bundles/): Was ein Bundle ist und wie die Runtime es startet
-- [Storage](/docs/backend/storage/): Buckets, Endpunkte, Größenbeschränkungen und Zugriffsregeln
-- [Ausführen mehrerer Instanzen](/docs/deployment/multiple-instances/): Der Status, den Rebase pro Prozess verwaltet
+- [Rebase Cloud](/docs/deployment/cloud/): Verknüpfung, Deployment, Compute-Einstellungen
+  und was die Beta nicht beinhaltet
+- [Custom Functions](/docs/backend/custom-functions/): Routen in
+  `backend/functions/` schreiben
+- [Runtime und Bundles](/docs/architecture/runtime-and-bundles/): Was ein Bundle
+  ist und wie die Runtime es startet
+- [Dateispeicher](/docs/backend/storage/): Buckets, Endpunkte, Größenbeschränkungen und Zugriffsregeln
+- [Mehrere Instanzen betreiben](/docs/deployment/multiple-instances/): Der
+  Status, den Rebase pro Prozess vorhält

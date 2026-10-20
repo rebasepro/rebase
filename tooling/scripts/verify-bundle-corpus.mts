@@ -267,7 +267,9 @@ const RUNTIME_PROVIDED = [
     "@rebasepro/client",
     "@rebasepro/common",
     "@rebasepro/utils",
-    "zod"
+    "zod",
+    "hono",
+    "@hono/node-server"
 ];
 
 /**
