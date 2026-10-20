@@ -1,9 +1,9 @@
 export const en = {
   "hero.badge": "Open-source backend · MIT · Any Postgres",
-  "hero.title.part1": "A backend for your Postgres.",
-  "hero.title.part2": "And an admin panel you don't have to build.",
+  "hero.title.part1": "The backend for your Postgres.",
+  "hero.title.part2": "Built for your team. Safe for your agents.",
   "hero.subtitle":
-    "REST, a typed SDK, realtime, auth and storage for your app; spreadsheets, media, relations and roles for your team. Our own CRM is twenty-three collections and not one hand-written screen.",
+    "REST, a typed SDK, realtime, auth and storage for your app; an admin panel with spreadsheets, media, relations and review queues for your team; scoped MCP tools and Postgres RLS for your agents. Twenty-three collections run our own CRM — not one hand-written screen.",
   "hero.cta.demo": "Try the demo",
 
   // Free-tool section. The copy stays useful to someone who will never adopt
@@ -34,7 +34,7 @@ export const en = {
   "agentera.badge": "Built for the agent era",
   "agentera.title": 'The backend an agent can\'t screw up',
   "agentera.p1":
-    "An AI agent can scaffold a backend in an hour. It can't tell you whether that backend is safe. Agents are extremely good at producing <em>plausible</em> backends — and famously bad at producing <em>secure</em> ones. Rebase makes the safe outcome the only outcome, by construction.",
+    "An AI agent can scaffold a backend in an hour — and leave you with forty thousand lines of routes, middleware and screens nobody can audit. Agents are very good at producing <em>plausible</em> backends and famously bad at producing <em>secure</em> ones. With Rebase, a coding agent edits one compact collection file that the compiler verifies, and a runtime agent operates under scoped keys, Postgres RLS and human-reviewed states. The safe outcome is the only outcome, by construction.",
   "agentera.link": "Explore AI and agent features",
   // This beat proves claim 3 — the panel is a client of the same API and the
   // response does not move — which is what its figure actually models. The
@@ -43,20 +43,20 @@ export const en = {
   // for the third heading running. es/de/fr never drifted; this restores parity
   // with them rather than inventing new copy. The subtitle also stops listing
   // the layer stack, because the figure beside it already draws that.
-  "modes.subtitle": "Spreadsheet editing, media, relations, roles and workflows \u2014 an admin panel you can hand a non-developer on their first day. It is a client of your API like any other, so whatever it can see, your policies said so.",
+  "modes.subtitle": "Spreadsheet editing, media, relations, roles and review workflows \u2014 an admin panel where your team runs operations and approves what agents draft. It is a client of your API like any other, so whatever it can see, your policies said so.",
   "modes.baas.title": "Rebase Backend",
   "modes.baas.desc":
     "The server your app calls: REST, a typed SDK, realtime, auth and storage over your own Postgres.",
   "modes.baas.tag": "What your app talks to",
   "modes.cms.title": "Rebase CMS",
   "modes.cms.desc":
-    "Spreadsheet editing, media, relations, roles and workflows — with your own React components dropped in wherever the default field isn't enough.",
+    "Spreadsheet editing, media, relations, roles and approval queues — with your own or agent-written React views dropped in wherever the default table isn't enough.",
   "modes.cms.tag": "Where your team works",
   "modes.full.title": "Rebase Studio",
-  "modes.full.desc": "SQL editor, schema visualizer, RLS policy editor, logs and API explorer. Studio is the developer half of the same panel your team already uses.",
+  "modes.full.desc": "SQL editor, schema visualizer, RLS policy simulator, database branches, logs and API explorer. Studio is the developer half of the same panel your team already uses.",
   "modes.full.tag": "The developer half of the panel",
   "showcase.badge": "Built for real products",
-  "showcase.title.part1": "Seven products.",
+  "showcase.title.part1": "Dozens of products.",
   "showcase.title.part2": "All of them in production.",
   "showcase.subtitle":
     "A <b>certified medical device</b>, a <b>retail loyalty programme</b>, a <b>two-sided marketplace</b>, <b>public data</b>, an outbound sales agent, a design tool and a CRM \u2014 some of them ours, some of them our customers'.",
@@ -157,7 +157,7 @@ export const en = {
   "power.title":
     'You write this file.<br/>You don\u2019t write the rest.',
   "power.subtitle":
-    "Schema, REST API, typed SDK, edit forms and every panel view come out of it, and move when it moves. There is no second data model to keep in sync and no CRUD screen to go and maintain when a field changes name.",
+    "Schema, REST API, typed SDK, edit forms and every panel view come out of it, and move when it moves. Whether you write it or an agent edits it, there is no second data model to keep in sync and no CRUD screen to go and maintain when a field changes name.",
   "power.badge": "How it works",
   "power.appcode": "App Code",
   "power.generates": "→ generates all of the following",

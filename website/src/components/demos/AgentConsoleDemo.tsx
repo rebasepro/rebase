@@ -1,12 +1,12 @@
 import React, { useState } from "react";
 import {
-    Search, KeyRound, Zap, Server, Radio, Clock, BookOpen, FileCheck2, FileText
+    Search, KeyRound, Zap, Server, Radio, Clock, BookOpen, FileCheck2, FileText, ShieldCheck
 } from "lucide-react";
 
 /**
- * Nine agent capabilities that used to be a 3×3 card wall, folded into one
- * window: a left rail of capabilities, a mock product surface on the right.
- * Same information, one screen, and it looks like the product instead of a list.
+ * Ten agent capabilities folded into one window: a left rail of capabilities,
+ * a mock product surface on the right. Same information, one screen, and it
+ * looks like the product instead of a list.
  */
 
 interface Capability {
@@ -47,6 +47,27 @@ const CAPABILITIES: Capability[] = [
         )
     },
     {
+        key: "review",
+        label: "Human review gates",
+        Icon: ShieldCheck,
+        title: "Agents draft. Humans approve.",
+        desc: "Encode review boundaries directly in the collection and its Postgres policies. An agent holding a scoped key can draft rows or stage updates, while only an operator in the panel can move a record to approved or sent.",
+        pills: ["schema-enforced states", "approval queues in Rebase CMS", "RLS write guards"],
+        screen: "config/collections/outreach.ts",
+        body: (
+            <>
+                {line(0, <span className="text-surface-300">status: {"{"} type: </span>, <span className="text-emerald-300">"string"</span>, <span className="text-surface-300">, enumValues: [</span>, <span className="text-emerald-300">"draft"</span>, <span className="text-surface-300">, </span>, <span className="text-emerald-300">"approved"</span>, <span className="text-surface-300">] {"}"},</span>)}
+                {line(0, <span className="text-surface-300">securityRules: [</span>)}
+                {line(1, <span className="text-surface-300">{"{"} role: </span>, <span className="text-amber-300">"agent"</span>, <span className="text-surface-300">, operation: </span>, <span className="text-emerald-300">"insert"</span>, <span className="text-surface-300">, check: </span>, <span className="text-cyan-300">status = 'draft'</span>, <span className="text-surface-300"> {"}"},</span>)}
+                {line(1, <span className="text-surface-300">{"{"} role: </span>, <span className="text-primary">"operator"</span>, <span className="text-surface-300">, operation: </span>, <span className="text-emerald-300">"update"</span>, <span className="text-surface-300"> {"}"}</span>)}
+                {line(0, <span className="text-surface-300">]</span>)}
+                <div className="mt-3 border-t border-hairline pt-3">
+                    {line(0, <span className="text-emerald-400">✔ </span>, <span className="text-surface-400">agent drafts in Postgres · operator approves in the panel</span>)}
+                </div>
+            </>
+        )
+    },
+    {
         key: "keys",
         label: "Service API keys",
         Icon: KeyRound,
@@ -81,9 +102,9 @@ const CAPABILITIES: Capability[] = [
         key: "context",
         label: "Scaffolded context",
         Icon: FileText,
-        title: "Agent context, scaffolded",
-        desc: "Every new project ships with AGENTS.md and CLAUDE.md already written: the layout, the commands, the conventions. Your agent is productive on the first prompt.",
-        pills: ["AGENTS.md", "CLAUDE.md", "rebase init"],
+        title: "Agent context & guardrails, scaffolded",
+        desc: "Every new project ships with AGENTS.md and CLAUDE.md already written: the layout, the commands, the conventions, and the verification checks. Your agent is productive on the first prompt and checked before it finishes.",
+        pills: ["AGENTS.md", "CLAUDE.md", "rls-check", "rebase init"],
         screen: "my-app/",
         body: (
             <>

@@ -1,7 +1,6 @@
 ---
 import { NeatBackground } from "../NeatBackground";
 import ABVariant from "../ABVariant.astro";
-import CollectionPowerSection from "../CollectionPowerSection.astro";
 import ClientLogos from "../ClientLogos.astro";
 import PolicyPathsFigure from "../PolicyPathsFigure.astro";
 import CaseStudiesCarousel from "../CaseStudiesCarousel.astro";
@@ -39,20 +38,19 @@ const SELFHOST_COMMAND = "docker compose up -d";
     {/* ============================================================
         HOME PAGE SPINE — five numbered chapters, one close.
 
-          hero      the consequence — the back office stops being a project —
-                    with the artifact beside it
-          01        MECHANISM — the collection file and what it fans out to.
-                    This is the PROOF of the hero, not a second statement of
-                    it; see SITE-STORY §1, "Say it once", for the claim each
-                    beat owns and the phrases it may not borrow.
-          02        SECURITY — the claim ranked highest, then the free audit
-                    that lets a reader check it rather than read it
-          03        WHAT YOU GET — the engine and the panel, one chapter
-          04        AGENT ERA
-          05        CUSTOMERS
+          hero      the AI-era backend for your Postgres — built for your team,
+                    safe for your agents
+          01        WHAT YOU GET — the engine (typed SDK, REST API, realtime
+                    over LISTEN/NOTIFY) on `ground-raised`
+          02        THE PANEL — the admin panel that ships with it, plus the
+                    three ways to run Rebase (Backend, CMS, Studio)
+          03        SECURITY — the structural Postgres RLS claim on the brand
+                    blue slab, then the free `rls-check` audit band
+          04        AGENT ERA — MCP + CLI on the same security policy
+          05        CUSTOMERS — case studies
           close     the three lanes, the terms, and the ask
 
-        Colour is spent twice and only twice: the blue slab on 02 and the coral
+        Colour is spent twice and only twice: the blue slab on 03 and the coral
         close. Both carry a claim whose subject is the ABSENCE of an event, which
         no demo beside them can show. Everything else runs on the page ground or
         on `ground-raised`.
@@ -196,27 +194,16 @@ const SELFHOST_COMMAND = "docker compose up -d";
              the gradient behind the logos"). The wall sits on bare ground; the
              next divider is chapter 03's. -->
 
-        <!-- CHAPTER 01 — MECHANISM. The collection file in the middle and the
-             five artifacts it fans out to. -->
+        <!-- CHAPTER 01 — WHAT YOU GET (THE BACKEND).
+             Promoted to 01 so the reader sees the live SDK, REST API, and
+             realtime engine immediately after the hero. Sits on `ground-raised`
+             so `.frame` automatically steps up one rung to `--surface-card`. -->
         <div>
-            <CollectionPowerSection index="01" />
-        </div>
-
-        <!-- CHAPTER 02 — WHAT YOU GET. One chapter, two halves: the engine
-             (SDK, REST, realtime — three live demos) and then the panel that
-             ships on top of it. They used to be two numbered beats either side
-             of the security slab, which made the page state its feature list
-             twice. The engine's `ground-raised` plate went with the merge: the
-             security slab and the proof band above are already two grounds in a
-             row, and a third would leave the page with no ground at all. -->
-        <div>
-            {/* No `overflow-hidden` here and no z-0: the gold divider above
-                bleeds THROUGH this section by design (§6). */}
-            <section class="chapter relative py-chapter">
+            <section class="chapter ground-raised border-y border-white/8 relative py-chapter">
                 <div class="relative mx-auto max-w-6xl px-6 lg:px-8">
                     <div class="max-w-[42rem] animate-on-scroll fade-in-up">
                         <p class="eyebrow">
-                            <span class="font-mono">02</span>
+                            <span class="font-mono">01</span>
                             <span class="mx-2 text-surface-700">·</span>{t("engine.badge")}
                         </p>
                         <h2 class="mt-label font-headers text-display-2 text-balance">
@@ -272,14 +259,28 @@ const SELFHOST_COMMAND = "docker compose up -d";
                             <ArrowRight size={15} />
                         </a>
                     </div>
+                </div>
+            </section>
+        </div>
 
-                    <!-- The panel half. A sub-heading, not a second eyebrow: the
-                         panel is part of what you get, not a chapter of its own.
-                         The carousel shows it; the three columns under it say
-                         what it is made of and that the API does not move
-                         without it. -->
-                    <h3 class="mt-content font-headers text-2xl sm:text-3xl text-balance">{t("panel.title")}</h3>
-                    <p class="mt-lead max-w-[38rem] text-page-copy leading-relaxed">{t("modes.subtitle")}</p>
+        <!-- CHAPTER 02 — THE ADMIN PANEL.
+             Its own full chapter on the base ground so the 620px interactive
+             AdminDemoCarousel and the three mode columns breathe. No
+             `overflow-hidden` and no `z-0` so the gold divider below bleeds
+             through cleanly (§6). -->
+        <div>
+            <section class="chapter relative py-chapter">
+                <div class="relative mx-auto max-w-6xl px-6 lg:px-8">
+                    <div class="max-w-[42rem] animate-on-scroll fade-in-up">
+                        <p class="eyebrow">
+                            <span class="font-mono">02</span>
+                            <span class="mx-2 text-surface-700">·</span>{t("panel.badge")}
+                        </p>
+                        <h2 class="mt-label font-headers text-display-2 text-balance">
+                            {t("panel.title")}
+                        </h2>
+                        <p class="mt-lead max-w-[38rem] text-page-copy leading-relaxed">{t("modes.subtitle")}</p>
+                    </div>
                     {/* No `.frame`: the carousel draws the panel's own edge, and
                         §6 allows a demo one frame, not two. The view toggle is page
                         furniture and sits outside the product's edge.

@@ -2,6 +2,7 @@
 const { lang, t } = Astro.props;
 
 import { NeatBackground } from '../../components/NeatBackground';
+import CollectionPowerSection from '../../components/CollectionPowerSection.astro';
 import { TerminalInit } from '../../components/demos/TerminalInit.tsx';
 import { ArchitectureDiagram } from '../../components/demos/ArchitectureDiagram.tsx';
 import { DeveloperPlayground } from '../../components/demos/DeveloperPlayground.tsx';
@@ -185,6 +186,9 @@ import ClosingCta from "../ClosingCta.astro";
             </div>
         </div>
     </section>
+
+    <!-- ═══════════════════════ HOW IT WORKS · COLLECTION FAN-OUT ═══════════════════════ -->
+    <CollectionPowerSection />
 
     <!-- ═══════════════════════ 02 · THE PROJECT ═══════════════════════ -->
     <section class="relative z-0 py-chapter">

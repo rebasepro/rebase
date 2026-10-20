@@ -1,9 +1,9 @@
 export const es = {
   "hero.badge": "Backend open-source · MIT · Cualquier Postgres",
-  "hero.title.part1": "Un backend para tu Postgres.",
-  "hero.title.part2": "Y un panel de administración que no tienes que construir.",
+  "hero.title.part1": "El backend para tu Postgres.",
+  "hero.title.part2": "Hecho para tu equipo. Seguro para tus agentes.",
   "hero.subtitle":
-    "REST, un SDK tipado, realtime, auth y storage para tu app; hojas de cálculo, multimedia, relaciones y roles para tu equipo. Nuestro propio CRM son veintitrés colecciones y ni una sola pantalla escrita a mano.",
+    "REST, un SDK tipado, realtime, auth y storage para tu app; un panel de administración con hojas de cálculo, multimedia, relaciones y colas de revisión para tu equipo; herramientas MCP acotadas y RLS en Postgres para tus agentes. Nuestro propio CRM son veintitrés colecciones y ni una sola pantalla escrita a mano.",
   "hero.cta.demo": "Probar la demo",
   "rlscheck.title": "No te fíes de nuestra palabra.",
   "rlscheck.subtitle": "<code class=\"font-mono text-surface-300\">rls-check</code> lee el propio catálogo de tu base de datos y reporta lo que está realmente expuesto — tablas servidas con la seguridad a nivel de fila desactivada, políticas que evalúan a verdadero para todo el mundo, vistas que leen esquivando la RLS de sus tablas base. Quince comprobaciones. Cualquier Postgres: Supabase, Neon, RDS, tu propio servidor. Es de solo lectura, no necesita cuenta y le da igual si usas Rebase.",
@@ -29,23 +29,23 @@ export const es = {
   "engine.link": "Explorar el backend",
   "agentera.badge": "Diseñado para la era de los agentes",
   "agentera.title": "El backend que un agente no puede estropear",
-  "agentera.p1": "Un agente de IA puede montar un backend en una hora. Lo que no puede decirte es si ese backend es seguro. Los agentes son excelentes produciendo backends <em>plausibles</em> — y célebremente malos produciendo backends <em>seguros</em>. Rebase hace que el resultado seguro sea el único resultado posible, por construcción.",
+  "agentera.p1": "Un agente de IA puede montar un backend en una hora — y dejarte cuarenta mil líneas de rutas, middleware y pantallas que nadie puede auditar. Los agentes son excelentes produciendo backends <em>plausibles</em> y célebremente malos produciendo backends <em>seguros</em>. Con Rebase, un agente de código edita un único archivo de colección compacto que el compilador verifica, y un agente en producción opera bajo claves acotadas, RLS en Postgres y estados revisados por humanos. El resultado seguro es el único posible, por construcción.",
   "agentera.link": "Explorar las funciones de IA y agentes",
   "modes.subtitle":
-    "Edición tipo hoja de cálculo, multimedia, relaciones, roles y flujos de trabajo — un panel de administración que puedes entregar a un perfil no técnico en su primer día. Es un cliente más de tu API, así que todo lo que puede ver lo dictan tus políticas.",
+    "Edición tipo hoja de cálculo, multimedia, relaciones, roles y flujos de revisión — un panel de administración desde el que tu equipo opera el día a día y aprueba lo que los agentes redactan. Es un cliente más de tu API, así que todo lo que puede ver lo dictan tus políticas.",
   "modes.baas.title": "Rebase Backend",
   "modes.baas.desc":
     "El servidor al que llama tu app: REST, un SDK tipado, tiempo real, auth y almacenamiento sobre tu propio Postgres.",
   "modes.baas.tag": "Con lo que habla tu app",
   "modes.cms.title": "Rebase CMS",
   "modes.cms.desc":
-    "Edición tipo hoja de cálculo, medios, relaciones, roles y flujos de trabajo — con tus propios componentes React integrados donde el campo por defecto no baste.",
+    "Edición tipo hoja de cálculo, medios, relaciones, roles y colas de aprobación — con tus propias vistas React o las generadas por un agente integradas donde la tabla por defecto no baste.",
   "modes.cms.tag": "Donde trabaja tu equipo",
   "modes.full.title": "Rebase Studio",
-  "modes.full.desc": "Editor SQL, visualizador de esquema, editor de políticas RLS, logs y explorador de API. Studio es la mitad de desarrollo del mismo panel que ya usa tu equipo.",
+  "modes.full.desc": "Editor SQL, visualizador de esquema, simulador de políticas RLS, ramas de base de datos, logs y explorador de API. Studio es la mitad de desarrollo del mismo panel que ya usa tu equipo.",
   "modes.full.tag": "La mitad de desarrollo del panel",
   "showcase.badge": "Construido para productos reales",
-  "showcase.title.part1": "Siete productos.",
+  "showcase.title.part1": "Docenas de productos.",
   "showcase.title.part2": "Todos en producción.",
   "showcase.subtitle":
     "Un <b>producto sanitario certificado</b>, un <b>programa de fidelización en retail</b>, un <b>marketplace de dos caras</b>, <b>datos públicos</b>, un agente de ventas outbound, una herramienta de diseño y un CRM — algunos nuestros, otros de nuestros clientes.",
@@ -125,7 +125,7 @@ export const es = {
   "showcase.sync.tab3.desc": "Diseña tu modelo de datos visualmente en Rebase Studio. Cada cambio se escribe de vuelta a tus archivos locales TypeScript vía AST — tu código se mantiene limpio, tu equipo se mantiene sincronizado.",
   "power.title": "Escribes este archivo.<br/>No escribes el resto.",
   "power.subtitle":
-    "El esquema, la API REST, el SDK tipado, los formularios de edición y cada vista del panel salen de él, y evolucionan a la par. No hay un segundo modelo de datos que mantener sincronizado ni pantallas CRUD que mantener cuando un campo cambia de nombre.",
+    "El esquema, la API REST, el SDK tipado, los formularios de edición y cada vista del panel salen de él, y evolucionan a la par. Ya lo escribas tú o lo edite un agente, no hay un segundo modelo de datos que mantener sincronizado ni pantallas CRUD que mantener cuando un campo cambia de nombre.",
   "power.badge": "Cómo funciona",
   "power.appcode": "Código de la app",
   "power.generates": "→ genera todo lo siguiente",
