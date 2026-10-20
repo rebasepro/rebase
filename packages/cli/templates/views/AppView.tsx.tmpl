@@ -1,0 +1,138 @@
+/**
+ * __LABEL__ — a screen of the admin panel, at /__SLUG__.
+ *
+ * Scaffolded by `rebase generate view __SLUG__` and listed in `./index.ts`.
+ * It renders inside the admin shell, so the signed-in user, the sidebar, the
+ * router and the data layer are already there: read and write through
+ * `useData()` and the collection's security rules and callbacks apply.
+ *
+ * Replace the body with your screen. The `rebase-custom-views` agent skill
+ * documents the contract and the design tokens.
+ */
+import { useCallback, useEffect, useState } from "react";
+import type { Entity } from "@rebasepro/types";
+import { useAuthController, useData, useSnackbarController } from "@rebasepro/app";
+import {
+    Button,
+    Card,
+    Chip,
+    CircularProgressCenter,
+    Container,
+    Sheet,
+    Tab,
+    Table,
+    TableBody,
+    TableCell,
+    TableHeader,
+    TableRow,
+    Tabs,
+    Typography
+} from "@rebasepro/ui";
+
+/** The collection this screen reads. Change it to the one you need. */
+const COLLECTION = "__COLLECTION__";
+
+export function __COMPONENT__() {
+    const data = useData();
+    const { user } = useAuthController();
+    const snackbar = useSnackbarController();
+
+    const [rows, setRows] = useState<Entity[] | undefined>();
+    const [error, setError] = useState<string | undefined>();
+    const [tab, setTab] = useState("rows");
+    const [selected, setSelected] = useState<Entity | undefined>();
+
+    const load = useCallback(async () => {
+        try {
+            const { data: found } = await data.collection(COLLECTION).find({ limit: 20 });
+            setRows(found);
+            setError(undefined);
+        } catch (e: unknown) {
+            setError(e instanceof Error ? e.message : String(e));
+        }
+    }, [data]);
+
+    useEffect(() => {
+        void load();
+    }, [load]);
+
+    const columns = rows?.[0] ? Object.keys(rows[0].values).slice(0, 3) : [];
+
+    return (
+        <Container maxWidth="6xl" className="py-8 flex flex-col gap-4">
+            <div className="flex items-start justify-between gap-4">
+                <div className="flex flex-col gap-1">
+                    <Typography variant="h5">__LABEL__</Typography>
+                    <Typography variant="body2" color="secondary">
+                        Signed in as {user?.displayName ?? user?.email ?? "an anonymous user"}
+                    </Typography>
+                </div>
+                <Button color="primary" onClick={() => load().then(() => snackbar.open({ type: "success", message: "Refreshed" }))}>
+                    Refresh
+                </Button>
+            </div>
+
+            <Tabs value={tab} onValueChange={setTab}>
+                <Tab value="rows">Rows</Tab>
+                <Tab value="summary">Summary</Tab>
+            </Tabs>
+
+            {error && <Typography color="error">{error}</Typography>}
+            {!error && !rows && <CircularProgressCenter/>}
+
+            {rows && tab === "rows" && (
+                <Card className="overflow-hidden">
+                    <Table>
+                        <TableHeader>
+                            <TableCell>id</TableCell>
+                            {columns.map(column => <TableCell key={column}>{column}</TableCell>)}
+                        </TableHeader>
+                        <TableBody>
+                            {rows.map(row => (
+                                <TableRow key={String(row.id)} onClick={() => setSelected(row)}>
+                                    <TableCell>{String(row.id)}</TableCell>
+                                    {columns.map(column => <TableCell key={column}>{display(row.values[column])}</TableCell>)}
+                                </TableRow>
+                            ))}
+                        </TableBody>
+                    </Table>
+                </Card>
+            )}
+
+            {rows && tab === "summary" && (
+                <div className="grid grid-cols-2 gap-4">
+                    <Card className="p-4 flex flex-col gap-1">
+                        <Typography variant="caption" color="secondary">Rows loaded</Typography>
+                        <Typography variant="stat">{rows.length}</Typography>
+                    </Card>
+                    <Card className="p-4 flex flex-col gap-2 items-start">
+                        <Typography variant="caption" color="secondary">Collection</Typography>
+                        <Chip size="small">{COLLECTION}</Chip>
+                    </Card>
+                </div>
+            )}
+
+            <Sheet open={selected !== undefined} onOpenChange={open => !open && setSelected(undefined)} title="Row">
+                <div className="w-[28rem] max-w-full h-full overflow-auto p-6 flex flex-col gap-3">
+                    <Typography variant="h6">{selected ? String(selected.id) : ""}</Typography>
+                    {selected && Object.entries(selected.values).map(([key, value]) => (
+                        <div key={key} className="flex flex-col gap-0.5">
+                            <Typography variant="caption" color="secondary">{key}</Typography>
+                            <Typography variant="body2">{display(value)}</Typography>
+                        </div>
+                    ))}
+                </div>
+            </Sheet>
+        </Container>
+    );
+}
+
+/** A cell's text. Dates in `values` are `Date` objects in the admin. */
+function display(value: unknown): string {
+    if (value === null || value === undefined) return "—";
+    if (value instanceof Date) return value.toLocaleString();
+    if (typeof value === "object") return JSON.stringify(value);
+    return String(value);
+}
+
+export default __COMPONENT__;

@@ -1,0 +1,64 @@
+/**
+ * __LABEL__ — a tab on every record of the `__COLLECTION__` collection.
+ *
+ * Scaffolded by `rebase generate view __SLUG__ --collection __COLLECTION__` and
+ * listed in that collection's `admin.entityViews` by path, so the backend,
+ * which reads the same collection file, never loads this one. The admin
+ * imports it lazily and renders the default export.
+ *
+ * The admin hands the component `EntityCustomViewParams`: the collection, the
+ * record (`entity`, absent while it is being created), its unsaved edits
+ * (`modifiedValues`) and the form (`formContext`). The `rebase-custom-views`
+ * agent skill documents the contract and the design tokens.
+ */
+import type { EntityCustomViewParams } from "@rebasepro/cms-types";
+import { useSnackbarController } from "@rebasepro/app";
+import { Button, Card, Chip, Typography } from "@rebasepro/ui";
+
+export function __COMPONENT__({ collection, entity, modifiedValues, formContext }: EntityCustomViewParams) {
+    const snackbar = useSnackbarController();
+    const values = modifiedValues ?? entity?.values ?? {};
+
+    if (!entity) {
+        return (
+            <div className="p-6">
+                <Typography variant="body2" color="secondary">
+                    Save this {collection.singularName ?? collection.name} to see __label__.
+                </Typography>
+            </div>
+        );
+    }
+
+    const copy = () => navigator.clipboard.writeText(JSON.stringify(values, null, 2))
+        .then(() => snackbar.open({ type: "success", message: "Copied" }));
+
+    return (
+        <div className="p-6 flex flex-col gap-4">
+            <div className="flex items-center justify-between gap-2">
+                <Typography variant="h6">__LABEL__</Typography>
+                {formContext.readOnly && <Chip size="small">Read only</Chip>}
+            </div>
+            <Card className="p-4 flex flex-col gap-3">
+                {Object.entries(values).map(([key, value]) => (
+                    <div key={key} className="flex flex-col gap-0.5">
+                        <Typography variant="caption" color="secondary">{key}</Typography>
+                        <Typography variant="body2">{display(value)}</Typography>
+                    </div>
+                ))}
+            </Card>
+            <div>
+                <Button color="neutral" variant="outlined" onClick={copy}>Copy as JSON</Button>
+            </div>
+        </div>
+    );
+}
+
+/** A field's text. Dates in `values` are `Date` objects in the admin. */
+function display(value: unknown): string {
+    if (value === null || value === undefined) return "—";
+    if (value instanceof Date) return value.toLocaleString();
+    if (typeof value === "object") return JSON.stringify(value);
+    return String(value);
+}
+
+export default __COMPONENT__;

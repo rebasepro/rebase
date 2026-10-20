@@ -33,11 +33,14 @@
  */
 import fs from "fs";
 import path from "path";
+import { fileURLToPath } from "url";
 import chalk from "chalk";
 
 import { cmsMountOf, findBackendApp, loadManifest, resolveBackendPaths, DEFAULT_CONFIG_DIR } from "../manifest";
 import { requireProjectRoot } from "../utils/project";
 import { parseCommandArgs, UsageError, wantsHelp } from "../utils/args";
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 /** What `rebase generate` dispatches. Read by `cli.ts` to name the subcommand. */
 export const GENERATE_SUBCOMMANDS = ["view"] as const;
@@ -336,227 +339,52 @@ function declaredSlugs(dir: string): { slug: string; file: string; at: number }[
 // The files
 // ─────────────────────────────────────────────────────────────────────────────
 
-export function appViewSource(options: { slug: string; componentName: string; label: string; collection: string }): string {
-    const { slug, componentName, label, collection } = options;
-    return `/**
- * ${label} — a screen of the admin panel, at /${slug}.
- *
- * Scaffolded by \`rebase generate view ${slug}\` and listed in \`./index.ts\`.
- * It renders inside the admin shell, so the signed-in user, the sidebar, the
- * router and the data layer are already there: read and write through
- * \`useData()\` and the collection's security rules and callbacks apply.
- *
- * Replace the body with your screen. The \`rebase-custom-views\` agent skill
- * documents the contract and the design tokens.
+/**
+ * The scaffolds live in `templates/views/` rather than in template literals
+ * here: they import React and the admin packages, and this package's sources
+ * must not name those, even inside a string (`pnpm check:types-headless`).
  */
-import { useCallback, useEffect, useState } from "react";
-import type { Entity } from "@rebasepro/types";
-import { useAuthController, useData, useSnackbarController } from "@rebasepro/app";
-import {
-    Button,
-    Card,
-    Chip,
-    CircularProgressCenter,
-    Container,
-    Sheet,
-    Tab,
-    Table,
-    TableBody,
-    TableCell,
-    TableHeader,
-    TableRow,
-    Tabs,
-    Typography
-} from "@rebasepro/ui";
-
-/** The collection this screen reads. Change it to the one you need. */
-const COLLECTION = ${JSON.stringify(collection)};
-
-export function ${componentName}() {
-    const data = useData();
-    const { user } = useAuthController();
-    const snackbar = useSnackbarController();
-
-    const [rows, setRows] = useState<Entity[] | undefined>();
-    const [error, setError] = useState<string | undefined>();
-    const [tab, setTab] = useState("rows");
-    const [selected, setSelected] = useState<Entity | undefined>();
-
-    const load = useCallback(async () => {
-        try {
-            const { data: found } = await data.collection(COLLECTION).find({ limit: 20 });
-            setRows(found);
-            setError(undefined);
-        } catch (e: unknown) {
-            setError(e instanceof Error ? e.message : String(e));
-        }
-    }, [data]);
-
-    useEffect(() => {
-        void load();
-    }, [load]);
-
-    const columns = rows?.[0] ? Object.keys(rows[0].values).slice(0, 3) : [];
-
-    return (
-        <Container maxWidth="6xl" className="py-8 flex flex-col gap-4">
-            <div className="flex items-start justify-between gap-4">
-                <div className="flex flex-col gap-1">
-                    <Typography variant="h5">${label}</Typography>
-                    <Typography variant="body2" color="secondary">
-                        Signed in as {user?.displayName ?? user?.email ?? "an anonymous user"}
-                    </Typography>
-                </div>
-                <Button color="primary" onClick={() => load().then(() => snackbar.open({ type: "success", message: "Refreshed" }))}>
-                    Refresh
-                </Button>
-            </div>
-
-            <Tabs value={tab} onValueChange={setTab}>
-                <Tab value="rows">Rows</Tab>
-                <Tab value="summary">Summary</Tab>
-            </Tabs>
-
-            {error && <Typography color="error">{error}</Typography>}
-            {!error && !rows && <CircularProgressCenter/>}
-
-            {rows && tab === "rows" && (
-                <Card className="overflow-hidden">
-                    <Table>
-                        <TableHeader>
-                            <TableCell>id</TableCell>
-                            {columns.map(column => <TableCell key={column}>{column}</TableCell>)}
-                        </TableHeader>
-                        <TableBody>
-                            {rows.map(row => (
-                                <TableRow key={String(row.id)} onClick={() => setSelected(row)}>
-                                    <TableCell>{String(row.id)}</TableCell>
-                                    {columns.map(column => <TableCell key={column}>{display(row.values[column])}</TableCell>)}
-                                </TableRow>
-                            ))}
-                        </TableBody>
-                    </Table>
-                </Card>
-            )}
-
-            {rows && tab === "summary" && (
-                <div className="grid grid-cols-2 gap-4">
-                    <Card className="p-4 flex flex-col gap-1">
-                        <Typography variant="caption" color="secondary">Rows loaded</Typography>
-                        <Typography variant="stat">{rows.length}</Typography>
-                    </Card>
-                    <Card className="p-4 flex flex-col gap-2 items-start">
-                        <Typography variant="caption" color="secondary">Collection</Typography>
-                        <Chip size="small">{COLLECTION}</Chip>
-                    </Card>
-                </div>
-            )}
-
-            <Sheet open={selected !== undefined} onOpenChange={open => !open && setSelected(undefined)} title="Row">
-                <div className="w-[28rem] max-w-full h-full overflow-auto p-6 flex flex-col gap-3">
-                    <Typography variant="h6">{selected ? String(selected.id) : ""}</Typography>
-                    {selected && Object.entries(selected.values).map(([key, value]) => (
-                        <div key={key} className="flex flex-col gap-0.5">
-                            <Typography variant="caption" color="secondary">{key}</Typography>
-                            <Typography variant="body2">{display(value)}</Typography>
-                        </div>
-                    ))}
-                </div>
-            </Sheet>
-        </Container>
-    );
+function viewTemplate(name: string): string {
+    const cliRoot = findCliRoot(__dirname);
+    if (!cliRoot) throw new Error(`The CLI's templates/views folder is missing from ${__dirname}.`);
+    return fs.readFileSync(path.join(cliRoot, "templates", "views", name), "utf8");
 }
 
-/** A cell's text. Dates in \`values\` are \`Date\` objects in the admin. */
-function display(value: unknown): string {
-    if (value === null || value === undefined) return "—";
-    if (value instanceof Date) return value.toLocaleString();
-    if (typeof value === "object") return JSON.stringify(value);
-    return String(value);
-}
-
-export default ${componentName};
-`;
-}
-
-export function entityViewSource(options: { slug: string; componentName: string; label: string; collection: string }): string {
-    const { slug, componentName, label, collection } = options;
-    return `/**
- * ${label} — a tab on every record of the \`${collection}\` collection.
- *
- * Scaffolded by \`rebase generate view ${slug} --collection ${collection}\` and
- * listed in that collection's \`admin.entityViews\` by path, so the backend,
- * which reads the same collection file, never loads this one. The admin
- * imports it lazily and renders the default export.
- *
- * The admin hands the component \`EntityCustomViewParams\`: the collection, the
- * record (\`entity\`, absent while it is being created), its unsaved edits
- * (\`modifiedValues\`) and the form (\`formContext\`). The \`rebase-custom-views\`
- * agent skill documents the contract and the design tokens.
- */
-import type { EntityCustomViewParams } from "@rebasepro/cms-types";
-import { useSnackbarController } from "@rebasepro/app";
-import { Button, Card, Chip, Typography } from "@rebasepro/ui";
-
-export function ${componentName}({ collection, entity, modifiedValues, formContext }: EntityCustomViewParams) {
-    const snackbar = useSnackbarController();
-    const values = modifiedValues ?? entity?.values ?? {};
-
-    if (!entity) {
-        return (
-            <div className="p-6">
-                <Typography variant="body2" color="secondary">
-                    Save this {collection.singularName ?? collection.name} to see ${label.toLowerCase()}.
-                </Typography>
-            </div>
-        );
+/** Walk up to the package root, which holds `templates/views`. */
+function findCliRoot(from: string): string | null {
+    const root = path.parse(from).root;
+    let dir = from;
+    while (dir && dir !== root) {
+        if (fs.existsSync(path.join(dir, "templates", "views"))) return dir;
+        dir = path.dirname(dir);
     }
-
-    const copy = () => navigator.clipboard.writeText(JSON.stringify(values, null, 2))
-        .then(() => snackbar.open({ type: "success", message: "Copied" }));
-
-    return (
-        <div className="p-6 flex flex-col gap-4">
-            <div className="flex items-center justify-between gap-2">
-                <Typography variant="h6">${label}</Typography>
-                {formContext.readOnly && <Chip size="small">Read only</Chip>}
-            </div>
-            <Card className="p-4 flex flex-col gap-3">
-                {Object.entries(values).map(([key, value]) => (
-                    <div key={key} className="flex flex-col gap-0.5">
-                        <Typography variant="caption" color="secondary">{key}</Typography>
-                        <Typography variant="body2">{display(value)}</Typography>
-                    </div>
-                ))}
-            </Card>
-            <div>
-                <Button color="neutral" variant="outlined" onClick={copy}>Copy as JSON</Button>
-            </div>
-        </div>
-    );
+    return null;
 }
 
-/** A field's text. Dates in \`values\` are \`Date\` objects in the admin. */
-function display(value: unknown): string {
-    if (value === null || value === undefined) return "—";
-    if (value instanceof Date) return value.toLocaleString();
-    if (typeof value === "object") return JSON.stringify(value);
-    return String(value);
+type ViewTemplateOptions = { slug: string; componentName: string; label: string; collection: string };
+
+function fillViewTemplate(template: string, options: ViewTemplateOptions): string {
+    const { slug, componentName, label, collection } = options;
+    return template
+        .replaceAll("\"__COLLECTION__\"", JSON.stringify(collection))
+        .replaceAll("__COLLECTION__", collection)
+        .replaceAll("__COMPONENT__", componentName)
+        .replaceAll("__label__", label.toLowerCase())
+        .replaceAll("__LABEL__", label)
+        .replaceAll("__SLUG__", slug);
 }
 
-export default ${componentName};
-`;
+export function appViewSource(options: ViewTemplateOptions): string {
+    return fillViewTemplate(viewTemplate("AppView.tsx.tmpl"), options);
 }
 
-const VIEWS_INDEX_HEADER = `/**
- * The admin's own screens, handed to \`<RebaseCMS views>\` in \`App.tsx\`.
- *
- * \`rebase generate view <slug>\` adds a component file beside this one and an
- * entry here. Edit the entries freely: \`name\` is the sidebar label, \`icon\` a
- * Lucide name, \`group\` a sidebar section, \`roles\` who may see the screen.
- */
-import type { AppView } from "@rebasepro/cms-types";
-`;
+export function entityViewSource(options: ViewTemplateOptions): string {
+    return fillViewTemplate(viewTemplate("EntityView.tsx.tmpl"), options);
+}
+
+function viewsIndexHeader(): string {
+    return viewTemplate("index.ts.tmpl");
+}
 
 function appViewEntry(options: { slug: string; label: string; icon: string; componentName: string }, unit: string): string {
     return [
@@ -708,7 +536,7 @@ export function planGenerateView(options: GenerateViewOptions): GenerateViewPlan
         const unit = "    ";
         files.push({
             path: indexFile,
-            contents: `${VIEWS_INDEX_HEADER}import { ${componentName} } from "./${componentName}";\n\n` +
+            contents: `${viewsIndexHeader()}import { ${componentName} } from "./${componentName}";\n\n` +
                 `export const views: AppView[] = [\n${reindent(appViewEntry({ slug, label, icon, componentName }, unit), unit)}\n];\n`,
             action: "create"
         });
