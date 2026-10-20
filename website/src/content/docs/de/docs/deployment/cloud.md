@@ -1,5 +1,5 @@
 ---
-sourceHash: 852d6c98d8475f3b
+sourceHash: 31d27c5b8c358e31
 title: Rebase Cloud
 sidebar_label: Rebase Cloud
 description: Rebase Cloud ist dasselbe Rebase, für Sie betrieben. Was es ist, wie ein Projekt verknüpft und bereitgestellt wird und was die Private Beta noch nicht enthält.
@@ -153,6 +153,22 @@ Zwei Dinge bleiben bei einer angemeldeten Person:
 
 `rebase cloud whoami` zeigt bei gesetztem Token, was es darf und für welches Projekt. `rebase cloud tokens revoke <id> --yes` stoppt es sofort.
 
+## Ein Backend ohne Konto
+
+Ein Agent, der eine App gebaut hat, kann ihr ein Live-Backend geben, bevor sich irgendjemand registriert hat, und der Person, für die er arbeitet, einen Link übergeben, mit dem sie es behalten kann:
+
+```bash
+rebase cloud init --claim
+```
+
+Das provisioniert ein Projekt in Rebase Cloud, setzt `REBASE_BASE_URL` in `.env` auf seine Live-Adresse, verknüpft das Verzeichnis und deployt die lokalen Collections mit `rebase cloud deploy --bundle`. Ausgegeben werden die Live-URL, die URL des Admin-Panels und eine **Claim-URL**. Wer die Claim-URL öffnet und sich anmeldet, kann das Projekt in eine seiner Organisationen übernehmen. Der Link funktioniert genau einmal. Ein Projekt, das innerhalb von 72 Stunden niemand übernimmt, wird gelöscht, samt Datenbank. Das Tool `rebase_cloud_provision` des MCP-Servers führt denselben Befehl aus und liefert dieselben URLs.
+
+Bis zur Übernahme gehört das Projekt keinem Konto. Sein Token ist auf dieses eine Projekt und auf `deploy`, `logs`, `env` und `database` beschränkt. Es liegt in `~/.rebase/credentials.json`, nie im Repository, und `rebase cloud`-Befehle im verknüpften Verzeichnis verwenden es von selbst. Es läuft zusammen mit dem Projekt ab.
+
+Die Übernahme erfordert eine angemeldete Browser-Sitzung, kein Token, und eine Zahlungsmethode in der Organisation, in die das Projekt wechselt. Ab der Übernahme wird das Projekt wie jedes andere abgerechnet. Die Übernahme widerruft außerdem das Token des Agenten: Melden Sie sich mit `rebase cloud login` an oder erstellen Sie mit `rebase cloud tokens create` ein neues Token.
+
+Provisionieren ohne Konto ist pro Adresse und insgesamt begrenzt, und eine Control Plane, die es nicht eingeschaltet hat, lehnt mit einer entsprechenden Meldung ab.
+
 ## Compute und die Kosten
 
 Der Preis eines Projekts richtet sich nach den reservierten Ressourcen, nicht nach einem Tarif. `compute` gibt jeden Einstellwert und das aufgeschlüsselte Preisangebot der Control Plane dafür aus. (`rebase cloud resources` ist etwas anderes: die Datenbanken und Buckets, die der Code deklariert, und ob jede davon bereitgestellt ist – siehe [CLI-Referenz](/docs/cli/cloud/).)
@@ -184,6 +200,7 @@ Absichtlich wird von der CLI nichts validiert – die Grenzwerte gehören zu dem
 | `login`, `logout`, `whoami` | Ihre Sitzung |
 | `tokens` | Tokens für CI und Agenten, jedes auf ein Projekt beschränkt. Siehe [CI und Agenten](#ci-und-agenten) |
 | `link`, `unlink`, `use`, `open` | Verknüpfen dieses Verzeichnisses mit einem Projekt, Auswählen einer Organisation, Öffnen der Konsole |
+| `init` | Mit `--claim`: ein Live-Backend ohne Konto und ein Link, um es zu übernehmen. Siehe [Ein Backend ohne Konto](#ein-backend-ohne-konto) |
 | `projects` | Erstellen, auflisten, inspizieren, löschen |
 | `deploy`, `logs`, `deployments`, `rollback`, `cancel` | Ausliefern und beobachten |
 | `start`, `stop`, `restart` | Pausieren eines Projekts und Wiederherstellen |

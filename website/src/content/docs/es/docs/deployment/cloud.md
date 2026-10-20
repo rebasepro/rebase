@@ -1,5 +1,5 @@
 ---
-sourceHash: 852d6c98d8475f3b
+sourceHash: 31d27c5b8c358e31
 title: Rebase Cloud
 sidebar_label: Rebase Cloud
 description: Rebase Cloud es el mismo Rebase, operado para ti. Qué es, cómo se vincula y despliega un proyecto, y qué no incluye todavía la beta privada.
@@ -153,6 +153,22 @@ Dos cosas siguen en manos de una persona con la sesión iniciada:
 
 `rebase cloud whoami` con un token definido muestra lo que puede hacer y sobre qué proyecto. `rebase cloud tokens revoke <id> --yes` lo detiene al momento.
 
+## Un backend sin cuenta
+
+Un agente que ha construido una app puede darle un backend en vivo antes de que nadie se haya registrado, y entregar a la persona para la que trabaja un enlace para quedárselo:
+
+```bash
+rebase cloud init --claim
+```
+
+Eso aprovisiona un proyecto en Rebase Cloud, define `REBASE_BASE_URL` en `.env` con su dirección en vivo, vincula el directorio y despliega las colecciones locales con `rebase cloud deploy --bundle`. Imprime la URL en vivo, la URL del panel de administración y una **URL de reclamación**. Quien abra la URL de reclamación e inicie sesión puede mover el proyecto a una de sus organizaciones. El enlace funciona una sola vez. Un proyecto que nadie reclama en 72 horas se elimina, base de datos incluida. La herramienta `rebase_cloud_provision` del servidor MCP ejecuta el mismo comando y devuelve las mismas URL.
+
+Hasta que se reclama, el proyecto no pertenece a ninguna cuenta. Su token está limitado a ese proyecto y a `deploy`, `logs`, `env` y `database`. Se guarda en `~/.rebase/credentials.json`, nunca en el repositorio, y los comandos `rebase cloud` del directorio vinculado lo usan por sí solos. Caduca con el proyecto.
+
+Reclamar requiere una sesión iniciada en el navegador, no un token, y un método de pago en la organización a la que pasa el proyecto. Desde la reclamación, el proyecto se factura como cualquier otro. Reclamarlo también revoca el token del agente: inicia sesión con `rebase cloud login` o crea un token nuevo con `rebase cloud tokens create`.
+
+El aprovisionamiento sin cuenta está limitado por dirección y en total, y un plano de control que no lo ha activado lo rechaza con un mensaje que lo dice.
+
 ## Cómputo y cuánto cuesta
 
 El precio de un proyecto se calcula en función de lo que reserva, no de un plan o nivel (tier). `compute` muestra cada parámetro de configuración y el presupuesto desglosado del propio plano de control para ellos. (`rebase cloud resources` es algo diferente: las bases de datos y buckets que el código declara, y si cada uno está aprovisionado; consulta la [referencia de la CLI](/docs/cli/cloud/)).
@@ -184,6 +200,7 @@ La CLI no valida nada intencionadamente: los límites pertenecen al clúster en 
 | `login`, `logout`, `whoami` | Tu sesión |
 | `tokens` | Tokens para CI y agentes, cada uno limitado a un proyecto. Consulta [CI y agentes](#ci-y-agentes) |
 | `link`, `unlink`, `use`, `open` | Vincular este directorio a un proyecto, seleccionar una organización, abrir la consola |
+| `init` | Con `--claim`: un backend en vivo sin cuenta y un enlace para reclamarlo. Consulta [Un backend sin cuenta](#un-backend-sin-cuenta) |
 | `projects` | Crear, listar, inspeccionar, eliminar |
 | `deploy`, `logs`, `deployments`, `rollback`, `cancel` | Despliegue y monitorización |
 | `start`, `stop`, `restart` | Pausar un proyecto y reanudarlo |

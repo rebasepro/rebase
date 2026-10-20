@@ -12,6 +12,7 @@ import { loginCommand, logoutCommand, whoamiCommand } from "./auth";
 import { tokensCommand } from "./tokens";
 import { linkCommand, unlinkCommand, selectOrgCommand, openCommand } from "./link";
 import { listProjects, createProject, projectInfo, deleteProject, resolveProjectArg } from "./projects";
+import { cloudInitCommand } from "./init";
 import { deployCommand, logsCommand } from "./deploy";
 import { orgsCommand, printOrgsHelp } from "./orgs";
 import { dbCommand, printDbHelp } from "./databases";
@@ -301,6 +302,9 @@ export async function cloudCommand(subcommand: string | undefined, rawArgs: stri
             break;
 
         /* projects */
+        case "init":
+            await cloudInitCommand(rawArgs);
+            break;
         case "projects":
         case "project":
             await projectsGroup(action, rawArgs);
@@ -483,6 +487,7 @@ export const CLOUD_GROUPS: HelpAction[] = [
     { action: "use", section: "Project link", args: "[org]", description: "Select the active organization" },
     { action: "open", section: "Project link", description: "Open the console in a browser" },
 
+    { action: "init", section: "Projects", description: "With --claim: a live backend with no account, and a link to claim it within 72 hours" },
     { action: "projects", section: "Projects", description: "Create, list, inspect and delete projects" },
 
     { action: "deploy", section: "Deploy & observe", args: "[app]", description: "Build, upload and ship an app, following it to a terminal state" },

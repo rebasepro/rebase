@@ -24,7 +24,9 @@ import {
     answerCliFlags,
     lastLines,
     untrustedEnvelope,
-    managedDatabaseRefusal
+    managedDatabaseRefusal,
+    cloudProvisionArgv,
+    parseCloudProvisionResult
 } from "../src/index";
 import type { PackageManager } from "../src/index";
 import { spawn } from "node:child_process";
@@ -2132,5 +2134,105 @@ describe("managedDatabaseRefusal", () => {
 
     it("still says branches cannot work on the managed database", () => {
         expect(managedDatabaseRefusal("rebase_db_branch_create", "my-app")).toMatch(/Branches do not work there/);
+    });
+});
+
+describe("rebase_cloud_provision", () => {
+    const RESULT = {
+        projectId: "proj_eph",
+        slug: "todo-app-k3j9x2ab",
+        name: "Todo app",
+        projectUrl: "https://todo-app-k3j9x2ab.rebase.website",
+        adminUrl: "https://todo-app-k3j9x2ab.rebase.website/",
+        claimUrl: `https://app.rebase.pro/claim/rcl_${"a".repeat(48)}`,
+        expiresAt: "2026-10-23T12:00:00.000Z",
+        env: { REBASE_BASE_URL: "https://todo-app-k3j9x2ab.rebase.website" },
+        deploy: { ok: true, result: { status: "success" } }
+    };
+
+    /** The spawned CLI prints `stdout` on stdout and narration on stderr, then exits with `code`. */
+    function cliPrints(stdout: string, code = 0) {
+        mockSpawn.stdout.on.mockImplementation((event: string, callback: (d: Buffer) => void) => {
+            if (event === "data") setTimeout(() => callback(Buffer.from(stdout)), 0);
+            return mockSpawn.stdout;
+        });
+        mockSpawn.stderr.on.mockImplementation((event: string, callback: (d: Buffer) => void) => {
+            if (event === "data") setTimeout(() => callback(Buffer.from("Provisioned Todo app and deployed it\n")), 0);
+            return mockSpawn.stderr;
+        });
+        mockSpawn.on.mockImplementation((event: string, callback: (code: number) => void) => {
+            if (event === "close") setTimeout(() => callback(code), 10);
+            return mockSpawn;
+        });
+    }
+
+    const call = (args: Record<string, unknown>) =>
+        (server as any)._requestHandlers.get("tools/call")({
+            method: "tools/call",
+            params: { name: "rebase_cloud_provision", arguments: args }
+        });
+
+    beforeEach(() => vi.clearAllMocks());
+
+    it("is registered", () => {
+        expect(ALL_TOOLS.map((t) => t.name)).toContain("rebase_cloud_provision");
+    });
+
+    it("runs `rebase cloud init --claim --json` and returns the claim URL", async () => {
+        cliPrints(JSON.stringify(RESULT, null, 2));
+        const result = await call({ name: "Todo app" });
+
+        const [, argv, options] = vi.mocked(spawn).mock.calls.at(-1)!;
+        expect(options).toMatchObject({ shell: false });
+        expect(argv).toEqual(expect.arrayContaining(["rebase", "cloud", "init", "--claim", "--json", "--name=Todo app"]));
+
+        expect(result.isError).toBeFalsy();
+        const body = JSON.parse(result.content[0].text);
+        expect(body).toMatchObject({
+            claimUrl: RESULT.claimUrl,
+            projectUrl: RESULT.projectUrl,
+            adminUrl: RESULT.adminUrl,
+            expiresAt: RESULT.expiresAt,
+            deployed: true
+        });
+        expect(body.next).toContain("claimUrl");
+    });
+
+    it("still returns the claim URL when the deploy failed, as an error", async () => {
+        cliPrints(JSON.stringify({ ...RESULT, adminUrl: null, deploy: { ok: false, result: null } }), 1);
+        const result = await call({});
+        expect(result.isError).toBe(true);
+        expect(JSON.parse(result.content[0].text)).toMatchObject({ claimUrl: RESULT.claimUrl, deployed: false });
+    });
+
+    it("hands a refusal back fenced as untrusted, as an error", async () => {
+        cliPrints(JSON.stringify({ error: { code: "rate_limited", message: "Too many projects" } }), 1);
+        const result = await call({});
+        expect(result.isError).toBe(true);
+        expect(result.content[0].text).toContain("UNTRUSTED_DATA");
+        expect(result.content[0].text).toContain("rate_limited");
+    });
+
+    it("keeps a name a value, never a flag, and refuses one argv must not carry", () => {
+        expect(cloudProvisionArgv({ name: "--url=https://evil.example" })).toEqual(
+            ["cloud", "init", "--claim", "--json", "--name=--url=https://evil.example"]
+        );
+        expect(cloudProvisionArgv({ deploy: false })).toEqual(["cloud", "init", "--claim", "--json", "--no-deploy"]);
+        expect(() => cloudProvisionArgv({ name: "a\nb" })).toThrow();
+        expect(() => cloudProvisionArgv({ name: "x".repeat(61) })).toThrow();
+        expect(() => cloudProvisionArgv({ name: 42 })).toThrow();
+        expect(() => cloudProvisionArgv({ deploy: "no" })).toThrow();
+    });
+
+    it("refuses bad arguments before spawning anything", async () => {
+        const result = await call({ name: 42 });
+        expect(result.isError).toBe(true);
+        expect(spawn).not.toHaveBeenCalled();
+    });
+
+    it("reads only well-formed results", () => {
+        expect(parseCloudProvisionResult("not json")).toBeNull();
+        expect(parseCloudProvisionResult(JSON.stringify({ ...RESULT, claimUrl: "javascript:alert(1)" }))).toBeNull();
+        expect(parseCloudProvisionResult(JSON.stringify({ ...RESULT, adminUrl: "not a url" }))?.adminUrl).toBeNull();
     });
 });

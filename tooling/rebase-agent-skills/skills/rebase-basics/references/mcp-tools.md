@@ -24,7 +24,7 @@ database), the dev server applies the collections at boot. Restart it with
 
 <!-- generated: mcp tool tables — pnpm generate:mcp-readme -->
 
-42 tools, in 9 groups. Tools marked ⚠ are refused against a non-local
+43 tools, in 10 groups. Tools marked ⚠ are refused against a non-local
 target unless `REBASE_MCP_ALLOW_REMOTE_WRITES=true` — see the gate above.
 
 ### Schema & database (12)
@@ -119,6 +119,14 @@ CRUD over a collection through `@rebasepro/client`.
 | `rebase_project_remove` | `name` | Remove a registered project from the project registry |
 | `rebase_project_current` | — | Show details about the currently active Rebase project, including resolved URL and auth status |
 | `rebase_project_status` | — | Health-check the active project's backend by calling GET /health |
+
+### Rebase Cloud (1)
+
+Spawn `rebase cloud` in the active project directory.
+
+| Tool | Required | Description |
+|---|---|---|
+| `rebase_cloud_provision` ⚠ | — | Give the active project a live backend on Rebase Cloud with no account or signup: provisions a project,  |
 
 <!-- /generated: mcp tool tables -->
 

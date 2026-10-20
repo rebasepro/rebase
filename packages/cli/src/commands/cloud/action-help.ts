@@ -48,6 +48,30 @@ export interface ActionHelp {
  */
 
 export const ACTION_HELP: Record<string, ActionHelp> = {
+    init: {
+        command: "cloud init",
+        usage: "cloud init --claim [--name <name>] [--no-deploy]",
+        summary:
+            "Provision a project on Rebase Cloud with no account, push this project's collections to it, and print "
+            + "its live URL and a claim link. Whoever opens the link and signs in owns the project; unclaimed, it is "
+            + "deleted after 72 hours. Sets REBASE_BASE_URL in .env and links this directory to the project.",
+        flags: [
+            ["--claim", "Required: provision an unclaimed project and print the link that claims it"],
+            ["--name, -n <name>", "What to call the app. Default: a generated name"],
+            ["--no-deploy", "Provision and link only; push the collections later with `rebase cloud deploy`"]
+        ],
+        examples: [
+            "rebase cloud init --claim",
+            "rebase cloud init --claim --name \"Todo app\" --json"
+        ],
+        notes: [
+            "The project's token is kept in ~/.rebase/credentials.json, never in the repository, and `rebase cloud` "
+                + "commands in this directory use it until the project is claimed or expires.",
+            "Claiming takes a signed-in browser session and a payment method on the claiming organization.",
+            "With an account already: `rebase cloud projects create --link`."
+        ]
+    },
+
     projects: {
         command: "cloud projects",
         usage: "cloud projects <list|create|info|delete> [options]",

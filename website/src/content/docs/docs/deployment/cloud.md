@@ -213,6 +213,37 @@ Two things stay with a signed-in person:
 `rebase cloud whoami` with a token set shows what it may do, and on which
 project. `rebase cloud tokens revoke <id> --yes` stops it at once.
 
+## A backend with no account
+
+An agent that has built an app can give it a live backend before anyone has
+signed up, and hand the person it works for a link to keep it:
+
+```bash
+rebase cloud init --claim
+```
+
+That provisions a project on Rebase Cloud, sets `REBASE_BASE_URL` in `.env` to
+its live address, links the directory, and deploys the local collections with
+`rebase cloud deploy --bundle`. It prints the live URL, the admin panel URL and a
+**claim URL**. Whoever opens the claim URL and signs in can move the project into
+one of their organizations. The link works once. A project nobody claims within
+72 hours is deleted, database included. The MCP server's `rebase_cloud_provision`
+tool runs the same command and returns the same URLs.
+
+Until the project is claimed it belongs to no account. Its token is narrowed to
+that one project and to `deploy`, `logs`, `env` and `database`. It is kept in
+`~/.rebase/credentials.json`, never in the repository, and `rebase cloud`
+commands in the linked directory use it on their own. It expires with the
+project.
+
+Claiming takes a signed-in browser session, not a token, and a payment method on
+the organization the project moves into. From the claim onwards the project is
+billed like any other. Claiming also revokes the agent's token: sign in with
+`rebase cloud login`, or mint a new token with `rebase cloud tokens create`.
+
+Provisioning without an account is bounded per address and in total, and a
+control plane that has not switched it on refuses with a message saying so.
+
 ## Compute, and what it costs
 
 A project is priced from what it reserves, not from a tier. `compute` prints
@@ -252,6 +283,7 @@ except one that restarts the database, which waits for a maintenance window.
 | `login`, `logout`, `whoami` | Your session |
 | `tokens` | Tokens for CI and agents, each narrowed to one project. See [CI and agents](#ci-and-agents) |
 | `link`, `unlink`, `use`, `open` | Binding this directory to a project, selecting an organization, opening the console |
+| `init` | With `--claim`: a live backend with no account, and a link to claim it. See [A backend with no account](#a-backend-with-no-account) |
 | `projects` | Create, list, inspect, delete |
 | `deploy`, `logs`, `deployments`, `rollback`, `cancel` | Shipping and watching |
 | `start`, `stop`, `restart` | Pausing a project and bringing it back |

@@ -1,5 +1,5 @@
 ---
-sourceHash: dfe254ab13267668
+sourceHash: 98eee42b368266f4
 title: rebase cloud
 sidebar_label: rebase cloud
 description: Os grupos de comandos do rebase cloud — autenticação, vínculo de projeto, deploys, configuração, organizações, bancos de dados, recursos, computação, armazenamento, webhooks, clusters e faturamento.
@@ -33,6 +33,7 @@ rebase cloud open         # abre o dashboard em um navegador
 ## Projetos
 
 ```bash
+rebase cloud init --claim [--name <name>]   # um backend no ar sem conta e um link para reivindicá-lo em 72 horas
 rebase cloud projects list
 rebase cloud projects create [--link]
 rebase cloud projects info [id]

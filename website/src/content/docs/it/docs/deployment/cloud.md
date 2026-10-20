@@ -1,5 +1,5 @@
 ---
-sourceHash: 852d6c98d8475f3b
+sourceHash: 31d27c5b8c358e31
 title: Rebase Cloud
 sidebar_label: Rebase Cloud
 description: Rebase Cloud è lo stesso Rebase, gestito per te. Di cosa si tratta, come collegare ed eseguire il deploy di un progetto e cosa non include ancora la beta privata.
@@ -153,6 +153,22 @@ Due cose restano a una persona che ha effettuato l'accesso:
 
 `rebase cloud whoami`, con un token impostato, mostra cosa può fare e su quale progetto. `rebase cloud tokens revoke <id> --yes` lo ferma subito.
 
+## Un backend senza account
+
+Un agent che ha costruito un'app può darle un backend attivo prima che chiunque si sia registrato, e consegnare alla persona per cui lavora un link per tenerlo:
+
+```bash
+rebase cloud init --claim
+```
+
+Il comando effettua il provisioning di un progetto su Rebase Cloud, imposta `REBASE_BASE_URL` in `.env` sul suo indirizzo attivo, collega la directory ed esegue il deploy delle collection locali con `rebase cloud deploy --bundle`. Stampa l'URL attivo, l'URL del pannello di amministrazione e un **URL di rivendicazione**. Chi apre l'URL di rivendicazione ed effettua l'accesso può spostare il progetto in una delle proprie organizzazioni. Il link funziona una sola volta. Un progetto che nessuno rivendica entro 72 ore viene eliminato, database compreso. Lo strumento `rebase_cloud_provision` del server MCP esegue lo stesso comando e restituisce gli stessi URL.
+
+Finché non viene rivendicato, il progetto non appartiene a nessun account. Il suo token è limitato a quel solo progetto e a `deploy`, `logs`, `env` e `database`. È conservato in `~/.rebase/credentials.json`, mai nel repository, e i comandi `rebase cloud` nella directory collegata lo usano da soli. Scade insieme al progetto.
+
+La rivendicazione richiede una sessione con accesso effettuato nel browser, non un token, e un metodo di pagamento sull'organizzazione in cui passa il progetto. Dalla rivendicazione in poi il progetto viene fatturato come qualsiasi altro. La rivendicazione revoca anche il token dell'agent: accedi con `rebase cloud login`, oppure crea un nuovo token con `rebase cloud tokens create`.
+
+Il provisioning senza account è limitato per indirizzo e in totale, e un control plane che non lo ha attivato lo rifiuta con un messaggio che lo spiega.
+
 ## Risorse di calcolo e relativi costi
 
 Il prezzo di un progetto si basa sulle risorse riservate, non su un piano tariffario (tier). `compute` mostra ogni parametro e il relativo preventivo dettagliato fornito dal control plane. (`rebase cloud resources` è una cosa diversa: i database e i bucket dichiarati dal codice, e lo stato di provisioning di ciascuno — consulta il [riferimento della CLI](/docs/cli/cloud/).)
@@ -184,6 +200,7 @@ Nessun valore viene convalidato dalla CLI, intenzionalmente: i limiti appartengo
 | `login`, `logout`, `whoami` | La tua sessione |
 | `tokens` | Token per la CI e gli agent, ciascuno limitato a un progetto. Vedi [CI e agent](#ci-e-agent) |
 | `link`, `unlink`, `use`, `open` | Associazione di questa directory a un progetto, selezione dell'organizzazione, apertura della console |
+| `init` | Con `--claim`: un backend attivo senza account e un link per rivendicarlo. Vedi [Un backend senza account](#un-backend-senza-account) |
 | `projects` | Creazione, visualizzazione, ispezione, eliminazione |
 | `deploy`, `logs`, `deployments`, `rollback`, `cancel` | Rilascio e monitoraggio |
 | `start`, `stop`, `restart` | Sospensione di un progetto e ripristino |

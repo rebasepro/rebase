@@ -26,6 +26,7 @@ import { ENV_SET_FLAGS } from "./env";
 import { COMPUTE_SET_FLAGS, BILLING_ACTIONS } from "./resources";
 import { LOGIN_FLAGS } from "./auth";
 import { CREATE_TOKEN_FLAGS } from "./tokens";
+import { INIT_FLAGS } from "./init";
 import { CRON_LIST_FLAGS, CRON_LOGS_FLAGS } from "./cron";
 
 /**
@@ -37,6 +38,7 @@ import { CRON_LIST_FLAGS, CRON_LOGS_FLAGS } from "./cron";
  * command with nothing to declare from one somebody forgot.
  */
 const SPECS: Record<string, Record<string, unknown> | null> = {
+    init: INIT_FLAGS,
     projects: null,
     clusters: null,
     "projects create": CREATE_PROJECT_FLAGS,
@@ -231,6 +233,7 @@ flag: flag[1] });
         ["projects.ts", CREATE_PROJECT_FLAGS],
         ["env.ts", ENV_SET_FLAGS],
         ["tokens.ts", CREATE_TOKEN_FLAGS],
+        ["init.ts", INIT_FLAGS],
         ["cron.ts", CRON_LIST_FLAGS],
         ["cron.ts", CRON_LOGS_FLAGS]
     ] as const) {
