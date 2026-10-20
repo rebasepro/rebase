@@ -508,6 +508,20 @@
   ingress controller other than ingress-nginx,** such as k3s's Traefik in
   `kube-system`.
 
+#### Plugins
+
+- **`@rebasepro/plugin-review`: agents propose, people approve.** A new plugin,
+  outside the core packages. Its server function (`@rebasepro/plugin-review/server`)
+  takes proposed inserts, updates and deletes into `rebase.staged_changes`
+  without touching the collection, and applies an approved one — or a whole
+  batch, in one transaction — under the reviewer's own row-level security. A
+  state-field review instead holds agent roles to a pending value of a row's
+  own `status`, through a restrictive policy `reviewSecurityRules()` builds
+  (`@rebasepro/plugin-review/config`). The admin half (`useReviewPlugin`) adds
+  a "Review queue (N)" button beside a reviewed collection's view switcher:
+  cell-level diffs, who proposed each change and why, and `j` / `k`, `a`, `r`
+  and Space to work through it. See [Review queue](/docs/backend/review-queue).
+
 ### Changed
 
 #### Admin (CMS & app)

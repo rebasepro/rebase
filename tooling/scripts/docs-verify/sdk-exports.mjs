@@ -47,6 +47,7 @@ const PACKAGE_ORDER = [
     "@rebasepro/firebase",
     "@rebasepro/plugin-ai",
     "@rebasepro/plugin-insights",
+    "@rebasepro/plugin-review",
     "@rebasepro/mcp"
 ];
 
