@@ -26,6 +26,7 @@ import { CHECKS, runChecks } from "./checks";
 import { introspectWithDiagnostics, UnknownRoleError, UnknownSchemaError, unsupportedConnectionKeywords } from "./introspect";
 import { formatEndpoint, isLoopbackEndpoint, parseConnectionString, redactSecrets } from "./redact";
 import { EXIT_ERROR, EXIT_OK, exitCodeFor, renderCheckCatalog, renderJson, renderReport } from "./report";
+import { renderAgentReport } from "./report-agent";
 import { renderHtml } from "./report-html";
 import type { DbSnapshot, Finding, ScanResult, Severity } from "./types";
 import { SEVERITIES } from "./types";
@@ -68,6 +69,17 @@ export interface ScanOptions {
  * and this has an integration test.
  */
 export async function scan(options: ScanOptions): Promise<ScanResult> {
+    return (await scanWithSnapshot(options)).result;
+}
+
+/**
+ * {@link scan}, also handing back the snapshot the findings were computed from.
+ *
+ * `--format agent` needs it: a remediation names the owner column, the grants
+ * to revoke and the policy expression to rewrite, and the result carries none
+ * of those.
+ */
+export async function scanWithSnapshot(options: ScanOptions): Promise<{ result: ScanResult; snapshot: DbSnapshot }> {
     // `introspectWithDiagnostics`, not `introspect`: the latter drops the record
     // of what could not be read, and a check whose inputs went missing returns
     // no findings — which is indistinguishable from a clean table.
@@ -89,12 +101,14 @@ export async function scan(options: ScanOptions): Promise<ScanResult> {
         })
     });
 
-    return buildScanResult(snapshot, findings, {
+    const result = buildScanResult(snapshot, findings, {
         connectionString: options.connectionString,
         checksRun: selectCheckIds(options).length,
         scannedAt: (options.now ?? new Date()).toISOString(),
         diagnostics
     });
+
+    return { result, snapshot };
 }
 
 /**
@@ -159,8 +173,20 @@ export function buildScanResult(
 // Argument parsing
 // ---------------------------------------------------------------------------
 
+/**
+ * What stdout carries. `text` is the report for a person; `json` is the
+ * {@link ScanResult} contract; `agent` is one JSON document with a remediation —
+ * SQL and the Rebase `securityRules` equivalent — on every finding, for a
+ * coding agent to apply.
+ */
+export const OUTPUT_FORMATS = ["text", "json", "agent"] as const;
+
+export type OutputFormat = (typeof OUTPUT_FORMATS)[number];
+
 export interface CliOptions {
     connectionString: string | null;
+    format: OutputFormat;
+    /** `format === "json"`, kept for callers that read it. */
     json: boolean;
     /**
      * `--html <path>`: also write a self-contained HTML report there.
@@ -192,6 +218,7 @@ const FAIL_ON_VALUES = [...SEVERITIES, "none"] as const;
 function emptyOptions(): CliOptions {
     return {
         connectionString: null,
+        format: "text",
         json: false,
         html: null,
         schemas: [],
@@ -219,6 +246,18 @@ function splitList(value: string): string[] {
 export function parseArgs(argv: readonly string[]): ParseResult {
     const options = emptyOptions();
     let positionals = 0;
+    // `--json` is `--format json`; naming two different formats is refused
+    // rather than letting the later one silently win.
+    let formatFlag: OutputFormat | null = null;
+    const chooseFormat = (format: OutputFormat): string | null => {
+        if (formatFlag !== null && formatFlag !== format) {
+            return `Two output formats were asked for (${formatFlag} and ${format}). Pick one.`;
+        }
+        formatFlag = format;
+        options.format = format;
+        options.json = format === "json";
+        return null;
+    };
 
     for (let index = 0; index < argv.length; index += 1) {
         const arg = argv[index];
@@ -273,9 +312,27 @@ export function parseArgs(argv: readonly string[]): ParseResult {
             case "--version":
                 options.version = true;
                 break;
-            case "--json":
-                options.json = true;
+            case "--json": {
+                const conflict = chooseFormat("json");
+                if (conflict !== null) return { ok: false, message: conflict };
                 break;
+            }
+            case "--format": {
+                const value = takeValue();
+                if (value === null) {
+                    return { ok: false, message: `--format needs one of: ${OUTPUT_FORMATS.join(", ")}.` };
+                }
+                const format = OUTPUT_FORMATS.find((f) => f === value.toLowerCase());
+                if (format === undefined) {
+                    return {
+                        ok: false,
+                        message: `--format ${value} is not a format. Use one of: ${OUTPUT_FORMATS.join(", ")}.`
+                    };
+                }
+                const conflict = chooseFormat(format);
+                if (conflict !== null) return { ok: false, message: conflict };
+                break;
+            }
             case "--quiet":
             case "-q":
                 options.quiet = true;
@@ -649,6 +706,10 @@ fact. Its own output redacts the password everywhere.
 
 Options
   --json                 Machine-readable ScanResult on stdout, and nothing else.
+  --format <name>        text (default), json (the same as --json) or agent: one JSON
+                         document for a coding agent, where every finding carries the
+                         failing table and policy, the SQL that fixes it and the
+                         equivalent Rebase securityRules.
   --html <path>          Also write a self-contained HTML report to <path>. One file,
                          no network requests, safe to attach to a ticket.
   --schema <name>        Restrict the scan to a schema. Repeatable or comma-separated.
@@ -679,6 +740,7 @@ Examples
       npx @rebasepro/rls-check
   npx @rebasepro/rls-check --schema public --schema billing --fail-on medium
   npx @rebasepro/rls-check --json > rls-report.json
+  npx @rebasepro/rls-check --format agent
   npx @rebasepro/rls-check --html rls-report.html
 
 It is read-only: it issues SELECTs against the system catalogs, writes nothing,
@@ -783,7 +845,7 @@ export async function runCli(argv: readonly string[], io: CliIo = defaultIo()): 
         }
 
         const options = parsed.options;
-        const color = resolveColor(options.color, options.json, io.env, io.isTty);
+        const color = resolveColor(options.color, options.format !== "text", io.env, io.isTty);
         const version = resolveVersion();
 
         if (options.help) {
@@ -799,7 +861,7 @@ export async function runCli(argv: readonly string[], io: CliIo = defaultIo()): 
         }
 
         if (options.listChecks) {
-            if (options.json) {
+            if (options.format !== "text") {
                 io.stdout(
                     `${JSON.stringify(
                         CHECKS.map((check) => ({ id: check.id, title: check.title, description: check.description })),
@@ -884,15 +946,16 @@ export async function runCli(argv: readonly string[], io: CliIo = defaultIo()): 
         process.on("SIGINT", onSigint);
 
         let result: ScanResult;
+        let snapshot: DbSnapshot;
         try {
-            result = await scan({
+            ({ result, snapshot } = await scanWithSnapshot({
                 connectionString,
                 schemas: options.schemas,
                 roles: options.roles,
                 only: options.only,
                 skip: options.skip,
                 statementTimeoutMs: options.timeoutMs
-            });
+            }));
         } catch (error) {
             // A typo in `--role` is the user's mistake, not the database's, and
             // `explainError` would bury it under "the scan failed".
@@ -932,7 +995,9 @@ export async function runCli(argv: readonly string[], io: CliIo = defaultIo()): 
             process.removeListener("SIGINT", onSigint);
         }
 
-        if (options.json) {
+        if (options.format === "agent") {
+            io.stdout(`${renderAgentReport(result, snapshot, { failOn: options.failOn, version })}\n`);
+        } else if (options.format === "json") {
             io.stdout(`${renderJson(result)}\n`);
         } else {
             io.stdout(

@@ -62,13 +62,8 @@ export const unqualifiedColumnInSubquery: Check = {
             const outer = relationAt(snapshot, policy.schema, policy.table);
             if (!outer) continue;
 
-            for (const clause of ["USING", "WITH CHECK"] as const) {
-                const expr = clause === "USING" ? policy.using : policy.withCheck;
-                if (!expr) continue;
-
-                for (const hit of scanExpression(snapshot, outer, expr)) {
-                    findings.push(buildFinding(snapshot, policy, outer, clause, hit));
-                }
+            for (const { clause, hit } of policyAmbiguities(snapshot, policy)) {
+                findings.push(buildFinding(snapshot, policy, outer, clause, hit));
             }
         }
 
@@ -76,7 +71,7 @@ export const unqualifiedColumnInSubquery: Check = {
     }
 };
 
-interface Ambiguity {
+export interface Ambiguity {
     /**
      * `bare`: the unqualified name is in the text (never, from a live catalog).
      * `self`: the stored text compares an inner column with itself, which is
@@ -386,6 +381,27 @@ function resolveRelation(
         (r) => r.name === item.name && snapshot.schemas.includes(r.schema)
     );
     return candidates.length === 1 ? candidates[0] : undefined;
+}
+
+/**
+ * Every ambiguity this check reports on one policy, with the clause it sits in.
+ *
+ * The same scan `run` makes, exposed so the agent output can rewrite the exact
+ * comparison a finding names rather than restate a generic template.
+ */
+export function policyAmbiguities(
+    snapshot: DbSnapshot,
+    policy: DbPolicy
+): { clause: "USING" | "WITH CHECK"; hit: Ambiguity }[] {
+    const outer = relationAt(snapshot, policy.schema, policy.table);
+    if (!outer) return [];
+    const out: { clause: "USING" | "WITH CHECK"; hit: Ambiguity }[] = [];
+    for (const clause of ["USING", "WITH CHECK"] as const) {
+        const expr = clause === "USING" ? policy.using : policy.withCheck;
+        if (!expr) continue;
+        for (const hit of scanExpression(snapshot, outer, expr)) out.push({ clause, hit });
+    }
+    return out;
 }
 
 function buildFinding(

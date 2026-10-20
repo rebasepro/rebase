@@ -55,18 +55,7 @@ export const securityDefinerMutableSearchPath: Check = {
                         `(commonly PUBLIC on \`public\` in older databases).`,
                     fix:
                         `-- Pin the search_path on every overload of this routine:\n` +
-                        dollarQuotedDo(
-                            `DECLARE r record;\n` +
-                            `BEGIN\n` +
-                            `    FOR r IN\n` +
-                            `        SELECT p.oid::regprocedure AS sig\n` +
-                            `        FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace\n` +
-                            `        WHERE n.nspname = ${literal(routine.schema)} AND p.proname = ${literal(routine.name)}\n` +
-                            `    LOOP\n` +
-                            `        EXECUTE format('ALTER ROUTINE %s SET search_path = pg_catalog, pg_temp', r.sig);\n` +
-                            `    END LOOP;\n` +
-                            `END`
-                        ) +
+                        pinSearchPathSql(routine.schema, routine.name) +
                         `\n-- Then schema-qualify every identifier in the body, since nothing but\n` +
                         `-- pg_catalog is on the path any more.`
                 })
@@ -76,6 +65,27 @@ export const securityDefinerMutableSearchPath: Check = {
         return findings;
     }
 };
+
+/**
+ * A `DO` block that pins `search_path` on every overload of `schema.name`.
+ *
+ * Exported for the agent output, which prints the same statement as its
+ * runnable SQL.
+ */
+export function pinSearchPathSql(schema: string, name: string): string {
+    return dollarQuotedDo(
+        `DECLARE r record;\n` +
+        `BEGIN\n` +
+        `    FOR r IN\n` +
+        `        SELECT p.oid::regprocedure AS sig\n` +
+        `        FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace\n` +
+        `        WHERE n.nspname = ${literal(schema)} AND p.proname = ${literal(name)}\n` +
+        `    LOOP\n` +
+        `        EXECUTE format('ALTER ROUTINE %s SET search_path = pg_catalog, pg_temp', r.sig);\n` +
+        `    END LOOP;\n` +
+        `END`
+    );
+}
 
 const literal = (value: string): string => `'${value.replace(/'/g, "''")}'`;
 

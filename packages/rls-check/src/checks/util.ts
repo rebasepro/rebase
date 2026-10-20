@@ -272,7 +272,7 @@ const UNPRINTABLE_ALL = new RegExp(UNPRINTABLE.source, "g");
  * names the same object and has no line break to escape a comment with.
  */
 /** Column names that usually hold the id of the row's owner, most likely first. */
-const OWNER_COLUMNS = ["user_id", "owner_id", "created_by", "author_id", "account_id"];
+export const OWNER_COLUMNS = ["user_id", "owner_id", "created_by", "author_id", "account_id"];
 
 /**
  * The column a printed fix should scope rows by, when the table has one that

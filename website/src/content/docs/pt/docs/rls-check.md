@@ -1,5 +1,5 @@
 ---
-sourceHash: 26723d5fe58a36e5
+sourceHash: 1f6cc6a096428d0e
 slug: pt/docs/rls-check
 title: rls-check
 description: Audite a segurança em nível de linha (RLS) em qualquer banco de dados PostgreSQL — Supabase, Neon, RDS ou seu próprio servidor. Somente leitura, sem cadastro, sem necessidade de Rebase.
@@ -56,6 +56,7 @@ a `host` com a senha `pa@ss`. Codificá-los mesmo assim nunca é um erro.
 | Opção | Significado |
 | --- | --- |
 | `--json` | Saída legível por máquina no stdout, e nada mais no stdout |
+| `--format <name>` | `text` (padrão), `json` (o mesmo que `--json`) ou `agent`: um documento JSON para um agente de programação, em que cada achado traz a tabela e a policy afetadas, o SQL que o corrige e as `securityRules` equivalentes do Rebase |
 | `--html <path>` | Também grava um relatório HTML independente nesse caminho. Um único arquivo, sem requisições de rede |
 | `--schema <name>` | Restringe a verificação a um schema. Repetível ou separado por vírgulas |
 | `--role <name>` | Trata esta role como uma com a qual um chamador não confiável chega, além de `anon`, `authenticated`, `web_anon` e `rebase_user`. Repetível ou separado por vírgulas |
@@ -131,6 +132,17 @@ credenciais), `serverVersion`, `platform`, `scannerIsPrivileged`, `exposedRoles`
 `exposedRoles` e `diagnostics` fazem parte do contrato, não são extras: cada verificação é restrita pelo
 conjunto de roles expostas, e `diagnostics.degraded` é como um consumidor diferencia "não havia nada de errado" de
 "a varredura não conseguiu verificar". Ler `findings: []` sem ambos é ver apenas metade da resposta.
+
+### Saída para agentes
+
+`--format agent` imprime um único documento JSON para um agente de programação que corrige o que
+encontra. Cada achado traz o id da verificação e o objeto afetado (`target.table`,
+`target.policy`, …) e uma `remediation`: `apply` (`sql`; `rebase-config` quando o Rebase recria a
+policy a partir das `securityRules` de uma collection a cada inicialização; ou `manual`), `sql`
+executável escrito para cada verificação, os `placeholders` a preencher antes e `rebase` — a mesma
+correção como `defineCollection({ securityRules: [...] })`, ou por que as regras não conseguem
+expressá-la. A `key` de cada achado é estável entre execuções, então uma nova execução mostra o
+que foi resolvido. `--json` não muda.
 
 ## Executando em agendamento
 

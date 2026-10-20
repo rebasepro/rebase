@@ -220,7 +220,7 @@ export function formatTarget(target: Finding["target"]): string {
 }
 
 /** Sort key: worst first, then a stable schema/table/id ordering. */
-function compareFindings(a: Finding, b: Finding): number {
+export function compareFindings(a: Finding, b: Finding): number {
     const bySeverity = severityRank(b.severity) - severityRank(a.severity);
     if (bySeverity !== 0) return bySeverity;
 

@@ -17,8 +17,8 @@
  * has to be something they can read in full before they run it.
  */
 
-export { runCli, scan, selectCheckIds, EXIT_OK, EXIT_FINDINGS, EXIT_ERROR } from "./cli";
-export type { ScanOptions, CliIo, CliOptions } from "./cli";
+export { runCli, scan, scanWithSnapshot, selectCheckIds, EXIT_OK, EXIT_FINDINGS, EXIT_ERROR } from "./cli";
+export type { ScanOptions, CliIo, CliOptions, OutputFormat } from "./cli";
 
 export { introspect } from "./introspect";
 export type { ConnectOptions } from "./introspect";
@@ -35,6 +35,12 @@ export {
     formatTarget
 } from "./report";
 export type { RenderOptions } from "./report";
+
+export { renderAgentReport, findingKey, AGENT_FORMAT_VERSION } from "./report-agent";
+export type { AgentFinding, AgentReport, AgentRenderOptions } from "./report-agent";
+
+export { remediationFor } from "./remediation";
+export type { Remediation, RemediationApply, Placeholder, AlternativeFix, RebaseEquivalent } from "./remediation";
 
 export { renderHtml, escapeHtml } from "./report-html";
 export type { HtmlRenderOptions } from "./report-html";
