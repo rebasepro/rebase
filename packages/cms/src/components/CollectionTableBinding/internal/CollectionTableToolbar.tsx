@@ -3,7 +3,7 @@ import React, { useContext, useLayoutEffect, useRef, useState } from "react";
 import { CircularProgress, cls, SearchBar } from "@rebasepro/ui";
 import { useLargeLayout, useTranslation } from "@rebasepro/app";
 
-interface CollectionTableToolbarProps {
+export interface CollectionTableToolbarProps {
     loading: boolean;
     actionsStart?: React.ReactNode;
     actions?: React.ReactNode;

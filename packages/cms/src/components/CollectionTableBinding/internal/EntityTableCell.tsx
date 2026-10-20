@@ -20,7 +20,7 @@ export interface EntityTableCellOpener {
     onToggle: (open: boolean, cellRect: DOMRect | undefined) => void;
 }
 
-interface EntityTableCellProps {
+export interface EntityTableCellProps {
     children: React.ReactNode;
     actions?: React.ReactNode;
     /**

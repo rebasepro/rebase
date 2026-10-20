@@ -12,6 +12,7 @@ import { useComponentOverride, ErrorView, CollectionScopeProvider } from "@rebas
 import { useCollectionRegistryController } from "../../../hooks/navigation/contexts/CollectionRegistryContext";
 import { useReferencePaths } from "../../../hooks/useReferencePaths";
 import { CompactEntityCellField } from "./CompactEntityCellField";
+import { DefaultMissingReference } from "../../DefaultMissingReference";
 
 type TableReferenceFieldProps = {
     name: string;
@@ -35,7 +36,6 @@ type TableReferenceFieldProps = {
     onOpenChange?: (open: boolean) => void;
 };
 
-const DefaultMissingReference: React.FC<{ path: string }> = () => null;
 
 function TableReferenceFieldResolver(props: TableReferenceFieldProps & { collection: AdminCollection | undefined }) {
     const ResolvedMissingReference = useComponentOverride("Entity.MissingReference", DefaultMissingReference);

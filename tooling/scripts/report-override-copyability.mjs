@@ -13,8 +13,18 @@
  * public export of `@rebasepro/cms` or `@rebasepro/app`. Zero means a copy of
  * that file compiles once its relative imports are rewritten to package imports.
  *
- * It reports; it does not fail. The numbers are the work list for making the
- * parts copyable, and a part's count only ever needs to go down.
+ * Measured: the default's own file (a `lazyChunk` default is the component it
+ * loads), its type imports too, and the names it reads off a relative
+ * `import("./x")`. Not measured: what the public exports it uses import in turn
+ * — those resolve from the package.
+ *
+ * It reports; packages/cms/test/recipes/override_parts_are_copyable.test.ts is
+ * the gate, failing when a part that copies today stops copying. Three parts
+ * are left uncopyable on purpose — `Collection.View`, `DetailView` and
+ * `HomePage`'s drag-and-drop — because what they import are compositions'
+ * internals, not building blocks; packages/cms/recipes/README.md ("Copying a
+ * built-in part") says why and what to customize instead. Export a blocker
+ * only when a copy should reuse it, never to make a number reach zero.
  *
  *     node tooling/scripts/report-override-copyability.mjs [--json]
  */
@@ -68,6 +78,26 @@ function isPublic(symbol) {
     return (resolved(symbol)?.declarations ?? []).some(d => publicDeclarations.has(d));
 }
 
+/**
+ * A default declared as `lazyChunk(() => import("./X").then(m => ({ default: m.Y })))`
+ * is `Y` in `X`: the lazy wrapper is one line and says nothing about what a copy
+ * of the part needs.
+ */
+function lazyTarget(declaration) {
+    if (!declaration || !ts.isVariableDeclaration(declaration) || !declaration.initializer) return declaration;
+    let target;
+    const visit = (node) => {
+        if (target) return;
+        if (ts.isPropertyAssignment(node) && node.name.getText() === "default") {
+            target = resolved(checker.getSymbolAtLocation(ts.isPropertyAccessExpression(node.initializer) ? node.initializer.name : node.initializer))?.declarations?.[0];
+            return;
+        }
+        ts.forEachChild(node, visit);
+    };
+    visit(declaration.initializer);
+    return target ?? declaration;
+}
+
 /** `useComponentOverride("Name", Default)` call sites → the default's declaring file. */
 const sites = new Map();
 for (const file of files) {
@@ -76,9 +106,9 @@ for (const file of files) {
         if (ts.isCallExpression(node) && ts.isIdentifier(node.expression) && node.expression.text === "useComponentOverride"
             && node.arguments.length >= 2 && ts.isStringLiteral(node.arguments[0]) && ts.isIdentifier(node.arguments[1])) {
             const name = node.arguments[0].text;
-            const declaration = resolved(checker.getSymbolAtLocation(node.arguments[1]))?.declarations?.[0];
+            const declaration = lazyTarget(resolved(checker.getSymbolAtLocation(node.arguments[1]))?.declarations?.[0]);
             if (declaration && !sites.has(name)) {
-                sites.set(name, { component: node.arguments[1].text, file: declaration.getSourceFile().fileName });
+                sites.set(name, { component: declaration.name?.getText() ?? node.arguments[1].text, file: declaration.getSourceFile().fileName });
             }
         }
         ts.forEachChild(node, visit);
@@ -86,7 +116,11 @@ for (const file of files) {
     visit(source);
 }
 
-/** The relative imports of a file that no package entry point exports. */
+/**
+ * The relative imports of a file that no package entry point exports — types
+ * included, since a copy's `import type` has to resolve too — and the names it
+ * reads off a relative `import("./x")`, which a copy cannot load either.
+ */
 function internalImports(file) {
     const source = program.getSourceFile(file);
     const internal = [];
@@ -94,17 +128,39 @@ function internalImports(file) {
         if (!ts.isImportDeclaration(statement) || !ts.isStringLiteral(statement.moduleSpecifier)) continue;
         if (!statement.moduleSpecifier.text.startsWith(".")) continue;
         const clause = statement.importClause;
-        if (!clause || clause.isTypeOnly) continue;
+        if (!clause) continue;
         const names = [];
         if (clause.name) names.push(clause.name);
         if (clause.namedBindings && ts.isNamedImports(clause.namedBindings)) {
-            for (const element of clause.namedBindings.elements) if (!element.isTypeOnly) names.push(element.name);
+            for (const element of clause.namedBindings.elements) names.push(element.name);
         }
         for (const name of names) {
             if (!isPublic(checker.getSymbolAtLocation(name))) internal.push(`${name.text} (${statement.moduleSpecifier.text})`);
         }
     }
-    return internal;
+    const visit = (node) => {
+        if (ts.isCallExpression(node) && node.expression.kind === ts.SyntaxKind.ImportKeyword
+            && node.arguments[0] && ts.isStringLiteral(node.arguments[0]) && node.arguments[0].text.startsWith(".")) {
+            // `import("./x").then(m => ({ default: m.Y }))`: the names read off `m`.
+            const then = node.parent;
+            const callback = ts.isPropertyAccessExpression(then) && then.name.text === "then" && ts.isCallExpression(then.parent)
+                ? then.parent.arguments[0] : undefined;
+            const parameter = callback && ts.isArrowFunction(callback) ? callback.parameters[0]?.name : undefined;
+            const read = (inner) => {
+                if (ts.isPropertyAccessExpression(inner) && ts.isIdentifier(inner.expression)
+                    && parameter && ts.isIdentifier(parameter) && inner.expression.text === parameter.text
+                    && !isPublic(checker.getSymbolAtLocation(inner.name))) {
+                    internal.push(`${inner.name.text} (import("${node.arguments[0].text}"))`);
+                }
+                ts.forEachChild(inner, read);
+            };
+            if (callback) read(callback.body);
+            else internal.push(`import("${node.arguments[0].text}")`);
+        }
+        ts.forEachChild(node, visit);
+    };
+    visit(source);
+    return [...new Set(internal)];
 }
 
 const rows = [...sites].map(([name, { component, file }]) => ({

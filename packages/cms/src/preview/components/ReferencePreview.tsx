@@ -1,5 +1,6 @@
 
 import * as React from "react";
+import { DefaultMissingReference } from "../../components/DefaultMissingReference";
 
 import { EntityReference } from "@rebasepro/types";
 import type { PreviewSize } from "../../types/components/PropertyPreviewProps";
@@ -53,7 +54,6 @@ export const ReferencePreview = function ReferencePreview(props: ReferencePrevie
     </ErrorBoundary>;
 };
 
-const DefaultMissingReference: React.FC<{ path: string }> = () => null;
 
 function ReferencePreviewInternalInner({
     disabled,

@@ -27,6 +27,38 @@
   `getDatePropertyTimezone` (`Collection.FilterField`).
   `pnpm report:override-copyability` lists what still keeps each overridable
   part from being copied that way.
+- **16 of the 19 overridable parts can be copied into a project and compile
+  with package imports**, up from 5. What a copy reuses is exported:
+  - drawer: `DrawerExpansionContext`, `useDrawerExpansion`,
+    `useDrawerExpandedWhile`, `DrawerExpansion`, `NAVIGATION_DEFAULT_GROUP_NAME`;
+  - collection toolbar and table: `CollectionTableToolbar`,
+    `CollectionTableToolbarProps`, `useToolbarLabels`, `EditorCollectionAction`,
+    `CollectionTableBindingProps`, `EntityTableCell`, `EntityTableCellProps`,
+    `EntityTableCellOpener`, `PropertyTableCell`, `PropertyTableCellProps`,
+    `AdditionalFieldValue`, `AdditionalFieldValueProps`, `propertiesToColumns`,
+    `PropertiesToColumnsParams`, `CustomFieldValidator`;
+  - cards and previews: `resolveCollectionSlotKeys`, `useCollectionSlotKeys`,
+    `useEntitySlots`, `CollectionSlotKeys`, `EntityPreviewSlots`, `PreviewSlot`,
+    `DatePreviewSlot`, `RelationChipSlot`, `RelationChipItem`, `SlotValue`,
+    `SlotValueProps`, `TagChips`, `useEntityTitle`, `UseEntityDisplayParams`,
+    `ResolvedDisplayValue`, `useSearchExplanation`, `MatchExplanation`,
+    `fieldLabel`, `Highlighted`, `NestedEntityPreviewBoundary`,
+    `EntityPreviewLayout`, `isEmptyPreviewValue`;
+  - forms and records: `getParentLinkValues`, `getTouchedPropertyValues`,
+    `getUnappliedLocalChanges`, `overlayEdit`, `unlinkEntityAction`,
+    `entityActionName`, `resolveEntityActionState`, `EntityActionState`,
+    `useSideDialogContext`, `SideDialogController`, `useChildViewSource`,
+    `EditViewBinding`, `EditViewBindingProps`, `DetailViewBinding`,
+    `DetailViewBindingProps`;
+  - home page: `NavigationCardBinding`, `NavigationGroup`, `FavouritesView`;
+  - login screen (`@rebasepro/app`): `startOAuthRedirect`,
+    `consumeOAuthCallback`, `OAuthRedirectRequest`, `OAuthCallbackResult`,
+    `readMfaRequired`, `canAnswerMfa`, `classifyMfaRefusal`, `PendingMfaSignIn`,
+    `authErrorMessage`, `appAddressOfEmailLink`, `emailChangeErrorMessage`.
+
+  `Collection.View`, `DetailView` and `HomePage`'s drag-and-drop stay
+  uncopyable on purpose; the recipes README says why and what to customize
+  instead. A test fails when a part that copies stops copying.
 
 ### Changed
 

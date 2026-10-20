@@ -97,3 +97,31 @@ The override names are `Shell.AppBar`, `Shell.Drawer`, `HomePage`,
 and a few more: the full list is `OverridableComponentName` in
 `@rebasepro/cms-types`. A collection can override any `Collection.*` or
 `Entity.*` part for itself alone with `admin.components`.
+
+## Copying a built-in part
+
+A copy of a built-in part compiles in your project once its relative imports
+point at `@rebasepro/cms` and `@rebasepro/app`: everything it imports is a public
+export. That holds for every part except three, and the three are deliberate.
+
+- **`Collection.View`** is the composition of every view mode — list, table,
+  cards, board, split — with inline editing, the popup field editor, the delete
+  dialog and the view mode's URL state. What it imports is those modes'
+  internals. Replace one part of it instead (`Collection.Table`,
+  `Collection.Card`, `Collection.Actions`, `Collection.EmptyState`, which all
+  copy), add a view mode of your own with `collectionViews`, or wrap it with
+  `wrap: true`.
+- **`DetailView`** is the record view's composition: identity bar, tabs,
+  inspector and the split list's buttons, around tab ids that are URL values.
+  Customize a record with `admin.entityViews`, `admin.entityActions`, the
+  `form.*` slots, or the `Entity.Form` and `EditView.FormActions` overrides,
+  which copy.
+- **`HomePage`** copies but for its drag-and-drop reordering of cards and
+  groups, which has no API of its own to export. A home page of your own
+  composes `NavigationGroup`, `NavigationCardBinding` and `FavouritesView` over
+  `useNavigationStateController().topLevelNavigation`; to add to the stock one,
+  use the `home.cards` slot.
+
+`pnpm report:override-copyability` in the Rebase repository lists what each
+part imports that is not public, and a test there fails when a part that copies
+stops copying.

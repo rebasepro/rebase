@@ -1,5 +1,6 @@
 
 import * as React from "react";
+import { DefaultMissingReference } from "../../components/DefaultMissingReference";
 
 import { Entity, EntityRelation } from "@rebasepro/types";
 import type { PreviewSize } from "../../types/components/PropertyPreviewProps";
@@ -85,7 +86,6 @@ export const RelationPreview = function RelationPreview(props: RelationPreviewPr
     return <RelationPreviewInternal {...props}/>;
 };
 
-const DefaultMissingReference: React.FC<{ path: string }> = () => null;
 
 function RelationPreviewInternalInner({
     disabled,

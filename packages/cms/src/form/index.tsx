@@ -32,5 +32,13 @@ export {
     removeEmptyContainers,
     getChanges,
     getInitialEntityValues,
-    zodToFormErrors
+    zodToFormErrors,
+    // What `EntityFormBinding` opens with and keeps: the link a child created
+    // from its parent's tab takes, and the edit it carries or backs up, whole.
+    // A copy of `Entity.Form` that rebuilt these would bring back the drafts
+    // that resurrected deleted items.
+    getParentLinkValues,
+    getTouchedPropertyValues,
+    getUnappliedLocalChanges,
+    overlayEdit
 } from "./form_utils";
