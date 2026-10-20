@@ -1,5 +1,5 @@
 ---
-sourceHash: 852d6c98d8475f3b
+sourceHash: 27b9d73f979bc845
 title: Rebase Cloud
 sidebar_label: Rebase Cloud
 description: Rebase Cloud est le même Rebase, géré pour vous. De quoi il s'agit, comment lier et déployer un projet, et ce que la bêta privée n'inclut pas encore.
@@ -198,6 +198,24 @@ Deux choses restent réservées à une personne connectée :
 
 `rebase cloud whoami`, avec un jeton défini, indique ce qu'il peut faire et sur quel projet. `rebase cloud tokens revoke <id> --yes` l'arrête immédiatement.
 
+## Un backend sans compte
+
+Un agent qui a construit une application peut lui donner un backend en ligne avant que quiconque se soit inscrit, et remettre à la personne pour qui il travaille un lien pour le garder :
+
+```bash
+rebase cloud init --claim
+```
+
+Cela provisionne un projet sur Rebase Cloud, définit `REBASE_BASE_URL` dans `.env` sur son adresse en ligne, lie le répertoire et déploie les collections locales avec `rebase cloud deploy --bundle`. La commande affiche l'URL en ligne, l'URL du panneau d'administration et une **URL de réclamation**. Quiconque ouvre l'URL de réclamation et se connecte peut déplacer le projet dans l'une de ses organisations. Le lien ne fonctionne qu'une fois. Un projet que personne ne réclame dans les 72 heures est supprimé, base de données comprise. L'outil `rebase_cloud_provision` du serveur MCP exécute la même commande et renvoie les mêmes URL.
+
+Tant qu'il n'est pas réclamé, le projet n'appartient à aucun compte. Son jeton est limité à ce seul projet et à `deploy`, `logs`, `env` et `database`. Il est conservé dans `~/.rebase/credentials.json`, jamais dans le dépôt, et les commandes `rebase cloud` du répertoire lié l'utilisent d'elles-mêmes. Il expire avec le projet.
+
+Une fois que le déploiement a construit l'app, la commande définit aussi `REBASE_API_TOKEN` dans `.env` : une clé créée sur l'app elle-même, que le serveur MCP et le SDK lui envoient. Elle lit et écrit des données (`data:read`, `data:write`) à travers la sécurité au niveau des lignes de l'app, comme un appelant qui n'est ni une personne ni un administrateur. Elle ne détient rien du plan d'administration et expire avec le délai de réclamation. Une fois le projet à vous, créez les clés voulues dans son panneau d'administration.
+
+La réclamation exige une session connectée dans un navigateur, pas un jeton, ainsi qu'un moyen de paiement sur l'organisation qui reçoit le projet. Dès la réclamation, le projet est facturé comme n'importe quel autre. Réclamer révoque aussi le jeton de l'agent : connectez-vous avec `rebase cloud login`, ou créez un nouveau jeton avec `rebase cloud tokens create`.
+
+Le provisionnement sans compte est limité par adresse et au total, et un plan de contrôle qui ne l'a pas activé refuse avec un message qui le dit.
+
 ## Ressources de calcul et coûts
 
 Le prix d'un projet est basé sur ce qu'il réserve, et non sur un palier forfaitaire. `compute` affiche
@@ -237,6 +255,7 @@ sauf celle qui redémarre la base de données, qui attend une fenêtre de mainte
 | `login`, `logout`, `whoami` | Votre session |
 | `tokens` | Jetons pour la CI et les agents, chacun restreint à un projet. Voir [CI et agents](#ci-et-agents) |
 | `link`, `unlink`, `use`, `open` | Associer ce répertoire à un projet, sélectionner une organisation, ouvrir la console |
+| `init` | Avec `--claim` : un backend en ligne sans compte, et un lien pour le réclamer. Voir [Un backend sans compte](#un-backend-sans-compte) |
 | `projects` | Créer, lister, inspecter, supprimer |
 | `deploy`, `logs`, `deployments`, `rollback`, `cancel` | Déploiement et surveillance |
 | `start`, `stop`, `restart` | Mettre un projet en pause et le relancer |

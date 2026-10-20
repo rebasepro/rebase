@@ -27,7 +27,8 @@ const GROUPS = [
     { const: "STORAGE_TOOLS", title: "Storage", note: "" },
     { const: "CRON_TOOLS", title: "Cron", note: "" },
     { const: "FUNCTION_TOOLS", title: "Functions", note: "" },
-    { const: "PROJECT_TOOLS", title: "Project registry", note: "" }
+    { const: "PROJECT_TOOLS", title: "Project registry", note: "" },
+    { const: "CLOUD_TOOLS", title: "Rebase Cloud", note: "Spawn `rebase cloud` in the active project directory." }
 ];
 
 /** The body of the array literal whose `[` sits at `open`. */

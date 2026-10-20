@@ -1631,6 +1631,88 @@ const PROJECT_TOOLS: ToolDef[] = [
     }
 ];
 
+/**
+ * Rebase Cloud, reached by spawning `rebase cloud` in the active project — the
+ * same command a person would run, so the tool cannot drift from it.
+ */
+const CLOUD_TOOLS: ToolDef[] = [
+    {
+        name: "rebase_cloud_provision",
+        description:
+            "Give the active project a live backend on Rebase Cloud with no account or signup: provisions a project, " +
+            "sets REBASE_BASE_URL in .env, links the directory and deploys the local collections to it " +
+            "(`rebase cloud init --claim`), then sets REBASE_API_TOKEN in .env: a key the deployed app accepts, " +
+            "for reading and writing data through its row-level security, expiring with the claim window. " +
+            "Returns the live URL, the admin panel URL and a claim URL. Give the claim " +
+            "URL to the user: whoever opens it and signs in owns the project. Unclaimed, it is deleted after 72 hours. " +
+            "Afterwards `rebase cloud` commands in the directory act on it without a login.",
+        inputSchema: {
+            type: "object",
+            properties: {
+                name: { type: "string", description: "What to call the app (optional, up to 60 characters)" },
+                deploy: { type: "boolean", description: "Deploy the collections now. Default true; false provisions and links only" }
+            }
+        }
+    }
+];
+
+/** What `rebase cloud init --claim --json` prints, the fields this tool hands on. */
+export interface CloudProvisionResult {
+    projectUrl: string;
+    adminUrl: string | null;
+    claimUrl: string;
+    expiresAt: string;
+    slug: string;
+    deployed: boolean;
+    /** Whether REBASE_API_TOKEN, a key minted on the app, was written into .env. The key itself is never printed. */
+    apiTokenInEnv: boolean;
+}
+
+/** The arguments `rebase_cloud_provision` passes to the CLI, validated. Throws on a value argv must not carry. */
+export function cloudProvisionArgv(args: { name?: unknown; deploy?: unknown }): string[] {
+    const argv = ["cloud", "init", "--claim", "--json"];
+    if (args.name !== undefined) {
+        if (typeof args.name !== "string" || args.name.length > 60 || [...args.name].some((ch) => ch.charCodeAt(0) < 32)) {
+            throw new Error("`name` must be a string of at most 60 printable characters.");
+        }
+        // `--name=` form: a name starting with `-` stays a value, never a flag.
+        if (args.name.trim()) argv.push(`--name=${args.name.trim()}`);
+    }
+    if (args.deploy !== undefined && typeof args.deploy !== "boolean") {
+        throw new Error("`deploy` must be a boolean.");
+    }
+    if (args.deploy === false) argv.push("--no-deploy");
+    return argv;
+}
+
+/** Read the CLI's one JSON result, keeping only fields of the expected shape. Null when it printed none. */
+export function parseCloudProvisionResult(stdout: string): CloudProvisionResult | null {
+    let value: unknown;
+    try {
+        value = JSON.parse(stdout.trim());
+    } catch {
+        return null;
+    }
+    if (typeof value !== "object" || value === null) return null;
+    const url = (v: unknown) => typeof v === "string" && /^https?:\/\/[^\s]+$/.test(v) ? v : null;
+    const projectUrl = "projectUrl" in value ? url(value.projectUrl) : null;
+    const claimUrl = "claimUrl" in value ? url(value.claimUrl) : null;
+    const expiresAt = "expiresAt" in value && typeof value.expiresAt === "string" ? value.expiresAt : null;
+    const slug = "slug" in value && typeof value.slug === "string" ? value.slug : null;
+    if (!projectUrl || !claimUrl || !expiresAt || !slug) return null;
+    const deploy = "deploy" in value ? value.deploy : null;
+    const appKey = "appKey" in value ? value.appKey : null;
+    return {
+        projectUrl,
+        adminUrl: "adminUrl" in value ? url(value.adminUrl) : null,
+        claimUrl,
+        expiresAt,
+        slug,
+        deployed: typeof deploy === "object" && deploy !== null && "ok" in deploy && deploy.ok === true,
+        apiTokenInEnv: typeof appKey === "object" && appKey !== null && "ok" in appKey && appKey.ok === true
+    };
+}
+
 export const ALL_TOOLS: ToolDef[] = [
     ...CLI_TOOLS.map(({ cmd: _c, ...rest }) => rest),
     ...SCHEMA_TOOLS,
@@ -1640,7 +1722,8 @@ export const ALL_TOOLS: ToolDef[] = [
     ...STORAGE_TOOLS,
     ...CRON_TOOLS,
     ...FUNCTION_TOOLS,
-    ...PROJECT_TOOLS
+    ...PROJECT_TOOLS,
+    ...CLOUD_TOOLS
 ];
 
 // ── Tool Handlers ───────────────────────────────────────────────────────────
@@ -1659,6 +1742,27 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
  * whether a command worked will eventually parse it wrong.
  */
 function runRebaseCmd(commandArgs: string[]): Promise<{ output: string; code: number }> {
+    return spawnRebase(commandArgs).then(({ combined, code, spawnError }) => {
+        if (spawnError) return { output: `Error spawning command: ${spawnError}`, code: -1 };
+        const output = combined.trim();
+        return {
+            output: code !== 0 ? `Command exited with code ${code}\n\n${output}` : output || "(no output)",
+            code
+        };
+    });
+}
+
+/**
+ * The CLI as a child of this server, with its two streams kept apart.
+ *
+ * `runRebaseCmd` joins them, which is right for a command whose whole output is
+ * the answer. A `--json` command prints its one result on stdout and narrates on
+ * stderr, and a tool that reads the result needs stdout alone. `combined` is
+ * both, in the order they arrived.
+ */
+function spawnRebase(
+    commandArgs: string[]
+): Promise<{ stdout: string; stderr: string; combined: string; code: number; spawnError?: string }> {
     const projectDir = getProjectDir();
     const pm = detectPackageManager(projectDir);
     const { command, args: execArgs } = getExecCommand(pm);
@@ -1673,17 +1777,13 @@ function runRebaseCmd(commandArgs: string[]): Promise<{ output: string; code: nu
                 PNPM_CONFIG_VERIFY_DEPS_BEFORE_RUN: "false"
             }
         });
-        const chunks: string[] = [];
-        child.stdout?.on("data", (d: Buffer) => chunks.push(d.toString()));
-        child.stderr?.on("data", (d: Buffer) => chunks.push(d.toString()));
-        child.on("error", (err) => resolve({ output: `Error spawning command: ${err.message}`, code: -1 }));
-        child.on("close", (code) => {
-            const output = chunks.join("").trim();
-            resolve({
-                output: code !== 0 ? `Command exited with code ${code}\n\n${output}` : output || "(no output)",
-                code: code ?? -1
-            });
-        });
+        const out: string[] = [];
+        const err: string[] = [];
+        const all: string[] = [];
+        child.stdout?.on("data", (d: Buffer) => { out.push(d.toString()); all.push(d.toString()); });
+        child.stderr?.on("data", (d: Buffer) => { err.push(d.toString()); all.push(d.toString()); });
+        child.on("error", (error) => resolve({ stdout: "", stderr: "", combined: "", code: -1, spawnError: error.message }));
+        child.on("close", (code) => resolve({ stdout: out.join(""), stderr: err.join(""), combined: all.join(""), code: code ?? -1 }));
     });
 }
 
@@ -1963,6 +2063,33 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
     // ── Project management tools ────────────────────────────────────────
     switch (name) {
+        case "rebase_cloud_provision": {
+            let argv: string[];
+            try {
+                argv = cloudProvisionArgv((args ?? {}) as { name?: unknown; deploy?: unknown });
+            } catch (err) {
+                return { ...textResult(err instanceof Error ? err.message : String(err)), isError: true };
+            }
+            const { stdout, combined, code, spawnError } = await spawnRebase(argv);
+            if (spawnError) return { ...textResult(`Error spawning command: ${spawnError}`), isError: true };
+            const result = parseCloudProvisionResult(stdout);
+            if (!result) {
+                return untrustedTextResult("the `rebase cloud init --claim` command", combined.trim() || "(no output)", true);
+            }
+            return {
+                ...jsonResult({
+                    ...result,
+                    next: (result.deployed
+                        ? "Give the claimUrl to the user. Until they claim it, `rebase cloud deploy` here redeploys."
+                        : "The project exists but is not deployed: fix what `rebase cloud deploy` reports, run it again, and give the claimUrl to the user.")
+                        + (result.apiTokenInEnv
+                            ? " REBASE_BASE_URL and REBASE_API_TOKEN are in .env; this server reads them when it starts."
+                            : "")
+                }),
+                ...(code !== 0 ? { isError: true } : {})
+            };
+        }
+
         case "rebase_schema_plan": {
             const argsObj = args as { collectionId: string; collection: Record<string, unknown> };
             const project = getActiveProject();

@@ -1,5 +1,5 @@
 ---
-sourceHash: 852d6c98d8475f3b
+sourceHash: 27b9d73f979bc845
 title: Rebase Cloud
 sidebar_label: Rebase Cloud
 description: O Rebase Cloud é o mesmo Rebase, operado para você. O que é, como um projeto se conecta e faz deploy, e o que o beta privado ainda não inclui.
@@ -200,6 +200,24 @@ Duas coisas continuam com uma pessoa autenticada:
 
 `rebase cloud whoami`, com um token definido, mostra o que ele pode fazer e em qual projeto. `rebase cloud tokens revoke <id> --yes` o interrompe na hora.
 
+## Um backend sem conta
+
+Um agente que construiu um app pode dar a ele um backend no ar antes que alguém tenha se cadastrado, e entregar à pessoa para quem trabalha um link para ficar com ele:
+
+```bash
+rebase cloud init --claim
+```
+
+Isso provisiona um projeto no Rebase Cloud, define `REBASE_BASE_URL` no `.env` com o endereço no ar, vincula o diretório e faz o deploy das collections locais com `rebase cloud deploy --bundle`. O comando imprime a URL no ar, a URL do painel de administração e uma **URL de reivindicação**. Quem abrir a URL de reivindicação e entrar pode mover o projeto para uma das suas organizações. O link funciona uma única vez. Um projeto que ninguém reivindica em 72 horas é excluído, banco de dados incluído. A ferramenta `rebase_cloud_provision` do servidor MCP executa o mesmo comando e retorna as mesmas URLs.
+
+Até ser reivindicado, o projeto não pertence a nenhuma conta. O token dele é restrito a esse único projeto e a `deploy`, `logs`, `env` e `database`. Ele fica em `~/.rebase/credentials.json`, nunca no repositório, e os comandos `rebase cloud` no diretório vinculado o usam sozinhos. Ele expira junto com o projeto.
+
+Depois que o deploy constrói o app, o comando também define `REBASE_API_TOKEN` no `.env`: uma chave criada no próprio app, que é o que o servidor MCP e o SDK enviam a ele. Ela lê e grava dados (`data:read`, `data:write`) através da segurança em nível de linha do app, como um chamador que não é nem uma pessoa nem um administrador. Não tem nenhuma permissão do plano de administração e expira com o prazo de reivindicação. Quando o projeto for seu, crie as chaves que quiser no painel de administração dele.
+
+Reivindicar exige uma sessão conectada no navegador, não um token, e um método de pagamento na organização para onde o projeto vai. A partir da reivindicação, o projeto é cobrado como qualquer outro. Reivindicar também revoga o token do agente: entre com `rebase cloud login` ou crie um novo token com `rebase cloud tokens create`.
+
+O provisionamento sem conta é limitado por endereço e no total, e um plano de controle que não o ativou recusa com uma mensagem que diz isso.
+
 ## Computação e custos
 
 O preço de um projeto é calculado a partir do que ele reserva, e não por um plano
@@ -241,6 +259,7 @@ janela de manutenção.
 | `login`, `logout`, `whoami` | Sua sessão |
 | `tokens` | Tokens para CI e agentes, cada um restrito a um projeto. Veja [CI e agentes](#ci-e-agentes) |
 | `link`, `unlink`, `use`, `open` | Vinculação deste diretório a um projeto, seleção de organização, abertura do console |
+| `init` | Com `--claim`: um backend no ar sem conta e um link para reivindicá-lo. Veja [Um backend sem conta](#um-backend-sem-conta) |
 | `projects` | Criar, listar, inspecionar, excluir |
 | `deploy`, `logs`, `deployments`, `rollback`, `cancel` | Envio e monitoramento |
 | `start`, `stop`, `restart` | Pausar um projeto e reativá-lo |

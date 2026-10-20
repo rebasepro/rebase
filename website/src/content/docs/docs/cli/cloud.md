@@ -38,6 +38,7 @@ rebase cloud open         # open the dashboard in a browser
 ## Projects
 
 ```bash
+rebase cloud init --claim [--name <name>]   # a live backend with no account, and a link to claim it within 72 hours
 rebase cloud projects list
 rebase cloud projects create [--link]
 rebase cloud projects info [id]

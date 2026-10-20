@@ -84,6 +84,30 @@ interface CloudContextEntry {
     auth?: string;
     /** Active organization id for this host, if the user selected one. */
     org?: string;
+    /**
+     * Unclaimed projects `rebase cloud init --claim` provisioned on this host,
+     * keyed by project id: each one's token and claim link. See
+     * {@link EphemeralGrant}.
+     */
+    ephemeral?: Record<string, EphemeralGrant>;
+}
+
+/**
+ * What an account-less provision hands back, kept until it stops mattering.
+ *
+ * Both values are bearer secrets — the token deploys to the project, the claim
+ * link moves it into the organization of whoever opens it — so they live here, in
+ * the private credentials file, and never in the repository: not in `.env`,
+ * where `REBASE_API_TOKEN` beside `REBASE_BASE_URL` is what the MCP server and
+ * the SDK send to the APP (which knows nothing of a control-plane token; `init`
+ * writes a key minted on the app there instead), and not in
+ * `.rebase/cloud.json`, which a cloned repository supplies.
+ */
+export interface EphemeralGrant {
+    token: string;
+    claimUrl: string;
+    /** ISO time the project, and the token with it, expires unless claimed. */
+    expiresAt: string;
 }
 
 interface CredentialsFile {
@@ -112,6 +136,42 @@ function writeCredentials(data: CredentialsFile): void {
     } catch {
         // best effort on platforms without chmod semantics
     }
+}
+
+/** Keep an unclaimed project's token and claim link for this host. */
+export function saveEphemeralGrant(url: string, projectId: string, grant: EphemeralGrant): void {
+    const creds = readCredentials();
+    const entry = creds.contexts[url] || {};
+    entry.ephemeral = { ...(entry.ephemeral ?? {}), [projectId]: grant };
+    creds.contexts[url] = entry;
+    writeCredentials(creds);
+}
+
+/** Drop a grant — once its project is claimed, or its token is refused. */
+export function forgetEphemeralGrant(url: string, projectId: string): void {
+    const creds = readCredentials();
+    const entry = creds.contexts[url];
+    if (!entry?.ephemeral?.[projectId]) return;
+    delete entry.ephemeral[projectId];
+    writeCredentials(creds);
+}
+
+/** The grant for a project on a host, while it has not expired. */
+export function ephemeralGrantFor(url: string, projectId: string, now: number = Date.now()): EphemeralGrant | undefined {
+    const grant = readCredentials().contexts[url]?.ephemeral?.[projectId];
+    if (!grant || !(Date.parse(grant.expiresAt) > now)) return undefined;
+    return grant;
+}
+
+/**
+ * The grant for the project this directory is linked to, when the command
+ * targets the host it was provisioned on.
+ */
+function linkedEphemeralGrant(url: string): { projectId: string; grant: EphemeralGrant } | undefined {
+    const link = readLink();
+    if (!link?.projectId || link.mode === "direct" || normalizeUrl(link.url) !== url) return undefined;
+    const grant = ephemeralGrantFor(url, link.projectId);
+    return grant ? { projectId: link.projectId, grant } : undefined;
 }
 
 /** Host that a bare `rebase cloud` command should target, if any. */
@@ -347,7 +407,7 @@ const STATIC_TOKENS = new WeakMap<object, string>();
  * rather than by the SDK's session refresh, because there is no session to
  * refresh and "log in again" is the wrong remedy for a token.
  */
-export function createTokenClient(url: string, token: string): CloudClient {
+export function createTokenClient(url: string, token: string, ephemeralProjectId?: string): CloudClient {
     const client = createRebaseClient({
         baseUrl: url,
         realtime: false,
@@ -359,7 +419,9 @@ export function createTokenClient(url: string, token: string): CloudClient {
             autoRefresh: false
         }
     });
-    client.setOnUnauthorized(() => explainRefusedToken(url, token));
+    client.setOnUnauthorized(() => ephemeralProjectId
+        ? explainRefusedGrant(url, ephemeralProjectId)
+        : explainRefusedToken(url, token));
     STATIC_TOKENS.set(client, token);
     return client;
 }
@@ -433,15 +495,40 @@ export async function freshAccessToken(client: SessionHolder): Promise<string> {
 }
 
 /**
+ * An unclaimed project's token was refused: the project was claimed (which
+ * revokes it) or it expired. Forget it, so the next command uses the login, and
+ * say which. Never returns.
+ */
+function explainRefusedGrant(url: string, projectId: string): never {
+    forgetEphemeralGrant(url, projectId);
+    fail(
+        `The token \`rebase cloud init --claim\` stored for project ${projectId} was refused by ${url}.`,
+        "Once a project is claimed its agent token stops working: sign in with "
+            + `${chalk.bold("rebase cloud login")} as the account that claimed it, or create a token there with `
+            + `${chalk.bold("rebase cloud tokens create")}.`,
+        "token_rejected"
+    );
+}
+
+/**
  * Return an authenticated client for the resolved host.
  *
  * With `REBASE_TOKEN` set, that token is the credential for every request and
- * the stored login is not consulted at all. Otherwise it is the `cloud login`
- * session — see {@link requireSessionClient}.
+ * the stored login is not consulted at all. Next, a directory linked to a
+ * project `rebase cloud init --claim` provisioned uses the token stored for it
+ * (see {@link EphemeralGrant}) until it expires: nobody can sign in as that
+ * project's owner, so a login could not reach it anyway. Otherwise it is the
+ * `cloud login` session — see {@link requireSessionClient}.
  */
 export async function requireClient(rawArgs: string[]): Promise<{ client: CloudClient; url: string }> {
     const token = envToken();
-    if (!token) return requireSessionClient(rawArgs);
+    if (!token) {
+        const linked = linkedEphemeralGrant(resolveCloudUrl(rawArgs));
+        if (!linked) return requireSessionClient(rawArgs);
+        refuseDirectLink(rawArgs);
+        const url = resolveCloudUrl(rawArgs);
+        return { client: createTokenClient(url, linked.grant.token, linked.projectId), url };
+    }
     // Before anything else: everything downstream of here is a control-plane
     // call, and a direct-linked directory has no control plane to make it
     // against.
