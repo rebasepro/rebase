@@ -4,6 +4,7 @@ import { act, fireEvent, render, screen, waitFor, within } from "@testing-librar
 import { SnackbarProvider } from "notistack";
 import { ApiConfigProvider } from "@rebasepro/app";
 import { ReviewQueueView } from "../src/components/ReviewQueueView";
+import { formatReviewValue } from "../src/components/StagedChangeDiff";
 import type { ReviewConfig, StagedChange } from "../src/config";
 
 const config: ReviewConfig = {
@@ -231,5 +232,15 @@ ids: [IDS[0], IDS[2]] });
         await waitFor(() => expect(items()).toHaveLength(0));
         expect(calls.filter(call => call.method === "PATCH").at(-1)?.body).toEqual({ status: "rejected" });
         expect(screen.getByText("Nothing is waiting for review.")).toBeTruthy();
+    });
+});
+
+describe("formatReviewValue", () => {
+    it("reads the data API's wire encoding as the value it stands for", () => {
+        const date = "2026-10-20T10:00:00.000Z";
+        expect(formatReviewValue({ __type: "date", value: date })).toBe(new Date(date).toLocaleString());
+        expect(formatReviewValue({ __type: "relation", id: "42", path: "authors" })).toBe("42");
+        expect(formatReviewValue({ a: 1 })).toBe("{\"a\":1}");
+        expect(formatReviewValue("")).toBeUndefined();
     });
 });

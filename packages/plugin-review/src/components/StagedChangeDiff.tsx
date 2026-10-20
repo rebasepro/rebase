@@ -7,8 +7,35 @@ import { useReviewTranslation } from "../i18n";
 /** How long a rendered value may get before it is cut. */
 const MAX_VALUE_LENGTH = 240;
 
+/**
+ * A value in the data API's wire encoding, as what it stands for: a date
+ * (`{ __type: "date", value }`), a link to a row (its id), a point. Anything
+ * else is returned unchanged.
+ */
+function unwrapWireValue(value: unknown): unknown {
+    if (typeof value !== "object" || value === null || Array.isArray(value) || !("__type" in value)) return value;
+    const field = (key: string): unknown => Reflect.get(value, key);
+    switch (field("__type")) {
+        case "date":
+        case "Date": {
+            const date = new Date(String(field("value")));
+            return Number.isNaN(date.getTime()) ? field("value") : date.toLocaleString();
+        }
+        case "reference":
+        case "EntityReference":
+        case "relation":
+        case "EntityRelation":
+            return field("id");
+        case "GeoPoint":
+            return `${String(field("latitude"))}, ${String(field("longitude"))}`;
+        default:
+            return value;
+    }
+}
+
 /** A field value as one line of text, or undefined for no value. */
-export function formatReviewValue(value: unknown): string | undefined {
+export function formatReviewValue(raw: unknown): string | undefined {
+    const value = unwrapWireValue(raw);
     if (value === undefined || value === null || value === "") return undefined;
     let text: string;
     if (typeof value === "string") text = value;
