@@ -131,7 +131,7 @@ export function BranchesView() {
             await branchAdmin.createBranch(newBranchName.trim(), sourceDatabase ? { source: sourceDatabase } : undefined);
             snackbarRef.current.open({
                 type: "success",
-                message: `Branch "${newBranchName.trim()}" created successfully`
+                message: t("studio_branches_created_snackbar", { name: newBranchName.trim() })
             });
             setCreateOpen(false);
             setNewBranchName("");
@@ -154,7 +154,7 @@ export function BranchesView() {
             await branchAdmin.deleteBranch(deleteTarget);
             snackbarRef.current.open({
                 type: "success",
-                message: `Branch "${deleteTarget}" deleted`
+                message: t("studio_branches_deleted_snackbar", { name: deleteTarget })
             });
             if (selectedBranch === deleteTarget) setSelectedBranch(null);
             setDeleteTarget(null);
@@ -232,7 +232,7 @@ export function BranchesView() {
                         <div className="flex flex-col items-center justify-center h-full gap-3 text-center px-4">
                             <CopyIcon size={iconSize.small} className="text-surface-300 dark:text-surface-600"/>
                             <Typography variant="body2" color="disabled" className="text-[13px]">
-                                No branches yet. Create one to start working with an isolated database copy.
+                                {t("studio_branches_empty")}
                             </Typography>
                             <Button
                                 size="small"
@@ -240,7 +240,7 @@ export function BranchesView() {
                                 onClick={() => setCreateOpen(true)}
                                 startIcon={<PlusIcon size={iconSize.smallest}/>}
                             >
-                                Create Branch
+                                {t("studio_branches_create_action")}
                             </Button>
                         </div>
                     ) : (
@@ -259,7 +259,7 @@ export function BranchesView() {
                                 <div className="flex-1 min-w-0">
                                     <Typography variant="body2" className="truncate font-medium text-[13px]">{branch.name}</Typography>
                                     <Typography variant="caption" color="secondary" className="truncate text-[11px]">
-                                        from {branch.parentDatabase} · {formatRelative(branch.createdAt)}
+                                        {t("studio_branches_list_from", { parent: branch.parentDatabase, when: formatRelative(branch.createdAt) })}
                                     </Typography>
                                 </div>
                                 {branch.sizeBytes !== undefined && (
@@ -279,7 +279,7 @@ export function BranchesView() {
                     <div className="flex flex-col items-center justify-center h-full gap-3">
                         <GitBranchIcon size={iconSize.large} className="text-surface-200 dark:text-surface-700"/>
                         <Typography variant="body2" color="disabled">
-                            {branches.length === 0 ? "Create a branch to get started" : "Select a branch to view details"}
+                            {branches.length === 0 ? t("studio_branches_empty_detail") : t("studio_branches_select_prompt")}
                         </Typography>
                     </div>
                 ) : (
@@ -291,7 +291,7 @@ export function BranchesView() {
                                 <div className="min-w-0">
                                     <Typography variant="subtitle1" className="font-semibold truncate">{selected.name}</Typography>
                                     <Typography variant="caption" color="secondary" className="truncate">
-                                        Created from <span className="font-mono text-[11px]">{selected.parentDatabase}</span>
+                                        {t("studio_branches_created_from")} <Typography variant="mono" component="span" className="text-[11px]">{selected.parentDatabase}</Typography>
                                     </Typography>
                                 </div>
                             </div>
@@ -303,7 +303,7 @@ export function BranchesView() {
                                     onClick={() => setDeleteTarget(selected.name)}
                                     startIcon={<Trash2Icon size={iconSize.smallest}/>}
                                 >
-                                    Delete
+                                    {t("delete")}
                                 </Button>
                             </div>
                         </div>
@@ -311,26 +311,35 @@ export function BranchesView() {
                         {/* Info Cards */}
                         <div className="px-5 py-4 bg-surface-sheet">
                             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                                <StatCard label="Branch Name" value={selected.name} mono/>
-                                <StatCard label="Source Database" value={selected.parentDatabase} mono/>
-                                <StatCard label="Created" value={formatRelative(selected.createdAt)}/>
-                                <StatCard label="Size" value={formatSize(selected.sizeBytes)}/>
+                                <StatCard label={t("studio_branches_branch_name")} value={selected.name} mono/>
+                                <StatCard label={t("studio_branches_source_database")} value={selected.parentDatabase} mono/>
+                                <StatCard label={t("studio_branches_created")} value={formatRelative(selected.createdAt)}/>
+                                <StatCard label={t("studio_branches_size")} value={formatSize(selected.sizeBytes)}/>
                             </div>
                         </div>
 
                         {/* Usage Info */}
                         <div className="flex-1 overflow-y-auto px-5 py-4">
                             <Alert color="info">
-                                <Typography variant="body2" className="text-[13px]">
-                                    <strong>How to use this branch:</strong> point this checkout at it with
-                                    <code className="mx-1 px-1.5 py-0.5 rounded bg-surface-well font-mono text-[12px]">rebase db branch switch {selected.name}</code>
-                                    — every later command uses it, and
-                                    <code className="mx-1 px-1.5 py-0.5 rounded bg-surface-well font-mono text-[12px]">rebase db branch switch --off</code>
-                                    goes back to the main database. Changes made here don&apos;t affect it.
-                                </Typography>
+                                <div className="space-y-1.5">
+                                    <Typography variant="body2" className="text-[13px] font-medium">
+                                        {t("studio_branches_usage_title")}
+                                    </Typography>
+                                    <Typography variant="body2" className="text-[13px]">
+                                        {t("studio_branches_usage_switch")}
+                                    </Typography>
+                                    <UsageCommand command={`rebase db branch switch ${selected.name}`}/>
+                                    <Typography variant="body2" className="text-[13px]">
+                                        {t("studio_branches_usage_off")}
+                                    </Typography>
+                                    <UsageCommand command="rebase db branch switch --off"/>
+                                    <Typography variant="body2" className="text-[13px]">
+                                        {t("studio_branches_usage_isolated")}
+                                    </Typography>
+                                </div>
                             </Alert>
                             <div className="mt-4 p-4 rounded-lg border bg-surface-sheet border-hairline-strong">
-                                <Typography variant="caption" className="text-[10px] uppercase tracking-wider text-surface-400 mb-2 block font-medium">Connection Details</Typography>
+                                <Typography variant="caption" className="text-[10px] uppercase tracking-wider text-surface-400 mb-2 block font-medium">{t("studio_branches_connection_details")}</Typography>
                                 <div className="space-y-2">
                                     <div className="flex items-center gap-2">
                                         {/* The *database*, not the branch name. They are not the
@@ -338,21 +347,21 @@ export function BranchesView() {
                                             with `rb_` — and a connection string built from the name
                                             on this pane pointed at a database that does not
                                             exist. */}
-                                        <Typography variant="caption" color="secondary" className="w-24 shrink-0 text-[11px]">Database:</Typography>
+                                        <Typography variant="caption" color="secondary" className="w-24 shrink-0 text-[11px]">{t("studio_branches_row_database")}</Typography>
                                         <Typography variant="body2" className="font-mono text-[12px]">{`${BRANCH_DB_PREFIX}${selected.name}`}</Typography>
                                     </div>
                                     <div className="flex items-start gap-2">
-                                        <Typography variant="caption" color="secondary" className="w-24 shrink-0 text-[11px]">Connect with:</Typography>
+                                        <Typography variant="caption" color="secondary" className="w-24 shrink-0 text-[11px]">{t("studio_branches_row_connect")}</Typography>
                                         <Typography variant="body2" className="font-mono text-[12px] break-all">
                                             {`DATABASE_URL=…/${BRANCH_DB_PREFIX}${selected.name}`}
                                         </Typography>
                                     </div>
                                     <div className="flex items-center gap-2">
-                                        <Typography variant="caption" color="secondary" className="w-24 shrink-0 text-[11px]">Branched from:</Typography>
+                                        <Typography variant="caption" color="secondary" className="w-24 shrink-0 text-[11px]">{t("studio_branches_row_branched_from")}</Typography>
                                         <Typography variant="body2" className="font-mono text-[12px]">{selected.parentDatabase}</Typography>
                                     </div>
                                     <div className="flex items-center gap-2">
-                                        <Typography variant="caption" color="secondary" className="w-24 shrink-0 text-[11px]">Created at:</Typography>
+                                        <Typography variant="caption" color="secondary" className="w-24 shrink-0 text-[11px]">{t("studio_branches_row_created_at")}</Typography>
                                         <Typography variant="body2" className="font-mono text-[12px]">
                                             {selected.createdAt instanceof Date
                                                 ? selected.createdAt.toLocaleString()
@@ -371,10 +380,10 @@ export function BranchesView() {
                 setCreateOpen(open);
                 if (!open) setCreateError(null);
             }}>
-                <DialogTitle>Create New Branch</DialogTitle>
+                <DialogTitle>{t("studio_branches_create_title")}</DialogTitle>
                 <DialogContent className="space-y-4 min-w-[400px]">
                     <Typography variant="body2" color="secondary" className="text-[13px]">
-                        Create an isolated database copy. The branch will be a full clone of the source database at this point in time.
+                        {t("studio_branches_create_body")}
                     </Typography>
                     {createError && (
                         <Alert color="error">
@@ -383,10 +392,10 @@ export function BranchesView() {
                     )}
                     <div>
                         <TextField
-                            label="Branch Name"
+                            label={t("studio_branches_branch_name")}
                             value={newBranchName}
                             onChange={(e) => setNewBranchName(e.target.value)}
-                            placeholder="e.g. feature-auth, staging, preview-pr-42"
+                            placeholder={t("studio_branches_name_placeholder")}
                             size="small"
                             autoFocus
                         />
@@ -394,13 +403,13 @@ export function BranchesView() {
                     {branches.length > 0 && (
                         <div>
                             <Select
-                                label="Source Database"
+                                label={t("studio_branches_source_database")}
                                 value={sourceDatabase ?? "__main__"}
                                 onValueChange={(v) => setSourceDatabase(v === "__main__" ? undefined : v)}
-                                placeholder="Default (main database)"
+                                placeholder={t("studio_branches_source_main")}
                                 size="small"
                             >
-                                <SelectItem value="__main__">Default (main database)</SelectItem>
+                                <SelectItem value="__main__">{t("studio_branches_source_main")}</SelectItem>
                                 {branches.map(b => (
                                     <SelectItem key={b.name} value={b.database}>{b.name}</SelectItem>
                                 ))}
@@ -410,7 +419,7 @@ export function BranchesView() {
                 </DialogContent>
                 <DialogActions>
                     <Button variant="text" onClick={() => setCreateOpen(false)} disabled={creating}>
-                        Cancel
+                        {t("cancel")}
                     </Button>
                     <Button
                         color="primary"
@@ -418,7 +427,7 @@ export function BranchesView() {
                         disabled={!newBranchName.trim() || creating}
                         startIcon={creating ? <CircularProgress size="smallest"/> : <PlusIcon size={iconSize.smallest}/>}
                     >
-                        {creating ? "Creating..." : "Create Branch"}
+                        {creating ? t("studio_branches_creating") : t("studio_branches_create_action")}
                     </Button>
                 </DialogActions>
             </Dialog>
@@ -428,16 +437,28 @@ export function BranchesView() {
                 open={!!deleteTarget}
                 onAccept={handleDelete}
                 onCancel={() => setDeleteTarget(null)}
-                title="Delete Branch"
+                title={t("studio_branches_delete_title")}
                 body={
                     <Typography variant="body2">
-                        Are you sure you want to permanently delete the branch <strong>{deleteTarget}</strong>?
-                        This action cannot be undone and all data in this branch will be lost.
+                        {t("studio_branches_delete_body", { name: deleteTarget ?? "" })}
                     </Typography>
                 }
                 loading={deleting}
             />
         </div>
+    );
+}
+
+/** A command the usage alert tells the reader to run, set apart from the prose. */
+function UsageCommand({ command }: { command: string }) {
+    return (
+        <Typography
+            variant="mono"
+            component="div"
+            className="px-2 py-1 rounded bg-surface-well text-[12px] break-all"
+        >
+            {command}
+        </Typography>
     );
 }
 

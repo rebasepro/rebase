@@ -1729,6 +1729,36 @@ export interface RebaseTranslations {
     studio_storage_folder_created?: string;
     studio_storage_create_folder_failed?: string;
 
+    // ─── Studio: Branches pane ───────────────────────────────────
+    studio_branches_empty?: string;
+    studio_branches_create_action?: string;
+    studio_branches_empty_detail?: string;
+    studio_branches_select_prompt?: string;
+    studio_branches_list_from?: string;
+    studio_branches_created_from?: string;
+    studio_branches_branch_name?: string;
+    studio_branches_source_database?: string;
+    studio_branches_created?: string;
+    studio_branches_size?: string;
+    studio_branches_usage_title?: string;
+    studio_branches_usage_switch?: string;
+    studio_branches_usage_off?: string;
+    studio_branches_usage_isolated?: string;
+    studio_branches_connection_details?: string;
+    studio_branches_row_database?: string;
+    studio_branches_row_connect?: string;
+    studio_branches_row_branched_from?: string;
+    studio_branches_row_created_at?: string;
+    studio_branches_create_title?: string;
+    studio_branches_create_body?: string;
+    studio_branches_name_placeholder?: string;
+    studio_branches_source_main?: string;
+    studio_branches_creating?: string;
+    studio_branches_delete_title?: string;
+    studio_branches_delete_body?: string;
+    studio_branches_created_snackbar?: string;
+    studio_branches_deleted_snackbar?: string;
+
     // ─── Insights plugin ─────────────────────────────────────────
     /** Above a row of insights: the window their figures cover. Pluralised on `count`. */
     insights_period_last_days?: string;
