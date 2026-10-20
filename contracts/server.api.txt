@@ -711,8 +711,16 @@ interface BelongsToRelation { index, kind, localKey, onDelete, onUpdate, overrid
 interface BinaryProperty { access, callbacks, columnName, conditions, databaseDefault, defaultValue, description, dynamicProps, excludeFromApi, metadata, name, propertyConfig, type, validation }
 interface BooleanProperty { access, callbacks, columnName, conditions, databaseDefault, defaultValue, description, dynamicProps, excludeFromApi, metadata, name, propertyConfig, type, validation }
 interface BootstrappedAuth { authRepository, emailService, schemaHealthCheck, userService }
-interface BranchAdmin { createBranch, deleteBranch, getBranchInfo, listBranches }
+interface BranchAdmin { createBranch, deleteBranch, diffBranch, getBranchInfo, listBranches, mergeBranch }
+interface BranchDiff { branch, branchDatabase, computedAt, data, fingerprint, forkPointKnown, sampleLimit, schema, schemas, targetDatabase }
+interface BranchDiffOptions { maxRowsPerTable, sampleLimit, schemas }
 interface BranchInfo { createdAt, database, name, parentDatabase, sizeBytes }
+interface BranchMergeBlock { code, message }
+interface BranchMergeOptions { expectedFingerprint, maxRowsPerTable, onConflict, schemas, skipBlocked }
+interface BranchMergeResult { branch, conflictsKept, schemaChangesNotMerged, skipped, tables, targetDatabase, warnings }
+interface BranchRowChange { after, before, change, changedColumns, key }
+interface BranchSchemaChange { after, before, change, name, object, schema, table }
+interface BranchTableDataDiff { blocked, collection, conflicts, deleted, inserted, primaryKey, rowCounts, samples, schema, table, targetChanges, updated }
 interface BrinIndex { on, reason, using, where }
 interface BroadcastAckMessage { channel, error, payload, requestId, row, rows, seq, subscriptionId, type }
 interface BroadcastMessage { channel, error, event, payload, requestId, row, rows, seq, subscriptionId, type }

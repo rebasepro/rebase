@@ -1,7 +1,7 @@
 import { describe, it, expect } from "@jest/globals";
 import type { DatabaseAdmin } from "@rebasepro/types";
+import { ApiError } from "@rebasepro/server";
 import {
-    BranchDiffError,
     classifyRows,
     columnDefinitionSql,
     diffCatalogs,
@@ -155,7 +155,7 @@ describe("refusals before any SQL runs", () => {
 
     it("refuses a data source without SQL or branching, as 501", async () => {
         const error = await diffDatabaseBranch(noSql, "feature").catch((caught: unknown) => caught);
-        expect(error).toBeInstanceOf(BranchDiffError);
+        expect(error).toBeInstanceOf(ApiError);
         expect(error).toMatchObject({ code: "BRANCH_DIFF_UNSUPPORTED", statusCode: 501 });
     });
 

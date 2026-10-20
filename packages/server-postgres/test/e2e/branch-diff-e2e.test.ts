@@ -22,7 +22,8 @@ import type { DatabaseAdmin } from "@rebasepro/types";
 import { startPgContainer, stopPgContainer, type PgContainer } from "./pg-setup.js";
 import { DatabasePoolManager } from "../../src/databasePoolManager.js";
 import { BranchService } from "../../src/services/BranchService.js";
-import { BranchDiffError, diffDatabaseBranch, mergeDatabaseBranch } from "../../src/branching/branch-diff.js";
+import { ApiError } from "@rebasepro/server";
+import { diffDatabaseBranch, mergeDatabaseBranch } from "../../src/branching/branch-diff.js";
 
 const MAIN = "rebase";
 
@@ -38,11 +39,11 @@ describe("database branch diff and merge", () => {
     const main = (text: string, params?: unknown[]) => on(MAIN, text, params);
     const branch = (name: string, text: string, params?: unknown[]) => on(`rb_${name}`, text, params);
 
-    async function refusal(promise: Promise<unknown>): Promise<BranchDiffError> {
+    async function refusal(promise: Promise<unknown>): Promise<ApiError> {
         try {
             await promise;
         } catch (error) {
-            if (error instanceof BranchDiffError) return error;
+            if (error instanceof ApiError) return error;
             throw error;
         }
         throw new Error("expected a refusal");
@@ -192,6 +193,10 @@ describe("database branch diff and merge", () => {
             const blocked = await refusal(mergeDatabaseBranch(admin, "agent", { expectedFingerprint: diff.fingerprint }));
             expect(blocked.code).toBe("BRANCH_MERGE_BLOCKED");
             expect(blocked.statusCode).toBe(409);
+            expect(blocked.details).toMatchObject({ tables: expect.arrayContaining([
+                expect.objectContaining({ table: "notes", code: "TABLE_ADDED" }),
+                expect.objectContaining({ table: "tags", code: "COLUMNS_DIFFER" })
+            ]) });
 
             const conflict = await refusal(mergeDatabaseBranch(admin, "agent", { expectedFingerprint: diff.fingerprint, skipBlocked: true }));
             expect(conflict.code).toBe("BRANCH_MERGE_CONFLICT");

@@ -73,36 +73,20 @@ export const DEFAULT_BRANCH_DIFF_MAX_ROWS = 100_000;
 /** The age Postgres gives a frozen or permanent transaction id. */
 const FROZEN_AGE = 2147483647;
 
-export type BranchDiffErrorCode =
-    | "BRANCH_DIFF_UNSUPPORTED"
-    | "BRANCH_NOT_FOUND"
-    | "BRANCH_DIFF_STALE"
-    | "BRANCH_MERGE_BLOCKED"
-    | "BRANCH_MERGE_CONFLICT"
-    | "INVALID_INPUT";
-
-const STATUS: Record<BranchDiffErrorCode, number> = {
-    BRANCH_DIFF_UNSUPPORTED: 501,
-    BRANCH_NOT_FOUND: 404,
-    BRANCH_DIFF_STALE: 409,
-    BRANCH_MERGE_BLOCKED: 409,
-    BRANCH_MERGE_CONFLICT: 409,
-    INVALID_INPUT: 400
-};
-
 /**
- * A refusal, with the status a route answers it with and the tables it is
- * about. Every one is the caller's to act on, so none logs as a warning.
+ * Every refusal here is an `ApiError` the caller can act on — the status a
+ * route answers it with, and the tables it is about in `details.tables` — so
+ * none logs as a warning. Thrown with its code and status written out at the
+ * call, where the error-code reference's scan reads them.
  */
-export class BranchDiffError extends ApiError {
-    constructor(
-        code: BranchDiffErrorCode,
-        message: string,
-        tables?: { schema: string; table: string; reason: string }[]
-    ) {
-        super(STATUS[code], code, message, tables ? { tables } : undefined, true);
-        this.name = "BranchDiffError";
-    }
+const EXPECTED = true;
+
+/** A table a refusal is about: the code `blocked` carried, or the reason it conflicts. */
+interface RefusedTable {
+    schema: string;
+    table: string;
+    code?: BranchMergeBlock["code"];
+    reason: string;
 }
 
 // ── Reading rows ─────────────────────────────────────────────────────────────
@@ -602,17 +586,14 @@ function emptyTableDiff(facts: TableFacts): BranchTableDataDiff {
 function positiveInteger(value: number | undefined, fallback: number, name: string, allowZero: boolean): number {
     if (value === undefined) return fallback;
     if (!Number.isInteger(value) || value < (allowZero ? 0 : 1)) {
-        throw new BranchDiffError("INVALID_INPUT", `\`${name}\` must be a ${allowZero ? "non-negative" : "positive"} integer.`);
+        throw new ApiError(400, "INVALID_INPUT", `\`${name}\` must be a ${allowZero ? "non-negative" : "positive"} integer.`, undefined, EXPECTED);
     }
     return value;
 }
 
 function requireAdmin(admin: DatabaseAdmin | undefined): SQLAdmin & BranchAdmin {
     if (!isSQLAdmin(admin) || !isBranchAdmin(admin)) {
-        throw new BranchDiffError(
-            "BRANCH_DIFF_UNSUPPORTED",
-            "This data source cannot compare branches: it needs SQL and database branching (a Postgres backend with an admin connection)."
-        );
+        throw new ApiError(501, "BRANCH_DIFF_UNSUPPORTED", "This data source cannot compare branches: it needs SQL and database branching (a Postgres backend with an admin connection).", undefined, EXPECTED);
     }
     return admin;
 }
@@ -624,7 +605,7 @@ async function computeDiff(admin: DatabaseAdmin | undefined, branchName: string,
     const schemas = options.schemas && options.schemas.length > 0 ? [...new Set(options.schemas)].sort() : null;
 
     const branch = await sql.getBranchInfo(branchName);
-    if (!branch) throw new BranchDiffError("BRANCH_NOT_FOUND", `Branch "${branchName}" not found.`);
+    if (!branch) throw new ApiError(404, "BRANCH_NOT_FOUND", `Branch "${branchName}" not found.`, undefined, EXPECTED);
     const branchDb = branch.database;
     const targetDb = branch.parentDatabase;
 
@@ -820,11 +801,11 @@ export async function mergeDatabaseBranch(
 ): Promise<BranchMergeResult> {
     const sql = requireAdmin(admin);
     if (typeof options?.expectedFingerprint !== "string" || options.expectedFingerprint === "") {
-        throw new BranchDiffError("INVALID_INPUT", "Send `expectedFingerprint`: the fingerprint of the diff that was reviewed.");
+        throw new ApiError(400, "INVALID_INPUT", "Send `expectedFingerprint`: the fingerprint of the diff that was reviewed.", undefined, EXPECTED);
     }
     const onConflict = options.onConflict ?? "abort";
     if (onConflict !== "abort" && onConflict !== "branch" && onConflict !== "target") {
-        throw new BranchDiffError("INVALID_INPUT", "`onConflict` must be \"abort\", \"branch\" or \"target\".");
+        throw new ApiError(400, "INVALID_INPUT", "`onConflict` must be \"abort\", \"branch\" or \"target\".", undefined, EXPECTED);
     }
 
     const { diff, matched } = await computeDiff(admin, branchName, {
@@ -833,28 +814,23 @@ export async function mergeDatabaseBranch(
         maxRowsPerTable: options.maxRowsPerTable
     });
     if (diff.fingerprint !== options.expectedFingerprint) {
-        throw new BranchDiffError(
-            "BRANCH_DIFF_STALE",
-            `The branch or ${diff.targetDatabase} changed since the diff was read. Nothing was merged; review the diff again.`
-        );
+        throw new ApiError(409, "BRANCH_DIFF_STALE", `The branch or ${diff.targetDatabase} changed since the diff was read. Nothing was merged; review the diff again.`, undefined, EXPECTED);
     }
 
     const branchChanges = (entry: BranchTableDataDiff) => entry.inserted + entry.updated + entry.deleted + entry.conflicts;
     const blocked = diff.data.filter((entry) => entry.blocked && branchChanges(entry) > 0);
     if (blocked.length > 0 && options.skipBlocked !== true) {
-        throw new BranchDiffError(
-            "BRANCH_MERGE_BLOCKED",
-            `${blocked.length} table(s) with changed rows cannot be merged. Nothing was merged.`,
-            blocked.map((entry) => ({ schema: entry.schema, table: entry.table, reason: entry.blocked?.message ?? "" }))
+        throw new ApiError(409, "BRANCH_MERGE_BLOCKED", `${blocked.length} table(s) with changed rows cannot be merged. Nothing was merged.`,
+            { tables: blocked.map((entry): RefusedTable => ({ schema: entry.schema, table: entry.table, code: entry.blocked?.code, reason: entry.blocked?.message ?? "" })) },
+            EXPECTED
         );
     }
     const conflicted = diff.data.filter((entry) => !entry.blocked && entry.conflicts > 0);
     if (conflicted.length > 0 && onConflict === "abort") {
-        throw new BranchDiffError(
-            "BRANCH_MERGE_CONFLICT",
-            `${conflicted.reduce((sum, entry) => sum + entry.conflicts, 0)} row(s) were changed on both the branch and ${diff.targetDatabase}. ` +
+        throw new ApiError(409, "BRANCH_MERGE_CONFLICT", `${conflicted.reduce((sum, entry) => sum + entry.conflicts, 0)} row(s) were changed on both the branch and ${diff.targetDatabase}. ` +
             "Nothing was merged. Merge again choosing which side wins.",
-            conflicted.map((entry) => ({ schema: entry.schema, table: entry.table, reason: `${entry.conflicts} conflicting row(s)` }))
+            { tables: conflicted.map((entry): RefusedTable => ({ schema: entry.schema, table: entry.table, reason: `${entry.conflicts} conflicting row(s)` })) },
+            EXPECTED
         );
     }
 
@@ -901,7 +877,7 @@ export async function mergeDatabaseBranch(
             rowText.set(rowKey, text(row, "r"));
         }
         if (rowText.size !== updates.length + inserts.length) {
-            throw new BranchDiffError("BRANCH_DIFF_STALE", "The branch changed while it was being merged. Nothing was merged; review the diff again.");
+            throw new ApiError(409, "BRANCH_DIFF_STALE", "The branch changed while it was being merged. Nothing was merged; review the diff again.", undefined, EXPECTED);
         }
         const rowsJson = (keys: readonly string[]) => `[${keys.map((rowKey) => rowText.get(rowKey)).join(",")}]`;
 
@@ -969,18 +945,12 @@ export async function mergeDatabaseBranch(
     } catch (error: unknown) {
         const message = error instanceof Error ? error.message : String(error);
         if (message.includes(MERGE_REFUSAL)) {
-            throw new BranchDiffError(
-                "BRANCH_MERGE_CONFLICT",
-                `${diff.targetDatabase} refused part of the merge — a row changed meanwhile, a trigger skipped it, or a policy hid it. Nothing was merged.`
-            );
+            throw new ApiError(409, "BRANCH_MERGE_CONFLICT", `${diff.targetDatabase} refused part of the merge — a row changed meanwhile, a trigger skipped it, or a policy hid it. Nothing was merged.`, undefined, EXPECTED);
         }
         throw error;
     }
     if (outcome !== "merged") {
-        throw new BranchDiffError(
-            "BRANCH_MERGE_CONFLICT",
-            `${diff.targetDatabase} changed while the merge was being prepared. Nothing was merged; review the diff again.`
-        );
+        throw new ApiError(409, "BRANCH_MERGE_CONFLICT", `${diff.targetDatabase} changed while the merge was being prepared. Nothing was merged; review the diff again.`, undefined, EXPECTED);
     }
 
     for (const { entry, table, inserted, updated, deleted } of written) {
