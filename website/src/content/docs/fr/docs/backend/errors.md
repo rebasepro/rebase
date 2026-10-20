@@ -1,5 +1,5 @@
 ---
-sourceHash: 737b37c2bcd33dac
+sourceHash: 67d937d47cc6146c
 title: Codes d'erreur
 sidebar_label: Codes d'erreur
 description: Tous les codes d'erreur qu'un backend Rebase peut renvoyer, avec leur statut HTTP, leur signification et la marche à suivre — ainsi que l'enveloppe de réponse, X-Request-ID et les règles applicables aux détails.
@@ -282,6 +282,11 @@ Ces codes indiquent qu'une fonctionnalité est désactivée ou non configurée, 
 | Code | Statut | Signification | Action |
 | --- | --- | --- | --- |
 | `ADMIN_SURFACE_UNAVAILABLE` | 501 | Une interface réservée aux administrateurs a été appelée sur un serveur sans authentification configurée ; impossible donc de distinguer un administrateur d'un tiers anonyme. | Définissez `auth.jwtSecret`, ou transmettez un `AuthAdapter`. |
+| `BRANCH_DIFF_STALE` | 409 | `POST /api/admin/branches/:name/merge` a reçu le fingerprint d'un diff qui n'est plus vrai : la branche ou son parent a changé depuis. Rien n'a été écrit. | Relisez le diff, examinez-le et fusionnez avec son nouveau `fingerprint`. |
+| `BRANCH_DIFF_UNSUPPORTED` | 501 | La source de données ne peut pas comparer de branches : elle n'a pas de SQL, ou pas de branching (pas de connexion d'administration). | Utilisez un backend Postgres avec `adminConnectionString` défini. |
+| `BRANCH_MERGE_BLOCKED` | 409 | Une table dont la branche a modifié des lignes ne peut pas être fusionnée — ajoutée ou supprimée par la branche, colonnes ou clé primaire différentes, pas de clé primaire, ou trop de lignes à apparier. `details.tables` nomme chacune, avec la raison. Rien n'a été écrit. | Appliquez d'abord le schéma avec vos migrations, ou fusionnez avec `skipBlocked: true` pour laisser ces tables tranquilles. |
+| `BRANCH_MERGE_CONFLICT` | 409 | Des lignes ont été modifiées à la fois dans la branche et dans son parent, et `onConflict` valait `"abort"` (par défaut) ; ou le parent a refusé une partie de la fusion — une ligne a changé entre-temps, un trigger l'a ignorée, une politique l'a masquée. Rien n'a été écrit. | Choisissez quel côté l'emporte avec `onConflict: "branch"` ou `"target"`, ou relisez le diff. |
+| `BRANCH_NOT_FOUND` | 404 | Aucune branche ne porte ce nom dans le registre. | `rebase db branch list`, ou le panneau Branches, liste celles qui existent. |
 | `CONTRACT_UNAVAILABLE` | 404 | Le contrat du projet n'est exposé que lorsque l'authentification est configurée — il décrit l'intégralité des tables et des relations. | Configurez l'authentification. `/meta/schema-version` reste toujours accessible. |
 | `DEV_MAILBOX_UNAVAILABLE` | 501 | Aucune boîte de réception de développement n'est active. Les e-mails ne sont interceptés que lorsque `SMTP_HOST` n'est pas défini et que `NODE_ENV` n'est pas en production. | Supprimez `SMTP_HOST` en développement, ou consultez la véritable boîte de réception. |
 | `INVALID_CHANGE` | 400 | La modification de schéma proposée n'est pas bien formée. | Voir le message. |
@@ -299,6 +304,19 @@ Ces codes indiquent qu'une fonctionnalité est désactivée ou non configurée, 
 | `SCHEMA_EDITOR_NO_COLLECTIONS_DIR` | 501 | Le serveur n'a pas de `collectionsDir` ; l'éditeur n'a donc aucun emplacement où écrire. | Définissez `collectionsDir`. |
 | `SCHEMA_EDITOR_PRODUCTION` | 501 | L'éditeur est désactivé avec `NODE_ENV=production` : les fichiers d'un serveur déployé étant reconstruits depuis votre dépôt à chaque déploiement, toute modification locale ici serait écrasée. | Modifiez les collections en développement puis déployez, ou configurez `liveSchema.repository` pour les y valider. |
 | `SQL_EXPORT_UNSUPPORTED` | 501 | `POST /api/admin/sql/csv` ne peut pas diffuser de résultat ici : la base de développement en processus (PGlite) n'a qu'une connexion, et un curseur conservé pendant un téléchargement retiendrait derrière lui toutes les autres requêtes ; ou la source de données n'a pas de curseur SQL. | Faites pointer `DATABASE_URL` vers un Postgres de votre choix (`rebase dev --docker` en démarre un), ou ajoutez un `LIMIT` et exportez les lignes affichées à l'écran. |
+
+### Pourquoi la table d'une branche ne peut pas être fusionnée
+
+`BRANCH_MERGE_BLOCKED` nomme chaque table refusée dans `details.tables`, avec l'un de ces codes. Le même code figure dans le `blocked` de la table dans le diff lui-même, pour que Studio puisse le dire avant que quiconque n'appuie sur **Fusionner**. Aucun n'est une réponse à lui seul.
+
+| Code | Statut | Signification | Action |
+| --- | --- | --- | --- |
+| `COLUMNS_DIFFER` | — | Les colonnes de la table diffèrent entre la branche et son parent. Les lignes sont comparées sur les colonnes communes. | Appliquez le schéma au parent avec vos migrations (`rebase db push`), puis fusionnez. |
+| `NO_PRIMARY_KEY` | — | La table n'a pas de clé primaire, ses lignes ne peuvent donc pas être appariées une à une ; le diff ne donne que ses nombres de lignes. | Donnez une clé primaire à la table, ou déplacez ses lignes à la main. |
+| `PRIMARY_KEY_DIFFERS` | — | Les colonnes de la clé primaire, ou leurs types, diffèrent entre les deux. | Appliquez d'abord le schéma au parent. |
+| `TABLE_ADDED` | — | La branche a créé la table. Une fusion n'en crée jamais. | Créez-la dans le parent avec vos migrations, puis fusionnez ses lignes. |
+| `TABLE_DROPPED` | — | La branche a supprimé la table. Une fusion n'en supprime jamais. | Supprimez-la avec vos migrations. |
+| `TOO_LARGE` | — | La table contient d'un côté plus de lignes qu'un diff n'en apparie une à une (100 000 par défaut, `maxRowsPerTable`). | Augmentez `maxRowsPerTable` sur le diff comme sur la fusion, ou déplacez les lignes autrement. |
 
 ## Codes génériques
 

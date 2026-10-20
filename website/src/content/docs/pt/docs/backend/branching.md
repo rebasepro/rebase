@@ -1,5 +1,5 @@
 ---
-sourceHash: 24b4fea53f88a18f
+sourceHash: 6c8e1509d678993c
 title: Branching de Banco de Dados
 sidebar_label: Branching
 description: Crie branches de banco de dados isoladas para desenvolvimento, staging e testes usando o CREATE DATABASE ... TEMPLATE do PostgreSQL — cópias instantâneas e de alta fidelidade com zero tempo de inatividade.
@@ -213,6 +213,9 @@ rebase db branch switch --off
 # Show one branch's parent, age and size
 rebase db branch info dev_sandbox
 
+# O que o branch mudou: esquema, políticas RLS e linhas (--json para tudo)
+rebase db branch diff dev_sandbox
+
 # Delete a branch
 rebase db branch delete dev_sandbox
 ```
@@ -262,6 +265,57 @@ Criar uma branch **não** altera com qual banco de dados o seu projeto se comuni
 ```bash
 postgresql://user:pass@localhost:5432/rb_dev_sandbox
 ```
+
+## Revisar e mesclar um branch
+
+Um branch é onde um agente, ou uma migração de que você não tem certeza, pode alterar um banco de dados sem tocar no real. Antes que qualquer coisa chegue ao banco de onde o branch foi criado, você pode ver o que mudou e mesclar pelo [Studio](/docs/studio/): abra **Branches** e escolha um.
+
+- **Esquema e políticas RLS** lista cada tabela, coluna, chave primária e política que o branch adicionou, removeu ou alterou, como SQL, com a definição do pai ao lado da do branch.
+- **Alterações de dados** conta, por tabela, as linhas que o branch inseriu, atualizou e excluiu, pareadas pela chave primária, e mostra até 100 por tabela com as colunas que mudaram.
+
+O mesmo diff é `rebase db branch diff <name>` num terminal, `GET /api/admin/branches/<name>/diff` via HTTP, a ferramenta MCP `rebase_db_branch_diff` e `admin.diffBranch(name)` no código. As tabelas próprias do Rebase (sessões, histórico, o registro de branches) ficam de fora.
+
+### Qual lado mudou uma linha
+
+O pai continua recebendo escritas enquanto se trabalha no branch, então «os dois bancos diferem» não é o mesmo que «o branch mudou»: uma linha que o pai inseriu depois de o branch ser criado parece exatamente uma linha que o branch excluiu. O Rebase as distingue pelo momento em que cada linha foi escrita. Os IDs de transação pertencem ao servidor, não a um banco, e a cópia por template os preserva; portanto, uma linha escrita depois da criação do branch — de qualquer lado — é mais recente que a transação que criou o banco do branch.
+
+| A linha do branch | A linha do pai | Conta como |
+| --- | --- | --- |
+| escrita desde a bifurcação | ausente | inserida pelo branch |
+| ausente | de antes da bifurcação | excluída pelo branch |
+| escrita desde a bifurcação | de antes da bifurcação | atualizada pelo branch |
+| de antes da bifurcação, ou ausente | escrita desde a bifurcação, ou ausente | alteração do pai: mantida |
+| escrita desde a bifurcação | escrita desde a bifurcação | um **conflito** |
+
+Dois casos se parecem e são lidos da forma que não perde nada: uma linha que o branch excluiu e o pai depois alterou é mantida, e uma linha que o pai excluiu e o branch depois alterou é uma inserção do branch. Um `UPDATE` que grava os valores que a linha já tinha ainda conta como escrita.
+
+Quando o ponto de bifurcação não pode ser lido — um branch antigo cuja linha em `pg_database` foi congelada por um vacuum, ou um renomeado com `ALTER DATABASE` — o diff avisa e conta cada diferença como do branch.
+
+### O que uma mesclagem faz
+
+**Mesclar** grava no pai as linhas que o branch inseriu, atualizou e excluiu. O que vence:
+
+- **Linhas que só o branch mudou** são gravadas: inseridas, sobrescritas ou excluídas.
+- **Linhas que só o pai mudou** desde a criação do branch ficam exatamente como estão.
+- **Linhas que os dois mudaram** são conflitos. Por padrão a mesclagem não grava nada; escolha `onConflict: "branch"` para gravar a linha do branch sobre a do pai, ou `"target"` para manter a do pai.
+- **Alterações de esquema e de políticas nunca são mescladas.** Elas pertencem às suas coleções e às migrações delas: aplique-as com `rebase db push` (ou `migrate`) e depois mescle as linhas.
+
+Uma tabela cujas linhas não podem ser pareadas bloqueia a mesclagem: uma que o branch adicionou ou removeu, uma cujas colunas ou chave primária diferem entre os dois, uma sem chave primária, ou uma com mais de 100.000 linhas num dos lados. Passe `skipBlocked` (no Studio, marque **Mesclar as outras tabelas**) para mesclar o resto e deixar essas de lado.
+
+Todas as escritas acontecem numa única instrução no pai — tudo ou nada, com chaves estrangeiras verificadas no fim. Uma mesclagem leva o `fingerprint` do diff que você revisou e não grava nada se algum dos dois bancos mudou desde então: recarregue o diff e olhe de novo. As sequências avançam além de qualquer id que a mesclagem inseriu.
+
+```typescript
+const diff = await admin.diffBranch("agent_run_17");
+// …revise diff.schema e diff.data…
+const result = await admin.mergeBranch("agent_run_17", {
+    expectedFingerprint: diff.fingerprint,
+    onConflict: "abort" // ou "branch", ou "target"
+});
+```
+
+Mesclar não é, de propósito, uma ferramenta MCP: um agente propõe no seu branch, e uma pessoa mescla.
+
+---
 
 ---
 

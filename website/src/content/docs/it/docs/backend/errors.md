@@ -1,5 +1,5 @@
 ---
-sourceHash: 737b37c2bcd33dac
+sourceHash: 67d937d47cc6146c
 title: Codici di errore
 sidebar_label: Codici di errore
 description: Tutti i codici di errore che un backend Rebase può restituire, con il rispettivo stato HTTP, il significato e come gestirli — oltre all'envelope di risposta, X-Request-ID e le regole di details.
@@ -318,6 +318,11 @@ la funzione (in grigio) anziché mostrare un errore.
 | Codice | Stato | Significato | Cosa fare |
 | --- | --- | --- | --- |
 | `ADMIN_SURFACE_UNAVAILABLE` | 501 | È stata chiamata una superficie riservata agli amministratori su un server senza autenticazione configurata, quindi non è possibile distinguere un amministratore da un utente anonimo. | Imposta `auth.jwtSecret`, oppure passa un `AuthAdapter`. |
+| `BRANCH_DIFF_STALE` | 409 | `POST /api/admin/branches/:name/merge` ha ricevuto il fingerprint di un diff non più vero: il branch o il suo genitore sono cambiati da allora. Non è stato scritto nulla. | Rileggi il diff, esaminalo e unisci con il suo nuovo `fingerprint`. |
+| `BRANCH_DIFF_UNSUPPORTED` | 501 | La sorgente dati non può confrontare branch: non ha SQL, o non ha il branching (nessuna connessione di amministrazione). | Usa un backend Postgres con `adminConnectionString` impostato. |
+| `BRANCH_MERGE_BLOCKED` | 409 | Una tabella con righe cambiate dal branch non si può unire: aggiunta o eliminata dal branch, colonne o chiave primaria diverse, nessuna chiave primaria, o troppe righe da abbinare. `details.tables` le nomina tutte, con il motivo. Non è stato scritto nulla. | Applica prima lo schema con le tue migrazioni, o unisci con `skipBlocked: true` per lasciare stare quelle tabelle. |
+| `BRANCH_MERGE_CONFLICT` | 409 | Alcune righe sono cambiate sia nel branch sia nel suo genitore, e `onConflict` era `"abort"` (il predefinito); oppure il genitore ha rifiutato parte dell'unione: una riga è cambiata nel frattempo, un trigger l'ha saltata, una policy l'ha nascosta. Non è stato scritto nulla. | Scegli quale lato prevale con `onConflict: "branch"` o `"target"`, o rileggi il diff. |
+| `BRANCH_NOT_FOUND` | 404 | Nessun branch ha quel nome nel registro. | `rebase db branch list`, o il pannello Branch, elenca quelli esistenti. |
 | `CONTRACT_UNAVAILABLE` | 404 | Il contratto del progetto viene fornito solo quando l'autenticazione è configurata — descrive ogni tabella e relazione. | Configura l'autenticazione. `/meta/schema-version` è sempre disponibile. |
 | `DEV_MAILBOX_UNAVAILABLE` | 501 | Nessuna casella di posta di sviluppo è attiva. Le email vengono acquisite solo quando `SMTP_HOST` non è impostato e `NODE_ENV` non è in produzione. | Rimuovi `SMTP_HOST` in ambiente di sviluppo, oppure controlla la casella di posta reale. |
 | `INVALID_CHANGE` | 400 | La modifica dello schema proposta non è ben formata. | Consulta il messaggio. |
@@ -335,6 +340,19 @@ la funzione (in grigio) anziché mostrare un errore.
 | `SCHEMA_EDITOR_NO_COLLECTIONS_DIR` | 501 | Il server non dispone di una `collectionsDir`, quindi l'editor non ha una destinazione in cui scrivere. | Imposta `collectionsDir`. |
 | `SCHEMA_EDITOR_PRODUCTION` | 501 | L'editor è disattivato quando `NODE_ENV=production`: i file di un server distribuito vengono ricompilati dal repository a ogni deploy, quindi una modifica qui andrebbe persa. | Modifica le collection in sviluppo ed effettua il deploy, oppure configura `liveSchema.repository` per eseguirne il commit lì. |
 | `SQL_EXPORT_UNSUPPORTED` | 501 | `POST /api/admin/sql/csv` non può trasmettere un risultato qui: il database di sviluppo in-process (PGlite) ha una sola connessione, e un cursore tenuto aperto durante un download bloccherebbe ogni altra query; oppure la data source non ha un cursore SQL. | Punta `DATABASE_URL` a un Postgres tuo (`rebase dev --docker` ne avvia uno), oppure aggiungi un `LIMIT` ed esporta le righe a schermo. |
+
+### Perché la tabella di un branch non si può unire
+
+`BRANCH_MERGE_BLOCKED` nomina ogni tabella rifiutata in `details.tables`, con uno di questi codici. Lo stesso codice è nel `blocked` della tabella nel diff stesso, così Studio può dirlo prima che qualcuno prema **Unisci**. Nessuno è una risposta a sé.
+
+| Codice | Stato | Significato | Cosa fare |
+| --- | --- | --- | --- |
+| `COLUMNS_DIFFER` | — | Le colonne della tabella differiscono tra il branch e il suo genitore. Le righe vengono confrontate sulle colonne comuni. | Applica lo schema al genitore con le tue migrazioni (`rebase db push`), poi unisci. |
+| `NO_PRIMARY_KEY` | — | La tabella non ha chiave primaria, quindi le righe non si possono abbinare una per una; il diff ne riporta solo il numero di righe. | Dai alla tabella una chiave primaria, o sposta le sue righe a mano. |
+| `PRIMARY_KEY_DIFFERS` | — | Le colonne della chiave primaria, o i loro tipi, differiscono tra i due. | Applica prima lo schema al genitore. |
+| `TABLE_ADDED` | — | Il branch ha creato la tabella. Un'unione non ne crea mai una. | Creala nel genitore con le tue migrazioni, poi unisci le sue righe. |
+| `TABLE_DROPPED` | — | Il branch ha eliminato la tabella. Un'unione non ne elimina mai una. | Eliminala con le tue migrazioni. |
+| `TOO_LARGE` | — | La tabella ha su un lato più righe di quante un diff ne abbini una per una (100.000 per impostazione predefinita, `maxRowsPerTable`). | Aumenta `maxRowsPerTable` sia nel diff sia nell'unione, o sposta le righe in un altro modo. |
 
 ## Codici generici
 

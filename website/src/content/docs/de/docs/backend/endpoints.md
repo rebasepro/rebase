@@ -1,5 +1,5 @@
 ---
-sourceHash: fba11bae884a016c
+sourceHash: 3952f6dabdcb2f92
 title: Endpunkt-Index
 sidebar_label: Endpunkt-Index
 description: Jede HTTP-Route, die ein Rebase-Backend mountet – Daten, Authentifizierung, Speicher, Admin, Meta – mit dem jeweiligen Gate und der Seite, die sie erklärt.
@@ -147,6 +147,8 @@ der auf eine Collection beschränkt ist, erreicht nichts davon. Siehe [Rollen un
 | `GET` | `/api/admin/logs/stream` | `logs:read` | Server-Sent Events |
 | `GET` | `/api/admin/rls-audit` | `schema:read` | Das jüngste Ergebnis des geplanten Audits |
 | `POST` | `/api/admin/sql/csv` | `database:write` | Streamt das gesamte Ergebnis einer schreibgeschützten Abfrage als CSV — „Gesamtes Ergebnis als CSV herunterladen“ in [Studio](/docs/studio/) |
+| `GET` | `/api/admin/branches/:name/diff` | `database:read` | Was ein [Branch](/docs/backend/branching/#reviewing-and-merging-a-branch) geändert hat: Schema, Richtlinien und Zeilen, `?sampleLimit=&schemas=&maxRowsPerTable=` |
+| `POST` | `/api/admin/branches/:name/merge` | `database:write` | Schreibt die Zeilen des Branches in seinen Elternteil, `{ expectedFingerprint, onConflict?, skipBlocked? }`; `409`, wenn sich seit dem Diff eine Seite geändert hat oder Zeilen in Konflikt stehen |
 | `GET` | `/api/admin/schema/status` | `schema:read` | [Live-Schema-Bearbeitung](/docs/backend/live-schema-editing/) |
 | `POST` | `/api/admin/schema/plan` | `schema:read` | Plant eine Änderung; wendet sie niemals an |
 | `POST` | `/api/admin/schema/apply` | `schema:write` | Nur eine Person, außer wenn `REBASE_LIVE_SCHEMA_ALLOW_MACHINE_APPLY` |

@@ -1,5 +1,5 @@
 ---
-sourceHash: 02fa0bb111c71ed5
+sourceHash: 8b0cf8dec1186f45
 title: Comandos de base de datos
 sidebar_label: Comandos de base de datos
 description: Los comandos rebase db — push, generate y migrate, copias de seguridad y restauraciones, traer una copia, la cadena de conexión, la base de datos de desarrollo gestionada y las ramas.
@@ -232,6 +232,7 @@ volvía en otro puerto, y el backend respondía 503 hasta que se reiniciaba
 rebase db branch create <name>
 rebase db branch list
 rebase db branch info <name>
+rebase db branch diff <name> [--json] [--sample-limit <n>]
 rebase db branch switch <name>     # work on it; every later command follows
 rebase db branch switch            # say which branch you are on
 rebase db branch switch --off      # back to the main database
@@ -245,6 +246,8 @@ Cada rama es una copia completa en disco, por lo que es necesario limpiarlas. `p
 Sin un terminal en el que preguntar, como en CI, no elimina nada, indica que hay que pasar `--yes` y termina con código 1; en la 0.24 dice "Nothing was changed." y termina con código 0.
 `list` e `info` solo leen: una base de datos en la que no se creó ninguna rama no tiene ninguna, y
 no crean ningún esquema `rebase` allí. En la 0.24 crean el registro.
+
+`diff` muestra qué cambió una rama respecto a la base de datos de la que se creó: tablas, columnas y políticas RLS añadidas, eliminadas o modificadas, y por tabla las filas que insertó, actualizó y borró. Las filas que el padre cambió por su cuenta desde entonces se cuentan aparte, y las que cambiaron ambos son conflictos. `--json` imprime el diff completo, con hasta `--sample-limit` filas por tabla (100 por defecto). Lee las dos bases de datos y no cambia ninguna; la fusión está en Studio — consulta [Revisar y fusionar una rama](/docs/backend/branching/#reviewing-and-merging-a-branch).
 
 `switch` registra la rama en `.rebase/branch.json` y nunca edita `.env`. Tiene prioridad sobre `DATABASE_URL` en `.env` y cede ante `--database-url` o un `DATABASE_URL` en el shell, por lo que un flag en la línea de comandos siempre prevalece sobre un cambio realizado anteriormente. `delete` rechaza la rama en la que te encuentras, ya que todos los comandos del checkout, el propio delete incluido, apuntan a ella: primero `switch --off`, y luego elimínala. El flujo de trabajo completo está en [Ramificación de bases de datos](/docs/backend/branching/).
 

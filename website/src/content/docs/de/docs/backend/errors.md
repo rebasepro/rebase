@@ -1,5 +1,5 @@
 ---
-sourceHash: 737b37c2bcd33dac
+sourceHash: 67d937d47cc6146c
 title: Fehlercodes
 sidebar_label: Fehlercodes
 description: Jeder Fehlercode, den ein Rebase-Backend zurückgeben kann, mit seinem HTTP-Status, seiner Bedeutung und Lösungsansätzen – plus Response-Envelope, X-Request-ID und den Details-Regeln.
@@ -282,6 +282,11 @@ Diese besagen eher, dass eine Funktion deaktiviert oder unkonfiguriert ist, als 
 | Code | Status | Bedeutung | Maßnahme |
 | --- | --- | --- | --- |
 | `ADMIN_SURFACE_UNAVAILABLE` | 501 | Eine reine Admin-Oberfläche wurde auf einem Server ohne konfigurierte Authentifizierung aufgerufen, sodass ein Administrator nicht von einem beliebigen Besucher unterschieden werden kann. | Setzen Sie `auth.jwtSecret` oder übergeben Sie einen `AuthAdapter`. |
+| `BRANCH_DIFF_STALE` | 409 | `POST /api/admin/branches/:name/merge` wurde der Fingerprint eines Diffs geschickt, der nicht mehr stimmt: Der Branch oder sein Elternteil hat sich seitdem geändert. Es wurde nichts geschrieben. | Lesen Sie den Diff erneut, prüfen Sie ihn und führen Sie mit seinem neuen `fingerprint` zusammen. |
+| `BRANCH_DIFF_UNSUPPORTED` | 501 | Die Datenquelle kann keine Branches vergleichen: Sie hat kein SQL oder kein Branching (keine Admin-Verbindung). | Verwenden Sie ein Postgres-Backend mit gesetztem `adminConnectionString`. |
+| `BRANCH_MERGE_BLOCKED` | 409 | Eine Tabelle mit Zeilen, die der Branch geändert hat, lässt sich nicht zusammenführen – vom Branch hinzugefügt oder entfernt, abweichende Spalten oder Primärschlüssel, kein Primärschlüssel oder zu viele Zeilen zum Zuordnen. `details.tables` nennt jede, mit Grund. Es wurde nichts geschrieben. | Wenden Sie zuerst das Schema mit Ihren Migrationen an, oder führen Sie mit `skipBlocked: true` zusammen, um diese Tabellen in Ruhe zu lassen. |
+| `BRANCH_MERGE_CONFLICT` | 409 | Zeilen wurden sowohl im Branch als auch in seinem Elternteil geändert, und `onConflict` war `"abort"` (der Standard); oder der Elternteil hat einen Teil des Zusammenführens abgelehnt – eine Zeile hat sich zwischenzeitlich geändert, ein Trigger hat sie übersprungen, eine Richtlinie hat sie verborgen. Es wurde nichts geschrieben. | Wählen Sie mit `onConflict: "branch"` oder `"target"`, welche Seite gewinnt, oder lesen Sie den Diff erneut. |
+| `BRANCH_NOT_FOUND` | 404 | Kein Branch im Register trägt diesen Namen. | `rebase db branch list` oder der Bereich Branches listet die vorhandenen auf. |
 | `CONTRACT_UNAVAILABLE` | 404 | Der Projektvertrag (Contract) wird nur bereitgestellt, wenn die Authentifizierung konfiguriert ist – er beschreibt jede Tabelle und Relation. | Konfigurieren Sie die Authentifizierung. `/meta/schema-version` wird immer bereitgestellt. |
 | `DEV_MAILBOX_UNAVAILABLE` | 501 | Kein Entwicklungs-Postfach ist aktiv. E-Mails werden nur erfasst, wenn `SMTP_HOST` nicht gesetzt ist und `NODE_ENV` nicht auf `production` steht. | Entfernen Sie `SMTP_HOST` in der Entwicklung oder lesen Sie das echte Postfach. |
 | `INVALID_CHANGE` | 400 | Die vorgeschlagene Schemaänderung ist nicht wohlgeformt. | Siehe Nachricht. |
@@ -299,6 +304,19 @@ Diese besagen eher, dass eine Funktion deaktiviert oder unkonfiguriert ist, als 
 | `SCHEMA_EDITOR_NO_COLLECTIONS_DIR` | 501 | Der Server hat kein `collectionsDir`, sodass der Editor keinen Speicherort zum Schreiben hat. | Setzen Sie `collectionsDir`. |
 | `SCHEMA_EDITOR_PRODUCTION` | 501 | Der Editor ist unter `NODE_ENV=production` deaktiviert: Die Dateien eines deployten Servers werden bei jedem Deployment aus Ihrem Repository neu gebaut, sodass eine Bearbeitung hier verworfen werden würde. | Bearbeiten Sie Collections in der Entwicklung und deployen Sie anschließend, oder konfigurieren Sie `liveSchema.repository`, um sie dort zu committen. |
 | `SQL_EXPORT_UNSUPPORTED` | 501 | `POST /api/admin/sql/csv` kann hier kein Ergebnis streamen: Die In-Process-Entwicklungsdatenbank (PGlite) hat eine Verbindung, und ein über einen Download gehaltener Cursor würde jede andere Abfrage dahinter aufhalten; oder die Datenquelle hat keinen SQL-Cursor. | Verweisen Sie `DATABASE_URL` auf ein eigenes Postgres (`rebase dev --docker` startet eines), oder fügen Sie ein `LIMIT` hinzu und exportieren Sie die Zeilen auf dem Bildschirm. |
+
+### Warum sich die Tabelle eines Branches nicht zusammenführen lässt
+
+`BRANCH_MERGE_BLOCKED` nennt jede abgelehnte Tabelle in `details.tables`, mit einem dieser Codes. Derselbe Code steht im Diff selbst im `blocked` der Tabelle, damit Studio es sagen kann, bevor jemand **Zusammenführen** drückt. Keiner ist eine eigene Antwort.
+
+| Code | Status | Bedeutung | Maßnahme |
+| --- | --- | --- | --- |
+| `COLUMNS_DIFFER` | — | Die Spalten der Tabelle unterscheiden sich zwischen dem Branch und seinem Elternteil. Zeilen werden über die gemeinsamen Spalten verglichen. | Wenden Sie das Schema mit Ihren Migrationen auf den Elternteil an (`rebase db push`) und führen Sie dann zusammen. |
+| `NO_PRIMARY_KEY` | — | Die Tabelle hat keinen Primärschlüssel, Zeilen lassen sich also nicht einzeln zuordnen; der Diff nennt nur ihre Zeilenzahlen. | Geben Sie der Tabelle einen Primärschlüssel, oder übertragen Sie ihre Zeilen von Hand. |
+| `PRIMARY_KEY_DIFFERS` | — | Die Spalten des Primärschlüssels oder ihre Typen unterscheiden sich zwischen beiden. | Wenden Sie zuerst das Schema auf den Elternteil an. |
+| `TABLE_ADDED` | — | Der Branch hat die Tabelle angelegt. Ein Zusammenführen legt nie eine an. | Legen Sie sie mit Ihren Migrationen im Elternteil an und führen Sie dann ihre Zeilen zusammen. |
+| `TABLE_DROPPED` | — | Der Branch hat die Tabelle entfernt. Ein Zusammenführen entfernt nie eine. | Entfernen Sie sie mit Ihren Migrationen. |
+| `TOO_LARGE` | — | Die Tabelle hat auf einer Seite mehr Zeilen, als ein Diff einzeln zuordnet (standardmäßig 100.000, `maxRowsPerTable`). | Erhöhen Sie `maxRowsPerTable` sowohl beim Diff als auch beim Zusammenführen, oder übertragen Sie die Zeilen auf anderem Weg. |
 
 ## Generische Codes
 

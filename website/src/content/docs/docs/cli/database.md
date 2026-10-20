@@ -247,6 +247,7 @@ restarted.
 rebase db branch create <name>
 rebase db branch list
 rebase db branch info <name>
+rebase db branch diff <name> [--json] [--sample-limit <n>]
 rebase db branch switch <name>     # work on it; every later command follows
 rebase db branch switch            # say which branch you are on
 rebase db branch switch --off      # back to the main database
@@ -266,6 +267,14 @@ With no terminal to ask on, such as in CI, it removes nothing, says to
 pass `--yes`, and exits 1; on 0.24 it says "Nothing was changed." and exits 0.
 `list` and `info` only read: a database no branch was made on has none, and
 they create no `rebase` schema there. On 0.24 they create the registry.
+
+`diff` shows what a branch changed against the database it was made from:
+tables, columns and RLS policies added, dropped or altered, and per table the
+rows it inserted, updated and deleted. Rows the parent changed on its own since
+are counted apart, and rows both changed are conflicts. `--json` prints the
+whole diff, with up to `--sample-limit` rows a table (default 100). It reads
+both databases and changes neither; merging is in Studio — see
+[Reviewing and merging a branch](/docs/backend/branching/#reviewing-and-merging-a-branch).
 
 `switch` records the branch in `.rebase/branch.json` and never edits `.env`. It
 takes precedence over `DATABASE_URL` in `.env` and loses to `--database-url` or a

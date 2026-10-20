@@ -1,5 +1,5 @@
 ---
-sourceHash: 737b37c2bcd33dac
+sourceHash: 67d937d47cc6146c
 title: Códigos de erro
 sidebar_label: Códigos de erro
 description: Todos os códigos de erro que um backend Rebase pode retornar, com seu status HTTP, significado e o que fazer a respeito — além do envelope de resposta, X-Request-ID e as regras de details.
@@ -321,6 +321,11 @@ visualmente o recurso em vez de exibir um erro.
 | Código | Status | Significado | O que fazer |
 | --- | --- | --- | --- |
 | `ADMIN_SURFACE_UNAVAILABLE` | 501 | Uma interface exclusiva para administradores foi chamada em um servidor sem autenticação configurada, impossibilitando distinguir um administrador de qualquer outro usuário. | Defina `auth.jwtSecret` ou forneça um `AuthAdapter`. |
+| `BRANCH_DIFF_STALE` | 409 | `POST /api/admin/branches/:name/merge` recebeu o fingerprint de um diff que já não é verdadeiro: o branch ou o pai mudaram desde então. Nada foi gravado. | Leia o diff de novo, revise-o e mescle com o novo `fingerprint`. |
+| `BRANCH_DIFF_UNSUPPORTED` | 501 | A fonte de dados não consegue comparar branches: não tem SQL, ou não tem branching (sem conexão de administração). | Use um backend Postgres com `adminConnectionString` definido. |
+| `BRANCH_MERGE_BLOCKED` | 409 | Uma tabela com linhas que o branch mudou não pode ser mesclada — adicionada ou removida pelo branch, colunas ou chave primária diferentes, sem chave primária, ou linhas demais para parear. `details.tables` nomeia cada uma, com o motivo. Nada foi gravado. | Aplique antes o esquema com suas migrações, ou mescle com `skipBlocked: true` para deixar essas tabelas de lado. |
+| `BRANCH_MERGE_CONFLICT` | 409 | Há linhas alteradas tanto no branch quanto no pai, e `onConflict` era `"abort"` (o padrão); ou o pai recusou parte da mesclagem — uma linha mudou nesse meio-tempo, um trigger a pulou, uma política a ocultou. Nada foi gravado. | Escolha qual lado vence com `onConflict: "branch"` ou `"target"`, ou leia o diff de novo. |
+| `BRANCH_NOT_FOUND` | 404 | Nenhum branch tem esse nome no registro. | `rebase db branch list`, ou o painel Branches, lista os que existem. |
 | `CONTRACT_UNAVAILABLE` | 404 | O contrato do projeto é servido apenas quando a autenticação está configurada — ele descreve todas as tabelas e relações. | Configure a autenticação. `/meta/schema-version` é sempre servido. |
 | `DEV_MAILBOX_UNAVAILABLE` | 501 | Nenhuma caixa de correio de desenvolvimento está ativa. As mensagens só são capturadas quando `SMTP_HOST` não está definido e `NODE_ENV` não é production. | Remova `SMTP_HOST` em desenvolvimento ou consulte a caixa de entrada real. |
 | `INVALID_CHANGE` | 400 | A alteração de schema proposta não está bem formatada. | Veja a mensagem. |
@@ -338,6 +343,19 @@ visualmente o recurso em vez de exibir um erro.
 | `SCHEMA_EDITOR_NO_COLLECTIONS_DIR` | 501 | O servidor não possui `collectionsDir`, portanto o editor não tem onde gravar. | Defina `collectionsDir`. |
 | `SCHEMA_EDITOR_PRODUCTION` | 501 | O editor fica desativado sob `NODE_ENV=production`: os arquivos de um servidor em produção são reconstruídos a partir do seu repositório a cada deploy, logo uma edição aqui seria descartada. | Edite as collections em desenvolvimento e faça o deploy, ou configure `liveSchema.repository` para fazer o commit delas lá. |
 | `SQL_EXPORT_UNSUPPORTED` | 501 | `POST /api/admin/sql/csv` não consegue transmitir um resultado aqui: o banco de dados de desenvolvimento em processo (PGlite) tem uma única conexão, e um cursor mantido durante um download seguraria todas as outras consultas atrás dele; ou a fonte de dados não tem cursor SQL. | Aponte `DATABASE_URL` para um Postgres seu (`rebase dev --docker` inicia um), ou adicione um `LIMIT` e exporte as linhas da tela. |
+
+### Por que a tabela de um branch não pode ser mesclada
+
+`BRANCH_MERGE_BLOCKED` nomeia cada tabela recusada em `details.tables`, com um destes códigos. O mesmo código está no `blocked` da tabela no próprio diff, para que o Studio possa dizê-lo antes que alguém clique em **Mesclar**. Nenhum é uma resposta por si só.
+
+| Código | Status | Significado | O que fazer |
+| --- | --- | --- | --- |
+| `COLUMNS_DIFFER` | — | As colunas da tabela diferem entre o branch e o pai. As linhas são comparadas nas colunas em comum. | Aplique o esquema ao pai com suas migrações (`rebase db push`) e depois mescle. |
+| `NO_PRIMARY_KEY` | — | A tabela não tem chave primária, então as linhas não podem ser pareadas uma a uma; o diff dá só as contagens de linhas. | Dê à tabela uma chave primária, ou mova as linhas à mão. |
+| `PRIMARY_KEY_DIFFERS` | — | As colunas da chave primária, ou seus tipos, diferem entre os dois. | Aplique antes o esquema ao pai. |
+| `TABLE_ADDED` | — | O branch criou a tabela. Uma mesclagem nunca cria uma. | Crie-a no pai com suas migrações e depois mescle as linhas. |
+| `TABLE_DROPPED` | — | O branch removeu a tabela. Uma mesclagem nunca remove uma. | Remova-a com suas migrações. |
+| `TOO_LARGE` | — | A tabela tem num dos lados mais linhas do que um diff pareia uma a uma (100.000 por padrão, `maxRowsPerTable`). | Aumente `maxRowsPerTable` tanto no diff quanto na mesclagem, ou mova as linhas de outra forma. |
 
 ## Códigos genéricos
 

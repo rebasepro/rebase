@@ -214,6 +214,9 @@ rebase db branch switch --off
 # Show one branch's parent, age and size
 rebase db branch info dev_sandbox
 
+# What the branch changed: schema, RLS policies and rows (--json for all of it)
+rebase db branch diff dev_sandbox
+
 # Delete a branch
 rebase db branch delete dev_sandbox
 ```
@@ -269,6 +272,96 @@ Creating a branch does **not** change which database your project talks to. `reb
 ```bash
 postgresql://user:pass@localhost:5432/rb_dev_sandbox
 ```
+
+---
+
+## Reviewing and merging a branch
+
+<span class="since-badge" data-since="0.26">Since 0.26</span>
+
+A branch is where an agent, or a migration you are not sure of, can change a
+database without touching the real one. Before any of it reaches the database
+the branch was made from, you can see what changed and merge it from
+[Studio](/docs/studio/): open **Branches** and pick one.
+
+- **Schema & RLS policies** lists every table, column, primary key and policy
+  the branch added, dropped or altered, as SQL, with the parent's definition
+  beside the branch's.
+- **Data changes** counts, per table, the rows the branch inserted, updated and
+  deleted, matched by primary key, and shows up to 100 of them per table with
+  the columns that changed.
+
+The same diff is `rebase db branch diff <name>` in a terminal, `GET
+/api/admin/branches/<name>/diff` over HTTP, the `rebase_db_branch_diff` MCP
+tool, and `admin.diffBranch(name)` in code. Rebase's own tables (sessions,
+history, the branch registry) are left out.
+
+### Which side changed a row
+
+The parent keeps taking writes while the branch is worked on, so "the two
+databases differ" is not the same as "the branch changed it": a row the parent
+inserted after the branch was made looks exactly like a row the branch deleted.
+Rebase tells them apart by when each row was written. Transaction ids belong to
+the server, not to one database, and the template copy keeps them, so a row
+written after the branch was made — on either side — is younger than the
+transaction that created the branch database.
+
+| The branch's row | The parent's row | Counted as |
+| --- | --- | --- |
+| written since the fork | absent | inserted by the branch |
+| absent | from before the fork | deleted by the branch |
+| written since the fork | from before the fork | updated by the branch |
+| from before the fork, or absent | written since the fork, or absent | the parent's change: kept |
+| written since the fork | written since the fork | a **conflict** |
+
+Two cases look alike and are read the way that loses nothing: a row the branch
+deleted and the parent then changed is kept, and a row the parent deleted and
+the branch then changed is the branch's insert. An `UPDATE` that writes the
+values a row already had still counts as a write.
+
+When the fork point cannot be read — a long-lived branch whose `pg_database`
+row a vacuum froze, or one renamed with `ALTER DATABASE` — the diff says so,
+and counts every difference as the branch's.
+
+### What a merge does
+
+**Merge** writes the rows the branch inserted, updated and deleted to the
+parent. What wins:
+
+- **Rows only the branch changed** are written: inserted, overwritten or
+  deleted.
+- **Rows only the parent changed** since the branch was made are left exactly as
+  they are.
+- **Rows both changed** are conflicts. By default the merge writes nothing at
+  all; choose `onConflict: "branch"` to write the branch's row over the
+  parent's, or `"target"` to keep the parent's.
+- **Schema and policy changes are never merged.** They belong to your
+  collections and their migrations: apply them with `rebase db push` (or
+  `migrate`), then merge the rows.
+
+A table whose rows cannot be matched blocks the merge: one the branch added or
+dropped, one whose columns or primary key differ between the two, one with no
+primary key, or one with more than 100,000 rows on a side. Pass `skipBlocked`
+(in Studio, tick **Merge the other tables**) to merge the rest and leave those
+alone.
+
+Every write happens in one statement on the parent — all of it, or none of it,
+foreign keys checked at its end. A merge carries the `fingerprint` of the diff
+you reviewed, and writes nothing when either database has changed since:
+reload the diff and look again. Sequences are moved past any ids the merge
+inserted.
+
+```typescript
+const diff = await admin.diffBranch("agent_run_17");
+// …review diff.schema and diff.data…
+const result = await admin.mergeBranch("agent_run_17", {
+    expectedFingerprint: diff.fingerprint,
+    onConflict: "abort" // or "branch", or "target"
+});
+```
+
+Merging is deliberately not an MCP tool: an agent proposes on its branch, and a
+person merges.
 
 ---
 

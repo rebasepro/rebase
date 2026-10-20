@@ -315,6 +315,11 @@ so a panel can grey the feature out instead of showing an error.
 | Code | Status | Means | Do |
 | --- | --- | --- | --- |
 | `ADMIN_SURFACE_UNAVAILABLE` | 501 | An admin-only surface was called on a server with no authentication configured, so nothing can tell an admin from a stranger. | Set `auth.jwtSecret`, or pass an `AuthAdapter`. |
+| `BRANCH_DIFF_STALE` | 409 | `POST /api/admin/branches/:name/merge` was sent the fingerprint of a diff that is no longer true: the branch or its parent changed since. Nothing was written. | Read the diff again, review it, and merge with its new `fingerprint`. |
+| `BRANCH_DIFF_UNSUPPORTED` | 501 | The data source cannot compare branches: it has no SQL, or no branching (no admin connection). | Use a Postgres backend with `adminConnectionString` set. |
+| `BRANCH_MERGE_BLOCKED` | 409 | A table with rows the branch changed cannot be merged — added or dropped by the branch, columns or primary key that differ, no primary key, or too many rows to match. `details.tables` names each, with why. Nothing was written. | Apply the schema with your migrations first, or merge with `skipBlocked: true` to leave those tables alone. |
+| `BRANCH_MERGE_CONFLICT` | 409 | Rows were changed on both the branch and its parent, and `onConflict` was `"abort"` (the default); or the parent refused part of the merge — a row changed meanwhile, a trigger skipped it, a policy hid it. Nothing was written. | Choose which side wins with `onConflict: "branch"` or `"target"`, or read the diff again. |
+| `BRANCH_NOT_FOUND` | 404 | No branch has that name in the registry. | `rebase db branch list`, or the Branches pane, lists the ones there are. |
 | `CONTRACT_UNAVAILABLE` | 404 | The project contract is served only when authentication is configured — it describes every table and relation. | Configure auth. `/meta/schema-version` is always served. |
 | `DEV_MAILBOX_UNAVAILABLE` | 501 | No development mailbox is active. Mail is captured only when `SMTP_HOST` is unset and `NODE_ENV` is not production. | Unset `SMTP_HOST` in development, or read the real inbox. |
 | `INVALID_CHANGE` | 400 | The proposed schema change is not well-formed. | See the message. |
@@ -332,6 +337,22 @@ so a panel can grey the feature out instead of showing an error.
 | `SCHEMA_EDITOR_NO_COLLECTIONS_DIR` | 501 | The server has no `collectionsDir`, so the editor has nothing to write to. | Set `collectionsDir`. |
 | `SCHEMA_EDITOR_PRODUCTION` | 501 | The editor is off under `NODE_ENV=production`: a deployed server's files are rebuilt from your repository on every deploy, so an edit here would be discarded. | Edit collections in development and deploy, or configure `liveSchema.repository` to commit them there. |
 | `SQL_EXPORT_UNSUPPORTED` | 501 | `POST /api/admin/sql/csv` cannot stream a result here: the in-process development database (PGlite) has one connection, and a cursor held across a download would hold every other query behind it; or the data source has no SQL cursor. | Point `DATABASE_URL` at a Postgres of your own (`rebase dev --docker` starts one), or add a `LIMIT` and export the rows on screen. |
+
+### Why a branch's table cannot be merged
+
+`BRANCH_MERGE_BLOCKED` names each table it refused in `details.tables`, with one
+of these codes. The same code is on the table's `blocked` in the diff itself,
+so Studio can say so before anyone presses **Merge**. None is a response of its
+own.
+
+| Code | Status | Means | Do |
+| --- | --- | --- | --- |
+| `COLUMNS_DIFFER` | — | The table's columns differ between the branch and its parent. Rows are compared on the columns they share. | Apply the schema to the parent with your migrations (`rebase db push`), then merge. |
+| `NO_PRIMARY_KEY` | — | The table has no primary key, so rows cannot be matched one by one; the diff gives its row counts only. | Give the table a primary key, or move its rows by hand. |
+| `PRIMARY_KEY_DIFFERS` | — | The primary key's columns, or their types, differ between the two. | Apply the schema to the parent first. |
+| `TABLE_ADDED` | — | The branch created the table. A merge never creates one. | Create it on the parent with your migrations, then merge its rows. |
+| `TABLE_DROPPED` | — | The branch dropped the table. A merge never drops one. | Drop it with your migrations. |
+| `TOO_LARGE` | — | The table holds more rows on a side than a diff matches one by one (100,000 by default, `maxRowsPerTable`). | Raise `maxRowsPerTable` on both the diff and the merge, or move the rows another way. |
 
 ## Generic codes
 

@@ -1,5 +1,5 @@
 ---
-sourceHash: 24b4fea53f88a18f
+sourceHash: 6c8e1509d678993c
 title: Ramificación de bases de datos
 sidebar_label: Ramificación
 description: Crea ramas aisladas de bases de datos para desarrollo, staging y pruebas usando CREATE DATABASE ... TEMPLATE de PostgreSQL — copias instantáneas y de fidelidad total sin tiempo de inactividad.
@@ -217,6 +217,9 @@ rebase db branch switch --off
 # Show one branch's parent, age and size
 rebase db branch info dev_sandbox
 
+# Qué cambió la rama: esquema, políticas RLS y filas (--json para todo)
+rebase db branch diff dev_sandbox
+
 # Delete a branch
 rebase db branch delete dev_sandbox
 ```
@@ -266,6 +269,57 @@ Crear una rama **no** cambia la base de datos con la que se comunica tu proyecto
 ```bash
 postgresql://user:pass@localhost:5432/rb_dev_sandbox
 ```
+
+## Revisar y fusionar una rama
+
+Una rama es donde un agente, o una migración de la que no estás seguro, puede cambiar una base de datos sin tocar la real. Antes de que nada de eso llegue a la base de datos de la que se creó la rama, puedes ver qué cambió y fusionarlo desde [Studio](/docs/studio/): abre **Ramas** y elige una.
+
+- **Esquema y políticas RLS** lista cada tabla, columna, clave primaria y política que la rama añadió, eliminó o modificó, como SQL, con la definición del padre junto a la de la rama.
+- **Cambios de datos** cuenta, por tabla, las filas que la rama insertó, actualizó y borró, emparejadas por clave primaria, y muestra hasta 100 por tabla con las columnas que cambiaron.
+
+El mismo diff es `rebase db branch diff <name>` en una terminal, `GET /api/admin/branches/<name>/diff` por HTTP, la herramienta MCP `rebase_db_branch_diff` y `admin.diffBranch(name)` en código. Las tablas propias de Rebase (sesiones, historial, el registro de ramas) quedan fuera.
+
+### Qué lado cambió una fila
+
+El padre sigue recibiendo escrituras mientras se trabaja en la rama, así que «las dos bases de datos difieren» no es lo mismo que «la rama lo cambió»: una fila que el padre insertó después de crear la rama se ve exactamente igual que una fila que la rama borró. Rebase las distingue por el momento en que se escribió cada fila. Los identificadores de transacción pertenecen al servidor, no a una base de datos, y la copia por plantilla los conserva, así que una fila escrita después de crear la rama —en cualquiera de los dos lados— es más reciente que la transacción que creó la base de datos de la rama.
+
+| La fila de la rama | La fila del padre | Cuenta como |
+| --- | --- | --- |
+| escrita desde la bifurcación | ausente | insertada por la rama |
+| ausente | de antes de la bifurcación | borrada por la rama |
+| escrita desde la bifurcación | de antes de la bifurcación | actualizada por la rama |
+| de antes de la bifurcación, o ausente | escrita desde la bifurcación, o ausente | cambio del padre: se conserva |
+| escrita desde la bifurcación | escrita desde la bifurcación | un **conflicto** |
+
+Dos casos se parecen y se leen de la forma que no pierde nada: una fila que la rama borró y que el padre cambió después se conserva, y una fila que el padre borró y que la rama cambió después es una inserción de la rama. Un `UPDATE` que escribe los valores que una fila ya tenía sigue contando como escritura.
+
+Cuando no se puede leer el punto de bifurcación —una rama de larga duración cuya fila de `pg_database` congeló un vacuum, o una renombrada con `ALTER DATABASE`— el diff lo indica y cuenta cada diferencia como de la rama.
+
+### Qué hace una fusión
+
+**Fusionar** escribe en el padre las filas que la rama insertó, actualizó y borró. Qué gana:
+
+- **Las filas que solo cambió la rama** se escriben: insertadas, sobrescritas o borradas.
+- **Las filas que solo cambió el padre** desde que se creó la rama se dejan exactamente como están.
+- **Las filas que cambiaron ambos** son conflictos. Por defecto la fusión no escribe nada; elige `onConflict: "branch"` para escribir la fila de la rama sobre la del padre, o `"target"` para conservar la del padre.
+- **Los cambios de esquema y de políticas nunca se fusionan.** Pertenecen a tus colecciones y sus migraciones: aplícalos con `rebase db push` (o `migrate`) y luego fusiona las filas.
+
+Una tabla cuyas filas no se pueden emparejar bloquea la fusión: una que la rama añadió o eliminó, una cuyas columnas o clave primaria difieren entre las dos, una sin clave primaria, o una con más de 100.000 filas en un lado. Pasa `skipBlocked` (en Studio, marca **Fusionar las demás tablas**) para fusionar el resto y dejar esas en paz.
+
+Todas las escrituras ocurren en una sola sentencia en el padre —todo o nada—, con las claves foráneas comprobadas al final. Una fusión lleva el `fingerprint` del diff que revisaste y no escribe nada si alguna de las dos bases de datos cambió desde entonces: recarga el diff y vuelve a mirarlo. Las secuencias se adelantan más allá de cualquier id que la fusión insertó.
+
+```typescript
+const diff = await admin.diffBranch("agent_run_17");
+// …revisa diff.schema y diff.data…
+const result = await admin.mergeBranch("agent_run_17", {
+    expectedFingerprint: diff.fingerprint,
+    onConflict: "abort" // o "branch", o "target"
+});
+```
+
+Fusionar no es, a propósito, una herramienta MCP: un agente propone en su rama y una persona fusiona.
+
+---
 
 ---
 
