@@ -615,7 +615,7 @@ All property types support a `admin` object for display configuration:
 | `admin.hideFromCollection` | `boolean` | — | Hide from collection table view |
 | `admin.readOnly` | `boolean` | — | Render as read-only preview |
 | `admin.disabled` | `boolean \| PropertyDisabledConfig` | — | Disable editing |
-| `admin.span` | `1 \| 2 \| 3 \| 4` | `4` | Field width over the four-column form grid. Set it from the content — see **Form layout** |
+| `admin.span` | `1 \| 2 \| 3 \| 4` | `4`, or `2` for a pair of like compact fields | Field width over the four-column form grid. Set it from the content — see **Form layout** |
 | `admin.customProps` | `unknown` | — | Custom props passed to the field component |
 | `admin.Field` | `ComponentRef` | — | Custom field component |
 | `admin.Preview` | `ComponentRef` | — | Custom preview/cell component |
@@ -623,9 +623,17 @@ All property types support a `admin` object for display configuration:
 ### Form layout
 
 The id and the audit timestamps go to a metadata rail. Every other field takes
-the **full width** unless its property sets `admin.span`. The form never guesses
-a width from a property's type, and never from which property is the title.
-Column layout is your job, and you should do it for every collection you write.
+the **full width** unless its property sets `admin.span` — with one cautious
+exception: two **neighbouring** fields with the same small editor (two numbers,
+two switches, two dates of the same mode, two selects with short options) share
+a row, as long as neither has a long label, help text over 60 characters,
+`conditions` or a custom `Field`. A free-text string is never paired, and the
+form never looks at which property is the title.
+
+That default only covers what a schema can prove. Whether two strings belong
+together — city / country, provider / region — is something only you can tell,
+so column layout is your job, and you should do it for every collection you
+write.
 
 **Set `admin.span` from what the field holds, not from its type.** Two string
 properties are not a pair just because both are strings — Namespace beside
@@ -648,7 +656,8 @@ property and ask how long its value really is and what it belongs with:
 Rules that keep the result clean:
 
 - **Spans in a row add up to exactly 4.** Nothing widens a field to close a gap,
-  so a row of `2` with no partner leaves half a row empty.
+  so a row of `2` with no partner leaves half a row empty. Once you set a span on
+  a field, the automatic pairing leaves it alone — set its partner's too.
 - **Order the properties so pairs are adjacent.** Rows fill in declaration order
   (or `sections[].properties` order), so a pair split by another field breaks.
 - **Pair by meaning, never to save height.** A field with nothing that belongs

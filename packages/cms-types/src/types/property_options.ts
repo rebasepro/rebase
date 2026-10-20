@@ -76,9 +76,11 @@ export interface AdminPropertyOptions<CustomProps = unknown> {
 
     /**
      * How many of the form grid's {@link FORM_GRID_COLUMNS} columns this field
-     * occupies. Omit for the full width — the layout never derives a width from
-     * the property's type. Set it from what the field holds: two short values
-     * that belong together share a row, anything that reads long keeps it.
+     * occupies. Omitted, a field takes the full width, except that two
+     * neighbouring fields with the same small editor — two numbers, two
+     * switches, two dates, two short selects — share a row. Set it from what the
+     * field holds: two short values that belong together share a row, anything
+     * that reads long keeps it.
      *
      * Spans snap to a shared grid, so two fields line up whatever order they
      * are declared in.

@@ -4,19 +4,21 @@
  * Turns a collection into the shape the entity form renders: an ordered list of
  * sections holding grid-spanned fields, plus the metadata rail beside them.
  *
- * Every field takes the full row unless its property sets `admin.span`. Widths
- * guessed from a property's type paired fields that had nothing to do with each
- * other — Namespace beside Custom Domain, Git Branch beside Git Repository URL —
- * so the eye zig-zagged across values that were neighbours only by type. Nothing
- * here looks at which property is the record's title either. A collection that
- * wants columns says so, field by field.
+ * A field takes the full row unless its property sets `admin.span`, with one
+ * exception: two neighbouring fields whose editors are both small and of the
+ * same kind — two numbers, two switches, two dates, two short selects — share a
+ * row. Nothing wider is ever guessed. Pairing by type alone put Namespace beside
+ * Custom Domain and Git Branch beside Git Repository URL, values that sat
+ * together only because both were strings; a string's editor says nothing about
+ * how long its value is, so a free-text field is never paired. Nothing here
+ * looks at which property is the record's title either.
  */
 import type {
     AdminCollection,
     FormSection,
     PropertySpan
 } from "@rebasepro/cms-types";
-import type { Property } from "@rebasepro/types";
+import type { EnumValues, Property } from "@rebasepro/types";
 import { isHidden } from "./property_presentation";
 
 /**
@@ -39,6 +41,8 @@ export interface ResolvedFormField {
     span: PropertySpan;
     /** True for an `additionalFields` entry rather than a property. */
     additional: boolean;
+    /** The span was written on the property. Pairing leaves these alone. */
+    spanExplicit?: boolean;
 }
 
 export interface ResolvedFormSection {
@@ -122,6 +126,109 @@ export function isAuditTimestamp(property: Property | undefined): boolean {
 }
 
 /* -------------------------------------------------------------------------- */
+/* pairing                                                                    */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Longest label, help text and option label a field can carry and still take
+ * half a row. Past these a half-width field truncates its label, or wraps its
+ * help text into a block that leaves its neighbour floating above a hole — the
+ * App Capacity field, whose paragraph of help sat beside a one-line App Region.
+ */
+const PAIR_MAX_LABEL = 32;
+const PAIR_MAX_DESCRIPTION = 60;
+const PAIR_MAX_OPTION_LABEL = 32;
+
+/** What a field's editor is, for the purpose of sitting beside another one. */
+type PairKind = "number" | "switch" | "date" | "date_time" | "select";
+
+function enumLabels(values: EnumValues | Map<unknown, unknown>): string[] {
+    const entries: unknown[] = values instanceof Map
+        ? [...values.values()]
+        : Array.isArray(values) ? values : Object.values(values);
+    return entries.map(entry =>
+        typeof entry === "string" ? entry : String((entry as { label?: unknown })?.label ?? ""));
+}
+
+/**
+ * The kind of compact editor this property renders, or `undefined` when its
+ * editor needs the row — or when nothing about it says how long its value is.
+ *
+ * Deliberately narrow. A plain string is never compact: "Namespace" and "Git
+ * Branch" are both strings and nothing in the schema tells a 6-character branch
+ * from a 60-character URL. Neither is a relation, whose preview is the related
+ * record's own text. Only editors whose width is bounded by what they are —
+ * a number, a switch, a date picker, a select over short options — qualify.
+ */
+export function pairKind(property: Property): PairKind | undefined {
+    // A custom editor's size is unknown, and a partner that hides itself on a
+    // condition strands the other half of its row.
+    if (property.admin?.Field) return undefined;
+    if (property.conditions) return undefined;
+    if ((property.name?.length ?? 0) > PAIR_MAX_LABEL) return undefined;
+    if ((property.description?.length ?? 0) > PAIR_MAX_DESCRIPTION) return undefined;
+
+    switch (property.type) {
+        case "boolean":
+            return "switch";
+        case "date":
+            return property.mode === "date_time" ? "date_time" : "date";
+        case "number":
+        case "string": {
+            if (property.enum) {
+                const labels = enumLabels(property.enum as EnumValues);
+                return labels.every(label => label.length <= PAIR_MAX_OPTION_LABEL) ? "select" : undefined;
+            }
+            return property.type === "number" ? "number" : undefined;
+        }
+        default:
+            return undefined;
+    }
+}
+
+/**
+ * Put neighbouring fields of the same compact kind two to a row.
+ *
+ * Greedy and in declaration order: a run of three numbers is a pair and a full
+ * row, never a pair with the third pulled out of order. A pair only starts at
+ * the beginning of a row — the grid flows, so a pair placed after an author's
+ * `span: 2` would split across two rows. Fields with a span the author wrote are
+ * left as written, and nothing is widened to close a gap they leave.
+ */
+export function pairCompactFields(
+    fields: ResolvedFormField[],
+    propertyOf: (key: string) => Property | undefined
+): ResolvedFormField[] {
+    const kindOf = (field: ResolvedFormField | undefined): PairKind | undefined => {
+        if (!field || field.additional || field.spanExplicit) return undefined;
+        const property = propertyOf(field.key);
+        return property ? pairKind(property) : undefined;
+    };
+
+    const out = [...fields];
+    let used = 0; // columns taken in the current row
+    for (let i = 0; i < out.length; i++) {
+        const kind = kindOf(out[i]);
+        if (used === 0 && kind && kindOf(out[i + 1]) === kind) {
+            out[i] = {
+                ...out[i],
+                span: 2
+            };
+            out[i + 1] = {
+                ...out[i + 1],
+                span: 2
+            };
+            i++;
+            continue;
+        }
+        const span = out[i].span;
+        if (used + span > GRID_COLUMNS) used = 0;
+        used = (used + span) % GRID_COLUMNS;
+    }
+    return out;
+}
+
+/* -------------------------------------------------------------------------- */
 /* resolution                                                                 */
 /* -------------------------------------------------------------------------- */
 
@@ -143,7 +250,8 @@ function buildField<M extends Record<string, unknown>>(
     return {
         key,
         span: property.admin?.span ?? GRID_COLUMNS,
-        additional: false
+        additional: false,
+        spanExplicit: property.admin?.span !== undefined
     };
 }
 
@@ -262,8 +370,14 @@ export function resolveFormLayout<M extends Record<string, unknown>>({
 
     // A configured section that ended up empty (every key hidden, unknown, or
     // claimed by the rail) would render as a heading over nothing.
+    const propertyOf = (key: string) => collection.properties?.[key] as Property | undefined;
     return {
-        sections: sections.filter(s => s.fields.length > 0),
+        sections: sections
+            .filter(s => s.fields.length > 0)
+            .map(s => ({
+                ...s,
+                fields: pairCompactFields(s.fields, propertyOf)
+            })),
         sidebar,
         showRecordMeta,
         hasRail: sidebar.length > 0 || showRecordMeta

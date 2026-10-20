@@ -10,9 +10,9 @@ description: Controlla come è organizzato il form dell'entità — estensioni d
 Il form dell'entità viene generato a partire dalle tue proprietà:
 
 - l'id e i timestamp `createdAt` / `updatedAt` vengono collocati in una barra dei metadati, in sola lettura
-- ogni altro campo occupa l'intera larghezza della colonna principale
+- ogni altro campo occupa l'intera larghezza della colonna principale, tranne due campi vicini con lo stesso editor compatto — due numeri, due interruttori, due date dello stesso tipo, due select con opzioni brevi — che condividono una riga
 
-Il form non ricava mai una larghezza dal tipo di una proprietà, né da quale proprietà è il titolo. Le colonne le chiede la collezione, campo per campo, con `admin.span`, scelto in base a ciò che ogni campo contiene, come spiegato sotto. Usa `admin.form` per raggruppare i campi in sezioni e spostarli nella barra.
+Un campo con un'etichetta lunga, un testo di aiuto oltre i 60 caratteri, `conditions` o un `Field` personalizzato non viene mai affiancato, e nemmeno una stringa di testo libero: nulla nello schema distingue un nome di branch breve da un URL lungo. Il form non guarda mai quale proprietà è il titolo. Le altre colonne le chiede la collezione, campo per campo, con `admin.span`, scelto in base a ciò che ogni campo contiene, come spiegato sotto. Usa `admin.form` per raggruppare i campi in sezioni e spostarli nella barra.
 
 ## Larghezza del campo
 

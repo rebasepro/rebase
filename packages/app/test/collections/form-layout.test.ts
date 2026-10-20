@@ -2,7 +2,10 @@ import type { AdminCollection } from "@rebasepro/cms-types";
 import type { Property } from "@rebasepro/types";
 import {
     isIdPropertyEditable,
-    resolveFormLayout
+    pairCompactFields,
+    pairKind,
+    resolveFormLayout,
+    type ResolvedFormField
 } from "../../src/collections/form-layout";
 
 const collection = (properties: Record<string, unknown>, admin: Record<string, unknown> = {}) =>
@@ -19,6 +22,150 @@ const keysOf = (layout: { sections: { fields: { key: string }[] }[] }) =>
 
 const spanOf = (layout: { sections: { fields: { key: string, span: number }[] }[] }, key: string) =>
     layout.sections.flatMap(s => s.fields).find(f => f.key === key)?.span;
+
+describe("pairKind", () => {
+    const p = (v: unknown) => v as Property;
+
+    it("names the compact editors", () => {
+        expect(pairKind(p({ type: "number", name: "Price" }))).toBe("number");
+        expect(pairKind(p({ type: "boolean", name: "Active" }))).toBe("switch");
+        expect(pairKind(p({ type: "date", name: "Starts" }))).toBe("date");
+        expect(pairKind(p({ type: "date", name: "Starts", mode: "date_time" }))).toBe("date_time");
+        expect(pairKind(p({ type: "string", name: "Status", enum: { draft: "Draft", live: "Live" } }))).toBe("select");
+        expect(pairKind(p({ type: "number", name: "Priority", enum: [{ id: 1, label: "Low" }] }))).toBe("select");
+        expect(pairKind(p({ type: "string", name: "Plan", enum: new Map([["a", "A"]]) }))).toBe("select");
+    });
+
+    it("never pairs a free-text string, whatever it is called or holds", () => {
+        // Namespace beside Custom Domain: both strings, nothing alike.
+        expect(pairKind(p({ type: "string", name: "Namespace" }))).toBeUndefined();
+        expect(pairKind(p({ type: "string", name: "Git Branch" }))).toBeUndefined();
+    });
+
+    it("never pairs what renders another record or a list", () => {
+        expect(pairKind(p({ type: "relation", name: "Owner" }))).toBeUndefined();
+        expect(pairKind(p({ type: "reference", name: "Owner" }))).toBeUndefined();
+        expect(pairKind(p({ type: "array", name: "Tags", of: { type: "string" } }))).toBeUndefined();
+        expect(pairKind(p({ type: "map", name: "Address" }))).toBeUndefined();
+    });
+
+    it("keeps a field with long help text, a long label or long options on its own row", () => {
+        expect(pairKind(p({
+            type: "string",
+            name: "App Capacity",
+            enum: { shared: "Shared", reserved: "Reserved" },
+            description: "Shared: you get what you buy and can use more when there is spare capacity."
+        }))).toBeUndefined();
+        expect(pairKind(p({ type: "number", name: "Maximum concurrent connections per region" }))).toBeUndefined();
+        expect(pairKind(p({
+            type: "string",
+            name: "Tier",
+            enum: { a: "Dedicated hardware running this project and nothing else" }
+        }))).toBeUndefined();
+        expect(pairKind(p({ type: "number", name: "Seats", description: "Paid seats." }))).toBe("number");
+    });
+
+    it("keeps a custom editor or a conditional field on its own row", () => {
+        expect(pairKind(p({ type: "number", name: "Score", admin: { Field: () => null } }))).toBeUndefined();
+        expect(pairKind(p({ type: "number", name: "Score", conditions: { hidden: {} } }))).toBeUndefined();
+    });
+});
+
+describe("pairCompactFields", () => {
+    const field = (key: string, span: ResolvedFormField["span"] = 4, spanExplicit = false): ResolvedFormField =>
+        ({ key, span, additional: false, spanExplicit });
+    const props: Record<string, unknown> = {
+        n1: { type: "number", name: "Width" },
+        n2: { type: "number", name: "Height" },
+        n3: { type: "number", name: "Depth" },
+        n4: { type: "number", name: "Weight" },
+        b1: { type: "boolean", name: "Active" },
+        b2: { type: "boolean", name: "Featured" },
+        d1: { type: "date", name: "Starts" },
+        d2: { type: "date", name: "Ends" },
+        dt: { type: "date", name: "Sent", mode: "date_time" },
+        s1: { type: "string", name: "Namespace" },
+        x2: { type: "string", name: "Code" }
+    };
+    const pair = (fields: ResolvedFormField[]) =>
+        pairCompactFields(fields, key => props[key] as Property | undefined).map(f => [f.key, f.span]);
+
+    it("pairs two neighbours of the same kind", () => {
+        expect(pair([field("n1"), field("n2")])).toEqual([["n1", 2], ["n2", 2]]);
+        expect(pair([field("b1"), field("b2")])).toEqual([["b1", 2], ["b2", 2]]);
+        expect(pair([field("d1"), field("d2")])).toEqual([["d1", 2], ["d2", 2]]);
+    });
+
+    it("does not pair different kinds", () => {
+        expect(pair([field("n1"), field("b1")])).toEqual([["n1", 4], ["b1", 4]]);
+        expect(pair([field("d1"), field("dt")])).toEqual([["d1", 4], ["dt", 4]]);
+    });
+
+    it("does not pair fields that are not next to each other", () => {
+        expect(pair([field("n1"), field("s1"), field("n2")])).toEqual([["n1", 4], ["s1", 4], ["n2", 4]]);
+    });
+
+    it("pairs a run two at a time and leaves the odd one out on its own row, in order", () => {
+        expect(pair([field("n1"), field("n2"), field("n3")])).toEqual([["n1", 2], ["n2", 2], ["n3", 4]]);
+        expect(pair([field("n1"), field("n2"), field("n3"), field("n4")]))
+            .toEqual([["n1", 2], ["n2", 2], ["n3", 2], ["n4", 2]]);
+    });
+
+    it("never resizes a span the author wrote, nor pairs with it", () => {
+        expect(pair([field("n1", 2, true), field("n2")])).toEqual([["n1", 2], ["n2", 4]]);
+    });
+
+    it("only starts a pair at the beginning of a row", () => {
+        // `x2` takes half a row: a pair after it would split across two rows.
+        expect(pair([field("x2", 2, true), field("n1"), field("n2")]))
+            .toEqual([["x2", 2], ["n1", 4], ["n2", 4]]);
+        // once the author's row is full, pairing resumes
+        expect(pair([field("x2", 2, true), field("x2", 2, true), field("n1"), field("n2")]))
+            .toEqual([["x2", 2], ["x2", 2], ["n1", 2], ["n2", 2]]);
+    });
+
+    it("leaves additionalFields alone", () => {
+        const extra: ResolvedFormField = { key: "n1", span: 4, additional: true };
+        expect(pairCompactFields([extra, field("n2")], key => props[key] as Property).map(f => f.span))
+            .toEqual([4, 4]);
+    });
+});
+
+describe("resolveFormLayout — the projects form", () => {
+    // The form that started this: every value a string, so nothing pairs.
+    it("keeps unrelated strings on rows of their own", () => {
+        const projects = collection({
+            name: { type: "string", name: "Name" },
+            subdomain: { type: "string", name: "Subdomain" },
+            namespace: { type: "string", name: "Namespace" },
+            customDomain: { type: "string", name: "Custom Domain" },
+            gitRepositoryUrl: { type: "string", name: "Git Repository URL" },
+            gitBranch: { type: "string", name: "Git Branch" }
+        });
+        const keys = ["name", "subdomain", "namespace", "customDomain", "gitRepositoryUrl", "gitBranch"];
+        const l = resolveFormLayout({ collection: projects, fieldKeys: keys, status: "existing" });
+        for (const key of keys) expect(spanOf(l, key)).toBe(4);
+    });
+
+    it("pairs within a section, never across two", () => {
+        const sectioned = collection({
+            a: { type: "number", name: "A" },
+            b: { type: "number", name: "B" },
+            c: { type: "number", name: "C" }
+        }, {
+            form: {
+                sections: [
+                    { key: "one", properties: ["a"] },
+                    { key: "two", title: "Two", properties: ["b", "c"] }
+                ]
+            }
+        });
+        const l = resolveFormLayout({ collection: sectioned, fieldKeys: ["a", "b", "c"], status: "existing" });
+        expect(spanOf(l, "a")).toBe(4);
+        expect(spanOf(l, "b")).toBe(2);
+        expect(spanOf(l, "c")).toBe(2);
+    });
+});
 
 describe("isIdPropertyEditable", () => {
     it("keeps a manual id typeable while creating and freezes it afterwards", () => {
@@ -97,10 +244,12 @@ describe("resolveFormLayout — defaults", () => {
         expect(keysOf(editing)).not.toContain("id");
     });
 
-    it("gives every field the full row, whatever its type", () => {
-        for (const key of keysOf(layout)) {
-            expect(spanOf(layout, key)).toBe(4);
-        }
+    it("pairs the two neighbouring numbers and leaves every string full width", () => {
+        expect(spanOf(layout, "name")).toBe(4);
+        expect(spanOf(layout, "sku")).toBe(4);
+        expect(spanOf(layout, "price")).toBe(2);
+        expect(spanOf(layout, "stock")).toBe(2);
+        expect(spanOf(layout, "description")).toBe(4);
     });
 
     it("does not widen or narrow the title property", () => {

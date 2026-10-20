@@ -10,9 +10,9 @@ description: Controle como o formulário da entidade é organizado — larguras 
 O formulário da entidade é gerado a partir de suas propriedades:
 
 - o id e os timestamps `createdAt` / `updatedAt` vão para uma barra lateral de metadados, somente leitura
-- todos os outros campos ocupam a largura total da coluna principal
+- todos os outros campos ocupam a largura total da coluna principal, exceto dois campos vizinhos com o mesmo editor compacto — dois números, dois interruptores, duas datas do mesmo modo, dois selects com opções curtas — que dividem uma linha
 
-O formulário nunca deriva uma largura a partir do tipo de uma propriedade, nem de qual propriedade é o título. As colunas são pedidas pela coleção, campo a campo, com `admin.span`, escolhido pelo que cada campo contém, como abaixo. Use `admin.form` para agrupar campos em seções e movê-los para a barra lateral.
+Um campo com rótulo longo, texto de ajuda com mais de 60 caracteres, `conditions` ou um `Field` personalizado nunca é emparelhado, nem qualquer string de texto livre: nada no schema distingue um nome de branch curto de uma URL longa. O formulário nunca olha qual propriedade é o título. As demais colunas são pedidas pela coleção, campo a campo, com `admin.span`, escolhido pelo que cada campo contém, como abaixo. Use `admin.form` para agrupar campos em seções e movê-los para a barra lateral.
 
 ## Largura do campo
 

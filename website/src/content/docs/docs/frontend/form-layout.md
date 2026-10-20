@@ -9,11 +9,16 @@ description: Control how the entity form is arranged — column spans, sections,
 The entity form is generated from your properties:
 
 - the id and the `createdAt` / `updatedAt` timestamps go to a metadata rail, read-only
-- every other field takes the full width of the main column
+- every other field takes the full width of the main column, except that two
+  neighbouring fields with the same small editor — two numbers, two switches,
+  two dates of the same mode, two selects with short options — share a row
 
-The form never guesses a width from a property's type, or from which property is
-the title. Columns are something the collection asks for, field by field, with
-`admin.span` — set from what each field holds, as below. Use `admin.form` to
+A field with a long label, help text over 60 characters, `conditions` or a
+custom `Field` is never paired, and neither is any free-text string: nothing in
+a schema tells a short branch name from a long URL. The form never looks at
+which property is the title. Any other columns are something the collection asks
+for, field by field, with `admin.span` — set from what each field holds, as
+below. Use `admin.form` to
 group fields into sections and move them to the rail.
 
 ## Field width
