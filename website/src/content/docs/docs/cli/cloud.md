@@ -95,6 +95,12 @@ rebase cloud extensions list | enable | disable
 rebase cloud settings show | set        # name, branch, repo, subdomain, rebuilds
 ```
 
+A backend preview starts from production's variables, live keys included.
+`env set KEY=VALUE --preview` gives previews their own value, `env unset KEY
+--preview` leaves the variable out of them, `env reset KEY --preview` hands
+back production's value, and `env list --preview` shows the differences.
+Production is never changed by any of them.
+
 ## Organizations
 
 ```bash

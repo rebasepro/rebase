@@ -63,6 +63,15 @@
   ships to production. The control plane's half is specified in
   `docs/preview-deployments.md`.
 
+- **Previews can run with their own environment variables.** A backend preview
+  starts from production's variables, and that copy carries production's live
+  third-party keys, so a preview that charges a card does it for real.
+  `rebase cloud env set KEY=VALUE --preview` gives previews their own value (a
+  test key), `env unset KEY --preview` leaves a variable out of them, `env reset
+  KEY --preview` gives them production's value again, and `env list --preview`
+  shows what differs. None of them changes production. A control plane without
+  previews refuses them with `previews_unavailable`.
+
 ### Fixed
 
 #### CLI

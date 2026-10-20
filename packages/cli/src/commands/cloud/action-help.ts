@@ -460,16 +460,18 @@ export const ACTION_HELP: Record<string, ActionHelp> = {
 
     "env set": {
         command: "cloud env set",
-        usage: "cloud env set KEY=VALUE | KEY VALUE [--secret] [--force]",
+        usage: "cloud env set KEY=VALUE | KEY VALUE [--secret] [--force] [--preview]",
         summary:
             "Set one environment variable on the project. Takes effect on the next deploy — "
             + "a running instance does not pick it up.",
         flags: [
             ["--secret", "Store it encrypted and never return it in a listing"],
-            ["--force", "Set a build-time key (VITE_*, NEXT_PUBLIC_*, …) anyway, for a build that reads it at run time"]
+            ["--force", "Set a build-time key (VITE_*, NEXT_PUBLIC_*, …) anyway, for a build that reads it at run time"],
+            ["--preview", "Set it for the project's previews only; production keeps its value"]
         ],
         examples: [
             "rebase cloud env set STRIPE_KEY=sk_live_… --secret",
+            "rebase cloud env set STRIPE_KEY=sk_test_… --secret --preview",
             "rebase cloud env set LOG_LEVEL debug",
             "rebase cloud env set FEATURE_X= "
         ],
