@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { spawn } from "node:child_process";
 import { existsSync, readdirSync, readFileSync, realpathSync, statSync } from "node:fs";
 import { dirname, isAbsolute, join, relative, sep } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -28,6 +29,100 @@ const paint = (code, text) => (useColor ? `\x1b[${code}m${text}\x1b[0m` : text);
 const red = (text) => paint(31, text);
 const yellow = (text) => paint(33, text);
 const dim = (text) => paint(90, text);
+
+/**
+ * Run the project's own CLI when this one is a checkout and the project has one.
+ *
+ * The global `rebase` on a CLI developer's machine is a link to a checkout of
+ * this repo, so a bare `rebase cloud deploy` typed in a customer project ran
+ * the checkout's `dist/` — 280h older than its source, on the machine it was
+ * found on — and not the `@rebasepro/cli` 0.25.1 that project had pinned. Only
+ * `pnpm rebase` used the pinned one. Nothing said so, and a deploy is the
+ * command where the version matters most.
+ *
+ * So, as jest, webpack-cli and gulp do, a checkout hands off to the CLI the project
+ * installed: same argv, same stdio, its exit code. A note naming both versions
+ * was the alternative; it leaves the wrong CLI running and trains people to
+ * skim past a line on stderr. The project's pin is the answer to "which CLI",
+ * and a source checkout is never the release anyone pinned.
+ *
+ * Only a checkout hands off. An install runs itself, which is also what keeps
+ * this from looping: the CLI handed to is always an install. A project whose
+ * `@rebasepro/cli` resolves to a checkout (a workspace or `link:` dependency,
+ * as in this repo's own apps and end-to-end suites) is already running the
+ * build it asked for. `REBASE_CLI_DEV=1` runs the checkout anyway, for testing
+ * a dev build against a project elsewhere.
+ */
+function isInstalled(dir) {
+    return dir.split(sep).includes("node_modules");
+}
+
+function projectCli() {
+    const packageDir = realpathSync(join(here, ".."));
+    if (isInstalled(packageDir) || parseFlag(process.env.REBASE_CLI_DEV)) return null;
+
+    // Node's own lookup: the nearest `node_modules` up from where it was run.
+    let dir = process.cwd();
+    while (!existsSync(join(dir, "node_modules", "@rebasepro", "cli", "package.json"))) {
+        const parent = dirname(dir);
+        if (parent === dir) return null;
+        dir = parent;
+    }
+
+    const installed = realpathSync(join(dir, "node_modules", "@rebasepro", "cli"));
+    if (installed === packageDir || !isInstalled(installed)) return null;
+
+    const manifest = JSON.parse(readFileSync(join(installed, "package.json"), "utf8"));
+    const binPath = typeof manifest.bin === "string" ? manifest.bin : manifest.bin?.rebase;
+    if (typeof binPath !== "string" || !existsSync(join(installed, binPath))) return null;
+    return { bin: join(installed, binPath),
+version: manifest.version,
+packageDir };
+}
+
+function handOff({ bin, version, packageDir }) {
+    if (process.argv.includes("--debug") || parseFlag(process.env.REBASE_DEBUG)) {
+        process.stderr.write(dim(
+            `rebase CLI: running this project's @rebasepro/cli ${version} (${bin}) ` +
+            `instead of ${packageDir}. REBASE_CLI_DEV=1 runs that one.`
+        ) + "\n");
+    }
+
+    const child = spawn(process.execPath, [...process.execArgv, bin, ...process.argv.slice(2)], { stdio: "inherit" });
+
+    // Ctrl+C and a closed terminal reach the child through the process group,
+    // so this process only has to outlive it. A `kill` names this pid alone.
+    const stayUp = () => { /* the child decides */ };
+    const forward = (signal) => child.kill(signal);
+    process.on("SIGINT", stayUp);
+    process.on("SIGHUP", stayUp);
+    process.on("SIGTERM", forward);
+
+    return new Promise(() => {
+        child.on("error", (error) => {
+            process.stderr.write(`${red(`✗ rebase CLI: could not start ${bin}: ${error.message}`)}\n`);
+            process.exit(1);
+        });
+        child.on("exit", (code, signal) => {
+            if (signal) {
+                process.off("SIGINT", stayUp);
+                process.off("SIGHUP", stayUp);
+                process.off("SIGTERM", forward);
+                process.kill(process.pid, signal);
+                return;
+            }
+            process.exit(code ?? 1);
+        });
+    });
+}
+
+let local = null;
+try {
+    local = projectCli();
+} catch {
+    // Looking for another CLI must never stop this one from running.
+}
+if (local) await handOff(local);
 
 /**
  * Refuse to run on a Node older than this CLI's own floor, before anything else.

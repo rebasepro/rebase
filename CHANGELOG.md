@@ -86,6 +86,17 @@
   `REBASE_CLI_DEV=1` to get it when testing a dev build against another
   project.
 
+- **A `rebase` linked to a checkout runs the CLI your project pinned.** On a
+  machine whose global `rebase` links to a checkout of this repo, a bare
+  `rebase cloud deploy` in a project ran the checkout's build (280h older than
+  its source, where it was found) instead of the project's installed
+  `@rebasepro/cli` 0.25.1; only `pnpm rebase` used the pinned one. A checkout
+  now hands off to the `@rebasepro/cli` the project installed in
+  `node_modules`, with the same arguments, and exits with its code, as jest and
+  gulp do. `--debug` names both. A project that links its CLI to a checkout
+  keeps running that checkout, and `REBASE_CLI_DEV=1` runs the checkout
+  anyway, for testing a dev build against another project.
+
 - **The cloud debug boot view shows the functions and crons a 0.25 runtime
   loaded.** It kept a line only if it said "Loaded function" or "Mounted", the
   words runtimes used up to 0.24; 0.25 says "Loaded custom functions", "Loaded
