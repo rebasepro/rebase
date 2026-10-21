@@ -506,8 +506,14 @@ test("every customization task reverts one recipe and verifies it with that reci
     }
 });
 
-test("a task pinned by subject resolves to a commit in this history", () => {
+test("a task pinned by subject resolves to a commit in this history", (t) => {
     const root = context().primaryRoot;
+    // CI checks out one commit (`fetch-depth: 1`): there is no history to find
+    // a subject in, and an empty answer there says nothing about the pins.
+    if (execFileSync("git", ["-C", root, "rev-parse", "--is-shallow-repository"], { encoding: "utf8" }).trim() === "true") {
+        t.skip("a shallow clone has no history to resolve a subject in");
+        return;
+    }
     for (const task of TASKS.filter((t) => t.subject)) {
         const commit = resolveCommit(root, task);
         assert.match(commit, /^[0-9a-f]{7,}$/, task.id);

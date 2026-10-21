@@ -62,6 +62,9 @@
             "@rebasepro/cli": [
                 "./packages/cli/src"
             ],
+            "@rebasepro/rls-check": [
+                "./packages/rls-check/src"
+            ],
             "@rebasepro/mcp": [
                 "./packages/mcp/src"
             ]
