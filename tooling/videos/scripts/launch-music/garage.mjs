@@ -150,7 +150,7 @@ export function compose(s) {
             downlifter(fx, t(0), s.beat * 3, { vel: 0.22 });
         }
         if (b.next && b.next.kind !== "premise") swell(fx, t(8), s.beat * 2, { vel: 0.35 });
-        if (b.kind === "premise" && b.last) riser(fx, t(0), s.beat * 4, { vel: 0.7 });
+        if (b.intoFirstVerb) riser(fx, t(0), s.beat * 4, { vel: 0.7 });
         if (b.kind === "claim" && b.last) {
             riser(fx, t(0), s.beat * 4, { vel: 0.9 });
             const roll = [0, 2, 4, 6, 8, 9, 10, 11, 12, 12.5, 13, 13.5, 14, 14.5, 15, 15.5];

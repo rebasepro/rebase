@@ -136,7 +136,7 @@ export function compose(s) {
             swell(fx, t(8), s.beat * 2, { vel: 0.4 });
             if (b.kind === "verb") for (const [x, p] of [[12, 120], [13, 105], [14, 92], [15, 78]]) tom(perc, t(x) + loose(), { vel: 0.55, pitch: p });
         }
-        if (b.kind === "premise" && b.last) riser(fx, t(0), s.beat * 4, { vel: 0.6, to: 6000 });
+        if (b.intoFirstVerb) riser(fx, t(0), s.beat * 4, { vel: 0.6, to: 6000 });
         if (b.kind === "claim" && b.last) {
             riser(fx, t(0), s.beat * 4, { vel: 0.8, to: 7000 });
             const roll = [0, 2, 4, 6, 8, 9, 10, 11, 12, 12.5, 13, 13.5, 14, 14.5, 15, 15.5];

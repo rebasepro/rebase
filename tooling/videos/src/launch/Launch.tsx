@@ -4,17 +4,16 @@ import { NeatCanvas } from "../gradient/NeatCanvas";
 import { ramp, SHIFT } from "../components/motion";
 import { ToneOverride } from "../Plane";
 import { GROUND, TONE, type Ground } from "../theme";
-import { Hook } from "./Hook";
 import { Premise } from "./Premise";
 import { Agents, Define, Secure } from "./Claims";
 import { Build, Claim, EndCard, Manage, Shape } from "./Sections";
 import { FPS, type Section, sectionLength, sectionStart, SECTIONS, type Track } from "./score";
 
 /**
- * RebaseLaunch — a 46-second teaser, cut to its own soundtrack.
+ * RebaseLaunch — a 42-second teaser, cut to its own soundtrack.
  *
- *   hook     2 bars  a wall of the live product
- *   premise  2 bars  the site's headline, a word group per beat
+ *   premise  2 bars  the site's headline, slammed in a word group per beat —
+ *                    the film's first frame (the intro wall was cut 10-21)
  *   define   3 bars  one collection file, and every surface drawn out of it
  *   secure   3 bars  the same query, two users, different rows (claim field)
  *   build    2 bars  the backend: the typed SDK, realtime
@@ -33,7 +32,6 @@ import { FPS, type Section, sectionLength, sectionStart, SECTIONS, type Track } 
  *  inside the 0.10–0.82 plateau where the ribbon's coverage of the frame is
  *  steady (see Reel.tsx), and turn 14–40 degrees per cut. */
 const LOOK: Record<Section, { ground: Ground; roll: number }> = {
-    hook: { ground: "base", roll: 0.3 },
     premise: { ground: "base", roll: 0.22 },
     define: { ground: "base", roll: 0.62 },
     // Security in the database is THE CLAIM, and the claim field is the
@@ -55,7 +53,7 @@ const ORDER = Object.keys(SECTIONS) as Section[];
 const Backdrop: React.FC = () => {
     const frame = useCurrentFrame();
 
-    let roll = LOOK.hook.roll;
+    let roll = LOOK[ORDER[0]].roll;
     let surge = 0;
     for (let i = 1; i < ORDER.length; i++) {
         const cut = sectionStart(ORDER[i]);
@@ -66,7 +64,7 @@ const Backdrop: React.FC = () => {
 
     // A field is a hard cut on its downbeat, both ways: a fade puts the hit
     // on a half-coloured frame.
-    const current = [...ORDER].reverse().find((s) => frame >= sectionStart(s)) ?? "hook";
+    const current = [...ORDER].reverse().find((s) => frame >= sectionStart(s)) ?? ORDER[0];
     const field = LOOK[current].ground;
 
     // The end card is the one place the art comes up: the brand, at the drop.
@@ -78,7 +76,7 @@ const Backdrop: React.FC = () => {
             {field !== "base" && <AbsoluteFill style={{ background: GROUND[field] }} />}
             <NeatCanvas
                 framing="hero"
-                opacity={interpolate(bloom, [0, 1], [0.3, 0.5])}
+                opacity={interpolate(bloom, [0, 1], [0.38, 0.55])}
                 camera={{ cameraX: 0, cameraY: -12, cameraZoom: 2.05, cameraRotationZ: roll }}
                 time={frame / FPS * 0.7 + surge * 0.8}
                 style={{ mixBlendMode: "screen" }}
@@ -88,7 +86,6 @@ const Backdrop: React.FC = () => {
 };
 
 const PARTS: Record<Section, React.FC> = {
-    hook: Hook,
     premise: Premise,
     define: Define,
     secure: Secure,
