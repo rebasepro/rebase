@@ -538,10 +538,12 @@ describe("groupSchemaRows", () => {
     });
 
     it("grows linearly with the number of tables, not with its square", () => {
-        // Best of three, so a collection or a JIT tier change lands in one run
-        // and not in the answer. Linear is ~10x for 10x the tables; the old
-        // lookup was ~100x.
-        const best = (rows: Record<string, unknown>[]) => Math.min(...[0, 1, 2].map(() => {
+        // Best of five, after warming up both sizes, so a collection or a JIT
+        // tier change lands in one run and not in the answer: warming only the
+        // small set left the large one's first runs to tier up, and on a busy
+        // CI runner a linear grouping measured 37x and 43x. Linear is ~10x for
+        // 10x the tables; the old lookup was ~100x.
+        const best = (rows: Record<string, unknown>[]) => Math.min(...[0, 1, 2, 3, 4].map(() => {
             const start = performance.now();
             groupSchemaRows(rows);
             return performance.now() - start;
@@ -549,6 +551,7 @@ describe("groupSchemaRows", () => {
         const small = rowsFor(500);
         const large = rowsFor(5_000);
         best(small);
+        best(large);
         expect(best(large) / Math.max(best(small), 0.5)).toBeLessThan(30);
     });
 });

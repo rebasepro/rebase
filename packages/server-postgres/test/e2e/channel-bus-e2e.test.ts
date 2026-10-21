@@ -244,6 +244,16 @@ describe("Channel bus (E2E, two backend instances)", () => {
 
         await alice.track({ name: "Alice" });
         await bob.track({ name: "Bob" });
+        // `track` resolves when the frame is written, not when the server has
+        // recorded it. Carol is meant to arrive after both are in the room;
+        // asking sooner races her snapshot against their rows, and the join
+        // diffs went out before she was there to receive them.
+        await waitFor(async () => {
+            const rows = await inspect.query(
+                "SELECT 1 FROM rebase.channel_presence WHERE channel = $1", [RETAINED]
+            );
+            return rows.rowCount === 2;
+        }, "Alice's and Bob's presence reached the shared table");
 
         // A third client asking cold: it has seen no diffs, so whatever it knows
         // came from the shared roster rather than from being in the room.
