@@ -297,57 +297,6 @@ Instead, Rebase should make it effortless for a coding agent to drop a **100-lin
 
 ---
 
-### Task 4.2: Declarative SQL/Metric Blocks for Agent-Authored Dashboards (`@rebasepro/cms`, `@rebasepro/app`)
-
-#### Files to Modify
-- `packages/cms-types/src/dashboard.ts` (new or extend existing view types)
-- `packages/app/src/components/dashboard/DeclarativeDashboardView.tsx` (new)
-- `packages/mcp/src/tools/views.ts` (new MCP tool group or part of schema tools)
-
-#### Specification
-1. **Declarative Dashboard Schema (`defineDashboard` in `@rebasepro/cms-types`)**:
-   Allow developers and agents to define operational dashboards as pure data/TypeScript in `config/dashboards/*.ts` (or stored in Postgres) without writing charting boilerplate:
-   ```ts
-   export interface DashboardKpiWidget {
-       kind: "kpi";
-       id: string;
-       title: string;
-       collection: string;
-       aggregate: "count" | "sum" | "avg" | "min" | "max";
-       field?: string;
-       filter?: Record<string, unknown>;
-   }
-
-   export interface DashboardTableWidget {
-       kind: "table";
-       id: string;
-       title: string;
-       collection: string;
-       columns?: string[];
-       limit?: number;
-       filter?: Record<string, unknown>;
-   }
-
-   export interface DashboardConfig {
-       slug: string;
-       name: string;
-       description?: string;
-        icon?: string;
-       widgets: Array<DashboardKpiWidget | DashboardTableWidget>;
-   }
-
-   export function defineDashboard(config: DashboardConfig): DashboardConfig {
-       return config;
-   }
-   ```
-2. **Renderer in `@rebasepro/app` (`DeclarativeDashboardView.tsx`)**:
-   - Renders `DashboardConfig` widgets using `@rebasepro/ui` cards and `useDataSource` queries (so every widget automatically respects the viewer's Postgres RLS policies!).
-
-#### Verification
-- Run `pnpm typecheck && pnpm check:api-surface` (and `pnpm write:api-surface` if intentionally exporting `defineDashboard` from `@rebasepro/cms-types`).
-
----
-
 ## Pillar 5: Zero-Signup Ephemeral Cloud Claiming & `rls-check` Growth Loop
 
 ### Context & Goal
