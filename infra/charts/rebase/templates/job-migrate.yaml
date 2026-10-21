@@ -1,4 +1,4 @@
-{{- if .Values.migrationJob.enabled }}
+{{- if eq (include "rebase.jobOwnsSchema" .) "true" }}
 {{/*
 Schema provisioning as a Job, so nothing on the request path owns DDL.
 

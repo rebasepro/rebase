@@ -143,6 +143,11 @@ export interface ExpiredTokenSweepWiring {
     ownsTimers: boolean;
     /** `cronPersistence: false` keeps the claims table out of the database, here too. */
     persistClaims?: boolean;
+    /**
+     * `false`: the backend changes nothing in its database, so the claims
+     * table is used if it is there and never created by the first tick.
+     */
+    provision?: boolean;
 }
 
 /**
@@ -158,7 +163,7 @@ export function startExpiredTokenSweep(wiring: ExpiredTokenSweepWiring): Expired
     if (!wiring.ownsTimers || !repo || typeof repo.deleteExpiredTokens !== "function") return undefined;
     const deleteExpiredTokens = repo.deleteExpiredTokens.bind(repo);
     const store = wiring.persistClaims !== false && isSQLAdmin(wiring.driver.admin)
-        ? createCronStore(wiring.driver)
+        ? createCronStore(wiring.driver, { provision: wiring.provision })
         : undefined;
     let ready: Promise<void> | undefined;
     const sweep = createExpiredTokenSweep({

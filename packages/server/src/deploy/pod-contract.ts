@@ -101,6 +101,10 @@ export const TOPOLOGY_ENV_VARS = [
     // platform configured — and the platform would have no record of it.
     "REBASE_MCP_ENABLED",
     "REBASE_MIGRATE_ON_BOOT",
+    // Whether this pod may change its database at all. The same question as
+    // the line above, asked more widely — and a tenant who could answer it
+    // would have a database the platform can never provision.
+    "REBASE_PROVISION",
     "TRUSTED_PROXY_HOPS",
     "REBASE_RATE_LIMIT_STORE",
     "REBASE_REQUIRE_SCHEMA_MATCH"

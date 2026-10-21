@@ -335,6 +335,7 @@ so a panel can grey the feature out instead of showing an error.
 | `SCHEMA_EDIT_REQUIRES_A_PERSON` | 403 | An API key or other machine principal tried to apply a schema change. | Sign in as a user, or set `liveSchema.allowMachineApply`. |
 | `SCHEMA_EDITING_NO_COLLECTIONS_DIR` | 501 | Live schema editing needs `collectionsDir` or `liveSchema.repository`, and this server was started with neither. | Configure one. |
 | `SCHEMA_EDITING_NO_REPOSITORY` | 503 | Planning works; there is no repository to commit the change to. | Configure `liveSchema.repository`. |
+| `SCHEMA_EDITING_PROVISIONING_OFF` | 409 | This deployment changes nothing in its database (`REBASE_PROVISION=false`), so a change cannot be applied from the panel. <span class="since-badge" data-since="0.26">Since 0.26</span> | Commit it as source only, and let the process that changes the database apply it. |
 | `SCHEMA_EDITING_UNSUPPORTED` | 503 | This driver cannot plan schema changes. | Live editing is available on Postgres. |
 | `SCHEMA_EDITOR_BAAS_MODE` | 501 | Collections are introspected from the database here, so there are no source files to edit. | Change the schema with a migration. |
 | `SCHEMA_EDITOR_DISABLED` | 501 | The schema editor is turned off for this server. A built bundle always answers this. | Turn it on with `schemaEditor`. On a bundle, set `REBASE_LIVE_SCHEMA_REPOSITORY` to edit collections through a repository — see [Live schema editing](/docs/backend/live-schema-editing#from-a-built-bundle). |

@@ -140,10 +140,35 @@ export async function ensureMetricsHistory(exec: Exec): Promise<void> {
     // recorder runs on is unaffected.
     await exec(revokeInternalTableSql("rebase", "metric_samples"), []);
 
-    // Swept here rather than by a cron, so a deployment that runs no scheduler
-    // still stays bounded. A DELETE is the right tool at this size — a few
-    // thousand rows a day — and partitioning would be machinery for a table
-    // that never gets big.
+    await sweepMetricsHistory(exec);
+}
+
+/**
+ * {@link ensureMetricsHistory} for a backend that changes nothing in its
+ * database: the table is read, never made, and its absence is an error — which
+ * the caller turns into "no history", the same outcome as a create that failed.
+ * The sweep still runs: it deletes rows, and keeping the table bounded is not a
+ * schema change.
+ */
+export async function adoptExistingMetricsHistory(exec: Exec): Promise<void> {
+    try {
+        await exec(`SELECT at, series, instance, value FROM ${METRICS_HISTORY_TABLE} WHERE false`, []);
+    } catch (error) {
+        throw new Error(
+            `${METRICS_HISTORY_TABLE} is missing or out of date, and this backend changes nothing in its database`,
+            { cause: error }
+        );
+    }
+    await sweepMetricsHistory(exec);
+}
+
+/**
+ * Swept at boot rather than by a cron, so a deployment that runs no scheduler
+ * still stays bounded. A DELETE is the right tool at this size — a few thousand
+ * rows a day — and partitioning would be machinery for a table that never gets
+ * big.
+ */
+async function sweepMetricsHistory(exec: Exec): Promise<void> {
     await exec(
         `DELETE FROM ${METRICS_HISTORY_TABLE} WHERE at < now() - make_interval(days => $1)`,
         [RETENTION_DAYS]

@@ -1,5 +1,5 @@
 ---
-sourceHash: 89005ab195a605d6
+sourceHash: f07a976c896af1af
 title: Codici di errore
 sidebar_label: Codici di errore
 description: Tutti i codici di errore che un backend Rebase può restituire, con il rispettivo stato HTTP, il significato e come gestirli — oltre all'envelope di risposta, X-Request-ID e le regole di details.
@@ -338,6 +338,7 @@ la funzione (in grigio) anziché mostrare un errore.
 | `SCHEMA_EDIT_REQUIRES_A_PERSON` | 403 | Una chiave API o un'altra identità automatizzata (machine principal) ha tentato di applicare una modifica allo schema. | Accedi come utente, oppure imposta `liveSchema.allowMachineApply`. |
 | `SCHEMA_EDITING_NO_COLLECTIONS_DIR` | 501 | La modifica dello schema dal vivo richiede `collectionsDir` o `liveSchema.repository`, e questo server è stato avviato senza nessuno dei due. | Configura uno di essi. |
 | `SCHEMA_EDITING_NO_REPOSITORY` | 503 | La pianificazione funziona; non è presente alcun repository in cui salvare (commit) la modifica. | Configura `liveSchema.repository`. |
+| `SCHEMA_EDITING_PROVISIONING_OFF` | 409 | Questa distribuzione non modifica nulla nel proprio database (`REBASE_PROVISION=false`), quindi una modifica non può essere applicata dal pannello. <span class="since-badge" data-since="0.26">Da 0.26</span> | Fai il commit solo come sorgente e lascia che sia il processo che modifica il database ad applicarla. |
 | `SCHEMA_EDITING_UNSUPPORTED` | 503 | Questo driver non è in grado di pianificare modifiche allo schema. | La modifica dal vivo è disponibile su Postgres. |
 | `SCHEMA_EDITOR_BAAS_MODE` | 501 | In questo ambiente le collection vengono ricavate per introspezione dal database, quindi non sono presenti file sorgente da modificare. | Modifica lo schema tramite una migrazione. |
 | `SCHEMA_EDITOR_DISABLED` | 501 | L'editor di schema è disabilitato per questo server. Un bundle compilato risponde sempre così. | Abilitalo tramite `schemaEditor`. Su un bundle, imposta `REBASE_LIVE_SCHEMA_REPOSITORY` per modificare le collection tramite un repository — vedi [Live schema editing](/docs/backend/live-schema-editing#from-a-built-bundle). |

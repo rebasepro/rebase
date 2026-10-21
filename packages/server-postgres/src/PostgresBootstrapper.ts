@@ -36,6 +36,7 @@ import { ensureAuthTablesExist } from "./auth/ensure-tables";
 import { assertAuthSchemaCompatible, probeAuthSchema, resolveAuthSchema } from "./auth/schema-version";
 import { AuthSchemaTables, PostgresAuthRepository, UserService } from "./auth/services";
 import { createAuthSchema } from "./schema/auth-schema";
+import { expectationOf, findUnusableAuthTables, unusableAuthTablesError, usersExpectation } from "./auth/verify-auth-tables";
 import { HistoryService } from "./history/HistoryService";
 import { ensureHistoryIndexes, ensureHistoryTableExists, historyUnavailableReason, readHistoryTableState } from "./history/ensure-history-table";
 import { patchPgArrayNullSafety } from "./utils/pg-array-null-patch";
@@ -44,7 +45,7 @@ import { buildCollectionsFromSchema, introspectSchema, readRlsStatus } from "./s
 import { buildBaasSchema, readCatalogueSchema } from "./schema/catalogue-schema";
 import { diffGeneratedSchemaAgainstCatalogue, warnOnGeneratedSchemaDrift } from "./schema/generated-schema-diff";
 import type { TableMeta } from "./schema/introspect-db-logic";
-import { detectConnectionPosture, ensureAppRole, ensureAppRoleGrants, revokeUserRoleSql, validatePolicyPgRoles, warnOnAnonymousGrants, warnOnLegacyRlsFunctions, warnOnRoleSchemaCollision, REBASE_USER_ROLE, type RawSqlRunner } from "./security/rls-enforcement";
+import { detectConnectionPosture, ensureAppRole, ensureAppRoleGrants, findExposedInternalTables, revokeUserRoleSql, validatePolicyPgRoles, warnOnAnonymousGrants, warnOnLegacyRlsFunctions, warnOnRoleSchemaCollision, REBASE_USER_ROLE, type RawSqlRunner } from "./security/rls-enforcement";
 import { provisionTriggerCdc, settleInstalledCapture, type CdcTableRef } from "./services/cdc/trigger-cdc";
 import { collectJunctionLinks } from "./services/cdc/junction-tables";
 import { collectionKeyColumns } from "./services/cdc/identity-columns";
@@ -157,6 +158,13 @@ export interface PostgresDriverInternals {
      * they would stay uninstrumented until the next restart.
      */
     provisionCdcForTables?: (tables: CdcTableRef[]) => Promise<void>;
+    /**
+     * Opened without provisioning: the framework's internal tables the
+     * request role can reach, which a provisioning boot would have revoked.
+     * Empty when there are none or requests do not run as that role. The
+     * server's boot refuses on any; a script's `openRebase` only warns.
+     */
+    exposedInternalTables?: string[];
 }
 
 // Re-export from shared CLI error utilities
@@ -867,6 +875,7 @@ export async function openPostgresDriver(
     // Default-on: a privileged connection that cannot be
     // isolated fails the boot rather than serving unenforced requests.
     let rlsEnforcement: string | undefined;
+    let exposedInternalTables: string[] | undefined;
     {
         const runSql: RawSqlRunner = async (text) => {
             const res = await schemaAwareDb.execute(sql.raw(text));
@@ -913,6 +922,16 @@ export async function openPostgresDriver(
                 // natively and switches only when there is a role to use.
                 const roleExists = (await runSql(`SELECT 1 FROM pg_roles WHERE rolname = '${REBASE_USER_ROLE}'`)).length > 0;
                 switched = roleExists || bypassesNow;
+                if (roleExists) {
+                    exposedInternalTables = await findExposedInternalTables(runSql, managedSchemas);
+                    if (exposedInternalTables.length > 0) {
+                        logger.warn(
+                            `⚠️ RLS enforcement: the request role "${REBASE_USER_ROLE}" can reach framework tables no ` +
+                            `user should: ${exposedInternalTables.join(", ")}. A provisioning boot revokes this; ` +
+                            "this driver was opened without provisioning, so nothing does."
+                        );
+                    }
+                }
                 if (!roleExists && bypassesNow) {
                     logger.warn(
                         `⚠️ RLS enforcement: connection role "${posture.role}" bypasses row-level security and the ` +
@@ -1029,7 +1048,10 @@ export async function openPostgresDriver(
                 createChannelBus(busSetting, {
                     db: schemaAwareDb as NodePgDatabase<Record<string, unknown>>,
                     directUrl
-                })
+                }),
+                // The roster table is the framework's, like `api_keys`: made by
+                // whichever process provisions, whatever its realtime part.
+                { provision }
             );
         }
     } catch (err) {
@@ -1335,6 +1357,7 @@ foundIn: (tablesByName.get(checkName) ?? []).filter(s => s !== schemaName) });
         poolManager,
         provisioned: provision,
         rlsEnforcement,
+        exposedInternalTables,
         provisionCdcForTables
     };
 
@@ -1520,6 +1543,19 @@ export function createPostgresBootstrapper(pgConfig: PostgresDriverConfig): Back
             const opened = await openPostgresDriver(effectiveConfig(init.dataSourceKey), init);
             // The boot announces the connection's posture; `openRebase` does not.
             if (opened.internals.rlsEnforcement) logger.info(opened.internals.rlsEnforcement);
+            // A server is what serves requests as the restricted role, so it is
+            // the one that must not come up while that role can read session
+            // tokens and key hashes. Fail closed, with the statements to run.
+            const exposed = opened.internals.exposedInternalTables ?? [];
+            if (exposed.length > 0) {
+                throw new Error(
+                    `The request role "${REBASE_USER_ROLE}" can read or write framework tables that hold sessions, ` +
+                    `key hashes and job payloads: ${exposed.join(", ")}.\n` +
+                    "A provisioning boot revokes this, and this backend changes nothing in its database " +
+                    "(provisioning is off). Revoke it as part of your change process:\n" +
+                    exposed.map(table => `  REVOKE ALL ON ${table.split(".").map(part => `"${part}"`).join(".")} FROM ${REBASE_USER_ROLE};`).join("\n")
+                );
+            }
             return opened;
         },
 
@@ -1544,6 +1580,26 @@ export function createPostgresBootstrapper(pgConfig: PostgresDriverConfig): Back
                 await ensureAuthTablesExist(db, authCollection);
             } else {
                 await assertAuthSchemaCompatible(db, resolveAuthSchema(authCollection));
+                // And the tables themselves, with every column auth reads: a
+                // missing one would otherwise be met as a 500 on the first
+                // sign-in. Placed where `ensureAuthTablesExist` puts them.
+                const usersSchema = authCollection
+                    ? ("schema" in authCollection && typeof authCollection.schema === "string" ? authCollection.schema : "public")
+                    : "rebase";
+                const usersTableName = authCollection
+                    ? ("table" in authCollection && typeof authCollection.table === "string" ? authCollection.table : authCollection.slug)
+                    : "users";
+                const authTablesSchema = usersSchema === "public" ? "rebase" : usersSchema;
+                const expected = createAuthSchema(authTablesSchema);
+                const problems = await findUnusableAuthTables(db, [
+                    usersExpectation(usersSchema === "public" ? `"${usersTableName}"` : `"${usersSchema}"."${usersTableName}"`),
+                    ...[
+                        expected.refreshTokens, expected.passwordResetTokens, expected.appConfig,
+                        expected.userIdentities, expected.mfaFactors, expected.mfaChallenges,
+                        expected.recoveryCodes, expected.magicLinkTokens
+                    ].map(expectationOf)
+                ]);
+                if (problems.length > 0) throw unusableAuthTablesError(problems);
             }
 
             // The driver bootstrapped before these tables existed, so CDC skipped

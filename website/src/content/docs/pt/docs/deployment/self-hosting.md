@@ -1,5 +1,5 @@
 ---
-sourceHash: ea0a6a3bfe925373
+sourceHash: cef32249585688a5
 title: Auto-hospedagem
 sidebar_label: Auto-hospedagem
 description: Execute o Rebase em qualquer lugar com a imagem oficial de runtime e o bundle do seu projeto — Docker Compose, Fly, Railway ou uma VPS simples.
@@ -163,6 +163,53 @@ assim que o schema estiver configurado, caso o banco de dados não deva ser aces
 
 `REBASE_MIGRATE_ON_BOOT` aceita apenas `ensure` e `none` — a
 imagem **recusa a inicialização** caso configurada com `push`, pelo motivo explicado acima.
+
+## Quando só o seu processo de mudanças pode alterar o banco de dados
+
+<span class="since-badge" data-since="0.26">A partir da versão 0.26</span>
+
+`REBASE_MIGRATE_ON_BOOT=none` deixa suas coleções em paz. Não deixa o banco de dados em paz: as tabelas próprias do framework (auth, chaves de API, jobs, cron) continuam sendo criadas e mantidas atualizadas a cada boot. Quando o banco de dados só pode mudar por meio de um processo de mudanças revisado, defina `REBASE_PROVISION=false` em cada processo que serve:
+
+| Configuração | Tabelas e políticas das coleções | Tabelas do framework |
+|---|---|---|
+| padrão (`REBASE_MIGRATE_ON_BOOT=ensure`) | criadas e mantidas atualizadas no boot | criadas e mantidas atualizadas |
+| `REBASE_MIGRATE_ON_BOOT=none` | intactas | criadas e mantidas atualizadas |
+| `REBASE_PROVISION=false` | intactas | intactas; o que faltar é nomeado no log |
+
+Com o provisionamento desligado, o runtime não cria nem altera nada: nenhuma tabela, coluna, índice, função, trigger, política, role ou permissão. Isso vale no boot e depois, incluindo as tabelas que um processo que serve criaria no primeiro uso (chaves de idempotência, claims do cron, os contadores compartilhados de rate limit). Em vez disso, ele lê o que existe:
+
+- **Faltam tabelas de auth, ou uma coluna que o auth lê:** o boot é recusado e cada uma é listada.
+- **O role das requisições alcança uma tabela do framework** como `rebase.refresh_tokens` ou `rebase.api_keys`: o boot é recusado e imprime o `REVOKE` a executar. Um boot que provisiona retira esses privilégios sozinho. Com o provisionamento desligado, nada faz isso.
+- **Falta uma tabela opcional** (chaves de API, chaves de idempotência, claims do cron, contadores de rate limit, presença, histórico de métricas): essa funcionalidade fica desligada, e o log diz qual tabela ela precisa.
+
+As linhas continuam mudando, como em qualquer banco de dados: logins, sessões, uso de chaves de API, chaves de idempotência, claims do cron. A primeira conta de administrador (`REBASE_ADMIN_EMAIL`) é criada pela execução de provisionamento, não pelos processos que servem. A [edição de schema ao vivo](/docs/backend/live-schema-editing) ainda pode fazer commit de uma mudança como código-fonte, mas se recusa a aplicá-la ao banco de dados.
+
+### A execução de provisionamento
+
+<span class="since-badge" data-since="0.26">A partir da versão 0.26</span>
+
+O schema vem de uma execução que o seu processo de mudanças controla. Use a mesma imagem e o mesmo bundle do servidor, com `REBASE_PROVISION_ONLY=true`, conectado como um role que pode criar no banco de dados. `REBASE_PROVISION_SQL_OUT` guarda cada mudança de schema que a execução fez, como um script SQL:
+
+```bash
+docker run --rm \
+  -e DATABASE_URL="postgres://admin:…@scratch-db:5432/app" \
+  -e JWT_SECRET="…" \
+  -e REBASE_PROVISION_ONLY=true \
+  -e REBASE_PROVISION_SQL_OUT=/out/rebase.sql \
+  -v "$PWD/out:/out" \
+  -v "$PWD/dist-bundle:/bundle" \
+  "rebasepro/server:$REBASE_VERSION"
+```
+
+O script é um registro, não um plano: cada instrução nele foi executada, em ordem, e teve sucesso. Gravado contra um banco de dados vazio, é o schema inteiro de que a versão precisa. Gravado contra uma cópia restaurada da produção, é exatamente a atualização. As linhas que a execução escreveu não estão nele. Revise-o e depois aplique-o ao banco de dados real:
+
+```bash
+psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f out/rebase.sql
+```
+
+Faça isso de novo a cada atualização do Rebase, antes de implantar os processos que servem. Uma versão pode adicionar uma tabela ou uma coluna, e um processo que não pode criá-la a informa como ausente em vez de criá-la.
+
+Um servidor que você mesmo constrói segue a mesma regra: `initializeRebaseBackend` lê `REBASE_PROVISION`, e `createRebaseBackend` aceita [`provision: false`](/docs/backend/custom-server#what-creating-a-backend-may-change-provision).
 
 ## Armazenamento de arquivos
 

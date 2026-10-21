@@ -403,10 +403,15 @@ export interface RebaseBackendOptions {
      *   and their RLS policies, change capture for realtime, the database
      *   role requests run as, and the framework's own tables (API keys, cron
      *   runs, jobs, metrics). What a single-process deployment wants.
-     * - `false` — nothing. The schema must already be there: applied by a
-     *   migration, or by another process created with `provision: true`. What
-     *   a script, a REPL, a test reading rows, or a second process of a split
-     *   deployment wants. A missing table then fails on use, not at boot.
+     * - `false` — nothing, at boot or later: not even the tables other
+     *   backends make on first use (idempotency keys, cron claims). The schema
+     *   must already be there: applied by a migration, or by another process
+     *   created with `provision: true`. What a script, a REPL, a test reading
+     *   rows, a second process of a split deployment, or a database only a
+     *   change process may change wants. Missing auth tables refuse at boot;
+     *   a missing optional table turns its feature off and is named in the log.
+     *   `initializeRebaseBackend` and the runtime image pass it for
+     *   `REBASE_PROVISION=false`.
      * - `{ collections: false, realtime: false }` — the framework's tables and
      *   the role, but not the collection schema or change capture: a process
      *   that is not the schema's owner in a split deployment.

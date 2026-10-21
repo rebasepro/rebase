@@ -311,6 +311,60 @@ describe("provision", () => {
         expect(rec.initConfigs[0]).toMatchObject({ provision: false, realtime: { provision: false } });
     });
 
+    /** Every statement the backend sent through its driver's SQL admin, in order. */
+    const sqlSentThrough = (driver: DataDriver): string[] =>
+        (driver.admin as unknown as { executeSql: jest.Mock }).executeSql.mock.calls.map(call => String(call[0]));
+    const SCHEMA_CHANGE = /^\s*(CREATE|ALTER|DROP|GRANT|REVOKE|COMMENT|DO)\b/i;
+
+    /**
+     * The framework's own tables, a write that carries an Idempotency-Key (whose
+     * table is made on first use), the job queue and its function, and the
+     * hourly token sweep, whose claims table is made on its first tick:
+     * everything that used to run DDL whatever `provision` said.
+     */
+    async function bootAndWrite(provision: boolean): Promise<string[]> {
+        const driver = scopingDriver("(default)");
+        const withSweep: BackendBootstrapper = {
+            ...bootstrapper(recorder(), { driver }),
+            async initializeAuth() {
+                const authRepository = { getUserRoleIds: async () => [], deleteExpiredTokens: async () => 0 };
+                return { userService: authRepository, authRepository } as never;
+            }
+        };
+        const backend = await create({
+            provision,
+            bootstrappers: [withSweep],
+            cronPersistence: true,
+            jobs: { enabled: true, tasks: {} }
+        });
+        backend.start();
+        const app = new Hono<HonoEnv>();
+        app.route("/data", backend.routes.data());
+        const headers = { ...(await bearer("u-1")).headers, "content-type": "application/json", "idempotency-key": "k-1" };
+        const res = await app.request("/data/widgets", { method: "POST", headers, body: JSON.stringify({}) });
+        expect(res.status).toBe(201);
+        // The sweep's first tick is started, not awaited, by `start()`.
+        await new Promise(resolve => setTimeout(resolve, 50));
+        return sqlSentThrough(driver);
+    }
+
+    it("`false` sends no schema change anywhere — the framework's own tables and a first-use table included", async () => {
+        const sent = await bootAndWrite(false);
+
+        expect(sent.filter(statement => SCHEMA_CHANGE.test(statement))).toEqual([]);
+        // It still reads: what is missing is found out at boot, not at the first request.
+        expect(sent.some(statement => /rebase\.api_keys|"rebase"\."idempotency_keys"/.test(statement))).toBe(true);
+    });
+
+    it("`true` makes them — the observation point above is not blind", async () => {
+        const sent = await bootAndWrite(true);
+
+        expect(sent.some(statement => /CREATE TABLE IF NOT EXISTS rebase\.api_keys/.test(statement))).toBe(true);
+        expect(sent.some(statement => /CREATE TABLE IF NOT EXISTS "rebase"\."idempotency_keys"/.test(statement))).toBe(true);
+        expect(sent.some(statement => /CREATE TABLE IF NOT EXISTS rebase\.jobs/.test(statement))).toBe(true);
+        expect(sent.some(statement => /CREATE TABLE IF NOT EXISTS rebase\.cron_claims/.test(statement))).toBe(true);
+    });
+
     it("a part can be left to another process", async () => {
         const rec = recorder();
         await create({ provision: { collections: false, realtime: false } }, rec);

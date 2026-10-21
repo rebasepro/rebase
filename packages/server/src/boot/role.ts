@@ -41,6 +41,8 @@ export interface RoleEnv {
     /** Opt in to the MCP surface. No role grants it — see `resolveRole`. */
     REBASE_MCP_ENABLED?: boolean;
     REBASE_MIGRATE_ON_BOOT?: "none" | "ensure" | "push" | "";
+    /** `false`: this process changes nothing in its database. See `resolveProvisionEnv`. */
+    REBASE_PROVISION?: boolean;
     REBASE_FUNCTIONS_ONLY?: string;
     REBASE_FUNCTIONS_EXCLUDE?: string;
     REBASE_FUNCTIONS_UPSTREAM?: string;
@@ -146,8 +148,11 @@ export function resolveRole(env: RoleEnv): ResolvedRole {
     // boot DDL. `CREATE … IF NOT EXISTS` is not atomic, and while the driver now
     // survives losing that race, N processes racing to provision is still a
     // deployment that nobody designed. Exactly one owner.
+    //
+    // `REBASE_PROVISION=false` answers it too, more strictly: a process that
+    // changes nothing in the database races nobody.
     const migrate = env.REBASE_MIGRATE_ON_BOOT || "ensure";
-    if (!base.provisionSchema && migrate !== "none") {
+    if (!base.provisionSchema && migrate !== "none" && env.REBASE_PROVISION !== false) {
         throw new RoleConfigurationError(
             `REBASE_ROLE="${role}" cannot also provision the database schema ` +
             `(REBASE_MIGRATE_ON_BOOT="${migrate}").`,

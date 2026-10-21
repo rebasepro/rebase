@@ -61,6 +61,8 @@ import {
     type ProvisionTarget,
     provisionCollectionPolicies,
     provisionCollectionTables,
+    PROVISIONING_OFF_NOTICE,
+    PROVISIONING_OFF_SKIP_REASON,
     verifyProvisioningConnection
 } from "../boot/provision";
 import { enforceSchemaStamp, resolveSchemaMismatchPolicy } from "../boot/schema-stamp";
@@ -485,6 +487,13 @@ interface ResolvedProvision {
     database: boolean;
     collections: boolean;
     realtime: boolean;
+    /**
+     * `provision: false`: this backend changes nothing in its database. Kept
+     * apart from the three above because the reason a step is skipped differs
+     * — "nothing here changes the database" rather than "another process in
+     * this deployment provisions" — and the boot log has to say the right one.
+     */
+    off: boolean;
 }
 
 function resolveProvision(provision: boolean | ProvisionOptions | undefined): ResolvedProvision {
@@ -497,12 +506,13 @@ function resolveProvision(provision: boolean | ProvisionOptions | undefined): Re
         );
     }
     if (typeof provision === "boolean") {
-        return { database: provision, collections: provision, realtime: provision };
+        return { database: provision, collections: provision, realtime: provision, off: !provision };
     }
     return {
         database: true,
         collections: provision.collections ?? true,
-        realtime: provision.realtime ?? true
+        realtime: provision.realtime ?? true,
+        off: false
     };
 }
 
@@ -540,6 +550,10 @@ export async function createRebaseBackend(options: RebaseBackendOptions): Promis
 async function buildRebaseBackend(options: RebaseBackendOptions, announcements: BootAnnouncements): Promise<RebaseBackend> {
     const config = options;
     const provision = resolveProvision(config.provision);
+    if (provision.off) logger.info(PROVISIONING_OFF_NOTICE);
+    // Why a provisioning step does not run, when it does not — the same words
+    // in every step's line, so the log reads as one decision.
+    const provisionSkipReason = provision.off ? PROVISIONING_OFF_SKIP_REASON : undefined;
 
     // One level system, and the process's: every line any backend in this
     // process writes goes through the one logger, so the level is set only
@@ -728,7 +742,8 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
 
     let schemaOutcome = await provisionCollectionTables(provisionable, provisionTarget, {
         introspecting: introspectCollections,
-        provision: provision.collections
+        provision: provision.collections,
+        skipReason: provisionSkipReason
     });
     for (const target of provisionTargets.slice(1)) {
         const mine = provisionableBy.get(target) ?? [];
@@ -740,7 +755,8 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
         await verifyProvisioningConnection(target);
         const outcome = await provisionCollectionTables(mine, target, {
             introspecting: introspectCollections,
-            provision: provision.collections
+            provision: provision.collections,
+            skipReason: provisionSkipReason
         });
         if (outcome.status === "applied" && schemaOutcome.status === "applied") {
             schemaOutcome = { status: "applied", applied: schemaOutcome.applied + outcome.applied };
@@ -1042,7 +1058,8 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
     // to an empty result.
     const policyOutcome = await provisionCollectionPolicies(provisionable, provisionTarget, {
         introspecting: introspectCollections,
-        provision: provision.collections
+        provision: provision.collections,
+        skipReason: provisionSkipReason
     });
     for (const target of provisionTargets.slice(1)) {
         const mine = provisionableBy.get(target) ?? [];
@@ -1056,7 +1073,8 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
         }
         await provisionCollectionPolicies(mine, target, {
             introspecting: introspectCollections,
-            provision: provision.collections
+            provision: provision.collections,
+            skipReason: provisionSkipReason
         });
     }
 
@@ -1160,10 +1178,14 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
     // front of every admin surface (Hono runs middleware in registration order
     // — a `use()` after `route()` would never fire for that router).
     let apiKeyStore: ApiKeyStore | undefined;
-    const apiKeyStoreResult = createApiKeyStore(defaultDriver);
+    const apiKeyStoreResult = createApiKeyStore(defaultDriver, { provision: provision.database });
     if (apiKeyStoreResult) {
         apiKeyStore = apiKeyStoreResult;
-        if (provision.database) await apiKeyStore.ensureTable();
+        // Every backend runs this, one that provisions nothing included: built
+        // with `provision: false` the store creates nothing and only reads, so
+        // a table that is missing is named here at boot rather than met as a
+        // 500 on the first request that carries a key.
+        await apiKeyStore.ensureTable();
         logger.debug("Service API Keys initialized");
     }
 
@@ -1299,7 +1321,7 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
             // `undefined` when the driver has no SQL admin — it warns and we
             // fall back, rather than refusing to serve on a Mongo deployment
             // that asked for something Mongo cannot give.
-            ? createSqlRateLimitStore(defaultDriver)
+            ? createSqlRateLimitStore(defaultDriver, { provision: provision.database })
             : undefined
     );
     const rateLimitStore = sharedRateLimitStore ?? new MemoryRateLimitStore(rateLimitWindowMs);
@@ -1530,7 +1552,14 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
         // Awaited, so the account exists before the server accepts a request.
         // A write, so only a backend allowed to change the database makes it.
         // See ./auth/seed-admin.
-        if (provision.database) await seedInitialAdmin(authAdapter?.userManagement);
+        if (provision.database) {
+            await seedInitialAdmin(authAdapter?.userManagement);
+        } else if (process.env.REBASE_ADMIN_EMAIL?.trim()) {
+            logger.info(
+                "REBASE_ADMIN_EMAIL is set, but this backend changes nothing in its database, so no admin " +
+                "account is seeded here. The provisioning run seeds it."
+            );
+        }
     }
     // Settled now — the app's own adapter, or the built-in one just made — so
     // a session is judged the same way at every door, `verifyCredential`
@@ -1579,7 +1608,7 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
                 "Every MCP call must run under the caller's own row-level security; a driver without " +
                 "`withAuth()` would run them as the database owner instead.");
         } else {
-            const store = createOAuthStore(driver);
+            const store = createOAuthStore(driver, { provision: provision.database });
             if (!store) {
                 logger.error("[mcp] Surface enabled but the driver cannot persist OAuth state — not mounting.");
             } else {
@@ -1589,15 +1618,14 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
                 // switched on `mcp` should get a server that runs everything
                 // else and one loud line explaining what did not mount, not a
                 // process that refuses to start. A backend that provisions
-                // nothing leaves the tables to whoever does.
+                // nothing creates nothing here, and is told by the same check
+                // whether the tables it needs are there.
                 let ready = true;
-                if (provision.database) {
-                    try {
-                        await store.ensureTables();
-                    } catch (error) {
-                        ready = false;
-                        logger.error("[mcp] Could not prepare the OAuth tables — not mounting.", { error });
-                    }
+                try {
+                    await store.ensureTables();
+                } catch (error) {
+                    ready = false;
+                    logger.error("[mcp] Could not prepare the OAuth tables — not mounting.", { error });
                 }
                 if (ready) mcpReady = { store, publicUrl };
             }
@@ -2028,6 +2056,17 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
                 // With a repository the source-only editor's reasons do not
                 // apply — that path never uses it — so only its own does.
                 sourceEditingOff: remoteRepo ? remoteEditingOff : schemaEditorOff,
+                // A backend that provisions nothing does not change its schema
+                // from the panel either: the change is committed as source and
+                // reaches the database through whatever applies the rest.
+                databaseChangesOff: provision.off
+                    ? {
+                        code: "SCHEMA_EDITING_PROVISIONING_OFF",
+                        message: "This deployment changes nothing in its database (provisioning is off), so a " +
+                            "change cannot be applied from here. Commit it as source only, and let the process " +
+                            "that changes this database apply it."
+                    }
+                    : undefined,
                 // Only answerable for a project on this machine. A deployment
                 // committing to a remote repository is a built bundle, which is
                 // provisioned by boot-ensure rather than by replaying
@@ -2527,7 +2566,10 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
         const restGenerator = new RestApiGenerator(
             serverCollections,
             defaultDriver,
-            authAdapter
+            authAdapter,
+            undefined,
+            undefined,
+            { provision: provision.database }
         );
         dataRouter.route("/", restGenerator.generateRoutes());
 
@@ -2969,9 +3011,13 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
 
             // Attach database persistence if the driver supports SQL and persistence is enabled
             const admin = defaultBootstrapper.getAdmin?.(defaultDriverResult);
-            const store = (admin && config.cronPersistence !== false) ? createCronStore(defaultDriver) : undefined;
+            const store = (admin && config.cronPersistence !== false)
+                ? createCronStore(defaultDriver, { provision: provision.database })
+                : undefined;
             if (store) {
-                if (provision.database) await store.ensureTable();
+                // Run by a backend that provisions nothing too: it then only
+                // reads, and says which capability each missing table costs.
+                await store.ensureTable();
                 cronScheduler.setStore(store);
             }
         }
@@ -3060,10 +3106,10 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
     let metricsHistory: MetricsHistory | undefined;
     try {
         const { createMetricsHistory } = await import("../metrics/history-recorder.js");
-        metricsHistory = createMetricsHistory(defaultDriver);
-        if (metricsHistory && provision.database) {
-            await metricsHistory.ensure();
-        }
+        metricsHistory = createMetricsHistory(defaultDriver, { provision: provision.database });
+        // Without provisioning this reads the table rather than making it, and
+        // a missing one lands in the catch below like a create that failed.
+        if (metricsHistory) await metricsHistory.ensure();
     } catch (err) {
         // A backend that serves is worth more than one that charts. This is the
         // only subsystem here whose absence costs nothing but a graph.
@@ -3074,10 +3120,13 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
     let jobQueue: JobQueue | undefined;
     if (jobsOptions?.enabled) {
         const { createJobStore, createJobQueue } = await import("../jobs");
-        const store = createJobStore(defaultDriver);
+        const store = createJobStore(defaultDriver, { provision: provision.database });
 
         if (store) {
-            if (provision.database) await store.ensureTable();
+            // Without provisioning this creates nothing and still finds out
+            // whether the queue's enqueue function is there to ride a write's
+            // transaction.
+            await store.ensureTable();
             // Each job runs in this backend's scope, so a handler that imports
             // `rebase`, or publishes to a topic, reaches this backend.
             const tasks = Object.fromEntries(Object.entries(jobsOptions.tasks ?? {}).map(([task, handler]) => [
@@ -3817,7 +3866,8 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
             authRepo: adminIdentityRepo,
             driver: defaultDriver,
             ownsTimers: ownership.cronScheduler,
-            persistClaims: config.cronPersistence !== false
+            persistClaims: config.cronPersistence !== false,
+            provision: provision.database
         });
 
         // ── History retention ─────────────────────────────────────────────
@@ -3829,7 +3879,8 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
             historyService: historyConfigResult?.historyService,
             driver: defaultDriver,
             ownsTimers: ownership.cronScheduler,
-            persistClaims: config.cronPersistence !== false
+            persistClaims: config.cronPersistence !== false,
+            provision: provision.database
         });
     };
 

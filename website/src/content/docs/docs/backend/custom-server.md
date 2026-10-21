@@ -242,14 +242,15 @@ Creating a backend can run DDL, so `createRebaseBackend` asks you to decide:
 | `provision` | Creates | For |
 |---|---|---|
 | `true` | Everything the backend serves: the collection tables and their RLS policies, change capture for realtime, the role requests run as, and the framework's own tables (API keys, cron runs, jobs, metrics). | a single-process deployment; what `initializeRebaseBackend` passes |
-| `false` | Nothing. The schema must already be there, applied by `rebase db push`, a migration, or another process. A missing table fails when it is used. | a script, a test, a REPL, a process that only reads |
+| `false` | Nothing, at boot or later: the tables other backends make on first use (idempotency keys, cron claims) are not made either. The schema must already be there, applied by `rebase db push`, a migration, or another process. Missing auth tables refuse at boot; a missing optional table turns its feature off, named in the log. | a script, a test, a REPL, a process that only reads, a database only your change process may change |
 | `{ collections: false, realtime: false }` | The framework's tables and the role, but not the collection schema or change capture. | a process that does not own the schema in a split deployment |
 
 It is an option rather than a later step on purpose. The driver reads the
 tables as it opens, and attaches change capture to the ones that exist then.
 A `provision()` called afterwards would run after the driver had already
 decided what exists. `REBASE_MIGRATE_ON_BOOT=none` still turns the collection
-schema off for any backend in the process.
+schema off for any backend in the process. <span class="since-badge" data-since="0.26">Since 0.26</span> `initializeRebaseBackend` passes
+`false` when `REBASE_PROVISION=false`.
 
 ## Mounting only the groups you want
 

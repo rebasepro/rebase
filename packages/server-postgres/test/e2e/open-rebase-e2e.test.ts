@@ -210,8 +210,11 @@ describe("openRebase (E2E)", () => {
                     provision: false,
                     realtime: false
                 });
-                const auth = await bootstrapper.initializeAuth!({}, driverResult);
-                expect(auth?.userService).toBeDefined();
+                // Auth cannot run on part of its schema, so on a database with
+                // none of it the hook refuses, naming the tables — it does not
+                // make them, and it does not come up to fail every sign-in.
+                await expect(bootstrapper.initializeAuth!({}, driverResult))
+                    .rejects.toThrow(/Auth cannot run on this database[\s\S]*"rebase"\."refresh_tokens"/);
                 const history = await bootstrapper.initializeHistory!(true, driverResult);
                 // Attached, and refusing writes to audited collections up
                 // front: there is no table to record into, and none is made.

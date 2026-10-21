@@ -215,12 +215,18 @@ export class RestApiGenerator {
         driver: DataDriver,
         authAdapter?: AuthAdapter,
         maxBulkRows: number = DEFAULT_MAX_BULK_ROWS,
-        listLimits: ListLimitOptions = {}
+        listLimits: ListLimitOptions = {},
+        /**
+         * `provision: false` is a backend that changes nothing in its database:
+         * the idempotency-key table is used if it is there, never created.
+         */
+        storeOptions: { provision?: boolean } = {}
     ) {
         this.collections = collections;
         this.driver = driver;
         this.authAdapter = authAdapter;
         this.maxBulkRows = maxBulkRows;
+        this.provision = storeOptions.provision;
         this.listLimits = {
             defaultLimit: listLimits.defaultLimit ?? DEFAULT_LIST_LIMIT,
             maxLimit: listLimits.maxLimit ?? MAX_LIST_LIMIT
@@ -233,8 +239,9 @@ export class RestApiGenerator {
      * for SQL support and creates a table, and most requests never send a key.
      */
     private idempotencyStore?: IdempotencyStore | null;
+    private readonly provision: boolean | undefined;
     private idempotency(): IdempotencyStore | undefined {
-        this.idempotencyStore ??= createIdempotencyStore(this.driver) ?? null;
+        this.idempotencyStore ??= createIdempotencyStore(this.driver, { provision: this.provision }) ?? null;
         return this.idempotencyStore ?? undefined;
     }
 

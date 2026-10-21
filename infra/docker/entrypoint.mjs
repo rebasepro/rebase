@@ -425,7 +425,9 @@ for (const pkg of FETCH_MODE ? [] : RUNTIME_PROVIDED) {
 //
 // So destructive schema changes stay where they can be reviewed: `rebase db
 // push` from a checkout or CI, with the destructive-change gate and a backup in
-// reach. `none` opts out of even the additive step.
+// reach. `none` opts out of even the additive step for collections; the auth
+// tables are still kept current. `REBASE_PROVISION=false`, which the runtime
+// validates, opts out of everything.
 const migrateMode = process.env.REBASE_MIGRATE_ON_BOOT || "ensure";
 
 if (!["none", "ensure"].includes(migrateMode)) {

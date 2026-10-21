@@ -1,5 +1,5 @@
 ---
-sourceHash: ea0a6a3bfe925373
+sourceHash: cef32249585688a5
 title: Self-Hosting
 sidebar_label: Self-Hosting
 description: Führen Sie Rebase überall mit dem offiziellen Runtime-Image und Ihrem Projekt-Bundle aus – Docker Compose, Fly, Railway oder auf einem einfachen VPS.
@@ -100,6 +100,53 @@ rebase db push
 Führen Sie den Befehl aus einem Checkout oder einem CI-Job aus, der auf die Datenbank des Deployments verweist. Die Änderung wird zunächst als Testlauf (Dry-Run) geprüft, destruktive Änderungen werden ohne explizite Bestätigung verweigert, und vor der Anwendung kann ein Backup erstellt werden. Die Datenbank gibt in der Compose-Datei einen Port frei, damit dieser Befehl sie vom Host aus erreichen kann; entfernen Sie dieses Port-Mapping, sobald das Schema eingerichtet ist, falls die Datenbank von außen nicht erreichbar sein soll.
 
 `REBASE_MIGRATE_ON_BOOT` akzeptiert nur `ensure` und `none` – das Image **verweigert den Start** bei `push` aus dem oben genannten Grund.
+
+## Wenn nur Ihr Änderungsprozess die Datenbank ändern darf
+
+<span class="since-badge" data-since="0.26">Seit 0.26</span>
+
+`REBASE_MIGRATE_ON_BOOT=none` lässt Ihre Collections in Ruhe. Die Datenbank lässt es nicht in Ruhe: Die eigenen Tabellen des Frameworks (Auth, API-Schlüssel, Jobs, Cron) werden bei jedem Start weiterhin angelegt und aktuell gehalten. Darf die Datenbank nur über einen geprüften Änderungsprozess geändert werden, setzen Sie `REBASE_PROVISION=false` auf jedem Prozess, der Anfragen bedient:
+
+| Einstellung | Collection-Tabellen und Policies | Framework-Tabellen |
+|---|---|---|
+| Standard (`REBASE_MIGRATE_ON_BOOT=ensure`) | beim Start angelegt und aktuell gehalten | angelegt und aktuell gehalten |
+| `REBASE_MIGRATE_ON_BOOT=none` | unangetastet | angelegt und aktuell gehalten |
+| `REBASE_PROVISION=false` | unangetastet | unangetastet; was fehlt, wird im Log genannt |
+
+Mit abgeschaltetem Provisioning legt die Runtime nichts an und ändert nichts: keine Tabelle, Spalte, keinen Index, keine Funktion, keinen Trigger, keine Policy, Rolle oder Berechtigung. Das gilt beim Start und danach, auch für die Tabellen, die ein bedienender Prozess sonst bei der ersten Nutzung erstellt (Idempotenzschlüssel, Cron-Claims, die gemeinsamen Rate-Limit-Zähler). Stattdessen liest sie, was vorhanden ist:
+
+- **Auth-Tabellen oder eine von Auth gelesene Spalte fehlen:** Der Start wird verweigert, und jede einzelne wird aufgeführt.
+- **Die Request-Rolle erreicht eine Framework-Tabelle** wie `rebase.refresh_tokens` oder `rebase.api_keys`: Der Start wird verweigert und das auszuführende `REVOKE` ausgegeben. Ein Provisioning-Start entzieht diese Rechte von selbst. Mit abgeschaltetem Provisioning tut das niemand.
+- **Eine optionale Tabelle fehlt** (API-Schlüssel, Idempotenzschlüssel, Cron-Claims, Rate-Limit-Zähler, Presence, Metrik-Verlauf): Diese Funktion ist aus, und das Log nennt die Tabelle, die sie braucht.
+
+Zeilen ändern sich weiterhin, wie in jeder Datenbank: Anmeldungen, Sitzungen, Nutzung von API-Schlüsseln, Idempotenzschlüssel, Cron-Claims. Das erste Admin-Konto (`REBASE_ADMIN_EMAIL`) wird vom Provisioning-Lauf angelegt, nicht von den bedienenden Prozessen. [Live-Schemabearbeitung](/docs/backend/live-schema-editing) kann eine Änderung weiterhin als Quellcode committen, verweigert aber, sie auf die Datenbank anzuwenden.
+
+### Der Provisioning-Lauf
+
+<span class="since-badge" data-since="0.26">Seit 0.26</span>
+
+Das Schema stammt aus einem Lauf, den Ihr Änderungsprozess steuert. Verwenden Sie dasselbe Image und Bundle wie der Server, mit `REBASE_PROVISION_ONLY=true`, verbunden als eine Rolle, die in der Datenbank anlegen darf. `REBASE_PROVISION_SQL_OUT` hält jede Schemaänderung des Laufs als SQL-Skript fest:
+
+```bash
+docker run --rm \
+  -e DATABASE_URL="postgres://admin:…@scratch-db:5432/app" \
+  -e JWT_SECRET="…" \
+  -e REBASE_PROVISION_ONLY=true \
+  -e REBASE_PROVISION_SQL_OUT=/out/rebase.sql \
+  -v "$PWD/out:/out" \
+  -v "$PWD/dist-bundle:/bundle" \
+  "rebasepro/server:$REBASE_VERSION"
+```
+
+Das Skript ist ein Protokoll, kein Plan: Jede Anweisung darin wurde der Reihe nach ausgeführt und war erfolgreich. Gegen eine leere Datenbank aufgezeichnet, ist es das gesamte Schema, das das Release braucht. Gegen eine wiederhergestellte Kopie der Produktion aufgezeichnet, ist es genau das Upgrade. Vom Lauf geschriebene Zeilen sind nicht enthalten. Prüfen Sie es und wenden Sie es dann auf die echte Datenbank an:
+
+```bash
+psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f out/rebase.sql
+```
+
+Wiederholen Sie das bei jedem Rebase-Upgrade, bevor die bedienenden Prozesse ausgerollt werden. Ein Release kann eine Tabelle oder Spalte hinzufügen, und ein Prozess, der nichts anlegen darf, meldet sie als fehlend, statt sie zu erstellen.
+
+Ein selbst gebauter Server folgt derselben Regel: `initializeRebaseBackend` liest `REBASE_PROVISION`, und `createRebaseBackend` nimmt [`provision: false`](/docs/backend/custom-server#what-creating-a-backend-may-change-provision).
 
 ## Dateispeicher
 

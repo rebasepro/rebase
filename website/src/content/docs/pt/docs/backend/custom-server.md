@@ -1,5 +1,5 @@
 ---
-sourceHash: e3a81a3528add4c5
+sourceHash: e6c4f1132a6e61eb
 title: Integração com Servidor Customizado
 sidebar_label: Servidor Customizado
 description: Construa o backend do Rebase a partir de peças públicas no seu próprio servidor — createRebaseBackend, seus grupos de rotas, mount, attachRealtime e start — ou incorpore o driver do Postgres no Express.
@@ -239,14 +239,14 @@ decida:
 | `provision` | Cria | Para |
 |---|---|---|
 | `true` | Tudo o que o backend serve: as tabelas das coleções e suas políticas de RLS, a captura de mudanças para o tempo real, a role com que as requisições rodam e as tabelas do próprio framework (chaves de API, execuções de cron, jobs, métricas). | um deploy de processo único; o que o `initializeRebaseBackend` passa |
-| `false` | Nada. O schema já deve estar lá, aplicado pelo `rebase db push`, por uma migração ou por outro processo. Uma tabela ausente falha quando é usada. | um script, um teste, um REPL, um processo que só lê |
+| `false` | Nada, nem no boot nem depois: as tabelas que outros backends criam no primeiro uso (chaves de idempotência, claims do cron) também não são criadas. O schema já deve estar lá, aplicado pelo `rebase db push`, por uma migração ou por outro processo. Tabelas de auth ausentes fazem o boot ser recusado; uma tabela opcional ausente desliga sua funcionalidade e é nomeada no log. | um script, um teste, um REPL, um processo que só lê, um banco de dados que só o seu processo de mudanças pode alterar |
 | `{ collections: false, realtime: false }` | As tabelas do framework e a role, mas não o schema das coleções nem a captura de mudanças. | um processo que não é dono do schema em um deploy dividido |
 
 É uma opção, e não um passo posterior, de propósito. O driver lê as tabelas ao
 abrir e anexa a captura de mudanças às que existem naquele momento. Um
 `provision()` chamado depois rodaria depois de o driver já ter decidido o que
 existe. O `REBASE_MIGRATE_ON_BOOT=none` ainda desliga o schema das coleções para
-qualquer backend do processo.
+qualquer backend do processo. <span class="since-badge" data-since="0.26">A partir da versão 0.26</span> `initializeRebaseBackend` passa `false` quando `REBASE_PROVISION=false`.
 
 ## Montando apenas os grupos que você quer
 

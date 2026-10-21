@@ -68,6 +68,25 @@ export const bootEnvExtension = z.object({
      */
     REBASE_MIGRATE_ON_BOOT: z.enum(["none", "ensure", "push", ""]).optional(),
     /**
+     * `false`: this deployment changes nothing in its database. No table,
+     * column, index, function, trigger, policy, role or grant — the framework's
+     * own included, which `REBASE_MIGRATE_ON_BOOT=none` leaves on — is created
+     * or altered, at boot or by a request; what is missing is reported by name
+     * instead. For a database whose schema only changes through a change
+     * process: run a provisioning step (`REBASE_PROVISION_ONLY=true`, with
+     * `REBASE_PROVISION_SQL_OUT` to keep the SQL it ran) under that process.
+     *
+     * See `resolveProvisionEnv` in `boot/provision.ts`.
+     */
+    REBASE_PROVISION: z.enum(["true", "false", ""]).default("true").transform(v => v !== "false"),
+    /**
+     * A file a provisioning run (`REBASE_PROVISION_ONLY=true`) writes every
+     * schema change it executed to, in order, as a SQL script — the reviewable
+     * record a change process applies with psql. Refused on a process that
+     * serves, which would write it while it kept running.
+     */
+    REBASE_PROVISION_SQL_OUT: z.string().optional(),
+    /**
      * Add `includeSubDomains` to the `Strict-Transport-Security` header.
      *
      * Off by default: it tells browsers to refuse plain HTTP on every subdomain

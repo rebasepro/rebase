@@ -21,7 +21,7 @@
 # one reads DATABASE_PASSWORD, which `rebase init` also embeds in the
 # DATABASE_URL it writes into your .env. Everything else — JWT_SECRET,
 # REBASE_SERVICE_KEY, CORS_ORIGINS, REBASE_ADMIN_EMAIL, REBASE_ADMIN_PASSWORD,
-# DISABLE_SELF_REGISTRATION, REBASE_MIGRATE_ON_BOOT, REBASE_VERSION — is the
+# DISABLE_SELF_REGISTRATION, REBASE_MIGRATE_ON_BOOT, REBASE_PROVISION, REBASE_VERSION — is the
 # same name meaning the same thing in both.
 #
 #   rebase build                # produces ./dist-bundle
@@ -221,8 +221,15 @@ services:
       # their RLS, additively, on every boot. It never alters a column type,
       # never drops anything and never edits an existing enum label — those go
       # through `rebase db push`, so that a container restart cannot reshape a
-      # schema as a side effect. `none` opts out of both entirely.
+      # schema as a side effect. `none` opts out of the collection tables; the
+      # auth tables and the framework's others are still kept current.
       REBASE_MIGRATE_ON_BOOT: ${REBASE_MIGRATE_ON_BOOT:-ensure}
+      # `false` changes nothing in the database at all, the auth tables
+      # included — for a database only your own change process may change.
+      # Its schema then comes from a provisioning run that process controls:
+      # see "When only your change process may change the database" in the
+      # self-hosting docs.
+      REBASE_PROVISION: ${REBASE_PROVISION:-true}
 
       # File storage is off unless a bucket is configured. It is not a default
       # because the alternative — the container filesystem — silently loses every

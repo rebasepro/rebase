@@ -5,6 +5,7 @@ import {
     provisionCollectionPolicies,
     provisionCollectionTables,
     provisionTargetFor,
+    resolveProvisionEnv,
     verifyProvisioningConnection,
     type ProvisionTarget
 } from "./provision";
@@ -339,6 +340,20 @@ describe("provisioning ownership", () => {
         expect(t.bootstrapper.ensureCollectionSchema).toHaveBeenCalled();
     });
 
+    it("names the reason it is given, so a backend that provisions nothing does not blame another process", async () => {
+        await provisionCollectionTables([collection("posts")], target(), {
+            provision: false,
+            skipReason: "this backend changes nothing in its database"
+        });
+        await provisionCollectionPolicies([collection("posts")], target(), {
+            provision: false,
+            skipReason: "this backend changes nothing in its database"
+        });
+
+        expect(loggedAtDefaultLevel()).toContain("this backend changes nothing in its database");
+        expect(logged()).not.toContain("another process");
+    });
+
     it("still declines for REBASE_MIGRATE_ON_BOOT=none, and names that reason instead", async () => {
         // The two opt-outs answer different questions and must not be collapsed:
         // an operator reading "another process owns it" on a deployment that has
@@ -350,5 +365,25 @@ describe("provisioning ownership", () => {
 
         expect(logged()).toContain("REBASE_MIGRATE_ON_BOOT=none");
         expect(logged()).not.toContain("another process");
+    });
+});
+
+describe("resolveProvisionEnv — REBASE_PROVISION", () => {
+    it("provisions unless told not to, and a blank value is unset", () => {
+        expect(resolveProvisionEnv({})).toBe(true);
+        expect(resolveProvisionEnv({ REBASE_PROVISION: "" })).toBe(true);
+        expect(resolveProvisionEnv({ REBASE_PROVISION: "  " })).toBe(true);
+        expect(resolveProvisionEnv({ REBASE_PROVISION: "true" })).toBe(true);
+    });
+
+    it("`false` is the one way to turn it off", () => {
+        expect(resolveProvisionEnv({ REBASE_PROVISION: "false" })).toBe(false);
+        expect(resolveProvisionEnv({ REBASE_PROVISION: " false " })).toBe(false);
+    });
+
+    it("refuses anything else rather than guessing — a typo read as `true` would change a managed database", () => {
+        for (const value of ["no", "off", "0", "FALSE", "none"]) {
+            expect(() => resolveProvisionEnv({ REBASE_PROVISION: value })).toThrow(/REBASE_PROVISION must be/);
+        }
     });
 });

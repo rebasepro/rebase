@@ -151,6 +151,11 @@ export interface HistoryRetentionSweepWiring {
     ownsTimers: boolean;
     /** `cronPersistence: false` keeps the claims table out of the database, here too. */
     persistClaims?: boolean;
+    /**
+     * `false`: the backend changes nothing in its database, so the claims
+     * table is used if it is there and never created by the first tick.
+     */
+    provision?: boolean;
 }
 
 /**
@@ -163,7 +168,7 @@ export function startHistoryRetentionSweep(wiring: HistoryRetentionSweepWiring):
     if (!wiring.ownsTimers || !service || typeof service.pruneExpired !== "function") return undefined;
     const pruneExpired = service.pruneExpired.bind(service);
     const store = wiring.persistClaims !== false && isSQLAdmin(wiring.driver.admin)
-        ? createCronStore(wiring.driver)
+        ? createCronStore(wiring.driver, { provision: wiring.provision })
         : undefined;
     let ready: Promise<void> | undefined;
     const sweep = createHistoryRetentionSweep({

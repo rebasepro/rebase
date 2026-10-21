@@ -175,6 +175,17 @@ describe("resolveRole — refusals", () => {
             .toThrow(/REBASE_MIGRATE_ON_BOOT/);
     });
 
+    it("lets a process that changes nothing in its database be any role, whatever REBASE_MIGRATE_ON_BOOT says", () => {
+        // REBASE_PROVISION=false races nobody, so the single-owner rule has
+        // nothing to protect — and compose files write `ensure` explicitly.
+        expect(resolveRole(env({ REBASE_ROLE: "worker", REBASE_PROVISION: false })).role).toBe("worker");
+        expect(resolveRole(env({ REBASE_ROLE: "functions", REBASE_MIGRATE_ON_BOOT: "ensure", REBASE_PROVISION: false }))
+            .provisionSchema).toBe(false);
+        // `true` is the default and changes nothing about the refusal.
+        expect(() => resolveRole(env({ REBASE_ROLE: "worker", REBASE_PROVISION: true })))
+            .toThrow(RoleConfigurationError);
+    });
+
     it("names the variable and the fix, not just the problem", () => {
         try {
             resolveRole(env({ REBASE_ROLE: "functions", REBASE_MIGRATE_ON_BOOT: "push" }));

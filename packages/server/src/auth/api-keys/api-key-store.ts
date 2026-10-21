@@ -13,7 +13,7 @@ import type { DataDriver } from "@rebasepro/types";
 import { isSQLAdmin } from "@rebasepro/types";
 import { REBASE_USER_ROLE, revokeInternalTableSql } from "@rebasepro/common";
 import { logger } from "../../utils/logger";
-import { createDdlBootstrapper } from "../../boot/ddl-bootstrap";
+import { createDdlBootstrapper, provisioningExec, SchemaChangeRefusedError } from "../../boot/ddl-bootstrap";
 import type {
     ApiKey,
     ApiKeyKind,
@@ -238,15 +238,28 @@ export interface ApiKeyStore {
  *
  * Returns `undefined` if the driver does not support `executeSql`.
  */
-export function createApiKeyStore(driver: DataDriver): ApiKeyStore | undefined {
+export function createApiKeyStore(
+    driver: DataDriver,
+    options: {
+        /**
+         * Default `true`. `false` is a backend that changes nothing in its
+         * database: `ensureTable` reads the table, creates, alters and revokes
+         * nothing, and leaves a pre-scopes table's rows as they are.
+         */
+        provision?: boolean;
+    } = {}
+): ApiKeyStore | undefined {
     const admin = driver.admin;
     if (!isSQLAdmin(admin)) {
         logger.warn("⚠️ [api-key-store] DataDriver does not support SQL admin — API keys will not be available.");
         return undefined;
     }
 
-    const exec = (sqlText: string, options?: { params?: unknown[] }) =>
-        admin.executeSql(sqlText, options?.params ? { params: options.params } : undefined);
+    const exec = provisioningExec(
+        (sqlText, execOptions) =>
+            admin.executeSql(sqlText, execOptions?.params ? { params: execOptions.params } : undefined),
+        options.provision
+    );
 
     const ddl = createDdlBootstrapper(exec, "api-key-store");
 
@@ -346,8 +359,10 @@ export function createApiKeyStore(driver: DataDriver): ApiKeyStore | undefined {
                 await exec(DROP_DUPLICATE_KEY_HASH_INDEX_SQL);
             } catch (err) {
                 // Redundant, not wrong: a later boot drops it.
-                logger.warn(`[api-key-store] Left the duplicate idx_api_keys_hash in place for now: ${
-                    err instanceof Error ? err.message : String(err)}`);
+                if (!(err instanceof SchemaChangeRefusedError)) {
+                    logger.warn(`[api-key-store] Left the duplicate idx_api_keys_hash in place for now: ${
+                        err instanceof Error ? err.message : String(err)}`);
+                }
             }
 
             await ddl.ensureObject("Creating idx_api_keys_prefix", `
@@ -378,11 +393,13 @@ export function createApiKeyStore(driver: DataDriver): ApiKeyStore | undefined {
             // Keyed on what exists, not on who created it, so an instance that
             // lost any race above still takes the table off the end-user role.
             if (!await ddl.isReadable(TABLE)) {
-                logger.error(
-                    `❌ [api-key-store] ${TABLE} is unavailable — every API-key authenticated ` +
-                    "request will be rejected on this instance, and the table could not be " +
-                    "taken back off the end-user role."
-                );
+                logger.error(options.provision === false
+                    ? `❌ [api-key-store] ${TABLE} does not exist, and this backend changes nothing in its ` +
+                      "database — every API-key authenticated request will be rejected on this instance " +
+                      "until a provisioning run creates it."
+                    : `❌ [api-key-store] ${TABLE} is unavailable — every API-key authenticated ` +
+                      "request will be rejected on this instance, and the table could not be " +
+                      "taken back off the end-user role.");
                 return;
             }
 
@@ -402,7 +419,29 @@ export function createApiKeyStore(driver: DataDriver): ApiKeyStore | undefined {
                 `SELECT 1 FROM information_schema.columns
                  WHERE table_schema = 'rebase' AND table_name = 'api_keys' AND column_name = 'permissions'`
             );
-            if (legacyColumns.length > 0) {
+            // A table an older release made reads as present and then fails the
+            // first query that names a column it never got. Said at boot, by
+            // name, since nothing here is allowed to add them.
+            if (options.provision === false) {
+                try {
+                    await exec(`SELECT ${BOOT_COLUMNS.join(", ")} FROM ${TABLE} WHERE false`);
+                } catch {
+                    logger.error(
+                        `❌ [api-key-store] ${TABLE} is out of date — it lacks one of ${BOOT_COLUMNS.join(", ")}, ` +
+                        "which this release reads. This backend changes nothing in its database; a provisioning " +
+                        "run adds them."
+                    );
+                }
+            }
+
+            if (legacyColumns.length > 0 && options.provision === false) {
+                // A backfill is a migration of rows, and the run that migrates
+                // the table is the one that gives them their scopes.
+                logger.warn(
+                    `⚠️ [api-key-store] ${TABLE} still has the pre-scopes \`permissions\` column. Keys stored ` +
+                    "before scopes are given theirs by a provisioning run; this backend changes nothing in its database."
+                );
+            } else if (legacyColumns.length > 0) {
                 await ddl.step("Backfilling API key scopes", backfillScopes);
             }
 

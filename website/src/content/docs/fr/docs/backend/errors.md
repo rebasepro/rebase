@@ -1,5 +1,5 @@
 ---
-sourceHash: 89005ab195a605d6
+sourceHash: f07a976c896af1af
 title: Codes d'erreur
 sidebar_label: Codes d'erreur
 description: Tous les codes d'erreur qu'un backend Rebase peut renvoyer, avec leur statut HTTP, leur signification et la marche à suivre — ainsi que l'enveloppe de réponse, X-Request-ID et les règles applicables aux détails.
@@ -302,6 +302,7 @@ Ces codes indiquent qu'une fonctionnalité est désactivée ou non configurée, 
 | `SCHEMA_EDIT_REQUIRES_A_PERSON` | 403 | Une clé API ou un autre compte de service a tenté d'appliquer une modification de schéma. | Connectez-vous en tant qu'utilisateur, ou activez `liveSchema.allowMachineApply`. |
 | `SCHEMA_EDITING_NO_COLLECTIONS_DIR` | 501 | L'édition de schéma à chaud nécessite `collectionsDir` ou `liveSchema.repository`, et ce serveur a été démarré sans aucun des deux. | Configurez l'un d'eux. |
 | `SCHEMA_EDITING_NO_REPOSITORY` | 503 | La planification fonctionne, mais aucun dépôt n'est configuré pour commiter le changement. | Configurez `liveSchema.repository`. |
+| `SCHEMA_EDITING_PROVISIONING_OFF` | 409 | Ce déploiement ne change rien dans sa base de données (`REBASE_PROVISION=false`), un changement ne peut donc pas être appliqué depuis le panneau. <span class="since-badge" data-since="0.26">Depuis 0.26</span> | Committez-le uniquement comme source, et laissez le processus qui modifie la base de données l'appliquer. |
 | `SCHEMA_EDITING_UNSUPPORTED` | 503 | Ce pilote ne sait pas planifier les modifications de schéma. | L'édition en direct est disponible sur Postgres. |
 | `SCHEMA_EDITOR_BAAS_MODE` | 501 | Les collections sont ici introspectées directement depuis la base de données ; aucun fichier source n'est donc modifiable. | Modifiez le schéma via une migration. |
 | `SCHEMA_EDITOR_DISABLED` | 501 | L'éditeur de schéma est désactivé sur ce serveur. Un bundle compilé répond toujours ceci. | Activez-le avec `schemaEditor`. Sur un bundle, définissez `REBASE_LIVE_SCHEMA_REPOSITORY` pour modifier les collections via un dépôt — voir [Modification du schéma en direct](/docs/backend/live-schema-editing#from-a-built-bundle). |

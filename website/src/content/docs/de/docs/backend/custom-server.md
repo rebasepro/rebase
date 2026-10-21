@@ -1,5 +1,5 @@
 ---
-sourceHash: e3a81a3528add4c5
+sourceHash: e6c4f1132a6e61eb
 title: Integration eines eigenen Servers
 sidebar_label: Eigener Server
 description: Bauen Sie das Rebase-Backend aus öffentlichen Bausteinen in Ihrem eigenen Server – createRebaseBackend, seine Routengruppen, mount, attachRealtime und start – oder betten Sie den Postgres-Treiber in Express ein.
@@ -236,14 +236,14 @@ von Ihnen eine Entscheidung:
 | `provision` | Legt an | Für |
 |---|---|---|
 | `true` | Alles, was das Backend ausliefert: die Collection-Tabellen und ihre RLS-Policies, die Änderungserfassung für Realtime, die Rolle, als die Requests laufen, und die eigenen Tabellen des Frameworks (API-Schlüssel, Cron-Läufe, Jobs, Metriken). | ein Deployment mit einem einzigen Prozess; das, was `initializeRebaseBackend` übergibt |
-| `false` | Nichts. Das Schema muss bereits vorhanden sein, angewendet durch `rebase db push`, eine Migration oder einen anderen Prozess. Eine fehlende Tabelle schlägt fehl, sobald sie verwendet wird. | ein Skript, ein Test, eine REPL, ein Prozess, der nur liest |
+| `false` | Nichts, weder beim Booten noch später: Auch die Tabellen, die andere Backends bei der ersten Nutzung anlegen (Idempotenzschlüssel, Cron-Claims), werden nicht angelegt. Das Schema muss bereits vorhanden sein, angewendet durch `rebase db push`, eine Migration oder einen anderen Prozess. Fehlende Auth-Tabellen verweigern den Start; eine fehlende optionale Tabelle schaltet ihre Funktion ab und wird im Log genannt. | ein Skript, ein Test, eine REPL, ein Prozess, der nur liest, eine Datenbank, die nur Ihr Änderungsprozess ändern darf |
 | `{ collections: false, realtime: false }` | Die Tabellen des Frameworks und die Rolle, aber weder das Collection-Schema noch die Änderungserfassung. | ein Prozess, der in einem getrennten Deployment das Schema nicht besitzt |
 
 Es ist mit Absicht eine Option und kein späterer Schritt. Der Treiber liest die
 Tabellen beim Öffnen und hängt die Änderungserfassung an die an, die dann existieren.
 Ein danach aufgerufenes `provision()` würde laufen, nachdem der Treiber bereits
 entschieden hätte, was existiert. `REBASE_MIGRATE_ON_BOOT=none` schaltet das
-Collection-Schema weiterhin für jedes Backend im Prozess ab.
+Collection-Schema weiterhin für jedes Backend im Prozess ab. <span class="since-badge" data-since="0.26">Seit 0.26</span> `initializeRebaseBackend` übergibt `false`, wenn `REBASE_PROVISION=false` gesetzt ist.
 
 ## Nur die gewünschten Gruppen einbinden
 

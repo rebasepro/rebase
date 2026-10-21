@@ -98,6 +98,13 @@ export interface LiveSchemaRoutesConfig {
      */
     sourceEditingOff?: { code: string; message: string };
     /**
+     * Set when this backend changes nothing in its database (provisioning is
+     * off): an apply that would run the change against the database is
+     * refused with this, while a source-only commit — which touches no
+     * database and goes wherever the project's own changes go — still works.
+     */
+    databaseChangesOff?: { code: string; message: string };
+    /**
      * Which paths {@link writeSource} will touch, without touching them.
      *
      * The dirty-tree check needs them *before* the write, or it reads the
@@ -814,12 +821,13 @@ export function createLiveSchemaRoutes(config: LiveSchemaRoutesConfig): Hono<Hon
             branch = undefined;
         }
 
+        const databaseOff = config.databaseChangesOff;
         return c.json({
             enabled: true,
             canPlan: capabilities.plan,
-            canApply: capabilities.apply,
-            applyRefusedBecause: capabilities.reason,
-            applyRefusedCode: capabilities.code,
+            canApply: capabilities.apply && !databaseOff,
+            applyRefusedBecause: databaseOff?.message ?? capabilities.reason,
+            applyRefusedCode: databaseOff?.code ?? capabilities.code,
             repository: repository.root,
             branch
         });
@@ -905,6 +913,9 @@ export function createLiveSchemaRoutes(config: LiveSchemaRoutesConfig): Hono<Hon
         // be a write through the source-only editor that was never committed,
         // which every later apply then met as somebody else's work — 409.
         const sourceOnly = isRecord(body) && body.sourceOnly === true;
+        if (config.databaseChangesOff && !sourceOnly) {
+            throw ApiError.conflict(config.databaseChangesOff.message, config.databaseChangesOff.code);
+        }
         const admin = requirePlanner();
 
         // Applying is the second privilege, and the admin gate in front of this

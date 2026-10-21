@@ -164,6 +164,81 @@ outside.
 `REBASE_MIGRATE_ON_BOOT` accepts `ensure` and `none`, and nothing else — the
 image **refuses to boot** on `push`, for the reason above.
 
+## When only your change process may change the database
+
+<span class="since-badge" data-since="0.26">Since 0.26</span>
+
+`REBASE_MIGRATE_ON_BOOT=none` leaves your collections alone. It does not leave
+the database alone: the framework's own tables (auth, API keys, jobs, cron) are
+still created and kept current at every boot. When the database may only change
+through a reviewed change process, set `REBASE_PROVISION=false` on every process
+that serves:
+
+| Setting | Collection tables and policies | Framework tables |
+|---|---|---|
+| default (`REBASE_MIGRATE_ON_BOOT=ensure`) | created and kept current at boot | created and kept current |
+| `REBASE_MIGRATE_ON_BOOT=none` | left alone | created and kept current |
+| `REBASE_PROVISION=false` | left alone | left alone; whatever is missing is named in the log |
+
+With provisioning off the runtime creates and alters nothing: no table, column,
+index, function, trigger, policy, role or grant. That holds at boot and later,
+including the tables a serving process otherwise makes on first use
+(idempotency keys, cron claims, the shared rate-limit counters). It reads what
+is there instead:
+
+- **Auth tables, or a column auth reads, missing:** the boot refuses and lists
+  each one.
+- **The request role can reach a framework table** such as
+  `rebase.refresh_tokens` or `rebase.api_keys`: the boot refuses and prints the
+  `REVOKE` to run. A provisioning boot takes those privileges away on its own.
+  With provisioning off, nothing does.
+- **An optional table missing** (API keys, idempotency keys, cron claims,
+  rate-limit counters, presence, metrics history): that feature is off, and the
+  log says which table it needs.
+
+Rows still change, as they would on any database: sign-ins, sessions, API key
+usage, idempotency keys, cron claims. The first admin account
+(`REBASE_ADMIN_EMAIL`) is seeded by the provisioning run, not by the serving
+processes. [Live schema editing](/docs/backend/live-schema-editing) can still
+commit a change as source, but refuses to apply it to the database.
+
+### The provisioning run
+
+<span class="since-badge" data-since="0.26">Since 0.26</span>
+
+The schema comes from a run your change process controls. Use the same image and
+bundle as the server, with `REBASE_PROVISION_ONLY=true`, connected as a role that
+may create in the database. `REBASE_PROVISION_SQL_OUT` keeps every schema change
+the run made, as a SQL script:
+
+```bash
+docker run --rm \
+  -e DATABASE_URL="postgres://admin:…@scratch-db:5432/app" \
+  -e JWT_SECRET="…" \
+  -e REBASE_PROVISION_ONLY=true \
+  -e REBASE_PROVISION_SQL_OUT=/out/rebase.sql \
+  -v "$PWD/out:/out" \
+  -v "$PWD/dist-bundle:/bundle" \
+  "rebasepro/server:$REBASE_VERSION"
+```
+
+The script is a record, not a plan: every statement in it ran, in order, and
+succeeded. Recorded against an empty database, it is the whole schema the release
+needs. Recorded against a restored copy of production, it is exactly the upgrade.
+Rows the run wrote are not in it. Review it, then apply it to the real database:
+
+```bash
+psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f out/rebase.sql
+```
+
+Do it again for every Rebase upgrade, before the serving processes roll. A
+release can add a table or a column, and a process that may not create one
+reports it missing rather than making it.
+
+A server you build yourself follows the same rule: `initializeRebaseBackend` reads
+`REBASE_PROVISION`, and `createRebaseBackend` takes
+[`provision: false`](/docs/backend/custom-server#what-creating-a-backend-may-change-provision).
+
 ## File storage
 
 Storage is **off** unless a bucket is configured, and that is deliberate: the

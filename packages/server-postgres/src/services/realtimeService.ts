@@ -2971,7 +2971,7 @@ roles: ["anon"] };
      * what it was before this existed, whereas refusing to boot takes the whole
      * backend down for it.
      */
-    async configureChannelBus(bus: ChannelBus): Promise<void> {
+    async configureChannelBus(bus: ChannelBus, options: { provision?: boolean } = {}): Promise<void> {
         if (bus.kind === "memory") {
             this.bus = bus;
             return;
@@ -2996,7 +2996,13 @@ roles: ["anon"] };
         // `channel-presence.ts`. It comes up with the bus and only with it.
         try {
             const store = new ChannelPresenceStore(this.db, this.instanceId);
-            await store.ensureTables();
+            const ready = await store.ensureTables({ provision: options.provision });
+            if (!ready && options.provision === false) {
+                throw new Error(
+                    "rebase.channel_presence does not exist, and this backend changes nothing in its database. " +
+                    "A provisioning run with the same channel bus configured creates it."
+                );
+            }
             this.presenceStore = store;
             this.ensurePresenceSweep();
         } catch (error) {

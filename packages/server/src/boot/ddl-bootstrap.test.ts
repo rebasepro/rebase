@@ -3,7 +3,11 @@ import {
     createDdlBootstrapper,
     isConcurrentDdlRace,
     isDuplicateObjectRace,
+    isSchemaChange,
     hasInCauseChain,
+    provisioningExec,
+    refuseSchemaChanges,
+    SchemaChangeRefusedError,
     DDL_ATTEMPTS,
     type SqlExec
 } from "./ddl-bootstrap";
@@ -231,5 +235,84 @@ describe("isDuplicateObjectRace", () => {
 
     it("refuses an unrelated failure", () => {
         expect(isDuplicateObjectRace(wrapped("42501"))).toBe(false);
+    });
+});
+
+describe("isSchemaChange", () => {
+    it("is true for every statement that changes structure or privileges", () => {
+        for (const statement of [
+            "CREATE SCHEMA IF NOT EXISTS rebase",
+            "\n                CREATE TABLE IF NOT EXISTS rebase.api_keys (id TEXT)",
+            "ALTER TABLE rebase.api_keys ADD COLUMN IF NOT EXISTS kind TEXT",
+            "DROP INDEX IF EXISTS rebase.idx_api_keys_hash",
+            "GRANT USAGE ON SCHEMA rebase TO rebase_user",
+            "REVOKE ALL ON rebase.jobs FROM rebase_user",
+            "COMMENT ON TABLE rebase.jobs IS 'queue'",
+            "DO $grant$ BEGIN END $grant$",
+            "create index concurrently idx on t (c)",
+            "-- a note first\nCREATE TABLE t (id int)",
+            "/* and a block */ ALTER TABLE t ADD c int"
+        ]) {
+            expect(isSchemaChange(statement)).toBe(true);
+        }
+    });
+
+    it("is false for reads, row writes and session settings", () => {
+        for (const statement of [
+            "SELECT 1 FROM rebase.api_keys WHERE false",
+            "  select to_regclass('rebase.jobs')",
+            "INSERT INTO rebase.cron_logs (job) VALUES ($1)",
+            "UPDATE rebase.api_keys SET scopes = $1 WHERE id = $2",
+            "DELETE FROM rebase.metric_samples WHERE at < now()",
+            "WITH x AS (SELECT 1) SELECT * FROM x",
+            "SET LOCAL lock_timeout = '1s'",
+            "TRUNCATE rebase.channel_presence",
+            "-- CREATE TABLE in a comment\nSELECT 1"
+        ]) {
+            expect(isSchemaChange(statement)).toBe(false);
+        }
+    });
+});
+
+describe("refuseSchemaChanges — a backend that provisions nothing", () => {
+    it("never passes a schema change on, and passes everything else through", async () => {
+        const { exec, statements } = recordingExec();
+        const guarded = refuseSchemaChanges(exec);
+
+        await expect(guarded("CREATE TABLE IF NOT EXISTS rebase.jobs (id TEXT)")).rejects.toBeInstanceOf(SchemaChangeRefusedError);
+        await guarded("SELECT 1 FROM rebase.jobs WHERE false");
+        await guarded("INSERT INTO rebase.jobs (id) VALUES ($1)", { params: ["a"] });
+
+        expect(statements).toEqual(["SELECT 1 FROM rebase.jobs WHERE false", "INSERT INTO rebase.jobs (id) VALUES ($1)"]);
+    });
+
+    it("is only installed when provisioning is off", async () => {
+        const { exec, statements } = recordingExec();
+
+        await provisioningExec(exec, true)("CREATE SCHEMA rebase");
+        await provisioningExec(exec, undefined)("CREATE SCHEMA rebase");
+        await expect(provisioningExec(exec, false)("CREATE SCHEMA rebase")).rejects.toThrow(/changes nothing in its database/);
+
+        expect(statements).toEqual(["CREATE SCHEMA rebase", "CREATE SCHEMA rebase"]);
+    });
+
+    it("lets a bootstrap run its steps without one error line per refused statement", async () => {
+        const errors = jest.spyOn(logger, "error").mockImplementation(() => undefined);
+        const { exec } = recordingExec();
+        const ddl = createDdlBootstrapper(refuseSchemaChanges(exec), "test-store");
+
+        await ddl.ensureObject("Creating rebase.t", "CREATE TABLE IF NOT EXISTS rebase.t (id int)");
+        await ddl.step("Revoking", () => refuseSchemaChanges(exec)("REVOKE ALL ON rebase.t FROM rebase_user"));
+
+        expect(errors).not.toHaveBeenCalled();
+    });
+
+    it("still reports a statement that genuinely failed", async () => {
+        const errors = jest.spyOn(logger, "error").mockImplementation(() => undefined);
+        const ddl = createDdlBootstrapper(async () => { throw new Error("permission denied for schema rebase"); }, "test-store");
+
+        await ddl.step("Reading", async () => { throw new Error("permission denied for schema rebase"); });
+
+        expect(errors).toHaveBeenCalledTimes(1);
     });
 });

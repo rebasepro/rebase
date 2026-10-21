@@ -1,5 +1,5 @@
 ---
-sourceHash: ea0a6a3bfe925373
+sourceHash: cef32249585688a5
 title: Auto-hébergement
 sidebar_label: Auto-hébergement
 description: Exécutez Rebase n'importe où avec l'image runtime officielle et le bundle de votre projet — Docker Compose, Fly, Railway ou un simple VPS.
@@ -105,6 +105,53 @@ rebase db push
 Exécutez-le depuis une copie locale du code ou une tâche de CI, pointant vers la base de données du déploiement. Il effectue d'abord un test à blanc (dry run) de la modification, refuse les changements destructifs sans confirmation explicite, et peut effectuer une sauvegarde avant d'appliquer. La base de données expose un port dans le fichier compose afin que cette commande puisse l'atteindre depuis l'hôte ; supprimez ce mappage une fois le schéma en place si la base de données ne doit pas être accessible de l'extérieur.
 
 `REBASE_MIGRATE_ON_BOOT` accepte `ensure` et `none`, et rien d'autre — l'image **refuse de démarrer** avec `push`, pour la raison mentionnée ci-dessus.
+
+## Quand seul votre processus de changement peut modifier la base de données
+
+<span class="since-badge" data-since="0.26">Depuis 0.26</span>
+
+`REBASE_MIGRATE_ON_BOOT=none` laisse vos collections tranquilles. Il ne laisse pas la base de données tranquille : les tables propres au framework (auth, clés d'API, jobs, cron) sont toujours créées et tenues à jour à chaque démarrage. Quand la base de données ne peut changer que par un processus de changement relu, définissez `REBASE_PROVISION=false` sur chaque processus qui sert :
+
+| Réglage | Tables et politiques des collections | Tables du framework |
+|---|---|---|
+| par défaut (`REBASE_MIGRATE_ON_BOOT=ensure`) | créées et tenues à jour au démarrage | créées et tenues à jour |
+| `REBASE_MIGRATE_ON_BOOT=none` | intactes | créées et tenues à jour |
+| `REBASE_PROVISION=false` | intactes | intactes ; ce qui manque est nommé dans le log |
+
+Provisionnement désactivé, le runtime ne crée et ne modifie rien : aucune table, colonne, index, fonction, trigger, politique, rôle ni privilège. Cela vaut au démarrage et ensuite, y compris pour les tables qu'un processus de service crée sinon à la première utilisation (clés d'idempotence, claims de cron, compteurs partagés de rate limit). Il lit à la place ce qui est là :
+
+- **Des tables d'auth, ou une colonne lue par l'auth, manquent :** le démarrage est refusé et chacune est listée.
+- **Le rôle des requêtes atteint une table du framework** comme `rebase.refresh_tokens` ou `rebase.api_keys` : le démarrage est refusé et affiche le `REVOKE` à exécuter. Un démarrage qui provisionne retire ces privilèges de lui-même. Provisionnement désactivé, rien ne le fait.
+- **Une table optionnelle manque** (clés d'API, clés d'idempotence, claims de cron, compteurs de rate limit, présence, historique des métriques) : cette fonctionnalité est désactivée, et le log indique la table dont elle a besoin.
+
+Les lignes changent toujours, comme dans n'importe quelle base de données : connexions, sessions, usage des clés d'API, clés d'idempotence, claims de cron. Le premier compte administrateur (`REBASE_ADMIN_EMAIL`) est créé par l'exécution de provisionnement, pas par les processus qui servent. L'[édition du schéma en direct](/docs/backend/live-schema-editing) peut toujours committer un changement comme source, mais refuse de l'appliquer à la base de données.
+
+### L'exécution de provisionnement
+
+<span class="since-badge" data-since="0.26">Depuis 0.26</span>
+
+Le schéma vient d'une exécution que contrôle votre processus de changement. Utilisez la même image et le même bundle que le serveur, avec `REBASE_PROVISION_ONLY=true`, connecté avec un rôle autorisé à créer dans la base de données. `REBASE_PROVISION_SQL_OUT` conserve chaque changement de schéma effectué par l'exécution, sous forme de script SQL :
+
+```bash
+docker run --rm \
+  -e DATABASE_URL="postgres://admin:…@scratch-db:5432/app" \
+  -e JWT_SECRET="…" \
+  -e REBASE_PROVISION_ONLY=true \
+  -e REBASE_PROVISION_SQL_OUT=/out/rebase.sql \
+  -v "$PWD/out:/out" \
+  -v "$PWD/dist-bundle:/bundle" \
+  "rebasepro/server:$REBASE_VERSION"
+```
+
+Le script est un enregistrement, pas un plan : chaque instruction qu'il contient a été exécutée, dans l'ordre, et a réussi. Enregistré sur une base de données vide, c'est tout le schéma dont la version a besoin. Enregistré sur une copie restaurée de la production, c'est exactement la mise à niveau. Les lignes écrites par l'exécution n'y figurent pas. Relisez-le, puis appliquez-le à la vraie base de données :
+
+```bash
+psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f out/rebase.sql
+```
+
+Recommencez à chaque mise à niveau de Rebase, avant de déployer les processus qui servent. Une version peut ajouter une table ou une colonne, et un processus qui ne peut pas en créer la signale comme manquante au lieu de la créer.
+
+Un serveur que vous construisez vous-même suit la même règle : `initializeRebaseBackend` lit `REBASE_PROVISION`, et `createRebaseBackend` accepte [`provision: false`](/docs/backend/custom-server#what-creating-a-backend-may-change-provision).
 
 ## Stockage de fichiers
 

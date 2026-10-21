@@ -171,6 +171,31 @@ if (!split.ok) {
         "a multi-process topology did not force the shared rate-limit store");
 }
 
+// 2b2. A database only the operator's change process changes.
+const external = render([
+    "--set", "provision=false",
+    "--set", "split=true",
+    "--set", "functions.enabled=true",
+    "--set", "worker.enabled=true"
+]);
+if (!external.ok) {
+    problems.push(`provision=false does not render:\n${external.out}`);
+} else {
+    // Every unit, the api included: one that still provisions is the boot-time
+    // DDL the setting exists to remove, and it would pass every probe.
+    for (const deployment of namesOf(external.out, "Deployment")) {
+        const env = envOf(external.out, deployment) ?? {};
+        check("provision", env.REBASE_PROVISION === "false",
+            `${deployment} boots without REBASE_PROVISION=false, so it still changes the database`);
+        check("provision", env.REBASE_MIGRATE_ON_BOOT === "none",
+            `${deployment} has REBASE_MIGRATE_ON_BOOT=${env.REBASE_MIGRATE_ON_BOOT}; nothing in this release provisions`);
+    }
+    // The Job would be a provisioning run, which the runtime refuses beside
+    // REBASE_PROVISION=false — and the provisioning step is the operator's here.
+    check("provision", namesOf(external.out, "Job").length === 0,
+        "provision=false still renders the migration Job");
+}
+
 // 2c. Split with a static app — the independently released unit.
 const withStatic = render([
     "--set", "split=true",

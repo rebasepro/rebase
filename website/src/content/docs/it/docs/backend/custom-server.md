@@ -1,5 +1,5 @@
 ---
-sourceHash: e3a81a3528add4c5
+sourceHash: e6c4f1132a6e61eb
 title: Integrazione Server Personalizzato
 sidebar_label: Server Personalizzato
 description: Costruisci il backend Rebase da componenti pubblici nel tuo server — createRebaseBackend, i suoi gruppi di rotte, mount, attachRealtime e start — oppure incorpora il driver Postgres in Express.
@@ -245,14 +245,14 @@ decidere:
 | `provision` | Crea | Per |
 |---|---|---|
 | `true` | Tutto ciò che il backend serve: le tabelle delle collection e le loro policy RLS, l'acquisizione delle modifiche per il realtime, il ruolo con cui girano le richieste e le tabelle del framework (chiavi API, esecuzioni cron, job, metriche). | un deployment a processo singolo; ciò che passa `initializeRebaseBackend` |
-| `false` | Nulla. Lo schema deve essere già presente, applicato da `rebase db push`, da una migrazione o da un altro processo. Una tabella mancante fa fallire la chiamata nel momento in cui viene usata. | uno script, un test, un REPL, un processo che si limita a leggere |
+| `false` | Nulla, né all'avvio né dopo: nemmeno le tabelle che altri backend creano al primo utilizzo (chiavi di idempotenza, claim del cron) vengono create. Lo schema deve essere già presente, applicato da `rebase db push`, da una migrazione o da un altro processo. Tabelle di auth mancanti fanno rifiutare l'avvio; una tabella opzionale mancante disattiva la sua funzione ed è indicata nel log. | uno script, un test, un REPL, un processo che legge soltanto, un database che solo il vostro processo di modifica può cambiare |
 | `{ collections: false, realtime: false }` | Le tabelle del framework e il ruolo, ma non lo schema delle collection né l'acquisizione delle modifiche. | un processo che, in un deployment suddiviso, non possiede lo schema |
 
 È un'opzione e non un passaggio successivo, di proposito. Il driver legge le tabelle
 mentre si apre e collega l'acquisizione delle modifiche a quelle che esistono in quel
 momento. Un `provision()` chiamato dopo verrebbe eseguito quando il driver ha già
 deciso che cosa esiste. `REBASE_MIGRATE_ON_BOOT=none` continua a disattivare lo schema
-delle collection per qualsiasi backend del processo.
+delle collection per qualsiasi backend del processo. <span class="since-badge" data-since="0.26">Da 0.26</span> `initializeRebaseBackend` passa `false` quando `REBASE_PROVISION=false`.
 
 ## Montare solo i gruppi che vuoi
 

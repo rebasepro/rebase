@@ -93,6 +93,24 @@
   administrator's own session gets `403 SIMULATION_FORBIDDEN`, and every other
   route refuses the headers. `/api/admin/rls-simulator` lists what can be
   simulated and previews each collection's visible rows and masked fields.
+- **`REBASE_PROVISION`: set it to `false` and Rebase changes nothing in your
+  database.** For a
+  database whose schema changes only through your own change process. No
+  table, column, index, function, trigger, policy, role or grant is created or
+  altered, at boot or later. That includes the framework's own tables, which
+  `REBASE_MIGRATE_ON_BOOT=none` still keeps current, and the tables the runtime
+  used to create on first use: idempotency keys, cron claims and the shared
+  rate-limit counters. The runtime reads what is there and names what is
+  missing. Missing auth tables, or a request role that can reach
+  `rebase.refresh_tokens` or `rebase.api_keys`, stop the boot, with the
+  `REVOKE` to run. A missing optional table turns its feature off and says so.
+  The schema comes from a provisioning run your process controls:
+  `REBASE_PROVISION_ONLY=true` with `REBASE_PROVISION_SQL_OUT=<file>` writes
+  every schema change the run made as a SQL script to review and apply with
+  `psql`. That run no longer starts cron or the job queue, and now creates the
+  first-use tables too. `initializeRebaseBackend` reads the variable as well; a
+  server built with `createRebaseBackend` passes `provision: false`. See
+  [When only your change process may change the database](/docs/deployment/self-hosting/#when-only-your-change-process-may-change-the-database).
 #### CLI
 
 - **`rebase cloud deploy` checks a static app's JavaScript before uploading
@@ -173,6 +191,13 @@
 
 #### Runtime
 
+- **The request role no longer gets write access to `rebase.schema_meta` on
+  first boot.** On a backend without auth, the collection schema stamp created
+  that table after boot's last sweep of the request role's grants. So
+  `rebase_user` held DML on it until the next boot, and a user-context query
+  could rewrite the version stamp that decides whether that boot serves. The
+  stamp now revokes on the table when it creates it, as every other internal
+  table's creator does, and runs no DDL at all once the table exists.
 - **A function that imports `hono` itself loads on the managed runtime.** The
   bundler removes `hono` and `@hono/node-server` from a bundle's dependencies
   because the image provides them, but nothing linked the image's copy into

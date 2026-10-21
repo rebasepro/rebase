@@ -1,5 +1,5 @@
 ---
-sourceHash: e3a81a3528add4c5
+sourceHash: e6c4f1132a6e61eb
 title: Integración de servidor personalizado
 sidebar_label: Servidor personalizado
 description: Construye el backend de Rebase a partir de piezas públicas en tu propio servidor — createRebaseBackend, sus grupos de rutas, mount, attachRealtime y start — o integra el driver de Postgres en Express.
@@ -237,14 +237,14 @@ decidas:
 | `provision` | Crea | Para |
 |---|---|---|
 | `true` | Todo lo que sirve el backend: las tablas de las colecciones y sus políticas RLS, la captura de cambios para realtime, el rol con el que se ejecutan las solicitudes y las tablas propias del framework (claves de API, ejecuciones de cron, trabajos, métricas). | un despliegue de un solo proceso; lo que pasa `initializeRebaseBackend` |
-| `false` | Nada. El esquema ya debe existir, aplicado por `rebase db push`, una migración u otro proceso. Una tabla que falta falla cuando se usa. | un script, una prueba, un REPL, un proceso que solo lee |
+| `false` | Nada, ni en el arranque ni después: tampoco se crean las tablas que otros backends crean en su primer uso (claves de idempotencia, claims de cron). El esquema ya debe existir, aplicado por `rebase db push`, una migración u otro proceso. Si faltan las tablas de auth, el arranque se rechaza; una tabla opcional que falta desactiva su función y se nombra en el log. | un script, un test, un REPL, un proceso que solo lee, una base de datos que solo su proceso de cambios puede modificar |
 | `{ collections: false, realtime: false }` | Las tablas del framework y el rol, pero no el esquema de las colecciones ni la captura de cambios. | un proceso que no es dueño del esquema en un despliegue dividido |
 
 Es una opción y no un paso posterior a propósito. El driver lee las tablas al
 abrirse y adjunta la captura de cambios a las que existen en ese momento. Un
 `provision()` llamado después se ejecutaría cuando el driver ya habría decidido
 qué existe. `REBASE_MIGRATE_ON_BOOT=none` sigue desactivando el esquema de las
-colecciones para cualquier backend del proceso.
+colecciones para cualquier backend del proceso. <span class="since-badge" data-since="0.26">Desde 0.26</span> `initializeRebaseBackend` pasa `false` cuando `REBASE_PROVISION=false`.
 
 ## Montar solo los grupos que quieras
 
