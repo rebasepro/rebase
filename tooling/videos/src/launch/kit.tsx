@@ -140,6 +140,12 @@ export const Eyebrow: React.FC<{ children: React.ReactNode; at: number; color?: 
     );
 };
 
+/** The window's entrance, in frames, and the section frame it has landed
+ *  by: it starts two LEADs before the downbeat. A camera move must not start
+ *  before this, or it fights the entrance's own easing. */
+const ENTRANCE = 30;
+export const WINDOW_LANDS = ENTRANCE - LEAD * 2;
+
 /** Where the product window sits in every verb section, in frame pixels.
  *  8:5, the demo footage's own aspect, so a clip fills it uncropped. */
 export const WINDOW = { x: 760, y: 198, width: 1088, height: 680 } as const;
@@ -192,7 +198,7 @@ export const ProductWindow: React.FC<{
 }> = ({ children, at = 0, focus = [], rect = WINDOW }) => {
     const frame = useCurrentFrame();
     // Lands on the downbeat with the verb, rather than starting from it.
-    const t = ramp(frame, at - LEAD * 2, 30);
+    const t = ramp(frame, at - LEAD * 2, ENTRANCE);
     const cam = camera(frame, focus);
     return (
         <div
