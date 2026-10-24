@@ -369,9 +369,18 @@ are allowed to any internet address on these TCP ports only:
 | 993 | IMAP over TLS |
 
 Everything else is blocked. That includes port 25, plain IMAP, and databases or
-caches on their own ports: a PostgreSQL on 5432, Redis on 6379 or MongoDB on
-27017 outside Rebase Cloud cannot be reached. The cloud metadata address
-(`169.254.169.254`) is blocked too.
+caches on their own ports: Redis on 6379 or MongoDB on 27017 outside Rebase
+Cloud cannot be reached. The cloud metadata address (`169.254.169.254`) is
+blocked too.
+
+The one exception is your own database. If the project brings its own
+PostgreSQL (BYODB), each deploy also allows connections to that database's
+host on the port in its connection string, and to nothing else on that port.
+The host is resolved to its IP addresses when you deploy, so if your provider
+moves the database to another address, deploy again. The database must accept
+connections from the internet: the app connects to the connection string
+directly. The SSH bastion settings are used only by the connection test, not
+by the deployed app.
 
 The platform adds no proxy and no outbound rate limit; the services you call
 have their own. Pass `getSignal(c)` to `fetch` so a call stops when its request
