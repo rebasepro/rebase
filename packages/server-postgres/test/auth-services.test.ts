@@ -40,24 +40,27 @@ type: "sql-join" }))
  * table was updated, scoped to the right row".
  */
 function readSql(query: unknown): { text: string; values: unknown[] } {
-    const { strings = [], values = [] } = (query ?? {}) as {
-        strings?: readonly string[];
-        values?: unknown[];
+    const bound: unknown[] = [];
+    const kindOf = (v: unknown): string | undefined =>
+        typeof v === "object" && v !== null ? (v as { type?: string }).type : undefined;
+    // A nested `sql` fragment or `sql.join` is SQL too: its literal parts go in
+    // the text and its interpolations are bound values, in order.
+    const render = (node: unknown): string => {
+        const kind = kindOf(node);
+        if (kind === "sql-raw") return (node as { val: string }).val;
+        if (kind === "sql-join") {
+            const { parts, separator } = node as { parts: unknown[]; separator: unknown };
+            return parts.map(render).join(render(separator));
+        }
+        if (kind === "sql") {
+            const { strings = [], values = [] } = node as { strings?: readonly string[]; values?: unknown[] };
+            return strings.map((part, i) => (i >= values.length ? part : part + render(values[i]))).join("");
+        }
+        bound.push(node);
+        return "?";
     };
-    const isRaw = (v: unknown): v is { val: string } =>
-        typeof v === "object" && v !== null && (v as { type?: string }).type === "sql-raw";
-
-    const text = strings
-        .map((part, i) => {
-            if (i >= values.length) return part;
-            return part + (isRaw(values[i]) ? (values[i] as { val: string }).val : "?");
-        })
-        .join("")
-        .replace(/\s+/g, " ")
-        .trim();
-
-    return { text,
-        values: values.filter((v) => !isRaw(v)) };
+    const text = render(query ?? { type: "sql" }).replace(/\s+/g, " ").trim();
+    return { text, values: bound };
 }
 
 function mockUserData(overrides: Partial<UserData>): UserData {
@@ -629,12 +632,20 @@ email: "test@example.com" };
                 // statement under test is the one inside the transaction.
                 const { text, values } = readSql(mockExecute.mock.calls[1][0]);
                 expect(text).toContain('UPDATE "rebase"."users"');
-                expect(text).toContain("SET roles = ?::text[]");
+                expect(text).toContain("SET roles = ARRAY[?, ?]::text[]");
                 expect(text).toContain("WHERE id = ?");
-                // The roles are handed to Postgres as one array literal, so the
-                // exact spelling is the whole contract: a JSON array or a bare
-                // comma list is either rejected or stored as a single junk role.
-                expect(values).toEqual(["{admin,editor}", "user-123"]);
+                // Each role is its own bound parameter. A hand-built array
+                // literal (`{admin,editor}`) let Postgres parse the caller's
+                // strings: `"support,admin"` was stored as two roles.
+                expect(values).toEqual(["admin", "editor", "user-123"]);
+            });
+
+            it("writes an empty role list as an empty array, with no parameter for it", async () => {
+                await userService.setUserRoles("user-123", []);
+
+                const { text, values } = readSql(mockExecute.mock.calls[1][0]);
+                expect(text).toContain("SET roles = '{}'::text[]");
+                expect(values).toEqual(["user-123"]);
             });
         });
 
