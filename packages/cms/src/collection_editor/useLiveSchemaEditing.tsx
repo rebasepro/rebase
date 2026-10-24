@@ -283,9 +283,15 @@ export function useLiveSchemaEditing(options: UseLiveSchemaEditingOptions): Live
         );
     }, [client, pending]);
 
+    // A deployment that provisions nothing applies no change from here, and
+    // says to commit it as source only: for a change that could be applied,
+    // that commit is the way through, and the dialog's main action.
+    const provisioningOff = status?.applyRefusedCode === "SCHEMA_EDITING_PROVISIONING_OFF";
+    const commitAsSourceOnly = Boolean(provisioningOff && plan?.applicable);
+
     // Offered only when every refused change says what it would leave behind.
     // One that does not may not be written to the source alone.
-    const sourceOnlyOffered = Boolean(plan && !plan.applicable &&
+    const sourceOnlyOffered = commitAsSourceOnly || Boolean(plan && !plan.applicable &&
         plan.changes.filter(change => change.verdict !== "safe").every(change => change.sourceOnly));
 
     const onClose = useCallback(() => {
@@ -321,6 +327,7 @@ export function useLiveSchemaEditing(options: UseLiveSchemaEditingOptions): Live
                     onConfirm={onConfirm}
                     onRetry={planError ? onRetry : undefined}
                     onSourceOnly={sourceOnlyOffered ? onSourceOnly : undefined}
+                    sourceOnlyIsTheCommit={commitAsSourceOnly}
                     onClose={onClose}
                     applyRefusedBecause={
                         status && !status.canApply ? status.applyRefusedBecause : undefined

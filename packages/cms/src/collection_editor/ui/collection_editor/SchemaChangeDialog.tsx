@@ -87,6 +87,12 @@ export interface SchemaChangeDialogProps {
      */
     applyRefusedBecause?: string;
     /**
+     * The change can only be committed as source — the deployment applies
+     * nothing to its database — so {@link onSourceOnly} is the main action,
+     * labelled "Commit", and not refused by {@link applyRefusedBecause}.
+     */
+    sourceOnlyIsTheCommit?: boolean;
+    /**
      * Where a confirmation would land — `owner/repo` and a branch.
      *
      * On screen before the button, not in the receipt after it. A commit is
@@ -288,6 +294,7 @@ export function SchemaChangeDialog({
     onSourceOnly,
     onClose,
     applyRefusedBecause,
+    sourceOnlyIsTheCommit,
     target
 }: SchemaChangeDialogProps) {
 
@@ -474,7 +481,12 @@ export function SchemaChangeDialog({
                         {t("schema_change_edit_source_only")}
                     </Button>
                 )}
-                {!result && (
+                {!result && sourceOnlyIsTheCommit && onSourceOnly && (
+                    <Button variant="filled" color="primary" onClick={onSourceOnly} disabled={applying}>
+                        {applying ? t("schema_change_committing") : t("schema_change_commit")}
+                    </Button>
+                )}
+                {!result && !(sourceOnlyIsTheCommit && onSourceOnly) && (
                     <Button
                         variant="filled"
                         color="primary"

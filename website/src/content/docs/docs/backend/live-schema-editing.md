@@ -160,6 +160,11 @@ default, which makes every later insert fail until it is dropped or made
 nullable. A change without one (moving a primary key, a relation whose link
 column nothing creates) cannot be written to the source alone.
 
+On a deployment that changes nothing in its database (`REBASE_PROVISION=false`)
+no change is applied from the panel, so every change goes this way: the
+dialog's main button reads **Commit** and sends `"sourceOnly": true`, and the
+process that changes that database applies the schema.
+
 Deleting a collection from the admin panel takes the same path: `/apply` with
 `"remove": true` and `"sourceOnly": true` deletes the collection's file and its
 entry in `index.ts` and commits both; the table and its rows stay. It is
