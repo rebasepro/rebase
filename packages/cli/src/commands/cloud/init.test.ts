@@ -666,6 +666,20 @@ describe("the helpers", () => {
         expect(fs.readFileSync(path.join(project, "new.env"), "utf-8")).toBe("K=v\n");
     });
 
+    it("creates a .env private, since it holds keys", () => {
+        const file = path.join(project, "fresh.env");
+        upsertDotenv(file, "REBASE_API_TOKEN", "rk_live_app_key");
+        expect(fs.statSync(file).mode & 0o777).toBe(0o600);
+    });
+
+    it("keeps a REBASE_API_TOKEN already in .env, and mints none to throw away", async () => {
+        fs.appendFileSync(path.join(project, ".env"), "REBASE_API_TOKEN=rk_live_made_by_hand\n");
+        await init(["--claim"]);
+        expect(fs.readFileSync(path.join(project, ".env"), "utf-8")).toContain("REBASE_API_TOKEN=rk_live_made_by_hand");
+        expect(sent.some(r => r.path === "/api/functions/ephemeral/app-key")).toBe(false);
+        expect(printedJson()).toMatchObject({ appKey: { ok: false, error: { code: "env_has_key" } } });
+    });
+
     it("finds the admin panel where rebase.json mounts the CMS, and nowhere when it mounts none", () => {
         expect(adminPanelUrl(project, "https://a.rebase.website")).toBe("https://a.rebase.website/");
         fs.writeFileSync(path.join(project, "rebase.json"), JSON.stringify({

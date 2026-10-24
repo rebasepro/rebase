@@ -374,7 +374,8 @@ second.
 
 Once the deploy has built the app, the command also sets `REBASE_API_TOKEN` in
 `.env`: a key minted on the app itself, which is what the MCP server and the SDK
-send to it. It reads and writes data (`data:read`, `data:write`) through the
+send to it. A `REBASE_API_TOKEN` already in `.env` is kept and none is minted,
+and a `.env` the command creates is readable by you alone. It reads and writes data (`data:read`, `data:write`) through the
 app's row-level security, as a caller who is neither a person nor an admin. It
 holds nothing of the admin plane, and it expires with the claim window. With
 `--no-deploy`, or when that first deploy fails, there is no key yet: the next

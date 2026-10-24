@@ -251,7 +251,9 @@ export function upsertDotenv(file: string, key: string, value: string): void {
     const at = lines.findIndex((l) => new RegExp(`^\\s*(export\\s+)?${key}\\s*=`).test(l));
     if (at >= 0) lines[at] = line;
     else lines.push(line);
-    fs.writeFileSync(file, `${lines.join("\n")}\n`);
+    // A `.env` this writes holds keys: created private, as `env pull` creates
+    // one. An existing file keeps the mode its owner gave it.
+    fs.writeFileSync(file, `${lines.join("\n")}\n`, { mode: 0o600 });
 }
 
 export { dotenvSets };
@@ -491,7 +493,18 @@ export async function cloudInitCommand(rawArgs: string[], deps: InitDeps = DEFAU
     // Only once the deploy has built the app: before that there is nothing to
     // mint the key on. A missing key is reported, never fatal.
     let appKey: AppKeyOutcome | undefined;
-    if (deployed?.ok) {
+    if (deployed?.ok && dotenvSets(path.join(root, ".env"), API_TOKEN_ENV)) {
+        // The rule `mintMissingAppKey` follows: a key already in `.env` may be
+        // one someone made by hand, and is not replaced. Not asked for either,
+        // since a key minted and never written is a key nobody can use.
+        appKey = {
+            ok: false,
+            code: "env_has_key",
+            message: `.env already sets ${API_TOKEN_ENV}, which may be a key someone made by hand, so it was kept. `
+                + "Remove it and run `rebase cloud deploy` to get the project's app key."
+        };
+        warn(`${API_TOKEN_ENV} was not written: ${appKey.message}`);
+    } else if (deployed?.ok) {
         appKey = await deps.appKey(url, project.apiKey, project.projectId);
         if (appKey.ok) {
             upsertDotenv(path.join(root, ".env"), API_TOKEN_ENV, appKey.key.apiKey);
