@@ -663,12 +663,11 @@ async function uploadAndTrigger(opts: {
         managed = res.managed === true;
         hosts = deployHostsFrom(res);
     } catch (e) {
-        // A refused bundle is a decision with a code and a remedy, not a
-        // transport failure — the same branch `resolveTriggerFailure` takes
-        // for a source build, which this path never reached.
-        const refusal = intakeRefusal(e);
-        if (refusal) fail(refusal.message, refusal.hint, refusal.code);
-        reportError(e, "Managed deploy failed to start");
+        // The same refusals as a source build, answered the same way: the
+        // control plane sends both doors identical envelopes. This path used
+        // to read only the intake code, so a 409 lost the blocking deploy's id
+        // and the way to cancel it, and a 402 the way to billing.
+        resolveTriggerFailure(e, "Managed deploy failed to start");
     }
 
     // Followed to a terminal state, like the source path beside it.
@@ -1894,7 +1893,7 @@ command: "cloud deploy" });
  * The refusal names the blocker, because "which one, since when, from where"
  * is the difference between an actionable refusal and a dead end.
  */
-function resolveTriggerFailure(e: unknown): never {
+function resolveTriggerFailure(e: unknown, fallback = "Failed to trigger deployment"): never {
     const err = e as {
         status?: number;
         message?: string;
@@ -1934,7 +1933,7 @@ function resolveTriggerFailure(e: unknown): never {
     const refusal = intakeRefusal(e);
     if (refusal) fail(refusal.message, refusal.hint, refusal.code);
 
-    reportError(e, "Failed to trigger deployment");
+    reportError(e, fallback);
 }
 
 /**
