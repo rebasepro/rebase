@@ -3812,8 +3812,36 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
         if (!inProcess) {
             inProcess = new Hono<HonoEnv>();
             mountInto(inProcess, IN_PROCESS_BASE_PATH, false);
+            refuseSurfacesOffByName(inProcess);
         }
         return inProcess;
+    };
+
+    // What `backend.rebase.functions`, `.auth` and `.admin` reach on a process
+    // whose role turned their surface off — a `worker` turns off every one.
+    // There is no route to dispatch into, and the generic envelope ("No route
+    // for POST /api/functions/send-digest on this backend.") named no surface,
+    // no role and nothing to do: a cron job moved to a worker, as
+    // docs/deployment/split-processes.md suggests, failed with it every night.
+    // Same status and code; the message says which surface and what instead.
+    const refuseSurfacesOffByName = (app: Hono<HonoEnv>): void => {
+        const off: Array<{ path: string; surface: RuntimeSurface; accessor: string; roles: string }> = [];
+        if (!functionsSurface) {
+            off.push({ path: "functions", surface: "functions", accessor: "rebase.functions", roles: "REBASE_ROLE=worker, and REBASE_ROLE=api without REBASE_FUNCTIONS_UPSTREAM" });
+        }
+        if (!surfaces.auth) off.push({ path: "auth", surface: "auth", accessor: "rebase.auth", roles: "REBASE_ROLE=worker and REBASE_ROLE=functions" });
+        if (!surfaces.admin) off.push({ path: "admin", surface: "admin", accessor: "rebase.admin and rebase.cron", roles: "REBASE_ROLE=worker and REBASE_ROLE=functions" });
+        for (const { path, surface, accessor, roles } of off) {
+            app.all(`${IN_PROCESS_BASE_PATH}/${path}/*`, (c) => errorHandler(new ApiError(
+                404,
+                "NOT_FOUND",
+                `No route for ${c.req.method} ${c.req.path} on this backend: its ${surface} surface is off ` +
+                `(${roles} turn it off), so ${accessor} has nothing to call in this process. ` +
+                "Call it over HTTP on a process that serves it, or run this code on one.",
+                undefined,
+                true
+            ), c));
+        }
     };
 
     // ── Realtime ──────────────────────────────────────────────────────────

@@ -200,6 +200,14 @@ turn it off on the API:
       REBASE_MIGRATE_ON_BOOT: none
 ```
 
+A job that moves to a worker keeps `rebase.dataAsAdmin`, `rebase.sql`,
+`rebase.storage` and `rebase.email`, which talk to the database, the buckets and
+the mail server directly. It loses `rebase.functions`, `rebase.auth`,
+`rebase.admin` and `rebase.cron`: those dispatch into the process's own routes,
+and a worker serves none, so a call answers `404 NOT_FOUND` naming the surface
+that is off. Call a function over HTTP on the API instead, or leave a job that
+needs one where its surface is on.
+
 A `functions` process never runs either. It is scaled by request load and
 replaced at will, and giving it scheduled work would make its replica count mean
 something it should not.
