@@ -441,7 +441,9 @@ claim URL and the expiry too (`unclaimed` in `--json`). `rebase cloud unlink`
 does not delete an unclaimed project: it warns that the project keeps running
 until it expires and prints the claim URL, and `init --claim` in a directory
 that is already linked to one points at its claim URL instead of provisioning a
-second.
+second. Until the claim, the app reaches the internet on ports 80 and 443 only;
+the mail ports every other project has (465, 587 and 993) open when the project
+is claimed.
 
 Once the deploy has built the app, the command also sets `REBASE_API_TOKEN` in
 `.env`: a key minted on the app itself, which is what the MCP server and the SDK
