@@ -185,12 +185,37 @@ function keyExpression(primaryKey: readonly string[]): string {
 }
 
 /**
+ * `t.<column>` as text that reads the same in any session.
+ *
+ * A row's text output follows the session's settings, and a database-level
+ * `ALTER DATABASE … SET timezone` (or `datestyle`) is not copied to a branch
+ * made from it — so the same `timestamptz` wrote different text on the two
+ * sides, and every untouched row read as changed. Times, timestamps and dates
+ * are written out with `to_char` in UTC instead; infinities keep their own
+ * words, which no setting changes.
+ */
+function settledValue(column: { name: string; type: string }): string {
+    const value = `t.${ident(column.name)}`;
+    const finite = (expression: string, format: string) =>
+        `CASE WHEN isfinite(${value}) THEN to_char(${expression}, '${format}') ELSE ${value}::text END`;
+    if (column.type === "timestamp with time zone" || (column.type.startsWith("timestamp(") && column.type.endsWith("with time zone"))) {
+        return finite(`${value} AT TIME ZONE 'UTC'`, "YYYY-MM-DD\"T\"HH24:MI:SS.US");
+    }
+    if (column.type === "timestamp without time zone" || column.type.startsWith("timestamp(")) {
+        return finite(value, "YYYY-MM-DD\"T\"HH24:MI:SS.US");
+    }
+    if (column.type === "date") return finite(value, "YYYY-MM-DD");
+    return value;
+}
+
+/**
  * A digest of `t`'s values in `columns`. A row constructor rather than a
  * function call, which would stop at 100 columns. The same columns, of the
- * same types, write the same text on both sides.
+ * same types, write the same text on both sides, whatever either session's
+ * timezone or date style.
  */
-function hashExpression(columns: readonly string[]): string {
-    return `md5(ROW(${columns.map((column) => `t.${ident(column)}`).join(", ")})::text)`;
+function hashExpression(columns: readonly { name: string; type: string }[]): string {
+    return `md5(ROW(${columns.map(settledValue).join(", ")})::text)`;
 }
 
 // ── The catalogue ────────────────────────────────────────────────────────────
@@ -1023,7 +1048,9 @@ async function computeDiff(admin: DatabaseAdmin | undefined, branchName: string,
     const probes = shared.map(({ target, compared }) => ({
         facts: target,
         keyExpr: target.primaryKey.length > 0 ? keyExpression(target.primaryKey) : "''",
-        hashExpr: hashExpression(compared.length > 0 ? compared : target.columns.map((column) => column.name))
+        hashExpr: hashExpression(compared.length > 0
+            ? target.columns.filter((column) => compared.includes(column.name)).sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0))
+            : target.columns)
     }));
     const [targetSums, branchSums] = await Promise.all([
         checksums(sql, targetDb, probes),

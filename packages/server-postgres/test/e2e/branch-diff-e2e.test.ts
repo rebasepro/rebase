@@ -319,6 +319,26 @@ describe("database branch diff and merge", () => {
         expect(updated?.changedColumns?.sort()).toEqual(["email", "password_hash"]);
     });
 
+    it("finds no differences in rows nobody touched when the parent has its own timezone or date style", async () => {
+        await freshBranch("tz", `
+            CREATE TABLE ev (id int PRIMARY KEY, at timestamptz NOT NULL DEFAULT now(), day date, local timestamp);
+            INSERT INTO ev (id, day, local) SELECT g, DATE '2026-01-01' + g, TIMESTAMP '2026-01-01 10:00' + g * INTERVAL '1 hour'
+              FROM generate_series(1, 5) g;
+            ALTER DATABASE tz SET timezone = 'Asia/Tokyo';
+            ALTER DATABASE tz SET datestyle = 'SQL, DMY';
+        `);
+        // The settings apply to sessions opened from now on.
+        await poolManager.disconnectDatabase("tz");
+        expect(await on("tz", "SHOW timezone")).toEqual([{ TimeZone: "Asia/Tokyo" }]);
+        const diff = await diffDatabaseBranch(admin, "tz");
+        expect(diff.data).toEqual([]);
+
+        // And a real change still shows.
+        await branch("tz", "UPDATE ev SET at = at + INTERVAL '1 second' WHERE id = 1");
+        const changed = await diffDatabaseBranch(admin, "tz");
+        expect(changed.data.find((entry) => entry.table === "ev")).toMatchObject({ updated: 1, conflicts: 0 });
+    });
+
     describe("a table rewritten since the branch was made", () => {
         const SETUP = `
             CREATE TABLE items (id int PRIMARY KEY, qty int, label text);
