@@ -209,6 +209,39 @@ describe("one group, mounted alone, at a path of the application's choosing", ()
     });
 });
 
+describe("a group mounted alone answers the impersonation and simulation headers itself", () => {
+    // `mount()` refused the headers on every route but data and functions at
+    // its base path; a group mounted on its own carried no such guard, so a
+    // custom server's storage or admin group answered `x-rebase-impersonate`
+    // as the administrator who sent it, under the other user's label.
+    const HONOURED = new Set(["data", "functions"]);
+    const ATTEMPTS: Array<[Record<string, string>, string]> = [
+        [{ "x-rebase-impersonate": "u-2" }, "IMPERSONATION_UNSUPPORTED"],
+        [{ "x-rebase-simulate-role": "customer" }, "SIMULATION_UNSUPPORTED"]
+    ];
+
+    it("every group but data and functions refuses them, wherever it is mounted", async () => {
+        const backend = await create({ surfaces: { cron: true, meta: true } });
+        const auth = await bearer("admin-1", ["admin"]);
+        let checked = 0;
+        for (const name of Object.keys(backend.routes) as Array<keyof typeof backend.routes>) {
+            const app = new Hono<HonoEnv>();
+            app.route(`/v2/${name}`, backend.routes[name]());
+            for (const [header, code] of ATTEMPTS) {
+                const res = await app.request(`/v2/${name}/anything`, { headers: { ...auth.headers, ...header } });
+                const body = await res.json().catch(() => ({})) as { error?: { code?: string } };
+                if (HONOURED.has(name)) {
+                    expect([name, body.error?.code]).not.toEqual([name, code]);
+                } else {
+                    expect([name, res.status, body.error?.code]).toEqual([name, 400, code]);
+                }
+            }
+            checked++;
+        }
+        expect(checked).toBe(Object.keys(backend.routes).length);
+    });
+});
+
 describe("building a backend does nothing on its own", () => {
     it("mounts nothing, starts no timer, and adds no process listener", async () => {
         const listeners = process.listenerCount("unhandledRejection");

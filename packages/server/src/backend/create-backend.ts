@@ -3533,10 +3533,20 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
     /**
      * A group: this backend's services on every request first, then a fresh
      * router over `router`'s handlers.
+     *
+     * Each group also answers the impersonation and simulation headers itself,
+     * so one mounted on its own (`backend.routes.storage()` at `/v2/storage`)
+     * keeps the rule `mount()` installs on its base path. A group that does
+     * not run requests as someone else refuses them; the data and functions
+     * groups (`"honoured"`), whose auth middleware applies them, report what a
+     * simulated request ran as. Without this a custom server's storage or
+     * admin group answered `x-rebase-impersonate: <B>` as the administrator
+     * who sent it, under B's label.
      */
-    const group = (router?: Hono<HonoEnv>): Hono<HonoEnv> => {
+    const group = (router?: Hono<HonoEnv>, identitySwap: "refused" | "honoured" = "refused"): Hono<HonoEnv> => {
         const composed = new Hono<HonoEnv>();
         composed.use("/*", provideServices);
+        composed.use("/*", identitySwap === "honoured" ? reportSimulatedContext() : refuseUnhonouredImpersonation([]));
         return router ? composed.route("/", router) : composed;
     };
 
@@ -3564,7 +3574,7 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
         },
         data: () => {
             requireSurface("data");
-            return group(dataSurface);
+            return group(dataSurface, "honoured");
         },
         storage: () => {
             requireSurface("storage");
@@ -3577,7 +3587,7 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
                     "with the functions surface on, or `functionsUpstream` with it off to forward them."
                 );
             }
-            return group(functionsSurface);
+            return group(functionsSurface, "honoured");
         },
         admin: () => {
             requireSurface("admin");
@@ -3691,9 +3701,9 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
         // else, never answered as the administrator who sent it. See
         // `auth/impersonation.ts`.
         app.use(`${basePath}/*`, refuseUnhonouredImpersonation([`${basePath}/data`, `${basePath}/functions`]));
-        // The other end of the RLS simulator: a simulated request's response
-        // names what it ran as and the fields that identity cannot read.
-        app.use(`${basePath}/*`, reportSimulatedContext());
+        // The other end of the RLS simulator — a simulated request's response
+        // naming what it ran as — is installed by the data and functions
+        // groups themselves (see `group`), so it holds wherever they are mounted.
 
         if (surfaces.admin) app.route(`${basePath}/admin`, groups.admin());
         if (surfaces.auth) app.route(`${basePath}/auth`, groups.auth());

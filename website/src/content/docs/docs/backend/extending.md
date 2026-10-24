@@ -225,8 +225,9 @@ await backend.attachRealtime(server);
 backend.start();                                // cron, job workers, sweeps
 ```
 
-A group carries its own auth context, rate limits and admin gate, so
-`getDriver(c)` works in a group mounted anywhere. What it does not carry is the
+A group carries its own auth context, rate limits and admin gate, and refuses
+the impersonation and simulation headers unless it is the data or functions
+group, so `getDriver(c)` works in a group mounted anywhere. What it does not carry is the
 process-wide middleware `mount()` adds: the body limit, compression, CSRF and
 the error envelope are yours to add when you mount groups one by one.
 

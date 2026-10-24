@@ -289,6 +289,23 @@ parameterised path such as `/:tenant/data` too. A group also reads where it was
 mounted, so the data API still routes each collection to its data source and
 the functions listing names the paths it is really served at.
 
+A group also answers the "act as someone else" headers itself, as `mount()`
+does: the data and functions groups honour `x-rebase-impersonate` and
+`x-rebase-simulate-*` for an administrator, and every other group refuses them
+with `400 IMPERSONATION_UNSUPPORTED` or `SIMULATION_UNSUPPORTED`, so a request
+asking to act as another user is never answered as the administrator who sent
+it. Routes of your own that should refuse them too can use the same guard:
+
+```typescript
+import { refuseUnhonouredImpersonation } from "@rebasepro/server";
+
+// Refuses the headers on every path below, except under the mounts listed.
+app.use("/v2/*", refuseUnhonouredImpersonation(["/v2/data", "/v2/functions"]));
+```
+
+On 0.25 a group mounted on its own ignored the headers and answered as the
+administrator.
+
 What a group does not carry is the process-wide middleware `mount()` puts in
 front of everything. Mounting groups one by one, add what you want of it
 yourself: a body limit (`bodyLimit` from `hono/body-limit`), compression, and

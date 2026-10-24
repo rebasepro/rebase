@@ -221,8 +221,10 @@ function readBackupBytes
 function readBundleManifest
 function readUploadPropertyContext
 function realtimeSocketPath
+function refuseUnhonouredImpersonation
 function registerDevEmailSink
 function registerResourceResolver
+function reportSimulatedContext
 function requireDriver
 function requireEnv
 function requireRole
@@ -633,6 +635,7 @@ function resourceKinds
 function resourceToDataSource
 function resourceToStorageSource
 function rewriteLegacyRlsFunctions
+function roleNameProblem
 function runtimeOnlyKeyIn
 function scopeAcceptsTarget
 function scopeGrants
