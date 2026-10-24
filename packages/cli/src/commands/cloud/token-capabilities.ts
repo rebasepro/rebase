@@ -17,7 +17,8 @@
  * - `deploy`   — `rebase cloud deploy` (bundle and source paths, uploads, the
  *                build follow, `--preview`), `rebase cloud deployments` and
  *                `rebase cloud previews`.
- * - `logs`     — `rebase cloud logs` (build, `--follow`, `--runtime`),
+ * - `logs`     — `rebase cloud logs` (build, `--follow`, `--runtime`,
+ *                `--preview`),
  *                `rebase cloud metrics` and `rebase cloud cron` — whose
  *                `runtime-token` call is how a token reads the app's own
  *                cron history.
@@ -80,7 +81,9 @@ export const TOKEN_CAPABILITIES: Record<TokenCapability, { label: string; scopes
             `project:logs:${projectId}`,
             "functions:invoke:runtime-logs",
             "functions:invoke:metrics",
-            "functions:invoke:runtime-token"
+            "functions:invoke:runtime-token",
+            // `logs --preview <name>` finds the preview through `previews`.
+            "functions:invoke:previews"
         ]
     },
     env: {

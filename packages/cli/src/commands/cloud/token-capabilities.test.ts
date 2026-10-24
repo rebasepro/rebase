@@ -176,7 +176,11 @@ function answer(method: string, url: URL): unknown {
         [p === "/api/functions/deploy/rollback", () => ({ success: true, deployment: { id: "d2" }, rolledBackTo: "d0", imageUrl: null, bundleId: "bundle_d0" })],
         [p === "/api/functions/deploy/cancel", () => ({ success: true, deploymentId: "d1", buildJobDeleted: true })],
         [p === "/api/functions/deploy", () => ({ success: true, deployment: { id: "d1" }, managed: true })],
-        [p === `/api/functions/runtime-logs/${PROJECT_ID}`, () => ({ logs: "listening on :3000\n" })],
+        [p === `/api/functions/runtime-logs/${PROJECT_ID}`, () => ({
+            logs: "listening on :3000\n",
+            // A control plane that reads a preview's pods says so.
+            ...(url.searchParams.get("preview") ? { preview: url.searchParams.get("preview") } : {})
+        })],
         [p === `/api/functions/metrics/${PROJECT_ID}`, () => ({ status: "running", cpu: "12m", memory: "120Mi", memoryPercent: "23%" })],
         [p === `/api/functions/runtime-token/${PROJECT_ID}`, () => ({ token: RUNTIME_TOKEN, scopes: ["cron:read"] })],
         [p === `/api/functions/env-vars/${PROJECT_ID}` && method === "GET", () => ENV_LIST],
@@ -356,7 +360,10 @@ const COMMANDS: Record<TokenCapability, string[][]> = {
         ["logs", "--follow"],
         ["metrics"],
         ["cron", "list"],
-        ["cron", "logs", "nightly"]
+        ["cron", "logs", "nightly"],
+        // A preview's build log, and what its backend prints.
+        ["logs", "--preview", "pr-12"],
+        ["logs", "--runtime", "--preview", "pr-12"]
     ],
     env: [
         ["env", "list"],
