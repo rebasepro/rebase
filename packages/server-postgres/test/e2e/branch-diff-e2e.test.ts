@@ -319,6 +319,46 @@ describe("database branch diff and merge", () => {
         expect(updated?.changedColumns?.sort()).toEqual(["email", "password_hash"]);
     });
 
+    describe("a table rewritten since the branch was made", () => {
+        const SETUP = `
+            CREATE TABLE items (id int PRIMARY KEY, qty int, label text);
+            INSERT INTO items SELECT g, g, 'l' || g FROM generate_series(1, 5) g;
+        `;
+
+        it("is blocked after the target applies the branch's type change, not read as the target's changes", async () => {
+            await freshBranch("rewrite", SETUP);
+            await branch("rewrite", `
+                ALTER TABLE items ALTER COLUMN qty TYPE bigint;
+                DELETE FROM items WHERE id = 1;
+                UPDATE items SET label = 'edited on branch' WHERE id = 2;
+            `);
+            const before = await diffDatabaseBranch(admin, "rewrite");
+            const blocked = before.data.find((entry) => entry.table === "items")?.blocked;
+            expect(blocked?.code).toBe("COLUMNS_DIFFER");
+            // The remedy no longer prescribes the step that rewrites the table.
+            expect(blocked?.message).toMatch(/rewrite/);
+
+            // The type change, applied to the target: every row rewritten.
+            await on("rewrite", "ALTER TABLE items ALTER COLUMN qty TYPE bigint");
+            const after = await diffDatabaseBranch(admin, "rewrite");
+            const items = after.data.find((entry) => entry.table === "items");
+            expect(items?.blocked?.code).toBe("TABLE_REWRITTEN");
+            expect(items).toMatchObject({ deleted: 0, conflicts: 0, targetChanges: 0 });
+
+            const refused = await refusal(mergeDatabaseBranch(admin, "rewrite", { expectedFingerprint: after.fingerprint, onConflict: "branch" }));
+            expect(refused.code).toBe("BRANCH_MERGE_BLOCKED");
+            expect(await on("rewrite", "SELECT id FROM items ORDER BY id")).toHaveLength(5);
+        });
+
+        it("is blocked when only the target rewrote it", async () => {
+            await freshBranch("rewritetarget", SETUP);
+            await branch("rewritetarget", "DELETE FROM items WHERE id = 1");
+            await on("rewritetarget", "ALTER TABLE items ALTER COLUMN qty TYPE bigint; ALTER TABLE items ALTER COLUMN qty TYPE int");
+            const diff = await diffDatabaseBranch(admin, "rewritetarget");
+            expect(diff.data.find((entry) => entry.table === "items")?.blocked?.code).toBe("TABLE_REWRITTEN");
+        });
+    });
+
     describe("a table whose rows cannot be matched one by one", () => {
         const SETUP = `
             CREATE TABLE big (id int PRIMARY KEY, price int);

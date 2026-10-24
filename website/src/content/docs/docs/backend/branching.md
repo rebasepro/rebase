@@ -366,6 +366,13 @@ of its rows, and the ones from before the fork are the same — is not blocked.
 Pass `skipBlocked` (in Studio, tick **Merge the other tables**) to merge the
 rest and leave those alone.
 
+A table rewritten since the branch was made is blocked too (`TABLE_REWRITTEN`).
+A column type change, an `ADD COLUMN` with a volatile default, `VACUUM FULL` or
+`CLUSTER` writes every row anew, so every row reads as written since and which
+side changed what can no longer be told. When the branch changed a column's
+type, merge its rows before applying that change to the parent, or make the
+branch again after it.
+
 Every write happens in one statement on the parent — all of it, or none of it,
 foreign keys checked at its end. A merge carries the `fingerprint` of the diff
 you reviewed, and writes nothing when either database has changed since:

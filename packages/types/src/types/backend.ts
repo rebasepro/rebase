@@ -921,7 +921,12 @@ export interface BranchSchemaChange {
  * @group Admin
  */
 export interface BranchMergeBlock {
-    code: "TABLE_ADDED" | "TABLE_DROPPED" | "COLUMNS_DIFFER" | "PRIMARY_KEY_DIFFERS" | "NO_PRIMARY_KEY" | "TOO_LARGE";
+    /**
+     * `TABLE_REWRITTEN`: one side wrote every row anew since the branch was
+     * made (a column type change, a volatile default, `VACUUM FULL`), so which
+     * side changed which row can no longer be told.
+     */
+    code: "TABLE_ADDED" | "TABLE_DROPPED" | "COLUMNS_DIFFER" | "PRIMARY_KEY_DIFFERS" | "NO_PRIMARY_KEY" | "TOO_LARGE" | "TABLE_REWRITTEN";
     message: string;
 }
 

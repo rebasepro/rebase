@@ -664,6 +664,25 @@ export function classifyRows(target: readonly RowState[], branch: readonly RowSt
     return result;
 }
 
+/**
+ * The sides that rewrote the table since the fork, as far as its rows tell.
+ *
+ * `ALTER COLUMN … TYPE`, an `ADD COLUMN` with a volatile default, `VACUUM
+ * FULL`, `CLUSTER`, `pg_repack`: each writes every row anew, so every row of
+ * that side reads as written after the fork, and the provenance the
+ * classification rests on is gone. Its mark is a side whose every row is
+ * young while some of them hold exactly what the other side holds — rows
+ * nobody changed, written again.
+ */
+export function rewrittenSides(target: readonly RowState[], branch: readonly RowState[]): ("target" | "branch")[] {
+    const branchHashes = new Map(branch.map((row) => [row.key, row.hash]));
+    if (!target.some((row) => branchHashes.get(row.key) === row.hash)) return [];
+    const sides: ("target" | "branch")[] = [];
+    if (target.length > 0 && target.every((row) => row.young)) sides.push("target");
+    if (branch.length > 0 && branch.every((row) => row.young)) sides.push("branch");
+    return sides;
+}
+
 /** Up to `limit` keys, taken in turn from each kind so that no kind crowds out the rest. */
 export function pickSamples(kinds: readonly (readonly string[])[], limit: number): string[][] {
     const picked = kinds.map((): string[] => []);
@@ -1063,6 +1082,25 @@ async function computeDiff(admin: DatabaseAdmin | undefined, branchName: string,
             rowStates(sql, branchDb, branchFacts, keyExpr, hashExpr, forkDatabase)
         ]);
         const rows = classifyRows(targetRows, branchRows, forkPointKnown);
+
+        // A table the target rewrote reads as all the target's: the branch's
+        // deletes would be kept and its updates become conflicts. One the
+        // branch rewrote misreads only what the target changed, as conflicts.
+        // Either way it is blocked, never merged on a guess.
+        const rewritten = forkPointKnown ? rewrittenSides(targetRows, branchRows) : [];
+        if (rewritten.includes("target") || (rewritten.includes("branch") && rows.conflicts.length > 0)) {
+            const who = rewritten.includes("target") ? targetDb : "The branch";
+            entry.blocked = {
+                code: "TABLE_REWRITTEN",
+                message: `${who} rewrote the table after the branch was made — a column type change, a volatile DEFAULT, VACUUM FULL or ` +
+                    "CLUSTER writes every row anew — so every row reads as written since, and which side changed which row can no longer " +
+                    `be told. Merge the branch before such a migration, or make the branch again from ${targetDb}.`
+            };
+            entry.rowCounts = rowCounts;
+            seen.push({ key, block: "TABLE_REWRITTEN", targetSum, branchSum });
+            data.push(entry);
+            continue;
+        }
         // Without a fork point every target-only row is already the branch's
         // delete, and nothing can be told the target's.
         const referenced = forkPointKnown
@@ -1085,8 +1123,10 @@ async function computeDiff(admin: DatabaseAdmin | undefined, branchName: string,
         if (branchChanged && columnsDiffer) {
             entry.blocked = {
                 code: "COLUMNS_DIFFER",
-                message: "The table's columns differ between the branch and the target. Rows are compared on the columns they share; " +
-                    "apply the schema to the target with your migrations (rebase db push), then merge."
+                message: "The table's columns differ between the branch and the target, so its rows are compared on the columns they " +
+                    "share and cannot be merged. Add the missing columns to the target with your migrations (rebase db push) and merge " +
+                    "again. A migration that rewrites the table — a column type change does — makes every row read as written since " +
+                    "and blocks the table for good: merge before such a change, or make the branch again after it."
             };
         }
 

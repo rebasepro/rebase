@@ -10,6 +10,7 @@ import {
     mergeDatabaseBranch,
     pickSamples,
     policySql,
+    rewrittenSides,
     type Catalog,
     type RowState,
     type SchemaObjectFacts,
@@ -69,6 +70,22 @@ describe("classifyRows", () => {
         // An `ALTER DATABASE` on the branch moves its fork point later than the
         // copy: a row the target changed in between reads as old on both sides.
         expect(classifyRows([row("[1]", "x")], [row("[1]", "y")], true).conflicts).toEqual(["[1]"]);
+    });
+});
+
+describe("rewrittenSides", () => {
+    it("names a side whose every row is young while some hold what the other side holds", () => {
+        const old = [row("[1]", "a"), row("[2]", "b")];
+        const rewritten = [row("[1]", "a", true), row("[2]", "b", true)];
+        expect(rewrittenSides(rewritten, old)).toEqual(["target"]);
+        expect(rewrittenSides(old, rewritten)).toEqual(["branch"]);
+        expect(rewrittenSides(rewritten, rewritten)).toEqual(["target", "branch"]);
+    });
+
+    it("names none when a side changed every row for real, or kept some old", () => {
+        expect(rewrittenSides([row("[1]", "a2", true), row("[2]", "b2", true)], [row("[1]", "a"), row("[2]", "b")])).toEqual([]);
+        expect(rewrittenSides([row("[1]", "a", true), row("[2]", "b")], [row("[1]", "a"), row("[2]", "b")])).toEqual([]);
+        expect(rewrittenSides([], [])).toEqual([]);
     });
 });
 
