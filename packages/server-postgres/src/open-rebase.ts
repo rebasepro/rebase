@@ -163,11 +163,12 @@ export async function openRebase<DB = RegisteredDatabase>(options: OpenRebaseOpt
         );
     }
 
+    const ownKey = options.dataSourceKey ?? DEFAULT_DATA_SOURCE_KEY;
     let opened: Awaited<ReturnType<typeof openPostgresDriver>>;
     try {
         opened = await openPostgresDriver({ connection: db, connectionString }, {
             collections: options.collections,
-            dataSourceKey: options.dataSourceKey ?? DEFAULT_DATA_SOURCE_KEY,
+            dataSourceKey: ownKey,
             introspectCollections: options.collections.length === 0,
             provision: false,
             realtime: false,
@@ -224,10 +225,22 @@ export async function openRebase<DB = RegisteredDatabase>(options: OpenRebaseOpt
         collections,
         async sql(query, sqlOptions) {
             if (!isSQLAdmin(admin)) throw new Error("This driver cannot run raw SQL.");
+            // `{ database }` names a data source, as on the server. This opened
+            // exactly one, so any other key is refused by name: it used to be
+            // passed on as a Postgres database name, running the query on
+            // `<this host>/<key>` — another database, or this one, silently.
+            if (sqlOptions?.database !== undefined) {
+                const asked = resourceKeyOf(sqlOptions.database);
+                if (asked !== ownKey) {
+                    throw new Error(
+                        `openRebase opened the "${ownKey}" data source only, so it cannot run SQL on "${asked}". ` +
+                        `Open that one with its own openRebase({ databaseUrl, dataSourceKey: "${asked}" }).`
+                    );
+                }
+            }
             return admin.executeSql(query, sqlOptions && {
                 role: sqlOptions.role,
-                params: sqlOptions.params,
-                ...(sqlOptions.database !== undefined ? { database: resourceKeyOf(sqlOptions.database) } : {})
+                params: sqlOptions.params
             });
         },
         async withAuth(user) {

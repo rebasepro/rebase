@@ -130,7 +130,7 @@ DATABASE_URL="$(pnpm exec rebase db url)" pnpm exec tsx scripts/publish-drafts.t
 | Member | What it does |
 |---|---|
 | `dataAsAdmin` | Every collection, read and written as the server's service identity (`{ uid: "service", roles: ["admin"] }`): admin, and still evaluated by your RLS policies, exactly like `rebase.dataAsAdmin` in a function |
-| `sql(query, { params })` | Raw SQL on the owner connection, with the same calling convention as `rebase.sql` in a function |
+| `sql(query, { params })` | Raw SQL on the owner connection, with the same calling convention as `rebase.sql` in a function. It runs on the one data source opened: `{ database }` naming any other is refused |
 | `withAuth(user)` | Resolves to `{ data }`: the collections as that user sees them. Every read and write runs as them, filtered by row-level security, as an HTTP request from that user would be |
 | `collections` | The collections it was opened with |
 | `close()` | Ends the connection pool `openRebase` created. Safe to call twice |

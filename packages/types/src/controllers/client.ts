@@ -515,6 +515,10 @@ export interface RebaseClient<DB = unknown> {
      * else. The derived client opens no realtime socket (live queries fetch
      * once), keeps no offline cache, and holds no session: a refusal of its
      * token is answered by this client. Close it with `close()` when done.
+     *
+     * Read-only: a write, delete, batch, history revert or non-GET function
+     * call through it is refused with `403 SIMULATION_READ_ONLY`, since it
+     * would run as the simulated identity rather than the administrator.
      */
     simulate?(simulation: AccessSimulation): RebaseClient<Record<string, unknown>>;
 
@@ -586,6 +590,11 @@ export interface RebaseServerClient<DB = RegisteredDatabase> extends Omit<Rebase
      * Execute raw SQL against the database. Always present server-side for SQL
      * engines. Values interpolated into the query should be passed via
      * `params`, referenced as `$1`, `$2`, … placeholders in the query text.
+     *
+     * `database` names a declared data source — the handle `database("analytics")`
+     * returned, or its key — and the query runs on that source's own
+     * connection. Omitted, it runs on the default source. A key no configured
+     * source has is refused by name.
      *
      * **Runtime note.** This is the one accessor on this object that is not
      * portable. It runs on the database owner connection over a TCP socket, so

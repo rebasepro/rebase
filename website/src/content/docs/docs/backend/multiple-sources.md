@@ -93,6 +93,12 @@ export default defineFunction((app, { rebase }) => {
 });
 ```
 
+`{ database: analytics }` runs the query on that source's own connection —
+whatever `DATABASE_URL__ANALYTICS` points at, on whichever server — and no
+option runs it on the default one. A key that names no configured source is
+refused with an error that lists the ones there are. Up to 0.25.1 the key was
+read as a database name on the default source's server instead.
+
 ### Seeing what you declared
 
 ```bash

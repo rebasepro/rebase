@@ -2780,13 +2780,36 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
     // Document databases (MongoDB, Firestore) won't have this.
     const driverAdmin = defaultBootstrapper.getAdmin?.(defaultDriverResult);
     if (isSQLAdmin(driverAdmin)) {
+        // `{ database }` names a declared data source — `database("analytics")`
+        // or its key — and the query runs on THAT source's own connection, as
+        // `rebase.dataAsAdmin` does for a collection routed there. It used to be
+        // handed to the default admin as a Postgres database name, which opened
+        // `<default host>/analytics`: "database does not exist" when the source
+        // lives on another server, and the wrong database, silently, wherever
+        // the name resolved anyway (PGlite ignores it).
+        const sqlAdminFor = (key: string): import("@rebasepro/types").SQLAdmin => {
+            if (key === DEFAULT_DRIVER_ID || key === defaultDriverId) return driverAdmin;
+            const source = bootstrappers.find(b => (b.id || b.type) === key);
+            if (!source) {
+                const known = bootstrappers.map(b => `"${b.id || b.type}"`).join(", ");
+                throw new Error(
+                    `rebase.sql: no data source "${key}" is configured on this backend. ` +
+                    `Configured: ${known}. Declare it with database("${key}") in config/resources.ts ` +
+                    "and bind it — `rebase status` shows which variable."
+                );
+            }
+            const result = driverResults.get(source);
+            const admin = result ? source.getAdmin?.(result) : undefined;
+            if (!isSQLAdmin(admin)) {
+                throw new Error(`rebase.sql: data source "${key}" is not a SQL database, so it cannot run raw SQL.`);
+            }
+            return admin;
+        };
         Object.assign(serverClient, {
-            sql: (query: string, sqlOptions?: { database?: import("@rebasepro/types").ResourceRef; role?: string; params?: unknown[] }) =>
-                driverAdmin.executeSql(query, sqlOptions && {
-                    role: sqlOptions.role,
-                    params: sqlOptions.params,
-                    ...(sqlOptions.database !== undefined ? { database: resourceKeyOf(sqlOptions.database) } : {})
-                })
+            sql: async (query: string, sqlOptions?: { database?: import("@rebasepro/types").ResourceRef; role?: string; params?: unknown[] }) => {
+                const admin = sqlOptions?.database !== undefined ? sqlAdminFor(resourceKeyOf(sqlOptions.database)) : driverAdmin;
+                return admin.executeSql(query, sqlOptions && { role: sqlOptions.role, params: sqlOptions.params });
+            }
         });
         logger.debug("SQL capability attached to singleton");
     }
