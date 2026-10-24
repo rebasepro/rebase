@@ -1544,7 +1544,7 @@ export const en: RebaseTranslations = {
     studio_branch_diff_merge: "Merge into {{target}}",
     studio_branch_diff_failed: "Could not compare this branch",
     studio_branch_diff_denied_title: "You cannot review this branch",
-    studio_branch_diff_denied_hint: "Reading a branch's diff needs the database:read scope, and merging it needs database:write.",
+    studio_branch_diff_denied_hint: "Reviewing a branch needs the database:write scope: its diff shows rows of both databases, read outside row-level security.",
     studio_branch_diff_unreadable: "The server answered with something that is not a branch diff.",
     studio_branch_diff_no_api: "This panel has no backend address to read the branch's diff from.",
     studio_branch_diff_fork_unknown: "The moment this branch was made could not be read, so every row that differs is counted as the branch's change. A merge would also undo what {{target}} changed since.",

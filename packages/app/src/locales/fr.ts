@@ -1536,7 +1536,7 @@ export const fr: RebaseTranslations = {
     studio_branch_diff_merge: "Fusionner dans {{target}}",
     studio_branch_diff_failed: "Impossible de comparer cette branche",
     studio_branch_diff_denied_title: "Vous ne pouvez pas examiner cette branche",
-    studio_branch_diff_denied_hint: "Lire le diff d'une branche demande le scope database:read, et la fusionner demande database:write.",
+    studio_branch_diff_denied_hint: "Examiner une branche demande le scope database:write : son diff montre des lignes des deux bases, lues hors de la sécurité au niveau des lignes.",
     studio_branch_diff_unreadable: "Le serveur a répondu par autre chose qu'un diff de branche.",
     studio_branch_diff_no_api: "Ce panneau n'a pas d'adresse de backend où lire le diff de la branche.",
     studio_branch_diff_fork_unknown: "Le moment où cette branche a été créée n'a pas pu être lu : chaque ligne qui diffère compte donc comme un changement de la branche. Une fusion annulerait aussi ce que {{target}} a changé depuis.",

@@ -296,6 +296,29 @@ describe("database branch diff and merge", () => {
         await branches.createBranch(source, { source });
     }
 
+    it("never shows a password hash or a token in a sample, and caps how many rows it samples", async () => {
+        await freshBranch("secrets", `
+            CREATE SCHEMA rebase;
+            CREATE TABLE rebase.users (id int PRIMARY KEY, email text, password_hash text, email_verification_token text);
+            INSERT INTO rebase.users VALUES (1, 'a@x', 'scrypt$old', 'tok-old'), (2, 'b@x', 'scrypt$b', NULL);
+        `);
+        await branch("secrets", `
+            UPDATE rebase.users SET email = 'a2@x', password_hash = 'scrypt$new' WHERE id = 1;
+            INSERT INTO rebase.users VALUES (3, 'c@x', 'scrypt$c', 'tok-c');
+            DELETE FROM rebase.users WHERE id = 2;
+        `);
+        const diff = await diffDatabaseBranch(admin, "secrets", { sampleLimit: 1_000_000 });
+        expect(diff.sampleLimit).toBe(1000);
+        const users = diff.data.find((entry) => entry.schema === "rebase" && entry.table === "users");
+        expect(users).toMatchObject({ inserted: 1, updated: 1, deleted: 1 });
+        const text = JSON.stringify(users?.samples);
+        expect(text).not.toMatch(/scrypt|tok-/);
+        const updated = users?.samples.find((sample) => sample.change === "updated");
+        expect(updated).toMatchObject({ before: { email: "a@x", password_hash: "[redacted]" }, after: { email: "a2@x", password_hash: "[redacted]" } });
+        // Still said to have changed: the value is hidden, not the change.
+        expect(updated?.changedColumns?.sort()).toEqual(["email", "password_hash"]);
+    });
+
     it("lists indexes, constraints, enum labels, views, functions and triggers the branch changed", async () => {
         await freshBranch("catalog", `
             CREATE TYPE mood AS ENUM ('happy', 'sad');

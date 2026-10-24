@@ -1536,7 +1536,7 @@ export const it: RebaseTranslations = {
     studio_branch_diff_merge: "Unisci in {{target}}",
     studio_branch_diff_failed: "Impossibile confrontare questo branch",
     studio_branch_diff_denied_title: "Non puoi esaminare questo branch",
-    studio_branch_diff_denied_hint: "Leggere il diff di un branch richiede lo scope database:read, unirlo richiede database:write.",
+    studio_branch_diff_denied_hint: "Esaminare un branch richiede lo scope database:write: il suo diff mostra righe di entrambi i database, lette fuori dalla sicurezza a livello di riga.",
     studio_branch_diff_unreadable: "Il server ha risposto con qualcosa che non è un diff di branch.",
     studio_branch_diff_no_api: "Questo pannello non ha un indirizzo di backend da cui leggere il diff del branch.",
     studio_branch_diff_fork_unknown: "Non è stato possibile leggere il momento in cui è stato creato questo branch, quindi ogni riga diversa conta come modifica del branch. Un'unione annullerebbe anche ciò che {{target}} ha cambiato da allora.",

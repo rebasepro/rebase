@@ -1536,7 +1536,7 @@ export const hi: RebaseTranslations = {
     studio_branch_diff_merge: "{{target}} में मर्ज करें",
     studio_branch_diff_failed: "इस ब्रांच की तुलना नहीं हो सकी",
     studio_branch_diff_denied_title: "आप इस ब्रांच की समीक्षा नहीं कर सकते",
-    studio_branch_diff_denied_hint: "किसी ब्रांच का diff पढ़ने के लिए database:read स्कोप चाहिए, और उसे मर्ज करने के लिए database:write।",
+    studio_branch_diff_denied_hint: "किसी ब्रांच की समीक्षा के लिए database:write स्कोप चाहिए: उसका diff दोनों डेटाबेस की पंक्तियाँ दिखाता है, जो row-level security के बाहर पढ़ी जाती हैं।",
     studio_branch_diff_unreadable: "सर्वर ने ऐसा उत्तर दिया जो ब्रांच diff नहीं है।",
     studio_branch_diff_no_api: "इस पैनल के पास ब्रांच का diff पढ़ने के लिए कोई बैकएंड पता नहीं है।",
     studio_branch_diff_fork_unknown: "यह ब्रांच कब बनी, यह पढ़ा नहीं जा सका, इसलिए हर अलग पंक्ति को ब्रांच का बदलाव गिना गया है। मर्ज करने से {{target}} में तब से हुए बदलाव भी पलट जाएँगे।",

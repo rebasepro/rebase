@@ -75,6 +75,29 @@ import { ApiError } from "@rebasepro/server";
 /** Rows shown per table when the caller does not say. */
 export const DEFAULT_BRANCH_DIFF_SAMPLE_LIMIT = 100;
 
+/** The most rows a diff samples per table, whatever the caller asks for. */
+export const MAX_BRANCH_DIFF_SAMPLE_LIMIT = 1000;
+
+/** What a sample shows in place of a secret's value. */
+export const REDACTED = "[redacted]";
+
+/**
+ * Columns whose values a sample never shows: the auth users table's password
+ * hash and mailed tokens, and anything named like a secret, a token or a hash
+ * in any table — a diff is read by whoever reviews a branch, and these are
+ * credentials, not data to review. Matched by name, so a users table in
+ * another schema, or an app's own `api_secret`, is covered too.
+ */
+const SECRET_COLUMN = /password|secret|(^|_)token$|_token_hash$|(^|_)hash$/i;
+
+/** `row` with every secret column's value replaced by {@link REDACTED}. */
+function redacted(row: Record<string, string | null> | undefined): Record<string, string | null> | undefined {
+    if (!row) return row;
+    const shown: Record<string, string | null> = {};
+    for (const [column, value] of Object.entries(row)) shown[column] = value !== null && SECRET_COLUMN.test(column) ? REDACTED : value;
+    return shown;
+}
+
 /** Rows a table may hold, per side, to be matched row by row, when the caller does not say. */
 export const DEFAULT_BRANCH_DIFF_MAX_ROWS = 100_000;
 
@@ -897,7 +920,7 @@ function requireAdmin(admin: DatabaseAdmin | undefined): SQLAdmin & BranchAdmin 
 
 async function computeDiff(admin: DatabaseAdmin | undefined, branchName: string, options: BranchDiffOptions = {}): Promise<ComputedDiff> {
     const sql = requireAdmin(admin);
-    const sampleLimit = positiveInteger(options.sampleLimit, DEFAULT_BRANCH_DIFF_SAMPLE_LIMIT, "sampleLimit", true);
+    const sampleLimit = Math.min(positiveInteger(options.sampleLimit, DEFAULT_BRANCH_DIFF_SAMPLE_LIMIT, "sampleLimit", true), MAX_BRANCH_DIFF_SAMPLE_LIMIT);
     const maxRows = positiveInteger(options.maxRowsPerTable, DEFAULT_BRANCH_DIFF_MAX_ROWS, "maxRowsPerTable", false);
     const schemas = options.schemas && options.schemas.length > 0 ? [...new Set(options.schemas)].sort() : null;
 
@@ -948,7 +971,7 @@ async function computeDiff(admin: DatabaseAdmin | undefined, branchName: string,
         if (after) entry.inserted = count;
         else entry.deleted = count;
         entry.samples = (await firstRows(sql, database, facts, sampleLimit)).map(({ key: rowKey, row }) =>
-            after ? { change, key: rowKey, after: row } : { change, key: rowKey, before: row });
+            after ? { change, key: rowKey, after: redacted(row) } : { change, key: rowKey, before: redacted(row) });
         entry.blocked = after
             ? { code: "TABLE_ADDED", message: "The table is new on the branch. Create it on the target with your migrations (rebase db push), then merge its rows." }
             : { code: "TABLE_DROPPED", message: "The branch dropped the table. A merge never drops one; drop it with your migrations." };
@@ -1037,14 +1060,18 @@ async function computeDiff(admin: DatabaseAdmin | undefined, branchName: string,
             const now = after.get(rowKey) ?? {};
             return compared.filter((column) => old[column] !== now[column]);
         };
+        // Which columns changed is read from the values; what is shown of
+        // them leaves secrets out.
+        const shownBefore = (rowKey: string) => redacted(before.get(rowKey));
+        const shownAfter = (rowKey: string) => redacted(after.get(rowKey));
         const samples: BranchRowChange[] = [
             ...conflictKeys.map((rowKey): BranchRowChange => after.has(rowKey)
-                ? { change: "conflict", key: rowKey, before: before.get(rowKey), after: after.get(rowKey), changedColumns: changed(rowKey) }
+                ? { change: "conflict", key: rowKey, before: shownBefore(rowKey), after: shownAfter(rowKey), changedColumns: changed(rowKey) }
                 // Deleted on the branch, and referenced by the target's rows.
-                : { change: "conflict", key: rowKey, before: before.get(rowKey) }),
-            ...insertedKeys.map((rowKey): BranchRowChange => ({ change: "inserted", key: rowKey, after: after.get(rowKey) })),
-            ...updatedKeys.map((rowKey): BranchRowChange => ({ change: "updated", key: rowKey, before: before.get(rowKey), after: after.get(rowKey), changedColumns: changed(rowKey) })),
-            ...deletedKeys.map((rowKey): BranchRowChange => ({ change: "deleted", key: rowKey, before: before.get(rowKey) }))
+                : { change: "conflict", key: rowKey, before: shownBefore(rowKey) }),
+            ...insertedKeys.map((rowKey): BranchRowChange => ({ change: "inserted", key: rowKey, after: shownAfter(rowKey) })),
+            ...updatedKeys.map((rowKey): BranchRowChange => ({ change: "updated", key: rowKey, before: shownBefore(rowKey), after: shownAfter(rowKey), changedColumns: changed(rowKey) })),
+            ...deletedKeys.map((rowKey): BranchRowChange => ({ change: "deleted", key: rowKey, before: shownBefore(rowKey) }))
         ];
         entry.samples = samples;
         data.push(entry);

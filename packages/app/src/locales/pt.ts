@@ -1541,7 +1541,7 @@ export const pt: RebaseTranslations = {
     studio_branch_diff_merge: "Mesclar em {{target}}",
     studio_branch_diff_failed: "Não foi possível comparar este branch",
     studio_branch_diff_denied_title: "Você não pode revisar este branch",
-    studio_branch_diff_denied_hint: "Ler o diff de um branch exige o escopo database:read, e mesclá-lo exige database:write.",
+    studio_branch_diff_denied_hint: "Revisar um branch exige o escopo database:write: o diff mostra linhas dos dois bancos, lidas fora da segurança em nível de linha.",
     studio_branch_diff_unreadable: "O servidor respondeu com algo que não é um diff de branch.",
     studio_branch_diff_no_api: "Este painel não tem um endereço de backend de onde ler o diff do branch.",
     studio_branch_diff_fork_unknown: "Não foi possível ler o momento em que este branch foi criado, então cada linha diferente conta como alteração do branch. Uma mesclagem também desfaria o que {{target}} mudou desde então.",

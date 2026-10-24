@@ -3328,13 +3328,16 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
 
     // 6b-ii-b. Studio's branch review: a branch's diff, and merging it.
     //
-    // Read and write split by method: `database:read` sees the diff, the
-    // scope listing branches asks; `database:write` merges, the scope creating
-    // one asks.
+    // `database:write` for both. The diff's samples are whole rows of both
+    // databases — `before` values from the main one, every row of a table the
+    // branch dropped, `rebase.users` among them — read as the database owner,
+    // outside row-level security. That is what `database:write` ("Run SQL as
+    // the database owner") already reaches; `database:read` lists databases
+    // and branches and reads no rows.
     if (surfaces.admin) {
         const { createBranchRoutes } = await import("../api/branch-routes");
         const branchRouter = new Hono<HonoEnv>();
-        applyAdminGate(branchRouter, "Branch review", { read: "database:read", write: "database:write" });
+        applyAdminGate(branchRouter, "Branch review", "database:write");
         branchRouter.route("/", createBranchRoutes({ getAdmin: () => defaultDriver.admin }));
         branchSurface = branchRouter;
     }

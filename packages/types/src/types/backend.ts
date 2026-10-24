@@ -881,7 +881,7 @@ export interface BranchAdmin {
  * @group Admin
  */
 export interface BranchDiffOptions {
-    /** Rows shown per table, across every kind of change. Default 100. */
+    /** Rows shown per table, across every kind of change. Default 100, at most 1,000. */
     sampleLimit?: number;
     /** Schemas to compare. Default: every schema but the system's, without Rebase's own tables. */
     schemas?: string[];
@@ -929,7 +929,9 @@ export interface BranchMergeBlock {
  * One row the branch changed, or one both sides changed.
  *
  * Values are the text the database writes for them, `null` for SQL NULL, so a
- * `bigint` or a `numeric` reads exactly as it is stored.
+ * `bigint` or a `numeric` reads exactly as it is stored — except a column named
+ * like a credential (`password_hash`, `*_token`, `*secret*`, `*_hash`), whose
+ * value reads `"[redacted]"`. It is still listed in {@link changedColumns}.
  *
  * A `"conflict"` with no {@link after} is a row the branch deleted that rows
  * the target wrote since the branch was made still reference — see

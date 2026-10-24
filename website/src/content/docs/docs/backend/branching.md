@@ -289,8 +289,15 @@ the branch was made from, you can see what changed and merge it from
   enum type (with its labels), view and function the branch added, dropped or
   altered, as SQL, with the parent's definition beside the branch's.
 - **Data changes** counts, per table, the rows the branch inserted, updated and
-  deleted, matched by primary key, and shows up to 100 of them per table with
-  the columns that changed.
+  deleted, matched by primary key, and shows up to 100 of them per table (at
+  most 1,000 when you ask for more) with the columns that changed. A column
+  named like a credential — `password_hash`, a `*_token`, anything with
+  `secret` in it, a `*_hash` — shows `[redacted]` instead of its value.
+
+Reviewing a branch needs the `database:write` scope, the one that runs SQL as
+the database owner: the samples are rows of both databases, read outside
+row-level security. `database:read` lists branches but does not read their
+rows.
 
 The same diff is `rebase db branch diff <name>` in a terminal, `GET
 /api/admin/branches/<name>/diff` over HTTP, the `rebase_db_branch_diff` MCP

@@ -1536,7 +1536,7 @@ export const de: RebaseTranslations = {
     studio_branch_diff_merge: "In {{target}} zusammenführen",
     studio_branch_diff_failed: "Dieser Branch konnte nicht verglichen werden",
     studio_branch_diff_denied_title: "Du kannst diesen Branch nicht prüfen",
-    studio_branch_diff_denied_hint: "Den Diff eines Branches zu lesen erfordert den Scope database:read, ihn zusammenzuführen database:write.",
+    studio_branch_diff_denied_hint: "Einen Branch zu prüfen erfordert den Scope database:write: Sein Diff zeigt Zeilen beider Datenbanken, gelesen außerhalb der Row-Level-Security.",
     studio_branch_diff_unreadable: "Der Server antwortete mit etwas, das kein Branch-Diff ist.",
     studio_branch_diff_no_api: "Dieses Panel hat keine Backend-Adresse, von der es den Diff des Branches lesen könnte.",
     studio_branch_diff_fork_unknown: "Der Zeitpunkt, zu dem dieser Branch erstellt wurde, ließ sich nicht lesen. Jede abweichende Zeile zählt daher als Änderung des Branches, und ein Zusammenführen würde auch rückgängig machen, was {{target}} seitdem geändert hat.",

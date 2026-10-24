@@ -1544,7 +1544,7 @@ export const es: RebaseTranslations = {
     studio_branch_diff_merge: "Fusionar en {{target}}",
     studio_branch_diff_failed: "No se ha podido comparar esta rama",
     studio_branch_diff_denied_title: "No puedes revisar esta rama",
-    studio_branch_diff_denied_hint: "Leer el diff de una rama requiere el permiso database:read, y fusionarla requiere database:write.",
+    studio_branch_diff_denied_hint: "Revisar una rama requiere el permiso database:write: su diff muestra filas de ambas bases de datos, leídas fuera de la seguridad a nivel de fila.",
     studio_branch_diff_unreadable: "El servidor respondió con algo que no es un diff de rama.",
     studio_branch_diff_no_api: "Este panel no tiene una dirección de backend desde la que leer el diff de la rama.",
     studio_branch_diff_fork_unknown: "No se ha podido leer el momento en que se creó esta rama, así que cada fila distinta cuenta como cambio de la rama. Una fusión desharía también lo que {{target}} cambió desde entonces.",
