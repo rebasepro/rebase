@@ -15,6 +15,7 @@
 import { Hono, type Context } from "hono";
 import { getConnInfo } from "@hono/node-server/conninfo";
 import type { HonoEnv } from "../api/types";
+import { ApiError, errorHandler } from "../api/errors";
 import { logger } from "../utils/logger";
 
 /**
@@ -141,12 +142,14 @@ export function createFunctionsProxy(options: FunctionsProxyOptions): Hono<HonoE
                 path: incoming.pathname,
                 error: err instanceof Error ? err : new Error(String(err))
             });
-            return c.json({
-                error: {
-                    code: "FUNCTIONS_UPSTREAM_UNREACHABLE",
-                    message: "The process serving custom functions could not be reached from this one."
-                }
-            }, 502);
+            // Through the error handler, so it is the envelope every other
+            // failure answers — with the request id that ties it to the line
+            // above. Built by hand, it carried none.
+            return errorHandler(new ApiError(
+                502,
+                "FUNCTIONS_UPSTREAM_UNREACHABLE",
+                "The process serving custom functions could not be reached from this one."
+            ), c);
         }
     });
 

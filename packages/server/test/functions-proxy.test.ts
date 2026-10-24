@@ -241,9 +241,13 @@ describe("the api role forwarding /api/functions", () => {
         const res = await broken.request("/api/functions/anything");
 
         expect(res.status).toBe(502);
-        expect(await res.json()).toMatchObject({
-            error: { code: "FUNCTIONS_UPSTREAM_UNREACHABLE" }
-        });
+        // The documented envelope, request id included, as every other
+        // failure answers — the id is what correlates it with the log line
+        // naming the upstream.
+        const body = await res.json() as { error: { code: string; requestId?: string } };
+        expect(body.error.code).toBe("FUNCTIONS_UPSTREAM_UNREACHABLE");
+        expect(body.error.requestId).toBe(res.headers.get("x-request-id"));
+        expect(body.error.requestId).toBeTruthy();
     });
 
     it("serves the functions itself, and does not forward, when the surface is on", async () => {
