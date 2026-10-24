@@ -554,7 +554,15 @@ export async function createRebaseBackend(options: RebaseBackendOptions): Promis
 }
 
 async function buildRebaseBackend(options: RebaseBackendOptions, announcements: BootAnnouncements): Promise<RebaseBackend> {
-    const config = options;
+    // A copy, down to the auth config, because the build fills in what the
+    // caller left out — the users collection it discovers, for one — and the
+    // options are the caller's. Written back, a second backend built from the
+    // same `auth` object bootstrapped auth against the first one's users
+    // collection. An adapter is an instance and is passed as it is.
+    const config: RebaseBackendOptions = {
+        ...options,
+        auth: options.auth && !isAuthAdapter(options.auth) ? { ...options.auth } : options.auth
+    };
     const provision = resolveProvision(config.provision);
     if (provision.off) logger.info(PROVISIONING_OFF_NOTICE);
     // Why a provisioning step does not run, when it does not — the same words

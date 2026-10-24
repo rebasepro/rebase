@@ -484,6 +484,27 @@ describe("a read reached over any door sees its backend as rebase", () => {
     });
 });
 
+describe("two backends built from one options object", () => {
+    it("leave it as they found it", async () => {
+        // The users collection a backend discovers was written back onto the
+        // caller's `auth`, so the second backend built from it bootstrapped
+        // auth against the first one's users collection.
+        const auth = { jwtSecret: SECRET.A };
+        const dbs = [await database("E"), await database("F")];
+        for (const [i, db] of dbs.entries()) {
+            const backend = await createRebaseBackend({
+                collections: [collection(`items_${i}`), users({})],
+                bootstrappers: [bootstrapper(i === 0 ? "E" : "F", db)],
+                auth,
+                cronPersistence: false,
+                provision: true
+            });
+            built.push({ backend, db });
+        }
+        expect(auth).toEqual({ jwtSecret: SECRET.A });
+    });
+});
+
 describe("initializeRebaseBackend installs its backend as the process default", () => {
     let db: PGlite;
     let server: Server;
