@@ -581,9 +581,20 @@ async function explainRefusedGrant(url: string, projectId: string, token: string
     }
     const grant = storedEphemeralGrant(url, projectId);
     forgetEphemeralGrant(url, projectId);
+    // The person who just claimed it has often just signed in, too. With the
+    // grant gone the next run uses that login, so "sign in" would send them to
+    // do what they have already done: tell them to run the command again.
+    const keyNote = grant && projectDotenvSetsAppKey() ? ` ${appKeyExpiryNote(grant.expiresAt)}` : "";
+    if (readCredentials().contexts[url]?.auth) {
+        fail(
+            `The token \`rebase cloud init --claim\` stored for project ${projectId} was refused by ${url}: the project was claimed, or it expired.`,
+            `It is forgotten, and you are signed in to ${url}: run the command again and it uses your login.${keyNote}`,
+            "token_rejected"
+        );
+    }
     const claim = grant
         ? ` If nobody has claimed it yet, its claim URL was ${chalk.bold(grant.claimUrl)} (expires ${new Date(grant.expiresAt).toLocaleString()}).`
-            + (projectDotenvSetsAppKey() ? ` ${appKeyExpiryNote(grant.expiresAt)}` : "")
+            + keyNote
         : "";
     fail(
         `The token \`rebase cloud init --claim\` stored for project ${projectId} was refused by ${url}.`,

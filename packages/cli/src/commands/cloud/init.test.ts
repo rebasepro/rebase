@@ -354,6 +354,24 @@ describe("the stored token afterwards", () => {
         expect(said.join("\n")).toContain(PROVISIONED.claimUrl);
     });
 
+    it("says to run the command again when the person who claimed it is already signed in", async () => {
+        await init(["--claim", "--no-deploy"]);
+        // What `rebase cloud login` leaves for this host.
+        const file = path.join(home, ".rebase", "credentials.json");
+        const creds = credentials() as { contexts: Record<string, Record<string, unknown>> };
+        creds.contexts[CP].auth = JSON.stringify({ accessToken: "a", refreshToken: "r", expiresAt: Date.now() + 3600_000 });
+        fs.writeFileSync(file, JSON.stringify(creds));
+        respond = () => json(401, { error: { code: "UNAUTHORIZED", message: "API key has been revoked" } });
+        said = [];
+
+        await expect(cloudCommand("logs", line("logs"))).rejects.toThrow(Exited);
+
+        expect(refusal().code).toBe("token_rejected");
+        expect(said.join("\n")).toContain("run the command again");
+        expect(said.join("\n")).not.toContain("sign in with");
+        expect(ephemeralGrantFor(CP, PROVISIONED.projectId)).toBeUndefined();
+    });
+
     /** A control plane where the token is good and `/auth/me` takes only a person's session. */
     function sessionOnlyMe(): void {
         respond = (request) => {
