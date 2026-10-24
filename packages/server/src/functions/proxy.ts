@@ -162,7 +162,11 @@ function responseHeaders(headers: Headers): Headers {
     for (const [name, value] of headers) {
         const lower = name.toLowerCase();
         if (HOP_BY_HOP.has(lower) || RESPONSE_ONLY_DROP.has(lower)) continue;
-        out.set(name, value);
+        // `append`, not `set`: iterating a `Headers` yields each `Set-Cookie`
+        // on its own, and `set` overwrote every one with the next — a sign-in
+        // setting a session and a CSRF cookie reached the browser with the
+        // CSRF cookie only. Every other header arrives folded, once.
+        out.append(name, value);
     }
     return out;
 }

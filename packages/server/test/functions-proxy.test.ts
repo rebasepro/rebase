@@ -210,6 +210,18 @@ describe("the api role forwarding /api/functions", () => {
         expect(await res.json()).toMatchObject({ ok: true });
     });
 
+    it("forwards every Set-Cookie the function sets, not only the last", async () => {
+        // A login function setting a session cookie and a CSRF cookie: copying
+        // the response headers with `set` kept only the last one, so through
+        // the api the browser got `csrf` and no session — signed in when the
+        // functions process was called directly, never through the api.
+        const direct = (await fetch(`${upstream.url}/api/functions/echo/cookies`)).headers.getSetCookie();
+        const proxied = (await callApi("/api/functions/echo/cookies")).headers.getSetCookie();
+
+        expect(direct).toEqual(["session=abc; Path=/; HttpOnly", "csrf=xyz; Path=/"]);
+        expect(proxied).toEqual(direct);
+    });
+
     it("does not forward the api process's Host header", async () => {
         // Forwarded unchanged it names the wrong service, and an upstream doing
         // any virtual-host routing answers for it.
