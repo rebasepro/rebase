@@ -245,8 +245,11 @@ production deploy does (`--live-timeout <seconds>`, `0` to skip). A new
 preview's certificate can take a minute or two, so a deploy that succeeded can
 say the address does not answer yet.
 
-A backend preview is billed like one app unit at the default size, and starting
-one needs a card on file, as a production deploy does. A first deploy that
+A backend preview is billed like one app unit at the default size (100m of CPU
+and 384 MiB of memory, at your app's rate for its region and capacity),
+prorated for as long as it exists, and it appears in the project's monthly
+quote in the console. Starting one needs a card on file, as a production deploy
+does. A first deploy that
 fails before anything runs is removed rather than billed. A project may run
 three backend previews at once.
 
@@ -483,8 +486,8 @@ rebase cloud compute set --cpu 500m --memory 2Gi
 | Dial | Unit, and what it means |
 |---|---|
 | `--cpu`, `--memory` | App request per instance, e.g. `500m` and `2Gi`. Empty means the platform default — `100m` and `384Mi`, bursting to 2 CPU and `2Gi` |
-| `--replicas` | Instances that always exist: the autoscaler's floor, and what the project is billed for at rest |
-| `--autoscale-max` | 1–16. The ceiling it may reach, and the worst case it may be billed. `--no-autoscale` turns it off |
+| `--replicas` | Instances that always exist: the autoscaler's floor, and what the project is billed for |
+| `--autoscale-max` | 1–16. The ceiling it may reach. Instances the autoscaler adds above `--replicas` are not billed today. `--no-autoscale` turns it off |
 | `--autoscale-cpu-target` | 10–95. The CPU utilisation the autoscaler holds, against the request rather than the limit. Empty means 70 |
 | `--spot` | `true` or `false`. Preemptible capacity: cheaper, and restarted without notice |
 | `--db-instances` | 1–3. `1` is a single instance with no failover; `2` adds an automatic standby |
