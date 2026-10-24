@@ -50,6 +50,21 @@ if [ "$status" -eq 0 ]; then
     exit 0
 fi
 
+# A project pinned to a CLI from before `rebase verify` answers "Unknown
+# command", and one with no CLI installed cannot run it at all. Neither is a
+# problem in the collections the agent just edited, so neither blocks the edit:
+# say why the check was skipped, and go on.
+case "$output" in
+    *"Unknown command"*verify*)
+        echo "Rebase guardrail skipped: this project's @rebasepro/cli predates \`rebase verify\`. Upgrade it with \`rebase upgrade\` to check collections after each edit." >&2
+        exit 0
+        ;;
+esac
+if [ "$status" -eq 127 ]; then
+    echo "Rebase guardrail skipped: no rebase CLI found in this project. Install @rebasepro/cli to check collections after each edit." >&2
+    exit 0
+fi
+
 {
     project_dir="${CLAUDE_PROJECT_DIR:-}"
     echo "rebase verify failed after editing ${file#"${project_dir//\\//}/"}:"

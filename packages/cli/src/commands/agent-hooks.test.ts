@@ -140,6 +140,14 @@ describe("post-edit-collection.sh", () => {
         expect(result.stderr).toContain("Fix them in config/collections/");
     });
 
+    it("does not block the edit when the project's CLI predates `rebase verify`", () => {
+        fakeRebase(1, "✗ Unknown command \"verify\" — did you mean `version`? Run `rebase --help` for the rest.");
+        const result = runHook(path.join(project, "config", "collections", "posts.ts"));
+        expect(result.status).toBe(0);
+        expect(result.stderr).toContain("predates `rebase verify`");
+        expect(result.stderr).not.toContain("Fix them in config/collections/");
+    });
+
     it("checks an edit Claude Code reports with a Windows path", () => {
         fakeRebase(1, "✗ config/collections/posts.ts → posts.securityRules  missing.");
         const result = runHook("C:\\Users\\me\\shop\\config\\collections\\posts.ts");
