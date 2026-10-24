@@ -20,10 +20,17 @@ specific control plane (or `REBASE_CLOUD_URL`), and `--project, -p <id>`.
 
 ```bash
 rebase cloud login      # sign in to the control plane
+rebase cloud login --code   # with an emailed 6-digit code: accounts made with Google, GitHub or LinkedIn
 rebase cloud logout     # sign out
 rebase cloud whoami     # the current session, or what REBASE_TOKEN may do
 rebase cloud tokens create --can deploy,logs   # a token for CI, shown once
 ```
+
+At a terminal with no password given, `login` asks whether to use your password
+or a code the control plane emails you. With two-factor authentication on, it
+then asks for your authenticator code (or a recovery code). Without a terminal
+neither can be typed: set `REBASE_TOKEN` to an access token made in the console
+under Settings → Access tokens. See [Rebase Cloud](/docs/deployment/cloud#link-a-project).
 
 ## Project link
 

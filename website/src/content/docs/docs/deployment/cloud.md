@@ -61,6 +61,27 @@ before sending your email and password there. Without a terminal, or with
 `--json`, it refuses with `unknown_control_plane`; pass `--url <host>` (or set
 `REBASE_CLOUD_URL`) to sign in there on purpose.
 
+**Signed up with Google, GitHub or LinkedIn?** Your account has no password, so
+sign in with a code instead:
+
+```bash
+rebase cloud login --code --email me@example.com
+```
+
+The control plane emails you a 6-digit code, good for ten minutes, and you type
+it at the prompt. Run plainly at a terminal, `rebase cloud login` asks whether
+to use your password or a code. Codes need the control plane to be able to send
+email; if it cannot, `--code` says so and exits with `otp_unavailable`.
+
+If you turned on two-factor authentication, `login` then asks for the code from
+your authenticator app, or one of your recovery codes, whichever way you signed
+in. Neither a sign-in code nor a second factor can be typed without a terminal.
+For a script, create an access token in the console (**Settings → Access
+tokens**) and set `REBASE_TOKEN`; see [CI and agents](#ci-and-agents).
+
+A wrong password answers `invalid_credentials` with the same two ways in, since
+the usual cause is an account that never had one.
+
 `billing setup` attaches a card to the organization, once. It is first in the
 sequence on purpose: the first deploy of a project is refused without one, and
 finding that out after a bundle has finished uploading is the worse order.
