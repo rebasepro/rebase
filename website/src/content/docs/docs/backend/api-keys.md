@@ -312,6 +312,7 @@ Every key is checked against whoever creates it, the same way on both routes:
 | `403 SCOPE_EXCEEDS_CREATOR` | A scope the creator does not hold. A key never holds more than the account that made it |
 | `403 ROLE_EXCEEDS_CREATOR` | A service-key role the creator does not hold, when the creator is not an admin |
 | `400 INVALID_ROLE` | A role name is empty or contains `,` `{` `}` `"` `\` or a control character, which RLS would read back as other roles |
+| `403 KEY_OUTRANKS_CALLER` | On a change (`PUT`) or a revoke (`DELETE`): the key already holds a role or scope the caller does not, and the caller is not an admin |
 
 A request the key itself lacks a scope for answers `403 SCOPE_MISSING`, with the
 scope in `details.requiredScope`. See [Error codes](/docs/backend/errors/#authentication-and-accounts).

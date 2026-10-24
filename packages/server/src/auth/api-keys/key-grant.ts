@@ -151,6 +151,31 @@ export function assertRolesGrantable(requested: readonly string[], minterRoles: 
     }
 }
 
+/**
+ * Refuse changing or revoking a key that holds more than the caller — a role
+ * they do not hold, or a scope beyond theirs. An admin manages any key.
+ *
+ * The same ceiling as minting, applied to the key as it already is: a
+ * `keys:write` role could otherwise widen an admin-role key it could never
+ * have minted to every data scope, or revoke the key an admin's integration
+ * runs on. `assertMayManageAccount` is the same rule for accounts.
+ */
+export function assertMayManageKey(
+    existing: { roles: readonly string[]; scopes: readonly string[] },
+    managerRoles: readonly string[],
+    managerScopes: readonly string[]
+): void {
+    if (hasAdminRole(managerRoles)) return;
+    const roles = existing.roles.filter(role => !managerRoles.includes(role));
+    const scopes = scopesBeyond(existing.scopes, managerScopes);
+    if (roles.length > 0 || scopes.length > 0) {
+        throw new ApiError(403, "KEY_OUTRANKS_CALLER",
+            `This key holds ${[...roles.map(role => `the role ${role}`), ...scopes].join(", ")}, which you do not, ` +
+            "so you cannot change or revoke it.",
+            { roles, scopes });
+    }
+}
+
 /** Read an optional `expires_at`: absent, null, or a future ISO-8601 instant. */
 export function readExpiresAt(value: unknown, requireFuture: boolean): string | null | undefined {
     if (value === undefined) return undefined;

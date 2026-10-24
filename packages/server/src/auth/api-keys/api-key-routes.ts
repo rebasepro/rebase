@@ -22,6 +22,7 @@ import type { HonoEnv } from "../../api/types";
 import type { ApiKeyStore } from "./api-key-store";
 import type { UpdateApiKeyRequest } from "./api-key-types";
 import {
+    assertMayManageKey,
     assertRolesGrantable,
     assertScopesGrantable,
     readExpiresAt,
@@ -128,6 +129,14 @@ export function createApiKeyRoutes(options: ApiKeyRouteOptions): Hono<HonoEnv> {
     router.use("/*", rejectApiKeyAuth);
     router.use("/*", requireScopeByMethod({ read: "keys:read", write: "keys:write" }));
 
+    const existingServiceKey = async (id: string) => {
+        const key = await store.getApiKeyById(id);
+        if (!key || key.kind !== "service") {
+            throw ApiError.notFound("API key not found");
+        }
+        return key;
+    };
+
     router.get("/", async (c) => {
         const keys = await store.listApiKeys({ kind: "service" });
         return c.json({ keys });
@@ -186,6 +195,9 @@ export function createApiKeyRoutes(options: ApiKeyRouteOptions): Hono<HonoEnv> {
         const expiresAt = readExpiresAt(body.expires_at, false);
         if (expiresAt !== undefined) updates.expires_at = expiresAt;
 
+        // The key as it is, too: nobody changes a key that holds more than they do.
+        assertMayManageKey(await existingServiceKey(id), minter.roles, callerScopes(c));
+
         const key = await store.updateApiKey(id, updates);
         if (!key) {
             throw ApiError.notFound("API key not found");
@@ -194,6 +206,8 @@ export function createApiKeyRoutes(options: ApiKeyRouteOptions): Hono<HonoEnv> {
     });
 
     router.delete("/:id", async (c) => {
+        // Nor revokes one: that is the integration an administrator runs on it.
+        assertMayManageKey(await existingServiceKey(c.req.param("id")), caller(c).roles, callerScopes(c));
         const revoked = await store.revokeApiKey(c.req.param("id"));
         if (!revoked) {
             throw ApiError.notFound("API key not found or already revoked");

@@ -249,6 +249,9 @@ For keys:
   is an admin. Otherwise `403 ROLE_EXCEEDS_CREATOR`.
 - `keys:read` and `keys:write` never go on a key. A key that manages keys could
   mint its own successor. `400 KEY_MANAGEMENT_SCOPE`.
+- A holder of `keys:write` cannot change or revoke a key that holds a role or
+  scope they do not, unless they are an admin: `403 KEY_OUTRANKS_CALLER`.
+  Without this, they could widen an admin-role key to every data scope.
 
 For accounts, a holder of `users:write`:
 
