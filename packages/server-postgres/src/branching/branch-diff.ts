@@ -1245,6 +1245,37 @@ function referencingList(found: readonly BranchReferencingRows[]): string {
     return found.map((entry) => `${entry.schema}.${entry.table} (${entry.rows} row(s), ON DELETE ${entry.onDelete.toUpperCase()})`).join(", ");
 }
 
+/** What Postgres said about a failed statement, found on the error or anywhere down its `cause`. */
+interface DatabaseFailure {
+    sqlState: string;
+    message: string;
+    table?: string;
+    constraint?: string;
+    detail?: string;
+}
+
+function databaseFailure(error: unknown): DatabaseFailure | undefined {
+    const field = (value: object, key: string): string | undefined => {
+        const found: unknown = Reflect.get(value, key);
+        return typeof found === "string" && found !== "" ? found : undefined;
+    };
+    let current: unknown = error;
+    for (let depth = 0; depth < 5 && typeof current === "object" && current !== null; depth += 1) {
+        const sqlState = field(current, "code");
+        if (sqlState && /^[0-9A-Z]{5}$/.test(sqlState)) {
+            return {
+                sqlState,
+                message: field(current, "message") ?? sqlState,
+                table: field(current, "table"),
+                constraint: field(current, "constraint"),
+                detail: field(current, "detail")
+            };
+        }
+        current = Reflect.get(current, "cause");
+    }
+    return undefined;
+}
+
 /** The marker a merge statement's own refusal carries, to be told from any other failure. */
 const MERGE_REFUSAL = "rebase branch merge refused";
 
@@ -1455,6 +1486,19 @@ export async function mergeDatabaseBranch(
         const message = error instanceof Error ? error.message : String(error);
         if (message.includes(MERGE_REFUSAL)) {
             throw new ApiError(409, "BRANCH_MERGE_CONFLICT", `${diff.targetDatabase} refused part of the merge — a row changed meanwhile, a trigger skipped it, or a policy hid it. Nothing was merged.`, undefined, EXPECTED);
+        }
+        // The target refused the branch's rows: a constraint, an enum label,
+        // a foreign key it holds and the branch did not. The rows are the
+        // two databases disagreeing, not a request error — left to the
+        // generic mapping, an enum label read as a bad filter value (400).
+        const failure = databaseFailure(error);
+        if (failure && /^(22|23|P0|42501)/.test(failure.sqlState)) {
+            const where = [failure.table ? `table ${failure.table}` : "", failure.constraint ? `constraint ${failure.constraint}` : ""].filter(Boolean).join(", ");
+            throw new ApiError(409, "BRANCH_MERGE_FAILED",
+                `${diff.targetDatabase} refused the branch's rows${where ? ` (${where})` : ""}: ${failure.message}. Nothing was merged. ` +
+                "The branch's rows break a rule the target holds — its schema or constraints differ from the branch's; see the diff's schema changes.",
+                { sqlState: failure.sqlState, table: failure.table, constraint: failure.constraint, detail: failure.detail },
+                EXPECTED);
         }
         throw error;
     }

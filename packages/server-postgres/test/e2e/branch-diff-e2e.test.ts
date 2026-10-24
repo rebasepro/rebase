@@ -269,8 +269,14 @@ describe("database branch diff and merge", () => {
         // branch's rows were never checked against.
         await main("ALTER TABLE authors ADD CONSTRAINT no_refused CHECK (name <> 'refused')");
         const diff = await diffDatabaseBranch(admin, "third");
-        await expect(mergeDatabaseBranch(admin, "third", { expectedFingerprint: diff.fingerprint }))
-            .rejects.toThrow(/no_refused/);
+        const refused = await refusal(mergeDatabaseBranch(admin, "third", { expectedFingerprint: diff.fingerprint }));
+        // A conflict between the databases, named — not a request error about
+        // a filter nobody sent.
+        expect(refused.statusCode).toBe(409);
+        expect(refused.code).toBe("BRANCH_MERGE_FAILED");
+        expect(refused.message).toMatch(/no_refused/);
+        expect(refused.message).toMatch(/authors/);
+        expect(refused.details).toMatchObject({ table: "authors", constraint: "no_refused", sqlState: "23514" });
         expect(await main("SELECT id FROM authors WHERE id >= 300")).toEqual([]);
         expect(await main("SELECT label FROM tags WHERE id = 1")).toEqual([{ label: "a" }]);
     });
