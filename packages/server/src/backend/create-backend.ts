@@ -2295,11 +2295,14 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
                 registry: storageRegistry,
                 controller: storageController,
                 collections: () => collectionRegistry.getRawCollections(),
-                // Unscoped: a row a policy hides from the admin still names its files.
+                // Unscoped, and read through `scanStoredRows` — past policies
+                // and read hooks alike: a row a policy or a `beforeQuery` hides
+                // from the admin still names its files.
                 driverFor: (collection) => {
                     const key = resolveDataSource(collection, dataSourceRegistry).key;
                     return !key || key === DEFAULT_DRIVER_ID ? defaultDriver : driverRegistry.get(key);
-                }
+                },
+                globalCallbacks: () => collectionRegistry.getGlobalCallbacks()
             }));
             storageMaintenanceSurface = maintenanceRouter;
         }

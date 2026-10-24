@@ -916,6 +916,16 @@ export class PostgresBackendDriver implements DataDriver {
     }
 
     /**
+     * Every stored row of a collection, past every read hook, for a whole-store
+     * sweep — see `DataDriver.scanStoredRows`. Only this unscoped driver has
+     * it: {@link AuthenticatedPostgresBackendDriver} reads as a caller, and a
+     * caller's reads are scoped.
+     */
+    scanStoredRows(props: { path: string; collection: CollectionConfig; pageSize?: number }): AsyncIterable<Record<string, unknown>[]> {
+        return this.dataService.getFetchService().scanStoredRows(props.path, props.pageSize);
+    }
+
+    /**
      * Listen to a collection: the rows now, then again after every change.
      *
      * The realtime service runs every read, the first one included, as

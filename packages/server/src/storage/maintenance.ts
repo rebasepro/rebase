@@ -11,8 +11,9 @@
  * whichever property holds it. A file is reported only when nothing points at
  * it at all.
  */
-import type { CollectionConfig, DataDriver } from "@rebasepro/types";
+import type { CollectionCallbacks, CollectionConfig, DataDriver } from "@rebasepro/types";
 import { storageTargetsInText } from "@rebasepro/types";
+import { buildPropertyCallbacks } from "@rebasepro/common";
 import type { StorageController } from "./types";
 import { isRenditionKey } from "./rendition-cache";
 
@@ -154,6 +155,20 @@ export interface UnscannedCollection {
 }
 
 /**
+ * Whether reading a collection through `fetchCollection` could hide a row or
+ * change a value: a `beforeQuery` or an `afterRead`, the collection's own, a
+ * global one, or a property's.
+ */
+export function hasReadHooks(collection: CollectionConfig, globalCallbacks?: CollectionCallbacks): boolean {
+    const own = collection.callbacks;
+    return Boolean(
+        own?.beforeQuery || own?.afterRead
+        || globalCallbacks?.beforeQuery || globalCallbacks?.afterRead
+        || (collection.properties && buildPropertyCallbacks(collection.properties)?.afterRead)
+    );
+}
+
+/**
  * Remove from `keys` every key some row names.
  *
  * Every row of every collection is read — soft-deleted rows too, since a
@@ -161,12 +176,19 @@ export interface UnscannedCollection {
  * serves the collection. What is left in `keys` afterwards is named by no row.
  * A collection that could not be read is returned, and its rows count for
  * nothing: a caller must not treat what is left as unused when any is.
+ *
+ * Rows are read as stored, through the driver's `scanStoredRows`. A driver
+ * without it is read through `fetchCollection` only for a collection with no
+ * read hooks: a `beforeQuery` scoping rows to `context.user` — there is none
+ * here — or an `afterRead` rewriting a file field would hide a reference, and
+ * the file it names would be deleted as unused. Such a collection is
+ * returned as unscanned instead.
  */
 export async function removeReferencedKeys(
     keys: Set<string>,
     collections: readonly CollectionConfig[],
     driverFor: (collection: CollectionConfig) => DataDriver | undefined,
-    options: { pageSize?: number } = {}
+    options: { pageSize?: number; globalCallbacks?: CollectionCallbacks } = {}
 ): Promise<{ scanned: string[]; unscanned: UnscannedCollection[] }> {
     const pageSize = options.pageSize ?? 500;
     const scanned: string[] = [];
@@ -183,18 +205,30 @@ export async function removeReferencedKeys(
             continue;
         }
         try {
-            let after: Record<string, unknown> | undefined;
-            for (;;) {
-                const rows = await driver.fetchCollection({
-                    path: collection.slug,
-                    collection,
-                    limit: pageSize,
-                    withDeleted: true,
-                    ...(after ? { startAfter: after } : {})
+            if (driver.scanStoredRows) {
+                for await (const rows of driver.scanStoredRows({ path: collection.slug, collection, pageSize })) {
+                    for (const row of rows) forEachString(row, visit);
+                }
+            } else if (hasReadHooks(collection, options.globalCallbacks)) {
+                unscanned.push({
+                    collection: collection.slug,
+                    reason: "it has a beforeQuery or afterRead hook, and its data driver cannot read its rows past them"
                 });
-                for (const row of rows) forEachString(row, visit);
-                if (rows.length < pageSize) break;
-                after = rows[rows.length - 1];
+                continue;
+            } else {
+                let after: Record<string, unknown> | undefined;
+                for (;;) {
+                    const rows = await driver.fetchCollection({
+                        path: collection.slug,
+                        collection,
+                        limit: pageSize,
+                        withDeleted: true,
+                        ...(after ? { startAfter: after } : {})
+                    });
+                    for (const row of rows) forEachString(row, visit);
+                    if (rows.length < pageSize) break;
+                    after = rows[rows.length - 1];
+                }
             }
             scanned.push(collection.slug);
         } catch (error: unknown) {
@@ -233,6 +267,8 @@ export async function findOrphans(options: {
     controller: StorageController;
     collections: readonly CollectionConfig[];
     driverFor: (collection: CollectionConfig) => DataDriver | undefined;
+    /** The callbacks every collection runs, which may scope or rewrite its reads. */
+    globalCallbacks?: CollectionCallbacks;
     olderThanMs: number;
     now?: number;
 }): Promise<OrphanReport> {
@@ -245,7 +281,9 @@ export async function findOrphans(options: {
     } while (cursor);
 
     const unnamed = new Set(all.map(object => object.key));
-    const { scanned, unscanned } = await removeReferencedKeys(unnamed, options.collections, options.driverFor);
+    const { scanned, unscanned } = await removeReferencedKeys(unnamed, options.collections, options.driverFor, {
+        globalCallbacks: options.globalCallbacks
+    });
 
     const cutoff = (options.now ?? Date.now()) - options.olderThanMs;
     const orphans: StoredObjectEntry[] = [];

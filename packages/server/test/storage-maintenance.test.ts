@@ -116,6 +116,38 @@ describe("storage orphans", () => {
         expect(report.orphans.map(o => o.key)).not.toContain("avatars/old.png");
     });
 
+    it("reads rows as stored when the driver can, and never through a read hook otherwise", async () => {
+        const data = rows();
+        // The documented `beforeQuery`: a scan has no user, so it would see no row.
+        const hooked = {
+            ...collection("users"),
+            callbacks: { beforeQuery: () => ({ filter: { owner_id: ["==", null] } }) }
+        } as unknown as CollectionConfig;
+        const fetchOnly = driverOver([]);
+        const scanning = {
+            ...driverOver([]),
+            async *scanStoredRows() { yield data.users; }
+        } as unknown as DataDriver;
+
+        const refused = await findOrphans({
+            controller: storage, collections: [hooked], driverFor: () => fetchOnly, olderThanMs: 24 * HOUR
+        });
+        expect(refused.unscanned.map(u => u.collection)).toEqual(["users"]);
+
+        // A global hook applies to every collection.
+        const global = await findOrphans({
+            controller: storage, collections: [collection("users")], driverFor: () => fetchOnly, olderThanMs: 24 * HOUR,
+            globalCallbacks: { afterRead: ({ row }) => row }
+        });
+        expect(global.unscanned.map(u => u.collection)).toEqual(["users"]);
+
+        const scanned = await findOrphans({
+            controller: storage, collections: [hooked], driverFor: () => scanning, olderThanMs: 24 * HOUR
+        });
+        expect(scanned.unscanned).toEqual([]);
+        expect(scanned.orphans.map(o => o.key)).not.toContain("avatars/kept.png");
+    });
+
     describe("through the admin route", () => {
         const app = (fail?: string) => {
             const data = rows();

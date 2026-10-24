@@ -703,6 +703,29 @@ export interface DataDriver {
     readTogether?<T>(work: (driver: DataDriver) => Promise<T>): Promise<T>;
 
     /**
+     * Every row a collection stores, as stored, a page at a time: soft-deleted
+     * rows included, and past every read hook — no `beforeQuery`, no
+     * `afterRead`, no per-field read rules.
+     *
+     * For whole-store sweeps run by the server itself, never for a read served
+     * to anyone. `rebase storage orphans` reads it to find the files no row
+     * names: read through `fetchCollection` instead, a `beforeQuery` scoping
+     * rows to `context.user` (there is none in a sweep) or an `afterRead` that
+     * rewrites a file field hides references, and the files they name are
+     * reported as unused and deleted.
+     *
+     * Optional. A sweep reads a collection without read hooks through
+     * `fetchCollection`, and refuses one with read hooks whose driver lacks
+     * this, rather than trust what the hooks let through.
+     */
+    scanStoredRows?(props: {
+        path: string;
+        collection: CollectionConfig;
+        /** Rows per page. */
+        pageSize?: number;
+    }): AsyncIterable<Record<string, unknown>[]>;
+
+    /**
      * Check if the given filter combination is valid
      * @param props
      */

@@ -1652,6 +1652,48 @@ target });
     }
 
     /**
+     * Every row of a collection's table, as stored, a page at a time, in key
+     * order — the driver's `scanStoredRows`.
+     *
+     * Deliberately none of the read pipeline: no `beforeQuery` (a sweep has no
+     * caller to scope to, and the documented hook narrows a caller-less read to
+     * the rows owned by nobody), no soft-delete filter, no `afterRead`, no
+     * field stripping. The columns come back under their table names; a sweep
+     * reads values, not keys. Paged by the key rather than an offset, so a row
+     * deleted during the scan never shifts another past the next page.
+     */
+    async *scanStoredRows(collectionPath: string, pageSize = 500): AsyncGenerator<Record<string, unknown>[]> {
+        const collection = getCollectionByPath(collectionPath, this.registry);
+        const table = getTableForCollection(collection, this.registry);
+        const keys = primaryKeyColumns(table, requirePrimaryKeys(collection, this.registry), collectionPath);
+        const keyNames = keys.map(column => {
+            const entry = Object.entries(getTableColumns(table)).find(([, candidate]) => candidate === column);
+            if (!entry) throw new Error(`Key column '${column.name}' not found in table for collection '${collectionPath}'`);
+            return entry[0];
+        });
+        const limit = Math.max(1, pageSize);
+
+        let after: unknown[] | undefined;
+        for (;;) {
+            // (k1 > v1) OR (k1 = v1 AND k2 > v2) OR … — the row after `after`.
+            const past = after
+                ? or(...keys.map((column, i) => and(
+                    ...keys.slice(0, i).map((earlier, j) => eq(earlier, (after as unknown[])[j])),
+                    gt(column, (after as unknown[])[i])
+                )))
+                : undefined;
+            const query = this.db.select().from(table);
+            const rows: Record<string, unknown>[] = await (past ? query.where(past) : query)
+                .orderBy(...keys.map(column => asc(column)))
+                .limit(limit);
+            if (rows.length > 0) yield rows;
+            if (rows.length < limit) return;
+            const last = rows[rows.length - 1];
+            after = keyNames.map(name => last[name]);
+        }
+    }
+
+    /**
      * Fetch a collection of rows
      */
     async fetchCollection<M extends Record<string, unknown>>(

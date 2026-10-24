@@ -8,7 +8,7 @@
  *   POST   /move  { from, to, prefix?, cursor?, limit?, deleteSource? }
  */
 import { Hono } from "hono";
-import type { CollectionConfig, DataDriver } from "@rebasepro/types";
+import type { CollectionCallbacks, CollectionConfig, DataDriver } from "@rebasepro/types";
 import { DEFAULT_STORAGE_SOURCE_KEY } from "@rebasepro/types";
 import type { HonoEnv } from "../api/types";
 import { ApiError } from "../api/errors";
@@ -22,8 +22,14 @@ export interface StorageMaintenanceRoutesConfig {
     controller?: StorageController;
     /** The collections whose rows are read for references, read per request. */
     collections: () => readonly CollectionConfig[];
-    /** The unscoped driver serving a collection: every row, whoever wrote it. */
+    /**
+     * The unscoped driver serving a collection: every row, whoever wrote it.
+     * Its `scanStoredRows` is read when it has one — rows as stored, past
+     * every read hook.
+     */
     driverFor: (collection: CollectionConfig) => DataDriver | undefined;
+    /** The global callbacks, read per request: a global read hook makes every collection hooked. */
+    globalCallbacks?: () => CollectionCallbacks | undefined;
 }
 
 /** The default grace period: an upload whose row is not saved yet is a day old at most. */
@@ -66,6 +72,7 @@ export function createStorageMaintenanceRoutes(config: StorageMaintenanceRoutesC
             controller,
             collections: config.collections(),
             driverFor: config.driverFor,
+            globalCallbacks: config.globalCallbacks?.(),
             olderThanMs: olderThanMs(olderThan)
         });
     };
