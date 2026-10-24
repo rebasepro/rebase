@@ -182,6 +182,34 @@ describe("socket rate limits", () => {
         expect(errorCode(await exchange(other, fetchFrame("e")))).toBeUndefined();
     });
 
+    it("counts an impersonating socket's frames in the administrator's bucket, not the impersonated user's", async () => {
+        const people: Record<string, { uid: string; roles: string[]; isAdmin: boolean }> = {
+            "admin-1": { uid: "admin-1", roles: ["admin"], isAdmin: true },
+            "u1": { uid: "u1", roles: ["user"], isAdmin: false }
+        };
+        const impersonating = {
+            verifyToken: async (token: string) => people[token] ?? null,
+            verifyRequest: async () => null,
+            resolveUser: async (uid: string) => people[uid] ?? null
+        } as unknown as AuthAdapter;
+        const { port, fetched } = await start({
+            adapter: impersonating,
+            limits: { dataRateLimit: createDataRateLimitCheck({ user: 3, store: new MemoryRateLimitStore(60_000) }) }
+        });
+        const ws = await open(port);
+        const answer = await exchange(ws, { type: "AUTHENTICATE", requestId: "auth", payload: { token: "admin-1", impersonate: "u1" } });
+        expect(answer.kind === "message" && answer.frame.type).toBe("AUTH_SUCCESS");
+
+        for (const id of ["a", "b", "c"]) expect(errorCode(await exchange(ws, fetchFrame(id)))).toBeUndefined();
+        expect(fetched()).toBe(3);
+
+        // u1's own budget is untouched; the administrator's is spent.
+        const real = await signIn(port, "u1");
+        expect(errorCode(await exchange(real, fetchFrame("d")))).toBeUndefined();
+        const admin = await signIn(port, "admin-1");
+        expect(errorCode(await exchange(admin, fetchFrame("e")))).toBe("RATE_LIMITED");
+    });
+
     it("counts an API key's data frames at the key's own rate limit, across its sockets", async () => {
         // The limit the API keys panel shows. Bucketed as the key's uid, a key
         // limited to 2 got the per-user allowance on the socket.

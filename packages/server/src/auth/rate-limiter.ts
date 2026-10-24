@@ -687,6 +687,15 @@ export function createDataRateLimiter(
         const serviceIdentity = c.get("user") as { uid?: string } | undefined;
         if (serviceIdentity?.uid === SERVICE_IDENTITY.uid) return null;
         if (isServiceKey(c)) return null;
+        // Simulation and impersonation put the target in `user` (and a
+        // simulated key in `apiKey`), but the administrator sent the request:
+        // it counts in their bucket. Charged to the target, an admin browsing
+        // "Simulate access" spent a production key's `rate_limit`, and the
+        // integration presenting that key got 429.
+        const impersonator = c.get("impersonator");
+        if (impersonator?.uid) {
+            return bucketFor({ uid: impersonator.uid, address: () => defaultKeyGenerator(c, trustedProxyHops) });
+        }
         const apiKey = c.get("apiKey") as { id: string; rate_limit?: number | null } | undefined;
         return bucketFor({
             apiKey,

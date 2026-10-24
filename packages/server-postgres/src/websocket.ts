@@ -1294,10 +1294,13 @@ roles: verifiedUser.roles }
                 // SOCKET_FETCH_ALLOWANCE for why a socket has one.
                 if (options?.dataRateLimit && (PUBLIC_TYPES.has(type)
                     || (FETCHING_REALTIME_TYPES.has(type) && !spendFetchAllowance(clientId)))) {
+                    // An impersonating socket is the administrator's traffic,
+                    // and counts in their bucket, not the impersonated user's.
+                    const sessionUser = clientSessions.get(clientId)?.user;
                     const decision = await options.dataRateLimit({
                         ...origin,
-                        uid: clientSessions.get(clientId)?.user?.uid,
-                        apiKey: clientSessions.get(clientId)?.user?.apiKey
+                        uid: sessionUser?.impersonator ?? sessionUser?.uid,
+                        apiKey: sessionUser?.impersonator ? undefined : sessionUser?.apiKey
                     });
                     if (decision && !decision.allowed) {
                         sendError("ERROR", "RATE_LIMITED", "Too many requests, please try again later.");

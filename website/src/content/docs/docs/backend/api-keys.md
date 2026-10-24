@@ -168,6 +168,11 @@ default. Past the limit an HTTP request answers `429` and a socket frame
 The admin routes under `/api/admin`, and the socket's admin messages such as the
 SQL editor's, are not rate limited.
 
+An administrator simulating a key ("Simulate access", `x-rebase-simulate-api-key-id`)
+spends their own allowance, not the key's: the integration running on that key
+keeps its whole budget. Simulating or impersonating a user is charged to the
+administrator the same way.
+
 ## Personal keys
 
 A personal key acts **as its owner**: their uid, and their roles as they are at
