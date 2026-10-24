@@ -631,6 +631,14 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
     private refetchQueue = new Set<SubscriptionGroup>();
     /** Group refetches running now — at most {@link maxConcurrentRefetches}. */
     private refetchesRunning = 0;
+    /**
+     * What a group refetch runs inside — see {@link setScopeRunner}. A refetch
+     * runs on a timer armed by whatever announced the change; one armed by a
+     * change-capture notification inherits the LISTEN connection's context,
+     * which is no backend's, so a hook the read reached saw the process
+     * default as `rebase`.
+     */
+    private runInScope: <T>(fn: () => T) => T = (fn) => fn();
     /** See {@link refetchConcurrencyFor}. */
     public maxConcurrentRefetches: number;
     /**
@@ -1028,7 +1036,7 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
             this.refetchQueue.delete(group);
             if (this.groups.get(group.key) !== group) continue;
             this.refetchesRunning++;
-            void this.refetchGroup(group).finally(() => {
+            void this.runInScope(() => this.refetchGroup(group)).finally(() => {
                 this.refetchesRunning--;
                 this.drainRefetchQueue();
             });
@@ -3565,6 +3573,11 @@ lastSeen: Date.now() });
      */
     public isCdcActive(): boolean {
         return this.cdcActive && this.cdcListener?.connected === true;
+    }
+
+    /** See `RealtimeProvider.setScopeRunner`. */
+    setScopeRunner(run: <T>(fn: () => T) => T): void {
+        this.runInScope = run;
     }
 
     /** The LISTEN connections this service depends on — see `RealtimeProvider.health`. */

@@ -457,6 +457,15 @@ export interface RealtimeProvider {
      * still look live, so it is reported rather than inferred.
      */
     health?(): RealtimeListenerHealth[];
+
+    /**
+     * Run the provider's own background reads — the refetches a change
+     * schedules, whatever announced it (a write here, change capture, another
+     * instance) — through `run`. The server passes one that enters the backend
+     * owning this provider, so a hook such a read reaches sees that backend as
+     * `rebase`. Without it they run in the context of whatever scheduled them.
+     */
+    setScopeRunner?(run: <T>(fn: () => T) => T): void;
 }
 
 /**
@@ -1367,6 +1376,14 @@ export interface RealtimeSocketOptions {
      * answered `404` and closed, so the client is not left hanging.
      */
     path?: string;
+    /**
+     * Run `fn` on behalf of the backend that owns this socket: each connection
+     * and each frame is handled inside it, so a hook a frame reaches sees that
+     * backend as `rebase`, as it does over REST. The server passes its own.
+     * Absent, frames run in the context the HTTP connection was accepted in —
+     * the process default's.
+     */
+    runInScope?: <T>(fn: () => T) => T;
 }
 
 /**

@@ -1673,8 +1673,14 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
         };
 
         app.route("/", createMcpWellKnownRoutes(mcpConfig));
-        app.route(mcpPath, createMcpRoutes(mcpConfig));
-        app.route(oauthBasePath, createOAuthRoutes({
+        // Through `group()`, like every other door into this backend's data:
+        // its services on the request, and the request run in its scope, so a
+        // hook a tool call reaches sees this backend as `rebase`. Mounted bare,
+        // it saw the process default — another backend's database — or threw.
+        // The `.well-known` documents above read nothing and stay bare: at
+        // the origin, a group's `/*` middleware would wrap every path there is.
+        app.route(mcpPath, group(createMcpRoutes(mcpConfig)));
+        app.route(oauthBasePath, group(createOAuthRoutes({
             store,
             jwt,
             publicUrl,
@@ -1690,7 +1696,7 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
             // to the same revocation, roles and account a session does — at
             // consent and every refresh.
             identity: grantIdentityFromRepository(adminIdentityRepo)
-        }));
+        })));
 
         if (announce) logger.info(`MCP endpoint mounted at ${publicUrl}${mcpPath} (OAuth at ${oauthBasePath})`);
     };
@@ -2829,6 +2835,13 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
     // answer, every cron run and job it executes. Not the process's — that is
     // whichever backend `setDefaultBackend` installed.
     const ownScope: BackendScope = { rebase: serverSingleton };
+    // The refetches a change schedules run on timers armed by whatever
+    // announced it — change capture's LISTEN connection among them, which is
+    // no backend's — so each provider is told which backend it reads for.
+    const runInOwnScope = <T>(fn: () => T): T => runInBackendScope(ownScope, fn);
+    const realtimeProviders = new Set(Object.values(realtimeServices));
+    if (defaultRealtimeService) realtimeProviders.add(defaultRealtimeService);
+    for (const provider of realtimeProviders) provider.setScopeRunner?.(runInOwnScope);
 
     // Retroactively inject the server client into every source's driver so that
     // entity callbacks receive `context.client` at runtime — see
@@ -3829,7 +3842,11 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
             accessModel: access.model,
             // Its own path, so it shares the server with the application's
             // websockets instead of claiming every upgrade on it.
-            path: attachOptions.path ?? realtimeSocketPath(mountedBasePath)
+            path: attachOptions.path ?? realtimeSocketPath(mountedBasePath),
+            // Every connection and frame in this backend's scope, as `group()`
+            // puts every request: a hook a frame reaches sees this backend as
+            // `rebase`, not the process default.
+            runInScope: runInOwnScope
         });
     };
 

@@ -41,7 +41,7 @@ import {
     type HonoEnv,
     type RebaseBackend
 } from "@rebasepro/server";
-import { generateAccessToken, verifyAccessToken } from "../../server/src/auth/jwt";
+import { generateAccessToken, generateMcpAccessToken, verifyAccessToken } from "../../server/src/auth/jwt";
 import { MemoryRateLimitStore } from "../../server/src/auth/rate-limit-store";
 import { _resetRebaseMock } from "../../server/src/singleton";
 import { createPostgresWebSocket } from "../src/websocket";
@@ -86,7 +86,9 @@ function driverFor(name: string, db: PGlite): DataDriver {
         (await db.query<Record<string, unknown>>(text, options?.params)).rows;
     const scoped = (user: Identity | null) => ({
         backend: name,
-        fetchCollection: async () => [{ id: "1", backend: name, as: user?.uid ?? null }],
+        // `imported`: what a hook importing `rebase` reaches from inside this
+        // read — the backend whose database answers, or why none does.
+        fetchCollection: async () => [{ id: "1", backend: name, as: user?.uid ?? null, imported: await importedRebase() }],
         fetchOne: async () => undefined,
         save: async () => ({}),
         delete: async () => undefined,
@@ -99,9 +101,24 @@ function driverFor(name: string, db: PGlite): DataDriver {
     } as unknown as DataDriver;
 }
 
+/** The `whoami` row of the database the imported `rebase` reaches, or the error it throws. */
+async function importedRebase(): Promise<unknown> {
+    try {
+        const [row] = await rebase.sql("SELECT name FROM whoami");
+        return row?.name;
+    } catch (error) {
+        return `threw: ${error instanceof Error ? error.message : String(error)}`;
+    }
+}
+
 /** What the Postgres socket needs of a realtime service to authenticate a client. */
 function realtimeStub(): RealtimeService {
     return {
+        // What the backend hands its realtime provider to run background
+        // refetches in — kept, so a test can run something through it.
+        setScopeRunner(run: <T>(fn: () => T) => T) {
+            (this as { scopeRunner?: unknown }).scopeRunner = run;
+        },
         addClient: () => undefined,
         removeClient: () => undefined,
         handleClientMessage: async () => undefined,
@@ -390,6 +407,83 @@ describe("inside a function served by a backend, rebase is that backend", () => 
     });
 });
 
+/**
+ * The same read, reached through each door into a backend's data, must see
+ * that backend as `rebase` — a hook importing it writes to that backend's
+ * database. The socket and MCP were mounted outside the scope REST runs in,
+ * and saw the process default (another backend's database) or nothing.
+ */
+describe("a read reached over any door sees its backend as rebase", () => {
+    it("REST", async () => {
+        const res = await B.app.request("/api/data/beta_items", bearer(token("B", "user-1")));
+        expect(JSON.stringify(await res.json())).toContain("\"imported\":\"B\"");
+    });
+
+    it("a frame on the realtime socket", async () => {
+        const server = createServer();
+        await B.backend.attachRealtime(server);
+        await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", () => resolve()));
+        const port = (server.address() as AddressInfo).port;
+        try {
+            const answer = await socketFetch(port, token("B", "user-1"), "beta_items");
+            expect(answer).toContain("\"imported\":\"B\"");
+        } finally {
+            server.closeAllConnections();
+            await new Promise<void>((resolve) => server.close(() => resolve()));
+        }
+    });
+
+    it("a realtime refetch, whatever scheduled it", async () => {
+        // A refetch runs on a timer armed by whatever announced the change —
+        // change capture's LISTEN connection among them, which is no
+        // backend's. The provider runs it through the runner its backend gave.
+        const provider = B.backend.realtimeService as unknown as { scopeRunner?: <T>(fn: () => T) => T };
+        expect(provider.scopeRunner).toBeDefined();
+        expect(await provider.scopeRunner!(() => importedRebase())).toBe("B");
+    });
+
+    it("an MCP tool call", async () => {
+        const publicUrl = "https://mcp-scope.test";
+        const db = await database("M");
+        const previous = process.env.REBASE_PUBLIC_URL;
+        process.env.REBASE_PUBLIC_URL = publicUrl;
+        let backend: RebaseBackend;
+        try {
+            // Signed with the process default's secret, so the token below —
+            // minted with the module-level helper — verifies on it.
+            backend = await createRebaseBackend({
+                collections: [collection("delta_items")],
+                bootstrappers: [bootstrapper("M", db)],
+                auth: { jwtSecret: SECRET.DEFAULT },
+                surfaces: { mcp: true },
+                cronPersistence: false,
+                provision: true
+            });
+        } finally {
+            if (previous === undefined) delete process.env.REBASE_PUBLIC_URL;
+            else process.env.REBASE_PUBLIC_URL = previous;
+        }
+        built.push({ backend, db });
+        const app = new Hono<HonoEnv>();
+        backend.mount(app, { basePath: "/api" });
+        const mcpToken = await generateMcpAccessToken({
+            uid: "admin-1", roles: ["admin"], scope: "data:read", clientId: "mcp_scope_test",
+            aud: `${publicUrl}/mcp`, iss: publicUrl
+        }, 3600);
+
+        const res = await app.request("/mcp", {
+            method: "POST",
+            headers: { "content-type": "application/json", accept: "application/json, text/event-stream", authorization: `Bearer ${mcpToken}` },
+            body: JSON.stringify({
+                jsonrpc: "2.0", id: 1, method: "tools/call",
+                params: { name: "query_collection", arguments: { collection: "delta_items" } }
+            })
+        });
+        const text = await res.text();
+        expect(text).toContain("\\\"imported\\\":\\\"M\\\"");
+    });
+});
+
 describe("initializeRebaseBackend installs its backend as the process default", () => {
     let db: PGlite;
     let server: Server;
@@ -425,6 +519,34 @@ describe("initializeRebaseBackend installs its backend as the process default", 
         expect((await A.app.request("/api/data/alpha_items", bearer(token("C", "user-1")))).status).toBe(401);
     });
 });
+
+/** Dial the socket, authenticate with `jwt`, send one FETCH_COLLECTION for `path`, and answer the reply as sent. */
+function socketFetch(port: number, jwt: string, path: string): Promise<string> {
+    return new Promise((resolve, reject) => {
+        const socket = new WebSocket(`ws://127.0.0.1:${port}/`);
+        const timer = setTimeout(() => {
+            socket.terminate();
+            reject(new Error("no answer to FETCH_COLLECTION"));
+        }, 5000);
+        socket.once("error", (error) => {
+            clearTimeout(timer);
+            reject(error);
+        });
+        socket.once("open", () => {
+            socket.send(JSON.stringify({ type: "AUTHENTICATE", requestId: "auth-1", payload: { token: jwt } }));
+        });
+        socket.on("message", (data) => {
+            const message = JSON.parse(String(data)) as { type?: string; requestId?: string };
+            if (message.type === "AUTH_SUCCESS") {
+                socket.send(JSON.stringify({ type: "FETCH_COLLECTION", requestId: "fetch-1", payload: { path } }));
+            } else if (message.requestId === "fetch-1" || message.type === "AUTH_ERROR") {
+                clearTimeout(timer);
+                socket.terminate();
+                resolve(String(data));
+            }
+        });
+    });
+}
 
 /** Dial the socket, authenticate with `jwt`, and answer the reply's type. */
 function authenticate(port: number, jwt: string): Promise<string> {

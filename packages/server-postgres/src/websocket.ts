@@ -606,12 +606,21 @@ export function createPostgresWebSocket(
     // it does not claim itself (the cloud control plane does) is then the
     // only listener, and gets the same refusal.
     const socketPath = normalizeSocketPath(options?.path ?? "/");
+    // The backend this socket belongs to, entered for each connection and each
+    // frame, so a hook a frame reaches — `afterRead`, `beforeSave`, a publish —
+    // sees that backend as `rebase`, as it does over REST. The events arrive
+    // in the context the HTTP connection was accepted in, which is no
+    // backend's: with two backends in one process a hook on B's socket wrote
+    // to the process default's database, or threw "not initialized".
+    const runInScope = options?.runInScope;
+    const inBackendScope = <A extends unknown[], R>(listener: (...args: A) => R) =>
+        runInScope ? (...args: A): R => runInScope(() => listener(...args)) : listener;
     const onUpgrade = (request: IncomingMessage, socket: Duplex, head: Buffer) => {
         if (upgradePathOf(request) !== socketPath) {
             if (server.listenerCount("upgrade") <= 1) refuseUpgrade(socket);
             return;
         }
-        wss.handleUpgrade(request, socket, head, (client) => wss.emit("connection", client, request));
+        wss.handleUpgrade(request, socket, head, inBackendScope((client: WebSocket) => wss.emit("connection", client, request)));
     };
     if (typeof server.on === "function") {
         server.on("upgrade", onUpgrade);
@@ -1051,7 +1060,7 @@ fetchAllowanceAt: Date.now() });
         });
 
         // Route all messages through RealtimeService for unified handling
-        ws.on("message", async (message: RawData) => {
+        ws.on("message", inBackendScope(async (message: RawData) => {
             // Every frame is answered, so one from a client that has not read
             // its earlier answers would only add to a backlog it is not draining.
             if (terminateIfBacklogged(ws, clientId)) return;
@@ -2100,7 +2109,7 @@ code: "BRANCHING_UNSUPPORTED" } }
                 };
                 ws.send(JSON.stringify(errorResponse));
             }
-        });
+        }));
     });
 
     // A peer that vanished without a close — lost signal, sleep, a forgotten
