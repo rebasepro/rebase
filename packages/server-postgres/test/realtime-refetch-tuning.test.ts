@@ -147,10 +147,36 @@ describe("recounting a big list", () => {
         expect(reused.map((meta) => meta.total)).toEqual([5_000_000, 5_000_000]);
         expect(reused.every((meta) => typeof meta.totalAsOf === "string")).toBe(true);
 
+        // Once the interval is up the list is counted again on its own —
+        // no write needed — and a write right after reuses that fresh total.
         jest.advanceTimersByTime(10_000);
-        await write();
+        await flush();
+        jest.advanceTimersByTime(350);
+        await flush();
         expect(count).toHaveBeenCalledTimes(1);
         expect(metas().at(-1)!.totalAsOf).toBeUndefined();
+    });
+
+    it("corrects a count-only subscriber's total when the interval is up, with no write after", async () => {
+        // A count-only frame is nothing but the total, so one that reused it
+        // equals the last and is not sent: a burst of writes inside the
+        // interval left the count wrong until somebody wrote again.
+        service.recountIntervalMs = 10_000;
+        count.mockResolvedValue(5_000_000);
+        await service.handleClientMessage("c", { type: "subscribe_collection", payload: { path: "posts", subscriptionId: "s", countOnly: true } }, { uid: "u", roles: ["editor"] });
+        await flush();
+        await write();
+        expect(metas().at(-1)!.total).toBe(5_000_000);
+
+        count.mockResolvedValue(5_000_050);
+        for (let i = 0; i < 5; i++) await write();
+        expect(metas().at(-1)!.total).toBe(5_000_000);
+
+        jest.advanceTimersByTime(10_000);
+        await flush();
+        jest.advanceTimersByTime(350);
+        await flush();
+        expect(metas().at(-1)!.total).toBe(5_000_050);
     });
 
     it("keeps counting a list smaller than REALTIME_RECOUNT_MIN_ROWS", async () => {

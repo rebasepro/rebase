@@ -320,6 +320,13 @@ type SubscriptionGroup = {
      * {@link RealtimeService.recountIntervalMs} allows. See `collectionMeta`.
      */
     lastCount?: { total: number; at: number };
+    /**
+     * The refetch that counts the list again once its reused total expires.
+     * A frame that reused a total may be the last one for a while: a
+     * count-only frame is nothing but that total, so the next equals it and is
+     * not sent, and without this the total stayed wrong until the next write.
+     */
+    recountTimer?: ReturnType<typeof setTimeout>;
     /** Whether the group's frames carry the row's `ETag`. See {@link Subscription.etag}. */
     etag?: boolean;
     authContext?: SubscriptionAuthContext;
@@ -949,6 +956,7 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
         if (group.pending !== "all") group.pending.delete(key);
         if (group.members.size > 0) return;
         if (group.timer) clearTimeout(group.timer);
+        if (group.recountTimer) clearTimeout(group.recountTimer);
         this.refetchQueue.delete(group);
         this.groups.delete(group.key);
         const [index, address] = group.type === "collection"
@@ -2174,6 +2182,18 @@ roles: ["anon"] };
     }
 
     /**
+     * Refetch `group` — and so count it again — at `at`, when the total its
+     * last frame reused expires. One pending at a time per group.
+     */
+    private scheduleRecount(group: SubscriptionGroup, at: number): void {
+        if (group.recountTimer) return;
+        group.recountTimer = setTimeout(() => {
+            group.recountTimer = undefined;
+            if (this.groups.get(group.key) === group) this.scheduleGroupRefetch(group);
+        }, Math.max(0, at - Date.now()) + 1);
+    }
+
+    /**
      * The `meta` a `collection_update` frame carries beside its rows, counted
      * through `service` — the subscriber's own transaction, read only, with
      * its auth context and `beforeQuery` narrowing already bound.
@@ -2217,6 +2237,7 @@ roles: ["anon"] };
             && Date.now() - reusable.at < this.recountIntervalMs) {
             total = reusable.total;
             totalAsOf = new Date(reusable.at).toISOString();
+            if (group) this.scheduleRecount(group, reusable.at + this.recountIntervalMs);
         } else {
             try {
                 total = await service.count(notifyPath, {
@@ -3490,6 +3511,8 @@ lastSeen: Date.now() });
         for (const group of this.groups.values()) {
             if (group.timer) clearTimeout(group.timer);
             group.timer = undefined;
+            if (group.recountTimer) clearTimeout(group.recountTimer);
+            group.recountTimer = undefined;
         }
 
         // 2. Clear subscriptions, callbacks and the groups and indexes over them

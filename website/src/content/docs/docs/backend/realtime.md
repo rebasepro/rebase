@@ -225,7 +225,7 @@ states of the collection.
 
 When the count itself fails, the frame carries `partial: true` and no `total`;
 that is not a subscription error, and a client should keep the last real total
-rather than substituting the page length. On a big table the count is most of what a frame costs. With `REALTIME_RECOUNT_INTERVAL_MS` set, a list whose last total was at least `REALTIME_RECOUNT_MIN_ROWS` (100,000 by default) reuses that total for the interval instead of counting on every write, and such a frame carries `meta.totalAsOf`, when the total was taken. Unset, as by default, every frame counts.
+rather than substituting the page length. On a big table the count is most of what a frame costs. With `REALTIME_RECOUNT_INTERVAL_MS` set, a list whose last total was at least `REALTIME_RECOUNT_MIN_ROWS` (100,000 by default) reuses that total for the interval instead of counting on every write, and such a frame carries `meta.totalAsOf`, when the total was taken. When the interval is up, a list whose last frame reused the total is counted again and sent the new total, whether or not anything was written since. Unset, as by default, every frame counts.
 
 ### What a write costs, and the limits
 
