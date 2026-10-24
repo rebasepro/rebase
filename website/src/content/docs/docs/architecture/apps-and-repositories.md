@@ -257,7 +257,9 @@ Once the records are published:
 rebase cloud domains verify admin.example.com
 ```
 
-`rebase cloud domains list` prints the records again if you lose them. When
+`rebase cloud domains list` prints the records again if you lose them. A
+hostname that is not verified within 7 days of being registered is released,
+and the next deploy registers it again. When
 verification passes, the platform issues the HTTPS certificate for the
 hostname; there is nothing to upload. Until then `admin` answers nowhere, since
 the one hostname it answers on does not reach the project yet — the rest of
@@ -267,8 +269,11 @@ The console follows the app onto its hostname: the *Open CMS* link and the CMS
 address on the project's overview are `https://admin.example.com/`, not the
 project host.
 
-A hostname that another project already holds fails the deploy before anything
-rolls out, and so does one under the platform's own domain. Adding a hostname
+A hostname that another project has verified fails the deploy before anything
+rolls out, and so does one under the platform's own domain. One that another
+project registered and never verified does not stand in your way: the refusal
+gives you a TXT record for your project, and once it exists the next deploy (or
+`rebase cloud domains add`) takes the hostname. Adding a hostname
 the project does not have yet changes the project's domains, which an access
 token made with `--can deploy` may not do: from CI, add the hostname once with
 `rebase cloud domains add` while signed in, and the token then deploys it like
