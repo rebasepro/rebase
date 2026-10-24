@@ -83,8 +83,10 @@ its own cannot be rolled back yet; see
 [Roll back](/docs/deployment/cloud#roll-back).
 
 `--preview` serves the build at `https://<project>--<name>.rebase.website` and
-leaves production alone. A preview of a static app calls the production backend.
-A preview of the backend runs its own backend, on an empty database of its own.
+leaves production alone. A preview of the backend runs its own backend, on an
+empty database of its own, with its static apps folded in. A static app cannot be
+previewed on its own on Rebase Cloud yet: `rebase cloud deploy <app> --preview`
+is refused with `PREVIEW_STATIC_UNSERVED` and publishes nothing.
 See [Preview a change](/docs/deployment/cloud/#preview-a-change).
 
 ## Config

@@ -162,6 +162,34 @@ function previewsUnavailable(e: unknown): void {
     }
 }
 
+/**
+ * The intake code a control plane refuses a static app's own preview with when
+ * nothing on it serves static sites by themselves (no front door). Rebase Cloud
+ * is one, today: every host is served by the project's own pod.
+ */
+export const PREVIEW_STATIC_UNSERVED = "PREVIEW_STATIC_UNSERVED";
+
+function intakeCodeOf(e: unknown): string | undefined {
+    if (!isRecord(e) || !isRecord(e.details)) return undefined;
+    return typeof e.details.intakeCode === "string" ? e.details.intakeCode : undefined;
+}
+
+/**
+ * Turn "this cloud cannot serve a static app on its own" into a refusal that
+ * says what to do instead — which depends on whether the project has a
+ * backend to fold the app into, so both ways are named.
+ */
+function staticPreviewUnserved(e: unknown): void {
+    if (intakeCodeOf(e) !== PREVIEW_STATIC_UNSERVED) return;
+    fail(
+        "Previews of a static app on its own are not available on this cloud yet: nothing here serves a static site by itself. "
+            + "Nothing was published, and production is untouched.",
+        "With a managed backend in rebase.json, `rebase cloud deploy --preview` previews it with its static apps folded in, "
+            + "this one included. Without one, deploy the app to production with `rebase cloud deploy <app>`.",
+        PREVIEW_STATIC_UNSERVED
+    );
+}
+
 /** What the `previews` trigger answers. */
 export interface PreviewTrigger {
     deploymentId: string;
@@ -187,6 +215,7 @@ export async function triggerPreview(
         res = await client.functions.invoke<unknown>(PREVIEWS_FUNCTION, body, { method: "POST", path: projectId });
     } catch (e) {
         previewsUnavailable(e);
+        staticPreviewUnserved(e);
         refusal(e);
         reportError(e, "Preview deploy failed to start");
     }

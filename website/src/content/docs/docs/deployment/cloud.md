@@ -188,13 +188,16 @@ rebase cloud deploy --preview-name new-checkout
 
 What a preview talks to depends on what you deployed:
 
-- **`rebase cloud deploy web --preview`** previews one static app. Its pages call
-  the **production** backend: a sign-in there is a real session, and anything
-  written there is production data.
 - **`rebase cloud deploy --preview`** previews the backend, with its static apps
   folded in, the same way production runs them. It gets a backend of its own on
   an **empty database of its own**, never production's. Booting against
   production's database would apply the preview's schema and access rules to it.
+- **`rebase cloud deploy web --preview`** would preview one static app on its
+  own, its pages calling the **production** backend. That needs a control plane
+  that serves static sites by themselves, and Rebase Cloud does not yet: it
+  refuses with `PREVIEW_STATIC_UNSERVED` and publishes nothing. Preview the
+  backend instead, which serves the static apps folded into it; a project with
+  no managed backend cannot be previewed yet.
 
 A preview uploads no source and registers no apps or hostnames, because each of
 those would change the production project. `--source` and `--eject` cannot be

@@ -316,6 +316,38 @@ describe("refusing a preview", () => {
         });
     });
 
+    it("of a static app on its own, on a cloud that serves no static site by itself, with what to do instead", async () => {
+        bundle("static");
+        invoke.mockImplementation(async () => {
+            throw Object.assign(new Error("This control plane does not serve static sites on their own yet."), {
+                status: 409,
+                details: {
+                    intakeCode: "PREVIEW_STATIC_UNSERVED",
+                    hint: "Preview the backend with its static apps folded in (`rebase cloud deploy --preview`): the preview pod serves them."
+                }
+            });
+        });
+        context.setJsonModeForTest(true);
+
+        await expect(deploy("game", "--preview", "--no-follow")).rejects.toThrow(Exited);
+
+        const { error } = JSON.parse(stdout.join("")) as { error: { code: string; message: string; hint: string } };
+        expect(error.code).toBe("PREVIEW_STATIC_UNSERVED");
+        expect(error.message).toContain("not available on this cloud yet");
+        // Both ways forward: a project with no backend cannot take the first.
+        expect(error.hint).toContain("rebase cloud deploy --preview");
+        expect(error.hint).toContain("rebase cloud deploy <app>");
+    });
+
+    it("for a container-image backend, without recommending a static app's own preview", async () => {
+        write(project, "rebase.json", JSON.stringify({ rebase: "^1", apps: { backend: { type: "backend" } } }));
+
+        await expect(deployCommand(["node", "rebase", "cloud", "deploy", "--preview"], "songbuzz"))
+            .rejects.toThrow(Exited);
+
+        expect(said.join("\n")).not.toContain("<app> --preview");
+    });
+
     it.each([
         ["--source", "."],
         ["--eject"]

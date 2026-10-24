@@ -256,10 +256,12 @@ export const ACTION_HELP: Record<string, ActionHelp> = {
             "Undo a bad deploy with `rebase cloud rollback`: it restores the previous successful backend "
                 + "deployment, static apps folded into it included. A static app deployed on its own "
                 + "(`cloud deploy <app>`) cannot be rolled back yet; deploy its last good version again.",
-            "--preview prints the preview's own address, https://<project>--<name>.rebase.website. A preview of a "
-                + "static app calls the production backend; a preview of the backend runs its own, on an empty "
-                + "database of its own. It uploads no source and registers no apps or hostnames. "
-                + "`rebase cloud previews` lists and deletes previews.",
+            "--preview prints the preview's own address, https://<project>--<name>.rebase.website. A preview of the "
+                + "backend runs its own, on an empty database of its own, with its static apps folded in. It uploads "
+                + "no source and registers no apps or hostnames. `rebase cloud previews` lists and deletes previews.",
+            "A static app previewed on its own (`cloud deploy <app> --preview`) needs a control plane that serves "
+                + "static sites by themselves. Rebase Cloud does not yet, and refuses it with PREVIEW_STATIC_UNSERVED; "
+                + "nothing is published.",
             "A control plane without previews refuses --preview with previews_unavailable, and nothing is deployed."
         ]
     },

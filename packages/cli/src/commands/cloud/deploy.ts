@@ -1557,7 +1557,8 @@ export async function deployCommand(rawArgs: string[], projectRef: string): Prom
     if (preview && !args["--bundle"] && !declaresManagedRuntime(appName)) {
         fail(
             "Previews are built from managed bundles, and this app builds a container image.",
-            "Preview a static app by name (`rebase cloud deploy <app> --preview`), or declare `runtime: \"managed\"` on the backend in rebase.json.",
+            "Declare `runtime: \"managed\"` on the backend in rebase.json to preview it, with its static apps folded in. "
+                + "A static app cannot be previewed on its own on Rebase Cloud yet.",
             "preview_unsupported"
         );
     }
