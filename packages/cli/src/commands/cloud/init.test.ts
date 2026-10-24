@@ -27,6 +27,7 @@ import {
     adminPanelUrl,
     dotenvSets,
     mintMissingAppKey,
+    bundleDeployEnv,
     INIT_CHILD_DEPLOY_ENV,
     type AppKey,
     type InitDeps,
@@ -492,6 +493,26 @@ describe("when the app's key stops working", () => {
         said = [];
         await cloudCommand("whoami", line("whoami"));
         expect((printedJson() as { appKeyNote: string | null }).appKeyNote).toBeNull();
+    });
+});
+
+describe("with REBASE_TOKEN in the environment", () => {
+    it("init's own deploy runs without it, so the project is deployed with its own token", () => {
+        const env = bundleDeployEnv({ PATH: "/bin", REBASE_TOKEN: "rk_live_other_projects" });
+        expect(env).not.toHaveProperty("REBASE_TOKEN");
+        expect(env[INIT_CHILD_DEPLOY_ENV]).toBe("1");
+        expect(env.PATH).toBe("/bin");
+    });
+
+    it("a command in the linked directory says it displaced the project's own token", async () => {
+        await init(["--claim", "--no-deploy"]);
+        process.env.REBASE_TOKEN = "rk_live_other_projects";
+        said = [];
+        const { client } = await requireClient(line("status"));
+        respond = () => json(200, { data: [] });
+        await client.data.collection("projects").find({ limit: 1 });
+        expect(sent.at(-1)?.authorization).toBe("Bearer rk_live_other_projects");
+        expect(said.join("\n")).toContain(`REBASE_TOKEN is set, so it is used instead of the token`);
     });
 });
 

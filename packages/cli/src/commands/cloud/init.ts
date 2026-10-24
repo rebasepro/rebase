@@ -48,6 +48,7 @@ import {
     resolveCloudUrl,
     saveEphemeralGrant,
     success,
+    TOKEN_ENV,
     warn,
     writeLink
 } from "./context";
@@ -360,6 +361,22 @@ export interface DeployOutcome {
 }
 
 /**
+ * The environment of {@link runBundleDeploy}'s child: this one, marked as
+ * init's own deploy, and without `REBASE_TOKEN`.
+ *
+ * `REBASE_TOKEN` outranks the stored grant (see `requireClient`), and a shell
+ * or an MCP server that has one holds it for the person's other projects — it
+ * has no scope on the project just provisioned, so the deploy was refused and
+ * the project never got its collections. The project is deployed with its own
+ * token.
+ */
+export function bundleDeployEnv(env: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
+    const child: NodeJS.ProcessEnv = { ...env, [INIT_CHILD_DEPLOY_ENV]: "1" };
+    delete child[TOKEN_ENV];
+    return child;
+}
+
+/**
  * Push the local collections: `rebase cloud deploy --bundle`, as a child.
  *
  * A child rather than a call, so this command still prints exactly one
@@ -375,7 +392,7 @@ export function runBundleDeploy(cwd: string, json: boolean): Promise<DeployOutco
         const child = spawn(process.execPath, args, {
             cwd,
             stdio: json ? ["ignore", "pipe", "inherit"] : "inherit",
-            env: { ...process.env, [INIT_CHILD_DEPLOY_ENV]: "1" }
+            env: bundleDeployEnv(process.env)
         });
         let stdout = "";
         child.stdout?.on("data", (chunk: Buffer) => { stdout += chunk.toString("utf-8"); });

@@ -618,6 +618,16 @@ export async function requireClient(rawArgs: string[]): Promise<{ client: CloudC
     // against.
     refuseDirectLink(rawArgs);
     const url = resolveCloudUrl(rawArgs);
+    // REBASE_TOKEN wins, as documented — but a token held for other projects
+    // has no scope on the one `init --claim` linked here, and its refusal
+    // would never say what displaced the project's own token.
+    const displaced = linkedEphemeralGrant(url);
+    if (displaced) {
+        warn(
+            `${TOKEN_ENV} is set, so it is used instead of the token \`rebase cloud init --claim\` stored for project ${displaced.projectId}.`,
+            `Unset ${TOKEN_ENV} to act on that project with its own token.`
+        );
+    }
     return { client: createTokenClient(url, token), url };
 }
 
