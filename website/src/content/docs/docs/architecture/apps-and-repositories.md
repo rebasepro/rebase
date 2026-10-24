@@ -268,7 +268,11 @@ address on the project's overview are `https://admin.example.com/`, not the
 project host.
 
 A hostname that another project already holds fails the deploy before anything
-rolls out, and so does one under the platform's own domain. Taking the app out
+rolls out, and so does one under the platform's own domain. Adding a hostname
+the project does not have yet changes the project's domains, which an access
+token made with `--can deploy` may not do: from CI, add the hostname once with
+`rebase cloud domains add` while signed in, and the token then deploys it like
+any hostname already on the project. Taking the app out
 of `rebase.json` leaves the hostname registered on the project; remove it with
 `rebase cloud domains remove admin.example.com`.
 
