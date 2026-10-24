@@ -531,6 +531,12 @@ function resolveProvision(provision: boolean | ProvisionOptions | undefined): Re
  * its backend. The one process-wide setting it touches is the log level, and
  * only when `logging.level` is given: the logger is the process's.
  *
+ * What it reads process-wide is the resource graph: the `database()`,
+ * `bucket()`, `topic()` and `queue()` declarations are module-level values,
+ * and every backend in the process sees all of them. So a process holds one
+ * project's resources — several backends of that project are fine, two
+ * projects declaring different resources are not.
+ *
  * What the build logs at info is written when the backend first serves — see
  * `boot-announcements.ts` — so a script that builds one and never mounts it
  * prints nothing of the boot's on its stdout.

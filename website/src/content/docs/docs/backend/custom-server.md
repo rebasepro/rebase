@@ -87,7 +87,12 @@ exported.
 import { createRebaseBackend, installUnhandledRejectionHandler, setDefaultBackend } from "@rebasepro/server";
 
 installUnhandledRejectionHandler();
-const backend = await createRebaseBackend({ ...options, provision: true });
+const backend = await createRebaseBackend({
+    ...options,
+    // `false` when REBASE_PROVISION=false, and
+    // `{ collections: false, realtime: false }` when called with `provisionSchema: false`.
+    provision: true
+});
 setDefaultBackend(backend);
 backend.mount(app, { basePath: "/api" });
 await backend.attachRealtime(server);
@@ -372,6 +377,14 @@ app.route("/b/data", b.routes.data());   // a session from `a` is a 401 here
 
 A backend given no `auth.jwtSecret`, such as one whose `auth` is an adapter,
 signs nothing of its own, so its `services.jwt` follows the process default.
+
+**Resources are the process's.** The `database()`, `bucket()`, `topic()` and
+`queue()` declarations in `config/resources.ts` are module-level values, and
+every backend in the process reads all of them: a backend whose own project
+declares no topic still turns its job queue on for another project's topic,
+and refuses to boot if its driver cannot carry one. Run one project's
+resources per process. Several backends of that one project, each on its own
+database, are fine.
 
 **Where `rebase` goes.** Inside a request, a cron run or a job that a backend
 serves, `rebase`, whether imported from `@rebasepro/server` or received as

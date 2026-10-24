@@ -63,7 +63,12 @@ export type RebaseBackendInstance = RebaseBackend;
  *
  * ```ts
  * installUnhandledRejectionHandler();
- * const backend = await createRebaseBackend({ ...options, provision: true });
+ * const backend = await createRebaseBackend({
+ *     ...options,
+ *     provision: !resolveProvisionEnv(process.env)
+ *         ? false
+ *         : provisionSchema === false ? { collections: false, realtime: false } : true
+ * });
  * setDefaultBackend(backend);
  * backend.mount(app, { basePath });
  * await backend.attachRealtime(server);
@@ -83,9 +88,10 @@ export async function initializeRebaseBackend(config: RebaseBackendConfig): Prom
     const { app, server, basePath, provisionSchema, ...options } = config;
 
     // One floating promise in application code — a fire-and-forget call in a
-    // custom function is the usual one — otherwise ends the process, and on the
-    // managed runtime that process is shared with other tenants. Log it and
-    // keep serving. Process-wide, so it belongs to the one call that owns the
+    // custom function is the usual one — otherwise ends the process, and with
+    // it every request in flight: on Rebase Cloud's managed runtime the
+    // project's own pod (each project runs in a process of its own, never
+    // shared between tenants). Log it and keep serving. Process-wide, so it belongs to the one call that owns the
     // process: a backend built with `createRebaseBackend` leaves the decision
     // to whoever does. Idempotent, and opt-out via
     // REBASE_EXIT_ON_UNHANDLED_REJECTION.
