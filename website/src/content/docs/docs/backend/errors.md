@@ -358,11 +358,12 @@ own.
 
 | Code | Status | Means | Do |
 | --- | --- | --- | --- |
-| `COLUMNS_DIFFER` | — | The table's columns differ between the branch and its parent. Rows are compared on the columns they share. | Apply the schema to the parent with your migrations (`rebase db push`), then merge. |
+| `COLUMNS_DIFFER` | — | The table's columns differ between the branch and its parent. Rows are compared on the columns they share. | Add the missing columns to the parent with your migrations (`rebase db push`), then merge. A migration that rewrites the table — a column type change — turns it into `TABLE_REWRITTEN`: merge before such a change, or make the branch again after it. |
 | `NO_PRIMARY_KEY` | — | The table has no primary key, so rows cannot be matched one by one; the diff gives its row counts only. | Give the table a primary key, or move its rows by hand. |
 | `PRIMARY_KEY_DIFFERS` | — | The primary key's columns, or their types, differ between the two. | Apply the schema to the parent first. |
 | `TABLE_ADDED` | — | The branch created the table. A merge never creates one. | Create it on the parent with your migrations, then merge its rows. |
 | `TABLE_DROPPED` | — | The branch dropped the table. A merge never drops one. | Drop it with your migrations. |
+| `TABLE_REWRITTEN` | — | One side wrote every row of the table anew after the branch was made — a column type change, an `ADD COLUMN` with a volatile default, `VACUUM FULL`, `CLUSTER` — so every row reads as written since and which side changed which row can no longer be told. | Merge the branch before such a migration, or make the branch again from the parent after it. |
 | `TOO_LARGE` | — | The table holds more rows on a side than a diff matches one by one (100,000 by default, `maxRowsPerTable`). | Raise `maxRowsPerTable` on both the diff and the merge, or move the rows another way. |
 
 ## Generic codes
