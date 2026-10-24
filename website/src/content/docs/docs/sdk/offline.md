@@ -181,7 +181,7 @@ const client = createRebaseClient({
 
 The queue waits while `onConflict` runs, so it can ask the user. If it throws, the edit is overwritten.
 
-The version an edit is made against is the one the row's last read reported: `findById()`, a `listenById()` frame, or the answer to an earlier `update()`. A row last read in a `find()` or `listen()` list has no version, and neither has an edit made on top of another queued write to the same row. Those replay without a precondition. An `ifMatch` you pass to `update()` yourself is kept when the edit queues.
+The version an edit is made against is the one the row's last read reported: `findById()`, a `listenById()` frame, or the answer to an earlier `update()`. A row last read in a `find()` or `listen()` list has no version, and neither has an edit made on top of another queued write to the same row. Those replay without a precondition. An `ifMatch` you pass to `update()` or `delete()` yourself is kept when the write queues, with or without `onConflict`, and `findById()` on an offline-enabled client returns the row with its version, so `etagOf(row)` works as it does online. Without `onConflict`, a queued write refused over your own `ifMatch` is rolled back and reported to `onSyncError` with a 412 `PRECONDITION_FAILED`.
 
 A failure that is merely temporary — a 429, a 503, a dropped connection — is not a rejection. Those stay queued and are retried; only after `maxRetries` deferrals does a write get rolled back.
 

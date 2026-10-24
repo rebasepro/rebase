@@ -1,6 +1,6 @@
 import { buildQueryString, FindParams, RebaseApiError } from "./transport";
 import { FindAllParams, FindResult, IterateParams, LogicalCondition, SDKCollectionClient, WhereFilterOp, WhereValueFor, WriteOptions, hasFieldOperation, isUnsupported, type ByIdReadOptions, type UpdateValues, type UpsertOptions } from "@rebasepro/types";
-import { collectAllPages, normalizeOrderBy, paginateFind } from "@rebasepro/common";
+import { collectAllPages, normalizeOrderBy, paginateFind, withETag } from "@rebasepro/common";
 import { CollectionClient, LiveResult, ObserveOptions, RowSnapshotMeta, byIdRead, etagOf, invalidBulkBody, type ObserveByIdOptions, type RestoreOptions, type TrashClient } from "./collection";
 import { SDKQueryBuilder } from "./sdk_query_builder";
 import { dehydrateMutation, dehydrateRow, hydrateMutation, hydrateRow, setOwn } from "./offline-codec";
@@ -130,7 +130,8 @@ export interface OfflineConfig {
      * A row last seen in a `find()` or `listen()` list has no version, and an
      * edit made on top of another queued write to the same row has none
      * either; those replay without a precondition. A caller's own `ifMatch` is
-     * kept on a queued edit too.
+     * kept on a queued edit or delete too — without this option as well, when
+     * a 412 over it is a refusal like any other.
      *
      * The queue waits while this runs, so a prompt can ask the user. Without
      * it — the default — replay sends no precondition and the last writer
@@ -1054,7 +1055,15 @@ export class OfflineManager {
                             this.removeLocalRow(slug, id, ticket, true);
                         }
                         this.notifyCollection(slug, false);
-                        return this.localRow<M>(slug, id);
+                        const local = this.localRow<M>(slug, id);
+                        // The row's version, as the server reported it, so
+                        // `etagOf(row)` works as it does without offline. Not
+                        // on a row a queued write has changed here: that is
+                        // not the version the server holds.
+                        const etag = etagOf(row);
+                        return etag && local !== undefined && !this.hasPending(slug, id)
+                            ? withETag({ ...local }, etag)
+                            : local;
                     } catch (error) {
                         if (!isNetworkError(error)) throw error;
                         this.connectivity.markFailure();
@@ -1385,10 +1394,10 @@ data: u.data as AnyRow })),
                 const base = this.rawLocalRow(slug, id);
                 // The version this edit was made against. On top of another
                 // queued write it is that write's row, which has no version
-                // until it replays — so none.
-                const ifMatch = this.onConflict
-                    ? options?.ifMatch ?? (this.hasPending(slug, id) ? undefined : this.etagFor(slug, id))
-                    : undefined;
+                // until it replays — so none. A precondition the caller asked
+                // for is always kept, `onConflict` or not.
+                const ifMatch = options?.ifMatch
+                    ?? (this.onConflict && !this.hasPending(slug, id) ? this.etagFor(slug, id) : undefined);
                 await this.enqueue({
                     collection: slug,
                     type: "update",
@@ -1435,6 +1444,7 @@ data: u.data as AnyRow })),
                     type: "delete",
                     id,
                     ...(sent ? { sent: { idempotencyKey } } : {}),
+                    ...(options?.ifMatch ? { ifMatch: options.ifMatch } : {}),
                     rollback: { rows: { [String(id)]: this.rawLocalRow(slug, id) ?? null } }
                 }, ticket);
                 this.removeLocalRow(slug, id, ticket);
@@ -2465,7 +2475,10 @@ data: u.data as AnyRow })),
                     && (tail.schemaVersion ?? 1) <= QUEUE_SCHEMA_VERSION
                     && tail.collection === mutation.collection
                     && (tail.type === "create" || tail.type === "update")
-                    && tail.id === mutation.id) {
+                    && tail.id === mutation.id
+                    // Nor an edit with a precondition of its own the tail does
+                    // not share: merged, it would be sent with the tail's.
+                    && (mutation.ifMatch === undefined || mutation.ifMatch === tail.ifMatch)) {
                     // The id must survive the merge: a queued create carries
                     // the client-generated id inside its data. The rollback
                     // stays the tail's — the state before the *first* of the
@@ -2709,7 +2722,11 @@ data: u.data as AnyRow })),
                         }
                         // The row moved on since the edit was made. Not a
                         // failure of the write: the app decides.
-                        if (op.type === "update" && op.ifMatch && isPreconditionFailed(error)) {
+                        // Without `onConflict` the precondition was the
+                        // caller's own, and its refusal is reported like any
+                        // other: "overwrite" would undo what they asked for.
+                        if ((op.type === "update" || op.type === "delete") && op.ifMatch && this.onConflict
+                            && isPreconditionFailed(error)) {
                             this.connectivity.markSuccess();
                             await this.resolveConflict(op, error, ticket);
                             continue;
@@ -3021,7 +3038,10 @@ data: u.data as AnyRow })),
             // A delete's request is its id, which nothing rewrites once it has
             // been sent, so it is always keyed: a replay of one that committed
             // is answered from the key instead of a 404 for the missing row.
-            await inner.delete(op.id!, { idempotencyKey: op.sent?.idempotencyKey ?? op.mutationId });
+            await inner.delete(op.id!, {
+                idempotencyKey: op.sent?.idempotencyKey ?? op.mutationId,
+                ...(op.ifMatch ? { ifMatch: op.ifMatch } : {})
+            });
             this.removeLocalRow(op.collection, op.id!, ticket, true);
         }
     }
