@@ -349,6 +349,54 @@ describe("the stored token afterwards", () => {
         expect(refusal()).toMatchObject({ code: "token_rejected" });
         expect(refusal().message).toContain("rebase cloud init --claim");
         expect(ephemeralGrantFor(CP, PROVISIONED.projectId)).toBeUndefined();
+        // The only stored copy of the claim link goes with it: it is printed first.
+        expect(said.join("\n")).toContain(PROVISIONED.claimUrl);
+    });
+
+    /** A control plane where the token is good and `/auth/me` takes only a person's session. */
+    function sessionOnlyMe(): void {
+        respond = (request) => {
+            if (request.path === "/api/auth/me") return json(401, { error: { code: "UNAUTHORIZED", message: "Invalid token" } });
+            if (request.path === "/api/auth/scopes") return json(200, { held: [`project:deploy:${PROVISIONED.projectId}`, `project:logs:${PROVISIONED.projectId}`] });
+            return json(404, { error: { code: "NOT_FOUND", message: "no route" } });
+        };
+    }
+
+    it("shows the project, the claim URL and the expiry on `whoami`, and keeps the token", async () => {
+        await init(["--claim", "--no-deploy"]);
+        sessionOnlyMe();
+        said = [];
+        await cloudCommand("whoami", line("whoami"));
+        expect(printedJson()).toMatchObject({
+            credential: "ephemeral",
+            projectId: PROVISIONED.projectId,
+            claimUrl: PROVISIONED.claimUrl,
+            expiresAt: PROVISIONED.expiresAt
+        });
+        expect(sent.some(r => r.path === "/api/auth/me")).toBe(false);
+        expect(ephemeralGrantFor(CP, PROVISIONED.projectId)?.claimUrl).toBe(PROVISIONED.claimUrl);
+    });
+
+    it("is kept when a session-only route refuses it, and the refusal says a session is needed", async () => {
+        // `rebase cloud projects create` reads `/auth/me` with whatever client it was handed.
+        await init(["--claim", "--no-deploy"]);
+        sessionOnlyMe();
+        said = [];
+        const { client } = await requireClient(line("projects", "create"));
+        await expect(client.auth.getUser()).rejects.toBeInstanceOf(Exited);
+        expect(refusal().code).toBe("session_required");
+        expect(ephemeralGrantFor(CP, PROVISIONED.projectId)?.claimUrl).toBe(PROVISIONED.claimUrl);
+    });
+
+    it("is kept when the control plane cannot say whether it still holds", async () => {
+        await init(["--claim", "--no-deploy"]);
+        respond = (request) => request.path === "/api/auth/scopes"
+            ? json(502, { error: { code: "upstream_error", message: "Bad gateway" } })
+            : json(401, { error: { code: "UNAUTHORIZED", message: "Invalid token" } });
+        said = [];
+        await expect(cloudCommand("logs", line("logs"))).rejects.toThrow(Exited);
+        expect(refusal().code).toBe("token_rejected");
+        expect(ephemeralGrantFor(CP, PROVISIONED.projectId)?.claimUrl).toBe(PROVISIONED.claimUrl);
     });
 });
 

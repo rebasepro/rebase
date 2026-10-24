@@ -26,8 +26,10 @@ import {
     warn,
     requireInteractive,
     envToken,
+    linkedEphemeralGrant,
     TOKEN_ENV,
-    type CloudClient
+    type CloudClient,
+    type EphemeralGrant
 } from "./context";
 import { capabilitiesInScopes } from "./token-capabilities";
 
@@ -268,6 +270,16 @@ maxPositionals: 0 });
         await whoamiToken(client, url);
         return;
     }
+    // Nor is the token `rebase cloud init --claim` stored for this directory's
+    // project, which `requireClient` picked over the login. Asking `/auth/me`
+    // with it used to be refused, and the refusal deleted the token and the
+    // only stored copy of the claim link. What it can answer is what it holds,
+    // and the claim link a person needs.
+    const linked = linkedEphemeralGrant(url);
+    if (linked) {
+        await whoamiGrant(client, url, linked);
+        return;
+    }
     try {
         const user = await client.auth.getUser();
         if (!user) {
@@ -310,6 +322,57 @@ slug: link.slug ?? null }
     } catch (e) {
         reportError(e, "Failed to fetch session");
     }
+}
+
+/**
+ * `whoami` in a directory linked to a project `rebase cloud init --claim`
+ * provisioned: the project's own token, what it may do, the claim URL and
+ * when the project expires unless someone claims it.
+ */
+async function whoamiGrant(
+    client: CloudClient,
+    url: string,
+    linked: { projectId: string; grant: EphemeralGrant }
+): Promise<void> {
+    let held: string[];
+    try {
+        ({ held } = await client.personalKeys.listScopes());
+    } catch (e) {
+        reportError(e, "Failed to read the project token's scopes");
+    }
+    const grants = capabilitiesInScopes(held).filter(grant => grant.capabilities.length > 0);
+    const link = readLink();
+    const expires = new Date(linked.grant.expiresAt);
+    emit(
+        () => {
+            console.log("");
+            console.log(chalk.bold("  🔐 Unclaimed project token"));
+            console.log("");
+            keyValues([
+                ["Host", url],
+                ["Credential", "the token `rebase cloud init --claim` stored (~/.rebase/credentials.json)"],
+                ["Project", link ? `${link.projectName ?? ""} (${linked.projectId})`.trim() : linked.projectId],
+                ["Can", grants.length ? grants.map(g => g.capabilities.join(", ")).join("; ") : undefined],
+                ["Claim URL", chalk.bold(linked.grant.claimUrl)],
+                ["Expires", `${expires.toLocaleString()} unless claimed`]
+            ]);
+            console.log("");
+            console.log(chalk.gray("  Open the claim URL and sign in to keep the project. Unclaimed, it is deleted when it expires."));
+            console.log("");
+        },
+        {
+            host: url,
+            credential: "ephemeral",
+            projectId: linked.projectId,
+            claimUrl: linked.grant.claimUrl,
+            expiresAt: linked.grant.expiresAt,
+            grants,
+            scopes: held,
+            linkedProject: link
+                ? { id: link.projectId, name: link.projectName ?? null, slug: link.slug ?? null }
+                : null
+        }
+    );
 }
 
 /** `whoami` under `REBASE_TOKEN`: the host, the token, and what it may do. */

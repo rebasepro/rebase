@@ -344,7 +344,11 @@ Until the project is claimed it belongs to no account. Its token is narrowed to
 that one project and to `deploy`, `logs`, `env` and `database`. It is kept in
 `~/.rebase/credentials.json`, never in the repository, and `rebase cloud`
 commands in the linked directory use it on their own. It expires with the
-project.
+project. `rebase cloud whoami` in that directory shows the project, what the
+token may do, the claim URL and when the project expires. A command that needs a
+person's session refuses with `session_required` and keeps the token; it is
+forgotten only once the control plane refuses it everywhere, after a claim or at
+expiry, and the claim URL is printed as it goes.
 
 Once the deploy has built the app, the command also sets `REBASE_API_TOKEN` in
 `.env`: a key minted on the app itself, which is what the MCP server and the SDK

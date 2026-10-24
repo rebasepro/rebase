@@ -164,10 +164,18 @@ export function ephemeralGrantFor(url: string, projectId: string, now: number = 
 }
 
 /**
+ * The grant as it is stored, expired or not: what a message about a refused
+ * token can still show (the claim link) after the token itself stops counting.
+ */
+export function storedEphemeralGrant(url: string, projectId: string): EphemeralGrant | undefined {
+    return readCredentials().contexts[url]?.ephemeral?.[projectId];
+}
+
+/**
  * The grant for the project this directory is linked to, when the command
  * targets the host it was provisioned on.
  */
-function linkedEphemeralGrant(url: string): { projectId: string; grant: EphemeralGrant } | undefined {
+export function linkedEphemeralGrant(url: string): { projectId: string; grant: EphemeralGrant } | undefined {
     const link = readLink();
     if (!link?.projectId || link.mode === "direct" || normalizeUrl(link.url) !== url) return undefined;
     const grant = ephemeralGrantFor(url, link.projectId);
@@ -420,10 +428,28 @@ export function createTokenClient(url: string, token: string, ephemeralProjectId
         }
     });
     client.setOnUnauthorized(() => ephemeralProjectId
-        ? explainRefusedGrant(url, ephemeralProjectId)
+        ? explainRefusedGrant(url, ephemeralProjectId, token)
         : explainRefusedToken(url, token));
     STATIC_TOKENS.set(client, token);
     return client;
+}
+
+/**
+ * Whether the control plane still accepts a token: one request to
+ * `/api/auth/scopes`, the route every token may read. `refused` only when it
+ * answered 401 or 403; `unknown` when it could not be asked, or answered
+ * something else — which proves nothing about the token.
+ */
+async function probeToken(url: string, token: string): Promise<"accepted" | "refused" | "unknown"> {
+    try {
+        const probe = await fetch(`${url}/api/auth/scopes`, {
+            headers: { Authorization: `Bearer ${token}`, "User-Agent": cliUserAgent() }
+        });
+        if (probe.ok) return "accepted";
+        return probe.status === 401 || probe.status === 403 ? "refused" : "unknown";
+    } catch {
+        return "unknown";
+    }
 }
 
 /**
@@ -438,16 +464,7 @@ export function createTokenClient(url: string, token: string, ephemeralProjectId
  * neither is answered with the other's remedy.
  */
 async function explainRefusedToken(url: string, token: string): Promise<never> {
-    let tokenAccepted = false;
-    try {
-        const probe = await fetch(`${url}/api/auth/scopes`, {
-            headers: { Authorization: `Bearer ${token}`, "User-Agent": cliUserAgent() }
-        });
-        tokenAccepted = probe.ok;
-    } catch {
-        // Unreachable: say what is certain — the request was refused.
-    }
-    if (tokenAccepted) {
+    if (await probeToken(url, token) === "accepted") {
         fail(
             `This command needs a signed-in session, and ${TOKEN_ENV} is an API token.`,
             `Unset ${TOKEN_ENV} and run ${chalk.bold("rebase cloud login")} to run it.`,
@@ -495,17 +512,44 @@ export async function freshAccessToken(client: SessionHolder): Promise<string> {
 }
 
 /**
- * An unclaimed project's token was refused: the project was claimed (which
- * revokes it) or it expired. Forget it, so the next command uses the login, and
- * say which. Never returns.
+ * A request made with an unclaimed project's token was refused. Never returns.
+ *
+ * Two causes reach that 401, as for {@link explainRefusedToken}. The project was
+ * claimed (which revokes the token) or expired, and the token is dead. Or the
+ * command called a route that takes only a person's session — `whoami` and
+ * `projects create` read `/auth/me` — which refuses a perfectly good token too.
+ * The grant holds the project's only token and the only stored copy of its
+ * claim link, so it is forgotten only once `/api/auth/scopes` refuses the token
+ * as well; and even then the claim link is printed before it goes.
  */
-function explainRefusedGrant(url: string, projectId: string): never {
+async function explainRefusedGrant(url: string, projectId: string, token: string): Promise<never> {
+    const verdict = await probeToken(url, token);
+    if (verdict === "accepted") {
+        fail(
+            `This command needs a signed-in session, and this directory uses the token \`rebase cloud init --claim\` stored for project ${projectId}.`,
+            "That token still works for deploy, logs, env and database; "
+                + `${chalk.bold("rebase cloud whoami")} shows it, the claim URL and when it expires. `
+                + `Run this command as a person once the project is claimed: ${chalk.bold("rebase cloud login")}.`,
+            "session_required"
+        );
+    }
+    if (verdict === "unknown") {
+        fail(
+            `The token \`rebase cloud init --claim\` stored for project ${projectId} was refused by ${url}, and the control plane could not say why.`,
+            `The token and the claim URL are kept. Check your connection and run the command again; ${chalk.bold("rebase cloud whoami")} shows the claim URL.`,
+            "token_rejected"
+        );
+    }
+    const grant = storedEphemeralGrant(url, projectId);
     forgetEphemeralGrant(url, projectId);
+    const claim = grant
+        ? ` If nobody has claimed it yet, its claim URL was ${chalk.bold(grant.claimUrl)} (expires ${new Date(grant.expiresAt).toLocaleString()}).`
+        : "";
     fail(
         `The token \`rebase cloud init --claim\` stored for project ${projectId} was refused by ${url}.`,
         "Once a project is claimed its agent token stops working: sign in with "
             + `${chalk.bold("rebase cloud login")} as the account that claimed it, or create a token there with `
-            + `${chalk.bold("rebase cloud tokens create")}.`,
+            + `${chalk.bold("rebase cloud tokens create")}.${claim}`,
         "token_rejected"
     );
 }
