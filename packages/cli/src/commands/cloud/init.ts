@@ -521,6 +521,8 @@ export async function cloudInitCommand(rawArgs: string[], deps: InitDeps = DEFAU
             const written = appKey?.ok ? `${BASE_URL_ENV} and ${API_TOKEN_ENV} are` : `${BASE_URL_ENV} is`;
             console.log(chalk.gray(`  ${written} set in .env. Open the claim URL, sign in, and the project is yours;`));
             console.log(chalk.gray("  until then `rebase cloud` commands here use the project's own token."));
+            console.log(chalk.gray(`  Local commands that read ${BASE_URL_ENV} (\`rebase api-keys\`, \`rebase storage\`, \`rebase auth reset-password\`)`));
+            console.log(chalk.gray("  now go to this project too, and say so; set it in the shell to reach a local backend instead."));
             if (appKey?.ok) {
                 console.log(chalk.gray(`  ${API_TOKEN_ENV} reads and writes data as the app's rules allow.`));
                 console.log(chalk.gray(`  ${appKeyExpiryNote(appKey.key.expiresAt)}`));

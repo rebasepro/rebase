@@ -343,6 +343,12 @@ one of their organizations. The link works once. A project nobody claims within
 72 hours is deleted, database included. The MCP server's `rebase_cloud_provision`
 tool runs the same command and returns the same URLs.
 
+`REBASE_BASE_URL` in `.env` is also where `rebase api-keys`, `rebase storage`
+and `rebase auth reset-password` send the local service key, so after `init
+--claim` they go to the cloud project, which does not take that key. They say so
+when they do; set `REBASE_BASE_URL` in the shell to reach a local backend
+instead.
+
 Until the project is claimed it belongs to no account. Its token is narrowed to
 that one project: it deploys, reads logs and metrics, sets environment variables
 and runs `db info`. It reads nothing secret back: not a variable's value (the

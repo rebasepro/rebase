@@ -60,7 +60,18 @@ const loadEnv = readEnvFile;
  * would hand that key to without knowing whose server answers.
  */
 export type BackendAddress =
-    | { url: string; source: "configured" | "running" }
+    | {
+        url: string;
+        source: "configured" | "running";
+        /**
+         * Set when the address came from `.env` and is the cloud project this
+         * directory is linked to — which `rebase cloud init --claim` writes
+         * there for the app and the SDK, not as a choice of where local
+         * commands go. The command still goes there; {@link cloudTargetNote}
+         * says so.
+         */
+        cloudProject?: string;
+    }
     | { url: null; reason: string };
 
 /** Whether a process with this pid is alive and ours to signal. */
@@ -92,8 +103,12 @@ function isAlive(pid: number): boolean {
  * other server may have taken since.
  */
 export function resolveBackendAddress(env: Record<string, string>, projectRoot: string): BackendAddress {
-    const configured = process.env.REBASE_BASE_URL?.trim() || env.REBASE_BASE_URL?.trim();
-    if (configured) return { url: configured, source: "configured" };
+    const fromShell = process.env.REBASE_BASE_URL?.trim();
+    const configured = fromShell || env.REBASE_BASE_URL?.trim();
+    if (configured) {
+        const cloudProject = fromShell ? undefined : linkedCloudProjectAt(projectRoot, configured);
+        return cloudProject ? { url: configured, source: "configured", cloudProject } : { url: configured, source: "configured" };
+    }
 
     const state = readBackendState(projectRoot);
     if (state && isAlive(state.pid)) return { url: state.url, source: "running" };
@@ -105,6 +120,33 @@ export function resolveBackendAddress(env: Record<string, string>, projectRoot: 
             "Start it with `rebase dev`. If it runs some other way — `rebase start`, a container — " +
             "set REBASE_BASE_URL in .env to its address."
     };
+}
+
+/** The slug of the cloud project `.rebase/cloud.json` links, when `url` is its address. */
+function linkedCloudProjectAt(projectRoot: string, url: string): string | undefined {
+    let link: unknown;
+    try {
+        link = JSON.parse(fs.readFileSync(path.join(projectRoot, ".rebase", "cloud.json"), "utf-8"));
+    } catch {
+        return undefined;
+    }
+    if (!isRecord(link) || link.mode === "direct" || typeof link.apiUrl !== "string") return undefined;
+    const bare = (u: string) => u.trim().replace(/\/+$/, "");
+    if (bare(link.apiUrl) !== bare(url)) return undefined;
+    const slug = typeof link.slug === "string" && link.slug ? link.slug : link.projectId;
+    return typeof slug === "string" && slug ? slug : "linked";
+}
+
+/**
+ * What a local command says before it sends the service key to the cloud
+ * project `.env` names (see `BackendAddress.cloudProject`), or undefined.
+ */
+export function cloudTargetNote(address: BackendAddress): string | undefined {
+    if (address.url === null || !address.cloudProject) return undefined;
+    return `Sending this to ${address.url}: REBASE_BASE_URL in .env is the address of cloud project ${address.cloudProject} `
+        + "(`rebase cloud init --claim` writes it there for the app, the SDK and the MCP server), and that project does not "
+        + "take this project's local service key. To reach the local backend instead, run the command with "
+        + "REBASE_BASE_URL set to it in the shell, e.g. REBASE_BASE_URL=http://localhost:3001.";
 }
 
 /** What `.rebase/state.json` says about the backend that wrote it, or null. */
@@ -130,6 +172,8 @@ function readBackendState(projectRoot: string): { url: string; pid: number } | n
  */
 export function requireBackendUrl(env: Record<string, string>, projectRoot: string): string {
     const address = resolveBackendAddress(env, projectRoot);
+    const note = cloudTargetNote(address);
+    if (note) console.error(chalk.yellow(`  ⚠ ${note}`));
     if (address.url !== null) return address.url;
 
     console.error(chalk.red("✗ No server to send the request to."));
