@@ -285,6 +285,26 @@ describe("openRebase (E2E)", () => {
                 .toEqual([{ n: 0 }]);
         });
 
+        it("runs the project's global callbacks when given them, as a server write does", async () => {
+            // A global `beforeSave` that stamps every write ran on every server
+            // write and on no script write, while the collection's own
+            // `beforeSave` ran on both.
+            const withGlobal = await openRebase({
+                databaseUrl: urlFor(container, "app", APP_NAME),
+                collections: [notesCollection, ledgerCollection],
+                callbacks: { beforeSave: ({ values }) => ({ ...values, title: `[stamped] ${String(values.title)}` }) }
+            });
+            try {
+                const note = await withGlobal.dataAsAdmin.notes.create({ ownerId: "cy", title: "cy's" });
+                expect(note).toMatchObject({ title: "[stamped] cy's" });
+                expect(await withGlobal.sql("SELECT title FROM public.notes WHERE owner_id = 'cy'"))
+                    .toEqual([{ title: "[stamped] cy's" }]);
+            } finally {
+                await withGlobal.sql("DELETE FROM public.notes WHERE owner_id = 'cy'");
+                await withGlobal.close();
+            }
+        });
+
         it("records history for dataAsAdmin and withAuth writes, as a server write would, with who made them", async () => {
             const entries = async () => (await observer.query<{ entity_id: string; action: string; updated_by: string }>(
                 "SELECT entity_id, action, updated_by FROM rebase.entity_history WHERE table_name = 'ledger' ORDER BY updated_at, action"

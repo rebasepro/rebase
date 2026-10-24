@@ -144,6 +144,7 @@ Its options:
 | `collections` | The project's collections. An empty array reads them from the database instead, as a server with no collection files does, and serves them read-only |
 | `pool` | Pool settings, with `databaseUrl` |
 | `dataSourceKey` | The data source these collections are served from. Default `(default)` |
+| `callbacks` | The project's global callbacks, the `callbacks` your `config/index.ts` exports. The server runs them ahead of every collection's own hooks; pass them here and a script write runs them too |
 
 `openRebase` reads no environment variable. The `DATABASE_URL` above is read by
 your script, and settings such as `REBASE_DB_POOL_MAX` or `REALTIME_CDC` change
@@ -268,9 +269,18 @@ and in its hourly sweep.
 
 ### What it leaves out
 
-`openRebase` opens the data layer and nothing else. It starts no realtime, so
-its writes are not announced to live queries. Storage, email, auth
+`openRebase` opens the data layer and nothing else. It starts no realtime of its
+own, but its writes still reach live queries: the database's change-capture
+triggers announce every write, whoever made it, so subscribers on a running
+server refetch after a backfill too. Only with `REALTIME_CDC=off` on that server
+are they not announced. See
+[Database change capture](/docs/backend/realtime-cdc/). Storage, email, auth
 administration and your functions are not on it.
+
+Collection callbacks run on every write, as on the server. The project's global
+`callbacks` run only when you pass them as the `callbacks` option.
+`rebase console` does not read `config/index.ts`, so a global `beforeSave`
+does not run on its writes.
 
 When a script needs those too, build the backend without serving it:
 `createRebaseBackend({ …, provision: false })` gives you `backend.rebase`, the

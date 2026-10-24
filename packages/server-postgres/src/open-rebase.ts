@@ -14,6 +14,7 @@ import {
     DEFAULT_DATA_SOURCE_KEY,
     isSQLAdmin,
     resourceKeyOf,
+    type CollectionCallbacks,
     type CollectionConfig,
     type RebaseSdkData,
     type RebaseServerClient,
@@ -60,6 +61,14 @@ export interface OpenRebaseOptions {
     pool?: PostgresPoolConfig;
     /** The data source these collections are served from. Defaults to `(default)`. */
     dataSourceKey?: string;
+    /**
+     * The project's global callbacks — `callbacks` exported from
+     * `config/index.ts`, what the server runs ahead of every collection's own.
+     * Without them a script write skips them: a global `beforeSave` that
+     * stamps a tenant or writes an audit row ran on every server write and on
+     * no script write, while the collection's own `beforeSave` ran on both.
+     */
+    callbacks?: CollectionCallbacks;
 }
 
 /**
@@ -184,6 +193,9 @@ export async function openRebase<DB = RegisteredDatabase>(options: OpenRebaseOpt
 
     const driver = opened.internals.driver;
     const registry = opened.internals.registry;
+    // Where the server's `handGlobalCallbacksTo` puts them: on the driver's own
+    // registry, which is the one its writes resolve hooks from.
+    if (options.callbacks) registry.setGlobalCallbacks(options.callbacks);
     // The server boot announces this at info. A script's stdout is its own
     // output — `tsx script.ts > out.json` — so here it is there only for a
     // reader who asked for debug.
