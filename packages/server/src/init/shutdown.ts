@@ -209,6 +209,23 @@ export function createShutdown(config: ShutdownConfig): (timeoutMs?: number) => 
             const workDeadline = timeoutMs > 0 ? Date.now() + Math.floor(timeoutMs * WORK_DRAIN_SHARE) : undefined;
             const workBudget = (): number | undefined =>
                 workDeadline === undefined ? undefined : Math.max(0, workDeadline - Date.now());
+            // What is left before the force timer, less a margin so a drain
+            // that runs out still resolves this rather than racing it.
+            const deadline = timeoutMs > 0 ? Date.now() + timeoutMs : undefined;
+            const timeLeft = (): number | undefined =>
+                deadline === undefined ? undefined : Math.max(0, deadline - Date.now() - 100);
+            const drainWaitUntil = async (drainBudget: number, last: boolean): Promise<void> => {
+                const stillPending = await drainBackgroundWork(drainBudget);
+                // Only the last drain drops anything: before it, what is still
+                // running is waited for again once the server has closed.
+                if (stillPending > 0 && last) {
+                    logger.warn(
+                        `${stillPending} background task(s) handed to waitUntil() did not finish within ` +
+                        `${drainBudget}ms and are being dropped. Give them an AbortSignal, or move work ` +
+                        "this long into a cron job or the job queue, where it is restartable."
+                    );
+                }
+            };
 
             (async () => {
                 logger.info("Shutting down Rebase Backend...");
@@ -274,15 +291,7 @@ export function createShutdown(config: ShutdownConfig): (timeoutMs?: number) => 
                 // Bounded well inside the overall budget: outstanding work is
                 // worth waiting for, but not worth turning a rolling deploy
                 // into a stall.
-                const drainBudget = Math.min(5_000, workBudget() ?? 5_000);
-                const stillPending = await drainBackgroundWork(drainBudget);
-                if (stillPending > 0) {
-                    logger.warn(
-                        `${stillPending} background task(s) handed to waitUntil() did not finish within ` +
-                        `${drainBudget}ms and are being dropped. Give them an AbortSignal, or move work ` +
-                        "this long into a cron job or the job queue, where it is restartable."
-                    );
-                }
+                await drainWaitUntil(Math.min(5_000, workBudget() ?? 5_000), !config.server);
 
                 // 2. Tear down realtime services (LISTEN clients, debounce timers,
                 //    subscriptions). Must happen BEFORE pool.end() so that pending
@@ -327,10 +336,19 @@ export function createShutdown(config: ShutdownConfig): (timeoutMs?: number) => 
                 server.close(() => {
                     clearInterval(sweepIdle);
                     logger.info("HTTP server closed");
-                    clearTimeout(forceTimer);
-                    // 4. The email transport, once no request can send.
-                    closeEmail();
-                    resolve();
+                    // 3b. Drain `waitUntil()` again. A request still in flight
+                    // at step 1c had not handed over its work yet — the
+                    // function registers it as it returns — so that drain
+                    // found nothing, and the webhook it then registered was
+                    // cut off by the pool closing and `exit(0)`, unwarned.
+                    // Every request has finished now; what remains of the
+                    // budget is what this may spend.
+                    void drainWaitUntil(Math.min(5_000, timeLeft() ?? 5_000), true).then(() => {
+                        clearTimeout(forceTimer);
+                        // 4. The email transport, once no request can send.
+                        closeEmail();
+                        resolve();
+                    });
                 });
             })();
         });
