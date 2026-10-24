@@ -240,6 +240,23 @@ rebase cloud previews delete new-checkout  # stops serving it and drops its data
 
 A preview expires a week after it was last deployed to.
 
+When it finishes, the deploy checks that the preview's address answers, as a
+production deploy does (`--live-timeout <seconds>`, `0` to skip). A new
+preview's certificate can take a minute or two, so a deploy that succeeded can
+say the address does not answer yet.
+
+A backend preview is billed like one app unit at the default size, and starting
+one needs a card on file, as a production deploy does. A first deploy that
+fails before anything runs is removed rather than billed. A project may run
+three backend previews at once.
+
+A backend preview's database is a second database on **production's** Postgres:
+its own data, but the same instance and the same disk. It is limited to 10
+connections, so previews cannot use up production's, but its size is not
+limited: a preview that loads a large fixture fills production's disk too.
+Delete previews you no longer need. Extensions installed on production are not
+installed in a preview's database.
+
 Previews are rolling out. A control plane that does not serve them yet refuses
 `--preview` with `previews_unavailable` and deploys nothing.
 
