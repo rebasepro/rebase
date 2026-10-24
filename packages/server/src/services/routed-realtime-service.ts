@@ -204,6 +204,11 @@ export function createRoutedRealtimeService(opts: RoutedRealtimeOptions): WsReal
             await Promise.all(all().map((p) => p.stopListening?.()));
         },
 
+        // Every source reads for the same backend.
+        setScopeRunner(run) {
+            for (const p of all()) p.setScopeRunner?.(run);
+        },
+
         // Every source's connections, named by the source they belong to.
         health() {
             return Object.entries(providers).flatMap(([key, p]) =>
