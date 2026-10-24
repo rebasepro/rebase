@@ -139,4 +139,11 @@ describe("post-edit-collection.sh", () => {
         expect(result.stderr).toContain(finding);
         expect(result.stderr).toContain("Fix them in config/collections/");
     });
+
+    it("checks an edit Claude Code reports with a Windows path", () => {
+        fakeRebase(1, "✗ config/collections/posts.ts → posts.securityRules  missing.");
+        const result = runHook("C:\\Users\\me\\shop\\config\\collections\\posts.ts");
+        expect(result.status).toBe(2);
+        expect(fs.readFileSync(path.join(project, "ran"), "utf-8").trim()).toBe("verify --quiet");
+    });
 });

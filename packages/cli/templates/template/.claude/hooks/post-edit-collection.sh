@@ -22,7 +22,9 @@ process.stdin.on("data", chunk => { raw += chunk; });
 process.stdin.on("end", () => {
     try {
         const toolInput = JSON.parse(raw).tool_input || {};
-        process.stdout.write(String(toolInput.file_path || toolInput.notebook_path || ""));
+        // Forward slashes on every OS: on Windows the path arrives as
+        // C:\Users\me\shop\config\collections\posts.ts, which the case below never matched.
+        process.stdout.write(String(toolInput.file_path || toolInput.notebook_path || "").replace(/\\/g, "/"));
     } catch {
         // Not a tool call this hook understands: nothing to check.
     }
@@ -49,7 +51,8 @@ if [ "$status" -eq 0 ]; then
 fi
 
 {
-    echo "rebase verify failed after editing ${file#"${CLAUDE_PROJECT_DIR:-}/"}:"
+    project_dir="${CLAUDE_PROJECT_DIR:-}"
+    echo "rebase verify failed after editing ${file#"${project_dir//\\//}/"}:"
     echo ""
     echo "$output"
     echo ""
