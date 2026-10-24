@@ -981,9 +981,13 @@ export interface BranchTableDataDiff {
     targetChanges: number;
     /** Up to {@link BranchDiffOptions.sampleLimit} of the rows counted above, but not of {@link targetChanges}. */
     samples: BranchRowChange[];
-    /** Present when this table's rows cannot be merged. Its counts may then be estimates. */
+    /** Present when this table's rows cannot be merged. A merge refuses it unless told to skip it. */
     blocked?: BranchMergeBlock;
-    /** Rows on each side, for a table whose rows were not matched one by one. */
+    /**
+     * Rows on each side, for a table whose rows were not matched one by one.
+     * Its inserted, updated, deleted and conflict counts are then 0 because
+     * they are unknown, not because nothing changed.
+     */
     rowCounts?: { target: number; branch: number };
     /**
      * The foreign keys through which rows the target wrote since the branch

@@ -495,7 +495,8 @@ function MergeDialog({ open, diff, onClose, merge }: {
     }, [open, diff.fingerprint]);
 
     const mergeable = diff.data.filter((entry) => !entry.blocked);
-    const blocked = diff.data.filter((entry) => entry.blocked && entry.inserted + entry.updated + entry.deleted + entry.conflicts > 0);
+    // Every blocked table: a zero count on one is "not matched", not "unchanged".
+    const blocked = diff.data.filter((entry) => entry.blocked);
     const sum = (key: "inserted" | "updated" | "deleted" | "conflicts" | "targetChanges") =>
         mergeable.reduce((total, entry) => total + entry[key], 0);
     const conflicts = sum("conflicts");

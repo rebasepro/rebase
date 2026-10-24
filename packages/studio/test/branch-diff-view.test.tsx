@@ -211,3 +211,31 @@ describe("a row the branch deleted that the target's newer rows reference", () =
         expect(screen.getByText(interpolate("studio_branch_diff_merge_referenced_reached", { count: 1, target: "app", tables }))).toBeTruthy();
     });
 });
+
+describe("a table whose rows could not be matched", () => {
+    // Its counts are 0 because they are unknown, not because nothing changed.
+    const BLOCKED: BranchDiff = {
+        ...DIFF,
+        fingerprint: "fp-3",
+        schema: [],
+        data: [{
+            schema: "public", table: "small", primaryKey: ["id"],
+            inserted: 1, updated: 0, deleted: 0, conflicts: 0, targetChanges: 0,
+            samples: [{ change: "inserted", key: "[2]", after: { id: "2" } }]
+        }, {
+            schema: "public", table: "big", primaryKey: ["id"],
+            inserted: 0, updated: 0, deleted: 0, conflicts: 0, targetChanges: 0, samples: [],
+            blocked: { code: "TOO_LARGE", message: "The table holds more than 5 rows on one side." },
+            rowCounts: { target: 10, branch: 10 }
+        }]
+    };
+
+    it("is listed as blocked in the merge, and the merge waits for it to be skipped", async () => {
+        diffBody = BLOCKED;
+        render(<BranchDiffView branch={branch} details={null}/>);
+        fireEvent.click(await screen.findByRole("button", { name: "Merge into app" }));
+        expect(await screen.findByText(interpolate("studio_branch_diff_merge_blocked", { count: 1 }))).toBeTruthy();
+        expect(screen.getByText("public.big")).toBeTruthy();
+        expect(screen.getByRole("button", { name: "Merge" }).hasAttribute("disabled")).toBe(true);
+    });
+});

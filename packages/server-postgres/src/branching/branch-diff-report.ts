@@ -28,7 +28,10 @@ export function branchDiffReport(diff: BranchDiff): string[] {
     }
     for (const table of diff.data) {
         const name = table.collection ? `${table.schema}.${table.table} (${table.collection})` : `${table.schema}.${table.table}`;
-        const counts = [`+${table.inserted}`, `~${table.updated}`, `-${table.deleted}`];
+        // A table whose rows were not matched has counts nobody knows.
+        const counts = table.rowCounts
+            ? [`rows: ${table.rowCounts.target} on ${diff.targetDatabase}, ${table.rowCounts.branch} on the branch, not matched one by one`]
+            : [`+${table.inserted}`, `~${table.updated}`, `-${table.deleted}`];
         if (table.conflicts > 0) counts.push(`${table.conflicts} conflict(s)`);
         const referencing = Math.min(reached.get(`${table.schema}.${table.table}`) ?? 0, table.targetChanges);
         if (table.targetChanges > 0) {

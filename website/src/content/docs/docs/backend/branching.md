@@ -359,9 +359,12 @@ parent. What wins:
 
 A table whose rows cannot be matched blocks the merge: one the branch added or
 dropped, one whose columns or primary key differ between the two, one with no
-primary key, or one with more than 100,000 rows on a side. Pass `skipBlocked`
-(in Studio, tick **Merge the other tables**) to merge the rest and leave those
-alone.
+primary key, or one with more than 100,000 rows on a side. Its counts read 0,
+because which rows changed is not known; `rowCounts` gives each side's row
+count. A table like that which only the parent changed — the branch wrote none
+of its rows, and the ones from before the fork are the same — is not blocked.
+Pass `skipBlocked` (in Studio, tick **Merge the other tables**) to merge the
+rest and leave those alone.
 
 Every write happens in one statement on the parent — all of it, or none of it,
 foreign keys checked at its end. A merge carries the `fingerprint` of the diff

@@ -319,6 +319,62 @@ describe("database branch diff and merge", () => {
         expect(updated?.changedColumns?.sort()).toEqual(["email", "password_hash"]);
     });
 
+    describe("a table whose rows cannot be matched one by one", () => {
+        const SETUP = `
+            CREATE TABLE big (id int PRIMARY KEY, price int);
+            CREATE TABLE nopk (code text, price int);
+            CREATE TABLE small (id int PRIMARY KEY, label text);
+            CREATE TABLE log (at int, line text);
+            INSERT INTO big SELECT g, 10 FROM generate_series(1, 10) g;
+            INSERT INTO nopk VALUES ('a', 1), ('b', 2);
+            INSERT INTO small VALUES (1, 'x');
+            INSERT INTO log VALUES (1, 'before the branch');
+        `;
+
+        it("refuses the merge even when its row count did not move, and says the counts are unknown", async () => {
+            await freshBranch("blocked", SETUP);
+            // Updates only: the counts stay where they were.
+            await branch("blocked", `
+                UPDATE big SET price = 99 WHERE id <= 5;
+                UPDATE nopk SET price = 99;
+                INSERT INTO small VALUES (2, 'y');
+            `);
+            const diff = await diffDatabaseBranch(admin, "blocked", { maxRowsPerTable: 5 });
+            const big = diff.data.find((entry) => entry.table === "big");
+            expect(big).toMatchObject({ blocked: { code: "TOO_LARGE" }, rowCounts: { target: 10, branch: 10 }, inserted: 0, updated: 0, deleted: 0 });
+            expect(diff.data.find((entry) => entry.table === "nopk")).toMatchObject({ blocked: { code: "NO_PRIMARY_KEY" } });
+
+            const refused = await refusal(mergeDatabaseBranch(admin, "blocked", { expectedFingerprint: diff.fingerprint, maxRowsPerTable: 5 }));
+            expect(refused.code).toBe("BRANCH_MERGE_BLOCKED");
+            expect(refused.details).toMatchObject({ tables: expect.arrayContaining([
+                expect.objectContaining({ table: "big", code: "TOO_LARGE" }),
+                expect.objectContaining({ table: "nopk", code: "NO_PRIMARY_KEY" })
+            ]) });
+            expect(await on("blocked", "SELECT id FROM small ORDER BY id")).toEqual([{ id: 1 }]);
+
+            const result = await mergeDatabaseBranch(admin, "blocked", { expectedFingerprint: diff.fingerprint, maxRowsPerTable: 5, skipBlocked: true });
+            expect(result.skipped.map((entry) => entry.table).sort()).toEqual(["big", "nopk"]);
+            expect(result.tables).toEqual([{ schema: "public", table: "small", inserted: 1, updated: 0, deleted: 0 }]);
+        });
+
+        it("does not block a table only the target changed, and does not call the target's rows the branch's deletes", async () => {
+            await freshBranch("targetonly", SETUP);
+            await branch("targetonly", "INSERT INTO small VALUES (2, 'y')");
+            // Main appends to its log, and grows the big table.
+            await on("targetonly", "INSERT INTO log VALUES (2, 'main'); INSERT INTO big VALUES (11, 10)");
+            const diff = await diffDatabaseBranch(admin, "targetonly", { maxRowsPerTable: 5 });
+            expect(diff.data.find((entry) => entry.table === "log")).toMatchObject({ deleted: 0, targetChanges: 1 });
+            expect(diff.data.find((entry) => entry.table === "log")?.blocked).toBeUndefined();
+            expect(diff.data.find((entry) => entry.table === "big")).toMatchObject({ deleted: 0, targetChanges: 1 });
+            expect(diff.data.find((entry) => entry.table === "big")?.blocked).toBeUndefined();
+
+            const result = await mergeDatabaseBranch(admin, "targetonly", { expectedFingerprint: diff.fingerprint, maxRowsPerTable: 5 });
+            expect(result.skipped).toEqual([]);
+            expect(result.tables).toEqual([{ schema: "public", table: "small", inserted: 1, updated: 0, deleted: 0 }]);
+            expect(await on("targetonly", "SELECT count(*)::int AS n FROM log")).toEqual([{ n: 2 }]);
+        });
+    });
+
     it("lists indexes, constraints, enum labels, views, functions and triggers the branch changed", async () => {
         await freshBranch("catalog", `
             CREATE TYPE mood AS ENUM ('happy', 'sad');

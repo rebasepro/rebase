@@ -59,6 +59,15 @@ describe("branchDiffReport", () => {
         expect(lines).toContain("    deleted on the branch, but referenced by rows app wrote since: public.posts (1 row(s), ON DELETE CASCADE)");
     });
 
+    it("gives a table whose rows were not matched its row counts, not counts nobody knows", () => {
+        const blocked = branchDiffReport({ ...DIFF, data: [{
+            schema: "public", table: "big", primaryKey: ["id"], inserted: 0, updated: 0, deleted: 0, conflicts: 0, targetChanges: 0, samples: [],
+            blocked: { code: "TOO_LARGE", message: "Too many rows." }, rowCounts: { target: 10, branch: 10 }
+        }] });
+        expect(blocked).toContain("  public.big: rows: 10 on app, 10 on the branch, not matched one by one");
+        expect(blocked).toContain("    cannot be merged: Too many rows.");
+    });
+
     it("does not call those rows kept, and still calls the others kept", () => {
         expect(lines).toContain("  public.posts: +0  ~0  -0  2 changed on app only (1 reference a row the branch deleted)");
         expect(lines).toContain("  public.tags: +0  ~0  -0  1 changed on app only, kept");

@@ -851,6 +851,28 @@ async function checksums(
     return result;
 }
 
+/**
+ * Of one side's rows, how many were written after the fork, and the checksum
+ * of the ones written before it.
+ */
+async function forkSplit(
+    sql: SQLAdmin,
+    database: string,
+    facts: TableFacts,
+    keyExpr: string,
+    hashExpr: string,
+    forkDatabase: string
+): Promise<{ young: number; oldSum: string }> {
+    const young = "(age(t.xmin) < (SELECT age(d.xmin) FROM pg_database d WHERE d.datname = $1))";
+    const [row] = await sql.executeSql(
+        `SELECT count(*) FILTER (WHERE ${young})::text AS young,
+                coalesce(sum(('x' || left(md5(${keyExpr} || ':' || ${hashExpr}), 15))::bit(60)::bigint) FILTER (WHERE NOT ${young}), 0)::text AS s
+           FROM ${qualified(facts.schema, facts.table)} t`,
+        { database, params: [forkDatabase] }
+    );
+    return row ? { young: Number(text(row, "young")), oldSum: text(row, "s") } : { young: 0, oldSum: "0" };
+}
+
 async function sampleRows(
     sql: SQLAdmin,
     database: string,
@@ -1008,10 +1030,29 @@ async function computeDiff(admin: DatabaseAdmin | undefined, branchName: string,
             block = { code: "TOO_LARGE", message: `The table holds more than ${maxRows} rows on one side, more than a diff matches row by row.` };
         }
         if (block) {
+            // Rows that cannot be matched can still be told untouched by the
+            // branch: it wrote none since the fork, and the rows from before
+            // it are the same on both sides. Then every difference is the
+            // target's, and there is nothing to merge or to block.
+            if (forkDatabase !== null) {
+                const [targetSplit, branchSplit] = await Promise.all([
+                    forkSplit(sql, targetDb, target, keyExpr, hashExpr, forkDatabase),
+                    forkSplit(sql, branchDb, branchFacts, keyExpr, hashExpr, forkDatabase)
+                ]);
+                if (branchSplit.young === 0 && targetSplit.oldSum === branchSplit.oldSum) {
+                    entry.targetChanges = targetSplit.young;
+                    seen.push({ key, untouched: true, targetSum, branchSum });
+                    data.push(entry);
+                    continue;
+                }
+            }
+            // Which rows changed, and on which side, is unknown: the counts
+            // stay 0, `rowCounts` says what each side holds, and a merge
+            // refuses the table unless told to skip it. A count difference
+            // is not the branch's inserts or deletes — the target may have
+            // made it.
             entry.blocked = block;
             entry.rowCounts = rowCounts;
-            if (branchSum.count > targetSum.count) entry.inserted = branchSum.count - targetSum.count;
-            else entry.deleted = targetSum.count - branchSum.count;
             seen.push({ key, block: block.code, targetSum, branchSum });
             data.push(entry);
             continue;
@@ -1167,10 +1208,13 @@ export async function mergeDatabaseBranch(
         throw new ApiError(409, "BRANCH_DIFF_STALE", `The branch or ${diff.targetDatabase} changed since the diff was read. Nothing was merged; review the diff again.`, undefined, EXPECTED);
     }
 
-    const branchChanges = (entry: BranchTableDataDiff) => entry.inserted + entry.updated + entry.deleted + entry.conflicts;
-    const blocked = diff.data.filter((entry) => entry.blocked && branchChanges(entry) > 0);
+    // Every blocked table: one whose rows could not be matched differs in
+    // ways nobody counted, and a zero there means "unknown", not "unchanged".
+    const blocked = diff.data.filter((entry) => entry.blocked);
     if (blocked.length > 0 && options.skipBlocked !== true) {
-        throw new ApiError(409, "BRANCH_MERGE_BLOCKED", `${blocked.length} table(s) with changed rows cannot be merged. Nothing was merged.`,
+        throw new ApiError(409, "BRANCH_MERGE_BLOCKED", `${blocked.length} table(s) with changed rows cannot be merged ` +
+            `(${blocked.map((entry) => `${entry.schema}.${entry.table}: ${entry.blocked?.code}`).join(", ")}). Nothing was merged. ` +
+            "Merge with skipBlocked to leave them as they are.",
             { tables: blocked.map((entry): RefusedTable => ({ schema: entry.schema, table: entry.table, code: entry.blocked?.code, reason: entry.blocked?.message ?? "" })) },
             EXPECTED
         );
