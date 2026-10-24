@@ -16,6 +16,7 @@ import { storageTargetsInText } from "@rebasepro/types";
 import { buildPropertyCallbacks } from "@rebasepro/common";
 import type { StorageController } from "./types";
 import { isRenditionKey } from "./rendition-cache";
+import { randomUUID } from "crypto";
 
 /** One stored object, as a listing describes it. */
 export interface StoredObjectEntry {
@@ -401,6 +402,25 @@ export async function moveObjects(options: {
         }
     }
     return { moved, cursor: page.cursor };
+}
+
+/**
+ * Whether two sources store in the same place — one bucket or directory under
+ * two names. Asked by their `storageLocation` when both can say; otherwise by
+ * a probe object written to `a` under the internal folder, looked for in `b`,
+ * and deleted.
+ */
+export async function storesInSamePlace(a: StorageController, b: StorageController): Promise<boolean> {
+    const here = a.storageLocation?.();
+    const there = b.storageLocation?.();
+    if (here !== undefined && there !== undefined) return here === there;
+    const key = `${INTERNAL_FOLDER}/move-probe/${randomUUID()}`;
+    await a.putObject({ file: new File(["probe"], "probe", { type: "text/plain" }), key }, { uploadLimits: false });
+    try {
+        return (await sizeIn(b, key)) !== undefined;
+    } finally {
+        await a.deleteObject(key).catch(() => undefined);
+    }
 }
 
 /** An object's size in a source, or `undefined` when it has no such object. */

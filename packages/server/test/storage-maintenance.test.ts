@@ -309,6 +309,39 @@ describe("storage move", () => {
         expect(keys.sort()).toEqual([...Array.from({ length: 7 }, (_, i) => `avatars/${i}.png`), "avatars/nested/deep.png", "posts/elsewhere.png"].sort());
     });
 
+    it("refuses to delete from a source that stores in the same place as the target", async () => {
+        // Two sources declared over one directory (or one bucket): every
+        // object is "already there" in the target — it is the same object —
+        // so `--delete-source` deleted each one from both.
+        const twin = new LocalStorageController({ type: "local", basePath: fromRoot });
+        // A custom controller that cannot say where it stores: found out by a probe.
+        const opaque = Object.assign(Object.create(LocalStorageController.prototype), twin, {
+            storageLocation: undefined
+        }) as LocalStorageController;
+        for (const target of [twin, opaque]) {
+            const hono = new Hono<HonoEnv>();
+            hono.onError(errorHandler);
+            hono.route("/admin/storage", createStorageMaintenanceRoutes({
+                registry: DefaultStorageRegistry.create({ "(default)": from, uploads: target }),
+                collections: () => [],
+                driverFor: () => undefined
+            }));
+            const refused = await hono.request("/admin/storage/move", {
+                method: "POST",
+                body: JSON.stringify({ to: "uploads", prefix: "avatars", deleteSource: true })
+            });
+            expect(refused.status).toBe(400);
+            expect((await refused.json()).error.code).toBe("STORAGE_SAME_LOCATION");
+            expect(await from.statObject("avatars/0.png")).not.toBeNull();
+        }
+        // Nothing left behind by the probe.
+        expect((await from.listObjects("_rebase/move-probe")).items).toEqual([]);
+
+        // Two places: the move goes ahead.
+        const separate = await moveObjects({ from, to, prefix: "posts", deleteSource: true });
+        expect(separate.moved).toEqual([{ key: "posts/elsewhere.png", outcome: "copied", deleted: true }]);
+    });
+
     it("refuses a move into the source it reads", async () => {
         const hono = new Hono<HonoEnv>();
         hono.onError(errorHandler);

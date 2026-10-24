@@ -284,6 +284,20 @@ export class LocalStorageController implements StorageController {
     }
 
     /**
+     * See {@link StorageController.storageLocation}: the default bucket's
+     * directory, with the storage root's links resolved.
+     */
+    storageLocation(): string {
+        let root = this.basePath;
+        try {
+            root = fs.realpathSync(this.basePath);
+        } catch {
+            // No storage root yet: nothing to resolve.
+        }
+        return `local:${path.join(root, DEFAULT_BUCKET)}`;
+    }
+
+    /**
      * Ensure directory exists, creating it if necessary
      */
     private async ensureDir(dirPath: string): Promise<void> {

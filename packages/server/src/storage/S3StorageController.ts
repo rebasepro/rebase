@@ -107,6 +107,12 @@ export class S3StorageController implements StorageController {
         return ["default", this.config.bucket];
     }
 
+    /** See {@link StorageController.storageLocation}: the endpoint (AWS when none) and the bucket. */
+    storageLocation(): string {
+        const endpoint = (this.config.endpoint ?? "aws").trim().toLowerCase().replace(/\/+$/, "");
+        return `s3:${endpoint}/${this.config.bucket}`;
+    }
+
     /** See {@link StorageController.maxFileSize}. */
     maxFileSize(): number {
         return this.config.maxFileSize ?? DEFAULT_MAX_FILE_SIZE;

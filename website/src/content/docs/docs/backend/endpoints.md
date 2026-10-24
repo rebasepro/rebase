@@ -140,7 +140,7 @@ a collection reaches none of this. See [Roles and scopes](/docs/backend/roles-an
 | `POST` | `/api/admin/backups/download-url` | `backups:read` | A link to one backup, `{ key }` → `{ url, token, expiresIn }`, good for 60 seconds — [Backups](/docs/deployment/backups/#download-a-backup) |
 | `GET` | `/api/admin/storage/orphans` | `database:read` | Stored files no row names, `?storageId=&olderThanHours=` — what `rebase storage orphans` prints |
 | `DELETE` | `/api/admin/storage/orphans` | `database:write` | Finds them again and deletes them; `409 STORAGE_SCAN_INCOMPLETE` when a collection could not be read |
-| `POST` | `/api/admin/storage/move` | `database:write` | Copies a folder to another source under the same keys, a page per call — what `rebase storage move` sends |
+| `POST` | `/api/admin/storage/move` | `database:write` | Copies a folder to another source under the same keys, a page per call — what `rebase storage move` sends; `400 STORAGE_SAME_LOCATION` for `deleteSource` between two sources that store in the same place |
 | `GET` | `/api/admin/logs` | `logs:read` | The recent log buffer |
 | `GET` | `/api/admin/logs/latest` | `logs:read` | The most recent entries |
 | `GET` | `/api/admin/logs/stream` | `logs:read` | Server-sent events |

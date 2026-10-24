@@ -490,7 +490,8 @@ outside collections name look unused: check before deleting.
 `move` copies the files under `--prefix` to another source under the same keys,
 a page at a time. A file the target already holds at the same size is skipped,
 so a stopped move resumes by running it again; `--delete-source` deletes each
-file from the source once the target holds it. Both need `database:read`, and
+file from the source once the target holds it, and is refused when the two
+sources store in the same bucket or directory. Both need `database:read`, and
 deleting or moving `database:write`, which the service key holds.
 
 ### `rebase skills install`

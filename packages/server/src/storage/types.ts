@@ -228,6 +228,18 @@ export interface StorageController {
     knownBuckets?(): string[];
 
     /**
+     * Where this controller's default bucket physically is, as a string two
+     * controllers return alike exactly when they store in the same place: a
+     * resolved directory, an endpoint and bucket.
+     *
+     * Two sources declared over one bucket or directory are one store under
+     * two names, and `rebase storage move --delete-source` between them found
+     * every object "already there" — it is the same object — and deleted it
+     * from both. A controller without this is found out by a probe object.
+     */
+    storageLocation?(): string;
+
+    /**
      * The largest file this controller accepts, in bytes.
      *
      * Every door that takes a file reads it, so the number a client is told is

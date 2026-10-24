@@ -15,7 +15,7 @@ import { ApiError } from "../api/errors";
 import type { StorageController } from "./types";
 import type { StorageRegistry } from "./storage-registry";
 import { canonicalStorageId } from "./keys";
-import { findOrphans, InvalidMaintenanceRequestError, moveObjects } from "./maintenance";
+import { findOrphans, InvalidMaintenanceRequestError, moveObjects, storesInSamePlace } from "./maintenance";
 
 export interface StorageMaintenanceRoutesConfig {
     registry?: StorageRegistry;
@@ -134,10 +134,23 @@ export function createStorageMaintenanceRoutes(config: StorageMaintenanceRoutesC
             || (deleteSource !== undefined && typeof deleteSource !== "boolean")) {
             throw ApiError.badRequest("`prefix` and `cursor` are strings, `limit` a whole number from 1 to 500, `deleteSource` a boolean.");
         }
+        const from = sourceOf(field("from"), "from");
+        const to = sourceOf(field("to"), "to");
+        // Two names for one store: every object is "already there" in the
+        // target, being the same object, and deleting the source's copy
+        // deletes it from both.
+        if (deleteSource && await storesInSamePlace(from, to)) {
+            throw new ApiError(
+                400,
+                "STORAGE_SAME_LOCATION",
+                `"${fromId}" and "${toId}" store in the same place, so deleting the source's copy would delete the only one. ` +
+                "Nothing was moved or deleted. Point the property at the other source instead; its files are already there."
+            );
+        }
         try {
             const result = await moveObjects({
-                from: sourceOf(field("from"), "from"),
-                to: sourceOf(field("to"), "to"),
+                from,
+                to,
                 prefix,
                 cursor,
                 limit,
