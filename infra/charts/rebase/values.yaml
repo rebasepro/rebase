@@ -347,8 +347,8 @@ networkPolicy:
   # The namespace your ingress controller's pods run in — the only source the
   # policy admits to the API. ingress-nginx installs into `ingress-nginx`; k3s's
   # bundled Traefik runs in `kube-system`. Wrong here, every request is dropped
-  # at L4 and the release serves timeouts with nothing in its logs, so the chart
-  # refuses ingress.className other than nginx with this left at its default.
+  # at L4 and the release serves timeouts with nothing in its logs — set it
+  # whenever ingress.className is not nginx.
   ingressNamespace: ingress-nginx
 
 podDisruptionBudget:

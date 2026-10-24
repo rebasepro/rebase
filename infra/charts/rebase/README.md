@@ -197,10 +197,6 @@ with the value to change:
 - `bundle.mode=image` while `image.repository` is still the stock runtime image
 - `ingress.enabled` with no host; `bundle.mode=url` with no URL
 - an unrecognised `migrationJob.mode` or `sharedState.rateLimitStore`
-- `networkPolicy.enabled` with an `ingress.className` other than `nginx` and
-  `networkPolicy.ingressNamespace` left at `ingress-nginx` — the policy admits
-  the API only from that namespace, so set it to where your controller runs
-  (k3s's bundled Traefik: `kube-system`)
 
 ## What the chart cannot do for you
 
