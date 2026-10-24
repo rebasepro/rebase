@@ -219,6 +219,16 @@ collection schema changes at boot is destructive, and `rebase db push` from a
 checkout or CI dry-runs it, refuses destructive changes without confirmation,
 and can take a backup first. None of that is available to a pod starting at 3am.
 */}}
+{{/* ── Network policy vs. the ingress controller ──────────────────────── */}}
+{{/*
+  The policy admits the API only from the ingress controller's namespace. With
+  a controller other than ingress-nginx and the namespace left at its default,
+  it admits nothing: every request times out at L4 and nothing logs why.
+*/}}
+{{- if and .Values.networkPolicy.enabled .Values.ingress.enabled (ne .Values.ingress.className "nginx") (eq (default "ingress-nginx" .Values.networkPolicy.ingressNamespace) "ingress-nginx") }}
+  {{- fail (printf "networkPolicy.enabled with ingress.className=%q: set networkPolicy.ingressNamespace to the namespace that controller runs in (k3s's Traefik: kube-system). Left at ingress-nginx, the policy drops every request to the API." .Values.ingress.className) }}
+{{- end }}
+
 {{- if eq .Values.migrationJob.mode "push" }}
   {{- fail "migrationJob.mode=push is refused by the runtime image, so a Job set to it fails and a release with migrationJob.enabled=false crash-loops the API instead. Use \"ensure\" — it creates missing tables, columns and enum types additively — and run `rebase db push` from a checkout or CI for a change that drops or rewrites something." }}
 {{- end }}

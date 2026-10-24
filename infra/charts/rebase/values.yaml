@@ -344,6 +344,12 @@ service:
 # switched on deliberately.
 networkPolicy:
   enabled: false
+  # The namespace your ingress controller's pods run in — the only source the
+  # policy admits to the API. ingress-nginx installs into `ingress-nginx`; k3s's
+  # bundled Traefik runs in `kube-system`. Wrong here, every request is dropped
+  # at L4 and the release serves timeouts with nothing in its logs, so the chart
+  # refuses ingress.className other than nginx with this left at its default.
+  ingressNamespace: ingress-nginx
 
 podDisruptionBudget:
   enabled: false
