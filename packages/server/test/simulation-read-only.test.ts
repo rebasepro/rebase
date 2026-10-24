@@ -14,7 +14,8 @@
  */
 import { describe, it, expect, jest } from "@jest/globals";
 import { Hono } from "hono";
-import type { AuthAdapter, AuthenticatedUser, BackendCollectionRegistry, CollectionConfig, DataDriver } from "@rebasepro/types";
+import type { AuthAdapter, AuthenticatedUser, CollectionConfig, DataDriver } from "@rebasepro/types";
+import type { BackendCollectionRegistry } from "../src/collections/BackendCollectionRegistry";
 import type { HonoEnv } from "../src/api/types";
 import { errorHandler } from "../src/api/errors";
 import { createAdapterAuthMiddleware } from "../src/auth/adapter-middleware";

@@ -306,8 +306,10 @@ describe("changing or revoking a service key", () => {
 
     function storeWith(...keys: ApiKey[]) {
         const store = makeStore();
-        store.getApiKeyById.mockImplementation(async (id: unknown) => keys.find(k => k.id === id) ?? null);
-        store.updateApiKey.mockImplementation(async (id: unknown) => keys.find(k => k.id === id) ?? null);
+        Object.assign(store, {
+            getApiKeyById: jest.fn(async (id: string) => keys.find(k => k.id === id) ?? null),
+            updateApiKey: jest.fn(async (id: string) => keys.find(k => k.id === id) ?? null)
+        });
         return store;
     }
     const as = async (roles: string[], init: RequestInit) => ({

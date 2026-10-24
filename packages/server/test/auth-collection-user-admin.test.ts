@@ -17,6 +17,7 @@ import { describe, it, expect, jest } from "@jest/globals";
 import { Hono } from "hono";
 import { RestApiGenerator } from "../src/api/rest/api-generator";
 import { errorHandler } from "../src/api/errors";
+import type { HonoEnv } from "../src/api/types";
 import { createBuiltinAuthAdapter } from "../src/auth/builtin-auth-adapter";
 import type { AuthHooks } from "../src/auth/auth-hooks";
 import type { AuthRepository, UserData } from "../src/auth/interfaces";
@@ -85,7 +86,7 @@ function harness(options: {
                     return { messageId: "m" };
                 }
             } as unknown as EmailService,
-            emailConfig: { resetPasswordUrl: "https://app.example.com" }
+            emailConfig: { from: "noreply@example.com", resetPasswordUrl: "https://app.example.com" }
         } : {})
     });
 
@@ -115,7 +116,7 @@ function harness(options: {
         })
     } as unknown as DataDriver;
 
-    const app = new Hono();
+    const app = new Hono<HonoEnv>();
     app.onError(errorHandler);
     app.use("/*", async (c, next) => {
         c.set("driver" as never, driver as never);
@@ -128,7 +129,7 @@ function harness(options: {
     return { app, calls, writes, sent, deleteAllRefreshTokensForUser };
 }
 
-const send = (app: Hono, method: string, path: string, body?: unknown) =>
+const send = (app: Hono<HonoEnv>, method: string, path: string, body?: unknown) =>
     app.request(path, {
         method,
         headers: { "Content-Type": "application/json" },
