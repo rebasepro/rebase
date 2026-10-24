@@ -223,6 +223,16 @@ describe("updating a user through the data API", () => {
         expect(writes()).toHaveLength(1);
     });
 
+    it("refuses a role name that would be read back as other roles, as /admin/users does", async () => {
+        const { app, writes } = harness({ admins: ["admin-1", "admin-2"] });
+
+        const res = await send(app, "PATCH", "/users/admin-2", { roles: ["viewer,admin"] });
+
+        expect(res.status).toBe(400);
+        expect((await errorOf(res)).code).toBe("INVALID_ROLE");
+        expect(writes()).toHaveLength(0);
+    });
+
     it("refuses a bulk update that demotes every administrator at once", async () => {
         // Each demotion alone leaves one admin; together they leave none.
         const { app, writes } = harness({ admins: ["admin-1", "admin-2"] });
@@ -318,6 +328,15 @@ describe("creating users through the data API's bulk doors", () => {
         expect(data[0]).toMatchObject({ invitationSent: false });
         expect(data[0]?.temporaryPassword).toBeUndefined();
         expect(typeof data[1]?.temporaryPassword).toBe("string");
+    });
+
+    it("POST /bulk refuses a role name that would be read back as other roles", async () => {
+        const { app, writes } = harness({ admins: ["admin-1"] });
+
+        const res = await send(app, "POST", "/users/bulk", { rows: [{ email: "n@example.com", roles: ["viewer,admin"] }] });
+
+        expect(res.status).toBe(400);
+        expect(writes()).toHaveLength(0);
     });
 
     it("POST /bulk answers in full even when asked for a minimal answer, as POST /users does", async () => {

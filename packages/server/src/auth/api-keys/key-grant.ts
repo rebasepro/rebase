@@ -14,6 +14,7 @@ import {
     KEY_MANAGEMENT_SCOPES,
     knownScopes,
     parseScope,
+    roleNameProblem,
     scopesBeyond,
     SCOPE_TARGETS,
     isBuiltInScope,
@@ -51,13 +52,27 @@ export function readScopesField(value: unknown): string[] {
     return [...new Set(value.map(entry => entry.trim()))];
 }
 
-/** Read a `roles` body field: an array of non-empty strings, deduplicated, without `service`. */
+/**
+ * Read a `roles` body field: an array of role names, trimmed, deduplicated,
+ * without `service`. A key's roles reach RLS joined by `,` in `app.user_roles`,
+ * so a name `roleNameProblem` refuses — `"editor,admin"` — is refused here too.
+ */
 export function readRolesField(value: unknown): string[] {
     if (!Array.isArray(value) || value.some(entry => typeof entry !== "string" || entry.trim() === "")) {
         throw ApiError.badRequest("roles must be an array of role names", "INVALID_INPUT");
     }
+    const trimmed = value.map(entry => String(entry).trim());
+    const problems = trimmed.flatMap(name => {
+        const problem = roleNameProblem(name);
+        return problem ? [`${JSON.stringify(name)} ${problem}`] : [];
+    });
+    if (problems.length > 0) {
+        throw new ApiError(400, "INVALID_ROLE",
+            `Not valid role names: ${problems.join("; ")}. A role name is a non-empty string without , { } " \\ or control characters.`,
+            { problems });
+    }
     // `service` is every service key's identity already; listing it adds nothing.
-    return [...new Set(value.map(entry => entry.trim()))].filter(role => role !== "service");
+    return [...new Set(trimmed)].filter(role => role !== "service");
 }
 
 /**

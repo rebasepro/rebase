@@ -314,6 +314,28 @@ export function hasAdminRole(roles: readonly string[] | null | undefined): boole
 }
 
 /**
+ * Why `name` cannot be written as a role, or `undefined` when it can.
+ *
+ * No naming pattern is imposed — an app may call its roles anything. What is
+ * refused is a name that would be read back as *other* roles: a role travels as
+ * one element of a Postgres `text[]` and as one entry of the comma-joined
+ * `app.user_roles` setting that RLS policies split with
+ * `string_to_array(…, ',')`. Written as `"support,admin"`, a role comes back as
+ * `admin`; braces, quotes and backslashes are array-literal syntax, so they are
+ * refused too, as are empty names and control characters.
+ *
+ * @group Auth
+ */
+export function roleNameProblem(name: unknown): string | undefined {
+    if (typeof name !== "string") return "is not a string";
+    if (name.trim() === "") return "is empty";
+    if (/[,{}"\\]/.test(name)) return "contains , { } \" or \\";
+    // eslint-disable-next-line no-control-regex
+    if (/[\u0000-\u001f\u007f]/.test(name)) return "contains a control character";
+    return undefined;
+}
+
+/**
  * Does a set of held scopes grant `scope`, optionally on one `target`?
  *
  * The unqualified grant covers every target. A qualified grant covers its own

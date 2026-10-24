@@ -257,6 +257,11 @@ For accounts, a holder of `users:write`:
   admin's password and sign in as them.
 - cannot grant roles that hold more than they do: `403 ROLE_EXCEEDS_CALLER`.
 
+A role name may be anything except a name that would be read back as other
+roles: an empty name, or one containing `,` `{` `}` `"` `\` or a control
+character, is refused with `400 INVALID_ROLE` wherever a role is written (users,
+the users collection, service keys).
+
 ## How each credential holds scopes
 
 | Credential | Acts as | Holds |

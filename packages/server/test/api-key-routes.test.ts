@@ -247,6 +247,15 @@ describe("what a service key may hold", () => {
         expect(res.status).toBe(201);
     });
 
+    // A key's roles reach RLS joined by "," in `app.user_roles`, which the
+    // policies split again: a role "editor,admin" is two roles there.
+    it.each([[["editor,admin"]], [["{admin}"]], [["\"admin\""]], [["a\\b"]]])("refuses the role name %j", async (roles) => {
+        const { res, body, store } = await mint({ name: "k", scopes: ["data:read"], roles }, ["admin"]);
+        expect(res.status).toBe(400);
+        expect(body.error?.code).toBe("INVALID_ROLE");
+        expect(store.createApiKey).not.toHaveBeenCalled();
+    });
+
     it.each([
         [["data:read:nope"], "UNKNOWN_SCOPE_TARGET"],
         [["storage:write:archive"], "UNKNOWN_SCOPE_TARGET"],
