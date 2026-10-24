@@ -30,6 +30,8 @@ import { accessOf, processAccessControl, type AccessControl } from "../access";
 import { logger } from "../../utils/logger";
 import { sha256Hex } from "../../utils/portable-crypto";
 import { ApiError, errorHandler } from "../../api/errors";
+import { refuseSimulatedWrite } from "../simulation-read-only";
+import { httpMethodToOperation } from "./http-operation";
 
 /**
  * Check whether a token looks like a Rebase API key.
@@ -226,9 +228,18 @@ export function createTusScopeGuard(): MiddlewareHandler<HonoEnv> {
  *                      name from the request path. Omitted, it is the
  *                      `mountPath` the functions group recorded for this
  *                      request — wherever the application mounted it.
+ *
+ * It also keeps "Simulate access" read-only here: a function called with a
+ * simulation header by any verb but GET, HEAD or OPTIONS is refused
+ * (`SIMULATION_READ_ONLY`), since it would run as the simulated identity.
  */
 export function createFunctionScopeGuard(mountPrefix?: string): MiddlewareHandler<HonoEnv> {
     return async (c, next) => {
+        try {
+            refuseSimulatedWrite(c, httpMethodToOperation(c.req.method));
+        } catch (error: unknown) {
+            return errorHandler(error instanceof Error ? error : new Error(String(error)), c) as Response;
+        }
         const narrowed = c.get("scopes");
         if (!narrowed) return next();
 

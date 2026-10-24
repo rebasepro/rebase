@@ -246,7 +246,7 @@ export const en: RebaseTranslations = {
     rls_simulation_masked_columns: "{{count}} columns masked by RLS",
     rls_simulation_masked_columns_one: "1 column masked by RLS",
     rls_simulation_counting: "Counting what this identity can read…",
-    rls_simulation_note: "Data views show only the rows and fields this identity can read. Live updates are paused while simulating.",
+    rls_simulation_note: "Data views show only the rows and fields this identity can read. Editing is off while simulating: stop simulating to make changes. Live updates are paused.",
     create_index: "Create Index",
     value_is_not_reference: "Value is not a reference.",
     click_to_edit: "Click to edit",

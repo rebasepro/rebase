@@ -5,6 +5,7 @@ import { ApiError, errorHandler } from "../api/errors";
 import { resolveListLimitParam } from "../api/rest/query-parser";
 import { CollectionConfig, DataDriver, scopeGrants, type ResolvedBelongsTo } from "@rebasepro/types";
 import { httpMethodToOperation } from "../auth/api-keys/http-operation";
+import { refuseSimulatedWrite } from "../auth/simulation-read-only";
 import { type FieldViewer, fieldKeyForColumn, resolveCollectionRelations, restrictedFieldNames, withRelationReferencesOnly } from "@rebasepro/common";
 import { requestViewer } from "../api/rest/field-access-query";
 import { assertNoClosedFields } from "../api/rest/write-validation";
@@ -280,6 +281,8 @@ export function createHistoryRoutes(params: {
         collection: CollectionConfig,
         id: string
     ): Promise<Record<string, unknown>> {
+        // A revert is a write: refused while simulating access.
+        refuseSimulatedWrite(c, httpMethodToOperation(c.req.method));
         const narrowed = c.get("scopes");
         const scope = `data:${httpMethodToOperation(c.req.method)}`;
         if (narrowed && !scopeGrants(narrowed, scope, collection.slug)) {
