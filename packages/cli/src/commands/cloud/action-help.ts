@@ -302,13 +302,33 @@ export const ACTION_HELP: Record<string, ActionHelp> = {
 
     logs: {
         command: "cloud logs",
-        usage: "cloud logs [--runtime] [--follow]",
-        summary: "The latest build log, or the running container's log with --runtime.",
+        usage: "cloud logs [--runtime] [--follow] [--preview [<name>]] [--since <t>] [--tail <n>] [--grep <text>] [--level <l>] [--previous]",
+        summary: "The latest build log, or what the running app prints with --runtime — from every pod, followed live with -f.",
         flags: [
             ["--runtime", "The running app's log instead of the build log"],
-            ["--follow, -f", "Tail a build that is still running"]
+            ["--follow, -f", "Keep printing new lines until Ctrl-C (exits 0); with no --runtime, tail a build still running"],
+            ["--preview [<name>]", "A preview's log instead of production's: its name, or the deployment id a preview deploy printed; alone, the project's only preview"],
+            ["--since <t>", "With --runtime: start from 30s / 5m / 1h ago, or from an RFC3339 time"],
+            ["--tail <n>", "With --runtime: at most this many lines per pod to start with (the control plane caps it at 2000)"],
+            ["--grep <text>", "With --runtime: only lines containing the text (any case); `/re/flags` for a regular expression"],
+            ["--level <l>", "With --runtime: only lines at this severity or worse — error, warn, info or debug"],
+            ["--previous", "With --runtime: the last instance of a container that restarted, where a crash's reason usually is"]
         ],
-        examples: ["rebase cloud logs", "rebase cloud logs --runtime", "rebase cloud logs -f"]
+        examples: [
+            "rebase cloud logs",
+            "rebase cloud logs -f",
+            "rebase cloud logs --runtime -f",
+            "rebase cloud logs --runtime -f --level error",
+            "rebase cloud logs --runtime --since 15m --grep timeout",
+            "rebase cloud logs --runtime --previous",
+            "rebase cloud logs --preview new-quiz -f",
+            "rebase cloud logs --runtime --json -f | jq -r 'select(.type == \"line\") | .text'"
+        ],
+        notes: [
+            "Under --json a followed runtime log is NDJSON: one `{\"type\":\"line\",\"ts\",\"pod\",\"text\"}` per log line, "
+                + "and `{\"type\":\"event\",\"event\":…}` when a pod starts, restarts or goes, or the connection drops and comes back.",
+            "A container that restarts while you follow has its previous instance's last lines printed — usually the crash's reason."
+        ]
     },
 
     status: {

@@ -67,7 +67,31 @@ import {
     type LiveCheck
 } from "./deploy-summary";
 import { listContextFiles, MAX_SOURCE_UPLOAD_BYTES, packSource, prepareRebuildSource, type RebuildSource } from "./rebuild-source";
-import { PREVIEW_DEPLOYMENTS_COLLECTION, normalizePreviewName, previewLines, triggerPreview, type Preview } from "./previews";
+import {
+    PREVIEW_DEPLOYMENTS_COLLECTION,
+    PREVIEWS_FUNCTION,
+    isPreviewsUnavailable,
+    normalizePreviewName,
+    previewFrom,
+    previewLines,
+    triggerPreview,
+    type Preview
+} from "./previews";
+import { resolveTail, type TailLimit } from "./debug";
+import {
+    describeEvent,
+    fetchRuntimeLogsPage,
+    followRuntimeLogs,
+    paintLine,
+    parseLevelFlag,
+    parseRecords,
+    parseSinceFlag,
+    recordFilter,
+    type FollowSink,
+    type LogRecord,
+    type RuntimeLogsPage,
+    type RuntimeLogsQuery
+} from "./runtime-logs";
 import { buildBundle } from "../../bundle";
 import { buildAssetApp } from "../build";
 import { foldableApps, foldFrontendIntoBundle } from "../../fold-static";
@@ -872,7 +896,7 @@ async function triggerAndFollowPreview(opts: {
             () => {
                 console.log(chalk.green(`  ✓ Preview deploy started (deployment ${deploymentId}).`));
                 for (const line of previewLines(preview)) console.log(`    ${line}`);
-                console.log(chalk.gray("    Not following (--no-follow). Track it with `rebase cloud previews`."));
+                console.log(chalk.gray(`    Not following (--no-follow). Follow its build with \`rebase cloud logs --preview ${preview.name} -f\`.`));
             },
             { success: true, deploymentId, following: false, preview }
         );
@@ -2089,6 +2113,11 @@ async function streamBuildLogs(
 ): Promise<{ status: string; logs: string }> {
     const quiet = opts.quiet === true;
     const timeoutMs = opts.timeoutMs ?? POLL_TIMEOUT_MS;
+    // Where the rest of this build's log is. Bare `rebase cloud logs` reads
+    // production's newest deployment, never a preview's.
+    const logsCommandHint = opts.preview
+        ? `\`rebase cloud logs --preview ${opts.preview.name} -f\``
+        : "`rebase cloud logs`";
     let printed = "";
     const started = Date.now();
     /** When the current run of failed status reads began. */
@@ -2099,7 +2128,7 @@ async function streamBuildLogs(
         if (!quiet) console.log("");
         fail(
             `Timed out after ${Math.round(timeoutMs / 1000)}s waiting for the build to finish.`,
-            "The deployment may still be running — check `rebase cloud logs`.",
+            `The deployment may still be running — check ${logsCommandHint}.`,
             "timeout"
         );
     };
@@ -2122,7 +2151,7 @@ async function streamBuildLogs(
                 fail(
                     `Could not read deployment ${deploymentId}'s status for over a minute: ` +
                         `${e instanceof Error ? e.message : String(e)}`,
-                    "The deployment may still be running — check `rebase cloud logs`.",
+                    `The deployment may still be running — check ${logsCommandHint}.`,
                     "status_unreadable"
                 );
             }
@@ -2152,7 +2181,7 @@ async function streamBuildLogs(
                             deploymentId,
                             apps: opts.failedApps ?? [],
                             reason: failureReason(logs) ?? null,
-                            hint: failureHint(deploymentId),
+                            hint: failureHint(deploymentId, opts.preview?.name),
                             logs
                         }
                     });
@@ -2163,7 +2192,7 @@ async function streamBuildLogs(
                 // reason was the whole failure report before.
                 console.log("");
                 console.log(chalk.bold.red(`  ✗ ${line}`));
-                console.log(chalk.gray(`    ${failureHint(deploymentId)}`));
+                console.log(chalk.gray(`    ${failureHint(deploymentId, opts.preview?.name)}`));
                 console.log("");
                 process.exit(1);
             }
@@ -2213,44 +2242,136 @@ function transientReadFailure(e: unknown): boolean {
 export const LOGS_FLAGS = {
     "--runtime": Boolean,
     "--follow": Boolean,
-    "-f": "--follow"
+    "-f": "--follow",
+    "--since": String,
+    "--tail": Number,
+    "--previous": Boolean,
+    "--grep": String,
+    "--level": String,
+    // Boolean, with the preview named by the one positional: `deploy --preview`
+    // is a boolean too, and the dispatcher's value-flag list has to be one list
+    // (`value-flags.test.ts`) — a value `--preview` would eat `deploy`'s app name.
+    "--preview": Boolean
 } as const;
+
+/** The flags that read the running app's log, and mean nothing for a build log. */
+const RUNTIME_ONLY_FLAGS = ["--since", "--tail", "--previous", "--grep", "--level"] as const;
 
 export async function logsCommand(rawArgs: string[], projectRef: string): Promise<void> {
     // Strict: `--folow` used to be dropped, so a caller that asked to follow
     // the log got one snapshot and an exit code.
-    const { flags: args } = parseCloudArgs({
+    const { flags: args, positionals } = parseCloudArgs({
         spec: LOGS_FLAGS,
         rawArgs,
         commandWords: 2, // cloud logs
         command: "cloud logs",
-        maxPositionals: 0
+        maxPositionals: 1 // the preview, after --preview
     });
+    const previewRef = positionals[0];
+    if (previewRef !== undefined && !args["--preview"]) {
+        fail(
+            `\`rebase cloud logs ${previewRef}\`: a name here is a preview's, and needs --preview.`,
+            `\`rebase cloud logs --preview ${previewRef}\` reads that preview's log.`,
+            "usage"
+        );
+    }
+
+    // Checked before anything is read, so a typo is a usage error rather than
+    // a log that silently ignored half of what was asked.
+    if (!args["--runtime"]) {
+        const stray = RUNTIME_ONLY_FLAGS.filter((f) => args[f] !== undefined);
+        if (stray.length > 0) {
+            fail(
+                `${stray.join(", ")} ${stray.length === 1 ? "reads" : "read"} the running app's log; add --runtime.`,
+                "`rebase cloud logs` alone is the build log.",
+                "usage"
+            );
+        }
+    }
+    if (args["--previous"] && args["--follow"]) {
+        fail(
+            "--previous reads a container instance that has already stopped, so there is nothing to follow.",
+            "Drop --follow, or --previous to follow the running instance.",
+            "usage"
+        );
+    }
+    const since = args["--since"] === undefined ? undefined : parseSinceFlag(args["--since"]);
+    if (since === null) {
+        fail(`--since must be a duration like 30s, 5m or 1h, or an RFC3339 time; received "${args["--since"]}".`, undefined, "usage");
+    }
+    let tail: TailLimit | undefined;
+    if (args["--tail"] !== undefined) {
+        if (!Number.isInteger(args["--tail"]) || args["--tail"] <= 0) {
+            fail(`--tail must be a positive whole number of lines; received "${args["--tail"]}".`, undefined, "usage");
+        }
+        tail = resolveTail(args["--tail"], true);
+    }
+    const level = args["--level"] === undefined ? undefined : parseLevelFlag(args["--level"]);
+    // Compiled now, so a broken pattern is refused before any request.
+    const filter = recordFilter({ grep: args["--grep"], level });
+    const filtered = args["--grep"] !== undefined || level !== undefined;
+
     const { client, url } = await requireClient(rawArgs);
     const projectId = await resolveProjectRef(projectRef, client);
+    const preview = args["--preview"]
+        ? await resolvePreviewRef(client, projectId, previewRef)
+        : undefined;
 
     if (args["--runtime"]) {
+        if (preview && preview.backend === "production") {
+            fail(
+                `Preview "${preview.name}" is a static app: it runs no server of its own and calls the production backend.`,
+                `Its build log is \`rebase cloud logs --preview ${preview.name}\`; production's runtime log is \`rebase cloud logs --runtime\`.`,
+                "preview_static"
+            );
+        }
+        const query: RuntimeLogsQuery = {
+            ...(since ?? {}),
+            ...(tail ? { tailLines: tail.applied } : {}),
+            ...(args["--previous"] ? { previous: true } : {}),
+            ...(preview ? { preview: preview.name } : {})
+        };
+        const subject = preview ? `preview ${preview.name}` : `project ${projectRef}`;
+        if (tail?.note) note(chalk.yellow(tail.note));
+        if (args["--follow"]) {
+            await followRuntime(client, projectId, { query, filter, subject, preview: preview?.name });
+            return;
+        }
+        let page: RuntimeLogsPage;
         try {
-            const res = await client.functions.invoke<{ logs?: string; error?: string }>(
-                "runtime-logs",
-                undefined,
-                { method: "GET",
-path: projectId }
-            );
-            emit(
-                () => {
-                    console.log("");
-                    console.log(chalk.bold(`  📄 Runtime logs — project ${projectRef}`));
-                    console.log("");
-                    console.log(res.logs ?? chalk.gray("  (no logs)"));
-                    console.log("");
-                },
-                { runtime: true,
-logs: res.logs ?? null }
-            );
+            page = await fetchRuntimeLogsPage(client, projectId, query);
         } catch (e) {
             reportError(e, "Failed to fetch runtime logs");
         }
+        const records = parseRecords(page.logs).filter(filter);
+        const logs = filtered ? records.map((r) => r.raw).join("\n") : (page.logs ?? null);
+        emit(
+            () => {
+                console.log("");
+                console.log(chalk.bold(`  📄 Runtime logs — ${subject}`) + (args["--previous"] ? chalk.gray("  previous instance") : ""));
+                console.log("");
+                printRuntimePodStates(page, preview?.name);
+                if (records.length > 0) for (const r of records) console.log(paintLine(r));
+                else console.log(chalk.gray(filtered && page.logs ? "  (no line matches)" : "  (no logs)"));
+                console.log("");
+            },
+            {
+                runtime: true,
+                preview: preview?.name ?? null,
+                logs,
+                pods: page.pods ?? [],
+                state: page.state ?? null,
+                message: page.message ?? null,
+                truncated: page.truncated === true,
+                // Where a script resumes from: pass it back as --since.
+                nextSinceTime: page.nextSinceTime ?? null
+            }
+        );
+        return;
+    }
+
+    if (preview) {
+        await previewBuildLogs(client, preview, { follow: args["--follow"] === true, projectId, url });
         return;
     }
 
@@ -2310,3 +2431,195 @@ logs }
         reportError(e, "Failed to fetch build logs");
     }
 }
+
+
+/* ═══════════════════════════════════════════════════════════════
+   cloud logs --preview / --runtime helpers
+   ═══════════════════════════════════════════════════════════════ */
+
+/**
+ * The preview `--preview <ref>` names: by name, or by the id of the
+ * deployment that built it (what a failed preview deploy prints). With no ref,
+ * the project's only preview — and when there are several, their names.
+ */
+async function resolvePreviewRef(client: CloudClient, projectId: string, ref: string | undefined): Promise<Preview> {
+    let res: unknown;
+    try {
+        res = await client.functions.invoke<unknown>(PREVIEWS_FUNCTION, undefined, { method: "GET", path: projectId });
+    } catch (e) {
+        if (isPreviewsUnavailable(e)) {
+            fail("This control plane does not serve preview deployments.", undefined, "previews_unavailable");
+        }
+        reportError(e, "Failed to list previews");
+    }
+    const rows = typeof res === "object" && res !== null && "previews" in res && Array.isArray(res.previews) ? res.previews : [];
+    const previews = rows.map(previewFrom).filter((p): p is Preview => p !== null);
+    if (ref === undefined) {
+        if (previews.length === 1) return previews[0];
+        fail(
+            previews.length === 0 ? "This project has no previews." : "Which preview? This project has several.",
+            previews.length === 0
+                ? "Make one with `rebase cloud deploy --preview`."
+                : `Name one: ${previews.map((p) => `\`rebase cloud logs --preview ${p.name}\``).join(", ")}.`,
+            previews.length === 0 ? "not_found" : "usage"
+        );
+    }
+    const wanted = ref.trim();
+    const found = previews.find((p) => p.name === wanted.toLowerCase()) ?? previews.find((p) => p.deploymentId === wanted);
+    if (!found) {
+        fail(
+            `No preview named "${wanted}" on this project.`,
+            previews.length > 0
+                ? `Its previews: ${previews.map((p) => p.name).join(", ")}.`
+                : "It has none. Make one with `rebase cloud deploy --preview`.",
+            "not_found"
+        );
+    }
+    return found;
+}
+
+/** A preview's build log: printed, or followed while it is still building. */
+async function previewBuildLogs(
+    client: CloudClient,
+    preview: Preview,
+    opts: { follow: boolean; projectId: string; url: string }
+): Promise<void> {
+    if (!preview.deploymentId) {
+        fail(`Preview "${preview.name}" has no deployment yet.`, undefined, "not_found");
+    }
+    const deploymentId = preview.deploymentId;
+    try {
+        const dep = (await client.data.collection(PREVIEW_DEPLOYMENTS_COLLECTION).findById(deploymentId)) as Deployment | undefined;
+        if (!dep) fail(`Preview "${preview.name}"'s deployment ${deploymentId} is gone.`, undefined, "not_found");
+        const heading = (): void => {
+            console.log("");
+            console.log(chalk.bold(`  📄 Build logs — preview ${preview.name}, deployment ${deploymentId}`) + `  ${colorStatus(dep.status)}`);
+            console.log("");
+        };
+        if (opts.follow && dep.status === "deploying") {
+            if (!isJsonMode()) heading();
+            const { status, logs } = await streamBuildLogs(client, deploymentId, {
+                quiet: isJsonMode(),
+                projectId: opts.projectId,
+                url: opts.url,
+                collection: PREVIEW_DEPLOYMENTS_COLLECTION,
+                preview
+            });
+            emit(() => {}, { preview: preview.name, deploymentId, status, logs });
+            return;
+        }
+        const logs = dep.logs == null ? null : withoutHeartbeat(dep.logs);
+        emit(
+            () => {
+                heading();
+                console.log(logs ?? chalk.gray("  (no logs)"));
+                console.log("");
+            },
+            { preview: preview.name, deploymentId, status: dep.status ?? null, logs }
+        );
+    } catch (e) {
+        reportError(e, "Failed to fetch the preview's build log");
+    }
+}
+
+/** The pods that are not plainly running, and what to do about each. */
+function printRuntimePodStates(page: RuntimeLogsPage, preview?: string): void {
+    if (page.state === "no_pods") {
+        console.log(chalk.yellow(`  ${page.message ?? "No pods are running for this project."}`));
+        console.log("");
+        return;
+    }
+    if (page.state === "error" && page.message) {
+        console.log(chalk.red(`  ${page.message}`));
+        console.log("");
+        return;
+    }
+    let any = false;
+    for (const p of page.pods ?? []) {
+        if (p.state === "ok") continue;
+        any = true;
+        const line = describeEvent({ event: "pod_state", pod: p.pod, state: p.state, message: p.message ?? null }, { preview });
+        if (line) console.log(chalk.yellow(`  ${line}`));
+    }
+    if (any) console.log("");
+}
+
+/** Resolve after `ms`, or at once when `signal` aborts. Never keeps the process alive past an abort. */
+function abortableSleep(ms: number, signal: AbortSignal): Promise<void> {
+    return new Promise((resolve) => {
+        if (signal.aborted) return resolve();
+        const timer = setTimeout(() => {
+            signal.removeEventListener("abort", onAbort);
+            resolve();
+        }, ms);
+        const onAbort = (): void => {
+            clearTimeout(timer);
+            resolve();
+        };
+        signal.addEventListener("abort", onAbort, { once: true });
+    });
+}
+
+/**
+ * `cloud logs --runtime --follow`: poll until Ctrl-C, then exit 0.
+ *
+ * In JSON mode stdout is NDJSON — one compact object per line, `{"type":"line",
+ * "ts","pod","text"}` for a log line and `{"type":"event","event",…}` for a pod
+ * starting, restarting or going, a reconnect — so a reader can act on each as
+ * it arrives. On a terminal the events are narration, on stderr.
+ */
+async function followRuntime(
+    client: CloudClient,
+    projectId: string,
+    opts: {
+        query: RuntimeLogsQuery;
+        filter: (rec: LogRecord) => boolean;
+        subject: string;
+        preview?: string;
+    }
+): Promise<void> {
+    const json = isJsonMode();
+    const controller = new AbortController();
+    const onSigint = (): void => controller.abort();
+    // `once`: a second Ctrl-C while a request is in flight kills the process
+    // the ordinary way instead of queueing another stop.
+    process.once("SIGINT", onSigint);
+
+    const sink: FollowSink = json
+        ? {
+            line: (r) => process.stdout.write(`${JSON.stringify({ type: "line", ts: r.ts, pod: r.pod, text: r.text })}\n`),
+            event: (e) => process.stdout.write(`${JSON.stringify({ type: "event", ...e })}\n`)
+        }
+        : {
+            line: (r) => console.log(paintLine(r)),
+            event: (e) => {
+                const text = describeEvent(e, { preview: opts.preview });
+                if (text) note(chalk.gray(text), "");
+            }
+        };
+
+    if (!json) {
+        console.log("");
+        console.log(chalk.bold(`  📄 Runtime logs — ${opts.subject}`) + chalk.gray("  following, Ctrl-C to stop"));
+        console.log("");
+    }
+    try {
+        await followRuntimeLogs(
+            {
+                fetch: (q) => fetchRuntimeLogsPage(client, projectId, q),
+                sleep: abortableSleep,
+                signal: controller.signal,
+                sink,
+                now: () => performance.now(),
+                isTransient: transientReadFailure
+            },
+            { initial: opts.query, filter: opts.filter }
+        );
+    } catch (e) {
+        reportError(e, "Failed to follow runtime logs");
+    } finally {
+        process.removeListener("SIGINT", onSigint);
+    }
+    if (!json) note(chalk.gray("Stopped."), "");
+}
+

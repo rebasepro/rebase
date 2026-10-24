@@ -387,7 +387,15 @@ export function failureLine(opts: { apps: string[]; status: string; deploymentId
     return `${subject} ${opts.status === "cancelled" ? "was cancelled" : "failed to deploy"}: ${why}`;
 }
 
-/** Where to read the rest of a failed deploy's story. */
-export function failureHint(deploymentId: string): string {
-    return `Full build log: \`rebase cloud logs\` (deployment ${deploymentId}).`;
+/**
+ * Where to read the rest of a failed deploy's story.
+ *
+ * A preview's build log is not production's: bare `rebase cloud logs` reads
+ * the newest PRODUCTION deployment, so pointing a failed preview at it showed
+ * the last good production build under the preview's deployment id.
+ */
+export function failureHint(deploymentId: string, preview?: string): string {
+    return preview !== undefined
+        ? `Full build log: \`rebase cloud logs --preview ${preview}\` (deployment ${deploymentId}).`
+        : `Full build log: \`rebase cloud logs\` (deployment ${deploymentId}).`;
 }

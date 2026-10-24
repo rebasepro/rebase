@@ -21,7 +21,7 @@ import { GLOBAL_SPEC_KEYS } from "./context";
 import { CREATE_PROJECT_FLAGS } from "./projects";
 import { CREATE_DATABASE_FLAGS } from "./databases";
 import { DB_CONNECT_FLAGS } from "./db-connect";
-import { DEPLOY_FLAGS } from "./deploy";
+import { DEPLOY_FLAGS, LOGS_FLAGS } from "./deploy";
 import { ENV_SET_FLAGS } from "./env";
 import { COMPUTE_SET_FLAGS, BILLING_ACTIONS } from "./resources";
 import { LOGIN_FLAGS } from "./auth";
@@ -34,7 +34,7 @@ import { PREVIEWS_LIST_FLAGS, PREVIEWS_DELETE_FLAGS } from "./previews";
  * Which spec backs which page.
  *
  * `null` means "this command declares no spec of its own" — `status` takes only
- * the global flags, and `logs` parses permissively inside its handler. Spelled
+ * the global flags. Spelled
  * out rather than omitted so that the completeness check below can tell a
  * command with nothing to declare from one somebody forgot.
  */
@@ -70,7 +70,7 @@ const SPECS: Record<string, Record<string, unknown> | null> = {
     "webhooks create": { "--name": String, "--table": String, "--endpoint": String, "--events": String },
     "webhooks delete": {},
     billing: {},
-    logs: null,
+    logs: LOGS_FLAGS,
     status: null,
     "clusters verify": null,
     // The graph. Neither listing nor pruning declares a flag of its own —
