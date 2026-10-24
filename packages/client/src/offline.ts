@@ -341,6 +341,14 @@ function isPlainObject(value: unknown): value is AnyRow {
     return proto === null || Object.getPrototypeOf(proto) === null;
 }
 
+/**
+ * The key a folded run is sent under: its first and last member and its
+ * length, which fixes its composition.
+ */
+function runKey(run: readonly PendingMutation[]): string {
+    return `${run[0].mutationId}..${run[run.length - 1].mutationId}:${run.length}`;
+}
+
 /** Whether a queued write's payload mentions `id` anywhere — see {@link replaceMintedId}. */
 function mentionsMintedId(op: PendingMutation, id: string | number): boolean {
     const payloads: unknown[] = [op.data, ...(op.updates ?? []).map((u) => u.data)];
@@ -2798,25 +2806,31 @@ data: u.data as AnyRow })),
      */
     private foldableRun(unbatched: ReadonlySet<string>): PendingMutation[] {
         if (this.replayBatchSize < 2) return [];
+        // A run already sent once (its answer lost) is sent again only as the
+        // same request: the same members, under the same key. Never sent,
+        // members join while they fit.
+        const head = this.queue[0];
+        const resent = head?.sent?.run;
         const foldable = (op: PendingMutation | undefined, collection?: string): op is PendingMutation =>
             op !== undefined
             && op.type === "create"
             && op.generatedId === true
             && typeof op.id === "string"
-            && op.sent === undefined
+            && (resent === undefined ? op.sent === undefined : op.sent?.run === resent)
             && !op.upsert
             && (op.schemaVersion ?? 1) <= QUEUE_SCHEMA_VERSION
             && !unbatched.has(op.mutationId)
             && (collection === undefined || op.collection === collection);
-        const head = this.queue[0];
         if (!foldable(head)) return [];
         const run = [head];
-        for (let i = 1; i < this.queue.length && run.length < this.replayBatchSize; i++) {
+        for (let i = 1; i < this.queue.length && (resent !== undefined || run.length < this.replayBatchSize); i++) {
             const next = this.queue[i];
             if (!foldable(next, head.collection)) break;
             if (run.some((member) => mentionsMintedId(next, member.id!))) break;
             run.push(next);
         }
+        // A member gone since (refused alone, say) makes it another request.
+        if (resent !== undefined && runKey(run) !== resent) return [];
         return run;
     }
 
@@ -2838,9 +2852,15 @@ data: u.data as AnyRow })),
      */
     private async replayRun(run: PendingMutation[], ticket: ScopeTicket): Promise<"done" | "offline" | "unbatch"> {
         const inner = this.innerFor(run[0].collection);
-        const idempotencyKey = `${run[0].mutationId}..${run[run.length - 1].mutationId}:${run.length}`;
+        const idempotencyKey = runKey(run);
         for (const member of run) this.inFlight.add(member.mutationId);
         try {
+            // Every member is marked sent before the request goes out, as a
+            // single create is: from then on the server may hold its row, so a
+            // later edit queues as an update and a delete is sent rather than
+            // cancelled against it. The mark names the run, which is sent
+            // again whole if this answer is lost.
+            for (const member of run) await this.markCreateSent(member, ticket, idempotencyKey);
             let rows: AnyRow[];
             try {
                 rows = await inner.createMany(run.map((member) => member.data as AnyRow), { idempotencyKey });
@@ -2863,6 +2883,13 @@ data: u.data as AnyRow })),
     private async replay(op: PendingMutation, ticket: ScopeTicket): Promise<void> {
         const inner = this.innerFor(op.collection);
         if (op.type === "create") {
+            // Recorded as sent before the request goes out, as an update is:
+            // tail coalescing and cancel-out both read an unmarked create as
+            // one the server cannot hold. Left unmarked, a create that
+            // committed and lost its answer took the next edit into its body
+            // — whose replay answered 409 and adopted the old row, dropping
+            // the edit — and a delete cancelled it out and was never sent.
+            await this.markCreateSent(op, ticket);
             // The queued row already carries its (client-generated) id.
             let row: AnyRow | undefined;
             try {
@@ -2997,6 +3024,19 @@ data: u.data as AnyRow })),
             await inner.delete(op.id!, { idempotencyKey: op.sent?.idempotencyKey ?? op.mutationId });
             this.removeLocalRow(op.collection, op.id!, ticket, true);
         }
+    }
+
+    /**
+     * Record a queued create as sent, with the request about to go out, and
+     * persist it — before the request, so a lost answer cannot leave it
+     * unmarked. One already marked (sent online before it was queued, or by
+     * an earlier replay) keeps what it holds: that is the request the server
+     * may have stored.
+     */
+    private async markCreateSent(op: PendingMutation, ticket: ScopeTicket, run?: string): Promise<void> {
+        if (op.sent) return;
+        op.sent = { idempotencyKey: op.mutationId, data: { ...(op.data as AnyRow) }, ...(run ? { run } : {}) };
+        await this.persistMutation(`${ticket.scope}|${op.mutationId}`, op).catch(() => undefined);
     }
 
     /**
