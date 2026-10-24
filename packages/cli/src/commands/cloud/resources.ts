@@ -36,6 +36,7 @@ import {
 import { DEFAULT_STORAGE_SOURCE_KEY } from "@rebasepro/types";
 import { firstRow, latestDeployment, fmtDate } from "./projects";
 import { wantsRawError } from "./errors";
+import { billingInvoices, billingUpcoming } from "./billing-invoices";
 import { switchOn } from "../../utils/args";
 
 /* ─── status: quick project dashboard ──────────────────────────── */
@@ -1341,22 +1342,40 @@ maxPositionals: 0 });
  * the account — a help page describing a command that does not exist, and a typo
  * exiting 0.
  */
-export const BILLING_ACTIONS = ["setup", "checkout"] as const;
+export const BILLING_ACTIONS = ["setup", "checkout", "invoices", "upcoming"] as const;
 
 export async function billingCommand(rawArgs: string[]): Promise<void> {
     // Parsed before the client is built: an unusable line should be refused
     // without first spending a login round-trip on it.
-    const action = parseCloudArgs({
-        spec: {},
+    const parsed = parseCloudArgs({
+        spec: { "--limit": Number },
         rawArgs,
         commandWords: 2, // cloud billing
         command: "cloud billing",
         maxPositionals: 1
-    }).positionals[0];
+    });
+    const action = parsed.positionals[0];
     requireKnownAction("billing", action, BILLING_ACTIONS);
+    const limit = parsed.flags["--limit"];
+    if (limit !== undefined && action !== "invoices") {
+        fail("`--limit` applies to `rebase cloud billing invoices` only.", undefined, "usage");
+    }
 
     const { client, url } = await requireClient(rawArgs);
     const org = getContextOrg(url);
+
+    // `rebase cloud billing invoices|upcoming` — what Stripe has invoiced the
+    // org, and what it will invoice next. Read-only; owner/admin only.
+    if (action === "invoices" || action === "upcoming") {
+        if (!org) fail("No active organization.", "Run `rebase cloud use` first.", "no_org");
+        try {
+            if (action === "invoices") await billingInvoices(client, org, limit);
+            else await billingUpcoming(client, org);
+        } catch (e) {
+            reportError(e, action === "invoices" ? "Failed to load invoices" : "Failed to load the next invoice");
+        }
+        return;
+    }
 
     // `rebase cloud billing setup` — attach a card to the org (one-time, opens a
     // browser). Once done, project create/deploy work headlessly (off_session).

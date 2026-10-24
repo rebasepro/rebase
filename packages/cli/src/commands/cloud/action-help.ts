@@ -641,17 +641,22 @@ export const ACTION_HELP: Record<string, ActionHelp> = {
 
     billing: {
         command: "cloud billing",
-        usage: "cloud billing [setup|checkout]",
+        usage: "cloud billing [setup|checkout|invoices|upcoming]",
         summary:
             "The selected organization's billing. Bare, it prints the billing account, the card on "
             + "file and what the linked project costs per month; `setup` attaches a card (one-time, "
-            + "opens a browser); `checkout` opens a Stripe session for one project. "
-            + "Organization-scoped, not project-scoped.",
-        flags: [],
+            + "opens a browser); `checkout` opens a Stripe session for one project; `invoices` lists "
+            + "the issued invoices with Stripe's hosted page for each; `upcoming` previews the next "
+            + "invoice of every subscription. Organization-scoped, not project-scoped.",
+        flags: [
+            ["--limit <n>", "`invoices` only: how many to list, newest first. Default 24, at most 100"]
+        ],
         examples: [
             "rebase cloud billing",
             "rebase cloud billing setup",
-            "rebase cloud billing checkout --project shop"
+            "rebase cloud billing checkout --project shop",
+            "rebase cloud billing invoices --json",
+            "rebase cloud billing upcoming"
         ],
         notes: [
             "`setup` comes before the first deploy: without a card the control plane answers 402, and `deploy` refuses before it builds."

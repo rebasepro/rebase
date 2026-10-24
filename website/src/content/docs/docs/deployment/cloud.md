@@ -86,6 +86,11 @@ the usual cause is an account that never had one.
 sequence on purpose: the first deploy of a project is refused without one, and
 finding that out after a bundle has finished uploading is the worse order.
 
+After that, the console's **Billing** page lists the organization's invoices,
+each with Stripe's hosted page and PDF, and previews the next invoice of every
+project. `rebase cloud billing invoices` and `rebase cloud billing upcoming`
+print the same. Both are for the organization's owners and admins.
+
 An existing project links without creating one:
 
 ```bash

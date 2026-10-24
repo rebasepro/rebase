@@ -203,4 +203,12 @@ rebase cloud clusters list | add | verify   # the clusters tenants run on; `add`
 rebase cloud billing             # the billing account and card on file
 rebase cloud billing setup       # attach a card, one-time, opens a browser
 rebase cloud billing checkout    # a Stripe session for one project
+rebase cloud billing invoices [--limit N]   # issued invoices, newest first, with Stripe's hosted page
+rebase cloud billing upcoming    # a preview of each subscription's next invoice
 ```
+
+`billing invoices` and `billing upcoming` read the same Stripe data as the
+console's Billing page, and are open to the organization's owners and admins
+only. Amounts in `--json` are in the currency's minor unit (cents), exactly as
+Stripe sends them. Draft invoices are not listed; the preview is computed by
+Stripe and its metered lines keep growing until the period closes.

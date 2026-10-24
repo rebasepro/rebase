@@ -69,7 +69,7 @@ const SPECS: Record<string, Record<string, unknown> | null> = {
     webhooks: null,
     "webhooks create": { "--name": String, "--table": String, "--endpoint": String, "--events": String },
     "webhooks delete": {},
-    billing: {},
+    billing: { "--limit": Number },
     logs: LOGS_FLAGS,
     status: null,
     "clusters verify": null,
