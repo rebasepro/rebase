@@ -19,7 +19,7 @@ Rebase implements RLS by scoping the DataDriver via `withAuth()` before each req
 ### Anonymous Users
 
 When `requireAuth` is `false` and no token is provided, the driver is scoped with:
-- `uid: "anon"`
+- `uid: "anonymous"` (`ANONYMOUS_USER_ID`; policies also treat the legacy `"anon"` uid as anonymous)
 - `roles: ["anon"]`
 
 This allows Postgres RLS policies to handle public access explicitly.
@@ -50,7 +50,7 @@ The auth middleware assigns these reserved identities automatically. They are vi
 | Service API key | `"api-key:{id}"` | `["service"]` | Machine-to-machine API key requests |
 | Service API key with `roles: ["admin"]` | `"api-key:{id}"` | `["service", "admin"]` | Keys meant to read every row (CI, migrations) |
 | Personal API key | the owner's uid | the owner's current roles | A person's own scripts and tools |
-| Anonymous | `"anonymous"` | `["anon"]` | Unauthenticated when `requireAuth: false` |
+| Anonymous | `"anonymous"` | `["anon"]` | Unauthenticated when `requireAuth: false` (in `context.user`; `c.get("user")` stays unset) |
 | No token + `requireAuth: true` | — | — | **Rejected (401)** |
 
 > **IMPORTANT FOR AGENTS:** the server singleton's data plane is `rebase.dataAsAdmin` (used in cron jobs, custom functions and webhooks). It is backed by the **native DataDriver** — no JSON round trip through the REST API — and is scoped once, at boot, as `{ uid: "service", roles: ["admin"] }`. Callbacks live in the driver rather than the route layer, so global and collection callbacks still fire, seeing `uid: "service"` and `roles: ["admin"]`. That is how a callback distinguishes a server-internal read from an end-user one. `rebase.data` does not exist — not on the type and not at runtime — so the privileged plane has exactly one name.

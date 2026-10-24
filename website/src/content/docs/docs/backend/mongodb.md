@@ -28,16 +28,20 @@ pnpm add @rebasepro/server-mongo
 ```
 
 ```ts title="backend/src/index.ts" no-verify
-import { rebase } from "@rebasepro/server";
-import { createMongoBootstrapper } from "@rebasepro/server-mongo";
+import { initializeRebaseBackend } from "@rebasepro/server";
+import { createMongoBootstrapper, createMongoDBConnection } from "@rebasepro/server-mongo";
 
-rebase({
-    backend: createMongoBootstrapper({ url: process.env.DATABASE_URL! })
+const { db, client } = await createMongoDBConnection(process.env.DATABASE_URL!, "app");
+
+await initializeRebaseBackend({
+    app,
+    server,
+    bootstrappers: [createMongoBootstrapper({ connection: db, client })]
 });
 ```
 
 Set `DATABASE_URL` to a MongoDB connection string
-(`mongodb://…` or `mongodb+srv://…`).
+(`mongodb://…` or `mongodb+srv://…`); the second argument names the database.
 
 ## What works
 

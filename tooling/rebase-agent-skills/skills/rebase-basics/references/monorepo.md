@@ -56,7 +56,7 @@ A BaaS install is `server` + a driver + `client`, with no React in the tree.
 | `@rebasepro/forms` | Form engine | Building dynamic forms from collection schemas |
 | `@rebasepro/mcp` | AI agent MCP tools | The MCP server that agents use |
 | `@rebasepro/codegen` | Typed SDK generation from collection definitions | Used by `rebase generate-sdk` command |
-| `@rebasepro/inference` | Auto-infer schema from data / database introspection | Used by `rebase schema introspect` |
+| `@rebasepro/inference` | Infer a collection schema from existing data | Used by the CMS collection editor and data import (`rebase schema introspect` is the driver's own) |
 | `@rebasepro/plugin-ai` | AI-powered data autofill | Studio plugin for auto-completing fields |
 | `@rebasepro/plugin-insights` | Usage and data insights views | Plugin for analytics over your collections |
 | `@rebasepro/cli` | CLI tool | The `rebase` CLI binary |

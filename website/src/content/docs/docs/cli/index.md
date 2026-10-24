@@ -87,7 +87,7 @@ application image to build yourself. Useful flags:
 |------|--------|
 | `--output <dir>` (or `--out`) | Write the bundle somewhere other than `dist-bundle/` (one app at a time) |
 | `--vendor` | Always install and ship the bundle's dependencies |
-| `--no-vendor` | Never vendor; the pod installs on first start |
+| `--no-vendor` | Never vendor; the pod installs them on every start |
 | `--skip-type-check` | Skip typechecking (faster, less safe) |
 | `--no-static` | Do not fold the frontend into the backend bundle (each static app still gets its own bundle) |
 | `--skip-static-build` | Fold the frontend as already built, without running its build command |
@@ -385,7 +385,9 @@ from working at all happens before a table can be compared:
 | Connection strings | An unencoded `=` in a URL parameter, which PostgreSQL's own tools refuse to parse — so backups and `psql` break while the app keeps working. |
 | Custom functions | What each function needs from its host, and which of them would not run on an edge runtime. |
 
-**Against the database**, when `DATABASE_URL` is set:
+**Against the database** — the project's own, resolved the way `rebase db url`
+resolves it, so on a fresh scaffold it is the managed database, which `doctor`
+starts:
 
 | Check | Why |
 | --- | --- |
@@ -401,7 +403,7 @@ reason and the rest still runs — see [Troubleshooting](/docs/troubleshooting/)
 
 Exits non-zero when a check finds an error, or when a phase could not run
 because the database it was given refuses connections. A phase skipped because
-you set no `DATABASE_URL` is not a failure.
+no database could be resolved is not a failure.
 
 `rebase doctor --policies` runs only the RLS checks — no schema diff, no SDK
 types — and fails closed, which makes it the form to use as a CI gate against a

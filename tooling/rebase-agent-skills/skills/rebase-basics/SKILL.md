@@ -21,7 +21,8 @@ Please complete these setup steps before proceeding, and remember your progress 
 
 2. **MCP server access:** The MCP server needs a running `rebase dev`, or a
    `REBASE_SERVICE_KEY` in the project's `.env`. Nothing else — there is no
-   login step, and the server never talks to Rebase Cloud.
+   login step, and only `rebase_cloud_provision` (which runs `rebase cloud init
+   --claim`) talks to Rebase Cloud.
    - `rebase dev` writes `.rebase/state.json`, and the MCP server reads the
      backend URL and service key straight out of it. That is the zero-config
      path.
@@ -50,11 +51,13 @@ Please adhere to these principles when working with Rebase, as they ensure relia
 
 4. **Know which schema loop this project is on:**
    - `rebase schema generate` — converts collection definitions to Drizzle ORM schema.
-   - **On the managed database (the default), boot applies it.** `rebase dev`
-     generates the schema and creates the missing tables additively at every
-     start, so an added collection or field needs no push step.
-   - **With your own `DATABASE_URL`:** `rebase db push` (development) or
-     `rebase db generate && rebase db migrate` (production).
+   - **Boot applies it, on the managed database (the default) and on your own
+     `DATABASE_URL` alike.** `rebase dev` generates the schema and the backend
+     creates the missing tables additively at every start
+     (`REBASE_MIGRATE_ON_BOOT=ensure`, the default; `none` opts out), so an
+     added collection or field needs no push step.
+   - **Versioned changes on your own `DATABASE_URL`:** `rebase db push`
+     (development) or `rebase db generate && rebase db migrate` (production).
    - What boot's additive apply deliberately leaves alone, on either database:
      any change that is not purely additive — a renamed column, a narrowed
      type, a removed field. Those need `rebase db push` or a migration. Since
@@ -89,10 +92,10 @@ section is background; this is the actual sequence.
    and on every save under `config/collections/`, together with the SDK types in
    `generated/sdk/`, so on a running dev server the step is a way to see the
    file now.
-4. **On the managed database: nothing.** Boot creates the new table. Restart
-   `rebase dev` (or let it restart itself) and the collection is there.
-   With your own `DATABASE_URL`: `rebase db push` in development, or
-   `rebase db generate && rebase db migrate` for production.
+4. **Nothing.** Boot creates the new table, on the managed database or your
+   own. Restart `rebase dev` (or let it restart itself) and the collection is
+   there. For a production database whose schema moves by migrations:
+   `rebase db generate && rebase db migrate`.
 
 **Add a backend function**
 
@@ -107,14 +110,16 @@ section is background; this is the actual sequence.
    `auth.scopes` on the users collection and guard with `requireScope` instead
    of `requireAdmin` (see `rebase-custom-functions`).
 3. Read configuration inside the handler with `requireEnv(c, "NAME")`. A
-   `process.env` read at module scope throws at import time, and the loader
-   reports that as a skipped function: the route just 404s.
+   `process.env` read at module scope (`new Stripe(process.env.KEY!)`) throws at
+   import time when the variable is unset — and always on an isolate host, which
+   has no `process` then — and the loader reports that as a skipped function:
+   the route just 404s.
 
 **Add an RLS rule**
 
 Rules live on the collection in `securityRules` and become Postgres policies
-at boot on the managed database, or when `rebase db push` (or a migration) runs
-against your own. Declaring one is not applying it — the rule takes effect on
+at boot, or when `rebase db push` (or a migration) runs. Declaring one is not
+applying it — the rule takes effect on
 the next start, not on the next save — junction tables of many-to-many
 relations included.
 
@@ -172,7 +177,7 @@ When you initialize a Rebase project via the CLI (`rebase init`), the generated 
 ├── .rebase/              # Dev-server state, and the managed database's data
 ├── .env                  # Environment variables (generated from .env.example)
 ├── .env.example          # Template with placeholder secrets
-├── docker-compose.yml    # Optional PostgreSQL container — `rebase dev --docker`
+├── docker-compose.yml    # Self-hosting: PostgreSQL + the runtime; `rebase dev --docker` uses its `db`
 ├── pnpm-workspace.yaml   # pnpm workspace definition
 └── package.json          # Root workspace package.json
 ```
@@ -227,7 +232,8 @@ pieces you can call yourself:
 - **`provision` is required on `createRebaseBackend`:** `true` creates what the
   backend serves (tables, RLS policies, change capture), `false` changes nothing
   in the database (a script, a test, a second process), and
-  `{ collections, realtime }` picks. `initializeRebaseBackend` passes `true`.
+  `{ collections, realtime }` picks. `initializeRebaseBackend` passes `true`
+  (`false` under `REBASE_PROVISION=false`).
 - **Functions and crons are values** (0.25+): `functions: { "send-invoice": sendInvoice }`
   and `crons: { nightly: defineCron({ … }) }`, or `functions: await loadFunctions(dir)`
   and `crons: await loadCrons(dir)`, which read a directory into that same shape.
@@ -332,12 +338,11 @@ Read these when you need them, not before.
 
 - **pnpm not found:** Install with `npm install -g pnpm`.
 - **Node.js version mismatch:** a scaffolded project declares `node >= 22.22.0` in its `package.json` `engines`. Use `nvm install 22.22.0 && nvm use 22.22.0`.
-- **`Could not find tsx binary`:** Install tsx in your project: `pnpm add -D tsx`.
+- **``Dependencies are not installed — run `pnpm install` in <project>``:** The driver's CLI or `tsx` is declared but not on disk — usually a fresh clone. Run the install it names, in the directory it names.
 - **`Could not detect an active database plugin`:** Ensure `@rebasepro/server-postgres` (or another driver) is listed in `backend/package.json` dependencies.
 - **`No bootstrappers or database adapter provided`:** The `initializeRebaseBackend()` (or `createRebaseBackend()`) call is missing the `database` (or `bootstrappers`) property. See `references/backend-configuration.md`.
 - **"createRebaseBackend needs `provision`":** Pass `provision: true` to create what the backend serves, or `false` to change nothing in the database.
 - **"Both `functions` and `functionsDir` are set"** (or `crons` and `cronsDir`): keep one. `functions: await loadFunctions(dir)` is the same as `functionsDir: dir`.
-- **`Could not find CLI entry point for <plugin>`:** The database driver plugin's CLI script is missing or not found. Reinstall the plugin: `pnpm add @rebasepro/server-postgres`.
 
 ### Singleton Errors
 
@@ -347,7 +352,7 @@ Read these when you need them, not before.
 
 ### Storage
 
-- **`Storage backend "default" uses local filesystem in production`:** A warning is emitted when using `type: "local"` with `NODE_ENV=production`. Files will be lost on container restart. Configure S3-compatible storage or a custom `StorageController`.
+- **Uploads answer `501 STORAGE_NOT_CONFIGURED` in production:** with `NODE_ENV=production`, `local` storage is switched off rather than writing to a container filesystem the next restart erases (an explicit `type: "local"` logs `Storage backend "<id>" is set to "local" in production — DISABLED`). Configure S3-compatible storage (`STORAGE_TYPE=s3`), GCS (`STORAGE_TYPE=gcs`) or a custom `StorageController` — or set `FORCE_LOCAL_STORAGE=true` when a durable volume really holds the storage path.
 - **`File too large`:** The storage upload endpoint has its own body limit (default 50 MB), separate from the global `maxBodySize` (default 10 MB). Configure `maxFileSize` in your storage config to increase it.
 
 # References

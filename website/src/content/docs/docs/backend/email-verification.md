@@ -43,8 +43,9 @@ The registrant follows the link and enters their password
 and signs them in. With it off, which is the default, an address that already
 has an account is answered `409 EMAIL_EXISTS`, as before.
 
-To recover from a step-3 rejection, the user signs in with their existing
-method and calls the explicit link endpoint:
+To recover from a step-3 rejection (`403 EMAIL_NOT_VERIFIED`, see
+[Account linking](/docs/backend/authentication/#account-linking-across-sign-in-methods)),
+the user signs in with their existing method and calls the explicit link endpoint:
 
 ```http
 POST /api/auth/link/google

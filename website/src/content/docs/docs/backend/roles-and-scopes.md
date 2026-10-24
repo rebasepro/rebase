@@ -252,10 +252,11 @@ For keys:
 
 For accounts, a holder of `users:write`:
 
-- cannot edit, reset or delete an account that holds a role or scope they do not:
+- cannot edit, reset or delete an account whose roles hold a scope they do not,
+  or `admin` when they are not an admin:
   `403 ACCOUNT_OUTRANKS_CALLER`. Without this, a support role could reset an
   admin's password and sign in as them.
-- cannot grant roles that hold more than they do: `403 ROLE_EXCEEDS_CALLER`.
+- cannot grant roles that hold more than they do, `admin` included: `403 ROLE_EXCEEDS_CALLER`.
 
 ## How each credential holds scopes
 

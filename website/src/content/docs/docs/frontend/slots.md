@@ -122,7 +122,7 @@ filter sidebar for it to render into.
 
 ## Slot Props Reference
 
-All slot prop types are exported from `@rebasepro/types` and can be imported for type-safe slot components:
+All slot prop types are exported from `@rebasepro/cms-types` and can be imported for type-safe slot components:
 
 ```typescript
 import type { CollectionActionsProps, NavigationSlotProps } from "@rebasepro/cms-types";

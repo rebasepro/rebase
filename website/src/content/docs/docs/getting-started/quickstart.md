@@ -34,7 +34,7 @@ No database to install, and no Docker. `rebase dev` runs a managed PostgreSQL fo
 `init` generates a ready-to-run `.env` at the project root with a real `JWT_SECRET`, a database password, and a free local database port. You don't need to create or edit anything to get started.
 
 :::caution
-Don't run `cp .env.example .env`. `.env.example` is a reference for the available variables — copying it over your `.env` discards the generated secrets and points `DATABASE_URL` at a database that doesn't exist. Edit `.env` directly if you want to change a value.
+Don't run `cp .env.example .env`. `.env.example` is a reference for the available variables — copying it over your `.env` discards the generated secrets — `JWT_SECRET`, the service key, the database password and the first-admin credentials, all blank or commented out there. Edit `.env` directly if you want to change a value.
 :::
 
 ## Start the Dev Servers

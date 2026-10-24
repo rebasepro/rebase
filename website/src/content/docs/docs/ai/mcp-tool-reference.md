@@ -8,10 +8,10 @@ The tools [`@rebasepro/mcp`](/docs/ai/mcp) offers an assistant. How it connects,
 which credential it holds and how the [loopback gate](/docs/ai/mcp#the-loopback-gate)
 decides what ⚠ means are on the [MCP server](/docs/ai/mcp) page.
 
-42 tools, in nine groups. Tools marked ⚠ are refused against non-local targets
+44 tools, in ten groups. Tools marked ⚠ are refused against non-local targets
 unless you opt out.
 
-## Schema & database (12)
+## Schema & database (13)
 
 Spawn the Rebase CLI in the active project directory.
 
@@ -28,6 +28,7 @@ Spawn the Rebase CLI in the active project directory.
 | `rebase_db_branch_list` | — | List database branches (admins only) |
 | `rebase_db_branch_delete` ⚠ | `name` | Delete a database branch (admins only) |
 | `rebase_db_branch_info` | `name` | Branch information and status (admins only) |
+| `rebase_db_branch_diff` | `name` | What a branch changed against the database it was made from — schema, policies and rows, with conflicts; changes neither (admins only) |
 | `rebase_db_branch_switch` | — | Point this checkout at a branch, or back at the main database (admins only) |
 
 ## Schema planning (1)
@@ -112,7 +113,7 @@ chose. Its blast radius is whatever your functions do.
 |---|---|---|
 | `rebase_project_list` | — | List registered projects and show the active one |
 | `rebase_project_switch` | `name` | Change the active project |
-| `rebase_project_add` | `name` | Register a project (`baseUrl`, optional `projectDir`, `token`) |
+| `rebase_project_add` | `name` | Register a project (optional `projectDir`, `baseUrl`, `token`) |
 | `rebase_project_remove` | `name` | Remove a project (the default project cannot be removed) |
 | `rebase_project_current` | — | Show the active project and its auth status |
 | `rebase_project_status` | — | Health-check the active backend |
@@ -121,3 +122,11 @@ chose. Its blast radius is whatever your functions do.
 rather than acting on a target itself. An assistant can therefore switch to a
 remote project without tripping the gate — it just cannot then run a destructive
 tool there.
+
+## Rebase Cloud (1)
+
+Spawns `rebase cloud` in the active project directory.
+
+| Tool | Required | Description |
+|---|---|---|
+| `rebase_cloud_provision` ⚠ | — | Provision an unclaimed Rebase Cloud project with no account (`rebase cloud init --claim`), write `REBASE_BASE_URL` and `REBASE_API_TOKEN` into `.env`, and deploy the collections; optional `name`, `deploy` |

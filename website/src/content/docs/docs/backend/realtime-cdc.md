@@ -45,14 +45,14 @@ If the connection can't support it, `auto` logs an informational line instead an
 2. **Capture** — A dedicated, unpooled `LISTEN` client per instance consumes `rebase_cdc`, maps the changed table back to its collection, and feeds the change into the same `RealtimeService` pipeline used by API mutations. Like the cross-instance listener, it prefers `DATABASE_DIRECT_URL` and auto-reconnects.
 3. **RLS-safe delivery** — The raw row from the change stream is **never** forwarded to subscribers. The change is marked invalidated, and each subscription re-reads the row under its **own** auth context. Filtering is therefore per subscriber, never per publisher: a client only ever receives rows its RLS policies permit.
 4. **Cross-instance** — Because every instance observes every commit through the change stream, CDC also *is* the cross-instance channel; the legacy per-mutation `rebase_entity_changes` broadcast is not used while CDC is active.
-5. **De-duplication** — A mutation made through the Rebase API is delivered locally the instant it commits and is also echoed back through the change stream. The originating instance suppresses an echo that arrives within the refetch debounce window (a short-lived record of its own emits), so an API write normally produces one frame. An echo that arrives later than that triggers one more refetch, which delivers the same rows again: harmless, but a subscriber can see an identical frame twice.
+5. **De-duplication** — A mutation made through the Rebase API schedules a refetch for the local subscribers the instant it commits and is also echoed back through the change stream. The originating instance suppresses an echo that arrives within the refetch debounce window (a short-lived record of its own emits), so an API write normally produces one frame. An echo that arrives later than that triggers one more refetch, which delivers the same rows again: harmless, but a subscriber can see an identical frame twice.
 
 ## Requirements & Notes
 
 `directConnectionString` is the adapter option; on 0.24 use `DATABASE_DIRECT_URL`.
 
 - CDC requires a direct connection string (`DATABASE_DIRECT_URL`, the adapter's `directConnectionString`, or the primary connection) for the `LISTEN` client — connection poolers in transaction mode do not support long-lived `LISTEN` sessions.
-- Triggers are installed only on tables backed by a registered collection. Writes to unmapped tables are ignored.
+- Triggers are installed only on tables backed by a registered collection, and on the junction tables of their many-to-many relations. Writes to unmapped tables are ignored.
 - A collection whose table has not yet been migrated is skipped with a warning rather than blocking CDC for the rest.
 - Native WAL logical-replication streaming (`wal2json`/`pgoutput`) is planned; today `REALTIME_CDC=wal` degrades to the trigger-based path, which provides equivalent database-level coverage.
 

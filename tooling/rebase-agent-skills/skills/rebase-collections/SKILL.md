@@ -11,7 +11,7 @@ Rebase collections are the core building blocks of your data model. They define 
 
 ### Collections
 
-A collection is defined as a TypeScript object implementing the `PostgresCollectionConfig` interface from `@rebasepro/types`. Each collection maps to a database table (via the `table` property) and generates:
+A collection is a TypeScript object written with `defineCollection` from `@rebasepro/cms-types` (or annotated as `PostgresCollectionConfig` from `@rebasepro/types`, which checks less — see the Kanban checklist below). Each collection maps to a database table (the `table` property, which defaults to the snake-cased `slug`) and generates:
 - Full CRUD REST endpoints at `/api/data/{slug}`
 - Admin panel views (table, forms, cards, kanban, list)
 
@@ -22,13 +22,13 @@ Properties define the fields of your collection. Rebase supports these built-in 
 | Type | Description | PostgreSQL Column |
 |------|-------------|-------------------|
 | `string` | Text fields, URLs, emails, markdown, file uploads | `VARCHAR` / `TEXT` |
-| `number` | Integers and decimals | `INTEGER` / `DOUBLE PRECISION` |
+| `number` | Integers and decimals | `NUMERIC`, or `INTEGER` with `validation.integer` or as a key |
 | `boolean` | True/false toggles | `BOOLEAN` |
-| `date` | Date and datetime values | `TIMESTAMP` |
+| `date` | Date and datetime values | `TIMESTAMPTZ` |
 | `map` | Nested objects (JSON) | `JSONB` |
 | `array` | Lists of values | `JSONB` or native arrays |
 | `relation` | Foreign key to another collection (SQL JOINs) | FK column or junction table |
-| `reference` | Legacy FK reference by collection slug (Firestore-style) | `UUID` with FK |
+| `reference` | Stored pointer to an entity of another collection (document databases) | The target's primary-key type, with an FK |
 | `geopoint` | Latitude/longitude pairs | `JSONB` |
 | `vector` | Embedding vectors for similarity search | `VECTOR` |
 | `binary` | Raw bytes; crosses the API as a base64 string | `BYTEA` |
@@ -37,30 +37,28 @@ Properties define the fields of your collection. Rebase supports these built-in 
 
 > **IMPORTANT FOR AGENTS:** Understand the difference between `reference` and `relation` — they are NOT interchangeable.
 
-| Feature | `relation` (Recommended) | `reference` (Legacy) |
+| Feature | `relation` (Postgres) | `reference` (document databases) |
 |---------|-------------------------|---------------------|
 | Backend | SQL JOINs, FK constraints | Stores a collection path + entity ID |
-| Cascade rules | `onDelete`, `onUpdate` | None |
+| Cascade rules | `onDelete`, `onUpdate` | None of its own (on Postgres its FK takes the `belongsTo` default: `SET NULL`, or `RESTRICT` when required) |
 | Junction tables | Yes (many-to-many) | No |
 | Multi-hop joins | Yes (`joinPath`) | No |
 | Inverse lookups | Yes (`kind: "hasMany"` / `"hasOne"`) | No |
-| Where to use | **PostgresCollectionConfig** | FirebaseCollectionConfig or legacy |
-| Stored value | FK column(s) managed by framework | `{ id, path }` object or string |
+| Where to use | **PostgresCollectionConfig** | FirebaseCollectionConfig / MongoDBCollectionConfig — `PostgresCollectionConfig`'s properties type excludes it |
+| Stored value | FK column(s) managed by framework | An `EntityReference` (id + path): a Firestore `DocumentReference`, a tagged sub-document in MongoDB |
 
-**Use `relation` for all new Postgres collections.** The `reference` type exists for backward compatibility with Firestore-style collections.
-
-A `string` property can also act as a lightweight reference via its `reference` sub-property (stores just the ID string and renders a reference picker), but this does not create SQL JOINs.
+**Use `relation` for all new Postgres collections.** `reference` is the native primitive of document databases (Firestore, MongoDB).
 
 ### Schema-as-Code
 
-Collections are defined as standalone TypeScript files under `config/collections/` relative to the project root, and each one is registered in the `collections` array exported by that directory's `index.ts` — a file that is not in the array does not exist as far as the CLI or the runtime is concerned. The visual Studio edits these files via AST manipulation — it never runs raw SQL. This preserves custom callbacks and complex configuration.
+Collections are defined as standalone TypeScript files under `config/collections/` relative to the project root, each default-exporting one collection. Every such file is loaded, whether or not it is listed in the `collections` array of that directory's `index.ts` — the array only orders the admin navigation (see **Schema Migration Workflow** below). The visual Studio edits these files via AST manipulation — it never runs raw SQL. This preserves custom callbacks and complex configuration.
 
 ## Defining a Collection
 
 ```typescript
-import { PostgresCollectionConfig } from "@rebasepro/types";
+import { defineCollection } from "@rebasepro/cms-types";
 
-const productsCollection: PostgresCollectionConfig = {
+const productsCollection = defineCollection({
     name: "Products",
     singularName: "Product",
     slug: "products",
@@ -124,7 +122,7 @@ const productsCollection: PostgresCollectionConfig = {
             "published", "createdAt"
         ]
     }
-};
+});
 
 export default productsCollection;
 
@@ -155,18 +153,19 @@ export default productsCollection;
 | `name` | `string` | — | Display name (plural). E.g. `"Products"` |
 | `singularName` | `string` | — | Singular display name. E.g. `"Product"` |
 | `slug` | `string` | — | URL slug for API and routing |
-| `table` | `string` | — | PostgreSQL table name |
+| `table` | `string` | `toSnakeCase(slug)` | PostgreSQL table name. Set it only when the table name differs from the slug |
 | `schema` | `string` | `"public"` | PostgreSQL schema name |
 | `description` | `string` | — | Description shown in the UI (supports Markdown) |
 | `admin.icon` | `string \| ReactNode` | — | Lucide icon name or React element |
 | `admin.group` | `string` | `"Views"` | Sidebar group heading |
 | `dataSource` | `string \| DatabaseHandle` | `"(default)"` | Routes the collection to a database declared with `database("<key>")` in `config/resources.ts`. Pass the handle (`import { analytics } from "../resources"`, `dataSource: analytics`) — `defineCollection` records its key — or the key as a string. See **Data sources & multiple backends** below. |
-| `driver` | `string` | `undefined` | **Deprecated** — engine hint (`"postgres"`/`"firestore"`/`"mongodb"`). Prefer `dataSource`. When `dataSource` is omitted, `driver` doubles as the routing key. |
+| `engine` | `string` | resolved from `dataSource` | The engine behind the collection (`"postgres"`/`"firestore"`/`"mongodb"`). Stamped during normalization; set it only to override. There is no collection-level `driver` field |
 | `databaseId` | `string` | — | Physical DB/schema/Firestore-database within the engine |
 | `history` | `boolean` | `false` | Enable entity audit trail (requires history plugin) |
-| `admin.defaultViewMode` | `ViewMode` | `"table"` | Default view: `"table"`, `"cards"`, `"kanban"`, `"list"` |
-| `admin.enabledViews` | `ViewMode[]` | `["table","cards","kanban"]` | Enabled view modes |
-| `admin.openEntityMode` | `"split" \| "side_panel" \| "full_screen" \| "dialog"` | `"full_screen"` | How entities open when clicked |
+| `admin.defaultViewMode` | `ViewMode` | `"list"` | Default view: `"list"`, `"table"`, `"cards"`, `"kanban"`, or a custom view's `key` |
+| `admin.enabledViews` | `ViewMode[]` | the four built-ins plus every custom view | Enabled view modes (`kanban` only when an `enum` property exists) |
+| `admin.customViews` | `(string \| CollectionCustomView)[]` | — | Extra renderings of the same query, offered in the view switcher |
+| `admin.openEntityMode` | `"split" \| "side_panel" \| "full_screen" \| "dialog"` | from the view: `"split"` for list, `"full_screen"` for table and cards, `"side_panel"` for kanban and custom views | How entities open when clicked |
 | `admin.defaultEntityAction` | `"edit" \| "view"` | `"edit"` | Click behavior: open form or read-only view |
 | `admin.kanban` | `{ columnProperty: string }` | — | Kanban column config (requires enum property). **Always pair with `admin.orderProperty`** — see **Kanban boards** below |
 | `admin.propertiesOrder` | `string[]` | — | Field display order in forms and table |
@@ -175,20 +174,21 @@ export default productsCollection;
 | `admin.display` | `EntityDisplay` | derived | What fills each display role — `title`, `subtitle`, `image`, `status`, `date`, `tags`. Each takes a property path or a resolver (may be async). See **Entity display** below |
 | `admin.previewProperties` | `string[]` | — | Properties shown when this collection is referenced |
 | `admin.listProperties` | `string[]` | — | Columns to display in list view |
-| `admin.selectionEnabled` | `boolean` | — | Enable row selection checkboxes |
+| `admin.selectionEnabled` | `boolean` | `true` | Enable row selection checkboxes |
 | `admin.selectionController` | `SelectionController` | — | External selection state controller |
-| `admin.inlineEditing` | `boolean` | — | Allow inline editing in collection table view |
-| `admin.exportable` | `boolean \| ExportConfig` | — | Enable data export. `true` for default, or `ExportConfig` for custom fields |
+| `admin.inlineEditing` | `boolean` | `true` | Allow inline editing in collection table view |
+| `admin.exportable` | `boolean \| ExportConfig` | `true` | Offer Export in the toolbar. `false` removes it; an `ExportConfig` keeps it and adds fields |
 | `admin.pagination` | `boolean \| number` | `true` (50) | Enable pagination. Set a number to customize page size |
-| `admin.defaultSize` | `"xs" \| "s" \| "m" \| "l" \| "xl"` | — | Default rendered row size |
+| `admin.defaultSize` | `"xs" \| "s" \| "m" \| "l" \| "xl"` | `"m"` | Default rendered row size |
 | `admin.fixedFilter` | `FilterValues` | — | Permanent filter that cannot be changed by users |
 | `admin.defaultFilter` | `FilterValues` | — | Initial filter (can be changed by users) |
 | `admin.filterPresets` | `FilterPreset[]` | — | Quick-access filter buttons in toolbar |
-| `admin.sort` | `[string, "asc" \| "desc"]` | — | Default sort order. E.g. `["createdAt", "desc"]` |
+| `admin.sort` | `OrderBySpec` | — | Default sort order: one key, `["createdAt", "desc"]`, or several in order of significance, `[["roles", "asc"], ["createdAt", "desc"]]` |
 | `admin.orderProperty` | `string` | — | Property key for drag-and-drop ordering (Kanban/general). Must name a **string** property — never a number. See **Kanban boards** below |
 | `admin.formAutoSave` | `boolean` | `false` | Auto-save form on field change |
 | `admin.formView` | `FormViewConfig` | — | Custom component replacing the default entity form |
 | `admin.hideFromNavigation` | `boolean` | `false` | Hide from sidebar (still accessible via URL) |
+| `admin.hideFromEntityViews` | `boolean` | `false` | Hide from a parent entity's tab strip when reached as a child view. Independent of `hideFromNavigation` |
 | `admin.hideIdFromForm` | `boolean` | `false` | Hide ID field in entity form. Prefer `admin.form.showRecordMeta`, which moves the id to the metadata rail instead of hiding it |
 | `admin.hideIdFromCollection` | `boolean` | `false` | Hide ID column in collection table |
 | `admin.defaultSelectedView` | `string \| Function` | — | Auto-open a custom view/subcollection tab |
@@ -201,9 +201,16 @@ export default productsCollection;
 | `admin.entityActions` | `EntityAction[]` | — | Custom action buttons (see Entity Actions section) |
 | `admin.Actions` | `ComponentRef[]` | — | Custom toolbar action components |
 | `callbacks` | `CollectionCallbacks<M, USER>` | — | Lifecycle hooks (see Collection Callbacks section) |
+| `admin.browserCallbacks` | `CollectionCallbacks<M, USER>` | — | The same hooks, run in the panel — see **Collection Callbacks** |
 | `relations` | `Relation[]` | — | Explicit relation definitions (usually auto-extracted from properties) |
 | `securityRules` | `SecurityRule[]` | — | Row Level Security policies |
+| `disableDefaultPolicies` | `boolean` | `false` | Drop the injected baseline policies (admin/server SELECT; on an auth collection also self-read and an admin-only write gate) and own the table's RLS entirely |
 | `search` | `SearchConfig` | — | Opt in to ranked full-text search over named fields (Postgres only). See **Search** below |
+| `indexes` | `CollectionIndex[]` | — | Ordinary indexes on the table (Postgres only). See **Indexes** below |
+| `softDelete` | `boolean \| { field?: string }` | — | `delete` stamps a timestamp and reads hide stamped rows. `true` uses `deletedAt`; the collection must declare that `date` property itself (Postgres only) |
+| `tenant` | `CollectionTenantConfig` | — | Scope every row to a tenant, e.g. `{ field: "orgId", from: { claim: "org_id" } }`; the property must already be declared (Postgres only) |
+| `strictWrites` | `boolean` | `true` | Reject with a 400 a write naming a field the collection does not declare |
+| `metadata` | `Record<string, unknown>` | — | Free-form data for your own code; Rebase does not read it |
 | `childCollections` | `() => CollectionConfig[]` | — | Nested child collections (populated automatically) |
 | `ownerId` | `string` | — | Owner user ID (for plugins/custom code) |
 | `auth` | `boolean | AuthCollectionConfig` | — | Mark collection as authentication collection (user management, reset password, etc.) |
@@ -451,8 +458,11 @@ const posts: PostgresCollectionConfig = {
         { on: ["publishDate"],
           where: { prop: "status", op: "=", value: "published" },
           reason: "public feed is published-only" },
-        // `author` is a belongsTo — it resolves to author_id.
-        { on: ["author"], reason: "an author's posts, and the ON DELETE cascade" }
+        // `author` is a belongsTo — it resolves to author_id. Its column is
+        // already indexed by default (`relation.index`), so declare it only
+        // as the lead of a composite like this one.
+        { on: ["author", { prop: "publishDate", direction: "desc" }],
+          reason: "an author's posts, newest first" }
     ]
 };
 ```
@@ -465,6 +475,9 @@ const posts: PostgresCollectionConfig = {
   is how you index nothing on the one case people reach for. A `hasMany` or
   many-to-many property is refused: the foreign key is on the *other* table, so
   declare the index there.
+- **A `belongsTo` column is indexed already.** `relation.index` defaults to
+  `true`, and that derived index is skipped when the column leads one you
+  declared. Do not add a lone `{ on: ["author"] }` "for the foreign key".
 - **`reason` is required**, and it is prose, not SQL. Say what query it serves.
   It is what gets printed beside "0 scans in 34 days, 412 MB" later, and it is
   deliberately not part of the index's identity, so rewording it rebuilds
@@ -595,11 +608,14 @@ All property types share these base options:
 
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
-| `name` | `string` | — | Display label for the field |
+| `name` | `string` | derived from the key (`publishDate` → "Publish Date") | Display label for the field |
 | `description` | `string` | — | Help text displayed under the field |
 | `columnName` | `string` | auto from key | Explicit DB column name (bypasses snake_case conversion) |
 | `validation` | `PropertyValidationSchema` | — | Validation rules (see below) |
-| `defaultValue` | `unknown` | — | Default value for new entities |
+| `defaultValue` | per type | — | Default value for new entities (typed by each property type, not on `BaseProperty`) |
+| `excludeFromApi` | `boolean` | — | Never served by the API, to any caller, nor in generated SDK/OpenAPI types (server-side; sugar for `access: { read: [], write: [] }`) |
+| `access` | `{ read?: string[]; write?: string[] }` | — | Field-level roles: an unreadable field is absent from the response, an unwritable one is a 400 `FIELD_NOT_WRITABLE` |
+| `databaseDefault` | ``boolean \| "sql`…`"`` | `false` | The database fills the column on create (`DEFAULT <expression>`), so a required field may be left out of a create |
 | `propertyConfig` | `string` | — | Reuse a globally defined property config by key |
 | `dynamicProps` | `(props) => Partial<Property>` | — | Dynamic property overrides based on entity values |
 | `conditions` | `PropertyConditions` | — | JSON Logic-based declarative conditions |
@@ -616,9 +632,12 @@ All property types support a `admin` object for display configuration:
 | `admin.readOnly` | `boolean` | — | Render as read-only preview |
 | `admin.disabled` | `boolean \| PropertyDisabledConfig` | — | Disable editing |
 | `admin.span` | `1 \| 2 \| 3 \| 4` | `4`, or `2` for a pair of like compact fields | Field width over the four-column form grid. Set it from the content — see **Form layout** |
+| `admin.filledByServer` | `boolean` | `false` | The server fills it on create (e.g. a `beforeSave` hook), so the form lets a record be created without it |
 | `admin.customProps` | `unknown` | — | Custom props passed to the field component |
 | `admin.Field` | `ComponentRef` | — | Custom field component |
 | `admin.Preview` | `ComponentRef` | — | Custom preview/cell component |
+| `admin.filterOperators` | `WhereFilterOp[]` | — | Narrow the filter operators offered for this property (`[]` disables filtering on it) |
+| `admin.Filter` | `ComponentRef` | — | Custom filter field for this property |
 
 ### Form layout
 
@@ -753,17 +772,19 @@ title: {
 
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
-| `columnType` | `"varchar" \| "text" \| "char" \| "uuid"` | `"text"` | Database column type |
+| `columnType` | `"varchar" \| "text" \| "char" \| "uuid"` | `"text"` (`"uuid"` for an `isId: "uuid"` key) | Database column type. `validation.max` does not bound `text`; `varchar`/`char` take their width from it (255 when unset) |
 | `isId` | `boolean \| "manual" \| "uuid" \| string` | — | Mark as primary key with generation strategy |
 | `enum` | `EnumValues` | — | Dropdown/picklist values |
 | `admin.multiline` | `boolean` | `false` | Multi-line text area |
 | `admin.markdown` | `boolean` | `false` | Markdown editor with preview. Uses the `RichTextEditor` component (`import { RichTextEditor } from "@rebasepro/cms/editor"`) — a full WYSIWYG editor supporting Markdown, JSON, and HTML output. |
-| `url` | `boolean \| PreviewType` | — | Render as link. `PreviewType`: `"image"`, `"video"`, `"audio"`, `"file"` |
+| `url` | `boolean` | — | The string holds a URL (emitted as `format: "uri"` in OpenAPI); renders as a link |
+| `admin.urlPreview` | `boolean \| PreviewType` | — | Upgrade that link to an inline preview. `PreviewType`: `"image"`, `"video"`, `"audio"`, `"file"` |
 | `email` | `boolean` | — | Email field rendering |
 | `storage` | `StorageConfig` | — | File upload configuration (see Storage section) |
-| `userSelect` | `boolean` | — | Render as user picker (value = user ID) |
+| `userSelect` | `boolean` | — | Render as user picker (value = user ID). Admin form only — no FK to the users table |
+| `autoValue` | `"user_on_create" \| "user_on_update"` | — | Stamp the acting user's uid (from the call context, never the body) on create, or on every write |
 | `admin.previewAsTag` | `boolean` | — | Render value as a colored tag/chip |
-| `reference` | `ReferenceProperty` | — | Lightweight reference to another collection by ID |
+| `admin.clearable` | `boolean` | `false` | Show a button that sets the value to `null` |
 
 ### String isId Strategies
 
@@ -840,7 +861,8 @@ avatar: {
 | `postProcess` | `(pathOrUrl) => Promise<string>` | — | Transform saved path/URL after upload |
 | `includeBucketUrl` | `boolean` | `false` | Include bucket URL in saved path |
 | `storeUrl` | `boolean` | `false` | Save download URL instead of storage path |
-| `storageSource` | `string` | `undefined` (default backend) | Named storage source key — routes uploads to a specific backend registered in the backend `storage` map or in `storageSources` on `<Rebase>`. Must match a `StorageSourceDefinition.key`. |
+| `public` | `boolean` | `false` | Store under the public prefix, served by stable token-less URLs (avatars, storefront images) instead of short-lived signed URLs |
+| `storageSource` | `string` (or a `bucket()` handle) | `undefined` (default backend) | Named storage source key — routes uploads to a specific backend registered in the backend `storage` map or in `storageSources` on `<Rebase>`. Must match a `StorageSourceDefinition.key`. |
 
 #### Per-Property Backend Binding
 
@@ -882,7 +904,8 @@ price: {
 
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
-| `columnType` | `"integer" \| "real" \| "double precision" \| "numeric" \| "bigint" \| "serial" \| "bigserial"` | auto | Database column type |
+| `columnType` | `"integer" \| "real" \| "double precision" \| "numeric" \| "bigint" \| "serial" \| "bigserial"` | `numeric` (`integer` with `validation.integer` or as a key) | Database column type. Ignored beside `isId: "increment"` |
+| `precision` / `scale` | `number` | — | `NUMERIC(precision, scale)` |
 | `isId` | `boolean \| "manual" \| "increment" \| string` | — | Mark as primary key |
 | `enum` | `EnumValues` | — | Dropdown values |
 
@@ -891,7 +914,7 @@ price: {
 | Value | Behavior |
 |-------|----------|
 | `true` / `"manual"` | User-defined numeric ID |
-| `"increment"` | Auto-incrementing integer (`GENERATED BY DEFAULT AS IDENTITY`) |
+| `"increment"` | Auto-incrementing integer (`INTEGER GENERATED BY DEFAULT AS IDENTITY`) |
 | Any other string | Raw SQL default expression |
 
 ### Number Validation
@@ -1164,22 +1187,22 @@ Each `EnumValueConfig` entry supports:
 | `color` | `ColorKey \| ColorScheme` | Optional chip color |
 | `disabled` | `boolean` | Option is visible but not selectable |
 
-`EnumValues` can also be a `Record<string, string | EnumValueConfig>` for simpler definitions:
+`EnumValues` can also be a `Record<string | number, string | EnumValueConfig>` for simpler definitions:
 
 ```typescript no-verify
 enum: {
     draft: "Draft",
-    published: { label: "Published", color: "green" }
+    published: { id: "published", label: "Published", color: "green" }  // a config entry still needs its `id`
 }
 ```
 
 ### PostgreSQL Enum Database Constraints
 
-When `rebase schema generate` is run, any `string` property configured with an `enum` array generates a corresponding PostgreSQL `ENUM` type (e.g. `CREATE TYPE "public"."collection_property" AS ENUM('val1', 'val2')`).
+When `rebase schema generate` is run, any `string` property configured with an `enum` generates a corresponding PostgreSQL `ENUM` type named `<table>_<column>` (e.g. `CREATE TYPE "public"."posts_status" AS ENUM('draft', 'published')`). An empty enum is refused at config load.
 
 If you write custom server functions, backend callback handlers, or perform manual database updates:
-1. **Validation Constraints**: Pushing or inserting a value that is NOT defined in the collection's enum options array will trigger a PostgreSQL database-level check constraint error (e.g., `invalid input value for enum`).
-2. **Adding Enum Options**: Adding a new enum value in code requires generating and applying a database migration (e.g., `pnpm db:generate` followed by `pnpm db:migrate` or raw enum modification SQL). In development, using a raw SQL command to alter the enum may be necessary because modifying PostgreSQL enums dynamically can be restrictive.
+1. **Validation Constraints**: Pushing or inserting a value that is NOT defined in the collection's enum options will be rejected by the enum type itself (`invalid input value for enum`).
+2. **Adding Enum Options**: adding a value is additive — `rebase db push` (or `rebase db generate` + `rebase db migrate`) and the boot-time schema ensure both apply `ALTER TYPE … ADD VALUE IF NOT EXISTS`. **Removing** a value is not: Postgres cannot drop a value from an enum type, so it needs a hand-written migration that rewrites the rows still using it and recreates the type.
 
 
 ## Relations (Inline Property API)
@@ -1237,8 +1260,6 @@ comments: {
 
 ### Relation Property Options
 
-| Option | Type | Default | Description |
-|--------|------|---------|-------------|
 The link goes under `relation`, and its `kind` decides which fields apply.
 
 | Option | Type | Default | Description |
@@ -1246,8 +1267,10 @@ The link goes under `relation`, and its `kind` decides which fields apply.
 | `kind` | `"belongsTo" \| "hasOne" \| "hasMany" \| "manyToMany" \| "via"` | — | **Required.** Which kind of link |
 | `target` | `() => CollectionConfig` | — | Target collection (a thunk, to survive circular imports) |
 | `localKey` | `string` | `<relationName>_id` | `belongsTo` only — column on THIS table |
+| `index` | `boolean` | `true` | `belongsTo` only — btree index on `localKey` (skipped when the column already leads an index) |
 | `foreignKeyOnTarget` | `string` | `<thisCollection>_id` | `hasOne`/`hasMany` only — column on the TARGET's table |
-| `through` | `{ table?, sourceColumn?, targetColumn? }` | derived | `manyToMany` only; `sourceColumn` names THIS collection |
+| `sourceKey` | `string` | this collection's primary key | `hasOne`/`hasMany` only — the (unique) column on THIS table that `foreignKeyOnTarget` holds, for a natural-key link |
+| `through` | `{ table?, sourceColumn?, targetColumn?, properties? }` | derived | `manyToMany` only; `sourceColumn` names THIS collection. `properties` declares payload columns on the junction row, served under `_pivot` |
 | `joinPath` | `JoinStep[]` | — | `via` only; read-only |
 | `cardinality` | `"one" \| "many"` | — | `via` only — a join chain cannot imply it |
 | `relationName` | `string` | property key | The name it is addressed by: `include`, admin tab, nested path segment |
@@ -1266,6 +1289,7 @@ The link goes under `relation`, and its `kind` decides which fields apply.
 |--------|------|---------|-------------|
 | `admin.widget` | `"select" \| "dialog"` | `"select"` | UI widget for selecting relations |
 | `admin.previewProperties` | `string[]` | — | Properties shown in relation preview (max 3) |
+| `admin.renderInForm` | `boolean` | `false` | Also render a **many**-relation as a picker inside the form, beside its tab |
 
 ### Cascade Rules (OnAction)
 
@@ -1412,11 +1436,10 @@ The `context.user` object is populated by the auth middleware. In server-side ca
 | Caller | `context.user.uid` | `context.user.roles` |
 |---|---|---|
 | JWT-authenticated end-user | Real user ID (e.g. `"abc123"`) | Their assigned roles (e.g. `["viewer"]`) |
-| Server-side `rebase.dataAsAdmin` (cron jobs, custom functions) | `"service"` | `["admin"]` |
-| API key (default) | `"api-key:{id}"` | `["service"]` |
-| API key (admin) | `"api-key:{id}"` | `["admin", "service"]` |
-| Anonymous (no auth, `requireAuth: false`) | `"anon"` | `["anon"]` |
-| Anonymous REST (no token) | `undefined` | N/A — `context.user` is not set; only the DataDriver is scoped |
+| Server-side `rebase.dataAsAdmin` (cron jobs, custom functions), or the static service key | `"service"` | `["admin"]` |
+| Service API key (`rk_…`) | `"api-key:{id}"` | `["service"]` plus the roles it was given (e.g. `["service", "admin"]`) |
+| Personal API key | the owner's uid | the owner's roles as they are now |
+| Anonymous (no token; only reaches data with `requireAuth: false`) | `"anonymous"` | `["anon"]` |
 
 > **IMPORTANT FOR AGENTS:** `rebase.dataAsAdmin` calls (used in cron jobs, afterSave side-effects, custom functions) run through the native driver scoped as the service identity, so callbacks see `uid: "service"`, `roles: ["admin"]`. Use this to gate behavior — e.g., skip PII masking for admin/service reads:
 >
@@ -1502,6 +1525,7 @@ const jobSubmissionsCollection: PostgresCollectionConfig<{
 | `afterSave` | After the write, **before the commit** | `void` | Yes — a throw rolls the write back |
 | `afterSaveError` | After a failed write | `void` | No |
 | `afterRead` | After reading from DB | Modified row (`Record<string, unknown>`) | No |
+| `beforeQuery` | Before any read is compiled (list, get, count, aggregate, relation loads) | `{ filter?, logical? }` to AND into the query, or nothing | Narrows only — it cannot widen a read. Postgres only; refused at boot on other engines |
 | `beforeDelete` | Before deletion | `void \| boolean` | Yes (throw, or return `false`) |
 | `afterDelete` | After the delete, **before the commit** | `void` | Yes — a throw rolls the delete back |
 
@@ -1515,7 +1539,7 @@ const jobSubmissionsCollection: PostgresCollectionConfig<{
 
 ### `callbacks` runs on the server. `admin.browserCallbacks` runs in the panel.
 
-Same six hooks, same props, different runtime — and `callbacks` is almost always
+Same hooks, same props, different runtime — and `callbacks` is almost always
 the one you want. It runs on every path that reaches the server (REST, the SDK,
 realtime, `dataAsAdmin`), and its bodies are stripped out of the admin bundle,
 so a secret read inside one never leaves the machine.
@@ -1542,12 +1566,13 @@ admin: {
 | Prop | Type | Description |
 |------|------|-------------|
 | `values` | `Partial<EntityValues<M>>` | Entity values being saved |
-| `id` | `string \| number` (optional in `beforeSave`) | Entity ID (`undefined` for new entities in `beforeSave`) |
+| `id` | `string \| number` (optional in `beforeSave` and `afterSaveError`) | Entity ID (`undefined` for new entities in `beforeSave`, and for a create that failed) |
 | `previousValues` | `Partial<EntityValues<M>> \| undefined` | Previous values (for updates) |
 | `status` | `EntityStatus` | `"new"`, `"existing"`, or `"copy"` |
 | `collection` | `CollectionConfig<M>` | The collection definition |
 | `path` | `string` | Collection path |
 | `context` | `RebaseCallContext<USER>` | Context with `client`, `data`, `storageSource`, `user` |
+| `error` | `unknown` | `afterSaveError` only — what the save threw |
 
 **`afterRead` Props:**
 
@@ -1733,7 +1758,7 @@ const jobSubmissionsCollection: PostgresCollectionConfig = {
 |----------|------|---------|-------------|
 | `name` | `string` | — | Button label |
 | `key` | `string` | — | Override default actions: `"edit"`, `"delete"`, `"copy"` |
-| `admin.icon` | `ReactElement` | — | Optional icon |
+| `icon` | `ReactElement \| string` | — | Optional icon — a rendered element or a Lucide icon name. On the action itself, not under `admin` |
 | `onClick` | `(props: EntityActionClickProps) => void \| Promise<void>` | — | Action handler |
 | `isEnabled` | `(props: EntityActionClickProps) => boolean` | — | Conditionally disable the action |
 | `disabledReason` | `(props: EntityActionClickProps) => string \| undefined` | — | Why a disabled action is unavailable — shown under its name in a menu and as a disabled button's tooltip. Give one whenever you give `isEnabled` |
@@ -1848,9 +1873,11 @@ own rendering (an enum stays a chip, a date stays formatted).
 `display.title` takes the same string.
 
 ### Title Property Selection
-When `display.title` is not set, the property used as the entity's display title (previews, headers) is resolved as follows:
-1. If `propertiesOrder` is explicitly defined on the collection, the first non-ID property that is either a `relation` or `string` type is chosen as the title key.
-2. If no `propertiesOrder` is defined, the framework searches the properties in order and picks the first string type property.
+When `display.title` is not set, the property used as the entity's display title (previews, headers) is resolved from the property *schema*. Only a `string`, a to-one `relation` or a `reference` can qualify; primary keys, foreign-key columns, `uuid` columns, `storage` fields and `admin.hideFromCollection` fields never do. Then:
+1. If `propertiesOrder` is explicitly defined on the collection, the first qualifying property in that order is chosen.
+2. If no `propertiesOrder` is defined, the candidates are ranked — a string whose key names a label (`name`, `title`, `label`, `displayName`, `username`, …) first, then other short free text, email, enums, multiline/markdown text, relations and user pickers, and references last — with ties broken by declaration order.
+
+For a concrete record, a candidate whose value is empty, repeats the record id or looks like an identifier (a UUID, an ObjectId) is skipped in favour of the next.
 
 ### Relation Previews in Tables
 When `propertiesOrder` is explicitly set, relation properties are *not* automatically filtered out of the default preview columns (whereas they are excluded from unordered defaults to avoid slow join operations).
@@ -1962,8 +1989,8 @@ const customUsersCollection: PostgresCollectionConfig = {
         onResetPassword: async (userId, ctx) => {
             if (ctx.emailConfigured) {
                 const tempPassword = "reset_" + Math.random().toString(36).substring(2, 8);
-                const hash = await ctx.hashPassword(tempPassword);
-                // Custom email sending or persistence
+                // Rebase hashes and saves a returned `temporaryPassword` itself,
+                // signs the account out and shows it to the admin
                 return { temporaryPassword: tempPassword, invitationSent: false };
             }
             return { invitationSent: false };
@@ -2061,13 +2088,15 @@ const postsCollection: PostgresCollectionConfig = {
 
 ### Security Rule Types
 
-Rules are a discriminated union — you must use exactly one of: `ownerField`, `access: "public"`, raw `using`/`withCheck`, or roles-only. They cannot be mixed (enforced at the type level).
+Rules are a discriminated union — you must use exactly one of: `ownerField`, `access: "public"`, a structured `condition`/`check`, raw `using`/`withCheck`, or roles-only. They cannot be mixed (enforced at the type level).
 
 | Variant | Key Field | Generates |
 |---------|-----------|-----------|
 | `OwnerSecurityRule` | `ownerField: "user_id"` | `USING ((user_id)::text = (SELECT rebase.uid()))`: `rebase.uid()` is text, so the column is cast |
-| `PublicSecurityRule` | `access: "public"` | `USING (true)` |
+| `PublicSecurityRule` | `access: "public"` | `USING (true)` — no row filter, not anonymous access |
+| `StructuredSecurityRule` | `condition: policy.…` (`check` defaults to it) | USING/WITH CHECK compiled from a `PolicyExpression` — the recommended form for a non-trivial condition, because the admin UI evaluates the same expression |
 | `RawSQLSecurityRule` | `using: "..."` | Custom USING/WITH CHECK clause |
+| `RawSQLCheckOnlySecurityRule` | `withCheck: "..."` alone | WITH CHECK only — the shape of an INSERT policy |
 | `RolesOnlySecurityRule` | (none of the above) | Roles-only, no row filter |
 
 ### Common Options (SecurityRuleBase)
@@ -2134,8 +2163,8 @@ internal_note: {
 **Every collection file in `config/collections/` is loaded, listed or not.** The
 barrel is a sort order, not a registry: the runtime, the admin panel, `rebase
 build`, `schema generate` and `generate-sdk` scan the directory. Add a new file to
-the `collections` array exported by `config/collections/index.ts` to place it in
-the admin navigation; to remove a collection, delete its file:
+the `collections` array exported by `config/collections/index.ts` to set its place
+in the admin navigation; to remove a collection, delete its file:
 
 ```typescript title="config/collections/index.ts"
 import postsCollection from "./posts.js";
@@ -2144,11 +2173,13 @@ import productsCollection from "./products.js";   // ← the new one
 export const collections = [postsCollection, productsCollection];
 ```
 
-`rebase generate-sdk`, `rebase build` and the runtime all load that index and
-read `collections` from it — none of them scans the directory. A file left out
-of the array produces no error and no table; it simply is not there. (The
-directory scan in `generate_sdk.ts` is a *fallback* for projects with no index
-file at all, so a project that has one gets the array or nothing.)
+A file left out of the array is still created, served at `/api/data/<slug>`,
+typed in the SDK and shown in the panel — it just sorts after the listed ones in
+the navigation. Every
+top-level `.ts`/`.js` file in the directory other than `index`, tests and
+`.d.ts` must import cleanly and default-export a collection: one that does not
+fails the load, at boot and in every command. The index's other job is
+`defaultSecurityRules`, which every collection declaring no rules inherits.
 
 Then apply the changes to the database. While `rebase dev` is running, saving
 the file already regenerates the Drizzle schema and the SDK types in

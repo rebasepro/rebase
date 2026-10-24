@@ -13,6 +13,12 @@ Rebase uses a **two-step schema generation process**:
 1. **Rebase Collections → Drizzle Schema**: The `rebase schema generate` command reads your Rebase collection definitions and generates a Drizzle ORM schema file.
 2. **Drizzle Schema → Database**: Either apply directly with `rebase db push` (development) or generate migration files with `rebase db generate` (production).
 
+The backend also applies the additive part itself at every boot, on any
+database — missing tables, columns and enum types, and the RLS policies
+(`REBASE_MIGRATE_ON_BOOT=ensure`, the default) — so under `rebase dev` an added
+property or collection needs neither step. Boot never drops, renames or narrows:
+that is what `db push` and the migrations are for.
+
 ```mermaid
 graph LR
     A[config/collections/*.ts] -->|rebase schema generate| B[schema.generated.ts]
@@ -142,7 +148,9 @@ rebase schema generate && rebase db generate && rebase db migrate
 ### Adding a New Collection
 
 1. Create the collection definition as a new file in `config/collections/`
-2. Export it from `config/collections/index.ts`
+2. Add it to the `collections` array in `config/collections/index.ts` for its
+   place in the admin navigation. That array is a sort order, not a registry:
+   every file in the directory is loaded whether it is listed or not
 3. Run `rebase schema generate` → `rebase db push` (dev) or `rebase db generate` → `rebase db migrate` (prod)
 
 ### Adding Relations
@@ -187,7 +195,7 @@ type offers exactly the fields that kind can use:
 
 | `kind` | Where the foreign key lives | What `schema generate` emits |
 |---|---|---|
-| `belongsTo` | this collection's table | a `<relationName>_id` column here — override with `localKey` |
+| `belongsTo` | this collection's table | a `<relation_name>_id` column here, the relation's name snake-cased (`primaryCategory` → `primary_category_id`) — override with `localKey` |
 | `hasOne` | the target's table | nothing here; read back via `foreignKeyOnTarget` |
 | `hasMany` | the target's table | nothing here; read back via `foreignKeyOnTarget` |
 | `manyToMany` | a junction table | the junction and its two key columns — override with `through` |
@@ -248,7 +256,10 @@ This will generate TypeScript collection definitions in your `config/collections
 
 ### "DATABASE_URL is not set"
 
-Make sure your `.env` file exists in the project root folder and contains:
+A scaffolded project leaves `DATABASE_URL` unset on purpose: `rebase dev` and
+the `rebase db` commands find the managed development database (PGlite, under
+`.rebase/`) themselves, and `rebase db url` prints the one in use. Set it only
+for a PostgreSQL of your own — in the project root's `.env`:
 
 ```env
 DATABASE_URL=postgresql://user:password@localhost:5432/rebase

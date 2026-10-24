@@ -69,7 +69,7 @@ All configuration is done via environment variables in your `.env` file at the p
 | `LOG_LEVEL` | Logging verbosity: `error`, `warn`, `info`, `debug` | `info` |
 | `REBASE_LOG_RAW_QUERIES` | Show the SQL behind a `Failed query: [redacted]` line. Every failing statement is redacted by default, because a failed query carries its bound parameters — an email, a password hash. Set it to `true` while diagnosing a DDL, RLS or change-capture failure. Ignored when `NODE_ENV=production`. | `false` |
 | `NODE_ENV` | Environment: `development`, `production`, or `test` | `development` |
-| `CORS_ORIGINS` | Comma-separated list of allowed origins. **Required in production** if different from backend domain. In development it is *added to* localhost — see below. | — |
+| `CORS_ORIGINS` | Comma-separated list of allowed origins. **Required in production** unless `FRONTEND_URL` is set: a production boot with neither refuses to start. In development it is *added to* localhost — see below. | — |
 | `FRONTEND_URL` | URL of the frontend app. Used as an alternative to CORS_ORIGINS, in both environments. | — |
 | `ADMIN_CONNECTION_STRING` | Admin-level database connection string (used for schema introspection and admin operations). The database it names is not the one the SQL console calls current, nor what a new branch copies by default: both are the database the app's own connection is on (see `REBASE_BRANCH_PARENT_DATABASE` for a server on a branch). | `DATABASE_URL` |
 | `DISABLE_DB_ROLE_SWITCHING` | Disable PostgreSQL role-switching in SQL Editor (useful for custom authentication where DB roles are not mapped). Studio's SQL console then says that the rows were read as the connection owner, names it, and greys out its role picker. | `false` |
@@ -386,8 +386,8 @@ Read by `rebase`, not by the server. Nothing here affects a deployment.
 
 ## Secrets in development
 
-`JWT_SECRET` and `REBASE_SERVICE_KEY` are required in production and generated
-for you outside it, so you can start without setting anything up.
+`JWT_SECRET` is required in production. It and `REBASE_SERVICE_KEY` are
+generated for you outside it, so you can start without setting anything up.
 
 Those generated values are cached in `.rebase-dev-secrets.json`, beside
 `.rebase-dev-port` and `.rebase-dev-url` and gitignored with them. Before, they
@@ -401,13 +401,13 @@ your own app and invalidated any API key you had just created.
 - If the file cannot be written — a read-only container, say — the server starts
   anyway with an ephemeral secret, exactly as it used to.
 
-Nothing is cached in production, or under a test runner. In production a boot
-that had to generate either secret still fails, naming the variable, and that is
-unchanged:
+Nothing is cached in production, or under a test runner. In production nothing
+is generated either: a boot with no `JWT_SECRET` fails, naming the variable, and
+that is unchanged:
 
 ```
-JWT_SECRET must be explicitly set in production.
-Do not rely on auto-generated secrets outside development.
+The environment is not valid:
+  JWT_SECRET: is required
 ```
 
 ## Backend Config Object

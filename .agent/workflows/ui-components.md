@@ -97,7 +97,7 @@ Each collection view mode has a standard icon from Lucide. When building view sw
 |-----------|-------------|-------|
 | `table` | `Table` | Default tabular view |
 | `cards` | `LayoutGrid` | Grid of cards |
-| `kanban` | `Columns` | Board with columns |
+| `kanban` | `Kanban` | Board with columns |
 | `list` | `List` | Compact list view |
 
 ---
@@ -119,5 +119,5 @@ Each collection view mode has a standard icon from Lucide. When building view sw
    | Hand-rolled alert/banner div | `Alert` |
    | Hand-rolled badge/pill span | `Badge` / `Chip` |
    | Hardcoded `border-gray-*` | `defaultBorderMixin` |
-   | Hardcoded `text-gray-*` / `text-slate-*` | `text-surface-*` design tokens |
+   | Hardcoded `text-gray-*` / `text-slate-*` | `Typography`'s `color`, or the text tokens `text-text-primary dark:text-text-primary-dark` / `text-text-secondary dark:text-text-secondary-dark` |
 

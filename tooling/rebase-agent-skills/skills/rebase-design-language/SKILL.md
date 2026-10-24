@@ -136,10 +136,35 @@ Rebase uses a carefully defined set of CSS custom properties. **Never invent arb
 | `--color-primary`      | `#0070F4`    | Primary actions, links, focus rings       |
 | `--color-primary-light`| oklch derived| Lighter tint of primary                   |
 | `--color-primary-dark` | oklch derived| Darker shade of primary                   |
-| `--color-secondary`    | `#FF5B79`    | Secondary accent                          |
+| `--color-secondary`    | `#E11D48`    | Secondary accent (marketing; not a control colour) |
 | `--color-primary-bg`   | primary/0.1  | Subtle primary backgrounds               |
 
+#### Role Surfaces (what a background is chosen by)
+
+A surface is named by **role**, and the theme decides the value — the role
+tokens switch between light and dark on their own, so they need no `dark:`
+pair. Never write `bg-white dark:bg-surface-900` or any other numbered
+light/dark pair. The ladder and its rules are in `packages/ui/DESIGN.md`.
+
+| Class                          | Light       | Dark        | Used for                                         |
+|--------------------------------|-------------|-------------|--------------------------------------------------|
+| `bg-surface-frame`             | `#eff0f3`   | `#090a0c`   | drawer, rail, app bar, the page around the sheet |
+| `bg-surface-sheet`             | `#f8f9fa`   | `#111316`   | the content area (a page's background)           |
+| `bg-surface-card`              | `#ffffff`   | `#16181c`   | cards, paper, dialogs, menus, table rows         |
+| `hover:bg-surface-card-hover`  | `#f6f7f9`   | `#1b1d21`   | a clickable card or row                          |
+| `bg-surface-raised`            | `#eaecef`   | `#212429`   | neutral buttons, chips, tiles inside a card      |
+| `bg-surface-field`             | black 3.5%  | white 4%    | inputs, search, segmented tracks                 |
+| `hover:bg-surface-hover`       | black 4%    | white 6%    | hover on a transparent row, nav item, menu item  |
+| `bg-surface-active`            | black 7%    | white 9%    | selected or checked item                         |
+| `bg-surface-well`              | `#f4f5f7`   | `#090a0c`   | an inset code well (`codeSurfaceMixin`)          |
+| `border-hairline`              | black 8%    | white 8%    | cards on the sheet, fields, dividers             |
+| `border-hairline-strong`       | black 13%   | white 14%   | menus, popovers, dialogs, outlined buttons       |
+
 #### Surface Scale (Neutrals)
+
+The numbered scale below is the palette *under* the roles. It stays exported
+for the marketing site and custom fields, but inside the kit it is no longer
+how a background is chosen.
 
 Every neutral in the system — this scale, the text tokens, the role surfaces —
 is **Graphite**: `oklch(L c 258)`, the brand blue's hue at a chroma too low to
@@ -150,37 +175,39 @@ zinc value (`#a1a1aa`, hue 286°) by hand; Tailwind's `zinc`, `neutral`,
 
 The surface scale goes from `50` (lightest) to `950` (darkest):
 
-| Token              | Value       | Light mode usage       | Dark mode usage        |
-|--------------------|-------------|------------------------|------------------------|
-| `surface-50`       | `#f9fafb`   | Page background        | —                      |
-| `surface-100`      | `#f4f5f7`   | Subtle backgrounds     | —                      |
-| `surface-200`      | `#e3e5e9`   | Borders, dividers      | —                      |
-| `surface-300`      | `#d1d4d9`   | Hover borders          | —                      |
-| `surface-400`      | `#9ea4ab`   | Muted text, placeholders | —                    |
-| `surface-500`      | `#747a81`   | Secondary icons        | Secondary icons        |
-| `surface-600`      | `#3c4046`   | —                      | Muted text, labels     |
-| `surface-700`      | `#23262b`   | —                      | Borders, dividers      |
-| `surface-800`      | `#0f1114`   | —                      | Page background        |
-| `surface-900`      | `#090a0c`   | —                      | Card backgrounds       |
-| `surface-950`      | `#000000`   | —                      | Deepest backgrounds    |
+| Token              | Value       |
+|--------------------|-------------|
+| `surface-50`       | `#f9fafb`   |
+| `surface-100`      | `#f4f5f7`   |
+| `surface-200`      | `#e3e5e9`   |
+| `surface-300`      | `#d1d4d9`   |
+| `surface-400`      | `#9ea4ab`   |
+| `surface-500`      | `#747a81`   |
+| `surface-600`      | `#3c4046`   |
+| `surface-700`      | `#23262b`   |
+| `surface-800`      | `#0f1114`   |
+| `surface-900`      | `#090a0c`   |
+| `surface-950`      | `#000000`   |
 
 #### Surface Accent Scale (Slate: the brand hue at a higher chroma)
 
-Used for subtle interactive backgrounds and input fields. Full 50–950 range:
+Survives as a text colour (the icons in neutral buttons and icon buttons) and
+as the unchecked `Checkbox` border; it paints no background in the kit. Full
+50–950 range:
 
-| Token                     | Value       | Usage                              |
-|---------------------------|-------------|-------------------------------------|
-| `surface-accent-50`       | `#f8fafc`   | Lightest accent background         |
-| `surface-accent-100`      | `#f2f5f9`   | Hover backgrounds (light)          |
-| `surface-accent-200`      | `#e2e8f0`   | Field backgrounds (light)          |
-| `surface-accent-300`      | `#ccd5e1`   | Accent borders (light)             |
-| `surface-accent-400`      | `#94a3b8`   | Muted accent text                  |
-| `surface-accent-500`      | `#64748b`   | Mid-tone accent                    |
-| `surface-accent-600`      | `#475569`   | Accent labels (dark)               |
-| `surface-accent-700`      | `#334155`   | Field backgrounds (dark)           |
-| `surface-accent-800`      | `#1d293b`   | Hover backgrounds (dark)           |
-| `surface-accent-900`      | `#152133`   | Deep accent background (dark)      |
-| `surface-accent-950`      | `#0c182a`   | Deepest accent background (dark)   |
+| Token                     | Value       |
+|---------------------------|-------------|
+| `surface-accent-50`       | `#f8fafc`   |
+| `surface-accent-100`      | `#f2f5f9`   |
+| `surface-accent-200`      | `#e2e8f0`   |
+| `surface-accent-300`      | `#ccd5e1`   |
+| `surface-accent-400`      | `#94a3b8`   |
+| `surface-accent-500`      | `#64748b`   |
+| `surface-accent-600`      | `#475569`   |
+| `surface-accent-700`      | `#334155`   |
+| `surface-accent-800`      | `#1d293b`   |
+| `surface-accent-900`      | `#152133`   |
+| `surface-accent-950`      | `#0c182a`   |
 
 #### Text Colors
 
@@ -197,7 +224,7 @@ Used for subtle interactive backgrounds and input fields. Full 50–950 range:
 
 1. **NEVER use arbitrary Tailwind colors** like `text-violet-600`, `bg-indigo-500`, `text-fuchsia-500`, `bg-rose-500` for structural UI elements. These are only acceptable inside semantic status indicators (e.g., pipeline stage colors).
 2. **NEVER use gradient text** (`bg-gradient-to-r ... bg-clip-text text-transparent`) for titles or headings. Use `Typography` with its built-in color prop.
-3. **NEVER use glassmorphism** (`backdrop-blur`, `backdrop-filter`, semi-transparent backgrounds) for cards or panels. Use the `Card`, `Paper` components or standard `bg-white dark:bg-surface-900` backgrounds.
+3. **NEVER use glassmorphism** (`backdrop-blur`, `backdrop-filter`, semi-transparent backgrounds) for cards or panels. Use the `Card`, `Paper` components or the role surface `bg-surface-card`.
 4. **All borders must use `defaultBorderMixin`** — never hardcode border colors like `border-surface-200` or `border-gray-300`.
 5. **`#0070F4` is tuned as a fill, not as ink.** White on it, or it on white, is
    correct. Read as *text* on a `surface-900` card it measures **4.36:1** — below
@@ -223,13 +250,14 @@ Used for subtle interactive backgrounds and input fields. Full 50–950 range:
 
 The scale is compact — built for content density — and spans **three weights:
 400 / 500 / 600. Semibold (600) is the ceiling — nothing goes to 700.** The
-display tier separates itself by size and tracking, not by weight: medium at
-4xl is a page title, semibold at 2xl is a section, medium at sm is UI chrome.
+ladder is monotonic: semibold for `h1`–`h4`, medium for `h5`, `h6` and small
+labels, regular for copy. The display end separates itself by size and
+tracking, not by weight.
 
 | Variant      | CSS Class             | Rendered Element | Specs                                                  |
 |--------------|-----------------------|------------------|---------------------------------------------------------|
-| `h1`         | `typography-h1`       | `<h1>`           | 4xl, font-headers, font-medium, tracking-display        |
-| `h2`         | `typography-h2`       | `<h2>`           | 3xl, font-headers, font-medium, tracking-display        |
+| `h1`         | `typography-h1`       | `<h1>`           | 4xl, font-headers, font-semibold, tracking-display      |
+| `h2`         | `typography-h2`       | `<h2>`           | 3xl, font-headers, font-semibold, tracking-display      |
 | `h3`         | `typography-h3`       | `<h3>`           | 2xl, font-headers, font-semibold, tracking-title        |
 | `h4`         | `typography-h4`       | `<h4>`           | xl, font-headers, font-semibold, tracking-title         |
 | `h5`         | `typography-h5`       | `<h5>`           | lg, font-headers, font-medium, tracking-heading         |
@@ -240,12 +268,12 @@ display tier separates itself by size and tracking, not by weight: medium at
 | `body1`      | `typography-body1`    | `<p>`            | sm                                                      |
 | `body2`      | `typography-body2`    | `<p>`            | xs                                                      |
 | `caption`    | `typography-caption`  | `<p>`            | [11px], leading-[1.4]                                   |
-| `micro`      | `typography-micro`    | `<p>`            | 2xs, font-medium, uppercase, tracking-[0.08em]          |
-| `mono`       | `typography-mono`     | `<p>`            | font-mono, tabular-nums                                 |
-| `stat`       | `typography-stat`     | `<p>`            | 3xl, font-headers, font-semibold, tracking-display, tabular-nums |
+| `micro`      | `typography-micro`    | `<span>`         | 2xs, font-medium, uppercase, tracking-[0.08em]          |
+| `mono`       | `typography-mono`     | `<span>`         | font-mono, tabular-nums                                 |
+| `stat`       | `typography-stat`     | `<span>`         | 3xl, font-headers, font-semibold, tracking-display, tabular-nums |
 | `label`      | `typography-label`    | `<label>`        | xs, font-medium, tracking-wide                          |
 | `inherit`    | `typography-inherit`  | `<p>`            | text-inherit (inherits parent sizing)                   |
-| `button`     | `typography-button`   | `<span>`         | sm, font-semibold, tracking-wide                        |
+| `button`     | `typography-button`   | `<span>`         | sm, font-medium (sentence case, no tracking)            |
 
 **The three tiers people most often improvise, and should not:**
 
@@ -316,7 +344,7 @@ display tier separates itself by size and tracking, not by weight: medium at
 The reference layout used by `ContentHomePage` (the default Rebase home page):
 
 ```tsx
-<div className="py-2 overflow-auto h-full w-full bg-surface-50 dark:bg-surface-800">
+<div className="py-2 overflow-auto h-full w-full bg-surface-sheet">
     <Container maxWidth="6xl">
         {/* Content sections */}
         …
@@ -326,7 +354,7 @@ The reference layout used by `ContentHomePage` (the default Rebase home page):
 
 Key rules:
 - **Wrap content in `<Container>`** with an appropriate `maxWidth` (`4xl`, `5xl`, `6xl`, `7xl`).
-- **Page background**: `bg-surface-50 dark:bg-surface-800` (not `dark:bg-surface-950`).
+- **Page background**: the role surface `bg-surface-sheet` — never a numbered light/dark pair such as `bg-surface-50 dark:bg-surface-950`.
 - **Use `overflow-auto h-full w-full`** on the outermost wrapper so the page scrolls inside the admin shell.
 
 ### Card Grid Layout
@@ -358,8 +386,8 @@ The `Card` component from `@rebasepro/ui` automatically applies `cardMixin` and,
 
 ```tsx
 // Style mixins applied by Card:
-// cardMixin = "bg-white dark:bg-surface-900 rounded-xl border border-surface-200 dark:border-surface-700/60"
-// cardClickableMixin = "hover:bg-primary/5 dark:hover:bg-primary/5 cursor-pointer transition-colors duration-150"
+// cardMixin = "bg-surface-card rounded-xl border border-hairline"
+// cardClickableMixin = "hover:bg-surface-card-hover cursor-pointer transition-colors duration-150"
 ```
 
 ```tsx no-verify
@@ -382,79 +410,83 @@ The `Card` component from `@rebasepro/ui` automatically applies `cardMixin` and,
 
 | ❌ Don't                                          | ✅ Do                                         |
 |---------------------------------------------------|-----------------------------------------------|
-| `rounded-2xl`                                     | Let `Card` use `rounded-lg`                   |
-| `shadow-lg shadow-blue-500/20`                    | No shadows — hover uses `bg-surface-50` only  |
+| `rounded-2xl`                                     | Let `Card` use its own `rounded-xl`           |
+| `shadow-lg shadow-blue-500/20`                    | No shadows — hover is `bg-surface-card-hover` only |
 | `hover:-translate-y-1`                            | Don't lift cards on hover                     |
 | `hover:scale-110` on icons                        | Use subtle `transition-colors` at most        |
 | `bg-gradient-to-br from-blue-500 to-indigo-600`  | Use plain surface colors                      |
 | `glass-card`, `glass-panel`, backdrop-blur        | Use `Card` or `Paper` component               |
-| `hover:shadow-md`, `hover:ring-1`                | Use `hover:bg-surface-50 dark:hover:bg-surface-800` |
+| `hover:shadow-md`, `hover:ring-1`                | Pass `onClick` to `Card`; it hovers to `bg-surface-card-hover` |
 
 ### NavigationCard Reference Pattern
 
 This is the gold standard for how a card should look:
 
 ```tsx
-<Card className={cls(
-    "group h-full p-4 cursor-pointer transition-colors duration-150 ease-in-out",
-    "hover:bg-surface-50 dark:hover:bg-surface-800"
-)}>
+<Card
+    onClick={onClick}
+    className="group h-full p-4 cursor-pointer transition-colors duration-150 ease-in-out"
+>
     <div className="flex flex-col h-full">
         {/* Header: icon + title left, actions right */}
         <div className="flex items-center w-full justify-between mb-1">
             <div className="flex items-center gap-3">
                 {/* Icon: plain muted color, no background pill */}
-                <div className="flex items-center justify-center w-5 h-5 text-surface-400 dark:text-surface-500">
+                <div className="flex items-center justify-center w-5 h-5 text-surface-400 dark:text-surface-500 transition-colors duration-150 group-hover:text-primary dark:group-hover:text-primary">
                     {icon}
                 </div>
                 <Typography variant="subtitle1" component="h2">{title}</Typography>
             </div>
         </div>
         {/* Description indented to align with title */}
-        <div className="grow pl-8">
-            <Typography variant="caption" color="secondary">
+        <div className="pl-8">
+            <Typography variant="caption" color="secondary" component="div">
                 <Markdown source={description} size="small" />
             </Typography>
         </div>
+        <div className="grow"/>
     </div>
 </Card>
 ```
 
 **Key observations from NavigationCard:**
-- Icons are **plain muted color** (`text-surface-400 dark:text-surface-500`) — no background pill, no gradient, no primary tint.
-- Hover effect is a **single background color change** — `hover:bg-surface-50 dark:hover:bg-surface-800`. No shadows, no border changes, no rings.
+- Icons are **plain muted color** (`text-surface-400 dark:text-surface-500`) at rest — no background pill, no gradient. The one tint is `group-hover:text-primary` while the card is hovered.
+- Hover effect is a **single background color change**, and `Card` supplies it: with an `onClick` it applies `cardClickableMixin` (`hover:bg-surface-card-hover`). No shadows, no border changes, no rings.
 - The card transitions use `transition-colors duration-150` — fast and minimal.
 - No arrow icon or decorative footer — the card is the affordance.
 - Description is offset with `pl-8` to align with the title (past the icon).
 
 ---
 
-## 7. Style Mixins (`@rebasepro/ui/styles`)
+## 7. Style Mixins (`@rebasepro/ui`)
 
-Always import and use these mixins rather than hardcoding equivalent classes:
+Always import and use these mixins rather than hardcoding equivalent classes. They are on the package barrel; there is no `@rebasepro/ui/styles` subpath for an installed consumer.
 
 ### Layout & Card Mixins
 
 | Mixin                        | Classes                                                                                              |
 |------------------------------|------------------------------------------------------------------------------------------------------|
-| `defaultBorderMixin`         | `border-surface-200 dark:border-surface-700/60`                                                      |
-| `paperMixin`                 | `bg-white rounded-lg dark:bg-surface-900 border border-surface-200 dark:border-surface-700`          |
-| `cardMixin`                  | `bg-white dark:bg-surface-900 rounded-xl border border-surface-200 dark:border-surface-700/60`       |
-| `codeSurfaceMixin`           | `bg-surface-100 dark:bg-surface-950 rounded-md`                                                      |
-| `cardClickableMixin`         | `hover:bg-primary/5 dark:hover:bg-primary/5 cursor-pointer transition-colors duration-150`           |
+| `defaultBorderMixin`         | `border-hairline` (colour only — pair it with `border`)                                              |
+| `paperMixin`                 | `bg-surface-card rounded-lg border border-hairline-strong` — a floating surface                      |
+| `cardMixin`                  | `bg-surface-card rounded-xl border border-hairline` — a card in the document flow                   |
+| `codeSurfaceMixin`           | `bg-surface-well rounded-md`                                                                         |
+| `cardClickableMixin`         | `hover:bg-surface-card-hover cursor-pointer transition-colors duration-150`                          |
 | `cardSelectedMixin`          | `bg-primary-bg/30 dark:bg-primary-bg/10 ring-1 ring-primary/75`                                     |
+| `accentTextMixin`            | `text-primary dark:text-primary-light` — the accent as text (links, accent labels)                   |
+| `surfaceHoverMixin`          | `hover:bg-surface-hover transition-colors duration-150` — hover on a transparent row or item         |
+| `surfaceActiveMixin`         | `bg-surface-active` — the selected row or item                                                       |
 
 ### Field & Focus Mixins
 
 | Mixin                            | Classes                                                                                          |
 |----------------------------------|--------------------------------------------------------------------------------------------------|
-| `fieldBackgroundMixin`           | `bg-surface-accent-200/50 dark:bg-surface-900`                                                   |
-| `fieldBackgroundInvisibleMixin`  | `bg-surface-accent-200/0 dark:bg-surface-900/0` — fully transparent field background             |
-| `fieldBackgroundDisabledMixin`   | `bg-surface-accent-200/50 dark:bg-surface-900/90` — slightly opaque disabled state               |
-| `fieldBackgroundHoverMixin`      | `hover:bg-surface-accent-200/70 hover:dark:bg-surface-700/40` — hover highlight for fields       |
-| `focusedClasses`                 | `z-30 outline-none ring-2 ring-primary/75 ring-offset-0` — standard focus ring                   |
-| `focusedDisabled`                | `focus-visible:ring-0 focus-visible:ring-offset-0` — removes focus ring for disabled elements    |
-| `focusedInvisibleMixin`          | `focus:bg-surface-accent-100/70 dark:focus:bg-surface-900/60` — subtle bg on focus for invisible fields |
+| `fieldBackgroundMixin`           | `bg-surface-field border border-hairline`                                                        |
+| `fieldBackgroundInvisibleMixin`  | `bg-transparent` — fully transparent field background                                            |
+| `fieldBackgroundDisabledMixin`   | `bg-surface-field/60` — disabled field background                                                |
+| `fieldBackgroundHoverMixin`      | `transition-colors duration-150 hover:bg-surface-field-hover` — hover highlight for fields       |
+| `focusedClasses`                 | `z-30 outline-none ring-2 ring-primary/60 ring-offset-0 ring-offset-transparent` — an outset focus ring |
+| `focusedDisabled`                | `focus-visible:ring-0 focus-visible:ring-offset-0` — removes the focus ring                      |
+| `focusedInvisibleMixin`          | `focus:bg-surface-field-hover` — subtle bg on focus for invisible fields                         |
 
 ### `cardSelectedMixin` Usage
 
@@ -478,24 +510,27 @@ The mixin applies a subtle primary-tinted background and a `ring-1` primary bord
 
 The `Button` component accepts these variants and colors. Buttons use `rounded-lg`, `transition-colors`, and no active scale effect.
 
+`color` defaults to `"neutral"`, which paints `surface-raised` — that is what almost every button is. A filled `primary` button is the **one** main action a screen has (add, save, publish). `secondary` and `error` are for destructive confirmations and the marketing site, not the panel's chrome.
+
 ```tsx
 <Button variant="filled" color="primary">Primary Action</Button>
-<Button variant="outlined" color="primary">Secondary Action</Button>
-<Button variant="text" color="primary">Tertiary Action</Button>
-<Button variant="filled" color="neutral">Neutral Button</Button>
+<Button>Neutral Action</Button>
+<Button variant="outlined">Secondary Action</Button>
+<Button variant="text">Tertiary Action</Button>
 ```
 
 | Prop      | Values                                        |
 |-----------|-----------------------------------------------|
-| `variant` | `"filled"`, `"outlined"`, `"text"`            |
-| `color`   | `"primary"`, `"secondary"`, `"text"`, `"error"`, `"neutral"` |
-| `size`    | `"small"`, `"medium"`, `"large"`, `"xl"`, `"2xl"` |
+| `variant` | `"filled"` (default), `"outlined"`, `"text"`  |
+| `color`   | `"primary"`, `"secondary"`, `"text"`, `"error"`, `"neutral"` (default) |
+| `size`    | `"smallest"`, `"small"`, `"medium"` (default), `"large"`, `"xl"`, `"2xl"` |
 
 ### Button Styling Details
 
 - Base shape: `rounded-lg` (not `rounded-md`)
 - Transitions: `transition-colors` (not `transition-all`)
-- Filled hover: `hover:brightness-105` (subtle, not `hover:brightness-110`)
+- Label: `typography-button` — 14px, weight 500, sentence case, no tracking. Never add `uppercase`, `font-semibold` or `tracking-wide`.
+- Filled hover: `hover:brightness-105` on primary/secondary (subtle, not `hover:brightness-110`); neutral steps to `surface-raised-hover`
 - No `shadow-sm`, no `hover:shadow-md`, no `active:scale-[0.98]`
 
 ### Button Anti-Patterns
@@ -515,7 +550,7 @@ The `Button` component accepts these variants and colors. Buttons use `rounded-l
 
 // ✅ CORRECT: Use proper variant and color
 <Button variant="filled" color="primary">Submit</Button>
-<Button variant="outlined" color="primary">Cancel</Button>
+<Button variant="text">Cancel</Button>
 <Button variant="text" color="primary" startIcon={<RefreshCwIcon />}>Refresh</Button>
 ```
 
@@ -550,15 +585,15 @@ The `Button` component accepts these variants and colors. Buttons use `rounded-l
 
 ### How to Title a Section
 
-Follow the `NavigationGroup` pattern — section headers are **small, uppercase, secondary-colored labels**, not large bold headings:
+Follow the `NavigationGroup` pattern — section headers are **small, uppercase, secondary-colored labels** in the `micro` tier, not large bold headings:
 
 ```tsx
 // ✅ CORRECT: Section header pattern (from NavigationGroup)
 <Typography
-    variant="caption"
+    variant="micro"
     component="h2"
     color="secondary"
-    className="px-4 py-1 rounded font-medium text-[10px] uppercase tracking-[0.08em] text-surface-400 dark:text-surface-500"
+    className="py-1 rounded"
 >
     Pipeline Stages
 </Typography>
@@ -622,9 +657,9 @@ When displaying numeric KPIs, use plain muted icons (matching NavigationCard) �
 
 ## 12. Icons
 
-- Import icons from `lucide-react` for functional/semantic icons.
-- Import icons from `@rebasepro/ui`, which re-exports `lucide-react` under its own names — `PlusIcon`, `Trash2Icon`, `ArrowRightIcon`. There are no `AddIcon` or `DeleteIcon` exports
-- **Icon treatment**: plain muted color (`text-surface-400 dark:text-surface-500`). **No** background pill, **no** primary tint, **no** gradients.
+- Never add a direct `lucide-react` dependency.
+- Import icons from `@rebasepro/ui`, which re-exports a curated set of lucide icons under their lucide names with an `Icon` suffix — `PlusIcon`, `Trash2Icon`, `ArrowRightIcon`. There are no `AddIcon` or `DeleteIcon` exports. An icon outside that set (`packages/ui/src/icons/index.ts`) is not exported by name: render it with `<LucideIconByName name="…" />`.
+- **Icon treatment**: plain muted color (`text-surface-400 dark:text-surface-500`). **No** background pill, **no** primary tint at rest, **no** gradients.
 - Icon size: typically `h-4 w-4` or `h-5 w-5`.
 - No decorative arrow icons on cards — the card itself is the affordance.
 
@@ -687,18 +722,17 @@ Form inputs should use `@rebasepro/ui` components directly without excessive cla
 ## 16. Font Stack
 
 ```css
---font-sans: 'Instrument Sans Variable', 'Instrument Sans', ui-sans-serif, system-ui, 'Helvetica', 'Arial', sans-serif;
---font-headers: 'Instrument Sans Variable', 'Instrument Sans', ui-sans-serif, system-ui, sans-serif;
+--font-sans: 'Inter Variable', 'Inter', ui-sans-serif, system-ui, 'Helvetica', 'Arial', sans-serif;
+--font-headers: 'Instrument Sans Variable', 'Instrument Sans', 'Inter Variable', 'Inter', ui-sans-serif, system-ui, sans-serif;
 --font-mono: 'JetBrains Mono', 'Space Mono', 'Lucida Console', monospace;
 ```
 
-**One face, Instrument Sans**, for headings and body alike. `--font-headers`
-exists so headings can take their own weight and tracking tier, not because it
-is a different family — mixing in a second face is what made earlier pages read
-as two competing voices stacked on top of each other.
+**Instrument Sans for headings, Inter for UI and body copy, JetBrains Mono for
+anything measured** (counts, sizes, timestamps, ids — the `mono` tier).
 
-Ensure `@fontsource-variable/instrument-sans` and `@fontsource/jetbrains-mono`
-are imported in the entry file.
+Ensure `@fontsource-variable/inter`, `@fontsource-variable/instrument-sans` and
+`@fontsource/jetbrains-mono` are imported in the entry file, as a scaffolded
+project's `App.tsx` does.
 
 ---
 
@@ -707,10 +741,10 @@ are imported in the entry file.
 - Rebase uses `dark:` variant for dark mode classes.
 - Custom variant: `@custom-variant dark (&:where(.dark, .dark *))`.
 - **Always provide dark mode equivalents** for any custom styling.
-- Standard dark mode backgrounds:
-  - Page: `dark:bg-surface-800`
-  - Cards: `dark:bg-surface-900`
-  - Borders: `dark:border-surface-700`
+- The role surfaces switch on their own and need no `dark:` pair:
+  - Page: `bg-surface-sheet`
+  - Cards: `bg-surface-card`
+  - Borders: `border-hairline`
 
 ---
 
@@ -725,7 +759,7 @@ The project CSS file should:
    ```
 2. Source the UI kit JS for Tailwind scanning:
    ```css
-   @source "../node_modules/@rebasepro/*/dist/**/*.js";
+   @source "../node_modules/@rebasepro";
    ```
 3. Define the dark mode variant:
    ```css
@@ -748,24 +782,24 @@ Before submitting UI code, verify you have NONE of these:
 | 4 | Template literal class concatenation                  | Use `cls()` from `@rebasepro/ui`                       |
 | 5 | Gradient text on headings                             | Remove gradient, use `Typography` color prop           |
 | 6 | Glassmorphism (`backdrop-blur`, translucent bg)       | Use `Card`, `Paper`, or solid backgrounds              |
-| 7 | `rounded-2xl` on cards/panels                         | Use `Card`/`Paper` which use `rounded-lg`              |
+| 7 | `rounded-2xl` on cards/panels                         | Use `Card` (`rounded-xl`) / `Paper` (`rounded-lg`)     |
 | 8 | Colored gradient or primary-tinted icon backgrounds   | Use plain `text-surface-400 dark:text-surface-500`     |
 | 9 | `hover:-translate-y-1` or `hover:scale-110`           | Don't lift or scale on hover                           |
-| 10| Custom shadow colors (`shadow-blue-500/20`)           | No shadows on hover — use `hover:bg-surface-50` only   |
+| 10| Custom shadow colors (`shadow-blue-500/20`)           | No shadows on hover — `Card` with `onClick` hovers to `bg-surface-card-hover` |
 | 11| `animate-bounce`, `animate-pulse` on alerts           | Use static `Alert` component                           |
 | 12| Custom CSS classes like `glass-card`, `shimmer-shine` | Remove and use standard UI kit patterns                |
 | 13| `font-bold`/`font-extrabold` overrides on Typography  | Let the variant handle font weight — 600 is the ceiling |
-| 14| `text-[10px]`, `tracking-widest` custom overrides     | Use `Typography variant="caption"`                     |
+| 14| `text-[10px]`, `tracking-widest` custom overrides     | Use `Typography variant="micro"` (uppercase label) or `"caption"` |
 | 15| Per-card colored themes (blue card, green card, etc.) | Use uniform `Card` with plain muted icons              |
-| 16| `dark:bg-surface-950` for page background             | Use `dark:bg-surface-800`                              |
+| 16| A numbered light/dark pair for a page background (`bg-surface-50 dark:bg-surface-950`) | Use the role surface `bg-surface-sheet` |
 | 17| Arbitrary Tailwind colors (`text-violet-600`, etc.)   | Use design token colors                                |
-| 18| `hover:shadow-md`, `hover:ring-1` on cards            | Use `hover:bg-surface-50 dark:hover:bg-surface-800`   |
+| 18| `hover:shadow-md`, `hover:ring-1` on cards            | Pass `onClick` to `Card` (`hover:bg-surface-card-hover`) |
 | 19| `active:scale-[0.98]` on buttons                      | Buttons don't scale — use `transition-colors` only     |
-| 20| `border-*/60` opacity on borders                      | Use solid borders via `defaultBorderMixin`             |
+| 20| Hand-picked border colours (`border-surface-700/60`)  | Use `defaultBorderMixin` (`border-hairline`)           |
 | 21| `bg-primary/8` icon background pills                  | Icons are plain color, no background container         |
 | 22| Decorative arrow icons on cards                       | Cards are the affordance — no `ArrowRightIcon` needed  |
 
-> **IMPORTANT FOR AGENTS:** The internal `EntityCard` component (used for card-view in collection grids) uses `hover:-translate-y-0.5` and `hover:shadow-lg`, and the Studio home page uses per-section colored icons. These are **intentional exceptions** in Rebase's own codebase for specific contexts (rich media cards with thumbnails and the Studio admin landing page). **Do NOT copy these patterns** into custom views, home pages, or dashboard cards — they are reserved for these specific internal components.
+> **IMPORTANT FOR AGENTS:** The internal `EntityCardBinding` component (used for card-view in collection grids) uses `hover:-translate-y-0.5` and `hover:shadow-lg`. This is an **intentional exception** in Rebase's own codebase for rich media cards with thumbnails. **Do NOT copy this pattern** into custom views, home pages, or dashboard cards — it is reserved for that internal component.
 
 ---
 

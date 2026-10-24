@@ -56,7 +56,7 @@ renders it, and `rebase doctor` compares it to the live database.
 | Decide who may read or write a row | `securityRules` | [Authentication](/docs/backend/authentication) |
 | Search text properly — accents, JSONB, ranking, substrings | a `search` block | [Search](/docs/backend/search) |
 | Find rows by meaning | a `vector` property | [Search](/docs/backend/search) |
-| Keep deleted rows | `softDelete` | [Writes](/docs/backend/writes) |
+| Keep deleted rows | `softDelete` | [Soft delete](/docs/collections/soft-delete) |
 | Record who changed what | `history` | [History](/docs/backend/history) |
 | Run something on a schedule | a cron job file | [Cron Jobs](/docs/backend/cron-jobs) |
 | Run something after a write, out of band | a job | [Jobs](/docs/backend/jobs) |
@@ -103,7 +103,7 @@ callbacks: {
 }
 ```
 
-Three properties are worth knowing before you rely on it:
+Four properties are worth knowing before you rely on it:
 
 - **It can only narrow.** The return value is a filter to AND in, and there is
   no shape it can return that widens the read. That is deliberate: a hook handed

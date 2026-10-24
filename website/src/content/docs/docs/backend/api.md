@@ -291,9 +291,9 @@ body.
 
 | Status | Typical code | Means |
 |--------|--------------|-------|
-| 400 | `BAD_REQUEST`, `VALIDATION_ERROR`, `INVALID_LIMIT`, `INVALID_OFFSET`, `INVALID_PAGE` | The request is malformed or asks for something impossible |
+| 400 | `BAD_REQUEST`, `INVALID_INPUT`, `INVALID_LIMIT`, `INVALID_OFFSET`, `INVALID_PAGE` | The request is malformed or asks for something impossible |
 | 401 | `UNAUTHORIZED` | No credential, or one that identifies nobody |
-| 403 | `FORBIDDEN`, `DB_PERMISSION_DENIED` | A credential that identifies somebody without the right |
+| 403 | `FORBIDDEN`, `SCOPE_MISSING`, `WRITE_DENIED` | A credential that identifies somebody without the right |
 | 404 | `NOT_FOUND` | The thing addressed does not exist |
 | 409 | `CONFLICT` | The state conflicts — a duplicate key, a dirty tree |
 | 501 | varies | The surface exists but is **not configured** on this deployment |
@@ -420,15 +420,15 @@ Every hook is awaited, and a throw from any of them undoes the whole write:
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|
 | `GET` | `/health` and `/api/health` | none | Liveness/readiness check |
-| `GET` | `/api/docs` | none | The OpenAPI 3.0 JSON specification |
-| `GET` | `/api/swagger` | none | Swagger UI. On in development, off in production; `REBASE_ENABLE_SWAGGER` overrides either way |
-| `GET` | `/api/meta/schema-version` | none | The schema hash this backend was built from — deliberately unauthenticated, and it returns only that hash |
+| `GET` | `/api/docs` | none; `schema:read` when `enableSwagger` is `false` (the runtime's default in production) | The OpenAPI 3.0 JSON specification |
+| `GET` | `/api/swagger` | none | Swagger UI. Served only outside production; `REBASE_ENABLE_SWAGGER` cannot turn it on in production |
+| `GET` | `/api/meta/schema-version` | none | The schema hash this backend was built from, and the runtime version — deliberately unauthenticated, and nothing that describes the schema |
 | `GET` | `/api/meta/contract` | `schema:read`: an admin, the service key, or an API key holding it | The full collection contract, for `rebase generate-sdk --from`. Fail-closed: `404` when no auth is configured |
 | `GET` | `/metrics` | `REBASE_METRICS_TOKEN` when set | Prometheus metrics, when `REBASE_METRICS=true` |
 
 ## OpenAPI / Swagger
 
-The OpenAPI spec is auto-generated from your collection definitions: it describes the list, read, create, update, delete and bulk endpoints of every collection the backend serves, with their query parameters and response schemas. It is not a complete map of the HTTP surface — the auth, storage, functions and cron routes are documented on this site only — and columns marked `excludeFromApi` are left out of it.
+The OpenAPI spec is auto-generated from your collection definitions: it describes the list, query, count, aggregate, read, create, update, delete and bulk endpoints of every collection the backend serves, its nested routes and `_batch`, with their query parameters and response schemas. It is not a complete map of the HTTP surface — the auth, storage, functions and cron routes are documented on this site only — and columns marked `excludeFromApi` are left out of it.
 
 For a [`softDelete`](/docs/collections/soft-delete/) collection the spec says
 that a delete, single or bulk, moves the row to the trash, and documents
@@ -459,8 +459,8 @@ GET /api/meta/schema-version
 ```
 
 For the shape of the endpoints rather than the schema behind them, the OpenAPI
-document is at `GET /api/docs`, with Swagger UI at `/api/swagger` when
-`enableSwagger` is on.
+document is at `GET /api/docs`, with Swagger UI at `/api/swagger` outside
+production.
 
 ## Next Steps
 

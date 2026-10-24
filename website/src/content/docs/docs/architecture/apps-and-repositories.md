@@ -204,7 +204,7 @@ they are on their own: `https://admin.example.com/api` is no more valid than
 
 Everything else about `path` applies to the part after the hostname. The app
 is still built for it: `https://admin.example.com` is built with
-`REBASE_APP_BASE` set to `/`, `https://admin.example.com/cms` with `/cms`, and
+`REBASE_APP_BASE` set to `/`, `https://admin.example.com/cms` with `/cms/`, and
 a bundler that ignores it still gives you a blank page. `cms` is a path on the
 app's hostname, inside that path part. The URL must be `https://` and carry a
 hostname and a path and nothing else — no port, query or fragment. A bare
@@ -352,7 +352,7 @@ change that strands a client built against the old shape.
 Every generated SDK records the schema it came from:
 
 ```ts
-// src/rebase/schema.meta.ts — generated
+// generated/sdk/schema.meta.ts — generated
 export const SCHEMA_VERSION = "v1:c5d97d0f96b7f87a";
 ```
 
@@ -361,7 +361,7 @@ version stamp reveals nothing about the schema it stands for:
 
 ```bash
 curl -s https://api.example.com/api/meta/schema-version
-# {"schemaVersion":"v1:c5d97d0f96b7f87a"}
+# {"schemaVersion":"v1:c5d97d0f96b7f87a","runtime":{"version":"0.25.1","contract":1}}
 ```
 
 Comparing the two in CI turns a silent mismatch into a failed check. The stamp

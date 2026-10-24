@@ -108,8 +108,9 @@ To copy one: put the file in the project's frontend, rewrite each relative
 import (`../hooks/…`, `./drawer_expansion`, …) to `@rebasepro/cms` or
 `@rebasepro/app` — everything the file imports is exported from one of them —
 change what you came to change, and register the copy under its name in
-`<Rebase components>` (or a collection's `admin.components` for `Collection.*`
-and `Entity.*`). Keep the copy small: change the part, not its neighbours.
+`<Rebase components>` (or a collection's `admin.components` for the
+collection-scoped names: `Collection.*`, `Entity.*`, `EditView.FormActions`,
+`DetailView` and `EntityPreview`). Keep the copy small: change the part, not its neighbours.
 
 Three parts are deliberately **not** copyable, because what they import are
 internals of a composition, not building blocks. Do not try to export or

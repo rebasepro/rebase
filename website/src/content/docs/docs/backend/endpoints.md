@@ -34,7 +34,6 @@ list. `:slug` is a collection's `slug`.
 
 | Method | Path | Gate | More |
 |---|---|---|---|
-| `GET` | `/api/data/collections` | session | [REST API](/docs/backend/api/) |
 | `GET` | `/api/data/:slug` | RLS | [Querying](/docs/backend/filtering/) |
 | `POST` | `/api/data/:slug` | RLS | [REST API](/docs/backend/api/) |
 | `POST` | `/api/data/:slug/query` | RLS | The listing, query parameters in the body — [Queries too long for a URL](/docs/backend/vector-search/#queries-too-long-for-a-url) |
@@ -57,7 +56,7 @@ that `aggregate` is not read as an entity id. `?select=` and `?groupBy=` are
 their parameters, and `select` is required on `/aggregate`.
 
 Text search, vector search, relation inclusion and field selection *are* query
-parameters on `GET /api/data/:slug` rather than routes — `search`,
+parameters on `GET /api/data/:slug` rather than routes — `searchString`,
 `vector_search`, `include`, `fields`. See [REST API](/docs/backend/api/).
 
 A project that declares no collections and introspects none serves this prefix
@@ -80,6 +79,8 @@ as a single `404 NO_COLLECTIONS`. See [Backend only](/docs/getting-started/headl
 | `POST` | `/api/auth/forgot-password` | none | [Authentication](/docs/backend/authentication/) |
 | `POST` | `/api/auth/reset-password` | none (a reset token) | [Authentication](/docs/backend/authentication/) |
 | `POST` | `/api/auth/change-password` | session | [Authentication](/docs/backend/authentication/) |
+| `POST` | `/api/auth/change-email` | session | Mails a confirmation link to the new address — [Changing an email address](/docs/backend/auth-endpoints/#changing-an-email-address) |
+| `POST` | `/api/auth/confirm-email-change` | none (a link token) | Moves the account onto the new address — [Changing an email address](/docs/backend/auth-endpoints/#changing-an-email-address) |
 | `POST` | `/api/auth/send-verification` | session | [Authentication](/docs/backend/authentication/) |
 | `GET` | `/api/auth/verify-email` | none (a verification token) | [Authentication](/docs/backend/authentication/) |
 | `POST` | `/api/auth/verify-email` | none (a verification token, and a session or the password to keep it) | [Email verification](/docs/backend/email-verification/) |
@@ -184,17 +185,20 @@ for projects that have not moved; write new code against the canonical path.
 | `DELETE` | `/api/storage/tus/:id` | the upload's owner | Resumable uploads: cancel |
 
 A deployment with no storage configured serves this prefix as a `501` naming the
-variable it needs, rather than 404ing as if the feature did not exist.
+variable it needs, rather than 404ing as if the feature did not exist —
+except `GET /api/storage/sources`, which answers `200` with an empty list.
 
 ## Functions
 
 | Method | Path | Gate | More |
 |---|---|---|---|
+| `GET` | `/api/functions` | session | The names of the functions served, and how many files failed to load |
 | any | `/api/functions/<name>` | whatever the function declares. An API key also needs `functions:invoke` | [Custom Functions](/docs/backend/custom-functions/) |
 
 One route per file under `backend/functions/`, so the paths come from your
-project. `GET /api/functions` does **not** list them: an inventory of a
-deployment's custom endpoints is not public.
+project. `GET /api/functions` lists them only to a signed-in caller — a
+session, an API key or the service key — and answers anyone else `401`: an
+inventory of a deployment's custom endpoints is not public.
 
 ## Meta and operations
 
@@ -202,9 +206,9 @@ deployment's custom endpoints is not public.
 |---|---|---|---|
 | `GET` | `/livez` | none | Liveness alone: is this process running. Does not touch the database, which is why it is the probe path a container should use — `RUNTIME_LIVENESS_PATH` |
 | `GET` | `/health`, `/api/health` | none | Liveness and readiness. Reports every configured data source, not only the default |
-| `GET` | `/api/docs` | none (`schema:read` in production) | The OpenAPI 3.0 document |
-| `GET` | `/api/swagger` | none | Swagger UI. Development only unless `REBASE_ENABLE_SWAGGER` |
-| `GET` | `/api/meta/schema-version` | none | The schema hash this backend was built from, and nothing else |
+| `GET` | `/api/docs` | none (`schema:read` when `enableSwagger` is `false`, the runtime's default in production) | The OpenAPI 3.0 document |
+| `GET` | `/api/swagger` | none | Swagger UI. Outside production only; `REBASE_ENABLE_SWAGGER` cannot turn it on in production |
+| `GET` | `/api/meta/schema-version` | none | The schema hash this backend was built from and the runtime version, and nothing else |
 | `GET` | `/api/meta/contract` | `schema:read` | The full collection contract, for `rebase generate-sdk --from`. `404` when no auth is configured |
 | `GET` | `/metrics` | `REBASE_METRICS_TOKEN` when set | Prometheus metrics, when `REBASE_METRICS=true` |
 | `GET` | `/metrics/history` | `REBASE_METRICS_TOKEN` when set | The recorded series behind the Studio charts. `501` on a runtime with no backend |

@@ -179,8 +179,8 @@ the condition by hand. `serializeFilter({ a: ["gt", 5] })` throws rather than
 round-tripping `gte`.
 
 **What to change:** only if you call `@rebasepro/common`'s serializers directly.
-Use the operator names the types declare (`gt`, `gte`, `lt`, `lte`, …) rather
-than REST short codes. Query builders and the SDK were already spelling them
+Use the operator names the types declare (`>`, `>=`, `<`, `<=`, …) rather
+than REST short codes (`gt`, `gte`, …). Query builders and the SDK were already spelling them
 this way; what changes is that the wrong spelling now says so.
 
 ---

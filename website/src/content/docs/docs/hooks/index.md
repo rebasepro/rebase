@@ -92,7 +92,7 @@ function ProductList() {
 | Parameter | Type | Description |
 |-----------|------|-------------|
 | `path` | `string` | Absolute collection path (e.g., `"products"`). |
-| `collection` | `CollectionConfig` | The collection definition object. |
+| `collection` | `AdminCollection` | The collection definition object. |
 | `itemCount` | `number` | Optional. Number of entities to fetch (SQL limit). |
 | `offset` | `number` | Optional. Number of items to skip. |
 | `page` | `number` | Optional. Page number (1-indexed), alternative to offset. |
@@ -144,7 +144,7 @@ function ProductDetail({ productId }) {
 |-----------|------|-------------|
 | `path` | `string` | Absolute collection path. |
 | `entityId` | `string \| number` | The ID of the entity to fetch. |
-| `collection` | `CollectionConfig` | The collection definition object. |
+| `collection` | `AdminCollection` | The collection definition object. |
 | `useCache` | `boolean` | Optional. If `true` and entity is in cache, skips background refresh. (Default: `false`). |
 
 ### Caching Utilities
@@ -415,7 +415,7 @@ function CategorySelector({ onSelect }) {
 | Option | Type | Description |
 |--------|------|-------------|
 | `path` | `string` | Absolute collection path. |
-| `collection` | `CollectionConfig` | Target collection definition. |
+| `collection` | `AdminCollection` | Target collection definition. |
 | `fixedFilter` | `FilterValues` | Optional. Static filters to restrict search results. |
 | `pageSize` | `number` | Optional. Number of items per page. (Default: `10`). |
 | `getLabelFromEntity` | `(entity) => string` | Optional. Customize the display label text. |

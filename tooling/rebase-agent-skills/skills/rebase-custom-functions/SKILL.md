@@ -306,8 +306,8 @@ export default defineFunction((app, { rebase }) => {
 import { rebase } from "@rebasepro/server/functions";
 
 await rebase.dataAsAdmin.collection<Record<string, unknown>>("orders").find({ where: { status: ["==", "paid"] } });
-// `storage` is undefined when the deployment configured none — check, or
-// `requireStorage()` and let the 503 say so.
+// `storage` is undefined when the deployment configured none — check it
+// before you rely on it.
 await rebase.storage?.putObject({ key, file });  // → storageUrl (gs://|s3://|local://)
 await rebase.email.send({ to, subject, html: "<p>Thanks for your order.</p>" });
 ```
@@ -334,7 +334,7 @@ The `user` object set by the auth middleware uses reserved values for system ide
 | Service Key | `"service"` | `["admin"]` |
 | Service API key | `"api-key:{id}"` | `["service", ...key.roles]` (e.g. `["service", "admin"]`) |
 | Personal API key | the owner's uid | the owner's current roles |
-| Anonymous | `"anon"` | `["anon"]` |
+| Anonymous | not set — `getUser(c)` is `undefined` | — (the request's driver is scoped as `{ uid: "anonymous", roles: ["anon"] }`) |
 
 > **TIP:** Use these to differentiate internal vs. external callers in your custom functions:
 > ```typescript

@@ -35,7 +35,8 @@ export default defineCollection({
     table: "posts",
     properties: {
         title: { name: "Title", type: "string" },
-        status: { name: "Status", type: "string" }
+        status: { name: "Status", type: "string" },
+        __order: { name: "Order", type: "string", admin: { disabled: true, hideFromCollection: true } }
     },
     admin: {
         // Enabled view modes: "table" | "cards" | "kanban" | "list"
@@ -44,6 +45,9 @@ export default defineCollection({
         defaultViewMode: "table",
         // Kanban needs the property it groups columns by
         kanban: { columnProperty: "status" },
+        // ...and a string property to keep a card's place within a column;
+        // without it `rebase verify` warns and the order resets on every read
+        orderProperty: "__order",
         // How an entity opens: "split" | "side_panel" | "full_screen" | "dialog"
         openEntityMode: "split"
     }

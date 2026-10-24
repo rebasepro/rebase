@@ -5,9 +5,9 @@ description: Guide for configuring and using the Rebase email system. Use this s
 
 # Rebase Email
 
-Rebase includes a built-in email system that powers password reset, email verification, user invitation, and welcome email flows. It supports SMTP (via Nodemailer), custom send functions for third-party providers (AWS SES, Resend, Postmark, etc.), and fully customizable HTML/text templates.
+Rebase includes a built-in email system that powers password reset, email verification, user invitation, welcome, magic-link, sign-in code and address-change flows. It supports SMTP (via Nodemailer), custom send functions for third-party providers (AWS SES, Resend, Postmark, etc.), and fully customizable HTML/text templates.
 
-> **IMPORTANT FOR AGENTS:** Always read the `rebase-basics` skill first. Email requires a running Rebase backend with `initializeRebaseBackend()` and is configured through the `auth.email` property.
+> **IMPORTANT FOR AGENTS:** Always read the `rebase-basics` skill first. In a **scaffolded project** (the managed runtime) email is configured from the environment alone: `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`, `SMTP_USER`, `SMTP_PASS`, `SMTP_FROM`, `SMTP_NAME`, `APP_NAME`, `EMAIL_LOGO_URL`, and `FRONTEND_URL` as the base of every emailed link — no code. Outside production, with no `SMTP_HOST` and an absolute `FRONTEND_URL`, mail goes to a development sink that captures it and prints its links. An **ejected** project or hand-wired server configures it through the `auth.email` property of `initializeRebaseBackend()`, as below.
 
 ## EmailConfig Interface
 
@@ -43,13 +43,15 @@ const backend = await initializeRebaseBackend({
 |----------|------|---------|-------------|
 | `from` | `string` | — | **Required.** Sender address. Format: `"noreply@example.com"` or `"MyApp <noreply@example.com>"` |
 | `smtp` | `SMTPConfig` | `undefined` | SMTP server configuration (see below) |
-| `sendEmail` | `(options: EmailSendOptions) => Promise<EmailSendResult>` | `undefined` | Custom send function — replaces SMTP entirely. Return what your provider reported; the message id is what makes a reply threadable |
-| `resetPasswordUrl` | `string` | `""` | Base URL for password reset links. The reset link becomes `{resetPasswordUrl}/reset-password?token={token}` |
-| `verifyEmailUrl` | `string` | `""` | Base URL for email verification links. The link becomes `{verifyEmailUrl}/verify-email?token={token}` |
+| `sendEmail` | `(options: EmailSendOptions) => Promise<EmailSendResult \| void>` | `undefined` | Custom send function — replaces SMTP entirely. Return what your provider reported; the message id is what makes a reply threadable. Returning nothing is allowed |
+| `resetPasswordUrl` | `string` | — | **Required in practice.** Absolute base URL for password reset links: `{resetPasswordUrl}/reset-password?token={token}`. The verification and magic-link bases fall back to it, so boot refuses a configured email service without an absolute one (or with any relative link base) |
+| `verifyEmailUrl` | `string` | `resetPasswordUrl` | Base URL for email verification links. The link becomes `{verifyEmailUrl}/verify-email?token={token}` |
+| `magicLinkUrl` | `string` | `resetPasswordUrl` | Base URL for magic links: `{magicLinkUrl}/auth/magic-link?token={token}` |
 | `appName` | `string` | `"Rebase"` | Application name used in email subjects and body text |
+| `logoUrl` | `string` | Rebase mark only while `appName` is unset | Absolute PNG/JPG URL shown at 48x48 above every default template (see below) |
 | `templates` | `object` | `undefined` | Custom template functions to override built-in templates (see [Custom Templates](#custom-templates)) |
 
-> **IMPORTANT FOR AGENTS:** You must provide **either** `smtp` or `sendEmail` (not both). If neither is provided, the email service reports `isConfigured() === false` and all email-dependent auth flows (forgot-password, send-verification, user invitation) will fail with a `503 EMAIL_NOT_CONFIGURED` error.
+> **IMPORTANT FOR AGENTS:** Provide `smtp` or `sendEmail`; if both are set, `sendEmail` is used and `smtp` is ignored. If neither is provided, the email service reports `isConfigured() === false` and all email-dependent auth flows (forgot-password, send-verification, magic link) fail with a `503 EMAIL_NOT_CONFIGURED` error; an admin-created user gets a `temporaryPassword` instead of an invitation.
 
 ### SMTPConfig Properties
 
@@ -60,6 +62,8 @@ const backend = await initializeRebaseBackend({
 | `secure` | `boolean` | `true` when `port === 465`, otherwise `false` | Use SSL/TLS. Auto-inferred from port when not set |
 | `auth` | `{ user: string; pass: string }` | `undefined` | SMTP credentials. Omit for unauthenticated SMTP relays |
 | `name` | `string` | Auto-detected from `FRONTEND_URL` | Client hostname sent in SMTP `EHLO`/`HELO` greeting (see [SMTP Name Resolution](#smtp-name-resolution)) |
+| `maxConnections` | `number` | `5` | Pooled connections a burst of mail may hold open. Lower it for a provider that caps them (Office 365 allows 3) |
+| `timeoutMs` | `number` | `30000` | Connect, greeting and socket-silence timeout. Auth routes await their mail inside the request, so this bounds them too |
 
 ### EmailSendOptions
 
@@ -72,6 +76,7 @@ The `EmailSendOptions` interface is used by both `emailService.send()` and custo
 | `html` | `string` | Yes | HTML body content |
 | `text` | `string` | No | Plain-text fallback body |
 | `replyTo` | `string` | No | Reply-to email address |
+| `headers` | `Record<string, string>` | No | Extra headers, verbatim (`List-Unsubscribe`, `In-Reply-To`, …). A value containing CR or LF is rejected, not stripped |
 
 ### EmailService Interface
 
@@ -173,7 +178,7 @@ auth: {
 }
 ```
 
-> **IMPORTANT FOR AGENTS:** SMTP-related variables (`SMTP_HOST`, `SMTP_PORT`, etc.) are **NOT** part of the base Rebase environment schema. They must be added via `loadEnv({ extend: ... })`. The base schema does include `FRONTEND_URL` which is used for SMTP name resolution.
+> **IMPORTANT FOR AGENTS:** SMTP-related variables (`SMTP_HOST`, `SMTP_PORT`, etc.) are **NOT** part of `loadEnv`'s base schema, so a server you wire yourself must add them via `loadEnv({ extend: ... })`. The base schema does include `FRONTEND_URL` which is used for SMTP name resolution. The managed runtime (a scaffolded project) reads `SMTP_*` itself — there, setting them in `.env` is all it takes.
 
 ### `.env` File Example
 
@@ -195,7 +200,7 @@ FRONTEND_URL=https://myapp.com
 
 ## Built-in Email Templates
 
-Rebase ships five built-in HTML email templates. All templates include both HTML and plain-text versions, use responsive inline CSS, and follow a consistent card-based design with a blue (#3b82f6) call-to-action button.
+Rebase ships eight built-in HTML email templates — the five below, plus a one-time sign-in code (`emailOtp`), an address-change confirmation (`emailChange`) and the notice mailed to the old address (`emailChangeNotice`). All templates include both HTML and plain-text versions, use responsive inline CSS, and follow a consistent card-based design with a blue (#3b82f6) call-to-action button.
 
 Each one renders `email.logoUrl` at 48x48 above the card. It must be a **PNG or
 JPG on an absolute `http(s)` URL** — mail clients do not render SVG and block
@@ -210,14 +215,14 @@ users someone else's mark. On the managed runtime, set `EMAIL_LOGO_URL` instead.
 | Template | Trigger | Subject | Token Expiry |
 |----------|---------|---------|-------------|
 | Password Reset | `POST /api/auth/forgot-password` | `"Reset your {appName} password"` | 1 hour |
-| Email Verification | `POST /api/auth/send-verification` | `"Verify your {appName} email address"` | No expiry (stored as user field) |
-| User Invitation | `POST /api/admin/users` (admin-created user, no explicit password) | `"You've been invited to {appName}"` | 1 hour (uses password reset token) |
+| Email Verification | `POST /api/auth/register`, and `POST /api/auth/send-verification` | `"Verify your {appName} email address"` | 24 hours |
+| User Invitation | `POST /api/admin/users` (admin-created user, no explicit password) | `"You've been invited to {appName}"` | 24 hours (uses a password reset token) |
 | Welcome Email | `POST /api/auth/register` and OAuth first-login | `"Welcome to {appName}"` | N/A (informational) |
 | Magic Link | `POST /api/auth/magic-link` (needs `auth.magicLink: true`) | `"Sign in to {appName}"` | 15 minutes |
 
 ### Template Functions
 
-Each built-in template is a standalone function exported from `@rebasepro/server`:
+Each built-in template is a standalone function exported from `@rebasepro/server` (also `getMagicLinkTemplate`, `getEmailOtpTemplate`, `getEmailChangeTemplate`, `getEmailChangeNoticeTemplate`). Each takes an optional `logoUrl` as its last argument:
 
 ```typescript
 import {
@@ -234,7 +239,8 @@ import {
 function getPasswordResetTemplate(
     resetUrl: string,
     user: { email: string; displayName?: string | null },
-    appName?: string   // default: "Rebase"
+    appName?: string,  // default: "Rebase"
+    logoUrl?: string
 ): { subject: string; html: string; text: string }
 ```
 
@@ -246,7 +252,8 @@ The template includes a "Reset Password" button linking to `resetUrl`, a plain-t
 function getEmailVerificationTemplate(
     verifyUrl: string,
     user: { email: string; displayName?: string | null },
-    appName?: string   // default: "Rebase"
+    appName?: string,  // default: "Rebase"
+    logoUrl?: string
 ): { subject: string; html: string; text: string }
 ```
 
@@ -258,11 +265,12 @@ The template includes a "Verify Email Address" button linking to `verifyUrl`.
 function getUserInvitationTemplate(
     setPasswordUrl: string,
     user: { email: string; displayName?: string | null },
-    appName?: string   // default: "Rebase"
+    appName?: string,  // default: "Rebase"
+    logoUrl?: string
 ): { subject: string; html: string; text: string }
 ```
 
-Sent when an admin creates a user via `POST /api/admin/users` without specifying a password. The template includes a "Set Your Password" button and a 1-hour expiry warning.
+Sent when an admin creates a user via `POST /api/admin/users` without specifying a password. The template includes a "Set Your Password" button and a 24-hour expiry warning.
 
 #### getWelcomeEmailTemplate
 
@@ -270,7 +278,8 @@ Sent when an admin creates a user via `POST /api/admin/users` without specifying
 function getWelcomeEmailTemplate(
     user: { email: string; displayName?: string | null },
     appName?: string,   // default: "Rebase"
-    loginUrl?: string
+    loginUrl?: string,
+    logoUrl?: string
 ): { subject: string; html: string; text: string }
 ```
 
@@ -282,9 +291,13 @@ All templates greet the user by `displayName` if available, otherwise by the ema
 
 ## Custom Templates
 
-Override any built-in template by providing a function in `emailConfig.templates`:
+Override any built-in template by providing a function in `emailConfig.templates` (keys: `passwordReset`, `emailVerification`, `userInvitation`, `welcomeEmail`, `magicLink`, `emailOtp`, `emailChange`, `emailChangeNotice`).
+
+> **IMPORTANT FOR AGENTS:** `user.displayName` is user input, exactly as the account was registered — markup and all. Build template HTML with the `html` tagged template from `@rebasepro/server`, which escapes every interpolation, never with a plain template literal.
 
 ```typescript
+import { html } from "@rebasepro/server";
+
 auth: {
     email: {
         from: "noreply@myapp.com",
@@ -295,20 +308,20 @@ auth: {
         templates: {
             passwordReset: (resetUrl, user) => ({
                 subject: `Reset your password, ${user.displayName || user.email}`,
-                html: `<h1>Password Reset</h1><p>Click <a href="${resetUrl}">here</a> to reset.</p>`,
+                html: html`<h1>Password Reset</h1><p>Click <a href="${resetUrl}">here</a> to reset.</p>`.toString(),
                 text: `Reset your password: ${resetUrl}`,
             }),
             emailVerification: (verifyUrl, user) => ({
                 subject: "Please verify your email",
-                html: `<p>Hi ${user.displayName || user.email}, <a href="${verifyUrl}">verify here</a></p>`,
+                html: html`<p>Hi ${user.displayName || user.email}, <a href="${verifyUrl}">verify here</a></p>`.toString(),
             }),
             userInvitation: (setPasswordUrl, user) => ({
                 subject: "You've been invited!",
-                html: `<p>Welcome! Set your password: <a href="${setPasswordUrl}">${setPasswordUrl}</a></p>`,
+                html: html`<p>Welcome! Set your password: <a href="${setPasswordUrl}">${setPasswordUrl}</a></p>`.toString(),
             }),
             welcomeEmail: (user, appName) => ({
                 subject: `Welcome to ${appName}!`,
-                html: `<h1>Welcome, ${user.displayName || user.email}!</h1><p>Thanks for joining ${appName}.</p>`,
+                html: html`<h1>Welcome, ${user.displayName || user.email}!</h1><p>Thanks for joining ${appName}.</p>`.toString(),
                 text: `Welcome to ${appName}!`,
             }),
         },
@@ -324,6 +337,10 @@ auth: {
 | `emailVerification` | `(verifyUrl: string, user: { email: string; displayName?: string \| null }) => { subject: string; html: string; text?: string }` |
 | `userInvitation` | `(setPasswordUrl: string, user: { email: string; displayName?: string \| null }) => { subject: string; html: string; text?: string }` |
 | `welcomeEmail` | `(user: { email: string; displayName?: string \| null }, appName: string) => { subject: string; html: string; text?: string }` |
+| `magicLink` | `(magicLinkUrl: string, user: { email: string; displayName?: string \| null }) => { subject: string; html: string; text?: string }` |
+| `emailOtp` | `(code: string, user: { email: string; displayName?: string \| null }) => { subject: string; html: string; text?: string }` |
+| `emailChange` | `(confirmUrl: string, user: { email: string; displayName?: string \| null }, newEmail: string) => { subject: string; html: string; text?: string }` |
+| `emailChangeNotice` | `(user: { email: string; displayName?: string \| null }, newEmail: string) => { subject: string; html: string; text?: string }` |
 
 > **IMPORTANT FOR AGENTS:** The `text` field is optional in custom templates but recommended for deliverability. Many spam filters penalize emails without a plain-text alternative.
 
@@ -421,13 +438,13 @@ auth: {
 
 ## `rebase.email` Singleton
 
-When email is configured, the email service is automatically attached to the `rebase` server-side singleton as `rebase.email`. This allows sending emails programmatically from custom functions, cron jobs, and collection callbacks.
+The email service is attached to the `rebase` server-side singleton as `rebase.email` — always, configured or not (see [Checking Email Configuration](#checking-email-configuration)). This allows sending emails programmatically from custom functions, cron jobs, and collection callbacks.
 
 ```typescript
 import { rebase } from "@rebasepro/server";
 
-// Check if email is available
-if (rebase.email) {
+// Check if email can send
+if (rebase.email.isConfigured()) {
     await rebase.email.send({
         to: "user@example.com",
         subject: "Your order has shipped",
@@ -525,15 +542,15 @@ The email system is tightly integrated with Rebase authentication. Here is how e
 | 2 | User clicks link | User is directed to `{resetPasswordUrl}/reset-password?token={token}` |
 | 3 | `POST /api/auth/reset-password` | Client submits `{ token, password }`. Server verifies the token, updates the password, marks the token as used, and invalidates all refresh tokens (logs out all sessions) |
 
-> **WARNING FOR AGENTS:** The `POST /api/auth/forgot-password` endpoint **always** returns `{ success: true }` regardless of whether the email exists. This is a security measure to prevent email enumeration. If the email service is not configured, it throws `503 EMAIL_NOT_CONFIGURED`.
+> **WARNING FOR AGENTS:** The `POST /api/auth/forgot-password` endpoint **always** returns `{ success: true, message }` regardless of whether the email exists, held to the same minimum response time either way. This is a security measure to prevent email enumeration. If the email service is not configured, it throws `503 EMAIL_NOT_CONFIGURED`.
 
 ### Email Verification Flow
 
 | Step | Endpoint | Description |
 |------|----------|-------------|
-| 1 | `POST /api/auth/send-verification` | Authenticated user requests verification. Server generates a token, stores the SHA-256 hash on the user record, and sends the verification email |
+| 1 | `POST /api/auth/register`, or `POST /api/auth/send-verification` | Sent on registration, and when an authenticated user asks again. Server generates a token, stores the SHA-256 hash on the user record, and sends the verification email. The token is valid for 24 hours |
 | 2 | User clicks link | User is directed to `{verifyEmailUrl}/verify-email?token={token}` |
-| 3 | `GET /api/auth/verify-email?token={token}` | Server looks up the user by hashed token and sets `emailVerified = true` |
+| 3 | `GET /api/auth/verify-email?token={token}` (or `POST /api/auth/verify-email` with `{ token, password? }`) | Server looks up the user by hashed token and sets `emailVerified = true`, removing any credential the request did not prove |
 
 The `send-verification` endpoint requires authentication and returns `400 ALREADY_VERIFIED` if the email is already verified.
 
@@ -545,7 +562,7 @@ The `send-verification` endpoint requires authentication and returns `400 ALREAD
 | 2 | User clicks link | User is directed to `{resetPasswordUrl}/reset-password?token={token}` (same as password reset) |
 | 3 | `POST /api/auth/reset-password` | User sets their password via the standard reset flow |
 
-**Fallback behavior:** If the email service is not configured or the email fails to send, the API response includes a `temporaryPassword` field that the admin can share manually:
+**Fallback behavior:** If the email service is not configured or the email fails to send, the API response includes a `temporaryPassword` field that the admin can share manually (plus `emailDeliveryFailed: true` when the send failed):
 
 ```json
 {
@@ -578,7 +595,7 @@ Sent automatically (fire-and-forget) when:
 
 The welcome email is **not sent** when an admin creates a user via `POST /api/admin/users` (the invitation email is sent instead).
 
-The welcome email uses `resetPasswordUrl` as the base for a login link, appending `/app` (e.g., `https://myapp.com/app`).
+The welcome email's login link is the `resetPasswordUrl` base itself (e.g., `https://myapp.com`), with nothing appended. A custom `welcomeEmail` template is not given the link.
 
 ## SMTP Name Resolution
 
@@ -602,9 +619,9 @@ When creating the Nodemailer transport, Rebase automatically resolves a hostname
 
 ## SMTP Connection Verification
 
-At startup, Rebase automatically verifies the SMTP connection when email is configured. This is a non-blocking check that logs the result:
+When the backend starts (`start()`, which `initializeRebaseBackend` calls for you), Rebase automatically verifies the SMTP connection when email is configured. This is a non-blocking check that logs the result:
 
-- **Success:** `"SMTP connection verified successfully."`
+- **Success:** `"SMTP connection verified successfully."` (at `debug` level)
 - **Failure:** `"Warning: SMTP connection verification failed. Email delivery may fail."`
 
 The verification calls Nodemailer's `transporter.verify()` which attempts to connect and authenticate with the SMTP server. **Startup is not blocked** — the verification runs asynchronously after the backend is initialized.
@@ -672,7 +689,7 @@ await initializeRebaseBackend({
             resetPasswordUrl: env.FRONTEND_URL || "http://localhost:3000",
             verifyEmailUrl: env.FRONTEND_URL || "http://localhost:3000",
             templates: {
-                // Override the default Spanish welcome email
+                // Override the default (English) welcome email
                 welcomeEmail: (user, appName) => ({
                     subject: `Welcome to ${appName}!`,
                     html: `<h1>Welcome!</h1><p>Hi ${user.displayName || user.email}, thanks for joining ${appName}.</p>`,
@@ -697,15 +714,17 @@ console.log(`Server running on port ${env.PORT}`);
 | `"Email is already verified"` | `POST /api/auth/send-verification` for a verified user | 400 |
 | `"Invalid or expired reset token"` | `POST /api/auth/reset-password` with bad/expired token | 400 |
 | `"Invalid or expired verification token"` | `GET /api/auth/verify-email` with bad token | 400 |
-| `"Email service not configured. Provide SMTP config or sendEmail function."` | Calling `emailService.send()` with no transport | Error thrown |
+| `"Email service not configured. Set SMTP_HOST (…), or pass \`auth.email\` to initializeRebaseBackend. …"` | Calling `rebase.email.send()` when nothing configured email | Error thrown |
+| `"Email service not configured. Magic link login is not available."` | `POST /api/auth/magic-link` when no email configured | 503 |
 | `"Failed to send email: {message}"` | SMTP send failure | Error thrown |
 
 ### Silent Failures
 
 The following email failures are logged but do **not** cause the API request to fail:
 
-- **Password reset email:** If `send()` throws, the error is logged but `POST /api/auth/forgot-password` still returns `{ success: true }` (security: don't reveal failures)
+- **Password reset email:** Not awaited — if `send()` throws, the error is logged and `POST /api/auth/forgot-password` still returns `{ success: true }` (security: neither a failure nor the SMTP round trip may reveal whether the address exists)
 - **Welcome email:** Sent fire-and-forget — failures are logged but don't block registration
+- **Verification email at registration:** Sent in the background — failures are logged but don't block registration
 - **User invitation email:** If `send()` throws, the response falls back to returning `temporaryPassword`
 
 ## References

@@ -49,14 +49,15 @@ const products = defineCollection({
     }
 ```
 
-The checked fields are `display`, `sort`, `propertiesOrder` and `listProperties`.
-Three forms are accepted besides a plain property key:
+The checked fields are `display`, `sort`, `propertiesOrder`, `listProperties`,
+`previewProperties`, `orderProperty` and the filters `defaultFilter`, `fixedFilter`
+and `filterPresets`. Three forms are accepted besides a plain property key:
 
 | Form | Example | Notes |
 | --- | --- | --- |
-| Dotted path into a `map` | `"profile.displayName"` | The **root** must be a real property; the path below it is not checked. |
+| Dotted path into a `map` | `"profile.displayName"` | The **root** must be a real property; the path below it is not checked. Not on `previewProperties` / `orderProperty`, which take a top-level key. |
 | Child-collection column | `"subcollection:orders"` | `propertiesOrder` / `listProperties` only. |
-| An `additionalFields` key | `"score" as AdditionalFieldKey` | Needs the cast — see below. |
+| An `additionalFields` key | `"score" as AdditionalFieldKey` | `propertiesOrder` / `listProperties` only. Needs the cast — see below. |
 
 `AdditionalFieldDelegate.key` is a plain `string`, so the type system has no way to know
 which extra keys a collection declares. Rather than reopen these fields to every string,
@@ -171,7 +172,7 @@ is the authoring type.
 :::note[Why a BaaS project pays nothing]
 A property type in a BaaS install has no `Field`, no `columnWidth`, no
 `hideFromCollection` — those live in `AdminPropertyOptions` in the admin package. The
-guarantee is asserted, not claimed: `e2e/baas-typecheck/src/admin_absent.ts` uses
+guarantee is asserted, not claimed: `tests/e2e/baas-typecheck/src/admin_absent.ts` uses
 `@ts-expect-error` on `admin`, so the build fails if the field ever becomes writable in
 core again.
 :::
@@ -181,7 +182,7 @@ core again.
 Before 0.11 these fields sat at the top level. To move them:
 
 ```bash
-node scripts/codemod/collections-admin-block.mjs config/collections
+node tooling/scripts/codemod/collections-admin-block.mjs config/collections
 ```
 
 It reports anything it cannot move safely — notably presentation inside
@@ -332,7 +333,7 @@ And inside `admin`, because only the panel draws them:
 | Property | Type | Description |
 |----------|------|-------------|
 | `admin.entityActions` | `EntityAction[]` | Custom actions on entities (archive, publish, etc.) |
-| `admin.Actions` | `React.ComponentType` | Custom toolbar actions component |
+| `admin.Actions` | `ComponentRef<CollectionActionsProps>[]` | Custom toolbar actions components |
 | `admin.entityViews` | `EntityCustomView[]` | Custom tabs in the entity detail view |
 | `admin.additionalFields` | `AdditionalFieldDelegate[]` | Computed/virtual columns |
 | `admin.exportable` | `boolean \| ExportConfig` | Enable data export |
@@ -415,14 +416,14 @@ unknown-key error.
 
 ### Title Property Selection
 When `display.title` is not set, the property used as the entity's display title (previews, headers) is resolved automatically:
-1. If `propertiesOrder` is explicitly defined, the first non-ID property that is either a `relation` or `string` type is chosen as the title.
-2. If no `propertiesOrder` is defined, the framework searches the properties in order and picks the first string type property.
+1. If `propertiesOrder` is explicitly defined, the first property in that order that can be a title is chosen: a `string`, a single-cardinality `relation` or a `reference`. Identifiers (primary and foreign keys, `uuid` columns, `isId`), file-upload fields and hidden properties never qualify.
+2. If no `propertiesOrder` is defined, the same candidates are ranked: a string whose key names a label (`name`, `title`, `label`, …) first, then plain short text, an email, an enum, long text, a relation or user picker, and a reference last. Ties go to declaration order.
 
 ### Relation Previews in Tables
 When `propertiesOrder` is explicitly set, relation properties are **not** automatically filtered out of the default preview columns (whereas they are excluded from unordered defaults to avoid slow join operations).
 
 ### What a title value renders as
-Whatever the title property holds, the panel renders a string. A date is formatted, an array is joined, and a relation — which arrives as `{ id, data: { values } }` rather than as text — is looked through for the first of `name`, `title`, `label` or `displayName` on the related row, falling back to its id. So a title may name a `relation` property and still read as a name rather than a uuid.
+Whatever the title property holds, the panel renders a string. A date is formatted, an array is joined, and a relation — which arrives as `{ id, data: { values } }` rather than as text — is looked through for the first of `name`, `title`, `label` or `displayName` on the related row, then for its first short string value, falling back to its id. So a title may name a `relation` property and still read as a name rather than a uuid.
 
 This is not an exported helper: it is what every surface that draws a record already does. Nothing to call, and nothing to import.
 

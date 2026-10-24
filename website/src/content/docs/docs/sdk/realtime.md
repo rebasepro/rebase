@@ -245,7 +245,7 @@ useEffect(() => {
 
 The WebSocket client handles authentication automatically:
 
-- On **sign-in** or **token refresh**, the new token is sent to an already-open socket via an `authenticate` message. If none is open, nothing happens — signing in is not a request for realtime, and a socket opened later authenticates itself.
+- On **sign-in** or **token refresh**, an already-open socket takes the new credential. A refresh, or a sign-in as the account it already holds, sends the token in an `authenticate` message; a sign-in as a different account — a visitor signing in included — rebuilds the socket, which authenticates as that account and re-sends every live subscription and channel. If none is open, nothing happens — signing in is not a request for realtime, and a socket opened later authenticates itself.
 - On **sign-out**, the WebSocket connection is disconnected. The client stays usable; a later subscription reconnects anonymously.
 - If the connection drops, the client **reconnects automatically** and re-establishes all active subscriptions. It never stops trying while a subscription or a joined channel exists; the delay between attempts grows to at most 30 seconds.
 - If the server ends the socket's session — the user signed out everywhere, this session was revoked, the account was deleted, or the token expired before a refresh reached the socket — it closes the socket with code `4001`. The client reconnects like after any drop, authenticating with the session it holds then (refreshed if it can be), or anonymously when there is none. A role taken away does not close the socket: it applies from the next frame. See [Authentication & RLS](/docs/backend/realtime/#authentication--rls).

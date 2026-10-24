@@ -184,10 +184,11 @@ retry: the configured port is the port, and `EADDRINUSE` is fatal.
 ## The backend crashed and `rebase dev` kept running
 
 A backend that throws on boot does not stop the watcher — it prints the stack and
-waits for a file change. `rebase dev` reports this:
+waits for a file change. When the backend has not announced itself within
+`REBASE_DEV_READY_TIMEOUT_MS` (30 seconds by default), `rebase dev` reports this:
 
 ```
-  ✗ The backend crashed on startup.
+  ✗ The backend has not started after 30s.
     Fix the error above; the watcher restarts it on the next change.
 ```
 

@@ -37,10 +37,10 @@ Each collection accessor (`context.data.<slug>`) provides these methods:
 
 | Method | Signature | Description |
 |--------|-----------|-------------|
-| `.find()` | `find(params?: FindParams) → FindResponse` | Query entities with filters, sorting, and pagination |
-| `.findById()` | `findById(id: string \| number) → Entity \| undefined` | Fetch a single entity by ID |
-| `.create()` | `create(data: Partial<Values>, id?: string) → Entity` | Create a new entity |
-| `.update()` | `update(id: string \| number, data: Partial<Values>) → Entity` | Update an existing entity |
+| `.find()` | `find(params?: FindParams) → FindResult` | Query entities with filters, sorting, and pagination |
+| `.findById()` | `findById(id: string \| number) → Row \| undefined` | Fetch a single row by ID |
+| `.create()` | `create(data: Insert, id?: string \| number) → Row` | Create a new row, and return it as stored |
+| `.update()` | `update(id: string \| number, data: Update) → Row` | Update an existing row, and return it as stored |
 | `.delete()` | `delete(id: string \| number) → void` | Delete a record |
 | `.count()` | `count(params?: FindParams) → number` | Count matching entities |
 | `.listen()` | `listen(params, onUpdate, onError?) → unsubscribe` | Real-time subscription (where supported) |

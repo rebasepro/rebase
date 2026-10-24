@@ -10,8 +10,9 @@ The Rebase frontend is a **React framework** that renders your admin panel. It r
 
 In the default scaffold, the admin panel **is** the frontend: it's served at the root of your deployed URL. If you build your own product app instead, you can mount the admin under a prefix like `/admin` in the same deployment — see [Changing the Base URL](/docs/getting-started/deployment#changing-the-base-url).
 
-This is `frontend/src/App.tsx` as `rebase init` writes it — the whole admin
-panel, four declarations inside one provider:
+This is `frontend/src/App.tsx` as `rebase init` writes it, without its font
+imports, error boundary and Google client id — the whole admin panel, four
+declarations inside one provider:
 
 ```tsx
 import React from "react";
@@ -83,9 +84,9 @@ were props the component never read:
 | `plugins` | Plugin instances — see [Plugins](/docs/plugins) |
 | `slots` | Slot contributions declared directly, without a plugin |
 | `propertyConfigs` | Custom field widgets, keyed by the name a property names in `propertyConfig` |
-| `entityViews` | Global custom entity view tabs |
+| `entityViews` | Custom entity view tabs, available to any collection that names their `key` in `admin.entityViews` |
 | `collectionViews` | Custom collection view modes, available to any collection by `key` |
-| `entityActions` | Global entity actions |
+| `entityActions` | Entity actions, available to any collection that names their `key` in `admin.entityActions` |
 | `effectiveRoleController` | Simulate a different role while dev mode is on |
 | `modeController` | Hand Rebase the host app's light/dark mode; Rebase then never touches `<html>`, `prefers-color-scheme` or localStorage — see [Styling](#styling) |
 | `translations` | Override or extend any UI string, keyed by locale — see [Translations](/docs/frontend/i18n) |

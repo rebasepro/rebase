@@ -16,7 +16,7 @@ Plugins are the primary extension mechanism in the panel. They can:
 
 - Wrap the entire app with a **provider** (context, state management)
 - Add **home page actions** and widgets
-- Inject **collection view** components (toolbar, column builders)
+- Inject **collection view** components (toolbar, column headers)
 - Add **form** components (field builders, additional panels)
 - **Inject or modify collections** dynamically
 
@@ -29,7 +29,7 @@ interface RebasePlugin {
 
     // UI contributions — a flat array, each entry naming its slot.
     // This replaced the old per-area objects (homePage, collectionView, form).
-    slots?: SlotContribution[];
+    slots?: AnySlotContribution[];
 
     // HOC providers. `scope: "root"` wraps the whole admin below
     // RebaseContext; `scope: "form"` wraps each entity form / edit view.

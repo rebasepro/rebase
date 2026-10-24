@@ -196,6 +196,9 @@ a hosted console that has its own storage browser, say, can leave that one out:
 <RebaseStudio tools={["sql", "rls", "schema-visualizer", "api"]} />
 ```
 
+The Collection Editor's Studio view is the `"schema"` tool. Omit `tools` and it
+is there; pass a list without `"schema"`, as above, and it is left out.
+
 The list is read by *contents*, not identity, so writing it inline is safe: a
 re-render of the host does not tear down and remount whichever tool is on screen.
 

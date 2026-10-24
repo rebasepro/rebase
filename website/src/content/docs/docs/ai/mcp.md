@@ -1,7 +1,7 @@
 ---
 title: MCP Server
 sidebar_label: MCP Server
-description: Connect Claude Code, Cursor, Gemini CLI or any MCP client to a Rebase project — the 42 tools it exposes, the credential it authenticates with, and the loopback gate that stands between an agent and production.
+description: Connect Claude Code, Cursor, Gemini CLI or any MCP client to a Rebase project — the 44 tools it exposes, the credential it authenticates with, and the loopback gate that stands between an agent and production.
 ---
 
 `@rebasepro/mcp` is a [Model Context Protocol](https://modelcontextprotocol.io)
@@ -296,12 +296,12 @@ on the loopback interface.** The gate is written as a list of what is *not*
 gated, so a tool added later arrives protected by default.
 
 - **Not gated — reads:** `rebase_schema_plan`, `rebase_doctor`,
-  `rebase_db_branch_list`, `rebase_db_branch_info`, `list_documents`,
+  `rebase_db_branch_list`, `rebase_db_branch_info`, `rebase_db_branch_diff`, `list_documents`,
   `get_document`, `list_users`, `list_roles`, `storage_list_objects`,
   `storage_get_download_url`, `cron_list_jobs`, `cron_get_job`, `cron_get_job_logs`,
   `rebase_dev_logs`.
 - **Not gated — local only:** `rebase_schema_introspect`, `rebase_schema_generate`, `rebase_db_generate`,
-  `rebase_generate_sdk`, the dev-server tools and the project-registry tools.
+  `rebase_generate_sdk`, `rebase_db_branch_switch`, the dev-server tools and the project-registry tools.
   These write local files or local state and have no remote target to check.
 - **Gated against `DATABASE_URL`:** the remaining CLI tools — `rebase_db_push`,
   `rebase_db_migrate`, `rebase_db_branch_create`, `rebase_db_branch_delete`.
@@ -309,7 +309,8 @@ gated, so a tool added later arrives protected by default.
   `create_document`, `update_document`, `delete_document`, `create_user`,
   `update_user`, `delete_user`, `rebase_auth_reset_password`,
   `storage_delete_object`, `cron_trigger_job`, `cron_toggle_job`,
-  `invoke_function`.
+  `invoke_function` — and `rebase_cloud_provision`, which spawns `rebase cloud`
+  but is checked against `baseUrl` too.
 
 The two targets are not interchangeable. CLI tools never see `baseUrl`, so a
 localhost backend sitting next to a production `DATABASE_URL` is checked against
@@ -341,7 +342,8 @@ From a terminal,
 `rebase db push` and `rebase db migrate` do run on that database; only the MCP
 tools are refused. On 0.24 the CLI refuses them there too.
 
-Only loopback counts as local: `localhost`, `*.localhost`, `127.0.0.0/8`, `::1`.
+Only loopback counts as local: `localhost`, `*.localhost`, `127.0.0.0/8`, `::1`
+(and `0.0.0.0`).
 Private ranges like `10.x` and `192.168.x` do **not** — those are as likely to be
 a shared staging cluster as a laptop, and treating them as local would wave
 through exactly the accident the gate exists to stop.
@@ -415,8 +417,9 @@ it accordingly.
 
 ## Tool reference
 
-42 tools, in nine groups: schema and database, schema planning, documents, users
-and roles, storage, cron, functions, the dev server and the project registry.
+44 tools, in ten groups: schema and database, schema planning, documents, users
+and roles, storage, cron, functions, the dev server, the project registry and
+Rebase Cloud.
 Each one, with what it needs and whether the gate refuses it against a non-local
 target, is in the [MCP tool reference](/docs/ai/mcp-tool-reference).
 

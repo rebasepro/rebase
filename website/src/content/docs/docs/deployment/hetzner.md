@@ -19,8 +19,10 @@ module "rebase" {
   domain          = "api.example.com"
   cors_origins    = ["https://app.example.com"]
   ssh_public_keys = [file(pathexpand("~/.ssh/id_ed25519.pub"))]
+  admin_email     = "you@example.com"
 
-  bundle_url = "https://storage.example.com/bundles/app-1.4.0.tar.gz"
+  bundle_url      = "https://storage.example.com/bundles/app-1.4.0.tar.gz"
+  runtime_version = "0.25.1" # required with bundle_url: `latest` is refused at plan
 
   s3_bucket            = "example-uploads"
   s3_access_key_id     = var.s3_access_key_id
@@ -98,7 +100,7 @@ docker compose -f infra/docker/docker-compose.selfhost.yml --env-file .env up -d
 
 The runtime listens on port 8080 inside the Compose network.
 
-`REBASE_SERVICE_KEY` bypasses row-level security. Treat it as a database superuser credential, not as an API key.
+`REBASE_SERVICE_KEY` acts as an administrator on every collection: it does not bypass row-level security, but it passes every default policy the `admin` role passes. Treat it as an admin credential, not as an API key.
 
 ## 5. Terminate TLS with Caddy
 
@@ -126,7 +128,7 @@ Point that domain's A record at the server before starting Caddy, or the certifi
 
 ## Storage is not optional
 
-The runtime **refuses to start in production** with local storage configured, because the container filesystem is destroyed on every restart and a local backend in production is silent data loss.
+The runtime **does not register local storage in production**, because the container filesystem is destroyed on every restart and a local backend in production is silent data loss. Until a bucket is configured, uploads answer `501 STORAGE_NOT_CONFIGURED`.
 
 Hetzner Object Storage is S3-compatible and sits in the same datacenters, so it is the natural pairing:
 
@@ -139,7 +141,7 @@ S3_ACCESS_KEY_ID=...
 S3_SECRET_ACCESS_KEY=...
 ```
 
-If your project stores no uploads at all, set `FORCE_LOCAL_STORAGE=true` to acknowledge that explicitly. See [Storage](/docs/backend/storage) for the full picture.
+If your project stores no uploads at all, leave storage unset and it stays off. `FORCE_LOCAL_STORAGE=true` is not an acknowledgement: it registers local storage anyway, so set it only with a durable volume mounted above `STORAGE_PATH` (the Terraform module asks for `force_local_storage = true` when it has no bucket). See [Storage](/docs/backend/storage) for the full picture.
 
 ## What boot does to your schema
 
@@ -149,7 +151,7 @@ What boot deliberately never does is anything destructive: it does not alter a c
 
 One thing therefore still needs [`rebase db push`](/docs/architecture/schema-as-code), run from a checkout or CI where the destructive-change gate and a backup are in reach: any change that is not purely additive — a renamed column, a narrowed type, a removed field.
 
-If the module or Compose file bound Postgres to loopback — both do — reach it through an SSH tunnel:
+The module binds Postgres to loopback. The Compose file publishes it on every interface (`${POSTGRES_PORT:-5432}:5432`), so narrow that mapping to `127.0.0.1:5432:5432` or remove it. Then reach it through an SSH tunnel:
 
 ```bash
 ssh -N -L 5433:127.0.0.1:5432 root@<your-server-ip>
