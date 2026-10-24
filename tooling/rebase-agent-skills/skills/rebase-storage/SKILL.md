@@ -25,7 +25,7 @@ export const media = bucket("media", { engine: "s3" });  // a named one: S3_BUCK
 - **Shared credentials.** `bucket("media", { engine: "s3", account: "minio" })` keeps its own `S3_BUCKET__MEDIA` but falls back to `S3_ACCESS_KEY_ID__MINIO`, `S3_SECRET_ACCESS_KEY__MINIO`, `S3_ENDPOINT__MINIO` (and region, path style) when no per-bucket value is set.
 - **One default.** Uploads whose property names no `storageSource` go to the default-keyed `bucket()`, or to a named bucket marked `default: true`. Mark one; do not rely on declaration order.
 - **Engines** are `local`, `s3` and `gcs` on the server. `transport: "direct"` declares a bucket the client talks to itself, with the backend out of the path.
-- **Unbound is not an error.** In development an unbound bucket stands in as a local directory; in production it stays off and its routes answer `501 STORAGE_NOT_CONFIGURED`. `rebase status` names the variable it is waiting on. A project that declares no bucket at all still gets one default bucket, typed by `STORAGE_TYPE`.
+- **Unbound is not an error.** In development an unbound bucket stands in as a local directory; in production it stays off — requests naming it answer `501 STORAGE_SOURCE_NOT_CONFIGURED`, and an unbound default answers requests that name no source with `501 STORAGE_NOT_CONFIGURED`. `rebase status` names the variable it is waiting on. A project that declares no bucket at all still gets one default bucket, typed by `STORAGE_TYPE`.
 - **Point a property at a bucket by handle:** `storage: { storageSource: media }` (the key string works too).
 
 The `storage` option below is the **ejected / custom-server** form — what you pass when you call `initializeRebaseBackend` yourself. Passing the removed `storageSources` config key is refused at boot.
@@ -71,6 +71,8 @@ The `storage` option in `initializeRebaseBackend()` accepts three forms:
 | `type` | `"gcs"` | — | **Required.** Must be `"gcs"` |
 | `bucket` | `string` | — | **Required.** GCS bucket name |
 | `projectId` | `string` | `undefined` | Google Cloud project ID (auto-detected from credentials if omitted) |
+| `keyFilename` | `string` | `undefined` | Path to a service account JSON key file, instead of ADC |
+| `credentials` | `{ client_email, private_key, project_id? }` | `undefined` | Service account credentials object (alternative to `keyFilename`) |
 | `maxFileSize` | `number` | `52428800` (50 MB) | Maximum file size in bytes |
 | `allowedMimeTypes` | `string[]` | `undefined` (all allowed) | Restrict uploads to these MIME types |
 
@@ -82,7 +84,8 @@ These options are set internally when mounting routes but are derived from the b
 
 | Property | Type | Default | Description |
 |----------|------|---------|-------------|
-| `controller` | `StorageController` | — | **Required.** The storage controller instance |
+| `controller` | `StorageController` | — | The storage controller, for a backend with one source. Used when no `registry` is given |
+| `registry` | `StorageRegistry` | — | Every source, for routing by `storageId`. Takes precedence over `controller` |
 | `basePath` | `string` | `"/api/storage"` | Base path for storage routes |
 | `requireAuth` | `boolean` | `true` | Require authentication for write operations |
 | `publicRead` | `boolean` | `false` | Allow unauthenticated read access to stored files |
@@ -95,6 +98,7 @@ These options are set internally when mounting routes but are derived from the b
 > **STORAGE REFUSES TO BOOT IN PRODUCTION WITHOUT ONE.** Collections are protected by row-level security; storage is not, and there is no per-object equivalent in the bucket — so this hook *is* the model. When storage is configured and `NODE_ENV=production`, `initializeRebaseBackend` **throws at startup** unless one of these is set:
 >
 > - `storageAuthorize` — a hook, per object. Recommended.
+> - `storagePolicies` — declarative path patterns (`{ path: "users/:uid/**", allow: ({ params, user }) => user?.uid === params.uid }`). A key no policy matches is refused unless a `storageAuthorize` hook allows it. Ejected-only.
 > - `storagePublicRead: true` — the bucket genuinely is a public read-only CDN.
 > - `storageInsecureAllowAnyAuthenticated: true` — a single-tenant app where every signed-in user is trusted with every file. Named to be read twice.
 >
@@ -128,10 +132,10 @@ Return `false` to deny with a **403**. Throwing also denies — an ownership loo
 Notes:
 
 - **`GET /metadata/*` is the important one.** It mints the short-lived path-scoped download token that `GET /file/*` trusts, so it is where read access is really decided. The hook gates it.
-- Requests already carrying a valid scoped download token, or hitting a declared public path, **skip** the hook — the token was minted under it and is valid only for its own path.
+- Two reads **skip** the hook: one carrying a valid scoped download token (the token was minted under the hook and is valid only for its own path and source, until it expires), and a read of a key under `public/` by a caller with **no** credential. A signed-in caller's read of a `public/` key is still asked about, so a hook cannot make a `public/` key private — store it outside `public/`.
 - `list` is gated on the *prefix*. Listing is how you discover keys nobody told you about.
 - TUS resumable uploads are gated at create time, so a denied upload leaves no temp file behind.
-- Omitting the hook preserves the previous behaviour, so single-tenant apps are unaffected.
+- Omitting the hook (and `storagePolicies`) leaves no per-object check — so production refuses to boot unless `storagePublicRead` or `storageInsecureAllowAnyAuthenticated` is set (see above).
 
 ## Storage Providers
 
@@ -167,7 +171,7 @@ Local storage uses a `{basePath}/{bucket}/{path}` directory structure. The defau
 }
 ```
 
-Local storage includes **path traversal protection** — any resolved path that escapes the bucket directory throws an error.
+Local storage includes **path traversal protection** — any resolved path that escapes the bucket directory throws an error. Because the sidecar sits beside the object, a key whose last segment ends in `.metadata.json` is refused with `400 INVALID_STORAGE_KEY` on every route (S3 and GCS keep metadata on the object and store any key).
 
 ### S3-Compatible Storage
 
@@ -248,7 +252,7 @@ The `StorageRegistry` interface:
 | `register` | `(id: string, controller: StorageController) => void` | Register a controller with an ID |
 | `getDefault` | `() => StorageController` | Get the `(default)` controller (throws if none) |
 | `get` | `(id: string \| undefined \| null) => StorageController \| undefined` | Get by ID, returns `undefined` if not found |
-| `getOrDefault` | `(id: string \| undefined \| null) => StorageController` | Get by ID with fallback to default (throws if neither exists) |
+| `getOrDefault` | `(id: string \| undefined \| null) => StorageController` | The named controller, or the default when no id is given. An id naming no registered source throws `UnknownStorageSourceError` — it is never redirected to the default |
 | `has` | `(id: string) => boolean` | Check if a storage ID exists |
 | `list` | `() => string[]` | List all registered storage IDs |
 | `size` | `() => number` | Number of registered controllers |
@@ -285,10 +289,10 @@ The backend validates storage-related environment variables via a Zod schema. Th
 | Variable | Type | Default | Description |
 |----------|------|---------|-------------|
 | `STORAGE_TYPE` | `"local" \| "s3" \| "gcs"` | `"local"` | Storage provider type |
-| `STORAGE_PATH` | `string` | `<project>/uploads` | Base path for local storage / TUS temp directory. A relative path is read from the directory the server runs in: the project root under `rebase dev`, `backend/` after `rebase eject` — so suggest an absolute path. A named local bucket keeps its files beside it, in `<STORAGE_PATH>__<key>`, so a durable volume goes on its parent |
+| `STORAGE_PATH` | `string` | `<project>/uploads` | Base path for local storage / TUS temp directory. A relative path is read from the directory the server runs in: the project root under `rebase dev`, `backend/` after `rebase eject` — so suggest an absolute path. A named local bucket keeps its files beside it, in `<STORAGE_PATH>__<key>` (unless `STORAGE_PATH__<KEY>` names its own), so a durable volume goes on its parent |
 | `FORCE_LOCAL_STORAGE` | `"true" \| "false"` | `false` | Allow local storage in production. Without it the local backend is not registered and uploads answer `501 STORAGE_NOT_CONFIGURED` — the backend still boots |
 | `S3_BUCKET` | `string` | — | S3 bucket name |
-| `S3_REGION` | `string` | — | S3 region |
+| `S3_REGION` | `string` | `"auto"` | S3 region |
 | `S3_ACCESS_KEY_ID` | `string` | — | S3 access key ID |
 | `S3_SECRET_ACCESS_KEY` | `string` | — | S3 secret access key |
 | `S3_ENDPOINT` | `string` (URL) | — | Custom S3-compatible endpoint |
@@ -297,6 +301,11 @@ The backend validates storage-related environment variables via a Zod schema. Th
 | `GCS_PROJECT_ID` | `string` | — | Google Cloud project ID (auto-detected on GCP) |
 | `GCS_KEY_FILENAME` | `string` (path) | — | Service account key file for this bucket, instead of ADC |
 | `GOOGLE_APPLICATION_CREDENTIALS` | `string` (path) | — | Path to GCP service account key JSON file |
+| `STORAGE_MAX_FILE_SIZE` | `number` (bytes) | `52428800` (50 MB) | Largest file the source accepts, on every upload door (multipart, TUS, `Tus-Max-Size`). Suffix `__<KEY>` per source; a value that is not a whole number of bytes refuses the boot |
+| `STORAGE_DOWNLOAD_TOKEN_TTL` | `number` (seconds) | `300` | Lifetime of the download token `GET /metadata/*` mints for a private file (at most `604800`) |
+| `STORAGE_PUBLIC_READ` | `"true" \| "false"` | `false` | Env spelling of `storagePublicRead` — satisfies the production boot guard |
+| `STORAGE_ALLOW_ANY_AUTHENTICATED` | `"true" \| "false"` | `false` | Env spelling of `storageInsecureAllowAnyAuthenticated` |
+| `STORAGE_RENDITION_CACHE` | `"true" \| "false"` | `false` | Write image-transform renditions back to the bucket under `_rebase/renditions/` (env spelling of `storageRenditionCache: { enabled: true }`) |
 
 ```env
 # S3 example
@@ -399,9 +408,13 @@ GET /api/storage/list?prefix=images/&storageId=media
 | `POST` | `/api/storage/upload` | Write | Upload a file (multipart/form-data) |
 | `GET` | `/api/storage/file/*` | Read | Download / serve a file (supports image transforms) |
 | `DELETE` | `/api/storage/file/*` | Write | Delete a file |
-| `GET` | `/api/storage/metadata/*` | Read | Get file metadata |
+| `GET` | `/api/storage/metadata/*` | Read | Get file metadata, plus a short-lived download `token` when the object is private |
+| `POST` | `/api/storage/metadata` | Read | The same for up to 100 keys of one source: body `{ keys, storageId? }`, one entry (or `error`) per key |
 | `GET` | `/api/storage/list` | Write | List files in a prefix |
 | `POST` | `/api/storage/folder` | Write | Create a new folder |
+| `GET` | `/api/storage/sources` | None | The storage sources this backend serves (key, engine, transport, label) — never a file |
+
+> **IMPORTANT FOR AGENTS:** `GET /api/storage/file/*` **refuses an ordinary access JWT** (`401 Unauthorized: Access JWT not allowed on file routes`). It takes the short-lived path-scoped download token that `GET /metadata/*` (and `client.storage.getSignedUrl()`) mints, as `?token=` or a `Bearer`, or nothing for a `public/` key. Every other route takes the access JWT as usual. Every route except `/file/*` answers the `/api/data` envelope: the payload under `data`, a failure as `{ "error": { message, code, requestId } }`.
 
 ### TUS Resumable Upload Endpoints
 
@@ -425,13 +438,13 @@ Upload a file via `multipart/form-data`.
 | `key` | `string` | No | Storage key/path. Falls back to original filename, then `"unnamed"` |
 | `bucket` | `string` | No | Target bucket name |
 | `storageId` | `string` | No | Route to a named backend (alternative to `?storageId` query param) |
+| `collection`, `property` | `string` | No | The property the file is for — holds it to that property's `storage.maxSize` and `acceptedFiles` |
 | `metadata_*` | `string` | No | Custom metadata keys prefixed with `metadata_` |
 
 **Response** (201):
 
 ```json
 {
-  "success": true,
   "data": {
     "key": "products/images/photo.jpg",
     "bucket": "default",
@@ -440,14 +453,14 @@ Upload a file via `multipart/form-data`.
 }
 ```
 
-The `storageUrl` format is `local://{bucket}/{key}` for local storage and `s3://{bucket}/{key}` for S3.
+The `storageUrl` format is `local://{bucket}/{key}` for local storage, `s3://{bucket}/{key}` for S3 and `gs://{bucket}/{key}` for GCS.
 
 **Error responses:**
 
 | Status | Condition |
 |--------|-----------|
 | 400 | No file provided in request body |
-| 413 | File exceeds `maxFileSize` (body limit middleware) |
+| 413 | `PAYLOAD_TOO_LARGE` — file exceeds the source's limit (`maxFileSize` / `STORAGE_MAX_FILE_SIZE`) |
 
 ### GET /api/storage/file/{path}
 
@@ -455,14 +468,15 @@ Download or serve a file. The path can include a bucket prefix (e.g., `/file/def
 
 For **local storage**, files are served directly from disk with content type read from the `.metadata.json` sidecar file.
 
-For **S3 storage**, files are proxied through the backend (not redirected to signed URLs). This avoids mixed-content issues and unreachable internal VPC endpoints.
+For **S3 and GCS storage**, files are proxied through the backend (not redirected to signed URLs). This avoids mixed-content issues and unreachable internal VPC endpoints.
 
 **Image transformation query parameters** can be appended — see [Image Transformation](#image-transformation).
 
 **Response headers:**
-- `Content-Type` — from metadata or inferred
-- `Cache-Control: public, max-age=31536000, immutable` (when image transforms are applied)
-- `Cache-Control: public, max-age=3600, immutable` (for S3-proxied files without transforms)
+- `Content-Type` — the stored type, for a narrow inline allowlist (images, video, audio, `application/pdf`, `text/plain`); anything else is served as `application/octet-stream` with `Content-Disposition: attachment`, always with `X-Content-Type-Options: nosniff`
+- A weak `ETag` and `Last-Modified` (an `If-None-Match` revalidation answers `304`), and `Accept-Ranges: bytes` (a `Range` request answers `206`)
+- `Cache-Control: public, max-age=60, stale-while-revalidate=86400, must-revalidate` for a key under `public/` (or `publicRead: true`); `private, max-age=60, must-revalidate` otherwise
+- Image transforms: the same, with `max-age=3600`. Nothing is ever marked `immutable` — a key can be overwritten
 
 ### GET /api/storage/metadata/{path}
 
@@ -472,17 +486,20 @@ Get metadata for a file without downloading it.
 
 ```json
 {
-  "success": true,
   "data": {
     "bucket": "default",
     "fullPath": "products/images/photo.jpg",
     "name": "photo.jpg",
     "size": 204800,
     "contentType": "image/jpeg",
-    "customMetadata": {}
+    "customMetadata": {},
+    "token": "…",
+    "tokenExpiresIn": 300
   }
 }
 ```
+
+`token` / `tokenExpiresIn` are present only for a private object: the short-lived download token `GET /file/*` accepts for this path. A key ending in `/` (a folder) is `404`.
 
 ### GET /api/storage/list
 
@@ -494,8 +511,8 @@ List files and folders in a given prefix.
 |-----------|------|---------|-------------|
 | `prefix` | `string` | `""` | Path prefix to list (also accepts `path` for backward compat) |
 | `bucket` | `string` | `"default"` (local) | Bucket name |
-| `maxResults` | `number` | `1000` | Maximum number of results |
-| `pageToken` | `string` | — | Pagination token from previous response |
+| `maxResults` | `number` | `1000` | Maximum number of results. Below 1 is `400 INVALID_LIST_OPTIONS` |
+| `pageToken` | `string` | — | Pagination token from previous response. One the source never issued is `400 INVALID_LIST_OPTIONS` |
 
 > Listing is **one level deep**: files land in `items`, immediate subfolders in `prefixes`. "Everything under this prefix" needs an explicit recursive walk over `prefixes`.
 
@@ -503,7 +520,6 @@ List files and folders in a given prefix.
 
 ```json
 {
-  "success": true,
   "data": {
     "items": [
       { "bucket": "default", "fullPath": "images/photo.jpg", "name": "photo.jpg" }
@@ -540,7 +556,7 @@ For **local storage**, creates the directory on disk. For **S3**, creates a zero
 **Response** (201):
 
 ```json
-{ "success": true, "message": "Folder created" }
+{ "message": "Folder created" }
 ```
 
 ### DELETE /api/storage/file/{path}
@@ -550,12 +566,12 @@ Delete a file. For local storage, also deletes the `.metadata.json` sidecar file
 **Response** (200):
 
 ```json
-{ "success": true, "message": "File deleted" }
+{ "message": "File deleted" }
 ```
 
 ## TUS Resumable Uploads
 
-Rebase implements [TUS v1.0.0](https://tus.io/protocols/resumable-upload) with the **Creation** and **Termination** extensions. This allows reliable upload of large files (up to 5 GB) with automatic resume on network failure.
+Rebase implements [TUS v1.0.0](https://tus.io/protocols/resumable-upload) with the **Creation** and **Termination** extensions. This allows reliable upload of large files with automatic resume on network failure. `client.storage.putObject()` and the admin panel send any file over 8 MiB this way, in 8 MiB chunks.
 
 ### TUS Configuration
 
@@ -563,12 +579,12 @@ Rebase implements [TUS v1.0.0](https://tus.io/protocols/resumable-upload) with t
 |---------|-------|
 | TUS version | `1.0.0` |
 | Extensions | `creation`, `termination` |
-| Max upload size | 5 GB (`5 * 1024 * 1024 * 1024` bytes) |
+| Max upload size | The target source's own limit — `maxFileSize` / `STORAGE_MAX_FILE_SIZE`, **50 MB** by default — never above the 5 GB protocol ceiling. Refused at creation, before the first chunk |
 | Stale upload expiry | 24 hours |
 | Cleanup interval | Every 60 seconds |
 | Temp directory | `{storageBasePath}/.tus-uploads` |
 
-TUS uploads are stored in a temporary directory and automatically moved to the final storage backend (via `putObject`) when the upload completes.
+TUS uploads are stored in a temporary directory and automatically moved to the final storage backend (via `putObject`) when the upload completes. Each upload's record (`<id>.json`) lives beside its bytes in that directory, not in the process, so a restarted server resumes it and every instance sharing `STORAGE_PATH` serves it. An upload started by a signed-in caller answers only to that caller and administrators (anyone else gets `404`).
 
 ### TUS Protocol Flow
 
@@ -589,8 +605,10 @@ Returns TUS server capabilities.
 Tus-Resumable: 1.0.0
 Tus-Version: 1.0.0
 Tus-Extension: creation,termination
-Tus-Max-Size: 5368709120
+Tus-Max-Size: 52428800
 ```
+
+`Tus-Max-Size` is the limit of the source named by `?storageId=` (the default one otherwise) — 50 MB unless configured.
 
 ### POST /api/storage/tus (Create)
 
@@ -600,18 +618,21 @@ Create a new resumable upload.
 
 | Header | Description |
 |--------|-------------|
-| `Upload-Length` | Total file size in bytes (must be > 0 and ≤ 5 GB) |
+| `Upload-Length` | Total file size in bytes (must be > 0 and within the source's limit — `413 PAYLOAD_TOO_LARGE` otherwise) |
 | `Upload-Metadata` | TUS metadata as `key base64value,key2 base64value2` |
 
 **Supported metadata keys:**
 
 | Key | Description |
 |-----|-------------|
-| `filename` | Original file name (used as storage key if no `key` provided) |
+| `filename` | Original file name (used as storage key if no `key` provided; with neither, the upload id is the key) |
 | `key` | Explicit storage key/path |
 | `bucket` | Target bucket |
+| `storageId` | Named backend (wins over the `storageId` in the query string) |
+| `collection`, `property` | The property the file is for — its `maxSize` / `acceptedFiles` are checked at creation |
 | `contentType` | File MIME type |
 | `filetype` | Alternative MIME type key (fallback) |
+| `metadata_<name>` | Custom metadata, as the multipart route's `metadata_*` fields |
 
 **Response** (201):
 
@@ -653,12 +674,13 @@ Append data to an in-progress upload.
 | 409 | Offset mismatch (client offset ≠ server offset) |
 | 413 | Chunk would exceed declared `Upload-Length` |
 | 415 | Wrong `Content-Type` (must be `application/offset+octet-stream`) |
+| 423 | `UPLOAD_LOCKED` — another `PATCH` for the same upload is still being received; resume from the offset `HEAD` reports |
 
 When `Upload-Offset` reaches `Upload-Length`, the upload is **automatically finalized**: the temp file is read, a `File` object is created with the metadata-derived MIME type, `putObject` is called on the storage controller, and the temp file is cleaned up.
 
 ### DELETE /api/storage/tus/:id (Terminate)
 
-Cancel and remove an in-progress upload. Deletes the temp file and removes the upload from the in-memory registry.
+Cancel and remove an in-progress upload. Deletes the temp file and its `<id>.json` record.
 
 ### TUS Client Example
 
@@ -695,7 +717,7 @@ upload.start();
 
 Rebase provides on-the-fly image resize, crop, format conversion, and quality adjustment. Transformations are applied by adding query parameters to the `GET /api/storage/file/*` endpoint.
 
-> **IMPORTANT FOR AGENTS:** Image transformation requires the `sharp` npm package as an **optional peer dependency**. Install it: `pnpm add sharp`. If `sharp` is not installed, requesting a transform will throw an error.
+> **IMPORTANT FOR AGENTS:** Image transformation requires the `sharp` npm package as an **optional peer dependency**. Install it: `pnpm add sharp` (in `backend/` for an ejected project). If `sharp` is not installed, a transform request is served the **original** file, and the backend warns once.
 
 ### Transform Query Parameters
 
@@ -707,7 +729,7 @@ Rebase provides on-the-fly image resize, crop, format conversion, and quality ad
 | `format` | `string` | `webp`, `avif`, `jpeg`, `png` | `webp` | Output format |
 | `fit` | `string` | `cover`, `contain`, `fill`, `inside`, `outside` | `cover` | Resize fit mode |
 
-All dimensions are capped at **4096 px** to prevent abuse. `withoutEnlargement` is enabled — images are never upscaled.
+A parameter outside these ranges (`?width=99999`, `?format=tiff`) is a **400**, not a silently clamped value. `withoutEnlargement` is enabled — images are never upscaled. A small number of transforms run at once; past a bounded backlog the server answers **503 `TRANSFORM_OVERLOADED`**.
 
 ### Transform Examples
 
@@ -724,11 +746,11 @@ GET /api/storage/file/default/images/photo.jpg?format=avif&fit=contain&width=500
 
 ### Transformable Image Types
 
-Only raster images are transformable. SVG and GIF are **excluded**:
+Only raster images are transformable. SVG and GIF are **excluded** by their stored content type and always served as they are. The bytes are then checked too: a file whose decoded format is not one of `jpeg`, `png`, `webp`, `avif`, `tiff`, `heif` (a BMP, or a non-image stored as `image/png`) answers **415 `UNSUPPORTED_MEDIA_TYPE`**:
 
 ```
-✅  image/jpeg, image/png, image/webp, image/bmp, image/tiff
-❌  image/svg+xml, image/gif
+✅  image/jpeg, image/png, image/webp, image/avif, image/tiff, image/heif
+❌  image/svg+xml, image/gif (served untransformed); anything else (415)
 ```
 
 ### Transform Cache
@@ -738,22 +760,22 @@ Transformed images are cached in an **LRU in-memory cache** to avoid redundant p
 | Setting | Value |
 |---------|-------|
 | Max entries | 500 |
+| Max total size | 256 MB |
 | TTL | 1 hour (3,600,000 ms) |
-| Cache key | `{filePath}::{JSON.stringify(options)}` |
+| Cache key | `{storageId}/{bucket}/{key}@{sourceVersion}::{JSON.stringify(options)}` — replacing the source serves a fresh rendition |
 | Eviction policy | LRU (oldest entry evicted when at capacity) |
 
-Transformed responses include `Cache-Control: public, max-age=31536000, immutable`.
+Concurrent requests for the same uncached variant produce one transform. The cache is per process: not shared between instances, and lost on restart. `storageRenditionCache: { enabled: true }` (or `STORAGE_RENDITION_CACHE=true`) also writes each rendition back to the source's bucket under the reserved prefix `_rebase/renditions/` (a read then costs one `PUT` per new variant; set a lifecycle rule on that prefix). Transformed responses carry the object's `Cache-Control` with `max-age=3600` — see the response headers above.
 
 ## Client SDK Methods
 
 The `@rebasepro/client` package provides a `StorageSource` interface via `createStorage(transport)`. These methods are available on `client.storage` (or through the React/Studio hooks).
 
-All SDK methods accept an optional `storageId` parameter (passed as a query parameter) to route the request to a specific named backend:
+The methods take no `storageId` argument: a source object is bound to one backend, and sends its `storageId` (as a query parameter, and a form field on uploads) on every request. `client.storage` is the default source; `client.createStorageSource(key)` returns one bound to a named backend. `client.storageRegistry.get(key)` answers only for sources already registered — from the client's `storageSources` option or after `client.fetchStorageSources()` — so do not fall back from it to `client.storage`, which would quietly write to the default backend:
 
 ```typescript
 // Upload to a specific backend
-// `client.storage` is the default source. Pick a named backend from the registry.
-const media = client.storageRegistry.get("media") ?? client.storage;
+const media = client.createStorageSource("media");
 
 const result = await media.putObject({
     file: myFile,
@@ -778,7 +800,7 @@ const result = await client.storage.putObject({
 // result: { key: "products/images/photo.jpg", bucket: "default", storageUrl: "local://..." }
 ```
 
-The SDK sends a `multipart/form-data` request to `POST /api/storage/upload`. Custom metadata keys are prefixed with `metadata_` in the form data.
+The SDK sends a `multipart/form-data` request to `POST /api/storage/upload`. Custom metadata keys are prefixed with `metadata_` in the form data. A file over 8 MiB goes through the resumable (TUS) endpoint instead, in 8 MiB chunks, and lands the same way with the same result; a server without it gets the multipart request. `public: true` places the key under `public/`, and `context: { collection, property }` holds the file to that property's limits.
 
 ### getSignedUrl
 
@@ -804,6 +826,8 @@ if (config.fileNotFound) {
 - **Public files** → `{baseUrl}/api/storage/file/{path}` with **no token**. A file is public when it lives under the `public/` prefix — set `storage: { public: true }` on the property, or pass `public: true` to `putObject`. Public URLs are **stable, permanent, and CDN-cacheable**, so they are safe to store in a database and hotlink. For public paths, `getSignedUrl()` returns the URL immediately with no server round-trip.
 
 Protocol prefixes (`local://`, `s3://`) are automatically stripped from the key.
+
+> **WARNING FOR AGENTS:** on `getSignedUrl`, `getObject` and `deleteObject` the `bucket` argument is folded into the object path (`<bucket>/<key>`) and never reaches the server as a bucket — only a leading `default/` is read back off it. So a file written with `putObject({ bucket: "media" })` is **not** read back with `getSignedUrl(key, "media")`, and an unknown bucket reads as a missing file. Use the default bucket (or a named storage *source* via `createStorageSource`) rather than a non-default bucket.
 
 ### getObject
 
@@ -857,9 +881,9 @@ console.log(result.nextPageToken); // for next page, or undefined
 Define file upload fields in your collections using the `storage` option on string properties:
 
 ```typescript
-import { PostgresCollectionConfig } from "@rebasepro/types";
+import { defineCollection } from "@rebasepro/cms-types";
 
-const productsCollection: PostgresCollectionConfig = {
+const productsCollection = defineCollection({
     name: "Products",
     slug: "products",
     table: "products",
@@ -888,7 +912,7 @@ const productsCollection: PostgresCollectionConfig = {
             }
         }
     }
-};
+});
 ```
 
 The `storageSource` field maps to a named backend registered in the `StorageRegistry` (server-side) or in the `storageSources` prop (client-side). When omitted, the `(default)` backend is used.
@@ -897,8 +921,8 @@ The `storageSource` field maps to a named backend registered in the `StorageRegi
 
 | Property | Type | Description |
 |----------|------|-------------|
-| `storageSource` | `string` | Named backend to route uploads to (optional, defaults to `(default)`) |
-| `storagePath` | `string` | Path template for uploaded files. Supports `{entityId}` placeholder |
+| `storageSource` | `string` or a `bucket()` handle | Named backend to route uploads to (optional, defaults to `(default)`) |
+| `storagePath` | `string \| (context) => string` | **Required.** Path template for uploaded files. Placeholders: `{file}`, `{file.name}`, `{file.ext}`, `{rand}`, `{entityId}`, `{propertyKey}`, `{path}`. Resolved by the admin panel's uploader — nothing on the server confines an upload to this prefix; that is what `storageAuthorize` / `storagePolicies` are for |
 | `acceptedFiles` | `string[]` | Accepted MIME types or globs (e.g., `["image/*"]`) |
 | `maxSize` | `number` | Maximum file size in bytes |
 | `public` | `boolean` | Store files under the `public/` prefix and serve them via stable, token-less, permanent, CDN-cacheable URLs (safe to persist/hotlink). Defaults to `false` (private, short-lived signed URLs). |
@@ -972,7 +996,7 @@ function MyUploadComponent() {
 | `"server"` | File operations are proxied through the Rebase backend REST API | S3, GCS, or local backends managed by the server |
 | `"direct"` | File operations go directly from the client to the storage provider | External cloud storage, or any provider with client-side SDKs |
 
-> **IMPORTANT FOR AGENTS:** Direct transport sources must provide a `source` property implementing the `StorageSource` interface. Server transport sources use the built-in SDK transport and only need `key` and `engine`.
+> **IMPORTANT FOR AGENTS:** Direct transport sources must provide a `source` property implementing the `StorageSource` interface. Server transport sources need no entry at all — the frontend learns them from `GET /api/storage/sources`; list one only to set its label or transport yourself (then `key`, `engine` and `transport`), and its `key` must match a backend key the server registers.
 
 ## Storage Browser (Studio)
 
@@ -990,14 +1014,14 @@ The `@rebasepro/studio` package includes a built-in `StorageView` component:
 File size is validated at two levels:
 
 1. **Hono body limit middleware** — returns `413` with `PAYLOAD_TOO_LARGE` before the file reaches the controller. The limit is derived from `maxFileSize` in the storage config (default 50 MB).
-2. **Controller-level validation** — the controller's `validateFile()` checks `file.size` against `maxFileSize` and throws an `Error` if exceeded.
+2. **Controller-level validation** — every controller checks `file.size` against the source's limit and refuses it with `413 PAYLOAD_TOO_LARGE` (`details: { size, maxFileSize }`).
 
 ### MIME Type Validation
 
-When `allowedMimeTypes` is set in the storage config, uploads with disallowed MIME types are rejected with an error:
+When `allowedMimeTypes` is set in the storage config, uploads with disallowed MIME types are rejected with `400 STORAGE_FILE_TYPE_REFUSED`:
 
 ```
-File type application/zip is not allowed. Allowed types: image/jpeg, image/png
+File type application/zip is not allowed on this storage source. Allowed types: image/jpeg, image/png.
 ```
 
 ### Common MIME Type Constants
@@ -1027,8 +1051,9 @@ import { IMAGE_MIME_TYPES, DOCUMENT_MIME_TYPES } from "@rebasepro/server";
 | 400 | Missing/invalid `Upload-Length` header, missing `Upload-Offset`, upload already completed |
 | 404 | Upload ID not found |
 | 409 | `Upload-Offset` mismatch (client offset ≠ server offset) |
-| 413 | `Upload-Length` exceeds 5 GB max, or chunk exceeds declared length |
+| 413 | `Upload-Length` exceeds the source's limit (50 MB by default), or chunk exceeds declared length |
 | 415 | `Content-Type` is not `application/offset+octet-stream` |
+| 423 | `UPLOAD_LOCKED` — a concurrent `PATCH` for the same upload |
 
 ## Metadata Sidecar Files (Local Storage)
 
