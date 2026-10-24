@@ -246,7 +246,7 @@ export async function readFunctionsDirectory(
                     `  export type: ${exportType}${exported?.constructor?.name ? ` (${exported.constructor.name})` : ""}\n` +
                     `  prototype methods: ${keys}\n` +
                     "  Hint: ensure the function exports a Hono app created with the same hono version as the server.\n" +
-                    "  Author with `defineFunction(...)` from @rebasepro/server for a typed, checked contract.\n" +
+                    "  Author with `defineFunction(...)` from @rebasepro/server/functions for a typed, checked contract.\n" +
                     "  The loader checks for .fetch() and .routes — any Hono-compatible app will work."
                 );
                 problems.push(`${file} (not a Hono app or factory)`);
