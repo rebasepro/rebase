@@ -174,6 +174,14 @@ export function createDevEmailSink(options: { capacity?: number } = {}): DevEmai
 let activeSink: DevEmailSink | undefined;
 
 /**
+ * Every sink registered, by the `sendEmail` it hands out: what lets a backend
+ * serve the mailbox it was given rather than the process's last one. With two
+ * backends in one development process, the slot above made B's admins read
+ * A's users' reset and magic links.
+ */
+const sinksBySender = new WeakMap<object, DevEmailSink>();
+
+/**
  * Make `sink` the process's development mailbox.
  *
  * Returns the sink, so this can wrap the construction it replaces. In
@@ -189,7 +197,18 @@ export function registerDevEmailSink(sink: DevEmailSink): DevEmailSink {
         return sink;
     }
     activeSink = sink;
+    sinksBySender.set(sink.sendEmail, sink);
     return sink;
+}
+
+/**
+ * The registered mailbox whose `sendEmail` this is — the sink a backend's
+ * `auth.email.sendEmail` came from — or `undefined` when it is some other
+ * sender, or the process is production.
+ */
+export function devEmailSinkFor(sendEmail: object | undefined): DevEmailSink | undefined {
+    if (process.env.NODE_ENV === "production" || !sendEmail) return undefined;
+    return sinksBySender.get(sendEmail);
 }
 
 /** The registered mailbox, if there is one. */

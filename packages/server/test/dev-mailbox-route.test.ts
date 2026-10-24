@@ -78,7 +78,7 @@ const bootstrapper: BackendBootstrapper = {
 type Boot = { app: Hono; stop: () => void };
 const started: Boot[] = [];
 
-async function boot(): Promise<Hono> {
+async function boot(email?: object): Promise<Hono> {
     const app = new Hono();
     const backend = await initializeRebaseBackend({
         app: app as never,
@@ -87,7 +87,7 @@ async function boot(): Promise<Hono> {
         cronsDir: CRONS_DIR,
         cronPersistence: false,
         bootstrappers: [bootstrapper],
-        auth: { requireAuth: false, jwtSecret: JWT_SECRET }
+        auth: { requireAuth: false, jwtSecret: JWT_SECRET, ...(email ? { email } : {}) }
     } as never);
     started.push({
         app,
@@ -167,6 +167,31 @@ describe("GET /api/admin/dev/emails", () => {
         expect(response.status).toBe(501);
         expect((await response.json() as { error: { code: string } }).error.code)
             .toBe("DEV_MAILBOX_UNAVAILABLE");
+    });
+
+    it("serves each backend the mailbox it was given, not the process's last one", async () => {
+        // Two backends in one development process, each wired to a sink of
+        // its own, as the boot wires one: B's admins read A's reset links
+        // through the one process-wide slot, which held whichever registered
+        // last.
+        const emailFor = (sink: { sendEmail: unknown }) =>
+            ({ from: "app@example.com", sendEmail: sink.sendEmail, resetPasswordUrl: "http://localhost:5173" });
+        const sinkA = registerDevEmailSink(await sinkWithOneMessage());
+        const appA = await boot(emailFor(sinkA));
+        const sinkB = registerDevEmailSink(createDevEmailSink());
+        const appB = await boot(emailFor(sinkB));
+
+        const messages = async (app: Hono) =>
+            ((await (await app.request("/api/admin/dev/emails", bearer(await adminToken()))).json()) as { messages: unknown[] }).messages;
+        expect(await messages(appA)).toHaveLength(1);
+        expect(await messages(appB)).toHaveLength(0);
+    });
+
+    it("has nothing to show for a backend whose mail goes to a sender of its own", async () => {
+        registerDevEmailSink(await sinkWithOneMessage());
+        const app = await boot({ from: "app@example.com", sendEmail: async () => undefined, resetPasswordUrl: "http://localhost:5173" });
+
+        expect((await app.request("/api/admin/dev/emails", bearer(await adminToken()))).status).toBe(501);
     });
 
     it("refuses in production even when a sink was registered before NODE_ENV was set", async () => {

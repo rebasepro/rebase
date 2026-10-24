@@ -155,7 +155,7 @@ import { createHistoryRoutes } from "../history";
 import type { HistoryService } from "../history/history-routes";
 import type { EmailService } from "../email";
 import { createEmailService, createUnconfiguredEmailService } from "../email";
-import { activeDevEmailSink } from "../email/dev-sink";
+import { activeDevEmailSink, devEmailSinkFor } from "../email/dev-sink";
 import type { OAuthProvider } from "../auth/interfaces";
 import { isAuthAdapter, resolveRequireAuth } from "../auth/require-auth";
 import {
@@ -3387,8 +3387,16 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
             }
         } as const;
 
+        // The mailbox this backend was given: the sink its own
+        // `auth.email.sendEmail` came from. Only a backend configured with no
+        // mail at all falls back to the process's registered one — one with a
+        // mail server, or a sender of its own, has nothing captured to show,
+        // and the process's mailbox would be another backend's.
+        const ownEmail = config.auth && !isAuthAdapter(config.auth) ? config.auth.email : undefined;
+        const devMailbox = () => ownEmail ? devEmailSinkFor(ownEmail.sendEmail) : activeDevEmailSink();
+
         devMailRouter.get("/", (c) => {
-            const sink = activeDevEmailSink();
+            const sink = devMailbox();
             if (!sink) return c.json(unavailable, 501);
             return c.json({ enabled: true, messages: sink.list() });
         });
@@ -3397,7 +3405,7 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
         // message in. DELETE rather than POST /clear: it removes a collection
         // of things, which is what DELETE means.
         devMailRouter.delete("/", (c) => {
-            const sink = activeDevEmailSink();
+            const sink = devMailbox();
             if (!sink) return c.json(unavailable, 501);
             sink.clear();
             return c.json({ cleared: true });
