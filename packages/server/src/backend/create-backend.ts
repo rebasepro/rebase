@@ -2302,7 +2302,9 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
                     const key = resolveDataSource(collection, dataSourceRegistry).key;
                     return !key || key === DEFAULT_DRIVER_ID ? defaultDriver : driverRegistry.get(key);
                 },
-                globalCallbacks: () => collectionRegistry.getGlobalCallbacks()
+                globalCallbacks: () => collectionRegistry.getGlobalCallbacks(),
+                // A revert restores what an entry holds: its files are in use.
+                history: historyConfigResult?.historyService
             }));
             storageMaintenanceSurface = maintenanceRouter;
         }

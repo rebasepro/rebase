@@ -241,6 +241,33 @@ export async function removeReferencedKeys(
     return { scanned, unscanned };
 }
 
+/** How row history is named among the scanned and unscanned collections. */
+export const HISTORY_SCAN_NAME = "(row history)";
+
+/**
+ * Remove from `keys` every key a history entry names, in its values or its
+ * previous values. Resolves to why history could not be read, if it could not.
+ */
+async function removeKeysInHistory(
+    keys: Set<string>,
+    history: { scanStoredValues?(pageSize?: number): AsyncIterable<unknown[]> }
+): Promise<UnscannedCollection | undefined> {
+    if (!history.scanStoredValues) {
+        return { collection: HISTORY_SCAN_NAME, reason: "this backend's history service cannot be scanned" };
+    }
+    try {
+        for await (const values of history.scanStoredValues()) {
+            if (keys.size === 0) return undefined;
+            forEachString(values, (text) => {
+                for (const key of keysNamedBy(text)) keys.delete(key);
+            });
+        }
+        return undefined;
+    } catch (error: unknown) {
+        return { collection: HISTORY_SCAN_NAME, reason: error instanceof Error ? error.message : String(error) };
+    }
+}
+
 /** What `findOrphans` found. */
 export interface OrphanReport {
     /** Objects in the source, internal ones aside. */
@@ -269,6 +296,12 @@ export async function findOrphans(options: {
     driverFor: (collection: CollectionConfig) => DataDriver | undefined;
     /** The callbacks every collection runs, which may scope or rewrite its reads. */
     globalCallbacks?: CollectionCallbacks;
+    /**
+     * Row history, when the backend keeps it: a revert restores the values an
+     * entry holds, so a file only history names is still in use. One that
+     * cannot be read is reported unscanned, as {@link HISTORY_SCAN_NAME}.
+     */
+    history?: { scanStoredValues?(pageSize?: number): AsyncIterable<unknown[]> };
     olderThanMs: number;
     now?: number;
 }): Promise<OrphanReport> {
@@ -284,6 +317,11 @@ export async function findOrphans(options: {
     const { scanned, unscanned } = await removeReferencedKeys(unnamed, options.collections, options.driverFor, {
         globalCallbacks: options.globalCallbacks
     });
+    if (options.history) {
+        const history = await removeKeysInHistory(unnamed, options.history);
+        if (history) unscanned.push(history);
+        else scanned.push(HISTORY_SCAN_NAME);
+    }
 
     const cutoff = (options.now ?? Date.now()) - options.olderThanMs;
     const orphans: StoredObjectEntry[] = [];

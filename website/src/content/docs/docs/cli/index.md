@@ -474,10 +474,12 @@ rebase storage move --from "(default)" --to media --prefix avatars
 rebase storage move --from "(default)" --to media --prefix avatars --delete-source
 ```
 
-`orphans` reads every row of every collection as stored, soft-deleted rows
-included and past every `beforeQuery` and `afterRead` hook, and lists the files of one source (`--source`, the default source when left out)
-that no string in any row names: a key, a URL, a `rebase-storage:` reference in
-a text. Files newer than `--older-than` hours (24 by default) are left out,
+`orphans` reads every row of every collection as stored (soft-deleted rows
+included, past every `beforeQuery` and `afterRead` hook) and every
+[history](/docs/backend/history/) entry, since a revert restores what it holds.
+It lists the files of one source (`--source`, the default source when left out)
+that no string in any of them names: a key, a URL, a `rebase-storage:`
+reference in a text. Files newer than `--older-than` hours (24 by default) are left out,
 because the admin panel uploads a file before the row that names it is saved.
 `--delete` asks before it deletes (`--yes` skips the question, and is required
 with no terminal), the server finds the files again first, and nothing is

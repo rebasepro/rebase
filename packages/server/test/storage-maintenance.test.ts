@@ -148,6 +148,28 @@ describe("storage orphans", () => {
         expect(scanned.orphans.map(o => o.key)).not.toContain("avatars/kept.png");
     });
 
+    it("counts a file a history entry names as in use, and history it cannot read as unread", async () => {
+        const data = rows();
+        const kept = await findOrphans({
+            controller: storage,
+            collections: [collection("users"), collection("posts")],
+            driverFor: (c) => driverOver(data[c.slug as keyof typeof data]),
+            history: { async *scanStoredValues() { yield [[{ avatar: "avatars/kept.png" }, { avatar: "avatars/old.png" }]]; } },
+            olderThanMs: 24 * HOUR
+        });
+        expect(kept.orphans).toEqual([]);
+        expect(kept.scanned).toContain("(row history)");
+
+        const unread = await findOrphans({
+            controller: storage,
+            collections: [collection("users"), collection("posts")],
+            driverFor: (c) => driverOver(data[c.slug as keyof typeof data]),
+            history: {},
+            olderThanMs: 24 * HOUR
+        });
+        expect(unread.unscanned.map(u => u.collection)).toEqual(["(row history)"]);
+    });
+
     describe("through the admin route", () => {
         const app = (fail?: string) => {
             const data = rows();

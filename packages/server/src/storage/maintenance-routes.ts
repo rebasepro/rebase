@@ -30,6 +30,8 @@ export interface StorageMaintenanceRoutesConfig {
     driverFor: (collection: CollectionConfig) => DataDriver | undefined;
     /** The global callbacks, read per request: a global read hook makes every collection hooked. */
     globalCallbacks?: () => CollectionCallbacks | undefined;
+    /** Row history, when kept: a file only an entry names is restored by a revert. */
+    history?: { scanStoredValues?(pageSize?: number): AsyncIterable<unknown[]> };
 }
 
 /** The default grace period: an upload whose row is not saved yet is a day old at most. */
@@ -73,6 +75,7 @@ export function createStorageMaintenanceRoutes(config: StorageMaintenanceRoutesC
             collections: config.collections(),
             driverFor: config.driverFor,
             globalCallbacks: config.globalCallbacks?.(),
+            history: config.history,
             olderThanMs: olderThanMs(olderThan)
         });
     };
