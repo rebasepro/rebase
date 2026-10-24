@@ -264,6 +264,28 @@ describe("storage move", () => {
         expect(await to.statObject("posts/elsewhere.png")).not.toBeNull();
     });
 
+    it("moves every file of a local folder over many pages, deleting as it goes", async () => {
+        // Each page deletes what it moved, and the local page token used to be
+        // an index into the folder: the next page started that many entries
+        // into the shrunken folder, and half the files were never moved.
+        for (let i = 0; i < 60; i++) await put(from, `bulk/${String(i).padStart(3, "0")}.txt`, `file ${i}`);
+        const counts = { copied: 0, deleted: 0, other: 0 };
+        let cursor: string | undefined;
+        do {
+            const page = await moveObjects({ from, to, prefix: "bulk", cursor, limit: 25, deleteSource: true });
+            for (const m of page.moved) {
+                if (m.outcome === "copied") counts.copied++;
+                else counts.other++;
+                if (m.deleted) counts.deleted++;
+            }
+            cursor = page.cursor;
+        } while (cursor);
+
+        expect(counts).toEqual({ copied: 60, deleted: 60, other: 0 });
+        expect((await from.listObjects("bulk")).items).toEqual([]);
+        expect((await to.listObjects("bulk")).items).toHaveLength(60);
+    });
+
     it("keeps the source's copy when the target did not take one", async () => {
         // A target that answers every write and stores nothing.
         const leaky = Object.assign(Object.create(LocalStorageController.prototype), to, {
