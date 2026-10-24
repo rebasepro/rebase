@@ -59,6 +59,8 @@ let requests: string[];
 let readsFrom: string[];
 /** What a deployment row reads as while followed. */
 let row: Record<string, unknown> | undefined;
+/** What the preview's own health route answers once its build has finished. */
+let previewHealth: Response | (() => Response);
 
 function write(root: string, relative: string, content: string): void {
     const file = path.join(root, relative);
@@ -101,6 +103,7 @@ beforeEach(() => {
     requests = [];
     readsFrom = [];
     row = undefined;
+    previewHealth = () => new Response(JSON.stringify({ status: "ok" }), { status: 200 });
     const capture = (...args: unknown[]) => { said.push(args.map(String).join(" ")); };
     vi.spyOn(console, "log").mockImplementation(capture);
     vi.spyOn(console, "error").mockImplementation(capture);
@@ -117,6 +120,7 @@ beforeEach(() => {
         requests.push(url);
         if (url.includes("/deploy/bundle/upload")) return new Response(JSON.stringify({ bundleId: "b1" }));
         if (url.includes("/deploy/source/upload")) return new Response(JSON.stringify({ sourceId: "0123456789abcdef0123456789abcdef" }));
+        if (url === `${PREVIEW.url}/api/health`) return typeof previewHealth === "function" ? previewHealth() : previewHealth;
         return new Response("not found", { status: 404 });
     }));
 
@@ -228,6 +232,46 @@ describe("a --preview deploy", () => {
         // The production verdict, and the production address under it, are
         // the other branch.
         expect(out).not.toContain("Deployment succeeded");
+    });
+
+    it("checks that the preview answers before calling it live, as a production deploy does", async () => {
+        bundle("backend");
+        row = { id: "pd1", status: "success", logs: "built\n" };
+
+        await deploy("--preview");
+
+        expect(requests).toContain(`${PREVIEW.url}/api/health`);
+        expect(said.join("\n")).toMatch(/Live: the preview answers/);
+    });
+
+    it("says so when the preview does not answer yet, and still succeeds — the build did", async () => {
+        bundle("backend");
+        row = { id: "pd1", status: "success", logs: "built\n" };
+        previewHealth = () => new Response("<html>default backend - 404</html>", { status: 404 });
+
+        await deploy("--preview", "--live-timeout", "0.01");
+
+        const out = said.join("\n");
+        expect(out).toContain("Preview deployed");
+        expect(out).toMatch(/Not confirmed live after .*health check answered 404/);
+        // Not production's status command: it says nothing about a preview.
+        expect(out).not.toContain("rebase cloud status");
+    });
+
+    it("skips the check with --live-timeout 0, and carries the verdict in JSON", async () => {
+        bundle("backend");
+        row = { id: "pd1", status: "success", logs: "built\n" };
+        context.setJsonModeForTest(true);
+
+        await deploy("--preview");
+
+        expect(JSON.parse(stdout.join(""))).toMatchObject({ success: true, following: true, live: true, liveChecks: [{ live: true }] });
+        stdout.length = 0;
+        requests.length = 0;
+
+        await deploy("--preview", "--live-timeout", "0");
+        expect(requests).not.toContain(`${PREVIEW.url}/api/health`);
+        expect(JSON.parse(stdout.join(""))).toMatchObject({ success: true, live: null });
     });
 
     it("exits non-zero when the preview's build fails", async () => {

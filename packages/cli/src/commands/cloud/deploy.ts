@@ -850,6 +850,8 @@ async function triggerAndFollowPreview(opts: {
     url: string;
     follow: boolean;
     timeoutMs: number;
+    /** How long to wait for the preview to answer once built; 0 skips the check. */
+    liveTimeoutMs: number;
     preview?: PreviewRequest;
     body: Record<string, unknown>;
     record: (followed: boolean, status: string) => Promise<void>;
@@ -892,7 +894,44 @@ async function triggerAndFollowPreview(opts: {
         preview,
         onTerminal: (ended) => opts.record(true, ended)
     });
-    emit(() => {}, { success: true, deploymentId, following: true, status, preview });
+    // The control plane's `ready` is a pod that passed its readiness probe,
+    // not an address that answers: the preview's certificate, and its Ingress
+    // rule, can trail it. So the same live check a production deploy runs,
+    // against the preview's own address.
+    const live = opts.liveTimeoutMs > 0 ? await checkPreviewLive(preview, deploymentId, opts.liveTimeoutMs) : undefined;
+    emit(
+        () => {
+            if (!live) return;
+            const down = live.filter(check => !check.live);
+            console.log(down.length === 0
+                ? chalk.green(`  Live: the preview answers at ${preview.url}.`)
+                : chalk.yellow(`  Not confirmed live after ${Math.max(1, Math.round(opts.liveTimeoutMs / 1000))}s: ${down.map(c => c.reason ?? "no answer").join(", ")}. `
+                    + "The build succeeded; a new preview's certificate can take a minute or two. Open the address again shortly.")
+            );
+            console.log("");
+        },
+        { success: true, deploymentId, following: true, status, preview, live: liveVerdict(live, opts.liveTimeoutMs).live, liveChecks: live ?? [] }
+    );
+}
+
+/** Probe a preview's own address until it answers, like {@link checkLive} for a deploy. */
+async function checkPreviewLive(preview: Preview, deploymentId: string, timeoutMs: number): Promise<LiveCheck[]> {
+    let host: string;
+    try {
+        host = new URL(preview.url).host;
+    } catch {
+        return [];
+    }
+    progress(chalk.gray("  Checking that the preview answers..."));
+    const app: DeployedApp = {
+        name: preview.app ?? (preview.backend === "production" ? "site" : "backend"),
+        // A backend preview is live when its health route says so; a static
+        // one when its address answers.
+        type: preview.backend === "production" ? "static" : "backend",
+        url: preview.url,
+        host
+    };
+    return checkLive([app], { deploymentId, hosts: [], timeoutMs });
 }
 
 /**

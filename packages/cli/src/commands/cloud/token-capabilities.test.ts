@@ -88,7 +88,7 @@ let said: string[];
 /** The scope the control plane checks a request against. */
 function requiredScope(method: string, url: URL): string {
     const [api, plane, name] = url.pathname.split("/").filter(Boolean);
-    if (url.origin === APP) return `app:${method} ${url.pathname}`;
+    if (url.origin === APP || url.origin === PREVIEW_APP) return `app:${method} ${url.pathname}`;
     if (url.origin !== cp) return `elsewhere:${method} ${url.href}`;
     if (api === "api" && plane === "data") {
         const verb = method === "GET" ? "read" : method === "DELETE" ? "delete" : "write";
@@ -151,6 +151,9 @@ const PREVIEW = {
     deploymentId: "pd1",
     expiresAt: "2026-10-08T10:00:00.000Z"
 };
+
+/** The preview's own app, which `deploy --preview` checks answers, with no credential. */
+const PREVIEW_APP = new URL(PREVIEW.url).origin;
 
 const PREVIEW_VAR = { key: "FOO", secret: false, unset: false, updatedAt: null };
 
@@ -220,7 +223,7 @@ function controlPlane(input: RequestInfo | URL, init?: RequestInit): Response {
     const method = init?.method ?? "GET";
     const scope = requiredScope(method, url);
     sent.push({ method, url, scope });
-    if (url.origin === APP) return app(method, url, init);
+    if (url.origin === APP || url.origin === PREVIEW_APP) return app(method, url, init);
     // A token, so the bearer is the one the line was given — never a session.
     expect(new Headers(init?.headers).get("Authorization")).toBe("Bearer rk_live_token");
     if (enforce && !grants(held, scope)) {
