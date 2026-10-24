@@ -476,7 +476,11 @@ function EditForm() {
 
 ## `useEffectiveRoleController`
 
-Switch roles at runtime to preview permissions and test Row-Level Security (RLS) policies locally without signing out.
+Switch the role the admin panel's navigation is built for, without signing out:
+which Studio views it lists. It sends nothing to the server and evaluates no
+row-level security policy, so a data view still shows what you can read. To
+test RLS, use **Simulate access** in the app bar, or `client.simulate()` from
+code; see [Testing access](/docs/frontend/authentication/#testing-access-simulate-access).
 
 ```typescript
 import { useEffectiveRoleController } from "@rebasepro/app";

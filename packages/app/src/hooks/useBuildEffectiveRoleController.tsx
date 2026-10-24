@@ -8,6 +8,10 @@ import { readStoredString, removeStoredString, writeStoredString } from "../util
  * what role is simulated in Editor mode when Dev mode is active.
  *
  * It uses localStorage to persist the simulated role across reloads.
+ *
+ * Navigation only: it changes which Studio views are listed, sends nothing to
+ * the server and evaluates no row-level security policy. To test what a role
+ * can read, use "Simulate access" (`useRlsSimulation`, `client.simulate()`).
  */
 export function useBuildEffectiveRoleController(): EffectiveRoleController {
 

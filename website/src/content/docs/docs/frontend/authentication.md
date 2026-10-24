@@ -112,18 +112,42 @@ To add or remove role options, update the `enum` map in your users collection an
 
 A role in this list is a name your [security rules](/docs/collections/security-rules) can match. What it may do beyond its rows (manage users, read logs, change the schema) is declared separately, under `auth.roles` on the same collection. `admin` is built in and holds everything. See [Roles and scopes](/docs/backend/roles-and-scopes).
 
-## Role Simulation (Dev Mode)
+## Testing access: Simulate access
 
-In developer mode, you can simulate different roles without logging out. This is useful for testing RLS policies:
+To check what a role, a user or a service key can read, an administrator uses
+**Simulate access**, the pill in the admin panel's app bar. Pick a role (with an
+optional user id, which need not be an account), a user, or a live service key.
+Every data view then reads through the server as that identity, against the
+real row-level security policies: a grid shows exactly the rows it can read,
+fields its roles cannot read are masked, and the banner counts the collections
+it sees nothing in. The server checks on every request that you are an
+administrator.
+
+Simulated access is read-only. While it is on, the views offer no create, edit
+or delete, and the server refuses any write that carries a simulation with
+`403 SIMULATION_READ_ONLY`, so nothing is saved as someone else. Stop simulating
+to make changes.
+
+What it does not simulate: the data API's `requireAuth` gate, which lets a
+simulated anonymous caller past so you see what the rows' policies give it
+(a custom function sees it as no session, as a real anonymous caller is);
+storage, whose files are read as you, with uploads off while simulating; and
+live updates, which pause until you stop.
+
+The same thing from code, on the SDK, is `client.simulate()`. It derives a
+client whose requests carry the simulation, and only an administrator's own
+session may use it:
 
 ```typescript
-import { useBuildEffectiveRoleController } from "@rebasepro/app";
-
-const effectiveRoleController = useBuildEffectiveRoleController();
-
-// When active, the UI behaves as if the current user has this role
-effectiveRoleController.setEffectiveRole("editor");
+const asCustomer = client.simulate?.({ role: "customer", userId: "u_1" });
+if (asCustomer) {
+    const { data } = await asCustomer.data.collection("tickets").find();
+}
 ```
+
+The effective-role switch (`useBuildEffectiveRoleController`) is not an RLS
+tester: it only changes which Studio views the navigation lists, sends nothing
+to the server, and evaluates no policy.
 
 ## Next Steps
 
