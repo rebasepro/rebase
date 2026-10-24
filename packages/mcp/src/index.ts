@@ -455,8 +455,35 @@ export function childProcessEnv(
     return out;
 }
 
+let rebaseTokenNoted = false;
+
+/**
+ * The app's key from the environment: `REBASE_API_TOKEN`, and nothing else.
+ *
+ * `REBASE_TOKEN` used to stand in for it. It is the CLI's control-plane token
+ * — a deploy token on the person's real projects — and the app this server
+ * talks to may be a cloud tenant running agent-written code (`rebase cloud
+ * init --claim` points `REBASE_BASE_URL` at one), so a control-plane
+ * credential sent there is a credential handed to that code. It is no longer
+ * sent to the app. It still reaches the CLI the cloud tools spawn, which sends
+ * it only to the control plane. Said once per process when it is the only
+ * token set, since setups that relied on the alias stop authenticating.
+ */
+export function envAppToken(
+    env: NodeJS.ProcessEnv = process.env,
+    note: (message: string) => void = (message) => process.stderr.write(`${message}\n`)
+): string | undefined {
+    const token = env.REBASE_API_TOKEN || undefined;
+    if (!token && env.REBASE_TOKEN && !rebaseTokenNoted) {
+        rebaseTokenNoted = true;
+        note("[rebase-mcp] REBASE_TOKEN is a Rebase Cloud control-plane token and is no longer sent to the app as its API key. "
+            + "Set REBASE_API_TOKEN to a key the app issued (`rebase api-keys create`) to authenticate with it.");
+    }
+    return token;
+}
+
 const ENV_BASE_URL = process.env.REBASE_BASE_URL || "";
-const ENV_API_TOKEN = process.env.REBASE_API_TOKEN || process.env.REBASE_TOKEN || "";
+const ENV_API_TOKEN = envAppToken() || "";
 
 /**
  * The env vars that describe a `default` project, or `null` when the client
@@ -471,7 +498,9 @@ export function envDeclaredProject(
 ): { projectDir?: string; baseUrl?: string; token?: string } | null {
     const projectDir = env.REBASE_PROJECT_DIR || undefined;
     const baseUrl = env.REBASE_BASE_URL || undefined;
-    const token = env.REBASE_API_TOKEN || env.REBASE_TOKEN || undefined;
+    // Not REBASE_TOKEN: see `envAppToken`. Passed `() => {}` so asking this
+    // question does not repeat the note.
+    const token = envAppToken(env, () => {});
     if (!projectDir && !baseUrl && !token) return null;
     return { projectDir, baseUrl, token };
 }

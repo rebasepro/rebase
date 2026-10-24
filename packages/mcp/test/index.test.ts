@@ -18,6 +18,7 @@ import {
     findBackendDir,
     findDevDir,
     envDeclaredProject,
+    envAppToken,
     autoDiscoverLocal,
     describeForeignDevServer,
     explainToolError,
@@ -1677,11 +1678,35 @@ describe("the environment block outranks the persisted registry", () => {
 
     it("reports nothing when the environment is silent", () => {
         expect(envDeclaredProject({} as NodeJS.ProcessEnv)).toBeNull();
-        expect(envDeclaredProject({ REBASE_TOKEN: "rk_x" } as NodeJS.ProcessEnv)).toEqual({
+        expect(envDeclaredProject({ REBASE_API_TOKEN: "rk_x" } as NodeJS.ProcessEnv)).toEqual({
             projectDir: undefined,
             baseUrl: undefined,
             token: "rk_x"
         });
+    });
+
+    it("never takes the CLI's control-plane token (REBASE_TOKEN) as the app's key", () => {
+        // `init --claim` points REBASE_BASE_URL at a cloud tenant running
+        // agent-written code; a deploy token for the person's real projects
+        // must not be sent there.
+        expect(envDeclaredProject({
+            REBASE_BASE_URL: "https://todo-x.rebase.website",
+            REBASE_TOKEN: "rk_live_control_plane"
+        } as NodeJS.ProcessEnv)).toEqual({
+            projectDir: undefined,
+            baseUrl: "https://todo-x.rebase.website",
+            token: undefined
+        });
+        expect(envDeclaredProject({ REBASE_TOKEN: "rk_live_control_plane" } as NodeJS.ProcessEnv)).toBeNull();
+    });
+
+    it("says once that REBASE_TOKEN is no longer sent to the app", () => {
+        const notes: string[] = [];
+        const env = { REBASE_TOKEN: "rk_live_control_plane" } as NodeJS.ProcessEnv;
+        expect(envAppToken(env, (m) => notes.push(m))).toBeUndefined();
+        expect(envAppToken(env, (m) => notes.push(m))).toBeUndefined();
+        expect(notes.length).toBeLessThanOrEqual(1);
+        expect(envAppToken({ REBASE_API_TOKEN: "rk_app", REBASE_TOKEN: "rk_cp" } as NodeJS.ProcessEnv, (m) => notes.push(m))).toBe("rk_app");
     });
 });
 

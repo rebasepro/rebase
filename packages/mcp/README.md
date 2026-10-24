@@ -37,7 +37,7 @@ The MCP server supports managing multiple Rebase projects simultaneously. This i
 
 One precedence, in this order:
 
-1. **The environment block** — `REBASE_PROJECT_DIR`, `REBASE_BASE_URL`, `REBASE_API_TOKEN` / `REBASE_TOKEN`. If any of them is set, the `default` project is rebuilt from them on **every** start. The rebuild is whole-entry: a token registered against the old `projectDir` is dropped rather than carried into a directory it was never issued for.
+1. **The environment block** — `REBASE_PROJECT_DIR`, `REBASE_BASE_URL`, `REBASE_API_TOKEN`. If any of them is set, the `default` project is rebuilt from them on **every** start. The rebuild is whole-entry: a token registered against the old `projectDir` is dropped rather than carried into a directory it was never issued for.
 2. **The server's working directory**, when it holds a `rebase.json`. `~/.rebase/projects.json` is machine-wide, and a project you are standing in outranks a home-directory cache.
 3. **The persisted `default`**, when neither of the first two says anything.
 
@@ -55,7 +55,7 @@ The server reads configuration from environment variables and `.env` files:
 |---|---|---|
 | `REBASE_PROJECT_DIR` | `process.cwd()` | Project root directory (the `rebase.json` directory) |
 | `REBASE_BASE_URL` | `http://localhost:3001` | Rebase backend URL, when discovery finds no dev server |
-| `REBASE_API_TOKEN` / `REBASE_TOKEN` | (empty) | Auth token for API calls |
+| `REBASE_API_TOKEN` | (empty) | Auth token for API calls to the app. `REBASE_TOKEN` (the CLI's control-plane token) is never sent to the app; the cloud tools pass it to the CLI only |
 | `REBASE_MCP_ALLOW_REMOTE_WRITES` | `false` | Allow destructive tools to run against non-local targets (see below) |
 
 The server attempts to load `.env` from `$REBASE_PROJECT_DIR/.env` or `$REBASE_PROJECT_DIR/app/.env`. Those values configure the server itself. They are not passed on to the CLI or the dev server it spawns: those read the active project's own `.env`, and a variable handed down would outrank it, and the branch the checkout is switched to, as if you had exported it in your shell.

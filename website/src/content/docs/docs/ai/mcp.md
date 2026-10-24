@@ -166,7 +166,10 @@ only switch in the package opts *in* to more reach rather than less.
 
 Which credential that is, in priority order:
 
-1. `REBASE_API_TOKEN` / `REBASE_TOKEN` from the environment
+1. `REBASE_API_TOKEN` from the environment. `REBASE_TOKEN` is not read here:
+   it is the CLI's control-plane token, and it is never sent to the app (the
+   server says so once on stderr when it is the only one set). The cloud tools
+   still pass it to the CLI they spawn, which sends it to the control plane.
 2. `REBASE_SERVICE_KEY` read out of the project's `.env`
 3. The service key auto-discovered from `.rebase/state.json` while `rebase dev`
    is running
