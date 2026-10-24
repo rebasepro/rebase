@@ -51,7 +51,7 @@ rebase cloud projects delete [id]
 rebase cloud deploy [app] [--source .]   # deploy an app and stream build logs
 rebase cloud deploy [app] --preview [--preview-name <name>]  # its own address; production untouched
 rebase cloud previews [list|delete <name>]
-rebase cloud logs [--runtime] [-f]       # build logs, or the running process's
+rebase cloud logs [--runtime] [-f] [--preview [name]]  # build log, or what the app prints
 rebase cloud deployments list [--limit N|--all]
 rebase cloud rollback [id] [-y]          # back to a successful deploy
 rebase cloud cancel [-y]                 # cancel the in-flight build
@@ -88,6 +88,40 @@ empty database of its own, with its static apps folded in. A static app cannot b
 previewed on its own on Rebase Cloud yet: `rebase cloud deploy <app> --preview`
 is refused with `PREVIEW_STATIC_UNSERVED` and publishes nothing.
 See [Preview a change](/docs/deployment/cloud/#preview-a-change).
+
+### Logs
+
+`rebase cloud logs` prints the latest build log, and `-f` tails a build that is
+still running. `--runtime` reads what the app prints instead, from every pod
+behind it, each line tagged with its pod:
+
+```bash
+rebase cloud logs --runtime -f                    # follow until Ctrl-C (exits 0)
+rebase cloud logs --runtime --since 15m --grep timeout
+rebase cloud logs --runtime -f --level error      # errors only
+rebase cloud logs --runtime --previous            # a restarted container's last run
+```
+
+- `--since` takes a duration (`30s`, `5m`, `1h`) or an RFC3339 time.
+- `--tail <n>` is the lines per pod to start from (the control plane caps it at 2000).
+- `--grep` keeps lines containing the text, in any case; write `/re/flags` for a
+  regular expression.
+- `--level error|warn|info|debug` keeps lines at that severity or worse. It reads
+  the structured `severity` a Rebase backend logs, a level word at the start of a
+  plain line, or an error shape such as `TypeError:`. Lines with none are left out.
+
+A follow polls every two seconds and prints each line once. It announces pods
+that start, stop or restart. When a container restarts it also prints the last
+lines of the instance that died, where the reason usually is. It waits while no
+pod is running, and after a dropped connection it retries with backoff and
+resumes where it left off. With `--json`, a follow prints one JSON object per
+line (NDJSON): `{"type":"line","ts","pod","text"}` for each log line, and
+`{"type":"event","event":…}` for the rest.
+
+`--preview <name>` reads a preview instead of production. Use the preview's
+name, or the deployment id a preview deploy printed. On its own, `--preview`
+reads the project's only preview. A static preview has a build log but no
+runtime log, because it runs no server.
 
 ## Config
 

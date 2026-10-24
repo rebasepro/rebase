@@ -157,9 +157,9 @@ under `node_modules` is read, and neither is a prebuilt `--bundle-dir`.
 Watch it:
 
 ```bash
-rebase cloud logs            # the build log
-rebase cloud logs --runtime  # what the running container is printing
-rebase cloud status          # what the platform thinks the project is doing
+rebase cloud logs               # the build log
+rebase cloud logs --runtime -f  # what the running app prints, live, until Ctrl-C
+rebase cloud status             # what the platform thinks the project is doing
 ```
 
 `status` reports `blockedOn` and `nextAction`. When `blockedOn` is `null` the
@@ -205,8 +205,12 @@ combined with `--preview`. Each builds a container image for production.
 
 ```bash
 rebase cloud previews                      # name, address, app, backend, expiry
+rebase cloud logs --preview new-checkout   # its build log; -f follows a build still running
+rebase cloud logs --runtime --preview new-checkout -f  # what its backend prints
 rebase cloud previews delete new-checkout  # stops serving it and drops its database
 ```
+
+`rebase cloud logs` without `--preview` is always production's.
 
 A preview expires a week after it was last deployed to.
 
