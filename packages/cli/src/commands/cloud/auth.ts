@@ -3,6 +3,7 @@
  */
 import chalk from "chalk";
 import inquirer from "inquirer";
+import { NO_PASSWORD_HINT, askSignInMethod, offersSignInCodes, requireTerminalForCode, signInWithCode, withSecondFactor } from "./login-flow";
 import {
     resolveCloudUrl,
     resolveCloudTarget,
@@ -46,6 +47,7 @@ import { capabilitiesInScopes } from "./token-capabilities";
 export const LOGIN_FLAGS = {
     "--email": String,
     "--password": String,
+    "--code": Boolean,
     "-e": "--email"
 } as const;
 
@@ -98,6 +100,10 @@ export async function loginCommand(rawArgs: string[]): Promise<void> {
     note(`Signing in to ${chalk.cyan(url)}`);
     noteBlank();
 
+    if (args["--code"] && passwordOnTheCommandLine(args)) {
+        fail("--code and --password are two ways to sign in. Pass one of them.", undefined, "usage");
+    }
+
     // Once, and before the request: by the time this succeeds the password is
     // already in the history file, and a warning after the fact is advice about
     // something that has happened.
@@ -111,48 +117,48 @@ export async function loginCommand(rawArgs: string[]): Promise<void> {
     const envEmail = (process.env[EMAIL_ENV] ?? "").trim();
     const envPassword = process.env[PASSWORD_ENV] ?? "";
 
-    // Collect any missing credentials interactively — but only where a terminal
-    // can supply them. Piped, this used to hang on a password prompt.
-    const needsEmail = !args["--email"] && !envEmail;
-    const needsPassword = !args["--password"] && !envPassword;
-    if (needsEmail || needsPassword) {
+    // Which way in. `--code` asks for an emailed code; a password from the flag
+    // or the environment is a choice already made; otherwise a terminal is
+    // asked, and offered a code only when this control plane mails them.
+    // Accounts made with Google, GitHub or LinkedIn have no password, so for
+    // them the code is the only way in that a terminal can reach.
+    let method: "password" | "code" | undefined = args["--code"]
+        ? "code"
+        : (args["--password"] || envPassword) ? "password" : undefined;
+    if (method === "code") requireTerminalForCode();
+
+    // Collect anything missing interactively — but only where a terminal can
+    // supply it. Piped, this used to hang on a password prompt.
+    let email = (args["--email"] || envEmail).trim();
+    if (!email || method === undefined) {
         requireInteractive("credentials", `--email and --password, or ${EMAIL_ENV} and ${PASSWORD_ENV}`);
     }
-
-    // The questions' real type, not `Record<string, unknown>`. Inquirer infers
-    // the answer shape from the array it is given, so an array of open records
-    // matches no overload — which is what the
-    // `as unknown as Parameters<typeof inquirer.prompt>[0]` here was answering.
-    // Naming the two question kinds this command asks makes the call check.
-    const prompts: Array<
-        | { type: "input"; name: string; message: string }
-        | { type: "password"; name: string; message: string; mask: string }
-    > = [];
-    if (needsEmail) {
-        prompts.push({ type: "input",
-name: "email",
-message: "Email:" });
+    if (!email) {
+        const answers = await inquirer.prompt([{ type: "input", name: "email", message: "Email:" }]);
+        email = String(answers.email ?? "").trim();
     }
-    if (needsPassword) {
-        prompts.push({ type: "password",
-name: "password",
-message: "Password:",
-mask: "•" });
+    if (!email) fail("An email is required.", undefined, "input_required");
+
+    const client = createCloudClient(url);
+    if (method === undefined) {
+        method = await offersSignInCodes(client.auth) ? await askSignInMethod() : "password";
     }
-    const answers = prompts.length
-        ? await inquirer.prompt(prompts)
-        : {};
 
-    const email = (args["--email"] || envEmail || (answers as { email?: string }).email || "").trim();
-    const password = args["--password"] || envPassword || (answers as { password?: string }).password || "";
-
-    if (!email || !password) {
+    let password = args["--password"] || envPassword;
+    if (method === "password" && !password) {
+        const answers = await inquirer.prompt([{ type: "password", name: "password", message: "Password:", mask: "•" }]);
+        password = String(answers.password ?? "");
+    }
+    if (method === "password" && !password) {
         fail("Email and password are required.");
     }
 
-    const client = createCloudClient(url);
     try {
-        const { user } = await client.auth.signInWithEmail(email, password);
+        // An account with 2FA on answers either door with MFA_REQUIRED; the
+        // second factor is asked for here and the sign-in finished with it.
+        const { user } = await withSecondFactor(client.auth, () => method === "code"
+            ? signInWithCode(client.auth, email)
+            : client.auth.signInWithEmail(email, password));
         setCurrentContext(url);
 
         // Convenience: if the account belongs to exactly one org, make it active.
@@ -185,8 +191,10 @@ mask: "•" });
     } catch (e) {
         // Auth failures are the common case — give a clean message, not a stack.
         const err = e as { status?: number; message?: string };
-        if (err?.status === 401) {
-            fail("Invalid email or password.", undefined, "invalid_credentials");
+        if (err?.status === 401 && method === "password") {
+            // Most often an account that never had a password: a console
+            // sign-up through Google, GitHub or LinkedIn.
+            fail("Invalid email or password.", NO_PASSWORD_HINT, "invalid_credentials");
         }
         reportError(e, "Login failed");
     }

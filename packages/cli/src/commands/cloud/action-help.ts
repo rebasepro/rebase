@@ -731,24 +731,30 @@ export const ACTION_HELP: Record<string, ActionHelp> = {
 
     login: {
         command: "cloud login",
-        usage: "cloud login [--email <address>] [--password <password>]",
+        usage: "cloud login [--email <address>] [--password <password> | --code]",
         summary:
             "Sign in to the control plane and write the session to ~/.rebase/credentials.json. "
             + "Prompts for whatever is missing when attached to a terminal, and refuses rather than "
             + "hangs when it is not.",
         flags: [
             ["--email, -e <address>", "The account's email. Prompted when omitted, or REBASE_CLOUD_EMAIL"],
-            ["--password <password>", "Discouraged: a password written here is recorded in your shell history and visible in the process table. Prefer the prompt, or REBASE_CLOUD_PASSWORD"]
+            ["--password <password>", "Discouraged: a password written here is recorded in your shell history and visible in the process table. Prefer the prompt, or REBASE_CLOUD_PASSWORD"],
+            ["--code", "Sign in with a 6-digit code emailed to you instead of a password: the way in for accounts made with Google, GitHub or LinkedIn. Needs a terminal"]
         ],
         examples: [
             "rebase cloud login",
             "rebase cloud login --email me@example.com",
+            "rebase cloud login --code --email me@example.com",
             "rebase cloud login --url https://cloud.example.com"
         ],
         notes: [
+            "At a terminal with no password given, login asks whether to use your password or an emailed code, when the control plane sends codes.",
+            "With two-factor authentication on, login then asks for the code from your authenticator app (or a recovery code), whichever way you signed in.",
+            "Without a terminal, a code or a second factor cannot be typed: create an access token in the console (Settings → Access tokens) and set REBASE_TOKEN instead.",
             "--password warns, once, before the request: by the time a login succeeds the password is already in the history file.",
-            "There is no machine token yet, so CI genuinely needs a human's credentials. REBASE_CLOUD_EMAIL and "
-                + "REBASE_CLOUD_PASSWORD are how a secret store hands them over without them appearing on a command line.",
+            "CI should not log in at all: `rebase cloud tokens create` mints a token for REBASE_TOKEN. Where a login is "
+                + "still wanted, REBASE_CLOUD_EMAIL and REBASE_CLOUD_PASSWORD are how a secret store hands the "
+                + "credentials over without them appearing on a command line.",
             "In a directory whose .rebase/cloud.json names a control plane you have not signed in to before, login "
                 + "names it and asks first, and refuses without a terminal: a cloned repository does not choose where "
                 + "your password goes. Pass --url <that host> to sign in there on purpose."
