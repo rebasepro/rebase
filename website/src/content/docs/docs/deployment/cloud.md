@@ -351,7 +351,12 @@ project. `rebase cloud whoami` in that directory shows the project, what the
 token may do, the claim URL and when the project expires. A command that needs a
 person's session refuses with `session_required` and keeps the token; it is
 forgotten only once the control plane refuses it everywhere, after a claim or at
-expiry, and the claim URL is printed as it goes.
+expiry, and the claim URL is printed as it goes. `rebase cloud status` shows the
+claim URL and the expiry too (`unclaimed` in `--json`). `rebase cloud unlink`
+does not delete an unclaimed project: it warns that the project keeps running
+until it expires and prints the claim URL, and `init --claim` in a directory
+that is already linked to one points at its claim URL instead of provisioning a
+second.
 
 Once the deploy has built the app, the command also sets `REBASE_API_TOKEN` in
 `.env`: a key minted on the app itself, which is what the MCP server and the SDK

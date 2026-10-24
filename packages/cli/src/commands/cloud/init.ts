@@ -36,6 +36,7 @@ import {
     emit,
     ephemeralGrantFor,
     fail,
+    grantForLink,
     isJsonMode,
     keyValues,
     note,
@@ -421,9 +422,15 @@ export async function cloudInitCommand(rawArgs: string[], deps: InitDeps = DEFAU
 
     const existing = readLink();
     if (existing?.projectId) {
+        // An unclaimed project here is the one to hand over, not to replace:
+        // unlinking it leaves it running, and orphaned, until it expires.
+        const grant = grantForLink(existing);
         fail(
             `This directory is already linked to project ${existing.slug ?? existing.projectId}.`,
-            "Run `rebase cloud unlink` first to provision a new one here.",
+            grant
+                ? `It is unclaimed: open ${grant.claimUrl} and sign in to keep it (it is deleted ${new Date(grant.expiresAt).toLocaleString()} otherwise). `
+                    + "Deploy to it with `rebase cloud deploy`."
+                : "Run `rebase cloud unlink` first to provision a new one here.",
             "already_linked"
         );
     }

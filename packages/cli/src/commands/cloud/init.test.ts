@@ -400,6 +400,64 @@ describe("the stored token afterwards", () => {
     });
 });
 
+describe("reading the claim URL back", () => {
+    /** Enough of a control plane for `status`: the project row, and empty lists for everything else. */
+    function projectRow(): void {
+        const row = { id: PROVISIONED.projectId, name: PROVISIONED.name, subdomain: PROVISIONED.slug, status: "active" };
+        respond = (request) => {
+            if (request.path === `/api/data/projects/${PROVISIONED.projectId}`) return json(200, row);
+            if (request.path.startsWith("/api/data/projects")) return json(200, { data: [row] });
+            if (request.path.startsWith("/api/data/")) return json(200, { data: [] });
+            return json(404, { error: { code: "NOT_FOUND", message: "no route" } });
+        };
+    }
+
+    it("`status` carries the claim URL and the expiry while the project is unclaimed", async () => {
+        await init(["--claim", "--no-deploy"]);
+        projectRow();
+        said = [];
+        await cloudCommand("status", line("status"));
+        expect(printedJson()).toMatchObject({
+            projectId: PROVISIONED.projectId,
+            unclaimed: { claimUrl: PROVISIONED.claimUrl, expiresAt: PROVISIONED.expiresAt }
+        });
+    });
+
+    it("`status` carries none once the grant is gone", async () => {
+        await init(["--claim", "--no-deploy"]);
+        projectRow();
+        // Gone the way a claim takes it: the token is refused and forgotten.
+        // `status` then needs another credential; REBASE_TOKEN stands in for the login.
+        forgetEphemeralGrant(CP, PROVISIONED.projectId);
+        process.env.REBASE_TOKEN = "rk_live_ci";
+        said = [];
+        await cloudCommand("status", line("status"));
+        expect(printedJson()).toMatchObject({ unclaimed: null });
+    });
+
+    it("`unlink` warns that an unclaimed project keeps running, with its claim URL", async () => {
+        await init(["--claim", "--no-deploy"]);
+        said = [];
+        await cloudCommand("unlink", line("unlink"));
+        expect(printedJson()).toMatchObject({
+            unlinked: true,
+            unclaimed: { projectId: PROVISIONED.projectId, claimUrl: PROVISIONED.claimUrl }
+        });
+        expect(said.join("\n")).toContain("Unlinking does not delete it");
+        expect(readLink()).toBeNull();
+    });
+
+    it("a second `init --claim` points at the existing claim URL, not at `unlink`", async () => {
+        await init(["--claim", "--no-deploy"]);
+        said = [];
+        await expect(init(["--claim", "--no-deploy"])).rejects.toBeInstanceOf(Exited);
+        expect(refusal().code).toBe("already_linked");
+        const hint = said.join("\n");
+        expect(hint).toContain(PROVISIONED.claimUrl);
+        expect(hint).not.toContain("rebase cloud unlink");
+    });
+});
+
 describe("asking for the app's key", () => {
     it("gives up after its attempts while the app never answers, waiting between them", async () => {
         respond = () => json(503, { error: { code: "upstream_error", message: "The project's app is not answering yet." } });

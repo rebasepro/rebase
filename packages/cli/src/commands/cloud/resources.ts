@@ -28,6 +28,7 @@ import {
     noteBlank,
     requireCloudRow,
     billingAccountIdOf,
+    grantForLink,
     warn
 } from "./context";
 import { DEFAULT_STORAGE_SOURCE_KEY } from "@rebasepro/types";
@@ -294,6 +295,10 @@ path: projectId })
 
         const storageLine = describeStorageState(storage);
         const databaseLine = describeDatabaseState(db);
+        // An unclaimed project's claim URL, read back from where `init --claim`
+        // kept it: the only other copy was that command's output.
+        const link = readLink();
+        const grant = link?.projectId === projectId ? grantForLink(link) : undefined;
         const blocked = resolveBlockedState({
             projectStatus: project.status,
             database: db as { connectionStatus?: string | null } | undefined,
@@ -311,7 +316,9 @@ path: projectId })
                     ["Last deploy", deploy ? `${colorStatus(deploy.status)} · ${fmtDate(deploy.createdAt)}` : "never"],
                     ["Runtime", describeRuntime(project)],
                     ["Database", databaseLine],
-                    ["Storage", storageLine]
+                    ["Storage", storageLine],
+                    ["Claim URL", grant ? chalk.bold(grant.claimUrl) : undefined],
+                    ["Expires", grant ? `${new Date(grant.expiresAt).toLocaleString()} unless claimed, then deleted` : undefined]
                 ]);
                 // The same fact the JSON carries, in the place a person reads.
                 // Below the rows rather than inside them: it is not another
@@ -356,7 +363,10 @@ createdAt: deploy.createdAt ?? null } : null,
                 },
                 database: db ? { type: db.type ?? null,
 connectionStatus: db.connectionStatus ?? null } : null,
-                storage: storage ?? null
+                storage: storage ?? null,
+                // Present while the project is unclaimed: open `claimUrl` and
+                // sign in to keep it, before `expiresAt`.
+                unclaimed: grant ? { claimUrl: grant.claimUrl, expiresAt: grant.expiresAt } : null
             }
         );
     } catch (e) {

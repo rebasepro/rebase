@@ -182,6 +182,16 @@ export function linkedEphemeralGrant(url: string): { projectId: string; grant: E
     return grant ? { projectId: link.projectId, grant } : undefined;
 }
 
+/**
+ * The unexpired grant for the project a link names, on the host it names: what
+ * `status`, `unlink` and `init` read the claim URL back from. Undefined for a
+ * claimed project (its grant is gone), a direct link, or no link.
+ */
+export function grantForLink(link: ProjectLink | null | undefined): EphemeralGrant | undefined {
+    if (!link?.projectId || link.mode === "direct") return undefined;
+    return ephemeralGrantFor(normalizeUrl(link.url), link.projectId);
+}
+
 /** Host that a bare `rebase cloud` command should target, if any. */
 function currentContextUrl(): string | undefined {
     return readCredentials().current;
