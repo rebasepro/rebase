@@ -1704,6 +1704,8 @@ export interface RebaseTranslations {
     studio_branch_diff_row_conflict?: string;
     studio_branch_diff_conflicts?: string;
     studio_branch_diff_target_changes?: string;
+    studio_branch_diff_target_changes_referencing?: string;
+    studio_branch_diff_referenced_by?: string;
     studio_branch_diff_row_counts?: string;
     studio_branch_diff_column_change?: string;
     studio_branch_diff_column_key?: string;
@@ -1715,6 +1717,8 @@ export interface RebaseTranslations {
     studio_branch_diff_merge_target_kept_count?: string;
     studio_branch_diff_merge_schema_skipped?: string;
     studio_branch_diff_merge_conflicts?: string;
+    studio_branch_diff_merge_referenced_conflicts?: string;
+    studio_branch_diff_merge_referenced_reached?: string;
     studio_branch_diff_conflict_abort?: string;
     studio_branch_diff_conflict_branch?: string;
     studio_branch_diff_conflict_target?: string;

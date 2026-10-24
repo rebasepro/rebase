@@ -80,8 +80,9 @@ import { BranchDiffView } from "../src/components/Branches/BranchDiffView";
 
 type Answer = { status: number; body: unknown };
 let mergeAnswer: Answer = { status: 200, body: MERGED };
+let diffBody: BranchDiff = DIFF;
 const fetchMock = jest.fn(async (url: string, init?: RequestInit) => {
-    const answer: Answer = init?.method === "POST" ? mergeAnswer : { status: 200, body: DIFF };
+    const answer: Answer = init?.method === "POST" ? mergeAnswer : { status: 200, body: diffBody };
     return { ok: answer.status < 400, status: answer.status, json: async () => answer.body };
 });
 
@@ -89,6 +90,7 @@ beforeEach(() => {
     fetchMock.mockClear();
     snackbar.open.mockClear();
     mergeAnswer = { status: 200, body: MERGED };
+    diffBody = DIFF;
     Object.defineProperty(globalThis, "fetch", { value: fetchMock, writable: true, configurable: true });
 });
 
@@ -150,5 +152,62 @@ describe("merging a branch", () => {
 
         await waitFor(() => expect(diffCalls()).toHaveLength(2));
         expect(snackbar.open).toHaveBeenCalledWith({ type: "warning", message: "The branch changed since the diff was read." });
+    });
+});
+
+describe("a row the branch deleted that the target's newer rows reference", () => {
+    // The branch deleted author 2; main wrote post 10 by author 2 since.
+    const REFERENCED: BranchDiff = {
+        ...DIFF,
+        fingerprint: "fp-2",
+        schema: [],
+        data: [{
+            schema: "public",
+            table: "authors",
+            primaryKey: ["id"],
+            inserted: 0,
+            updated: 0,
+            deleted: 0,
+            conflicts: 1,
+            targetChanges: 0,
+            samples: [{ change: "conflict", key: "[2]", before: { id: "2", name: "grace" } }],
+            referencedBy: [{ schema: "public", table: "posts", constraint: "posts_author_id_fkey", onDelete: "cascade", rows: 1 }]
+        }, {
+            schema: "public",
+            table: "posts",
+            primaryKey: ["id"],
+            inserted: 0,
+            updated: 0,
+            deleted: 0,
+            conflicts: 0,
+            targetChanges: 1,
+            samples: []
+        }]
+    };
+    const tables = "public.posts (ON DELETE CASCADE, 1)";
+
+    it("shows the deleted row as a conflict, and which of the target's rows reference it", async () => {
+        diffBody = REFERENCED;
+        render(<BranchDiffView branch={branch} details={null}/>);
+        fireEvent.click(await screen.findByRole("tab", { name: /Data changes/ }));
+        expect(await screen.findByText(/name=grace/)).toBeTruthy();
+        expect(screen.getByText(interpolate("studio_branch_diff_referenced_by", { target: "app", tables }))).toBeTruthy();
+        // posts' row is not promised as kept: it references the deleted author.
+        expect(screen.queryByText(interpolate("studio_branch_diff_target_changes", { count: 1, target: "app" }))).toBeNull();
+        expect(screen.getByText(interpolate("studio_branch_diff_target_changes_referencing", { count: 1, reached: 1, target: "app" }))).toBeTruthy();
+    });
+
+    it("no longer says the target's rows are kept once the branch is chosen to win", async () => {
+        diffBody = REFERENCED;
+        render(<BranchDiffView branch={branch} details={null}/>);
+        fireEvent.click(await screen.findByRole("button", { name: "Merge into app" }));
+        await screen.findByText(interpolate("studio_branch_diff_merge_conflicts", { count: 1 }));
+        expect(screen.getByText(interpolate("studio_branch_diff_merge_referenced_conflicts", { count: 1, target: "app", tables }))).toBeTruthy();
+        const kept = interpolate("studio_branch_diff_merge_target_kept_count", { count: 1, target: "app" });
+        expect(screen.getByText(kept)).toBeTruthy();
+
+        fireEvent.click(screen.getByRole("radio", { name: "The branch's (agent)" }));
+        await waitFor(() => expect(screen.queryByText(kept)).toBeNull());
+        expect(screen.getByText(interpolate("studio_branch_diff_merge_referenced_reached", { count: 1, target: "app", tables }))).toBeTruthy();
     });
 });

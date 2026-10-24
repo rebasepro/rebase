@@ -34,6 +34,13 @@
  * branch's insert. An update that wrote the same values still counts as a
  * write, so it can make a conflict of a row only one side meant to change.
  *
+ * A delete reaches further than its row. A row the branch deleted can be
+ * referenced, through a foreign key, by a row the target wrote since — a post
+ * by an author the branch removed. Deleting it on the target would cascade
+ * into that post, null its column, or fail outright, so it is a conflict, not
+ * a delete: `onConflict: "target"` keeps the row, `"branch"` deletes it and
+ * says what the foreign key reached (`referencedBy` on the diff).
+ *
  * When the fork point cannot be read — the `pg_database` row was frozen by a
  * vacuum, or rewritten by an `ALTER DATABASE` — every difference is counted as
  * the branch's and the diff says so (`forkPointKnown: false`).
@@ -55,6 +62,7 @@ import {
     type BranchMergeBlock,
     type BranchMergeOptions,
     type BranchMergeResult,
+    type BranchReferencingRows,
     type BranchRowChange,
     type BranchSchemaChange,
     type BranchTableDataDiff,
@@ -475,6 +483,116 @@ export function pickSamples(kinds: readonly (readonly string[])[], limit: number
     return picked;
 }
 
+// ── Foreign keys into deleted rows ───────────────────────────────────────────
+
+/** A foreign key that references a table, read from the target. */
+interface ReferencingKey {
+    constraint: string;
+    schema: string;
+    table: string;
+    onDelete: BranchReferencingRows["onDelete"];
+    /** The referencing columns, in the key's order. */
+    columns: string[];
+    /** The columns of the referenced table they point at, in the same order. */
+    referenced: string[];
+}
+
+const ON_DELETE: Record<string, BranchReferencingRows["onDelete"]> = {
+    a: "no action",
+    r: "restrict",
+    c: "cascade",
+    n: "set null",
+    d: "set default"
+};
+
+/**
+ * Every foreign key that references `$1.$2`, on any table of any schema — a
+ * delete reaches a referencing row wherever it is. A partition's copy of a
+ * key (`conparentid`) is its parent's, and counted once.
+ */
+const REFERENCING_KEYS_SQL = `
+SELECT con.conname AS constraint_name, cn.nspname AS schema_name, cc.relname AS table_name,
+       con.confdeltype::text AS on_delete,
+       (SELECT json_agg(a.attname::text ORDER BY k.ord)
+          FROM unnest(con.conkey) WITH ORDINALITY AS k(attnum, ord)
+          JOIN pg_attribute a ON a.attrelid = con.conrelid AND a.attnum = k.attnum)::text AS columns,
+       (SELECT json_agg(a.attname::text ORDER BY k.ord)
+          FROM unnest(con.confkey) WITH ORDINALITY AS k(attnum, ord)
+          JOIN pg_attribute a ON a.attrelid = con.confrelid AND a.attnum = k.attnum)::text AS referenced
+  FROM pg_constraint con
+  JOIN pg_class cc ON cc.oid = con.conrelid
+  JOIN pg_namespace cn ON cn.oid = cc.relnamespace
+  JOIN pg_class pc ON pc.oid = con.confrelid
+  JOIN pg_namespace pn ON pn.oid = pc.relnamespace
+ WHERE con.contype = 'f' AND con.conparentid = 0 AND pn.nspname = $1 AND pc.relname = $2
+ ORDER BY cn.nspname, cc.relname, con.conname`;
+
+async function referencingKeys(sql: SQLAdmin, database: string, facts: TableFacts): Promise<ReferencingKey[]> {
+    const rows = await sql.executeSql(REFERENCING_KEYS_SQL, { database, params: [facts.schema, facts.table] });
+    return rows.map((row) => ({
+        constraint: text(row, "constraint_name"),
+        schema: text(row, "schema_name"),
+        table: text(row, "table_name"),
+        onDelete: ON_DELETE[text(row, "on_delete")] ?? "no action",
+        columns: stringList(text(row, "columns")),
+        referenced: stringList(text(row, "referenced"))
+    }));
+}
+
+/**
+ * The rows of `key`'s table, written after the fork, that reference a row of
+ * `facts` among the keys in `keysParam` — joined from the referenced table, so
+ * the result is per referenced key. `forkParam` names the branch database,
+ * whose creation is the fork point.
+ */
+function referencingRowsFrom(facts: TableFacts, keyExpr: string, key: ReferencingKey, keysParam: string, forkParam: string): string {
+    const join = key.columns.map((column, index) => `c.${ident(column)} = t.${ident(key.referenced[index] ?? column)}`).join(" AND ");
+    return `FROM ${qualified(facts.schema, facts.table)} t
+              JOIN ${qualified(key.schema, key.table)} c ON ${join}
+             WHERE ${keyExpr} = ANY(${keysParam}::text[])
+               AND age(c.xmin) < (SELECT age(d.xmin) FROM pg_database d WHERE d.datname = ${forkParam})`;
+}
+
+/** What {@link deleteConflicts} found: the keys in conflict, and through which keys. */
+interface DeleteConflicts {
+    keys: string[];
+    referencedBy: (BranchReferencingRows & { key: ReferencingKey })[];
+}
+
+/**
+ * Of the keys the branch deleted from `facts`, the ones that rows the target
+ * wrote after the fork still reference. Read on the target only: on the
+ * branch, the delete already went through its foreign keys.
+ */
+async function deleteConflicts(
+    sql: SQLAdmin,
+    targetDb: string,
+    branchDb: string,
+    facts: TableFacts,
+    keyExpr: string,
+    deleted: readonly string[]
+): Promise<DeleteConflicts> {
+    const found: DeleteConflicts = { keys: [], referencedBy: [] };
+    if (deleted.length === 0) return found;
+    const keys = await referencingKeys(sql, targetDb, facts);
+    const conflicting = new Set<string>();
+    for (const key of keys) {
+        const rows = await sql.executeSql(
+            `SELECT ${keyExpr} AS k, count(*)::text AS n ${referencingRowsFrom(facts, keyExpr, key, "$1", "$2")} GROUP BY 1`,
+            { database: targetDb, params: [[...deleted], branchDb] }
+        );
+        if (rows.length === 0) continue;
+        let count = 0;
+        for (const row of rows) {
+            conflicting.add(text(row, "k"));
+            count += Number(text(row, "n"));
+        }
+        found.referencedBy.push({ schema: key.schema, table: key.table, constraint: key.constraint, onDelete: key.onDelete, rows: count, key });
+    }
+    found.keys = deleted.filter((rowKey) => conflicting.has(rowKey));
+    return found;
+}
+
 /** What a merge needs to know about a table the diff matched row by row. */
 interface MatchedTable {
     facts: TableFacts;
@@ -483,7 +601,10 @@ interface MatchedTable {
     /** `md5` of every `key:hash` on the target, in `"C"` key order — what the merge's guard recomputes. */
     targetDigest: string;
     branchHashes: Map<string, string>;
+    /** Who changed each row. `deleted` leaves out {@link deleteConflicts}. */
     rows: RowClassification;
+    /** Keys the branch deleted that rows the target wrote since reference: conflicts. */
+    deleteConflicts: DeleteConflicts;
 }
 
 interface ComputedDiff {
@@ -700,10 +821,20 @@ async function computeDiff(admin: DatabaseAdmin | undefined, branchName: string,
             rowStates(sql, branchDb, branchFacts, keyExpr, hashExpr, forkDatabase)
         ]);
         const rows = classifyRows(targetRows, branchRows, forkPointKnown);
+        // Without a fork point every target-only row is already the branch's
+        // delete, and nothing can be told the target's.
+        const referenced = forkPointKnown
+            ? await deleteConflicts(sql, targetDb, branchDb, target, keyExpr, rows.deleted)
+            : { keys: [], referencedBy: [] };
+        if (referenced.keys.length > 0) {
+            const inConflict = new Set(referenced.keys);
+            rows.deleted = rows.deleted.filter((rowKey) => !inConflict.has(rowKey));
+            entry.referencedBy = referenced.referencedBy.map(({ key: _key, ...rest }) => rest);
+        }
         entry.inserted = rows.inserted.length;
         entry.updated = rows.updated.length;
         entry.deleted = rows.deleted.length;
-        entry.conflicts = rows.conflicts.length;
+        entry.conflicts = rows.conflicts.length + referenced.keys.length;
         entry.targetChanges = rows.targetChanges;
         const branchChanged = entry.inserted + entry.updated + entry.deleted + entry.conflicts > 0;
         if (!branchChanged && entry.targetChanges === 0) continue;
@@ -718,7 +849,7 @@ async function computeDiff(admin: DatabaseAdmin | undefined, branchName: string,
         }
 
         const [conflictKeys, insertedKeys, updatedKeys, deletedKeys] = pickSamples(
-            [rows.conflicts, rows.inserted, rows.updated, rows.deleted], sampleLimit);
+            [[...rows.conflicts, ...referenced.keys], rows.inserted, rows.updated, rows.deleted], sampleLimit);
         const [before, after] = await Promise.all([
             sampleRows(sql, targetDb, target, keyExpr, [...conflictKeys, ...updatedKeys, ...deletedKeys]),
             sampleRows(sql, branchDb, branchFacts, keyExpr, [...conflictKeys, ...insertedKeys, ...updatedKeys])
@@ -729,7 +860,10 @@ async function computeDiff(admin: DatabaseAdmin | undefined, branchName: string,
             return compared.filter((column) => old[column] !== now[column]);
         };
         const samples: BranchRowChange[] = [
-            ...conflictKeys.map((rowKey): BranchRowChange => ({ change: "conflict", key: rowKey, before: before.get(rowKey), after: after.get(rowKey), changedColumns: changed(rowKey) })),
+            ...conflictKeys.map((rowKey): BranchRowChange => after.has(rowKey)
+                ? { change: "conflict", key: rowKey, before: before.get(rowKey), after: after.get(rowKey), changedColumns: changed(rowKey) }
+                // Deleted on the branch, and referenced by the target's rows.
+                : { change: "conflict", key: rowKey, before: before.get(rowKey) }),
             ...insertedKeys.map((rowKey): BranchRowChange => ({ change: "inserted", key: rowKey, after: after.get(rowKey) })),
             ...updatedKeys.map((rowKey): BranchRowChange => ({ change: "updated", key: rowKey, before: before.get(rowKey), after: after.get(rowKey), changedColumns: changed(rowKey) })),
             ...deletedKeys.map((rowKey): BranchRowChange => ({ change: "deleted", key: rowKey, before: before.get(rowKey) }))
@@ -739,14 +873,15 @@ async function computeDiff(admin: DatabaseAdmin | undefined, branchName: string,
 
         const targetDigest = md5(targetRows.map((row) => `${row.key}:${row.hash}`).join(","));
         const stateDigest = (states: readonly RowState[]) => md5(states.map((row) => `${row.key}:${row.hash}:${row.young ? 1 : 0}`).join(","));
-        seen.push({ key, target: stateDigest(targetRows), branch: stateDigest(branchRows) });
+        seen.push({ key, target: stateDigest(targetRows), branch: stateDigest(branchRows), referencedBy: entry.referencedBy ?? [] });
         matched.set(key, {
             facts: target,
             keyExpression: keyExpr,
             hashExpression: hashExpr,
             targetDigest,
             branchHashes: new Map(branchRows.map((row) => [row.key, row.hash])),
-            rows
+            rows,
+            deleteConflicts: referenced
         });
     }
 
@@ -786,6 +921,16 @@ export async function diffDatabaseBranch(
 }
 
 // ── Merge ────────────────────────────────────────────────────────────────────
+
+/** Up to ten keys, for a message. */
+function keyList(keys: readonly string[]): string {
+    return keys.length > 10 ? `${keys.slice(0, 10).join(", ")} and ${keys.length - 10} more` : keys.join(", ");
+}
+
+/** `public.posts (1 row, ON DELETE CASCADE)`, for each foreign key. */
+function referencingList(found: readonly BranchReferencingRows[]): string {
+    return found.map((entry) => `${entry.schema}.${entry.table} (${entry.rows} row(s), ON DELETE ${entry.onDelete.toUpperCase()})`).join(", ");
+}
 
 /** The marker a merge statement's own refusal carries, to be told from any other failure. */
 const MERGE_REFUSAL = "rebase branch merge refused";
@@ -827,9 +972,32 @@ export async function mergeDatabaseBranch(
     }
     const conflicted = diff.data.filter((entry) => !entry.blocked && entry.conflicts > 0);
     if (conflicted.length > 0 && onConflict === "abort") {
-        throw new ApiError(409, "BRANCH_MERGE_CONFLICT", `${conflicted.reduce((sum, entry) => sum + entry.conflicts, 0)} row(s) were changed on both the branch and ${diff.targetDatabase}. ` +
-            "Nothing was merged. Merge again choosing which side wins.",
-            { tables: conflicted.map((entry): RefusedTable => ({ schema: entry.schema, table: entry.table, reason: `${entry.conflicts} conflicting row(s)` })) },
+        const referenced = conflicted.flatMap((entry) => {
+            const table = matched.get(tableKey(entry.schema, entry.table));
+            return table && table.deleteConflicts.keys.length > 0 ? [{ entry, conflicts: table.deleteConflicts }] : [];
+        });
+        const both = conflicted.reduce((sum, entry) => sum + entry.conflicts, 0) -
+            referenced.reduce((sum, { conflicts }) => sum + conflicts.keys.length, 0);
+        const sentences: string[] = [];
+        if (both > 0) sentences.push(`${both} row(s) were changed on both the branch and ${diff.targetDatabase}.`);
+        for (const { entry, conflicts } of referenced) {
+            sentences.push(`The branch deleted ${conflicts.keys.length} row(s) of ${entry.schema}.${entry.table} (${keyList(conflicts.keys)}) that rows ` +
+                `${diff.targetDatabase} wrote since still reference: ${referencingList(conflicts.referencedBy)}.`);
+        }
+        const remedy = referenced.length > 0
+            ? "Merge again with onConflict \"target\" to keep those rows, or \"branch\" to delete them and let the foreign keys reach the rows that reference them."
+            : "Merge again choosing which side wins.";
+        throw new ApiError(409, "BRANCH_MERGE_CONFLICT", `${sentences.join(" ")} Nothing was merged. ${remedy}`,
+            {
+                tables: conflicted.map((entry): RefusedTable => {
+                    const keys = matched.get(tableKey(entry.schema, entry.table))?.deleteConflicts;
+                    const reason = keys && keys.keys.length > 0
+                        ? `${entry.conflicts} conflicting row(s); deleted on the branch and referenced by rows ${diff.targetDatabase} wrote since: ` +
+                            `${keyList(keys.keys)} (${referencingList(keys.referencedBy)})`
+                        : `${entry.conflicts} conflicting row(s)`;
+                    return { schema: entry.schema, table: entry.table, reason };
+                })
+            },
             EXPECTED
         );
     }
@@ -861,7 +1029,7 @@ export async function mergeDatabaseBranch(
         if (!table) continue;
         const updates = onConflict === "branch" ? [...table.rows.updated, ...table.rows.conflicts] : table.rows.updated;
         const inserts = table.rows.inserted;
-        const deletes = table.rows.deleted;
+        const deletes = onConflict === "branch" ? [...table.rows.deleted, ...table.deleteConflicts.keys] : table.rows.deleted;
         if (updates.length + inserts.length + deletes.length === 0) continue;
 
         const branchRows = await sql.executeSql(
@@ -920,10 +1088,35 @@ export async function mergeDatabaseBranch(
             `(SELECT md5(coalesce(string_agg(${table.keyExpression} || ':' || ${table.hashExpression}, ',' ORDER BY (${table.keyExpression}) COLLATE "C"), '')) ` +
             `FROM ${target} t) = ${param(table.targetDigest)}`
         );
+        // The target's rows that reference what this deletes, as many as the
+        // diff counted: none for a plain delete, the ones it named for a
+        // conflict the branch won. A row written since would be reached by a
+        // delete nobody reviewed.
+        if (deletes.length > 0 && diff.forkPointKnown) {
+            const counted = new Map(table.deleteConflicts.referencedBy.map((found) => [found.constraint + "\u0000" + found.schema + "." + found.table, found.rows]));
+            const keys = await referencingKeys(sql, diff.targetDatabase, table.facts);
+            const keysParam = keys.length > 0 ? param([...deletes]) : "";
+            const forkParam = keys.length > 0 ? param(diff.branchDatabase) : "";
+            for (const key of keys) {
+                const expected = onConflict === "branch" ? counted.get(key.constraint + "\u0000" + key.schema + "." + key.table) ?? 0 : 0;
+                guards.push(`(SELECT count(*) ${referencingRowsFrom(table.facts, table.keyExpression, key, keysParam, forkParam)}) = ${expected}`);
+            }
+        }
         written.push({ entry, table, inserted: inserts.length, updated: updates.length, deleted: deletes.length });
     }
 
     if (written.length === 0) return result;
+
+    if (onConflict === "branch") {
+        for (const { entry, table } of written) {
+            const { keys, referencedBy } = table.deleteConflicts;
+            if (keys.length === 0) continue;
+            result.warnings.push(
+                `Deleting ${keys.length} row(s) of ${entry.schema}.${entry.table} the branch deleted (${keyList(keys)}) reached rows ` +
+                `${diff.targetDatabase} wrote since the branch was made: ${referencingList(referencedBy)}.`
+            );
+        }
+    }
 
     // One statement: the guard, every write, and a check that each wrote what
     // it was meant to. Non-deferrable foreign keys are checked at its end, so

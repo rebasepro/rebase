@@ -280,4 +280,119 @@ describe("database branch diff and merge", () => {
         expect(missing.code).toBe("BRANCH_NOT_FOUND");
         expect(missing.statusCode).toBe(404);
     });
+
+    /**
+     * A database of its own, set up with `setup`, and a branch made from it —
+     * so a case's tables never show up in another case's diff.
+     */
+    async function freshBranch(source: string, setup: string): Promise<void> {
+        await maintenance.query(`CREATE DATABASE "${source}"`);
+        await on(source, setup);
+        await branches.createBranch(source, { source });
+    }
+
+    describe("a row the branch deleted that rows the target wrote since still reference", () => {
+        // `rb_<name>` is the branch's database; the parent is `<name>`.
+        const SETUP = `
+            CREATE TABLE authors (id int PRIMARY KEY, name text NOT NULL);
+            CREATE TABLE posts (id int PRIMARY KEY, author_id int REFERENCES authors(id) ON DELETE CASCADE, title text);
+            CREATE TABLE notes (id int PRIMARY KEY, author_id int REFERENCES authors(id) ON DELETE SET NULL, body text);
+            INSERT INTO authors VALUES (1, 'ada'), (2, 'grace'), (3, 'hedy');
+            INSERT INTO posts VALUES (1, 3, 'by hedy, before the branch');
+        `;
+        const name = "fkcascade";
+
+        beforeAll(async () => {
+            await freshBranch(name, SETUP);
+            // The branch deletes grace, and hedy with her old post.
+            await branch(name, "DELETE FROM authors WHERE id IN (2, 3)");
+            // Main, meanwhile, writes a post and a note by grace.
+            await on(name, "INSERT INTO posts VALUES (10, 2, 'written on main after the branch')");
+            await on(name, "INSERT INTO notes VALUES (20, 2, 'note on main')");
+        });
+
+        it("is a conflict, not a delete, and the diff names the rows that reference it", async () => {
+            const diff = await diffDatabaseBranch(admin, name);
+            const authors = diff.data.find((entry) => entry.table === "authors");
+            expect(authors).toMatchObject({ deleted: 1, conflicts: 1 }); // hedy deleted; grace in conflict
+            expect(authors?.referencedBy).toEqual(expect.arrayContaining([
+                expect.objectContaining({ schema: "public", table: "posts", onDelete: "cascade", rows: 1 }),
+                expect.objectContaining({ schema: "public", table: "notes", onDelete: "set null", rows: 1 })
+            ]));
+            expect(authors?.referencedBy).toHaveLength(2);
+            const grace = authors?.samples.find((sample) => sample.key === "[2]");
+            expect(grace).toMatchObject({ change: "conflict", before: { name: "grace" } });
+            expect(grace?.after).toBeUndefined();
+        });
+
+        it("refuses by default, naming the table, the rows and the remedy, and writes nothing", async () => {
+            const diff = await diffDatabaseBranch(admin, name);
+            const refused = await refusal(mergeDatabaseBranch(admin, name, { expectedFingerprint: diff.fingerprint }));
+            expect(refused.code).toBe("BRANCH_MERGE_CONFLICT");
+            expect(refused.message).toMatch(/authors/);
+            expect(refused.message).toMatch(/onConflict/);
+            expect(refused.details).toMatchObject({ tables: [expect.objectContaining({ table: "authors", reason: expect.stringContaining("[2]") })] });
+            expect(await on(name, "SELECT id FROM authors ORDER BY id")).toEqual([{ id: 1 }, { id: 2 }, { id: 3 }]);
+        });
+
+        it("keeps the referenced row, and so the target's rows, with onConflict: target", async () => {
+            const diff = await diffDatabaseBranch(admin, name);
+            const result = await mergeDatabaseBranch(admin, name, { expectedFingerprint: diff.fingerprint, onConflict: "target" });
+            expect(result.conflictsKept).toBe(1);
+            // hedy, and her post from before the branch, which the branch deleted with her.
+            expect(result.tables).toEqual(expect.arrayContaining([
+                { schema: "public", table: "authors", inserted: 0, updated: 0, deleted: 1 },
+                { schema: "public", table: "posts", inserted: 0, updated: 0, deleted: 1 }
+            ]));
+            expect(result.tables).toHaveLength(2);
+            expect(result.warnings).toEqual([]);
+            expect(await on(name, "SELECT id FROM authors ORDER BY id")).toEqual([{ id: 1 }, { id: 2 }]);
+            // Main's own rows, untouched.
+            expect(await on(name, "SELECT id, author_id FROM posts ORDER BY id")).toEqual([{ id: 10, author_id: 2 }]);
+            expect(await on(name, "SELECT id, author_id FROM notes ORDER BY id")).toEqual([{ id: 20, author_id: 2 }]);
+        });
+
+        it("deletes it with onConflict: branch, and says what the foreign keys reached", async () => {
+            await freshBranch("fkbranch", SETUP);
+            await branch("fkbranch", "DELETE FROM authors WHERE id = 2");
+            await on("fkbranch", "INSERT INTO posts VALUES (10, 2, 'written on main after the branch')");
+            await on("fkbranch", "INSERT INTO notes VALUES (20, 2, 'note on main')");
+            const diff = await diffDatabaseBranch(admin, "fkbranch");
+            const result = await mergeDatabaseBranch(admin, "fkbranch", { expectedFingerprint: diff.fingerprint, onConflict: "branch" });
+            expect(result.tables).toEqual([{ schema: "public", table: "authors", inserted: 0, updated: 0, deleted: 1 }]);
+            expect(result.warnings).toEqual([expect.stringMatching(/public\.posts.*cascade.*public\.notes.*set null|public\.notes.*set null.*public\.posts.*cascade/i)]);
+            expect(await on("fkbranch", "SELECT id FROM posts")).toEqual([{ id: 1 }]);
+            expect(await on("fkbranch", "SELECT id, author_id FROM notes")).toEqual([{ id: 20, author_id: null }]);
+        });
+
+        it("refuses a merge when the target writes a referencing row after the diff was read", async () => {
+            await freshBranch("fklate", SETUP);
+            await branch("fklate", "DELETE FROM authors WHERE id = 2");
+            const diff = await diffDatabaseBranch(admin, "fklate");
+            expect(diff.data.find((entry) => entry.table === "authors")).toMatchObject({ deleted: 1, conflicts: 0 });
+            await on("fklate", "INSERT INTO posts VALUES (11, 2, 'raced the merge')");
+            const refused = await refusal(mergeDatabaseBranch(admin, "fklate", { expectedFingerprint: diff.fingerprint }));
+            expect(refused.statusCode).toBe(409);
+            expect(await on("fklate", "SELECT id FROM posts ORDER BY id")).toEqual([{ id: 1 }, { id: 11 }]);
+        });
+
+        it("refuses inside the merge statement when a referencing row lands after the merge re-read the diff", async () => {
+            await freshBranch("fkrace", SETUP);
+            await branch("fkrace", "DELETE FROM authors WHERE id = 2");
+            const diff = await diffDatabaseBranch(admin, "fkrace");
+            // The target writes a post by grace in the moment between the
+            // merge's own re-read and its statement.
+            const racing: DatabaseAdmin = {
+                ...admin,
+                executeSql: async (text, options) => {
+                    if (text.startsWith("WITH guard")) await on("fkrace", "INSERT INTO posts VALUES (12, 2, 'raced the statement')");
+                    return on(options?.database ?? MAIN, text, options?.params);
+                }
+            };
+            const refused = await refusal(mergeDatabaseBranch(racing, "fkrace", { expectedFingerprint: diff.fingerprint }));
+            expect(refused.code).toBe("BRANCH_MERGE_CONFLICT");
+            expect(await on("fkrace", "SELECT id FROM authors ORDER BY id")).toEqual([{ id: 1 }, { id: 2 }, { id: 3 }]);
+            expect(await on("fkrace", "SELECT id FROM posts ORDER BY id")).toEqual([{ id: 1 }, { id: 12 }]);
+        });
+    });
 });

@@ -914,6 +914,10 @@ export interface BranchMergeBlock {
  *
  * Values are the text the database writes for them, `null` for SQL NULL, so a
  * `bigint` or a `numeric` reads exactly as it is stored.
+ *
+ * A `"conflict"` with no {@link after} is a row the branch deleted that rows
+ * the target wrote since the branch was made still reference — see
+ * {@link BranchTableDataDiff.referencedBy}.
  * @group Admin
  */
 export interface BranchRowChange {
@@ -944,7 +948,13 @@ export interface BranchTableDataDiff {
     updated: number;
     /** Rows the branch deleted. */
     deleted: number;
-    /** Rows both sides changed since the branch was made, differently. */
+    /**
+     * Rows both sides changed since the branch was made, differently — and
+     * rows the branch deleted that rows the target wrote since still
+     * reference through a foreign key ({@link referencedBy}). Deleting one of
+     * those on the target would cascade into, or rewrite, the target's own
+     * rows, so it is a conflict {@link BranchMergeOptions.onConflict} decides.
+     */
     conflicts: number;
     /**
      * Rows the target changed since the branch was made, and the branch did
@@ -957,6 +967,28 @@ export interface BranchTableDataDiff {
     blocked?: BranchMergeBlock;
     /** Rows on each side, for a table whose rows were not matched one by one. */
     rowCounts?: { target: number; branch: number };
+    /**
+     * The foreign keys through which rows the target wrote since the branch
+     * was made reference rows of this table the branch deleted. Each such
+     * delete is counted in {@link conflicts}.
+     */
+    referencedBy?: BranchReferencingRows[];
+}
+
+/**
+ * Rows of one table, written on the target since the branch was made, that
+ * reference rows the branch deleted.
+ * @group Admin
+ */
+export interface BranchReferencingRows {
+    schema: string;
+    table: string;
+    /** The foreign key's name. */
+    constraint: string;
+    /** What deleting the referenced row does to them on the target. */
+    onDelete: "cascade" | "set null" | "set default" | "restrict" | "no action";
+    /** How many of them there are. */
+    rows: number;
 }
 
 /**
@@ -1007,6 +1039,12 @@ export interface BranchMergeOptions {
      * A row both sides changed: `"abort"` (the default) writes nothing,
      * `"branch"` writes the branch's row over the target's, `"target"` keeps
      * the target's.
+     *
+     * A row the branch deleted that the target's newer rows reference
+     * ({@link BranchTableDataDiff.referencedBy}) is a conflict too: `"target"`
+     * keeps it, and with it the rows that reference it; `"branch"` deletes it,
+     * and the foreign key's `ON DELETE` reaches those rows — the result's
+     * `warnings` say which.
      */
     onConflict?: "abort" | "branch" | "target";
     /** Merge the other tables when some cannot be merged, instead of writing nothing. */
@@ -1031,7 +1069,11 @@ export interface BranchMergeResult {
     conflictsKept: number;
     /** Schema and policy changes on the branch, none of which a merge applies. */
     schemaChangesNotMerged: number;
-    /** What went wrong after the rows were written: a sequence left behind them. */
+    /**
+     * What the merge did beyond the rows it counts, or what went wrong after
+     * they were written: a delete whose foreign keys reached the target's own
+     * rows (with `onConflict: "branch"`), a sequence left behind them.
+     */
     warnings: string[];
 }
 

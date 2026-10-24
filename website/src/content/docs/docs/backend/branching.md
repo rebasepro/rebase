@@ -331,10 +331,20 @@ parent. What wins:
 - **Rows only the branch changed** are written: inserted, overwritten or
   deleted.
 - **Rows only the parent changed** since the branch was made are left exactly as
-  they are.
+  they are — unless one references a row the branch deleted, which is a
+  conflict (below).
 - **Rows both changed** are conflicts. By default the merge writes nothing at
   all; choose `onConflict: "branch"` to write the branch's row over the
   parent's, or `"target"` to keep the parent's.
+- **A row the branch deleted that the parent's newer rows still reference** is
+  a conflict too. Say the branch deleted an author, and the parent has since
+  written a post by them: deleting the author on the parent would cascade into
+  that post, null its column, or fail on the foreign key. The diff counts the
+  author as a conflict and names the referencing rows (`referencedBy`: the
+  table, the foreign key, its `ON DELETE` and how many rows). By default the
+  merge refuses, naming the table, the rows and the way out; `"target"` keeps
+  the author, and with it the post; `"branch"` deletes the author, lets the
+  foreign key do what it says, and lists what it reached in `warnings`.
 - **Schema and policy changes are never merged.** They belong to your
   collections and their migrations: apply them with `rebase db push` (or
   `migrate`), then merge the rows.
