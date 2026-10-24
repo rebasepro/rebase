@@ -141,6 +141,19 @@ const DB_INFO = {
     unavailableReason: null
 };
 
+/** A backend preview, as the `previews` function describes one. */
+const PREVIEW = {
+    name: "pr-12",
+    url: "https://shop--pr-12.rebase.website",
+    app: "backend",
+    backend: "preview",
+    status: "deploying",
+    deploymentId: "pd1",
+    expiresAt: "2026-10-08T10:00:00.000Z"
+};
+
+const PREVIEW_VAR = { key: "FOO", secret: false, unset: false, updatedAt: null };
+
 /** What the control plane answers, or undefined for a 404. */
 function answer(method: string, url: URL): unknown {
     const p = url.pathname;
@@ -173,7 +186,14 @@ function answer(method: string, url: URL): unknown {
         [p === "/api/functions/backup/create", () => ({ success: true, backup: { name: "base-1" } })],
         [p === `/api/functions/backup/backup-status/${PROJECT_ID}`, () => ({ enabled: true, reason: "", databaseType: "managed" })],
         [p.startsWith(`/api/functions/backup/download/${PROJECT_ID}/`), () => ({ url: "https://storage.example/base-1", name: "base-1", size: 1024 })],
-        [p === `/api/functions/backup/pitr-status/${PROJECT_ID}`, () => ({ enabled: true })]
+        [p === `/api/functions/backup/pitr-status/${PROJECT_ID}`, () => ({ enabled: true })],
+        [p.startsWith("/api/data/preview-deployments/"), () => deployment(p.split("/").pop() ?? "", "success")],
+        [p === `/api/functions/previews/${PROJECT_ID}` && method === "POST", () => ({ deployment: { id: "pd1" }, preview: PREVIEW })],
+        [p === `/api/functions/previews/${PROJECT_ID}`, () => ({ previews: [PREVIEW] })],
+        [p === `/api/functions/previews/${PROJECT_ID}/pr-12`, () => ({ success: true })],
+        [p === `/api/functions/previews/${PROJECT_ID}/env` && method === "GET", () => ({ vars: [PREVIEW_VAR] })],
+        [p === `/api/functions/previews/${PROJECT_ID}/env`, () => ({ success: true, var: PREVIEW_VAR, pendingRedeploy: true })],
+        [p === `/api/functions/previews/${PROJECT_ID}/env/FOO`, () => ({ success: true })]
     ];
     return routes.find(([matches]) => matches)?.[1]();
 }
@@ -320,7 +340,12 @@ const COMMANDS: Record<TokenCapability, string[][]> = {
         ["deploy", "--source", ".", "--eject"],
         ["deployments", "list"],
         ["rollback", "d0", "--yes"],
-        ["cancel", "--yes"]
+        ["cancel", "--yes"],
+        // A preview is a deploy aimed elsewhere: the same upload, triggered
+        // through `previews`, its build followed in `preview-deployments`.
+        ["deploy", "--bundle", "--bundle-dir", "<bundle>", "--preview-name", "pr-12"],
+        ["previews", "list"],
+        ["previews", "delete", "pr-12", "--yes"]
     ],
     logs: [
         ["logs"],
@@ -335,7 +360,11 @@ const COMMANDS: Record<TokenCapability, string[][]> = {
         ["env", "set", "FOO=bar"],
         ["env", "reveal", "FOO"],
         ["env", "unset", "FOO", "--yes"],
-        ["env", "pull", "--output", "<out>"]
+        ["env", "pull", "--output", "<out>"],
+        ["env", "list", "--preview"],
+        ["env", "set", "FOO=bar", "--preview"],
+        ["env", "unset", "FOO", "--preview", "--yes"],
+        ["env", "reset", "FOO", "--preview"]
     ],
     database: [
         ["db", "list"],

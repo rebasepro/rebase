@@ -15,12 +15,14 @@
  * hold:
  *
  * - `deploy`   — `rebase cloud deploy` (bundle and source paths, uploads, the
- *                build follow) and `rebase cloud deployments`.
+ *                build follow, `--preview`), `rebase cloud deployments` and
+ *                `rebase cloud previews`.
  * - `logs`     — `rebase cloud logs` (build, `--follow`, `--runtime`),
  *                `rebase cloud metrics` and `rebase cloud cron` — whose
  *                `runtime-token` call is how a token reads the app's own
  *                cron history.
- * - `env`      — `rebase cloud env list|set|unset|reveal|pull`.
+ * - `env`      — `rebase cloud env list|set|unset|reveal|pull`, and the
+ *                same with `--preview` (and `env reset --preview`).
  * - `database` — `rebase cloud db list|info|connect`.
  * - `backups`  — `rebase cloud db backup list|create|status|download` and
  *                `db pitr status`. Restoring takes `project:restore`, which no
@@ -46,12 +48,14 @@ export const TOKEN_CAPABILITY_NAMES: readonly TokenCapability[] = ["deploy", "lo
 
 /**
  * Scopes every token holds, whatever it was created for: resolving a project
- * by its slug, reading the deployment a command follows, the organization a
- * project belongs to, and the control plane's public description of itself.
+ * by its slug, reading the deployment a command follows (a production one, or
+ * a preview's), the organization a project belongs to, and the control plane's
+ * public description of itself.
  */
 export const ALWAYS_SCOPES: string[] = [
     "data:read:projects",
     "data:read:deployments",
+    "data:read:preview-deployments",
     "data:read:organizations",
     "functions:invoke:platform-config"
 ];
@@ -63,7 +67,10 @@ export const TOKEN_CAPABILITIES: Record<TokenCapability, { label: string; scopes
         scopes: (projectId) => [
             `project:read:${projectId}`,
             `project:deploy:${projectId}`,
-            "functions:invoke:deploy"
+            "functions:invoke:deploy",
+            // `deploy --preview` triggers, and `cloud previews` lists and
+            // deletes, through the `previews` function.
+            "functions:invoke:previews"
         ]
     },
     logs: {
@@ -80,7 +87,9 @@ export const TOKEN_CAPABILITIES: Record<TokenCapability, { label: string; scopes
         label: "Read and change environment variables, secrets included",
         scopes: (projectId) => [
             `project:env:${projectId}`,
-            "functions:invoke:env-vars"
+            "functions:invoke:env-vars",
+            // `env … --preview`: previews' own overrides live in `previews`.
+            "functions:invoke:previews"
         ]
     },
     database: {

@@ -298,9 +298,9 @@ jobs:
 
 | Capability | What the token may do |
 |---|---|
-| `deploy` | Deploy the project and follow its builds: `deploy`, `deployments` |
+| `deploy` | Deploy the project and follow its builds: `deploy` (`--preview` included), `deployments`, `previews` |
 | `logs` | Read build and runtime logs, and live metrics: `logs`, `metrics` |
-| `env` | Read and change environment variables, secrets included |
+| `env` | Read and change environment variables, secrets included, and previews' own (`--preview`) |
 | `database` | `db list`, `db info` and `db connect`, which includes the database password |
 | `backups` | List, create, inspect and download backups, and read the point-in-time window |
 
