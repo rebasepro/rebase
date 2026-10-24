@@ -78,6 +78,12 @@ afterAll(async () => {
     }
 });
 
+/** An accessor the in-process client always carries, typed optional on the shared client type. */
+function present<T>(accessor: T | undefined, name: string): T {
+    if (!accessor) throw new Error(`backend.rebase.${name} is missing`);
+    return accessor;
+}
+
 /** The error a call rejects with, as `status code message`. */
 async function refusal(call: Promise<unknown>): Promise<string> {
     try {
@@ -92,12 +98,12 @@ async function refusal(call: Promise<unknown>): Promise<string> {
 describe("the in-process client on a trimmed role", () => {
     it("reaches the function where the functions surface is on", async () => {
         const backend = await make();
-        expect(await backend.rebase.functions.invoke("ping", {})).toEqual({ pong: true });
+        expect(await present(backend.rebase.functions, "functions").invoke("ping", {})).toEqual({ pong: true });
     });
 
     it("names the functions surface, and what to do, where it is off", async () => {
         const backend = await make(WORKER);
-        const said = await refusal(backend.rebase.functions.invoke("ping", {}));
+        const said = await refusal(present(backend.rebase.functions, "functions").invoke("ping", {}));
         expect(said).toMatch(/^404 NOT_FOUND /);
         expect(said).toContain("functions surface is off");
         expect(said).toContain("REBASE_ROLE=worker");
@@ -106,7 +112,7 @@ describe("the in-process client on a trimmed role", () => {
 
     it("names the admin surface where it is off", async () => {
         const backend = await make(WORKER);
-        const said = await refusal(backend.rebase.admin.listUsers());
+        const said = await refusal(present(backend.rebase.admin, "admin").listUsers());
         expect(said).toMatch(/^404 NOT_FOUND /);
         expect(said).toContain("admin surface is off");
     });
