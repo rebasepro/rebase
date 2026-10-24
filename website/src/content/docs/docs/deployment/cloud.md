@@ -289,6 +289,34 @@ A rollback appends a new deployment rather than rewinding history, and waits for
 the restored version to serve before reporting success. Follow it with
 `rebase cloud logs -f`.
 
+## Secure your account
+
+Your console account can reach production databases, secrets and billing, so
+protect it like one. Open **Account security** from the menu under your avatar
+in the console (or go to `/account`). The page is yours, not an
+organization's: what you set there applies in every organization you belong to.
+
+- **Two-step verification.** Turn it on with any authenticator app (1Password,
+  Google Authenticator, Authy). The page shows a setup key to add to the app, or a
+  link that opens the app with the key filled in on a phone, then asks for the
+  6-digit code the app shows. From then on, every sign-in asks for a code,
+  whether you sign in with a password, Google or GitHub.
+- **Recovery codes.** Turning it on gives you ten single-use codes, shown once.
+  Each one signs you in in place of the authenticator code if you lose your
+  phone, so save them before you close the dialog. **New recovery codes**
+  replaces them, and the old ones stop working. Turning two-step verification
+  off and getting new codes both ask for a code first.
+- **Password.** Changing it signs you out on every other device. An account
+  created with Google, GitHub or LinkedIn has no password; the page offers to
+  email you a link to set one.
+- **Signed-in devices.** Every browser and terminal signed in to your account,
+  with its address and when it signed in. Sign out any device you do not
+  recognise, or all of them at once.
+
+[Access tokens](#ci-and-agents) are not sessions and do not ask for a second
+factor, so CI keeps deploying after you turn it on. Revoke a token you no longer
+trust under **Settings → Access tokens**.
+
 ## CI and agents
 
 A CI job or an agent should not carry your password. Give it a token
