@@ -341,7 +341,10 @@ one of their organizations. The link works once. A project nobody claims within
 tool runs the same command and returns the same URLs.
 
 Until the project is claimed it belongs to no account. Its token is narrowed to
-that one project and to `deploy`, `logs`, `env` and `database`. It is kept in
+that one project: it deploys, reads logs and metrics, sets environment variables
+and runs `db info`. It reads nothing secret back: not a variable's value (the
+service key included), not the database password, and it cannot open
+`db connect` or a preview. It is kept in
 `~/.rebase/credentials.json`, never in the repository, and `rebase cloud`
 commands in the linked directory use it on their own. It expires with the
 project. `rebase cloud whoami` in that directory shows the project, what the
