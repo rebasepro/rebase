@@ -2248,13 +2248,37 @@ describe("rebase_cloud_provision", () => {
         expect(result.content[0].text).toContain("rate_limited");
     });
 
+    it("says what to do when the control plane has not switched provisioning on", async () => {
+        cliPrints(JSON.stringify({ error: {
+            code: "not_configured",
+            message: "Provisioning without an account is not enabled on this control plane."
+        } }), 1);
+        const result = await call({});
+        expect(result.isError).toBe(true);
+        const text = result.content[0].text;
+        // The way forward is the server's own text, before the fenced refusal.
+        expect(text.indexOf("rebase cloud login")).toBeGreaterThanOrEqual(0);
+        expect(text.indexOf("rebase cloud login")).toBeLessThan(text.indexOf("UNTRUSTED_DATA"));
+        expect(text).toContain("not enabled on this control plane");
+    });
+
+    it("does not tell an agent that asked for no deploy to fix a deploy", async () => {
+        cliPrints(JSON.stringify({ ...RESULT, adminUrl: null, deploy: null }), 0);
+        const result = await call({ deploy: false });
+        const next = (JSON.parse(result.content[0].text) as { next: string }).next;
+        expect(next).not.toContain("fix what");
+        expect(next).toContain("as asked");
+    });
+
     it("keeps a name a value, never a flag, and refuses one argv must not carry", () => {
         expect(cloudProvisionArgv({ name: "--url=https://evil.example" })).toEqual(
             ["cloud", "init", "--claim", "--json", "--name=--url=https://evil.example"]
         );
         expect(cloudProvisionArgv({ deploy: false })).toEqual(["cloud", "init", "--claim", "--json", "--no-deploy"]);
         expect(() => cloudProvisionArgv({ name: "a\nb" })).toThrow();
-        expect(() => cloudProvisionArgv({ name: "x".repeat(61) })).toThrow();
+        // The control plane's own limit, not a tighter one of this server's.
+        expect(cloudProvisionArgv({ name: "x".repeat(200) })).toContain(`--name=${"x".repeat(200)}`);
+        expect(() => cloudProvisionArgv({ name: "x".repeat(201) })).toThrow();
         expect(() => cloudProvisionArgv({ name: 42 })).toThrow();
         expect(() => cloudProvisionArgv({ deploy: "no" })).toThrow();
     });

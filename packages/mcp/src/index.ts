@@ -1661,6 +1661,9 @@ const PROJECT_TOOLS: ToolDef[] = [
     }
 ];
 
+/** The longest project name the control plane's provision endpoint accepts (`MAX_NAME_LENGTH` there). */
+const CLOUD_PROJECT_NAME_MAX = 200;
+
 /**
  * Rebase Cloud, reached by spawning `rebase cloud` in the active project — the
  * same command a person would run, so the tool cannot drift from it.
@@ -1679,7 +1682,7 @@ const CLOUD_TOOLS: ToolDef[] = [
         inputSchema: {
             type: "object",
             properties: {
-                name: { type: "string", description: "What to call the app (optional, up to 60 characters)" },
+                name: { type: "string", description: `What to call the app (optional, up to ${CLOUD_PROJECT_NAME_MAX} characters)` },
                 deploy: { type: "boolean", description: "Deploy the collections now. Default true; false provisions and links only" }
             }
         }
@@ -1702,8 +1705,8 @@ export interface CloudProvisionResult {
 export function cloudProvisionArgv(args: { name?: unknown; deploy?: unknown }): string[] {
     const argv = ["cloud", "init", "--claim", "--json"];
     if (args.name !== undefined) {
-        if (typeof args.name !== "string" || args.name.length > 60 || [...args.name].some((ch) => ch.charCodeAt(0) < 32)) {
-            throw new Error("`name` must be a string of at most 60 printable characters.");
+        if (typeof args.name !== "string" || args.name.length > CLOUD_PROJECT_NAME_MAX || [...args.name].some((ch) => ch.charCodeAt(0) < 32)) {
+            throw new Error(`\`name\` must be a string of at most ${CLOUD_PROJECT_NAME_MAX} printable characters.`);
         }
         // `--name=` form: a name starting with `-` stays a value, never a flag.
         if (args.name.trim()) argv.push(`--name=${args.name.trim()}`);
@@ -1713,6 +1716,48 @@ export function cloudProvisionArgv(args: { name?: unknown; deploy?: unknown }): 
     }
     if (args.deploy === false) argv.push("--no-deploy");
     return argv;
+}
+
+/** The code of a refusal `rebase cloud init --claim --json` printed (`{ error: { code, … } }`), or null. */
+export function cloudProvisionRefusalCode(stdout: string): string | null {
+    let value: unknown;
+    try {
+        value = JSON.parse(stdout.trim());
+    } catch {
+        return null;
+    }
+    if (typeof value !== "object" || value === null || !("error" in value)) return null;
+    const error = value.error;
+    if (typeof error !== "object" || error === null || !("code" in error)) return null;
+    return typeof error.code === "string" ? error.code : null;
+}
+
+/**
+ * The way forward after a provision refusal this server recognises by its
+ * code, or null. Written here, so it is trusted text; the refusal's own message
+ * stays fenced as untrusted data beside it.
+ *
+ * A control plane that has not switched provisioning on answers
+ * `not_configured`. The tool stays listed — whether provisioning is on is the
+ * control plane's to say, and it can change — so the refusal has to carry the
+ * way forward on its own.
+ */
+export function cloudProvisionRefusalNext(code: string): string | null {
+    switch (code) {
+        case "not_configured":
+        case "not_supported":
+            return "This control plane does not provision projects without an account, so nothing was created. " +
+                "Ask the user to sign in with `rebase cloud login`; then create the project with " +
+                "`rebase cloud projects create --link` and deploy it with `rebase cloud deploy`.";
+        case "rate_limited":
+            return "Too many projects were provisioned from this address recently, so nothing was created. " +
+                "Have the user claim an earlier one, wait, or sign in and use `rebase cloud projects create --link`.";
+        case "already_linked":
+            return "This directory is already linked to a project, so nothing was created. " +
+                "`rebase cloud status` shows it, and its claim URL while it is unclaimed.";
+        default:
+            return null;
+    }
 }
 
 /** Read the CLI's one JSON result, keeping only fields of the expected shape. Null when it printed none. */
@@ -2104,14 +2149,23 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
             if (spawnError) return { ...textResult(`Error spawning command: ${spawnError}`), isError: true };
             const result = parseCloudProvisionResult(stdout);
             if (!result) {
-                return untrustedTextResult("the `rebase cloud init --claim` command", combined.trim() || "(no output)", true);
+                const code = cloudProvisionRefusalCode(stdout);
+                const next = code ? cloudProvisionRefusalNext(code) : null;
+                const fenced = untrustedEnvelope("the `rebase cloud init --claim` command", combined.trim() || "(no output)");
+                return {
+                    ...textResult(next ? `Rebase Cloud refused the provision (${code}). ${next}\n\n${fenced}` : fenced),
+                    isError: true
+                };
             }
+            const deployAsked = !argv.includes("--no-deploy");
             return {
                 ...jsonResult({
                     ...result,
                     next: (result.deployed
                         ? "Give the claimUrl to the user. Until they claim it, `rebase cloud deploy` here redeploys."
-                        : "The project exists but is not deployed: fix what `rebase cloud deploy` reports, run it again, and give the claimUrl to the user.")
+                        : deployAsked
+                            ? "The project exists but is not deployed: fix what `rebase cloud deploy` reports, run it again, and give the claimUrl to the user."
+                            : "The project exists and is linked, with nothing deployed yet, as asked: run `rebase cloud deploy` when the collections are ready, and give the claimUrl to the user.")
                         + (result.apiTokenInEnv
                             ? " REBASE_BASE_URL and REBASE_API_TOKEN are in .env; this server reads them when it starts."
                             : "")
