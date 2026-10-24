@@ -284,9 +284,10 @@ database without touching the real one. Before any of it reaches the database
 the branch was made from, you can see what changed and merge it from
 [Studio](/docs/studio/): open **Branches** and pick one.
 
-- **Schema & RLS policies** lists every table, column, primary key and policy
-  the branch added, dropped or altered, as SQL, with the parent's definition
-  beside the branch's.
+- **Schema & RLS policies** lists every table, column, primary key,
+  constraint (unique, foreign key, check, exclusion), index, trigger, policy,
+  enum type (with its labels), view and function the branch added, dropped or
+  altered, as SQL, with the parent's definition beside the branch's.
 - **Data changes** counts, per table, the rows the branch inserted, updated and
   deleted, matched by primary key, and shows up to 100 of them per table with
   the columns that changed.

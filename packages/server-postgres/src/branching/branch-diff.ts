@@ -193,6 +193,12 @@ export interface PolicyFacts {
     withCheck: string | null;
 }
 
+/** An object of a table — a constraint, an index, a trigger — as the SQL that declares it. */
+export interface NamedDefinition {
+    name: string;
+    definition: string;
+}
+
 export interface TableFacts {
     schema: string;
     table: string;
@@ -201,10 +207,28 @@ export interface TableFacts {
     columns: ColumnFacts[];
     primaryKey: string[];
     policies: PolicyFacts[];
+    /** Unique, foreign-key, check and exclusion constraints: everything but the primary key and NOT NULL. */
+    constraints?: NamedDefinition[];
+    /** Indexes that back no constraint — a constraint's own index comes and goes with it. */
+    indexes?: NamedDefinition[];
+    /** Triggers someone wrote: not the ones Postgres makes for a foreign key. */
+    triggers?: NamedDefinition[];
 }
 
 /** Tables by `schema.table`, as a JSON pair so no name can collide with another. */
 export type Catalog = Map<string, TableFacts>;
+
+/** An object of a schema rather than a table: an enum type, a view, a function. */
+export interface SchemaObjectFacts {
+    object: "enum" | "view" | "function";
+    schema: string;
+    /** Its name; a function's carries its argument types, as overloads differ by them. */
+    name: string;
+    definition: string;
+}
+
+/** Schema objects by kind, schema and name. */
+export type SchemaObjects = Map<string, SchemaObjectFacts>;
 
 const tableKey = (schema: string, table: string): string => JSON.stringify([schema, table]);
 
@@ -249,13 +273,102 @@ SELECT schemaname::text AS schema_name, tablename::text AS table_name, policynam
  WHERE ${schemaFilter("schemaname::text")}
  ORDER BY schemaname, tablename, policyname`;
 
+const CONSTRAINTS_SQL = `
+SELECT n.nspname AS schema_name, c.relname AS table_name, con.conname AS object_name,
+       pg_get_constraintdef(con.oid) AS definition
+  FROM pg_constraint con
+  JOIN pg_class c ON c.oid = con.conrelid
+  JOIN pg_namespace n ON n.oid = c.relnamespace
+ WHERE con.contype IN ('u', 'f', 'c', 'x') AND ${TABLE_FILTER} AND ${schemaFilter("n.nspname")}
+ ORDER BY n.nspname, c.relname, con.conname`;
+
+const INDEXES_SQL = `
+SELECT n.nspname AS schema_name, c.relname AS table_name, i.relname AS object_name,
+       pg_get_indexdef(i.oid) AS definition
+  FROM pg_index x
+  JOIN pg_class i ON i.oid = x.indexrelid
+  JOIN pg_class c ON c.oid = x.indrelid
+  JOIN pg_namespace n ON n.oid = c.relnamespace
+ WHERE NOT EXISTS (SELECT 1 FROM pg_constraint con WHERE con.conindid = x.indexrelid AND con.contype IN ('p', 'u', 'x'))
+   AND ${TABLE_FILTER} AND ${schemaFilter("n.nspname")}
+ ORDER BY n.nspname, c.relname, i.relname`;
+
+const TRIGGERS_SQL = `
+SELECT n.nspname AS schema_name, c.relname AS table_name, t.tgname AS object_name,
+       pg_get_triggerdef(t.oid) AS definition
+  FROM pg_trigger t
+  JOIN pg_class c ON c.oid = t.tgrelid
+  JOIN pg_namespace n ON n.oid = c.relnamespace
+ WHERE NOT t.tgisinternal AND ${TABLE_FILTER} AND ${schemaFilter("n.nspname")}
+ ORDER BY n.nspname, c.relname, t.tgname`;
+
+/** Not an extension's: `CREATE EXTENSION` owns those, not a migration. */
+const notFromExtension = (catalog: string, oid: string) => `NOT EXISTS (SELECT 1 FROM pg_depend dep
+     WHERE dep.classid = '${catalog}'::regclass AND dep.objid = ${oid} AND dep.deptype = 'e')`;
+
+const ENUMS_SQL = `
+SELECT n.nspname AS schema_name, t.typname AS object_name,
+       json_agg(e.enumlabel::text ORDER BY e.enumsortorder)::text AS labels
+  FROM pg_type t
+  JOIN pg_namespace n ON n.oid = t.typnamespace
+  JOIN pg_enum e ON e.enumtypid = t.oid
+ WHERE ${schemaFilter("n.nspname")} AND ${notFromExtension("pg_type", "t.oid")}
+ GROUP BY n.nspname, t.typname`;
+
+const VIEWS_SQL = `
+SELECT n.nspname AS schema_name, c.relname AS object_name, c.relkind::text AS kind,
+       pg_get_viewdef(c.oid) AS definition
+  FROM pg_class c
+  JOIN pg_namespace n ON n.oid = c.relnamespace
+ WHERE c.relkind IN ('v', 'm') AND ${schemaFilter("n.nspname")} AND ${notFromExtension("pg_class", "c.oid")}`;
+
+const FUNCTIONS_SQL = `
+SELECT n.nspname AS schema_name,
+       p.proname || '(' || pg_get_function_identity_arguments(p.oid) || ')' AS object_name,
+       pg_get_functiondef(p.oid) AS definition
+  FROM pg_proc p
+  JOIN pg_namespace n ON n.oid = p.pronamespace
+ WHERE p.prokind IN ('f', 'p') AND ${schemaFilter("n.nspname")} AND ${notFromExtension("pg_proc", "p.oid")}`;
+
+const literal = (value: string): string => `'${value.replace(/'/g, "''")}'`;
+
+/** The enum types, views and functions of the schemas a diff reads. */
+async function readSchemaObjects(sql: SQLAdmin, database: string, schemas: string[] | null): Promise<SchemaObjects> {
+    const params = [schemas];
+    const [enums, views, functions] = await Promise.all([
+        sql.executeSql(ENUMS_SQL, { database, params }),
+        sql.executeSql(VIEWS_SQL, { database, params }),
+        sql.executeSql(FUNCTIONS_SQL, { database, params })
+    ]);
+    const objects: SchemaObjects = new Map();
+    const add = (facts: SchemaObjectFacts) => objects.set(JSON.stringify([facts.object, facts.schema, facts.name]), facts);
+    for (const row of enums) {
+        const schema = text(row, "schema_name");
+        const name = text(row, "object_name");
+        add({ object: "enum", schema, name, definition: `CREATE TYPE ${qualified(schema, name)} AS ENUM (${stringList(text(row, "labels")).map(literal).join(", ")});` });
+    }
+    for (const row of views) {
+        const schema = text(row, "schema_name");
+        const name = text(row, "object_name");
+        const kind = text(row, "kind") === "m" ? "MATERIALIZED VIEW" : "VIEW";
+        add({ object: "view", schema, name, definition: `CREATE ${kind} ${qualified(schema, name)} AS\n${text(row, "definition").trim()}` });
+    }
+    for (const row of functions) {
+        add({ object: "function", schema: text(row, "schema_name"), name: text(row, "object_name"), definition: text(row, "definition").trim() });
+    }
+    return objects;
+}
+
 async function readCatalog(sql: SQLAdmin, database: string, schemas: string[] | null): Promise<Catalog> {
     const params = [schemas];
-    const [tables, columns, primaryKeys, policies] = await Promise.all([
+    const [tables, columns, primaryKeys, policies, constraints, indexes, triggers] = await Promise.all([
         sql.executeSql(TABLES_SQL, { database, params }),
         sql.executeSql(COLUMNS_SQL, { database, params }),
         sql.executeSql(PRIMARY_KEYS_SQL, { database, params }),
-        sql.executeSql(POLICIES_SQL, { database, params })
+        sql.executeSql(POLICIES_SQL, { database, params }),
+        sql.executeSql(CONSTRAINTS_SQL, { database, params }),
+        sql.executeSql(INDEXES_SQL, { database, params }),
+        sql.executeSql(TRIGGERS_SQL, { database, params })
     ]);
     const catalog: Catalog = new Map();
     for (const row of tables) {
@@ -271,7 +384,10 @@ async function readCatalog(sql: SQLAdmin, database: string, schemas: string[] | 
             forceRls: flag(row, "force_rls"),
             columns: [],
             primaryKey: [],
-            policies: []
+            policies: [],
+            constraints: [],
+            indexes: [],
+            triggers: []
         });
     }
     for (const row of columns) {
@@ -301,6 +417,15 @@ async function readCatalog(sql: SQLAdmin, database: string, schemas: string[] | 
             withCheck: nullableText(row, "with_check")
         });
     }
+    const named = (rows: Row[], list: (facts: TableFacts) => NamedDefinition[] | undefined) => {
+        for (const row of rows) {
+            const facts = catalog.get(tableKey(text(row, "schema_name"), text(row, "table_name")));
+            if (facts) list(facts)?.push({ name: text(row, "object_name"), definition: text(row, "definition") });
+        }
+    };
+    named(constraints, (facts) => facts.constraints);
+    named(indexes, (facts) => facts.indexes);
+    named(triggers, (facts) => facts.triggers);
     return catalog;
 }
 
@@ -353,12 +478,26 @@ function primaryKeySql(facts: TableFacts): string {
         : `ALTER TABLE ${qualified(facts.schema, facts.table)} ADD PRIMARY KEY (${facts.primaryKey.map(ident).join(", ")});`;
 }
 
+/** A table's constraint, index or trigger, as the SQL that would create it. */
+function tableObjectSql(object: "constraint" | "index" | "trigger", facts: TableFacts, item: NamedDefinition): string {
+    return object === "constraint"
+        ? `ALTER TABLE ${qualified(facts.schema, facts.table)} ADD CONSTRAINT ${ident(item.name)} ${item.definition};`
+        : `${item.definition};`;
+}
+
+const TABLE_OBJECTS = [
+    ["constraint", (facts: TableFacts) => facts.constraints ?? []],
+    ["index", (facts: TableFacts) => facts.indexes ?? []],
+    ["trigger", (facts: TableFacts) => facts.triggers ?? []]
+] as const;
+
 const sameList = (a: readonly string[], b: readonly string[]): boolean =>
     a.length === b.length && a.every((item, index) => item === b[index]);
 
 /**
  * The schema changes from `target` to `branch`: tables, columns, primary keys,
- * row-level security and policies, ordered by table.
+ * constraints, indexes, triggers, row-level security and policies, ordered by
+ * table.
  */
 export function diffCatalogs(target: Catalog, branch: Catalog): BranchSchemaChange[] {
     const changes: BranchSchemaChange[] = [];
@@ -397,6 +536,25 @@ export function diffCatalogs(target: Catalog, branch: Catalog): BranchSchemaChan
                 changes.push({ object: "rls", change: "altered", schema, table, before: rlsSql(before), after: rlsSql(after) });
             }
         }
+        // A dropped table takes its constraints, indexes and triggers with it;
+        // an added one brings them.
+        if (after) {
+            for (const [object, list] of TABLE_OBJECTS) {
+                const old = new Map((before ? list(before) : []).map((item) => [item.name, item]));
+                const now = new Map(list(after).map((item) => [item.name, item]));
+                for (const [name, item] of now) {
+                    const was = old.get(name);
+                    const definition = tableObjectSql(object, after, item);
+                    if (!was) changes.push({ object, change: "added", schema, table, name, after: definition });
+                    else if (was.definition !== item.definition) {
+                        changes.push({ object, change: "altered", schema, table, name, before: tableObjectSql(object, after, was), after: definition });
+                    }
+                }
+                for (const [name, item] of old) {
+                    if (!now.has(name)) changes.push({ object, change: "dropped", schema, table, name, before: tableObjectSql(object, after, item) });
+                }
+            }
+        }
         const policiesBefore = new Map((before?.policies ?? []).map((policy) => [policy.name, policy]));
         const policiesAfter = new Map((after?.policies ?? []).map((policy) => [policy.name, policy]));
         for (const [name, policy] of policiesAfter) {
@@ -412,6 +570,24 @@ export function diffCatalogs(target: Catalog, branch: Catalog): BranchSchemaChan
             if (!policiesAfter.has(name)) {
                 changes.push({ object: "policy", change: "dropped", schema, table, name, before: policySql(schema, table, policy) });
             }
+        }
+    }
+    return changes;
+}
+
+/** The enum types, views and functions added, dropped or altered from `target` to `branch`. */
+export function diffSchemaObjects(target: SchemaObjects, branch: SchemaObjects): BranchSchemaChange[] {
+    const changes: BranchSchemaChange[] = [];
+    for (const key of [...new Set([...target.keys(), ...branch.keys()])].sort()) {
+        const before = target.get(key);
+        const after = branch.get(key);
+        const facts = after ?? before;
+        if (!facts) continue;
+        const base = { object: facts.object, schema: facts.schema, table: facts.name };
+        if (!before && after) changes.push({ ...base, change: "added", after: after.definition });
+        else if (before && !after) changes.push({ ...base, change: "dropped", before: before.definition });
+        else if (before && after && before.definition !== after.definition) {
+            changes.push({ ...base, change: "altered", before: before.definition, after: after.definition });
         }
     }
     return changes;
@@ -730,16 +906,18 @@ async function computeDiff(admin: DatabaseAdmin | undefined, branchName: string,
     const branchDb = branch.database;
     const targetDb = branch.parentDatabase;
 
-    const [targetCatalog, branchCatalog, fork] = await Promise.all([
+    const [targetCatalog, branchCatalog, targetObjects, branchObjects, fork] = await Promise.all([
         readCatalog(sql, targetDb, schemas),
         readCatalog(sql, branchDb, schemas),
+        readSchemaObjects(sql, targetDb, schemas),
+        readSchemaObjects(sql, branchDb, schemas),
         sql.executeSql("SELECT age(xmin)::text AS age FROM pg_database WHERE datname = $1", { database: targetDb, params: [branchDb] })
     ]);
     const forkAge = fork[0] ? Number(text(fork[0], "age")) : NaN;
     const forkPointKnown = Number.isFinite(forkAge) && forkAge < FROZEN_AGE;
     const forkDatabase = forkPointKnown ? branchDb : null;
 
-    const schemaChanges = diffCatalogs(targetCatalog, branchCatalog);
+    const schemaChanges = [...diffCatalogs(targetCatalog, branchCatalog), ...diffSchemaObjects(targetObjects, branchObjects)];
     const data: BranchTableDataDiff[] = [];
     const matched = new Map<string, MatchedTable>();
     /** What the fingerprint covers, per table, beyond the schema. */

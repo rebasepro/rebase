@@ -854,8 +854,9 @@ export interface BranchAdmin {
 
     /**
      * What the branch changed, against the database it was made from: its
-     * tables, columns and row-level-security policies, and per table the rows
-     * it inserted, updated and deleted. Reads only.
+     * tables, columns, constraints, indexes, triggers, row-level-security
+     * policies, enum types, views and functions, and per table the rows it
+     * inserted, updated and deleted. Reads only.
      */
     diffBranch?(name: string, options?: BranchDiffOptions): Promise<BranchDiff>;
 
@@ -884,15 +885,21 @@ export interface BranchDiffOptions {
 }
 
 /**
- * One change to a table, a column, a policy or a table's row-level security.
+ * One change to the schema: a table, a column, a policy, a table's row-level
+ * security, a constraint (unique, foreign key, check, exclusion), an index, a
+ * trigger — or, outside any table, an enum type, a view or a function.
  * @group Admin
  */
 export interface BranchSchemaChange {
-    object: "table" | "column" | "policy" | "rls";
+    object: "table" | "column" | "policy" | "rls" | "constraint" | "index" | "trigger" | "enum" | "view" | "function";
     change: "added" | "dropped" | "altered";
     schema: string;
+    /**
+     * The table the change is on — or, for an enum, a view or a function, the
+     * object's own name (a function's with its argument types).
+     */
     table: string;
-    /** The column's or the policy's name. */
+    /** The column's, policy's, constraint's, index's or trigger's name. */
     name?: string;
     /** The definition on the target, as SQL. Absent for an addition. */
     before?: string;

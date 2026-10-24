@@ -1694,6 +1694,12 @@ export interface RebaseTranslations {
     studio_branch_diff_object_column?: string;
     studio_branch_diff_object_policy?: string;
     studio_branch_diff_object_rls?: string;
+    studio_branch_diff_object_constraint?: string;
+    studio_branch_diff_object_index?: string;
+    studio_branch_diff_object_trigger?: string;
+    studio_branch_diff_object_enum?: string;
+    studio_branch_diff_object_view?: string;
+    studio_branch_diff_object_function?: string;
     studio_branch_diff_change_added?: string;
     studio_branch_diff_change_dropped?: string;
     studio_branch_diff_change_altered?: string;

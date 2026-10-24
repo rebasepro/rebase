@@ -40,7 +40,8 @@ import { splitLineDiff } from "./split-line-diff";
  * merge, behind a dialog that says what wins before anything is written.
  *
  * The diff is the server's (`GET /api/admin/branches/:name/diff`), computed
- * against the database the branch was made from: schema and RLS policies as
+ * against the database the branch was made from: schema (tables, columns,
+ * constraints, indexes, triggers, enums, views, functions) and RLS policies as
  * SQL, side by side, and the rows the branch inserted, updated and deleted.
  * Rows that database changed on its own since are counted apart and never
  * offered as the branch's — and a row the branch deleted that they still
@@ -263,7 +264,13 @@ function SchemaChanges({ diff }: { diff: BranchDiff }) {
         table: t("studio_branch_diff_object_table"),
         column: t("studio_branch_diff_object_column"),
         policy: t("studio_branch_diff_object_policy"),
-        rls: t("studio_branch_diff_object_rls")
+        rls: t("studio_branch_diff_object_rls"),
+        constraint: t("studio_branch_diff_object_constraint"),
+        index: t("studio_branch_diff_object_index"),
+        trigger: t("studio_branch_diff_object_trigger"),
+        enum: t("studio_branch_diff_object_enum"),
+        view: t("studio_branch_diff_object_view"),
+        function: t("studio_branch_diff_object_function")
     };
     const changeLabel: Record<BranchSchemaChange["change"], string> = {
         added: t("studio_branch_diff_change_added"),

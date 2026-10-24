@@ -6,11 +6,14 @@ import {
     columnDefinitionSql,
     diffCatalogs,
     diffDatabaseBranch,
+    diffSchemaObjects,
     mergeDatabaseBranch,
     pickSamples,
     policySql,
     type Catalog,
     type RowState,
+    type SchemaObjectFacts,
+    type SchemaObjects,
     type TableFacts
 } from "../src/branching/branch-diff";
 
@@ -121,6 +124,43 @@ describe("diffCatalogs", () => {
             "altered policy posts.read",
             "added policy posts.write"
         ]);
+    });
+
+    it("reports constraints, indexes and triggers, and the ones a new table brings", () => {
+        const unique = { name: "posts_slug_key", definition: "UNIQUE (slug)" };
+        const index = { name: "posts_title_idx", definition: "CREATE INDEX posts_title_idx ON public.posts USING btree (title)" };
+        const before = catalog(table({ table: "posts", indexes: [index] }));
+        const after = catalog(
+            table({ table: "posts", constraints: [unique], triggers: [{ name: "touch", definition: "CREATE TRIGGER touch BEFORE UPDATE ON public.posts FOR EACH ROW EXECUTE FUNCTION touch()" }] }),
+            table({ table: "tags", constraints: [{ name: "tags_label_check", definition: "CHECK ((label <> ''::text))" }] })
+        );
+        const changes = diffCatalogs(before, after);
+        expect(changes.map((change) => `${change.change} ${change.object} ${change.table}${change.name ? `.${change.name}` : ""}`)).toEqual([
+            "added constraint posts.posts_slug_key",
+            "dropped index posts.posts_title_idx",
+            "added trigger posts.touch",
+            "added table tags",
+            "added constraint tags.tags_label_check"
+        ]);
+        expect(changes[0].after).toBe("ALTER TABLE \"public\".\"posts\" ADD CONSTRAINT \"posts_slug_key\" UNIQUE (slug);");
+    });
+
+    it("reports enum labels, views and functions", () => {
+        const objects = (...facts: SchemaObjectFacts[]): SchemaObjects => new Map(facts.map((item) => [JSON.stringify([item.object, item.schema, item.name]), item]));
+        const before = objects(
+            { object: "enum", schema: "public", name: "mood", definition: "CREATE TYPE \"public\".\"mood\" AS ENUM ('happy');" },
+            { object: "function", schema: "public", name: "gone()", definition: "CREATE FUNCTION gone() …" }
+        );
+        const after = objects(
+            { object: "enum", schema: "public", name: "mood", definition: "CREATE TYPE \"public\".\"mood\" AS ENUM ('happy', 'angry');" },
+            { object: "view", schema: "public", name: "recent", definition: "CREATE VIEW \"public\".\"recent\" AS SELECT 1" }
+        );
+        expect(diffSchemaObjects(before, after).map((change) => `${change.change} ${change.object} ${change.table}`)).toEqual([
+            "altered enum mood",
+            "dropped function gone()",
+            "added view recent"
+        ]);
+        expect(diffSchemaObjects(after, after)).toEqual([]);
     });
 
     it("says nothing about identical catalogues", () => {

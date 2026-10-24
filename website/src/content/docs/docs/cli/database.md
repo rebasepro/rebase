@@ -269,8 +269,9 @@ pass `--yes`, and exits 1; on 0.24 it says "Nothing was changed." and exits 0.
 they create no `rebase` schema there. On 0.24 they create the registry.
 
 `diff` shows what a branch changed against the database it was made from:
-tables, columns and RLS policies added, dropped or altered, and per table the
-rows it inserted, updated and deleted. Rows the parent changed on its own since
+tables, columns, constraints, indexes, triggers, RLS policies, enum types,
+views and functions added, dropped or altered, and per table the rows it
+inserted, updated and deleted. Rows the parent changed on its own since
 are counted apart, and rows both changed are conflicts. `--json` prints the
 whole diff, with up to `--sample-limit` rows a table (default 100). It reads
 both databases and changes neither; merging is in Studio — see

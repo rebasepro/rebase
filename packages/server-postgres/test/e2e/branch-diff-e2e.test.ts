@@ -285,11 +285,55 @@ describe("database branch diff and merge", () => {
      * A database of its own, set up with `setup`, and a branch made from it —
      * so a case's tables never show up in another case's diff.
      */
+    const freshDatabases: string[] = [];
     async function freshBranch(source: string, setup: string): Promise<void> {
+        // Each database keeps a pool of its own; let the earlier cases' go, or
+        // the server runs out of connections.
+        for (const database of freshDatabases.splice(0)) await poolManager.disconnectDatabase(database);
+        freshDatabases.push(source, `rb_${source}`);
         await maintenance.query(`CREATE DATABASE "${source}"`);
         await on(source, setup);
         await branches.createBranch(source, { source });
     }
+
+    it("lists indexes, constraints, enum labels, views, functions and triggers the branch changed", async () => {
+        await freshBranch("catalog", `
+            CREATE TYPE mood AS ENUM ('happy', 'sad');
+            CREATE TABLE a (id int PRIMARY KEY, email text, m mood, ref int);
+            CREATE TABLE b (id int PRIMARY KEY);
+            CREATE INDEX a_ref_idx ON a (ref);
+            INSERT INTO a VALUES (1, 'x@y', 'happy', NULL);
+        `);
+        await branch("catalog", `
+            CREATE INDEX a_email_idx ON a (email);
+            DROP INDEX a_ref_idx;
+            ALTER TABLE a ADD CONSTRAINT a_email_key UNIQUE (email);
+            ALTER TABLE a ADD CONSTRAINT a_ref_fk FOREIGN KEY (ref) REFERENCES b(id);
+            ALTER TABLE a ADD CONSTRAINT a_email_check CHECK (email LIKE '%@%');
+            ALTER TYPE mood ADD VALUE 'angry';
+            CREATE VIEW a_view AS SELECT id, email FROM a;
+            CREATE FUNCTION touch() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RETURN NEW; END $$;
+            CREATE TRIGGER a_touch BEFORE UPDATE ON a FOR EACH ROW EXECUTE FUNCTION touch();
+        `);
+        const diff = await diffDatabaseBranch(admin, "catalog");
+        const summary = diff.schema.map((change) => `${change.change} ${change.object} ${change.table}${change.name ? `.${change.name}` : ""}`);
+        expect(summary.sort()).toEqual([
+            "added constraint a.a_email_check",
+            "added constraint a.a_email_key",
+            "added constraint a.a_ref_fk",
+            "added function touch()",
+            "added index a.a_email_idx",
+            "added trigger a.a_touch",
+            "added view a_view",
+            "altered enum mood",
+            "dropped index a.a_ref_idx"
+        ]);
+        const fk = diff.schema.find((change) => change.name === "a_ref_fk");
+        expect(fk?.after).toContain("FOREIGN KEY (ref) REFERENCES b(id)");
+        const mood = diff.schema.find((change) => change.object === "enum");
+        expect(mood?.before).toContain("('happy', 'sad')");
+        expect(mood?.after).toContain("('happy', 'sad', 'angry')");
+    });
 
     describe("a row the branch deleted that rows the target wrote since still reference", () => {
         // `rb_<name>` is the branch's database; the parent is `<name>`.
