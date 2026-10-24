@@ -458,6 +458,43 @@ describe("reading the claim URL back", () => {
     });
 });
 
+describe("when the app's key stops working", () => {
+    it("init says the key expires even once the project is claimed, and how to replace it", async () => {
+        await init(["--claim"]);
+        const note = (printedJson() as { appKey: { note: string } }).appKey.note;
+        expect(note).toContain("even once the project is claimed");
+        expect(note).toContain("admin panel");
+    });
+
+    it("`whoami` says it while the project is unclaimed", async () => {
+        await init(["--claim"]);
+        respond = (request) => request.path === "/api/auth/scopes"
+            ? json(200, { held: [`project:deploy:${PROVISIONED.projectId}`] })
+            : json(404, { error: { code: "NOT_FOUND", message: "no route" } });
+        said = [];
+        await cloudCommand("whoami", line("whoami"));
+        expect((printedJson() as { appKeyNote: string | null }).appKeyNote).toContain("even once the project is claimed");
+    });
+
+    it("the refusal that follows a claim says it, with the date", async () => {
+        await init(["--claim"]);
+        respond = () => json(401, { error: { code: "UNAUTHORIZED", message: "API key has been revoked" } });
+        said = [];
+        await expect(cloudCommand("logs", line("logs"))).rejects.toThrow(Exited);
+        expect(said.join("\n")).toContain("REBASE_API_TOKEN in .env stops working at");
+    });
+
+    it("says nothing about a key `.env` does not hold", async () => {
+        await init(["--claim", "--no-deploy"]);
+        respond = (request) => request.path === "/api/auth/scopes"
+            ? json(200, { held: [] })
+            : json(404, { error: { code: "NOT_FOUND", message: "no route" } });
+        said = [];
+        await cloudCommand("whoami", line("whoami"));
+        expect((printedJson() as { appKeyNote: string | null }).appKeyNote).toBeNull();
+    });
+});
+
 describe("asking for the app's key", () => {
     it("gives up after its attempts while the app never answers, waiting between them", async () => {
         respond = () => json(503, { error: { code: "upstream_error", message: "The project's app is not answering yet." } });

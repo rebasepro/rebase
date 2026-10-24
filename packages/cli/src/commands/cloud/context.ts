@@ -192,6 +192,35 @@ export function grantForLink(link: ProjectLink | null | undefined): EphemeralGra
     return ephemeralGrantFor(normalizeUrl(link.url), link.projectId);
 }
 
+/** Whether a `.env` sets a variable to something: an empty `KEY=` or `KEY=""` does not. */
+export function dotenvSets(file: string, key: string): boolean {
+    if (!fs.existsSync(file)) return false;
+    const pattern = new RegExp(`^\\s*(export\\s+)?${key}\\s*=(.*)$`);
+    return fs.readFileSync(file, "utf-8").split("\n").some((l) => {
+        const value = pattern.exec(l)?.[2]?.trim();
+        return value !== undefined && value !== "" && value !== "\"\"" && value !== "''";
+    });
+}
+
+/** The variable `init --claim` writes the app's key to, and the MCP server and the SDK read. */
+const APP_KEY_ENV = "REBASE_API_TOKEN";
+
+/** Whether this project's `.env` (at its root, else here) holds an app key. */
+export function projectDotenvSetsAppKey(): boolean {
+    return dotenvSets(path.join(findProjectRoot() ?? process.cwd(), ".env"), APP_KEY_ENV);
+}
+
+/**
+ * When the app key `init --claim` minted stops working, and what to do about
+ * it. It is minted to expire with the claim window and a claim does not extend
+ * it, so a person who claims at hour 1 sees their local MCP server and SDK
+ * start failing at hour 72 — every command that knows the date says so.
+ */
+export function appKeyExpiryNote(expiresAt: string): string {
+    return `${APP_KEY_ENV} in .env stops working at ${new Date(expiresAt).toLocaleString()}, even once the project is claimed. `
+        + `Once it is yours, create a permanent key in the project's admin panel and put it in .env as ${APP_KEY_ENV} instead.`;
+}
+
 /** Host that a bare `rebase cloud` command should target, if any. */
 function currentContextUrl(): string | undefined {
     return readCredentials().current;
@@ -554,6 +583,7 @@ async function explainRefusedGrant(url: string, projectId: string, token: string
     forgetEphemeralGrant(url, projectId);
     const claim = grant
         ? ` If nobody has claimed it yet, its claim URL was ${chalk.bold(grant.claimUrl)} (expires ${new Date(grant.expiresAt).toLocaleString()}).`
+            + (projectDotenvSetsAppKey() ? ` ${appKeyExpiryNote(grant.expiresAt)}` : "")
         : "";
     fail(
         `The token \`rebase cloud init --claim\` stored for project ${projectId} was refused by ${url}.`,

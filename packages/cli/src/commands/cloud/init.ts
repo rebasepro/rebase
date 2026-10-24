@@ -33,6 +33,8 @@ import path from "path";
 import { spawn } from "child_process";
 import chalk from "chalk";
 import {
+    appKeyExpiryNote,
+    dotenvSets,
     emit,
     ephemeralGrantFor,
     fail,
@@ -251,15 +253,7 @@ export function upsertDotenv(file: string, key: string, value: string): void {
     fs.writeFileSync(file, `${lines.join("\n")}\n`);
 }
 
-/** Whether a `.env` sets a variable to something: an empty `KEY=` or `KEY=""` does not. */
-export function dotenvSets(file: string, key: string): boolean {
-    if (!fs.existsSync(file)) return false;
-    const pattern = new RegExp(`^\\s*(export\\s+)?${key}\\s*=(.*)$`);
-    return fs.readFileSync(file, "utf-8").split("\n").some((l) => {
-        const value = pattern.exec(l)?.[2]?.trim();
-        return value !== undefined && value !== "" && value !== "\"\"" && value !== "''";
-    });
-}
+export { dotenvSets };
 
 /**
  * Set on the deploy `init` runs as a child. `init` asks for the app's key
@@ -271,7 +265,14 @@ export const INIT_CHILD_DEPLOY_ENV = "REBASE_CLOUD_INIT_DEPLOY";
 /** The key's outcome as a result reports it. Never the key: this output reaches an agent's transcript. */
 export function appKeyPayload(outcome: AppKeyOutcome): Record<string, unknown> {
     return outcome.ok
-        ? { ok: true, env: API_TOKEN_ENV, scopes: outcome.key.scopes, expiresAt: outcome.key.expiresAt }
+        ? {
+            ok: true,
+            env: API_TOKEN_ENV,
+            scopes: outcome.key.scopes,
+            expiresAt: outcome.key.expiresAt,
+            // A claim does not extend it: say so where an agent reads it.
+            note: appKeyExpiryNote(outcome.key.expiresAt)
+        }
         : { ok: false, error: { code: outcome.code, message: outcome.message } };
 }
 
@@ -330,7 +331,8 @@ export function reportMintedAppKey(outcome: AppKeyOutcome | undefined): void {
     }
     if (isJsonMode()) return;
     console.log(chalk.gray(`  ${API_TOKEN_ENV} set in .env (${outcome.key.scopes.join(", ")}): the app's own key, for this unclaimed project.`));
-    console.log(chalk.gray("  It reads and writes data as the app's rules allow, and expires with the claim window."));
+    console.log(chalk.gray("  It reads and writes data as the app's rules allow."));
+    console.log(chalk.gray(`  ${appKeyExpiryNote(outcome.key.expiresAt)}`));
     console.log("");
 }
 
@@ -503,7 +505,8 @@ export async function cloudInitCommand(rawArgs: string[], deps: InitDeps = DEFAU
             console.log(chalk.gray(`  ${written} set in .env. Open the claim URL, sign in, and the project is yours;`));
             console.log(chalk.gray("  until then `rebase cloud` commands here use the project's own token."));
             if (appKey?.ok) {
-                console.log(chalk.gray(`  ${API_TOKEN_ENV} reads and writes data as the app's rules allow, and expires with the claim window.`));
+                console.log(chalk.gray(`  ${API_TOKEN_ENV} reads and writes data as the app's rules allow.`));
+                console.log(chalk.gray(`  ${appKeyExpiryNote(appKey.key.expiresAt)}`));
             }
             console.log("");
         },

@@ -365,8 +365,12 @@ app's row-level security, as a caller who is neither a person nor an admin. It
 holds nothing of the admin plane, and it expires with the claim window. With
 `--no-deploy`, or when that first deploy fails, there is no key yet: the next
 `rebase cloud deploy` that succeeds in the directory asks for one, as long as the
-project is unclaimed and `.env` sets no `REBASE_API_TOKEN` already. Once the
-project is yours, create the keys you want in its admin panel.
+project is unclaimed and `.env` sets no `REBASE_API_TOKEN` already. The key
+expires at the end of the claim window even when the project is claimed sooner,
+so the MCP server and the SDK start getting 401 from the app then; `init`,
+`deploy`, `status` and `whoami` print the date, and so does the refusal that
+follows a claim. Once the project is yours, create a permanent key in its admin
+panel and put it in `.env` as `REBASE_API_TOKEN` in place of the agent's.
 
 Claiming takes a signed-in browser session, not a token, and a payment method on
 the organization the project moves into. From the claim onwards the project is

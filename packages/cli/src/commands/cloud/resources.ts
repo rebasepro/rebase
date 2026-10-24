@@ -29,6 +29,8 @@ import {
     requireCloudRow,
     billingAccountIdOf,
     grantForLink,
+    appKeyExpiryNote,
+    projectDotenvSetsAppKey,
     warn
 } from "./context";
 import { DEFAULT_STORAGE_SOURCE_KEY } from "@rebasepro/types";
@@ -299,6 +301,7 @@ path: projectId })
         // kept it: the only other copy was that command's output.
         const link = readLink();
         const grant = link?.projectId === projectId ? grantForLink(link) : undefined;
+        const appKeyNote = grant && projectDotenvSetsAppKey() ? appKeyExpiryNote(grant.expiresAt) : undefined;
         const blocked = resolveBlockedState({
             projectStatus: project.status,
             database: db as { connectionStatus?: string | null } | undefined,
@@ -323,6 +326,10 @@ path: projectId })
                 // The same fact the JSON carries, in the place a person reads.
                 // Below the rows rather than inside them: it is not another
                 // property of the project, it is what to do next.
+                if (appKeyNote) {
+                    console.log("");
+                    console.log(chalk.gray(`  ${appKeyNote}`));
+                }
                 if (blocked.blockedOn) {
                     console.log("");
                     console.log(`  ${chalk.yellow("Waiting on you")} ${chalk.gray(`— ${blocked.blockedOn}`)}`);
@@ -366,7 +373,9 @@ connectionStatus: db.connectionStatus ?? null } : null,
                 storage: storage ?? null,
                 // Present while the project is unclaimed: open `claimUrl` and
                 // sign in to keep it, before `expiresAt`.
-                unclaimed: grant ? { claimUrl: grant.claimUrl, expiresAt: grant.expiresAt } : null
+                unclaimed: grant
+                    ? { claimUrl: grant.claimUrl, expiresAt: grant.expiresAt, appKeyNote: appKeyNote ?? null }
+                    : null
             }
         );
     } catch (e) {

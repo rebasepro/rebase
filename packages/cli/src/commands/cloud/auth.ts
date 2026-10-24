@@ -27,6 +27,8 @@ import {
     requireInteractive,
     envToken,
     linkedEphemeralGrant,
+    appKeyExpiryNote,
+    projectDotenvSetsAppKey,
     TOKEN_ENV,
     type CloudClient,
     type EphemeralGrant
@@ -343,6 +345,7 @@ async function whoamiGrant(
     const grants = capabilitiesInScopes(held).filter(grant => grant.capabilities.length > 0);
     const link = readLink();
     const expires = new Date(linked.grant.expiresAt);
+    const appKeyNote = projectDotenvSetsAppKey() ? appKeyExpiryNote(linked.grant.expiresAt) : undefined;
     emit(
         () => {
             console.log("");
@@ -358,6 +361,7 @@ async function whoamiGrant(
             ]);
             console.log("");
             console.log(chalk.gray("  Open the claim URL and sign in to keep the project. Unclaimed, it is deleted when it expires."));
+            if (appKeyNote) console.log(chalk.gray(`  ${appKeyNote}`));
             console.log("");
         },
         {
@@ -366,6 +370,7 @@ async function whoamiGrant(
             projectId: linked.projectId,
             claimUrl: linked.grant.claimUrl,
             expiresAt: linked.grant.expiresAt,
+            appKeyNote: appKeyNote ?? null,
             grants,
             scopes: held,
             linkedProject: link
