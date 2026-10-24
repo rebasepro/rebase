@@ -270,6 +270,17 @@ export const SESSION_ENDED_CLOSE_CODE = 4001;
 export const TOO_MANY_SOCKETS_CLOSE_CODE = 4002;
 
 /**
+ * What a socket counts against under `REALTIME_MAX_SOCKETS_PER_USER`: the
+ * user it signed in as, or — for an API key — that key. A key acts as the
+ * account that made it, and a fleet of workers holding sockets under its keys
+ * counted against that account's ceiling, locking out its people and each
+ * other; each key is a credential of its own, with its own ceiling.
+ */
+function socketCeilingBucket(user: Pick<WsUserIdentity, "uid" | "apiKey">): string {
+    return user.apiKey ? `key:${user.apiKey.id}` : `user:${user.uid}`;
+}
+
+/**
  * When a JWT expires, in ms, or undefined for a credential that is not one
  * (an API key, the service key, an adapter's opaque token).
  *
@@ -1190,9 +1201,10 @@ fetchAllowanceAt: Date.now() });
                         // auth error sends the SDK to refresh the session —
                         // then closed, so the tab does not run on as nobody.
                         if (maxSocketsPerUser !== undefined && session) {
+                            const bucket = socketCeilingBucket(verifiedUser);
                             let held = 0;
                             for (const other of clientSessions.values()) {
-                                if (other !== session && other.user?.uid === verifiedUser.uid) held++;
+                                if (other !== session && other.user && socketCeilingBucket(other.user) === bucket) held++;
                             }
                             if (held >= maxSocketsPerUser) {
                                 logger.warn(`[WebSocket Server] Refused a socket for ${verifiedUser.uid}: ${held} already open, ceiling ${maxSocketsPerUser}`);

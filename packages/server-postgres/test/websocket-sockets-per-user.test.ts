@@ -109,6 +109,28 @@ describe("the per-user socket ceiling", () => {
         expect(second.last().type).toBe("AUTH_SUCCESS");
     });
 
+    it("counts each API key's sockets on their own, not against the key's owner", async () => {
+        // Workers holding sockets under keys made by one account shared that
+        // account's ceiling, and locked it (and each other) out.
+        start({
+            maxSocketsPerUser: 1,
+            resolveApiKey: async (token) => ({ uid: "ada", roles: ["user"], scopes: ["data:read"], apiKey: { id: token.slice(3), rate_limit: null } })
+        });
+        const session = connect();
+        const keyA = connect();
+        const keyB = connect();
+        const keyAAgain = connect();
+        await session.authenticate("ada");
+        await keyA.authenticate("rk_a");
+        await keyB.authenticate("rk_b");
+        await keyAAgain.authenticate("rk_a");
+
+        expect(session.last().type).toBe("AUTH_SUCCESS");
+        expect(keyA.last().type).toBe("AUTH_SUCCESS");
+        expect(keyB.last().type).toBe("AUTH_SUCCESS");
+        expect(keyAAgain.last()).toMatchObject({ type: "ERROR", payload: { error: { code: "TOO_MANY_SOCKETS" } } });
+    });
+
     it("unset, there is no ceiling", async () => {
         start();
         const sockets = Array.from({ length: 30 }, () => connect());
