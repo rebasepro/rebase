@@ -1365,6 +1365,10 @@ function checkTenant(
  *   function Rebase has never created — not by a generator, not at boot, not in
  *   a migration — so the column has never had a working default on Postgres and
  *   the first insert relying on it failed with `function cuid() does not exist`.
+ * - **A strategy keyword on a type that cannot honour it.** `"increment"` on
+ *   anything but a number, or `"uuid"` on anything but a string, fell through to
+ *   "any other string is raw SQL" and emitted `DEFAULT increment` or `DEFAULT
+ *   uuid` — a reference to a column that does not exist.
  * - **`columnType` beside `isId: "increment"`.** An identity key is INTEGER,
  *   because every column that points at a numeric primary key is INTEGER; a
  *   BIGINT one would be referenced by int4 foreign keys. The width is ignored
@@ -1394,6 +1398,18 @@ function checkPrimaryKeyStrategy(
                 "`DEFAULT cuid()`, and no `cuid()` function is ever created, so every insert that relies " +
                 "on it fails. Use `isId: \"uuid\"`, or give the strategy as SQL — " +
                 "``isId: \"sql`my_id()`\"`` — and create that function in a migration."
+            );
+        }
+        if ((property.isId === "increment" && property.type !== "number") || (property.isId === "uuid" && property.type !== "string")) {
+            const needs = property.isId === "increment" ? "number" : "string";
+            collect.error(
+                `${at}.properties.${key}.isId`,
+                `\`isId: "${property.isId}"\` needs a ${needs} property, and this one is ` +
+                `\`type: "${String(property.type)}"\`. Any other string is read as a raw SQL default, so ` +
+                `the column would get \`DEFAULT ${property.isId}\`, which Postgres refuses. ` +
+                (property.isId === "increment"
+                    ? "Make the key `type: \"number\"`, or use `isId: \"uuid\"` for a string key."
+                    : "Make the key `type: \"string\"`, or use `isId: \"increment\"` for a number key.")
             );
         }
         if (property.isId === "increment" && property.columnType !== undefined) {

@@ -233,6 +233,21 @@ export const idColumnDefault = (propName: string, prop: Property, collection: Co
     if (prop.type === "string" && (isId as StringProperty["isId"]) === "uuid") return { kind: "uuid" };
     if (prop.type === "number" && (isId as NumberProperty["isId"]) === "increment") return { kind: "identity" };
 
+    // A strategy keyword on a type that cannot honour it. Without this it fell
+    // through to "any other string is raw SQL", and `DEFAULT increment` on a
+    // TEXT key — or `DEFAULT uuid` on an INTEGER one — names a column that does
+    // not exist, refused by Postgres at the first CREATE TABLE.
+    if (isId === "increment" || isId === "uuid") {
+        const needs = isId === "increment" ? "number" : "string";
+        throw new Error(
+            `Property "${propName}" of collection "${collection.slug ?? collection.name ?? "(unnamed)"}" ` +
+            `is a ${prop.type} property, and \`isId: "${isId}"\` needs a ${needs} property. ` +
+            (isId === "increment"
+                ? "Make the key `type: \"number\"`, or use `isId: \"uuid\"` for a string key."
+                : "Make the key `type: \"string\"`, or use `isId: \"increment\"` for a number key.")
+        );
+    }
+
     if (isId === "cuid") {
         throw new Error(
             `Property "${propName}" of collection "${collection.slug ?? collection.name ?? "(unnamed)"}" ` +
