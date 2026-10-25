@@ -1,8 +1,9 @@
 /**
  * `rebase console` — the driver's half.
  *
- * Loads the project's collections the way `rebase db push` does, opens the
- * database with {@link openRebase}, and either evaluates one piece of code
+ * Loads the project's collections the way `rebase db push` does, and the
+ * global callbacks its `config/index.ts` exports, opens the database with
+ * {@link openRebase}, and either evaluates one piece of code
  * (`--eval`) or starts a Node REPL with `rebase` and `collections` in scope.
  * The `rebase` CLI resolves the database first (the managed one included) and
  * hands this process `DATABASE_URL`, exactly as it does for `db` commands.
@@ -18,9 +19,10 @@ import readline from "node:readline";
 import repl from "node:repl";
 import { PassThrough } from "node:stream";
 import tty from "node:tty";
+import { pathToFileURL } from "node:url";
 import { inspect } from "node:util";
 import { setLogOutput } from "@rebasepro/server";
-import type { CollectionConfig } from "@rebasepro/types";
+import type { CollectionCallbacks, CollectionConfig } from "@rebasepro/types";
 import { RELAYED_FLAGS } from "./cli-flags";
 import { diagnoseDbError } from "./cli-errors";
 import { out, outError, describeFailure } from "./cli-output";
@@ -165,6 +167,43 @@ export function describeOpenFailure(error: unknown, databaseUrl: string, managed
     return diagnoseDbError(error, databaseUrl) ?? describeFailure(error);
 }
 
+/**
+ * The project's global callbacks: the `callbacks` its `config/index.ts`
+ * exports, which the server runs ahead of every collection's own hooks.
+ *
+ * The config package is the directory the collections live in
+ * (`<config>/collections`), or `../config` beside the backend for a
+ * collections directory named otherwise. No `index` there means no global
+ * callbacks, as it does for the server.
+ *
+ * One that is there and cannot be imported — an import that needs an
+ * environment variable the console was not given, say — does not stop the
+ * console, which can still read and write. It says so, once, and runs without
+ * them: writes from this session then skip the global tier, and the reader
+ * knows it.
+ */
+export async function loadProjectCallbacks(collectionsPath: string): Promise<CollectionCallbacks | undefined> {
+    const configDir = path.basename(collectionsPath) === "collections"
+        ? path.dirname(collectionsPath)
+        : path.resolve("..", "config");
+    // `.js` first, as the server's own loader reads it.
+    const indexPath = [".js", ".ts"]
+        .map(ext => path.join(configDir, `index${ext}`))
+        .find(candidate => fs.existsSync(candidate));
+    if (!indexPath) return undefined;
+
+    let mod: Record<string, unknown>;
+    try {
+        mod = await import(pathToFileURL(indexPath).href) as Record<string, unknown>;
+    } catch (error) {
+        const reason = (error instanceof Error ? error.message : String(error)).split("\n")[0];
+        outError(`⚠ Global callbacks are off in this session: ${indexPath} could not be loaded (${reason}). Collection callbacks still run.`);
+        return undefined;
+    }
+    const callbacks = mod.callbacks;
+    return callbacks && typeof callbacks === "object" ? callbacks as CollectionCallbacks : undefined;
+}
+
 /** Open the project, run `--eval` or the REPL, and close it again. Resolves with the exit code. */
 async function openAndRun(
     options: { databaseUrl: string; collections?: string; eval?: string; history?: string },
@@ -174,6 +213,8 @@ async function openAndRun(
     const collectionsPath = path.resolve(options.collections || path.join("..", "config", "collections"));
     const { loadCollections } = await import("./schema/doctor");
     const collections = fs.existsSync(collectionsPath) ? await loadCollections(collectionsPath) : [];
+    // Writes from the console run the same hook tiers as a server write.
+    const callbacks = await loadProjectCallbacks(collectionsPath);
 
     const ceiling = poolMaxCeiling();
     let rebase: OpenedRebase;
@@ -181,6 +222,7 @@ async function openAndRun(
         rebase = await openRebase({
             databaseUrl,
             collections,
+            ...(callbacks ? { callbacks } : {}),
             ...(ceiling !== null ? { pool: { max: ceiling } } : {})
         });
     } catch (error) {

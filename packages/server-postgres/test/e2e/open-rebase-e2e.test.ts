@@ -510,6 +510,55 @@ describe("openRebase (E2E)", () => {
                 expect(rows).toEqual([{ action: "create", updated_by: "service" }]);
             });
 
+            describe("the project's global callbacks, from config/index", () => {
+                /** A project's config package: `collections/` and an `index.js` beside it. */
+                function configPackage(index: string): string {
+                    const root = fs.mkdtempSync(path.join(os.tmpdir(), "rebase-console-config-"));
+                    const config = path.join(root, "config");
+                    fs.mkdirSync(path.join(config, "collections"), { recursive: true });
+                    fs.writeFileSync(path.join(config, "package.json"), JSON.stringify({ type: "module" }));
+                    fs.writeFileSync(path.join(config, "collections", "notes.js"), `export default ${JSON.stringify(notesCollection)};\n`);
+                    fs.writeFileSync(path.join(config, "index.js"), index);
+                    made.push(root);
+                    return path.join(config, "collections");
+                }
+                const made: string[] = [];
+
+                afterAll(async () => {
+                    for (const root of made) fs.rmSync(root, { recursive: true, force: true });
+                    await observer.query("DELETE FROM public.notes WHERE owner_id = 'console-cb'");
+                });
+
+                it("runs them on a console write, as the server does", async () => {
+                    // A global `beforeSave` that stamps every write ran on every
+                    // server write and on no console write.
+                    const dir = configPackage(
+                        "export const callbacks = { beforeSave: ({ values }) => ({ ...values, title: `[global] ${values.title}` }) };\n"
+                    );
+                    const result = await evalInConsole(
+                        "(await rebase.dataAsAdmin.notes.create({ ownerId: 'console-cb', title: 'stamped?' })).title",
+                        dir
+                    );
+                    expect(result).toMatchObject({ code: 0 });
+                    expect(JSON.parse(result.stdout)).toBe("[global] stamped?");
+                    expect(result.stderr).not.toContain("Global callbacks are off");
+                });
+
+                it("says so in one line and carries on without them when config/index cannot be imported", async () => {
+                    const dir = configPackage("throw new Error(\"STRIPE_SECRET_KEY is not set\");\nexport const callbacks = {};\n");
+                    const result = await evalInConsole(
+                        "(await rebase.dataAsAdmin.notes.create({ ownerId: 'console-cb', title: 'plain' })).title",
+                        dir
+                    );
+                    expect(result).toMatchObject({ code: 0 });
+                    expect(JSON.parse(result.stdout)).toBe("plain");
+                    const said = result.stderr.split("\n").filter(line => line.includes("Global callbacks are off"));
+                    expect(said).toHaveLength(1);
+                    expect(said[0]).toContain("STRIPE_SECRET_KEY is not set");
+                    expect(said[0]).toContain(path.join(path.dirname(dir), "index.js"));
+                });
+            });
+
             it("without --eval, is a REPL with rebase in scope and top-level await", async () => {
                 const input = new PassThrough();
                 const output = new PassThrough();

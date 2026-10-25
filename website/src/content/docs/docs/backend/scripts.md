@@ -51,7 +51,9 @@ Two names are in scope, and top-level `await` works:
 | `collections` | The project's collections, loaded the way `rebase db push` loads them |
 
 The console opens the project the way `rebase db push` does: the same `.env`,
-the same database, and the same collections. A project on the managed
+the same database, and the same collections. It also loads the global
+`callbacks` from `config/index.ts`, so its writes run the same hooks as a
+server write. A project on the managed
 development database gets it started first. The history of what you typed is
 kept in `.rebase/console_history`, which the scaffold's `.gitignore` already
 leaves out.
@@ -279,8 +281,11 @@ administration and your functions are not on it.
 
 Collection callbacks run on every write, as on the server. The project's global
 `callbacks` run only when you pass them as the `callbacks` option.
-`rebase console` does not read `config/index.ts`, so a global `beforeSave`
-does not run on its writes.
+`rebase console` passes them for you: it reads the `callbacks` your
+`config/index.ts` exports, so a global `beforeSave` runs on its writes too. If
+that file cannot be imported (for example, it needs an environment variable the
+console was not given), the console prints one line saying global callbacks are
+off for the session and opens without them.
 
 When a script needs those too, build the backend without serving it:
 `createRebaseBackend({ …, provision: false })` gives you `backend.rebase`, the
