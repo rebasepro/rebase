@@ -279,7 +279,12 @@ function ownerColumnsOf(collection: CollectionConfig): OwnerColumn[] {
         if (property.type === "relation") {
             const relation = property.relation;
             if (isRecord(relation) && relation.kind === "belongsTo") {
-                const singular = /[^s]s$/.test(key) ? key.slice(0, -1) : key;
+                // As the generator names it (`generateForeignKeyName` in
+                // `@rebasepro/utils`, which the CLI does not depend on): from
+                // the relation's name, which is the property key only when
+                // `relationName` is not set.
+                const name = typeof relation.relationName === "string" && relation.relationName ? relation.relationName : key;
+                const singular = /[^s]s$/.test(name) ? name.slice(0, -1) : name;
                 consider(typeof relation.localKey === "string" ? relation.localKey : `${snake(singular)}_id`, key);
             }
             continue;

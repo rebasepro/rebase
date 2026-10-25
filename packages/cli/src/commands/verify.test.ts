@@ -164,6 +164,28 @@ describe("rebase verify: RLS coverage", () => {
         expect(report.findings[0].message).toContain("defaultSecurityRules");
     });
 
+    it("reads a belongsTo's column the way the generator names it, from its relationName", async () => {
+        // `relationName: "tenant"` makes the column `tenant_id`, whatever the
+        // property is called. Derived from the key instead (`workspace_id`),
+        // the owner column was missed and the table passed as public.
+        collectionFile("index.ts", `export const defaultSecurityRules = [{ operation: "select", access: "public" }];\n`);
+        collectionFile("tenants.ts", collection(`
+    slug: "tenants",
+    table: "tenants",
+    name: "Tenants",
+    properties: { label: { type: "string", name: "Label" } }`));
+        collectionFile("invoices.ts", collection(`
+    slug: "invoices",
+    table: "invoices",
+    name: "Invoices",
+    properties: {
+        workspace: { type: "relation", name: "Workspace", relation: { kind: "belongsTo", target: () => ({ slug: "tenants" }), relationName: "tenant" } }
+    }`));
+        const report = await verify();
+        expect(report.findings.map(f => f.check)).toEqual(["rls-missing"]);
+        expect(report.findings[0].message).toContain("tenant_id");
+    });
+
     it("accepts a collection that inherits directory defaults and has no owner column", async () => {
         collectionFile("index.ts", `export const defaultSecurityRules = [{ operation: "select", access: "public" }];\n`);
         collectionFile("tags.ts", collection(`
