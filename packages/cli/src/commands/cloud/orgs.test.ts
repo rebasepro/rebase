@@ -237,6 +237,22 @@ describe("rebase cloud orgs invites", () => {
         expect(JSON.parse(out)).toMatchObject({ link: LINK, emailDelivery: { sent: true } });
     });
 
+    it("tells a member that pending invitations are for owners and admins", async () => {
+        const refusal = Object.assign(new Error("Only an organization's owners and admins can see its pending invitations."), {
+            status: 403, code: "forbidden"
+        });
+        for (const words of [["invites", "--json"], ["invites", "revoke", "new@x.com"]]) {
+            invoke.mockRejectedValueOnce(refusal);
+            const { out, exited } = await run(...words);
+            expect(exited, words.join(" ")).toBe(true);
+            const error = JSON.parse(out).error;
+            expect(error.code).toBe("forbidden");
+            expect(error.message).toMatch(/owners and admins/);
+            expect(error.hint).toMatch(/rebase cloud orgs members/);
+        }
+        expect(invoke).not.toHaveBeenCalledWith("invites", undefined, expect.objectContaining({ method: "DELETE" }));
+    });
+
     it("refuses an unknown invitation and a missing reference", async () => {
         const unknown = await run("invites", "revoke", "nobody@x.com");
         expect(unknown.exited).toBe(true);

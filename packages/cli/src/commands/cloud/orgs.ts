@@ -462,6 +462,15 @@ async function invitesCommand(rawArgs: string[]): Promise<void> {
     try {
         listed = await loadInvites(client, org);
     } catch (e) {
+        // A member: pending invitations, like inviting, are an owner's and
+        // admin's. Said plainly rather than as a bare 403.
+        if ((e as { status?: number } | null)?.status === 403) {
+            fail(
+                `Only owners and admins of org ${org} can see its pending invitations.`,
+                "Ask one of them; `rebase cloud orgs members` lists who they are.",
+                "forbidden"
+            );
+        }
         reportError(e, "Failed to list invitations");
     }
 
@@ -571,7 +580,7 @@ description: "List organizations you belong to" },
                 action: "invites",
                 args: "[list]",
                 section: "Invitations",
-                description: "Pending invitations: email, role, who invited, expiry"
+                description: "Pending invitations: email, role, who invited, expiry. Owners and admins only"
             },
             {
                 action: "invites revoke",

@@ -201,8 +201,8 @@ it was not, a warning says to send the link yourself. `--role` is `admin` or
 an owner promotes them with `members role <email> owner` once they have joined.
 `invites resend` gives a new link and the old one stops working.
 Inviting and `invites` need a `rebase cloud login` session; `REBASE_TOKEN` is
-refused. Inviting, resending and revoking take the owner or admin role; listing
-takes any member.
+refused. Inviting, listing, resending and revoking take the owner or admin
+role; a member is told so.
 `members remove` asks first (`--yes` skips it); removing or demoting an owner
 takes an owner, and the last owner stays. `--org <id>` picks an organization
 other than the selected one.
