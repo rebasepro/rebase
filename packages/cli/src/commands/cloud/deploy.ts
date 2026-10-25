@@ -73,9 +73,12 @@ import {
     isPreviewsUnavailable,
     normalizePreviewName,
     previewFrom,
+    previewCost,
+    previewCostLines,
     previewLines,
     triggerPreview,
-    type Preview
+    type Preview,
+    type PreviewCost
 } from "./previews";
 import { resolveTail, type TailLimit } from "./debug";
 import {
@@ -890,14 +893,21 @@ async function triggerAndFollowPreview(opts: {
         }
     );
 
+    // What it costs, in the control plane's numbers. Only a backend preview
+    // is billed: one that is only files runs no pod of its own.
+    const costOf = async (): Promise<PreviewCost | null> =>
+        preview.backend === "production" ? null : previewCost(client, projectId);
+
     if (!opts.follow) {
+        const cost = await costOf();
         emit(
             () => {
                 console.log(chalk.green(`  ✓ Preview deploy started (deployment ${deploymentId}).`));
                 for (const line of previewLines(preview)) console.log(`    ${line}`);
+                if (cost) for (const line of previewCostLines(cost, preview.name)) console.log(chalk.gray(`    ${line}`));
                 console.log(chalk.gray(`    Not following (--no-follow). Follow its build with \`rebase cloud logs --preview ${preview.name} -f\`.`));
             },
-            { success: true, deploymentId, following: false, preview }
+            { success: true, deploymentId, following: false, preview, cost }
         );
         await opts.record(false, "not_followed");
         return;
@@ -922,8 +932,13 @@ async function triggerAndFollowPreview(opts: {
     // rule, can trail it. So the same live check a production deploy runs,
     // against the preview's own address.
     const live = opts.liveTimeoutMs > 0 ? await checkPreviewLive(preview, deploymentId, opts.liveTimeoutMs) : undefined;
+    const cost = await costOf();
     emit(
         () => {
+            if (cost) {
+                for (const line of previewCostLines(cost, preview.name)) console.log(chalk.gray(`  ${line}`));
+                console.log("");
+            }
             if (!live) return;
             const down = live.filter(check => !check.live);
             console.log(down.length === 0
@@ -933,7 +948,7 @@ async function triggerAndFollowPreview(opts: {
             );
             console.log("");
         },
-        { success: true, deploymentId, following: true, status, preview, live: liveVerdict(live, opts.liveTimeoutMs).live, liveChecks: live ?? [] }
+        { success: true, deploymentId, following: true, status, preview, cost, live: liveVerdict(live, opts.liveTimeoutMs).live, liveChecks: live ?? [] }
     );
 }
 

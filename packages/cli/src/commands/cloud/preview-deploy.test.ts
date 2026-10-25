@@ -61,6 +61,10 @@ let readsFrom: string[];
 let row: Record<string, unknown> | undefined;
 /** What the preview's own health route answers once its build has finished. */
 let previewHealth: Response | (() => Response);
+/** The previews `GET previews/:id` lists. */
+let listed: unknown[];
+/** What `pricing/quote` answers a batch of project rows with. */
+let quote: (rows: Array<Record<string, unknown>>) => unknown;
 
 function write(root: string, relative: string, content: string): void {
     const file = path.join(root, relative);
@@ -124,9 +128,15 @@ beforeEach(() => {
         return new Response("not found", { status: 404 });
     }));
 
-    invoke = vi.fn(async (name: string) => name === "previews"
-        ? { success: true, deployment: { id: "pd1" }, preview: PREVIEW }
-        : { success: true, deployment: { id: "d1" }, managed: true });
+    listed = [PREVIEW];
+    quote = (rows) => ({ quotes: rows.map(r => ({ lines: [], totalEur: 30 + 4.5 * Number(r.backendPreviews), backendPreviews: r.backendPreviews })) });
+    invoke = vi.fn(async (name: string, body: unknown, options?: { method?: string }) => {
+        if (name === "pricing") return quote(body as Array<Record<string, unknown>>);
+        if (name === "previews" && options?.method === "GET") return { previews: listed };
+        return name === "previews"
+            ? { success: true, deployment: { id: "pd1" }, preview: PREVIEW }
+            : { success: true, deployment: { id: "d1" }, managed: true };
+    });
     (context.requireClient as unknown as ReturnType<typeof vi.fn>).mockResolvedValue({
         client: {
             auth: { getSession: () => ({ accessToken: "tok", expiresAt: Date.now() + 60 * 60_000 }) },
@@ -159,11 +169,25 @@ function deploy(...flags: string[]): Promise<void> {
     return deployCommand(["node", "rebase", "cloud", "deploy", "--bundle-dir", bundleDir, ...flags], "songbuzz");
 }
 
-/** The one trigger that was sent: its function, its body and its options. */
+/**
+ * The one trigger that was sent: its function, its body and its options. The
+ * reads a preview's price takes afterwards (the previews list, the quote) are
+ * not triggers.
+ */
 function triggered(): { name: string; body: Record<string, unknown>; options: unknown } {
-    expect(invoke).toHaveBeenCalledTimes(1);
-    const [name, body, options] = invoke.mock.calls[0] as [string, Record<string, unknown>, unknown];
+    const triggers = invoke.mock.calls.filter(([name, , options]) =>
+        name !== "pricing" && (options as { method?: string } | undefined)?.method !== "GET");
+    expect(triggers).toHaveLength(1);
+    const [name, body, options] = triggers[0] as [string, Record<string, unknown>, unknown];
     return { name, body, options };
+}
+
+/** The batch of project rows the preview's price was asked for. */
+function quoted(): Array<Record<string, unknown>> {
+    const call = invoke.mock.calls.find(([name]) => name === "pricing");
+    expect(call).toBeDefined();
+    expect(call?.[2]).toEqual({ method: "POST", path: "quote" });
+    return call?.[1] as Array<Record<string, unknown>>;
 }
 
 const routeMissing = () => Object.assign(new Error("No route for POST /api/functions/previews/proj_1 on this backend."), { status: 404 });
@@ -294,6 +318,71 @@ describe("a --preview deploy", () => {
             following: false,
             preview: { name: "new-quiz", url: PREVIEW.url, backend: "preview", deploymentId: "pd1" }
         });
+    });
+});
+
+describe("what a preview costs", () => {
+    it("states the control plane's quote for one backend preview, not a number of its own", async () => {
+        bundle("backend");
+
+        await deploy("--preview", "--no-follow");
+
+        // The project's own row, priced without and with one preview.
+        expect(quoted().map(row => [row.id, row.backendPreviews])).toEqual([["proj_1", 0], ["proj_1", 1]]);
+        const out = said.join("\n");
+        expect(out).toContain("€4.50/month");
+        expect(out).toContain("rebase cloud previews delete new-quiz");
+    });
+
+    it("adds what all the project's backend previews cost together when it runs more than one", async () => {
+        bundle("backend");
+        listed = [PREVIEW, { ...PREVIEW, name: "old-quiz", url: "https://songbuzz--old-quiz.rebase.website" }];
+
+        await deploy("--preview", "--no-follow");
+
+        expect(quoted().map(row => row.backendPreviews)).toEqual([0, 1, 2]);
+        expect(said.join("\n")).toMatch(/runs 2 backend previews: €9\.00\/month together/);
+    });
+
+    it("carries the cost in the JSON result of a followed preview", async () => {
+        bundle("backend");
+        row = { id: "pd1", status: "success", logs: "built\n" };
+        context.setJsonModeForTest(true);
+
+        await deploy("--preview", "--live-timeout", "0");
+
+        expect(JSON.parse(stdout.join(""))).toMatchObject({
+            success: true,
+            cost: { perPreviewMonthlyEur: 4.5, backendPreviews: 1, previewsMonthlyEur: 4.5, docs: expect.stringContaining("#preview-a-change") }
+        });
+    });
+
+    it("prints the documented rule and the docs link when the control plane does not price previews", async () => {
+        bundle("backend");
+        // An older quote: the same total whatever the count, and no echo of it.
+        quote = (rows) => ({ quotes: rows.map(() => ({ lines: [], totalEur: 30 })) });
+        context.setJsonModeForTest(true);
+
+        await deploy("--preview", "--no-follow");
+
+        const result = JSON.parse(stdout.join("")) as { cost: { perPreviewMonthlyEur: number | null; rule: string } };
+        expect(result.cost.perPreviewMonthlyEur).toBeNull();
+        expect(result.cost.rule).toContain("one app unit at the default size");
+    });
+
+    it("says nothing about a price, and asks for none, for a preview that is only files", async () => {
+        bundle("static");
+        invoke.mockImplementation(async (name: string, _body: unknown, options?: { method?: string }) => {
+            if (name === "previews" && options?.method !== "GET") {
+                return { success: true, deployment: { id: "pd1" }, preview: { ...PREVIEW, app: "game", backend: "production" } };
+            }
+            return {};
+        });
+
+        await deploy("game", "--preview", "--no-follow");
+
+        expect(invoke.mock.calls.some(([name]) => name === "pricing")).toBe(false);
+        expect(said.join("\n")).not.toContain("/month");
     });
 });
 

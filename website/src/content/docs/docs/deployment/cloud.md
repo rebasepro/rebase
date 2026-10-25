@@ -265,7 +265,8 @@ say the address does not answer yet.
 A backend preview is billed like one app unit at the default size (100m of CPU
 and 384 MiB of memory, at your app's rate for its region and capacity),
 prorated for as long as it exists, and it appears in the project's monthly
-quote in the console. Starting one needs a card on file, as a production deploy
+quote in the console. `rebase cloud deploy --preview` prints the same quote for
+it, per month (`cost` under `--json`). Starting one needs a card on file, as a production deploy
 does. A first deploy that
 fails before anything runs is removed rather than billed. A project may run
 three backend previews at once.

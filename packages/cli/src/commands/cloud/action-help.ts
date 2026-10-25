@@ -275,6 +275,8 @@ export const ACTION_HELP: Record<string, ActionHelp> = {
             "--preview prints the preview's own address, https://<project>--<name>.rebase.website. A preview of the "
                 + "backend runs its own, on an empty database of its own, with its static apps folded in. It uploads "
                 + "no source and registers no apps or hostnames. `rebase cloud previews` lists and deletes previews.",
+            "A backend preview is billed while it exists; the deploy prints what it costs per month, as the control "
+                + "plane quotes it (`cost` under --json).",
             "A static app previewed on its own (`cloud deploy <app> --preview`) needs a control plane that serves "
                 + "static sites by themselves. Rebase Cloud does not yet, and refuses it with PREVIEW_STATIC_UNSERVED; "
                 + "nothing is published.",

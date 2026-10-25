@@ -107,8 +107,10 @@ leaves production alone. A preview of the backend runs its own backend, on an
 empty database of its own, with its static apps folded in. A static app cannot be
 previewed on its own on Rebase Cloud yet: `rebase cloud deploy <app> --preview`
 is refused with `PREVIEW_STATIC_UNSERVED` and publishes nothing. A backend
-preview is billed as one more app unit at the default size while it exists;
-`rebase cloud previews delete <name>` stops it.
+preview is billed as one more app unit at the default size while it exists, and
+the deploy says what that comes to per month, from the control plane's own quote
+(`cost` under `--json`; only the rule and this link when the control plane cannot
+price it); `rebase cloud previews delete <name>` stops it.
 See [Preview a change](/docs/deployment/cloud/#preview-a-change).
 
 ### Logs

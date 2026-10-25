@@ -245,6 +245,122 @@ export function previewLines(preview: Preview): string[] {
     return lines;
 }
 
+/** Where the docs state what a backend preview costs. */
+export const PREVIEW_PRICING_DOCS = "https://rebase.pro/docs/deployment/cloud/#preview-a-change";
+
+/** The billing rule in words: what is printed when the control plane cannot put a number on it. */
+export const PREVIEW_PRICING_RULE =
+    "A backend preview is billed like one app unit at the default size, at your app's rate for its region and capacity, "
+    + "prorated for as long as it exists.";
+
+/** What a backend preview costs, as the control plane quotes it. */
+export interface PreviewCost {
+    /** €/month one backend preview adds to the project's quote; null when it could not be priced. */
+    perPreviewMonthlyEur: number | null;
+    /** Backend previews the project runs, this one included; null when unknown. */
+    backendPreviews: number | null;
+    /** €/month all of them add together; null when unknown. */
+    previewsMonthlyEur: number | null;
+    /** The rule the numbers come from, in words. */
+    rule: string;
+    docs: string;
+}
+
+interface QuoteAnswer {
+    totalEur: number;
+    backendPreviews?: number;
+}
+
+function quoteAnswerFrom(value: unknown): QuoteAnswer | null {
+    if (!isRecord(value) || typeof value.totalEur !== "number" || !Number.isFinite(value.totalEur)) return null;
+    return {
+        totalEur: value.totalEur,
+        backendPreviews: typeof value.backendPreviews === "number" ? value.backendPreviews : undefined
+    };
+}
+
+const cents = (eur: number) => Math.round(eur * 100) / 100;
+
+/**
+ * What a backend preview costs, in the control plane's own numbers.
+ *
+ * No price is written down here: the control plane quotes the project's dials
+ * with and without backend previews (`pricing/quote` with `backendPreviews`,
+ * the call the console's quote makes) and the difference is what they add —
+ * which follows the rate card, the app's region and its capacity class as
+ * they change. One batched call, best-effort: a control plane that does not
+ * price previews (its answer does not echo the count it was sent) or cannot be
+ * asked leaves the numbers null, and the rule and the docs carry the answer.
+ */
+export async function previewCost(client: CloudClient, projectId: string): Promise<PreviewCost> {
+    const cost: PreviewCost = {
+        perPreviewMonthlyEur: null,
+        backendPreviews: null,
+        previewsMonthlyEur: null,
+        rule: PREVIEW_PRICING_RULE,
+        docs: PREVIEW_PRICING_DOCS
+    };
+    let project: Record<string, unknown> | undefined;
+    try {
+        project = (await client.data.collection("projects").findById(projectId)) as Record<string, unknown> | undefined;
+    } catch {
+        return cost;
+    }
+    if (!isRecord(project)) return cost;
+
+    try {
+        const res = await client.functions.invoke<unknown>(PREVIEWS_FUNCTION, undefined, { method: "GET", path: projectId });
+        const rows = isRecord(res) && Array.isArray(res.previews) ? res.previews : undefined;
+        if (rows) {
+            // At least this one, should the list trail the trigger.
+            cost.backendPreviews = Math.max(1, rows.map(previewFrom).filter(p => p !== null && p.backend !== "production").length);
+        }
+    } catch {
+        // The count is a detail; the price of one preview does not need it.
+    }
+
+    const counts = [0, 1];
+    if (cost.backendPreviews !== null && cost.backendPreviews > 1) counts.push(cost.backendPreviews);
+    let quotes: Array<QuoteAnswer | null>;
+    try {
+        const res = await client.functions.invoke<unknown>(
+            "pricing",
+            counts.map(backendPreviews => ({ ...project, backendPreviews })),
+            { method: "POST", path: "quote" }
+        );
+        quotes = isRecord(res) && Array.isArray(res.quotes) ? res.quotes.map(quoteAnswerFrom) : [];
+    } catch {
+        return cost;
+    }
+    const [none, one, all] = quotes;
+    // A control plane that prices no previews answers the same total for both
+    // and echoes no count: a €0.00 from it would be a guess, not a quote.
+    if (!none || !one || one.backendPreviews !== 1) return cost;
+    cost.perPreviewMonthlyEur = cents(one.totalEur - none.totalEur);
+    if (cost.backendPreviews !== null && cost.backendPreviews <= 1) {
+        cost.previewsMonthlyEur = cost.backendPreviews === 1 ? cost.perPreviewMonthlyEur : 0;
+    } else if (all && all.backendPreviews !== undefined) {
+        cost.backendPreviews = all.backendPreviews;
+        cost.previewsMonthlyEur = cents(all.totalEur - none.totalEur);
+    }
+    return cost;
+}
+
+/** The line a preview deploy prints about its cost. */
+export function previewCostLines(cost: PreviewCost, previewName: string): string[] {
+    const stop = `\`rebase cloud previews delete ${previewName}\` stops it.`;
+    if (cost.perPreviewMonthlyEur === null) {
+        return [`${cost.rule} ${stop}`, `See ${cost.docs}`];
+    }
+    const lines = [
+        `Billed while it exists: €${cost.perPreviewMonthlyEur.toFixed(2)}/month, prorated — the control plane's quote for one backend preview of this project. ${stop}`
+    ];
+    if (cost.backendPreviews !== null && cost.backendPreviews > 1 && cost.previewsMonthlyEur !== null) {
+        lines.push(`The project runs ${cost.backendPreviews} backend previews: €${cost.previewsMonthlyEur.toFixed(2)}/month together.`);
+    }
+    return lines;
+}
+
 /* ═══════════════════════════════════════════════════════════════
    previews list
    ═══════════════════════════════════════════════════════════════ */
