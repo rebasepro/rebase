@@ -269,7 +269,7 @@ rebase cloud storage create      # provision platform-managed storage
 rebase cloud storage attach      # attach your own S3-compatible bucket
 rebase cloud notifications [list] | add <url> | test <id> | remove <id>   # deploy, backup, billing and usage events to Slack, Discord or any URL
 rebase cloud webhooks            # retired: exits 1 (`command_retired`) and names `notifications`
-rebase cloud clusters list | add | verify   # the clusters tenants run on; `add` registers one from a kubeconfig
+rebase cloud clusters list | add | verify | registry   # the clusters tenants run on; `add` registers one from a kubeconfig
 rebase cloud billing             # the billing account and card on file
 rebase cloud billing setup       # attach a card, one-time, opens a browser
 rebase cloud billing checkout    # a Stripe session for one project
@@ -291,6 +291,19 @@ the test event. Listing is open to any member of the organization; `add`, `test`
 and `remove` need the owner or admin role. These routes take your
 `rebase cloud login`: no access-token capability includes them. See
 [Cloud notifications](/docs/deployment/cloud-notifications/).
+
+<span class="since-badge" data-since="0.26">Since 0.26</span> `clusters registry <cluster-id> --repository <host/project/repo>
+--push-service-account <email> --pull-key-file <key.json>` gives a customer's
+own cluster an image registry of its own, used for that cluster alone. Without
+one, such a cluster uses the platform's shared registry, and every deploy to it
+says so in its log. With one, builds push to that repository with a token for
+that account, pods pull with that key alone, and a rollback accepts the
+project's images there. Images
+the project built in the shared repository before stay pullable and stay
+rollback targets. The three values go together; `--clear` forgets them. The key
+is sealed when it is written and never read back. Like the rest of `clusters`,
+it needs the platform-admin role. The operator creates the repository and both
+accounts with Terraform (`saas/infra/gcp/registry-linked-clusters.tf`).
 
 <span class="since-badge" data-since="0.26">Since 0.26</span> `billing invoices` and `billing upcoming` read the same Stripe data as the
 console's Billing page, and are open to the organization's owners and admins

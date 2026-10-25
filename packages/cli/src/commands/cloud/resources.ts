@@ -888,7 +888,7 @@ async function storageAttachCommand(rawArgs: string[]): Promise<void> {
 /* ─── clusters ─────────────────────────────────────────────────── */
 
 /** The action words `rebase cloud clusters` dispatches. No word means `list`. */
-export const CLUSTERS_ACTIONS = ["list", "add", "verify"] as const;
+export const CLUSTERS_ACTIONS = ["list", "add", "verify", "registry"] as const;
 
 /**
  * `rebase cloud clusters` — list, register and verify the clusters tenants run on.
@@ -901,6 +901,7 @@ export const CLUSTERS_ACTIONS = ["list", "add", "verify"] as const;
 export async function clustersCommand(action: string | undefined, rawArgs: string[]): Promise<void> {
     if (action === "verify") return clustersVerifyCommand(rawArgs);
     if (action === "add") return clustersAddCommand(rawArgs);
+    if (action === "registry") return clustersRegistryCommand(rawArgs);
     // `clusters verifyy` used to LIST the clusters and exit 0 — the one command
     // whose whole purpose is to answer a yes/no question about a specific one.
     requireKnownAction("clusters", action, CLUSTERS_ACTIONS);
@@ -1155,6 +1156,135 @@ async function clustersAddCommand(rawArgs: string[]): Promise<void> {
             }
         },
         { id: created.id, name: args.name, provider: args.provider, region: args.region, platformCapacity: args.platformCapacity }
+    );
+}
+
+/** The flags `clusters registry` declares; exported for its help page's test. */
+export const CLUSTER_REGISTRY_FLAGS = {
+    "--repository": String,
+    "--push-service-account": String,
+    "--pull-key-file": String,
+    "--clear": Boolean
+};
+
+/**
+ * What `clusters registry` was asked to record: a customer cluster's own image
+ * repository, the account its builds push as, and the file holding the key of
+ * its read-only account — or `--clear`, to go back to the shared registry.
+ */
+export type ClusterRegistryArgs =
+    | { id: string; clear: true }
+    | { id: string; clear: false; repository: string; pushServiceAccount: string; pullKeyFile: string };
+
+/**
+ * Parse `rebase cloud clusters registry <id> …`.
+ *
+ * All three values or `--clear`, never a part: the control plane ignores a
+ * partial set (and keeps handing the cluster the shared credentials), so a
+ * command that wrote one would look done and change nothing.
+ */
+export function resolveClusterRegistryArgs(rawArgs: string[]): ClusterRegistryArgs {
+    const { flags, positionals } = parseCloudArgs({
+        spec: CLUSTER_REGISTRY_FLAGS,
+        rawArgs,
+        commandWords: 2, // cloud clusters — `registry` is the action positional
+        command: "cloud clusters registry",
+        maxPositionals: 2
+    });
+    const usage =
+        "Usage: rebase cloud clusters registry <cluster-id> --repository <host/project/repo> " +
+        "--push-service-account <email> --pull-key-file <key.json>   (or --clear)";
+    const id = positionals[1];
+    if (!id) fail(usage, undefined, "bad_request");
+    const repository = flags["--repository"]?.trim();
+    const pushServiceAccount = flags["--push-service-account"]?.trim();
+    const pullKeyFile = flags["--pull-key-file"];
+    if (flags["--clear"] === true) {
+        if (repository || pushServiceAccount || pullKeyFile) {
+            fail("--clear takes no other registry flag.", undefined, "bad_request");
+        }
+        return { id: id!, clear: true };
+    }
+    if (!repository || !pushServiceAccount || !pullKeyFile) {
+        fail(`${usage}\nAll three go together: the control plane ignores a partial set.`, undefined, "bad_request");
+    }
+    if (!/^[a-z0-9.-]+(:[0-9]+)?(\/[a-z0-9]+([._-][a-z0-9]+)*){2,}$/.test(repository!.replace(/\/+$/, ""))) {
+        fail(`--repository must be <host>/<project>/<repository> (got "${repository}").`, undefined, "bad_request");
+    }
+    return { id: id!, clear: false, repository: repository!.replace(/\/+$/, ""), pushServiceAccount: pushServiceAccount!, pullKeyFile: pullKeyFile! };
+}
+
+/**
+ * The reader's key from `--pull-key-file`, checked before it leaves this
+ * machine: a service-account key, and not the pusher's — the pull secret sits
+ * where the customer's cluster admin can read it, so it must not be able to
+ * write. Returns the key text and the account it belongs to.
+ */
+export function readPullKey(text: string, pushServiceAccount: string): { key: string; account: string } {
+    let parsed: unknown;
+    try {
+        parsed = JSON.parse(text);
+    } catch {
+        fail("--pull-key-file is not JSON; it must be the reader service account's key file.", undefined, "bad_request");
+    }
+    const record = typeof parsed === "object" && parsed !== null ? parsed as Record<string, unknown> : {};
+    const account = record.client_email;
+    if (typeof account !== "string" || typeof record.private_key !== "string") {
+        fail("--pull-key-file has no client_email/private_key; it must be a service-account key file.", undefined, "bad_request");
+    }
+    if ((account as string).toLowerCase() === pushServiceAccount.toLowerCase()) {
+        fail("--pull-key-file is the push account's key. Use the cluster's read-only account (rlc-<key>-pull).", undefined, "bad_request");
+    }
+    return { key: text.trim(), account: account as string };
+}
+
+/**
+ * Record (or clear) a cluster's own image registry. Platform-admin only, like
+ * the rest of `clusters`: the collection is admin-only. The key is sealed by
+ * the control plane at write and never read back.
+ */
+async function clustersRegistryCommand(rawArgs: string[]): Promise<void> {
+    const args = resolveClusterRegistryArgs(rawArgs);
+    let columns: Record<string, string | null>;
+    let pullAccount: string | null = null;
+    if (args.clear) {
+        columns = { tenantRegistry: null, registryPushServiceAccount: null, registryPullKey: null };
+    } else {
+        let text: string;
+        try {
+            text = fs.readFileSync(args.pullKeyFile, "utf8");
+        } catch {
+            fail(`Could not read ${args.pullKeyFile}`, undefined, "bad_request");
+            return;
+        }
+        const pull = readPullKey(text, args.pushServiceAccount);
+        pullAccount = pull.account;
+        columns = { tenantRegistry: args.repository, registryPushServiceAccount: args.pushServiceAccount, registryPullKey: pull.key };
+    }
+
+    const { client } = await requireClient(rawArgs);
+    try {
+        await client.data.collection("clusters").update(args.id, columns);
+    } catch (error: unknown) {
+        reportError(error, "Could not record the cluster's registry");
+        return;
+    }
+
+    emit(
+        () => {
+            if (args.clear) {
+                success(`Cluster ${args.id} uses the shared registry again.`);
+                note("Deploys to it warn again if it is not platform capacity.");
+                return;
+            }
+            success(`Cluster ${args.id} now builds into ${args.repository}.`);
+            noteBlank();
+            note(`Builds push as ${args.pushServiceAccount}; pods pull with ${pullAccount}'s key (sealed, never shown).`);
+            note("Takes effect on each project's next deploy to it.");
+        },
+        args.clear
+            ? { id: args.id, tenantRegistry: null, registryPushServiceAccount: null, pullServiceAccount: null }
+            : { id: args.id, tenantRegistry: args.repository, registryPushServiceAccount: args.pushServiceAccount, pullServiceAccount: pullAccount }
     );
 }
 

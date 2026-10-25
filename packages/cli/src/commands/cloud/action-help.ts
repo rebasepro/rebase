@@ -104,13 +104,14 @@ export const ACTION_HELP: Record<string, ActionHelp> = {
 
     clusters: {
         command: "cloud clusters",
-        usage: "cloud clusters [list|add|verify] [options]",
+        usage: "cloud clusters [list|add|verify|registry] [options]",
         summary: "The compute clusters tenants run on. Platform-admin only.",
         flags: [],
         examples: [
             "rebase cloud clusters",
             "rebase cloud clusters verify <cluster-id> --baseline",
-            "rebase cloud clusters add --name gke-eu --provider gcp --region europe-west1 --kubeconfig ./kubeconfig"
+            "rebase cloud clusters add --name gke-eu --provider gcp --region europe-west1 --kubeconfig ./kubeconfig",
+            "rebase cloud clusters registry <cluster-id> --repository europe-west1-docker.pkg.dev/p/rlc-acme --push-service-account rlc-acme-push@p.iam.gserviceaccount.com --pull-key-file ./rlc-acme-pull.json"
         ]
     },
 
@@ -393,6 +394,29 @@ export const ACTION_HELP: Record<string, ActionHelp> = {
         notes: [
             "The backup flags go together; a bucket without a key is a cluster with no backup store.",
             "A Hetzner cluster registered with --platform-capacity must bring its own backup store."
+        ]
+    },
+
+    "clusters registry": {
+        command: "cloud clusters registry",
+        usage: "cloud clusters registry <cluster-id> --repository <host/project/repo> --push-service-account <email> --pull-key-file <key.json>",
+        summary:
+            "Give a customer's own cluster an image registry of its own. Its admin can read every Secret there, so "
+            + "without one it is handed the platform's shared registry credentials, and every deploy to it says so. "
+            + "With one, its builds push to this repository as this account, and its pods pull with this key only.",
+        flags: [
+            ["--repository <host/project/repo>", "The cluster's own Artifact Registry repository (Terraform output tenant_registry)"],
+            ["--push-service-account <email>", "Writer on that repository only; the control plane impersonates it (push_service_account)"],
+            ["--pull-key-file <key.json>", "The JSON key of the cluster's read-only account (pull_service_account). Sealed at write, never shown again"],
+            ["--clear", "Forget the cluster's registry and go back to the shared one"]
+        ],
+        examples: [
+            "rebase cloud clusters registry <cluster-id> --repository europe-west1-docker.pkg.dev/p/rlc-acme --push-service-account rlc-acme-push@p.iam.gserviceaccount.com --pull-key-file ./rlc-acme-pull.json",
+            "rebase cloud clusters registry <cluster-id> --clear"
+        ],
+        notes: [
+            "All three values go together: the control plane ignores a partial set and keeps the shared credentials.",
+            "The repository and both accounts come from saas/infra/gcp/registry-linked-clusters.tf. Takes effect on each project's next deploy."
         ]
     },
 

@@ -53,6 +53,8 @@ import {
     webhooksCommand,
     resolveClusterVerifyArgs,
     resolveClusterAddArgs,
+    resolveClusterRegistryArgs,
+    readPullKey,
     storageCommand,
     clustersCommand,
     computeCommand,
@@ -568,5 +570,62 @@ describe("cloud clusters add", () => {
             "clusters", "add", "--name", "x", "--provider", "azure", "--region", "r", "--kubeconfig", "k"
         )));
         expect(refusal.message).toMatch(/gcp, aws or hetzner/);
+    });
+});
+
+/**
+ * `rebase cloud clusters registry` — a customer cluster's own image registry.
+ *
+ * The control plane ignores a partial set (and keeps handing the cluster the
+ * shared credentials), so the command takes all three values or `--clear` —
+ * and a pull key that could push is refused before it leaves the machine,
+ * because the pull secret sits where the cluster's admin can read it.
+ */
+describe("cloud clusters registry", () => {
+    const REPO = "europe-west1-docker.pkg.dev/rebase-578f2/rlc-acme";
+    const PUSHER = "rlc-acme-push@rebase-578f2.iam.gserviceaccount.com";
+
+    it("reads the cluster id and all three values", () => {
+        expect(resolveClusterRegistryArgs(argv(
+            "clusters", "registry", "c_1", "--repository", `${REPO}/`, "--push-service-account", PUSHER, "--pull-key-file", "./pull.json"
+        ))).toEqual({ id: "c_1", clear: false, repository: REPO, pushServiceAccount: PUSHER, pullKeyFile: "./pull.json" });
+    });
+
+    it("clears with --clear alone", () => {
+        expect(resolveClusterRegistryArgs(argv("clusters", "registry", "c_1", "--clear"))).toEqual({ id: "c_1", clear: true });
+    });
+
+    it("refuses a partial set: the control plane would ignore it", async () => {
+        const refusal = await refusalOf(() => resolveClusterRegistryArgs(argv(
+            "clusters", "registry", "c_1", "--repository", REPO, "--push-service-account", PUSHER
+        )));
+        expect(refusal.message).toMatch(/All three go together/);
+    });
+
+    it("refuses a repository that is not <host>/<project>/<repository>", async () => {
+        const refusal = await refusalOf(() => resolveClusterRegistryArgs(argv(
+            "clusters", "registry", "c_1", "--repository", "europe-west1-docker.pkg.dev", "--push-service-account", PUSHER, "--pull-key-file", "k"
+        )));
+        expect(refusal.message).toMatch(/<host>\/<project>\/<repository>/);
+    });
+
+    it("refuses a missing cluster id", async () => {
+        const refusal = await refusalOf(() => resolveClusterRegistryArgs(argv("clusters", "registry", "--clear")));
+        expect(refusal.message).toMatch(/Usage: rebase cloud clusters registry/);
+    });
+
+    it("accepts the reader's key and names its account", () => {
+        const key = JSON.stringify({ client_email: "rlc-acme-pull@rebase-578f2.iam.gserviceaccount.com", private_key: "k" });
+        expect(readPullKey(`${key}\n`, PUSHER)).toEqual({ key, account: "rlc-acme-pull@rebase-578f2.iam.gserviceaccount.com" });
+    });
+
+    it("refuses the pusher's key as the pull key: the pull secret must not be able to write", async () => {
+        const refusal = await refusalOf(() => readPullKey(JSON.stringify({ client_email: PUSHER, private_key: "k" }), PUSHER));
+        expect(refusal.message).toMatch(/read-only account/);
+    });
+
+    it("refuses a file that is not a service-account key", async () => {
+        expect((await refusalOf(() => readPullKey("not json", PUSHER))).message).toMatch(/not JSON/);
+        expect((await refusalOf(() => readPullKey("{}", PUSHER))).message).toMatch(/client_email\/private_key/);
     });
 });

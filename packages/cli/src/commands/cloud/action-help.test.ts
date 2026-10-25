@@ -23,7 +23,7 @@ import { CREATE_DATABASE_FLAGS } from "./databases";
 import { DB_CONNECT_FLAGS } from "./db-connect";
 import { DEPLOY_FLAGS, LOGS_FLAGS } from "./deploy";
 import { ENV_SET_FLAGS } from "./env";
-import { COMPUTE_SET_FLAGS, BILLING_ACTIONS } from "./resources";
+import { COMPUTE_SET_FLAGS, BILLING_ACTIONS, CLUSTER_REGISTRY_FLAGS, CLUSTERS_ACTIONS } from "./resources";
 import { LOGIN_FLAGS } from "./auth";
 import { CREATE_TOKEN_FLAGS } from "./tokens";
 import { INIT_FLAGS } from "./init";
@@ -84,6 +84,7 @@ const SPECS: Record<string, Record<string, unknown> | null> = {
     logs: LOGS_FLAGS,
     status: null,
     "clusters verify": null,
+    "clusters registry": CLUSTER_REGISTRY_FLAGS,
     // The graph. Neither listing nor pruning declares a flag of its own —
     // `prune`'s `--yes` is the global one.
     resources: null,
@@ -524,7 +525,8 @@ describe("ACTION_HELP", () => {
     it.each([
         ["billing", BILLING_ACTIONS],
         ["usage", USAGE_ACTIONS],
-        ["app-key", APP_KEY_ACTIONS]
+        ["app-key", APP_KEY_ACTIONS],
+        ["clusters", CLUSTERS_ACTIONS]
     ])("%s's usage line names the actions it dispatches", (key, dispatched) => {
         expect(actionWordsIn(ACTION_HELP[key].usage).sort()).toEqual([...dispatched].sort());
     });
