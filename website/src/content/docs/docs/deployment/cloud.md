@@ -89,7 +89,15 @@ finding that out after a bundle has finished uploading is the worse order.
 After that, the console's **Billing** page lists the organization's invoices,
 each with Stripe's hosted page and PDF, and previews the next invoice of every
 project. `rebase cloud billing invoices` and `rebase cloud billing upcoming`
-print the same. Both are for the organization's owners and admins.
+print the same. Both are for the organization's owners and admins. Where the
+platform offers it, **Manage billing** opens Stripe's customer portal for the
+card, the billing details and past invoices.
+
+With a card already on file, creating another project in the console asks for
+no second payment: the project is billed on that card and deploys. If the card
+is declined, or the bank wants the payment confirmed, the console takes you to
+**Billing**, where **Fix your card** saves another card and **Complete the
+payment** opens Stripe's invoice.
 
 What a project has used shows on its overview, under **Usage this month**, and
 for every project at once on the **Billing** page: requests against the
@@ -100,7 +108,11 @@ appears on the invoice of the month after. `rebase cloud usage` prints the
 same, and `rebase cloud usage org` the whole organization. Any member can read
 it. The figures say what they cannot see yet: object storage is not measured,
 so no storage overage is billed; while a project runs two or more app pods,
-its requests are not counted; and a day with missed samples undercounts.
+its requests are not counted; and a day with missed samples undercounts. An
+autoscaled project also shows the pods it ran above `--replicas`, in pod-hours,
+what they cost at its own rates and whether this platform charges them yet. A
+project claimed from an agent counts only the days from the claim on: before
+it, the project was the platform's.
 
 An existing project links without creating one:
 
@@ -436,8 +448,8 @@ rebase cloud compute set --cpu 500m --memory 2Gi
 | Dial | Unit, and what it means |
 |---|---|
 | `--cpu`, `--memory` | App request per instance, e.g. `500m` and `2Gi`. Empty means the platform default — `100m` and `384Mi`, bursting to 2 CPU and `2Gi` |
-| `--replicas` | Instances that always exist: the autoscaler's floor, and what the project is billed for |
-| `--autoscale-max` | 1–16. The ceiling it may reach. Instances the autoscaler adds above `--replicas` are not billed today. `--no-autoscale` turns it off |
+| `--replicas` | Instances that always exist: the autoscaler's floor, and what the project's subscription bills monthly |
+| `--autoscale-max` | 1–16. The ceiling it may reach. Instances the autoscaler adds above `--replicas` are metered per pod-second at the same rates, and charged only where the platform has switched that on; **Usage this month** says which. `--no-autoscale` turns it off |
 | `--autoscale-cpu-target` | 10–95. The CPU utilisation the autoscaler holds, against the request rather than the limit. Empty means 70 |
 | `--spot` | `true` or `false`. Preemptible capacity: cheaper, and restarted without notice |
 | `--db-instances` | 1–3. `1` is a single instance with no failover; `2` adds an automatic standby |
@@ -463,7 +475,7 @@ except one that restarts the database, which waits for a maintenance window.
 | `projects` | Create, list, inspect, delete |
 | `deploy`, `logs`, `deployments`, `rollback`, `cancel` | Shipping and watching |
 | `previews` | Builds served on their own address by `deploy --preview`, and deleting them. See [Preview a change](#preview-a-change) |
-| `start`, `stop`, `restart` | Pausing a project and bringing it back |
+| `start`, `stop`, `restart` | Pausing a project and bringing it back. A stopped project keeps its subscription, unless the platform bills stopped projects for storage and the platform fee only; the console's **Billing** row says so when it does |
 | `status`, `metrics`, `debug` | What it is doing, and why it is not |
 | `cron` | The deployed app's cron jobs and their recorded runs, read with your `rebase cloud` login. Read-only |
 | `env` | Environment variables. `list` never prints values; `--secret` is write-only |

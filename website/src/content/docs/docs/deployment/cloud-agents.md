@@ -185,5 +185,7 @@ the organization the project moves into. From the claim onwards the project is
 billed like any other. Claiming also revokes the agent's token: sign in with
 `rebase cloud login`, or mint a new token with `rebase cloud tokens create`.
 
-Provisioning without an account is bounded per address and in total, and a
-control plane that has not switched it on refuses with a message saying so.
+Provisioning without an account is bounded per address, per network (an IPv4
+/24) and in total, and a control plane that has not switched it on refuses with
+a message saying so. Usage from before the claim is not billed to whoever
+claims the project.

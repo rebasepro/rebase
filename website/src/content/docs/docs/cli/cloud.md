@@ -351,4 +351,8 @@ token holds that on.
 `--month` takes a past month. The answer carries `caveats`, each with a `code`: `storage_not_measured`
 (object storage reads 0), `multi_pod_undercount` (requests served while two or
 more app pods run are not counted), `partial_days`, `metering_off`,
-`overage_billing_off`, `not_billed` and `billed_next_month`.
+`overage_billing_off`, `not_billed`, `billed_next_month`, `pre_claim_days` (a
+project claimed from an agent counts only the days from the claim on) and
+`autoscale_not_charged` (pods ran above `--replicas` and this platform does not
+charge them yet). An autoscaled project's answer also carries `autoscale`:
+`extraPodSeconds` above the floor, `amountEur` at its rates, and `charged`.
