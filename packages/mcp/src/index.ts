@@ -13,6 +13,20 @@ import { existsSync, readFileSync, readdirSync, writeFileSync, mkdirSync, chmodS
 import { homedir } from "node:os";
 import { randomUUID } from "node:crypto";
 import { fileURLToPath } from "node:url";
+import {
+    CLOUD_LOGS_DEFAULT_TAIL,
+    ToolArgumentError,
+    cliRefusal,
+    cloudRefusalNext,
+    cloudSuccessNext,
+    cloudToolCall,
+    envSetResult,
+    isCloudCommandTool,
+    parseCliJson,
+    redactSecrets,
+    validateToolArgs,
+    withTailedLogs
+} from "./cloud-tools.js";
 
 /**
  * The server version advertised in the MCP `initialize` handshake — read from
@@ -778,7 +792,35 @@ export const READ_ONLY_TOOLS = new Set<string>([
     "cron_get_job",
     "cron_get_job_logs",
     // Dev-server output is this machine's, not the target's
-    "rebase_dev_logs"
+    "rebase_dev_logs",
+    // Rebase Cloud reads, through the CLI and its own credential. They read
+    // the linked project's state from the control plane and change nothing.
+    "rebase_cloud_status",
+    "rebase_cloud_logs",
+    "rebase_cloud_env_list",
+    "rebase_cloud_deployments_list"
+]);
+
+/**
+ * Rebase Cloud tools that change the linked project: a deploy, a variable, a
+ * rollback.
+ *
+ * Not gated, and not because they are harmless — each one changes a
+ * production project. The gate asks whether the app's `baseUrl` or the CLI's
+ * `DATABASE_URL` is local, and these use neither: they spawn `rebase cloud`,
+ * which acts on the project `.rebase/cloud.json` links, with the credential the
+ * CLI resolves (`REBASE_TOKEN`, the token `init --claim` stored, or the
+ * person's login) and the control plane's own permission checks. Gating them
+ * on `baseUrl` would test a value they never read — and after
+ * `rebase_cloud_provision` points `REBASE_BASE_URL` at the new project,
+ * would refuse the very deploy that journey needs. The accident the gate
+ * exists for — an agent that thinks it is local — cannot happen to a tool
+ * whose name says "cloud".
+ */
+export const CLOUD_CONTROL_PLANE_TOOLS = new Set<string>([
+    "rebase_cloud_deploy",
+    "rebase_cloud_env_set",
+    "rebase_cloud_rollback"
 ]);
 
 /**
@@ -833,6 +875,7 @@ export const LOCAL_ONLY_TOOLS = new Set<string>([
 export function gatedTargetFor(toolName: string): "http" | "db" | null {
     if (READ_ONLY_TOOLS.has(toolName)) return null;
     if (LOCAL_ONLY_TOOLS.has(toolName)) return null;
+    if (CLOUD_CONTROL_PLANE_TOOLS.has(toolName)) return null;
     return CLI_TOOLS.some((t) => t.name === toolName) ? "db" : "http";
 }
 
@@ -1127,6 +1170,7 @@ interface ToolDef {
         type: "object";
         properties: Record<string, unknown>;
         required?: string[];
+        additionalProperties?: boolean;
     };
 }
 
@@ -1682,9 +1726,115 @@ const CLOUD_TOOLS: ToolDef[] = [
         inputSchema: {
             type: "object",
             properties: {
-                name: { type: "string", description: `What to call the app (optional, up to ${CLOUD_PROJECT_NAME_MAX} characters)` },
+                name: { type: "string", maxLength: CLOUD_PROJECT_NAME_MAX, description: `What to call the app (optional, up to ${CLOUD_PROJECT_NAME_MAX} characters)` },
                 deploy: { type: "boolean", description: "Deploy the collections now. Default true; false provisions and links only" }
-            }
+            },
+            additionalProperties: false
+        }
+    },
+    {
+        name: "rebase_cloud_status",
+        description:
+            "Show the Rebase Cloud project this directory is linked to (`rebase cloud status`). " +
+            "Its URL, status, last deploy, runtime, database and storage. While the project is unclaimed, `unclaimed` carries " +
+            "its claim URL and when it is deleted; `blockedOn`/`nextAction` name anything only the user can do.",
+        inputSchema: { type: "object", properties: {}, additionalProperties: false }
+    },
+    {
+        name: "rebase_cloud_deploy",
+        description:
+            "Deploy this directory to its linked Rebase Cloud project (`rebase cloud deploy`). " +
+            "Builds, uploads and follows the deployment to a terminal state, then checks the new version answers. Production " +
+            "changes. A deploy can take minutes; `wait: false` returns once it is triggered.",
+        inputSchema: {
+            type: "object",
+            properties: {
+                app: { type: "string", pattern: "^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$", description: "Which app of rebase.json to deploy. Default: the one the CLI picks" },
+                bundle: { type: "boolean", description: "Deploy as a managed bundle (`--bundle`). Needed when the CLI answers `managed_project`" },
+                message: { type: "string", maxLength: 200, pattern: "^[^\\u0000-\\u001f\\u007f]*$", description: "A label for the deployment in its history" },
+                wait: { type: "boolean", description: "Follow it to the end (default true). false returns as soon as it is triggered" },
+                timeoutSeconds: { type: "integer", minimum: 30, maximum: 3600, description: "How long to follow it before giving up. Default: the CLI's 15 minutes" },
+                preview: { type: "boolean", description: "Serve this build on an address of its own and leave production alone" },
+                previewName: { type: "string", pattern: "^[A-Za-z0-9][A-Za-z0-9-]{0,23}$", description: "Name the preview, so later deploys with the same name update it. Implies preview" }
+            },
+            additionalProperties: false
+        }
+    },
+    {
+        name: "rebase_cloud_logs",
+        description:
+            "Read the linked Rebase Cloud project's log once, the running app's or the latest build's (`rebase cloud logs`). " +
+            "`source: \"runtime\"` (the default) is what the app prints, `source: \"build\"` the latest deployment's build log. " +
+            "Never follows; pass `nextSinceTime` back as `since` to read on.",
+        inputSchema: {
+            type: "object",
+            properties: {
+                source: { type: "string", enum: ["runtime", "build"], description: "runtime (default): what the app prints. build: the latest deployment's build log" },
+                since: { type: "string", pattern: "^[0-9][0-9A-Za-z:.+-]{0,39}$", description: "Runtime only: a duration like 30s, 5m or 1h, or an RFC3339 time" },
+                tail: { type: "integer", minimum: 1, maximum: 2000, description: `The last N lines. Default ${CLOUD_LOGS_DEFAULT_TAIL}` },
+                grep: { type: "string", minLength: 1, maxLength: 200, pattern: "^[^\\u0000-\\u001f\\u007f]*$", description: "Runtime only: keep lines containing this text (case-insensitive), or matching /regex/flags" },
+                level: { type: "string", enum: ["error", "warn", "info", "debug"], description: "Runtime only: keep lines at this severity or above" },
+                previous: { type: "boolean", description: "Runtime only: the previous, crashed instance of the container" },
+                preview: { type: "string", pattern: "^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$", description: "A preview's name (or the id of the deployment that built it), to read its log instead of production's" }
+            },
+            additionalProperties: false
+        }
+    },
+    {
+        name: "rebase_cloud_env_list",
+        description:
+            "List the linked Rebase Cloud project's environment variables, never their values (`rebase cloud env list`). " +
+            "Keys, whether each is secret and set, and whether a change awaits a redeploy.",
+        inputSchema: {
+            type: "object",
+            properties: {
+                preview: { type: "boolean", description: "What the project's previews run with instead of production's values" }
+            },
+            additionalProperties: false
+        }
+    },
+    {
+        name: "rebase_cloud_env_set",
+        description:
+            "Set one environment variable on the linked Rebase Cloud project (`rebase cloud env set KEY --stdin`). " +
+            "The value is written through stdin, never put on a command line, and never returned; `secret: true` makes it " +
+            "write-only. It applies on the next deploy.",
+        inputSchema: {
+            type: "object",
+            properties: {
+                key: { type: "string", pattern: "^[A-Za-z_][A-Za-z0-9_]{0,127}$", description: "The variable's name" },
+                value: { type: "string", maxLength: 65536, description: "The value. Never echoed back" },
+                secret: { type: "boolean", description: "Write-only: it can be replaced and used, never read back" },
+                preview: { type: "boolean", description: "Set it for the project's previews only; production keeps its value" }
+            },
+            required: ["key", "value"],
+            additionalProperties: false
+        }
+    },
+    {
+        name: "rebase_cloud_deployments_list",
+        description:
+            "List the linked Rebase Cloud project's recent deployments, newest first (`rebase cloud deployments list`). " +
+            "Status, duration, trigger, and which ones rebase_cloud_rollback can return to.",
+        inputSchema: {
+            type: "object",
+            properties: {
+                limit: { type: "integer", minimum: 1, maximum: 100, description: "How many. Default 20" }
+            },
+            additionalProperties: false
+        }
+    },
+    {
+        name: "rebase_cloud_rollback",
+        description:
+            "Put a previous successful deployment of the linked Rebase Cloud project back into service (`rebase cloud rollback`). " +
+            "Production changes. Without `deploymentId`, the most recent rollbackable deployment that is not the live one.",
+        inputSchema: {
+            type: "object",
+            properties: {
+                deploymentId: { type: "string", pattern: "^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$", description: "The deployment to return to, from rebase_cloud_deployments_list" }
+            },
+            additionalProperties: false
         }
     }
 ];
@@ -1788,6 +1938,72 @@ export function parseCloudProvisionResult(stdout: string): CloudProvisionResult 
     };
 }
 
+/** The advertised input schema of a cloud tool: what its arguments are validated against. */
+function cloudToolSchema(name: string): ToolDef["inputSchema"] {
+    const tool = CLOUD_TOOLS.find((t) => t.name === name);
+    if (!tool) throw new Error(`No cloud tool named ${name}.`);
+    return tool.inputSchema;
+}
+
+/**
+ * The validated CLI call a cloud tool makes, from its arguments: what the
+ * dispatcher runs, and what the schema-against-handler test drives. Throws a
+ * `ToolArgumentError` before anything is spawned.
+ */
+export function parseCloudToolArgs(name: string, args: unknown): { argv: string[]; stdin?: string; secrets: string[]; tailLines: number } {
+    if (name === "rebase_cloud_provision") {
+        return { argv: cloudProvisionArgv(validateToolArgs(name, cloudToolSchema(name), args)), secrets: [], tailLines: CLOUD_LOGS_DEFAULT_TAIL };
+    }
+    if (!isCloudCommandTool(name)) throw new ToolArgumentError(`No cloud tool named ${name}.`);
+    return cloudToolCall(name, cloudToolSchema(name), args);
+}
+
+/**
+ * Run one of the cloud tools past provisioning: spawn `rebase cloud … --json`
+ * and hand back its one JSON value.
+ *
+ * Success is the CLI's JSON fenced as untrusted (a status, a log and a
+ * deployment message are all text somebody else wrote), behind one trusted
+ * line on what to do with it. A refusal is an error: the code, the way forward
+ * when this server knows it, then the CLI's own words, fenced. `env set` is
+ * the exception both ways — its result is built from its own arguments, and
+ * the value it set is cut out of anything it returns.
+ */
+async function runCloudTool(name: string, args: unknown) {
+    if (!isCloudCommandTool(name)) return { ...textResult(`No cloud tool named ${name}.`), isError: true };
+    let call: ReturnType<typeof cloudToolCall>;
+    try {
+        call = cloudToolCall(name, cloudToolSchema(name), args);
+    } catch (err) {
+        return { ...textResult(err instanceof Error ? err.message : String(err)), isError: true };
+    }
+    const { stdout, combined, code, spawnError } = await spawnRebase(call.argv, call.stdin);
+    if (spawnError) return { ...textResult(`Error spawning command: ${spawnError}`), isError: true };
+    const source = `the \`${call.command}\` command`;
+    const value = parseCliJson(redactSecrets(stdout, call.secrets));
+
+    const refusal = cliRefusal(value);
+    if (refusal || value === undefined) {
+        const next = refusal ? cloudRefusalNext(name, refusal) : null;
+        const lead = refusal
+            ? `\`${call.command}\` was refused (${refusal.code}).${next ? ` ${next}` : ""}`
+            : `\`${call.command}\` exited with code ${code} and printed no result.`;
+        const body = value === undefined
+            ? redactSecrets(combined.trim(), call.secrets) || "(no output)"
+            : JSON.stringify(withTailedLogs(value, call.tailLines));
+        return { ...textResult(`${lead}\n\n${untrustedEnvelope(source, body)}`), isError: true };
+    }
+
+    const next = cloudSuccessNext(name, call);
+    if (name === "rebase_cloud_env_set") {
+        return { ...jsonResult({ ...envSetResult(call, value), next }), ...(code !== 0 ? { isError: true } : {}) };
+    }
+    return {
+        ...textResult(`${next}\n\n${untrustedEnvelope(source, JSON.stringify(withTailedLogs(value, call.tailLines)))}`),
+        ...(code !== 0 ? { isError: true } : {})
+    };
+}
+
 export const ALL_TOOLS: ToolDef[] = [
     ...CLI_TOOLS.map(({ cmd: _c, ...rest }) => rest),
     ...SCHEMA_TOOLS,
@@ -1836,7 +2052,9 @@ function runRebaseCmd(commandArgs: string[]): Promise<{ output: string; code: nu
  * both, in the order they arrived.
  */
 function spawnRebase(
-    commandArgs: string[]
+    commandArgs: string[],
+    /** Written to the child's stdin, which is then closed. A secret travels here, never on argv. */
+    input?: string
 ): Promise<{ stdout: string; stderr: string; combined: string; code: number; spawnError?: string }> {
     const projectDir = getProjectDir();
     const pm = detectPackageManager(projectDir);
@@ -1859,6 +2077,12 @@ function spawnRebase(
         child.stderr?.on("data", (d: Buffer) => { err.push(d.toString()); all.push(d.toString()); });
         child.on("error", (error) => resolve({ stdout: "", stderr: "", combined: "", code: -1, spawnError: error.message }));
         child.on("close", (code) => resolve({ stdout: out.join(""), stderr: err.join(""), combined: all.join(""), code: code ?? -1 }));
+        if (input !== undefined) {
+            // A child that exits before reading (a refusal) closes the pipe;
+            // that EPIPE is its answer, not this server's error.
+            child.stdin?.on("error", () => {});
+            child.stdin?.end(input);
+        }
     });
 }
 
@@ -2141,7 +2365,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         case "rebase_cloud_provision": {
             let argv: string[];
             try {
-                argv = cloudProvisionArgv((args ?? {}) as { name?: unknown; deploy?: unknown });
+                argv = cloudProvisionArgv(validateToolArgs(name, cloudToolSchema(name), args));
             } catch (err) {
                 return { ...textResult(err instanceof Error ? err.message : String(err)), isError: true };
             }
@@ -2173,6 +2397,15 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
                 ...(code !== 0 ? { isError: true } : {})
             };
         }
+
+        case "rebase_cloud_status":
+        case "rebase_cloud_deploy":
+        case "rebase_cloud_logs":
+        case "rebase_cloud_env_list":
+        case "rebase_cloud_env_set":
+        case "rebase_cloud_deployments_list":
+        case "rebase_cloud_rollback":
+            return runCloudTool(name, args);
 
         case "rebase_schema_plan": {
             const argsObj = args as { collectionId: string; collection: Record<string, unknown> };

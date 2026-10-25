@@ -1,7 +1,7 @@
 ---
 title: MCP Server
 sidebar_label: MCP Server
-description: Connect Claude Code, Cursor, Gemini CLI or any MCP client to a Rebase project — the 42 tools it exposes, the credential it authenticates with, and the loopback gate that stands between an agent and production.
+description: Connect Claude Code, Cursor, Gemini CLI or any MCP client to a Rebase project — the 51 tools it exposes, the credential it authenticates with, and the loopback gate that stands between an agent and production.
 ---
 
 `@rebasepro/mcp` is a [Model Context Protocol](https://modelcontextprotocol.io)
@@ -302,7 +302,12 @@ gated, so a tool added later arrives protected by default.
   `rebase_db_branch_list`, `rebase_db_branch_info`, `list_documents`,
   `get_document`, `list_users`, `list_roles`, `storage_list_objects`,
   `storage_get_download_url`, `cron_list_jobs`, `cron_get_job`, `cron_get_job_logs`,
-  `rebase_dev_logs`.
+  `rebase_dev_logs`, and the Rebase Cloud reads `rebase_cloud_status`,
+  `rebase_cloud_logs`, `rebase_cloud_env_list`, `rebase_cloud_deployments_list`.
+- **Not gated — Rebase Cloud writes:** `rebase_cloud_deploy`,
+  `rebase_cloud_env_set`, `rebase_cloud_rollback`. They change a production
+  project, but not through `baseUrl` or `DATABASE_URL`, which are all the gate
+  can check. See [Rebase Cloud](#rebase-cloud) for what stands in front of them.
 - **Not gated — local only:** `rebase_schema_introspect`, `rebase_schema_generate`, `rebase_db_generate`,
   `rebase_generate_sdk`, the dev-server tools and the project-registry tools.
   These write local files or local state and have no remote target to check.
@@ -312,7 +317,7 @@ gated, so a tool added later arrives protected by default.
   `create_document`, `update_document`, `delete_document`, `create_user`,
   `update_user`, `delete_user`, `rebase_auth_reset_password`,
   `storage_delete_object`, `cron_trigger_job`, `cron_toggle_job`,
-  `invoke_function`.
+  `invoke_function`, and `rebase_cloud_provision`.
 
 The two targets are not interchangeable. CLI tools never see `baseUrl`, so a
 localhost backend sitting next to a production `DATABASE_URL` is checked against
@@ -416,10 +421,86 @@ Tokens are stored in that registry **in plaintext**. It is a file in your home
 directory holding admin credentials for every project you have registered; treat
 it accordingly.
 
+## Rebase Cloud
+
+Eight tools take an app from this directory to a live backend on
+[Rebase Cloud](/docs/deployment/cloud/) and keep it running. Each one spawns
+`rebase cloud <command> --json` in the active project directory: the same
+command a person runs, so there is no second implementation to drift from it.
+
+| Tool | Runs | Changes the project |
+|---|---|---|
+| `rebase_cloud_provision` | `rebase cloud init --claim` | Creates one, with no account |
+| `rebase_cloud_status` | `rebase cloud status` | No |
+| `rebase_cloud_deploy` | `rebase cloud deploy` | Yes |
+| `rebase_cloud_logs` | `rebase cloud logs [--runtime]` | No |
+| `rebase_cloud_env_list` | `rebase cloud env list` | No |
+| `rebase_cloud_env_set` | `rebase cloud env set KEY --stdin` | Yes, from the next deploy |
+| `rebase_cloud_deployments_list` | `rebase cloud deployments list` | No |
+| `rebase_cloud_rollback` | `rebase cloud rollback --yes` | Yes |
+
+The usual agent journey is: `rebase_cloud_provision`, then give the user the
+claim URL; `rebase_cloud_status` to see the project (while it is unclaimed,
+`unclaimed` carries the claim URL and when it is deleted); `rebase_cloud_deploy`
+after a change; `rebase_cloud_logs` when something misbehaves; and
+`rebase_cloud_rollback` when production is broken.
+
+**What they act on.** The project the active directory is linked to in
+`.rebase/cloud.json`. None of them takes a project id or a directory, so an
+assistant cannot point them at another project than the one the directory is
+linked to. Switching the active project with `rebase_project_switch` switches
+the directory they run in.
+
+**Whose authority.** Whatever the CLI resolves in that directory: `REBASE_TOKEN`
+when it is set, then the token `rebase cloud init --claim` stored for an
+unclaimed project, then the `rebase cloud login` session. The control plane
+checks each call as it checks the CLI's, so with a token made by
+`rebase cloud tokens create --can logs` an assistant can read logs, and the
+control plane refuses its deploys, variables and rollbacks. No credential, or a refused one, comes back as an error that says what the
+user has to do (`rebase cloud login`, or claiming the project).
+
+**Why the loopback gate does not apply.** The gate checks the app's `baseUrl` and
+the CLI's `DATABASE_URL`; these tools use neither. After `rebase_cloud_provision`,
+`REBASE_BASE_URL` points at the new cloud project, so gating on it would refuse
+the very deploy the journey needs. A deploy, a variable and a rollback each
+change production. What stands in front of them is the credential above and
+your MCP client's tool approval. To keep an assistant from changing a cloud
+project, set `REBASE_TOKEN` in the server's environment to a token without the
+`deploy` and `env` capabilities.
+
+Each tool is a snapshot:
+
+- `rebase_cloud_logs` never follows. Its result carries `nextSinceTime`; pass it
+  back as `since` to read what came after. It returns the last 200 lines unless
+  `tail` says otherwise. `source: "build"` returns the latest build log instead.
+- `rebase_cloud_deploy` follows the deployment to the end and checks that the new
+  version answers. `wait: false` returns as soon as the deployment is triggered.
+  It never ejects a project from the managed runtime, deploys an older framework
+  release, or skips the build checks: those are the user's decisions, and a
+  refusal that needs one says so.
+- `rebase_cloud_rollback` passes `--yes`. The tool call is the confirmation, since
+  there is no terminal to ask at.
+
+`rebase_cloud_env_set` writes the value to the CLI's standard input, so it is
+never on a command line where `ps` would show it, and the value is cut out of
+anything the tool returns. Its result says what was stored (the key, whether it
+is secret, whether a redeploy is pending), never the value. `rebase_cloud_env_list`
+lists keys only. A CLI older than `env set --stdin` is refused with a message to
+upgrade it; the value is not sent another way.
+
+Results come back in the [untrusted-data envelope](#untrusted-data-marking),
+behind one line from the server on what to do next. A refusal is a tool error
+that carries the CLI's code, such as `no_project`, `token_rejected`,
+`managed_project` or `deploy_failed`. When the server recognises the code, it
+adds the next step, then the CLI's own message. Every tool checks its arguments
+against the schema it advertises before anything is spawned, and refuses an
+argument it does not declare.
+
 ## Tool reference
 
-42 tools, in nine groups: schema and database, schema planning, documents, users
-and roles, storage, cron, functions, the dev server and the project registry.
+51 tools, in ten groups: schema and database, schema planning, documents, users
+and roles, storage, cron, functions, the dev server, the project registry and
+Rebase Cloud.
 Each one, with what it needs and whether the gate refuses it against a non-local
 target, is in the [MCP tool reference](/docs/ai/mcp-tool-reference).
 

@@ -447,8 +447,11 @@ its live address, links the directory, and deploys the local collections with
 `rebase cloud deploy --bundle`. It prints the live URL, the admin panel URL and a
 **claim URL**. Whoever opens the claim URL and signs in can move the project into
 one of their organizations. The link works once. A project nobody claims within
-72 hours is deleted, database included. The MCP server's `rebase_cloud_provision`
-tool runs the same command and returns the same URLs.
+72 hours is deleted, database included. `rebase cloud claim` prints the claim
+URL again with the time left, and `--open` opens it. The MCP server's
+`rebase_cloud_provision` tool runs the same command and returns the same URLs;
+its other cloud tools then check, deploy, read logs, set variables and roll back
+the project without a login (see [MCP server](/docs/ai/mcp#rebase-cloud)).
 
 `REBASE_BASE_URL` in `.env` is also where `rebase api-keys`, `rebase storage`
 and `rebase auth reset-password` send the local service key, so after `init

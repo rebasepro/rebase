@@ -8,7 +8,7 @@ The tools [`@rebasepro/mcp`](/docs/ai/mcp) offers an assistant. How it connects,
 which credential it holds and how the [loopback gate](/docs/ai/mcp#the-loopback-gate)
 decides what ⚠ means are on the [MCP server](/docs/ai/mcp) page.
 
-42 tools, in nine groups. Tools marked ⚠ are refused against non-local targets
+51 tools, in ten groups. Tools marked ⚠ are refused against non-local targets
 unless you opt out.
 
 ## Schema & database (12)
@@ -121,3 +121,24 @@ chose. Its blast radius is whatever your functions do.
 rather than acting on a target itself. An assistant can therefore switch to a
 remote project without tripping the gate — it just cannot then run a destructive
 tool there.
+
+## Rebase Cloud (8)
+
+Spawn `rebase cloud … --json` in the active project directory, against the
+project it is linked to, with the CLI's own credential. See
+[Rebase Cloud](/docs/ai/mcp#rebase-cloud) for what they act on and why the
+deploy, variable and rollback tools are not gated.
+
+| Tool | Required | Description |
+|---|---|---|
+| `rebase_cloud_provision` ⚠ | — | A live backend with no account (`rebase cloud init --claim`): the live URL, the admin URL and a claim URL (`name`, `deploy`) |
+| `rebase_cloud_status` | — | The linked project's URL, status, last deploy, runtime, database, storage, and its claim URL while unclaimed |
+| `rebase_cloud_deploy` | — | Deploy and follow it to the end (`app`, `bundle`, `message`, `wait`, `timeoutSeconds`, `preview`, `previewName`) |
+| `rebase_cloud_logs` | — | One snapshot of the runtime log, or the latest build log (`source`, `since`, `tail`, `grep`, `level`, `previous`, `preview`). Never follows |
+| `rebase_cloud_env_list` | — | Variable keys, never values (`preview`) |
+| `rebase_cloud_env_set` | `key`, `value` | Set one variable; the value goes through stdin and is never returned (`secret`, `preview`) |
+| `rebase_cloud_deployments_list` | — | Recent deployments, and which ones can be rolled back to (`limit`) |
+| `rebase_cloud_rollback` | — | Put a previous successful deployment back into service (`deploymentId`) |
+
+`rebase_cloud_provision` is checked against the project `baseUrl` like the SDK
+tools, so it is refused when the active project points at a remote backend.

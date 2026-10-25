@@ -24,7 +24,7 @@ database), the dev server applies the collections at boot. Restart it with
 
 <!-- generated: mcp tool tables — pnpm generate:mcp-readme -->
 
-44 tools, in 10 groups. Tools marked ⚠ are refused against a non-local
+51 tools, in 10 groups. Tools marked ⚠ are refused against a non-local
 target unless `REBASE_MCP_ALLOW_REMOTE_WRITES=true` — see the gate above.
 
 ### Schema & database (13)
@@ -121,13 +121,20 @@ CRUD over a collection through `@rebasepro/client`.
 | `rebase_project_current` | — | Show details about the currently active Rebase project, including resolved URL and auth status |
 | `rebase_project_status` | — | Health-check the active project's backend by calling GET /health |
 
-### Rebase Cloud (1)
+### Rebase Cloud (8)
 
-Spawn `rebase cloud` in the active project directory.
+Spawn `rebase cloud … --json` in the active project directory, against the project it is linked to, with the CLI's own credential. Deploy, env set and rollback change that project; the loopback gate does not apply to them, because they never use `baseUrl` or `DATABASE_URL`.
 
 | Tool | Required | Description |
 |---|---|---|
 | `rebase_cloud_provision` ⚠ | — | Give the active project a live backend on Rebase Cloud with no account or signup: provisions a project,  |
+| `rebase_cloud_status` | — | Show the Rebase Cloud project this directory is linked to (`rebase cloud status`) |
+| `rebase_cloud_deploy` | — | Deploy this directory to its linked Rebase Cloud project (`rebase cloud deploy`) |
+| `rebase_cloud_logs` | — | Read the linked Rebase Cloud project's log once, the running app's or the latest build's (`rebase cloud logs`) |
+| `rebase_cloud_env_list` | — | List the linked Rebase Cloud project's environment variables, never their values (`rebase cloud env list`) |
+| `rebase_cloud_env_set` | `key`, `value` | Set one environment variable on the linked Rebase Cloud project (`rebase cloud env set KEY --stdin`) |
+| `rebase_cloud_deployments_list` | — | List the linked Rebase Cloud project's recent deployments, newest first (`rebase cloud deployments list`) |
+| `rebase_cloud_rollback` | — | Put a previous successful deployment of the linked Rebase Cloud project back into service (`rebase cloud rollback`) |
 
 <!-- /generated: mcp tool tables -->
 
