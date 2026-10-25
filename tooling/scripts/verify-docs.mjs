@@ -41,6 +41,8 @@ import { checkMarketingSnippets } from "./docs-verify/check-marketing-snippets.m
 import { checkDocCommands } from "./docs-verify/check-doc-commands.mjs";
 import { checkAgentBundle } from "./docs-verify/check-agent-bundle.mjs";
 import { checkProseTypes } from "./docs-verify/check-prose-types.mjs";
+import { checkDeclaredTypes } from "./docs-verify/check-declared-types.mjs";
+import { checkSurfaceCounts } from "./docs-verify/check-surface-counts.mjs";
 import { checkPortableImports } from "./docs-verify/check-portable-imports.mjs";
 import { checkVersionPins } from "./docs-verify/check-version-pins.mjs";
 import { checkEnvReference } from "./docs-verify/check-env-reference.mjs";
@@ -89,6 +91,8 @@ if (asJson) {
         out.docCommands = checkDocCommands(ROOT).findings;
         out.agentBundle = checkAgentBundle(ROOT).findings;
         out.proseTypes = checkProseTypes(ROOT).findings;
+        out.declaredTypes = checkDeclaredTypes(ROOT).findings;
+        out.surfaceCounts = checkSurfaceCounts(ROOT).findings;
         out.portableImports = checkPortableImports(ROOT).findings;
         out.versionPins = checkVersionPins(ROOT).findings;
         out.envReference = checkEnvReference(ROOT).findings;
@@ -542,6 +546,38 @@ if (only === "both" || only === "names") {
     } else {
         findings += bad.length;
         console.log(`${RED}✗ ${bad.length} type name(s) that do not exist:${NC}`);
+        for (const b of bad) {
+            console.log(`  ${RED}${b.file}:${b.line}${NC}`);
+            console.log(`      ${DIM}${b.message}${NC}`);
+        }
+    }
+}
+
+if (only === "both" || only === "names") {
+    console.log(`\n${YELLOW}━━━ Types a fence declares (en + skills) ━━━${NC}`);
+    const { findings: bad, scanned, declarations } = checkDeclaredTypes(ROOT);
+    console.log(`${DIM}Read ${scanned} fences; ${declarations} declare the shape of a type a @rebasepro package exports.${NC}`);
+    if (!bad.length) {
+        console.log(`${GREEN}✓ Every member a fence declares on a real type exists there, with the same \`?\`.${NC}`);
+    } else {
+        findings += bad.length;
+        console.log(`${RED}✗ ${bad.length} declared member(s) the real type contradicts:${NC}`);
+        for (const b of bad) {
+            console.log(`  ${RED}${b.file}:${b.line}${NC}`);
+            console.log(`      ${DIM}${b.message}${NC}`);
+        }
+    }
+}
+
+if (only === "both" || only === "names") {
+    console.log(`\n${YELLOW}━━━ MCP tool and skill counts in prose ━━━${NC}`);
+    const { findings: bad, scanned, tools, groups, skills } = checkSurfaceCounts(ROOT);
+    console.log(`${DIM}Read ${scanned} pages against ${tools} tools in ${groups} groups and ${skills} skills.${NC}`);
+    if (!bad.length) {
+        console.log(`${GREEN}✓ Every count of tools, groups and skills is the current one.${NC}`);
+    } else {
+        findings += bad.length;
+        console.log(`${RED}✗ ${bad.length} stale count(s):${NC}`);
         for (const b of bad) {
             console.log(`  ${RED}${b.file}:${b.line}${NC}`);
             console.log(`      ${DIM}${b.message}${NC}`);

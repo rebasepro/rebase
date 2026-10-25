@@ -43,6 +43,25 @@ last one is the class the export surface cannot catch: `@rebasepro/server` and
 `@rebasepro/server/functions` both resolve, so a page teaching the root is a
 page whose readers silently lose portability.
 
+Stage 1 also holds **fences that declare a real type** to that type
+(`check-declared-types.mjs`). A fence that writes `interface CronJobDefinition { … }`
+is a declaration, and a declaration always compiles, so the snippet stage
+accepts any members it lists. In the 2026-10-24 sweep this was the most common
+drift in every slice, with the gate green the whole time. The check takes each
+top-level `interface X` / `type X = { … }` in the English docs, skills, READMEs
+and agent instructions. When `X` is a type a `@rebasepro/*` package exports, it
+compares the members with the real declaration through the stage-1 program. A
+member the type does not have is a finding, and so is a `?` that disagrees with
+source. A member the doc leaves out is not: showing part of a type is fine,
+showing it wrong is not. `no-verify` fences are read too. Run against the tree
+before that sweep, it reports six invented or mis-optional members, all real.
+
+Next to it, `check-surface-counts.mjs` reads the pages that say how big the
+MCP server and the skills bundle are ("44 tools, in ten groups", "23 skills")
+and checks those numbers against `ALL_TOOLS` and `tooling/rebase-agent-skills/skills/`.
+The tables are generated; the sentences around them were not, and stayed a
+release behind.
+
 **2. `snippets` — English + skills, deep.** Compiles each fenced ts/js block
 against workspace *source* — the English docs, the skills, the example and
 package READMEs, and the agent instructions. English only, because the other
@@ -236,6 +255,11 @@ or an HTML comment on the line immediately above the fence:
 
 Use it when the block is *not meant to compile*. Do not use it to silence a
 block that is wrong — that is the bug this exists to find.
+
+A fence that declares one of the *reader's* types, and happens to share a name
+with one of ours, takes `<!-- docs-verify: own-type -->` on the line above it.
+That marker exempts it from the declared-type check only. `no-verify` does not
+exempt it: a fragment that spells out a real type wrongly is still wrong.
 
 ## Where it blocks
 
