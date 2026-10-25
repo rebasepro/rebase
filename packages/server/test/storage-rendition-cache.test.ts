@@ -197,6 +197,20 @@ describe("GET /file/* with a durable rendition cache", () => {
         expect(spy).toHaveBeenCalledTimes(1);
     });
 
+    it("keeps one in-memory rendition for every spelling of the source", async () => {
+        // Omitted, empty, `(default)` and padded with spaces all name the
+        // default source, so they must all name the one cached rendition.
+        const router = routerOn(false);
+        const spy = jest.spyOn(imageTransform, "transformImage");
+        for (const storageId of [undefined, "", "(default)", " (default) ", "%20"]) {
+            const query = storageId === undefined ? "" : `storageId=${storageId}&`;
+            const response = await router.fetch(new Request(url(`?${query}width=21&format=webp`)));
+            expect(response.status).toBe(200);
+        }
+
+        expect(spy).toHaveBeenCalledTimes(1);
+    });
+
     it("writes the rendition into the source bucket, under the reserved prefix", async () => {
         await routerOn(true).fetch(new Request(url("?width=18&format=webp")));
 
