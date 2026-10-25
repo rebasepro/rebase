@@ -195,7 +195,9 @@ export function AICollectionGeneratorPopover({
             }}
             trigger={trigger ?? defaultTrigger}
         >
-            <div className="p-4 flex flex-col gap-3 min-w-[360px] max-w-[480px]">
+            {/* A phone's width less its margins below `sm`, as the panel is
+                positioned inside the viewport but never shrunk to it. */}
+            <div className="p-4 flex flex-col gap-3 w-[calc(100vw-2rem)] sm:w-auto sm:min-w-[360px] max-w-[480px]">
                 <div className="flex items-center gap-2">
                     <AIIcon size="small"/>
                     <Typography variant="subtitle2">

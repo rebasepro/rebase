@@ -17,11 +17,11 @@ import { Dialog } from "@rebasepro/ui";
 | `children` | `React.ReactNode` | yes |  |
 | `className` | `string` | — |  |
 | `containerClassName` | `string` | — |  |
-| `fullWidth` | `boolean` | — |  |
+| `fullWidth` | `boolean` | — | Size the paper to most of the viewport's width (`w-11/12`), capped at `maxWidth`. On by default. Off, the paper takes `maxWidth`'s width, still capped at that share of the viewport, so it never runs off a phone. |
 | `fullHeight` | `boolean` | — |  |
 | `fullScreen` | `boolean` | — |  |
 | `scrollable` | `boolean` | — |  |
-| `maxWidth` | `"xl" \| "2xl" \| "xs" \| "sm" \| "md" \| "lg" \| "3xl" \| "4xl" \| "5xl" \| "6xl" \| "7xl" \| "full"` | — |  |
+| `maxWidth` | `"xl" \| "2xl" \| "xs" \| "sm" \| "md" \| "lg" \| "3xl" \| "4xl" \| "5xl" \| "6xl" \| "7xl" \| "full"` | — | The widest the paper gets (default `"lg"`). Ignored when `fullScreen`. |
 | `modal` | `boolean` | — |  |
 | `onOpenAutoFocus` | `(e: Event) => void` | — |  |
 | `onCloseAutoFocus` | `(e: Event) => void` | — | Called when focus is about to return after the dialog closes. By default it goes back to the element that had it when the dialog opened; call `preventDefault()` to put it somewhere else. |
