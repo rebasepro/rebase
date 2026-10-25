@@ -22,6 +22,12 @@ interface ShutdownConfig {
     historyRetentionSweep?: { stop(): Promise<void> | void };
     /** The stop `MetricsHistory.start()` returned: its interval writes to the pool. */
     stopMetricsSampler?: () => void;
+    /**
+     * The shared rate-limit store the backend created itself
+     * (`REBASE_RATE_LIMIT_STORE=sql`): its sweep timer deletes from the pool.
+     * Not one the caller passed in, which is the caller's to stop.
+     */
+    ownedRateLimitStore?: { dispose?(): void };
     realtimeServices: Record<string, RealtimeProvider>;
     /**
      * End the responses that stay open until their client leaves — the Logs
@@ -259,6 +265,8 @@ export function createShutdown(config: ShutdownConfig): (timeoutMs?: number) => 
                 // And the metrics sampler, whose next tick would write to a
                 // pool the embedder closes once this resolves.
                 config.stopMetricsSampler?.();
+                // And the rate-limit store's bucket sweep, for the same reason.
+                config.ownedRateLimitStore?.dispose?.();
 
                 // 1b. Stop claiming jobs, and wait for the ones in flight.
                 //

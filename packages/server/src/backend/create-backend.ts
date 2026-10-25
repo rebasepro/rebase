@@ -4097,6 +4097,7 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
             authTokenSweep,
             historyRetentionSweep,
             stopMetricsSampler,
+            ownedRateLimitStore: config.rateLimit?.store ? undefined : sharedRateLimitStore,
             realtimeServices,
             closeLongLivedResponses: () => longLivedResponses.abort(),
             emailService
