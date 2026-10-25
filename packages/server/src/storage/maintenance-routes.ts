@@ -6,6 +6,7 @@
  *   GET    /orphans?storageId=&olderThanHours=   objects no row names
  *   DELETE /orphans?storageId=&olderThanHours=   delete them, found again first
  *   POST   /move  { from, to, prefix?, cursor?, limit?, deleteSource? }
+ *   POST   /move/verify  (the same body)            what a move left behind
  */
 import { Hono } from "hono";
 import type { CollectionCallbacks, CollectionConfig, DataDriver } from "@rebasepro/types";
@@ -15,7 +16,7 @@ import { ApiError } from "../api/errors";
 import type { StorageController } from "./types";
 import type { StorageRegistry } from "./storage-registry";
 import { canonicalStorageId } from "./keys";
-import { findOrphans, InvalidMaintenanceRequestError, moveObjects, storesInSamePlace } from "./maintenance";
+import { findOrphans, InvalidMaintenanceRequestError, moveObjects, storesInSamePlace, verifyMove } from "./maintenance";
 
 export interface StorageMaintenanceRoutesConfig {
     registry?: StorageRegistry;
@@ -113,7 +114,8 @@ export function createStorageMaintenanceRoutes(config: StorageMaintenanceRoutesC
         return c.json({ data: { storageId: canonicalStorageId(storageId), deleted, failed, recent: found.recent } });
     });
 
-    router.post("/move", async (c) => {
+    /** A move's JSON body, checked: the two sources, and the walk's options. */
+    const moveRequest = async (c: { req: { json(): Promise<unknown> } }) => {
         const body: unknown = await c.req.json().catch(() => undefined);
         if (!body || typeof body !== "object" || Array.isArray(body)) {
             throw ApiError.badRequest("The body must be a JSON object: { from, to, prefix?, cursor?, limit?, deleteSource? }.");
@@ -134,8 +136,20 @@ export function createStorageMaintenanceRoutes(config: StorageMaintenanceRoutesC
             || (deleteSource !== undefined && typeof deleteSource !== "boolean")) {
             throw ApiError.badRequest("`prefix` and `cursor` are strings, `limit` a whole number from 1 to 500, `deleteSource` a boolean.");
         }
-        const from = sourceOf(field("from"), "from");
-        const to = sourceOf(field("to"), "to");
+        return {
+            fromId,
+            toId,
+            from: sourceOf(field("from"), "from"),
+            to: sourceOf(field("to"), "to"),
+            prefix,
+            cursor,
+            limit,
+            deleteSource
+        };
+    };
+
+    router.post("/move", async (c) => {
+        const { fromId, toId, from, to, prefix, cursor, limit, deleteSource } = await moveRequest(c);
         // Two names for one store: every object is "already there" in the
         // target, being the same object, and deleting the source's copy
         // deletes it from both.
@@ -156,6 +170,20 @@ export function createStorageMaintenanceRoutes(config: StorageMaintenanceRoutesC
                 limit,
                 deleteSource
             });
+            return c.json({ data: { from: fromId, to: toId, ...result } });
+        } catch (error: unknown) {
+            if (error instanceof InvalidMaintenanceRequestError) throw ApiError.badRequest(error.message);
+            throw error;
+        }
+    });
+
+    // The source listed again after a move, by a walk of its own: every file
+    // the move did not move. Reads only; `rebase storage move` asks it once
+    // the move's own pages are done.
+    router.post("/move/verify", async (c) => {
+        const { fromId, toId, from, to, prefix, cursor, limit, deleteSource } = await moveRequest(c);
+        try {
+            const result = await verifyMove({ from, to, prefix, cursor, limit, deleteSource });
             return c.json({ data: { from: fromId, to: toId, ...result } });
         } catch (error: unknown) {
             if (error instanceof InvalidMaintenanceRequestError) throw ApiError.badRequest(error.message);

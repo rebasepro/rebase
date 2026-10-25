@@ -279,18 +279,67 @@ async function move(rawArgs: string[]): Promise<void> {
         cursor = page.cursor;
     } while (cursor);
 
+    // The source listed again, by a walk of its own: a move reports what its
+    // walk saw, and a walk that skipped files once reported success over the
+    // half it moved.
+    const verified = await listLeftBehind(backend, {
+        from,
+        to,
+        prefix: flags["--prefix"],
+        deleteSource: flags["--delete-source"] === true
+    }, flags["--json"] === true);
+    const reported = new Set(failures.map(failure => failure.key));
+    const leftBehind = verified?.filter(entry => !reported.has(entry.key)) ?? [];
+
     if (flags["--json"]) {
-        console.log(JSON.stringify({ ...counts, failures }, null, 2));
+        console.log(JSON.stringify({ ...counts, failures, verified: verified !== undefined, notMoved: verified ?? [] }, null, 2));
     } else {
         if (process.stdout.isTTY) process.stdout.write("\n");
         console.log(chalk.green(`  ✓ ${counts.copied} copied, ${counts.exists} already there` +
             `${flags["--delete-source"] ? `, ${counts.deleted} deleted from the source` : ""}.`));
         for (const failure of failures) console.error(chalk.red(`  ✗ ${failure.key}: ${failure.error ?? "failed"}`));
+        if (verified === undefined) {
+            console.log(chalk.gray("  This backend cannot list the source again (it needs a backend newer than 0.25.1), so the CLI did not check for files the move left behind."));
+        } else if (leftBehind.length > 0) {
+            console.error(chalk.red(`  ✗ Listed again, the source holds ${leftBehind.length} more file(s) the move did not report: ${leftBehind.length} file(s) were not moved.`));
+            for (const entry of leftBehind) console.error(chalk.red(`    ${entry.key}: ${entry.reason}`));
+            console.error(chalk.gray("  Run the same move again to pick them up."));
+        }
         if (counts.copied + counts.exists > 0 && !flags["--delete-source"]) {
             console.log(chalk.gray("  The source keeps its copies. Point the property at the new source, then run again with --delete-source."));
         }
     }
-    if (failures.length > 0) process.exitCode = 1;
+    if (failures.length > 0 || leftBehind.length > 0) process.exitCode = 1;
+}
+
+/**
+ * Every file under the moved folder the move did not move, read by the
+ * backend's `/move/verify` — or `undefined` from a backend without it.
+ */
+async function listLeftBehind(
+    backend: Backend,
+    request: { from?: string; to?: string; prefix?: string; deleteSource: boolean },
+    quiet: boolean
+): Promise<{ key: string; reason: string }[] | undefined> {
+    const notMoved: { key: string; reason: string }[] = [];
+    let cursor: string | undefined;
+    let checked = 0;
+    do {
+        let page: { checked: number; notMoved: { key: string; reason: string }[]; cursor?: string };
+        try {
+            page = await backend.request("POST", "/move/verify", { ...request, ...(cursor ? { cursor } : {}), limit: 500 });
+        } catch (error: unknown) {
+            if (error instanceof RebaseApiError && error.status === 404 && error.code !== "UNKNOWN_STORAGE_SOURCE") return undefined;
+            fail("Failed to list the source again after the move", error, backend.baseUrl);
+        }
+        checked += page.checked;
+        notMoved.push(...page.notMoved);
+        if (!quiet && process.stdout.isTTY) {
+            process.stdout.write(`\r  Checking the source again: ${checked} file(s) listed…`);
+        }
+        cursor = page.cursor;
+    } while (cursor);
+    return notMoved;
 }
 
 export async function storageCommand(subcommand: string | undefined, rawArgs: string[]): Promise<void> {

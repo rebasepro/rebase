@@ -404,6 +404,66 @@ export async function moveObjects(options: {
     return { moved, cursor: page.cursor };
 }
 
+/** A file a move did not move, and why it counts as not moved. */
+export interface NotMovedObject {
+    key: string;
+    reason: string;
+}
+
+/**
+ * List the source again after a move and name every file it did not move,
+ * `limit` source objects per call; hand the returned `cursor` back for the
+ * next ones.
+ *
+ * Defence in depth: a move reports what its own walk saw, and a walk that
+ * skipped files (as the local listing's page token once did, over a folder
+ * the move was emptying) reported success over the half it moved. A fresh
+ * listing does not share the walk's state. With `deleteSource`, every file
+ * still in the source is not moved; without it, a file the target holds no
+ * copy of the same size of.
+ */
+export async function verifyMove(options: {
+    from: StorageController;
+    to: StorageController;
+    prefix?: string;
+    cursor?: string;
+    limit?: number;
+    deleteSource?: boolean;
+}): Promise<{ checked: number; notMoved: NotMovedObject[]; cursor?: string }> {
+    const page = await walkObjects(options.from, {
+        prefix: options.prefix,
+        cursor: options.cursor,
+        limit: options.limit ?? 100
+    });
+    const notMoved: NotMovedObject[] = [];
+    for (const object of page.objects) {
+        let copy: number | undefined;
+        try {
+            copy = await sizeIn(options.to, object.key);
+        } catch (error: unknown) {
+            notMoved.push({
+                key: object.key,
+                reason: `the target could not be asked for it: ${error instanceof Error ? error.message : String(error)}`
+            });
+            continue;
+        }
+        const held = copy !== undefined && (object.size === undefined || copy === object.size);
+        if (options.deleteSource) {
+            notMoved.push({
+                key: object.key,
+                reason: held
+                    ? "still in the source; the target holds a copy, so running the move again deletes it"
+                    : "still in the source, and the target has no copy of the same size"
+            });
+        } else if (copy === undefined) {
+            notMoved.push({ key: object.key, reason: "the target has no copy" });
+        } else if (!held) {
+            notMoved.push({ key: object.key, reason: `the target's copy is ${copy} bytes, the source's ${object.size}` });
+        }
+    }
+    return { checked: page.objects.length, notMoved, cursor: page.cursor };
+}
+
 /**
  * Whether two sources store in the same place — one bucket or directory under
  * two names. Asked by their `storageLocation` when both can say; otherwise by

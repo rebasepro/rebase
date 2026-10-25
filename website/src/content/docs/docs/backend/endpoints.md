@@ -142,6 +142,7 @@ a collection reaches none of this. See [Roles and scopes](/docs/backend/roles-an
 | `GET` | `/api/admin/storage/orphans` | `database:read` | Stored files no row names, `?storageId=&olderThanHours=` — what `rebase storage orphans` prints |
 | `DELETE` | `/api/admin/storage/orphans` | `database:write` | Finds them again and deletes them; `409 STORAGE_SCAN_INCOMPLETE` when a collection could not be read |
 | `POST` | `/api/admin/storage/move` | `database:write` | Copies a folder to another source under the same keys, a page per call — what `rebase storage move` sends; `400 STORAGE_SAME_LOCATION` for `deleteSource` between two sources that store in the same place |
+| `POST` | `/api/admin/storage/move/verify` | `database:write` | Lists the source again after a move, with the same body, a page per call: `{ checked, notMoved: [{ key, reason }], cursor? }` — every file still in the source with `deleteSource`, every file the target has no copy of without it. `rebase storage move` asks it when the move is done |
 | `GET` | `/api/admin/logs` | `logs:read` | The recent log buffer |
 | `GET` | `/api/admin/logs/latest` | `logs:read` | The most recent entries |
 | `GET` | `/api/admin/logs/stream` | `logs:read` | Server-sent events |

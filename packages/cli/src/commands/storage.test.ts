@@ -129,18 +129,64 @@ describe("rebase storage move", () => {
     it("asks for page after page until the folder is done", async () => {
         answers.push(
             { moved: [{ key: "avatars/1.png", outcome: "copied" }, { key: "avatars/2.png", outcome: "exists" }], cursor: "c1" },
-            { moved: [{ key: "avatars/3.png", outcome: "failed", error: "too big" }] }
+            { moved: [{ key: "avatars/3.png", outcome: "failed", error: "too big" }] },
+            { checked: 3, notMoved: [{ key: "avatars/3.png", reason: "the target has no copy" }] }
         );
         await storageCommand("move", argv("storage", "move", "--from", "(default)", "--to", "media", "--prefix", "avatars"));
 
         expect(calls.map(call => call.body)).toEqual([
             { from: "(default)", to: "media", prefix: "avatars", deleteSource: false },
-            { from: "(default)", to: "media", prefix: "avatars", cursor: "c1", deleteSource: false }
+            { from: "(default)", to: "media", prefix: "avatars", cursor: "c1", deleteSource: false },
+            { from: "(default)", to: "media", prefix: "avatars", deleteSource: false, limit: 500 }
         ]);
         const text = printed.join("\n").replace(ANSI, "");
         expect(text).toContain("1 copied, 1 already there");
         expect(text).toContain("avatars/3.png: too big");
         expect(process.exitCode).toBe(1);
+    });
+
+    it("lists the source again afterwards, and names every file the move left behind", async () => {
+        // A walk that skipped files reported success over the half it moved.
+        answers.push(
+            { moved: [{ key: "a/1.png", outcome: "copied", deleted: true }] },
+            { checked: 1, notMoved: [{ key: "a/2.png", reason: "still in the source, and the target has no copy of the same size" }], cursor: "v1" },
+            { checked: 1, notMoved: [] }
+        );
+        await storageCommand("move", argv("storage", "move", "--to", "media", "--delete-source"));
+
+        expect(calls.map(call => call.url.replace("http://rebase.test/api/admin/storage", ""))).toEqual(["/move", "/move/verify", "/move/verify"]);
+        expect(calls[2].body).toMatchObject({ to: "media", cursor: "v1", deleteSource: true });
+        const text = printed.join("\n").replace(ANSI, "");
+        expect(text).toContain("1 copied");
+        expect(text).toMatch(/1 file\(s\) were not moved/);
+        expect(text).toContain("a/2.png: still in the source");
+        expect(process.exitCode).toBe(1);
+    });
+
+    it("says so when the move left nothing behind, and in --json", async () => {
+        answers.push(
+            { moved: [{ key: "a/1.png", outcome: "copied" }] },
+            { checked: 1, notMoved: [] }
+        );
+        await storageCommand("move", argv("storage", "move", "--to", "media", "--json"));
+        const json = JSON.parse(printed.join("\n")) as { copied: number; notMoved: unknown[]; verified: boolean };
+        expect(json).toMatchObject({ copied: 1, notMoved: [], verified: true });
+        expect(process.exitCode).toBeUndefined();
+    });
+
+    it("moves anyway against a backend that cannot list the source again, and says it did not check", async () => {
+        vi.stubGlobal("fetch", vi.fn(async (url: string, init: RequestInit) => {
+            calls.push({ method: init.method ?? "GET", url, body: init.body ? JSON.parse(String(init.body)) : undefined });
+            if (url.endsWith("/move/verify")) {
+                return new Response(JSON.stringify({ error: { code: "NOT_FOUND", message: "Not Found" } }), { status: 404 });
+            }
+            return new Response(JSON.stringify({ data: { moved: [{ key: "a/1.png", outcome: "copied" }] } }), { status: 200 });
+        }));
+        await storageCommand("move", argv("storage", "move", "--to", "media"));
+        const text = printed.join("\n").replace(ANSI, "");
+        expect(text).toContain("1 copied");
+        expect(text).toContain("did not check");
+        expect(process.exitCode).toBeUndefined();
     });
 
     it("names the flag a typo was one swap away from, and sends nothing", async () => {

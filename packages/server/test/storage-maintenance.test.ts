@@ -8,7 +8,7 @@ import { storageReference } from "@rebasepro/types";
 
 import { LocalStorageController } from "../src/storage/LocalStorageController";
 import { DefaultStorageRegistry } from "../src/storage/storage-registry";
-import { findOrphans, keysNamedBy, moveObjects, walkObjects } from "../src/storage/maintenance";
+import { findOrphans, keysNamedBy, moveObjects, verifyMove, walkObjects } from "../src/storage/maintenance";
 import { createStorageMaintenanceRoutes } from "../src/storage/maintenance-routes";
 import { errorHandler } from "../src/api/errors";
 import type { HonoEnv } from "../src/api/types";
@@ -286,6 +286,33 @@ describe("storage move", () => {
         expect((await to.listObjects("bulk")).items).toHaveLength(60);
     });
 
+    it("finds again, after a move, every file the move left behind", async () => {
+        // Defence in depth for the class of bug the local page token was: a
+        // walk that skipped files reported success over the half it moved.
+        await moveObjects({ from, to, prefix: "avatars", limit: 100, deleteSource: true });
+        // One the walk "skipped", and one whose copy the target lost.
+        await put(from, "avatars/skipped.png", "skipped");
+        await put(from, "avatars/9.png", "copied once");
+        await put(to, "avatars/9.png", "copied once");
+
+        const checked: { key: string; reason: string }[] = [];
+        let cursor: string | undefined;
+        do {
+            const page = await verifyMove({ from, to, prefix: "avatars", cursor, limit: 1, deleteSource: true });
+            checked.push(...page.notMoved);
+            cursor = page.cursor;
+        } while (cursor);
+        expect(checked.map(entry => entry.key).sort()).toEqual(["avatars/9.png", "avatars/skipped.png"]);
+        expect(checked.find(entry => entry.key === "avatars/skipped.png")?.reason).toMatch(/still in the source.*no copy/);
+        expect(checked.find(entry => entry.key === "avatars/9.png")?.reason).toMatch(/still in the source.*holds a copy/);
+
+        // Without --delete-source the source keeps its files: only one the
+        // target has no copy of is not moved.
+        const kept = await verifyMove({ from, to, prefix: "avatars", limit: 100 });
+        expect(kept.notMoved).toEqual([{ key: "avatars/skipped.png", reason: "the target has no copy" }]);
+        expect(kept.checked).toBe(2);
+    });
+
     it("keeps the source's copy when the target did not take one", async () => {
         // A target that answers every write and stores nothing.
         const leaky = Object.assign(Object.create(LocalStorageController.prototype), to, {
@@ -359,5 +386,15 @@ describe("storage move", () => {
         });
         expect(moved.status).toBe(200);
         expect((await moved.json()).data.moved).toEqual([{ key: "posts/elsewhere.png", outcome: "copied" }]);
+
+        // Listed again: the move left nothing behind, and a file added since is named.
+        const verify = (body: Record<string, unknown>) => hono.request("/admin/storage/move/verify", { method: "POST", body: JSON.stringify(body) });
+        const clean = await verify({ to: "media", prefix: "posts" });
+        expect(clean.status).toBe(200);
+        expect((await clean.json()).data).toMatchObject({ from: "(default)", to: "media", checked: 1, notMoved: [] });
+        await put(from, "posts/late.png");
+        const late = await (await verify({ to: "media", prefix: "posts" })).json();
+        expect(late.data.notMoved).toEqual([{ key: "posts/late.png", reason: "the target has no copy" }]);
+        expect((await verify({ from: "media", to: "media" })).status).toBe(400);
     });
 });

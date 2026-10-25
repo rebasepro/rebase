@@ -494,7 +494,11 @@ outside collections name look unused: check before deleting.
 a page at a time. A file the target already holds at the same size is skipped,
 so a stopped move resumes by running it again; `--delete-source` deletes each
 file from the source once the target holds it, and is refused when the two
-sources store in the same bucket or directory. Both need `database:read`, and
+sources store in the same bucket or directory. Once the move is done, the CLI
+lists the source again with a fresh walk and names every file the move did not
+move: with `--delete-source`, any file still in the source; without it, any file
+the target holds no copy of the same size of. It exits 1 when there is one, and
+running the same move again picks it up. `--json` prints them as `notMoved`. Both need `database:read`, and
 deleting or moving `database:write`, which the service key holds.
 
 ### `rebase skills install`
