@@ -386,7 +386,7 @@ organization's owners and admins who deployed, set or revealed an environment
 variable (by name, never by value), changed a domain, restored a backup,
 resized, stopped or deleted a project, changed a member's role, or created a
 token, and when. A project's **Settings** links to its own entries; an entry
-about a deleted project stays. The filters are in
+about a deleted project stays. Entries are kept for a year. The filters are in
 [`rebase cloud`](/docs/cli/cloud/#organizations).
 
 ## CI and agents
