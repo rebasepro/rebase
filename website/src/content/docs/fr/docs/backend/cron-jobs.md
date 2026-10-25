@@ -1,5 +1,5 @@
 ---
-sourceHash: 008801863c78b3e5
+sourceHash: 05002dc371e1e1e7
 title: Tâches Cron
 sidebar_label: Tâches Cron
 description: Planifiez des tâches d'arrière-plan récurrentes grâce au système intégré de tâches cron de Rebase. Définissez des tâches sous forme de fichiers TypeScript, surveillez-les dans Studio et gérez-les via l'API REST.
@@ -154,8 +154,8 @@ interface CronJobDefinition {
     // loads rather than read as local time.
     timezone?: string;
 
-    // Human-readable name shown in Studio
-    name: string;
+    // Human-readable name shown in Studio (default: the job id, the file's name)
+    name?: string;
 
     // Optional description shown in Studio
     description?: string;
@@ -368,7 +368,7 @@ décrit dans [Cron entre plusieurs instances](/docs/backend/cron-across-instance
   `Error: Cron job "<id>" timed out after <N>ms`
   L'annulation est la partie qui interrompt le *travail* ; le rejet empêche seulement le planificateur de continuer à attendre. Un gestionnaire qui ignore `ctx.signal` continue de tourner au-delà de sa propre exécution.
 - **Arrêt** : `backend.shutdown()` attend une exécution en cours, dans le même budget que la file de jobs (les deux tiers du timeout d'arrêt). Si l'exécution tourne encore quand il est épuisé, `ctx.signal` est annulé et elle est enregistrée comme échouée, avec la raison. Son créneau reste réservé, donc aucune autre instance ne la réexécute.
-- **Try/Catch sécurisé** : Chaque gestionnaire de tâche s'exécute au sein d'une enveloppe isolée. Toute exception non interceptée est capturée, formatant la trace d'erreur en une chaîne, définissant le statut de la tâche sur `"error"` et mettant à jour le compteur d'échecs de la tâche. Un plantage au sein d'une tâche cron individuelle ne fera jamais planter la boucle du planificateur ni le serveur web HTTP principal sous Hono.
+- **Try/Catch sécurisé** : Chaque gestionnaire de tâche s'exécute au sein d'une enveloppe isolée. Toute exception non interceptée est capturée, enregistrant le message de l'erreur (expurgé) sous forme de chaîne, définissant le statut de la tâche sur `"error"` et mettant à jour le compteur d'échecs de la tâche. Un plantage au sein d'une tâche cron individuelle ne fera jamais planter la boucle du planificateur ni le serveur web HTTP principal sous Hono.
 - **Mémoire tampon circulaire en mémoire** : Le planificateur maintient un ring buffer contenant les **50 dernières exécutions** par tâche. Cette mémoire tampon est conservée en mémoire vive pour permettre des lectures quasi instantanées depuis Rebase Studio.
 
 ---
@@ -387,7 +387,7 @@ CREATE TABLE IF NOT EXISTS rebase.cron_logs (
     finished_at  TIMESTAMPTZ NOT NULL,
     duration_ms  INTEGER NOT NULL,
     success      BOOLEAN NOT NULL DEFAULT true,
-    error        TEXT,                                 -- Stack trace or error message
+    error        TEXT,                                 -- The error's message, redacted
     result       JSONB,                                -- Return value of handler
     logs         JSONB,                                -- Ring buffer array of ctx.log outputs
     manual       BOOLEAN NOT NULL DEFAULT false        -- True if triggered from Studio/REST

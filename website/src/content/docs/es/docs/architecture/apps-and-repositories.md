@@ -1,5 +1,5 @@
 ---
-sourceHash: 6cb1ed423c284379
+sourceHash: 87b274f81d5501d1
 title: Apps y repositorios
 sidebar_label: Apps y repositorios
 description: Un proyecto es un backend más las apps que se comunican con él, cada una de las cuales puede residir en su propio repositorio.
@@ -209,7 +209,7 @@ que `/api`.
 Todo lo demás sobre `path` se aplica a la parte que va después del nombre de
 host. La app se sigue compilando para ella: `https://admin.example.com` se
 compila con `REBASE_APP_BASE` igual a `/`, `https://admin.example.com/cms` con
-`/cms`, y un empaquetador que lo ignore sigue dando una página en blanco. `cms` es
+`/cms/`, y un empaquetador que lo ignore sigue dando una página en blanco. `cms` es
 una ruta en el nombre de host de la app, dentro de esa parte de la ruta. La URL
 tiene que ser `https://` y llevar un nombre de host y una ruta y nada más: ni
 puerto, ni query, ni fragmento. Un `admin.example.com` suelto se rechaza,
@@ -358,7 +358,7 @@ cambio que deje desamparado a un cliente compilado con la estructura anterior.
 Cada SDK generado registra el esquema del que proviene:
 
 ```ts
-// src/rebase/schema.meta.ts — generated
+// generated/sdk/schema.meta.ts — generated
 export const SCHEMA_VERSION = "v1:c5d97d0f96b7f87a";
 ```
 
@@ -367,7 +367,7 @@ marca de versión no revela nada sobre el esquema al que representa:
 
 ```bash
 curl -s https://api.example.com/api/meta/schema-version
-# {"schemaVersion":"v1:c5d97d0f96b7f87a"}
+# {"schemaVersion":"v1:c5d97d0f96b7f87a","runtime":{"version":"0.25.1","contract":1}}
 ```
 
 Comparar ambos en CI convierte un desajuste silencioso en una comprobación fallida. La marca

@@ -1,5 +1,5 @@
 ---
-sourceHash: fef2eb56c7043526
+sourceHash: a6f7e70d9dfb90ae
 title: Layout do Formulário
 sidebar_label: Layout do Formulário
 description: Controle como o formulário da entidade é organizado — larguras de colunas, seções e a barra lateral de metadados.
@@ -172,7 +172,7 @@ na coluna principal.
 | `admin.form.sections` | `FormSection[]` | Grupos com título para a coluna principal |
 | `admin.form.showRecordMeta` | `boolean` | Exibir id/criado/atualizado no rodapé da barra lateral |
 
-`FormSection` é `{ key, title?, properties, collapsed?, collapsible? }`.
+`FormSection` é `{ key, title?, properties, collapsed?, collapsible?, readVariant? }`. `readVariant: "summary"` empilha os campos da seção como linhas rótulo/valor na visualização somente leitura do registro; o padrão, `"grid"`, usa a grade do formulário.
 
 ## Relacionados
 

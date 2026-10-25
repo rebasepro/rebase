@@ -1,5 +1,5 @@
 ---
-sourceHash: 65ad924b56043f2e
+sourceHash: 1959160bec263545
 title: Rebase Cloud
 sidebar_label: Rebase Cloud
 description: Rebase Cloud ist dasselbe Rebase, für Sie betrieben. Was es ist, wie ein Projekt verknüpft und bereitgestellt wird und was die private Beta noch nicht enthält.
@@ -93,13 +93,12 @@ Am Ende sagt es, unter welcher Adresse jede App jetzt antwortet und ob die neue 
     backend  backend  https://songbuzz.rebase.website/api  live
 
   ✓ Live: the new version answers on every address above.
+  Something wrong? `rebase cloud rollback` puts the previous deployment back.
 ```
 
 „Live“ heißt, dass die Adresse nach dem Build geantwortet hat: `/api/health` des Backends lieferte `ok`, und die Seite einer statischen App wurde geladen (aus diesem Deployment, wenn die Plattform sie ausliefert). Die Prüfung wartet bis zu `--live-timeout` Sekunden, standardmäßig 60; `0` überspringt sie. Antwortet eine App nicht rechtzeitig, endet das Deployment trotzdem mit Exit-Code null, weil es erfolgreich war, und die letzte Zeile sagt, welche App nicht geantwortet hat und warum. Ein fehlgeschlagenes Deployment endet stattdessen mit einer Zeile, die die App und den Grund nennt; das vollständige Build-Log zeigt `rebase cloud logs`.
 
 Skripte übergeben `--json` und erhalten ein Objekt mit denselben Fakten – `apps`, `hosts`, `live`, `liveChecks`, `durationMs` und die Deployment-ID. Anders als der Rest von `rebase cloud` wechselt `deploy` bei Pipes nicht von selbst zu JSON.
-
-Um ein Artefakt auszuliefern, das bereits zuvor gebaut wurde – beispielsweise ein CI-Job, der einmal baut und zweimal deployt –, verweisen Sie auf das Verzeichnis, anstatt neu zu bauen:
 
 Was diese Runtime zulässt – Pakete und native Module, Speicher und Instanzen,
 Timeouts und Body-Größen, das Dateisystem, Secrets, Storage und ausgehender
@@ -146,6 +145,38 @@ rebase cloud status          # what the platform thinks the project is doing
 arbeitet die Plattform tatsächlich und Polling ist das Richtige; wenn dort etwas
 angegeben ist, wartet dieses Etwas auf Sie.
 
+## Eine Änderung in der Vorschau ansehen
+
+<span class="since-badge" data-since="0.26">Seit 0.26</span>
+
+```bash
+rebase cloud deploy --preview
+```
+
+Das baut und lädt exakt das hoch, was `deploy` auch hochladen würde, liefert es aber unter einer eigenen Adresse aus, etwa `https://shop--k3x9ab.rebase.website`. Die Produktion liefert weiter aus, was sie vorher ausgeliefert hat. Das Deployment gibt die Adresse der Vorschau aus, sobald der Build fertig ist.
+
+Um eine Adresse über mehrere Deployments hinweg beizubehalten, geben Sie der Vorschau einen Namen. Wird derselbe Name erneut deployt, aktualisiert das die Vorschau:
+
+```bash
+rebase cloud deploy --preview-name new-checkout
+```
+
+Womit eine Vorschau spricht, hängt davon ab, was Sie deployt haben:
+
+- **`rebase cloud deploy web --preview`** zeigt eine einzelne statische App in der Vorschau. Ihre Seiten rufen das **Produktions**-Backend auf: Eine Anmeldung dort ist eine echte Sitzung, und alles, was dort geschrieben wird, sind Produktionsdaten.
+- **`rebase cloud deploy --preview`** zeigt das Backend in der Vorschau, mit seinen eingebetteten statischen Apps, so wie die Produktion sie ausführt. Es erhält ein eigenes Backend auf einer **eigenen, leeren Datenbank**, niemals der der Produktion. Ein Start gegen die Datenbank der Produktion würde das Schema und die Zugriffsregeln der Vorschau auf sie anwenden.
+
+Eine Vorschau lädt keinen Quellcode hoch und registriert weder Apps noch Hostnamen, denn jedes davon würde das Produktionsprojekt ändern. `--source` und `--eject` lassen sich nicht mit `--preview` kombinieren. Beide bauen ein Container-Image für die Produktion.
+
+```bash
+rebase cloud previews                      # name, address, app, backend, expiry
+rebase cloud previews delete new-checkout  # stops serving it and drops its database
+```
+
+Eine Vorschau läuft eine Woche nach dem letzten Deployment auf sie ab.
+
+Vorschauen werden gerade ausgerollt. Eine Control Plane, die sie noch nicht bereitstellt, lehnt `--preview` mit `previews_unavailable` ab und deployt nichts.
+
 ## Rollback
 
 ```bash
@@ -162,8 +193,8 @@ funktionieren:
 
 | Art der Bereitstellung | Was wiederhergestellt wird |
 |---|---|
-| `rebase cloud deploy` (a source build) | Das Image, das dieser Build veröffentlicht hat |
-| `rebase cloud deploy --bundle` (the platform runtime) | Das Bundle, das dieses Deployment ausgeliefert hat, auf der Runtime-Version, die das Projekt jetzt ausführt |
+| `rebase cloud deploy` (ein Source-Build) | Das Image, das dieser Build veröffentlicht hat |
+| `rebase cloud deploy --bundle` (die Plattform-Runtime) | Das Bundle, das dieses Deployment ausgeliefert hat, auf der Runtime-Version, die das Projekt jetzt ausführt |
 
 Statische Apps, die in das Bundle des Backends eingebettet sind (ein einfaches `rebase cloud deploy` in einem Projekt mit Backend), sind Teil dieses Bundles und werden mit ihm zurückgerollt.
 
@@ -223,7 +254,7 @@ jobs:
 | Capability | Was das Token tun darf |
 |---|---|
 | `deploy` | Das Projekt deployen und dessen Builds verfolgen: `deploy`, `deployments` |
-| `logs` | Build- und Runtime-Logs sowie Live-Metriken lesen: `logs`, `metrics` |
+| `logs` | Build- und Runtime-Logs, Cron-Verlauf und Live-Metriken lesen: `logs`, `cron`, `metrics` |
 | `env` | Umgebungsvariablen lesen und ändern, einschließlich Secrets |
 | `database` | `db list`, `db info` und `db connect`, was das Datenbankpasswort beinhaltet |
 | `backups` | Backups auflisten, erstellen, prüfen und herunterladen sowie das Point-in-Time-Fenster einsehen |
@@ -285,7 +316,7 @@ rebase cloud compute set --cpu 500m --memory 2Gi
 | `--autoscale-cpu-target` | 10–95. Die CPU-Auslastung, die der Autoscaler anstrebt, bezogen auf den Request statt auf das Limit. Leer bedeutet 70 |
 | `--spot` | `true` oder `false`. Preemptible Kapazität: günstiger, wird aber ohne Vorankündigung neu gestartet |
 | `--db-instances` | 1–3. `1` ist eine Einzelinstanz ohne Failover; `2` fügt ein automatisches Standby hinzu |
-| `--db-cpu`, `--db-memory`, `--storage` | Pro Datenbankinstanz. Leer bedeutet `500m`, `2Gi` und das Standard-Volume |
+| `--db-cpu`, `--db-memory` | Pro Datenbankinstanz. Leer bedeutet `160m` und `1Gi` |
 
 Ein leerer Parameter ist nicht dasselbe wie ein auf denselben Wert festgelegter: Ein leerer Parameter
 folgt dem Plattformstandard und ändert sich mit diesem.
@@ -306,6 +337,7 @@ außer bei Änderungen, die die Datenbank neu starten – diese warten auf ein W
 | `init` | Mit `--claim`: ein Live-Backend ohne Konto und ein Link, um es zu übernehmen. Siehe [Ein Backend ohne Konto](#ein-backend-ohne-konto) |
 | `projects` | Erstellen, auflisten, prüfen, löschen |
 | `deploy`, `logs`, `deployments`, `rollback`, `cancel` | Bereitstellen und überwachen |
+| `previews` | Builds, die `deploy --preview` unter einer eigenen Adresse ausliefert, und deren Löschen. Siehe [Eine Änderung in der Vorschau ansehen](#eine-änderung-in-der-vorschau-ansehen) |
 | `start`, `stop`, `restart` | Pausieren eines Projekts und Wiederinbetriebnahme |
 | `status`, `metrics`, `debug` | Was es gerade tut und warum möglicherweise nicht |
 | `cron` | Die Cron-Jobs der bereitgestellten App und deren aufgezeichnete Ausführungen, gelesen mit Ihrem `rebase cloud`-Login. Schreibgeschützt |
@@ -342,8 +374,8 @@ Klar ausgedrückt, denn es erst später herauszufinden, ist ärgerlicher:
 - **Kein Self-Service.** Der Zugang wird in Batches gewährt; es gibt keine Registrierung mit direkter Bezahlung.
 - **Kein veröffentlichtes SLA** und kein SOC 2. Wenn Sie eines davon benötigen, geben Sie dies bei der
   Zugangsanfrage an, anstatt davon auszugehen.
-- **Keine Preview- oder Branch-Deployments** und keine First-Party-GitHub-App. Deploy-Hooks –
-  geheime URLs, auf die Sie einen Repository-Webhook richten – sind die unterstützte Automatisierung.
+- **Keine Branch-Deployments** und keine First-Party-GitHub-App. Deploy-Hooks –
+  geheime URLs, auf die Sie einen Repository-Webhook richten – sind die unterstützte Automatisierung. [Preview-Deployments](#eine-änderung-in-der-vorschau-ansehen) werden gerade ausgerollt und über die CLI gestartet.
 - **Tokens agieren als Person.** Ein [Token](#ci-und-agents) wird von einem Konto erstellt
   und agiert als dieses; es gibt bisher keine organisationsgebundene Maschinenidentität. Wenn Sie
   sich stattdessen über CI anmelden, übergeben Sie `REBASE_CLOUD_EMAIL` und `REBASE_CLOUD_PASSWORD`

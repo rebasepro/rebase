@@ -106,7 +106,7 @@ vorwärts paginiert, braucht es nie, denn `meta.hasMore` hängt nicht davon ab: 
 
 ```typescript
 const { data, meta } = await client.data.orders.find({ limit: 100, count: "none" });
-meta.hasMore; // exakt
+meta.hasMore; // exact
 ```
 
 Ohne Zählung gibt es keine Gesamtzahl zu melden: Über HTTP fehlt `meta.total`, und im Prozess

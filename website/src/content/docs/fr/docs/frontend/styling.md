@@ -1,5 +1,5 @@
 ---
-sourceHash: 8721ee795ebd8dce
+sourceHash: bbef56d48a3598af
 title: Styliser l'UI personnalisée
 sidebar_label: Styliser l'UI personnalisée
 description: Créez des vues personnalisées, des pages d'accueil et des actions à partir des mêmes composants et jetons de thème que le reste de l'administration, afin qu'elles paraissent natives et respectent le thème.
@@ -40,7 +40,7 @@ export function DashboardView() {
 }
 ```
 
-Chaque composant du kit est répertorié sous [Composants UI](/docs/ui/components/card/) avec ses véritables props, générées à partir du code source. Vérifiez-y avant de développer vous-même : `Card`, `Chip`, `Badge`, `Alert`, `Button`, `Typography`, `Paper`, `Container`, `Table`, `Tooltip`, `Dialog` et une quarantaine d'autres existent déjà.
+Chaque composant du kit est répertorié sous [Composants UI](/docs/ui/components/card/) avec ses véritables props, générées à partir du code source. Vérifiez-y avant de développer vous-même : `Card`, `Chip`, `Badge`, `Alert`, `Button`, `Typography`, `Paper`, `Container`, `Table`, `Tooltip`, `Dialog` et une soixantaine d'autres existent déjà.
 
 ## Couleur : utilisez des jetons, jamais de valeurs littérales
 
@@ -61,9 +61,9 @@ Deux règles issues de dysfonctionnements réels :
 
 ## Typographie : utilisez l'échelle
 
-`Typography` prend en charge toute l'échelle — `h1`–`h6`, `subtitle1`/`subtitle2`, `body1`/`body2`, `caption`, `label`. Utilisez `variant`, et non une classe de taille de police (`font-size`). L'échelle encode déjà l'espacement des lettres (tracking) dont chaque niveau a besoin (`--tracking-display` à ≥30px, `--tracking-title` à 20–24px, `--tracking-heading` en dessous), ce qu'une classe `text-[27px]` ne fait pas.
+`Typography` prend en charge toute l'échelle — `h1`–`h6`, `subtitle1`/`subtitle2`, `body1`/`body2`, `lead`, `caption`, `label`, `button`, `stat`, `micro`, `mono`. Utilisez `variant`, et non une classe de taille de police (`font-size`). L'échelle encode déjà l'espacement des lettres (tracking) dont chaque niveau a besoin (`--tracking-display` à ≥30px, `--tracking-title` à 20–24px, `--tracking-heading` en dessous), ce qu'une classe `text-[27px]` ne fait pas.
 
-L'interface produit ne descend pas en dessous de `text-xs`. Les niveaux `text-2xs` et `text-3xs` sont réservés aux pages marketing uniquement.
+L'interface produit ne descend pas en dessous de `text-xs`, à une exception près : la variante `micro`, l'étiquette en majuscules au-dessus d'une valeur, s'appuie sur `text-2xs`. Le niveau `text-3xs` est réservé aux pages marketing uniquement.
 
 ## Configuration
 

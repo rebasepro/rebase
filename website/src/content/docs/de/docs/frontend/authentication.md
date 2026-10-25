@@ -1,5 +1,5 @@
 ---
-sourceHash: c35ed2ce1194af56
+sourceHash: 6ac0abb490b5801e
 title: Authentifizierung & Anmeldung
 sidebar_label: Authentifizierung & Anmeldung
 description: Richten Sie den Auth-Controller, die Login-Ansicht und die Rollensimulation in Ihrem Rebase-React-Frontend ein.
@@ -35,7 +35,7 @@ authController.signOut()      // Log out
 authController.getAuthToken() // Get current JWT for API calls
 ```
 
-Übergeben Sie den `authController` an den Rebase-Navigations-Controller, um das gesamte Admin-Panel durch eine Authentifizierung zu schützen.
+Übergeben Sie den `authController` an `<Rebase authController>`. `<RebaseShell>` (oder `<RebaseAuthGate>` in einem manuellen Layout) liest ihn von dort und schützt das gesamte Admin-Panel durch eine Authentifizierung.
 
 ## Ihr eigener Auth-Provider
 

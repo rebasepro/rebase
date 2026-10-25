@@ -65,7 +65,7 @@ const client = createRebaseClient({
 Per impostazione predefinita il client non stampa nulla sulla sua connessione realtime, così una pagina pubblica non rivela nulla del suo backend nella console di un visitatore. Avvisi ed errori vengono sempre stampati. Per vedere la connessione aprirsi, autenticarsi, cadere e riconnettersi, passa `debug: true`, oppure attivalo in un solo browser senza modificare il sito eseguendo questo nella sua console:
 
 ```js
-localStorage.setItem("rebase_debug", "1"); // localStorage.removeItem("rebase_debug") per disattivarlo
+localStorage.setItem("rebase_debug", "1"); // localStorage.removeItem("rebase_debug") to stop
 ```
 
 Vale dalla riga successiva che il client registra, quindi una pagina già connessa non va ricaricata. Fuori da un browser, imposta `globalThis.__REBASE_DEBUG__ = true`. I browser mostrano `console.debug` solo al livello Dettagliato (Verbose).

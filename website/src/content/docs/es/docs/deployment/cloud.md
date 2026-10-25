@@ -1,5 +1,5 @@
 ---
-sourceHash: 65ad924b56043f2e
+sourceHash: 1959160bec263545
 title: Rebase Cloud
 sidebar_label: Rebase Cloud
 description: Rebase Cloud es el mismo Rebase, operado para ti. Qué es, cómo se vincula y despliega un proyecto, y qué no incluye todavía la beta privada.
@@ -95,13 +95,12 @@ Termina indicando dónde responde ahora cada aplicación y si la nueva versión 
     backend  backend  https://songbuzz.rebase.website/api  live
 
   ✓ Live: the new version answers on every address above.
+  Something wrong? `rebase cloud rollback` puts the previous deployment back.
 ```
 
 "Live" significa que la dirección respondió después del build: el `/api/health` del backend devolvió `ok` y la página de una aplicación estática cargó (desde este despliegue, cuando la sirve la plataforma). La comprobación espera hasta `--live-timeout` segundos, 60 por defecto; `0` la omite. Si una aplicación no responde a tiempo, el despliegue sale igualmente con código cero, porque el despliegue tuvo éxito, y la última línea dice qué aplicación no respondió y por qué. Un despliegue fallido termina en cambio con una línea que nombra la aplicación y el motivo, con `rebase cloud logs` para el log completo del build.
 
 Los scripts pasan `--json` para obtener un objeto con los mismos datos: `apps`, `hosts`, `live`, `liveChecks`, `durationMs` y el id del despliegue. A diferencia del resto de `rebase cloud`, `deploy` no cambia a JSON por sí solo en una tubería.
-
-Para desplegar un artefacto que se compiló previamente —por ejemplo, un trabajo de CI que compila una vez y despliega dos—, apunta al directorio en lugar de volver a compilar:
 
 Lo que permite ese runtime (paquetes y módulos nativos, memoria e instancias,
 tiempos de espera y tamaños del cuerpo de la petición, el sistema de archivos, secretos, almacenamiento y red
@@ -147,6 +146,50 @@ rebase cloud status          # what the platform thinks the project is doing
 `status` reporta `blockedOn` y `nextAction`. Cuando `blockedOn` es `null`, la
 plataforma está operando realmente y consultar periódicamente (polling) es lo correcto; cuando nombra
 algo, ese algo te está esperando a ti.
+
+## Previsualizar un cambio
+
+<span class="since-badge" data-since="0.26">Desde 0.26</span>
+
+```bash
+rebase cloud deploy --preview
+```
+
+Esto compila y sube exactamente lo que subiría `deploy`, pero lo sirve en una dirección
+propia, como `https://shop--k3x9ab.rebase.website`. La producción sigue sirviendo lo que
+servía antes. El despliegue imprime la dirección de la previsualización cuando termina
+la compilación.
+
+Para conservar una misma dirección entre despliegues, ponle nombre a la previsualización. Desplegar el mismo nombre
+de nuevo la actualiza:
+
+```bash
+rebase cloud deploy --preview-name new-checkout
+```
+
+A qué se conecta una previsualización depende de lo que desplegaste:
+
+- **`rebase cloud deploy web --preview`** previsualiza una aplicación estática. Sus páginas llaman
+  al backend de **producción**: un inicio de sesión allí es una sesión real, y todo lo que se
+  escriba allí son datos de producción.
+- **`rebase cloud deploy --preview`** previsualiza el backend, con sus aplicaciones estáticas
+  integradas, igual que las ejecuta la producción. Obtiene un backend propio sobre una
+  **base de datos vacía y propia**, nunca la de producción. Arrancar contra la base de datos
+  de producción le aplicaría el esquema y las reglas de acceso de la previsualización.
+
+Una previsualización no sube el código fuente ni registra aplicaciones ni hostnames, porque cada
+una de esas cosas cambiaría el proyecto de producción. `--source` y `--eject` no se pueden
+combinar con `--preview`. Cada uno construye una imagen de contenedor para producción.
+
+```bash
+rebase cloud previews                      # name, address, app, backend, expiry
+rebase cloud previews delete new-checkout  # stops serving it and drops its database
+```
+
+Una previsualización caduca una semana después de su último despliegue.
+
+Las previsualizaciones se están desplegando de forma gradual. Un plano de control que aún no las sirve rechaza
+`--preview` con `previews_unavailable` y no despliega nada.
 
 ## Rollback
 
@@ -225,7 +268,7 @@ jobs:
 | Capacidad | Lo que el token puede hacer |
 |---|---|
 | `deploy` | Desplegar el proyecto y seguir sus compilaciones: `deploy`, `deployments` |
-| `logs` | Leer registros de compilación y runtime, así como métricas en tiempo real: `logs`, `metrics` |
+| `logs` | Leer registros de compilación y runtime, el historial de cron y métricas en tiempo real: `logs`, `cron`, `metrics` |
 | `env` | Leer y modificar variables de entorno, incluidos los secretos |
 | `database` | `db list`, `db info` y `db connect`, lo cual incluye la contraseña de la base de datos |
 | `backups` | Listar, crear, inspeccionar y descargar copias de seguridad, y leer la ventana de point-in-time |
@@ -287,7 +330,7 @@ rebase cloud compute set --cpu 500m --memory 2Gi
 | `--autoscale-cpu-target` | 10–95. El porcentaje de utilización de CPU que el autoscaler mantiene, en relación con la solicitud (request) en lugar del límite. Vacío significa 70 |
 | `--spot` | `true` o `false`. Capacidad interrumpible (spot): más económica, y reiniciada sin previo aviso |
 | `--db-instances` | 1–3. `1` es una instancia única sin tolerancia a fallos (failover); `2` añade un nodo de respaldo automático (standby) |
-| `--db-cpu`, `--db-memory`, `--storage` | Por instancia de base de datos. Vacío significa `500m`, `2Gi` y el volumen por defecto |
+| `--db-cpu`, `--db-memory` | Por instancia de base de datos. Vacío significa `160m` y `1Gi` |
 
 Un parámetro vacío no es lo mismo que fijarlo al mismo número: un parámetro vacío
 sigue el valor por defecto de la plataforma y varía cuando este varía.
@@ -308,6 +351,7 @@ excepto aquel que reinicie la base de datos, el cual esperará a una ventana de 
 | `init` | Con `--claim`: un backend en vivo sin cuenta y un enlace para reclamarlo. Consulta [Un backend sin cuenta](#un-backend-sin-cuenta) |
 | `projects` | Crear, listar, inspeccionar, eliminar |
 | `deploy`, `logs`, `deployments`, `rollback`, `cancel` | Despliegue y monitorización |
+| `previews` | Compilaciones servidas en su propia dirección por `deploy --preview`, y su eliminación. Consulta [Previsualizar un cambio](#previsualizar-un-cambio) |
 | `start`, `stop`, `restart` | Pausar un proyecto y reactivarlo |
 | `status`, `metrics`, `debug` | Qué está haciendo y por qué no lo está haciendo |
 | `cron` | Las tareas cron de la aplicación desplegada y sus ejecuciones registradas, consultadas con tu inicio de sesión de `rebase cloud`. Solo lectura |
@@ -344,8 +388,9 @@ Dicho con total claridad, porque enterarse más tarde es peor:
 - **No es de autoservicio.** El acceso se concede por lotes; no existe el flujo de registro y pago inmediato.
 - **Sin SLA publicado** ni certificación SOC 2. Si necesitas alguno de los dos, indícalo
   al solicitar acceso en lugar de asumirlo.
-- **Sin despliegues de vista previa (preview) o por rama**, y sin GitHub App oficial. Los deploy hooks —URLs
-  secretas a las que apuntas un webhook de repositorio— son el método de automatización soportado.
+- **Sin despliegues por rama**, y sin GitHub App oficial. Los deploy hooks —URLs
+  secretas a las que apuntas un webhook de repositorio— son el método de automatización soportado. Los
+  [despliegues de previsualización](#previsualizar-un-cambio) se están desplegando de forma gradual y se inician desde la CLI.
 - **Los tokens actúan como una persona.** Un [token](#ci-y-agentes) es emitido por una cuenta
   y actúa en su nombre; todavía no existen identidades de máquina administradas por la organización. Si
   en su lugar inicias sesión desde CI, pasa `REBASE_CLOUD_EMAIL` y `REBASE_CLOUD_PASSWORD`

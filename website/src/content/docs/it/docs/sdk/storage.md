@@ -113,7 +113,7 @@ import { resolveStorageReferences } from "@rebasepro/client";
 
 const post = await client.data.collection("posts").findById("post-1");
 const body = await resolveStorageReferences(String(post?.body ?? ""), client);
-// `body` è lo stesso markdown, con ogni riferimento sostituito da un URL nuovo.
+// `body` is the same markdown, each reference replaced by a fresh URL.
 ```
 
 Ogni oggetto viene firmato una volta per chiamata, dalla propria sorgente, così

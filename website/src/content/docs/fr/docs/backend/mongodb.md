@@ -1,8 +1,8 @@
 ---
-sourceHash: 239a291d53ade1fd
+sourceHash: 7c817c2bea2ff579
 title: MongoDB
 sidebar_label: MongoDB
-description:"\"@rebasepro/server-mongo fait fonctionner Rebase sur MongoDB : un pilote de données complet, du temps réel via change streams et un historique par instantanés — sans sécurité au niveau des lignes.\""
+description: "@rebasepro/server-mongo fait fonctionner Rebase sur MongoDB : un pilote de données complet, du temps réel via change streams et un historique par instantanés — sans sécurité au niveau des lignes."
 ---
 
 `@rebasepro/server-mongo` implémente le `BackendBootstrapper` de Rebase pour
@@ -30,16 +30,20 @@ pnpm add @rebasepro/server-mongo
 ```
 
 ```ts title="backend/src/index.ts" no-verify
-import { rebase } from "@rebasepro/server";
-import { createMongoBootstrapper } from "@rebasepro/server-mongo";
+import { initializeRebaseBackend } from "@rebasepro/server";
+import { createMongoBootstrapper, createMongoDBConnection } from "@rebasepro/server-mongo";
 
-rebase({
-    backend: createMongoBootstrapper({ url: process.env.DATABASE_URL! })
+const { db, client } = await createMongoDBConnection(process.env.DATABASE_URL!, "app");
+
+await initializeRebaseBackend({
+    app,
+    server,
+    bootstrappers: [createMongoBootstrapper({ connection: db, client })]
 });
 ```
 
 Définissez `DATABASE_URL` avec une chaîne de connexion MongoDB
-(`mongodb://…` ou `mongodb+srv://…`).
+(`mongodb://…` ou `mongodb+srv://…`) ; le second argument nomme la base de données.
 
 ## Ce qui fonctionne
 

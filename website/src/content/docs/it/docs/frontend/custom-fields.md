@@ -1,5 +1,5 @@
 ---
-sourceHash: db02ecc36f64f46c
+sourceHash: af7e2ab87a0b3b4f
 title: Campi Personalizzati
 sidebar_label: Campi Personalizzati
 description: Crea campi modulo personalizzati per la modifica delle entità con pieno accesso al contesto del modulo, ai valori dell'entità e agli hook di Rebase.
@@ -47,7 +47,7 @@ function ColorPickerField({ value, setValue, error, showError }: FieldProps<Stri
 | `property` | `Property` | La configurazione della proprietà |
 | `context` | `FormContext` | Contesto completo del modulo con tutti i valori dell'entità |
 | `disabled` | `boolean` | Il campo è di sola lettura |
-| `tableMode` | `boolean` | Rendering all'interno del foglio di calcolo (modalità compatta) |
+| `minimalistView` | `boolean` | Rendering nell'editor popup della cella della tabella (modalità compatta) |
 
 ## Registrare un Campo Personalizzato
 
@@ -80,8 +80,8 @@ properties: {
         type: "string",
         name: "Brand Color",
         admin: {
-            Field: () => import("../../../frontend/src/ColorPickerField"),
-            Preview: () => import("../../../frontend/src/ColorPreview")
+            Field: () => import("../../frontend/src/ColorPickerField"),
+            Preview: () => import("../../frontend/src/ColorPreview")
         }
     }
 }
@@ -145,12 +145,12 @@ function PriceWithTaxField({ value, setValue, context }: FieldProps<NumberProper
 
 ## Modalità Tabella
 
-Quando si effettua il rendering all'interno della vista foglio di calcolo, i campi dovrebbero essere compatti. Controlla `tableMode`:
+Un campo personalizzato non viene disegnato dentro una cella della tabella: la cella mostra il valore (o la tua `Preview`), e modificarlo apre il campo in un popup con `minimalistView` impostato. Lì mantienilo compatto:
 
 ```tsx
 function MyField({ value, setValue, minimalistView }: FieldProps<StringProperty>) {
     if (minimalistView) {
-        return <span onClick={() => { /* open editor */ }}>{value}</span>;
+        return <input value={value ?? ""} onChange={(e) => setValue(e.target.value)}/>;
     }
 
     return (

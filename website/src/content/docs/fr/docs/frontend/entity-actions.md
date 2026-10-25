@@ -71,7 +71,7 @@ Définissez `collapsed: false` sur l'action pour laquelle on ouvre l'enregistrem
 {
     name: "Publish",
     icon: "Upload",
-    collapsed: false, // un bouton sur l'enregistrement, une icône sur la ligne
+    collapsed: false, // a button on the record, an icon on the row
     onClick: async ({ entity, context }) => { /* … */ }
 }
 ```
@@ -93,7 +93,7 @@ Une action désactivée qui ne dit pas pourquoi a l'air cassée. `disabledReason
 {
     name: "Resend to Shopify",
     isEnabled: ({ entity }) => Boolean(entity?.values.shopify_id),
-    disabledReason: () => "Ce client n'a pas de compte Shopify",
+    disabledReason: () => "This customer has no Shopify account",
     onClick: async ({ entity, context }) => { /* … */ }
 }
 ```

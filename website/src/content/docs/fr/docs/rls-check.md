@@ -1,5 +1,5 @@
 ---
-sourceHash: 1f6cc6a096428d0e
+sourceHash: 25ab35336a3b3976
 slug: fr/docs/rls-check
 title: rls-check
 description: Auditez la sécurité au niveau des lignes (RLS) sur n'importe quelle base de données PostgreSQL — Supabase, Neon, RDS ou votre propre serveur. En lecture seule, sans inscription, sans Rebase requis.
@@ -177,7 +177,8 @@ atteint `warnAtSeverity`, à `info` sinon :
 
 ```
 ⚠️  [rls-audit] RLS audit found 3 issue(s) — 1 critical, 2 medium. 1 table(s)
-    without RLS. Read the detail at GET /api/admin/rls-audit.
+    without RLS. Read the detail at GET /api/admin/rls-audit, or run
+    `npx @rebasepro/rls-check` for the full report.
 ```
 
 ### Pourquoi vous devez injecter `scan`

@@ -1,5 +1,5 @@
 ---
-sourceHash: 2d930362e74e2a12
+sourceHash: 8f3cdbfa7f75e54b
 title: Collections
 sidebar_label: Collections
 description: Les collections sont la brique de base de Rebase — chaque collection correspond à une table de base de données et définit son schéma, ses relations, sa sécurité et son comportement d'interface utilisateur.
@@ -46,13 +46,13 @@ const products = defineCollection({
     }
 ```
 
-Les champs vérifiés sont `display`, `sort`, `propertiesOrder` et `listProperties`. Trois formes sont acceptées en plus d'une simple clé de propriété :
+Les champs vérifiés sont `display`, `sort`, `propertiesOrder`, `listProperties`, `previewProperties`, `orderProperty` et les filtres `defaultFilter`, `fixedFilter` et `filterPresets`. Trois formes sont acceptées en plus d'une simple clé de propriété :
 
 | Forme | Exemple | Notes |
 | --- | --- | --- |
-| Chemin pointé dans un `map` | `"profile.displayName"` | La **racine** doit être une vraie propriété ; le chemin sous-jacent n'est pas vérifié. |
+| Chemin pointé dans un `map` | `"profile.displayName"` | La **racine** doit être une vraie propriété ; le chemin sous-jacent n'est pas vérifié. Pas sur `previewProperties` / `orderProperty`, qui prennent une clé de premier niveau. |
 | Colonne de sous-collection enfant | `"subcollection:orders"` | `propertiesOrder` / `listProperties` uniquement. |
-| Une clé de `additionalFields` | `"score" as AdditionalFieldKey` | Nécessite le cast — voir ci-dessous. |
+| Une clé de `additionalFields` | `"score" as AdditionalFieldKey` | `propertiesOrder` / `listProperties` uniquement. Nécessite le cast — voir ci-dessous. |
 
 `AdditionalFieldDelegate.key` est une simple `string`, le système de types n'a donc aucun moyen de savoir quelles clés supplémentaires une collection déclare. Plutôt que de rouvrir ces champs à n'importe quelle chaîne, le cast rend l'exception explicite :
 
@@ -144,7 +144,7 @@ const posts = defineCollection({
 Une augmentation s'applique à l'ensemble du *programme* TypeScript, et `config/` et `frontend/` sont des programmes distincts — c'est pourquoi la référence a sa place dans le package config. Il n'existe pas de type wrapper `AdminCollectionConfig` : une fois le champ fusionné, `CollectionConfig` constitue le type de rédaction principal.
 
 :::note[Pourquoi un projet BaaS n'a aucun surcoût]
-Un type de propriété dans une installation BaaS ne contient ni `Field`, ni `columnWidth`, ni `hideFromCollection` — ceux-ci résident dans `AdminPropertyOptions` au sein du package admin. Cette garantie est vérifiée de manière stricte : `e2e/baas-typecheck/src/admin_absent.ts` utilise `@ts-expect-error` sur `admin`, de sorte que le build échoue si jamais ce champ redevient modifiable dans le core.
+Un type de propriété dans une installation BaaS ne contient ni `Field`, ni `columnWidth`, ni `hideFromCollection` — ceux-ci résident dans `AdminPropertyOptions` au sein du package admin. Cette garantie est vérifiée de manière stricte : `tests/e2e/baas-typecheck/src/admin_absent.ts` utilise `@ts-expect-error` sur `admin`, de sorte que le build échoue si jamais ce champ redevient modifiable dans le core.
 :::
 
 ### Migration depuis une collection plate
@@ -152,7 +152,7 @@ Un type de propriété dans une installation BaaS ne contient ni `Field`, ni `co
 Avant la version 0.11, ces champs se trouvaient au niveau racine. Pour les déplacer :
 
 ```bash
-node scripts/codemod/collections-admin-block.mjs config/collections
+node tooling/scripts/codemod/collections-admin-block.mjs config/collections
 ```
 
 L'outil signale tout ce qu'il ne peut pas déplacer en toute sécurité — notamment la présentation dans `relations[].overrides`, qui requiert `overrides: { admin: { … } }` manuellement.
@@ -301,7 +301,7 @@ Et dans `admin`, car seul le panneau les affiche :
 | Propriété | Type | Description |
 |----------|------|-------------|
 | `admin.entityActions` | `EntityAction[]` | Actions personnalisées sur les entités (archiver, publier, etc.) |
-| `admin.Actions` | `React.ComponentType` | Composant d'actions de barre d'outils personnalisé |
+| `admin.Actions` | `ComponentRef<CollectionActionsProps>[]` | Composants d'actions de barre d'outils personnalisés |
 | `admin.entityViews` | `EntityCustomView[]` | Onglets personnalisés dans la vue détaillée de l'entité |
 | `admin.additionalFields` | `AdditionalFieldDelegate[]` | Colonnes calculées/virtuelles |
 | `admin.exportable` | `boolean \| ExportConfig` | Activer l'exportation de données |
@@ -365,14 +365,14 @@ Privilégiez un chemin chaque fois que la valeur se trouve sur l'enregistrement 
 
 ### Sélection de la propriété de titre
 Lorsque `display.title` n'est pas défini, la propriété utilisée comme titre d'affichage de l'entité (aperçus, en-têtes) est résolue automatiquement :
-1. Si `propertiesOrder` est explicitement défini, la première propriété non-ID qui est de type `relation` ou `string` est choisie comme titre.
-2. Si aucun `propertiesOrder` n'est défini, le framework parcourt les propriétés dans l'ordre et sélectionne la première propriété de type string.
+1. Si `propertiesOrder` est explicitement défini, la première propriété de cet ordre pouvant servir de titre est choisie : une `string`, une `relation` de cardinalité unique ou une `reference`. Les identifiants (clés primaires et étrangères, colonnes `uuid`, `isId`), les champs de téléversement de fichiers et les propriétés masquées ne sont jamais retenus.
+2. Si aucun `propertiesOrder` n'est défini, les mêmes candidats sont classés : d'abord une chaîne dont la clé désigne un libellé (`name`, `title`, `label`, …), puis un texte court simple, un e-mail, un enum, un texte long, une relation ou un sélecteur d'utilisateur, et une référence en dernier. En cas d'égalité, l'ordre de déclaration l'emporte.
 
 ### Aperçus des relations dans les tableaux
 Lorsque `propertiesOrder` est explicitement défini, les propriétés de relation ne sont **pas** automatiquement filtrées des colonnes d'aperçu par défaut (alors qu'elles sont exclues des valeurs par défaut non ordonnées pour éviter des opérations de jointure lentes).
 
 ### Rendu de la valeur du titre
-Quel que soit le contenu de la propriété de titre, le panneau affiche une chaîne de caractères. Une date est formatée, un tableau est joint, et pour une relation — qui arrive sous la forme `{ id, data: { values } }` plutôt que sous forme de texte — le panneau recherche le premier champ parmi `name`, `title`, `label` ou `displayName` sur la ligne liée, en se rabattant sur son id à défaut. Ainsi, un titre peut désigner une propriété de type `relation` tout en s'affichant sous la forme d'un nom plutôt que d'un uuid.
+Quel que soit le contenu de la propriété de titre, le panneau affiche une chaîne de caractères. Une date est formatée, un tableau est joint, et pour une relation — qui arrive sous la forme `{ id, data: { values } }` plutôt que sous forme de texte — le panneau recherche le premier champ parmi `name`, `title`, `label` ou `displayName` sur la ligne liée, puis sa première valeur de type chaîne courte, en se rabattant sur son id à défaut. Ainsi, un titre peut désigner une propriété de type `relation` tout en s'affichant sous la forme d'un nom plutôt que d'un uuid.
 
 Il ne s'agit pas d'un helper exporté : c'est le comportement standard de chaque surface affichant un enregistrement. Rien à appeler, et rien à importer.
 

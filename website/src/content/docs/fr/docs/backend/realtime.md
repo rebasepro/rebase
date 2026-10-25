@@ -1,5 +1,5 @@
 ---
-sourceHash: 0a56c2d3dea31616
+sourceHash: be1f8cd1b6c6a95b
 title: Temps réel & WebSocket
 sidebar_label: Temps réel
 description: Synchronisation des données en temps réel, canaux de diffusion et suivi de présence via WebSocket.
@@ -65,8 +65,8 @@ const unsubscribe = client.data.products.listen(
 );
 ```
 
-La fonction de rappel reçoit un objet `FindResponse<M>` contenant :
-- `data` — Tableau d'objets `Entity<M>`.
+La fonction de rappel reçoit un objet `FindResult<M>` contenant :
+- `data` — Les lignes, à plat, telles que `find()` les renvoie (`row.name`, et non `row.values.name`).
 - `meta` — Informations de pagination (`total`, `limit`, `offset`, `hasMore`).
 
 ### S'abonner à une collection avec des filtres
@@ -149,7 +149,7 @@ const unsubscribe = client.data.orders
 ```
 
 :::note
-La méthode `.listen()` sur le query builder n'est disponible que lorsque le `RebaseClient` est configuré avec un `websocketUrl`. Si la connexion WebSocket n'est pas configurée, l'appel de `.listen()` générera une erreur.
+`.listen()` — sur le query builder comme sur l'accesseur de collection — a besoin du WebSocket du client. Le client déduit son URL de `baseUrl`, sauf si `websocketUrl` est fourni. Sur un client créé avec `realtime: false`, ou qui n'a pu déduire aucune URL, l'appel de `.listen()` génère une erreur.
 :::
 
 ## Distribution des mises à jour : Patch instantané + Récupération pour exactitude
@@ -369,7 +369,7 @@ La présence permet de suivre quels utilisateurs sont actuellement en ligne dans
 | `presence_track` | Client → Serveur | Commencer à suivre la présence avec un état personnalisé |
 | `presence_untrack`| Client → Serveur | Arrêter le suivi de présence |
 | `presence_state` | Client → Serveur | Demander l'état de présence complet d'un canal |
-| `presence_state` | Serveur → Client | Entité complète de toutes les présences dans un canal |
+| `presence_state` | Serveur → Client | Toutes les présences du canal, en entier |
 | `presence_diff` | Serveur → Client | Mise à jour incrémentielle (arrivées et départs) |
 
 Lorsqu'un client envoie `presence_track`, le serveur l'ajoute automatiquement au canal (nul besoin d'un `join_channel` distinct) et diffuse un `presence_diff` à tous les membres du canal. Le SDK renvoie son état toutes les 20 secondes environ en guise de battement de cœur (heartbeat) ; un battement dont l'état n'a pas changé ne fait que rafraîchir le délai d'expiration du client et n'envoie aucun `presence_diff`.
@@ -426,7 +426,7 @@ reconnexion :
 | `connecting` | En train de composer, sans coupure en cours. |
 | `connected` | Le socket est ouvert. |
 | `reconnecting` | Le socket s'est coupé et le client recompose. Rien n'a encore été signalé. |
-| `disconnected` | La coupure dure depuis environ 15 secondes ou plus. `CONNECTION_LOST` a été signalé, et le client continue de recomposer. |
+| `disconnected` | La coupure dure depuis 14 secondes ou plus. `CONNECTION_LOST` a été signalé, et le client continue de recomposer. |
 | `closed` | `client.close()` a été appelé. Définitif. |
 
 ```typescript
@@ -469,15 +469,17 @@ L'exécution de plusieurs instances — le bus LISTEN/NOTIFY, le comportement de
 
 ## Capture des modifications au niveau de la base de données (CDC)
 
-→ [Capture des modifications au niveau de la base de données (CDC)](/docs/backend/realtime-cdc/)
+Chaque écriture validée émet des événements en temps réel, quelle que soit sa provenance : REST, le
+SDK, Studio, `psql`, une tâche cron dans un autre service. Comment fonctionne la capture, le paramètre
+`REALTIME_CDC` et ce dont elle a besoin : [Capture des modifications de la base de données](/docs/backend/realtime-cdc/).
 
 ## Expiration des requêtes en attente (Timeout)
 
 Pour éviter que les requêtes des clients ne restent indéfiniment bloquées, toutes les opérations WebSocket en attente qui attendent une réponse du serveur (telles que les requêtes ponctuelles de collection `FETCH_COLLECTION`, les requêtes d'entité unique `FETCH_ONE`, la création/mise à jour `SAVE`, les suppressions `DELETE`, les comptages `COUNT` et les vérifications d'unicité `CHECK_UNIQUE_FIELD`) ont un délai d'expiration par défaut de 30 secondes.
 
-Si le serveur ne répond pas dans cet intervalle de 30 secondes, le client supprime automatiquement la requête en attente et rejette la promesse avec une erreur `ApiError` portant le message `"Request timed out"`.
+Si le serveur ne répond pas dans cet intervalle de 30 secondes, le client supprime automatiquement la requête en attente et rejette la promesse avec une `RebaseApiError` dont le code est `REQUEST_TIMEOUT`.
 
-Les messages unidirectionnels qui n'attendent pas de réponse (comme `subscribe_collection`, `subscribe_one`, `unsubscribe`, `join_channel`, `leave_channel`, `broadcast`, `presence_track`, `presence_untrack` et `presence_state`) sont résolus immédiatement lors de l'envoi et ne déclenchent pas de délai d'expiration.
+Les messages unidirectionnels qui n'attendent pas de réponse (comme `subscribe_collection`, `subscribe_one`, `unsubscribe`, `join_channel`, `leave_channel`, `broadcast`, `presence_track`, `presence_untrack`, `presence_state` et `channel_history`) sont résolus immédiatement lors de l'envoi et ne déclenchent pas ce délai d'expiration. Un abonnement dont la première trame n'est pas arrivée 30 secondes après l'envoi de sa souscription échoue en revanche, avec `SUBSCRIPTION_TIMEOUT` sur son `onError`.
 
 ### Lorsqu'une trame de canal est refusée
 
@@ -497,7 +499,7 @@ channel.onError((error) => {
 | Code | Signification |
 |------|-------|
 | `CHANNEL_FORBIDDEN` | Vous n'êtes pas membre du canal — rejoignez-le avant d'émettre ou de lire son historique |
-| `RATE_LIMITED` | Dépassement du quota de trames de canal ci-dessus, ou, pour une demande d'historique, de la [limite de débit des données](#ce-que-coûte-une-écriture-et-les-limites) |
+| `RATE_LIMITED` | Dépassement du quota de trames de canal ci-dessus (7 200 trames de canal par minute et par socket), ou, pour une demande d'historique, de la [limite de débit des données](#ce-que-coûte-une-écriture-et-les-limites) |
 | `CHANNEL_HISTORY_WRITE_FAILED` | Une diffusion retenue n'a pas pu être persistée et a donc été abandonnée |
 | `CHANNEL_HISTORY_READ_FAILED` | Une requête de rattrapage n'a pas pu être satisfaite |
 | `CHANNEL_HISTORY_GAP` | Levée par le client : un rattrapage a constaté que le serveur ne conserve plus des messages que ce client n'a jamais reçus. `details` vaut `{ from, to }`, les numéros de séquence manqués. Resynchronisez l'état du canal depuis sa source de vérité |

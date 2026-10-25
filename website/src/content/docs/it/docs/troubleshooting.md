@@ -1,5 +1,5 @@
 ---
-sourceHash: 648de86871ab3d3d
+sourceHash: fdbf8e3627811576
 slug: it/docs/troubleshooting
 title: Risoluzione dei problemi
 description: Gli errori che impediscono l'avvio o il funzionamento di un backend Rebase — un database irraggiungibile, credenziali errate, un'estensione mancante, un rifiuto RLS, schema drift, una porta occupata, una funzione che non si carica — e come si presenta ciascuno di essi.
@@ -148,10 +148,10 @@ Passa `--port` per fissarne una, oppure arresta l'altro processo. In produzione 
 
 ## Il backend è andato in crash e `rebase dev` è rimasto in esecuzione
 
-Un backend che genera un'eccezione all'avvio non arresta il watcher: stampa lo stack trace e attende una modifica ai file. `rebase dev` segnala questo:
+Un backend che genera un'eccezione all'avvio non arresta il watcher: stampa lo stack trace e attende una modifica ai file. Quando il backend non si è annunciato entro `REBASE_DEV_READY_TIMEOUT_MS` (30 secondi per impostazione predefinita), `rebase dev` segnala questo:
 
 ```
-  ✗ The backend crashed on startup.
+  ✗ The backend has not started after 30s.
     Fix the error above; the watcher restarts it on the next change.
 ```
 

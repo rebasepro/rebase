@@ -1,5 +1,5 @@
 ---
-sourceHash: 7f10dbaa07451bc9
+sourceHash: 4b28c5fe78adb3d0
 title: Multiples bases de données et buckets
 sidebar_label: Multiples sources
 description: Acheminez les collections vers différentes bases de données et les propriétés vers différents buckets de stockage, et configurez chacun depuis l'environnement.
@@ -42,9 +42,8 @@ signups.subscription("send-welcome", async (event) => {
 });
 ```
 
-`queue()` est nouveau. `database()`, `bucket()` et `topic()`
-peuvent être déclarés depuis la version 0.17 ; ainsi, un projet sur la version publiée déclare
-ces trois éléments et accède au travail en arrière-plan via `jobs.tasks` à la place.
+`database()`, `bucket()` et `topic()` peuvent être déclarés depuis la version 0.17, et
+`queue()` depuis la 0.18.
 
 Pointez ensuite une collection vers l'un d'eux, par son handle — le même nom, orthographié une seule fois :
 
@@ -69,7 +68,7 @@ import { media } from "../resources";
 coverImage: {
     name: "Cover image",
     type: "string",
-    storage: { storageSource: media, acceptedFiles: ["image/*"] }
+    storage: { storagePath: "covers", storageSource: media, acceptedFiles: ["image/*"] }
 }
 ```
 
@@ -230,7 +229,7 @@ Le moteur provient de la déclaration, il n'y a donc aucun `STORAGE_TYPE` à dé
 Une propriété de stockage qui ne spécifie aucun `storageSource` écrit dans le bucket par **défaut**.
 Déclarer des buckets nommés ne le déplace jamais. Le bucket par défaut garde sa propre
 configuration, quoi que déclare `config/resources.ts` : `STORAGE_TYPE`,
-`STORAGE_PATH` (`./uploads` s'il n'est pas défini), et les variables `S3_*` / `GCS_*`
+`STORAGE_PATH` (`<project>/uploads` s'il n'est pas défini), et les variables `S3_*` / `GCS_*`
 sans suffixe. Ajouter `bucket("media", { engine: "s3" })` à un projet qui a déjà
 des fichiers dans `./uploads` les laisse où ils sont, et toujours servis. `media`
 lit ses propres variables `__MEDIA` et, en développement, se rabat sur son propre
@@ -297,8 +296,8 @@ await signups.publish({ userId });
 ```
 
 Une file d'attente (queue) représente l'autre forme de travail en arrière-plan : une liste de tâches avec **un
-seul gestionnaire (handler)**, où l'appelant détient l'identifiant de la tâche. Les files d'attente sont nouvelles
- — les topics ont été introduits dans la version 0.17.
+seul gestionnaire (handler)**, où l'appelant détient l'identifiant de la tâche. Les files d'attente ont été introduites dans la version 0.18,
+les topics dans la 0.17.
 
 ```ts
 export const thumbnails = queue<{ key: string }>("thumbnails");
@@ -379,8 +378,8 @@ export const storageAuthorize: StorageAuthorize = async ({ key, user, operation 
 
 Il existe deux échappatoires via l'environnement pour les cas où cela correspond réellement au modèle souhaité :
 
-- `STORAGE_PUBLIC_READ=true` — le bucket est un CDN public en lecture seule. Les écritures,
-  suppressions et listages nécessitent toujours une authentification.
+- `STORAGE_PUBLIC_READ=true` — le bucket est un CDN public en lecture seule. Sans hook `storageAuthorize`, les écritures,
+  suppressions et listages sont réservés aux administrateurs.
 - `STORAGE_ALLOW_ANY_AUTHENTICATED=true` — chaque utilisateur authentifié a un accès de confiance à
   l'ensemble des fichiers. Défendable pour une application mono-tenant, jamais pour une application multi-tenant.
 

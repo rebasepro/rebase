@@ -1,5 +1,5 @@
 ---
-sourceHash: 9210bf054bc3c431
+sourceHash: de64511406443392
 title: CLI-Referenz
 sidebar_label: CLI
 description: Rebase-CLI-Befehle für Projektinitialisierung, Schemagenerierung, Datenbankmigrationen und SDK-Generierung.
@@ -88,7 +88,7 @@ Anwendungs-Image selbst gebaut werden muss. Nützliche Flags:
 |------|------------|
 | `--output <dir>` (oder `--out`) | Schreibt das Bundle an einen anderen Ort als `dist-bundle/` (jeweils eine App) |
 | `--vendor` | Die Abhängigkeiten des Bundles immer installieren und mitliefern |
-| `--no-vendor` | Niemals vendoren; der Pod installiert beim ersten Start |
+| `--no-vendor` | Niemals vendoren; der Pod installiert sie bei jedem Start |
 | `--skip-type-check` | Typechecking überspringen (schneller, weniger sicher) |
 | `--no-static` | Das Frontend nicht ins Backend-Bundle einfalten (jede statische App bekommt trotzdem ihr eigenes Bundle) |
 | `--skip-static-build` | Das Frontend als bereits gebaut einfalten, ohne dessen Build-Befehl auszuführen |
@@ -382,7 +382,7 @@ daran hindert, überhaupt zu funktionieren, passiert, bevor eine Tabelle verglic
 | Verbindungsstrings | Ein nicht-kodiertes `=` in einem URL-Parameter, das die bordeigenen Tools von PostgreSQL nicht parsen können — Backups und `psql` schlagen fehl, während die App weiterläuft. |
 | Benutzerdefinierte Funktionen | Was jede Funktion von ihrem Host benötigt und welche davon nicht auf einer Edge-Runtime laufen würden. |
 
-**Gegen die Datenbank**, wenn `DATABASE_URL` gesetzt ist:
+**Gegen die Datenbank** — die des Projekts selbst, aufgelöst so, wie `rebase db url` sie auflöst; bei einem frischen Scaffold ist das die verwaltete Datenbank, die `doctor` startet:
 
 | Prüfung | Warum |
 | --- | --- |
@@ -398,7 +398,7 @@ Begründung als übersprungen gemeldet und der Rest läuft trotzdem weiter — s
 
 Beendet mit einem Exit-Code ungleich null, wenn eine Prüfung einen Fehler findet oder wenn eine Phase nicht ausgeführt werden konnte,
 weil die angegebene Datenbank Verbindungen ablehnt. Eine Phase, die übersprungen wurde, weil
-Sie keine `DATABASE_URL` angegeben haben, gilt nicht als Fehler.
+keine Datenbank aufgelöst werden konnte, gilt nicht als Fehler.
 
 `rebase doctor --policies` führt nur die RLS-Prüfungen aus — kein Schema-Diff, keine SDK-Typen —
 und schlägt im Zweifelsfall fehl ("fails closed"), was es zur geeigneten Form für ein CI-Gate gegen eine

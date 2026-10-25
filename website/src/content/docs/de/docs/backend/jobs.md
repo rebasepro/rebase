@@ -21,6 +21,19 @@ Verwenden Sie dies für Aufgaben, die nicht verloren gehen dürfen und nicht inn
 
 ## Aktivierung
 
+:::note[Wo dies hingehört]
+**Managed Runtime** — nirgends. `jobs` nimmt Handler-*Funktionen* entgegen, die weder eine
+Umgebungsvariable noch ein Export aus `config/index.ts` tragen kann, daher kann ein per Scaffolding
+erstelltes Projekt die Warteschlange nicht aktivieren. Führen Sie `rebase eject` aus (oder schreiben Sie einen
+[Custom Server](/docs/backend/custom-server/)), um sie zu erreichen. `REBASE_JOB_WORKERS`
+in `.env` entscheidet nur, ob die Worker einer bereits aktivierten Warteschlange in *diesem*
+Prozess laufen.
+
+**Ejected** — der `jobs`-Block in `initializeRebaseBackend({ … })`, wie unten.
+
+Die vollständige Übersicht steht in der [Backend-Übersicht](/docs/backend/#where-each-option-lives).
+:::
+
 ```typescript no-verify
 await initializeRebaseBackend({
     jobs: {

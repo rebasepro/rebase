@@ -1,5 +1,5 @@
 ---
-sourceHash: cc1736a186791d89
+sourceHash: afd1a90c05fb48c3
 title: Configuração de Storage
 sidebar_label: Configuração de Storage
 description: Configure backends de sistema de arquivos local, compatíveis com S3 ou GCS/Firebase Storage para uploads de arquivos, imagens e mídia.
@@ -16,7 +16,7 @@ O Rebase suporta três backends de armazenamento:
 ## Configuração
 
 :::note[Onde isso fica]
-**Runtime gerenciado** — as variáveis `STORAGE_*` no `.env` (`STORAGE_TYPE`, `STORAGE_BUCKET` ou `S3_BUCKET` / `GCS_BUCKET`, `STORAGE_PATH`, `STORAGE_PUBLIC_READ`, … — adicione o sufixo `__<KEY>` a qualquer uma delas para uma fonte nomeada), além de uma declaração `bucket("<key>")` em `config/resources.ts` para cada bucket além do padrão, e `export const storageAuthorize` a partir de `config/index.ts`. `storageAuthorize` não possui uma forma via variável de ambiente de propósito: nenhuma variável pode expressar "este usuário pode ler esta chave".
+**Runtime gerenciado** — as variáveis `STORAGE_*` no `.env` (`STORAGE_TYPE`, `S3_BUCKET` / `GCS_BUCKET`, `STORAGE_PATH`, `STORAGE_PUBLIC_READ`, … — adicione o sufixo `__<KEY>` a qualquer uma delas para uma fonte nomeada), além de uma declaração `bucket("<key>")` em `config/resources.ts` para cada bucket além do padrão, e `export const storageAuthorize` a partir de `config/index.ts`. `storageAuthorize` não possui uma forma via variável de ambiente de propósito: nenhuma variável pode expressar "este usuário pode ler esta chave".
 
 **Ejetado** — o bloco `storage` em `initializeRebaseBackend({ … })`. `storagePolicies` e `storageTriggers` são exclusivos do modo ejetado.
 
@@ -99,7 +99,7 @@ image: {
 
 | Método | Caminho | Descrição |
 |--------|---------|-----------|
-| `POST` | `/api/storage/upload` | Upload direto de arquivo, um único corpo `multipart/form-data`: `file` (obrigatório); `key`, a chave do objeto, pastas incluídas (`author_pictures/ada.jpg`), senão o nome do arquivo na raiz; `bucket`, senão o bucket padrão; `storageId`; e `metadata_<name>` para metadados personalizados. Qualquer outro campo é ignorado: não existe um campo `path` |
+| `POST` | `/api/storage/upload` | Upload direto de arquivo, um único corpo `multipart/form-data`: `file` (obrigatório); `key`, a chave do objeto, pastas incluídas (`author_pictures/ada.jpg`), senão o nome do arquivo na raiz; `bucket`, senão o bucket padrão; `storageId`; `collection` e `property`, que limitam o arquivo ao `maxSize` e aos `acceptedFiles` dessa propriedade; e `metadata_<name>` para metadados personalizados. Qualquer outro campo é ignorado: não existe um campo `path` |
 | `POST` | `/api/storage/upload?storageId=<key>` | Upload para um backend nomeado específico |
 | `GET` | `/api/storage/file/*` | Recuperar um arquivo — tudo após `/file/` é a chave do objeto |
 | `GET` | `/api/storage/file/*?storageId=<key>` | Recuperar um arquivo de um backend específico |
@@ -364,8 +364,8 @@ Direcione uma propriedade para uma fonte com `storageSource`:
 ```ts
 {
     name: "Cover",
-    dataType: "string",
-    storage: { storageSource: "media", acceptedFiles: ["image/*"] }
+    type: "string",
+    storage: { storagePath: "covers", storageSource: "media", acceptedFiles: ["image/*"] }
 }
 ```
 
@@ -403,7 +403,7 @@ para que uma fonte possa migrar de provedor sem quebrar as restantes.
 
 ## Fontes de Armazenamento no Frontend
 
-Ao usar múltiplos backends de armazenamento, passe `storageSources` para o provedor `<Rebase>` para que o frontend saiba como rotear os uploads diretamente:
+O frontend conhece as fontes do servidor por meio de `GET /api/storage/sources`, então uma fonte `server` não precisa de entrada. Passe `storageSources` ao provedor `<Rebase>` para uma fonte `direct`, que envia os uploads direto ao seu provedor, ou para definir você mesmo um rótulo ou um transporte:
 
 ```tsx
 import { Rebase } from "@rebasepro/app";
@@ -422,7 +422,7 @@ import { Rebase } from "@rebasepro/app";
 </Rebase>
 ```
 
-A propriedade `key` de cada fonte deve coincidir com uma chave de backend registrada no mapa `storage` do servidor. O contexto React `StorageSourcesContext` resolve a fonte ativa para cada campo de upload.
+A propriedade `key` de uma fonte `server` deve coincidir com uma chave de backend registrada no mapa `storage` do servidor. O contexto React `StorageSourcesContext` resolve a fonte ativa para cada campo de upload.
 
 ## Cache e CDNs
 
@@ -460,8 +460,7 @@ storagePolicies: [
 ]
 ```
 
-**Uma chave que não corresponda a nenhuma política é recusada.** Cada liberação é uma linha explícita,
-e um erro nega o acesso em vez de concedê-lo.
+**Uma chave que não corresponda a nenhuma política é recusada**, a menos que um hook `storageAuthorize` a permita: o hook só é consultado quando nenhuma política correspondeu, e nenhum dos dois pode restringir o outro. Cada liberação é uma linha explícita, e um erro nega o acesso em vez de concedê-lo.
 
 Os padrões correspondem **por segmento, nunca por substring** — `public/**` não corresponde a
 `publicity/secret.png`:
@@ -535,7 +534,7 @@ Vale saber:
 - **Um caminho é público quando a chave que ele referencia for pública.** O prefixo `public/` é testado na chave canônica que a rota serve — depois que o segmento de bucket inicial `default/` for removido e `//`, `./` e a barra `/` inicial forem normalizados — nunca na URL como foi escrita. `/api/storage/file/notes://public/x.txt` referencia a chave privada `notes:/public/x.txt`, e a chave `default/public/x.txt` (acessada como `/api/storage/file/default/default/public/x.txt`) reside em uma pasta chamada `default`; nenhuma das duas é pública. Em um hook, teste a `key` recebida usando `isPublicStorageKey` do pacote `@rebasepro/types` — `isPublicStoragePath` analisa um caminho ou URL do lado do cliente, interpretando ambos como públicos.
 - **`list` é protegido no prefixo.** A listagem é como você descobre chaves sobre as quais ninguém o informou.
 - **Uploads retomáveis (TUS) são validados no momento da criação**, de modo que um upload negado não deixa arquivos temporários para trás.
-- Omitir o hook preserva o comportamento anterior, de modo que aplicativos single-tenant não são afetados.
+- Omitir o hook (e `storagePolicies`) deixa sem nenhuma verificação por objeto, então a produção se recusa a inicializar a menos que `storagePublicRead` ou `storageInsecureAllowAnyAuthenticated` esteja definido.
 
 ### Chaves de API e tokens
 

@@ -1,5 +1,5 @@
 ---
-sourceHash: b2a395fe87b59669
+sourceHash: d26aa741e787a03f
 title: Introduzione
 sidebar_label: Introduzione
 description: Rebase è il backend open-source per Postgres, con un pannello di amministrazione per il tuo team, creato con React e TypeScript. Definisci il tuo schema in TypeScript e Rebase genera un'interfaccia CRUD completa, API REST, autenticazione, archiviazione e sincronizzazione in tempo reale — basato su PostgreSQL.
@@ -15,7 +15,7 @@ Rebase è il **backend open-source per PostgreSQL**, con un **pannello di ammini
 
 - **Schema as Code** — Definisci i tuoi modelli di dati come collezioni TypeScript. Rebase genera tabelle PostgreSQL, un'interfaccia CRUD completa, endpoint API REST e un SDK tipizzato a partire da un'unica fonte di verità.
 - **Pannello di amministrazione istantaneo** — Un pannello basato su React, elegante e veloce, con tabelle in stile foglio di calcolo, liste, form, bacheche Kanban, modifica inline e sincronizzazione in tempo reale.
-- **Backend integrato** — Autenticazione (password, magic link, codici monouso, MFA, chiavi API e dodici provider OAuth/OIDC), archiviazione file (locale o S3), Row Level Security, cronologia delle entità e real-time via WebSocket — tutto integrato.
+- **Backend integrato** — Autenticazione (password, magic link, codici monouso, MFA, chiavi API e dodici provider OAuth/OIDC), archiviazione file (locale, S3 o GCS), Row Level Security, cronologia delle entità e real-time via WebSocket — tutto integrato.
 - **Radicalmente estendibile** — Se puoi crearlo in React, puoi aggiungerlo a Rebase. Campi personalizzati, viste personalizzate, plugin e accesso completo agli hook interni.
 
 :::tip
@@ -90,7 +90,7 @@ Per utilizzare invece il tuo Postgres, decommenta `DATABASE_URL` in `.env` ed es
 | **Relations** | Uno-a-uno, uno-a-molti, molti-a-molti con tabelle di giunzione e join multi-hop |
 | **Row Level Security** | Criteri RLS in stile Supabase definiti nella configurazione della collezione |
 | **Authentication** | JWT + refresh token, dodici provider OAuth/OIDC, magic link, codici monouso, MFA con TOTP, chiavi API con scope, controllo degli accessi basato sui ruoli (RBAC) |
-| **File Storage** | Filesystem locale o compatibile con S3 con campi di upload e file browser |
+| **File Storage** | Filesystem locale, compatibile con S3 o Google Cloud Storage, con campi di upload e file browser |
 | **Real-time Sync** | Aggiornamenti live basati su WebSocket per tutti i client connessi |
 | **Entity History** | Traccia di controllo (audit trail) completa per ogni creazione, modifica ed eliminazione |
 | **REST API** | Endpoint CRUD generati automaticamente per ogni collezione |

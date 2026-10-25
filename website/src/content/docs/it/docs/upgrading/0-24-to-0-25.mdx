@@ -1,5 +1,5 @@
 ---
-sourceHash: 5fe43cc6af8d171f
+sourceHash: 6c20228a92368bc2
 slug: it/docs/upgrading/0-24-to-0-25
 title: Aggiornamento da 0.24 a 0.25
 sidebar_label: 0.24 → 0.25
@@ -161,7 +161,7 @@ else await client.data.users.update(String(found.id), user);
 
 ## 78. `page` insieme a `offset` viene rifiutato con `PAGE_WITH_OFFSET`
 
-Una lettura che specifica sia `page` che `offset` viene ora rifiutata. Il server risponde con `400 PAGE_WITH_OFFSET` e l'SDK rifiuta la coppia prima di inviare qualsiasi richiesta, con un `RebaseClientError` contenente lo stesso codice: via HTTP, in-process (`rebase.data`) e offline. In precedenza, `page` aveva la precedenza e `offset` veniva ignorato silenziosamente.
+Una lettura che specifica sia `page` che `offset` viene ora rifiutata. Il server risponde con `400 PAGE_WITH_OFFSET` e l'SDK rifiuta la coppia prima di inviare qualsiasi richiesta, con un `RebaseClientError` contenente lo stesso codice: via HTTP, in-process (`rebase.dataAsAdmin`) e offline. In precedenza, `page` aveva la precedenza e `offset` veniva ignorato silenziosamente.
 
 **Chi è interessato:** il codice che invia entrambi, ad esempio un `find({ page, offset })` o una chiamata REST con `?page=3&offset=40`. Tale lettura stava già considerando solo `page`.
 
@@ -216,7 +216,7 @@ Una scrittura che invia `""` per una proprietà `string` con `validation.require
 
 **Chi è interessato:** il codice che scrive `""` in un campo stringa obbligatorio, ad esempio un form o un'importazione che invia tutte le colonne indipendentemente dal fatto che siano compilate o meno.
 
-**Cosa modificare:** inviare un valore valido, omettere la chiave in creazione quando deve applicarsi un `defaultValue`, oppure rimuovere `required` dai campi che possono legittimamente essere vuoti. Le collezioni che dichiarano un `beforeSave` non vengono verificate al boundary (l'hook può popolare il valore), come prima. Il codice lato server che scrive in-process (`rebase.data`) non è interessato.
+**Cosa modificare:** inviare un valore valido, omettere la chiave in creazione quando deve applicarsi un `defaultValue`, oppure rimuovere `required` dai campi che possono legittimamente essere vuoti. Le collezioni che dichiarano un `beforeSave` non vengono verificate al boundary (l'hook può popolare il valore), come prima. Il codice lato server che scrive in-process (`rebase.dataAsAdmin`) non è interessato.
 
 ## 83. `QueryBuilder` e `createBackups` non sono più esportati da `@rebasepro/client`
 

@@ -1,5 +1,5 @@
 ---
-sourceHash: de9051fe769a602b
+sourceHash: 88050e5f44c6457a
 title: Ejecutar más de una instancia
 sidebar_label: Más de una instancia
 description: "Cada elemento de estado que un proceso de Rebase mantiene para sí mismo y la configuración que lo comparte: qué configurar antes de que una segunda réplica, un despliegue rolling o un despliegue dividido reciba tráfico."
@@ -35,7 +35,8 @@ Las secciones siguientes detallan qué ocurre con cada uno cuando se mantiene a 
 
 ## Secretos de firma
 
-`JWT_SECRET` firma cada sesión y `REBASE_SERVICE_KEY` autentica las llamadas entre servidores. En desarrollo, cada proceso genera el suyo propio cuando no están establecidos, por lo que un token emitido por un proceso es rechazado por el siguiente. En producción ya se deniega el arranque sin ellos; lo que importa con varios procesos es que cada uno reciba los **mismos** valores: a partir de un único secreto, no uno por réplica.
+`JWT_SECRET` firma cada sesión y `REBASE_SERVICE_KEY` autentica las llamadas entre servidores. En desarrollo, cada proceso genera el suyo propio cuando no están establecidos, por lo que un token emitido por un proceso es rechazado por el siguiente. En producción ya se deniega el arranque sin `JWT_SECRET` (sin `REBASE_SERVICE_KEY` arranca
+sin ninguna clave de servicio); lo que importa con varios procesos es que cada uno reciba los **mismos** valores: a partir de un único secreto, no uno por réplica.
 
 ## Límites de tasa y la dirección del cliente
 

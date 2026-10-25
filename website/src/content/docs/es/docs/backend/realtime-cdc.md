@@ -1,5 +1,5 @@
 ---
-sourceHash: 7256a7d26ab9e154
+sourceHash: 53c151ad9bf8af55
 title: "Captura de cambios a nivel de base de datos (CDC)"
 sidebar_label: "Captura de cambios a nivel de base de datos (CDC)"
 description: "Eventos en tiempo real para cada escritura confirmada, sea cual sea su origen: los triggers de captura, el ajuste REALTIME_CDC y lo que necesitan."
@@ -46,14 +46,14 @@ Si la conexión no lo soporta, `auto` muestra en su lugar una línea informativa
 2. **Captura** — Un cliente `LISTEN` dedicado y no agrupado (unpooled) por instancia consume `rebase_cdc`, mapea la tabla modificada a su colección correspondiente e introduce el cambio en el mismo flujo de `RealtimeService` utilizado por las mutaciones de la API. Al igual que el listener entre instancias, prioriza `DATABASE_DIRECT_URL` y se reconecta automáticamente.
 3. **Entrega segura con RLS** — La fila en bruto del flujo de cambios **nunca** se reenvía a los suscriptores. El cambio se marca como invalidado y cada suscripción vuelve a leer la fila bajo su **propio** contexto de autenticación. Por tanto, el filtrado es por suscriptor y nunca por emisor: un cliente solo recibe las filas que sus políticas RLS le permiten.
 4. **Entre instancias** — Dado que cada instancia observa cada commit a través del flujo de cambios, CDC también *es* el canal entre instancias; la difusión heredada por mutación `rebase_entity_changes` no se utiliza mientras CDC esté activo.
-5. **Desduplicación** — Una mutación realizada a través de la API de Rebase se entrega localmente en el instante en que se confirma (commits) y también se replica a través del flujo de cambios. La instancia de origen suprime un eco que llega dentro de la ventana de debounce del refetch (un registro efímero de sus propias emisiones), de modo que una escritura de la API normalmente produce una trama. Un eco que llega más tarde dispara un refetch más, que entrega de nuevo las mismas filas: es inocuo, pero un suscriptor puede ver una trama idéntica dos veces.
+5. **Desduplicación** — Una mutación realizada a través de la API de Rebase programa un refetch para los suscriptores locales en el instante en que se confirma (commits) y también se replica a través del flujo de cambios. La instancia de origen suprime un eco que llega dentro de la ventana de debounce del refetch (un registro efímero de sus propias emisiones), de modo que una escritura de la API normalmente produce una trama. Un eco que llega más tarde dispara un refetch más, que entrega de nuevo las mismas filas: es inocuo, pero un suscriptor puede ver una trama idéntica dos veces.
 
 ## Requisitos y notas
 
 `directConnectionString` es la opción del adaptador; en 0.24 usa `DATABASE_DIRECT_URL`.
 
 - CDC requiere una cadena de conexión directa (`DATABASE_DIRECT_URL`, el `directConnectionString` del adaptador o la conexión principal) para el cliente `LISTEN`: los agrupadores de conexiones (connection poolers) en modo transacción no admiten sesiones `LISTEN` de larga duración.
-- Los triggers solo se instalan en tablas respaldadas por una colección registrada. Las escrituras en tablas no asignadas se ignoran.
+- Los triggers solo se instalan en tablas respaldadas por una colección registrada, y en las tablas de unión de sus relaciones muchos a muchos. Las escrituras en tablas no asignadas se ignoran.
 - Una colección cuya tabla aún no ha sido migrada se omite con una advertencia en lugar de bloquear CDC para el resto.
 - La transmisión por replicación lógica nativa de WAL (`wal2json`/`pgoutput`) está prevista; hoy en día `REALTIME_CDC=wal` se degrada a la vía basada en triggers, que proporciona una cobertura equivalente a nivel de base de datos.
 

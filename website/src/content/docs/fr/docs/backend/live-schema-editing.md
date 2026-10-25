@@ -1,5 +1,5 @@
 ---
-sourceHash: fcc8e36632d57207
+sourceHash: f833e803807f9ac4
 title: Édition de schéma en direct
 description: Créez et modifiez des collections sur un backend en cours d'exécution — d'abord validé dans votre dépôt, puis appliqué.
 ---
@@ -332,7 +332,7 @@ Deux éléments garantissent la sécurité de l'exécution sur un dépôt dans l
 
 - Modifications additives uniquement. Tout le reste est refusé avec un motif, car le chemin d'assurance est la seule chose qui modifie un schéma et il ne peut qu'ajouter.
 - Aucun fichier de migration n'est écrit. Un projet provisionné par boot-ensure n'en a pas besoin ; un projet provisionné par migrations doit exécuter `rebase db generate`, qui en produit un via Atlas avec le hachage d'intégrité requis par Atlas.
-- Postgres uniquement. La fonctionnalité est détectée sur le pilote, et les autres moteurs répondent `SCHEMA_EDITING_UNSUPPORTED`.
+- Postgres et MongoDB (voir [MongoDB](#mongodb)). La fonctionnalité est détectée sur le pilote, et les autres moteurs répondent `SCHEMA_EDITING_UNSUPPORTED`.
 
 ## Liens connexes
 

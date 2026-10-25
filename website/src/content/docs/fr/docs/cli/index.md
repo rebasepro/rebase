@@ -1,5 +1,5 @@
 ---
-sourceHash: 9210bf054bc3c431
+sourceHash: de64511406443392
 title: Référence de la CLI
 sidebar_label: CLI
 description: Commandes de la CLI Rebase pour l'initialisation de projet, la génération de schéma, les migrations de base de données et la génération de SDK.
@@ -77,7 +77,7 @@ Le bundle est l'artefact que vous déployez — l'image du runtime le charge, il
 |------|--------|
 | `--output <dir>` (ou `--out`) | Écrire le bundle ailleurs que dans `dist-bundle/` (une application à la fois) |
 | `--vendor` | Toujours installer et inclure les dépendances du bundle |
-| `--no-vendor` | Ne jamais inclure les dépendances ; le pod les installe au premier démarrage |
+| `--no-vendor` | Ne jamais inclure les dépendances ; le pod les installe à chaque démarrage |
 | `--skip-type-check` | Ignorer la vérification de types (plus rapide, moins sûr) |
 | `--no-static` | Ne pas intégrer le frontend dans le bundle backend (chaque application statique obtient tout de même son propre bundle) |
 | `--skip-static-build` | Intégrer le frontend comme déjà compilé, sans exécuter sa commande de build |
@@ -325,7 +325,7 @@ La commande à exécuter lorsque quelque chose ne va pas et que vous ne savez pa
 | Chaînes de connexion | Un `=` non encodé dans un paramètre d'URL, que les outils de PostgreSQL refusent de parser — ainsi, les sauvegardes et `psql` échouent alors que l'application continue de fonctionner. |
 | Fonctions personnalisées | Ce dont chaque fonction a besoin de son hôte, et lesquelles ne s'exécuteraient pas sur un runtime edge. |
 
-**Sur la base de données**, lorsque `DATABASE_URL` est définie :
+**Sur la base de données** — celle du projet lui-même, résolue comme le fait `rebase db url`, donc sur un scaffold neuf il s'agit de la base gérée, que `doctor` démarre :
 
 | Vérification | Raison |
 | --- | --- |
@@ -338,7 +338,7 @@ La commande à exécuter lorsque quelque chose ne va pas et que vous ne savez pa
 
 Si la base de données est inaccessible, ses étapes sont signalées comme ignorées avec la raison correspondante et le reste s'exécute quand même — voir [Dépannage](/docs/troubleshooting/).
 
-Renvoie un code de sortie non nul lorsqu'une vérification détecte une erreur, ou lorsqu'une étape n'a pas pu s'exécuter parce que la base de données fournie refuse les connexions. Une étape ignorée parce qu'aucune variable `DATABASE_URL` n'a été définie n'est pas considérée comme un échec.
+Renvoie un code de sortie non nul lorsqu'une vérification détecte une erreur, ou lorsqu'une étape n'a pas pu s'exécuter parce que la base de données fournie refuse les connexions. Une étape ignorée parce qu'aucune base de données n'a pu être résolue n'est pas considérée comme un échec.
 
 `rebase doctor --policies` n'exécute que les vérifications RLS — pas de diff de schéma, pas de types de SDK — et échoue par défaut, ce qui en fait la forme idéale à utiliser comme barrière de contrôle en CI sur une base de données déployée.
 

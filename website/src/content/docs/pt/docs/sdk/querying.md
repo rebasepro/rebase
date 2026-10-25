@@ -1,5 +1,5 @@
 ---
-sourceHash: dc64725d910c68e0
+sourceHash: aecc5f68b6d9adc0
 title: Consultando Dados
 sidebar_label: Consultando Dados
 description: Operações CRUD, construtor de consultas fluente, operadores de filtro, ordenação, seleção de colunas e agregações com o SDK tipado do Rebase.
@@ -417,7 +417,7 @@ const byCustomer = await client.data.orders.aggregate({
     groupBy: ["customerId"],
     limit: 200
 });
-byCustomer.meta; // { limit: 200, offset: 0, hasMore: true } — pagine com offset: 200
+byCustomer.meta; // { limit: 200, offset: 0, hasMore: true } — page on with offset: 200
 ```
 
 O resultado continua sendo um array de linhas; `meta` é uma propriedade não
@@ -428,8 +428,8 @@ uma function de servidor (`rebase.data`, `context.data`) uma agregação
 agrupada sem `limit` retorna todos os grupos. Na 0.23 não há `meta` nem
 `offset`, então uma lista de grupos cortada no limite parece completa.
 `include` não é enviado com uma
-agregação: ela não tem relações para carregar. O SDK ainda não ordena grupos;
-via HTTP eles também podem ser ordenados — veja
+agregação: ela não tem relações para carregar. Os grupos
+podem ser ordenados com `orderBy`, por uma coluna de `groupBy` ou pela chave de uma agregação — veja
 [Agregações e busca](/docs/sdk/aggregates-and-search/).
 
 O objetivo principal é evitar a busca de linhas apenas para reduzi-las na aplicação. "Receita por status" em um milhão de pedidos é resolvido aqui com uma consulta e uma linha por status, enquanto em outros lugares exigiria um `findAll()` com um loop — o que é incorreto com um `limit` e impraticável sem ele. Essa operação é executada sob o mesmo handle de requisição de qualquer outra leitura, garantindo a aplicação de row-level security às linhas agregadas.

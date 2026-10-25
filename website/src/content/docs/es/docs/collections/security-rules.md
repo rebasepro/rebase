@@ -1,5 +1,5 @@
 ---
-sourceHash: bf198f4f8752c00d
+sourceHash: 0a89002005014cb6
 title: Reglas de seguridad (RLS)
 sidebar_label: Reglas de seguridad
 description: Define políticas de seguridad a nivel de fila (RLS) para tus colecciones mediante atajos prácticos o expresiones SQL puras.
@@ -86,7 +86,7 @@ Esto genera: `USING ((user_id)::text = (SELECT rebase.uid()))` — consulta
 
 ### Acceso público
 
-Permite que cualquiera (incluidos los usuarios no autenticados) pueda leer:
+No pone ningún filtro de filas en las lecturas, de modo que todo solicitante al que la API deja pasar lee todas las filas:
 
 ```typescript
 securityRules: [
@@ -95,6 +95,11 @@ securityRules: [
 ```
 
 Esto genera: `USING (true)`
+
+Amplía qué filas ve un solicitante, no quién puede llamar. Por defecto la API sigue
+respondiendo 401 a una solicitud sin token. Define `AUTH_REQUIRE=false`
+(`auth.requireAuth: false`) para quitar esa barrera y dejar que decidan solo
+las políticas; entonces un solicitante no autenticado también lee estas filas.
 
 ### Acceso autenticado
 
@@ -171,7 +176,8 @@ Importado desde `@rebasepro/types`. Las expresiones se componen; los operandos s
 | `policy.outerField(name)` | dentro de `existsIn`, una columna de la fila externa |
 | `policy.literal(value)` | una cadena de texto, número, booleano o `null` |
 | `policy.authUid()` | `rebase.uid()` |
-| `policy.authRoles()` | `rebase.roles()` |
+| `policy.authRoles()` | los roles del solicitante como un array, `string_to_array(rebase.roles(), ',')` |
+| `policy.authClaim(name)` | un claim personalizado del token de sesión, `NULLIF(rebase.jwt() ->> '<name>', '')`, convertido al tipo de la columna con la que se compara |
 
 #### Evaluado una vez por sentencia
 
@@ -231,7 +237,7 @@ securityRules: [
 - **`using`** — Filtra qué filas existentes son visibles (se aplica a SELECT, UPDATE, DELETE)
 - **`withCheck`** — Valida los valores de las nuevas filas (se aplica a INSERT, UPDATE)
 
-Las referencias a columnas utilizan la sintaxis `{nombre_columna}`, la cual se resuelve a la columna completamente calificada con el nombre de la tabla.
+Las referencias a columnas utilizan la sintaxis `{column_name}`, la cual se resuelve a la columna completamente calificada con el nombre de la tabla.
 
 ## Combinar atajos y SQL
 
@@ -342,7 +348,7 @@ securityRules: [
 
 ## Acceso anónimo (inserciones públicas)
 
-Una necesidad común es permitir que los **usuarios no autenticados** envíen datos: formularios de contacto, suscripciones a boletines o solicitudes públicas. Rebase ofrece un patrón limpio para esto.
+Una necesidad común es permitir que los **usuarios no autenticados** envíen datos: formularios de contacto, suscripciones a boletines o solicitudes públicas. Rebase ofrece un patrón limpio para esto. Una solicitud sin token solo llega a estas políticas cuando `AUTH_REQUIRE=false` (`auth.requireAuth: false`); de lo contrario, la API la responde antes con un 401.
 
 ### Recomendado: una regla `withCheck` pura
 
@@ -371,7 +377,7 @@ const contactMessagesCollection = defineCollection({
 });
 ```
 
-El atajo `access: "public"` genera una política que permite la operación sin requerir autenticación.
+El atajo `access: "public"` genera una política sin filtro de filas. Que un solicitante sin token llegue a ella depende de `AUTH_REQUIRE`, no de la política.
 
 ### Para captación de prospectos / registros
 
@@ -396,11 +402,11 @@ const leadSignupsCollection = defineCollection({
 
 ### Cómo funcionan las solicitudes anónimas
 
-Cuando llega una solicitud sin un token JWT, el backend de Rebase establece las variables de sesión de PostgreSQL en:
+Cuando llega una solicitud sin un token JWT (y `AUTH_REQUIRE=false` la deja pasar), el backend de Rebase establece las variables de sesión de PostgreSQL en:
 
 | Variable | Valor |
 |----------|-------|
-| `app.user_id` | `'anonymous'` |
+| `app.uid` (y su alias heredado `app.user_id`) | `'anonymous'` |
 | `app.user_roles` | `''` (vacío) |
 
 Esto significa que:

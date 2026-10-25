@@ -184,7 +184,7 @@ Wie ein Suchbegriff mit den von Ihnen benannten Feldern abgeglichen wird.
 | `mode` | Treffer | Findet `Muñoz` anhand von `munoz` | Findet `sebastian` anhand von `seb` |
 |---|---|---|---|
 | `"fts"` (Standard) | ganze Lexeme, über den `tsvector` und dessen GIN-Index | mit `unaccent` | nein |
-| `"hybrid"` | dies, `ODER` ein Substring-Abgleich über dieselben Felder | **immer** | **ja** |
+| `"hybrid"` | dies, `OR` ein Substring-Abgleich über dieselben Felder | **immer** | **ja** |
 
 ```typescript
 search: {

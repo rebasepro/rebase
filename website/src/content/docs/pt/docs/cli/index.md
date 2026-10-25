@@ -1,5 +1,5 @@
 ---
-sourceHash: 9210bf054bc3c431
+sourceHash: de64511406443392
 title: Referência da CLI
 sidebar_label: CLI
 description: Comandos da CLI do Rebase para inicialização de projetos, geração de schemas, migrações de banco de dados e geração de SDK.
@@ -86,7 +86,7 @@ O bundle é o artefato que você implanta — a imagem de runtime o carrega, por
 |------|--------|
 | `--output <dir>` (ou `--out`) | Grava o bundle em outro local que não seja `dist-bundle/` (um app por vez) |
 | `--vendor` | Sempre instala e empacota as dependências do bundle |
-| `--no-vendor` | Nunca faz o vendoring; o pod instala na primeira inicialização |
+| `--no-vendor` | Nunca faz o vendoring; o pod as instala a cada inicialização |
 | `--skip-type-check` | Pula a verificação de tipos (mais rápido, menos seguro) |
 | `--no-static` | Não embute o frontend no bundle do backend (cada app estático ainda recebe seu próprio bundle) |
 | `--skip-static-build` | Embute o frontend como já compilado, sem executar seu comando de build |
@@ -351,7 +351,9 @@ O comando para executar quando algo estiver errado e você ainda não souber o q
 | Strings de conexão | Um caractere `=` não codificado em um parâmetro de URL, o qual as próprias ferramentas do PostgreSQL se recusam a interpretar — fazendo com que backups e o `psql` quebrem enquanto a aplicação continua funcionando. |
 | Funções customizadas | O que cada função requer de seu host e quais delas não executariam em um runtime de edge. |
 
-**Contra o banco de dados**, quando `DATABASE_URL` estiver definido:
+**Contra o banco de dados** — o do próprio projeto, resolvido da mesma forma que
+`rebase db url` o resolve, de modo que num scaffold novo é o banco gerenciado, que o
+`doctor` inicia:
 
 | Verificação | Motivo |
 | --- | --- |
@@ -364,7 +366,7 @@ O comando para executar quando algo estiver errado e você ainda não souber o q
 
 Se o banco de dados estiver inacessível, suas etapas são reportadas como ignoradas informando o motivo, e o restante continua sendo executado — consulte [Solução de Problemas](/docs/troubleshooting/).
 
-Encerra com código diferente de zero quando uma verificação encontra um erro, ou quando uma etapa não pôde ser executada porque o banco de dados fornecido recusa conexões. Uma etapa ignorada por você não ter definido `DATABASE_URL` não é considerada uma falha.
+Encerra com código diferente de zero quando uma verificação encontra um erro, ou quando uma etapa não pôde ser executada porque o banco de dados fornecido recusa conexões. Uma etapa ignorada porque nenhum banco de dados pôde ser resolvido não é considerada uma falha.
 
 `rebase doctor --policies` executa apenas as verificações de RLS — sem diff de schema, sem tipos do SDK — e falha de forma estrita (fails closed), tornando-se o formato ideal para ser utilizado como validação de CI contra um banco de dados implantado.
 

@@ -21,6 +21,18 @@ Utilisez-le pour les tâches qui ne doivent pas être perdues et ne doivent pas 
 
 ## Activation
 
+:::note[Où placer ce code]
+**Runtime managé** — nulle part. `jobs` prend des *fonctions* de gestionnaire, qu'aucune variable
+d'environnement ni aucun export de `config/index.ts` ne peut transporter : un projet généré ne peut donc pas
+activer la file d'attente. Lancez `rebase eject` (ou écrivez un
+[serveur personnalisé](/docs/backend/custom-server/)) pour y accéder. `REBASE_JOB_WORKERS`
+dans `.env` décide seulement si les workers d'une file déjà activée tournent dans *ce* processus.
+
+**Éjecté** — le bloc `jobs` de `initializeRebaseBackend({ … })`, comme ci-dessous.
+
+La carte complète se trouve dans la [Vue d'ensemble du backend](/docs/backend/#where-each-option-lives).
+:::
+
 ```typescript no-verify
 await initializeRebaseBackend({
     jobs: {

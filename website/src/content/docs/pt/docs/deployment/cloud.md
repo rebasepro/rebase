@@ -1,5 +1,5 @@
 ---
-sourceHash: 65ad924b56043f2e
+sourceHash: 1959160bec263545
 title: Rebase Cloud
 sidebar_label: Rebase Cloud
 description: O Rebase Cloud é o mesmo Rebase, operado para você. O que é, como um projeto se vincula e faz deploy, e o que o beta privado ainda não inclui.
@@ -95,15 +95,12 @@ Ele termina dizendo onde cada app responde agora e se a nova versão está no ar
     backend  backend  https://songbuzz.rebase.website/api  live
 
   ✓ Live: the new version answers on every address above.
+  Something wrong? `rebase cloud rollback` puts the previous deployment back.
 ```
 
 "Live" significa que o endereço respondeu depois do build: o `/api/health` do backend retornou `ok` e a página de um app estático carregou (deste deploy, quando a plataforma a serve). A verificação espera até `--live-timeout` segundos, 60 por padrão; `0` a pula. Se um app não responder a tempo, o deploy ainda sai com código zero, porque o deployment teve sucesso, e a última linha diz qual app não respondeu e por quê. Um deploy que falhou termina, em vez disso, com uma linha que nomeia o app e o motivo, com `rebase cloud logs` para o log completo do build.
 
 Scripts passam `--json` para receber um objeto com os mesmos dados — `apps`, `hosts`, `live`, `liveChecks`, `durationMs` e o id do deploy. Diferente do resto de `rebase cloud`, o `deploy` não muda para JSON sozinho quando usado com pipe.
-
-Para enviar um artefato que foi compilado anteriormente — por exemplo, um job de
-CI que compila uma vez e faz deploy duas vezes —, aponte para o diretório em vez
-de recompilar:
 
 O que esse runtime permite — pacotes e módulos nativos, memória e instâncias,
 timeouts e tamanhos de corpo de requisição, o sistema de arquivos, segredos, armazenamento e rede
@@ -141,14 +138,58 @@ Com `--json`, o `code` do erro é `syntax_error`. Scripts inline que um navegado
 Acompanhe:
 
 ```bash
-rebase cloud logs            # o log de build
-rebase cloud logs --runtime  # o que o contêiner em execução está imprimindo
-rebase cloud status          # o que a plataforma indica que o projeto está fazendo
+rebase cloud logs            # the build log
+rebase cloud logs --runtime  # what the running container is printing
+rebase cloud status          # what the platform thinks the project is doing
 ```
 
 O comando `status` informa `blockedOn` e `nextAction`. Quando `blockedOn` for `null`, a
 plataforma está genuinamente trabalhando e fazer polling é o correto; quando indicar
 algo, esse algo está aguardando você.
+
+## Pré-visualizar uma mudança
+
+<span class="since-badge" data-since="0.26">A partir da versão 0.26</span>
+
+```bash
+rebase cloud deploy --preview
+```
+
+Isso compila e envia exatamente o que o `deploy` enviaria, mas o serve em um endereço
+próprio, como `https://shop--k3x9ab.rebase.website`. A produção continua
+servindo o que servia antes. O deploy imprime o endereço do preview quando o
+build termina.
+
+Para manter um mesmo endereço entre deploys, dê um nome ao preview. Fazer o deploy do mesmo nome
+de novo o atualiza:
+
+```bash
+rebase cloud deploy --preview-name new-checkout
+```
+
+Com o que um preview conversa depende do que você publicou:
+
+- **`rebase cloud deploy web --preview`** faz o preview de um app estático. Suas páginas chamam
+  o backend de **produção**: um login ali é uma sessão real, e qualquer coisa
+  gravada ali são dados de produção.
+- **`rebase cloud deploy --preview`** faz o preview do backend, com seus apps estáticos
+  incorporados, do mesmo jeito que a produção os executa. Ele recebe um backend próprio em
+  um **banco de dados vazio e só dele**, nunca o da produção. Inicializar contra
+  o banco de dados da produção aplicaria a ele o schema e as regras de acesso do preview.
+
+Um preview não envia código-fonte e não registra apps nem hostnames, porque cada um
+deles alteraria o projeto de produção. `--source` e `--eject` não podem ser
+combinados com `--preview`. Cada um constrói uma imagem de contêiner para a produção.
+
+```bash
+rebase cloud previews                      # name, address, app, backend, expiry
+rebase cloud previews delete new-checkout  # stops serving it and drops its database
+```
+
+Um preview expira uma semana depois do último deploy feito nele.
+
+Os previews estão sendo liberados gradualmente. Um plano de controle que ainda não os serve recusa
+`--preview` com `previews_unavailable` e não faz deploy de nada.
 
 ## Fazer rollback
 
@@ -233,7 +274,7 @@ jobs:
 | Permissão | O que o token pode fazer |
 |---|---|
 | `deploy` | Fazer deploy do projeto e acompanhar seus builds: `deploy`, `deployments` |
-| `logs` | Ler logs de build e runtime, além de métricas em tempo real: `logs`, `metrics` |
+| `logs` | Ler logs de build e runtime, o histórico de crons e métricas em tempo real: `logs`, `cron`, `metrics` |
 | `env` | Ler e alterar variáveis de ambiente, incluindo segredos |
 | `database` | `db list`, `db info` e `db connect`, o que inclui a senha do banco de dados |
 | `backups` | Listar, criar, inspecionar e baixar backups, e ler a janela de point-in-time |
@@ -295,7 +336,7 @@ rebase cloud compute set --cpu 500m --memory 2Gi
 | `--autoscale-cpu-target` | 10–95. A utilização de CPU que o autoscaler mantém, calculada sobre o request em vez do limit. Vazio indica 70 |
 | `--spot` | `true` ou `false`. Capacidade preemptível: mais barata, porém reiniciada sem aviso prévio |
 | `--db-instances` | 1–3. `1` é uma instância única sem failover; `2` adiciona um standby automático |
-| `--db-cpu`, `--db-memory`, `--storage` | Por instância de banco de dados. Vazio indica `500m`, `2Gi` e o volume padrão |
+| `--db-cpu`, `--db-memory` | Por instância de banco de dados. Vazio indica `160m` e `1Gi` |
 
 Um parâmetro vazio não é o mesmo que um fixado no mesmo valor: um parâmetro vazio
 segue o padrão da plataforma e é ajustado quando este mudar.
@@ -311,11 +352,12 @@ exceto alterações que reiniciem o banco de dados, que aguardam uma janela de m
 | Grupo de comandos | O que abrange |
 |---|---|
 | `login`, `logout`, `whoami` | Sua sessão |
-| `init` | Com `--claim`: um backend no ar sem conta e um link para reivindicá-lo. Veja [Um backend sem conta](#um-backend-sem-conta) |
 | `tokens` | Tokens para CI e agentes, cada um restrito a um projeto. Consulte [CI e agentes](#ci-e-agentes) |
 | `link`, `unlink`, `use`, `open` | Vincular este diretório a um projeto, selecionar uma organização, abrir o console |
+| `init` | Com `--claim`: um backend no ar sem conta e um link para reivindicá-lo. Veja [Um backend sem conta](#um-backend-sem-conta) |
 | `projects` | Criar, listar, inspecionar, excluir |
 | `deploy`, `logs`, `deployments`, `rollback`, `cancel` | Publicação e monitoramento |
+| `previews` | Builds servidos em seu próprio endereço por `deploy --preview`, e a exclusão deles. Veja [Pré-visualizar uma mudança](#pré-visualizar-uma-mudança) |
 | `start`, `stop`, `restart` | Pausar um projeto e reativá-lo |
 | `status`, `metrics`, `debug` | O que está em execução e eventuais falhas |
 | `cron` | Os cron jobs da aplicação implantada e suas execuções registradas, lidos com o seu login do `rebase cloud`. Somente leitura |
@@ -352,8 +394,9 @@ Explicado abertamente, porque descobrir depois é pior:
 - **Não é self-service.** O acesso é concedido em lotes; não há cadastro com pagamento imediato.
 - **Sem SLA publicado**, e sem SOC 2. Caso necessite de qualquer um deles, mencione
   ao solicitar acesso em vez de assumir que existem.
-- **Sem deploys de preview ou branch**, e sem GitHub App oficial. Deploy hooks —
-  URLs secretas para as quais você direciona um webhook do repositório — são a automação suportada.
+- **Sem deploys por branch**, e sem GitHub App oficial. Deploy hooks —
+  URLs secretas para as quais você direciona um webhook do repositório — são a automação suportada. Os [deploys
+  de preview](#pré-visualizar-uma-mudança) estão sendo liberados gradualmente e são iniciados pela CLI.
 - **Tokens atuam em nome de uma pessoa.** Um [token](#ci-e-agentes) é gerado por uma conta
   e atua como ela; ainda não existe uma identidade de máquina de propriedade da organização. Caso
   faça login a partir do CI, forneça `REBASE_CLOUD_EMAIL` e `REBASE_CLOUD_PASSWORD`

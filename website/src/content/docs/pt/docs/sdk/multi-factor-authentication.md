@@ -2,6 +2,7 @@
 sourceHash: a67897c131d33a15
 title: "Autenticação Multifator"
 sidebar_label: "Autenticação Multifator"
+description: "Fatores TOTP com o SDK do Rebase: cadastrar um, o segundo passo de um login, códigos de recuperação e remoção de um fator."
 ---
 
 Fatores TOTP — um aplicativo autenticador — mais o desafio que eleva uma sessão

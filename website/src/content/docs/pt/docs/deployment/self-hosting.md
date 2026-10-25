@@ -1,5 +1,5 @@
 ---
-sourceHash: cef32249585688a5
+sourceHash: 64dad399c92c2e1c
 title: Auto-hospedagem
 sidebar_label: Auto-hospedagem
 description: Execute o Rebase em qualquer lugar com a imagem oficial de runtime e o bundle do seu projeto — Docker Compose, Fly, Railway ou uma VPS simples.
@@ -44,8 +44,8 @@ isso ocorre porque cada um foi escrito para o seu próprio gerador: este lê
 grava no seu `.env`.
 
 ```bash
-rebase build                    # produz ./dist-bundle
-./infra/docker/quickstart.sh    # grava infra/docker/.env se ausente e depois o inicializa
+rebase build                    # produces ./dist-bundle
+./infra/docker/quickstart.sh    # writes infra/docker/.env if absent, then brings it up
 ```
 
 O `quickstart.sh` é um comando único que faz duas coisas óbvias e imprime ambas. A
@@ -96,10 +96,11 @@ Três segredos, uma definição e a conta com a qual você faz login:
   uma única vez, enquanto a tabela de usuários estiver vazia, e não faz nada em todas as inicializações
   subsequentes.
 
-Cada um dos três segredos deve ter pelo menos 32 caracteres, e a senha de admin,
-pelo menos 12. Use um endereço com ponto em seu domínio: `POST /auth/login` valida
-seu corpo com `z.string().email()`, portanto `admin@localhost` inicializaria uma conta
-e depois recusaria qualquer tentativa de usá-la. O arquivo compose declara todos os seis com
+`JWT_SECRET` e `REBASE_SERVICE_KEY` devem ter cada um pelo menos 32 caracteres, e
+a senha de admin, pelo menos 12. Use um endereço com ponto em seu domínio: `POST /auth/login` valida
+seu corpo com `z.string().email()`, portanto o runtime se recusa a criar a conta
+`admin@localhost` — uma conta na qual ninguém conseguiria entrar — e registra o
+motivo em vez disso. O arquivo compose declara todos os seis com
 `${VAR:?…}`, de modo que a ausência de um deles interrompe a stack com uma mensagem indicando-o
 em vez de iniciar algo configurado pela metade — e o autorregistro vem desativado
 (`DISABLE_SELF_REGISTRATION`, padrão `true`), para que nada fique desprotegido.
@@ -219,15 +220,18 @@ arquivos enviados no próximo reinício. Os uploads são recusados com
 `501 STORAGE_NOT_CONFIGURED` até que você configure um.
 
 Para usar um bucket, defina `STORAGE_TYPE=s3` (ou `gcs`) juntamente com seu bucket e credenciais —
-o arquivo compose lista as variáveis comentadas.
+o arquivo compose lista as variáveis comentadas. O `gcs` carrega
+`@google-cloud/storage`, que a imagem oficial não inclui, então nessa imagem
+acesse o Google Cloud Storage pelo seu endpoint compatível com S3
+(`STORAGE_TYPE=s3`, `S3_ENDPOINT=https://storage.googleapis.com`, chaves HMAC).
 
 Para disco local, o que só é apropriado quando o caminho for um volume real que
 persista além da vida útil do contêiner:
 
 ```yaml
       STORAGE_TYPE: local
-      # Cada bucket declarado ganha um diretório ao lado deste, bucket("media")
-      # /storage/uploads__media, portanto o volume vai no diretório pai deles.
+      # Each declared bucket gets a directory beside this one, bucket("media")
+      # /storage/uploads__media, so the volume goes on their parent.
       STORAGE_PATH: /storage/uploads
       FORCE_LOCAL_STORAGE: "true"
     volumes:
@@ -292,7 +296,7 @@ contêineres funcionará. Dois pontos que devem ser configurados corretamente em
 
 ```toml
 [build]
-  image = "rebasepro/server:0.25.1"
+  dockerfile = "Dockerfile"   # FROM rebasepro/server:0.25.1 + COPY dist-bundle /bundle
 
 [http_service]
   internal_port = 8080
@@ -317,7 +321,7 @@ rebase-server /srv/myapp/dist-bundle
 ```
 
 O comando `rebase-server --help` lista as variáveis que ele lê. Sob o systemd — as
-três linhas de admin são recentes e, na versão 0.17.3, a primeira conta a
+duas linhas `REBASE_ADMIN_*` exigem a versão 0.18 ou posterior e, na versão 0.17.3, a primeira conta a
 se registrar torna-se administradora:
 
 ```ini title="/etc/systemd/system/rebase.service"
@@ -373,9 +377,9 @@ postgres://rebase:$POSTGRES_PASSWORD@your-host:6432/rebase
 ```
 
 ```bash
-PGBOUNCER_PORT=6432           # porta no host
-PGBOUNCER_MAX_CLIENT_CONN=500 # conexões de clientes aceitas
-PGBOUNCER_POOL_SIZE=20        # conexões com o servidor usadas para atendê-los
+PGBOUNCER_PORT=6432           # host port
+PGBOUNCER_MAX_CLIENT_CONN=500 # client connections accepted
+PGBOUNCER_POOL_SIZE=20        # server connections used to serve them
 ```
 
 A autenticação dos clientes é gerada a partir de `DATABASE_URL` na inicialização, de modo que a

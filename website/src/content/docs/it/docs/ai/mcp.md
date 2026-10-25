@@ -1,8 +1,8 @@
 ---
-sourceHash: ee28e46d5e82c6f9
+sourceHash: 78d733a060f9bbd1
 title: Server MCP
 sidebar_label: Server MCP
-description: Connetti Claude Code, Cursor, Gemini CLI o qualsiasi client MCP a un progetto Rebase — i 42 tool esposti, le credenziali con cui si autentica e il loopback gate che si interpone tra un agent e la produzione.
+description: Connetti Claude Code, Cursor, Gemini CLI o qualsiasi client MCP a un progetto Rebase — i 44 tool esposti, le credenziali con cui si autentica e il loopback gate che si interpone tra un agent e la produzione.
 ---
 
 `@rebasepro/mcp` è un server [Model Context Protocol](https://modelcontextprotocol.io)
@@ -297,12 +297,12 @@ sull'interfaccia di loopback.** Il gate è definito come un elenco di ciò che *
 soggetto al gate, pertanto un tool aggiunto successivamente risulterà protetto per impostazione predefinita.
 
 - **Non soggetti a gate — letture:** `rebase_schema_plan`, `rebase_doctor`,
-  `rebase_db_branch_list`, `rebase_db_branch_info`, `list_documents`,
+  `rebase_db_branch_list`, `rebase_db_branch_info`, `rebase_db_branch_diff`, `list_documents`,
   `get_document`, `list_users`, `list_roles`, `storage_list_objects`,
   `storage_get_download_url`, `cron_list_jobs`, `cron_get_job`, `cron_get_job_logs`,
   `rebase_dev_logs`.
 - **Non soggetti a gate — solo locali:** `rebase_schema_introspect`, `rebase_schema_generate`, `rebase_db_generate`,
-  `rebase_generate_sdk`, i tool del dev-server e i tool del registro dei progetti.
+  `rebase_generate_sdk`, `rebase_db_branch_switch`, i tool del dev-server e i tool del registro dei progetti.
   Questi scrivono file locali o stato locale e non hanno alcuna destinazione remota da verificare.
 - **Soggetti a gate rispetto a `DATABASE_URL`:** i restanti tool della CLI — `rebase_db_push`,
   `rebase_db_migrate`, `rebase_db_branch_create`, `rebase_db_branch_delete`.
@@ -310,7 +310,8 @@ soggetto al gate, pertanto un tool aggiunto successivamente risulterà protetto 
   `create_document`, `update_document`, `delete_document`, `create_user`,
   `update_user`, `delete_user`, `rebase_auth_reset_password`,
   `storage_delete_object`, `cron_trigger_job`, `cron_toggle_job`,
-  `invoke_function`.
+  `invoke_function` — e `rebase_cloud_provision`, che avvia `rebase cloud`
+  ma viene verificato anch'esso rispetto a `baseUrl`.
 
 Le due destinazioni non sono intercambiabili. I tool della CLI non vedono mai `baseUrl`, quindi un
 backend su localhost associato a un `DATABASE_URL` di produzione viene verificato rispetto
@@ -342,7 +343,8 @@ Da un terminale,
 `rebase db push` e `rebase db migrate` girano su quel database; solo i tool MCP
 vengono rifiutati. Su 0.24 la CLI li rifiuta lì anche lei.
 
-Solo il loopback è considerato locale: `localhost`, `*.localhost`, `127.0.0.0/8`, `::1`.
+Solo il loopback è considerato locale: `localhost`, `*.localhost`, `127.0.0.0/8`, `::1`
+(e `0.0.0.0`).
 Gli intervalli privati come `10.x` e `192.168.x` **non** lo sono — possono altrettanto facilmente essere
 un cluster di staging condiviso quanto un laptop, e trattarli come locali lascerebbe
 passare proprio l'incidente che il gate intende prevenire.
@@ -416,9 +418,9 @@ con la dovuta cautela.
 
 ## Riferimento dei tool
 
-42 tool, suddivisi in nove gruppi: schema e database, pianificazione dello schema,
-documenti, utenti e ruoli, storage, cron, funzioni, il dev server e il registro
-dei progetti. Ognuno, con ciò che richiede e se il gate lo rifiuta rivolto a una
+44 tool, suddivisi in dieci gruppi: schema e database, pianificazione dello schema,
+documenti, utenti e ruoli, storage, cron, funzioni, il dev server, il registro
+dei progetti e Rebase Cloud. Ognuno, con ciò che richiede e se il gate lo rifiuta rivolto a una
 destinazione non locale, si trova nel [Riferimento dei tool MCP](/docs/ai/mcp-tool-reference).
 
 ## Risorse

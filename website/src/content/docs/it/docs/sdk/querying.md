@@ -1,5 +1,5 @@
 ---
-sourceHash: dc64725d910c68e0
+sourceHash: aecc5f68b6d9adc0
 title: Interrogare i dati
 sidebar_label: Interrogare i dati
 description: Operazioni CRUD, fluent query builder, operatori di filtro, ordinamento, selezione delle colonne e aggregazioni con l'SDK tipizzato di Rebase.
@@ -410,7 +410,7 @@ const byCustomer = await client.data.orders.aggregate({
     groupBy: ["customerId"],
     limit: 200
 });
-byCustomer.meta; // { limit: 200, offset: 0, hasMore: true } — pagina con offset: 200
+byCustomer.meta; // { limit: 200, offset: 0, hasMore: true } — page on with offset: 200
 ```
 
 Il risultato resta un array di righe; `meta` è una proprietà non enumerabile su
@@ -421,8 +421,9 @@ funzione server (`rebase.data`, `context.data`) un'aggregazione raggruppata
 senza `limit` restituisce tutti i gruppi. Sulla 0.23 non esistono `meta` né
 `offset`, quindi un elenco di gruppi troncato al limite sembra completo.
 `include` non viene inviato con
-un'aggregazione: non ha relazioni da caricare. L'SDK non ordina ancora i
-gruppi; via HTTP possono anche essere ordinati — vedi
+un'aggregazione: non ha relazioni da caricare. I gruppi possono essere
+ordinati con `orderBy`, per una colonna di `groupBy` o per la chiave di
+un'aggregazione — vedi
 [Aggregazioni e ricerca](/docs/sdk/aggregates-and-search/).
 
 Il vantaggio fondamentale consiste nell'evitare di scaricare le righe solo per aggregarle. Il "fatturato per stato" su un milione di ordini corrisponde in questo modo a un'unica query e a una sola riga per stato, mentre altrove richiederebbe una `findAll()` seguita da un ciclo — approccio non corretto in presenza di un `limit` e insostenibile senza di esso. L'operazione viene eseguita attraverso lo stesso handle contestuale alla richiesta usato da ogni altra lettura, per cui la sicurezza a livello di riga (RLS) si applica anche alle righe aggregate.

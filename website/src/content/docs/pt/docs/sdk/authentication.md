@@ -1,5 +1,5 @@
 ---
-sourceHash: 65085708df65a92e
+sourceHash: aba79f55ccca539b
 title: Autenticação
 sidebar_label: Autenticação
 description: Autenticação no lado do cliente com o SDK Rebase — login com e-mail/senha, provedores OAuth, gerenciamento de sessão e listeners de estado de autenticação.
@@ -133,8 +133,8 @@ não uma conta. Isso é deliberado: um endpoint que dissesse "usuário inexisten
 oráculo de enumeração de contas, portanto não use o resultado para informar a uma pessoa se ela está
 cadastrada — ele não sabe.
 
-Ambos precisam de um serviço de e-mail configurado no backend, caso contrário responderão com 503
-`EMAIL_NOT_CONFIGURED`.
+Enviar um exige um serviço de e-mail configurado no backend, caso contrário
+`sendMagicLink` responde com 503 `EMAIL_NOT_CONFIGURED`.
 
 ## Códigos de Uso Único
 
@@ -364,8 +364,8 @@ unsubscribe();
 |-------|------|
 | `SIGNED_IN` | Um login ou cadastro foi concluído |
 | `TOKEN_REFRESHED` | O token de acesso foi renovado — incluindo a renovação silenciosa que restaura uma sessão no carregamento da página |
-| `USER_UPDATED` | `updateUser()` alterou o perfil, ou `confirmEmailChange()` moveu esta conta para seu novo endereço |
-| `SIGNED_OUT` | Um logout ou uma atualização que falhou definitivamente |
+| `USER_UPDATED` | `updateUser()` alterou o perfil, `linkAnonymous()` transformou um convidado em uma conta, `changeEmail()` iniciou uma troca de endereço, ou `confirmEmailChange()` moveu esta conta para seu novo endereço |
+| `SIGNED_OUT` | Um logout, `revokeAllSessions()`, ou uma atualização que falhou definitivamente |
 
 ## Gerenciamento de Senha
 

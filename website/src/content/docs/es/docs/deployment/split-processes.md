@@ -1,5 +1,5 @@
 ---
-sourceHash: 8dc5279c89b40f48
+sourceHash: 8c0fc8ebbe0f0b10
 title: División en varios procesos
 sidebar_label: Procesos divididos
 description: Ejecute un bundle como varios procesos cooperativos —una API, una capa de funciones, un worker— desde la misma imagen de runtime publicada, para que una función personalizada pesada deje de competir con la API de datos.
@@ -295,9 +295,10 @@ regla que usted debe seguir en lugar de una que el runtime pueda hacer cumplir.
 ## Actualización
 
 Sin cambios: cada proceso ejecuta la misma imagen publicada, por lo que una actualización es el mismo
-cambio de etiqueta en cada uno de ellos. Actualice la `api` al final si desea que el
-aprovisionamiento del esquema ocurra primero contra la nueva versión; aunque en la práctica el
-orden no importa, porque el paso del esquema es aditivo e idempotente.
+cambio de etiqueta en cada uno de ellos. Actualice primero el proceso que es dueño del esquema —la `api`,
+o el Job de migración—, para que el esquema de la nueva versión esté en su sitio antes de que
+los demás procesos se ejecuten contra él: una unidad puede ir por detrás, nunca por delante (consulta
+[La regla](#la-regla)).
 
 ## Relacionado
 

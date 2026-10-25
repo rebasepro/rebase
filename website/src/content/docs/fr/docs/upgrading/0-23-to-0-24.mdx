@@ -1,5 +1,5 @@
 ---
-sourceHash: acd1967fc17b4924
+sourceHash: b95e3733ef1e2cda
 slug: fr/docs/upgrading/0-23-to-0-24
 title: Mise à niveau de 0.23 vers 0.24
 sidebar_label: 0.23 → 0.24
@@ -179,7 +179,7 @@ conserve sa clé. Un upsert dont la clé appartenait à une telle ligne écrivai
 la ligne cachée et répondait `201 Created` : la ligne restait supprimée et
 l'appelant voyait un succès. Il est désormais refusé avec `409 ROW_IN_TRASH` et rien n'est
 écrit, sur chaque porte d'upsert : `?on_conflict=`, `/bulk`, `/_batch`, le SDK, le
-socket, et `rebase.data` ou `context.data` côté serveur.
+socket, et `rebase.dataAsAdmin` ou `context.data` côté serveur.
 
 **Ce qu'il faut changer :** rien, sauf si quelque chose fait des upserts dans une collection à suppression logique
 et compte y ramener une ligne. Restaurez d'abord la ligne, avec une
@@ -195,7 +195,7 @@ mise à jour qui met son champ de suppression logique à `null`, puis faites l'u
 ## 49. Une mise à jour qui change la clé d'une ligne est refusée avec `400 KEY_IMMUTABLE`
 
 Une mise à jour dont le corps nommait la clé de la ligne avec une autre valeur, ou un `beforeSave`
-qui la changeait, répondait `500`. En processus, via `rebase.data`, la ligne avait
+qui la changeait, répondait `500`. En processus, via `rebase.dataAsAdmin`, la ligne avait
 déjà migré vers la nouvelle clé quand l'écriture levait l'exception. Chaque porte la refuse désormais
 avec `400 KEY_IMMUTABLE` avant l'exécution de tout hook, en nommant le champ, et rien n'est
 écrit. Envoyer la clé que la ligne a déjà est toujours accepté.
@@ -373,7 +373,7 @@ Voir [L'endpoint distant](/docs/ai/mcp/#the-remote-endpoint).
 
 ## 57. Les écritures en processus refusent `ifMatch` et `idempotencyKey`
 
-Une écriture via `context.data` dans un callback, ou `rebase.data` dans une fonction,
+Une écriture via `context.data` dans un callback, ou `rebase.dataAsAdmin` dans une fonction,
 une tâche cron ou un seed, ne quitte jamais le processus : il n'y a ni `If-Match` à vérifier ni
 magasin d'idempotence. Les deux options étaient ignorées en silence : une écriture conditionnelle
 y était donc inconditionnelle. Elles lèvent désormais `UNSUPPORTED_OPTION` avant que quoi que ce soit ne soit
@@ -389,7 +389,7 @@ HTTP, qui honore les deux.
 ```
 
 ```bash
-grep -rnE "(context|rebase)\.data\..*(ifMatch|idempotencyKey)" --exclude-dir=node_modules .
+grep -rnE "(context\.data|rebase\.dataAsAdmin)\..*(ifMatch|idempotencyKey)" --exclude-dir=node_modules .
 ```
 
 ## 58. `Button` et `IconButton` sont typés d'après l'élément qu'ils rendent

@@ -1,5 +1,5 @@
 ---
-sourceHash: 65085708df65a92e
+sourceHash: aba79f55ccca539b
 title: Authentification
 sidebar_label: Authentification
 description: Authentification côté client avec le SDK Rebase — connexion par e-mail/mot de passe, fournisseurs OAuth, gestion des sessions et écouteurs d'état d'authentification.
@@ -133,8 +133,8 @@ compte. C'est délibéré : un point de terminaison qui indiquerait « aucun uti
 d'énumération de comptes ; n'utilisez donc pas le résultat pour indiquer à une personne si elle est
 inscrite — il ne le sait pas.
 
-Les deux nécessitent qu'un service d'e-mail soit configuré sur le backend, faute de quoi ils renvoient un code 503
-`EMAIL_NOT_CONFIGURED`.
+L'envoi nécessite qu'un service d'e-mail soit configuré sur le backend, faute de quoi
+`sendMagicLink` renvoie un code 503 `EMAIL_NOT_CONFIGURED`.
 
 ## Codes à usage unique
 
@@ -334,8 +334,8 @@ unsubscribe();
 |-----------|-------|
 | `SIGNED_IN` | Une connexion ou une inscription est terminée |
 | `TOKEN_REFRESHED` | Le jeton d'accès a été renouvelé — y compris le renouvellement silencieux qui restaure une session au chargement de la page |
-| `USER_UPDATED` | `updateUser()` a modifié le profil, ou `confirmEmailChange()` a déplacé ce compte vers sa nouvelle adresse |
-| `SIGNED_OUT` | Une déconnexion, ou un rafraîchissement qui a échoué définitivement |
+| `USER_UPDATED` | `updateUser()` a modifié le profil, `linkAnonymous()` a fait d'un invité un compte, `changeEmail()` a démarré un changement d'adresse, ou `confirmEmailChange()` a déplacé ce compte vers sa nouvelle adresse |
+| `SIGNED_OUT` | Une déconnexion, `revokeAllSessions()`, ou un rafraîchissement qui a échoué définitivement |
 
 ## Gestion des mots de passe
 

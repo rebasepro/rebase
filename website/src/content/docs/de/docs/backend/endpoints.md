@@ -1,5 +1,5 @@
 ---
-sourceHash: eeb3c8895a643633
+sourceHash: 75edbe600ee52a3e
 title: Endpunkt-Index
 sidebar_label: Endpunkt-Index
 description: Jede HTTP-Route, die ein Rebase-Backend mountet – Daten, Authentifizierung, Speicher, Admin, Meta – mit dem jeweiligen Gate und der Seite, die sie erklärt.
@@ -35,7 +35,6 @@ Liste. `:slug` ist der `slug` einer Collection.
 
 | Methode | Pfad | Gate | Mehr |
 |---|---|---|---|
-| `GET` | `/api/data/collections` | session | [REST API](/docs/backend/api/) |
 | `GET` | `/api/data/:slug` | RLS | [Abfragen](/docs/backend/filtering/) |
 | `POST` | `/api/data/:slug` | RLS | [REST API](/docs/backend/api/) |
 | `POST` | `/api/data/:slug/query` | RLS | Die Auflistung, Query-Parameter im Body — [Abfragen, die für eine URL zu lang sind](/docs/backend/vector-search/#queries-too-long-for-a-url) |
@@ -58,7 +57,7 @@ damit `aggregate` nicht als Entity-ID interpretiert wird. `?select=` und `?group
 deren Parameter, und `select` ist bei `/aggregate` erforderlich.
 
 Volltextsuche, Vektorsuche, Einbindung von Relationen und Feldauswahl *sind* Query-Parameter
-auf `GET /api/data/:slug` und keine Routen – `search`,
+auf `GET /api/data/:slug` und keine Routen – `searchString`,
 `vector_search`, `include`, `fields`. Siehe [REST API](/docs/backend/api/).
 
 Ein Projekt, das keine Collections deklariert und keine introspeziert, liefert für dieses Präfix
@@ -81,6 +80,8 @@ ein einzelnes `404 NO_COLLECTIONS` aus. Siehe [Backend only](/docs/getting-start
 | `POST` | `/api/auth/forgot-password` | none | [Authentifizierung](/docs/backend/authentication/) |
 | `POST` | `/api/auth/reset-password` | none (ein Reset-Token) | [Authentifizierung](/docs/backend/authentication/) |
 | `POST` | `/api/auth/change-password` | session | [Authentifizierung](/docs/backend/authentication/) |
+| `POST` | `/api/auth/change-email` | session | Sendet einen Bestätigungslink an die neue Adresse — [E-Mail-Adresse ändern](/docs/backend/auth-endpoints/#changing-an-email-address) |
+| `POST` | `/api/auth/confirm-email-change` | none (ein Link-Token) | Stellt das Konto auf die neue Adresse um — [E-Mail-Adresse ändern](/docs/backend/auth-endpoints/#changing-an-email-address) |
 | `POST` | `/api/auth/send-verification` | session | [Authentifizierung](/docs/backend/authentication/) |
 | `GET` | `/api/auth/verify-email` | none (ein Verifizierungs-Token) | [Authentifizierung](/docs/backend/authentication/) |
 | `POST` | `/api/auth/verify-email` | none (ein Verifizierungs-Token, und eine Session oder das Passwort, um es zu behalten) | [E-Mail-Verifizierung](/docs/backend/email-verification/) |
@@ -186,17 +187,20 @@ sind für Projekte gedacht, die noch nicht umgestellt wurden; schreiben Sie neue
 
 Ein Deployment, für das kein Speicher konfiguriert ist, antwortet bei diesem Präfix mit
 einem `501` und nennt die Variable, die es benötigt, anstatt einen 404-Fehler auszugeben,
-als ob das Feature gar nicht existieren würde.
+als ob das Feature gar nicht existieren würde —
+mit Ausnahme von `GET /api/storage/sources`, das mit `200` und einer leeren Liste antwortet.
 
 ## Funktionen
 
 | Methode | Pfad | Gate | Mehr |
 |---|---|---|---|
+| `GET` | `/api/functions` | session | Die Namen der bereitgestellten Funktionen und wie viele Dateien nicht geladen werden konnten |
 | any | `/api/functions/<name>` | was auch immer die Funktion deklariert. Ein API-Schlüssel braucht außerdem `functions:invoke` | [Benutzerdefinierte Funktionen](/docs/backend/custom-functions/) |
 
 Eine Route pro Datei unter `backend/functions/`, die Pfade stammen also aus Ihrem
-Projekt. `GET /api/functions` listet diese **nicht** auf: Eine Übersicht über die
-benutzerdefinierten Endpunkte eines Deployments ist nicht öffentlich.
+Projekt. `GET /api/functions` listet sie nur für einen angemeldeten Aufrufer auf — eine
+Session, einen API-Schlüssel oder den Service-Key — und antwortet jedem anderen mit `401`: Eine
+Übersicht über die benutzerdefinierten Endpunkte eines Deployments ist nicht öffentlich.
 
 ## Meta und Betrieb
 
@@ -204,9 +208,9 @@ benutzerdefinierten Endpunkte eines Deployments ist nicht öffentlich.
 |---|---|---|---|
 | `GET` | `/livez` | none | Reine Liveness: Läuft dieser Prozess? Berührt nicht die Datenbank und ist daher der Probe-Pfad, den ein Container verwenden sollte – `RUNTIME_LIVENESS_PATH` |
 | `GET` | `/health`, `/api/health` | none | Liveness und Readiness. Meldet jede konfigurierte Datenquelle, nicht nur die Standardquelle |
-| `GET` | `/api/docs` | none (`schema:read` in der Produktion) | Das OpenAPI-3.0-Dokument |
-| `GET` | `/api/swagger` | none | Swagger UI. Nur in der Entwicklung, außer wenn `REBASE_ENABLE_SWAGGER` |
-| `GET` | `/api/meta/schema-version` | none | Der Schema-Hash, aus dem dieses Backend erstellt wurde, und sonst nichts |
+| `GET` | `/api/docs` | none (`schema:read`, wenn `enableSwagger` `false` ist, der Standard der Runtime in der Produktion) | Das OpenAPI-3.0-Dokument |
+| `GET` | `/api/swagger` | none | Swagger UI. Nur außerhalb der Produktion; `REBASE_ENABLE_SWAGGER` kann es in der Produktion nicht einschalten |
+| `GET` | `/api/meta/schema-version` | none | Der Schema-Hash, aus dem dieses Backend erstellt wurde, und die Runtime-Version, und sonst nichts |
 | `GET` | `/api/meta/contract` | `schema:read` | Der vollständige Collection-Vertrag für `rebase generate-sdk --from`. `404`, wenn keine Authentifizierung konfiguriert ist |
 | `GET` | `/metrics` | `REBASE_METRICS_TOKEN`, wenn gesetzt | Prometheus-Metriken, wenn `REBASE_METRICS=true` |
 | `GET` | `/metrics/history` | `REBASE_METRICS_TOKEN`, wenn gesetzt | Die aufgezeichneten Zeitreihen hinter den Studio-Diagrammen. `501` auf einer Runtime ohne Backend |

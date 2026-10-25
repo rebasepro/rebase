@@ -1,5 +1,5 @@
 ---
-sourceHash: e3130fcc43e901ed
+sourceHash: f37fbfe1270f8317
 title: Relaciones
 sidebar_label: Relaciones
 description: Define relaciones SQL uno a uno, uno a muchos y muchos a muchos entre colecciones con claves foráneas, tablas de unión y uniones multi-salto.
@@ -79,7 +79,8 @@ vuelve una fila o muchas, y qué puede tocar una escritura a través de ella.
 | `manyToMany` | en una **tabla de unión** | muchas | las filas se comparten; tuyo es el enlace |
 | `via` | un `joinPath` explícito | cualquiera | de solo lectura; indica tú mismo la `cardinality` |
 
-Todos los campos son opcionales salvo `kind` y `target` — el resto se deriva.
+Todos los campos son opcionales salvo `kind` y `target` (y, en `via`, `cardinality`
+y `joinPath`) — el resto se deriva.
 
 ### belongsTo — la clave está en esta tabla
 
@@ -357,7 +358,7 @@ Por eso el valor predeterminado hace fallar el borrado y nombra la restricción,
     kind: "belongsTo",
     relationName: "order",
     target: () => ordersCollection,
-    // Una línea de pedido no significa nada sin su pedido: dilo.
+    // A line item is meaningless without its order — say so.
     onDelete: "cascade"
 }
 ```
@@ -415,7 +416,7 @@ for (const article of data) {
 }
 ```
 
-> Los nombres de relación pasados a `include()` deben coincidir con el `relationName` definido en el array `relations` de la colección.
+> Los nombres de relación pasados a `include()` deben coincidir con el nombre de la relación: el `relationName` de una entrada del array `relations` de la colección, o la clave de la propiedad que la declara en línea.
 
 Para la referencia completa del constructor de consultas (filtrado, ordenación, paginación, en tiempo real), consulta la [documentación del SDK tipado](/docs/sdk).
 
@@ -544,7 +545,12 @@ interface HasManyRelation extends RelationBase {
 
 interface ManyToManyRelation extends RelationBase {
     kind: "manyToMany";
-    through?: { table?: string; sourceColumn?: string; targetColumn?: string };
+    through?: {
+        table?: string;
+        sourceColumn?: string;
+        targetColumn?: string;
+        properties?: Properties;    // extra columns on the junction row, served under `_pivot`
+    };
 }
 
 interface ViaRelation extends RelationBase {

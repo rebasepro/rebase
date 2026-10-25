@@ -1,5 +1,5 @@
 ---
-sourceHash: d9b66c9d404a5085
+sourceHash: bd2df1ee8d59330b
 title: Autenticazione
 sidebar_label: Autenticazione
 description: Configura l'autenticazione JWT, i provider OAuth, le email SMTP, la protezione dai bot e la collection users sul backend Rebase.
@@ -95,6 +95,7 @@ const backend = await initializeRebaseBackend({
 | `disableSelfRegistration` | `boolean` | `false` | Kill switch: chiude anche la finestra di bootstrap del primo utente lasciata aperta da `allowRegistration: false` |
 | `allowAnonymous` | `boolean` | `false` | Abilita `POST /api/auth/anonymous`. Volutamente non vincolato a `allowRegistration`: un'app pubblica a prevalente lettura potrebbe richiedere sessioni senza account. Trasformare un guest in un account (`POST /api/auth/anonymous/link`) è una registrazione, e richiede anche `allowRegistration` — e `allowAnonymous` ancora attivo: se è disattivato, rifiuta anche i guest già autenticati, quindi nessuno può diventare un account (`403 ANONYMOUS_AUTH_DISABLED`) |
 | `allowUserLookup` | `boolean` | `false` | Monta `POST /api/auth/find-user` per i flussi di invito via email |
+| `captcha` | `CaptchaConfig` | — | Protezione dai bot sulle route che inviano email — vedi [Protezione dai bot](#protezione-dai-bot) |
 | `defaultRole` | `string` | — | Ruolo assegnato a un nuovo utente registrato quando non ne viene specificato uno. Non può essere `admin`, né un ruolo dichiarato che possiede uno scope del piano di amministrazione: l'avvio li rifiuta entrambi |
 | `serviceKey` | `string` | — | Chiave statica per chiamate server-to-server — vedi [Autenticazione con Service Key](/docs/backend/auth-endpoints/#service-key-authentication) |
 | `email` | `EmailConfig` | — | SMTP, per ripristino password, verifiche, inviti e magic link |
@@ -315,9 +316,11 @@ DISCORD_CLIENT_SECRET=…
 
 `GET /api/auth/config` elenca quindi `discord` in `enabledProviders`, consentendo di verificare la corretta acquisizione della coppia.
 
+Google è configurato con il solo `GOOGLE_CLIENT_ID`: il suo flusso con ID token non richiede alcun secret, quindi `GOOGLE_CLIENT_SECRET` è facoltativo.
+
 Apple fa eccezione: non dispone di un client secret statico, poiché Rebase firma un JWT ES256 a breve durata per ogni scambio di token. Richiede tutte e quattro le variabili: `APPLE_CLIENT_ID`, `APPLE_TEAM_ID`, `APPLE_KEY_ID` e `APPLE_PRIVATE_KEY` — ovvero l'intero contenuto del file `.p8`, inclusi i ritorni a capo.
 
-Due opzioni non dispongono di una variabile d'ambiente equivalente e richiedono il blocco `auth` (quindi un backend ejected o configurato da codice): `microsoft.tenantId`, che altrimenti ha come valore predefinito `common` e segnala ogni indirizzo come non verificato, e `gitlab.baseUrl`, per un'istanza self-hosted.
+Due opzioni non dispongono di una variabile d'ambiente equivalente e richiedono il blocco `auth` (quindi un backend ejected o configurato da codice): `microsoft.tenantId`, che altrimenti ha come valore predefinito `common` e accetta ogni tenant Entra (con qualsiasi tenant, un indirizzo conta come verificato solo quando la registrazione dell'app emette il claim `xms_edov`), e `gitlab.baseUrl`, per un'istanza self-hosted.
 
 Ogni campo denominato viene risolto all'avvio in `auth.providers`, che rappresenta l'array canonico e il punto di estensione per tutto ciò che i campi denominati non coprono. Le voci vengono create con le factory `create*Provider` e le due modalità si fondono — i campi denominati vengono aggiunti in coda alle voci esplicite:
 
@@ -371,11 +374,13 @@ confirm-first. Vedi [Verifica email](/docs/backend/email-verification/).
 
 ## Tabelle create automaticamente
 
-Al primo avvio, Rebase crea automaticamente lo schema `auth` e le seguenti tabelle nel database (associate allo schema definito nella collection, ad esempio `rebase`):
+Al primo avvio, Rebase crea automaticamente lo schema `rebase` e le seguenti tabelle nel database (associate allo schema definito nella collection, ad esempio `rebase`):
 
 - **`rebase.users`** — Account utente con email, hash della password, metadati e una colonna text[] per `roles` (i ruoli sono memorizzati come array di testo inline per ottimizzare le query ed evitare join).
+- **`rebase.user_identities`** — Le identità OAuth collegate a ciascun account, una riga per ogni identità del provider.
 - **`rebase.refresh_tokens`** — Sessioni a lunga durata contenenti gli hash dei refresh token, user agent e indirizzi IP. Include un indice univoco su `token_hash`. Un accesso è un `session_id`, condiviso da ogni token ruotato a partire da esso; non esiste alcun vincolo per dispositivo, quindi due browser dietro lo stesso indirizzo sono due sessioni. Ogni token di una sessione porta anche il proprio livello di garanzia (`aal`) e come è stato effettuato l'accesso (`method`, che `providerId` riporta).
 - **`rebase.password_reset_tokens`** — Token monouso a scadenza per i flussi di recupero password.
+- **`rebase.magic_link_tokens`** — Token monouso a scadenza per l'accesso tramite magic link.
 - **`rebase.mfa_factors`** — Metodi di autenticazione a più fattori registrati (es. segreti TOTP crittografati con AES-256).
 - **`rebase.mfa_challenges`** — Log di verifica che tracciano i tentativi attivi di verifica MFA.
 - **`rebase.recovery_codes`** — Codici di backup/recupero multi-fattore con hash.
@@ -383,8 +388,8 @@ Al primo avvio, Rebase crea automaticamente lo schema `auth` e le seguenti tabel
 
 I token che scadono — link di reset, magic link e codici email, refresh token,
 challenge MFA — vengono eliminati un'ora dopo la loro scadenza. La pulizia
-viene eseguita sul processo che possiede i timer (il ruolo `worker` in un
-deployment suddiviso) e su una sola istanza della fleet: ogni ora viene
+viene eseguita sui processi che possiedono i timer (ogni ruolo tranne `functions` in un
+deployment suddiviso, a meno che `REBASE_CRON_SCHEDULER=false` non li tolga dall'`api`) e su una sola istanza della fleet: ogni ora viene
 rivendicata in `rebase.cron_claims` sotto l'id di job
 `rebase:auth:expired-tokens`, come avviene per uno slot cron. Con
 `cronPersistence: false` non esiste alcuna tabella di claim, e ogni istanza di

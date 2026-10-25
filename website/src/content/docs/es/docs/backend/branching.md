@@ -1,5 +1,5 @@
 ---
-sourceHash: 6c8e1509d678993c
+sourceHash: 90e9eafee6523006
 title: Ramificación de bases de datos
 sidebar_label: Ramificación
 description: Crea ramas aisladas de bases de datos para desarrollo, staging y pruebas usando CREATE DATABASE ... TEMPLATE de PostgreSQL — copias instantáneas y de fidelidad total sin tiempo de inactividad.
@@ -98,7 +98,7 @@ Las configuraciones de las ramas se almacenan en la base de datos predeterminada
 CREATE SCHEMA IF NOT EXISTS rebase;
 
 CREATE TABLE IF NOT EXISTS rebase.branches (
-    name         TEXT PRIMARY KEY,              -- Sanitize user branch name (alphanumeric & underscores)
+    name         TEXT PRIMARY KEY,              -- Branch name as given (letters, digits, underscores, hyphens)
     db_name      TEXT NOT NULL UNIQUE,          -- Actual PostgreSQL database name (prefixed with 'rb_')
     parent_db    TEXT NOT NULL,                 -- Source database cloned from
     created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -217,7 +217,7 @@ rebase db branch switch --off
 # Show one branch's parent, age and size
 rebase db branch info dev_sandbox
 
-# Qué cambió la rama: esquema, políticas RLS y filas (--json para todo)
+# What the branch changed: schema, RLS policies and rows (--json for all of it)
 rebase db branch diff dev_sandbox
 
 # Delete a branch
@@ -270,7 +270,11 @@ Crear una rama **no** cambia la base de datos con la que se comunica tu proyecto
 postgresql://user:pass@localhost:5432/rb_dev_sandbox
 ```
 
+---
+
 ## Revisar y fusionar una rama
+
+<span class="since-badge" data-since="0.26">Desde 0.26</span>
 
 Una rama es donde un agente, o una migración de la que no estás seguro, puede cambiar una base de datos sin tocar la real. Antes de que nada de eso llegue a la base de datos de la que se creó la rama, puedes ver qué cambió y fusionarlo desde [Studio](/docs/studio/): abre **Ramas** y elige una.
 
@@ -310,16 +314,14 @@ Todas las escrituras ocurren en una sola sentencia en el padre —todo o nada—
 
 ```typescript
 const diff = await admin.diffBranch("agent_run_17");
-// …revisa diff.schema y diff.data…
+// …review diff.schema and diff.data…
 const result = await admin.mergeBranch("agent_run_17", {
     expectedFingerprint: diff.fingerprint,
-    onConflict: "abort" // o "branch", o "target"
+    onConflict: "abort" // or "branch", or "target"
 });
 ```
 
 Fusionar no es, a propósito, una herramienta MCP: un agente propone en su rama y una persona fusiona.
-
----
 
 ---
 

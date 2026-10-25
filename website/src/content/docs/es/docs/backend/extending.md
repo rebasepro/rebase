@@ -1,5 +1,5 @@
 ---
-sourceHash: b2aa1062d257415a
+sourceHash: 791588f79f48d44f
 title: Rebase no hace X
 sidebar_label: Extender el servidor
 description: La escalera de extensiones del lado del servidor — declaración, callback de colección, función personalizada, tus propias rutas, tu propio servidor, eject — con lo que cada uno puede y no puede alcanzar.
@@ -58,7 +58,7 @@ convierte en métodos del SDK, el panel de administración la renderiza y
 | Decidir quién puede leer o escribir una fila | `securityRules` | [Authentication](/docs/backend/authentication) |
 | Buscar texto adecuadamente — acentos, JSONB, ranking, subcadenas | un bloque `search` | [Search](/docs/backend/search) |
 | Encontrar filas por significado | una propiedad `vector` | [Search](/docs/backend/search) |
-| Conservar filas eliminadas | `softDelete` | [Writes](/docs/backend/writes) |
+| Conservar filas eliminadas | `softDelete` | [Soft delete](/docs/collections/soft-delete) |
 | Registrar quién cambió qué | `history` | [History](/docs/backend/history) |
 | Ejecutar algo de forma programada | un archivo de cron job | [Cron Jobs](/docs/backend/cron-jobs) |
 | Ejecutar algo tras una escritura, fuera de banda | un trabajo (job) | [Jobs](/docs/backend/jobs) |
@@ -106,7 +106,7 @@ callbacks: {
 }
 ```
 
-Vale la pena conocer tres propiedades antes de depender de él:
+Vale la pena conocer cuatro propiedades antes de depender de él:
 
 - **Solo puede restringir.** El valor de retorno es un filtro para combinar con AND,
   y no hay estructura que pueda devolver que amplíe la lectura. Esto es deliberado:

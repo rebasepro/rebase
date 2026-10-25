@@ -1,5 +1,5 @@
 ---
-sourceHash: ebc75b9bd33595a6
+sourceHash: f4fe63c58f66c539
 title: Filtrage dans l'API REST
 sidebar_label: Filtrage
 description: Filtrez les listes de l'API REST avec des opérateurs de style PostgREST, des groupes or/and et le dialecte JSON where, et voyez comment les filtres se combinent.
@@ -56,7 +56,7 @@ Les quatre opérateurs de motif comparent du texte. Une colonne enum se compare 
 (`?status=like.draft%25`) ; sur un nombre, une date ou toute autre colonne qui n'est pas du
 texte, ils renvoient une erreur 400 `INVALID_FILTER_OPERATOR`.
 
-`isnull` et `notnull` ignorent leur valeur — l'opérateur constitue toute la condition, et tout ce qui suit le point est ignoré. Le SDK écrit `.null`, c'est donc la syntaxe que vous verrez passer sur le réseau.
+`isnull` et `notnull` ne prennent aucun opérande — l'opérateur constitue toute la condition, et `.null`, `.true`, `.false` ou rien après le point signifient tous la même chose. Le SDK écrit `.null`, c'est donc la syntaxe que vous verrez passer sur le réseau. Tout le reste après le point n'est pas un opérande qu'ils possèdent, la chaîne entière est donc lue comme une valeur : `?reason=notnull.reason` correspond au texte `notnull.reason`.
 
 :::caution[`eq.null` est la chaîne de quatre caractères, pas `IS NULL`]
 `?deleted_at=eq.null` recherche le texte littéral `null`. En SQL, `= NULL` n'est jamais vrai, il n'existe donc aucune interprétation d'`eq.null` qui puisse correspondre au test de nullité — utilisez `isnull` pour cela. C'est exactement pour cette raison que le SDK sérialise `.where("deleted_at", "==", null)` sous la forme `isnull.null`.
@@ -116,13 +116,15 @@ Un `where` malformé renvoie une erreur 400 `INVALID_WHERE`, plutôt qu'un filtr
 
 ## Comment les filtres se combinent
 
-`?field=op.value`, `?where=`, `?or=`/`?and=` et `?searchString=` sont indépendants, et chacun d'eux présent doit correspondre :
+`?field=op.value`, `?where=`, `?or=`/`?and=`/`?not=` et `?searchString=` sont indépendants, et chacun d'eux présent doit correspondre :
 
 ```text
 (field filters and `where`, AND-ed together)
   AND (the logical group)
   AND (the search string)
 ```
+
+La seule exception est un champ nommé à la fois dans `?field=op.value` et dans `where` : le paramètre de requête **remplace** alors la condition `where` sur ce champ, étant la demande la plus précise, au lieu d'être combiné avec elle par un AND.
 
 Il n'y a aucun moyen de combiner l'un avec l'autre via un OU (OR). Tout ce qui n'est pas un simple ET (AND) de ces groupes doit se trouver à l'intérieur d'un seul arbre `or=`/`and=`.
 

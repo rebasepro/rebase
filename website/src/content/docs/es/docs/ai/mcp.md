@@ -1,8 +1,8 @@
 ---
-sourceHash: ee28e46d5e82c6f9
+sourceHash: 78d733a060f9bbd1
 title: Servidor MCP
 sidebar_label: Servidor MCP
-description: "Conecta Claude Code, Cursor, Gemini CLI o cualquier cliente MCP a un proyecto de Rebase: las 42 herramientas que expone, la credencial con la que se autentica y la barrera de loopback que se interpone entre un agente y producción."
+description: "Conecta Claude Code, Cursor, Gemini CLI o cualquier cliente MCP a un proyecto de Rebase: las 44 herramientas que expone, la credencial con la que se autentica y la barrera de loopback que se interpone entre un agente y producción."
 ---
 
 `@rebasepro/mcp` es un servidor del [Model Context Protocol](https://modelcontextprotocol.io)
@@ -299,12 +299,12 @@ que *no* está restringido, de modo que una herramienta agregada más tarde lleg
 forma predeterminada.
 
 - **Sin restricción — lecturas:** `rebase_schema_plan`, `rebase_doctor`,
-  `rebase_db_branch_list`, `rebase_db_branch_info`, `list_documents`,
+  `rebase_db_branch_list`, `rebase_db_branch_info`, `rebase_db_branch_diff`, `list_documents`,
   `get_document`, `list_users`, `list_roles`, `storage_list_objects`,
   `storage_get_download_url`, `cron_list_jobs`, `cron_get_job`, `cron_get_job_logs`,
   `rebase_dev_logs`.
 - **Sin restricción — solo locales:** `rebase_schema_introspect`, `rebase_schema_generate`, `rebase_db_generate`,
-  `rebase_generate_sdk`, las herramientas del servidor de desarrollo y las herramientas del registro de proyectos.
+  `rebase_generate_sdk`, `rebase_db_branch_switch`, las herramientas del servidor de desarrollo y las herramientas del registro de proyectos.
   Estas escriben archivos locales o estado local y no tienen un destino remoto que verificar.
 - **Restringidas contra `DATABASE_URL`:** las herramientas de CLI restantes — `rebase_db_push`,
   `rebase_db_migrate`, `rebase_db_branch_create`, `rebase_db_branch_delete`.
@@ -312,7 +312,8 @@ forma predeterminada.
   `create_document`, `update_document`, `delete_document`, `create_user`,
   `update_user`, `delete_user`, `rebase_auth_reset_password`,
   `storage_delete_object`, `cron_trigger_job`, `cron_toggle_job`,
-  `invoke_function`.
+  `invoke_function` — y `rebase_cloud_provision`, que ejecuta `rebase cloud`
+  pero también se verifica contra `baseUrl`.
 
 Los dos destinos no son intercambiables. Las herramientas de CLI nunca ven `baseUrl`, por lo
 que un backend en localhost situado junto a una `DATABASE_URL` de producción se comprueba
@@ -344,7 +345,8 @@ Desde una terminal,
 `rebase db push` y `rebase db migrate` sí se ejecutan en esa base de datos; solo se
 rechazan las herramientas de MCP. En la 0.24 la CLI también las rechaza allí.
 
-Solo loopback cuenta como local: `localhost`, `*.localhost`, `127.0.0.0/8`, `::1`.
+Solo loopback cuenta como local: `localhost`, `*.localhost`, `127.0.0.0/8`, `::1`
+(y `0.0.0.0`).
 Los rangos privados como `10.x` y `192.168.x` **no** lo hacen; es tan probable que sean
 un clúster de staging compartido como un ordenador portátil, y tratarlos como locales
 permitiría exactamente el accidente que la barrera existe para evitar.
@@ -415,9 +417,9 @@ trátalo en consecuencia.
 
 ## Referencia de herramientas
 
-42 herramientas, en nueve grupos: esquema y base de datos, planificación de esquema,
-documentos, usuarios y roles, almacenamiento, cron, funciones, el servidor de desarrollo
-y el registro de proyectos. Cada una, con lo que necesita y si la barrera la rechaza
+44 herramientas, en diez grupos: esquema y base de datos, planificación de esquema,
+documentos, usuarios y roles, almacenamiento, cron, funciones, el servidor de desarrollo,
+el registro de proyectos y Rebase Cloud. Cada una, con lo que necesita y si la barrera la rechaza
 frente a un destino no local, está en la [referencia de herramientas MCP](/docs/ai/mcp-tool-reference).
 
 ## Recursos

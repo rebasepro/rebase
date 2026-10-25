@@ -1,5 +1,5 @@
 ---
-sourceHash: c35ed2ce1194af56
+sourceHash: 6ac0abb490b5801e
 title: Autenticación e inicio de sesión
 sidebar_label: Autenticación e inicio de sesión
 description: Configura el controlador de autenticación, la vista de inicio de sesión y la simulación de roles en tu frontend React de Rebase.
@@ -35,7 +35,7 @@ authController.signOut()      // Log out
 authController.getAuthToken() // Get current JWT for API calls
 ```
 
-Pasa el `authController` al controlador de navegación de Rebase para proteger todo el panel de administración tras la autenticación.
+Pasa el `authController` a `<Rebase authController>`. `<RebaseShell>` (o `<RebaseAuthGate>` en un layout manual) lo lee de ahí y protege todo el panel de administración tras la autenticación.
 
 ## Tu propio proveedor de autenticación
 

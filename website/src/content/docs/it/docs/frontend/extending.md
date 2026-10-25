@@ -1,5 +1,5 @@
 ---
-sourceHash: a874bc209f13c746
+sourceHash: 2888be015d5ef43f
 title: Estendere Rebase
 sidebar_label: Estendere Rebase
 description: Una guida alle decisioni per scegliere il meccanismo di estensione corretto — plugin, slot, override dei componenti, viste di entità, azioni e altro ancora.
@@ -28,7 +28,7 @@ per il backend.
 | Sostituire la pagina di login | `components` (`Auth.LoginView`) | app | [Override dei componenti](/docs/frontend/component-overrides) |
 | Sostituire la home page | `components` (`HomePage`) | app | [Override dei componenti](/docs/frontend/component-overrides) |
 | Cambiare completamente l'aspetto del form di una collezione | `formView` | collezione | [sotto](#formview) |
-| Sostituire un singolo componente all'interno di una collezione | `collection.components` | collezione | [Override dei componenti](/docs/frontend/component-overrides) |
+| Sostituire un singolo componente all'interno di una collezione | `admin.components` | collezione | [Override dei componenti](/docs/frontend/component-overrides) |
 | Impostare override di componenti predefiniti per tutte le collezioni | `components` (nomi con ambito a livello di collezione) | app | [Override dei componenti](/docs/frontend/component-overrides) |
 | Aggiungere un pulsante alla barra degli strumenti della collezione | `Actions` della collezione | collezione | [Azioni di entità](/docs/frontend/entity-actions#collection-actions) |
 | Iniettare interfaccia utente in uno slot della barra degli strumenti della collezione | slot `collection.actions` | app/plugin | [Slot](/docs/frontend/slots) |
@@ -56,7 +56,7 @@ e un colore hardcoded risulterà invisibile in uno dei due temi. Consulta
 
 **Ambito:** app.
 
-Un plugin raggruppa collezioni, viste, override dei componenti, contributi agli slot, autenticazione, origini dati, provider, hook e callback del ciclo di vita in una singola unità installabile. Tutti gli altri meccanismi elencati qui possono essere forniti tramite l'interfaccia di un plugin.
+Un plugin raggruppa collezioni iniettate o modificate, viste, contributi agli slot, wrapper di campo, provider, hook e callback del ciclo di vita in una singola unità installabile. Gli override dei componenti, le viste di entità, le azioni di entità e `propertyConfigs` non sono campi di un plugin: vanno su `<Rebase>` o sulla collezione.
 
 → [Riferimento per i plugin](/docs/plugins)
 
@@ -99,7 +99,7 @@ Due modalità: **Eject** (sostituzione completa) o **Wrap** (estensione dell'ori
 - `EntityPreview`
 - `Entity.MissingReference`
 
-**Priorità:** I `components` a livello di collezione sovrascrivono i valori predefiniti a livello di app per lo stesso nome di componente (semplice object spread — i valori della collezione sovrascrivono i valori globali). I nomi dei componenti disponibili solo a livello di app (`Shell.*`, `HomePage`, `Auth.*`) possono essere sovrascritti unicamente a livello di `<Rebase>`.
+**Priorità:** I `components` a livello di collezione si applicano sopra i valori predefiniti a livello di app per lo stesso nome di componente: una sostituzione a livello di collezione sostituisce entrambi, e un override con `wrap: true` a livello di collezione avvolge quello a livello di app. I nomi dei componenti disponibili solo a livello di app (`Shell.*`, `HomePage`, `Auth.*`) possono essere sovrascritti unicamente a livello di `<Rebase>`.
 
 → [Override dei componenti](/docs/frontend/component-overrides)
 
@@ -107,7 +107,7 @@ Due modalità: **Eject** (sostituzione completa) o **Wrap** (estensione dell'ori
 
 **Ambito:** entità (aggiunge schede).
 
-Viste personalizzate che appaiono come schede nella pagina di dettaglio dell'entità. Possono essere definite a livello globale su `<Rebase>` o per collezione.
+Viste personalizzate che appaiono come schede nella pagina di dettaglio dell'entità. Definite per collezione, oppure registrate una volta su `<Rebase entityViews>` (o `<RebaseCMS entityViews>`) e indicate tramite `key` nelle `admin.entityViews` di una collezione.
 
 → [Viste di entità](/docs/frontend/entity-views)
 
@@ -115,7 +115,7 @@ Viste personalizzate che appaiono come schede nella pagina di dettaglio dell'ent
 
 **Ambito:** entità.
 
-Pulsanti di azione personalizzati su singole entità (pubblica, archivia, clona, ecc.). Possono essere definiti a livello globale o per collezione.
+Pulsanti di azione personalizzati su singole entità (pubblica, archivia, clona, ecc.). Definiti per collezione, oppure registrati una volta su `<Rebase entityActions>` (o `<RebaseCMS entityActions>`) e indicati tramite `key` nelle `admin.entityActions` di una collezione.
 
 → [Azioni di entità](/docs/frontend/entity-actions)
 
@@ -202,7 +202,7 @@ const collection = {
 
 ```
 
-Da utilizzare quando hai bisogno di un layout completamente personalizzato per l'esperienza di modifica delle entità di una collezione. Per modifiche più contenute, è preferibile utilizzare `collection.components` con l'override di `Entity.Form`.
+Da utilizzare quando hai bisogno di un layout completamente personalizzato per l'esperienza di modifica delle entità di una collezione. Per modifiche più contenute, è preferibile utilizzare `admin.components` con l'override di `Entity.Form`.
 
 Il Builder viene renderizzato all'interno del form del record e riceve il relativo `formContext` attivo: scrivi con `formContext.setFieldValue`, e il tasto Salva della barra memorizzerà il record. Laddove il record non può essere modificato — la vista di dettaglio in sola lettura o un utente senza permessi di modifica — `formContext.disabled` è `true` e i tentativi di scrittura generano un errore. Imposta `includeActions: false` se il tuo Builder esegue il salvataggio autonomamente tramite `formContext.submit()`.
 
@@ -239,7 +239,7 @@ mostra il pannello, questa non è la pagina corretta. Il server segue una propri
 
 ## Riepilogo delle priorità
 
-- **`collection.components` ha la precedenza sui `components` globali** all'interno di quella collezione. Una sostituzione a livello di collezione sostituisce entrambi; un override con `wrap: true` a livello di collezione avvolge l'override globale se presente (nella versione 0.24 avvolge il componente integrato e l'override globale viene ignorato). Consulta [Override dei componenti](/docs/frontend/component-overrides#when-both-scopes-override-a-component).
+- **Gli `admin.components` di una collezione si applicano sopra i `components` globali** all'interno di quella collezione. Una sostituzione a livello di collezione sostituisce entrambi; un override con `wrap: true` a livello di collezione avvolge l'override globale se presente (nella versione 0.24 avvolge il componente integrato e l'override globale viene ignorato). Consulta [Override dei componenti](/docs/frontend/component-overrides#when-both-scopes-override-a-component).
 - **Le `Actions` della collezione e lo slot `collection.actions` sono additivi** — i componenti `Actions` vengono renderizzati per primi, seguiti dai contributi dello slot.
-- **`entityActions` ed `entityViews` a livello di collezione estendono (non sostituiscono) quelli globali.**
+- **Gli `entityActions` e gli `entityViews` a livello di app sono un registro, non valori predefiniti:** una collezione ne mostra uno solo quando i propri `admin.entityActions` / `admin.entityViews` ne indicano la `key`.
 - **I plugin vengono applicati nell'ordine dell'array `plugins`**, non in base alla `key`. I contributi agli slot vengono renderizzati in base al loro `order` (il più basso per primo, 50 come valore predefinito) e, a parità di valore, mantengono tale ordine. I wrapper di campo provenienti da più plugin si compongono in quell'ordine, con quello del primo plugin posizionato più all'interno; nella versione 0.24 veniva renderizzato solo l'ultimo wrapper. Consulta [Plugin](/docs/plugins#field-wrappers-from-several-plugins).

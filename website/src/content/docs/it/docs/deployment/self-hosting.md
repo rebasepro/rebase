@@ -1,5 +1,5 @@
 ---
-sourceHash: cef32249585688a5
+sourceHash: 64dad399c92c2e1c
 title: Self-Hosting
 sidebar_label: Self-Hosting
 description: Esegui Rebase ovunque con l'immagine di runtime ufficiale e il bundle del tuo progetto — Docker Compose, Fly, Railway o un semplice VPS.
@@ -62,7 +62,7 @@ Tre segreti, un dato di configurazione e l'account con cui effettuare l'accesso:
 - **`CORS_ORIGINS`** — le origini da cui viene servito il frontend, separate da virgola. Non è un segreto e non è opzionale: il runtime rifiuta di avviarsi in produzione senza questo valore invece di tirare a indovinare, perché un'API che tenta di indovinare le origini consentite prima o poi autorizzerà quella sbagliata.
 - **`REBASE_ADMIN_EMAIL`** / **`REBASE_ADMIN_PASSWORD`** — il primo amministratore. Un database appena creato non ha utenti e, al di fuori dell'ambiente di produzione, la policy di registrazione accetta la prima iscrizione promuovendola ad admin — altrimenti un database vuoto sarebbe un vicolo cieco, poiché l'inizializzazione di un admin richiede un chiamante già autenticato. Nel momento in cui questo stack risponde su un hostname pubblico, tale comodità diventa una race condition che l'operatore può perdere; perciò, in produzione la finestra viene chiusa e l'account viene definito qui. Il runtime lo crea una sola volta, quando la tabella utenti è vuota, e non compie alcuna azione a ogni avvio successivo.
 
-Ciascuno dei tre segreti deve essere lungo almeno 32 caratteri, e la password di admin almeno 12. Usa un indirizzo con un punto nel dominio: `POST /auth/login` valida il corpo della richiesta con `z.string().email()`, quindi `admin@localhost` creerebbe un account rifiutando poi qualsiasi tentativo di accesso. Il file compose dichiara tutti e sei i parametri con `${VAR:?…}`, di conseguenza un valore mancante arresterà lo stack con un messaggio esplicativo invece di avviare un'istanza configurata a metà — inoltre l'auto-registrazione è disattivata di default (`DISABLE_SELF_REGISTRATION`, default `true`), impedendo a terzi di appropriarsi dell'account.
+`JWT_SECRET` e `REBASE_SERVICE_KEY` devono essere lunghi ciascuno almeno 32 caratteri, e la password di admin almeno 12. Usa un indirizzo con un punto nel dominio: `POST /auth/login` valida il corpo della richiesta con `z.string().email()`, quindi il runtime rifiuta di creare `admin@localhost` — un account con cui nessuno potrebbe accedere — e ne registra invece il motivo nel log. Il file compose dichiara tutti e sei i parametri con `${VAR:?…}`, di conseguenza un valore mancante arresterà lo stack con un messaggio esplicativo invece di avviare un'istanza configurata a metà — inoltre l'auto-registrazione è disattivata di default (`DISABLE_SELF_REGISTRATION`, default `true`), impedendo a terzi di appropriarsi dell'account.
 
 Accedi con queste credenziali e cambia la password: sono memorizzate in chiaro in un file sull'host.
 
@@ -154,7 +154,7 @@ Un server costruito da voi segue la stessa regola: `initializeRebaseBackend` leg
 
 L'archiviazione è **disattivata** a meno che non sia configurato un bucket, e questo è intenzionale: l'alternativa predefinita sarebbe il filesystem del container, che perderebbe silenziosamente ogni file caricato al riavvio successivo. I caricamenti vengono rifiutati con `501 STORAGE_NOT_CONFIGURED` finché non ne configuri uno.
 
-Per un bucket, imposta `STORAGE_TYPE=s3` (o `gcs`) insieme al relativo bucket e alle credenziali — il file compose elenca le variabili, commentate.
+Per un bucket, imposta `STORAGE_TYPE=s3` (o `gcs`) insieme al relativo bucket e alle credenziali — il file compose elenca le variabili, commentate. `gcs` carica `@google-cloud/storage`, che l'immagine ufficiale non include, quindi su quell'immagine raggiungi Google Cloud Storage tramite il suo endpoint compatibile con S3 (`STORAGE_TYPE=s3`, `S3_ENDPOINT=https://storage.googleapis.com`, chiavi HMAC).
 
 Per il disco locale, appropriato solo quando il percorso corrisponde a un volume reale persistente che sopravvive al container:
 
@@ -197,7 +197,7 @@ Il runtime è un normale container in ascolto su `$PORT`, quindi qualsiasi servi
 
 ```toml
 [build]
-  image = "rebasepro/server:0.25.1"
+  dockerfile = "Dockerfile"   # FROM rebasepro/server:0.25.1 + COPY dist-bundle /bundle
 
 [http_service]
   internal_port = 8080
@@ -219,7 +219,7 @@ npm install -g @rebasepro/server @rebasepro/server-postgres
 rebase-server /srv/myapp/dist-bundle
 ```
 
-`rebase-server --help` elenca le variabili che legge. Sotto systemd — le tre righe relative all'amministratore sono nuove; sulla versione 0.17.3 il primo account registrato diventa invece l'amministratore:
+`rebase-server --help` elenca le variabili che legge. Sotto systemd — le due righe `REBASE_ADMIN_*` richiedono la 0.18 o successiva, e sulla 0.17.3 il primo account registrato diventa invece l'amministratore:
 
 ```ini title="/etc/systemd/system/rebase.service"
 [Service]

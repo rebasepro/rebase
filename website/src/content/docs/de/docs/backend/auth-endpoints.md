@@ -1,5 +1,5 @@
 ---
-sourceHash: b2f805e5fb18de22
+sourceHash: 74dfd3dd58550c90
 title: Auth-Endpunkte und Tokens
 sidebar_label: Auth-Endpunkte
 description: Die Authentifizierungs-Routen, die das Rebase-Backend bereitstellt, ihre Antwortstrukturen, Multi-Faktor-Authentifizierung, der Datenbankkontext für Richtlinien, JWKS und Service-Schlüssel.
@@ -44,7 +44,7 @@ Alle Auth-Endpunkte sind unter `/api/auth/` eingebunden:
 | `GET` | `/api/auth/keys` | Die eigenen [persönlichen API-Schlüssel](/docs/backend/api-keys/#personal-keys) des Aufrufers |
 | `POST` | `/api/auth/keys` | Einen persönlichen Schlüssel erstellen. `403 PERSONAL_KEYS_DISABLED`, außer die Users-Collection setzt `auth.personalKeys` |
 | `DELETE` | `/api/auth/keys/:id` | Einen der eigenen Schlüssel des Aufrufers widerrufen |
-| `GET` | `/.well-known/jwks.json` | Das öffentliche JWKS – am Root eingebunden, nicht unter `basePath`, da ein Verifizierer dort sucht. Vorhanden, wenn [asymmetrische Signierung](#asymmetrische-tokens-und-jwks) konfiguriert ist |
+| `GET` | `/.well-known/jwks.json` | Das öffentliche JWKS – am Root eingebunden, nicht unter `basePath`, da ein Verifizierer dort sucht. Eingebunden, sobald das Backend eigene Tokens ausstellt; ein leerer Schlüsselsatz, bis [asymmetrische Signierung](#asymmetrische-tokens-und-jwks) konfiguriert ist |
 | `POST` | `/api/auth/mfa/enroll` | TOTP-Registrierung starten (gibt das Secret und Wiederherstellungscodes zurück) |
 | `POST` | `/api/auth/mfa/verify` | Registrierung mit einem Code aus dem Authentifikator bestätigen |
 | `GET` | `/api/auth/mfa/factors` | Registrierte Faktoren des Aufrufers auflisten |
@@ -183,7 +183,7 @@ Zeichenkette im Body. Das Access-Token ist davon unberührt.
 
 **Ein zweiter Faktor sichert die Anmeldung ab, nicht nur einzelne Operationen.** Sobald ein
 Konto über einen *verifizierten* TOTP-Faktor verfügt, stellt keine Route eine Sitzung aus, bis ein
-Code vorgelegt wird – Passwort-Anmeldung, jeder OAuth-Anbieter, Magic-Link und
+Code vorgelegt wird – Passwort-Anmeldung, jeder OAuth-Anbieter, Magic-Link, E-Mail-Code und
 Anonymous-Link verweigern alle den Zugriff mit `401 MFA_REQUIRED`:
 
 ```json
@@ -264,26 +264,32 @@ Konten existieren; aktivieren Sie ihn nur, wenn Ihre Einladungs-UX dies erforder
 
 Rebase leitet die Authentifizierung von Anfragen direkt an die PostgreSQL Row-Level Security (RLS) weiter. Jede Datenbankabfrage, die über einen benutzerspezifischen Treiber ausgeführt wird, läuft innerhalb einer Datenbanktransaktion (`db.transaction()`), die transaktionslokale Konfigurationsparameter setzt:
 
-*   `app.user_id` — Die eindeutige ID des authentifizierten Benutzers (`uid`). Standardmäßig `'anon'` für unauthentifizierte Anfragen.
+*   `app.uid` — Die eindeutige ID des authentifizierten Benutzers (`uid`). Standardmäßig `'anonymous'` für unauthentifizierte Anfragen. Das vor der Umbenennung gültige `app.user_id` wird weiterhin daneben geschrieben, für Policies, die vor der Umbenennung kompiliert wurden.
 *   `app.user_roles` — Ein kommagetrennter String, der die zugewiesenen Rollen des Benutzers auflistet.
-*   `app.jwt` — Ein JSON-String, der die vollständige JWT-Claims-Payload enthält (`{"sub": "<uid>", "roles": [...]}`).
+*   `app.is_anonymous` — `'true'` für eine Gastsitzung (anonyme Anmeldung), sonst `'false'`.
+*   `app.jwt` — Ein JSON-String mit den benutzerdefinierten Claims des Tokens plus `sub`, `roles` und `is_anonymous` (`{"sub": "<uid>", "roles": [...], "is_anonymous": false, …}`).
 
 Diese Parameter werden lokal für die Dauer der Transaktion mithilfe der Postgres-Funktion `set_config` konfiguriert:
 ```sql
 SELECT 
+    set_config('app.uid', $1, true),
     set_config('app.user_id', $1, true),
     set_config('app.user_roles', $2, true),
-    set_config('app.jwt', $3, true);
+    set_config('app.is_anonymous', $3, true),
+    set_config('app.jwt', $4, true);
 ```
 
 ### PostgreSQL-Policy-Hilfsfunktionen
 
-Um das Schreiben von Row-Level-Security-Policies zu vereinfachen, erstellt Rebase beim Bootstrapping der Datenbank Hilfsfunktionen unter dem `auth`-Schema:
+Um das Schreiben von Row-Level-Security-Policies zu vereinfachen, erstellt Rebase beim Bootstrapping der Datenbank Hilfsfunktionen unter dem `rebase`-Schema:
 
 *   **`rebase.uid()`** — Gibt die ID des authentifizierten Benutzers als `text` zurück oder `NULL`, falls nicht gesetzt:
     ```sql
     CREATE OR REPLACE FUNCTION rebase.uid() RETURNS text AS $$
-        SELECT NULLIF(current_setting('app.user_id', true), '');
+        SELECT COALESCE(
+            NULLIF(current_setting('app.uid', true), ''),
+            NULLIF(current_setting('app.user_id', true), '')
+        );
     $$ LANGUAGE sql STABLE;
     ```
 *   **`rebase.roles()`** — Gibt den kommagetrennten Rollen-String zurück:
@@ -298,6 +304,7 @@ Um das Schreiben von Row-Level-Security-Policies zu vereinfachen, erstellt Rebas
         SELECT COALESCE(NULLIF(current_setting('app.jwt', true), ''), '{}')::jsonb;
     $$ LANGUAGE sql STABLE;
     ```
+*   **`rebase.is_anonymous()`** — Gibt an, ob der Aufrufer ein Gast ist, als `boolean` (`false`, wenn nicht gesetzt), sodass eine Policy `NOT rebase.is_anonymous()` sagen kann.
 
 Sie können diese Helfer direkt in Ihren benutzerdefinierten Sicherheitsregeln oder Datenbankmigrationen verwenden:
 ```sql

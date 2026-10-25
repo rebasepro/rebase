@@ -1,5 +1,5 @@
 ---
-sourceHash: fcc8e36632d57207
+sourceHash: f833e803807f9ac4
 title: Live-Schema-Bearbeitung
 description: Erstellen und Ändern von Collections auf einem laufenden Backend – zuerst in Ihr Repository committet, dann angewendet.
 ---
@@ -450,7 +450,7 @@ Personen arbeiten:
 - Es wird keine Migrationsdatei geschrieben. Ein Projekt, das über Boot-Ensure bereitgestellt wird, benötigt keine;
   ein über Migrationen bereitgestelltes Projekt sollte `rebase db generate` ausführen, wodurch
   eine Migration über Atlas mit dem von Atlas geforderten Integritäts-Hash erstellt wird.
-- Nur Postgres. Die Fähigkeit wird auf Treiberebene erkannt, und andere Engines
+- Postgres und MongoDB (siehe [MongoDB](#mongodb)). Die Fähigkeit wird auf Treiberebene erkannt, und andere Engines
   antworten mit `SCHEMA_EDITING_UNSUPPORTED`.
 
 ## Verwandte Themen

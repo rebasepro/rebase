@@ -1,5 +1,5 @@
 ---
-sourceHash: fcc8e36632d57207
+sourceHash: f833e803807f9ac4
 title: Edición de esquemas en vivo
 description: "Crea y modifica colecciones en un backend en ejecución: primero se confirman en tu repositorio y luego se aplican."
 ---
@@ -110,7 +110,7 @@ colección o una propiedad, cambiar el tipo de una columna (alternar un entero,
 que una cadena se convierta en un enum, el tipo de elemento de un array, el
 ancho de un varchar), renombrar una columna, cambiar una clave primaria,
 eliminar un valor de un enum, hacer única una columna existente, y cambiar una
-relación — su `kind`, su destino, su `localKey`, su `onDelete`. Un `hasMany` o
+relación — su tipo, su destino, su `localKey`, su `onDelete`. Un `hasMany` o
 `hasOne` cuya columna de enlace nada crea también se rechaza. Cada rechazo
 especifica el cambio y qué hacer en su lugar.
 
@@ -374,7 +374,7 @@ Dos cosas que hacen que sea seguro ejecutarlo contra un repositorio en el que ot
 
 - Solo cambios aditivos. Cualquier otra cosa se rechaza con un motivo, porque la ruta ensure es lo único que modifica un esquema y solo puede agregar.
 - No se escribe ningún archivo de migración. Un proyecto aprovisionado mediante boot-ensure no necesita ninguno; un proyecto aprovisionado mediante migraciones debe ejecutar `rebase db generate`, que genera uno a través de Atlas con el hash de integridad que Atlas requiere.
-- Solo para Postgres. La capacidad se detecta en el controlador (driver), y otros motores responden `SCHEMA_EDITING_UNSUPPORTED`.
+- Postgres y MongoDB (consulta [MongoDB](#mongodb)). La capacidad se detecta en el controlador (driver), y otros motores responden `SCHEMA_EDITING_UNSUPPORTED`.
 
 ## Relacionado
 

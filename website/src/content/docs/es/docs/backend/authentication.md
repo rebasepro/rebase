@@ -1,5 +1,5 @@
 ---
-sourceHash: d9b66c9d404a5085
+sourceHash: bd2df1ee8d59330b
 title: Autenticación
 sidebar_label: Autenticación
 description: Configura la autenticación JWT, proveedores OAuth, correo SMTP, protección contra bots y la colección de usuarios en el backend de Rebase.
@@ -95,6 +95,7 @@ const backend = await initializeRebaseBackend({
 | `disableSelfRegistration` | `boolean` | `false` | Mecanismo de corte: también cierra la ventana de inicialización del primer usuario que `allowRegistration: false` deja abierta |
 | `allowAnonymous` | `boolean` | `false` | Habilita `POST /api/auth/anonymous`. Deliberadamente no condicionado por `allowRegistration` — una aplicación pública principalmente de lectura puede requerir sesiones sin cuentas. Convertir a un invitado en una cuenta (`POST /api/auth/anonymous/link`) es un registro, y también necesita `allowRegistration` — y que `allowAnonymous` siga activado: si se desactiva, también rechaza a los invitados que ya habían iniciado sesión, de modo que ninguno puede convertirse en cuenta (`403 ANONYMOUS_AUTH_DISABLED`) |
 | `allowUserLookup` | `boolean` | `false` | Monta `POST /api/auth/find-user` para flujos de invitación por correo electrónico |
+| `captcha` | `CaptchaConfig` | — | Protección contra bots en las rutas que envían correo — consulte [Protección contra bots](#protección-contra-bots) |
 | `defaultRole` | `string` | — | Rol asignado a un usuario recién registrado cuando no se especifica ninguno. No puede ser `admin` ni un rol declarado que tenga un alcance del plano de administración: el arranque rechaza ambos |
 | `serviceKey` | `string` | — | Clave estática para llamadas servidor a servidor — consulte [Autenticación mediante clave de servicio](/docs/backend/auth-endpoints/#service-key-authentication) |
 | `email` | `EmailConfig` | — | SMTP, para restablecimiento de contraseña, verificación, invitaciones y enlaces mágicos |
@@ -310,9 +311,11 @@ DISCORD_CLIENT_SECRET=…
 
 `GET /api/auth/config` listará entonces `discord` en `enabledProviders`, lo cual sirve para comprobar que el par de variables se cargó correctamente.
 
+Google se configura solo con `GOOGLE_CLIENT_ID`: su flujo de ID token no necesita ningún secreto, así que `GOOGLE_CLIENT_SECRET` es opcional.
+
 Apple es la excepción: no tiene un client secret estático, ya que Rebase firma un JWT ES256 de corta duración para cada intercambio de tokens. Requiere los cuatro valores: `APPLE_CLIENT_ID`, `APPLE_TEAM_ID`, `APPLE_KEY_ID` y `APPLE_PRIVATE_KEY` — el contenido del archivo `.p8`, con saltos de línea incluidos.
 
-Dos opciones no tienen equivalente en variables de entorno y requieren el bloque `auth` (es decir, un backend ejected o configurado por código): `microsoft.tenantId`, que de lo contrario utiliza por defecto `common` y reporta cada dirección como no verificada, y `gitlab.baseUrl`, para una instancia autoalojada.
+Dos opciones no tienen equivalente en variables de entorno y requieren el bloque `auth` (es decir, un backend ejected o configurado por código): `microsoft.tenantId`, que de lo contrario utiliza por defecto `common` y acepta todos los tenants de Entra (con cualquier tenant, una dirección cuenta como verificada solo cuando el registro de la aplicación emite el claim `xms_edov`), y `gitlab.baseUrl`, para una instancia autoalojada.
 
 Cada campo nombrado se resuelve al inicio dentro de `auth.providers`, que es el array canónico y el punto de extensión para cualquier cosa que los campos nombrados no cubran. Las entradas se construyen con las funciones factoría `create*Provider`, y ambas formas se combinan — los campos nombrados se agregan después de las entradas explícitas:
 
@@ -366,11 +369,13 @@ registro confirme primero. Consulte
 
 ## Tablas creadas automáticamente
 
-En el primer arranque, Rebase aprovisiona automáticamente el esquema `auth` y las siguientes tablas en la base de datos (vinculadas al esquema definido en su colección, p. ej., `rebase`):
+En el primer arranque, Rebase aprovisiona automáticamente el esquema `rebase` y las siguientes tablas en la base de datos (vinculadas al esquema definido en su colección, p. ej., `rebase`):
 
 - **`rebase.users`** — Cuentas de usuario con correo electrónico, hash de contraseña, metadatos y una columna text[] `roles` (los roles se almacenan como arrays de texto en línea para optimizar consultas y evitar joins).
+- **`rebase.user_identities`** — Las identidades OAuth vinculadas a cada cuenta, una fila por cada identidad de proveedor.
 - **`rebase.refresh_tokens`** — Sesiones de larga duración que contienen tokens de actualización hasheados, user agents y direcciones IP. Incluye un índice único en `token_hash`. Un inicio de sesión es un `session_id`, compartido por cada token que se rota a partir de él; no hay ninguna restricción por dispositivo, así que dos navegadores detrás de una misma dirección son dos sesiones. Cada token de una sesión también lleva su nivel de confianza (`aal`) y cómo se inició sesión (`method`, que `providerId` reporta).
 - **`rebase.password_reset_tokens`** — Tokens de un solo uso con expiración para los flujos de recuperación de contraseña.
+- **`rebase.magic_link_tokens`** — Tokens de un solo uso con expiración para el inicio de sesión con enlace mágico.
 - **`rebase.mfa_factors`** — Métodos de autenticación multifactor registrados (p. ej., secretos TOTP cifrados con AES-256).
 - **`rebase.mfa_challenges`** — Registros de verificación que rastrean los intentos activos de verificación MFA.
 - **`rebase.recovery_codes`** — Códigos de respaldo/recuperación multifactor hasheados.
@@ -378,8 +383,9 @@ En el primer arranque, Rebase aprovisiona automáticamente el esquema `auth` y l
 
 Los tokens que expiran — enlaces de restablecimiento, enlaces mágicos y códigos
 por correo, refresh tokens, desafíos MFA — se eliminan una hora después de
-expirar. La limpieza se ejecuta en el proceso que posee los temporizadores (el
-rol `worker` en un despliegue dividido) y en una sola instancia de la flota:
+expirar. La limpieza se ejecuta en los procesos que poseen los temporizadores (todos los
+roles excepto `functions` en un despliegue dividido, a menos que
+`REBASE_CRON_SCHEDULER=false` los saque de `api`) y en una sola instancia de la flota:
 cada hora se reclama en `rebase.cron_claims` bajo el id de tarea
 `rebase:auth:expired-tokens`, igual que un slot de cron. Con
 `cronPersistence: false` no hay tabla de reclamaciones, y todas esas

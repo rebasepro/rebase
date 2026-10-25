@@ -1,5 +1,5 @@
 ---
-sourceHash: 289adf93a568aac7
+sourceHash: 9d4730f8239c48ed
 title: KI & Agenten
 sidebar_label: Übersicht
 description: Was Rebase für KI-Coding-Assistenten und autonome Agenten bereitstellt – ein MCP-Server, projektlokale Agent Skills, gerüstartige Anweisungsdateien und das Berechtigungsmodell, das bestimmt, worauf ein Agent tatsächlich zugreifen kann.
@@ -10,8 +10,8 @@ Probleme. Es lohnt sich zu wissen, wonach Sie greifen:
 
 | | Was es ist | Wer es nutzt |
 |---|---|---|
-| [**MCP-Server**](/docs/ai/mcp) | Ein Stdio-Model-Context-Protocol-Server mit 42 Tools für Ihr Schema, Ihre Daten, Benutzer, Speicher, Cron und Dev-Server | Ein Assistent, zur Laufzeit |
-| [**Agent Skills**](/docs/ai/skills) | 21 Markdown-Skill-Dateien, die durch `rebase skills install` in Ihr Repo geschrieben werden | Ein Assistent, als Referenzmaterial |
+| [**MCP-Server**](/docs/ai/mcp) | Ein Stdio-Model-Context-Protocol-Server mit 44 Tools für Ihr Schema, Ihre Daten, Benutzer, Speicher, Cron und Dev-Server | Ein Assistent, zur Laufzeit |
+| [**Agent Skills**](/docs/ai/skills) | 23 Markdown-Skill-Dateien, die durch `rebase skills install` in Ihr Repo geschrieben werden | Ein Assistent, als Referenzmaterial |
 | [**Anweisungsdateien**](/docs/ai/instruction-files) | `ai-instructions.md` plus zeigerbasierte Dateien pro Assistent, geschrieben von `rebase init` | Ein Assistent, als dauerhaft aktive Regeln |
 | [**API-Keys**](/docs/backend/api-keys) | Maschinen-Anmeldedaten, die [Scopes](/docs/backend/roles-and-scopes) halten, pro Collection und pro Operation | Alles, was die HTTP-API aufruft |
 
@@ -97,5 +97,5 @@ Es handelt sich um einen anderen Mechanismus, und die beiden interagieren nicht 
 ## Nächste Schritte
 
 - [MCP Server](/docs/ai/mcp) — Verbinden Sie Claude Code, Cursor oder einen beliebigen MCP-Client
-- [Agent Skills](/docs/ai/skills) — `rebase skills install` und die 21 Skills
+- [Agent Skills](/docs/ai/skills) — `rebase skills install` und die 23 Skills
 - [AI Instruction Files](/docs/ai/instruction-files) — Das Gerüstmuster für Anweisungsdateien

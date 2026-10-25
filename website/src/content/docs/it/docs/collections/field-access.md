@@ -1,5 +1,5 @@
 ---
-sourceHash: cd33d688b582283c
+sourceHash: 155fe61b0635a331
 title: Accesso ai campi
 sidebar_label: Accesso ai campi
 description: Permessi di lettura e scrittura per proprietà in base al ruolo. Un chiamante ammesso dalle regole di sicurezza della riga non riceve comunque un campo che i suoi ruoli non possono leggere.
@@ -179,7 +179,7 @@ La ricerca di fallback — una collection senza blocco `search` — confronta tr
 proprietà stringa, saltando quelle che il chiamante non può leggere. Nulla viene
 divulgato attraverso di essa.
 
-Una collection che **dichiara** un blocco [`search`](/docs/backend/api/) viene compilata
+Una collection che **dichiara** un blocco [`search`](/docs/backend/search) viene compilata
 in una singola colonna generata `tsvector` condivisa da tutti i chiamanti. Non ne esiste una
 variante per ruolo, pertanto un campo riservato indicato in `search.fields` rimarrebbe
 *ricercabile* per i chiamanti che non possono vederne il valore — recuperabile un termine
@@ -188,7 +188,7 @@ alla volta. Rebase rifiuta questa combinazione all'avvio: rimuovi il campo da
 
 ## Cronologia
 
-La [cronologia dell'entità](/docs/backend/api/) memorizza l'intera riga e viene fornita a
+La [cronologia dell'entità](/docs/backend/history) memorizza l'intera riga e viene fornita a
 chiunque possa leggere la riga: il controllo d'accesso si basa su "puoi recuperare questa entità",
 non su "sei un amministratore". Pertanto la regola di lettura viene applicata anche a ciascuno
 snapshot memorizzato: la voce compare comunque nell'elenco, con l'autore e la data della modifica,
@@ -238,7 +238,7 @@ concretamente applicabile: qualcosa deve pur essere in grado di memorizzare l'ha
 
 Le letture tramite `rebase.dataAsAdmin` possiedono il ruolo `admin`, quindi una regola sui ruoli non
 nasconde loro nulla. `[]` lo fa comunque — anche per `dataAsAdmin`. Usa
-[`rebase.sql()`](/docs/backend/api/) se hai bisogno della colonna grezza.
+[`rebase.sql()`](/docs/backend/custom-functions) se hai bisogno della colonna grezza.
 
 ## Validazione
 

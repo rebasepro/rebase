@@ -1,5 +1,5 @@
 ---
-sourceHash: 8721ee795ebd8dce
+sourceHash: bbef56d48a3598af
 title: Estilizar UI personalizada
 sidebar_label: Estilizar UI personalizada
 description: Construye vistas personalizadas, páginas de inicio y acciones con los mismos componentes y tokens de tema que el resto del panel de administración, para que se vean nativos y sigan el tema.
@@ -40,7 +40,7 @@ export function DashboardView() {
 }
 ```
 
-Cada componente del kit está catalogado en [UI components](/docs/ui/components/card/) con sus props reales, generadas a partir del código fuente. Consulta allí antes de crearlos manualmente: `Card`, `Chip`, `Badge`, `Alert`, `Button`, `Typography`, `Paper`, `Container`, `Table`, `Tooltip`, `Dialog` y unos cuarenta más ya existen.
+Cada componente del kit está catalogado en [UI components](/docs/ui/components/card/) con sus props reales, generadas a partir del código fuente. Consulta allí antes de crearlos manualmente: `Card`, `Chip`, `Badge`, `Alert`, `Button`, `Typography`, `Paper`, `Container`, `Table`, `Tooltip`, `Dialog` y unos setenta más ya existen.
 
 ## Color: usa tokens, nunca literales
 
@@ -61,9 +61,9 @@ Dos reglas que surgen de errores reales:
 
 ## Tipografía: usa la escala
 
-`Typography` incluye toda la escala: `h1`–`h6`, `subtitle1`/`subtitle2`, `body1`/`body2`, `caption`, `label`. Usa `variant`, no una clase de tamaño de fuente. La escala ya codifica el tracking que cada nivel necesita (`--tracking-display` en ≥30px, `--tracking-title` en 20–24px, `--tracking-heading` por debajo de eso), algo que un `text-[27px]` no hace.
+`Typography` incluye toda la escala: `h1`–`h6`, `subtitle1`/`subtitle2`, `body1`/`body2`, `lead`, `caption`, `label`, `button`, `stat`, `micro`, `mono`. Usa `variant`, no una clase de tamaño de fuente. La escala ya codifica el tracking que cada nivel necesita (`--tracking-display` en ≥30px, `--tracking-title` en 20–24px, `--tracking-heading` por debajo de eso), algo que un `text-[27px]` no hace.
 
-La UI de producto no baja de `text-xs`. Los niveles `text-2xs` y `text-3xs` existen únicamente para páginas de marketing.
+La UI de producto no baja de `text-xs`, con una excepción: la variante `micro`, la etiqueta en mayúsculas sobre un valor, se asienta en `text-2xs`. El nivel `text-3xs` existe únicamente para páginas de marketing.
 
 ## Configuración
 

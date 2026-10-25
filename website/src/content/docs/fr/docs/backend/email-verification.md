@@ -1,5 +1,5 @@
 ---
-sourceHash: 3d6a5a62a25e5b8c
+sourceHash: 6c024c2a337ce83c
 title: Vérification de l'e-mail
 sidebar_label: Vérification de l'e-mail
 description: "Comment un compte prouve son adresse e-mail : le lien envoyé à l'inscription, ce qu'en le suivant on conserve et on retire, et l'inscription à confirmation préalable avec requireEmailVerification."
@@ -44,7 +44,9 @@ La personne inscrite suit le lien et saisit son mot de passe
 et la connecte. Désactivé, ce qui est la valeur par défaut, une adresse qui a déjà
 un compte répond `409 EMAIL_EXISTS`, comme avant.
 
-Pour surmonter un rejet à l'étape 3, l'utilisateur se connecte avec sa méthode existante et appelle le point de terminaison explicite de liaison :
+Pour surmonter un rejet à l'étape 3 (`403 EMAIL_NOT_VERIFIED`, voir
+[Liaison de comptes](/docs/backend/authentication/#account-linking-across-sign-in-methods)),
+l'utilisateur se connecte avec sa méthode existante et appelle le point de terminaison explicite de liaison :
 
 ```http
 POST /api/auth/link/google

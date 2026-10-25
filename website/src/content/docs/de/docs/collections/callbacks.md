@@ -1,5 +1,5 @@
 ---
-sourceHash: c3af858aa8d11859
+sourceHash: 85df48d51e9e9dd9
 title: Entitäts-Callbacks
 sidebar_label: Callbacks
 description: Nutzen Sie Lifecycle-Callbacks, um benutzerdefinierte Logik auszuführen, wenn Entitäten erstellt, aktualisiert, gelesen oder gelöscht werden. Beinhaltet die context.data-API für kollektionsübergreifende Operationen.
@@ -221,7 +221,7 @@ Verbindung](/docs/collections/context-data-api#a-callback-holds-a-connection).
 ```typescript
 beforeSave: async ({
     values,       // Entity values
-    id,           // Entity ID (null for new entities)
+    id,           // Entity ID (undefined for a new entity, unless the caller sent one)
     status,       // "new" | "existing" | "copy"
     previousValues, // Previous values (for updates)
     context       // Full Rebase context

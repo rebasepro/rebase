@@ -1,5 +1,5 @@
 ---
-sourceHash: 8dc5279c89b40f48
+sourceHash: 8c0fc8ebbe0f0b10
 title: Divisão em vários processos
 sidebar_label: Processos Divididos
 description: Execute um bundle como vários processos cooperantes — uma API, uma camada de funções, um worker — a partir da mesma imagem de runtime publicada, para que uma função customizada pesada deixe de concorrer com a API de dados.
@@ -208,7 +208,7 @@ Nada verifica a *direção* — a versão do schema é um hash, portanto ela pod
 
 ## Atualização
 
-Inalterado: cada processo executa a mesma imagem publicada, portanto um upgrade consiste na mesma alteração de tag em cada um deles. Atualize a `api` por último se quiser que o provisionamento do schema ocorra em relação à nova versão primeiro — embora, na prática, a ordem não importe, pois a etapa do schema é aditiva e idempotente.
+Inalterado: cada processo executa a mesma imagem publicada, portanto um upgrade consiste na mesma alteração de tag em cada um deles. Atualize primeiro o processo que é dono do schema — a `api`, ou o Job de migração —, para que o schema da nova versão já esteja no lugar antes que os demais processos rodem contra ele: uma unidade pode ficar para trás, nunca à frente (veja [A regra](#a-regra)).
 
 ## Relacionado
 

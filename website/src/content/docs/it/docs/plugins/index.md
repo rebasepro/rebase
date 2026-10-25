@@ -1,5 +1,5 @@
 ---
-sourceHash: a0bd19745c59b12b
+sourceHash: 71525adfd73230ec
 title: Sistema dei plugin
 sidebar_label: Plugin
 description: Estendi Rebase con i plugin — inserisci componenti UI, modifica collection, aggiungi azioni alla barra degli strumenti e crea field builder personalizzati.
@@ -13,7 +13,7 @@ I plugin costituiscono il meccanismo primario di estensione nel pannello. Posson
 
 - Avvolgere l'intera app con un **provider** (contesto, gestione dello stato)
 - Aggiungere **azioni per la home page** e widget
-- Inserire componenti per la **vista delle collection** (barra degli strumenti, column builder)
+- Inserire componenti per la **vista delle collection** (barra degli strumenti, intestazioni di colonna)
 - Aggiungere componenti per i **form** (field builder, pannelli aggiuntivi)
 - **Iniettare o modificare collection** in modo dinamico
 
@@ -26,7 +26,7 @@ interface RebasePlugin {
 
     // UI contributions — a flat array, each entry naming its slot.
     // This replaced the old per-area objects (homePage, collectionView, form).
-    slots?: SlotContribution[];
+    slots?: AnySlotContribution[];
 
     // HOC providers. `scope: "root"` wraps the whole admin below
     // RebaseContext; `scope: "form"` wraps each entity form / edit view.

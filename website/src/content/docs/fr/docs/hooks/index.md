@@ -1,5 +1,5 @@
 ---
-sourceHash: f3af5fc4d4e8aac0
+sourceHash: c8644465af03e13a
 title: Référence des Hooks
 sidebar_label: Hooks
 description: Hooks React fournis par Rebase pour accéder à l'authentification, aux données, à la navigation, aux panneaux latéraux, au stockage et à l'état de l'interface.
@@ -93,7 +93,7 @@ function ProductList() {
 | Paramètre | Type | Description |
 |-----------|------|-------------|
 | `path` | `string` | Chemin absolu de la collection (par ex. `"products"`). |
-| `collection` | `CollectionConfig` | L'objet de définition de la collection. |
+| `collection` | `AdminCollection` | L'objet de définition de la collection. |
 | `itemCount` | `number` | Facultatif. Nombre d'entités à charger (limite SQL). |
 | `offset` | `number` | Facultatif. Nombre d'éléments à ignorer. |
 | `page` | `number` | Facultatif. Numéro de page (à partir de 1), alternative à `offset`. |
@@ -145,7 +145,7 @@ function ProductDetail({ productId }) {
 |-----------|------|-------------|
 | `path` | `string` | Chemin absolu de la collection. |
 | `entityId` | `string \| number` | L'ID de l'entité à charger. |
-| `collection` | `CollectionConfig` | L'objet de définition de la collection. |
+| `collection` | `AdminCollection` | L'objet de définition de la collection. |
 | `useCache` | `boolean` | Facultatif. Si `true` et que l'entité est en cache, ignore le rafraîchissement en arrière-plan. (Par défaut : `false`). |
 
 ### Utilitaires de cache
@@ -416,7 +416,7 @@ function CategorySelector({ onSelect }) {
 | Option | Type | Description |
 |--------|------|-------------|
 | `path` | `string` | Chemin absolu de la collection. |
-| `collection` | `CollectionConfig` | Définition de la collection cible. |
+| `collection` | `AdminCollection` | Définition de la collection cible. |
 | `fixedFilter` | `FilterValues` | Facultatif. Filtres statiques restreignant les résultats de recherche. |
 | `pageSize` | `number` | Facultatif. Nombre d'éléments par page. (Par défaut : `10`). |
 | `getLabelFromEntity` | `(entity) => string` | Facultatif. Personnalise le texte du libellé affiché. |

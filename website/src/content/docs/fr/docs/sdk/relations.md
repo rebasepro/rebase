@@ -160,10 +160,10 @@ const { data } = await client.data
     .find();
 
 for (const post of data) {
-    // Clé étrangère scalaire — toujours présente
+    // Scalar foreign key — always present
     console.log(post.authorId);    // "uuid-1234"
 
-    // Relation hydratée — présente lorsqu'elle est incluse
+    // Hydrated relation — present when included
     console.log(post.author?.name); // "Jane Doe"
 }
 ```

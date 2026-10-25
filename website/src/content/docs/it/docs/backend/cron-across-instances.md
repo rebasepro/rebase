@@ -68,11 +68,11 @@ anche a riavvii e nuovi deploy: un job messo in pausa in Studio resta in pausa.
 stampato da `rebase dev`; vedi l'[API REST](/docs/backend/cron-jobs-api/).
 
 ```bash
-# Mettere in pausa, per ogni processo, finché qualcuno non lo riprende
+# Pause, for every process, until someone resumes it
 curl -X PUT -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
     -d '{ "enabled": false }' "$API_URL/api/admin/cron/health-check"
 
-# Smettere di sovrascrivere: tornare a seguire l'`enabled` dichiarato nel file del job
+# Stop overriding: follow the `enabled` the job's file declares again
 curl -X PUT -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
     -d '{ "enabled": null }' "$API_URL/api/admin/cron/health-check"
 ```

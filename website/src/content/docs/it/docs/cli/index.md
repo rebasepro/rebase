@@ -1,5 +1,5 @@
 ---
-sourceHash: 9210bf054bc3c431
+sourceHash: de64511406443392
 title: Riferimento CLI
 sidebar_label: CLI
 description: Comandi della CLI di Rebase per l'inizializzazione del progetto, la generazione dello schema, le migrazioni del database e la generazione dell'SDK.
@@ -86,7 +86,7 @@ Il bundle è l'artefatto di cui esegui il deploy — l'immagine di runtime lo ca
 |------|--------|
 | `--output <dir>` (o `--out`) | Scrive il bundle in una posizione diversa da `dist-bundle/` (un'app alla volta) |
 | `--vendor` | Installa e include sempre le dipendenze del bundle |
-| `--no-vendor` | Non include mai le dipendenze; il pod le installerà al primo avvio |
+| `--no-vendor` | Non include mai le dipendenze; il pod le installa a ogni avvio |
 | `--skip-type-check` | Salta il controllo dei tipi (più veloce, meno sicuro) |
 | `--no-static` | Non ripiega il frontend nel bundle del backend (ogni app statica ottiene comunque un proprio bundle) |
 | `--skip-static-build` | Ripiega il frontend come già compilato, senza eseguire il suo comando di build |
@@ -345,7 +345,8 @@ Il comando da eseguire qualora si verifichi un'anomalia di cui non sia ancora no
 | Stringhe di connessione | Carattere `=` non codificato all'interno di un parametro dell'URL, che gli strumenti nativi di PostgreSQL non riescono ad analizzare — causando il malfunzionamento di backup e `psql` pur mantenendo operativa l'applicazione. |
 | Funzioni personalizzate | Requisiti richiesti da ciascuna funzione all'ambiente host e verifica della compatibilità per l'esecuzione su runtime edge. |
 
-**Con connessione al database**, in presenza della variabile `DATABASE_URL`:
+**Con connessione al database** — quello del progetto, risolto come lo risolve `rebase db url`,
+quindi su uno scaffold appena creato è il database gestito, che `doctor` avvia:
 
 | Controllo | Motivazione |
 | --- | --- |
@@ -358,7 +359,7 @@ Il comando da eseguire qualora si verifichi un'anomalia di cui non sia ancora no
 
 In caso di mancata raggiungibilità del database, le relative fasi vengono contrassegnate come ignorate (con la specifica della causa), procedendo con l'esecuzione dei controlli restanti — per approfondimenti, consulta la sezione [Risoluzione dei problemi](/docs/troubleshooting/).
 
-Il comando restituisce un codice di uscita diverso da zero qualora un controllo riscontri un errore, oppure quando una fase non possa essere completata a causa del rifiuto delle connessioni da parte del database configurato. L'omissione di una fase causata dalla mancata impostazione di `DATABASE_URL` non costituisce un errore.
+Il comando restituisce un codice di uscita diverso da zero qualora un controllo riscontri un errore, oppure quando una fase non possa essere completata a causa del rifiuto delle connessioni da parte del database configurato. Una fase saltata perché non è stato possibile risolvere alcun database non costituisce un errore.
 
 `rebase doctor --policies` esegue esclusivamente i controlli relativi a RLS — escludendo la verifica delle differenze di schema e i tipi dell'SDK — e adotta una modalità restrittiva con blocco in caso di anomalie (fail closed), risultando ideale come controllo di gate nei sistemi di CI a fronte di un database di produzione.
 

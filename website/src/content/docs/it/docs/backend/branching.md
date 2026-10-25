@@ -1,5 +1,5 @@
 ---
-sourceHash: 6c8e1509d678993c
+sourceHash: 90e9eafee6523006
 title: Database Branching
 sidebar_label: Branching
 description: Crea branch di database isolati per sviluppo, staging e testing utilizzando CREATE DATABASE ... TEMPLATE di PostgreSQL — copie istantanee a fedeltà totale senza tempi di inattività.
@@ -98,7 +98,7 @@ Le configurazioni dei branch sono memorizzate nel database predefinito all'inter
 CREATE SCHEMA IF NOT EXISTS rebase;
 
 CREATE TABLE IF NOT EXISTS rebase.branches (
-    name         TEXT PRIMARY KEY,              -- Sanitize user branch name (alphanumeric & underscores)
+    name         TEXT PRIMARY KEY,              -- Branch name as given (letters, digits, underscores, hyphens)
     db_name      TEXT NOT NULL UNIQUE,          -- Actual PostgreSQL database name (prefixed with 'rb_')
     parent_db    TEXT NOT NULL,                 -- Source database cloned from
     created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -214,7 +214,7 @@ rebase db branch switch --off
 # Show one branch's parent, age and size
 rebase db branch info dev_sandbox
 
-# Cosa ha cambiato il branch: schema, policy RLS e righe (--json per tutto)
+# What the branch changed: schema, RLS policies and rows (--json for all of it)
 rebase db branch diff dev_sandbox
 
 # Delete a branch
@@ -274,6 +274,8 @@ postgresql://user:pass@localhost:5432/rb_dev_sandbox
 
 ## Esaminare e unire un branch
 
+<span class="since-badge" data-since="0.26">Da 0.26</span>
+
 Un branch è il posto in cui un agente, o una migrazione di cui non sei sicuro, può modificare un database senza toccare quello vero. Prima che qualcosa arrivi al database da cui il branch è stato creato, puoi vedere cosa è cambiato e unirlo da [Studio](/docs/studio/): apri **Branch** e scegline uno.
 
 - **Schema e policy RLS** elenca ogni tabella, colonna, chiave primaria e policy che il branch ha aggiunto, eliminato o modificato, come SQL, con la definizione del genitore accanto a quella del branch.
@@ -312,16 +314,14 @@ Ogni scrittura avviene in un'unica istruzione sul genitore — tutto o niente, c
 
 ```typescript
 const diff = await admin.diffBranch("agent_run_17");
-// …esamina diff.schema e diff.data…
+// …review diff.schema and diff.data…
 const result = await admin.mergeBranch("agent_run_17", {
     expectedFingerprint: diff.fingerprint,
-    onConflict: "abort" // oppure "branch", oppure "target"
+    onConflict: "abort" // or "branch", or "target"
 });
 ```
 
 L'unione non è, di proposito, uno strumento MCP: un agente propone sul suo branch, e una persona unisce.
-
----
 
 ---
 

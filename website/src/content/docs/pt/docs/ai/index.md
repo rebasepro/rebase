@@ -1,5 +1,5 @@
 ---
-sourceHash: 289adf93a568aac7
+sourceHash: 9d4730f8239c48ed
 title: IA & Agentes
 sidebar_label: Visão Geral
 description: O que o Rebase oferece para assistentes de programação com IA e agentes autônomos — um servidor MCP, skills de agente locais no projeto, arquivos de instrução estruturados e o modelo de credenciais que decide o que um agente pode realmente acessar.
@@ -10,8 +10,8 @@ problemas diferentes. Vale a pena saber qual deles você está buscando:
 
 | | O que é | Quem consome |
 |---|---|---|
-| [**Servidor MCP**](/docs/ai/mcp) | Um servidor Model Context Protocol via stdio com 42 ferramentas para seu schema, dados, usuários, storage, cron e servidor de desenvolvimento | Um assistente, em tempo de execução |
-| [**Agent skills**](/docs/ai/skills) | 21 arquivos de skill em Markdown gravados no seu repositório por `rebase skills install` | Um assistente, como material de referência |
+| [**Servidor MCP**](/docs/ai/mcp) | Um servidor Model Context Protocol via stdio com 44 ferramentas para seu schema, dados, usuários, storage, cron e servidor de desenvolvimento | Um assistente, em tempo de execução |
+| [**Agent skills**](/docs/ai/skills) | 23 arquivos de skill em Markdown gravados no seu repositório por `rebase skills install` | Um assistente, como material de referência |
 | [**Arquivos de instrução**](/docs/ai/instruction-files) | `ai-instructions.md` mais arquivos de apontamento por assistente, gravados por `rebase init` | Um assistente, como regras ativas contínuas |
 | [**Chaves de API**](/docs/backend/api-keys) | Credenciais de máquina que têm [escopos](/docs/backend/roles-and-scopes), por collection e por operação | Qualquer chamada para a API HTTP |
 
@@ -93,5 +93,5 @@ diferente e os dois não interagem.
 ## Próximos passos
 
 - [Servidor MCP](/docs/ai/mcp) — conecte o Claude Code, Cursor ou qualquer cliente MCP
-- [Agent Skills](/docs/ai/skills) — `rebase skills install` e as 21 skills
+- [Agent Skills](/docs/ai/skills) — `rebase skills install` e as 23 skills
 - [Arquivos de Instrução de IA](/docs/ai/instruction-files) — o padrão estruturado de regras

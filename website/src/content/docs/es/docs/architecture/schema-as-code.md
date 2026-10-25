@@ -1,5 +1,5 @@
 ---
-sourceHash: d1f704c55103031a
+sourceHash: d55621114a4225a1
 title: Esquema como Código
 sidebar_label: Esquema como Código
 description: Cómo Rebase utiliza colecciones de TypeScript como la única fuente de verdad para el esquema de su base de datos, UI y API.
@@ -42,29 +42,29 @@ mediante [Atlas](https://atlasgo.io), que compara tu esquema deseado con el
 existente y planifica el cambio:
 
 ```
-                        Colecciones (TypeScript)
+                        Collections (TypeScript)
                                   │
             ┌─────────────────────┴─────────────────────┐
             ▼                                           ▼
-   rebase schema generate                   (db push y db generate escriben
-            │                               el SQL de abajo en cada ejecución,
-            ▼                               en .rebase/sql/, que no se versiona)
+   rebase schema generate                   (db push and db generate write
+            │                               the SQL below on every run, into
+            ▼                               .rebase/sql/, which is not committed)
   backend/src/schema.generated.ts                       │
-  el esquema Drizzle a través del                       ▼
-  cual el runtime lee y escribe filas       schema.sql              ← estado deseado de Atlas
-                                            policies.sql            ← RLS, se aplica por separado
-                                            search.sql, vector.sql, ← Atlas no puede gestionarlos
+  the Drizzle schema the runtime                        ▼
+  reads and writes rows through             schema.sql              ← Atlas's desired state
+                                            policies.sql            ← RLS, applied separately
+                                            search.sql, vector.sql, ← Atlas cannot manage these
                                             triggers.sql
                                                         │
                                           ┌─────────────┴─────────────┐
                                           ▼                           ▼
                                    rebase db push              rebase db generate
-                                   Atlas planifica el diff     Atlas escribe el diff
-                                   y lo aplica al momento      en drizzle/migrations/
+                                   Atlas plans the diff        Atlas writes the diff
+                                   and applies it now          to drizzle/migrations/
                                           │                           │
                                           │                           ▼
                                           │                    rebase db migrate
-                                          │                    las aplica en orden
+                                          │                    applies them in order
                                           └─────────────┬─────────────┘
                                                         ▼
                                                   PostgreSQL
@@ -98,7 +98,7 @@ const productsCollection = defineCollection({
 });
 ```
 
-Rebase genera este esquema Drizzle:
+Rebase genera este esquema Drizzle: el archivo completo, con la columna `id`, las políticas predeterminadas y todo:
 
 <!-- schema-sample: drizzle -->
 ```typescript
@@ -170,10 +170,10 @@ none of the four.
 
 Cuando Rebase actualiza el esquema de la base de datos, mapea las definiciones de colección de TypeScript a las tablas de la base de datos. Para garantizar que **los objetos de base de datos no mapeados (por ejemplo, tablas, vistas, enumeraciones) nunca se eliminen ni modifiquen**, Rebase implementa varias capas de seguridad:
 
-1. **Filtrado Estricto de Tablas (`tablesFilter`)**: La configuración de Drizzle generada restringe dinámicamente la sincronización solo a las tablas exportadas en el esquema generado. El motor de sincronización ignora cualquier tabla no reconocida o tablas de sistemas heredados que existan en la base de datos.
-2. **Restricciones de Esquema (`schemaFilter`)**: La sincronización de la base de datos se restringe exclusivamente al esquema `public`. Las tablas internas de la base de datos, los esquemas personalizados y las tablas específicas de extensiones no se modifican.
-3. **Protección de Roles y Extensiones**: Drizzle está configurado para no gestionar roles de base de datos (`entities.roles: false`) ni tablas auxiliares de extensiones como PostGIS.
-4. **Confirmación Interactiva en Modo de Desarrollo**: Al ejecutar `rebase db push` en desarrollo, la CLI se ejecuta con los flags `--strict` y `--verbose`, lo que garantiza que los desarrolladores deban revisar y aprobar explícitamente cualquier acción SQL destructiva antes de que se ejecute.
+1. **Exclusión de tablas sin mapear**: Antes de cada push, la CLI lista todas las tablas y vistas de la base de datos y le pasa a Atlas un `--exclude` por cada una que no respalde ninguna colección (ni sea la tabla de unión de una colección), de modo que Atlas nunca planifica un cambio sobre ella. Si no se puede leer la base de datos, el push se aborta en lugar de ejecutarse con una lista parcial.
+2. **Esquemas que Rebase posee**: El esquema `rebase` (tablas de autenticación, funciones auxiliares de RLS, la tabla de revisiones de Atlas) y cualquier esquema `auth` se excluyen por completo, de modo que un push nunca puede planificar un `DROP SCHEMA … CASCADE`.
+3. **Objetos que Atlas no puede modelar**: Las columnas de búsqueda, los índices vectoriales y los triggers también se excluyen de Atlas, y se aplican desde sus propios archivos generados.
+4. **Barrera para cambios destructivos**: `rebase db push` primero ejecuta el plan en modo de simulación. Una sentencia que destruye datos (una columna o tabla eliminada, un cambio de tipo con pérdida) detiene el push: en un terminal te pide que escribas `yes`, y sin uno (CI, scripts, agentes) se niega a menos que pases `--allow-destructive`.
 5. **Propiedad de los Índices por Nombre**: Los índices son el único objeto que vive *sobre* una tabla mapeada, así que el filtrado de tablas no puede protegerlos — y un push planificaba `DROP INDEX` para cualquier índice ausente del estado deseado, es decir, para todos los escritos a mano. Ahora Rebase nombra los índices que genera `<table>_<columns>_ix_<7 hex>` (`_ux_` cuando son únicos), una forma que ningún otro generador de nombres produce aquí, y excluye del diff todo lo demás por su nombre. Un índice que escribiste a mano, o que llegó por introspección, nunca se toca; una declaración que borras sigue eliminando su índice, que es la intención. Consulta **[Índices](/docs/backend/indexes)**.
 
 ## Siguientes Pasos

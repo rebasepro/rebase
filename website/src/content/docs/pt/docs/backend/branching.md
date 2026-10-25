@@ -1,5 +1,5 @@
 ---
-sourceHash: 6c8e1509d678993c
+sourceHash: 90e9eafee6523006
 title: Branching de Banco de Dados
 sidebar_label: Branching
 description: Crie branches de banco de dados isoladas para desenvolvimento, staging e testes usando o CREATE DATABASE ... TEMPLATE do PostgreSQL — cópias instantâneas e de alta fidelidade com zero tempo de inatividade.
@@ -97,7 +97,7 @@ As configurações de branch são armazenadas no banco de dados padrão sob a ta
 CREATE SCHEMA IF NOT EXISTS rebase;
 
 CREATE TABLE IF NOT EXISTS rebase.branches (
-    name         TEXT PRIMARY KEY,              -- Sanitize user branch name (alphanumeric & underscores)
+    name         TEXT PRIMARY KEY,              -- Branch name as given (letters, digits, underscores, hyphens)
     db_name      TEXT NOT NULL UNIQUE,          -- Actual PostgreSQL database name (prefixed with 'rb_')
     parent_db    TEXT NOT NULL,                 -- Source database cloned from
     created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -213,7 +213,7 @@ rebase db branch switch --off
 # Show one branch's parent, age and size
 rebase db branch info dev_sandbox
 
-# O que o branch mudou: esquema, políticas RLS e linhas (--json para tudo)
+# What the branch changed: schema, RLS policies and rows (--json for all of it)
 rebase db branch diff dev_sandbox
 
 # Delete a branch
@@ -266,7 +266,11 @@ Criar uma branch **não** altera com qual banco de dados o seu projeto se comuni
 postgresql://user:pass@localhost:5432/rb_dev_sandbox
 ```
 
+---
+
 ## Revisar e mesclar um branch
+
+<span class="since-badge" data-since="0.26">A partir da versão 0.26</span>
 
 Um branch é onde um agente, ou uma migração de que você não tem certeza, pode alterar um banco de dados sem tocar no real. Antes que qualquer coisa chegue ao banco de onde o branch foi criado, você pode ver o que mudou e mesclar pelo [Studio](/docs/studio/): abra **Branches** e escolha um.
 
@@ -306,16 +310,14 @@ Todas as escritas acontecem numa única instrução no pai — tudo ou nada, com
 
 ```typescript
 const diff = await admin.diffBranch("agent_run_17");
-// …revise diff.schema e diff.data…
+// …review diff.schema and diff.data…
 const result = await admin.mergeBranch("agent_run_17", {
     expectedFingerprint: diff.fingerprint,
-    onConflict: "abort" // ou "branch", ou "target"
+    onConflict: "abort" // or "branch", or "target"
 });
 ```
 
 Mesclar não é, de propósito, uma ferramenta MCP: um agente propõe no seu branch, e uma pessoa mescla.
-
----
 
 ---
 

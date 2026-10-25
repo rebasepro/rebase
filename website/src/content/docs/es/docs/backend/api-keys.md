@@ -182,7 +182,7 @@ para los scripts de una persona, una CLI en su portátil o una herramienta que c
 a su propia cuenta.
 
 Están desactivadas por defecto, porque cada una es una credencial de larga duración
-para una cuenta. Actívalas en el bloque `auth` de la colección de usuarios:
+para una cuenta. Actívalas en el bloque auth de la colección de usuarios:
 
 ```typescript
 import { defineCollection } from "@rebasepro/cms-types";

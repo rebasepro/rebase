@@ -1,5 +1,5 @@
 ---
-sourceHash: de9051fe769a602b
+sourceHash: 88050e5f44c6457a
 title: Executando mais de uma instância
 sidebar_label: Mais de uma instância
 description: Cada fragmento de estado que um processo do Rebase mantém para si e a configuração que o compartilha — o que definir antes que uma segunda réplica, um rolling deploy ou um split deployment receba tráfego.
@@ -48,7 +48,8 @@ As seções abaixo explicam o comportamento de cada item quando deixado na confi
 O `JWT_SECRET` assina cada sessão e o `REBASE_SERVICE_KEY` autentica
 chamadas de servidor para servidor. Em desenvolvimento, cada processo gera seus próprios segredos
 quando eles não estão definidos; portanto, um token emitido por um processo é recusado pelo
-próximo. Em produção, a inicialização já é bloqueada sem eles; o que importa ao executar
+próximo. Em produção, a inicialização já é bloqueada sem `JWT_SECRET` (sem `REBASE_SERVICE_KEY` ela
+inicializa sem nenhuma chave de serviço); o que importa ao executar
 vários processos é que todos recebam os **mesmos** valores — a partir de um único segredo, e não um por réplica.
 
 ## Rate limits e o endereço do cliente

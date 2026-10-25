@@ -1,5 +1,5 @@
 ---
-sourceHash: 65ad924b56043f2e
+sourceHash: 1959160bec263545
 title: Rebase Cloud
 sidebar_label: Rebase Cloud
 description: Rebase Cloud est le même Rebase, opéré pour vous. Ce que c'est, comment lier et déployer un projet, et ce que la bêta privée n'inclut pas encore.
@@ -95,14 +95,12 @@ Il se termine en indiquant où chaque application répond désormais et si la no
     backend  backend  https://songbuzz.rebase.website/api  live
 
   ✓ Live: the new version answers on every address above.
+  Something wrong? `rebase cloud rollback` puts the previous deployment back.
 ```
 
 « Live » signifie que l'adresse a répondu après le build : le `/api/health` du backend a renvoyé `ok`, et la page d'une application statique s'est chargée (depuis ce déploiement, quand la plateforme la sert). La vérification attend jusqu'à `--live-timeout` secondes, 60 par défaut ; `0` la désactive. Si une application ne répond pas à temps, le déploiement se termine quand même avec le code zéro, car il a réussi, et la dernière ligne indique quelle application n'a pas répondu et pourquoi. Un déploiement en échec se termine à la place par une ligne qui nomme l'application et la raison, avec `rebase cloud logs` pour le log de build complet.
 
 Les scripts passent `--json` pour obtenir un objet portant les mêmes informations — `apps`, `hosts`, `live`, `liveChecks`, `durationMs` et l'identifiant du déploiement. Contrairement au reste de `rebase cloud`, `deploy` ne passe pas de lui-même en JSON via un pipe.
-
-Pour déployer un artefact compilé plus tôt — par exemple, un job CI qui compile une fois et
-déploie deux fois —, pointez vers le répertoire au lieu de recompiler :
 
 Ce que ce runtime autorise — paquets et modules natifs, mémoire et instances, timeouts et tailles de payload, système de fichiers, secrets, stockage et réseau sortant — se trouve sur sa propre page :
 [Runtime backend managé](/docs/deployment/managed-runtime/).
@@ -138,14 +136,58 @@ Avec `--json`, le `code` de l'erreur est `syntax_error`. Les scripts en ligne qu
 Surveiller le déploiement :
 
 ```bash
-rebase cloud logs            # le journal de build
-rebase cloud logs --runtime  # ce que le conteneur en cours d'exécution affiche
-rebase cloud status          # ce que la plateforme perçoit de l'état du projet
+rebase cloud logs            # the build log
+rebase cloud logs --runtime  # what the running container is printing
+rebase cloud status          # what the platform thinks the project is doing
 ```
 
 `status` rapporte `blockedOn` et `nextAction`. Lorsque `blockedOn` vaut `null`, la
 plateforme travaille réellement et le polling est la bonne chose à faire ; lorsqu'il indique
 une valeur, cette étape est en attente d'une action de votre part.
+
+## Prévisualiser un changement
+
+<span class="since-badge" data-since="0.26">Since 0.26</span>
+
+```bash
+rebase cloud deploy --preview
+```
+
+Cela compile et téléverse exactement ce que ferait `deploy`, mais le sert à une adresse
+qui lui est propre, comme `https://shop--k3x9ab.rebase.website`. La production continue
+de servir ce qu'elle servait auparavant. Le déploiement affiche l'adresse de l'aperçu une fois
+le build terminé.
+
+Pour conserver la même adresse d'un déploiement à l'autre, nommez l'aperçu. Déployer
+le même nom à nouveau le met à jour :
+
+```bash
+rebase cloud deploy --preview-name new-checkout
+```
+
+Ce à quoi un aperçu parle dépend de ce que vous avez déployé :
+
+- **`rebase cloud deploy web --preview`** prévisualise une application statique. Ses pages appellent
+  le backend de **production** : une connexion y est une vraie session, et tout ce qui y est
+  écrit est une donnée de production.
+- **`rebase cloud deploy --preview`** prévisualise le backend, avec ses applications statiques
+  intégrées, comme la production les exécute. Il obtient un backend à lui sur une
+  **base de données vide qui lui est propre**, jamais celle de la production. Démarrer sur
+  la base de données de production lui appliquerait le schéma et les règles d'accès de l'aperçu.
+
+Un aperçu ne téléverse aucune source et n'enregistre aucune application ni aucun nom d'hôte, car chacun
+de ces éléments modifierait le projet de production. `--source` et `--eject` ne peuvent pas
+être combinés avec `--preview`. Chacun construit une image de conteneur pour la production.
+
+```bash
+rebase cloud previews                      # name, address, app, backend, expiry
+rebase cloud previews delete new-checkout  # stops serving it and drops its database
+```
+
+Un aperçu expire une semaine après son dernier déploiement.
+
+Les aperçus sont en cours de déploiement. Un plan de contrôle qui ne les sert pas encore refuse
+`--preview` avec `previews_unavailable` et ne déploie rien.
 
 ## Revenir en arrière (Rollback)
 
@@ -229,7 +271,7 @@ jobs:
 | Capacité | Ce que le jeton peut faire |
 |---|---|
 | `deploy` | Déployer le projet et suivre ses builds : `deploy`, `deployments` |
-| `logs` | Lire les logs de build et de runtime, ainsi que les métriques en direct : `logs`, `metrics` |
+| `logs` | Lire les logs de build et de runtime, l'historique des crons, ainsi que les métriques en direct : `logs`, `cron`, `metrics` |
 | `env` | Lire et modifier les variables d'environnement, secrets inclus |
 | `database` | `db list`, `db info` et `db connect`, ce qui inclut le mot de passe de la base de données |
 | `backups` | Lister, créer, inspecter et télécharger les sauvegardes, et consulter la fenêtre PITR |
@@ -291,7 +333,7 @@ rebase cloud compute set --cpu 500m --memory 2Gi
 | `--autoscale-cpu-target` | 10–95. L'utilisation du CPU que l'autoscaler maintient, par rapport à la ressource demandée (request) plutôt qu'à la limite. Vide correspond à 70 |
 | `--spot` | `true` ou `false`. Capacité préemptible : moins chère, mais redémarrée sans préavis |
 | `--db-instances` | 1–3. `1` est une instance unique sans basculement automatique ; `2` ajoute une instance de secours (standby) automatique |
-| `--db-cpu`, `--db-memory`, `--storage` | Par instance de base de données. Vide correspond à `500m`, `2Gi` et au volume par défaut |
+| `--db-cpu`, `--db-memory` | Par instance de base de données. Vide correspond à `160m` et `1Gi` |
 
 Un paramètre laissé vide n'est pas équivalent à un paramètre fixé à la même valeur : un paramètre vide
 suit la valeur par défaut de la plateforme et évolue avec elle.
@@ -308,10 +350,11 @@ sauf celle qui redémarre la base de données, qui attendra une fenêtre de main
 |---|---|
 | `login`, `logout`, `whoami` | Votre session |
 | `tokens` | Jetons pour la CI et les agents, chacun restreint à un projet. Voir [CI et agents](#ci-et-agents) |
-| `init` | Avec `--claim` : un backend en ligne sans compte, et un lien pour le réclamer. Voir [Un backend sans compte](#un-backend-sans-compte) |
 | `link`, `unlink`, `use`, `open` | Lier ce répertoire à un projet, sélectionner une organisation, ouvrir la console |
+| `init` | Avec `--claim` : un backend en ligne sans compte, et un lien pour le réclamer. Voir [Un backend sans compte](#un-backend-sans-compte) |
 | `projects` | Créer, lister, inspecter, supprimer |
 | `deploy`, `logs`, `deployments`, `rollback`, `cancel` | Déployer et surveiller |
+| `previews` | Les builds servis à leur propre adresse par `deploy --preview`, et leur suppression. Voir [Prévisualiser un changement](#prévisualiser-un-changement) |
 | `start`, `stop`, `restart` | Mettre un projet en pause et le réactiver |
 | `status`, `metrics`, `debug` | Ce qu'il fait, et pourquoi il ne le fait pas |
 | `cron` | Les tâches cron de l'application déployée et leurs exécutions enregistrées, consultées avec votre session `rebase cloud`. Lecture seule |
@@ -347,8 +390,9 @@ Indiqué en toute transparence, car s'en rendre compte plus tard est toujours d�
 - **Pas de libre-service.** L'accès est accordé par vagues ; il n'y a pas d'inscription directe avec paiement.
 - **Pas de SLA publié**, ni de certification SOC 2. Si vous avez besoin de l'un d'eux, mentionnez-le lors de votre demande
   d'accès plutôt que de le supposer.
-- **Pas de déploiements de prévisualisation ou de branche**, et aucune application GitHub officielle. Les hooks de déploiement —
-  des URLs secrètes vers lesquelles pointer un webhook de dépôt — constituent l'automatisation prise en charge.
+- **Pas de déploiements par branche**, et aucune application GitHub officielle. Les hooks de déploiement —
+  des URLs secrètes vers lesquelles pointer un webhook de dépôt — constituent l'automatisation prise en charge. Les [déploiements
+  de prévisualisation](#prévisualiser-un-changement) sont en cours de déploiement et se lancent depuis le CLI.
 - **Les jetons agissent en tant que personne.** Un [jeton](#ci-et-agents) est généré par un compte
   et agit en son nom ; il n'y a pas encore d'identité machine propre à l'organisation. Si vous
   vous authentifiez depuis une CI, transmettez `REBASE_CLOUD_EMAIL` et `REBASE_CLOUD_PASSWORD`

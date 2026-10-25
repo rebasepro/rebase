@@ -1,5 +1,5 @@
 ---
-sourceHash: e68d814b6b83ef41
+sourceHash: a5511fd6dc8fd73e
 title: Referencia de herramientas MCP
 sidebar_label: Referencia de herramientas MCP
 description: Cada herramienta que registra el servidor MCP de Rebase, por grupo — qué necesita y hace cada una, y cuáles rechaza la barrera de loopback frente a un proyecto no local.
@@ -9,10 +9,10 @@ Las herramientas que [`@rebasepro/mcp`](/docs/ai/mcp) ofrece a un asistente. Có
 conecta, qué credencial posee y cómo decide la [barrera de loopback](/docs/ai/mcp#the-loopback-gate)
 qué significa ⚠ están en la página del [servidor MCP](/docs/ai/mcp).
 
-42 herramientas, en nueve grupos. Las herramientas marcadas con ⚠ se rechazan frente a destinos
+44 herramientas, en diez grupos. Las herramientas marcadas con ⚠ se rechazan frente a destinos
 no locales a menos que desactives la protección.
 
-## Esquema y base de datos (12)
+## Esquema y base de datos (13)
 
 Ejecutan la CLI de Rebase en el directorio del proyecto activo.
 
@@ -29,6 +29,7 @@ Ejecutan la CLI de Rebase en el directorio del proyecto activo.
 | `rebase_db_branch_list` | — | Listar ramas de base de datos (solo administradores) |
 | `rebase_db_branch_delete` ⚠ | `name` | Eliminar una rama de base de datos (solo administradores) |
 | `rebase_db_branch_info` | `name` | Información y estado de la rama (solo administradores) |
+| `rebase_db_branch_diff` | `name` | Lo que una rama cambió respecto a la base de datos de la que se creó: esquema, políticas y filas, con conflictos; no modifica ninguna de las dos (solo administradores) |
 | `rebase_db_branch_switch` | — | Apuntar este checkout a una rama, o de vuelta a la base de datos principal (solo administradores) |
 
 ## Planificación de esquema (1)
@@ -112,7 +113,7 @@ el modelo. Su radio de impacto abarca todo lo que hagan tus funciones.
 |---|---|---|
 | `rebase_project_list` | — | Listar proyectos registrados y mostrar el activo |
 | `rebase_project_switch` | `name` | Cambiar el proyecto activo |
-| `rebase_project_add` | `name` | Registrar un proyecto (`baseUrl`, `projectDir` opcional, `token`) |
+| `rebase_project_add` | `name` | Registrar un proyecto (`projectDir`, `baseUrl`, `token` opcionales) |
 | `rebase_project_remove` | `name` | Eliminar un proyecto (el proyecto predeterminado no se puede eliminar) |
 | `rebase_project_current` | — | Mostrar el proyecto activo y su estado de autenticación |
 | `rebase_project_status` | — | Comprobar el estado de salud del backend activo |
@@ -120,3 +121,11 @@ el modelo. Su radio de impacto abarca todo lo que hagan tus funciones.
 `rebase_project_switch` no está restringido porque redirige todo lo demás en lugar de actuar
 sobre un destino en sí mismo. Por lo tanto, un asistente puede cambiar a un proyecto remoto
 sin activar la barrera; simplemente no podrá ejecutar una herramienta destructiva allí después.
+
+## Rebase Cloud (1)
+
+Ejecuta `rebase cloud` en el directorio del proyecto activo.
+
+| Herramienta | Requerido | Descripción |
+|---|---|---|
+| `rebase_cloud_provision` ⚠ | — | Aprovisionar un proyecto de Rebase Cloud sin reclamar, sin cuenta (`rebase cloud init --claim`), escribir `REBASE_BASE_URL` y `REBASE_API_TOKEN` en `.env` y desplegar las colecciones; `name` y `deploy` opcionales |

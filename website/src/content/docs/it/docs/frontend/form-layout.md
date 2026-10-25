@@ -1,5 +1,5 @@
 ---
-sourceHash: fef2eb56c7043526
+sourceHash: a6f7e70d9dfb90ae
 title: Layout del form
 sidebar_label: Layout del form
 description: Controlla la disposizione del form dell'entità — ampiezza delle colonne, sezioni e barra dei metadati.
@@ -172,7 +172,7 @@ colonna principale.
 | `admin.form.sections` | `FormSection[]` | Gruppi con intestazione per la colonna principale |
 | `admin.form.showRecordMeta` | `boolean` | Mostra id/creazione/aggiornamento ai piedi della barra |
 
-`FormSection` corrisponde a `{ key, title?, properties, collapsed?, collapsible? }`.
+`FormSection` corrisponde a `{ key, title?, properties, collapsed?, collapsible?, readVariant? }`. `readVariant: "summary"` dispone i campi della sezione come righe etichetta/valore nella vista di sola lettura del record; il valore predefinito, `"grid"`, usa la griglia del form.
 
 ## Correlati
 

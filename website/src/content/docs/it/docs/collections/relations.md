@@ -1,5 +1,5 @@
 ---
-sourceHash: e3130fcc43e901ed
+sourceHash: f37fbfe1270f8317
 title: Relazioni
 sidebar_label: Relazioni
 description: Definisci relazioni SQL uno-a-uno, uno-a-molti e molti-a-molti tra collezioni con chiavi esterne, tabelle di giunzione e join multi-hop.
@@ -80,7 +80,8 @@ attraverso.
 | `manyToMany` | in una **tabella di giunzione** | molte | le righe sono condivise; il collegamento è tuo |
 | `via` | un `joinPath` esplicito | l'una o l'altra | in sola lettura; la `cardinality` la dichiari tu |
 
-Ogni campo è opzionale tranne `kind` e `target` — il resto è derivato.
+Ogni campo è opzionale tranne `kind` e `target` (e, su `via`, `cardinality`
+e `joinPath`) — il resto è derivato.
 
 ### belongsTo — la chiave è su questa tabella
 
@@ -361,7 +362,7 @@ esplicitamente:
     kind: "belongsTo",
     relationName: "order",
     target: () => ordersCollection,
-    // Una riga d'ordine non ha senso senza il suo ordine: dillo.
+    // A line item is meaningless without its order — say so.
     onDelete: "cascade"
 }
 ```
@@ -420,7 +421,7 @@ for (const article of data) {
 }
 ```
 
-> I nomi delle relazioni passati a `include()` devono corrispondere al `relationName` definito nell'array `relations` della collezione.
+> I nomi delle relazioni passati a `include()` devono corrispondere al nome della relazione: il `relationName` di una voce dell'array `relations` della collezione, oppure la chiave della proprietà che la dichiara in linea.
 
 Per la documentazione completa del query builder (filtro, ordinamento, paginazione, real-time), consulta la [documentazione dell'SDK tipizzato](/docs/sdk).
 
@@ -549,7 +550,12 @@ interface HasManyRelation extends RelationBase {
 
 interface ManyToManyRelation extends RelationBase {
     kind: "manyToMany";
-    through?: { table?: string; sourceColumn?: string; targetColumn?: string };
+    through?: {
+        table?: string;
+        sourceColumn?: string;
+        targetColumn?: string;
+        properties?: Properties;    // extra columns on the junction row, served under `_pivot`
+    };
 }
 
 interface ViaRelation extends RelationBase {

@@ -1,5 +1,5 @@
 ---
-sourceHash: 008801863c78b3e5
+sourceHash: 05002dc371e1e1e7
 title: Cron Jobs
 sidebar_label: Cron Jobs
 description: Pianifica attività ricorrenti in background con il sistema di cron job integrato di Rebase. Definisci i job come file TypeScript, monitorali in Studio e gestiscili tramite l'API REST.
@@ -151,8 +151,8 @@ interface CronJobDefinition {
     // loads rather than read as local time.
     timezone?: string;
 
-    // Human-readable name shown in Studio
-    name: string;
+    // Human-readable name shown in Studio (default: the job id, the file's name)
+    name?: string;
 
     // Optional description shown in Studio
     description?: string;
@@ -347,7 +347,7 @@ pianificato è descritto in [Cron su più istanze](/docs/backend/cron-across-ins
   `Error: Cron job "<id>" timed out after <N>ms`
   L'abort è la metà che interrompe il *lavoro*; il rifiuto interrompe solo l'attesa dello scheduler. Un handler che ignora `ctx.signal` continuerà a essere eseguito oltre la sua stessa esecuzione.
 - **Arresto**: `backend.shutdown()` attende un'esecuzione in corso, entro lo stesso budget della coda dei job (due terzi del timeout di arresto). Se l'esecuzione è ancora in corso quando il budget si esaurisce, `ctx.signal` viene interrotto e l'esecuzione viene registrata come fallita, con il motivo. Il suo slot resta reclamato, quindi nessun'altra istanza la riesegue.
-- **Try/Catch a prova di errore**: Ogni job handler viene eseguito all'interno di un wrapper isolato. Eventuali eccezioni non rilevate vengono intercettate, formattando il traceback dell'errore in una stringa, impostando lo stato del job su `"error"` e aggiornando il contatore dei fallimenti del job. Un arresto anomalo all'interno di un singolo cron task non causerà mai il crash del ciclo dello scheduler né del server web HTTP principale Hono.
+- **Try/Catch a prova di errore**: Ogni job handler viene eseguito all'interno di un wrapper isolato. Eventuali eccezioni non rilevate vengono intercettate, registrando il messaggio dell'errore (oscurato) come stringa, impostando lo stato del job su `"error"` e aggiornando il contatore dei fallimenti del job. Un arresto anomalo all'interno di un singolo cron task non causerà mai il crash del ciclo dello scheduler né del server web HTTP principale Hono.
 - **Ring buffer in memoria**: Lo scheduler mantiene un ring buffer contenente le ultime **50 esecuzioni** per ogni job. Questo buffer viene conservato in memoria per consentire letture quasi istantanee da Rebase Studio.
 
 ---
@@ -366,7 +366,7 @@ CREATE TABLE IF NOT EXISTS rebase.cron_logs (
     finished_at  TIMESTAMPTZ NOT NULL,
     duration_ms  INTEGER NOT NULL,
     success      BOOLEAN NOT NULL DEFAULT true,
-    error        TEXT,                                 -- Stack trace or error message
+    error        TEXT,                                 -- The error's message, redacted
     result       JSONB,                                -- Return value of handler
     logs         JSONB,                                -- Ring buffer array of ctx.log outputs
     manual       BOOLEAN NOT NULL DEFAULT false        -- True if triggered from Studio/REST

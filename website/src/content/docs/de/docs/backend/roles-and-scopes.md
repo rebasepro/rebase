@@ -1,5 +1,5 @@
 ---
-sourceHash: e6d2447955c86775
+sourceHash: 96a224ca982e3d25
 title: Rollen und Scopes
 sidebar_label: Rollen und Scopes
 description: "Was ein Aufrufer darf: die Datenebene, die jede Person hält, die Admin-Ebene, die Rollen gewähren, die Scopes, die eine App für sich selbst deklariert, und wie jedes Credential sie trägt."
@@ -253,10 +253,10 @@ Für Schlüssel:
 
 Für Konten gilt: Wer `users:write` hält,
 
-- kann kein Konto bearbeiten, zurücksetzen oder löschen, das eine Rolle oder einen Scope hält, die er nicht hält:
+- kann kein Konto bearbeiten, zurücksetzen oder löschen, dessen Rollen einen Scope halten, den er nicht hält, oder `admin`, wenn er kein Admin ist:
   `403 ACCOUNT_OUTRANKS_CALLER`. Ohne das könnte eine Support-Rolle das Passwort eines
   Admins zurücksetzen und sich als dieser anmelden.
-- kann keine Rollen gewähren, die mehr halten als er: `403 ROLE_EXCEEDS_CALLER`.
+- kann keine Rollen gewähren, die mehr halten als er, `admin` eingeschlossen: `403 ROLE_EXCEEDS_CALLER`.
 
 ## Wie jedes Credential Scopes hält
 

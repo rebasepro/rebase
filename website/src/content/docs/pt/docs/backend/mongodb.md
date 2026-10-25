@@ -1,8 +1,8 @@
 ---
-sourceHash: 239a291d53ade1fd
+sourceHash: 7c817c2bea2ff579
 title: MongoDB
 sidebar_label: MongoDB
-description:"\"@rebasepro/server-mongo executa o Rebase no MongoDB: um driver de dados completo, tempo real via change streams e histórico por snapshots — e sem segurança em nível de linha.\""
+description: "@rebasepro/server-mongo executa o Rebase no MongoDB: um driver de dados completo, tempo real via change streams e histórico por snapshots — e sem segurança em nível de linha."
 ---
 
 O `@rebasepro/server-mongo` implementa o `BackendBootstrapper` do Rebase no
@@ -29,16 +29,20 @@ pnpm add @rebasepro/server-mongo
 ```
 
 ```ts title="backend/src/index.ts" no-verify
-import { rebase } from "@rebasepro/server";
-import { createMongoBootstrapper } from "@rebasepro/server-mongo";
+import { initializeRebaseBackend } from "@rebasepro/server";
+import { createMongoBootstrapper, createMongoDBConnection } from "@rebasepro/server-mongo";
 
-rebase({
-    backend: createMongoBootstrapper({ url: process.env.DATABASE_URL! })
+const { db, client } = await createMongoDBConnection(process.env.DATABASE_URL!, "app");
+
+await initializeRebaseBackend({
+    app,
+    server,
+    bootstrappers: [createMongoBootstrapper({ connection: db, client })]
 });
 ```
 
 Defina `DATABASE_URL` com uma string de conexão do MongoDB
-(`mongodb://…` ou `mongodb+srv://…`).
+(`mongodb://…` ou `mongodb+srv://…`); o segundo argumento dá o nome do banco de dados.
 
 ## O que funciona
 

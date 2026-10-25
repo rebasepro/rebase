@@ -1,5 +1,5 @@
 ---
-sourceHash: 867178ccdf409a3f
+sourceHash: 3dd5a537f812658a
 title: Panoramica del Frontend
 sidebar_label: Frontend
 description: "Crea e personalizza il pannello — Rebase CMS e Rebase Studio — con React: controller, scaffold, routing e viste."
@@ -11,7 +11,7 @@ Il frontend di Rebase è un **framework React** che esegue il rendering del pann
 
 Nello scaffold predefinito, il pannello di amministrazione **è** il frontend: viene servito alla radice dell'URL distribuito. Se invece crei la tua applicazione prodotto personalizzata, puoi montare l'admin sotto un prefisso come `/admin` nella stessa distribuzione — vedi [Modifica dell'URL di base](/docs/getting-started/deployment#changing-the-base-url).
 
-Questo è `frontend/src/App.tsx` come viene scritto da `rebase init` — l'intero pannello di amministrazione, quattro dichiarazioni all'interno di un unico provider:
+Questo è `frontend/src/App.tsx` come viene scritto da `rebase init`, senza gli import dei font, l'error boundary e il client id di Google — l'intero pannello di amministrazione, quattro dichiarazioni all'interno di un unico provider:
 
 ```tsx
 import React from "react";
@@ -77,9 +77,9 @@ Tutte e ventitré, al completo — la tabella prima ne elencava dieci, e due di 
 | `plugins` | Istanze di plugin — vedi [Plugin](/docs/plugins) |
 | `slots` | Contributi slot dichiarati direttamente, senza un plugin |
 | `propertyConfigs` | Widget di campo personalizzati, indicizzati in base al nome indicato da una proprietà in `propertyConfig` |
-| `entityViews` | Schede di vista entità personalizzate globali |
+| `entityViews` | Schede di vista entità personalizzate, disponibili per qualsiasi collezione che indichi la loro `key` in `admin.entityViews` |
 | `collectionViews` | Modalità di visualizzazione personalizzate delle collezioni, disponibili per qualsiasi collezione tramite `key` |
-| `entityActions` | Azioni globali sulle entità |
+| `entityActions` | Azioni sulle entità, disponibili per qualsiasi collezione che indichi la loro `key` in `admin.entityActions` |
 | `effectiveRoleController` | Simula un ruolo diverso mentre la modalità dev è attiva |
 | `modeController` | Passa a Rebase la modalità chiaro/scuro dell'app ospitante; Rebase non tocca più `<html>`, `prefers-color-scheme` né localStorage — vedi [Stile](#stile) |
 | `translations` | Sovrascrivi o estendi qualsiasi stringa dell'interfaccia utente, indicizzata per locale — vedi [Traduzioni](/docs/frontend/i18n) |

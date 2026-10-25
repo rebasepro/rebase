@@ -1,5 +1,5 @@
 ---
-sourceHash: eeb3c8895a643633
+sourceHash: 75edbe600ee52a3e
 title: Index des points de terminaison
 sidebar_label: Index des points de terminaison
 description: Chaque route HTTP montée par un backend Rebase — données, auth, stockage, admin, méta — avec son contrôle d'accès et la page qui l'explique.
@@ -35,7 +35,6 @@ liste fixe. `:slug` est le `slug` d'une collection.
 
 | Méthode | Chemin | Contrôle | En savoir plus |
 |---|---|---|---|
-| `GET` | `/api/data/collections` | session | [API REST](/docs/backend/api/) |
 | `GET` | `/api/data/:slug` | RLS | [Requêtage](/docs/backend/filtering/) |
 | `POST` | `/api/data/:slug` | RLS | [API REST](/docs/backend/api/) |
 | `POST` | `/api/data/:slug/query` | RLS | La liste, paramètres de requête dans le corps — [Requêtes trop longues pour une URL](/docs/backend/vector-search/#queries-too-long-for-a-url) |
@@ -58,7 +57,7 @@ que `aggregate` ne soit pas interprété comme un id d'entité. `?select=` et `?
 leurs paramètres, et `select` est requis sur `/aggregate`.
 
 La recherche textuelle, la recherche vectorielle, l'inclusion de relations et la sélection de champs *sont* des
-paramètres de requête sur `GET /api/data/:slug` plutôt que des routes distinctes — `search`,
+paramètres de requête sur `GET /api/data/:slug` plutôt que des routes distinctes — `searchString`,
 `vector_search`, `include`, `fields`. Voir [API REST](/docs/backend/api/).
 
 Un projet qui ne déclare aucune collection et n'en inspecte aucune sert ce préfixe
@@ -81,6 +80,8 @@ avec une simple erreur `404 NO_COLLECTIONS`. Voir [Backend uniquement](/docs/get
 | `POST` | `/api/auth/forgot-password` | none | [Authentification](/docs/backend/authentication/) |
 | `POST` | `/api/auth/reset-password` | none (un jeton de réinitialisation) | [Authentification](/docs/backend/authentication/) |
 | `POST` | `/api/auth/change-password` | session | [Authentification](/docs/backend/authentication/) |
+| `POST` | `/api/auth/change-email` | session | Envoie un lien de confirmation à la nouvelle adresse — [Changer d'adresse e-mail](/docs/backend/auth-endpoints/#changing-an-email-address) |
+| `POST` | `/api/auth/confirm-email-change` | none (un jeton de lien) | Déplace le compte vers la nouvelle adresse — [Changer d'adresse e-mail](/docs/backend/auth-endpoints/#changing-an-email-address) |
 | `POST` | `/api/auth/send-verification` | session | [Authentification](/docs/backend/authentication/) |
 | `GET` | `/api/auth/verify-email` | none (un jeton de vérification) | [Authentification](/docs/backend/authentication/) |
 | `POST` | `/api/auth/verify-email` | none (un jeton de vérification, et une session ou le mot de passe pour la conserver) | [Vérification de l'e-mail](/docs/backend/email-verification/) |
@@ -185,16 +186,19 @@ destinés aux projets qui n'ont pas encore migré ; écrivez le nouveau code en 
 | `DELETE` | `/api/storage/tus/:id` | propriétaire du téléversement | Téléversements avec reprise : annulation |
 
 Un déploiement sans stockage configuré sert ce préfixe avec une erreur `501` indiquant la
-variable nécessaire, plutôt que de renvoyer une 404 comme si la fonctionnalité n'existait pas.
+variable nécessaire, plutôt que de renvoyer une 404 comme si la fonctionnalité n'existait pas —
+sauf `GET /api/storage/sources`, qui répond `200` avec une liste vide.
 
 ## Fonctions
 
 | Méthode | Chemin | Contrôle | En savoir plus |
 |---|---|---|---|
+| `GET` | `/api/functions` | session | Les noms des fonctions servies, et le nombre de fichiers dont le chargement a échoué |
 | any | `/api/functions/<name>` | ce que la fonction déclare. Une clé d'API a aussi besoin de `functions:invoke` | [Fonctions personnalisées](/docs/backend/custom-functions/) |
 
 Une route par fichier sous `backend/functions/`, les chemins proviennent donc de votre
-projet. `GET /api/functions` ne les liste **pas** : l'inventaire des
+projet. `GET /api/functions` ne les liste qu'à un appelant connecté — une
+session, une clé d'API ou la clé de service — et répond `401` à tout autre : l'inventaire des
 points de terminaison personnalisés d'un déploiement n'est pas public.
 
 ## Méta et opérations
@@ -203,9 +207,9 @@ points de terminaison personnalisés d'un déploiement n'est pas public.
 |---|---|---|---|
 | `GET` | `/livez` | none | Liveness seule : ce processus est-il en cours d'exécution. Ne touche pas à la base de données, c'est pourquoi il s'agit du chemin de sonde qu'un conteneur doit utiliser — `RUNTIME_LIVENESS_PATH` |
 | `GET` | `/health`, `/api/health` | none | Liveness et readiness. Signale chaque source de données configurée, pas seulement celle par défaut |
-| `GET` | `/api/docs` | none (`schema:read` en production) | Le document OpenAPI 3.0 |
-| `GET` | `/api/swagger` | none | Swagger UI. En développement uniquement sauf si `REBASE_ENABLE_SWAGGER` |
-| `GET` | `/api/meta/schema-version` | none | Le hachage du schéma à partir duquel ce backend a été construit, et rien d'autre |
+| `GET` | `/api/docs` | none (`schema:read` lorsque `enableSwagger` vaut `false`, valeur par défaut du runtime en production) | Le document OpenAPI 3.0 |
+| `GET` | `/api/swagger` | none | Swagger UI. Hors production uniquement ; `REBASE_ENABLE_SWAGGER` ne peut pas l'activer en production |
+| `GET` | `/api/meta/schema-version` | none | Le hachage du schéma à partir duquel ce backend a été construit et la version du runtime, et rien d'autre |
 | `GET` | `/api/meta/contract` | `schema:read` | Le contrat complet des collections, pour `rebase generate-sdk --from`. `404` si aucune authentification n'est configurée |
 | `GET` | `/metrics` | `REBASE_METRICS_TOKEN` si défini | Métriques Prometheus, lorsque `REBASE_METRICS=true` |
 | `GET` | `/metrics/history` | `REBASE_METRICS_TOKEN` si défini | Les séries enregistrées alimentant les graphiques du Studio. `501` sur un runtime sans backend |

@@ -1,5 +1,5 @@
 ---
-sourceHash: 3d6a5a62a25e5b8c
+sourceHash: 6c024c2a337ce83c
 title: Verificación de correo electrónico
 sidebar_label: Verificación de correo electrónico
 description: "Cómo una cuenta demuestra su dirección de correo electrónico: el enlace que se envía al registrarse, lo que seguirlo conserva y elimina, y el registro con confirmación previa con requireEmailVerification."
@@ -44,7 +44,8 @@ Quien se registra sigue el enlace e introduce su contraseña
 y le inicia la sesión. Con esta opción desactivada, que es lo predeterminado, una dirección
 que ya tiene una cuenta recibe `409 EMAIL_EXISTS`, como antes.
 
-Para recuperarse de un rechazo en el paso 3, el usuario inicia sesión con su método existente y
+Para recuperarse de un rechazo en el paso 3 (`403 EMAIL_NOT_VERIFIED`, consulta
+[Vinculación de cuentas](/docs/backend/authentication/#account-linking-across-sign-in-methods)), el usuario inicia sesión con su método existente y
 llama al endpoint de vinculación explícito:
 
 ```http

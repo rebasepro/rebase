@@ -1,8 +1,8 @@
 ---
-sourceHash: 22ec003847a742c2
+sourceHash: 2f29788275d0b4db
 title: Echtzeit über mehrere Instanzen
 sidebar_label: Echtzeit über mehrere Instanzen
-description:"\"Wie Broadcast-Channels und Presence mehr als einen Server-Prozess überstehen: der LISTEN/NOTIFY-Bus, was jede Instanz besitzt, und das Schreiben eines eigenen Transports.\""
+description: "Wie Broadcast-Channels und Presence mehr als einen Server-Prozess überstehen: der LISTEN/NOTIFY-Bus, was jede Instanz besitzt, und das Schreiben eines eigenen Transports."
 ---
 
 ## Instanzübergreifendes Broadcasting & LISTEN/NOTIFY-Architektur
@@ -17,7 +17,7 @@ Da Connection-Pooler wie **pgBouncer** das persistente Verbindungsmodell nicht u
 
 ### Benachrichtigungsmechanik & Payload-Layout
 
-Wenn ein Datensatz auf Instanz A geändert wird, sendet sie eine Benachrichtigung auf dem Channel `rebase_entity_changes`. Um den Datenbank-Overhead und die Netzwerkbandbreite zu minimieren, wird der Benachrichtigungs-Payload extrem kompakt gehalten:
+Ist die [Datenbank-Änderungserfassung](/docs/backend/realtime-cdc/) aktiv – der Standard überall dort, wo die Datenbankrolle Trigger anlegen kann –, hört jede Instanz jeden Commit auf dem Channel `rebase_cdc`, und nichts von dem Folgenden wird gesendet. Ohne sie sendet eine Instanz A, wenn ein Datensatz geändert wird, eine Benachrichtigung auf dem Channel `rebase_entity_changes`. Um den Datenbank-Overhead und die Netzwerkbandbreite zu minimieren, wird der Benachrichtigungs-Payload extrem kompakt gehalten:
 
 ```json
 {
@@ -102,7 +102,7 @@ Das Zeitfenster ist standardmäßig auf 10 ms eingestellt und keine sensible Ein
 
 ```typescript
 realtime: {
-    bus: { type: "postgres", batchWindowMs: 20 }   // 0 deaktiviert Coalescing
+    bus: { type: "postgres", batchWindowMs: 20 }   // 0 disables coalescing
 }
 ```
 

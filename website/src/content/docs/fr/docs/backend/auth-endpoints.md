@@ -1,5 +1,5 @@
 ---
-sourceHash: b2f805e5fb18de22
+sourceHash: 74dfd3dd58550c90
 title: Endpoints d'authentification et jetons
 sidebar_label: Endpoints d'authentification
 description: Les routes d'authentification montées par le backend Rebase, le format de leurs réponses, l'authentification multifacteur, le contexte de base de données vu par une politique, JWKS et clés de service.
@@ -44,7 +44,7 @@ Tous les endpoints d'authentification sont montés sur `/api/auth/` :
 | `GET` | `/api/auth/keys` | Les propres [clés API personnelles](/docs/backend/api-keys/#personal-keys) de l'appelant |
 | `POST` | `/api/auth/keys` | Créer une clé personnelle. `403 PERSONAL_KEYS_DISABLED` sauf si la collection des utilisateurs définit `auth.personalKeys` |
 | `DELETE` | `/api/auth/keys/:id` | Révoquer l'une des propres clés de l'appelant |
-| `GET` | `/.well-known/jwks.json` | Le JWKS public — monté à la racine, et non sous `basePath`, car c'est là qu'un vérificateur regarde. Présent lorsque la [signature asymétrique](#jetons-asymétriques-et-jwks) est configurée |
+| `GET` | `/.well-known/jwks.json` | Le JWKS public — monté à la racine, et non sous `basePath`, car c'est là qu'un vérificateur regarde. Monté dès que le backend émet ses propres jetons ; un jeu de clés vide tant que la [signature asymétrique](#jetons-asymétriques-et-jwks) n'est pas configurée |
 | `POST` | `/api/auth/mfa/enroll` | Démarrer l'enrôlement TOTP (renvoie le secret et les codes de récupération) |
 | `POST` | `/api/auth/mfa/verify` | Confirmer un enrôlement avec un code provenant de l'application d'authentification |
 | `GET` | `/api/auth/mfa/factors` | Lister les facteurs enregistrés de l'appelant |
@@ -183,7 +183,7 @@ vide dans le corps de la réponse. Le jeton d'accès n'est pas affecté.
 
 **Un deuxième facteur conditionne la connexion, et pas seulement des opérations individuelles.** Dès qu'un
 compte dispose d'un facteur TOTP *vérifié*, aucune route ne lui délivre de session tant qu'un
-code n'a pas été fourni — la connexion par mot de passe, chaque fournisseur OAuth, le lien magique et
+code n'a pas été fourni — la connexion par mot de passe, chaque fournisseur OAuth, le lien magique, le code par e-mail et
 anonymous-link refusent tous avec une erreur `401 MFA_REQUIRED` :
 
 ```json
@@ -265,26 +265,32 @@ possèdent un compte ; ne l'activez que si votre expérience d'invitation le né
 
 Rebase transmet directement l'authentification de la requête à la sécurité au niveau des lignes (Row-Level Security ou RLS) de PostgreSQL. Chaque requête de base de données exécutée via un pilote lié à l'utilisateur s'exécute au sein d'une transaction de base de données (`db.transaction()`) qui configure des paramètres locaux à la transaction :
 
-*   `app.user_id` — L'identifiant unique (`uid`) de l'utilisateur authentifié. Vaut `'anon'` par défaut pour les requêtes non authentifiées.
+*   `app.uid` — L'identifiant unique (`uid`) de l'utilisateur authentifié. Vaut `'anonymous'` par défaut pour les requêtes non authentifiées. L'ancien `app.user_id` (avant le renommage) est toujours écrit à côté, pour les politiques compilées avant le renommage.
 *   `app.user_roles` — Une chaîne de caractères séparée par des virgules listant les rôles attribués à l'utilisateur.
-*   `app.jwt` — Une chaîne JSON contenant l'intégralité du payload des revendications (claims) du JWT (`{"sub": "<uid>", "roles": [...]}`).
+*   `app.is_anonymous` — `'true'` pour une session invité (connexion anonyme), `'false'` sinon.
+*   `app.jwt` — Une chaîne JSON contenant les revendications (claims) personnalisées du jeton ainsi que `sub`, `roles` et `is_anonymous` (`{"sub": "<uid>", "roles": [...], "is_anonymous": false, …}`).
 
 Ces paramètres sont configurés localement pour la durée de la transaction à l'aide de la fonction `set_config` de Postgres :
 ```sql
 SELECT 
+    set_config('app.uid', $1, true),
     set_config('app.user_id', $1, true),
     set_config('app.user_roles', $2, true),
-    set_config('app.jwt', $3, true);
+    set_config('app.is_anonymous', $3, true),
+    set_config('app.jwt', $4, true);
 ```
 
 ### Fonctions d'aide pour les politiques PostgreSQL
 
-Pour simplifier l'écriture des politiques Row-Level Security, Rebase crée des fonctions d'aide sous le schéma `auth` lors de l'initialisation (bootstrapping) de la base de données :
+Pour simplifier l'écriture des politiques Row-Level Security, Rebase crée des fonctions d'aide sous le schéma `rebase` lors de l'initialisation (bootstrapping) de la base de données :
 
 *   **`rebase.uid()`** — Renvoie l'identifiant de l'utilisateur authentifié sous forme de `text`, ou `NULL` s'il n'est pas défini :
     ```sql
     CREATE OR REPLACE FUNCTION rebase.uid() RETURNS text AS $$
-        SELECT NULLIF(current_setting('app.user_id', true), '');
+        SELECT COALESCE(
+            NULLIF(current_setting('app.uid', true), ''),
+            NULLIF(current_setting('app.user_id', true), '')
+        );
     $$ LANGUAGE sql STABLE;
     ```
 *   **`rebase.roles()`** — Renvoie la chaîne des rôles séparés par des virgules :
@@ -299,6 +305,7 @@ Pour simplifier l'écriture des politiques Row-Level Security, Rebase crée des 
         SELECT COALESCE(NULLIF(current_setting('app.jwt', true), ''), '{}')::jsonb;
     $$ LANGUAGE sql STABLE;
     ```
+*   **`rebase.is_anonymous()`** — Indique si l'appelant est un invité, sous forme de `boolean` (`false` s'il n'est pas défini), de sorte qu'une politique puisse écrire `NOT rebase.is_anonymous()`.
 
 Vous pouvez utiliser ces fonctions d'aide directement dans vos règles de sécurité personnalisées ou vos migrations de base de données :
 ```sql

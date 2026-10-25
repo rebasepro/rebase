@@ -1,5 +1,5 @@
 ---
-sourceHash: fa5ea5eeb92e1460
+sourceHash: d672b029e72aca9e
 title: A API context.data
 sidebar_label: API context.data
 description: Leia e grave outras coleções de dentro de um callback com context.data — seus métodos, os privilégios com que é executado, a semântica transacional e a conexão que um callback ocupa.
@@ -38,10 +38,10 @@ Cada acessor de coleção (`context.data.<slug>`) fornece estes métodos:
 
 | Método | Assinatura | Descrição |
 |--------|-----------|-------------|
-| `.find()` | `find(params?: FindParams) → FindResponse` | Consultar entidades com filtros, ordenação e paginação |
-| `.findById()` | `findById(id: string \| number) → Entity \| undefined` | Buscar uma única entidade por ID |
-| `.create()` | `create(data: Partial<Values>, id?: string) → Entity` | Criar uma nova entidade |
-| `.update()` | `update(id: string \| number, data: Partial<Values>) → Entity` | Atualizar uma entidade existente |
+| `.find()` | `find(params?: FindParams) → FindResult` | Consultar entidades com filtros, ordenação e paginação |
+| `.findById()` | `findById(id: string \| number) → Row \| undefined` | Buscar uma única linha por ID |
+| `.create()` | `create(data: Insert, id?: string \| number) → Row` | Criar uma nova linha e retorná-la como armazenada |
+| `.update()` | `update(id: string \| number, data: Update) → Row` | Atualizar uma linha existente e retorná-la como armazenada |
 | `.delete()` | `delete(id: string \| number) → void` | Excluir um registro |
 | `.count()` | `count(params?: FindParams) → number` | Contar entidades correspondentes |
 | `.listen()` | `listen(params, onUpdate, onError?) → unsubscribe` | Inscrição em tempo real (onde suportado) |

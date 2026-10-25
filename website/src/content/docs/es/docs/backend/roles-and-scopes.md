@@ -1,5 +1,5 @@
 ---
-sourceHash: e6d2447955c86775
+sourceHash: 96a224ca982e3d25
 title: Roles y alcances
 sidebar_label: Roles y alcances
 description: "Lo que puede hacer quien llama: el plano de datos que tiene toda persona, el plano de administración que conceden los roles, los alcances que una aplicación declara para sí misma y cómo los lleva cada credencial."
@@ -265,10 +265,11 @@ Para las claves:
 
 Para las cuentas, quien tiene `users:write`:
 
-- no puede editar, restablecer ni eliminar una cuenta que tenga un rol o un alcance
-  que él no tiene: `403 ACCOUNT_OUTRANKS_CALLER`. Sin esto, un rol de soporte podría
+- no puede editar, restablecer ni eliminar una cuenta cuyos roles tengan un alcance
+  que él no tiene, o `admin` cuando él no es administrador:
+  `403 ACCOUNT_OUTRANKS_CALLER`. Sin esto, un rol de soporte podría
   restablecer la contraseña de un administrador e iniciar sesión como él.
-- no puede conceder roles que tengan más de lo que él tiene:
+- no puede conceder roles que tengan más de lo que él tiene, `admin` incluido:
   `403 ROLE_EXCEEDS_CALLER`.
 
 ## Cómo lleva los alcances cada credencial

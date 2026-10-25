@@ -1,5 +1,5 @@
 ---
-sourceHash: fcc8e36632d57207
+sourceHash: f833e803807f9ac4
 title: Edição de schema ao vivo
 description: Crie e altere coleções em um backend em execução — comitadas primeiro no seu repositório, depois aplicadas.
 ---
@@ -460,8 +460,8 @@ pessoa está trabalhando:
   não precisa de nenhum; um projeto provisionado por migrações deve executar
   `rebase db generate`, que cria um através do Atlas com o hash de integridade
   que o Atlas exige.
-- Apenas Postgres. A funcionalidade é detectada no driver, e outros mecanismos
-  respondem `SCHEMA_EDITING_UNSUPPORTED`.
+- Postgres e MongoDB (veja [MongoDB](#mongodb)). A funcionalidade é detectada
+  no driver, e outros mecanismos respondem `SCHEMA_EDITING_UNSUPPORTED`.
 
 ## Relacionado
 

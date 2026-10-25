@@ -1,5 +1,5 @@
 ---
-sourceHash: dc64725d910c68e0
+sourceHash: aecc5f68b6d9adc0
 title: Daten abfragen
 sidebar_label: Daten abfragen
 description: CRUD-Operationen, Fluent Query Builder, Filteroperatoren, Sortierung, Spaltenauswahl und Aggregate mit dem typisierten SDK von Rebase.
@@ -424,8 +424,8 @@ Zeile, `limit` bewirkt nichts und `offset` wird abgelehnt. In einer Server-Funct
 (`rebase.data`, `context.data`) liefert ein gruppiertes Aggregat ohne `limit` jede Gruppe. Unter 0.23
 gibt es kein `meta` und kein `offset`, sodass eine bei `limit` gekappte Liste von Gruppen
 vollständig aussieht.
-`include` wird bei einem Aggregat nicht gesendet: Es hat keine Relationen zum Laden. Das SDK
-sortiert Gruppen noch nicht; über HTTP lassen sie sich ebenfalls sortieren — siehe
+`include` wird bei einem Aggregat nicht gesendet: Es hat keine Relationen zum Laden. Gruppen
+lassen sich mit `orderBy` sortieren, nach einer `groupBy`-Spalte oder dem Schlüssel eines Aggregats — siehe
 [Aggregate und Suche](/docs/sdk/aggregates-and-search/).
 
 Der eigentliche Sinn besteht darin, Zeilen nicht erst abrufen zu müssen, um sie anschließend zu aggregieren. „Umsatz nach Status“ über eine Million Bestellungen ist hier eine einzige Abfrage mit einer Zeile pro Status – anderswo hingegen ein `findAll()` samt Schleife, was bei einem `limit` falsch und ohne ein solches nicht tragbar ist. Die Ausführung erfolgt über denselben anforderungsbezogenen Handle wie jeder andere Lesevorgang, sodass Row-Level Security auch für die aggregierten Zeilen gilt.

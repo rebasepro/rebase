@@ -1,5 +1,5 @@
 ---
-sourceHash: 172ed813d51ccec3
+sourceHash: 607e40e364a1e6b0
 title: Sottoscrizioni Realtime
 sidebar_label: Realtime
 description: Sottoscrivi le modifiche ai dati in tempo reale con l'SDK tipizzato di Rebase utilizzando listener realtime basati su WebSocket.
@@ -215,7 +215,7 @@ useEffect(() => {
 
 Il client WebSocket gestisce l'autenticazione automaticamente:
 
-- Al **login** o al **refresh del token**, il nuovo token viene inviato a un socket già aperto tramite un messaggio `authenticate`. Se non c'è alcun socket aperto, non accade nulla — l'accesso non è una richiesta per il realtime, e un socket aperto successivamente si autentica da solo.
+- Al **login** o al **refresh del token**, un socket già aperto acquisisce la nuova credenziale. Un refresh, o un login con lo stesso account che il socket già detiene, invia il token in un messaggio `authenticate`; un login con un account diverso — compreso un visitatore che effettua l'accesso — ricostruisce il socket, che si autentica come quell'account e reinvia ogni sottoscrizione e ogni canale attivi. Se non c'è alcun socket aperto, non accade nulla — l'accesso non è una richiesta per il realtime, e un socket aperto successivamente si autentica da solo.
 - Al **logout**, la connessione WebSocket viene disconnessa. Il client rimane utilizzabile; una sottoscrizione successiva si riconnette in modo anonimo.
 - Se la connessione cade, il client **si riconnette automaticamente** e ristabilisce tutte le sottoscrizioni attive. Non smette mai di tentare finché esiste una sottoscrizione o un canale cui si è aderito; il ritardo tra i tentativi cresce fino a un massimo di 30 secondi.
 - Se il server termina la sessione del socket — l'utente si è disconnesso ovunque, questa sessione è stata revocata, l'account è stato eliminato, oppure il token è scaduto prima che un refresh raggiungesse il socket — chiude il socket con il codice `4001`. Il client si riconnette come dopo qualsiasi caduta, autenticandosi con la sessione che possiede in quel momento (aggiornata se possibile), oppure in modo anonimo quando non ce n'è una. Un ruolo revocato non chiude il socket: si applica a partire dal frame successivo. Vedi [Autenticazione e RLS](/docs/backend/realtime/#authentication--rls).

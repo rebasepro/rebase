@@ -37,7 +37,7 @@ rebase cloud open         # open the dashboard in a browser
 ## Projects
 
 ```bash
-rebase cloud init --claim [--name <name>]   # un backend en vivo sin cuenta y un enlace para reclamarlo en 72 horas
+rebase cloud init --claim [--name <name>]   # a live backend with no account, and a link to claim it within 72 hours
 rebase cloud projects list
 rebase cloud projects create [--link]
 rebase cloud projects info [id]
@@ -48,6 +48,8 @@ rebase cloud projects delete [id]
 
 ```bash
 rebase cloud deploy [app] [--source .]   # deploy an app and stream build logs
+rebase cloud deploy [app] --preview [--preview-name <name>]  # its own address; production untouched
+rebase cloud previews [list|delete <name>]
 rebase cloud logs [--runtime] [-f]       # build logs, or the running process's
 rebase cloud deployments list [--limit N|--all]
 rebase cloud rollback [id] [-y]          # back to a successful deploy
@@ -67,6 +69,11 @@ Un `deploy` seguido termina con un resumen: cada aplicación desplegada con su U
 
 Antes de subir nada, `deploy` analiza el JavaScript de cada aplicación estática que publica: los archivos `.js`/`.mjs`/`.cjs` de su `output` y los bloques `<script>` en línea de su HTML. Un error de sintaxis detiene el despliegue con `file:line:column` (código `syntax_error` con `--json`), y `--no-verify` omite la comprobación. Un despliegue exitoso termina con el camino de vuelta, `rebase cloud rollback`. Una aplicación estática desplegada por separado todavía no admite rollback; consulta [Rollback](/docs/deployment/cloud#roll-back).
 
+`--preview` sirve la compilación en `https://<project>--<name>.rebase.website` y
+deja la producción intacta. La previsualización de una aplicación estática llama al backend de producción.
+La previsualización del backend ejecuta su propio backend, sobre una base de datos vacía y propia.
+Consulta [Previsualizar un cambio](/docs/deployment/cloud/#preview-a-change).
+
 ## Configuración
 
 ```bash
@@ -75,6 +82,12 @@ rebase cloud domains list | add <domain> | verify [domain] | remove <domain>
 rebase cloud extensions list | enable | disable
 rebase cloud settings show | set        # name, branch, repo, subdomain, rebuilds
 ```
+
+La previsualización de un backend parte de las variables de producción, claves reales incluidas.
+`env set KEY=VALUE --preview` da a las previsualizaciones su propio valor, `env unset KEY
+--preview` deja la variable fuera de ellas, `env reset KEY --preview` devuelve
+el valor de producción, y `env list --preview` muestra las diferencias.
+Ninguno de ellos modifica la producción.
 
 ## Organizations
 

@@ -1,5 +1,5 @@
 ---
-sourceHash: e68d814b6b83ef41
+sourceHash: a5511fd6dc8fd73e
 title: Riferimento dei tool MCP
 sidebar_label: Riferimento dei tool MCP
 description: Ogni tool registrato dal server MCP di Rebase, per gruppo — cosa richiede e cosa fa ciascuno, e quali vengono rifiutati dal loopback gate se rivolti a un progetto non locale.
@@ -9,10 +9,10 @@ I tool che [`@rebasepro/mcp`](/docs/ai/mcp) offre a un assistente. Come si conne
 quale credenziale possiede e come il [loopback gate](/docs/ai/mcp#the-loopback-gate)
 decide cosa significa ⚠ si trovano nella pagina del [server MCP](/docs/ai/mcp).
 
-42 tool, suddivisi in nove gruppi. I tool contrassegnati con ⚠ vengono rifiutati se rivolti a destinazioni non locali,
+44 tool, suddivisi in dieci gruppi. I tool contrassegnati con ⚠ vengono rifiutati se rivolti a destinazioni non locali,
 a meno che non si scelga esplicitamente di disattivare il controllo.
 
-## Schema & database (12)
+## Schema & database (13)
 
 Avviano la CLI di Rebase nella directory del progetto attivo.
 
@@ -29,6 +29,7 @@ Avviano la CLI di Rebase nella directory del progetto attivo.
 | `rebase_db_branch_list` | — | Elenca i branch del database (solo amministratori) |
 | `rebase_db_branch_delete` ⚠ | `name` | Elimina un branch del database (solo amministratori) |
 | `rebase_db_branch_info` | `name` | Informazioni e stato del branch (solo amministratori) |
+| `rebase_db_branch_diff` | `name` | Cosa ha cambiato un branch rispetto al database da cui è stato creato — schema, policy e righe, con i conflitti; non modifica nessuno dei due (solo amministratori) |
 | `rebase_db_branch_switch` | — | Punta questo checkout a un branch, o di nuovo al database principale (solo amministratori) |
 
 ## Pianificazione dello schema (1)
@@ -113,7 +114,7 @@ dal modello. Il suo raggio d'azione corrisponde a qualsiasi cosa facciano le tue
 |---|---|---|
 | `rebase_project_list` | — | Elenca i progetti registrati e mostra quello attivo |
 | `rebase_project_switch` | `name` | Cambia il progetto attivo |
-| `rebase_project_add` | `name` | Registra un progetto (`baseUrl`, opzionali `projectDir`, `token`) |
+| `rebase_project_add` | `name` | Registra un progetto (opzionali `projectDir`, `baseUrl`, `token`) |
 | `rebase_project_remove` | `name` | Rimuove un progetto (il progetto default non può essere rimosso) |
 | `rebase_project_current` | — | Mostra il progetto attivo e il relativo stato di autenticazione |
 | `rebase_project_status` | — | Controlla lo stato di salute (health-check) del backend attivo |
@@ -122,3 +123,11 @@ dal modello. Il suo raggio d'azione corrisponde a qualsiasi cosa facciano le tue
 anziché intervenire direttamente su una destinazione. Un assistente può quindi passare a un
 progetto remoto senza attivare il blocco — semplicemente non potrà poi eseguire tool
 distruttivi su di esso.
+
+## Rebase Cloud (1)
+
+Avvia `rebase cloud` nella directory del progetto attivo.
+
+| Tool | Richiesto | Descrizione |
+|---|---|---|
+| `rebase_cloud_provision` ⚠ | — | Crea un progetto Rebase Cloud non rivendicato, senza account (`rebase cloud init --claim`), scrive `REBASE_BASE_URL` e `REBASE_API_TOKEN` in `.env` e distribuisce le collection; opzionali `name`, `deploy` |

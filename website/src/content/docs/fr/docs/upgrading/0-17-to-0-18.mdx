@@ -1,5 +1,5 @@
 ---
-sourceHash: 056364d861650668
+sourceHash: 8361698c6e191ecf
 slug: fr/docs/upgrading/0-17-to-0-18
 title: Migrer de 0.17 vers 0.18
 sidebar_label: 0.17 → 0.18
@@ -9,34 +9,54 @@ description: Chaque rupture de la 0.18, et ce qu'il faut faire pour chacune.
 # Migrer 0.17 → 0.18
 
 **La 0.18.0 est publiée.** Ce sont les entrées `### Breaking` de sa
-[section du changelog](/fr/docs/changelog/), une par une, avec ce que chacune vous
+[section du changelog](/docs/changelog/), une par une, avec ce que chacune vous
 demande de modifier. En 0.x, c'est la version mineure qui casse : voici donc le
 mur entre la 0.17.3 et la 0.18.0 — lisez-le avant de migrer, pas après.
 
+Chacune d'elles est une erreur de compilation ou un démarrage refusé plutôt
+qu'un changement silencieux de comportement, sauf la dernière, qui réécrit une
+contrainte que le prochain `db push` planifiera pour vous.
+
+---
+
 ## 20. `defineCollection` n'a plus qu'une signature
 
-C'étaient trois surcharges — Postgres, Firestore, MongoDB — et il n'y en a plus
-qu'une, discriminée par `engine` (Postgres par défaut).
+C'étaient trois surcharges — Postgres, Firestore, MongoDB — et un appel en échec
+produisait un seul diagnostic sur `defineCollection(`, listant le premier échec de
+chaque surcharge. Il n'y a plus qu'une signature, discriminée par `engine`
+(Postgres en son absence), et les erreurs sont signalées sur la clé fautive, toutes
+à la fois.
 
-**À changer :** rien dans un appel qui compilait déjà ; ce qui change, c'est où
-l'erreur tombe : sur la clé fautive, et non sur `defineCollection(`.
-`UnknownPropertyKey` s'appelle maintenant `NoSuchKey` : seul le code qui importait
-l'ancien nom a une modification à faire.
+**À changer :** rien, dans un appel qui compilait déjà. Ce qui change, c'est
+l'endroit où tombe le soulignement rouge. Deux exports de types ont bougé avec
+elle : `UnknownPropertyKey` s'appelle maintenant `NoSuchKey` (et porte un membre
+`didYouMean`), et `PropertyTypeNotOnThisEngine` est nouveau. Les deux sont des
+rouages internes du constructeur : seul le code qui importait l'ancien nom a une
+modification à faire.
 
 ## 21. `defineCollection` continue de vérifier après la première propriété fautive
 
-Une seule propriété erronée faisait s'effondrer l'entité inférée en
-`Record<string, unknown>` et désactivait toutes les autres vérifications.
+Le constructeur contraignait sa table de propriétés, et une contrainte que
+TypeScript ne peut pas satisfaire est une contrainte dont il se replie en silence :
+un seul `defaultValue` erroné élargissait donc l'entité inférée à
+`Record<string, unknown>` et désactivait toutes les vérifications sur
+`display.title`, `listProperties`, `propertiesOrder` et `previewProperties`.
 
-**À changer :** rien à écrire, mais attendez-vous à de *nouvelles* erreurs dans des
+**À changer :** rien à écrire, mais attendez-vous à de *nouvelles* erreurs dans les
 fichiers de collection qui compilaient auparavant. Ils étaient déjà faux ; le
-compilateur avait cessé de regarder.
+compilateur avait cessé de regarder. Corrigez la propriété que nomme la première
+erreur et recompilez — le reste de ce fichier est vérifié pour la première fois.
 
 ## 22. Le champ de lien d'une relation doit appartenir à son `kind`
 
-`{ kind: "belongsTo", foreignKeyOnTarget: … }` ne compile plus.
+`Relation` est une union fermée depuis la 0.11 — `belongsTo` possède `localKey`,
+`hasOne`/`hasMany` possèdent `foreignKeyOnTarget`, `manyToMany` possède `through`,
+`via` possède `joinPath` — mais la vérification des propriétés excédentaires
+s'exécutait sur l'union dans son ensemble, si bien que
+`{ kind: "belongsTo", foreignKeyOnTarget: "author_id" }` compilait puis se
+résolvait vers un lien différent de celui qui était écrit.
 
-**À changer :** écrivez le champ que la sorte de relation possède.
+**À changer :** écrivez le champ de lien que possède la sorte de relation.
 
 ```diff lang="ts"
   author: {
@@ -46,12 +66,19 @@ compilateur avait cessé de regarder.
   }
 ```
 
-Le validateur de démarrage les refusait déjà : si votre projet démarre
+Le validateur de démarrage les refusait déjà : cela fait donc passer le signalement
+d'un déploiement en échec à une erreur de compilation. Si votre projet démarre
 aujourd'hui, il compile aujourd'hui.
 
 ## 23. La `validation` d'une relation remonte sur la propriété
 
 `RelationBase.validation` et `ResolvedRelationBase.validation` sont supprimés.
+Il y avait deux endroits où écrire `required` et deux générateurs qui lisaient des
+endroits différents : le DDL interrogeait la propriété (la colonne sortait donc
+`NOT NULL`) tandis que le générateur de types du SDK interrogeait la relation (le
+type `Insert` généré rendait donc le champ optionnel), et un `create()` qui
+omettait la relation passait la vérification de types puis échouait à la base de
+données.
 
 **À changer :** remontez-la d'un niveau, à côté de celle de tous les autres champs.
 
@@ -64,16 +91,25 @@ aujourd'hui, il compile aujourd'hui.
   }
 ```
 
-Le démarrage refuse l'ancienne clé en la nommant. Le code qui demandait à une
-relation si elle était obligatoire utilise désormais
+Le démarrage refuse l'ancienne clé en la nommant au lieu de l'ignorer. Le code qui
+demandait à une relation si elle était obligatoire demande désormais à
 `import { isRelationRequired, relationDeclaringProperty } from "@rebasepro/common"`.
 
 ## 24. Un `belongsTo` obligatoire supprime en `RESTRICT`, pas en `CASCADE`
 
-**C'est un changement de DDL.** Le prochain `rebase db push` planifie une
-reconstruction de contrainte pour chaque relation obligatoire qui n'a jamais
-nommé d'`onDelete`, et après cela les suppressions du parent échouent là où elles
-cascadaient.
+`validation: { required: true }` dit que l'enfant ne peut pas exister sans parent.
+Cela ne dit pas que supprimer le parent doit supprimer l'enfant — mais c'est ce que
+le générateur déduisait, si bien que chaque `DELETE FROM authors` cascadait à
+travers les articles, leurs commentaires, et tout ce qui était accroché à ceux-ci.
+La valeur par défaut est désormais `RESTRICT` : la suppression échoue et nomme la
+contrainte. Les relations optionnelles sont inchangées (`SET NULL`), de même que la
+table de jonction d'un `manyToMany` (`CASCADE` — la ligne qu'elle supprime est le
+lien).
+
+**C'est un changement de DDL.** Le prochain `rebase db push` planifie un
+`DROP CONSTRAINT` / `ADD CONSTRAINT` pour chaque relation obligatoire qui n'a
+jamais nommé d'`onDelete`, et après cela les suppressions du parent commencent à
+échouer là où elles cascadaient.
 
 **À changer :** pour conserver l'ancien comportement, écrivez-le.
 
@@ -82,7 +118,7 @@ cascadaient.
 + relation: { kind: "belongsTo", onDelete: "cascade", target: () => authors }
 ```
 
-Relisez le plan avant de l'appliquer — `rebase db push` affiche les instructions.
+Relisez ensuite le plan avant de l'appliquer — `rebase db push` affiche les instructions.
 
 ## 25. Le plancher Node est `>=22.22.0`
 
@@ -94,7 +130,6 @@ le `.nvmrc` du dépôt.
 répond à une incompatibilité d'engines par `[WARN] Unsupported engine` et
 installe quand même : l'échec n'arrive donc pas à l'installation, mais plus tard,
 à un endroit où Node n'est jamais mentionné.
-
 
 ## 26. `rebase.data` a disparu à l'exécution
 
@@ -108,19 +143,19 @@ sur l'objet comme alias d'exécution. Elle est supprimée au démarrage :
 là où vous voulez celui de l'appelant. Le code typé recevait l'erreur depuis le
 changement de type ; ce qui casse maintenant, c'est le code non typé, et le
 `ai-instructions.md` d'un échafaudage, qui indique encore à un assistant
-d'utiliser `rebase.data.<slug>`. Ce fichier est écrit par `rebase init` :
-régénérez-le ou corrigez la règle à la main. Le code navigateur est intact :
-`rebase.data` dans le SDK typé est le plan utilisateur et reste.
+d'utiliser `rebase.data.<slug>` — `rebase init` réécrit ce fichier : régénérez-le
+ou corrigez la règle à la main. Le code navigateur est intact : `rebase.data`
+dans le SDK typé est le plan utilisateur et reste.
 
 ## 27. `@rebasepro/cli` publie trois exports
 
 `src/index.ts` réexportait seize modules et plaçait 95 noms sur npm. Il exporte
 maintenant `entry`, `manifest` et `bundle`.
 
-**À changer :** rien, sauf si vous importez depuis `@rebasepro/cli` — ce qui est
-peu probable, puisque ni ce dépôt ni le plan de contrôle ne le faisaient. Si oui :
-la CLI est un binaire. Appelez `rebase <command>` comme processus plutôt que
-d'importer ses fonctions de commande, dont les signatures n'ont jamais été un
+**À changer :** rien, sauf si vous faites un `import` depuis `@rebasepro/cli` — ce
+qui est peu probable, puisque ni ce dépôt ni le plan de contrôle ne le faisaient.
+Si oui : la CLI est un binaire. Appelez `rebase <command>` comme processus plutôt
+que d'appeler ses fonctions de commande, dont les signatures n'ont jamais été un
 contrat.
 
 ## 28. Les plages de peers sont des carets
@@ -152,15 +187,16 @@ pas de comportement à préserver, seulement des lignes à corriger.
 L'encodeur de feuilles partagé analyse largement, parce qu'un code court arrive
 du réseau, et émet strictement, parce qu'un appelant qui en passe un au
 sérialiseur a construit la condition à la main. `serializeFilter({ a: ["gt", 5] })`
-lève au lieu de renvoyer `gte`.
+lève une exception au lieu de renvoyer `gte`.
 
 **À changer :** seulement si vous appelez directement les sérialiseurs de
 `@rebasepro/common`. Utilisez les noms d'opérateurs que déclarent les types
-(`gt`, `gte`, `lt`, `lte`, …) plutôt que les codes courts REST. Les constructeurs
-de requêtes et le SDK les écrivaient déjà ainsi ; ce qui change, c'est que la
-mauvaise graphie le dit maintenant.
+(`>`, `>=`, `<`, `<=`, …) plutôt que les codes courts REST (`gt`, `gte`, …). Les
+constructeurs de requêtes et le SDK les écrivaient déjà ainsi ; ce qui change,
+c'est que la mauvaise graphie le dit maintenant.
 
 ---
 
-**Ensuite :** [Quel saut](/fr/docs/upgrading/) ·
-[Changelog](/fr/docs/changelog/).
+**Ensuite :** [la liste de contrôle de migration](/docs/upgrading/#upgrade-checklist) ·
+[0.14 → 0.17](/docs/upgrading/0-14-to-0-17/), le saut précédent ·
+[Changelog](/docs/changelog/), les notes de version que ces sections résument.

@@ -1,5 +1,5 @@
 ---
-sourceHash: ebc75b9bd33595a6
+sourceHash: f4fe63c58f66c539
 title: Filtrado en la API REST
 sidebar_label: Filtrado
 description: Filtra las listas de la API REST con operadores al estilo PostgREST, grupos or/and y el dialecto JSON where, y cómo se combinan los filtros.
@@ -56,7 +56,7 @@ Los cuatro operadores de patrón comparan texto. Una columna enum se compara por
 (`?status=like.draft%25`); en un número, una fecha o cualquier otra columna que no sea texto
 son un 400 `INVALID_FILTER_OPERATOR`.
 
-`isnull` y `notnull` ignoran su valor: el operador es la condición completa y todo lo que esté después del punto se descarta. El SDK escribe `.null`, por lo que esa es la sintaxis que verás transmitida.
+`isnull` y `notnull` no toman operando: el operador es la condición completa, y `.null`, `.true`, `.false` o nada después del punto significan lo mismo. El SDK escribe `.null`, por lo que esa es la sintaxis que verás transmitida. Cualquier otra cosa después del punto no es un operando que tengan, así que toda la cadena se lee como un valor: `?reason=notnull.reason` coincide con el texto `notnull.reason`.
 
 :::caution[`eq.null` es la cadena de cuatro caracteres, no `IS NULL`]
 `?deleted_at=eq.null` busca el texto literal `null`. SQL `= NULL` nunca es verdadero, por lo que ninguna interpretación de `eq.null` podría significar la comprobación de nulidad; utiliza `isnull` para ello. El SDK serializa `.where("deleted_at", "==", null)` como `isnull.null` exactamente por esta razón.
@@ -113,13 +113,15 @@ Un `where` mal formado devuelve un error 400 `INVALID_WHERE`, no un filtro desca
 
 ## Cómo se combinan los filtros
 
-`?field=op.value`, `?where=`, `?or=`/`?and=` y `?searchString=` son independientes, y cada uno de los que esté presente debe coincidir:
+`?field=op.value`, `?where=`, `?or=`/`?and=`/`?not=` y `?searchString=` son independientes, y cada uno de los que esté presente debe coincidir:
 
 ```text
 (field filters and `where`, AND-ed together)
   AND (the logical group)
   AND (the search string)
 ```
+
+La única excepción es un campo nombrado tanto en `?field=op.value` como en `where`: en ese caso el parámetro de consulta **reemplaza** la condición de `where` sobre ese campo, por ser la petición más específica, en lugar de combinarse con ella mediante AND.
 
 No hay forma de aplicar un OR entre ellos. Cualquier condición que no sea un AND directo de esos grupos debe ubicarse dentro de un único árbol `or=`/`and=`.
 

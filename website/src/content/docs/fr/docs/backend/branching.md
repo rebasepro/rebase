@@ -1,5 +1,5 @@
 ---
-sourceHash: 6c8e1509d678993c
+sourceHash: 90e9eafee6523006
 title: Branches de base de données
 sidebar_label: Branches
 description: Créez des branches de base de données isolées pour le développement, le staging et les tests à l'aide de CREATE DATABASE ... TEMPLATE de PostgreSQL — des copies instantanées et parfaitement fidèles, sans temps d'arrêt.
@@ -96,7 +96,7 @@ Les configurations de branche sont stockées dans la base de données par défau
 CREATE SCHEMA IF NOT EXISTS rebase;
 
 CREATE TABLE IF NOT EXISTS rebase.branches (
-    name         TEXT PRIMARY KEY,              -- Sanitize user branch name (alphanumeric & underscores)
+    name         TEXT PRIMARY KEY,              -- Branch name as given (letters, digits, underscores, hyphens)
     db_name      TEXT NOT NULL UNIQUE,          -- Actual PostgreSQL database name (prefixed with 'rb_')
     parent_db    TEXT NOT NULL,                 -- Source database cloned from
     created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -202,7 +202,7 @@ rebase db branch switch --off
 # Show one branch's parent, age and size
 rebase db branch info dev_sandbox
 
-# Ce que la branche a changé : schéma, politiques RLS et lignes (--json pour tout)
+# What the branch changed: schema, RLS policies and rows (--json for all of it)
 rebase db branch diff dev_sandbox
 
 # Delete a branch
@@ -254,7 +254,11 @@ Créer une branche ne modifie **pas** la base de données avec laquelle votre pr
 postgresql://user:pass@localhost:5432/rb_dev_sandbox
 ```
 
+---
+
 ## Examiner et fusionner une branche
+
+<span class="since-badge" data-since="0.26">Depuis 0.26</span>
 
 Une branche est l'endroit où un agent, ou une migration dont vous n'êtes pas sûr, peut modifier une base de données sans toucher à la vraie. Avant que quoi que ce soit n'atteigne la base dont la branche a été créée, vous pouvez voir ce qui a changé et le fusionner depuis [Studio](/docs/studio/) : ouvrez **Branches** et choisissez-en une.
 
@@ -294,16 +298,14 @@ Toutes les écritures se font en une seule instruction sur le parent — tout ou
 
 ```typescript
 const diff = await admin.diffBranch("agent_run_17");
-// …examiner diff.schema et diff.data…
+// …review diff.schema and diff.data…
 const result = await admin.mergeBranch("agent_run_17", {
     expectedFingerprint: diff.fingerprint,
-    onConflict: "abort" // ou "branch", ou "target"
+    onConflict: "abort" // or "branch", or "target"
 });
 ```
 
 La fusion n'est volontairement pas un outil MCP : un agent propose sur sa branche, et une personne fusionne.
-
----
 
 ---
 

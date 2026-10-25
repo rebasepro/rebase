@@ -71,7 +71,7 @@ Defina `collapsed: false` na ação que é o motivo de abrir o registro, e ela g
 {
     name: "Publish",
     icon: "Upload",
-    collapsed: false, // um botão no registro, um ícone na linha
+    collapsed: false, // a button on the record, an icon on the row
     onClick: async ({ entity, context }) => { /* … */ }
 }
 ```
@@ -93,7 +93,7 @@ Uma ação desabilitada que não diz por quê parece quebrada. `disabledReason` 
 {
     name: "Resend to Shopify",
     isEnabled: ({ entity }) => Boolean(entity?.values.shopify_id),
-    disabledReason: () => "Este cliente não tem conta na Shopify",
+    disabledReason: () => "This customer has no Shopify account",
     onClick: async ({ entity, context }) => { /* … */ }
 }
 ```

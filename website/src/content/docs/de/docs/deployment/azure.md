@@ -1,5 +1,5 @@
 ---
-sourceHash: 8f4a068442f3d703
+sourceHash: 63e2253a58fb0c76
 title: Rebase auf Microsoft Azure bereitstellen
 description: Stellen Sie Ihre Rebase-Instanz sicher auf Azure mithilfe von Azure Database for PostgreSQL und Azure Container Apps bereit.
 sidebar_label: Azure
@@ -98,7 +98,7 @@ Das Runtime-Image wird ohne die CLI ausgeliefert, sodass dies niemals innerhalb 
 
 ## Dateispeicher
 
-Container Apps-Replikate besitzen keinen persistenten Speicher (durable disk). Lokaler Dateispeicher führt daher zu unbemerktem Datenverlust, weshalb die Runtime dies in der Produktion verweigert. Erstellen Sie ein Azure Storage-Konto und nutzen Sie dessen S3-kompatible Schnittstelle oder ein S3-kompatibles Bucket in derselben Region mit `STORAGE_TYPE=s3` – siehe [Storage](/docs/backend/storage).
+Container Apps-Replikate besitzen keinen persistenten Speicher (durable disk). Lokaler Dateispeicher führt daher zu unbemerktem Datenverlust, weshalb die Runtime dies in der Produktion verweigert. Azure Blob Storage spricht die S3-API nicht, nutzen Sie also ein S3-kompatibles Bucket in derselben Region mit `STORAGE_TYPE=s3` und dessen `S3_ENDPOINT` – siehe [Storage](/docs/backend/storage).
 
 ## Nächste Schritte
 

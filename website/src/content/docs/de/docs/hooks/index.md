@@ -1,5 +1,5 @@
 ---
-sourceHash: f3af5fc4d4e8aac0
+sourceHash: c8644465af03e13a
 title: Hooks-Referenz
 sidebar_label: Hooks
 description: React-Hooks, die von Rebase bereitgestellt werden, um auf Authentifizierung, Daten, Navigation, Seitenfenster, Speicher und UI-Zustand zuzugreifen.
@@ -93,10 +93,10 @@ function ProductList() {
 | Parameter | Typ | Beschreibung |
 |-----------|------|-------------|
 | `path` | `string` | Absoluter Sammlungspfad (z. B. `"products"`). |
-| `collection` | `CollectionConfig` | Das Objekt mit der Sammlungsdefinition. |
+| `collection` | `AdminCollection` | Das Objekt mit der Sammlungsdefinition. |
 | `itemCount` | `number` | Optional. Anzahl der zu ladenden Entitäten (SQL-Limit). |
 | `offset` | `number` | Optional. Anzahl der zu überspringenden Einträge. |
-| `page` | `number` | Optional. Seitennummer (1-basiert), Alternative zu `offset`. |
+| `page` | `number` | Optional. Seitennummer (1-basiert), Alternative zu offset. |
 | `filterValues` | `FilterValues` | Optional. Abfragefilter. Unterstützt Kurzform-Gleichheit, Tupel `[op, val]` und PostgREST-Operator-Strings. |
 | `sortBy` | `[string, "asc" \| "desc"]` | Optional. Tupel aus Sortierfeld und Sortierrichtung. |
 | `searchString` | `string` | Optional. Suchbegriff für die Volltextsuche. |
@@ -145,7 +145,7 @@ function ProductDetail({ productId }) {
 |-----------|------|-------------|
 | `path` | `string` | Absoluter Sammlungspfad. |
 | `entityId` | `string \| number` | Die ID der zu ladenden Entität. |
-| `collection` | `CollectionConfig` | Das Objekt mit der Sammlungsdefinition. |
+| `collection` | `AdminCollection` | Das Objekt mit der Sammlungsdefinition. |
 | `useCache` | `boolean` | Optional. Bei `true` und vorhandener Entität im Cache wird die Hintergrundaktualisierung übersprungen. (Standard: `false`). |
 
 ### Cache-Hilfsfunktionen
@@ -416,7 +416,7 @@ function CategorySelector({ onSelect }) {
 | Option | Typ | Beschreibung |
 |--------|------|-------------|
 | `path` | `string` | Absoluter Sammlungspfad. |
-| `collection` | `CollectionConfig` | Definition der Zielsammlung. |
+| `collection` | `AdminCollection` | Definition der Zielsammlung. |
 | `fixedFilter` | `FilterValues` | Optional. Statische Filter, die die Suchergebnisse einschränken. |
 | `pageSize` | `number` | Optional. Anzahl der Einträge pro Seite. (Standard: `10`). |
 | `getLabelFromEntity` | `(entity) => string` | Optional. Passt den angezeigten Beschriftungstext an. |

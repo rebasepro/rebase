@@ -1,5 +1,5 @@
 ---
-sourceHash: cef32249585688a5
+sourceHash: 64dad399c92c2e1c
 title: Autoalojamiento (Self-Hosting)
 sidebar_label: Autoalojamiento
 description: Ejecuta Rebase en cualquier lugar con la imagen oficial de runtime y el bundle de tu proyecto — Docker Compose, Fly, Railway o un VPS convencional.
@@ -95,10 +95,11 @@ Tres secretos, un dato informativo y la cuenta con la que inicias sesión:
   una sola vez, mientras la tabla de usuarios está vacía, y no hace nada en cada arranque
   posterior.
 
-Cada uno de los tres secretos debe tener al menos 32 caracteres, y la contraseña de administrador
-al menos 12. Utiliza una dirección con un punto en su dominio: `POST /auth/login` valida
-su cuerpo con `z.string().email()`, por lo que `admin@localhost` inicializaría una cuenta
-y luego rechazaría cualquier intento de usarla. El archivo compose declara los seis con
+`JWT_SECRET` y `REBASE_SERVICE_KEY` deben tener cada uno al menos 32 caracteres, y la
+contraseña de administrador al menos 12. Utiliza una dirección con un punto en su dominio:
+`POST /auth/login` valida su cuerpo con `z.string().email()`, por lo que el runtime
+se niega a crear `admin@localhost` —una cuenta en la que nadie podría iniciar sesión— y registra
+el motivo en su lugar. El archivo compose declara los seis con
 `${VAR:?…}`, por lo que si falta alguno, detendrá el stack con un mensaje indicando cuál falta en
 lugar de iniciar algo a medio configurar — y el autoregistro viene desactivado
 (`DISABLE_SELF_REGISTRATION`, por defecto `true`), por lo que no queda nada abierto para ser reclamado.
@@ -219,7 +220,10 @@ archivo subido tras el siguiente reinicio. Las subidas se rechazan con
 `501 STORAGE_NOT_CONFIGURED` hasta que configures uno.
 
 Para un bucket, define `STORAGE_TYPE=s3` (o `gcs`) junto con su bucket y credenciales —
-el archivo compose lista estas variables comentadas.
+el archivo compose lista estas variables comentadas. `gcs` carga
+`@google-cloud/storage`, que la imagen oficial no incluye, así que en esa imagen
+accede a Google Cloud Storage a través de su endpoint compatible con S3
+(`STORAGE_TYPE=s3`, `S3_ENDPOINT=https://storage.googleapis.com`, claves HMAC).
 
 Para almacenamiento en disco local, que solo es apropiado cuando la ruta es un volumen real que
 persiste tras la eliminación del contenedor:
@@ -292,7 +296,7 @@ contenedores funcionará. Hay dos aspectos clave que debes configurar correctame
 
 ```toml
 [build]
-  image = "rebasepro/server:0.25.1"
+  dockerfile = "Dockerfile"   # FROM rebasepro/server:0.25.1 + COPY dist-bundle /bundle
 
 [http_service]
   internal_port = 8080
@@ -317,7 +321,7 @@ rebase-server /srv/myapp/dist-bundle
 ```
 
 `rebase-server --help` muestra las variables que puede leer. Bajo systemd — las
-tres líneas de administración son nuevas, y en la versión 0.17.3 la primera cuenta en
+dos líneas `REBASE_ADMIN_*` requieren la 0.18 o posterior, y en la versión 0.17.3 la primera cuenta en
 registrarse se convierte en la administradora:
 
 ```ini title="/etc/systemd/system/rebase.service"

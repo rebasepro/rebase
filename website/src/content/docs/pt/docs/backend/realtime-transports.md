@@ -1,8 +1,8 @@
 ---
-sourceHash: 22ec003847a742c2
+sourceHash: 2f29788275d0b4db
 title: Tempo real entre instâncias
 sidebar_label: Tempo real entre instâncias
-description:"\"Como canais de broadcast e presença sobrevivem a mais de um processo de servidor: o barramento LISTEN/NOTIFY, o que pertence a cada instância e como escrever seu próprio transporte.\""
+description: "Como canais de broadcast e presença sobrevivem a mais de um processo de servidor: o barramento LISTEN/NOTIFY, o que pertence a cada instância e como escrever seu próprio transporte."
 ---
 
 ## Transmissão entre instâncias e arquitetura LISTEN/NOTIFY
@@ -17,7 +17,7 @@ Como poolers de conexão como o **pgBouncer** não suportam o modelo de conexão
 
 ### Mecânica de notificação e estrutura do payload
 
-Quando um registro é modificado na Instância A, ele transmite uma notificação no canal `rebase_entity_changes`. Para minimizar a sobrecarga do banco de dados e a largura de banda da rede, o payload da notificação é mantido extremamente compacto:
+Com a [captura de alterações do banco de dados](/docs/backend/realtime-cdc/) ativa — o padrão sempre que a role do banco de dados pode criar triggers — cada instância ouve cada commit no canal `rebase_cdc`, e nada do que vem abaixo é enviado. Sem ela, quando um registro é modificado na Instância A, ele transmite uma notificação no canal `rebase_entity_changes`. Para minimizar a sobrecarga do banco de dados e a largura de banda da rede, o payload da notificação é mantido extremamente compacto:
 
 ```json
 {

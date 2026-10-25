@@ -1,5 +1,5 @@
 ---
-sourceHash: f02c2b6d0bb6de5f
+sourceHash: 819343e76e0e61e9
 title: Runtime de backend gerenciado
 sidebar_label: Runtime Gerenciado
 description: O que um backend com runtime "managed" pode e não pode fazer no Rebase Cloud — pacotes e binários, memória e CPU, timeouts e tamanhos de corpo, o sistema de arquivos, estado em memória, segredos, armazenamento para arquivos gerados e rede de saída.
@@ -46,7 +46,7 @@ Os números aqui apresentados vêm do runtime e da plataforma como estão hoje. 
 
 - **Scripts de instalação nunca são executados.** A instalação usa `--ignore-scripts`. Um pacote que baixa um binário ou compila algo no `postinstall` será instalado sem isso.
 - **Apenas versões de registro são instaladas.** Uma dependência `file:`, `link:`, `git+…` ou `github:` causa falha na compilação, pois o runtime não tem como resolvê-la.
-- **Alguns pacotes vêm da imagem, não de você.** `@rebasepro/*`, `hono`, `@hono/node-server` e `zod` são removidos das dependências do bundle e as cópias da própria imagem são vinculadas, portanto a sua versão deles não se aplica. `typescript` e `tsx` também são removidos; eles são ferramentas de compilação.
+- **Alguns pacotes vêm da imagem, não de você.** `@rebasepro/server`, `@rebasepro/types`, `@rebasepro/client`, `@rebasepro/common`, `@rebasepro/utils`, `hono`, `@hono/node-server` e `zod` são removidos das dependências do bundle e as cópias da própria imagem são vinculadas, portanto a sua versão deles não se aplica. Os demais pacotes `@rebasepro/*`, como o driver de banco de dados, são instalados a partir do seu `package.json` como qualquer dependência. `typescript` e `tsx` também são removidos; eles são ferramentas de compilação.
 - **Pacotes privados precisam de um `.npmrc`.** O `rebase build` copia o `.npmrc` do projeto (e `backend/.npmrc`) para o bundle, para que a instalação use as mesmas configurações de registro da sua máquina. Toda credencial nele deve ser uma referência a variável de ambiente, nunca o token em si; um token literal falha a compilação, pois o bundle é enviado junto com o seu código:
 
   ```ini title=".npmrc"
@@ -127,7 +127,7 @@ Use-o para arquivos temporários de rascunho durante uma requisição. Não o us
 |---|---|---|
 | Timeout de função | 30 s, depois `504` com código `FUNCTION_TIMEOUT` | `REBASE_FUNCTIONS_TIMEOUT_MS` (`0` desativa) |
 | Espera na sua instância, no edge | 10 minutos entre leituras ou gravações | Fixo |
-| Corpo da requisição, todas as rotas `/api/*` | 10 MiB, depois `413 PAYLOAD_TOO_LARGE` | `REBASE_MAX_BODY_SIZE`, em bytes |
+| Corpo da requisição, rotas `/api/*` sem um limite próprio | 10 MiB, depois `413 PAYLOAD_TOO_LARGE` | `REBASE_MAX_BODY_SIZE`, em bytes |
 | Corpo da requisição no edge | 64 MiB | Fixo |
 | Um arquivo via `POST /api/storage/upload` | 50 MB | `STORAGE_MAX_FILE_SIZE` |
 | Chamadas anônimas para `/api/functions/*` | 3.000 por IP a cada 15 minutos | `rateLimit.anonymousFunctions` |

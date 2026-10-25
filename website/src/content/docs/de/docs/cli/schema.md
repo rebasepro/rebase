@@ -1,5 +1,5 @@
 ---
-sourceHash: 36aded03c38207a4
+sourceHash: 882f81a3b9bbe750
 title: Schema-Generierung
 sidebar_label: Schema-Generierung
 description: Generieren Sie Drizzle-ORM-Schemas aus Collection-Definitionen, erstellen Sie SQL-Migrationen und halten Sie Ihre Datenbank mit der Rebase-CLI synchron.
@@ -23,7 +23,7 @@ Ihre Collection-Definitionen in `config/collections/` beschreiben Tabellen, Spal
 
 ### 2. Drizzle-Schema → Migrationen
 
-Aus dem generierten Drizzle-Schema vergleicht `db generate` mit den Migrationen, die bereits in `drizzle/migrations/` liegen, auf einer Scratch-Datenbank nachgespielt, und erzeugt zeitgestempelte SQL-Migrationsdateien. Es liest Ihre Datenbank nie: Eine Spalte, die der Boot oder `db push` bereits hinzugefügt hat, kommt trotzdem als `ADD COLUMN` heraus.
+Aus dem generierten Drizzle-Schema vergleicht `db generate` mit den Migrationen, die bereits in `backend/drizzle/migrations/` liegen, auf einer Scratch-Datenbank nachgespielt, und erzeugt zeitgestempelte SQL-Migrationsdateien. Es liest Ihre Datenbank nie: Eine Spalte, die der Boot oder `db push` bereits hinzugefügt hat, kommt trotzdem als `ADD COLUMN` heraus.
 
 ### 3. Migrationen → PostgreSQL
 
@@ -83,7 +83,7 @@ rebase schema introspect
 ```
 
 **Was er tut:**
-- Verbindet sich mit Ihrer Datenbank (mit der Verbindungszeichenfolge aus Ihrer `.env`)
+- Verbindet sich mit der Datenbank dieses Projekts, nämlich der, die `rebase db url` ausgibt (die verwaltete wird gestartet, falls sie es ist); `--database-url` benennt eine andere, und `--docker` nutzt die Compose-Datenbank
 - Inspiziert alle Tabellen, Spalten, Typen und Fremdschlüssel
 - Generiert Collection-Definitionsdateien
 - Liest die
@@ -138,6 +138,9 @@ rebase schema introspect
 | `--output, -o` | Ausgabeverzeichnis für die generierten Collection-Dateien |
 | `--schema` | Das zu lesende Postgres-Schema (Standard: `public`) |
 | `--force, -f` | Überschreibt Collection-Dateien, die bereits existieren; ohne es wird eine vorhandene Datei übersprungen |
+| `--database-url` | Liest diese Datenbank statt der des Projekts |
+| `--docker` | Liest die Compose-Datenbank und startet sie bei Bedarf |
+| `--data-inference` / `--no-data-inference` | Zieht bis zu 100 Zeilen pro Tabelle als Stichprobe, um Formate, Constraints und UI-Einstellungen zu erkennen, oder liest nur die Struktur. Ohne eines von beiden fragt es nach, und ohne Terminal liest es nur die Struktur |
 
 Dies ist nützlich, wenn Sie Rebase auf einer bestehenden Datenbank einführen — zuerst introspizieren, dann die generierten Collections anpassen.
 
@@ -265,7 +268,7 @@ rebase db generate
 
 **Was er tut:**
 - Vergleicht das Drizzle-Schema mit dem Zustand, den die Migrationen in `drizzle/migrations/` aufbauen, nicht mit Ihrer Datenbank
-- Erzeugt zeitgestempelte SQL-Migrationsdateien in `drizzle/migrations/`
+- Erzeugt zeitgestempelte SQL-Migrationsdateien in `backend/drizzle/migrations/`
 - Dateien können überprüft, bearbeitet und in die Versionskontrolle committet werden
 - Nennt jede Anweisung der neuen Migration, die Daten zerstört, mit derselben Prüfung, die `db push` vor dem Anwenden ausführt: eine gelöschte Tabelle, Spalte, Schema, View oder ein gelöschter Typ, ein `TRUNCATE`, eine Änderung des Spaltentyps, die Werte verlieren kann, eine Änderung des Primärschlüssels oder das Löschen eines CHECK- oder EXCLUDE-Constraints, den die Datenbank enthält. Er schreibt die Datei trotzdem und endet mit Exit-Code 0, warnt also und verweigert nicht.
 - Endet mit dem,
@@ -375,7 +378,7 @@ Führen Sie `doctor` aus, wann immer sich etwas nicht synchron anfühlt. Es zeig
 
 Der Datenbankvergleich schließt den ein, den der Boot vornimmt, bevor er warnt, dass `schema.generated.ts` und die Datenbank nicht übereinstimmen, ausgeführt durch denselben Code. So steht jeder Unterschied, vor dem der Boot warnt, auch im Bericht, mit denselben Worten: eine Spalte, die auf einer Seite NOT NULL und auf der anderen nullable ist, und eine Spalte, die die Datenbank noch hat und die Datei nicht (der Boot löscht nie eine, daher lässt eine umbenannte Property ihre alte Spalte zurück). Jeder ist eine Warnung, und die Abhilfe nennt `rebase db push`.
 
-Der Datenbankvergleich braucht `DATABASE_URL` (oder `ADMIN_CONNECTION_STRING`). Ohne eine wird diese Phase als **übersprungen** gemeldet statt als bestanden, und der Lauf schließt nie mit „All schemas are in sync“ ab — eine Prüfung, die nicht stattgefunden hat, ist kein Gesundheitszeugnis.
+Der Datenbankvergleich liest die Datenbank des Projekts, aufgelöst so, wie `rebase db url` sie auflöst — bei einem frischen Scaffold die verwaltete, die `doctor` startet. Lässt sich keine auflösen, wird diese Phase als **übersprungen** gemeldet statt als bestanden, und der Lauf schließt nie mit „All schemas are in sync“ ab — eine Prüfung, die nicht stattgefunden hat, ist kein Gesundheitszeugnis.
 
 Es nennt außerdem jede Collection ohne [`search`-Block](/docs/backend/search), deren Tabelle mehr als etwa 10.000 Zeilen enthält. Eine Suche dort — das Suchfeld des Admins, `.search()`, `?searchString=` — ist `ILIKE '%term%'` über die Textspalten, was kein Index bedienen kann, sodass jede die ganze Tabelle liest und ihr Count sie erneut liest (etwa eine Drittelsekunde bei 100.000 Zeilen, mit der Tabelle wachsend). Die Zeilenzahl ist die eigene Schätzung von Postgres, die Prüfung scannt also nichts. Es ist ein Hinweis: Der Exit-Code ändert sich nicht, und nichts wird für Sie indiziert.
 
@@ -462,9 +465,9 @@ rebase schema generate
 # 3. Generate SQL migration files
 rebase db generate
 
-# 4. Review the generated SQL in drizzle/migrations/
+# 4. Review the generated SQL in backend/drizzle/migrations/
 # 5. Commit the migration to version control
-git add drizzle/migrations/
+git add backend/drizzle/migrations/
 
 # 6. Apply in production
 #    A database Rebase has already booted needs a baseline the first time —

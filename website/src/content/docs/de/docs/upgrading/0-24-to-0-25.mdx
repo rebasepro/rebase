@@ -1,5 +1,5 @@
 ---
-sourceHash: 5fe43cc6af8d171f
+sourceHash: 6c20228a92368bc2
 slug: de/docs/upgrading/0-24-to-0-25
 title: Upgrade von 0.24 auf 0.25
 sidebar_label: 0.24 → 0.25
@@ -238,7 +238,7 @@ Multi-Select verwenden Sie `onValueChange`.
 ## 77. Ein Upsert auf die Users-Collection wird abgelehnt
 
 Die Users-Collection (diejenige mit aktiviertem `auth`) antwortet bei einem Upsert
-nun über jeden Weg mit `400 INVALID_CONFLICT_TARGET`: `?on_conflict=`, `/bulk` mit
+nun über jeden Weg mit 400 `INVALID_CONFLICT_TARGET`: `?on_conflict=`, `/bulk` mit
 `upsert: true`, eine `_batch`-`upsert`-Operation, die SDK-Methoden `upsert()` und
 `createMany(…, { upsert: true })` sowie der Realtime-Socket. Ein Upsert erfährt erst
 während des Schreibvorgangs, ob eine Erstellung oder Aktualisierung stattfindet,
@@ -264,7 +264,7 @@ else await client.data.users.update(String(found.id), user);
 Ein Lesevorgang, der sowohl `page` als auch `offset` angibt, wird nun abgelehnt. Der
 Server antwortet mit `400 PAGE_WITH_OFFSET`, und das SDK verweigert die Kombination
 bereits vor der Anfrage mit einem `RebaseClientError`, der denselben Code enthält: über
-HTTP, In-Process (`rebase.data`) und offline. Zuvor hatte `page` Vorrang und `offset`
+HTTP, In-Process (`rebase.dataAsAdmin`) und offline. Zuvor hatte `page` Vorrang und `offset`
 wurde stillschweigend verworfen.
 
 **Wer betroffen ist:** Code, der beides sendet, z. B. ein `find({ page, offset })`
@@ -371,7 +371,7 @@ etwa ein Formular oder ein Import, der jede Spalte unabhängig von ihrer Befüll
 wenn ein `defaultValue` greifen soll, oder entfernen Sie `required` bei Feldern, die
 legitimerweise leer sein dürfen. Collections, die einen `beforeSave`-Hook deklarieren,
 werden an der Schnittstelle nicht vorab geprüft (der Hook kann den Wert noch füllen),
-wie bisher. Servercode, der In-Process schreibt (`rebase.data`), ist nicht betroffen.
+wie bisher. Servercode, der In-Process schreibt (`rebase.dataAsAdmin`), ist nicht betroffen.
 
 ## 83. `QueryBuilder` und `createBackups` werden nicht mehr aus `@rebasepro/client` exportiert
 

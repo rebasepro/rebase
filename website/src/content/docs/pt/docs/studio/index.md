@@ -1,5 +1,5 @@
 ---
-sourceHash: 352139def44b34e0
+sourceHash: e06a1e8e5d6dab6f
 title: Ferramentas do Studio
 sidebar_label: Studio
 description: O Rebase Studio oferece ferramentas para desenvolvedores para edição visual de esquemas, consultas SQL, scripting JavaScript, gerenciamento de políticas RLS e navegação de armazenamento.
@@ -47,15 +47,15 @@ O editor está ativo onde quer que o Studio esteja montado — o `<RebaseStudio/
 import { RebaseCMS } from "@rebasepro/cms";
 import { RebaseStudio } from "@rebasepro/studio";
 
-// O Studio está montado, por isso o editor de coleções está disponível.
-// Não é preciso mais nada.
+// Studio is mounted, so the Collection Editor is available. Nothing else
+// is needed for it.
 <Rebase>
     <RebaseCMS collections={collections}/>
     <RebaseStudio/>
 </Rebase>
 
-// `collectionEditor` serve para afinação — um editor só de leitura,
-// outro token — não para ativar.
+// `collectionEditor` is for fine-tuning — a read-only editor, a different
+// token — not for opting in.
 <RebaseCMS
     collections={collections}
     collectionEditor={{
@@ -192,6 +192,8 @@ armazenamento, por exemplo, pode deixar essa de fora:
 ```tsx
 <RebaseStudio tools={["sql", "rls", "schema-visualizer", "api"]} />
 ```
+
+A vista do Studio do Editor de Coleções é a ferramenta `"schema"`. Omite `tools` e ela está lá; passa uma lista sem `"schema"`, como acima, e fica de fora.
 
 A lista é lida pelo seu *conteúdo*, não pela sua identidade, por isso escrevê-la
 inline é seguro: uma nova renderização do host não desmonta nem volta a montar a

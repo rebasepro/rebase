@@ -1,5 +1,5 @@
 ---
-sourceHash: f66784a0d8158afb
+sourceHash: 5e1a0bbb522c32d0
 title: Umgebung & Konfiguration
 sidebar_label: Konfiguration
 description: Alle Umgebungsvariablen und Konfigurationsoptionen für Rebase-Projekte.
@@ -70,7 +70,7 @@ Die gesamte Konfiguration erfolgt über Umgebungsvariablen in Ihrer `.env`-Datei
 | `LOG_LEVEL` | Logging-Detailgrad: `error`, `warn`, `info`, `debug` | `info` |
 | `REBASE_LOG_RAW_QUERIES` | Zeigt das SQL hinter einer `Failed query: [redacted]`-Zeile an. Jedes fehlschlagende Statement wird standardmäßig geschwärzt, da eine fehlgeschlagene Abfrage gebundene Parameter enthält – etwa eine E-Mail-Adresse oder einen Passwort-Hash. Setzen Sie dies während der Diagnose eines DDL-, RLS- oder Change-Capture-Fehlers auf `true`. Wird ignoriert, wenn `NODE_ENV=production`. | `false` |
 | `NODE_ENV` | Umgebung: `development`, `production` oder `test` | `development` |
-| `CORS_ORIGINS` | Kommagetrennte Liste erlaubter Origins. **In Produktion erforderlich**, falls abweichend von der Backend-Domain. In der Entwicklung wird sie zu localhost *hinzugefügt* – siehe unten. | — |
+| `CORS_ORIGINS` | Kommagetrennte Liste erlaubter Origins. **In Produktion erforderlich**, sofern nicht `FRONTEND_URL` gesetzt ist: Ein Produktionsstart ohne beide verweigert den Start. In der Entwicklung wird sie zu localhost *hinzugefügt* – siehe unten. | — |
 | `FRONTEND_URL` | URL der Frontend-App. Wird in beiden Umgebungen als Alternative zu CORS_ORIGINS verwendet. | — |
 | `ADMIN_CONNECTION_STRING` | Datenbank-Verbindungszeichenfolge mit Administratorrechten (wird für Schema-Introspektion und Administrationsoperationen verwendet). Die hier angegebene Datenbank ist weder diejenige, die die SQL-Konsole als aktuell bezeichnet, noch diejenige, die ein neuer Branch standardmäßig kopiert: Beides ist die Datenbank, auf der die eigene Verbindung der App liegt (siehe `REBASE_BRANCH_PARENT_DATABASE` für einen Server auf einem Branch). | `DATABASE_URL` |
 | `DISABLE_DB_ROLE_SWITCHING` | Deaktiviert das Wechseln von PostgreSQL-Rollen im SQL-Editor (nützlich für benutzerdefinierte Authentifizierung, bei der DB-Rollen nicht zugeordnet sind). Die SQL-Konsole von Studio zeigt dann an, dass die Zeilen als Verbindungseigentümer gelesen wurden, nennt diesen und graut die Rollenauswahl aus. | `false` |
@@ -84,8 +84,8 @@ statt ersetzt wird. Die Variable funktioniert in beiden Umgebungen also gleich, 
 die sie in der Entwicklung erfordern, sind die üblichen:
 
 ```bash
-# Ein Telefon im LAN, der Rechner eines Kollegen, ein ngrok-Tunnel,
-# ein weitergeleiteter Codespaces-Port – alles Nicht-Localhost-Origins.
+# A phone on the LAN, a colleague's machine, an ngrok tunnel,
+# a forwarded Codespaces port — all non-localhost origins.
 CORS_ORIGINS=http://192.168.1.5:5173
 ```
 
@@ -384,7 +384,7 @@ Wird von `rebase` gelesen, nicht vom Server. Nichts hier hat Einfluss auf ein De
 
 ## Secrets in der Entwicklung
 
-`JWT_SECRET` und `REBASE_SERVICE_KEY` sind in der Produktion erforderlich und werden außerhalb
+`JWT_SECRET` ist in der Produktion erforderlich. Es und `REBASE_SERVICE_KEY` werden außerhalb
 dieser für Sie generiert, sodass Sie ohne jegliche Konfiguration starten können.
 
 Diese generierten Werte werden in `.rebase-dev-secrets.json` gecacht, direkt neben
@@ -399,12 +399,13 @@ eigenen App ab und machte jeden gerade erstellten API-Schlüssel ungültig.
 - Kann die Datei nicht geschrieben werden – etwa in einem schreibgeschützten Container –, startet
   der Server trotzdem mit einem kurzlebigen Secret, genau wie zuvor.
 
-In der Produktion oder unter einem Test-Runner wird nichts gecacht. In der Produktion schlägt
-ein Bootvorgang, der eines der Secrets generieren müsste, weiterhin unter Nennung der Variablen fehl:
+In der Produktion oder unter einem Test-Runner wird nichts gecacht. In der Produktion wird auch
+nichts generiert: Ein Start ohne `JWT_SECRET` schlägt unter Nennung der Variablen fehl, und das
+bleibt unverändert:
 
 ```
-JWT_SECRET must be explicitly set in production.
-Do not rely on auto-generated secrets outside development.
+The environment is not valid:
+  JWT_SECRET: is required
 ```
 
 ## Backend-Konfigurationsobjekt
@@ -420,18 +421,18 @@ await initializeRebaseBackend({
     app,
     server,
     collectionsDir: "./config/collections",
-    basePath: "/api",        // Basispfad für alle API-Routen (Standard: "/api")
+    basePath: "/api",        // Base path for all API routes (default: "/api")
 
     database: createPostgresAdapter({
         connection: db,
         schema: { tables, enums, relations }
     }),
 
-    auth: {                  // Authentifizierungskonfiguration
+    auth: {                  // Authentication config
         jwtSecret: env.JWT_SECRET,
         accessExpiresIn: env.JWT_ACCESS_EXPIRES_IN,
         refreshExpiresIn: env.JWT_REFRESH_EXPIRES_IN,
-        requireAuth: true,    // Authentifizierung für Daten-API verlangen (Standard: true)
+        requireAuth: true,    // Require auth for data API (default: true)
         allowRegistration: env.ALLOW_REGISTRATION,
         google: env.GOOGLE_CLIENT_ID
             ? {
@@ -442,9 +443,9 @@ await initializeRebaseBackend({
         serviceKey: env.REBASE_SERVICE_KEY
     },
 
-    // Wenn in der Produktion kein Bucket konfiguriert ist, ist der Speicher deaktiviert,
-    // nicht lokal: Uploads antworten mit 501, anstatt auf einem Dateisystem zu landen,
-    // das beim nächsten Redeploy gelöscht wird.
+    // No bucket configured in production means storage is off, not local:
+    // uploads answer 501 rather than landing on a filesystem that is erased
+    // on the next redeploy.
     storage: env.STORAGE_TYPE === "s3"
         ? {
             type: "s3",
@@ -468,9 +469,9 @@ await initializeRebaseBackend({
                     basePath: env.STORAGE_PATH || "./uploads"
                 },
 
-    history: true,           // Entitätsänderungshistorie aktivieren
+    history: true,           // Enable entity change history
 
-    enableSwagger: true,     // OpenAPI-Dokumentation unter /api/docs aktivieren
+    enableSwagger: true,     // Enable OpenAPI docs at /api/docs
 
     logging: {
         level: "info"
@@ -492,7 +493,7 @@ import { createRebaseClient } from "@rebasepro/client";
 
 export const rebase = createRebaseClient({
     baseUrl: "https://api.example.com",
-    apiPath: "/v1"          // muss mit dem basePath des Backends übereinstimmen
+    apiPath: "/v1"          // must match the backend's basePath
 });
 ```
 
@@ -504,7 +505,7 @@ Sie diese über den Client, anstatt `/api` selbst zu schreiben:
 import { useApiBase } from "@rebasepro/app";
 
 function Widget() {
-    const apiBase = useApiBase();   // z. B. "https://api.example.com/v1"
+    const apiBase = useApiBase();   // e.g. "https://api.example.com/v1"
     // fetch(`${apiBase}/data/products`)
 }
 ```

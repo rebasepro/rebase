@@ -306,7 +306,7 @@ result.meta;  // { operations: 4 }
 `values` a la forma `Insert` o `Update` generada de esa colección — una
 columna que la colección no tiene es un error de compilación, y también lo es
 un create al que le falta una obligatoria. `collection` es el accesor, el
-nombre que toma `client.data.<accesor>` (`orderItems` para el slug
+nombre que toma `client.data.<accessor>` (`orderItems` para el slug
 `order_items`); el cliente envía el slug, a través del diccionario
 `collections` con el que se creó. En 0.23 un batch tipado envía el accesor tal
 como está escrito, así que no se puede llegar a una colección en snake_case a

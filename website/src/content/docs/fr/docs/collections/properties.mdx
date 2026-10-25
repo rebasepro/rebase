@@ -1,5 +1,5 @@
 ---
-sourceHash: 9426e0b3511c31f5
+sourceHash: 01c8a1a724587153
 title: Propriétés
 sidebar_label: Propriétés
 description: Les types de propriétés définissent le type de données, la validation et le rendu de l'interface utilisateur pour chaque champ d'une collection. Rebase prend en charge les types string, number, boolean, date, array, map, reference, relation et geopoint.
@@ -20,10 +20,10 @@ Les propriétés définissent les colonnes de votre table de base de données ai
 
 | Type | Description | Colonne PostgreSQL |
 |------|-------------|-------------------|
-| `string` | Texte, sélection, markdown, téléversement de fichier, URL, e-mail | `text` par défaut ; `varchar`, `char` ou `uuid` avec `columnType` |
+| `string` | Texte, sélection, markdown, téléversement de fichier, URL, e-mail | `text` par défaut ; `varchar`, `char` ou `uuid` avec `columnType` ; un type enum Postgres (`<table>_<column>`) avec `enum` |
 | `number` | Entier, décimal, devise | `integer`, `numeric`, `bigint`, `serial` |
 | `boolean` | Sélecteur vrai/faux | `boolean` |
-| `date` | Date, date et heure, horodatage | `timestamp`, `date` |
+| `date` | Date, date et heure, horodatage | `timestamptz` par défaut ; `date` ou `time` avec `columnType` |
 | `array` | Liste ordonnée de valeurs | Un tableau natif (`text[]`, `integer[]`, `numeric[]`, `boolean[]`) lorsque `of` est une propriété unique de type string, number ou boolean ; `jsonb` sinon |
 | `map` | Objet clé-valeur | `jsonb` |
 | `geopoint` | Paire latitude/longitude | `jsonb` |
@@ -41,7 +41,7 @@ Tous les types de propriétés partagent ces options :
 | `type` | `string` | **Requis.** Type de données (voir ci-dessus) |
 | `name` | `string` | Libellé d'affichage. Par défaut, la clé de la propriété mise en forme — `publishDate` → "Publish Date". Définissez-le lorsque cette dérivation est incorrecte : `"URL"` plutôt que "Url". |
 | `description` | `string` | Texte d'aide affiché sous le champ |
-| `defaultValue` | `any` | Valeur par défaut pour les nouvelles entités. Une valeur littérale — une chaîne, un nombre, un booléen, une date, un identifiant d'enum ou un document `map`/`array` — devient également le `DEFAULT` de la colonne, de sorte qu'une ligne insérée par tout élément autre que le panneau d'administration (l'API REST, un seed, `psql`) en bénéficie également |
+| `defaultValue` | `any` | Valeur par défaut pour les nouvelles entités. Une valeur littérale — une chaîne, un nombre, un booléen, une date, un identifiant d'enum ou un document `map`/`array` stocké en JSON — devient également le `DEFAULT` de la colonne, de sorte qu'une ligne insérée par tout élément autre que le panneau d'administration (l'API REST, un seed, `psql`) en bénéficie également |
 | `databaseDefault` | `boolean \| SqlExpression` | La base de données remplit la colonne lorsqu'une création la laisse vide : une colonne `NOT NULL DEFAULT <expression>` telle que `gen_random_uuid()` ou `nextval(…)`. Un champ `required` doté de cette option peut être omis lors d'une création, par le formulaire d'administration et par l'API, et un `null` envoyé lors de la création est confié à la base de données ; il reste obligatoire lors de la modification, et le type `Insert` généré le rend facultatif. Indiquez l'expression sous la forme de modèle acceptée par `isId`, ``databaseDefault: "sql`gen_random_uuid()`"``, et le planificateur de schéma l'écrira en tant que `DEFAULT` de la colonne, afin que `rebase db push` le conserve. `true` déclare un `DEFAULT` défini ailleurs et n'en écrit aucun, donc un push prévoira de le supprimer. "Import from table" et `rebase schema introspect` définissent l'expression qu'ils lisent |
 | `validation` | `object` | Règles de validation |
 | `propertyConfig` | `string` | Clé de configuration de propriété enregistrée |
@@ -89,9 +89,9 @@ price: {
 | `admin.hideFromCollection` | `boolean` | Masquer de la vue tableau. Affichage uniquement : les lignes associées d'une propriété de relation masquée sont toujours intégrées dans la lecture de la liste (voir [Relations](/docs/collections/relations)) |
 | `admin.columnWidth` | `number` | Largeur de colonne en pixels (vue tableau) |
 | `admin.span` | `1 \| 2 \| 3 \| 4` | Largeur du champ sur la grille de formulaire à quatre colonnes |
-| `admin.Field` | `React.ComponentType` | Composant de champ personnalisé |
-| `admin.Preview` | `React.ComponentType` | Composant personnalisé de cellule de tableau |
-| `admin.Filter` | `React.ComponentType` | Champ de filtre personnalisé pour cette propriété. Prévaut sur la surcharge `Collection.FilterField` au niveau de la collection et sur le champ intégré par type |
+| `admin.Field` | `ComponentRef` | Composant de champ personnalisé |
+| `admin.Preview` | `ComponentRef` | Composant personnalisé de cellule de tableau |
+| `admin.Filter` | `ComponentRef` | Champ de filtre personnalisé pour cette propriété. Prévaut sur la surcharge `Collection.FilterField` au niveau de la collection et sur le champ intégré par type |
 | `admin.filterOperators` | `WhereFilterOp[]` | Restreindre les opérateurs proposés lors du filtrage sur cette propriété. L'ensemble proposé est l'**intersection** des capacités du moteur, des valeurs par défaut du type et de cette liste — vous pouvez uniquement restreindre, jamais ajouter un opérateur que le moteur ne peut pas exécuter. `[]` désactive le filtrage sur la propriété |
 | `admin.customProps` | `unknown` | Tout ce dont votre propre `Field` ou `Preview` a besoin. Rebase le transmet sans modification |
 
@@ -262,7 +262,7 @@ locales: {
 | `userSelect` | `boolean` | Afficher sous forme de sélecteur d'utilisateur. La valeur est une simple colonne de chaîne de caractères contenant l'ID de l'utilisateur — rien ne la résout ni ne la vérifie lors de la réception. **Formulaire d'administration uniquement — non appliqué par l'API ou la base de données.** Le sélecteur liste les noms, e-mails et avatars des utilisateurs à toute personne autorisée à écrire dans la collection, via [`GET /api/admin/users/pick`](/docs/backend/auth-endpoints/), sans la portée `users:read`. Une collection dont les règles d'écriture sont en SQL brut ne compte pas, car elles ne peuvent pas être évaluées à l'avance : seuls les détenteurs de `users:read` peuvent alors effectuer la sélection. |
 | `admin.previewAsTag` | `boolean` | Afficher cette chaîne sous forme de tag dans les aperçus |
 | `admin.clearable` | `boolean` | Ajouter une icône pour réinitialiser la valeur (définir sur null) |
-| `admin.urlPreview` | `PreviewType` | Comment afficher une chaîne contenant une URL : un lien ou un aperçu intégré d'image, d'audio ou de vidéo. Présentation uniquement — le fait que la valeur *soit* une URL dépend du drapeau `url` sur la propriété, à partir duquel le contrat OpenAPI est généré |
+| `admin.urlPreview` | `PreviewType \| boolean` | Comment afficher une chaîne contenant une URL : `true` pour un lien, ou `"image"`, `"video"`, `"audio"` ou `"file"` pour un aperçu intégré. Présentation uniquement — le fait que la valeur *soit* une URL dépend du drapeau `url` sur la propriété, à partir duquel le contrat OpenAPI est généré |
 
 ### Colonnes d'audit
 
@@ -336,7 +336,7 @@ price: {
 quantity: {
     type: "number",
     name: "Quantity",
-    columnType: "integer"  // Stocker sous forme d'entier
+    columnType: "integer"  // Store as integer
 }
 ```
 

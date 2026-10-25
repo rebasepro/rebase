@@ -1,5 +1,5 @@
 ---
-sourceHash: cd33d688b582283c
+sourceHash: 155fe61b0635a331
 title: Acesso a campos
 sidebar_label: Acesso a campos
 description: Permissões de leitura e escrita por propriedade com base em papéis. Um chamador autorizado pelas regras de segurança da linha ainda assim não recebe um campo que seus papéis não podem ler.
@@ -178,7 +178,7 @@ A busca padrão — em uma coleção sem o bloco `search` — faz a correspondê
 suas propriedades de texto e ignora aquelas que o chamador não pode ler. Nada
 vaza por meio dela.
 
-Uma coleção que **declara** um [bloco `search`](/docs/backend/api/) é compilada
+Uma coleção que **declara** um [bloco `search`](/docs/backend/search) é compilada
 em uma única coluna `tsvector` gerada e compartilhada por todos os chamadores. Não há
 uma variante dela por papel, portanto, um campo restrito declarado em `search.fields` continuaria
 sendo *passível de correspondência* por chamadores que nunca poderiam ver seu valor — tornando-se
@@ -187,7 +187,7 @@ recuperável um termo por vez. O Rebase recusa essa combinação na inicializaç
 
 ## Histórico
 
-O [histórico da entidade](/docs/backend/api/) armazena a linha completa e é fornecido para
+O [histórico da entidade](/docs/backend/history) armazena a linha completa e é fornecido para
 qualquer um que possa ler a linha — o controle de acesso é "você pode consultar esta entidade", não "você
 é um admin". Portanto, a regra de leitura também é aplicada a cada snapshot armazenado: a entrada
 ainda é listada, com quem a alterou e quando, mas as colunas retidas são removidas
@@ -237,7 +237,7 @@ de ser aplicada: algo precisa ser capaz de salvar o hash da senha.
 
 Leituras via `rebase.dataAsAdmin` possuem o papel `admin`, logo uma regra baseada em papel
 não oculta nada delas. `[]` ainda oculta — inclusive do `dataAsAdmin`. Utilize
-[`rebase.sql()`](/docs/backend/api/) caso precise da coluna bruta.
+[`rebase.sql()`](/docs/backend/custom-functions) caso precise da coluna bruta.
 
 ## Validação
 

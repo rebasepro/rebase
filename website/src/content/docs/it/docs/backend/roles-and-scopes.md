@@ -1,5 +1,5 @@
 ---
-sourceHash: e6d2447955c86775
+sourceHash: 96a224ca982e3d25
 title: Ruoli e scope
 sidebar_label: Ruoli e scope
 description: "Cosa può fare un chiamante: il piano dati che ogni persona possiede, il piano di amministrazione che i ruoli concedono, gli scope che un'app dichiara per sé e come ogni credenziale li porta con sé."
@@ -253,10 +253,11 @@ Per le chiavi:
 
 Per gli account, chi possiede `users:write`:
 
-- non può modificare, reimpostare o eliminare un account che possiede un ruolo o uno scope che lui non possiede:
+- non può modificare, reimpostare o eliminare un account i cui ruoli possiedono uno scope che lui non possiede,
+  oppure `admin` quando lui non è un admin:
   `403 ACCOUNT_OUTRANKS_CALLER`. Senza questa regola, un ruolo di supporto potrebbe reimpostare la
   password di un admin e accedere come lui.
-- non può concedere ruoli che possiedono più di quanto possiede lui: `403 ROLE_EXCEEDS_CALLER`.
+- non può concedere ruoli che possiedono più di quanto possiede lui, `admin` incluso: `403 ROLE_EXCEEDS_CALLER`.
 
 ## Come ogni credenziale possiede gli scope
 

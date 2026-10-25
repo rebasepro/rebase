@@ -1,5 +1,5 @@
 ---
-sourceHash: b0d41379c997dc49
+sourceHash: 7745e401ff93e847
 title: Hooks Backend Globaux
 sidebar_label: Hooks Globaux
 description: Appliquez des callbacks de cycle de vie transversaux à chaque collection au niveau du serveur à l'aide de CollectionCallbacks.
@@ -95,13 +95,13 @@ Chaque callback reçoit un objet props unique. Champs communs :
 | `collection` | `CollectionConfig` | Tous les callbacks |
 | `path` | `string` | Tous les callbacks |
 | `row` | `Record<string, unknown>` | `afterRead`, `beforeDelete`, `afterDelete` |
-| `id` | `string` | `beforeSave` (facultatif), `afterSave`, `afterSaveError`, `beforeDelete`, `afterDelete` |
+| `id` | `string \| number` | `beforeSave` (facultatif), `afterSave`, `afterSaveError` (facultatif), `beforeDelete`, `afterDelete` |
 | `values` | `EntityValues` | `beforeSave`, `afterSave`, `afterSaveError` |
 | `previousValues` | `EntityValues` (facultatif) | `beforeSave`, `afterSave`, `afterSaveError` |
-| `status` | `"new" \| "existing"` | `beforeSave`, `afterSave`, `afterSaveError` |
+| `status` | `"new" \| "existing" \| "copy"` | `beforeSave`, `afterSave`, `afterSaveError` |
 | `context` | `RebaseCallContext` | Tous les callbacks |
 
-`context.user` contient l'utilisateur authentifié (`uid`, `roles`, etc.), ou vaut `undefined` pour les requêtes publiques.
+`context.user` contient l'utilisateur authentifié (`uid`, `roles`, etc.). Une requête sans jeton, là où l'API en laisse passer une, porte l'identité anonyme `{ uid: "anonymous", roles: ["anon"] }` plutôt que `undefined`.
 
 `collection` est toujours présent. Un callback global se déclenche pour chaque collection, c'est
 donc le seul niveau enregistré indépendamment de chacune d'elles — mais il n'est
