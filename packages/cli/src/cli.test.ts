@@ -163,6 +163,32 @@ describe("the failure telemetry records", () => {
     });
 });
 
+describe("a usage error under --json", () => {
+    it("puts the {error} envelope on stdout, as every other --json exit does", async () => {
+        thrown = new UsageError("Unknown option for `rebase status`: --bogus");
+        const stdout: string[] = [];
+        const log = vi.spyOn(console, "log").mockImplementation((...args: unknown[]) => { stdout.push(args.map(String).join(" ")); });
+        const exit = vi.spyOn(process, "exit").mockImplementation(((code?: number) => {
+            throw new Error(`exit ${code}`);
+        }) as typeof process.exit);
+        try {
+            await expect(entry(["node", "rebase", "status", "--json", "--bogus"])).rejects.toThrow("exit 1");
+            const envelope = JSON.parse(stdout.join("\n")) as { error: { code: string; message: string; hint: string } };
+            expect(envelope.error.code).toBe("usage");
+            expect(envelope.error.message).toContain("--bogus");
+            expect(envelope.error.hint).toContain("rebase status --help");
+        } finally {
+            log.mockRestore();
+            exit.mockRestore();
+        }
+    });
+
+    it("is left to bin/rebase.js to print when JSON was not asked for", async () => {
+        thrown = new UsageError("Unknown option for `rebase status`: --bogus");
+        await expect(entry(["node", "rebase", "status", "--bogus"])).rejects.toThrow(UsageError);
+    });
+});
+
 /**
  * The command words `cli.error` carries.
  *
