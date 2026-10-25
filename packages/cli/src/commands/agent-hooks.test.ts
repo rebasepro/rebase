@@ -17,7 +17,7 @@ import path from "path";
 import { fileURLToPath } from "url";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
-import { AGENT_HOOK_SCRIPT, AGENT_HOOK_SETTINGS, installAgentHooks } from "./agent-setup";
+import { AGENT_HOOK_SCRIPT, AGENT_HOOK_SETTINGS, hookScriptSha256, installAgentHooks, SHIPPED_HOOK_SCRIPT_SHA256S } from "./agent-setup";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const PACKAGE_ROOT = path.resolve(HERE, "..", "..");
@@ -83,6 +83,28 @@ describe("installAgentHooks", () => {
         expect(installAgentHooks(project)[0].status).toBe("kept");
         expect(fs.readFileSync(path.join(project, AGENT_HOOK_SCRIPT), "utf-8")).toBe("#!/bin/sh\nexit 0\n");
         expect(installAgentHooks(project, { force: true })[0].status).toBe("replaced");
+    });
+
+    it("replaces a copy this CLI shipped earlier instead of calling it edited", () => {
+        // The hook exactly as `rebase init` wrote it on 2026-10-20 (4451138e43),
+        // before the Windows, predates-verify and not-installed fixes.
+        installAgentHooks(project);
+        fs.writeFileSync(
+            path.join(project, AGENT_HOOK_SCRIPT),
+            fs.readFileSync(path.join(HERE, "__test_support__", "post-edit-collection.4451138e43.sh"), "utf-8")
+        );
+        expect(installAgentHooks(project)[0].status).toBe("replaced");
+        expect(fs.readFileSync(path.join(project, AGENT_HOOK_SCRIPT), "utf-8"))
+            .toBe(fs.readFileSync(path.join(TEMPLATE, AGENT_HOOK_SCRIPT), "utf-8"));
+    });
+
+    it("knows every version it shipped, the current one included", () => {
+        // Changing the hook means appending its new hash: the old one must stay,
+        // or projects scaffolded with it would read as edited and never update.
+        const shipped = fs.readFileSync(path.join(TEMPLATE, AGENT_HOOK_SCRIPT), "utf-8");
+        expect(SHIPPED_HOOK_SCRIPT_SHA256S.at(-1)).toBe(hookScriptSha256(shipped));
+        expect(new Set(SHIPPED_HOOK_SCRIPT_SHA256S).size).toBe(SHIPPED_HOOK_SCRIPT_SHA256S.length);
+        expect(hookScriptSha256(shipped.replace(/\n/g, "\r\n"))).toBe(hookScriptSha256(shipped));
     });
 
     it("leaves a settings file that is not plain JSON alone", () => {
