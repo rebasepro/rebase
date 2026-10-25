@@ -1024,8 +1024,8 @@ export function needsStaleSchemaPreflight(generation: SchemaGeneration): boolean
  * example names it. The first run is before the backend binds, so it is told
  * rather than left to read `.rebase/state.json`.
  */
-async function regenerateSdk(projectRoot: string, backendPort: number | null): Promise<void> {
-    if (!projectHasCollections(projectRoot)) return;
+async function regenerateSdk(projectRoot: string, backendPort: number | null): Promise<SchemaGeneration> {
+    if (!projectHasCollections(projectRoot)) return "skipped";
     const entry = resolveCliEntry();
     const { execPath, prefixArgs } = resolveSpawn(entry);
     try {
@@ -1035,6 +1035,7 @@ async function regenerateSdk(projectRoot: string, backendPort: number | null): P
             // The README's example address — see `DEV_BACKEND_URL_ENV`.
             ...(backendPort !== null ? { env: { [DEV_BACKEND_URL_ENV]: `http://localhost:${backendPort}` } } : {})
         });
+        return "generated";
     } catch (error) {
         const output = typeof error === "object" && error !== null && "all" in error && typeof error.all === "string"
             ? error.all
@@ -1043,7 +1044,38 @@ async function regenerateSdk(projectRoot: string, backendPort: number | null): P
         console.log(`  ${chalk.yellow("⚠")} ${chalk.gray("Could not regenerate the SDK types in generated/sdk.")}`);
         if (cause.length > 0) console.log(chalk.gray(cause.map(line => `    ${line.trim()}`).join("\n")));
         console.log(`  ${chalk.gray(`Run ${chalk.cyan("rebase generate-sdk")} to see why.`)}`);
+        return "failed";
     }
+}
+
+/**
+ * What dev prints once a collection edit's regeneration is done.
+ *
+ * The green "regenerated" box only when neither half failed. It used to be
+ * printed unconditionally, right under "⚠ Could not regenerate the database
+ * schema … nothing was applied" — and then the backend refused to boot over
+ * the same collection error, so the success line was the one wrong thing on
+ * the screen.
+ */
+export function collectionChangeSummary(schema: SchemaGeneration, sdk: SchemaGeneration): string[] {
+    const failed = [schema === "failed" && "the database schema", sdk === "failed" && "the SDK types"]
+        .filter((part): part is string => Boolean(part));
+    if (failed.length > 0) {
+        return [
+            chalk.yellow(`  ⚠ Not regenerated: ${failed.join(" and ")} — fix the error above and save again.`),
+            chalk.gray("    The backend restarts and reports the same problem until it is fixed."),
+            ""
+        ];
+    }
+    return [
+        chalk.green("  ✓ Schema and SDK types regenerated. The backend restarts and boot"),
+        chalk.green("    creates what is missing — a new collection, a new property."),
+        // `db push` is the remedy for what boot leaves alone, on the
+        // managed database as on your own PostgreSQL.
+        chalk.gray("    For what boot leaves alone — a renamed column, a narrowed type,"),
+        chalk.gray(`    a removed field — run ${chalk.cyan("rebase db push")}.`),
+        ""
+    ];
 }
 
 /**
@@ -1410,7 +1442,7 @@ export async function devCommand(rawArgs: string[]): Promise<void> {
      * backend is told at boot, then each one it announces it bound.
      */
     let sdkBackendPort: number | null = startsBackend ? startPort : null;
-    const regenerateSdkFor = (port: number | null): Promise<void> => {
+    const regenerateSdkFor = (port: number | null): Promise<SchemaGeneration> => {
         sdkBackendPort = port;
         return regenerateSdk(projectRoot, port);
     };
@@ -1983,7 +2015,7 @@ export async function devCommand(rawArgs: string[]): Promise<void> {
                         ].join("\n"));
 
                         const schemaBefore = generatedSchemaStamp();
-                        await Promise.all([ensureGeneratedSchema(projectRoot), regenerateSdkFor(resolvedBackendPort ?? startPort)]);
+                        const [schemaResult, sdkResult] = await Promise.all([ensureGeneratedSchema(projectRoot), regenerateSdkFor(resolvedBackendPort ?? startPort)]);
                         // The stock runtime imports the generated schema, so tsx
                         // already restarts when it is written; a second restart
                         // from the trigger is exactly what this avoids.
@@ -1993,15 +2025,7 @@ export async function devCommand(rawArgs: string[]): Promise<void> {
                         // import it — dev restarts the backend itself.
                         if (!(usesStockRuntime && schemaBefore !== null && generatedSchemaStamp() !== schemaBefore)) restartBackend();
 
-                        console.log([
-                            chalk.green("  ✓ Schema and SDK types regenerated. The backend restarts and boot"),
-                            chalk.green("    creates what is missing — a new collection, a new property."),
-                            // `db push` is the remedy for what boot leaves alone, on the
-                            // managed database as on your own PostgreSQL.
-                            chalk.gray("    For what boot leaves alone — a renamed column, a narrowed type,"),
-                            chalk.gray(`    a removed field — run ${chalk.cyan("rebase db push")}.`),
-                            ""
-                        ].join("\n"));
+                        console.log(collectionChangeSummary(schemaResult, sdkResult).join("\n"));
                     })();
                 }, 500);
             };
