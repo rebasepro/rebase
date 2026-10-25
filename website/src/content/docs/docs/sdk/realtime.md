@@ -419,7 +419,7 @@ const { messages, retained, latestSeq } = await channel.history({
 :::note[Replays can overlap, and that is fine]
 The server cannot know exactly which messages reached you before the socket dropped, so a catch-up range may include some you already applied. The SDK discards anything at or below the sequence it has already delivered, so handlers never see a message twice.
 
-Your own messages are **not** filtered out of a replay: a reconnect assigns a new client id, so the very case catch-up exists for is the one where that filter would fail. Make operations idempotent if re-applying your own would be a problem.
+Your own messages are filtered out of a replay, as they are live, including ones sent before a reconnect gave the socket a new client id: the channel remembers the ids it broadcast from. A new channel object — after a page reload, say — remembers none, so a catch-up there delivers your earlier messages like anyone else's, which is what rebuilding state from history needs.
 :::
 
 ## Presence Tracking

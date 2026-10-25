@@ -421,7 +421,27 @@ export class RebaseRealtimeChannel {
      */
     async broadcast(event: string, payload: unknown): Promise<void> {
         await this.join();
+        this.rememberOwnSender(this.transport.socketClientId);
         await this.send("broadcast", { event, payload });
+    }
+
+    /**
+     * The socket ids this channel has broadcast from — the current one and the
+     * ones before a reconnect. A message in history from any of them is this
+     * client's own, and a sender is never sent its own messages: replayed after
+     * a reconnect whose `broadcast_ack` was lost, it was applied twice.
+     */
+    private readonly ownSenderIds = new Set<string>();
+
+    private rememberOwnSender(id: string | undefined): void {
+        if (id === undefined || this.ownSenderIds.has(id)) return;
+        this.ownSenderIds.add(id);
+        // A long-lived tab reconnects many times; the ones that matter are the
+        // last few, whose messages a catch-up can still replay.
+        if (this.ownSenderIds.size > 16) {
+            const oldest = this.ownSenderIds.values().next().value;
+            if (oldest !== undefined) this.ownSenderIds.delete(oldest);
+        }
     }
 
     /**
@@ -629,9 +649,9 @@ export class RebaseRealtimeChannel {
                     this.lastSeq = entry.seq;
                     // Sent from this very socket, which is never sent its own
                     // messages live; a hole filled from history keeps to that.
-                    // (After a reconnect the socket is a new one, and a replay
-                    // delivers the old socket's messages as it always has.)
-                    if (ownId !== undefined && entry.senderId === ownId) continue;
+                    // So is one sent from this channel's socket before a
+                    // reconnect.
+                    if (ownId !== undefined && (entry.senderId === ownId || this.ownSenderIds.has(entry.senderId))) continue;
                     this.deliver({
                         event: entry.event,
                         payload: entry.payload,
