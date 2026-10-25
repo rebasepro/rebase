@@ -737,8 +737,8 @@ export function createRebaseClient<DB = Record<string, unknown>>(options: Create
             // user (or switches to whoever it really is); a refusal means
             // there is no session, and the device is signed out.
             let confirming = false;
-            offlineManager.api.onStatusChange((status) => {
-                if (!status.online || !status.unverifiedUser || confirming || auth.getSession()) return;
+            const confirm = () => {
+                if (confirming || auth.getSession()) return;
                 confirming = true;
                 auth.refreshSession().catch((error: unknown) => {
                     const refused = error instanceof RebaseApiError
@@ -747,7 +747,13 @@ export function createRebaseClient<DB = Record<string, unknown>>(options: Create
                 }).finally(() => {
                     confirming = false;
                 });
+            };
+            offlineManager.api.onStatusChange((status) => {
+                if (status.online && status.unverifiedUser) confirm();
             });
+            // A read made while unconfirmed reached the server — the
+            // connection is back even when the status never said it was gone.
+            offlineManager.onReachedUnconfirmed(confirm);
         }
     }
 

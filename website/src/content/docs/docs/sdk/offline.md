@@ -234,7 +234,10 @@ replays until the session is confirmed: when the connection is back the
 client refreshes the session, and a sign-in confirms it too. If the server
 refuses the session, or someone else signs in, the device switches users, and
 the queued writes stay with their author until they sign in again. Meanwhile
-`status().unverifiedUser` is `true`.
+`status().unverifiedUser` is `true`, and that holds online too: until the
+refresh answers, writes queue rather than go out without credentials, and reads
+are answered from the user's local rows. What the server sends a request with
+no session is what a signed-out caller may see, so it is not kept.
 
 ```typescript
 createRebaseClient({

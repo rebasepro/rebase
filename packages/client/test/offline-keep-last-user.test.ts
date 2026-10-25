@@ -56,8 +56,15 @@ function backend() {
         if (url.endsWith("/auth/logout")) return jsonResponse({ success: true });
         if (url.includes("/data/posts")) {
             if (!state.dataReachable) throw new TypeError("Failed to fetch");
+            // Row-level security: a request without a session reads nothing.
+            const anonymous = !new Headers(init?.headers).get("Authorization");
+            const byId = /\/data\/posts\/([^/?]+)/.exec(url)?.[1];
+            if (method === "GET" && byId !== undefined) {
+                const row = anonymous ? undefined : posts.get(byId);
+                return row ? jsonResponse(row) : jsonResponse({ error: { message: "Not found", code: "NOT_FOUND" } }, 404);
+            }
             if (method === "GET") {
-                const data = [...posts.values()];
+                const data = anonymous ? [] : [...posts.values()];
                 return jsonResponse({ data, meta: { total: data.length, limit: 20, offset: 0, hasMore: false } });
             }
             writes.push({ method, authorization: new Headers(init?.headers).get("Authorization") });
@@ -178,6 +185,65 @@ describe("offline.keepLastUser", () => {
         expect(server.writes.map((w) => w.authorization)).toEqual(["Bearer token-u1"]);
         expect(rebase.offline!.status().unverifiedUser).toBeUndefined();
         expect(await rebase.offline!.pending()).toEqual([]);
+    });
+
+    /**
+     * Back online, the session not yet confirmed: the refresh has not
+     * answered, so every request goes out with no credentials. What comes back
+     * is what an anonymous caller may see, not the user's data — and it used
+     * to be kept as theirs: an empty list replaced their cached list, and a
+     * 404 for one of their rows deleted it from the device. A write was sent
+     * without credentials instead of queued for its author.
+     */
+    describe("online, before the session is confirmed", () => {
+        async function unconfirmed(server: Backend, store: MemoryOfflineStore) {
+            await earlierVisit(server, store, "u1", true);
+            const rebase = offlineReload(server, store, true);
+            await rebase.auth.isInitialized();
+            await flush();
+            // The data API answers again; the refresh still cannot be reached.
+            server.state.dataReachable = true;
+            await rebase.data.collection("posts").find();
+            await flush();
+            expect(rebase.offline!.status()).toMatchObject({ online: true, unverifiedUser: true });
+            return rebase;
+        }
+
+        it("answers reads from the last user's rows and keeps the anonymous answer nowhere", async () => {
+            const server = backend();
+            const store = new MemoryOfflineStore();
+            const rebase = await unconfirmed(server, store);
+            const posts = rebase.data.collection("posts");
+            const mine = [{ id: "p1", title: "only u1 can see this" }];
+
+            expect((await posts.find()).data).toEqual(mine);
+            expect(await posts.findById("p1")).toEqual(mine[0]);
+
+            server.state.dataReachable = false;
+            expect((await posts.find()).data).toEqual(mine);
+            expect(await posts.findById("p1")).toEqual(mine[0]);
+        });
+
+        it("queues a write for its author instead of sending it without credentials", async () => {
+            const server = backend();
+            const store = new MemoryOfflineStore();
+            const rebase = await unconfirmed(server, store);
+
+            await rebase.data.collection("posts").create({ id: "p2", title: "typed before the refresh answered" });
+
+            expect(server.writes).toEqual([]);
+            expect(await queuedTitles(store, "u1")).toEqual(["typed before the refresh answered"]);
+
+            // Confirmed: it goes out as u1.
+            server.state.refresh = () => tokenResponse("u1");
+            server.state.dataReachable = false;
+            await rebase.data.collection("posts").find();
+            server.state.dataReachable = true;
+            await rebase.data.collection("posts").find();
+            await flush();
+            expect(rebase.auth.getSession()?.user.uid).toBe("u1");
+            expect(server.writes.map((w) => w.authorization)).toEqual(["Bearer token-u1"]);
+        });
     });
 
     it("a session the server refuses once reachable signs the device out, and keeps the queue for its author", async () => {

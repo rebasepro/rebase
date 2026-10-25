@@ -509,6 +509,13 @@ interface QuerySnapshot {
 interface ScopeTicket {
     scope: string;
     epoch: number;
+    /**
+     * Taken while the scope is the last user's, unconfirmed
+     * ({@link OfflineConfig.keepLastUser}). A request made then carries no
+     * credentials, so its answer is what an anonymous caller may see — never
+     * kept as the user's rows, and never a reason to drop one.
+     */
+    unverified?: true;
 }
 
 /** The queue's row ids for one collection — see `OfflineManager.pendingIndex`. */
@@ -917,13 +924,45 @@ export class OfflineManager {
      */
     private ticket(): ScopeTicket | undefined {
         if (this.scopeHold) return undefined;
-        return { scope: this.scope, epoch: this.scopeEpoch };
+        return this.currentTicket();
     }
 
     /** The ticket of whoever the held scope turns out to be. */
     private async nextTicket(): Promise<ScopeTicket> {
         await this.scopeKnown();
-        return { scope: this.scope, epoch: this.scopeEpoch };
+        return this.currentTicket();
+    }
+
+    private currentTicket(): ScopeTicket {
+        return this.unverified
+            ? { scope: this.scope, epoch: this.scopeEpoch, unverified: true }
+            : { scope: this.scope, epoch: this.scopeEpoch };
+    }
+
+    /**
+     * Whether a write may go to the server now. Not while the scope is the last
+     * user's, unconfirmed: it would go out with no credentials, as nobody. It
+     * queues for its author instead, as it does offline.
+     */
+    private sendsWrites(): boolean {
+        return this.connectivity.shouldAttempt() && !this.unverified;
+    }
+
+    private readonly reachedUnconfirmedListeners = new Set<() => void>();
+
+    /**
+     * `listener` runs when a request made while the scope is unconfirmed
+     * reached the server: the connection is back, so the session can be asked
+     * about. The client wires it to the same confirmation the status listener
+     * runs — the status may never have said the connection was gone.
+     */
+    onReachedUnconfirmed(listener: () => void): () => void {
+        this.reachedUnconfirmedListeners.add(listener);
+        return () => this.reachedUnconfirmedListeners.delete(listener);
+    }
+
+    private reachedUnconfirmed(): void {
+        for (const listener of this.reachedUnconfirmedListeners) callSafely(listener);
     }
 
     /** Whether an operation's user is still the signed-in one. */
@@ -995,12 +1034,16 @@ export class OfflineManager {
                     // Answered for a user who has since signed out: theirs
                     // to read, not the next user's to keep.
                     if (!this.isCurrent(ticket)) return res;
-                    await this.ingest(slug, res.data ?? [], ticket, isProjection(params));
-                    if (!this.isCurrent(ticket)) return res;
-                    const snapshot = this.recordSnapshot(slug, params, res, ticket);
-                    const answer = this.answer<M>(slug, params, snapshot);
-                    this.notifyCollection(slug, false);
-                    return { data: answer.data, meta: answer.meta };
+                    // Read with no credentials: the local rows answer.
+                    if (ticket.unverified) this.reachedUnconfirmed();
+                    else {
+                        await this.ingest(slug, res.data ?? [], ticket, isProjection(params));
+                        if (!this.isCurrent(ticket)) return res;
+                        const snapshot = this.recordSnapshot(slug, params, res, ticket);
+                        const answer = this.answer<M>(slug, params, snapshot);
+                        this.notifyCollection(slug, false);
+                        return { data: answer.data, meta: answer.meta };
+                    }
                 } catch (error) {
                     if (!isNetworkError(error)) {
                         // A 5xx or a rate limit still deserves the cached
@@ -1047,6 +1090,12 @@ export class OfflineManager {
                         const row = await inner.findById(id, options);
                         this.connectivity.markSuccess();
                         if (!this.isCurrent(ticket)) return row;
+                        // Read with no credentials: a 404 here is not the
+                        // server saying the user's row is gone.
+                        if (ticket.unverified) {
+                            this.reachedUnconfirmed();
+                            return this.localRow<M>(slug, id);
+                        }
                         if (row !== undefined) {
                             await this.ingest(slug, [row], ticket);
                         } else if (!this.hasPending(slug, id)) {
@@ -1101,7 +1150,7 @@ export class OfflineManager {
                 // server can tell it from a second create.
                 const idempotencyKey = options?.idempotencyKey ?? createMutationId();
                 let sent = false;
-                if (this.connectivity.shouldAttempt()) {
+                if (this.sendsWrites()) {
                     try {
                         const row = await inner.create(data, id, { ...options, idempotencyKey });
                         this.connectivity.markSuccess();
@@ -1146,7 +1195,7 @@ export class OfflineManager {
                 // its replay is sent under.
                 const idempotencyKey = options?.idempotencyKey ?? createMutationId();
                 let sent = false;
-                if (this.connectivity.shouldAttempt()) {
+                if (this.sendsWrites()) {
                     try {
                         const rows = await inner.createMany(data, { ...options, idempotencyKey });
                         this.connectivity.markSuccess();
@@ -1214,7 +1263,7 @@ export class OfflineManager {
             upsert: async (data: Partial<M>, options?: UpsertOptions) => {
                 const ticket = this.ticket() ?? await this.nextTicket();
                 await this.ensureCollection(slug);
-                if (this.connectivity.shouldAttempt()) {
+                if (this.sendsWrites()) {
                     try {
                         const row = await inner.upsert(data, options);
                         this.connectivity.markSuccess();
@@ -1265,7 +1314,7 @@ export class OfflineManager {
                 // rows land together, and would reorder writes against a row
                 // whose own create has not landed yet.
                 const anyPending = updates.some((u) => this.hasPending(slug, u.id));
-                if (this.connectivity.shouldAttempt() && !anyPending) {
+                if (this.sendsWrites() && !anyPending) {
                     try {
                         const rows = await inner.updateMany(updates, options);
                         this.connectivity.markSuccess();
@@ -1304,7 +1353,7 @@ data: u.data as AnyRow })),
                 }
                 if (ids.length === 0) return;
                 const anyPending = ids.some((id) => this.hasPending(slug, id));
-                if (this.connectivity.shouldAttempt() && !anyPending) {
+                if (this.sendsWrites() && !anyPending) {
                     try {
                         await inner.deleteMany(ids, options);
                         this.connectivity.markSuccess();
@@ -1351,7 +1400,7 @@ data: u.data as AnyRow })),
                 // straight to a server that had never heard of the row and came
                 // back 404 — the caller's edit failing on a row they could see.
                 // Queuing keeps the order the app issued the writes in.
-                if (this.connectivity.shouldAttempt() && !this.hasPending(slug, id)) {
+                if (this.sendsWrites() && !this.hasPending(slug, id)) {
                     try {
                         const row = await inner.update(id, data, { ...options, idempotencyKey });
                         this.connectivity.markSuccess();
@@ -1425,7 +1474,7 @@ data: u.data as AnyRow })),
                 // As in `update`: a delete must not overtake this row's own
                 // queued create, or it 404s and the create then lands behind
                 // it, leaving the row the caller just deleted.
-                if (this.connectivity.shouldAttempt() && !this.hasPending(slug, id)) {
+                if (this.sendsWrites() && !this.hasPending(slug, id)) {
                     try {
                         await inner.delete(id, { ...options, idempotencyKey });
                         this.connectivity.markSuccess();
@@ -1459,6 +1508,12 @@ data: u.data as AnyRow })),
                         const n = await inner.count(params);
                         this.connectivity.markSuccess();
                         if (!this.isCurrent(ticket)) return n;
+                        if (ticket.unverified) {
+                            this.reachedUnconfirmed();
+                            const cached = await this.readCache<number>(this.countKey(slug, params));
+                            if (cached !== undefined) return Math.max(0, cached + this.pendingDelta(slug, params));
+                            throw offlineError(`No count of "${slug}" for the last user is cached, and their session is not confirmed yet.`);
+                        }
                         void this.writeCache(this.countKey(slug, params), n);
                         return Math.max(0, n + this.pendingDelta(slug, params));
                     } catch (error) {
@@ -1546,6 +1601,12 @@ data: u.data as AnyRow })),
                         onUpdate(response);
                         return;
                     }
+                    if (ticket.unverified) {
+                        // A frame for a socket with no credentials.
+                        const answer = this.localFind<M>(slug, params);
+                        onUpdate({ ...response, data: answer.data, meta: answer.meta });
+                        return;
+                    }
                     void this.ingest(slug, response.data ?? [], ticket, isProjection(params)).then(() => {
                         if (!this.isCurrent(ticket)) return;
                         const snapshot = this.recordSnapshot(slug, params, response, ticket);
@@ -1564,6 +1625,10 @@ data: u.data as AnyRow })),
                     const ticket = this.ticket();
                     if (!ticket) {
                         onUpdate(row);
+                        return;
+                    }
+                    if (ticket.unverified) {
+                        onUpdate(this.localRow<M>(slug, id));
                         return;
                     }
                     if (!row) {
@@ -1607,7 +1672,7 @@ data: u.data as AnyRow })),
     private wrapTrash<M extends AnyRow>(slug: string, inner: CollectionClient<M>): TrashClient<M> {
         const online = async <T>(what: string, call: () => Promise<T>): Promise<T> => {
             const message = `Offline: ${what} on the trash of "${slug}" needs the server; the trash is never cached on this device.`;
-            if (!this.connectivity.shouldAttempt()) throw offlineError(message);
+            if (!this.sendsWrites()) throw offlineError(message);
             try {
                 const result = await call();
                 this.connectivity.markSuccess();
@@ -1737,10 +1802,11 @@ data: u.data as AnyRow })),
 
         if (options?.realtime !== false && !isUnsupported(inner.listen)) {
             unlisten = inner.listen(params, (response) => {
-                // Whose rows these are is not known yet. The observer reads
-                // the query itself once it is.
+                // Whose rows these are is not known yet — or not confirmed,
+                // and the socket has no credentials. The observer reads the
+                // query itself once it is.
                 const ticket = this.ticket();
-                if (!ticket) return;
+                if (!ticket || ticket.unverified) return;
                 void this.ingest(slug, response.data ?? [], ticket, isProjection(params)).then(() => {
                     this.recordSnapshot(slug, params, response, ticket);
                     this.notifyCollection(slug, false);
@@ -1810,7 +1876,7 @@ data: u.data as AnyRow })),
                 // As in `observe`: before the scope is known, the observer's
                 // own read is what fills it in.
                 const ticket = this.ticket();
-                if (!ticket) return;
+                if (!ticket || ticket.unverified) return;
                 if (!row) {
                     if (!this.hasPending(slug, id)) this.removeLocalRow(slug, id, ticket, true);
                     this.notifyCollection(slug, false);
@@ -2205,6 +2271,9 @@ data: u.data as AnyRow })),
      */
     private removeLocalRow(slug: string, id: string | number, ticket: ScopeTicket, known = false): void {
         if (!this.isCurrent(ticket)) return;
+        // "The server says it is gone" is not something a request with no
+        // credentials can say.
+        if (known && ticket.unverified) return;
         const state = this.collectionState(slug);
         const key = String(id);
         const existed = state.rows.delete(key);
@@ -2242,7 +2311,7 @@ data: u.data as AnyRow })),
      * dropdown elsewhere asked for titles.
      */
     private async ingest(slug: string, rows: AnyRow[], ticket: ScopeTicket, projection = false): Promise<void> {
-        if (rows.length === 0 || !this.isCurrent(ticket)) return;
+        if (rows.length === 0 || !this.isCurrent(ticket) || ticket.unverified) return;
         const state = await this.ensureCollection(slug);
         if (!this.isCurrent(ticket)) return;
         const cachedAt = Date.now();
@@ -2341,7 +2410,7 @@ data: u.data as AnyRow })),
             hasMore: meta.hasMore ?? false,
             ...(isProjection(params) ? { rows: (result.data ?? []).map((row) => ({ ...row })) } : {})
         };
-        if (!this.isCurrent(ticket)) return snapshot;
+        if (!this.isCurrent(ticket) || ticket.unverified) return snapshot;
         const state = this.collectionState(slug);
         const key = buildQueryString(params);
         state.snapshots.set(key, snapshot);
