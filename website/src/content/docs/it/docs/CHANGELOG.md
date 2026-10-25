@@ -39,7 +39,11 @@ La traduzione è in arrivo. Il contenuto qui sotto è in inglese.
   `GET /api/admin/branches/:name/diff`, the read-only MCP tool
   `rebase_db_branch_diff`, and `diffBranch` on the driver's admin; see
   [Reviewing and merging a
-  branch](/docs/backend/branching/#reviewing-and-merging-a-branch).
+  branch](/docs/backend/branching/#reviewing-and-merging-a-branch). The fork
+  point is recorded when the branch is created, so a `GRANT` or
+  `ALTER DATABASE` on the branch no longer makes the merge count the parent's
+  later rows as branch deletes; a branch created before this release is still
+  placed by its catalog row.
 
 #### Admin (CMS & app)
 
@@ -144,8 +148,12 @@ La traduzione è in arrivo. Il contenuto qui sotto è in inglese.
   schema change dialog then commits a change as source only, for your process to
   apply. See [When only your change process may change the
   database](/docs/deployment/self-hosting/#when-only-your-change-process-may-change-the-database).
+  Creating a database branch on such a server names the missing
+  `rebase.branches` registry and how to create it.
 - **`openRebase({ callbacks })` runs the project's global callbacks on a
-  script's writes,** as the server does for an API write.
+  script's writes,** as the server does for an API write. `rebase console`
+  passes the project's own, from `config/index.ts`; when that file cannot be
+  imported it says so in one line and opens without them.
 - **Optional driver hooks for whole-store sweeps: `DataDriver.scanStoredRows`,
   `StorageController.storageLocation` and the history service's
   `scanStoredValues`.** `rebase storage orphans` reads rows through them as
@@ -155,7 +163,17 @@ La traduzione è in arrivo. Il contenuto qui sotto è in inglese.
   sees its own backend as `rebase`. `devEmailSinkFor(sendEmail)` in
   `@rebasepro/server`'s email exports gives a backend its own development
   mailbox.
-
+- **A worker process forwards its own function calls to the functions
+  process.** With `REBASE_FUNCTIONS_UPSTREAM` set on a `worker`, its in-process
+  `rebase.functions` calls go there. Its port still serves nothing under
+  `/api/functions`. It needs the deployment's
+  `REBASE_SERVICE_KEY`, like the `api`.
+- **On worker and functions processes, account administration and the cron
+  controls work from server code.** `rebase.admin` (users, roles, password
+  resets) and `rebase.cron` are carried in-process for that process's own jobs
+  and handlers. Before, they answered
+  404. `rebase.auth` still answers a 404 that names the surface and points at
+  `rebase.admin`.
 #### CLI
 
 - **`rebase cloud deploy` checks a static app's JavaScript before uploading
@@ -188,7 +206,10 @@ La traduzione è in arrivo. Il contenuto qui sotto è in inglese.
   through its own control-plane function, never through `deploy`, so a control
   plane without previews refuses it with `previews_unavailable` and nothing
   ships to production. The control plane's half is specified in
-  `docs/preview-deployments.md`.
+  `docs/preview-deployments.md`. A backend preview's deploy says what it costs
+  per month, from the control plane's own quote (`cost` under `--json`), or
+  gives the billing rule and a docs link when the control plane cannot price
+  it.
 
 - **Previews can run with their own environment variables.** A backend preview
   starts from production's variables, and that copy carries production's live
@@ -262,6 +283,16 @@ La traduzione è in arrivo. Il contenuto qui sotto è in inglese.
 - **`rebase cloud env set KEY --stdin` reads the value from standard input,**
   keeping it out of `ps` and shell history.
 
+- **`rebase storage orphans` scans in the background on the backend and shows
+  its progress,** so a project too big to scan inside one request (an ingress
+  timeout) finishes. New `POST /api/admin/storage/orphans/scans` and
+  `GET /api/admin/storage/orphans/scans/:id`. With the job queue on, the scan
+  is a `storage.orphans` job; without it, the server runs it in its own process
+  and says so. A scan is one attempt bounded by `jobs.timeoutMs`.
+
+- **`rebase storage move` lists the source again after the move and names
+  every file it did not move** (exit 1; `--json` `notMoved`). New
+  `POST /api/admin/storage/move/verify`.
 #### Client SDK
 
 - **`client.admin.listUsers({ role, ids })` filters by role and resolves a known
@@ -307,7 +338,8 @@ La traduzione è in arrivo. Il contenuto qui sotto è in inglese.
 - **A cloud deploy ends on a summary that says where the app is and whether it
   is live.** `rebase cloud deploy` lists each app it shipped with its URL, the
   deployment id and how long it took, then probes each URL — a backend's
-  `/api/health`, a static app's page — for up to `--live-timeout` seconds
+  `/health` (then `/api/health`, so a non-default `REBASE_BASE_PATH` is
+  found), a static app's page — for up to `--live-timeout` seconds
   (default 60, `0` skips) and says whether the new version answers. Before, a
   run through an agent or a pipe printed only `{"success":true,…,"hosts":[]}`,
   and people checked every deploy with `curl`. The summary now prints when
@@ -327,7 +359,12 @@ La traduzione è in arrivo. Il contenuto qui sotto è in inglese.
   `rebase api-keys`, `rebase storage` and `rebase auth reset-password` say so on
   stderr when `.env`'s `REBASE_BASE_URL` is the address of the cloud project
   `init --claim` linked; which address wins is unchanged.
-
+- **An orphan delete removes files only from the scan it just printed.**
+  `rebase storage orphans --delete` deletes within 15 minutes of that scan completing, in the background
+  (`DELETE /api/admin/storage/orphans?scan=:id`). Every row and history entry
+  is read again against the candidates, and each file is asked for again right
+  before it is deleted. A file a row names now, or one uploaded again, is kept
+  and listed.
 #### Server
 
 - **A create or update naming a multi-hop via relation is refused with a 400.**
@@ -350,7 +387,23 @@ La traduzione è in arrivo. Il contenuto qui sotto è in inglese.
 - **The realtime per-user socket ceiling counts each API key's sockets against
   that key,** not against the account that made it
   (`REALTIME_MAX_SOCKETS_PER_USER`).
+- **An impersonating administrator's sockets count against the administrator**
+  under `REALTIME_MAX_SOCKETS_PER_USER`, not against the user they act as.
+- **The functions upstream must be an http(s) URL, and a forwarder needs the
+  service key.** A `REBASE_FUNCTIONS_UPSTREAM` that is not `http://` or
+  `https://`, or one set without `REBASE_SERVICE_KEY`, now stops the boot with
+  a message naming the variable. Before, the boot
+  succeeded, every forwarded call failed with 502, and without the key every
+  in-process `rebase.functions.invoke` answered 401.
+- **An application's own `notFound` handler answers unmatched paths under the
+  API base path too.** Only Hono's default `404 Not Found` is turned into the
+  JSON envelope.
 
+### Deprecated
+
+- **`GET /api/admin/storage/orphans`, and `DELETE` without `?scan=`,** the
+  scan inside one request. They answer with `Deprecation: true` and a `Link` to
+  the scan routes, and will be removed in a later release.
 ### Fixed
 
 #### Runtime
@@ -438,7 +491,14 @@ La traduzione è in arrivo. Il contenuto qui sotto è in inglese.
   Object]",** and accounts with a second factor can consent: the screen asks for
   an authenticator or recovery code. An account that only signs in with a social
   provider or a magic link is told to set a password first.
-
+- **Two backends built from one auth adapter instance each keep their own
+  internal service key.** The adapter instance is no longer written to.
+- **A function's deliberate text 404 from an `app.all(...)` route is no longer
+  rewritten** into `{"error":{"code":"NOT_FOUND","message":"No route for …"}}`.
+- **`defineFunction` keeps an app returned from another copy of `hono`.** Its
+  routes were dropped, and every route answered 404.
+- **`backend.shutdown()` stops the SQL rate-limit store's sweep timer** when
+  the backend created the store itself.
 #### CLI
 
 - **A cloud deploy's result lists the project's own host.** The control plane
@@ -538,11 +598,30 @@ La traduzione è in arrivo. Il contenuto qui sotto è in inglese.
   `REBASE_API_TOKEN` expires and how to replace it. `init --claim` deploys with
   the new project's own token even when `REBASE_TOKEN` is set, and commands warn
   when `REBASE_TOKEN` displaces it. After a claim, a signed-in claimer is told
-  to run the command again instead of to sign in.
+  to run the command again instead of to sign in. In such a directory, a
+  `REBASE_TOKEN` that holds no scope on the project gives way to the project's
+  own token, and the first command says so; it still wins when it reaches the
+  project, when its scopes cannot be read, and for a command given `--project`
+  for another project. Minting the app's key retries on a 502 or 504 from the
+  app's gateway, and a session-only command refused there no longer says the
+  project's token reads the database: it deploys, reads logs and metrics, sets
+  variables and runs `db info`, and reads no secret back.
 
 - **A bundle deploy blocked by another deploy names it and how to cancel it,**
   and a `402` points at `rebase cloud billing setup`.
 
+- **Concurrent `rebase cloud` commands, such as parallel MCP tools, no longer
+  wipe `~/.rebase/credentials.json`.**
+
+- **`rebase cloud rollback` with no id no longer re-deploys the live
+  deployment.** After a static-only deploy it refuses, as the docs say.
+
+- **A generated screen can no longer take a slug the admin's own routes answer
+  first.** `rebase generate view` refuses `c`, `s` and `settings` for a screen.
+
+- **Project verification reads a belongsTo owner column from its
+  relation name.** In `rebase verify`, a `workspace` relation with
+  `relationName: "tenant"` (column `tenant_id`) passed as public.
 #### Client SDK
 
 - **A public page no longer prints the client's connection messages to every
@@ -584,7 +663,14 @@ La traduzione è in arrivo. Il contenuto qui sotto è in inglese.
 - **With a recount interval set, a list's total is counted again when the
   interval is up,** not left stale until the next write
   (`REALTIME_RECOUNT_INTERVAL_MS`, and `listenCount()`).
-
+- **With `offline.keepLastUser`, an unconfirmed session no longer sends writes
+  anonymously.** Once the network was back but before the session refresh
+  answered, writes went out with no `Authorization`, an anonymous empty list
+  replaced the user's cached list, and an anonymous 404 deleted their cached
+  row. Writes now queue, reads come from the local database, and anonymous
+  answers are not kept.
+- **A retained channel no longer replays a sender's own broadcast to it after
+  a reconnect,** including from a new channel object after a reload.
 #### Admin (CMS & app)
 
 - **The `"Shell.AppBar"`, `"HomePage.CollectionCard"` and `"Auth.LoginView"`
@@ -676,7 +762,16 @@ La traduzione è in arrivo. Il contenuto qui sotto è in inglese.
 - **A cloud claim's .env is private and keeps your token.**
   `rebase cloud init --claim` creates `.env` with mode 0600 and no longer
   overwrites a `REBASE_API_TOKEN` already in it.
-
+- **A remote MCP access token stops working as soon as its account is
+  deleted, disabled or signed out everywhere, and runs with the account's
+  current roles.** `/mcp` checked only the token's signature, so for up to an
+  hour it kept acting for a deleted or disabled account, after a password
+  change, and with roles a demotion had removed. Every request now re-reads
+  the account, as the other doors do; a failed lookup answers 503.
+- **The `_rebase/maintenance/` storage prefix, where orphan-scan records live,
+  is reserved.** Reading, writing or listing it answers `400
+  INVALID_STORAGE_KEY`, so a caller cannot forge what an administrator's
+  orphan delete removes.
 ### Documentation
 
 - **Embedding the Postgres Driver and The Remote MCP Endpoint are pages of their

@@ -810,7 +810,7 @@ image. A project that has ejected owns these decisions in its own code instead.
 | `REALTIME_CDC` | Database-level change capture: `auto` (enable where the connection supports it, silently fall back otherwise), `trigger` (force it, warn if impossible), `wal` (degrades to `trigger` today), `off`. See [Realtime](/docs/backend/realtime-cdc/). Wins over `realtime.cdc`. | `auto` |
 | `REALTIME_CHANNEL_BUS` | Cross-instance transport for broadcast channels and presence: `memory` or `postgres`. Ignored when `realtime.bus` was given a constructed transport. | `memory` |
 | `REALTIME_MAX_SUBSCRIPTIONS_PER_SOCKET` | How many subscriptions one realtime socket may hold; the next is refused with `TOO_MANY_SUBSCRIPTIONS`. A positive whole number — anything else stops the server at boot. Wins over `realtime.maxSubscriptionsPerSocket`. See [Realtime](/docs/backend/realtime#what-a-write-costs-and-the-limits). | `1000` |
-| `REALTIME_MAX_SOCKETS_PER_USER` | How many realtime sockets one user, or one API key, may hold open on one server instance. The next one's sign-in is refused with `TOO_MANY_SOCKETS` and the socket closed (4002); the SDK keeps retrying, so it gets in when another closes. A positive whole number — anything else stops the server at boot. Wins over `realtime.maxSocketsPerUser`. | No ceiling |
+| `REALTIME_MAX_SOCKETS_PER_USER` | How many realtime sockets one user, or one API key, may hold open on one server instance. An administrator's impersonating sockets count against the administrator. The next one's sign-in is refused with `TOO_MANY_SOCKETS` and the socket closed (4002); the SDK keeps retrying, so it gets in when another closes. A positive whole number — anything else stops the server at boot. Wins over `realtime.maxSocketsPerUser`. | No ceiling |
 | `REALTIME_REFETCH_MAX_WAIT_MS` | The longest a change waits for the refetch that delivers it to live subscribers, in ms. A refetch waits for 300 ms without a change, and at most this long under a steady stream of writes. A positive whole number — anything else stops the server at boot. Wins over `realtime.refetchMaxWaitMs`. | `1000` |
 | `REALTIME_RECOUNT_INTERVAL_MS` | How long a big list subscription's total may be reused before it is counted again, in ms; frames that reuse it carry `meta.totalAsOf`. Unset, every frame counts. Wins over `realtime.recountIntervalMs`. | Unset |
 | `REALTIME_RECOUNT_MIN_ROWS` | The smallest last total `REALTIME_RECOUNT_INTERVAL_MS` applies to; smaller lists are counted on every frame. Wins over `realtime.recountMinRows`. | `100000` |
@@ -852,7 +852,7 @@ combinations refuse to boot — is on
 | `REBASE_JOB_WORKERS` | Override whether this process runs job-queue workers. Unset follows the role. | — |
 | `REBASE_FUNCTIONS_ONLY` | Serve only the named custom functions in this process. | — |
 | `REBASE_FUNCTIONS_EXCLUDE` | Serve every custom function except the named ones. | — |
-| `REBASE_FUNCTIONS_UPSTREAM` | Where the API process forwards a function request it does not serve itself. | — |
+| `REBASE_FUNCTIONS_UPSTREAM` | Where the API process forwards a function request it does not serve itself. On a `worker`, where its own `rebase.functions` calls go. An `http(s)` URL. | — |
 
 #### MCP surface
 
@@ -950,7 +950,7 @@ Read by `rebase`, not by the server. Nothing here affects a deployment.
 | `REBASE_CLOUD_URL` | The control plane `rebase cloud` talks to. | — |
 | `REBASE_CLOUD_EMAIL` | The account `rebase cloud login` signs in as, instead of prompting. | — |
 | `REBASE_CLOUD_PASSWORD` | Its password, so a secret store can hand it over without it reaching the shell's history. | — |
-| `REBASE_TOKEN` | A token from `rebase cloud tokens create`. Set, every `rebase cloud` command authenticates with it instead of the `rebase cloud login` session, and never reads or writes the stored session. The way to run `rebase cloud` in CI — see [CI and agents](/docs/deployment/cloud/#ci-and-agents). The [MCP server](/docs/ai/mcp/) passes it to the CLI its cloud tools spawn, and never sends it to the app: set `REBASE_API_TOKEN` for that. | — |
+| `REBASE_TOKEN` | A token from `rebase cloud tokens create`. Set, every `rebase cloud` command authenticates with it instead of the `rebase cloud login` session, and never reads or writes the stored session. <span class="since-badge" data-since="0.26">Since 0.26</span> In a directory `rebase cloud init --claim` linked, it is set aside for that project's own token when it holds no scope on the project. The way to run `rebase cloud` in CI — see [CI and agents](/docs/deployment/cloud/#ci-and-agents). The [MCP server](/docs/ai/mcp/) passes it to the CLI its cloud tools spawn, and never sends it to the app: set `REBASE_API_TOKEN` for that. | — |
 | `REBASE_DEBUG` | `1` prints the underlying error and request detail instead of the short message. The first thing to set when a `rebase cloud` command fails unhelpfully. | — |
 | `REBASE_ATLAS_DEV_URL` | The empty database `rebase db push`, `db generate` and `db migrate` plan against, instead of the `<db>_dev_diff` they create beside `DATABASE_URL`. Rebase neither creates nor drops a database named here, and refuses one equal to `DATABASE_URL`. On the managed development database the CLI sets it to a throwaway in-memory PGlite of its own. Set it where `CREATE DATABASE` is not granted. | `<db>_dev_diff` |
 | `REBASE_DEV_NO_DB` | `rebase dev` starts no database and provisions nothing — you bring your own. Same as `--no-db`. | — |
@@ -4096,7 +4096,11 @@ yet, listed so that nobody reads a promise into them:
   `GET /api/admin/branches/:name/diff`, the read-only MCP tool
   `rebase_db_branch_diff`, and `diffBranch` on the driver's admin; see
   [Reviewing and merging a
-  branch](/docs/backend/branching/#reviewing-and-merging-a-branch).
+  branch](/docs/backend/branching/#reviewing-and-merging-a-branch). The fork
+  point is recorded when the branch is created, so a `GRANT` or
+  `ALTER DATABASE` on the branch no longer makes the merge count the parent's
+  later rows as branch deletes; a branch created before this release is still
+  placed by its catalog row.
 
 ##### Admin (CMS & app)
 
@@ -4201,8 +4205,12 @@ yet, listed so that nobody reads a promise into them:
   schema change dialog then commits a change as source only, for your process to
   apply. See [When only your change process may change the
   database](/docs/deployment/self-hosting/#when-only-your-change-process-may-change-the-database).
+  Creating a database branch on such a server names the missing
+  `rebase.branches` registry and how to create it.
 - **`openRebase({ callbacks })` runs the project's global callbacks on a
-  script's writes,** as the server does for an API write.
+  script's writes,** as the server does for an API write. `rebase console`
+  passes the project's own, from `config/index.ts`; when that file cannot be
+  imported it says so in one line and opens without them.
 - **Optional driver hooks for whole-store sweeps: `DataDriver.scanStoredRows`,
   `StorageController.storageLocation` and the history service's
   `scanStoredValues`.** `rebase storage orphans` reads rows through them as
@@ -4212,7 +4220,17 @@ yet, listed so that nobody reads a promise into them:
   sees its own backend as `rebase`. `devEmailSinkFor(sendEmail)` in
   `@rebasepro/server`'s email exports gives a backend its own development
   mailbox.
-
+- **A worker process forwards its own function calls to the functions
+  process.** With `REBASE_FUNCTIONS_UPSTREAM` set on a `worker`, its in-process
+  `rebase.functions` calls go there. Its port still serves nothing under
+  `/api/functions`. It needs the deployment's
+  `REBASE_SERVICE_KEY`, like the `api`.
+- **On worker and functions processes, account administration and the cron
+  controls work from server code.** `rebase.admin` (users, roles, password
+  resets) and `rebase.cron` are carried in-process for that process's own jobs
+  and handlers. Before, they answered
+  404. `rebase.auth` still answers a 404 that names the surface and points at
+  `rebase.admin`.
 ##### CLI
 
 - **`rebase cloud deploy` checks a static app's JavaScript before uploading
@@ -4245,7 +4263,10 @@ yet, listed so that nobody reads a promise into them:
   through its own control-plane function, never through `deploy`, so a control
   plane without previews refuses it with `previews_unavailable` and nothing
   ships to production. The control plane's half is specified in
-  `docs/preview-deployments.md`.
+  `docs/preview-deployments.md`. A backend preview's deploy says what it costs
+  per month, from the control plane's own quote (`cost` under `--json`), or
+  gives the billing rule and a docs link when the control plane cannot price
+  it.
 
 - **Previews can run with their own environment variables.** A backend preview
   starts from production's variables, and that copy carries production's live
@@ -4319,6 +4340,16 @@ yet, listed so that nobody reads a promise into them:
 - **`rebase cloud env set KEY --stdin` reads the value from standard input,**
   keeping it out of `ps` and shell history.
 
+- **`rebase storage orphans` scans in the background on the backend and shows
+  its progress,** so a project too big to scan inside one request (an ingress
+  timeout) finishes. New `POST /api/admin/storage/orphans/scans` and
+  `GET /api/admin/storage/orphans/scans/:id`. With the job queue on, the scan
+  is a `storage.orphans` job; without it, the server runs it in its own process
+  and says so. A scan is one attempt bounded by `jobs.timeoutMs`.
+
+- **`rebase storage move` lists the source again after the move and names
+  every file it did not move** (exit 1; `--json` `notMoved`). New
+  `POST /api/admin/storage/move/verify`.
 ##### Client SDK
 
 - **`client.admin.listUsers({ role, ids })` filters by role and resolves a known
@@ -4364,7 +4395,8 @@ yet, listed so that nobody reads a promise into them:
 - **A cloud deploy ends on a summary that says where the app is and whether it
   is live.** `rebase cloud deploy` lists each app it shipped with its URL, the
   deployment id and how long it took, then probes each URL — a backend's
-  `/api/health`, a static app's page — for up to `--live-timeout` seconds
+  `/health` (then `/api/health`, so a non-default `REBASE_BASE_PATH` is
+  found), a static app's page — for up to `--live-timeout` seconds
   (default 60, `0` skips) and says whether the new version answers. Before, a
   run through an agent or a pipe printed only `{"success":true,…,"hosts":[]}`,
   and people checked every deploy with `curl`. The summary now prints when
@@ -4384,7 +4416,12 @@ yet, listed so that nobody reads a promise into them:
   `rebase api-keys`, `rebase storage` and `rebase auth reset-password` say so on
   stderr when `.env`'s `REBASE_BASE_URL` is the address of the cloud project
   `init --claim` linked; which address wins is unchanged.
-
+- **An orphan delete removes files only from the scan it just printed.**
+  `rebase storage orphans --delete` deletes within 15 minutes of that scan completing, in the background
+  (`DELETE /api/admin/storage/orphans?scan=:id`). Every row and history entry
+  is read again against the candidates, and each file is asked for again right
+  before it is deleted. A file a row names now, or one uploaded again, is kept
+  and listed.
 ##### Server
 
 - **A create or update naming a multi-hop via relation is refused with a 400.**
@@ -4407,7 +4444,23 @@ yet, listed so that nobody reads a promise into them:
 - **The realtime per-user socket ceiling counts each API key's sockets against
   that key,** not against the account that made it
   (`REALTIME_MAX_SOCKETS_PER_USER`).
+- **An impersonating administrator's sockets count against the administrator**
+  under `REALTIME_MAX_SOCKETS_PER_USER`, not against the user they act as.
+- **The functions upstream must be an http(s) URL, and a forwarder needs the
+  service key.** A `REBASE_FUNCTIONS_UPSTREAM` that is not `http://` or
+  `https://`, or one set without `REBASE_SERVICE_KEY`, now stops the boot with
+  a message naming the variable. Before, the boot
+  succeeded, every forwarded call failed with 502, and without the key every
+  in-process `rebase.functions.invoke` answered 401.
+- **An application's own `notFound` handler answers unmatched paths under the
+  API base path too.** Only Hono's default `404 Not Found` is turned into the
+  JSON envelope.
 
+#### Deprecated
+
+- **`GET /api/admin/storage/orphans`, and `DELETE` without `?scan=`,** the
+  scan inside one request. They answer with `Deprecation: true` and a `Link` to
+  the scan routes, and will be removed in a later release.
 #### Fixed
 
 ##### Runtime
@@ -4495,7 +4548,14 @@ yet, listed so that nobody reads a promise into them:
   Object]",** and accounts with a second factor can consent: the screen asks for
   an authenticator or recovery code. An account that only signs in with a social
   provider or a magic link is told to set a password first.
-
+- **Two backends built from one auth adapter instance each keep their own
+  internal service key.** The adapter instance is no longer written to.
+- **A function's deliberate text 404 from an `app.all(...)` route is no longer
+  rewritten** into `{"error":{"code":"NOT_FOUND","message":"No route for …"}}`.
+- **`defineFunction` keeps an app returned from another copy of `hono`.** Its
+  routes were dropped, and every route answered 404.
+- **`backend.shutdown()` stops the SQL rate-limit store's sweep timer** when
+  the backend created the store itself.
 ##### CLI
 
 - **A cloud deploy's result lists the project's own host.** The control plane
@@ -4595,11 +4655,30 @@ yet, listed so that nobody reads a promise into them:
   `REBASE_API_TOKEN` expires and how to replace it. `init --claim` deploys with
   the new project's own token even when `REBASE_TOKEN` is set, and commands warn
   when `REBASE_TOKEN` displaces it. After a claim, a signed-in claimer is told
-  to run the command again instead of to sign in.
+  to run the command again instead of to sign in. In such a directory, a
+  `REBASE_TOKEN` that holds no scope on the project gives way to the project's
+  own token, and the first command says so; it still wins when it reaches the
+  project, when its scopes cannot be read, and for a command given `--project`
+  for another project. Minting the app's key retries on a 502 or 504 from the
+  app's gateway, and a session-only command refused there no longer says the
+  project's token reads the database: it deploys, reads logs and metrics, sets
+  variables and runs `db info`, and reads no secret back.
 
 - **A bundle deploy blocked by another deploy names it and how to cancel it,**
   and a `402` points at `rebase cloud billing setup`.
 
+- **Concurrent `rebase cloud` commands, such as parallel MCP tools, no longer
+  wipe `~/.rebase/credentials.json`.**
+
+- **`rebase cloud rollback` with no id no longer re-deploys the live
+  deployment.** After a static-only deploy it refuses, as the docs say.
+
+- **A generated screen can no longer take a slug the admin's own routes answer
+  first.** `rebase generate view` refuses `c`, `s` and `settings` for a screen.
+
+- **Project verification reads a belongsTo owner column from its
+  relation name.** In `rebase verify`, a `workspace` relation with
+  `relationName: "tenant"` (column `tenant_id`) passed as public.
 ##### Client SDK
 
 - **A public page no longer prints the client's connection messages to every
@@ -4641,7 +4720,14 @@ yet, listed so that nobody reads a promise into them:
 - **With a recount interval set, a list's total is counted again when the
   interval is up,** not left stale until the next write
   (`REALTIME_RECOUNT_INTERVAL_MS`, and `listenCount()`).
-
+- **With `offline.keepLastUser`, an unconfirmed session no longer sends writes
+  anonymously.** Once the network was back but before the session refresh
+  answered, writes went out with no `Authorization`, an anonymous empty list
+  replaced the user's cached list, and an anonymous 404 deleted their cached
+  row. Writes now queue, reads come from the local database, and anonymous
+  answers are not kept.
+- **A retained channel no longer replays a sender's own broadcast to it after
+  a reconnect,** including from a new channel object after a reload.
 ##### Admin (CMS & app)
 
 - **The `"Shell.AppBar"`, `"HomePage.CollectionCard"` and `"Auth.LoginView"`
@@ -4733,7 +4819,16 @@ yet, listed so that nobody reads a promise into them:
 - **A cloud claim's .env is private and keeps your token.**
   `rebase cloud init --claim` creates `.env` with mode 0600 and no longer
   overwrites a `REBASE_API_TOKEN` already in it.
-
+- **A remote MCP access token stops working as soon as its account is
+  deleted, disabled or signed out everywhere, and runs with the account's
+  current roles.** `/mcp` checked only the token's signature, so for up to an
+  hour it kept acting for a deleted or disabled account, after a password
+  change, and with roles a demotion had removed. Every request now re-reads
+  the account, as the other doors do; a failed lookup answers 503.
+- **The `_rebase/maintenance/` storage prefix, where orphan-scan records live,
+  is reserved.** Reading, writing or listing it answers `400
+  INVALID_STORAGE_KEY`, so a caller cannot forge what an administrator's
+  orphan delete removes.
 #### Documentation
 
 - **Embedding the Postgres Driver and The Remote MCP Endpoint are pages of their
@@ -25977,7 +26072,7 @@ and covers every step of a resumable (TUS) upload, including the offset check
 and the cancel. `storage:delete` deletes. The target is a storage source id. The
 default source's id is `(default)`, so `storage:read:(default)` reads the default
 source only, and `storage:write:avatars` writes a source named `avatars`.
-After the scope check, [`storageAuthorize`](/docs/backend/storage/#per-object-authorization)
+After the scope check, [`storageAuthorize`](/docs/backend/storage-authorization/)
 still runs, with the key's identity.
 
 #### Functions
@@ -26382,14 +26477,18 @@ the message names the constraint.
 | --- | --- | --- | --- |
 | `INVALID_LIST_OPTIONS` | 400 | A storage listing's `maxResults` is not a whole number of at least 1, or its `pageToken` is not one the source issued. A page size below one used to answer an empty page carrying the same token, so a `while (pageToken)` loop never ended. | Send a positive `maxResults`, and pass back `nextPageToken` unchanged. |
 | `INVALID_STORAGE_BUCKET` | 400 | The bucket name is malformed. | Check the name. |
-| `INVALID_STORAGE_KEY` | 400 | The object key is malformed, or escapes its prefix. | Check the key. |
+| `INVALID_STORAGE_KEY` | 400 | The object key is malformed, escapes its prefix, or is under a reserved prefix (`_rebase/renditions/`, `_rebase/maintenance/`). | Check the key. |
 | `INVALID_TRANSFORM_OPTIONS` | 400 | The image-transform parameters are out of range or contradictory. | See [Storage](/docs/backend/storage/). |
 | `STORAGE_FILE_TOO_LARGE` | 413 | The upload exceeds the `maxSize` the target property declares. Enforced on the server, not only in the browser. `details` carries the property, the limit and the actual size. | Upload a smaller file, or raise `maxSize` on the property. |
 | `STORAGE_FILE_TYPE_REFUSED` | 400 | The upload's type is not in the property's `acceptedFiles`, or not in the storage source's own `allowedMimeTypes`. `details` carries the property (or the source's list), the accepted list and the content type sent. | Upload an accepted type, or widen `acceptedFiles` / `allowedMimeTypes`. |
 | `STORAGE_MISCONFIGURED` | 502 | The S3 or GCS bucket this source is configured with does not exist, or the provider refused this deployment's credentials for it. The message names the bucket; `details.reason` is `NoSuchBucket` or the provider's refusal. A missing bucket used to read as "file not found" on every file. | Fix the bucket name (`S3_BUCKET` / `GCS_BUCKET`, `__<KEY>` for a named source) or the credentials' permissions. |
 | `STORAGE_NOT_CONFIGURED` | 501 / 503 | No storage backend is configured on this server, or none is the default and the request names no storage source; the message names the sources that are served (501). A resumable upload whose source disappeared before it finished is a 503. | Configure S3, GCS, or local storage, or name a source with `?storageId=`. |
 | `STORAGE_SAME_LOCATION` | 400 | `POST /api/admin/storage/move` with `deleteSource` (`rebase storage move --delete-source`) between two sources that store in the same bucket or directory. Every file would count as already in the target, being the same file, and deleting the source's copy would delete the only one. Nothing was moved or deleted. | Point the property at the other source; its files are already there. |
-| `STORAGE_SCAN_INCOMPLETE` | 409 | `DELETE /api/admin/storage/orphans` (`rebase storage orphans --delete`) could not read every collection, so a file one of them names would look unused. Nothing was deleted; `details.unscanned` names each collection and why it could not be read. | Fix what stops those collections from being read, and run it again. |
+| `STORAGE_SCAN_INCOMPLETE` | 409 | `DELETE /api/admin/storage/orphans` (`rebase storage orphans --delete`) could not read every collection, so a file one of them names would look unused. With `?scan=`, the scan it names is the one that could not read every collection. Nothing was deleted; `details.unscanned` names each collection and why it could not be read. | Fix what stops those collections from being read, and run it again. |
+| `STORAGE_SCAN_NOT_FOUND` | 404 | `GET /api/admin/storage/orphans/scans/:id` or `DELETE /api/admin/storage/orphans?scan=:id` names a scan the source does not hold. Scans are kept for 7 days, in the source they scanned, so a `storageId` different from the scan's also finds none. | Pass the scan's `storageId`, or start another scan. |
+| `STORAGE_SCAN_NOT_COMPLETE` | 409 | `DELETE /api/admin/storage/orphans?scan=:id` names a scan that is still `queued` or `running`, or that `failed`. Nothing was deleted; `details.status` says which. | Wait for the scan to complete, or start another. |
+| `STORAGE_SCAN_EXPIRED` | 409 | `DELETE /api/admin/storage/orphans?scan=:id` names a scan that completed more than 15 minutes ago. Nothing was deleted. | Start another scan, and delete from it. |
+| `STORAGE_SCAN_DELETION_STARTED` | 409 | `DELETE /api/admin/storage/orphans?scan=:id` names a scan whose orphans are already being deleted. | Read the scan's `deletion` with `GET /api/admin/storage/orphans/scans/:id`. |
 | `STORAGE_SOURCE_NOT_CONFIGURED` | 501 | The storage source is declared but has no credentials here. | Set that source's environment variables. |
 | `STORAGE_WRITE_FAILED` | 502 | The storage backend refused or dropped the write. | Check its own logs and credentials. |
 | `TRANSFORM_OVERLOADED` | 503 | Too many image transforms are in flight. | Retry; consider a CDN in front. |
@@ -26628,9 +26727,13 @@ a collection reaches none of this. See [Roles and scopes](/docs/backend/roles-an
 | `GET` | `/api/admin/backups` | `backups:read` | Backup inventory |
 | `GET` | `/api/admin/backups/download` | `backups:read` | Streams one backup. With `?token=` from a download link, no header is needed, for that backup only |
 | `POST` | `/api/admin/backups/download-url` | `backups:read` | A link to one backup, `{ key }` → `{ url, token, expiresIn }`, good for 60 seconds — [Backups](/docs/deployment/backups/#download-a-backup) |
-| `GET` | `/api/admin/storage/orphans` | `database:read` | Stored files no row names, `?storageId=&olderThanHours=` — what `rebase storage orphans` prints |
-| `DELETE` | `/api/admin/storage/orphans` | `database:write` | Finds them again and deletes them; `409 STORAGE_SCAN_INCOMPLETE` when a collection could not be read |
+| `POST` | `/api/admin/storage/orphans/scans` | `database:write` | Starts a scan for the stored files no row names, `?storageId=&olderThanHours=`, in the background. Answers `202` with the scan's record: `id`, `status` (`queued`), and `runner` (`worker` when it is a `storage.orphans` job on the job queue, `in-process` when the server runs it itself). Its record is written into the source, under the reserved `_rebase/maintenance/` |
+| `GET` | `/api/admin/storage/orphans/scans/:id` | `database:read` | The scan's record, `?storageId=`. While it runs: `progress` (`filesScanned`, `rowsScanned`, `collectionsScanned` of `collectionsTotal`, `unscanned`). Once `completed`: `result`, the report the old `GET /orphans` answered. A run that stopped reporting for 10 minutes is answered as `failed`. `404 STORAGE_SCAN_NOT_FOUND` when the source holds no such scan |
+| `DELETE` | `/api/admin/storage/orphans?scan=:id` | `database:write` | Deletes a completed scan's orphans in the background, `202`. Each one is checked against every row and history entry again, and asked for again right before it is deleted. The outcome is the scan record's `deletion`. `409` with `STORAGE_SCAN_NOT_COMPLETE`, `STORAGE_SCAN_INCOMPLETE`, `STORAGE_SCAN_EXPIRED` or `STORAGE_SCAN_DELETION_STARTED` |
+| `GET` | `/api/admin/storage/orphans` | `database:read` | Deprecated: the scan inside the request, `?storageId=&olderThanHours=`. Answers with `Deprecation: true`. Use `POST /orphans/scans` |
+| `DELETE` | `/api/admin/storage/orphans` | `database:write` | Deprecated, without `?scan=`: scans again and deletes inside the request. `409 STORAGE_SCAN_INCOMPLETE` when a collection could not be read |
 | `POST` | `/api/admin/storage/move` | `database:write` | Copies a folder to another source under the same keys, a page per call — what `rebase storage move` sends; `400 STORAGE_SAME_LOCATION` for `deleteSource` between two sources that store in the same place |
+| `POST` | `/api/admin/storage/move/verify` | `database:write` | Lists the source again after a move, with the same body, a page per call: `{ checked, notMoved: [{ key, reason }], cursor? }` — every file still in the source with `deleteSource`, every file the target has no copy of without it. `rebase storage move` asks it when the move is done |
 | `GET` | `/api/admin/logs` | `logs:read` | The recent log buffer |
 | `GET` | `/api/admin/logs/latest` | `logs:read` | The most recent entries |
 | `GET` | `/api/admin/logs/stream` | `logs:read` | Server-sent events |
@@ -27820,7 +27923,7 @@ Scopes come in two planes, and a person holds them differently.
 **The data plane** is `data:*`, `storage:*` and `functions:invoke`. Every
 signed-in person holds all of it. What a person may do with a row is decided by
 the collection's [security rules](/docs/collections/security-rules/), row by row,
-and what they may do with a file by the [storage policies](/docs/backend/storage/#per-object-authorization).
+and what they may do with a file by the [storage policies](/docs/backend/storage-authorization/).
 A scope never decides that for a person. On a key or a token, data-plane scopes
 narrow: a key that holds only `data:read:posts` reads `posts` and nothing else,
 whatever the rules would allow.
@@ -29132,6 +29235,13 @@ answers **400 `INVALID_STORAGE_KEY`**: every access rule in the product —
 *source* key, and a rendition served under its own path would answer a question
 nobody asked.
 
+`_rebase/maintenance/` is reserved the same way. `rebase storage orphans` keeps
+each scan's record there, in the source it scanned, so that the process that
+runs the scan and the one that answers its status read the same record. A
+caller who could write a record could choose what a later delete removes, so
+reading, writing or listing the prefix also answers 400. Records are deleted 7
+days after they were last written, when the next scan of that source starts.
+
 #### What gets served
 
 The stored content type is whatever the uploader declared — nothing sniffs the
@@ -29317,12 +29427,75 @@ Set `STORAGE_TYPE=s3` or `gcs`. If a **durable volume** really holds `STORAGE_PA
 - Mount a **persistent volume** over the parent of `STORAGE_PATH` if using local storage on Docker/Kubernetes, and set `FORCE_LOCAL_STORAGE=true` — see [Self-hosting](/docs/deployment/self-hosting/#file-storage)
 - Use **S3** or compatible (R2, MinIO), or **GCS**, for production deployments
 - Configure a **CDN** (CloudFront, Cloudflare) in front for performance — see [Putting a CDN in front](/docs/backend/storage-caching/#putting-a-cdn-in-front)
-- **Any app with storage in production must declare an access model** — see below.
+- **Any app with storage in production must declare an access model** — see
+  [Storage Authorization](/docs/backend/storage-authorization/).
   Not just multi-tenant ones: the server *refuses to boot* without one.
 
 ### Per-Object Authorization
 
-#### Policies
+Who may read, write, delete or list each key is decided by `storagePolicies`
+and the `storageAuthorize` hook, and an API key also needs the storage scope for
+the operation. Production refuses to boot with storage and no access model. See
+[Storage Authorization](/docs/backend/storage-authorization/).
+
+### Reacting to an upload
+
+Every other write in Rebase can be reacted to — a row has `beforeSave` and
+`afterSave`, a schedule has a cron job — and an upload had nothing. Anything an
+upload implied had to be done by the client, on a second call, which means it
+was not done at all when the client went away in between.
+
+```ts
+storageTriggers: [
+    {
+        path: "uploads/:uid/**",
+        events: ["finalize"],
+        handler: async ({ key, params, size, user }) => {
+            await indexUpload.enqueue({ key, uid: params.uid, size }); // a `queue()` in config/resources.ts
+        }
+    }
+]
+```
+
+The pattern language is the same as `storagePolicies` — literal segments, `*`
+for one segment, `:name` to capture one, `**` for the rest — and a malformed
+pattern fails the boot rather than quietly matching nothing.
+
+| Event | When |
+| --- | --- |
+| `finalize` | after the object is durably written; never for a write that failed |
+| `delete` | after the object is gone |
+
+`finalize` fires for the multipart and the resumable (TUS) paths alike — once
+per upload, not once per chunk — and a resumable upload reports the user who
+*created* it, since that is the principal the authorization checked.
+
+What a handler must not assume:
+
+- **A throwing handler does not fail the request.** The object is already stored
+  by the time it runs, so answering the client with an error would say the
+  upload failed when it did not, and clients retry uploads. Failures are logged
+  and the response is unchanged. If the work must happen, enqueue a job.
+- **Handlers are awaited**, in declaration order, before the response is sent —
+  firing and forgetting would leave a promise a serverless runtime is free to
+  freeze mid-flight. A slow handler is therefore a slow upload, which is the
+  other reason to enqueue rather than to work here.
+- **Internal writes do not fire triggers.** The image-rendition cache writes
+  derived objects straight to the storage controller; a `**` trigger firing on
+  those would be firing on its own output.
+
+### Next Steps
+
+- **[Frontend Storage & File Uploads](/docs/frontend/storage)** — File upload fields and hooks
+- **[Properties](/docs/collections/properties)** — Storage property configuration
+
+## Storage Authorization
+
+Collections are protected by row-level security; a bucket has no per-object
+equivalent, so storage is authorized here. [Storage
+Configuration](/docs/backend/storage/) covers the backends themselves.
+
+### Policies
 
 The declarative form. A list of path patterns, read without running anything:
 
@@ -29354,7 +29527,7 @@ predicate receiving the captured params, the user, the operation and the bucket.
 Policies satisfy the production boot guard on their own, and a malformed pattern
 fails the boot rather than the first upload.
 
-#### The hook
+### The hook
 
 `requireAuth` and `publicRead` are *global* switches: they decide whether a caller must be signed in, not what that caller may touch. Without an authorization hook, **any authenticated user can read any key they can name** — the only thing separating two tenants' files is key unguessability, which is not an access-control model. Worse, they can `GET /storage/list?prefix=` first, so the keys do not even have to be guessed.
 
@@ -29409,7 +29582,7 @@ Worth knowing:
 - **Resumable (TUS) uploads are gated at create time**, so a denied upload leaves no temp file behind.
 - Omitting the hook (and `storagePolicies`) leaves no per-object check, so production refuses to boot unless `storagePublicRead` or `storageInsecureAllowAnyAuthenticated` is set.
 
-#### API keys and tokens
+### API keys and tokens
 
 A signed-in person holds every storage scope, so the hook and the policies above
 decide for them. An [API key](/docs/backend/api-keys/) also needs the storage
@@ -29420,56 +29593,10 @@ source id, and the default source's is `(default)`: `storage:read:(default)`,
 `storage:write:avatars`. Without it the answer is `403 SCOPE_MISSING`. With it,
 the hook still runs, as whoever the key acts as.
 
-### Reacting to an upload
-
-Every other write in Rebase can be reacted to — a row has `beforeSave` and
-`afterSave`, a schedule has a cron job — and an upload had nothing. Anything an
-upload implied had to be done by the client, on a second call, which means it
-was not done at all when the client went away in between.
-
-```ts
-storageTriggers: [
-    {
-        path: "uploads/:uid/**",
-        events: ["finalize"],
-        handler: async ({ key, params, size, user }) => {
-            await indexUpload.enqueue({ key, uid: params.uid, size }); // a `queue()` in config/resources.ts
-        }
-    }
-]
-```
-
-The pattern language is the same as `storagePolicies` — literal segments, `*`
-for one segment, `:name` to capture one, `**` for the rest — and a malformed
-pattern fails the boot rather than quietly matching nothing.
-
-| Event | When |
-| --- | --- |
-| `finalize` | after the object is durably written; never for a write that failed |
-| `delete` | after the object is gone |
-
-`finalize` fires for the multipart and the resumable (TUS) paths alike — once
-per upload, not once per chunk — and a resumable upload reports the user who
-*created* it, since that is the principal the authorization checked.
-
-What a handler must not assume:
-
-- **A throwing handler does not fail the request.** The object is already stored
-  by the time it runs, so answering the client with an error would say the
-  upload failed when it did not, and clients retry uploads. Failures are logged
-  and the response is unchanged. If the work must happen, enqueue a job.
-- **Handlers are awaited**, in declaration order, before the response is sent —
-  firing and forgetting would leave a promise a serverless runtime is free to
-  freeze mid-flight. A slow handler is therefore a slow upload, which is the
-  other reason to enqueue rather than to work here.
-- **Internal writes do not fire triggers.** The image-rendition cache writes
-  derived objects straight to the storage controller; a `**` trigger firing on
-  those would be firing on its own output.
-
 ### Next Steps
 
-- **[Frontend Storage & File Uploads](/docs/frontend/storage)** — File upload fields and hooks
-- **[Properties](/docs/collections/properties)** — Storage property configuration
+- **[Storage Configuration](/docs/backend/storage/)** — backends, endpoints and limits
+- **[API Keys](/docs/backend/api-keys/)** — the scopes a key carries
 
 ## Storage caching and CDNs
 
@@ -29545,7 +29672,7 @@ Two things to configure on the CDN itself:
 ### Related
 
 - [Storage Configuration](/docs/backend/storage/) — the backends these headers are served from, and the `public/` prefix and `publicRead` that make an object `public`.
-- [Per-object authorization](/docs/backend/storage/#per-object-authorization) — who may read an object, which is what decides between `public` and `private`.
+- [Per-object authorization](/docs/backend/storage-authorization/) — who may read an object, which is what decides between `public` and `private`.
 - [File uploads](/docs/collections/file-uploads/) — the collection properties that store files.
 
 ## Resumable uploads (TUS)
@@ -30369,7 +30496,7 @@ start to lag. Beyond that, prefer narrower subscriptions (a page, a filter on
 the user's own rows) or a [broadcast channel](#broadcast-channels) carrying the
 change for clients to re-fetch on their own schedule.
 
-**One socket may hold at most 1,000 subscriptions.** The next is refused with an error frame coded `TOO_MANY_SUBSCRIPTIONS`; re-subscribing under an id the socket already holds replaces that subscription and does not count again. The SDK shares identical subscriptions on a socket, so this counts the distinct lists and records a page has open. Change it with `REALTIME_MAX_SUBSCRIPTIONS_PER_SOCKET` or `realtime.maxSubscriptionsPerSocket` on the Postgres adapter (the environment variable wins); a value that is not a positive whole number stops the server at boot. On 0.23 a socket's subscriptions are not limited. **The sockets one user holds can be limited too**, per server instance: set `REALTIME_MAX_SOCKETS_PER_USER` (or `realtime.maxSocketsPerUser`), and a sign-in past it is refused with `TOO_MANY_SOCKETS` and the socket closed with 4002. Sockets signed in with an API key count against that key, each key on its own, not against the account that made it; the service key is one credential, so all of its sockets count together. The SDK tells every live subscription and `onConnectionLost` at once, with a `CONNECTION_LOST` error whose `details.reason` is `TOO_MANY_SOCKETS`, and keeps retrying, waiting longer each time up to 30 s, so the tab gets in once another socket closes. Unset, as by default, there is no ceiling.
+**One socket may hold at most 1,000 subscriptions.** The next is refused with an error frame coded `TOO_MANY_SUBSCRIPTIONS`; re-subscribing under an id the socket already holds replaces that subscription and does not count again. The SDK shares identical subscriptions on a socket, so this counts the distinct lists and records a page has open. Change it with `REALTIME_MAX_SUBSCRIPTIONS_PER_SOCKET` or `realtime.maxSubscriptionsPerSocket` on the Postgres adapter (the environment variable wins); a value that is not a positive whole number stops the server at boot. On 0.23 a socket's subscriptions are not limited. **The sockets one user holds can be limited too**, per server instance: set `REALTIME_MAX_SOCKETS_PER_USER` (or `realtime.maxSocketsPerUser`), and a sign-in past it is refused with `TOO_MANY_SOCKETS` and the socket closed with 4002. Sockets signed in with an API key count against that key, each key on its own, not against the account that made it; the service key is one credential, so all of its sockets count together. An administrator's sockets that impersonate a user count against the administrator, with their own sockets, not against the user they act as. The SDK tells every live subscription and `onConnectionLost` at once, with a `CONNECTION_LOST` error whose `details.reason` is `TOO_MANY_SOCKETS`, and keeps retrying, waiting longer each time up to 30 s, so the tab gets in once another socket closes. Unset, as by default, there is no ceiling.
 
 A subscription id is the socket's own: two clients that both name a subscription `"sub-1"` each keep theirs, and an `unsubscribe` ends only the sender's.
 
@@ -32709,6 +32836,16 @@ code implements: they stay `pending`, their attempts untouched, until an updated
 peer claims them. A task that no instance implements stays `pending` too, rather
 than being dead-lettered.
 
+### Storage orphan scans
+
+`rebase storage orphans` runs on this queue when it is on: each scan, and each
+delete from a scan, is a `storage.orphans` job, with one attempt. The backend
+registers the handler itself, in every process with storage configured, and
+only processes whose job workers are on run it. A scan is bound by
+`timeoutMs` like any job, so a source too big to scan in 15 minutes needs a
+higher `timeoutMs`, or 0. Without the queue, the server runs the scan inside
+its own process instead. See [the CLI](/docs/cli/#rebase-storage).
+
 ### Durable webhooks
 
 [`WebhookDispatcher`](/docs/recipes/webhooks) queues its deliveries in memory by
@@ -33393,9 +33530,12 @@ exactly what it did before.
 
 The flag is remembered in `rebase.json`, as `"registerDatabase": true` on the
 backend app, so every later `rebase generate-sdk`, and `rebase dev` on each
-collection change, keeps both files current. That holds on a fresh clone and in
-CI too: the scaffold's `.gitignore` ignores `generated/` directories, and the
-first `rebase generate-sdk` or `rebase dev` writes them again. A project with
+collection change, keeps both files current. The scaffold's `.gitignore`
+ignores `generated/` directories, so a fresh clone has neither file until the
+first `rebase generate-sdk` or `rebase dev` writes them again. `rebase build`
+does not write them: in CI, run `rebase generate-sdk` before anything compiles
+the backend or the `config` package, or callbacks that read typed rows compile
+against the untyped `context.data` and fail. A project with
 no `rebase.json` keeps registering for as long as `config/generated/register.ts`
 is there. To go back to untyped server-side data, remove `registerDatabase` and
 delete `config/generated/`.
@@ -34334,7 +34474,9 @@ inserted after the branch was made looks exactly like a row the branch deleted.
 Rebase tells them apart by when each row was written. Transaction ids belong to
 the server, not to one database, and the template copy keeps them, so a row
 written after the branch was made — on either side — is younger than the
-transaction that created the branch database.
+transaction that created the branch database. That transaction is read when
+the branch is made and kept in its record, so a later `GRANT` or
+`ALTER DATABASE` on the branch database does not move it.
 
 | The branch's row | The parent's row | Counted as |
 | --- | --- | --- |
@@ -34349,9 +34491,11 @@ deleted and the parent then changed is kept, and a row the parent deleted and
 the branch then changed is the branch's insert. An `UPDATE` that writes the
 values a row already had still counts as a write.
 
-When the fork point cannot be read — a long-lived branch whose `pg_database`
-row a vacuum froze, or one renamed with `ALTER DATABASE` — the diff says so,
-and counts every difference as the branch's.
+A branch made before Rebase kept that transaction reads it from the branch
+database's `pg_database` row as it is now; anything that rewrote the row since
+moves it. When the fork point cannot be read at all — a long-lived branch
+whose row a vacuum froze — the diff says so, and counts every difference as
+the branch's.
 
 #### What a merge does
 
@@ -35129,7 +35273,9 @@ Two names are in scope, and top-level `await` works:
 | `collections` | The project's collections, loaded the way `rebase db push` loads them |
 
 The console opens the project the way `rebase db push` does: the same `.env`,
-the same database, and the same collections. A project on the managed
+the same database, and the same collections. It also loads the global
+`callbacks` from `config/index.ts`, so its writes run the same hooks as a
+server write. A project on the managed
 development database gets it started first. The history of what you typed is
 kept in `.rebase/console_history`, which the scaffold's `.gitignore` already
 leaves out.
@@ -35357,8 +35503,11 @@ administration and your functions are not on it.
 
 Collection callbacks run on every write, as on the server. The project's global
 `callbacks` run only when you pass them as the `callbacks` option.
-`rebase console` does not read `config/index.ts`, so a global `beforeSave`
-does not run on its writes.
+`rebase console` passes them for you: it reads the `callbacks` your
+`config/index.ts` exports, so a global `beforeSave` runs on its writes too. If
+that file cannot be imported (for example, it needs an environment variable the
+console was not given), the console prints one line saying global callbacks are
+off for the session and opens without them.
 
 When a script needs those too, build the backend without serving it:
 `createRebaseBackend({ …, provision: false })` gives you `backend.rebase`, the
@@ -47714,7 +47863,7 @@ const { messages, retained, latestSeq } = await channel.history({
 :::note[Replays can overlap, and that is fine]
 The server cannot know exactly which messages reached you before the socket dropped, so a catch-up range may include some you already applied. The SDK discards anything at or below the sequence it has already delivered, so handlers never see a message twice.
 
-Your own messages are **not** filtered out of a replay: a reconnect assigns a new client id, so the very case catch-up exists for is the one where that filter would fail. Make operations idempotent if re-applying your own would be a problem.
+Your own messages are filtered out of a replay, as they are live, including ones sent before a reconnect gave the socket a new client id: the channel remembers the ids it broadcast from. A new channel object — after a page reload, say — remembers none, so a catch-up there delivers your earlier messages like anyone else's, which is what rebuilding state from history needs.
 :::
 
 ### Presence Tracking
@@ -48031,7 +48180,10 @@ replays until the session is confirmed: when the connection is back the
 client refreshes the session, and a sign-in confirms it too. If the server
 refuses the session, or someone else signs in, the device switches users, and
 the queued writes stay with their author until they sign in again. Meanwhile
-`status().unverifiedUser` is `true`.
+`status().unverifiedUser` is `true`, and that holds online too: until the
+refresh answers, writes queue rather than go out without credentials, and reads
+are answered from the user's local rows. What the server sends a request with
+no session is what a signed-out caller may see, so it is not kept.
 
 ```typescript
 createRebaseClient({
@@ -48899,7 +49051,9 @@ the directory they run in.
 
 **Whose authority.** Whatever the CLI resolves in that directory: `REBASE_TOKEN`
 when it is set, then the token `rebase cloud init --claim` stored for an
-unclaimed project, then the `rebase cloud login` session. The control plane
+unclaimed project, then the `rebase cloud login` session. In that unclaimed
+project's directory, a `REBASE_TOKEN` that holds no scope on the project is set
+aside for the project's own token. The control plane
 checks each call as it checks the CLI's, so with a token made by
 `rebase cloud tokens create --can logs` an assistant can read logs, and the
 control plane refuses its deploys, variables and rollbacks. No credential, or a refused one, comes back as an error that says what the
@@ -49207,13 +49361,15 @@ to one user, the endpoint declines to mount and says why in the boot log. No
   `/api/data`, `/api/admin` and the WebSocket, so connecting an assistant does not
   hand it a session.
 
+Every request to `/mcp` re-reads the person's account. A deleted or disabled
+account, or a "sign out everywhere" or password change after the token was
+issued, stops a connected client at once with a 401. A demotion applies to its
+next tool call. Every refresh makes the same checks and refuses such a grant
+for good. A guest session cannot consent at all.
+
 One limit. Disconnecting a client (`DELETE /api/oauth/grants/:clientId`, with the
 person's own session) revokes its refresh tokens at once, but an access token
-already issued keeps working until it expires, within the hour. The same hour
-bounds everything else: every refresh re-reads the person's roles, and refuses
-an account that was deleted or a grant older than its last "sign out everywhere"
-or password change. So a demotion or a sign-out reaches a connected client
-within one access-token lifetime. A guest session cannot consent at all.
+already issued keeps working until it expires, within the hour.
 
 The routes are in [Endpoints](/docs/backend/endpoints/#mcp-surface) and the
 variables in [Configuration](/docs/getting-started/configuration/#mcp-surface).
@@ -50038,17 +50194,38 @@ It lists the files of one source (`--source`, the default source when left out)
 that no string in any of them names: a key, a URL, a `rebase-storage:`
 reference in a text. Files newer than `--older-than` hours (24 by default) are left out,
 because the admin panel uploads a file before the row that names it is saved.
+The scan runs on the backend in the background, so a project too big to scan
+inside one request (behind an ingress that times it out) still finishes. The
+CLI starts it, then shows its progress (files listed, rows read, collections
+done, and any that could not be read) until it is done. With the
+[job queue](/docs/backend/jobs/) on, the scan is a `storage.orphans` job that
+the job workers run. Without it, the scan runs inside the server process that
+was asked, and the CLI says so: restarting that process stops the scan. A scan
+is one job attempt, limited by `jobs.timeoutMs` (15 minutes by default). Raise
+it, or set it to 0, for a source that takes longer. `--json` prints the same
+report as before, plus its `scanId`.
+
 `--delete` asks before it deletes (`--yes` skips the question, and is required
-with no terminal), the server finds the files again first, and nothing is
-deleted while a collection cannot be read — a collection with read hooks on a
-data source whose driver cannot read past them counts as unread. Files that only your own tables
-outside collections name look unused: check before deleting.
+with no terminal). It deletes only from the scan just printed, and only within
+15 minutes of that scan completing. Nothing is deleted while a collection
+cannot be read: a collection with read hooks on a data source whose driver
+cannot read past them counts as unread. Before deleting anything, the server
+reads every row and history entry again against the listed files. Then it asks
+for each file again right before deleting it. A file that a row names now,
+that was uploaded again since the scan, or that is gone is kept, and the CLI
+lists it as kept. Files that only your own tables outside collections name look
+unused: check before deleting. Against a backend from 0.25.1 or earlier, the
+CLI scans the old way, inside one request.
 
 `move` copies the files under `--prefix` to another source under the same keys,
 a page at a time. A file the target already holds at the same size is skipped,
 so a stopped move resumes by running it again; `--delete-source` deletes each
 file from the source once the target holds it, and is refused when the two
-sources store in the same bucket or directory. Both need `database:read`, and
+sources store in the same bucket or directory. Once the move is done, the CLI
+lists the source again with a fresh walk and names every file the move did not
+move: with `--delete-source`, any file still in the source; without it, any file
+the target holds no copy of the same size of. It exits 1 when there is one, and
+running the same move again picks it up. `--json` prints them as `notMoved`. Both need `database:read`, and
 deleting or moving `database:write`, which the service key holds.
 
 #### `rebase skills install`
@@ -50493,7 +50670,7 @@ platform upgrade can rebuild it; `--no-source` skips that once, and `cloud setti
 A followed `deploy` ends on a summary: each app it shipped with its URL, the
 deployment id, how long it took, and whether the new version answers there. It
 waits up to `--live-timeout` seconds (default 60; `0` skips the check) for a
-backend's `/api/health` and each static app's address to answer. A failed deploy
+backend's `/health` and each static app's address to answer. A failed deploy
 ends on one line naming the app and the reason, and exits non-zero. The summary
 prints even when piped; `--json` (or `REBASE_JSON=1`) prints one object instead,
 with `apps`, `hosts`, `live`, `liveChecks` and `durationMs`.
@@ -50511,8 +50688,10 @@ leaves production alone. A preview of the backend runs its own backend, on an
 empty database of its own, with its static apps folded in. A static app cannot be
 previewed on its own on Rebase Cloud yet: `rebase cloud deploy <app> --preview`
 is refused with `PREVIEW_STATIC_UNSERVED` and publishes nothing. A backend
-preview is billed as one more app unit at the default size while it exists;
-`rebase cloud previews delete <name>` stops it.
+preview is billed as one more app unit at the default size while it exists, and
+the deploy says what that comes to per month, from the control plane's own quote
+(`cost` under `--json`; only the rule and this link when the control plane cannot
+price it); `rebase cloud previews delete <name>` stops it.
 See [Preview a change](/docs/deployment/cloud/#preview-a-change).
 
 #### Logs
@@ -53228,7 +53407,7 @@ live there:
   Something wrong? `rebase cloud rollback` puts the previous deployment back.
 ```
 
-"Live" means the address answered after the build: a backend's `/api/health`
+"Live" means the address answered after the build: a backend's `/health`
 returned `ok`, and a static app's page loaded (from this deployment, when the
 platform serves it). The check waits up to `--live-timeout` seconds, 60 by
 default; `0` skips it. If an app does not answer in time the deploy still exits
@@ -53358,7 +53537,8 @@ say the address does not answer yet.
 A backend preview is billed like one app unit at the default size (100m of CPU
 and 384 MiB of memory, at your app's rate for its region and capacity),
 prorated for as long as it exists, and it appears in the project's monthly
-quote in the console. Starting one needs a card on file, as a production deploy
+quote in the console. `rebase cloud deploy --preview` prints the same quote for
+it, per month (`cost` under `--json`). Starting one needs a card on file, as a production deploy
 does. A first deploy that
 fails before anything runs is removed rather than billed. A project may run
 three backend previews at once.
@@ -53399,7 +53579,8 @@ A static app deployed on its own (`rebase cloud deploy <app>`) cannot be rolled
 back yet. Its deployment records which app it published, but no bundle, so the
 control plane has nothing to restore it from. The fix is to deploy the last good
 version again, for example from the commit before the bad one. After such a
-deploy, `deploy` says this instead of pointing at `rollback`.
+deploy, `deploy` says this instead of pointing at `rollback`, and `rollback`
+without an id refuses rather than re-deploying the backend that is serving.
 
 So a rollback needs a deployment that recorded one of the two, which means a
 project that has deployed successfully at least twice. `rebase cloud deployments`
@@ -53716,9 +53897,12 @@ and runs `db info`. It reads nothing secret back: not a variable's value (the
 service key included), not the database password, and it cannot open
 `db connect` or a preview. It is kept in
 `~/.rebase/credentials.json`, never in the repository, and `rebase cloud`
-commands in the linked directory use it on their own (`REBASE_TOKEN`, when set,
-still wins, and those commands warn that it did; the deploy `init --claim` runs
-always uses the project's own token). It expires with the project. `rebase cloud whoami` in that directory shows the project, what the
+commands in the linked directory use it on their own. `REBASE_TOKEN`, when set,
+still wins if it holds a scope on that project, and those commands warn that it
+did; when it holds none (a CI token made for other projects), the project's own
+token is used and the first command says so. A command given `--project` for
+another project keeps `REBASE_TOKEN`, and the deploy `init --claim` runs always
+uses the project's own token. It expires with the project. `rebase cloud whoami` in that directory shows the project, what the
 token may do, the claim URL and when the project expires. A command that needs a
 person's session refuses with `session_required` and keeps the token; it is
 forgotten only once the control plane refuses it everywhere, after a claim or at
@@ -54104,7 +54288,7 @@ declared in `config/resources.ts`; see
 
 A deploy with storage is refused until the project says who may read and write
 files. The scaffold's `config/storage.ts` exports a `storageAuthorize` hook for
-this. See [Per-Object Authorization](/docs/backend/storage/#per-object-authorization).
+this. See [Per-Object Authorization](/docs/backend/storage-authorization/).
 
 **How files are served.** Your backend serves every file at
 `GET /api/storage/file/<key>`. It reads the object from the bucket and streams
@@ -54883,12 +55067,16 @@ docker compose up --scale functions=3
 
 Both processes need the same `DATABASE_URL`, the same `JWT_SECRET` and the same
 `REBASE_SERVICE_KEY` — they are one deployment, and a token minted by one has to
-be accepted by the other.
+be accepted by the other. A process with `REBASE_FUNCTIONS_UPSTREAM` and no
+`REBASE_SERVICE_KEY` refuses to boot: its own `rebase.functions.invoke(...)`
+calls, from a hook or a cron job, reach the functions process with that key.
 
 ### Keeping the URLs the same
 
 `REBASE_FUNCTIONS_UPSTREAM` tells the `api` process to forward `/api/functions/*`
-to the functions process rather than serve it. Clients, generated SDKs and API
+to the functions process rather than serve it. It must be an `http://` or
+`https://` URL; anything else stops the boot. Only `api` and `worker` read it
+(see [Cron and background jobs](#cron-and-background-jobs) for the worker). Clients, generated SDKs and API
 keys see exactly the surface they saw before the split, so no application code
 changes and you do not have to stand up a reverse proxy to try one.
 
@@ -54978,15 +55166,30 @@ turn it off on the API:
     environment:
       REBASE_ROLE: worker
       REBASE_MIGRATE_ON_BOOT: none
+      REBASE_SERVICE_KEY: ${REBASE_SERVICE_KEY}
+      # Only if a job calls rebase.functions:
+      REBASE_FUNCTIONS_UPSTREAM: http://functions:8080
 ```
 
 A job that moves to a worker keeps `rebase.dataAsAdmin`, `rebase.sql`,
 `rebase.storage` and `rebase.email`, which talk to the database, the buckets and
-the mail server directly. It loses `rebase.functions`, `rebase.auth`,
-`rebase.admin` and `rebase.cron`: those dispatch into the process's own routes,
-and a worker serves none, so a call answers `404 NOT_FOUND` naming the surface
-that is off. Call a function over HTTP on the API instead, or leave a job that
-needs one where its surface is on.
+the mail server directly. It also keeps:
+
+- **`rebase.admin`** (users, roles, password resets) **and `rebase.cron`.** A
+  worker serves no admin surface on its port, but carries these two in-process,
+  for its own jobs only.
+- **`rebase.functions`, with `REBASE_FUNCTIONS_UPSTREAM`.** A worker serves no
+  functions. With the upstream set, its own `rebase.functions.invoke(...)`
+  calls are forwarded to the functions process, where the function sees the
+  call as the service. The worker still answers nothing under `/api/functions`
+  on its port. The worker needs the deployment's `REBASE_SERVICE_KEY` for this,
+  like the `api`.
+
+It loses `rebase.auth`: those are a person's sign-in flows, and a worker
+serves none. For account work from a job, use `rebase.admin`. It also loses the
+rest of the admin API (backups, logs, the schema editor and so on), and
+`rebase.functions` when no upstream is set. A call to any of these answers
+`404 NOT_FOUND` naming the surface that is off and what to do instead.
 
 A `functions` process never runs either. It is scaled by request load and
 replaced at will, and giving it scheduled work would make its replica count mean
