@@ -15,6 +15,8 @@ import ts from "typescript";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
+    appViewSource,
+    entityViewSource,
     generateCommand,
     maskCode,
     planGenerateView,
@@ -338,4 +340,39 @@ describe("the generated files compile", () => {
             fs.rmSync(checkDir, { recursive: true, force: true });
         }
     }, 180_000);
+});
+
+describe("a view's label is quoted, not pasted", () => {
+    const LABEL = "KPIs {beta} <c> & */ \"d\"";
+
+    /** Every identifier the source reads and every JSX text/string it renders. */
+    function readsAndRenders(source: string): { identifiers: Set<string>; rendered: string[] } {
+        const file = ts.createSourceFile("View.tsx", source, ts.ScriptTarget.ES2022, true, ts.ScriptKind.TSX);
+        const identifiers = new Set<string>();
+        const rendered: string[] = [];
+        const visit = (node: ts.Node): void => {
+            if (ts.isIdentifier(node)) identifiers.add(node.text);
+            if (ts.isJsxText(node) && node.text.trim()) rendered.push(node.text.trim());
+            if (ts.isJsxExpression(node) && node.expression && ts.isStringLiteral(node.expression)) rendered.push(node.expression.text);
+            ts.forEachChild(node, visit);
+        };
+        visit(file);
+        return { identifiers, rendered };
+    }
+
+    it.each([
+        ["a screen", appViewSource],
+        ["a record tab", entityViewSource]
+    ])("in %s, a label with JSX characters compiles and renders as typed", (_kind, source) => {
+        const code = source({ slug: "kpis", componentName: "KpisView", label: LABEL, collection: "posts" });
+        expect(syntaxErrors("View.tsx", code)).toEqual([]);
+        const { identifiers, rendered } = readsAndRenders(code);
+        expect(identifiers.has("beta")).toBe(false);
+        expect(rendered).toContain(LABEL);
+    });
+
+    it("leaves a plain label as plain JSX text", () => {
+        const code = appViewSource({ slug: "kpis", componentName: "KpisView", label: "Sales KPIs", collection: "posts" });
+        expect(code).toContain(">Sales KPIs</Typography>");
+    });
 });

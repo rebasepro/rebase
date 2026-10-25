@@ -356,14 +356,31 @@ function findCliRoot(from: string): string | null {
 
 type ViewTemplateOptions = { slug: string; componentName: string; label: string; collection: string };
 
+/**
+ * A label as JSX text: written as is when it is plain, as a string expression
+ * when it holds a character JSX reads — `{`, `}`, `<`, `>`, `&`. Pasted raw,
+ * `--name "KPIs {beta}"` wrote `<Typography>KPIs {beta}</Typography>`, and the
+ * view did not compile ("Cannot find name 'beta'").
+ */
+function jsxText(text: string): string {
+    return /[{}<>&]/.test(text) ? `{${JSON.stringify(text)}}` : text;
+}
+
+/** A label inside the leading `/** … *\/` comment: one line, and no `*\/` to close it early. */
+function commentText(text: string): string {
+    return text.replace(/[\r\n]+/g, " ").replaceAll("*/", "*\\/");
+}
+
 function fillViewTemplate(template: string, options: ViewTemplateOptions): string {
     const { slug, componentName, label, collection } = options;
     return template
         .replaceAll("\"__COLLECTION__\"", JSON.stringify(collection))
         .replaceAll("__COLLECTION__", collection)
         .replaceAll("__COMPONENT__", componentName)
-        .replaceAll("__label__", label.toLowerCase())
-        .replaceAll("__LABEL__", label)
+        .replaceAll("__label_jsx__", jsxText(label.toLowerCase()))
+        .replaceAll("__LABEL_JSX__", jsxText(label))
+        .replaceAll("__label__", commentText(label.toLowerCase()))
+        .replaceAll("__LABEL__", commentText(label))
         .replaceAll("__SLUG__", slug);
 }
 
