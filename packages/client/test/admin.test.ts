@@ -96,6 +96,29 @@ updatedAt: "" }
             expect(result.offset).toBe(100);
         });
 
+        /**
+         * The route filters by `?role=` and resolves a known set by `?ids=`,
+         * and the client could send neither — "list the editors" meant paging
+         * every user and filtering locally.
+         */
+        it("listUsers filters by role", async () => {
+            const admin = createAdmin(transport);
+            mockRequest.mockResolvedValueOnce({ users: [], total: 0, limit: 25, offset: 0 });
+
+            await admin.listUsers({ role: "editor", limit: 50 });
+
+            expect(mockRequest).toHaveBeenCalledWith("/admin/users?limit=50&role=editor", { method: "GET" });
+        });
+
+        it("listUsers resolves a known set of ids", async () => {
+            const admin = createAdmin(transport);
+            mockRequest.mockResolvedValueOnce({ users: [], total: 0, limit: 2, offset: 0 });
+
+            await admin.listUsers({ ids: ["u 1", "u2"] });
+
+            expect(mockRequest).toHaveBeenCalledWith("/admin/users?ids=u+1%2Cu2", { method: "GET" });
+        });
+
         it("getUser calls GET /admin/users/:id", async () => {
             const admin = createAdmin(transport);
             mockRequest.mockResolvedValueOnce({ user: { uid: "usr_1" } });
