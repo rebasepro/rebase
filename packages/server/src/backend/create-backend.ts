@@ -29,6 +29,7 @@ import {
     CollectionConfig,
     HealthCheckResult,
     InitializedDriver,
+    isSchemaEditingAdmin,
     isSQLAdmin,
     MountableRouter,
     RealtimeProvider,
@@ -100,6 +101,7 @@ import {
 } from "../schema-edit/project-root";
 import { createGitHubRepository } from "../schema-edit/github-repository";
 import { rewriteRemoteCollection } from "../schema-edit/remote-source";
+import { refuseWhenRepositoryIsAhead } from "../schema-edit/deployed-schema-guard";
 import { editCollectionSource, writeLocalCollectionSource } from "../schema-edit/local-source";
 import type { SchemaSourceEditor } from "../schema-edit/source-editor";
 import { createLocalGitRepository, findRepositoryRoot } from "../schema-edit/local-git-repository";
@@ -2031,13 +2033,6 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
                 ? await findRepositoryRoot(collectionsDir)
                 : undefined;
             const liveSchemaRouter = new Hono<HonoEnv>();
-            // A commit to the remote repository that this process is not
-            // running yet. The generated schema files in a commit are built
-            // from the collections this process serves, and a remote commit
-            // does not change those until it is deployed — so a second change
-            // before then would commit generated files that leave the first
-            // one out. Set only once a commit has landed.
-            let undeployedCommit: string | undefined;
             // `apply` additionally needs `schema:write` — checked on its route.
             applyAdminGate(liveSchemaRouter, "Live schema editing", "schema:read");
             liveSchemaRouter.use("/*", sayEditorNeedsTsMorph);
@@ -2119,14 +2114,7 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
                             branch: remoteRepo.branch ?? "main",
                             author
                         });
-                        return {
-                            ...repository,
-                            commit: async (paths, message) => {
-                                const sha = await repository.commit(paths, message);
-                                undeployedCommit = sha;
-                                return sha;
-                            }
-                        };
+                        return repository;
                     }
                     if (!repositoryRoot) return undefined;
                     return createLocalGitRepository({ root: repositoryRoot, author });
@@ -2151,24 +2139,30 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
                         // keeping a collection file's imports, comments and
                         // formatting for the remote case would be a second
                         // thing to get wrong.
-                        if (undeployedCommit) {
-                            throw new Error(
-                                `This deployment already committed a schema change (${undeployedCommit.slice(0, 9)}) ` +
-                                "that it is not running yet. Deploy that commit, then make the next change: " +
-                                "until then a change here is planned against the collections this deployment " +
-                                "runs, and its generated schema files would leave the first change out. " +
-                                "Nothing was changed."
-                            );
+                        const repository = createGitHubRepository({
+                            auth: remoteRepo.auth,
+                            owner: remoteRepo.owner,
+                            repo: remoteRepo.repo,
+                            branch: remoteRepo.branch ?? "main"
+                        });
+                        // One undeployed change at a time. The commit's
+                        // generated files are rendered from the collections
+                        // this deployment serves, so a change committed and
+                        // not yet running here — by this process, a replica,
+                        // a process before a restart, or a developer — would
+                        // be left out of them. Read from the repository on
+                        // every apply rather than remembered, because memory
+                        // is exactly what a restart or a second replica lacks.
+                        const admin = defaultDriver.admin;
+                        if (isSchemaEditingAdmin(admin)) {
+                            const served = collectionRegistry.getRawCollections();
+                            const generated = await admin.planSchemaChange(served, served, { paths: commitPaths });
+                            await refuseWhenRepositoryIsAhead(repository, generated.files);
                         }
                         const { AstSchemaEditor } = remoteEditor!;
                         return rewriteRemoteCollection(
                             {
-                                repository: createGitHubRepository({
-                                    auth: remoteRepo.auth,
-                                    owner: remoteRepo.owner,
-                                    repo: remoteRepo.repo,
-                                    branch: remoteRepo.branch ?? "main"
-                                }),
+                                repository,
                                 collectionsPath: remoteRepo.collectionsPath ?? DEFAULT_COLLECTIONS_PATH,
                                 edit: async (dir, collectionId, edit: typeof change) => {
                                     const editor = new AstSchemaEditor(dir);
