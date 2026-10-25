@@ -405,6 +405,11 @@ describe("the stored token afterwards", () => {
         await expect(client.auth.getUser()).rejects.toBeInstanceOf(Exited);
         expect(refusal().code).toBe("session_required");
         expect(ephemeralGrantFor(CP, PROVISIONED.projectId)?.claimUrl).toBe(PROVISIONED.claimUrl);
+        // What the token can still do, as narrowed: no secret read back, no tunnel.
+        const hint = (printedJson() as { error: { hint?: string } }).error.hint ?? "";
+        expect(hint).toContain("db info");
+        expect(hint).toContain("not open `db connect`");
+        expect(hint).not.toContain("and database");
     });
 
     it("is kept when the control plane cannot say whether it still holds", async () => {

@@ -578,7 +578,11 @@ async function explainRefusedGrant(url: string, projectId: string, token: string
     if (verdict === "accepted") {
         fail(
             `This command needs a signed-in session, and this directory uses the token \`rebase cloud init --claim\` stored for project ${projectId}.`,
-            "That token still works for deploy, logs, env and database; "
+            // As narrowed on the control plane: an unclaimed project's token
+            // reads no secret back — no variable's value, no database
+            // password — and opens no tunnel or preview.
+            "That token still deploys, reads logs and metrics, sets environment variables and runs `db info`, "
+                + "but reads no secret back (no variable's value, no database password) and cannot open `db connect` or a preview; "
                 + `${chalk.bold("rebase cloud whoami")} shows it, the claim URL and when it expires. `
                 + `Run this command as a person once the project is claimed: ${chalk.bold("rebase cloud login")}.`,
             "session_required"
