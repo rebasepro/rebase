@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState, useMemo } from "react";
-import { useApiBase, useApiConfig } from "@rebasepro/app";
+import { useApiBase, useApiConfig, useRlsSimulation } from "@rebasepro/app";
+import { simulationHeaders } from "@rebasepro/types";
 import type { EntityHistoryEntry } from "@rebasepro/types";
 
 /**
@@ -22,6 +23,11 @@ export interface UseEntityHistoryResult {
 /**
  * Hook to fetch entity history from the backend REST API.
  * Replaces the old subcollection-based approach with a proper API call.
+ *
+ * While access is simulated ("Simulate access") every request carries the
+ * simulation, as the data views' `client.simulate()` does: the history is read
+ * as the simulated identity, and the server refuses a revert as the simulated
+ * write it would be.
  */
 export function useHistory(params: {
     slug: string;
@@ -39,6 +45,8 @@ export function useHistory(params: {
     const { slug, entityId, enabled = true, pageSize = 10, refreshToken } = params;
     const apiConfig = useApiConfig();
     const apiBase = useApiBase();
+    const { simulation } = useRlsSimulation();
+    const simulated = useMemo(() => simulationHeaders(simulation), [simulation]);
 
     const [entries, setEntries] = useState<HistoryEntryData[]>([]);
     const [total, setTotal] = useState(0);
@@ -52,7 +60,8 @@ export function useHistory(params: {
     // `refreshToken` is part of the identity on purpose: a save makes the list
     // we are holding a stale page of a longer list, which is the same problem
     // as having moved to a different record.
-    const entityKey = `${slug}/${entityId}/${refreshToken ?? 0}`;
+    // So is the simulation: another identity reads another history.
+    const entityKey = `${slug}/${entityId}/${refreshToken ?? 0}/${JSON.stringify(simulated)}`;
     const currentEntityRef = useRef<string | undefined>(undefined);
 
     const fetchEntries = useCallback(async (
@@ -67,7 +76,8 @@ export function useHistory(params: {
         try {
             const token = await apiConfig.getAuthToken?.();
             const headers: Record<string, string> = {
-                "Content-Type": "application/json"
+                "Content-Type": "application/json",
+                ...simulated
             };
             if (token) headers["Authorization"] = `Bearer ${token}`;
 
@@ -101,7 +111,7 @@ signal });
         } finally {
             setIsLoading(false);
         }
-    }, [apiConfig, apiBase, slug, entityId, entityKey, enabled, pageSize]);
+    }, [apiConfig, apiBase, slug, entityId, entityKey, enabled, pageSize, simulated]);
 
     // Single unified effect: reset state when entity changes, fetch when offset changes.
     // Uses AbortController to cancel stale requests on entity change or unmount.
@@ -145,7 +155,8 @@ signal });
 
         const token = await apiConfig.getAuthToken?.();
         const headers: Record<string, string> = {
-            "Content-Type": "application/json"
+            "Content-Type": "application/json",
+            ...simulated
         };
         if (token) headers["Authorization"] = `Bearer ${token}`;
 
@@ -167,7 +178,7 @@ headers });
 
         // Return the reverted entity data so callers can update the form
         return result.data as Record<string, unknown>;
-    }, [apiConfig, apiBase, slug, entityId]);
+    }, [apiConfig, apiBase, slug, entityId, simulated]);
 
     return useMemo(() => ({
         entries,

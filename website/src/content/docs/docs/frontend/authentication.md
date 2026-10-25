@@ -117,14 +117,15 @@ A role in this list is a name your [security rules](/docs/collections/security-r
 To check what a role, a user or a service key can read, an administrator uses
 **Simulate access**, the pill in the admin panel's app bar. Pick a role (with an
 optional user id, which need not be an account), a user, or a live service key.
-Every data view then reads through the server as that identity, against the
-real row-level security policies: a grid shows exactly the rows it can read,
+Every data view, and a record's History tab, then reads through the server as
+that identity, against the real row-level security policies: a grid shows
+exactly the rows it can read,
 fields its roles cannot read are masked, and the banner counts the collections
 it sees nothing in. The server checks on every request that you are an
 administrator.
 
-Simulated access is read-only. While it is on, the views offer no create, edit
-or delete, and the server refuses any write that carries a simulation with
+Simulated access is read-only. While it is on, the views offer no create, edit,
+delete or history revert, and the server refuses any write that carries a simulation with
 `403 SIMULATION_READ_ONLY`, so nothing is saved as someone else. Stop simulating
 to make changes.
 
