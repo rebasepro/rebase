@@ -311,8 +311,15 @@ describe("the consent screen's promise", () => {
         // The consent page must never send a password to the OAuth surface.
         const { app } = buildApp();
         const { html } = await authorize(app);
-        const fetchTargets = [...html.matchAll(/fetch\((\"[^\"]+\")/g)].map(m => JSON.parse(m[1]));
-        expect(fetchTargets).toEqual(["/api/auth/login"]);
+        // Every request goes through one `post(url, …)` helper. The MFA step
+        // (an account with a second factor) adds the two existing challenge
+        // routes, which take a code and the pending token — never the password.
+        const targets = [...html.matchAll(/post\((\"[^\"]+\")/g)].map(m => JSON.parse(m[1]));
+        expect([...targets].sort()).toEqual(["/api/auth/login", "/api/auth/mfa/challenge", "/api/auth/mfa/challenge/verify"]);
+        expect(html.match(/fetch\(/g)).toHaveLength(1);
+        const passwordPosts = [...html.matchAll(/post\((\"[^\"]+\")[^\n]*password\.value/g)].map(m => JSON.parse(m[1]));
+        expect(passwordPosts).toEqual(["/api/auth/login"]);
+        expect(html.match(/password\.value/g)).toHaveLength(1);
     });
 
     it("tells search engines not to index it", async () => {
