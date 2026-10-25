@@ -59,11 +59,12 @@ export function installRootErrorHandler(app: Hono<HonoEnv>): boolean {
  *   `boot.ts` registers `/api/health` *after* `initializeRebaseBackend` returns.
  *   A catch-all would have swallowed the health probe.
  *
- * Post-processing has neither problem: it converts a 404 that came back as
- * anything but JSON, and leaves the ones that are already an envelope — a
- * storage miss, an unknown collection, an unknown function — exactly as their
- * route wrote them. Scoped to `basePath`, so an app serving its own pages at `/`
- * keeps answering its own way for the pages.
+ * Post-processing has neither problem: it converts Hono's own default answer —
+ * `404 Not Found`, `text/plain` — and leaves every 404 something wrote exactly
+ * as it was written: the envelopes routes answer (a storage miss, an unknown
+ * collection, an unknown function), a function's own text or HTML 404, and an
+ * application's own `notFound`. Scoped to `basePath`, so an app serving its own
+ * pages at `/` keeps answering its own way for the pages.
  *
  * `expected`, so it logs at debug. A 404 from a frontend holding a stale link is
  * routine, and a `⚠️` per request would trade a missing envelope for noise
@@ -75,15 +76,20 @@ export function installUnmatchedApiEnvelope(app: Hono<HonoEnv>, basePath: string
         await next();
 
         if (c.res.status !== 404) return;
-        if ((c.res.headers.get("content-type") ?? "").includes("application/json")) return;
         // Only when nothing handled the request. A matched handler that
         // deliberately answers a text or HTML 404 — a custom function serving
         // pages, an XML feed — wrote that body on purpose, and replacing it
-        // discards it. Middleware registers as `ALL`; a route handler carries
-        // the method it answers, so its presence in the matched set is the
-        // signal. (The application's own `notFound`, if any, is not a route,
-        // so an unmatched path under the prefix still gets the envelope.)
+        // discards it. A route handler carrying the method it answers is one
+        // such signal.
         if (c.req.matchedRoutes.some((route) => route.method !== "ALL")) return;
+        // The method is no signal for the rest: `app.all("/feed", …)` in a
+        // function — a webhook receiver, a proxy — registers as `ALL`, exactly
+        // like middleware, and Hono keeps nothing else that tells them apart.
+        // So the body decides: only Hono's own default answer is "nothing
+        // handled this". An `app.all` handler's text 404 survives, and so does
+        // an application's own `notFound` — it is that app's answer, as its own
+        // `onError` is (see `installRootErrorHandler`).
+        if (!(await isHonoDefaultNotFound(c.res))) return;
 
         // Assignment, not a fresh return: Hono's `c.res` setter copies the
         // headers of the response being replaced onto the new one, so the
@@ -100,6 +106,27 @@ export function installUnmatchedApiEnvelope(app: Hono<HonoEnv>, basePath: string
         ) as Response;
     });
     logger.debug("Unmatched API routes answer the JSON envelope", { prefix });
+}
+
+/** What Hono's built-in not-found handler answers: `c.text("404 Not Found", 404)`. */
+const HONO_DEFAULT_NOT_FOUND_BODY = "404 Not Found";
+
+/**
+ * Whether a 404 is Hono's default answer rather than one a handler wrote.
+ *
+ * Read from a clone, and only for `text/plain` — the content type Hono's
+ * default carries — so a JSON envelope, an HTML page or a stream of any other
+ * type is never read here.
+ */
+async function isHonoDefaultNotFound(res: Response): Promise<boolean> {
+    if (!(res.headers.get("content-type") ?? "").startsWith("text/plain")) return false;
+    const length = res.headers.get("content-length");
+    if (length !== null && Number(length) !== HONO_DEFAULT_NOT_FOUND_BODY.length) return false;
+    try {
+        return (await res.clone().text()) === HONO_DEFAULT_NOT_FOUND_BODY;
+    } catch {
+        return false;
+    }
 }
 
 /** Whether `onError` has been called on this app. */
