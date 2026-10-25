@@ -32,6 +32,7 @@ import type { AccessModel, BackendBootstrapper, CollectionConfig, DataDriver, In
 import {
     configureAccess,
     configureJwt,
+    createCustomAuthAdapter,
     createRebaseBackend,
     defineFunction,
     getAccessModel,
@@ -502,6 +503,76 @@ describe("two backends built from one options object", () => {
             built.push({ backend, db });
         }
         expect(auth).toEqual({ jwtSecret: SECRET.A });
+    });
+});
+
+/**
+ * A backend whose auth adapter has no `serviceKey` mints a per-boot internal
+ * key for its in-process client. It wrote that key onto the caller's adapter
+ * instance, so the second backend built from the same adapter found it set and
+ * adopted it: one internal key opened both.
+ */
+describe("two backends built from one auth adapter", () => {
+    const who = defineFunction((app) => {
+        app.get("/", (c) => c.json({ uid: c.get("user")?.uid ?? null }));
+    });
+
+    async function twoBackends(auth: Parameters<typeof createRebaseBackend>[0]["auth"]): Promise<RebaseBackend[]> {
+        const backends: RebaseBackend[] = [];
+        for (const name of ["G", "H"]) {
+            const db = await database(name);
+            const backend = await createRebaseBackend({
+                collections: [collection(`keyed_${name.toLowerCase()}`)],
+                bootstrappers: [bootstrapper(name, db)],
+                auth,
+                functions: { who },
+                cronPersistence: false,
+                provision: true
+            });
+            built.push({ backend, db });
+            backends.push(backend);
+        }
+        return backends;
+    }
+
+    it("give each its own internal key, and leave the adapter as they found it", async () => {
+        const adapter = createCustomAuthAdapter({ verifyRequest: async () => null });
+        const [g, h] = await twoBackends(adapter);
+
+        expect(adapter.serviceKey).toBeUndefined();
+        const keys = [g, h].map(backend => backend.services.authAdapter?.serviceKey);
+        expect(keys[0]).toEqual(expect.any(String));
+        expect(keys[1]).toEqual(expect.any(String));
+        expect(keys[0]).not.toBe(keys[1]);
+    });
+
+    it("keep a class adapter's private fields reachable through each backend's view", async () => {
+        // A class instance's `#private` fields are readable only with `this`
+        // as the instance itself, so the view must not become its `this`.
+        class CountingAdapter {
+            readonly id = "counting";
+            #seen = 0;
+            async verifyRequest(request: Request) {
+                this.#seen += 1;
+                return request.headers.get("authorization") === "Bearer letmein"
+                    ? { uid: `caller-${this.#seen}`, email: "", roles: ["user"], isAdmin: false }
+                    : null;
+            }
+            async getCapabilities() {
+                return { hasBuiltInAuthRoutes: false, emailPasswordLogin: false, registrationEnabled: false, passwordReset: false, adminPasswordReset: false, sessionManagement: false, profileUpdate: false, emailVerification: false, magicLink: false, anonymousLogin: false, enabledProviders: [] };
+            }
+            get seen() { return this.#seen; }
+        }
+        const adapter = new CountingAdapter();
+        const [g, h] = await twoBackends(adapter as never);
+
+        for (const backend of [g, h]) {
+            const res = await backend.fetch(new Request("http://local/api/functions/who", { headers: { authorization: "Bearer letmein" } }));
+            expect(res.status).toBe(200);
+            expect(await res.json()).toEqual({ uid: expect.stringMatching(/^caller-\d+$/) });
+        }
+        expect(adapter.seen).toBe(2);
+        expect("serviceKey" in adapter).toBe(false);
     });
 });
 

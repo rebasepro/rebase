@@ -77,6 +77,7 @@ import { reportSimulatedContext } from "../auth/simulation";
 import { createAdapterAuthMiddleware } from "../auth/adapter-middleware";
 import { scopeDataDriver, SERVICE_IDENTITY } from "../auth/rls-scope";
 import { createBuiltinAuthAdapter } from "../auth/builtin-auth-adapter";
+import { withBackendServiceKey } from "../auth/adapter-service-key";
 import { ApiError, errorHandler } from "../api/errors";
 import { createSchemaDriftDetector } from "../api/schema-drift";
 import { installRootErrorHandler, installUnmatchedApiEnvelope } from "../api/root-error-handler";
@@ -1202,9 +1203,11 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
 
     // For user-provided AuthAdapters (the built-in one receives the key at
     // creation below): expose the internal key so the adapter and the
-    // websocket auth path recognize the singleton's control-plane requests.
+    // websocket auth path recognize the singleton's control-plane requests —
+    // on this backend's own view of the adapter, never written onto the
+    // caller's instance, which another backend may share.
     if (authAdapter && !authAdapter.serviceKey) {
-        authAdapter.serviceKey = internalServiceKey;
+        authAdapter = withBackendServiceKey(authAdapter, internalServiceKey);
     }
 
     // ─── API Key Store Bootstrap ──────────────────────────────────────────
@@ -3964,7 +3967,10 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
             throw new Error("attachRealtime(): this backend's websocket is already attached to a server.");
         }
         realtimeAttached = true;
-        await defaultBootstrapper.initializeWebsockets(server, effectiveRealtimeService, defaultDriver, config.auth, authAdapter, {
+        // The adapter as this backend sees it, in the place of the caller's
+        // instance: the socket reads the service key off its auth config.
+        const socketAuthConfig = config.auth && isAuthAdapter(config.auth) ? authAdapter : config.auth;
+        await defaultBootstrapper.initializeWebsockets(server, effectiveRealtimeService, defaultDriver, socketAuthConfig, authAdapter, {
             // The socket is another door into the rows the data router serves,
             // and not under `${basePath}/*` where that router's body limit and
             // rate limiter are registered: it carries both itself — the same
