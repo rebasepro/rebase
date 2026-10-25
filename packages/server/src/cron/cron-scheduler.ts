@@ -611,6 +611,16 @@ type LeaseOutcome =
     | { acquired: true; token?: string }
     | { acquired: false; holder?: string };
 
+/** What one run is for, beyond the job itself. */
+interface RunOptions {
+    /** The slot a scheduled or catch-up run fires for. Absent for a manual run. */
+    slot?: Date;
+    /** A first line for the run's captured log. */
+    seedLog?: string;
+    /** Called with the run's start time once its handler is about to be called. */
+    onStart?: (startedAt: string) => void;
+}
+
 /** A job the scheduler refused, with the definition it was refused from. */
 interface RefusedJob {
     job: RejectedCronJob;
@@ -1081,7 +1091,7 @@ export class CronScheduler {
 
         let onStart!: (startedAt: string) => void;
         const begun = new Promise<string>((resolve) => { onStart = resolve; });
-        const run = this.executeJob(job, true, undefined, onStart);
+        const run = this.executeJob(job, true, { onStart });
         // Whichever comes first: the handler being called, or the run ending
         // without it (a skip). A run that starts settles `begun` first, since
         // `onStart` is called before the handler is awaited.
@@ -1462,7 +1472,7 @@ export class CronScheduler {
                 // Takes the run lease: a manual trigger in progress on another
                 // process — the api role's, say — turns this slot into a
                 // recorded skip rather than a second run beside it.
-                await this.executeJob(job, false);
+                await this.executeJob(job, false, { slot: nextRun });
 
                 // Schedule the next tick (only if still started + armed)
                 if (this.started && this.shouldArm(job)) {
@@ -1560,7 +1570,10 @@ export class CronScheduler {
                 const lateBy = Math.round((now.getTime() - slot.getTime()) / 1000);
                 logger.info(`[cron] Catching up missed slot ${slotIso} for "${job.id}" (${lateBy}s late)`);
 
-                await this.executeJob(job, false, `⏰ Catch-up run for missed slot ${slotIso} (${lateBy}s late)`);
+                await this.executeJob(job, false, {
+                    slot,
+                    seedLog: `⏰ Catch-up run for missed slot ${slotIso} (${lateBy}s late)`
+                });
             } catch (err) {
                 logger.error(`[cron] Catch-up failed for "${job.id}"`, { error: err });
             }
@@ -1591,8 +1604,7 @@ export class CronScheduler {
     private executeJob(
         job: RegisteredJob,
         manual: boolean,
-        seedLog?: string,
-        onStart?: (startedAt: string) => void
+        run: RunOptions = {}
     ): Promise<CronJobLogEntry> {
         // Aborted when the run is over before its handler is: the timeout
         // below, or `stop()` giving up on it. Without it the timeout only
@@ -1601,9 +1613,9 @@ export class CronScheduler {
         // request per tick while every run was already marked failed.
         const abort = new AbortController();
         this.runControllers.add(abort);
-        const run = this.runJob(job, manual, abort, seedLog, onStart);
-        this.track(run);
-        return run.finally(() => {
+        const execution = this.runJob(job, manual, abort, run);
+        this.track(execution);
+        return execution.finally(() => {
             this.runControllers.delete(abort);
         });
     }
@@ -1619,8 +1631,7 @@ export class CronScheduler {
         job: RegisteredJob,
         manual: boolean,
         abort: AbortController,
-        seedLog?: string,
-        onStart?: (startedAt: string) => void
+        { slot, seedLog, onStart }: RunOptions
     ): Promise<CronJobLogEntry> {
         // Checked here as well as by each caller, because each caller awaits
         // something (a claim, a state read) between its own check and this.
@@ -1650,7 +1661,10 @@ export class CronScheduler {
 
         const ctx: CronJobContext = {
             jobId: job.id,
-            scheduledAt: startedAt,
+            // The slot the run is for, not the moment it began: a catch-up
+            // starts long after its slot, and even a punctual run starts
+            // after the lease's round trip. A manual run has no slot.
+            scheduledAt: slot ?? startedAt,
             signal: abort.signal,
             log: (...args: unknown[]) => {
                 const line = args.map((a) =>

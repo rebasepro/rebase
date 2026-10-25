@@ -110,7 +110,11 @@ export interface CronJobContext<DB = RegisteredDatabase> {
     /** The job's unique ID (derived from filename). */
     jobId: string;
 
-    /** The current scheduled tick timestamp. */
+    /**
+     * The slot this run fires for. A catch-up run gets the slot it missed,
+     * not the time it started; a manual trigger, which has no slot, gets the
+     * moment the run started.
+     */
     scheduledAt: Date;
 
     /**

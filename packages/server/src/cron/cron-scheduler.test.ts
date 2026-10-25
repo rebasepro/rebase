@@ -1447,6 +1447,41 @@ catchUpWindowSeconds: 3600,
             expect(scheduler.getJob("late")?.totalRuns).toBe(1);
         });
 
+        it("hands a scheduled run its slot as scheduledAt, however late the handler starts", async () => {
+            const { store } = makeFleetStore();
+            // The lease is a database round trip; here it takes two seconds.
+            const acquire = store.tryAcquireRunLease.getMockImplementation()!;
+            store.tryAcquireRunLease.mockImplementation(async (jobId: string, holder: string, ttl: number) => {
+                await new Promise(resolve => setTimeout(resolve, 2000));
+                return acquire(jobId, holder, ttl);
+            });
+            let seen: Date | undefined;
+            scheduler.setStore(store);
+            scheduler.registerJobs([makeJob("on-the-hour", {
+                schedule: "0 7 * * *",
+                handler: async (ctx) => { seen = ctx.scheduledAt; }
+            })]);
+            scheduler.start();
+            await jest.advanceTimersByTimeAsync(60 * 60 * 1000);
+
+            expect(seen?.toISOString()).toBe(new Date(2026, 6, 29, 7, 0).toISOString());
+        });
+
+        it("hands the handler the missed slot as scheduledAt, not the boot time", async () => {
+            // A catch-up exists to recover a slot; a handler that processes
+            // "the window ending at scheduledAt" has to see that slot.
+            const store = makeClaimStore(true);
+            let seen: Date | undefined;
+            scheduler.setStore(store);
+            scheduler.registerJobs([makeCatchUpJob("late-slot", {
+                handler: async (ctx) => { seen = ctx.scheduledAt; }
+            })]);
+            scheduler.start();
+            await settle();
+
+            expect(seen?.toISOString()).toBe(MISSED_SLOT);
+        });
+
         it("skips the slot another instance already ran", async () => {
             const store = makeClaimStore(false);
             let executed = false;
