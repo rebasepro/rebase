@@ -119,6 +119,7 @@ export const CLOUD_VALUE_FLAGS = {
     "--region": String,
     "--replicas": String,
     "--repo": String,
+    "--role": String,
     "--scale-to-zero": String,
     "--secret-access-key": String,
     "--since": String,

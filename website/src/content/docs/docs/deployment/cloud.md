@@ -366,6 +366,14 @@ organization's: what you set there applies in every organization you belong to.
 factor, so CI keeps deploying after you turn it on. Revoke a token you no longer
 trust under **Settings → Access tokens**.
 
+## Invite your team
+
+**Members → Invite member** adds someone whose Rebase account has the address
+verified; anyone else gets a link to copy (emailed when this control plane sends
+email) that works once, for 7 days, only for an account that verifies that
+address. Owners and admins resend or revoke it under **Pending invitations**;
+from a terminal, [`rebase cloud orgs members invite`](/docs/cli/cloud/#organizations).
+
 ## See who did what
 
 The console's **Activity** page and `rebase cloud activity` show the
@@ -567,7 +575,7 @@ except one that restarts the database, which waits for a maintenance window.
 | `compute` | What this project reserves, what it costs, and how to change it |
 | `usage` | Requests used this month against the included allowance, and the overage so far, as the invoice counts it. `usage org` lists every project of the organization |
 | `clusters` | The clusters tenants run on. Platform-admin only |
-| `settings`, `orgs`, `billing` | Project settings, organizations, payment |
+| `settings`, `orgs`, `billing` | Project settings, organizations and their members and invitations, payment |
 | `activity` | The organization's audit log: who deployed, changed an environment variable (by name), a domain, a backup, a member or a token. Owners and admins. See [See who did what](#see-who-did-what) |
 | `notifications`, `webhooks` | Where the project's events are POSTed: Slack, Discord or any https URL ([Cloud notifications](/docs/deployment/cloud-notifications/)). `webhooks` is retired and exits 1 with code `command_retired` |
 

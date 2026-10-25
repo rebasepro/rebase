@@ -662,9 +662,14 @@ export async function requireClient(rawArgs: string[]): Promise<{ client: CloudC
  *
  * For the commands a token cannot run — minting and revoking tokens: a key that
  * could mint keys could mint its own successor, so the control plane refuses
- * every key on those routes.
+ * every key on those routes. Inviting people is the other: it hands out access
+ * to every project in an organization, which no token capability grants.
+ * `action` names what the refusal says a token cannot do.
  */
-export async function requireSessionClient(rawArgs: string[]): Promise<{ client: CloudClient; url: string }> {
+export async function requireSessionClient(
+    rawArgs: string[],
+    action = "manage tokens"
+): Promise<{ client: CloudClient; url: string }> {
     // Before anything else: everything downstream of here is a control-plane
     // call, and a direct-linked directory has no control plane to make it
     // against.
@@ -677,7 +682,7 @@ export async function requireSessionClient(rawArgs: string[]): Promise<{ client:
         if (envToken()) {
             fail(
                 `This command needs a signed-in session for ${chalk.cyan(url)}, and ${TOKEN_ENV} is an API token.`,
-                `A token cannot manage tokens. Run ${chalk.bold("rebase cloud login")} first.`,
+                `A token cannot ${action}. Run ${chalk.bold("rebase cloud login")} first.`,
                 "session_required"
             );
         }

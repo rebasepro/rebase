@@ -174,9 +174,25 @@ values this way.
 ## Organizations
 
 ```bash
-rebase cloud orgs list | create | members
+rebase cloud orgs list | create
+rebase cloud orgs members [list] | invite <email> [--role admin|member] | remove <email|uid> | role <email|uid> <role>
+rebase cloud orgs invites [list] | revoke <id|email> | resend <id|email>
 rebase cloud activity [--project <id|slug>] [--action <area|action>] [--actor <email>] [--limit N] [--before <cursor>]
 ```
+
+`members invite` adds someone whose Rebase account has the address verified,
+and otherwise opens an invitation and prints its link: single use, valid 7 days,
+accepted only by an account that has verified that address. The output (and
+`emailDelivery` in `--json`) says whether it was emailed; when it was not, a
+warning says to send the link yourself. `--role` is `admin` or `member`
+(default); `owner` only adds an existing verified account, and only an owner
+may grant it. `invites resend` gives a new link and the old one stops working.
+Inviting and `invites` need a `rebase cloud login` session; `REBASE_TOKEN` is
+refused. Inviting, resending and revoking take the owner or admin role; listing
+takes any member.
+`members remove` asks first (`--yes` skips it); removing or demoting an owner
+takes an owner, and the last owner stays. `--org <id>` picks an organization
+other than the selected one.
 
 `activity` is the selected organization's audit log, newest first: who
 deployed, rolled back, set, deleted or revealed an environment variable (by
@@ -184,7 +200,7 @@ name, never by value), changed a domain, created, restored or downloaded a
 backup, changed a project's compute, stopped or deleted a project, changed a
 member's role, or created or revoked an access token. `--action` takes an area
 (`deploy`, `deploy_hook`, `env`, `domain`, `backup`, `pitr`, `database`,
-`extension`, `storage`, `project`, `org`, `member`, `token`) or a full action
+`extension`, `storage`, `project`, `org`, `member`, `invite`, `token`) or a full action
 such as `env.set`. A page holds up to 100 entries (`--limit`, default 50); the
 output prints the `--before` cursor for the next one. `--json` is one value,
 `{ org, events, nextCursor }`. It needs the organization's owner or admin role
