@@ -673,6 +673,11 @@ export class PostgresBackendDriver implements DataDriver {
         const client = this.client;
         return {
             user: this.user,
+            // The key the request authenticated with rides on the identity
+            // `withAuth` was given, which every per-request driver carries
+            // as `user`. Named apart so a hook can tell a personal key's
+            // write from its owner's own, which `user` cannot.
+            ...(this.user?.credential ? { credential: this.user.credential } : {}),
             driver: this,
             data: this.data,
             get client() {
@@ -3196,6 +3201,7 @@ export class AuthenticatedPostgresBackendDriver implements DataDriver {
         const client = this.delegate.client;
         writeScope?.setSettledContext({
             user: this.user,
+            ...(this.user?.credential ? { credential: this.user.credential } : {}),
             driver: this,
             data: this.data,
             get client() {

@@ -7,6 +7,7 @@ import type { HistoryConfig } from "../controllers/client";
 import type { ChannelBusSetting } from "./channel_bus";
 import type { SchemaEditingAdmin } from "./schema_editing";
 import type { AccessModel } from "./scopes";
+import type { ApiKeyKind } from "./api_keys";
 
 // =============================================================================
 // DATABASE CONNECTION INTERFACES
@@ -1332,8 +1333,12 @@ export interface RealtimeSocketOptions {
         uid: string;
         roles: string[];
         scopes: string[];
-        /** The key itself: its id and `rate_limit` decide which rate-limit bucket its frames count in. */
-        apiKey?: { id: string; rate_limit: number | null };
+        /**
+         * The key itself: its id and `rate_limit` decide which rate-limit
+         * bucket its frames count in. With `name` and `kind`, collection
+         * callbacks on its write frames read it as `context.credential`.
+         */
+        apiKey?: { id: string; rate_limit: number | null; name?: string; kind?: ApiKeyKind };
     } | { message: string }>;
     /**
      * Verify a session token presented to `AUTHENTICATE` with the backend's own

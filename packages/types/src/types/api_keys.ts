@@ -28,6 +28,27 @@ import type { ScopeSummary } from "./scopes";
 export type ApiKeyKind = "service" | "personal";
 
 /**
+ * The API key a request authenticated with, as server-side code sees it:
+ * `context.credential` in a collection callback, and `credential` on the
+ * identity the request's driver is scoped to.
+ *
+ * It tells a write made with a key from the same person's own session. A
+ * personal key acts as its owner, so `context.user` is the owner either way;
+ * this is what says "the CI token did it" rather than "Ada did it". Never the
+ * secret: only what the key list shows.
+ *
+ * @group Models
+ */
+export interface CallerCredential {
+    /** `"personal"` acts as its owner (`context.user`); `"service"` as the key itself. */
+    kind: ApiKeyKind;
+    /** The key's id, as `GET /api/auth/keys` lists it. */
+    id: string;
+    /** The name the key was given when it was created. */
+    name: string;
+}
+
+/**
  * An API key with the secret masked — what list / get / update return.
  * @group Models
  */

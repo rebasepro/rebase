@@ -20,7 +20,7 @@
  */
 
 import type { Context, MiddlewareHandler } from "hono";
-import { intersectScopes, scopesForRoles, scopeGrants, scopeGrantsAny, type DataDriver } from "@rebasepro/types";
+import { intersectScopes, scopesForRoles, scopeGrants, scopeGrantsAny, type CallerCredential, type DataDriver } from "@rebasepro/types";
 import type { HonoEnv } from "../../api/types";
 import type { ApiKeyStore } from "./api-key-store";
 import type { ApiKeyMasked } from "./api-key-types";
@@ -103,6 +103,14 @@ export async function resolveApiKey(
 }
 
 /**
+ * What a collection callback is told about the key a request authenticated
+ * with (`context.credential`): its kind, id and name, never the secret.
+ */
+export function credentialOf(apiKey: Pick<ApiKeyMasked, "id" | "name" | "kind">): CallerCredential {
+    return { kind: apiKey.kind, id: apiKey.id, name: apiKey.name };
+}
+
+/**
  * Who a stored key acts as and what it holds — the half of
  * {@link resolveApiKey} that does not depend on how the key was found. The RLS
  * simulator asks it of a key named by id, so "view as this key" and a request
@@ -170,7 +178,10 @@ export async function validateApiKey(
     try {
         c.set("driver", await scopeDataDriver(options.driver, {
             uid: resolved.uid,
-            roles: resolved.roles
+            roles: resolved.roles,
+            // So a collection callback can tell this key's write from its
+            // owner's own session: `context.credential`.
+            credential: credentialOf(resolved.apiKey)
         }));
     } catch (error) {
         logger.error("[AUTH] RLS scoping failed for API key", { error: error });

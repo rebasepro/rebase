@@ -21,7 +21,7 @@
  * is a second lock, not the main one: a `data:write` token still cannot write
  * a row the user could not write themselves.
  */
-import type { AuthAdapter, CollectionConfig, DataDriver, OrderBySpec } from "@rebasepro/types";
+import type { AuthAdapter, CallerCredential, CollectionConfig, DataDriver, OrderBySpec } from "@rebasepro/types";
 import { ALL_WHERE_FILTER_OPS, DEFAULT_LIST_LIMIT, MAX_LIST_LIMIT, getCollectionDataPath, scopeGrants, scopeGrantsAny } from "@rebasepro/types";
 import { type FieldViewer, OrderBySpecError, restoresSoftDeletedRow, serializeOrderBy, softDeleteFieldOf } from "@rebasepro/common";
 import { scopeDataDriver } from "../auth/rls-scope.js";
@@ -49,6 +49,12 @@ export interface McpCaller {
     /** The scopes granted to this connection — `data:read`, `data:write:posts`, … */
     scopes: string[];
     clientId: string;
+    /**
+     * The API key the connection authenticated with, when it was one rather
+     * than an OAuth grant. Handed to collection callbacks as
+     * `context.credential`.
+     */
+    credential?: CallerCredential;
 }
 
 export interface McpToolContext {
@@ -133,7 +139,8 @@ async function scopedDriver(ctx: McpToolContext): Promise<DataDriver> {
     return scopeDataDriver(ctx.driver, {
         uid: ctx.caller.uid,
         roles: ctx.caller.roles,
-        isAnonymous: false
+        isAnonymous: false,
+        ...(ctx.caller.credential ? { credential: ctx.caller.credential } : {})
     });
 }
 

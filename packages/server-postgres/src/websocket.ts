@@ -11,7 +11,7 @@ import { deserializeFilter, redactSqlLiterals, UnknownFilterOperatorError } from
 import { budgetSendBuffers, reapSilentSockets, terminateIfBacklogged } from "./services/socket-liveness";
 import { DEFAULT_HEARTBEAT_INTERVAL_MS, helloFrame, requestedOptIns, startHeartbeats, type SocketOptIn } from "./socket-opt-ins";
 import { ANONYMOUS_USER_ID, hasAdminRole, isSQLAdmin, isSchemaAdmin, resolveClientListLimit, ListLimitError, scopeGrants, scopesForRoles, type AccessModel, type AdminScope } from "@rebasepro/types";
-import type { User } from "@rebasepro/types";
+import type { CallerCredential, User } from "@rebasepro/types";
 
 import { WebSocketServer, WebSocket, type RawData } from "ws";
 import type { Server, IncomingMessage } from "http";
@@ -117,6 +117,12 @@ interface WsUserIdentity {
      * requests do.
      */
     apiKey?: { id: string; rate_limit: number | null };
+    /**
+     * The same key as collection callbacks are told about it
+     * (`context.credential`), so a write frame made with a personal key can be
+     * told from its owner's own session.
+     */
+    credential?: CallerCredential;
 }
 
 /**
@@ -686,7 +692,10 @@ export function createPostgresWebSocket(
                     isAdmin: hasAdminRole(resolved.roles),
                     isAnonymous: false,
                     scopes: resolved.scopes,
-                    ...(resolved.apiKey ? { apiKey: { id: resolved.apiKey.id, rate_limit: resolved.apiKey.rate_limit } } : {})
+                    ...(resolved.apiKey ? { apiKey: { id: resolved.apiKey.id, rate_limit: resolved.apiKey.rate_limit } } : {}),
+                    ...(resolved.apiKey?.name !== undefined && resolved.apiKey.kind !== undefined
+                        ? { credential: { kind: resolved.apiKey.kind, id: resolved.apiKey.id, name: resolved.apiKey.name } }
+                        : {})
                 }
             };
         }
@@ -1474,7 +1483,9 @@ roles: verifiedUser.roles }
                     // Check if the driver supports RLS-scoped delegates
                     if (typeof driver.withAuth === "function") {
                         try {
-                            const who = sessionAuthContext(clientSessions.get(clientId));
+                            const session = clientSessions.get(clientId);
+                            const who = sessionAuthContext(session);
+                            const credential = session?.user?.impersonator ? undefined : session?.user?.credential;
                             const userForAuth: User = {
                                 uid: who.uid,
                                 displayName: null,
@@ -1483,7 +1494,8 @@ roles: verifiedUser.roles }
                                 providerId: "websocket",
                                 isAnonymous: who.isAnonymous === true,
                                 roles: who.roles,
-                                ...(who.claims ? { claims: who.claims } : {})
+                                ...(who.claims ? { claims: who.claims } : {}),
+                                ...(credential ? { credential } : {})
                             };
                             return await driver.withAuth(userForAuth);
                         } catch (e) {

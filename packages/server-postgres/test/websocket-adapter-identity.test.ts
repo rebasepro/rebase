@@ -41,7 +41,7 @@ describe("WebSocket Server identity from an auth adapter", () => {
         return { send, frames };
     };
 
-    function start(adapterUser: Record<string, unknown>) {
+    function start(adapterUser: Record<string, unknown>, options?: Parameters<typeof createPostgresWebSocket>[5]) {
         scopedAs = [];
         const driver = {
             key: "postgres",
@@ -54,7 +54,7 @@ describe("WebSocket Server identity from an auth adapter", () => {
         } as unknown as PostgresBackendDriver;
         const realtime = { addClient: jest.fn(), startDataDriverSubscription: jest.fn(), rescopeClient: jest.fn() } as unknown as RealtimeService;
         const adapter = { verifyToken: async () => adapterUser, verifyRequest: async () => null } as unknown as AuthAdapter;
-        createPostgresWebSocket({} as Server, realtime, driver, { requireAuth: true }, adapter);
+        createPostgresWebSocket({} as Server, realtime, driver, { requireAuth: true }, adapter, options);
     }
 
     beforeEach(() => {
@@ -82,5 +82,35 @@ describe("WebSocket Server identity from an auth adapter", () => {
 
         expect(scopedAs).toHaveLength(1);
         expect(scopedAs[0]).not.toHaveProperty("claims");
+    });
+
+    it("scopes an API key's frames with the key named, so a callback can tell it from its owner", async () => {
+        start({ uid: "unused", roles: [] }, {
+            resolveApiKey: async () => ({
+                uid: "ada",
+                roles: ["editor"],
+                scopes: ["data:read"],
+                apiKey: { id: "key-1", rate_limit: null, name: "CI deploys", kind: "personal" }
+            })
+        });
+        const { send } = connect();
+
+        await send({ type: "AUTHENTICATE", requestId: "auth", payload: { token: "rk_live_x" } });
+        await send({ type: "FETCH_COLLECTION", requestId: "fetch", payload: { path: "projects" } });
+
+        expect(scopedAs).toEqual([expect.objectContaining({
+            uid: "ada",
+            credential: { kind: "personal", id: "key-1", name: "CI deploys" }
+        })]);
+    });
+
+    it("names no credential for a session", async () => {
+        start({ uid: "ada", email: "", roles: ["editor"], isAdmin: false });
+        const { send } = connect();
+
+        await send({ type: "AUTHENTICATE", requestId: "auth", payload: { token: "t" } });
+        await send({ type: "FETCH_COLLECTION", requestId: "fetch", payload: { path: "projects" } });
+
+        expect(scopedAs[0]).not.toHaveProperty("credential");
     });
 });

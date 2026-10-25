@@ -228,7 +228,8 @@ export function createMcpRoutes(config: McpRoutesConfig): Hono<HonoEnv> {
                 uid: resolved.uid,
                 roles: resolved.roles,
                 scopes: resolved.scopes,
-                clientId: `api-key:${resolved.apiKey.id}`
+                clientId: `api-key:${resolved.apiKey.id}`,
+                credential: { kind: resolved.apiKey.kind, id: resolved.apiKey.id, name: resolved.apiKey.name }
             };
         }
 

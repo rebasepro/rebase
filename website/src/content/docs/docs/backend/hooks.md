@@ -102,6 +102,8 @@ Each callback receives a single props object. Common fields:
 
 `context.user` contains the authenticated user (`uid`, `roles`, etc.). A request with no token, where the API lets one in, carries the anonymous identity `{ uid: "anonymous", roles: ["anon"] }` rather than `undefined`.
 
+`context.credential` names the API key a write was made with: `{ kind, id, name }`, where `kind` is `"personal"` or `"service"`. A personal key acts as its owner, so `context.user` is the owner whether they saved by hand or a CI job wrote with their key; `context.credential` tells the two apart. It is set on the data API, the realtime socket and `/mcp`, and absent for a session, the service key, server-context work (`rebase.dataAsAdmin`, crons) and in the browser. It never carries the secret.
+
 `collection` is always there. A global callback fires for every collection, so
 it is the one tier that is registered independently of any of them — but it is
 still never handed a missing collection. A request naming a path the collection
@@ -288,6 +290,8 @@ const instance = await initializeRebaseBackend({
                 collection: collection.slug,
                 entity_id: String(id),
                 actor: context.user?.uid ?? "anonymous",
+                // The API key, when the delete was made with one.
+                via_key: context.credential?.name ?? null,
                 snapshot: row
             });
         }
