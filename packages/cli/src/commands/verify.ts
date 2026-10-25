@@ -102,6 +102,8 @@ export interface VerifyOptions {
     backendDir: string | null;
     live: boolean;
     databaseUrl?: string;
+    /** Why no `databaseUrl` could be resolved for `--live`, when resolving it failed. */
+    databaseUnavailable?: string;
 }
 
 const STEP_TITLES: Record<VerifyStepId, string> = {
@@ -530,15 +532,39 @@ function liveSeverity(severity: string): VerifyFinding["severity"] | null {
     return null;
 }
 
+/**
+ * Why the database `--live` was pointed at cannot be opened, or `null` when it
+ * can. Asked once, before the live steps, so an unreachable database is one
+ * error rather than a skipped audit and a migration warning: under `--live`
+ * the audit was asked for, and a CI run in which it never ran is not green.
+ */
+async function databaseUnreachable(databaseUrl: string): Promise<string | null> {
+    const pg = await import("pg");
+    const client = new pg.default.Client({ connectionString: databaseUrl, connectionTimeoutMillis: 5_000 });
+    try {
+        await client.connect();
+        return null;
+    } catch (error) {
+        return error instanceof Error ? error.message : String(error);
+    } finally {
+        await client.end().catch(() => undefined);
+    }
+}
+
 async function checkLive(databaseUrl: string, step: VerifyStep): Promise<VerifyFinding[]> {
     const { scan, CHECKS } = await import("@rebasepro/rls-check");
     let result: Awaited<ReturnType<typeof scan>>;
     try {
         result = await scan({ connectionString: databaseUrl, statementTimeoutMs: 10_000 });
     } catch (error) {
-        step.status = "skipped";
-        step.detail = `could not reach the database: ${error instanceof Error ? error.message : String(error)}`;
-        return [];
+        step.detail = "the audit did not run";
+        return [{
+            step: "live",
+            check: "live-scan-failed",
+            severity: "error",
+            message: `The live RLS audit failed: ${error instanceof Error ? error.message : String(error)}`,
+            fix: "`npx @rebasepro/rls-check <database-url>` runs the same audit on its own and reports the failure in full."
+        }];
     }
     step.detail = `${CHECKS.length} rls-check checks against ${result.database.host}/${result.database.name}`;
 
@@ -616,21 +642,51 @@ export async function runVerify(options: VerifyOptions): Promise<VerifyReport> {
 
     findings.push(...checkRls(loaded));
 
+    // The database the live steps read, once it is known to answer. Under
+    // `--live` a database that is missing or does not answer is an error: the
+    // audit was asked for, and exit 0 without it is a green CI run over nothing.
+    let liveUrl: string | undefined;
+    if (options.live) {
+        if (!options.databaseUrl) {
+            liveStep.detail = "no database to audit";
+            findings.push({
+                step: "live",
+                check: "live-no-database",
+                severity: "error",
+                message: options.databaseUnavailable
+                    ? `--live was asked for, and the database could not be prepared: ${options.databaseUnavailable}`
+                    : "--live was asked for, and no database is configured to audit.",
+                fix: "Pass --database-url <url> (or set DATABASE_URL), or run without --live for the offline checks."
+            });
+        } else {
+            const unreachable = await databaseUnreachable(options.databaseUrl);
+            if (unreachable) {
+                liveStep.detail = "the database did not answer";
+                findings.push({
+                    step: "live",
+                    check: "live-unreachable",
+                    severity: "error",
+                    message: `--live was asked for, and the database could not be reached: ${unreachable}. Neither the migration check nor the RLS audit ran.`,
+                    fix: "Check the database is running and the URL is right (`rebase db url` prints the one this project resolves), or run without --live for the offline checks."
+                });
+            } else {
+                liveUrl = options.databaseUrl;
+            }
+        }
+    }
+
     if (findings.some(f => f.step === "config" && f.severity === "error")) {
         migrationsStep.status = "skipped";
         migrationsStep.detail = "fix the collection config errors first";
     } else {
-        findings.push(...await checkMigrations(options, loaded, migrationsStep));
+        findings.push(...await checkMigrations({ ...options, databaseUrl: liveUrl }, loaded, migrationsStep));
     }
 
     if (!options.live) {
         liveStep.status = "skipped";
         liveStep.detail = "pass --live to audit the database";
-    } else if (!options.databaseUrl) {
-        liveStep.status = "skipped";
-        liveStep.detail = "DATABASE_URL is not set (environment or .env)";
-    } else {
-        findings.push(...await checkLive(options.databaseUrl, liveStep));
+    } else if (liveUrl) {
+        findings.push(...await checkLive(liveUrl, liveStep));
     }
 
     steps.forEach(step => settle(step, findings));
@@ -702,7 +758,8 @@ ${chalk.green.bold("Steps")}
   3. Migration freshness   drizzle/migrations builds every declared table and column
   4. Live RLS audit        with --live: the rls-check catalogue against DATABASE_URL
 
-Exits 1 when any step reports an error; warnings do not fail. Fast and offline
+Exits 1 when any step reports an error; warnings do not fail. Under --live, a
+database that is missing or does not answer is an error. Fast and offline
 without --live: for CI, and for the Claude Code hook that ${chalk.cyan("rebase skills --hooks")} installs.
 `);
 }

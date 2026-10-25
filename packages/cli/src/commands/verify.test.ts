@@ -272,6 +272,36 @@ describe("rebase verify: migration freshness", () => {
     });
 });
 
+describe("rebase verify --live", () => {
+    const NOTES = collection(`
+    slug: "notes",
+    table: "notes",
+    name: "Notes",${NOTES_RULES}
+    properties: { title: { type: "string", name: "Title" } }`);
+
+    it("fails, rather than skipping the audit, when the database does not answer", async () => {
+        collectionFile("notes.ts", NOTES);
+        const report = await runVerify({
+            projectRoot: root,
+            collectionsDir: path.join(root, "config", "collections"),
+            backendDir: null,
+            live: true,
+            // Port 1 on loopback: nothing listens, the connection is refused at once.
+            databaseUrl: "postgresql://nobody:nothing@127.0.0.1:1/none"
+        });
+        expect(report.ok).toBe(false);
+        expect(report.findings.map(f => [f.step, f.check, f.severity])).toEqual([["live", "live-unreachable", "error"]]);
+        expect(report.steps.find(s => s.id === "live")?.status).toBe("failed");
+    });
+
+    it("fails when it was asked to audit and no database is configured", async () => {
+        collectionFile("notes.ts", NOTES);
+        const report = await verify({ live: true });
+        expect(report.ok).toBe(false);
+        expect(report.findings.map(f => f.check)).toEqual(["live-no-database"]);
+    });
+});
+
 describe("rebase verify --json", () => {
     let cwd: string;
     let stdout: string[];
