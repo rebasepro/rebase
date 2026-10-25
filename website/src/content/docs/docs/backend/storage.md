@@ -258,6 +258,13 @@ answers **400 `INVALID_STORAGE_KEY`**: every access rule in the product —
 *source* key, and a rendition served under its own path would answer a question
 nobody asked.
 
+`_rebase/maintenance/` is reserved the same way. `rebase storage orphans` keeps
+each scan's record there, in the source it scanned, so that the process that
+runs the scan and the one that answers its status read the same record. A
+caller who could write a record could choose what a later delete removes, so
+reading, writing or listing the prefix also answers 400. Records are deleted 7
+days after they were last written, when the next scan of that source starts.
+
 ### What gets served
 
 The stored content type is whatever the uploader declared — nothing sniffs the

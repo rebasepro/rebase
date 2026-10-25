@@ -121,6 +121,12 @@ import { createJwtService, DEFAULT_REFRESH_EXPIRES_IN, processJwtService, type J
 import { createJwksRoutes } from "../auth/jwks-routes";
 import { readRuntimeVersion } from "../boot/version-skew";
 import { createStorageMaintenanceRoutes } from "../storage/maintenance-routes";
+import {
+    createOrphanScanService,
+    STORAGE_ORPHANS_TASK,
+    type OrphanScanService,
+    type OrphanScanTaskPayload
+} from "../storage/orphan-scans";
 import { supportsRlsScoping } from "../auth/rls-scope";
 import { createOAuthStore, type OAuthStore } from "../mcp/oauth-store";
 import { createOAuthRoutes, grantIdentityFromRepository } from "../mcp/oauth-routes";
@@ -2254,6 +2260,8 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
     // and the admin group's storage maintenance surface.
     let storageSurface: Hono<HonoEnv>;
     let storageMaintenanceSurface: Hono<HonoEnv> | undefined;
+    /** The orphan scan's background half, whenever storage is on: the job queue's `storage.orphans` handler. */
+    let orphanScans: OrphanScanService | undefined;
     /** Whether the storage group carries its own upload body limit, in place of the global one. */
     let storageCarriesUploadLimit = false;
 
@@ -2318,24 +2326,33 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
         // source against every row, and copies between sources. Whole-store
         // operations past every storage policy, so admin-only: reading every
         // row is `database:read`, deleting or copying files `database:write`.
+        //
+        // The orphan scan runs in the background: built in every process that
+        // has storage, admin surface or not, because a worker pod (no admin
+        // surface) is what runs its `storage.orphans` jobs.
+        const maintenanceSources = {
+            registry: storageRegistry,
+            controller: storageController,
+            collections: () => collectionRegistry.getRawCollections(),
+            // Unscoped, and read through `scanStoredRows` — past policies
+            // and read hooks alike: a row a policy or a `beforeQuery` hides
+            // from the admin still names its files.
+            driverFor: (collection: CollectionConfig) => {
+                const key = resolveDataSource(collection, dataSourceRegistry).key;
+                return !key || key === DEFAULT_DRIVER_ID ? defaultDriver : driverRegistry.get(key);
+            },
+            globalCallbacks: () => collectionRegistry.getGlobalCallbacks(),
+            // A revert restores what an entry holds: its files are in use.
+            history: historyConfigResult?.historyService,
+            // Read per scan: the queue is built further down. Without one, a
+            // scan runs in the process that was asked.
+            jobs: () => jobQueue
+        };
+        orphanScans = createOrphanScanService(maintenanceSources);
         if (surfaces.admin) {
             const maintenanceRouter = new Hono<HonoEnv>();
             applyAdminGate(maintenanceRouter, "Storage maintenance", { read: "database:read", write: "database:write" });
-            maintenanceRouter.route("/", createStorageMaintenanceRoutes({
-                registry: storageRegistry,
-                controller: storageController,
-                collections: () => collectionRegistry.getRawCollections(),
-                // Unscoped, and read through `scanStoredRows` — past policies
-                // and read hooks alike: a row a policy or a `beforeQuery` hides
-                // from the admin still names its files.
-                driverFor: (collection) => {
-                    const key = resolveDataSource(collection, dataSourceRegistry).key;
-                    return !key || key === DEFAULT_DRIVER_ID ? defaultDriver : driverRegistry.get(key);
-                },
-                globalCallbacks: () => collectionRegistry.getGlobalCallbacks(),
-                // A revert restores what an entry holds: its files are in use.
-                history: historyConfigResult?.historyService
-            }));
+            maintenanceRouter.route("/", createStorageMaintenanceRoutes({ ...maintenanceSources, orphanScans }));
             storageMaintenanceSurface = maintenanceRouter;
         }
 
@@ -3208,6 +3225,13 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
                 (ctx: Parameters<typeof handler>[0]) => runInBackendScope(ownScope, () => handler(ctx))
             ]));
             jobQueue = createJobQueue(store, { ...jobsOptions, tasks });
+            // `rebase storage orphans`: a scan too long for one request runs as
+            // a job, wherever this backend's workers run.
+            if (orphanScans) {
+                const scans = orphanScans;
+                jobQueue.register<OrphanScanTaskPayload>(STORAGE_ORPHANS_TASK, (ctx) =>
+                    runInBackendScope(ownScope, () => scans.runTask(ctx.payload, ctx.signal)));
+            }
             // Topics publish through the queue, in every process — enqueueing is
             // a write, so an api pod that runs no workers still publishes. The
             // handlers only *run* where the workers do, which is the same split

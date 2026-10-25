@@ -189,56 +189,88 @@ export async function removeReferencedKeys(
     keys: Set<string>,
     collections: readonly CollectionConfig[],
     driverFor: (collection: CollectionConfig) => DataDriver | undefined,
-    options: { pageSize?: number; globalCallbacks?: CollectionCallbacks } = {}
+    options: {
+        pageSize?: number;
+        globalCallbacks?: CollectionCallbacks;
+        /** Counted into as it goes, and `onProgress` called after each page. */
+        progress?: ScanProgress;
+        onProgress?: () => void;
+        /** Checked between pages: an aborted scan stops, and throws. */
+        signal?: AbortSignal;
+    } = {}
 ): Promise<{ scanned: string[]; unscanned: UnscannedCollection[] }> {
     const pageSize = options.pageSize ?? 500;
     const scanned: string[] = [];
     const unscanned: UnscannedCollection[] = [];
+    const progress = options.progress;
     const visit = (text: string) => {
         if (keys.size === 0) return;
         for (const key of keysNamedBy(text)) keys.delete(key);
     };
+    const pageRead = (rows: readonly unknown[]) => {
+        for (const row of rows) forEachString(row, visit);
+        if (progress) progress.rowsScanned += rows.length;
+        options.onProgress?.();
+        options.signal?.throwIfAborted();
+    };
+    const notRead = (entry: UnscannedCollection) => {
+        unscanned.push(entry);
+        progress?.unscanned.push(entry);
+    };
+    if (progress) progress.collectionsTotal += collections.length;
 
     for (const collection of collections) {
-        const driver = driverFor(collection);
-        if (!driver) {
-            unscanned.push({ collection: collection.slug, reason: "no data driver serves it here" });
-            continue;
-        }
+        options.signal?.throwIfAborted();
+        if (progress) progress.currentCollection = collection.slug;
         try {
-            if (driver.scanStoredRows) {
-                for await (const rows of driver.scanStoredRows({ path: collection.slug, collection, pageSize })) {
-                    for (const row of rows) forEachString(row, visit);
-                }
-            } else if (hasReadHooks(collection, options.globalCallbacks)) {
-                unscanned.push({
-                    collection: collection.slug,
-                    reason: "it has a beforeQuery or afterRead hook, and its data driver cannot read its rows past them"
-                });
+            const driver = driverFor(collection);
+            if (!driver) {
+                notRead({ collection: collection.slug, reason: "no data driver serves it here" });
                 continue;
-            } else {
-                let after: Record<string, unknown> | undefined;
-                for (;;) {
-                    const rows = await driver.fetchCollection({
-                        path: collection.slug,
-                        collection,
-                        limit: pageSize,
-                        withDeleted: true,
-                        ...(after ? { startAfter: after } : {})
-                    });
-                    for (const row of rows) forEachString(row, visit);
-                    if (rows.length < pageSize) break;
-                    after = rows[rows.length - 1];
-                }
             }
-            scanned.push(collection.slug);
-        } catch (error: unknown) {
-            unscanned.push({
-                collection: collection.slug,
-                reason: error instanceof Error ? error.message : String(error)
-            });
+            try {
+                if (driver.scanStoredRows) {
+                    for await (const rows of driver.scanStoredRows({ path: collection.slug, collection, pageSize })) {
+                        pageRead(rows);
+                    }
+                } else if (hasReadHooks(collection, options.globalCallbacks)) {
+                    notRead({
+                        collection: collection.slug,
+                        reason: "it has a beforeQuery or afterRead hook, and its data driver cannot read its rows past them"
+                    });
+                    continue;
+                } else {
+                    let after: Record<string, unknown> | undefined;
+                    for (;;) {
+                        const rows = await driver.fetchCollection({
+                            path: collection.slug,
+                            collection,
+                            limit: pageSize,
+                            withDeleted: true,
+                            ...(after ? { startAfter: after } : {})
+                        });
+                        pageRead(rows);
+                        if (rows.length < pageSize) break;
+                        after = rows[rows.length - 1];
+                    }
+                }
+                scanned.push(collection.slug);
+            } catch (error: unknown) {
+                // A stopped scan is not a collection that could not be read.
+                if (options.signal?.aborted) throw error;
+                notRead({
+                    collection: collection.slug,
+                    reason: error instanceof Error ? error.message : String(error)
+                });
+            }
+        } finally {
+            if (progress) {
+                progress.collectionsScanned++;
+                progress.currentCollection = undefined;
+            }
         }
     }
+    options.onProgress?.();
     return { scanned, unscanned };
 }
 
@@ -251,7 +283,8 @@ export const HISTORY_SCAN_NAME = "(row history)";
  */
 async function removeKeysInHistory(
     keys: Set<string>,
-    history: { scanStoredValues?(pageSize?: number): AsyncIterable<unknown[]> }
+    history: StoredHistory,
+    options: { progress?: ScanProgress; onProgress?: () => void; signal?: AbortSignal } = {}
 ): Promise<UnscannedCollection | undefined> {
     if (!history.scanStoredValues) {
         return { collection: HISTORY_SCAN_NAME, reason: "this backend's history service cannot be scanned" };
@@ -262,11 +295,44 @@ async function removeKeysInHistory(
             forEachString(values, (text) => {
                 for (const key of keysNamedBy(text)) keys.delete(key);
             });
+            if (options.progress) options.progress.historyEntriesScanned += values.length;
+            options.onProgress?.();
+            options.signal?.throwIfAborted();
         }
         return undefined;
     } catch (error: unknown) {
+        if (options.signal?.aborted) throw error;
         return { collection: HISTORY_SCAN_NAME, reason: error instanceof Error ? error.message : String(error) };
     }
+}
+
+/**
+ * Remove from `keys` every key a row or a history entry names: the rows of
+ * every collection, then history when the backend keeps it. What is left is
+ * named by nothing — unless `unscanned` is not empty.
+ */
+async function removeKeysNamedAnywhere(
+    keys: Set<string>,
+    options: ReferenceSources & { progress?: ScanProgress; onProgress?: () => void; signal?: AbortSignal }
+): Promise<{ scanned: string[]; unscanned: UnscannedCollection[] }> {
+    const { scanned, unscanned } = await removeReferencedKeys(keys, options.collections, options.driverFor, {
+        globalCallbacks: options.globalCallbacks,
+        progress: options.progress,
+        onProgress: options.onProgress,
+        signal: options.signal
+    });
+    if (options.history) {
+        if (options.progress) options.progress.phase = "history";
+        options.onProgress?.();
+        const history = await removeKeysInHistory(keys, options.history, options);
+        if (history) {
+            unscanned.push(history);
+            options.progress?.unscanned.push(history);
+        } else {
+            scanned.push(HISTORY_SCAN_NAME);
+        }
+    }
+    return { scanned, unscanned };
 }
 
 /** What `findOrphans` found. */
@@ -284,15 +350,13 @@ export interface OrphanReport {
     unscanned: UnscannedCollection[];
 }
 
-/**
- * The objects of one source that no row names.
- *
- * @param olderThanMs an object written less long ago than this is not called
- *        an orphan: the admin panel uploads a file before the row that names it
- *        is saved. One whose age the listing does not say is not either.
- */
-export async function findOrphans(options: {
-    controller: StorageController;
+/** Row history, as a scan reads it. */
+export interface StoredHistory {
+    scanStoredValues?(pageSize?: number): AsyncIterable<unknown[]>;
+}
+
+/** Where references to stored files are read from: every row, and history. */
+export interface ReferenceSources {
     collections: readonly CollectionConfig[];
     driverFor: (collection: CollectionConfig) => DataDriver | undefined;
     /** The callbacks every collection runs, which may scope or rewrite its reads. */
@@ -302,27 +366,73 @@ export async function findOrphans(options: {
      * entry holds, so a file only history names is still in use. One that
      * cannot be read is reported unscanned, as {@link HISTORY_SCAN_NAME}.
      */
-    history?: { scanStoredValues?(pageSize?: number): AsyncIterable<unknown[]> };
+    history?: StoredHistory;
+}
+
+/** How far a scan has got. Counted into in place, so a caller can report it while it runs. */
+export interface ScanProgress {
+    phase: "listing" | "rows" | "history" | "deleting" | "done";
+    /** Objects listed in the source so far. */
+    filesScanned: number;
+    /** Rows read so far, over every collection. */
+    rowsScanned: number;
+    /** History entries read so far. */
+    historyEntriesScanned: number;
+    /** Collections finished, read or not. */
+    collectionsScanned: number;
+    collectionsTotal: number;
+    /** The collection being read now. */
+    currentCollection?: string;
+    /** The collections that could not be read, as they are found. */
+    unscanned: UnscannedCollection[];
+}
+
+/** A progress record at the start of a scan. */
+export function emptyScanProgress(): ScanProgress {
+    return {
+        phase: "listing",
+        filesScanned: 0,
+        rowsScanned: 0,
+        historyEntriesScanned: 0,
+        collectionsScanned: 0,
+        collectionsTotal: 0,
+        unscanned: []
+    };
+}
+
+/**
+ * The objects of one source that no row names.
+ *
+ * @param olderThanMs an object written less long ago than this is not called
+ *        an orphan: the admin panel uploads a file before the row that names it
+ *        is saved. One whose age the listing does not say is not either.
+ */
+export async function findOrphans(options: ReferenceSources & {
+    controller: StorageController;
     olderThanMs: number;
     now?: number;
+    /** Counted into as the scan goes; `onProgress` is called after each page. */
+    progress?: ScanProgress;
+    onProgress?: () => void;
+    /** Checked between pages: an aborted scan stops, and throws. */
+    signal?: AbortSignal;
 }): Promise<OrphanReport> {
+    const progress = options.progress;
     const all: StoredObjectEntry[] = [];
     let cursor: string | undefined;
+    if (progress) progress.phase = "listing";
     do {
+        options.signal?.throwIfAborted();
         const page = await walkObjects(options.controller, { cursor, limit: 1000 });
         all.push(...page.objects);
+        if (progress) progress.filesScanned = all.length;
+        options.onProgress?.();
         cursor = page.cursor;
     } while (cursor);
 
     const unnamed = new Set(all.map(object => object.key));
-    const { scanned, unscanned } = await removeReferencedKeys(unnamed, options.collections, options.driverFor, {
-        globalCallbacks: options.globalCallbacks
-    });
-    if (options.history) {
-        const history = await removeKeysInHistory(unnamed, options.history);
-        if (history) unscanned.push(history);
-        else scanned.push(HISTORY_SCAN_NAME);
-    }
+    if (progress) progress.phase = "rows";
+    const { scanned, unscanned } = await removeKeysNamedAnywhere(unnamed, options);
 
     const cutoff = (options.now ?? Date.now()) - options.olderThanMs;
     const orphans: StoredObjectEntry[] = [];
@@ -334,7 +444,102 @@ export async function findOrphans(options: {
         else recent++;
     }
     orphans.sort((a, b) => a.key.localeCompare(b.key));
+    if (progress) progress.phase = "done";
     return { objects: all.length, orphans, recent, scanned, unscanned };
+}
+
+/** What deleting a scan's orphans did. */
+export interface OrphanDeletion {
+    deleted: string[];
+    /** Candidates not deleted, because something changed since the scan. */
+    kept: { key: string; reason: string }[];
+    failed: { key: string; error: string }[];
+    /** Collections the re-check could not read; when any is, nothing was deleted. */
+    unscanned: UnscannedCollection[];
+}
+
+/** How far a stored object's time may stray from the listing's and still be the same version. */
+const SAME_VERSION_SLACK_MS = 1_000;
+
+/**
+ * Delete the orphans an earlier scan found — each only if it is still one.
+ *
+ * Every row and history entry is read again, against the candidates alone
+ * (the source is not listed again): a row written since the scan may name one
+ * now. When a collection cannot be read, nothing is deleted. Then, right
+ * before each delete, the object is asked for again: one that is gone, was
+ * written again since the scan (another size or time), or is now inside the
+ * grace period is kept.
+ */
+export async function deleteScannedOrphans(options: ReferenceSources & {
+    controller: StorageController;
+    candidates: readonly StoredObjectEntry[];
+    olderThanMs: number;
+    now?: () => number;
+    progress?: ScanProgress;
+    onProgress?: () => void;
+    /** Called after each file deleted. */
+    onDeleted?: (key: string) => void;
+    signal?: AbortSignal;
+}): Promise<OrphanDeletion> {
+    const progress = options.progress;
+    const unnamed = new Set(options.candidates.map(candidate => candidate.key));
+    if (progress) progress.phase = "rows";
+    const { unscanned } = await removeKeysNamedAnywhere(unnamed, options);
+    const result: OrphanDeletion = { deleted: [], kept: [], failed: [], unscanned };
+    if (unscanned.length > 0) return result;
+
+    if (progress) progress.phase = "deleting";
+    options.onProgress?.();
+    const now = options.now ?? Date.now;
+    for (const candidate of options.candidates) {
+        options.signal?.throwIfAborted();
+        if (!unnamed.has(candidate.key)) {
+            result.kept.push({ key: candidate.key, reason: "a row or a history entry names it now" });
+            continue;
+        }
+        try {
+            const current = await versionOf(options.controller, candidate.key, candidate);
+            const scannedAt = candidate.updated ? Date.parse(candidate.updated) : NaN;
+            if (current === null) {
+                result.kept.push({ key: candidate.key, reason: "it is gone already" });
+            } else if ((candidate.size !== undefined && current.size !== candidate.size)
+                || !Number.isFinite(scannedAt)
+                || Math.abs(current.lastModified - scannedAt) > SAME_VERSION_SLACK_MS) {
+                result.kept.push({ key: candidate.key, reason: "it was written again since the scan" });
+            } else if (current.lastModified > now() - options.olderThanMs) {
+                result.kept.push({ key: candidate.key, reason: "it is newer than the grace period" });
+            } else {
+                await options.controller.deleteObject(candidate.key);
+                result.deleted.push(candidate.key);
+                options.onDeleted?.(candidate.key);
+            }
+        } catch (error: unknown) {
+            result.failed.push({ key: candidate.key, error: error instanceof Error ? error.message : String(error) });
+        }
+        options.onProgress?.();
+    }
+    if (progress) progress.phase = "done";
+    return result;
+}
+
+/**
+ * An object's size and modification time now, or `null` when there is no such
+ * object. A source without `statObject` says only its size, and the time is
+ * then taken to be the one the scan listed.
+ */
+async function versionOf(
+    controller: StorageController,
+    key: string,
+    listed: StoredObjectEntry
+): Promise<{ size: number; lastModified: number } | null> {
+    if (controller.statObject) {
+        const info = await controller.statObject(key);
+        return info ? { size: info.size, lastModified: info.lastModified } : null;
+    }
+    const size = await sizeIn(controller, key);
+    if (size === undefined) return null;
+    return { size, lastModified: listed.updated ? Date.parse(listed.updated) : NaN };
 }
 
 /** What happened to one object in a move. */

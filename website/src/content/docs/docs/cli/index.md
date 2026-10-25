@@ -484,11 +484,28 @@ It lists the files of one source (`--source`, the default source when left out)
 that no string in any of them names: a key, a URL, a `rebase-storage:`
 reference in a text. Files newer than `--older-than` hours (24 by default) are left out,
 because the admin panel uploads a file before the row that names it is saved.
+The scan runs on the backend in the background, so a project too big to scan
+inside one request (behind an ingress that times it out) still finishes. The
+CLI starts it, then shows its progress (files listed, rows read, collections
+done, and any that could not be read) until it is done. With the
+[job queue](/docs/backend/jobs/) on, the scan is a `storage.orphans` job that
+the job workers run. Without it, the scan runs inside the server process that
+was asked, and the CLI says so: restarting that process stops the scan. A scan
+is one job attempt, limited by `jobs.timeoutMs` (15 minutes by default). Raise
+it, or set it to 0, for a source that takes longer. `--json` prints the same
+report as before, plus its `scanId`.
+
 `--delete` asks before it deletes (`--yes` skips the question, and is required
-with no terminal), the server finds the files again first, and nothing is
-deleted while a collection cannot be read — a collection with read hooks on a
-data source whose driver cannot read past them counts as unread. Files that only your own tables
-outside collections name look unused: check before deleting.
+with no terminal). It deletes only from the scan just printed, and only within
+15 minutes of that scan completing. Nothing is deleted while a collection
+cannot be read: a collection with read hooks on a data source whose driver
+cannot read past them counts as unread. Before deleting anything, the server
+reads every row and history entry again against the listed files. Then it asks
+for each file again right before deleting it. A file that a row names now,
+that was uploaded again since the scan, or that is gone is kept, and the CLI
+lists it as kept. Files that only your own tables outside collections name look
+unused: check before deleting. Against a backend from 0.25.1 or earlier, the
+CLI scans the old way, inside one request.
 
 `move` copies the files under `--prefix` to another source under the same keys,
 a page at a time. A file the target already holds at the same size is skipped,

@@ -13,6 +13,7 @@
 import { ApiError } from "../api/errors";
 import { canonicalStorageKey, InvalidStorageKeyError, canonicalStorageBucket, InvalidStorageBucketError } from "./keys";
 import { isRenditionKey, RENDITION_PREFIX } from "./rendition-cache";
+import { isMaintenanceKey, MAINTENANCE_PREFIX } from "./maintenance-keys";
 import { requestedStorageObject, storageObjectOfPath, type RequestedStorageObject } from "./requested-object";
 import type { StorageController } from "./types";
 
@@ -52,7 +53,7 @@ export function objectOfPathOrBadRequest(path: string): RequestedStorageObject {
 
 /**
  * Run a canonicalization, refuse what it yields when that is the reserved
- * rendition space, and turn either refusal into a 400.
+ * rendition or maintenance space, and turn either refusal into a 400.
  */
 function addressableOrBadRequest<T extends string | RequestedStorageObject>(canonicalize: () => T): T {
     try {
@@ -62,10 +63,18 @@ function addressableOrBadRequest<T extends string | RequestedStorageObject>(cano
         // without the source's key ever reaching `storageAuthorize` or the
         // declarative policies — both of which reason about that key — and
         // writing one would let a caller choose what a later transform serves.
-        if (isRenditionKey(typeof canonical === "string" ? canonical : canonical.key)) {
+        const key = typeof canonical === "string" ? canonical : canonical.key;
+        if (isRenditionKey(key)) {
             throw new InvalidStorageKeyError(
                 `"${RENDITION_PREFIX}" is reserved for derived image renditions and cannot be ` +
                 "read or written directly."
+            );
+        }
+        // Storage maintenance's own records: a scan's result is what a later
+        // delete acts on, so writing one would choose what it deletes.
+        if (isMaintenanceKey(key)) {
+            throw new InvalidStorageKeyError(
+                `"${MAINTENANCE_PREFIX}" is reserved for storage maintenance and cannot be read or written directly.`
             );
         }
         return canonical;
