@@ -1,3 +1,5 @@
+import { TYPED } from "./films/01-typed";
+import { SECURITY } from "./films/02-security";
 import { AGENTS } from "./films/03-agents";
 import { seriesDuration, seriesFilm, type FilmSpec, type SeriesProps } from "./kit";
 
@@ -7,7 +9,7 @@ import { seriesDuration, seriesFilm, type FilmSpec, type SeriesProps } from "./k
  * 1080x1920 — from the same take, and the recording page reads it with
  * `?film=<id>`.
  */
-export const SERIES: FilmSpec[] = [AGENTS];
+export const SERIES: FilmSpec[] = [TYPED, SECURITY, AGENTS];
 
 export interface SeriesEntry {
     spec: FilmSpec;

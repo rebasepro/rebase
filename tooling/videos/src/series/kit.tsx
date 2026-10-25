@@ -12,6 +12,7 @@ import {
 import { NeatCanvas } from "../gradient/NeatCanvas";
 import { HERO_TONES } from "../data/neat-config";
 import { Mark } from "../components/Mark";
+import { Code } from "../components/Code";
 import { ENTER, ramp, SHIFT } from "../components/motion";
 import { LiveCamera, Placeholder, type LiveFeed, type Take } from "../desk/Presenter";
 import { FONT, FRAME, GROUND, INK, SURFACE, TRACKING } from "../theme";
@@ -666,3 +667,166 @@ export function useBody(lines = 1): { x: number; y: number; w: number; format: F
     const lh = HEADLINE[format] * 1.04;
     return { x, y: y + lines * lh + (format === "tall" ? 48 : 56), w, format };
 }
+
+/* ── more building blocks ───────────────────────────────────────────── */
+
+/**
+ * A script from plain sentences: each line starts a breath after the last
+ * one ends at the authored nine frames a word. Saves hand-counting `at`.
+ */
+export function lines(spec: [id: string, text: string][], start = 15, gap = 30): Script {
+    let at = start;
+    return spec.map(([id, text], i) => {
+        const words = text.split(" ");
+        const line = { id, at, words };
+        at += words.length * 9 + (i === 0 ? gap + 6 : gap);
+        return line;
+    });
+}
+
+/** A window with a caption over it: a file, a terminal, a response. */
+export const Window: React.FC<{
+    caption?: string;
+    title?: string;
+    at?: number;
+    well?: boolean;
+    accent?: string;
+    children: React.ReactNode;
+    pad?: string;
+}> = ({ caption, title, at = 0, well = true, accent, children, pad = "22px 28px" }) => {
+    const format = useFormat();
+    return (
+        <div>
+            {caption && (
+                <div style={{ marginBottom: 12 }}>
+                    <Label at={at} color={accent ?? INK.muted} size={format === "tall" ? 20 : 18}>
+                        {caption}
+                    </Label>
+                </div>
+            )}
+            <FrameBox title={title} at={at + 4} well={well} pad={pad}>
+                {children}
+            </FrameBox>
+        </div>
+    );
+};
+
+/** The kit's own frame: the brand window, without the spring (a short film
+ *  cuts too fast for a settle to read). */
+const FrameBox: React.FC<{ title?: string; at: number; well: boolean; pad: string; children: React.ReactNode }> = ({ title, at, well, pad, children }) => {
+    const frame = useCurrentFrame();
+    const o = ramp(frame, at, 12, ENTER);
+    return (
+        <div
+            style={{
+                borderRadius: FRAME.radius,
+                border: FRAME.border,
+                background: well ? SURFACE.well : SURFACE.sheet,
+                overflow: "hidden",
+                opacity: o,
+                transform: o < 1 ? `translateY(${(1 - o) * 14}px)` : undefined,
+            }}
+        >
+            {title !== undefined && (
+                <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "12px 18px", borderBottom: `1px solid ${SURFACE.hairline}` }}>
+                    {["#F43F5E", "#FBBF24", "#34D399"].map((c) => (
+                        <span key={c} style={{ width: 10, height: 10, borderRadius: 99, background: c, opacity: 0.55 }} />
+                    ))}
+                    <span style={{ marginLeft: 8, fontFamily: FONT.mono, fontSize: 15, color: INK.muted }}>{title}</span>
+                </div>
+            )}
+            <div style={{ padding: pad }}>{children}</div>
+        </div>
+    );
+};
+
+/** Lines of output that print at their own frames (local), each in a tone. */
+export const Log: React.FC<{ lines: { text: string; at: number; color?: string }[]; size: number }> = ({ lines: rows, size }) => {
+    const frame = useCurrentFrame();
+    return (
+        <div style={{ fontFamily: FONT.mono, fontSize: size, lineHeight: 1.6 }}>
+            {rows.map((r, i) =>
+                frame < r.at ? null : (
+                    <div key={i} style={{ color: r.color ?? INK.copy, opacity: ramp(frame, r.at, 6), whiteSpace: "pre-wrap" }}>
+                        {r.text === "" ? " " : r.text}
+                    </div>
+                ),
+            )}
+        </div>
+    );
+};
+
+/** A typed command line: prompt, then the command a character at a time. */
+export const Prompt: React.FC<{ command: string; at: number; size: number; rate?: number }> = ({ command, at, size, rate = 0.55 }) => {
+    const frame = useCurrentFrame();
+    const n = Math.round(ramp(frame, at, command.length * rate, (t) => t) * command.length);
+    if (frame < at) return null;
+    return (
+        <div style={{ fontFamily: FONT.mono, fontSize: size, lineHeight: 1.6, color: INK.high, whiteSpace: "pre-wrap" }}>
+            <span style={{ color: INK.muted, marginRight: size * 0.5 }}>$</span>
+            {command.slice(0, n)}
+            <span style={{ color: "#4E9BFF", opacity: n < command.length || Math.floor(frame / 16) % 2 === 0 ? 1 : 0 }}>▌</span>
+        </div>
+    );
+};
+
+/** A pill: a scope, a status, a name — something to point at. */
+export const Pill: React.FC<{ children: React.ReactNode; at: number; color?: string; size: number; filled?: boolean }> = ({ children, at, color = INK.high, size, filled }) => {
+    const frame = useCurrentFrame();
+    const o = ramp(frame, at, 14, ENTER);
+    return (
+        <span
+            style={{
+                display: "inline-block",
+                fontFamily: FONT.mono,
+                fontSize: size,
+                padding: `${size * 0.32}px ${size * 0.6}px`,
+                borderRadius: 10,
+                border: `2px solid ${color}`,
+                background: filled ? color : "transparent",
+                color: filled ? GROUND.base : color,
+                opacity: o,
+                transform: o < 1 ? `translateY(${(1 - o) * 10}px)` : undefined,
+            }}
+        >
+            {children}
+        </span>
+    );
+};
+
+/* ── an editor ──────────────────────────────────────────────────────── */
+
+/** The editor window: a tab with the file's name, line numbers, the code. */
+export const Editor: React.FC<{ file: string; code: string; size: number; at?: number; step?: number; accent?: string; sql?: boolean; children?: React.ReactNode }> = ({
+    file,
+    code,
+    size,
+    at = 6,
+    step = 2,
+    accent = "#36CCD6",
+    sql = false,
+    children,
+}) => {
+    const frame = useCurrentFrame();
+    const n = code.split("\n").length;
+    const o = ramp(frame, 0, 12, ENTER);
+    return (
+        <div style={{ borderRadius: 13, border: `1px solid ${SURFACE.hairline}`, background: SURFACE.well, overflow: "hidden", opacity: o, position: "relative" }}>
+            <div style={{ display: "flex", background: SURFACE.sheet, borderBottom: `1px solid ${SURFACE.hairline}` }}>
+                <div style={{ padding: "12px 22px", fontFamily: FONT.mono, fontSize: size * 0.72, color: INK.high, borderBottom: `2px solid ${accent}` }}>{file}</div>
+            </div>
+            <div style={{ display: "flex", padding: "18px 0" }}>
+                <div style={{ width: size * 2.4, textAlign: "right", paddingRight: size * 0.8, fontFamily: FONT.mono, fontSize: size, lineHeight: 1.65, color: INK.muted, opacity: 0.6 }}>
+                    {Array.from({ length: n }, (_, i) => (
+                        <div key={i}>{i + 1}</div>
+                    ))}
+                </div>
+                <div style={{ flex: 1, position: "relative" }}>
+                    <Code code={code} size={size} delay={at} step={step} sql={sql} />
+                    {children}
+                </div>
+            </div>
+        </div>
+    );
+};
+

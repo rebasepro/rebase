@@ -57,7 +57,7 @@ const POLICY = `ALTER TABLE "public"."orders" ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "orders_select_4903a5a" ON "public"."orders";
 CREATE POLICY "orders_select_4903a5a" ON "public"."orders"
     AS PERMISSIVE FOR SELECT TO "public"
-    USING ((customer_id)::text = rebase.uid());`;
+    USING ((customer_id)::text = (SELECT rebase.uid()));`;
 
 export const RuleWindows: React.FC<{ x: number; y: number; at: number }> = ({ x, y, at }) => (
     <div style={{ position: "absolute", left: x, top: y, width: 1520 }}>
