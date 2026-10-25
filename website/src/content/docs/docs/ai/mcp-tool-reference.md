@@ -126,12 +126,12 @@ tool there.
 
 Spawn `rebase cloud … --json` in the active project directory, against the
 project it is linked to, with the CLI's own credential. See
-[Rebase Cloud](/docs/ai/mcp#rebase-cloud) for what they act on and why the
-deploy, variable and rollback tools are not gated.
+[Rebase Cloud](/docs/ai/mcp#rebase-cloud) for what they act on and why none of
+them is gated.
 
 | Tool | Required | Description |
 |---|---|---|
-| `rebase_cloud_provision` ⚠ | — | A live backend with no account (`rebase cloud init --claim`): the live URL, the admin URL and a claim URL (`name`, `deploy`) |
+| `rebase_cloud_provision` | — | A live backend with no account (`rebase cloud init --claim`): the live URL, the admin URL and a claim URL (`name`, `deploy`) |
 | `rebase_cloud_status` | — | The linked project's URL, status, last deploy, runtime, database, storage, and its claim URL while unclaimed |
 | `rebase_cloud_deploy` | — | Deploy and follow it to the end (`app`, `bundle`, `message`, `wait`, `timeoutSeconds`, `preview`, `previewName`) |
 | `rebase_cloud_logs` | — | One snapshot of the runtime log, or the latest build log (`source`, `since`, `tail`, `grep`, `level`, `previous`, `preview`). Never follows |
@@ -140,5 +140,6 @@ deploy, variable and rollback tools are not gated.
 | `rebase_cloud_deployments_list` | — | Recent deployments, and which ones can be rolled back to (`limit`) |
 | `rebase_cloud_rollback` | — | Put a previous successful deployment back into service (`deploymentId`) |
 
-`rebase_cloud_provision` is checked against the project `baseUrl` like the SDK
-tools, so it is refused when the active project points at a remote backend.
+`rebase_cloud_provision` creates a project and links this directory. It never
+reads the active project's `baseUrl`, so the gate does not check it; the CLI
+refuses it in a directory that is already linked.

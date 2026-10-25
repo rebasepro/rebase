@@ -28,7 +28,7 @@ const GROUPS = [
     { const: "CRON_TOOLS", title: "Cron", note: "" },
     { const: "FUNCTION_TOOLS", title: "Functions", note: "" },
     { const: "PROJECT_TOOLS", title: "Project registry", note: "" },
-    { const: "CLOUD_TOOLS", title: "Rebase Cloud", note: "Spawn `rebase cloud … --json` in the active project directory, against the project it is linked to, with the CLI's own credential. Deploy, env set and rollback change that project; the loopback gate does not apply to them, because they never use `baseUrl` or `DATABASE_URL`." }
+    { const: "CLOUD_TOOLS", title: "Rebase Cloud", note: "Spawn `rebase cloud … --json` in the active project directory, against the project it is linked to, with the CLI's own credential. Provisioning creates a project; deploy, env set and rollback change the linked one. The loopback gate does not apply to them, because they never use `baseUrl` or `DATABASE_URL`." }
 ];
 
 /** The body of the array literal whose `[` sits at `open`. */

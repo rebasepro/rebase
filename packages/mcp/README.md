@@ -67,10 +67,10 @@ The server attempts to load `.env` from `$REBASE_PROJECT_DIR/.env` or `$REBASE_P
 **Every tool that changes the target environment is refused unless that target is on the loopback interface.** The gate is a list of what is *not* gated, so a newly added tool is protected by default:
 
 - **Not gated — reads:** `rebase_schema_plan`, `rebase_doctor`, `rebase_db_branch_list`, `rebase_db_branch_info`, `list_documents`, `get_document`, `list_users`, `list_roles`, `storage_list_objects`, `storage_get_download_url`, `cron_list_jobs`, `cron_get_job`, `cron_get_job_logs`, `rebase_dev_logs`, and the Rebase Cloud reads `rebase_cloud_status`, `rebase_cloud_logs`, `rebase_cloud_env_list`, `rebase_cloud_deployments_list`.
-- **Not gated — Rebase Cloud writes:** `rebase_cloud_deploy`, `rebase_cloud_env_set`, `rebase_cloud_rollback`. They change the linked cloud project, but they spawn `rebase cloud`, which acts on the project `.rebase/cloud.json` links with the CLI's own credential and the control plane's own permission checks; they never use `baseUrl` or `DATABASE_URL`, which is all the gate can check.
+- **Not gated — Rebase Cloud writes:** `rebase_cloud_provision`, `rebase_cloud_deploy`, `rebase_cloud_env_set`, `rebase_cloud_rollback`. Provisioning creates a project and links this directory; the others change the linked cloud project, but they spawn `rebase cloud`, which acts on the project `.rebase/cloud.json` links with the CLI's own credential and the control plane's own permission checks; they never use `baseUrl` or `DATABASE_URL`, which is all the gate can check.
 - **Not gated — local only:** `rebase_schema_introspect`, `rebase_db_branch_switch`, `rebase_schema_generate`, `rebase_db_generate`, `rebase_generate_sdk`, the dev-server tools, and the project-registry tools. These write local files or local state and have no remote target to check.
 - **Gated against `DATABASE_URL`:** every other CLI tool — `rebase_db_push`, `rebase_db_migrate`, `rebase_db_branch_create`, `rebase_db_branch_delete`.
-- **Gated against the project `baseUrl`:** every other SDK tool — `create_document`, `update_document`, `delete_document`, `create_user`, `update_user`, `delete_user`, `rebase_auth_reset_password`, `storage_delete_object`, `cron_trigger_job`, `cron_toggle_job`, `invoke_function` — and `rebase_cloud_provision`.
+- **Gated against the project `baseUrl`:** every other SDK tool — `create_document`, `update_document`, `delete_document`, `create_user`, `update_user`, `delete_user`, `rebase_auth_reset_password`, `storage_delete_object`, `cron_trigger_job`, `cron_toggle_job`, `invoke_function`.
 
 The two targets are not interchangeable: CLI tools never see `baseUrl`, so a localhost backend sitting next to a production `DATABASE_URL` is checked against the database, not the backend. `create_user` and `update_user` set `roles`, so they can mint an admin; `invoke_function` calls any function with any HTTP method; `cron_toggle_job` disables a scheduled backup silently. None of those is recoverable in the sense "additive" suggests, which is why the list is now the other way round.
 
@@ -191,11 +191,11 @@ CRUD over a collection through `@rebasepro/client`.
 
 ### Rebase Cloud (8)
 
-Spawn `rebase cloud … --json` in the active project directory, against the project it is linked to, with the CLI's own credential. Deploy, env set and rollback change that project; the loopback gate does not apply to them, because they never use `baseUrl` or `DATABASE_URL`.
+Spawn `rebase cloud … --json` in the active project directory, against the project it is linked to, with the CLI's own credential. Provisioning creates a project; deploy, env set and rollback change the linked one. The loopback gate does not apply to them, because they never use `baseUrl` or `DATABASE_URL`.
 
 | Tool | Required | Description |
 |---|---|---|
-| `rebase_cloud_provision` ⚠ | — | Give the active project a live backend on Rebase Cloud with no account or signup: provisions a project,  |
+| `rebase_cloud_provision` | — | Give the active project a live backend on Rebase Cloud with no account or signup: provisions a project,  |
 | `rebase_cloud_status` | — | Show the Rebase Cloud project this directory is linked to (`rebase cloud status`) |
 | `rebase_cloud_deploy` | — | Deploy this directory to its linked Rebase Cloud project (`rebase cloud deploy`) |
 | `rebase_cloud_logs` | — | Read the linked Rebase Cloud project's log once, the running app's or the latest build's (`rebase cloud logs`) |

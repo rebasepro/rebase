@@ -304,10 +304,11 @@ gated, so a tool added later arrives protected by default.
   `storage_get_download_url`, `cron_list_jobs`, `cron_get_job`, `cron_get_job_logs`,
   `rebase_dev_logs`, and the Rebase Cloud reads `rebase_cloud_status`,
   `rebase_cloud_logs`, `rebase_cloud_env_list`, `rebase_cloud_deployments_list`.
-- **Not gated — Rebase Cloud writes:** `rebase_cloud_deploy`,
-  `rebase_cloud_env_set`, `rebase_cloud_rollback`. They change a production
-  project, but not through `baseUrl` or `DATABASE_URL`, which are all the gate
-  can check. See [Rebase Cloud](#rebase-cloud) for what stands in front of them.
+- **Not gated — Rebase Cloud writes:** `rebase_cloud_provision`,
+  `rebase_cloud_deploy`, `rebase_cloud_env_set`, `rebase_cloud_rollback`.
+  Provisioning creates a project; the others change a production project. None
+  of them goes through `baseUrl` or `DATABASE_URL`, which are all the gate can
+  check. See [Rebase Cloud](#rebase-cloud) for what stands in front of them.
 - **Not gated — local only:** `rebase_schema_introspect`, `rebase_schema_generate`, `rebase_db_generate`,
   `rebase_generate_sdk`, the dev-server tools and the project-registry tools.
   These write local files or local state and have no remote target to check.
@@ -317,7 +318,7 @@ gated, so a tool added later arrives protected by default.
   `create_document`, `update_document`, `delete_document`, `create_user`,
   `update_user`, `delete_user`, `rebase_auth_reset_password`,
   `storage_delete_object`, `cron_trigger_job`, `cron_toggle_job`,
-  `invoke_function`, and `rebase_cloud_provision`.
+  and `invoke_function`.
 
 The two targets are not interchangeable. CLI tools never see `baseUrl`, so a
 localhost backend sitting next to a production `DATABASE_URL` is checked against
@@ -462,7 +463,9 @@ user has to do (`rebase cloud login`, or claiming the project).
 **Why the loopback gate does not apply.** The gate checks the app's `baseUrl` and
 the CLI's `DATABASE_URL`; these tools use neither. After `rebase_cloud_provision`,
 `REBASE_BASE_URL` points at the new cloud project, so gating on it would refuse
-the very deploy the journey needs. A deploy, a variable and a rollback each
+the very deploy the journey needs. Provisioning itself only creates: it touches
+no existing app or database, and the CLI still refuses it in a directory that
+is already linked. A deploy, a variable and a rollback each
 change production. What stands in front of them is the credential above and
 your MCP client's tool approval. To keep an assistant from changing a cloud
 project, set `REBASE_TOKEN` in the server's environment to a token without the

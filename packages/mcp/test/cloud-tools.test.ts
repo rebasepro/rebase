@@ -250,6 +250,15 @@ describe("the loopback gate and cloud tools", () => {
             expect(gatedTargetFor(name)).toBeNull();
         }
     });
+
+    it("does not gate provisioning on baseUrl, which it never reads", () => {
+        // It creates a project on the control plane and links this directory;
+        // it touches no existing app or database. Gated, it was refused exactly
+        // when the active project already pointed at a remote app — with a
+        // message about a URL the tool does not use.
+        expect(CLOUD_CONTROL_PLANE_TOOLS.has("rebase_cloud_provision")).toBe(true);
+        expect(gatedTargetFor("rebase_cloud_provision")).toBeNull();
+    });
 });
 
 describe("running the cloud tools", () => {

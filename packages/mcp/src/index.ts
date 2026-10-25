@@ -802,8 +802,8 @@ export const READ_ONLY_TOOLS = new Set<string>([
 ]);
 
 /**
- * Rebase Cloud tools that change the linked project: a deploy, a variable, a
- * rollback.
+ * Rebase Cloud tools that act on the control plane: provisioning a project, and
+ * changing the linked one with a deploy, a variable or a rollback.
  *
  * Not gated, and not because they are harmless — each one changes a
  * production project. The gate asks whether the app's `baseUrl` or the CLI's
@@ -818,6 +818,12 @@ export const READ_ONLY_TOOLS = new Set<string>([
  * whose name says "cloud".
  */
 export const CLOUD_CONTROL_PLANE_TOOLS = new Set<string>([
+    // Creates a project and links this directory; it never touches an
+    // existing app or database. Gated, it was refused exactly when the active
+    // project already pointed at a remote app, with a message about a URL it
+    // does not read. Its own refusals (an already-linked directory, the
+    // control plane's limits) come from the CLI and still apply.
+    "rebase_cloud_provision",
     "rebase_cloud_deploy",
     "rebase_cloud_env_set",
     "rebase_cloud_rollback"

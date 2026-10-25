@@ -123,11 +123,11 @@ CRUD over a collection through `@rebasepro/client`.
 
 ### Rebase Cloud (8)
 
-Spawn `rebase cloud … --json` in the active project directory, against the project it is linked to, with the CLI's own credential. Deploy, env set and rollback change that project; the loopback gate does not apply to them, because they never use `baseUrl` or `DATABASE_URL`.
+Spawn `rebase cloud … --json` in the active project directory, against the project it is linked to, with the CLI's own credential. Provisioning creates a project; deploy, env set and rollback change the linked one. The loopback gate does not apply to them, because they never use `baseUrl` or `DATABASE_URL`.
 
 | Tool | Required | Description |
 |---|---|---|
-| `rebase_cloud_provision` ⚠ | — | Give the active project a live backend on Rebase Cloud with no account or signup: provisions a project,  |
+| `rebase_cloud_provision` | — | Give the active project a live backend on Rebase Cloud with no account or signup: provisions a project,  |
 | `rebase_cloud_status` | — | Show the Rebase Cloud project this directory is linked to (`rebase cloud status`) |
 | `rebase_cloud_deploy` | — | Deploy this directory to its linked Rebase Cloud project (`rebase cloud deploy`) |
 | `rebase_cloud_logs` | — | Read the linked Rebase Cloud project's log once, the running app's or the latest build's (`rebase cloud logs`) |
