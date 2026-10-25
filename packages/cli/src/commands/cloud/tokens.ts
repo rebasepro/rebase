@@ -9,7 +9,9 @@
  *
  * What a token may do is asked for as capabilities (`--can deploy,logs`) on one
  * project, and turned into scopes by `token-capabilities.ts`, the map the
- * console reads too.
+ * console reads too. Three capabilities act on one organization instead —
+ * `billing`, `audit`, `notifications` — and are given only when `--can` names
+ * them: on `--org`, else the project's organization, else the selected one.
  *
  * Managing tokens takes the signed-in session, never a token: the control
  * plane refuses every key on these routes, because a key that could mint keys
@@ -19,10 +21,16 @@ import chalk from "chalk";
 import type arg from "arg";
 import type { ApiKeyMasked, ApiKeyWithSecret } from "@rebasepro/types";
 import {
+    ALWAYS_SCOPES,
     capabilitiesInScopes,
+    isOrgCapability,
     isTokenCapability,
+    ORG_CAPABILITY_NAMES,
+    orgCapabilitiesInScopes,
     scopesForCapabilities,
+    scopesForOrgCapabilities,
     TOKEN_CAPABILITY_NAMES,
+    type OrgCapability,
     type TokenCapability
 } from "./token-capabilities";
 import {
@@ -30,6 +38,7 @@ import {
     displayProjectRef,
     emit,
     fail,
+    getContextOrg,
     keyValues,
     parseCloudArgs,
     reportError,
@@ -37,7 +46,8 @@ import {
     requireProject,
     requireSessionClient,
     success,
-    TOKEN_ENV
+    TOKEN_ENV,
+    type CloudClient
 } from "./context";
 
 /** Every action the group dispatches. */
@@ -47,7 +57,8 @@ export const TOKENS_ACTIONS = ["list", "create", "revoke"] as const;
 export const CREATE_TOKEN_FLAGS = {
     "--can": [String],
     "--name": String,
-    "--expires-in": String
+    "--expires-in": String,
+    "--org": String
 } satisfies arg.Spec;
 
 export async function tokensCommand(action: string | undefined, rawArgs: string[]): Promise<void> {
@@ -68,29 +79,51 @@ export async function tokensCommand(action: string | undefined, rawArgs: string[
 
 const DAY_MS = 86_400_000;
 
+/** Every word `--can` takes, project capabilities first. */
+const CAN_WORDS = [...TOKEN_CAPABILITY_NAMES, ...ORG_CAPABILITY_NAMES].join(", ");
+
+/** What `--can` names: capabilities on one project, and on one organization. */
+export interface RequestedCapabilities {
+    project: TokenCapability[];
+    org: OrgCapability[];
+}
+
 /**
- * The capabilities `--can` names, comma-separated or repeated, each once.
+ * The capabilities `--can` names, comma-separated or repeated, each once —
+ * split into the project's and the organization's.
  *
  * Exported so its tests can drive it without a session.
  */
-export function parseCapabilities(values: readonly string[] | undefined): TokenCapability[] {
+export function parseCapabilities(values: readonly string[] | undefined): RequestedCapabilities {
     const words = [...new Set((values ?? []).flatMap(value => value.split(/[\s,]+/)).filter(Boolean))];
     if (words.length === 0) {
         fail(
             "Say what the token may do: --can deploy,logs.",
-            `Capabilities: ${TOKEN_CAPABILITY_NAMES.join(", ")}.`,
+            `Capabilities: ${CAN_WORDS}.`,
             "usage"
         );
     }
-    const unknown = words.filter(word => !isTokenCapability(word));
+    const unknown = words.filter(word => !isTokenCapability(word) && !isOrgCapability(word));
     if (unknown.length > 0) {
         fail(
             `--can takes capabilities, and ${unknown.map(word => `"${word}"`).join(", ")} is not one.`,
-            `Capabilities: ${TOKEN_CAPABILITY_NAMES.join(", ")}.`,
+            `Capabilities: ${CAN_WORDS}.`,
             "usage"
         );
     }
-    return words.filter(isTokenCapability);
+    return { project: words.filter(isTokenCapability), org: words.filter(isOrgCapability) };
+}
+
+/** The organization a project belongs to, or undefined when its row does not say. */
+async function projectOrganization(client: CloudClient, projectId: string): Promise<string | undefined> {
+    try {
+        const row = (await client.data.collection("projects").findById(projectId)) as Record<string, unknown> | undefined;
+        const raw = row?.organization ?? row?.organizationId ?? row?.organization_id;
+        if (raw && typeof raw === "object" && "id" in raw) return String((raw as { id: unknown }).id);
+        return raw == null || raw === "" ? undefined : String(raw);
+    } catch {
+        return undefined;
+    }
 }
 
 /**
@@ -118,14 +151,34 @@ async function createToken(rawArgs: string[]): Promise<void> {
     });
     // Both refused before the session is asked for: an unusable line is
     // unusable whoever is signed in.
-    const capabilities = parseCapabilities(flags["--can"]);
+    const { project: capabilities, org: orgCapabilities } = parseCapabilities(flags["--can"]);
     const expiresAt = resolveTokenExpiry(flags["--expires-in"]);
 
-    const { client } = await requireSessionClient(rawArgs);
-    const projectId = await requireProject(rawArgs, client);
-    const projectRef = displayProjectRef(rawArgs) || projectId;
-    const name = flags["--name"]?.trim() || `${projectRef} ${capabilities.join("+")}`;
-    const scopes = scopesForCapabilities(projectId, capabilities);
+    const { client, url } = await requireSessionClient(rawArgs);
+    // A project only when a project capability asks for one: a token for an
+    // organization's billing alone needs none.
+    const projectId = capabilities.length > 0 ? await requireProject(rawArgs, client) : undefined;
+    const projectRef = projectId ? displayProjectRef(rawArgs) || projectId : undefined;
+    // The organization: --org, else the project's own, else the selected one.
+    let organizationId: string | undefined;
+    if (orgCapabilities.length > 0) {
+        organizationId = flags["--org"]?.trim()
+            || (projectId ? await projectOrganization(client, projectId) : undefined)
+            || getContextOrg(url);
+        if (!organizationId) {
+            fail(
+                `Say which organization ${orgCapabilities.join(", ")} ${orgCapabilities.length === 1 ? "is" : "are"} for.`,
+                "Pass --org <id>, or select one with `rebase cloud use`.",
+                "no_org"
+            );
+        }
+    }
+    const reach = projectRef ?? `org ${organizationId}`;
+    const name = flags["--name"]?.trim() || `${reach} ${[...capabilities, ...orgCapabilities].join("+")}`;
+    const scopes = [...new Set([
+        ...(projectId ? scopesForCapabilities(projectId, capabilities) : ALWAYS_SCOPES),
+        ...(organizationId ? scopesForOrgCapabilities(organizationId, orgCapabilities) : [])
+    ])];
 
     let created: ApiKeyWithSecret;
     try {
@@ -139,8 +192,9 @@ async function createToken(rawArgs: string[]): Promise<void> {
         () => {
             keyValues([
                 ["ID", created.id],
-                ["Project", projectRef === projectId ? projectId : `${projectRef} (${projectId})`],
-                ["Can", capabilities.join(", ")],
+                ["Project", !projectId ? undefined : projectRef === projectId ? projectId : `${projectRef} (${projectId})`],
+                ["Organization", organizationId],
+                ["Can", [...capabilities, ...orgCapabilities].join(", ")],
                 ["Expires", created.expires_at ? new Date(created.expires_at).toLocaleDateString() : "never"]
             ]);
             console.log("");
@@ -158,8 +212,10 @@ async function createToken(rawArgs: string[]): Promise<void> {
             name: created.name,
             token: created.key,
             env: TOKEN_ENV,
-            projectId,
+            projectId: projectId ?? null,
             capabilities,
+            organizationId: organizationId ?? null,
+            orgCapabilities,
             scopes: created.scopes,
             expiresAt: created.expires_at
         }
@@ -174,11 +230,27 @@ function tokenStatus(key: ApiKeyMasked, now: Date): "revoked" | "expired" | "act
     return "active";
 }
 
-/** What a token was created for, read back from its scopes: `deploy, logs on proj_1`. */
+/**
+ * What a token was created for, read back from its scopes:
+ * `deploy, logs on proj_1; billing on organization org_1`. Undefined when no
+ * capability explains them.
+ *
+ * Exported for `whoami`, which reads a token back the same way.
+ */
+export function describeGrants(scopes: readonly string[]): string | undefined {
+    const parts = [
+        ...capabilitiesInScopes(scopes)
+            .filter(grant => grant.capabilities.length > 0)
+            .map(grant => `${grant.capabilities.join(", ")} on ${grant.projectId}`),
+        ...orgCapabilitiesInScopes(scopes)
+            .filter(grant => grant.capabilities.length > 0)
+            .map(grant => `${grant.capabilities.join(", ")} on organization ${grant.organizationId}`)
+    ];
+    return parts.length > 0 ? parts.join("; ") : undefined;
+}
+
 function describeGrant(scopes: readonly string[]): string {
-    const grants = capabilitiesInScopes(scopes).filter(grant => grant.capabilities.length > 0);
-    if (grants.length === 0) return `${scopes.length} scope${scopes.length === 1 ? "" : "s"}`;
-    return grants.map(grant => `${grant.capabilities.join(", ")} on ${grant.projectId}`).join("; ");
+    return describeGrants(scopes) ?? `${scopes.length} scope${scopes.length === 1 ? "" : "s"}`;
 }
 
 async function listTokens(rawArgs: string[]): Promise<void> {
@@ -223,6 +295,7 @@ async function listTokens(rawArgs: string[]): Promise<void> {
                 prefix: key.key_prefix,
                 status: tokenStatus(key, now),
                 grants: capabilitiesInScopes(key.scopes),
+                orgGrants: orgCapabilitiesInScopes(key.scopes),
                 scopes: key.scopes,
                 expiresAt: key.expires_at,
                 lastUsedAt: key.last_used_at,

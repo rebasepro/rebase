@@ -35,7 +35,8 @@ import {
     type CloudClient,
     type EphemeralGrant
 } from "./context";
-import { capabilitiesInScopes } from "./token-capabilities";
+import { capabilitiesInScopes, orgCapabilitiesInScopes } from "./token-capabilities";
+import { describeGrants } from "./tokens";
 
 /**
  * Every flag `rebase cloud login` accepts.
@@ -400,6 +401,7 @@ async function whoamiToken(client: CloudClient, url: string): Promise<void> {
         reportError(e, "Failed to read the token's scopes");
     }
     const grants = capabilitiesInScopes(held).filter(grant => grant.capabilities.length > 0);
+    const orgGrants = orgCapabilitiesInScopes(held).filter(grant => grant.capabilities.length > 0);
     const link = readLink();
     emit(
         () => {
@@ -409,7 +411,7 @@ async function whoamiToken(client: CloudClient, url: string): Promise<void> {
             keyValues([
                 ["Host", url],
                 ["Credential", TOKEN_ENV],
-                ["Can", grants.length ? grants.map(g => `${g.capabilities.join(", ")} on ${g.projectId}`).join("; ") : undefined],
+                ["Can", describeGrants(held)],
                 ["Scopes", held.join(", ")],
                 [
                     "Linked project",
@@ -422,6 +424,7 @@ async function whoamiToken(client: CloudClient, url: string): Promise<void> {
             host: url,
             credential: "token",
             grants,
+            orgGrants,
             scopes: held,
             linkedProject: link
                 ? { id: link.projectId, name: link.projectName ?? null, slug: link.slug ?? null }

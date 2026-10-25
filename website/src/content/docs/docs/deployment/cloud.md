@@ -386,7 +386,8 @@ organization's owners and admins who deployed, set or revealed an environment
 variable (by name, never by value), changed a domain, restored a backup,
 resized, stopped or deleted a project, changed a member's role, or created a
 token, and when. A project's **Settings** links to its own entries; an entry
-about a deleted project stays. Entries are kept for a year. The filters are in
+about a deleted project stays. A script reads it with a token made with
+`--can audit` on the organization. Entries are kept for a year. The filters are in
 [`rebase cloud`](/docs/cli/cloud/#organizations).
 
 ## CI and agents
@@ -394,8 +395,10 @@ about a deleted project stays. Entries are kept for a year. The filters are in
 A CI job or an agent should not carry your password. Give it a token narrowed to
 a few actions on one project, created from a signed-in terminal with
 `rebase cloud tokens create --project shop --can deploy,logs`, and set it as
-`REBASE_TOKEN`. The capabilities, a GitHub Actions workflow and what stays with
-a signed-in person are in
+`REBASE_TOKEN`. An organization's billing, activity log and notification
+settings are capabilities of their own (`--can billing`, `audit`,
+`notifications`) that a token holds only when asked for. The capabilities, a
+GitHub Actions workflow and what stays with a signed-in person are in
 [CI and agents](/docs/deployment/cloud-agents/#ci-and-agents).
 
 ## A backend with no account

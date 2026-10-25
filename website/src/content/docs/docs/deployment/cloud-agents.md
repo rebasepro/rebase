@@ -53,16 +53,39 @@ jobs:
 | Capability | What the token may do |
 |---|---|
 | `deploy` | Deploy the project and follow its builds: `deploy` (`--preview` included), `deployments`, `previews` |
-| `logs` | Read build and runtime logs, cron history, and live metrics: `logs`, `cron`, `metrics` |
+| `logs` | Read build and runtime logs, cron history, live metrics and usage: `logs`, `cron`, `metrics`, `usage` |
 | `env` | Read and change environment variables, secrets included, and previews' own (`--preview`) |
 | `database` | `db list`, `db info` and `db connect`, which includes the database password |
 | `backups` | List, create, inspect and download backups, and read the point-in-time window |
+
+<span class="since-badge" data-since="0.26">Since 0.26</span> Three more capabilities act on an organization rather than a project. A token
+holds one only when `--can` names it, on the organization `--org` names (or,
+without `--org`, the project's organization, then the one selected with
+`rebase cloud use`). A token may hold them and no project capability:
+
+```bash
+rebase cloud tokens create --can billing --org <organization-id> --name invoices
+```
+
+| Capability | What the token may do |
+|---|---|
+| `billing` | Read the card on file, the invoices and the next invoice, and change the billing email: `billing`, `billing invoices`, `billing upcoming`. Owners and admins only |
+| `audit` | Read the organization's activity log: `activity`. Owners and admins only |
+| `notifications` | Change its owner's own email choices, and the organization's projects' notification webhooks: `notifications`. Adding, changing and removing a webhook still takes the owner or admin role |
+
+A token made before
+`billing` existed still reads billing for one release. Each of those answers
+carries a `Deprecation: true` header and a sentence naming the scope the token
+lacks, and the CLI prints it once, on stderr, as a warning. Replace such a token
+with one made with `--can billing` before the next release, when billing starts
+refusing it.
 
 Under the hood a token is a [personal API key](/docs/backend/api-keys/#personal-keys)
 on the control plane. Each capability becomes a few
 [scopes](/docs/backend/roles-and-scopes/): `deploy` on `shop` holds
 `project:deploy:<id>`, with the project's id, plus the data and function scopes
-the deploy commands call. The token never holds more than your account does at the moment
+the deploy commands call. An organization capability holds `org:billing:<id>`,
+`org:audit:<id>` or `org:notifications:<id>`, with the organization's id. The token never holds more than your account does at the moment
 it is used, so it loses whatever your account loses.
 
 Two things stay with a signed-in person:
@@ -75,7 +98,8 @@ Two things stay with a signed-in person:
   signed-in owner or admin.
 
 `rebase cloud whoami` with a token set shows what it may do, and on which
-project. `rebase cloud tokens revoke <id> --yes` stops it at once.
+project or organization. The console's **Access tokens** screen offers the same
+capabilities, the organization ones under **Organization access**. `rebase cloud tokens revoke <id> --yes` stops it at once.
 
 ## A backend with no account
 

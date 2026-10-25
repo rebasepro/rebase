@@ -36,9 +36,14 @@ import * as context from "./context";
 import {
     ALWAYS_SCOPES,
     capabilitiesInScopes,
+    ORG_CAPABILITIES,
+    ORG_CAPABILITY_NAMES,
+    orgCapabilitiesInScopes,
     scopesForCapabilities,
+    scopesForOrgCapabilities,
     TOKEN_CAPABILITIES,
     TOKEN_CAPABILITY_NAMES,
+    type OrgCapability,
     type TokenCapability
 } from "./token-capabilities";
 import { parseCapabilities, resolveTokenExpiry } from "./tokens";
@@ -72,6 +77,8 @@ const BEST_EFFORT: Record<string, string> = {
     // The same pre-check, only reached when the card check answered.
     "data:read:billing-accounts": "the deploy's billing pre-check, which proceeds when refused"
 };
+
+const ORG_ID = "org_1";
 
 /* ─── the stand-in control plane ───────────────────────────────── */
 
@@ -157,6 +164,38 @@ const PREVIEW_APP = new URL(PREVIEW.url).origin;
 
 const PREVIEW_VAR = { key: "FOO", secret: false, unset: false, updatedAt: null };
 
+/** A month of usage, as the `usage` function answers it. */
+const USAGE = {
+    projectId: PROJECT_ID,
+    month: "2026-10",
+    complete: false,
+    days: [],
+    totals: { requests: 0, errors: 0, daysRecorded: 0, daysWithGaps: 0 },
+    quotas: { requestsPerMonth: 1000000 },
+    fraction: 0,
+    warn: false,
+    overageEur: 0,
+    billed: true,
+    projection: null,
+    enforcement: { kind: "none", message: "" },
+    caveats: []
+};
+
+/** A notification webhook, as the `notifications` function lists one. */
+const WEBHOOK = {
+    id: "w1",
+    name: "",
+    url: "https://hooks.slack.com/…abc",
+    events: ["deploy.failed"],
+    format: "json",
+    enabled: true,
+    lastStatus: null,
+    lastError: "",
+    lastDeliveredAt: null,
+    failureCount: 0,
+    createdAt: null
+};
+
 /** What the control plane answers, or undefined for a 404. */
 function answer(method: string, url: URL): unknown {
     const p = url.pathname;
@@ -182,6 +221,14 @@ function answer(method: string, url: URL): unknown {
             ...(url.searchParams.get("preview") ? { preview: url.searchParams.get("preview") } : {})
         })],
         [p === `/api/functions/metrics/${PROJECT_ID}`, () => ({ status: "running", cpu: "12m", memory: "120Mi", memoryPercent: "23%" })],
+        [p === `/api/functions/usage/${PROJECT_ID}`, () => USAGE],
+        [p.startsWith("/api/functions/stripe-billing/invoices/"), () => ({ invoices: [], hasMore: false })],
+        [p.startsWith("/api/functions/stripe-billing/upcoming/"), () => ({ upcoming: [], truncated: false })],
+        [p === `/api/functions/audit/org/${ORG_ID}`, () => ({ events: [], nextCursor: null })],
+        [p === "/api/functions/notifications/webhooks" && method === "GET", () => ({ webhooks: [] })],
+        [p === "/api/functions/notifications/webhooks", () => ({ webhook: WEBHOOK, secret: "whsec_1" })],
+        [p === "/api/functions/notifications/webhooks/w1/test", () => ({ success: true, statusCode: 204, error: "", attempts: 1 })],
+        [p === "/api/functions/notifications/webhooks/w1", () => ({ success: true, deleted: "w1" })],
         [p === `/api/functions/runtime-token/${PROJECT_ID}`, () => ({ token: RUNTIME_TOKEN, scopes: ["cron:read"] })],
         [p === `/api/functions/env-vars/${PROJECT_ID}` && method === "GET", () => ENV_LIST],
         [p === `/api/functions/env-vars/${PROJECT_ID}`, () => ({ success: true, var: ENV_LIST.vars[0], pendingRedeploy: true })],
@@ -372,6 +419,7 @@ const COMMANDS: Record<TokenCapability, string[][]> = {
         ["logs", "--runtime"],
         ["logs", "--follow"],
         ["metrics"],
+        ["usage"],
         ["cron", "list"],
         ["cron", "logs", "nightly"],
         // A preview's build log, and what its backend prints.
@@ -462,6 +510,79 @@ describe("each capability covers its commands", () => {
     });
 });
 
+/* ─── organization capabilities ────────────────────────────────── */
+
+const ORG_COMMANDS: Record<OrgCapability, string[][]> = {
+    billing: [
+        ["billing"],
+        ["billing", "invoices"],
+        ["billing", "upcoming"]
+    ],
+    audit: [
+        ["activity"],
+        ["activity", "--action", "env"]
+    ],
+    notifications: [
+        ["notifications", "list"],
+        ["notifications", "add", "https://hooks.slack.com/services/T/B/abc"],
+        ["notifications", "test", "w1"],
+        ["notifications", "remove", "w1", "--yes"]
+    ]
+};
+
+/** One `rebase cloud …` line under a token holding nothing but `capability` on the organization. */
+async function runOrg(line: string[], capability: OrgCapability, enforced: boolean): Promise<Sent[]> {
+    cp = `https://cp-${++runs}.example`;
+    sent = [];
+    held = [...ALWAYS_SCOPES, ...scopesForOrgCapabilities(ORG_ID, [capability])];
+    enforce = enforced;
+    context.setContextOrg(cp, ORG_ID);
+    try {
+        await cloudCommand(line[0], ["node", "rebase", "cloud", ...line, "--project", "shop", "--url", cp]);
+    } catch (e) {
+        throw new Error(`rebase cloud ${line.join(" ")}: ${String(e)}\n${said.join("\n")}`);
+    }
+    return sent;
+}
+
+const orgCases = ORG_CAPABILITY_NAMES.flatMap(capability =>
+    ORG_COMMANDS[capability].map(line => [capability, line.join(" "), line] as const));
+
+describe("each organization capability covers its commands", () => {
+    it.each(orgCases)("%s covers `rebase cloud %s`", async (capability, _label, line) => {
+        const requests = await runOrg([...line], capability, false);
+        expect(requests.length, "the command made no request, so this proves nothing").toBeGreaterThan(0);
+        const gaps = requests
+            .filter(request => !request.scope.startsWith("public:"))
+            .filter(request => !grants(held, request.scope))
+            .map(request => `${request.method} ${request.url.pathname} needs ${request.scope}`);
+        expect(gaps, `--can ${capability} does not cover what the command calls`).toEqual([]);
+    });
+
+    it.each(orgCases)("%s alone completes `rebase cloud %s`", async (capability, _label, line) => {
+        const requests = await runOrg([...line], capability, true);
+        const refused = requests
+            .filter(request => !request.scope.startsWith("public:") && !grants(held, request.scope))
+            .map(request => request.scope);
+        expect(refused).toEqual([]);
+        expect(said.join("\n")).not.toMatch(/SCOPE_MISSING|does not hold/);
+    });
+
+    it.each(ORG_CAPABILITY_NAMES)("narrows %s's org scope to the token's organization, and holds no project scope", (capability) => {
+        const scopes = ORG_CAPABILITIES[capability].scopes("o1");
+        expect(scopes.filter(scope => scope.startsWith("org:"))).toEqual([`org:${capability}:o1`]);
+        expect(scopes.some(scope => scope.startsWith("project:"))).toBe(false);
+    });
+
+    it("reads a token's organization scopes back as its capabilities", () => {
+        expect(orgCapabilitiesInScopes(scopesForOrgCapabilities("o1", ["billing", "notifications"])))
+            .toEqual([{ organizationId: "o1", capabilities: ["billing", "notifications"] }]);
+        expect(orgCapabilitiesInScopes(["org:billing:o1"])).toEqual([{ organizationId: "o1", capabilities: [] }]);
+        expect(() => scopesForOrgCapabilities("", ["billing"])).toThrow(/organization id/);
+        expect(() => scopesForOrgCapabilities("o1", ["admin" as OrgCapability])).toThrow(/not an organization capability/);
+    });
+});
+
 /* ─── the map itself ───────────────────────────────────────────── */
 
 describe("scopesForCapabilities", () => {
@@ -501,7 +622,12 @@ describe("tokens create's line", () => {
     beforeEach(() => context.setJsonModeForTest(false));
 
     it("takes capabilities comma-separated or repeated, each once", () => {
-        expect(parseCapabilities(["deploy,logs", "logs", "env"])).toEqual(["deploy", "logs", "env"]);
+        expect(parseCapabilities(["deploy,logs", "logs", "env"])).toEqual({ project: ["deploy", "logs", "env"], org: [] });
+    });
+
+    it("tells the organization's capabilities from the project's", () => {
+        expect(parseCapabilities(["deploy,billing", "audit"])).toEqual({ project: ["deploy"], org: ["billing", "audit"] });
+        expect(parseCapabilities(["notifications"])).toEqual({ project: [], org: ["notifications"] });
     });
 
     it("refuses an empty --can and a word that is not a capability", () => {

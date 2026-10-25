@@ -24,7 +24,7 @@
  */
 import chalk from "chalk";
 import { emitHelp, GLOBAL_HELP_FLAGS } from "./context";
-import { TOKEN_CAPABILITIES, TOKEN_CAPABILITY_NAMES } from "./token-capabilities";
+import { ORG_CAPABILITIES, ORG_CAPABILITY_NAMES, TOKEN_CAPABILITIES, TOKEN_CAPABILITY_NAMES } from "./token-capabilities";
 
 export interface ActionHelp {
     /** `cloud projects create` — no leading `rebase`. */
@@ -662,7 +662,8 @@ export const ACTION_HELP: Record<string, ActionHelp> = {
             "Where the linked project's events are POSTed: a Slack or Discord incoming webhook, or any https URL. "
             + "`list` (the default) shows each destination, masked, with the outcome of its last delivery; any "
             + "member of the organization may read it. `add`, `test` and `remove` take the owner or admin role. "
-            + "Which emails you get is set in the console, under Account → Notifications.",
+            + "Which emails you get is set in the console, under Account → Notifications. A token manages them with "
+            + "the `notifications` capability on the organization (`rebase cloud tokens create --can notifications`).",
         flags: [],
         examples: [
             "rebase cloud notifications",
@@ -735,7 +736,9 @@ export const ACTION_HELP: Record<string, ActionHelp> = {
             "rebase cloud billing upcoming"
         ],
         notes: [
-            "`setup` comes before the first deploy: without a card the control plane answers 402, and `deploy` refuses before it builds."
+            "`setup` comes before the first deploy: without a card the control plane answers 402, and `deploy` refuses before it builds.",
+            "A token reaches billing with the `billing` capability on the organization (`rebase cloud tokens create --can billing --org <id>`). "
+            + "A token made before that capability existed still works for one release, and each answer warns that it will stop."
         ]
     },
 
@@ -779,7 +782,8 @@ export const ACTION_HELP: Record<string, ActionHelp> = {
             "The figures carry their limits as `caveats`: object storage is not measured yet, a project that can run "
             + "two or more app pods undercounts requests, and days with missed samples are partial.",
             "A month's overage is billed on the following month's invoice.",
-            "It reads with your login: no access-token capability includes it yet, so REBASE_TOKEN is refused."
+            "A token reads it with the `logs` capability on the project (`rebase cloud tokens create --can logs`); "
+            + "`usage org` lists the projects the token holds it on."
         ]
     },
 
@@ -806,7 +810,8 @@ export const ACTION_HELP: Record<string, ActionHelp> = {
         notes: [
             "--project narrows to one project's events; a deleted project's id still works.",
             "Times are UTC. A project that was deleted still shows by the name it had.",
-            "It reads with your login: no access-token capability includes it, so REBASE_TOKEN is refused.",
+            "A token reads it only with the `audit` capability on the organization "
+            + "(`rebase cloud tokens create --can audit --org <id>`), and only while you are its owner or admin.",
             "The same log is the Activity page in the console."
         ]
     },
@@ -982,23 +987,27 @@ export const ACTION_HELP: Record<string, ActionHelp> = {
 
     "tokens create": {
         command: "cloud tokens create",
-        usage: "cloud tokens create --can <capabilities> [--project <slug>] [--name <name>] [--expires-in <days>]",
+        usage: "cloud tokens create --can <capabilities> [--project <slug>] [--org <id>] [--name <name>] [--expires-in <days>]",
         summary:
             "Create a token for one project — the linked one unless --project names another — holding only "
-            + "the capabilities --can names. The token is printed once, as the `export REBASE_TOKEN=…` line "
-            + "to hand to CI.",
+            + "the capabilities --can names. `billing`, `audit` and `notifications` act on an organization instead: "
+            + "--org, else the project's own, else the selected one; a token may hold only those. The token is "
+            + "printed once, as the `export REBASE_TOKEN=…` line to hand to CI.",
         flags: [
-            ["--can <capabilities>", `Comma-separated or repeated: ${TOKEN_CAPABILITY_NAMES.join(", ")}`],
+            ["--can <capabilities>", `Comma-separated or repeated: ${[...TOKEN_CAPABILITY_NAMES, ...ORG_CAPABILITY_NAMES].join(", ")}`],
+            ["--org <id>", "The organization billing, audit and notifications are for"],
             ["--name <name>", "What to call it. Defaults to the project and its capabilities"],
             ["--expires-in <days>", "Days until it stops working. Default: it does not expire"]
         ],
         examples: [
             "rebase cloud tokens create --can deploy",
             "rebase cloud tokens create --project shop --can deploy,logs --name \"GitHub Actions\" --expires-in 90",
-            "rebase cloud tokens create --project shop --can env,database"
+            "rebase cloud tokens create --project shop --can env,database",
+            "rebase cloud tokens create --can billing,audit --org 3f2a9c1e --name invoices"
         ],
         notes: [
             ...TOKEN_CAPABILITY_NAMES.map(name => `${name}: ${TOKEN_CAPABILITIES[name].label}.`),
+            ...ORG_CAPABILITY_NAMES.map(name => `${name}: ${ORG_CAPABILITIES[name].label}.`),
             "A token never holds more than your account does when it is used, and cannot create tokens."
         ]
     },

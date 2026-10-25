@@ -503,6 +503,8 @@ export function createTokenClient(url: string, token: string, ephemeralProjectId
         baseUrl: url,
         realtime: false,
         headers: { "User-Agent": cliUserAgent() },
+        // Watches for the control plane saying a token's request is deprecated.
+        fetch: deprecationAwareFetch,
         token,
         auth: {
             storage: createMemoryStorage(),
@@ -517,6 +519,42 @@ export function createTokenClient(url: string, token: string, ephemeralProjectId
     if (ephemeralProjectId) GRANT_CLIENTS.set(client, ephemeralProjectId);
     return client;
 }
+
+/** The deprecation notices already printed, once each per process. */
+const TOLD_DEPRECATED = new Set<string>();
+
+/**
+ * Say, once, that the control plane marked a token's request as deprecated.
+ *
+ * The control plane answers a request it still serves, but will not in a later
+ * release, with `Deprecation: true` (RFC 9745), a `Link` with
+ * `rel="deprecation"` to the page that explains it, and an
+ * `X-Rebase-Deprecation` sentence saying what to do — a token from before
+ * `org:billing` reading billing is the first. CI logs are where that is seen,
+ * so it goes to stderr as a warning, once per notice per process, and never
+ * into the `--json` value on stdout.
+ *
+ * Exported so its test can hand it a response.
+ */
+export function noticeDeprecation(response: Response): void {
+    if (response.headers?.get?.("Deprecation") == null) return;
+    const notice = response.headers.get("X-Rebase-Deprecation")?.trim()
+        || "The control plane marked a request this command made as deprecated: it may stop working in a later release.";
+    if (TOLD_DEPRECATED.has(notice)) return;
+    TOLD_DEPRECATED.add(notice);
+    const link = /<([^>]+)>\s*;\s*rel="?deprecation"?/i.exec(response.headers.get("Link") ?? "")?.[1];
+    warn(notice, link ? `See ${link}` : undefined);
+}
+
+/**
+ * `fetch` for a token client: the global one — read at call time, so a test's
+ * stand-in is used — with every answer shown to {@link noticeDeprecation}.
+ */
+const deprecationAwareFetch: typeof globalThis.fetch = async (input, init) => {
+    const response = await globalThis.fetch(input, init);
+    noticeDeprecation(response);
+    return response;
+};
 
 /** What `/api/auth/scopes` said each token holds, asked once per process. */
 const TOKEN_SCOPES = new Map<string, Promise<string[] | undefined>>();
@@ -555,6 +593,7 @@ function tokenScopes(url: string, token: string): Promise<string[] | undefined> 
 export function resetTokenScopesForTest(): void {
     TOKEN_SCOPES.clear();
     TOLD_GRANT_PREFERRED.clear();
+    TOLD_DEPRECATED.clear();
 }
 
 /**

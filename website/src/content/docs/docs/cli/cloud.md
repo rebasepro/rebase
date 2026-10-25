@@ -24,7 +24,18 @@ rebase cloud login --code   # with an emailed 6-digit code: accounts made with G
 rebase cloud logout     # sign out
 rebase cloud whoami     # the current session, or what REBASE_TOKEN may do
 rebase cloud tokens create --can deploy,logs   # a token for CI, shown once
+rebase cloud tokens create --can billing --org <id>   # a token for an organization's billing
 ```
+
+`--can` takes `deploy`, `logs`, `env`, `database` and `backups` on one project
+(`--project`, or the linked one), and <span class="since-badge" data-since="0.26">Since 0.26</span> `billing`, `audit` and
+`notifications` on one organization: `--org`, else the project's organization,
+else the selected one. A token may hold only organization capabilities.
+`logs` also covers `usage`. What each one reaches is in
+[CI and agents](/docs/deployment/cloud-agents/#ci-and-agents). When the control
+plane marks an answer to a token as deprecated (a token from before `billing`
+reading billing), the CLI prints the notice once on stderr, never in the
+`--json` value.
 
 At a terminal with no password given, <span class="since-badge" data-since="0.26">Since 0.26</span> `login` asks whether to use your password
 or a code the control plane emails you. With two-factor authentication on, it
@@ -216,9 +227,10 @@ member's role, or created or revoked an access token. `--action` takes an area
 `extension`, `storage`, `project`, `org`, `member`, `invite`, `token`) or a full action
 such as `env.set`. A page holds up to 100 entries (`--limit`, default 50); the
 output prints the `--before` cursor for the next one. `--json` is one value,
-`{ org, events, nextCursor }`. It needs the organization's owner or admin role
-and reads with your login: no access-token capability includes it. The
-console's **Activity** page shows the same log.
+`{ org, events, nextCursor }`. It needs the organization's owner or admin role.
+A token reads it only with the `audit` capability on the organization
+(`rebase cloud tokens create --can audit`). The console's **Activity** page
+shows the same log.
 
 ## Databases
 
@@ -288,8 +300,8 @@ is a positional argument because `--url` names the control plane. `add` prints
 the signing secret once; `--json` returns `{ projectId, webhook, secret }`.
 `test <id>` exits 1 with code `delivery_failed` when the receiver did not accept
 the test event. Listing is open to any member of the organization; `add`, `test`
-and `remove` need the owner or admin role. These routes take your
-`rebase cloud login`: no access-token capability includes them. See
+and `remove` need the owner or admin role. A token manages them with the
+`notifications` capability on the organization, within the same role rule. See
 [Cloud notifications](/docs/deployment/cloud-notifications/).
 
 <span class="since-badge" data-since="0.26">Since 0.26</span> `clusters registry <cluster-id> --repository <host/project/repo>
@@ -307,7 +319,9 @@ accounts with Terraform (`saas/infra/gcp/registry-linked-clusters.tf`).
 
 <span class="since-badge" data-since="0.26">Since 0.26</span> `billing invoices` and `billing upcoming` read the same Stripe data as the
 console's Billing page, and are open to the organization's owners and admins
-only. Amounts in `--json` are in the currency's minor unit (cents), exactly as
+only. A token reaches them, and the rest of `billing`, with the `billing`
+capability on the organization; a token made before that capability keeps
+working for one release, with a warning on each answer. Amounts in `--json` are in the currency's minor unit (cents), exactly as
 Stripe sends them. Draft invoices are not listed; the preview is computed by
 Stripe and its metered lines keep growing until the period closes.
 
@@ -317,8 +331,9 @@ so far in euros and, for the month in progress, where it is heading at this
 pace (an estimate). The overage is the overage report's own calculation, the
 one that tells Stripe what to bill, and lands on the following month's invoice.
 `usage org` lists every project of the organization selected with `rebase cloud
-use`, and the total. Any member of the organization can read it, with their
-login: no access-token capability includes it yet, so `REBASE_TOKEN` is refused.
+use`, and the total. Any member of the organization can read it. A token reads
+it with the `logs` capability on the project; `usage org` lists the projects the
+token holds that on.
 `--month` takes a past month. The answer carries `caveats`, each with a `code`: `storage_not_measured`
 (object storage reads 0), `multi_pod_undercount` (requests served while two or
 more app pods run are not counted), `partial_days`, `metering_off`,
