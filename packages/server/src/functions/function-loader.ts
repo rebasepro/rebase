@@ -7,6 +7,7 @@ import { logger } from "../utils/logger.js";
 import { nativeDynamicImport, type ModuleImporter } from "../utils/dynamic-import.js";
 import { describeLoadFailure, SYNTAX_ERROR_ADVICE } from "../utils/load-failure.js";
 import { warnDeprecated } from "@rebasepro/common";
+import { isHonoLike } from "./hono-like";
 
 /**
  * One custom function: a Hono app, served at `<functions mount>/<name>`.
@@ -301,18 +302,3 @@ export async function readFunctionsDirectory(
     return { functions, problems };
 }
 
-/**
- * Duck-type check for Hono apps.
- * We avoid `instanceof Hono` because different Hono versions
- * installed in the user's project vs. our dependencies will
- * not share the same prototype, causing false negatives.
- */
-function isHonoLike(obj: unknown): boolean {
-    if (!obj || typeof obj !== "object") return false;
-    // Hono instances always have .fetch() and .routes
-    const record = obj as Record<string, unknown>;
-    return (
-        typeof record.fetch === "function" &&
-        Array.isArray(record.routes)
-    );
-}
