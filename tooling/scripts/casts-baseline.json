@@ -6,7 +6,7 @@
   },
   "cli": {
     "as never": 5,
-    "as unknown as": 5
+    "as unknown as": 4
   },
   "client": {
     "as any": 1,
