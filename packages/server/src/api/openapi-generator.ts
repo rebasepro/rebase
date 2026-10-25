@@ -1748,9 +1748,9 @@ export function buildCollectionInputSchema(collection: CollectionConfig): Record
  * Neither spelling is listed in `required`, even for a relation the collection
  * declares `validation: { required: true }` on: the two keys are alternatives,
  * and a schema naming both would tell a spec-validating gateway to reject a
- * create that the server accepts. (The SDK's `Insert` marks both non-optional
- * for the same relation, which is the same fact stated less carefully; a
- * document is the half that a gateway enforces.)
+ * create that the server accepts. (The SDK's `Insert` states the same fact as
+ * a type: both keys optional, intersected with `({ authorId } | { author })`.
+ * A JSON schema could say it with `anyOf`, which not every gateway reads.)
  */
 function emitWritableRelations(
     collection: CollectionConfig,
