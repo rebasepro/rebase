@@ -2,10 +2,11 @@
  * `rebase cloud orgs` — list / create / members / invites.
  *
  * Members: list, invite by email, remove, change a role. Inviting goes through
- * the control plane's `invites` function, which adds an existing account whose
- * address is verified straight away and otherwise opens an invitation: a link,
- * valid 7 days, that only an account which has verified that address can
- * accept. The link is printed, because the control plane may send no email;
+ * the control plane's `invites` function, which always opens an invitation —
+ * nobody joins an organization until they accept, an existing account
+ * included: a link, valid 7 days, that only an account which has verified that
+ * address can accept. Nobody is invited as owner; an owner promotes them once
+ * they have joined. The link is printed, because the control plane may send no email;
  * the output says whether it did. Inviting takes a `rebase cloud login`
  * session — a token cannot hand out access to an organization.
  */
@@ -262,8 +263,16 @@ async function membersCommand(rawArgs: string[]): Promise<void> {
         fail(`"${rest[1]}" is not a role.`, "A role is owner, admin or member.", "usage");
     }
     const role = flags["--role"] ?? "member";
+    if (action === "invite" && role === "owner") {
+        const who = rest[0] ?? "<email>";
+        fail(
+            "Nobody is invited as an owner.",
+            `Invite them with --role admin, and once they have joined: \`rebase cloud orgs members role ${who} owner\`.`,
+            "invite_role_not_allowed"
+        );
+    }
     if (action === "invite" && !(MEMBER_ROLES as readonly string[]).includes(role)) {
-        fail(`"${role}" is not a role.`, "Pass --role admin or --role member (owner only for an existing verified account).", "usage");
+        fail(`"${role}" is not a role.`, "Pass --role admin or --role member.", "usage");
     }
 
     switch (action) {
@@ -341,13 +350,15 @@ async function inviteMember(rawArgs: string[], orgFlag: string | undefined, emai
         reportError(e, `Failed to invite ${email}`);
     }
     if (result.kind === "added") {
+        // Only a control plane from before invitations-for-everyone adds
+        // anyone directly; today's always answers "invited".
         emit(() => success(`${result.email} already had a verified account and is now a member (${result.role}) of org ${org}`), { org, ...result });
         return;
     }
     const invited = result;
     emit(
         () => {
-            success(`Invited ${invited.invite.email} as ${invited.invite.role} — the link works once, until ${invited.invite.expiresAt.slice(0, 10)}`);
+            success(`Invitation sent to ${invited.invite.email} as ${invited.invite.role} — they join when they accept; the link works once, until ${invited.invite.expiresAt.slice(0, 10)}`);
             console.log("");
             console.log(`  ${chalk.cyan(invited.link)}`);
             console.log("");
@@ -541,8 +552,8 @@ description: "List organizations you belong to" },
                 action: "members invite",
                 args: "<email>",
                 section: "Members",
-                description: "Invite by email. A verified account is added now; anyone else gets a 7-day, single-use link",
-                flags: [["--role <role>", "admin or member (default). owner only for an existing verified account, by an owner"]]
+                description: "Invite by email: a 7-day, single-use link they accept. Nobody joins until they do",
+                flags: [["--role <role>", "admin or member (default). Never owner: promote them with `members role` once they have joined"]]
             },
             {
                 action: "members remove",

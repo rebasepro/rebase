@@ -182,13 +182,14 @@ rebase cloud orgs invites [list] | revoke <id|email> | resend <id|email>
 rebase cloud activity [--project <id|slug>] [--action <area|action>] [--actor <email>] [--limit N] [--before <cursor>]
 ```
 
-<span class="since-badge" data-since="0.26">Since 0.26</span> `members invite` adds someone whose Rebase account has the address verified,
-and otherwise opens an invitation and prints its link: single use, valid 7 days,
-accepted only by an account that has verified that address. The output (and
-`emailDelivery` in `--json`) says whether it was emailed; when it was not, a
-warning says to send the link yourself. `--role` is `admin` or `member`
-(default); `owner` only adds an existing verified account, and only an owner
-may grant it. `invites resend` gives a new link and the old one stops working.
+<span class="since-badge" data-since="0.26">Since 0.26</span> `members invite` opens an invitation and prints its link: single use,
+valid 7 days, accepted only by an account that has verified that address.
+Nobody joins until they accept, even someone who already has a Rebase account.
+The output (and `emailDelivery` in `--json`) says whether it was emailed; when
+it was not, a warning says to send the link yourself. `--role` is `admin` or
+`member` (default). Nobody is invited as `owner`: invite them as an admin, and
+an owner promotes them with `members role <email> owner` once they have joined.
+`invites resend` gives a new link and the old one stops working.
 Inviting and `invites` need a `rebase cloud login` session; `REBASE_TOKEN` is
 refused. Inviting, resending and revoking take the owner or admin role; listing
 takes any member.

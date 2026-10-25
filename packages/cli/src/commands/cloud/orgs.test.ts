@@ -41,7 +41,8 @@ const invoke = vi.fn(async (_name: string, body: unknown, opts?: { method?: stri
     if (opts?.method === "DELETE") return { invite: INVITE };
     if (opts?.path?.endsWith("/resend")) return { invite: INVITE, link: LINK, emailDelivery: { sent: true } };
     const email = (body as { email: string }).email;
-    if (email === "existing@x.com") return { kind: "added", userId: "u-2", role: "member", email };
+    // Only a control plane from before invitations-for-everyone answers this.
+    if (email === "older-cp@x.com") return { kind: "added", userId: "u-2", role: "member", email };
     return { kind: "invited", invite: { ...INVITE, email }, link: LINK, emailDelivery: { sent: false, reason: "not_configured" } };
 });
 const findMembers = vi.fn(async () => ({ data: [
@@ -125,10 +126,25 @@ describe("rebase cloud orgs members", () => {
         expect(body.org).toBe("org-1");
     });
 
-    it("says an existing verified account was added, defaulting the role to member", async () => {
+    it("invites an existing account like anyone else, defaulting the role to member", async () => {
         const { out } = await run("members", "invite", "existing@x.com", "--org", "org-2", "--json");
         expect(invoke).toHaveBeenCalledWith("invites", { organizationId: "org-2", email: "existing@x.com", role: "member" });
-        expect(JSON.parse(out)).toMatchObject({ org: "org-2", kind: "added", userId: "u-2" });
+        expect(JSON.parse(out)).toMatchObject({ org: "org-2", kind: "invited", link: LINK });
+    });
+
+    it("refuses --role owner before any call: invite as admin, promote once they have joined", async () => {
+        const { out, exited } = await run("members", "invite", "a@x.com", "--role", "owner");
+        expect(exited).toBe(true);
+        const error = JSON.parse(out).error;
+        expect(error.code).toBe("invite_role_not_allowed");
+        expect(error.hint).toMatch(/--role admin/);
+        expect(error.hint).toMatch(/members role a@x\.com owner/);
+        expect(invoke).not.toHaveBeenCalled();
+    });
+
+    it("still reports what an older control plane that adds directly did", async () => {
+        const { out } = await run("members", "invite", "older-cp@x.com", "--json");
+        expect(JSON.parse(out)).toMatchObject({ kind: "added", userId: "u-2" });
     });
 
     it("prints the link and the email outcome for a person", async () => {
@@ -143,6 +159,8 @@ describe("rebase cloud orgs members", () => {
             err.mockRestore();
         }
         const text = logs.join("\n");
+        expect(text).toContain("Invitation sent to new@x.com");
+        expect(text).not.toMatch(/added|is now a member/);
         expect(text).toContain(LINK);
         expect(text).toMatch(/sends no email/);
     });

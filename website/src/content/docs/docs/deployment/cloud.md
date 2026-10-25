@@ -373,11 +373,11 @@ trust under **Settings → Access tokens**.
 
 ## Invite your team
 
-**Members → Invite member** adds someone whose Rebase account has the address
-verified; anyone else gets a link to copy (emailed when this control plane sends
-email) that works once, for 7 days, only for an account that verifies that
-address. Owners and admins resend or revoke it under **Pending invitations**;
-from a terminal, <span class="since-badge" data-since="0.26">Since 0.26</span> [`rebase cloud orgs members invite`](/docs/cli/cloud/#organizations).
+**Members → Invite member** gives a link to copy (emailed when this control plane
+sends email) that works once, for 7 days, for an account that has verified that
+address; nobody joins until they accept. Invite an admin or a member, and make
+them an owner once they have joined. Owners and admins resend or revoke it under
+**Pending invitations**; from a terminal, <span class="since-badge" data-since="0.26">Since 0.26</span> [`rebase cloud orgs members invite`](/docs/cli/cloud/#organizations).
 
 ## See who did what
 
