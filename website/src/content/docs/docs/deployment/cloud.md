@@ -135,7 +135,7 @@ live there:
   Something wrong? `rebase cloud rollback` puts the previous deployment back.
 ```
 
-"Live" means the address answered after the build: a backend's `/api/health`
+"Live" means the address answered after the build: a backend's `/health`
 returned `ok`, and a static app's page loaded (from this deployment, when the
 platform serves it). The check waits up to `--live-timeout` seconds, 60 by
 default; `0` skips it. If an app does not answer in time the deploy still exits

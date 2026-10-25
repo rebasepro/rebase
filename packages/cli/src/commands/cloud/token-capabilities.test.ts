@@ -212,7 +212,7 @@ const json = (status: number, body: unknown) =>
 function app(method: string, url: URL, init?: RequestInit): Response {
     // The deploy's live check: public, so it must carry no credential at all —
     // neither the deploy token nor anything minted from it.
-    if (url.pathname === "/api/health") {
+    if (url.pathname === "/health" || url.pathname === "/api/health") {
         expect(new Headers(init?.headers).get("Authorization")).toBeNull();
         return json(200, { status: "ok" });
     }

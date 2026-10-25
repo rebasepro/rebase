@@ -89,7 +89,7 @@ platform upgrade can rebuild it; `--no-source` skips that once, and `cloud setti
 A followed `deploy` ends on a summary: each app it shipped with its URL, the
 deployment id, how long it took, and whether the new version answers there. It
 waits up to `--live-timeout` seconds (default 60; `0` skips the check) for a
-backend's `/api/health` and each static app's address to answer. A failed deploy
+backend's `/health` and each static app's address to answer. A failed deploy
 ends on one line naming the app and the reason, and exits non-zero. The summary
 prints even when piped; `--json` (or `REBASE_JSON=1`) prints one object instead,
 with `apps`, `hosts`, `live`, `liveChecks` and `durationMs`.

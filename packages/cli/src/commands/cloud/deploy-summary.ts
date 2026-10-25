@@ -118,7 +118,7 @@ status: "verified" }] : [];
 /** What probing one app's address found. */
 export interface LiveCheck {
     app: string;
-    /** The address probed: the site itself, or a backend's `/api/health`. */
+    /** The address probed: the site itself, or a backend's `/health` (or `/api/health`). */
     url: string;
     live: boolean;
     /** The HTTP status of the last answer, when there was one. */
@@ -133,10 +133,23 @@ export interface LiveCheck {
     reason?: string;
 }
 
-/** The URL that proves an app is up. */
+/**
+ * The URL that proves an app is up.
+ *
+ * For a backend, the bare `/health`: every rebase-server registers it, beside
+ * `<REBASE_BASE_PATH>/health`, and the platform routes it to the backend ahead
+ * of any static app. `/api/health` is only where it lives when the base path is
+ * the default — a project with `REBASE_BASE_PATH=/v1` and a site at `/` answers
+ * it with the site's index.html, and its deploy read as not live.
+ */
 export function probeUrl(app: DeployedApp): string | undefined {
     if (!app.url || !app.host) return undefined;
-    return app.type === "backend" ? `https://${app.host}${BACKEND_API_PATH}/health` : app.url;
+    return app.type === "backend" ? `https://${app.host}/health` : app.url;
+}
+
+/** Where a server that registers no bare `/health` — one of the developer's own — may still answer. */
+function fallbackHealthUrl(app: DeployedApp): string {
+    return `https://${app.host}${BACKEND_API_PATH}/health`;
 }
 
 type FetchLike = typeof fetch;
@@ -157,6 +170,22 @@ export async function probeOnce(
 ): Promise<LiveCheck | undefined> {
     const url = probeUrl(app);
     if (!url) return undefined;
+    const check = await probeAt(app, url, deploymentId, fetchImpl);
+    // Asked again at `/api/health` only when the bare path is not a health
+    // route at all — a 404, or a 200 that is not its JSON (a site's catch-all).
+    // A backend that answered 503 "degraded" there has answered.
+    const notAHealthRoute = (answer: LiveCheck) => !answer.live && (answer.httpStatus === 404 || answer.httpStatus === 200);
+    if (app.type !== "backend" || !notAHealthRoute(check)) return check;
+    const fallback = await probeAt(app, fallbackHealthUrl(app), deploymentId, fetchImpl);
+    return fallback.httpStatus !== undefined && !notAHealthRoute(fallback) ? fallback : check;
+}
+
+async function probeAt(
+    app: DeployedApp,
+    url: string,
+    deploymentId: string,
+    fetchImpl: FetchLike
+): Promise<LiveCheck> {
     try {
         const res = await fetchImpl(url, {
             redirect: "follow",
