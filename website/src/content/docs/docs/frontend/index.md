@@ -191,6 +191,11 @@ its record is deleted:
     onClose={() => navigate("/posts")}/>
 ```
 
+If someone else deletes the record while the form is open, the form keeps
+what was typed and says the record was deleted elsewhere. Its "Save as new"
+action turns it into a form that creates a new record with those values;
+`onSaved` then reports the new record.
+
 Both bring their own `CollectionsProvider` when none is above them. That is
 the step underneath, and you can mount it yourself to share one scope between
 several panels, or to use the lower-level pieces (`CollectionViewBinding`,

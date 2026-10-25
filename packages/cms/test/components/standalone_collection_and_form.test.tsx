@@ -113,10 +113,10 @@ const authController = {
     setExtra: () => undefined
 } as never;
 
-function Page({ children }: { children: React.ReactNode }) {
+function Page({ children, dataDriver = driver }: { children: React.ReactNode, dataDriver?: DataDriver }) {
     return (
         <Rebase authController={authController} storageSource={{} as never}
-            dataSources={[{ key: "(default)", engine: "postgres", driver }]}>
+            dataSources={[{ key: "(default)", engine: "postgres", driver: dataDriver }]}>
             <BrowserRouter>
                 <main data-testid={"host-page"}>{children}</main>
             </BrowserRouter>
@@ -289,5 +289,45 @@ describe("one record's form in a page of the host app", () => {
         await waitFor(() => expect(onSaved).toHaveBeenCalled());
         expect(onSaved).toHaveBeenCalledTimes(1);
         expect(saves).toEqual([expect.objectContaining({ path: "posts", values: expect.objectContaining({ title: "A new post" }) })]);
+    });
+
+    it("says when its record was deleted elsewhere, keeps what was typed, and saves it as a new record", async () => {
+        // The live read stopped delivering the record. The form used to carry
+        // on as if nothing happened: Save answered 404 and nothing said why.
+        const listeners = new Map<string, (row: Row | null) => void>();
+        const live: DataDriver = {
+            ...driver,
+            listenOne: ({ path, id, onUpdate }) => {
+                listeners.set(`${path}/${id}`, onUpdate);
+                onUpdate((rows[path] ?? []).find(r => String(r.id) === String(id)) ?? null);
+                return () => listeners.delete(`${path}/${id}`);
+            }
+        };
+        const onSaved = jest.fn();
+        render(<Page dataDriver={live}><EntityFormPanel collection={posts} entityId={"p1"} onSaved={onSaved}/></Page>);
+
+        const title = await screen.findByDisplayValue("Hello world");
+        await act(async () => {
+            fireEvent.change(title, { target: { value: "Hello again" } });
+        });
+        expect(screen.queryByText(/deleted elsewhere/i)).toBeNull();
+
+        await act(async () => {
+            rows.posts = rows.posts.filter(r => r.id !== "p1");
+            listeners.get("posts/p1")?.(null);
+        });
+
+        expect(await screen.findByText(/This record was deleted elsewhere/)).toBeTruthy();
+        expect(screen.getByDisplayValue("Hello again")).toBeTruthy();
+
+        fireEvent.click(screen.getByRole("button", { name: /save as new/i }));
+        await waitFor(() => expect(screen.queryByText(/deleted elsewhere/i)).toBeNull());
+        expect(screen.getByDisplayValue("Hello again")).toBeTruthy();
+        fireEvent.click(screen.getByRole("button", { name: /create/i }));
+
+        await waitFor(() => expect(onSaved).toHaveBeenCalledTimes(1));
+        expect(saves).toHaveLength(1);
+        expect(saves[0].id).not.toBe("p1");
+        expect(saves[0].values).toEqual(expect.objectContaining({ title: "Hello again" }));
     });
 });
