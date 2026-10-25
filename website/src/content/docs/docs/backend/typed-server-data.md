@@ -48,9 +48,12 @@ exactly what it did before.
 
 The flag is remembered in `rebase.json`, as `"registerDatabase": true` on the
 backend app, so every later `rebase generate-sdk`, and `rebase dev` on each
-collection change, keeps both files current. That holds on a fresh clone and in
-CI too: the scaffold's `.gitignore` ignores `generated/` directories, and the
-first `rebase generate-sdk` or `rebase dev` writes them again. A project with
+collection change, keeps both files current. The scaffold's `.gitignore`
+ignores `generated/` directories, so a fresh clone has neither file until the
+first `rebase generate-sdk` or `rebase dev` writes them again. `rebase build`
+does not write them: in CI, run `rebase generate-sdk` before anything compiles
+the backend or the `config` package, or callbacks that read typed rows compile
+against the untyped `context.data` and fail. A project with
 no `rebase.json` keeps registering for as long as `config/generated/register.ts`
 is there. To go back to untyped server-side data, remove `registerDatabase` and
 delete `config/generated/`.
