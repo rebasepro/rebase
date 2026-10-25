@@ -1,5 +1,5 @@
 ---
-sourceHash: 05002dc371e1e1e7
+sourceHash: 45e44f38a758ea0d
 title: Cron Jobs
 sidebar_label: Cron Jobs
 description: Agende tarefas em segundo plano recorrentes com o sistema integrado de cron jobs do Rebase. Defina jobs como arquivos TypeScript, monitore-os no Studio e gerencie-os via REST API.
@@ -134,6 +134,8 @@ As expressões Cron utilizam o **formato padrão de 5 campos**:
 
 Valores de intervalo (`*/n`), faixas (`a-b`) e listas (`a,b,c`) são todos suportados.
 
+Quando o dia do mês e o dia da semana estão ambos restritos, basta que um dia corresponda a um dos dois, como no cron padrão: `0 9 1 * 1` é executado no dia 1 de cada mês e em todas as segundas-feiras. Se um dos dois campos começar com `*`, o dia precisa corresponder a ambos.
+
 Um agendamento é comparado com o horário local do seu fuso. Numa mudança de horário de verão, isso significa que um job de horário fixo dentro da hora repetida (`30 2 * * *` onde os relógios atrasam às 03:00) é executado nas duas passagens dessa hora, e um dentro da hora pulada, quando os relógios adiantam, não é executado naquele dia.
 
 ## Referência de CronJobDefinition
@@ -183,7 +185,8 @@ interface CronJobContext {
     // The job's unique ID (derived from filename)
     jobId: string;
 
-    // The scheduled tick timestamp
+    // The slot this run fires for: a catch-up run gets the slot it
+    // missed, a manual trigger the moment it started
     scheduledAt: Date;
 
     // Logger — lines appear in Studio, the logs API and the server log
@@ -322,6 +325,7 @@ As contagens são de toda a vida; o histórico são os últimos 30 dias. A linha
 Na inicialização do backend, o Rebase analisa todos os agendamentos de cron registrados usando um expansor de cron em JS com zero dependências:
 - **Verificação de Sintaxe**: Garante que a string contenha exatamente 5 campos separados por espaços (`minute`, `hour`, `day of month`, `month`, `day of week`).
 - **Expansão de Intervalos**: Decompõe passos (`*/15`), faixas (`9-17`) e listas separadas por vírgulas (`0,30`) em arrays explícitos de inteiros válidos mapeados para seus respectivos limites (ex.: minutos `0-59`, horas `0-23`, meses `1-12`).
+- **Tokens inteiros**: Cada número, limite de faixa e passo precisa ser um inteiro completo: `5abc`, `*/5x` e `1.5` são recusados, assim como uma faixa invertida (`5-1`).
 - Se alguma expressão de cron falhar na validação, o Rebase rejeita a definição, grava um erro de inicialização no log e recusa registrar o job para evitar falhas durante o tempo de execução.
 
 ---

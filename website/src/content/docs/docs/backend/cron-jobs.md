@@ -135,6 +135,8 @@ Cron expressions use the standard **5-field format**:
 
 Step values (`*/n`), ranges (`a-b`), and lists (`a,b,c`) are all supported.
 
+When both day of month and day of week are restricted, a day that matches either one matches, as in standard cron: `0 9 1 * 1` runs on the 1st of every month and on every Monday. When either field starts with `*`, a day has to match both.
+
 A schedule is matched against the wall clock of its zone. Across a
 daylight-saving change that means a fixed-time job inside the repeated hour
 (`30 2 * * *` where clocks fall back at 03:00) runs in both passes of that hour,
@@ -189,7 +191,8 @@ interface CronJobContext {
     // The job's unique ID (derived from filename)
     jobId: string;
 
-    // The scheduled tick timestamp
+    // The slot this run fires for: a catch-up run gets the slot it
+    // missed, a manual trigger the moment it started
     scheduledAt: Date;
 
     // Logger — lines appear in Studio, the logs API and the server log
@@ -340,6 +343,7 @@ The counts are all-time; the history is the last 30 days. Each run's row in `reb
 At backend initialization, Rebase parses all registered cron schedules using a zero-dependency JS-based cron expander:
 - **Syntax Check**: Verifies that the string contains exactly 5 whitespace-separated fields (`minute`, `hour`, `day of month`, `month`, `day of week`).
 - **Range Expansion**: Deconstructs steps (`*/15`), ranges (`9-17`), and comma-separated lists (`0,30`) into explicit arrays of valid integers mapped to their respective bounds (e.g., minutes `0-59`, hours `0-23`, months `1-12`).
+- **Whole Tokens**: Every number, range bound and step must be a whole number: `5abc`, `*/5x` and `1.5` are refused, as is a range that runs backwards (`5-1`).
 - If any cron expression fails validation, Rebase rejects the definition, logs a startup error, and refuses to register the job to prevent runtime execution failures.
 
 ---

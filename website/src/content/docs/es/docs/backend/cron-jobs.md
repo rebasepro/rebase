@@ -1,5 +1,5 @@
 ---
-sourceHash: 05002dc371e1e1e7
+sourceHash: 45e44f38a758ea0d
 title: Cron Jobs
 sidebar_label: Cron Jobs
 description: Programa tareas recurrentes en segundo plano con el sistema integrado de cron jobs de Rebase. Define tareas como archivos TypeScript, monitorízalas en Studio y gestiónalas a través de la API REST.
@@ -134,6 +134,8 @@ Las expresiones cron utilizan el **formato estándar de 5 campos**:
 
 Se admiten valores de intervalo o pasos (`*/n`), rangos (`a-b`) y listas (`a,b,c`).
 
+Cuando el día del mes y el día de la semana están restringidos a la vez, basta con que un día cumpla uno de los dos, como en cron estándar: `0 9 1 * 1` se ejecuta el día 1 de cada mes y todos los lunes. Si alguno de los dos campos empieza por `*`, el día tiene que cumplir ambos.
+
 Una programación se compara con la hora local de su zona. En un cambio de horario de verano, eso significa que una tarea a hora fija dentro de la hora repetida (`30 2 * * *` donde los relojes se atrasan a las 03:00) se ejecuta en las dos pasadas de esa hora, y una dentro de la hora que se salta, cuando los relojes se adelantan, no se ejecuta ese día.
 
 ## Referencia de CronJobDefinition
@@ -183,7 +185,8 @@ interface CronJobContext {
     // The job's unique ID (derived from filename)
     jobId: string;
 
-    // The scheduled tick timestamp
+    // The slot this run fires for: a catch-up run gets the slot it
+    // missed, a manual trigger the moment it started
     scheduledAt: Date;
 
     // Logger — lines appear in Studio, the logs API and the server log
@@ -317,6 +320,7 @@ Los recuentos son de toda la vida; el historial son los últimos 30 días. La fi
 Durante la inicialización del backend, Rebase analiza todas las programaciones de cron registradas utilizando un expansor de cron basado en JS sin dependencias:
 - **Comprobación de sintaxis**: Verifica que la cadena contenga exactamente 5 campos separados por espacios en blanco (`minute`, `hour`, `day of month`, `month`, `day of week`).
 - **Expansión de rangos**: Descompone pasos (`*/15`), rangos (`9-17`) y listas separadas por comas (`0,30`) en arrays explícitos de enteros válidos mapeados a sus respectivos límites (por ejemplo, minutos `0-59`, horas `0-23`, meses `1-12`).
+- **Tokens completos**: Cada número, límite de rango y paso debe ser un número entero completo: `5abc`, `*/5x` y `1.5` se rechazan, igual que un rango que va hacia atrás (`5-1`).
 - Si alguna expresión cron no supera la validación, Rebase rechaza la definición, registra un error de inicio y se niega a registrar la tarea para evitar fallos de ejecución en tiempo de ejecución.
 
 ---

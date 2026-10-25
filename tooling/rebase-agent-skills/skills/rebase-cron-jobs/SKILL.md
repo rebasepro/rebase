@@ -342,13 +342,15 @@ Standard 5-field cron format: `minute hour day-of-month month day-of-week`
 | `N-M/S` | `0-30/5` | Every S values within range N–M |
 | `A,B,C` | `0,15,30,45` | Comma-separated list (combinable with above) |
 
+When both day-of-month and day-of-week are restricted, a day matching **either** matches, as in standard cron: `0 9 1 * 1` runs on every 1st and every Monday. When either field starts with `*` (`*/2` included), a day must match both.
+
 ### Schedule Validation
 
 Schedules are **validated on registration**. Invalid expressions are rejected with an error log and the job is **not** registered; it is listed under `rejected` on `GET /api/admin/cron`, with the reason (most often `Expected 5 fields, got 6`). Validation checks:
 
 - Exactly 5 fields (minute, hour, day-of-month, month, day-of-week)
 - All values within valid ranges: minute `0–59`, hour `0–23`, dom `1–31`, month `1–12`, dow `0–6`
-- No unparseable tokens
+- No unparseable tokens: every number, range bound and step is a whole number (`5abc`, `*/5x`, `1.5` are refused), and no range runs backwards (`5-1`)
 
 ### Minimum Schedule Interval
 
