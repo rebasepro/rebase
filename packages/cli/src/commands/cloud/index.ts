@@ -117,9 +117,14 @@ export const CLOUD_VALUE_FLAGS = {
     "--port": String,
     "--preview-name": String,
     "--provider": String,
+    // `clusters registry` (b403f036d5): its three values, so a flag's value is
+    // never read as the action.
+    "--pull-key-file": String,
+    "--push-service-account": String,
     "--region": String,
     "--replicas": String,
     "--repo": String,
+    "--repository": String,
     "--role": String,
     "--scale-to-zero": String,
     "--secret-access-key": String,
