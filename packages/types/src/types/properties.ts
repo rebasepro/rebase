@@ -1655,15 +1655,15 @@ export interface PropertyConditions {
 
     /**
      * Dynamic minimum value for number/string length.
-     * Should evaluate to a number.
+     * A number, or a rule that evaluates to one.
      */
-    min?: JsonLogicRule;
+    min?: number | JsonLogicRule;
 
     /**
      * Dynamic maximum value for number/string length.
-     * Should evaluate to a number.
+     * A number, or a rule that evaluates to one.
      */
-    max?: JsonLogicRule;
+    max?: number | JsonLogicRule;
 
     // ═══════════════════════════════════════════════════════════════════════
     // VALUE CONDITIONS
