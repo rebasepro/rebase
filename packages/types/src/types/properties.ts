@@ -451,9 +451,9 @@ export interface BaseProperty<CustomProps = unknown> {
      * Give the expression, in the template form `isId` takes
      * (``databaseDefault: "sql`gen_random_uuid()`"``), and the schema planner
      * writes it as the column's `DEFAULT`, so `rebase db push` keeps it. `true`
-     * declares a DEFAULT someone else wrote and the planner does not write
-     * one, so a push plans dropping it. "Import from table" and
-     * `rebase schema introspect` set the expression they read.
+     * declares a DEFAULT someone else wrote: the planner writes none, and
+     * `rebase db push` leaves the one the database holds as it is. "Import
+     * from table" and `rebase schema introspect` set the expression they read.
      */
     databaseDefault?: boolean | SqlExpression;
 

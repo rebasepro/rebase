@@ -713,6 +713,12 @@ async function dbCommand(subcommand: string, rawArgs: string[]): Promise<void> {
 
             const prebuilt = databaseUrl ? await prebuildForeignKeyIndexes(databaseUrl, collectionsPath, dryRun) : [];
 
+            // A column declared `databaseDefault: true` keeps the DEFAULT the
+            // database holds: read here and written into the desired state,
+            // since Atlas cannot be told to leave one DEFAULT alone. See
+            // `schema/push-kept-defaults.ts`.
+            if (databaseUrl) await keepDatabaseOwnedDefaults(databaseUrl, collectionsPath);
+
             // Preview the plan before touching data. `atlas schema apply` with
             // --auto-approve will silently DROP COLUMN on a field removal and
             // drop+add on a rename, so we first dry-run to obtain the planned
@@ -1032,6 +1038,45 @@ async function dbCommand(subcommand: string, rawArgs: string[]): Promise<void> {
  *
  * @returns `schema.index` of each one missing when this started.
  */
+/**
+ * Appends to `schema.sql` the live DEFAULT of every column declared
+ * `databaseDefault: true`, so Atlas plans no `DROP DEFAULT` for it.
+ *
+ * Fails CLOSED, like the exclude lists: without the catalogue the desired state
+ * says "no DEFAULT", and the push would drop each of them. A project declaring
+ * no such column reads nothing.
+ */
+async function keepDatabaseOwnedDefaults(databaseUrl: string, collectionsPath: string): Promise<void> {
+    const { loadCollections } = await import("./schema/doctor");
+    const { databaseOwnedDefaultColumns, readKeptDefaults, withKeptDefaults } = await import("./schema/push-kept-defaults");
+    const columns = databaseOwnedDefaultColumns(await loadCollections(path.resolve(process.cwd(), collectionsPath)));
+    if (columns.length === 0) return;
+
+    let kept: Awaited<ReturnType<typeof readKeptDefaults>>;
+    try {
+        kept = await withAppClient(databaseUrl, client => readKeptDefaults(
+            { query: async (text) => ({ rows: (await client.query(text)).rows }) },
+            columns
+        ));
+    } catch (err) {
+        outError(chalk.red("\n✗ Aborting push: could not read the DEFAULTs of the columns declared `databaseDefault: true`."));
+        outError(chalk.gray(`  ${err instanceof Error ? err.message : String(err)}`));
+        outError(chalk.gray("  Refusing to plan without them: the push would drop each of those DEFAULTs."));
+        const hint = diagnoseDbError(err, databaseUrl);
+        if (hint) outError(hint);
+        throw new CommandStopped("Could not read the DEFAULTs to keep.");
+    }
+    if (kept.length === 0) return;
+
+    const desiredSqlFile = path.join(generatedSqlDir(), "schema.sql");
+    fs.writeFileSync(desiredSqlFile, withKeptDefaults(fs.readFileSync(desiredSqlFile, "utf-8"), kept));
+    out(chalk.gray(`  Keeping ${kept.length} DEFAULT(s) the database holds, for columns declared \`databaseDefault: true\`:`));
+    for (const each of kept) {
+        out(chalk.gray(`       ${each.table}.${each.column}  DEFAULT ${each.expression}`));
+    }
+    out("");
+}
+
 /** Renames relation columns that carry their pre-0.13 derived name, as boot does; a dry-run only names them. */
 async function renameLegacyForeignKeys(databaseUrl: string, collectionsPath: string, dryRun: boolean): Promise<void> {
     let renames: LegacyRename[];
