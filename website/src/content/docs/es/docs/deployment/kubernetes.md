@@ -1,5 +1,5 @@
 ---
-sourceHash: 5764a95deb8e4e9c
+sourceHash: 8ca6480a862b6d07
 title: Kubernetes
 sidebar_label: Kubernetes
 description: Despliega Rebase en un clúster de Kubernetes con el chart oficial de Helm — uno o varios Deployments, un Job de migración que gestiona el esquema y aplicaciones estáticas en el mismo host.
@@ -91,7 +91,7 @@ para ver qué hace cada rol y por qué querrías separarlos.
 Lo que aporta el chart frente a hacerlo manualmente es que **deriva las configuraciones
 cuyo modo de fallo es silencioso**, a partir de los valores que ya le proporcionaste:
 
-- `REBASE_ROLE` por unidad
+- `REBASE_ROLE` por unidad — `all` en la API cuando no hay unidad de functions, para que siga sirviendo tus funciones
 - `REBASE_MIGRATE_ON_BOOT=none` en todas partes, ya que el Job de migración gestiona el esquema
 - `REBASE_CRON_SCHEDULER=false` / `REBASE_JOB_WORKERS=false` en la API una vez que existe un worker
 - `TRUSTED_PROXY_HOPS` en la unidad de functions

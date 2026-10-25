@@ -13,7 +13,12 @@ what the compose file runs.
 */}}
 {{- $units := list -}}
 {{- if .Values.split -}}
-  {{- $units = append $units (dict "name" "api" "role" "api" "replicas" .Values.api.replicas "resources" .Values.api.resources "nodeSelector" .Values.api.nodeSelector "tolerations" .Values.api.tolerations "affinity" .Values.api.affinity "image" .Values.api.image "bundleUrl" .Values.api.bundleUrl) -}}
+  {{/* With no functions unit the api is the only process that can serve
+       /api/functions: nothing else is routed there and no upstream is set. So
+       it runs `all`, which is `api` with the functions mounted — `api` itself
+       would answer every function call with a 404 while every probe passed. */}}
+  {{- $apiRole := ternary "api" "all" .Values.functions.enabled -}}
+  {{- $units = append $units (dict "name" "api" "role" $apiRole "replicas" .Values.api.replicas "resources" .Values.api.resources "nodeSelector" .Values.api.nodeSelector "tolerations" .Values.api.tolerations "affinity" .Values.api.affinity "image" .Values.api.image "bundleUrl" .Values.api.bundleUrl) -}}
   {{- if .Values.functions.enabled -}}
     {{- $units = append $units (dict "name" "functions" "role" "functions" "replicas" .Values.functions.replicas "resources" .Values.functions.resources "nodeSelector" .Values.functions.nodeSelector "tolerations" .Values.functions.tolerations "affinity" .Values.functions.affinity "image" .Values.functions.image "bundleUrl" .Values.functions.bundleUrl) -}}
   {{- end -}}

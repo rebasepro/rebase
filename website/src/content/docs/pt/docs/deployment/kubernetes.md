@@ -1,5 +1,5 @@
 ---
-sourceHash: 5764a95deb8e4e9c
+sourceHash: 8ca6480a862b6d07
 title: Kubernetes
 sidebar_label: Kubernetes
 description: Faça o deploy do Rebase em um cluster Kubernetes com o Helm chart oficial — um Deployment ou vários, um Job de migração responsável pelo schema, e aplicações estáticas no mesmo host.
@@ -76,7 +76,7 @@ Isso fornece uma camada de `api`, uma camada de `functions` e um `worker`, todos
 
 O que o chart acrescenta em relação a fazer isso manualmente é que ele **deduz as configurações cujo modo de falha é silencioso**, a partir dos valores que você já forneceu:
 
-- `REBASE_ROLE` por unidade
+- `REBASE_ROLE` por unidade — `all` na API quando não há unidade de functions, para que ela continue servindo suas funções
 - `REBASE_MIGRATE_ON_BOOT=none` em todos os lugares, porque o Job de migração gerencia o schema
 - `REBASE_CRON_SCHEDULER=false` / `REBASE_JOB_WORKERS=false` na api quando um worker existir
 - `TRUSTED_PROXY_HOPS` na unidade de functions

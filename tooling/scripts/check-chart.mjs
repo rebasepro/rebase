@@ -171,6 +171,40 @@ if (!split.ok) {
         "a multi-process topology did not force the shared rate-limit store");
 }
 
+// 2b1. Split with a worker and no functions unit — `api` + `worker`.
+const noFunctions = render([
+    "--set", "split=true",
+    "--set", "worker.enabled=true"
+]);
+if (!noFunctions.ok) {
+    problems.push(`the api + worker topology does not render:\n${noFunctions.out}`);
+} else {
+    const api = envOf(noFunctions.out, "rebase-rebase-api") ?? {};
+    // With no functions unit and no upstream, the api is the only process that
+    // can serve /api/functions. REBASE_ROLE=api mounts no functions at all, so
+    // every call would 404 while every probe passes.
+    check("api+worker", api.REBASE_ROLE === "all",
+        `the api is the only HTTP unit and has REBASE_ROLE=${api.REBASE_ROLE}, which serves no functions`);
+    // A worker exists, so cron and the job queue move off the request path —
+    // whether or not a functions unit exists beside them.
+    check("api+worker", api.REBASE_CRON_SCHEDULER === "false" && api.REBASE_JOB_WORKERS === "false",
+        "a worker exists but the api still runs cron and the job queue");
+}
+// And the three-unit split takes them off the api too.
+if (split.ok) {
+    const api = envOf(split.out, "rebase-rebase-api") ?? {};
+    check("split", api.REBASE_CRON_SCHEDULER === "false" && api.REBASE_JOB_WORKERS === "false",
+        "a worker exists but the api still runs cron and the job queue");
+}
+// Without a worker they stay on the api, which is what makes a two-unit split complete.
+const apiAndFunctions = render(["--set", "split=true", "--set", "functions.enabled=true"]);
+if (apiAndFunctions.ok) {
+    const api = envOf(apiAndFunctions.out, "rebase-rebase-api") ?? {};
+    check("api+functions", !("REBASE_CRON_SCHEDULER" in api) && !("REBASE_JOB_WORKERS" in api),
+        "with no worker the api must keep cron and the job queue, or nothing runs them");
+    check("api+functions", api.REBASE_ROLE === "api", `api unit has REBASE_ROLE=${api.REBASE_ROLE}`);
+}
+
 // 2b2. A database only the operator's change process changes.
 const external = render([
     "--set", "provision=false",

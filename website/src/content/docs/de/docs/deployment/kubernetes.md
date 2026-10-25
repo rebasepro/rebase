@@ -1,5 +1,5 @@
 ---
-sourceHash: 5764a95deb8e4e9c
+sourceHash: 8ca6480a862b6d07
 title: Kubernetes
 sidebar_label: Kubernetes
 description: Stellen Sie Rebase mit dem offiziellen Helm-Chart auf einem Kubernetes-Cluster bereit – ein Deployment oder mehrere, ein Migrations-Job für das Schema und statische Apps auf demselben Host.
@@ -56,7 +56,7 @@ Das ergibt eine `api`-Ebene, eine `functions`-Ebene und einen `worker`, alle aus
 
 Was das Chart gegenüber der manuellen Konfiguration hinzufügt, ist, dass es **die Einstellungen ableitet, deren Fehlerfall Stille ist**, basierend auf den Werten, die Sie bereits angegeben haben:
 
-- `REBASE_ROLE` pro Einheit
+- `REBASE_ROLE` pro Einheit — `all` auf der API, wenn es keine Functions-Einheit gibt, damit sie Ihre Functions weiterhin bedient
 - `REBASE_MIGRATE_ON_BOOT=none` überall, da der Migrations-Job das Schema besitzt
 - `REBASE_CRON_SCHEDULER=false` / `REBASE_JOB_WORKERS=false` auf der API, sobald ein Worker existiert
 - `TRUSTED_PROXY_HOPS` auf der Functions-Einheit
