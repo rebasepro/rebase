@@ -23,6 +23,7 @@ import {
     RebaseClient,
     RebaseSdkData,
     RowOf,
+    ClientStorageSource,
     StorageSource,
     StorageSourceDefinition,
     StorageSourceRegistry,
@@ -167,7 +168,10 @@ export type {
     RowOf,
     InsertOf,
     UpdateOf,
-    StorageSource
+    StorageSource,
+    ClientStorageSource,
+    ClientUploadFileProps,
+    UploadFileResult
 } from "@rebasepro/types";
 export type { OfflineStore, OfflineCacheEntry, OfflineCacheRecord, PendingMutation, MutationRollback } from "./offline-store";
 export { MemoryOfflineStore } from "./offline-store";
@@ -362,7 +366,8 @@ export type CreateRebaseClientResult<DB = Record<string, unknown>> = Omit<Rebase
      * persisted session survives for the next client to restore.
      */
     close: () => void;
-    storage: StorageSource;
+    /** The default storage source. Its upload takes any `Blob`, and a key only when you want to name the object. */
+    storage: ClientStorageSource;
     storageRegistry: StorageSourceRegistry;
     createStorageSource: (storageId: string) => StorageSource;
     fetchStorageSources: () => Promise<StorageSourceDefinition[]>;

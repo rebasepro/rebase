@@ -396,6 +396,30 @@ export interface StorageSource {
 }
 
 /**
+ * What the SDK's `putObject` takes. The server's controllers need a key; the
+ * SDK does not: with none, the server names the object after the uploaded
+ * file. And the SDK uploads any `Blob` — one that is not a `File` travels as a
+ * file called "blob".
+ *
+ * @group Models
+ */
+export interface ClientUploadFileProps extends Omit<UploadFileProps, "key" | "file"> {
+    file: Blob;
+    key?: string;
+}
+
+/**
+ * The SDK's storage source (`client.storage`). A {@link StorageSource} whose
+ * upload takes {@link ClientUploadFileProps} — a wider argument, so it is
+ * still a `StorageSource` wherever one is asked for.
+ *
+ * @group Models
+ */
+export interface ClientStorageSource extends Omit<StorageSource, "putObject"> {
+    putObject: (props: ClientUploadFileProps) => Promise<UploadFileResult>;
+}
+
+/**
  * Result returned by list().
  * @public
  */
