@@ -622,6 +622,99 @@ if (documented && documented.length > 0) {
     }
 }
 
+// ── 2h. every unit boots as what the chart meant it to be ────────────────────
+/**
+ * The runtime decides what a unit is, not the chart. Every assertion above
+ * reads a manifest, and a manifest that is right by every rule written here can
+ * still be a process the runtime refuses: the migration Job ran as
+ * `REBASE_ROLE=worker` with `REBASE_MIGRATE_ON_BOOT=ensure` from the day it was
+ * written, `resolveRole` refuses exactly that pair, and so every default install
+ * stopped at its pre-install hook. Nothing in this file could have said so.
+ *
+ * So each unit's env goes through the runtime's own boot-environment schema and
+ * role rules (`chart-unit-roles.mts`), and the answer is held to the one thing
+ * the chart promises about the schema: exactly one unit creates it — the Job
+ * when it is rendered, otherwise the unit serving the api — and with
+ * `provision: false`, none does.
+ *
+ * Units without a database (static apps) are left out: they never reach the
+ * role or the schema.
+ */
+const ROLES_HELPER = path.join(ROOT, "tooling/scripts/chart-unit-roles.mts");
+
+/** Every Deployment and Job that connects to the database, with its literal env. */
+function databaseUnitsOf(yaml) {
+    const units = [];
+    for (const doc of yaml.split(/^---$/m)) {
+        const kind = /^kind:\s*(Deployment|Job)\s*$/m.exec(doc)?.[1];
+        if (!kind || !/- name: DATABASE_URL\b/.test(doc)) continue;
+        const unit = /^metadata:\s*\n(?:\s+.*\n)*?\s+name:\s*(\S+)/m.exec(doc)?.[1];
+        const env = {};
+        for (const m of doc.matchAll(/^\s+- name: ([A-Z_][A-Z0-9_]*)\n\s+value: (.*)$/gm)) {
+            env[m[1]] = m[2].replace(/^["']|["']$/g, "");
+        }
+        units.push({ unit, kind, env });
+    }
+    return units;
+}
+
+/** What the runtime makes of each unit, from `chart-unit-roles.mts`. */
+function runtimeVerdicts(units) {
+    try {
+        const out = execFileSync(process.execPath, ["--import", "tsx", ROLES_HELPER], {
+            cwd: ROOT,
+            input: JSON.stringify(units.map(({ unit, env }) => ({ unit, env }))),
+            encoding: "utf8",
+            env: { ...process.env, TSX_TSCONFIG_PATH: path.join(ROOT, "tsconfig.typecheck.json") },
+            stdio: ["pipe", "pipe", "pipe"]
+        });
+        return JSON.parse(out);
+    } catch (err) {
+        problems.push(`roles: could not ask the runtime about the rendered units:\n      ${String(err.stderr ?? err.message).trim().split("\n").slice(0, 4).join("\n      ")}`);
+        return undefined;
+    }
+}
+
+const schemaOwnershipCases = [
+    { label: "default", args: [], owner: "job" },
+    { label: "split", args: ["--set", "split=true", "--set", "functions.enabled=true", "--set", "worker.enabled=true"], owner: "job" },
+    { label: "no migration Job", args: ["--set", "migrationJob.enabled=false"], owner: "api" },
+    { label: "split, no migration Job", args: ["--set", "migrationJob.enabled=false", "--set", "split=true", "--set", "functions.enabled=true", "--set", "worker.enabled=true"], owner: "api" },
+    { label: "provision=false", args: ["--set", "provision=false"], owner: "none" }
+];
+for (const { label, args, owner } of schemaOwnershipCases) {
+    const rendered = render(args);
+    if (!rendered.ok) {
+        problems.push(`roles (${label}): does not render:\n${rendered.out}`);
+        continue;
+    }
+    const units = databaseUnitsOf(rendered.out);
+    const verdicts = runtimeVerdicts(units);
+    if (!verdicts) break;
+    for (const v of verdicts) {
+        check(`roles (${label})`, !v.refused, `${v.unit} is a process the runtime refuses to start: ${v.refused}`);
+    }
+    const owners = verdicts.filter(v => v.provisionsCollections).map(v => v.unit);
+    const jobs = units.filter(u => u.kind === "Job").map(u => u.unit);
+    if (owner === "job") {
+        check(`roles (${label})`, jobs.length === 1, `expected the migration Job to be rendered, got ${jobs.join(", ") || "none"}`);
+        const job = verdicts.find(v => v.unit === jobs[0]);
+        // A refused Job is reported above; what it would have done is moot.
+        if (job && !job.refused) {
+            check(`roles (${label})`, job.provisionOnly,
+                `${jobs[0]} would boot and keep serving instead of provisioning and exiting (REBASE_PROVISION_ONLY)`);
+            check(`roles (${label})`, owners.length === 1 && owners[0] === jobs[0],
+                `the Job must be the one unit that creates the collection schema; the runtime says ${owners.join(", ") || "no unit"} does`);
+        }
+    } else if (owner === "api") {
+        check(`roles (${label})`, owners.length === 1 && /-api$/.test(owners[0]) && !verdicts.find(v => v.unit === owners[0])?.provisionOnly,
+            `with no Job the serving api must be the one unit that creates the collection schema; the runtime says ${owners.join(", ") || "no unit"} does`);
+    } else {
+        check(`roles (${label})`, owners.length === 0 && jobs.length === 0,
+            `nothing in this release may change the database, but ${[...owners, ...jobs].join(", ")} would`);
+    }
+}
+
 // ── 3. every refusal is reachable ────────────────────────────────────────────
 
 /**

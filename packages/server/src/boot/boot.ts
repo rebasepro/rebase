@@ -38,6 +38,11 @@ import { bootEnvExtension, loadBootEnv, resolveCorsOptions, resolveEnableSwagger
 import { runtimeCors } from "./runtime-cors";
 import { numericEnvVar } from "../env";
 import { resolveRole, RoleConfigurationError } from "./role";
+import { resolveProvisionOnly } from "./provision-only";
+
+// Where it has always been importable from. It has a module of its own now, so
+// `check:chart` can ask it about a rendered unit without loading the boot.
+export { resolveProvisionOnly };
 import { FunctionSelectionError } from "../functions/selection";
 import { CollectionConfigError } from "../collections/validate-config";
 import {
@@ -928,25 +933,6 @@ async function bootStaticApp(
  * answer is "set DATABASE_URL". Anything else keeps its stack, because it is a
  * bug and the trace is the point.
  */
-/**
- * Whether this process should provision the schema and stop, rather than serve.
- *
- * The shape a migration Job wants: same image, same bundle, same boot — and no
- * socket. Nothing else changes, which is the point. A separate migration image
- * would be a second artifact to build, publish and keep in step with the
- * runtime, and the failure mode of it drifting is a schema applied by a version
- * that is not the one about to run against it.
- *
- * A blank value is *unset*: `REBASE_PROVISION_ONLY=${SOMETHING}` with SOMETHING
- * undefined is the ordinary way to write a compose file or a Helm template, and
- * reading it as true would turn an ordinary deployment into one that migrates
- * and then refuses to serve.
- */
-export function resolveProvisionOnly(env: NodeJS.ProcessEnv = process.env): boolean {
-    const raw = (env.REBASE_PROVISION_ONLY ?? "").trim().toLowerCase();
-    return raw === "1" || raw === "true";
-}
-
 export async function runFromBundle(options: BootOptions = {}): Promise<BootedRuntime> {
     try {
         const booted = await bootFromBundle(options);
