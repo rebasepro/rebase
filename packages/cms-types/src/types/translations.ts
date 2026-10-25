@@ -225,6 +225,8 @@ export interface RebaseTranslations {
     rls_simulate_no_api_keys: string;
     /** The simulator could not load its options; {{message}} is why */
     rls_simulate_options_error: string;
+    /** The simulator's user search failed; {{message}} is why */
+    rls_simulate_users_error: string;
     /** Banner: simulating a role, {{role}} */
     rls_simulation_viewing_as_role: string;
     /** Banner: simulating uid {{user}} holding {{role}} */
@@ -243,6 +245,8 @@ export interface RebaseTranslations {
     rls_simulation_masked_columns_one: string;
     /** Banner while the per-collection preview loads */
     rls_simulation_counting: string;
+    /** Banner when the per-collection preview failed; {{message}} is why */
+    rls_simulation_count_failed: string;
     /** Banner body: what the data views show while simulating */
     rls_simulation_note: string;
     create_index: string;
