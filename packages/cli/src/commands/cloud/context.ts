@@ -192,6 +192,18 @@ export function grantForLink(link: ProjectLink | null | undefined): EphemeralGra
     return ephemeralGrantFor(normalizeUrl(link.url), link.projectId);
 }
 
+/**
+ * The grant a link names as it is stored, expired or not, with the host it is
+ * kept under: what `rebase cloud claim` reads, so it can say "expired" rather
+ * than "never had one".
+ */
+export function storedGrantForLink(link: ProjectLink | null | undefined): { url: string; grant: EphemeralGrant } | undefined {
+    if (!link?.projectId || link.mode === "direct") return undefined;
+    const url = normalizeUrl(link.url);
+    const grant = storedEphemeralGrant(url, link.projectId);
+    return grant ? { url, grant } : undefined;
+}
+
 /** Whether a `.env` sets a variable to something: an empty `KEY=` or `KEY=""` does not. */
 export function dotenvSets(file: string, key: string): boolean {
     if (!fs.existsSync(file)) return false;
@@ -479,7 +491,7 @@ export function createTokenClient(url: string, token: string, ephemeralProjectId
  * answered 401 or 403; `unknown` when it could not be asked, or answered
  * something else — which proves nothing about the token.
  */
-async function probeToken(url: string, token: string): Promise<"accepted" | "refused" | "unknown"> {
+export async function probeToken(url: string, token: string): Promise<"accepted" | "refused" | "unknown"> {
     try {
         const probe = await fetch(`${url}/api/auth/scopes`, {
             headers: { Authorization: `Bearer ${token}`, "User-Agent": cliUserAgent() }

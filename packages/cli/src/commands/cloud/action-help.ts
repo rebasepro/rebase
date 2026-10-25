@@ -73,6 +73,22 @@ export const ACTION_HELP: Record<string, ActionHelp> = {
         ]
     },
 
+    claim: {
+        command: "cloud claim",
+        usage: "cloud claim [--open]",
+        summary:
+            "Print the claim link of the project `rebase cloud init --claim` provisioned in this directory, and how long "
+            + "is left before it is deleted unclaimed. Asks the control plane first, and refuses once the project has "
+            + "been claimed.",
+        flags: [["--open", "Also open the link in a browser"]],
+        examples: ["rebase cloud claim", "rebase cloud claim --open", "rebase cloud claim --json"],
+        notes: [
+            "The link exists only on the machine that ran `init --claim` (in ~/.rebase/credentials.json); the control "
+                + "plane keeps a hash of it and cannot print it again.",
+            "`rebase cloud status` and `rebase cloud whoami` show the same link while the project is unclaimed."
+        ]
+    },
+
     projects: {
         command: "cloud projects",
         usage: "cloud projects <list|create|info|delete> [options]",

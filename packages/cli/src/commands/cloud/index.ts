@@ -13,6 +13,7 @@ import { tokensCommand } from "./tokens";
 import { linkCommand, unlinkCommand, selectOrgCommand, openCommand } from "./link";
 import { listProjects, createProject, projectInfo, deleteProject, resolveProjectArg } from "./projects";
 import { cloudInitCommand } from "./init";
+import { claimCommand } from "./claim";
 import { deployCommand, logsCommand } from "./deploy";
 import { orgsCommand, printOrgsHelp } from "./orgs";
 import { dbCommand, printDbHelp } from "./databases";
@@ -317,6 +318,9 @@ export async function cloudCommand(subcommand: string | undefined, rawArgs: stri
         case "init":
             await cloudInitCommand(rawArgs);
             break;
+        case "claim":
+            await claimCommand(rawArgs);
+            break;
         case "projects":
         case "project":
             await projectsGroup(action, rawArgs);
@@ -507,6 +511,7 @@ export const CLOUD_GROUPS: HelpAction[] = [
     { action: "open", section: "Project link", description: "Open the console in a browser" },
 
     { action: "init", section: "Projects", description: "With --claim: a live backend with no account, and a link to claim it within 72 hours" },
+    { action: "claim", section: "Projects", description: "The claim link of the project `init --claim` made here, and the time left; --open opens it" },
     { action: "projects", section: "Projects", description: "Create, list, inspect and delete projects" },
 
     { action: "deploy", section: "Deploy & observe", args: "[app]", description: "Build, upload and ship an app, following it to a terminal state" },

@@ -27,6 +27,7 @@ import { COMPUTE_SET_FLAGS, BILLING_ACTIONS } from "./resources";
 import { LOGIN_FLAGS } from "./auth";
 import { CREATE_TOKEN_FLAGS } from "./tokens";
 import { INIT_FLAGS } from "./init";
+import { CLAIM_FLAGS } from "./claim";
 import { CRON_LIST_FLAGS, CRON_LOGS_FLAGS } from "./cron";
 import { PREVIEWS_LIST_FLAGS, PREVIEWS_DELETE_FLAGS } from "./previews";
 import { USAGE_FLAGS, USAGE_ACTIONS } from "./usage";
@@ -41,6 +42,7 @@ import { USAGE_FLAGS, USAGE_ACTIONS } from "./usage";
  */
 const SPECS: Record<string, Record<string, unknown> | null> = {
     init: INIT_FLAGS,
+    claim: CLAIM_FLAGS,
     projects: null,
     clusters: null,
     "projects create": CREATE_PROJECT_FLAGS,
@@ -240,6 +242,7 @@ flag: flag[1] });
         ["env.ts", ENV_SET_FLAGS],
         ["tokens.ts", CREATE_TOKEN_FLAGS],
         ["init.ts", INIT_FLAGS],
+        ["claim.ts", CLAIM_FLAGS],
         ["cron.ts", CRON_LIST_FLAGS],
         ["cron.ts", CRON_LOGS_FLAGS],
         ["previews.ts", PREVIEWS_LIST_FLAGS],

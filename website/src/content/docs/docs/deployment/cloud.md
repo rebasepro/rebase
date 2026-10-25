@@ -538,7 +538,7 @@ except one that restarts the database, which waits for a maintenance window.
 | `login`, `logout`, `whoami` | Your session |
 | `tokens` | Tokens for CI and agents, each narrowed to one project. See [CI and agents](#ci-and-agents) |
 | `link`, `unlink`, `use`, `open` | Binding this directory to a project, selecting an organization, opening the console |
-| `init` | With `--claim`: a live backend with no account, and a link to claim it. See [A backend with no account](#a-backend-with-no-account) |
+| `init`, `claim` | With `--claim`: a live backend with no account, and a link to claim it; `claim` prints that link again. See [A backend with no account](#a-backend-with-no-account) |
 | `projects` | Create, list, inspect, delete |
 | `deploy`, `logs`, `deployments`, `rollback`, `cancel` | Shipping and watching |
 | `previews` | Builds served on their own address by `deploy --preview`, and deleting them. See [Preview a change](#preview-a-change) |

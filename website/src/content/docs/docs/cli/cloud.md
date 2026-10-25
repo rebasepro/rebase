@@ -46,11 +46,24 @@ rebase cloud open         # open the dashboard in a browser
 
 ```bash
 rebase cloud init --claim [--name <name>]   # a live backend with no account, and a link to claim it within 72 hours
+rebase cloud claim [--open]                 # that link again, and how long is left
 rebase cloud projects list
 rebase cloud projects create [--link]
 rebase cloud projects info [id]
 rebase cloud projects delete [id]
 ```
+
+`claim` prints the claim link of the project `init --claim` provisioned in this
+directory, and the time left before it is deleted unclaimed (`Unclaimed: deleted
+in 41h`). `--open` also opens it in a browser. The link is kept only on the
+machine that ran `init --claim`, in `~/.rebase/credentials.json`; the control
+plane stores a hash of it and cannot print it again. Before answering, `claim`
+asks the control plane whether the project's own token still works. A claim
+revokes that token, so once someone has claimed the project, `claim` refuses
+with `already_claimed` instead of printing a dead link. It also refuses once the
+window has ended (`claim_expired`), and in a directory with no claim link
+(`no_claim_link`). `rebase cloud status` and `rebase cloud whoami` show the same
+link while the project is unclaimed.
 
 ## Deploy and observe
 
