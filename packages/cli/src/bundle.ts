@@ -1391,6 +1391,21 @@ export async function buildBundle(options: BuildBundleOptions): Promise<BuildBun
         await regenerateSchema(projectRoot, paths.config, options);
     }
 
+    // The server-side `Database` registration, before anything compiles
+    // against it. It is gitignored, so on a fresh clone only this writes it:
+    // without it the callbacks compile against untyped `context.data`, and a
+    // project that builds locally fails to build in CI.
+    if (paths.hasCollections) {
+        const { writeRegistrationForBuild } = await import("./commands/generate_sdk");
+        const registered = await writeRegistrationForBuild(
+            path.join(projectRoot, paths.config, "collections"),
+            app.registerDatabase === true
+        );
+        if (registered) {
+            log(options, chalk.dim(`  registered the Database for server-side code in ${path.relative(projectRoot, registered)}/`));
+        }
+    }
+
     // Say out loud what this build is NOT going to include. See
     // `findUnusedServerEntry` for why silence here was expensive.
     const unusedEntry = findUnusedServerEntry(projectRoot, paths.functions);

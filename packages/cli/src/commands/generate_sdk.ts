@@ -127,6 +127,34 @@ function writeRegistration(dir: string, databaseTypes: string): void {
 }
 
 /**
+ * Write the server-side registration from the collection files in
+ * `collectionsDir`, exactly as `rebase generate-sdk` writes it, for a build.
+ *
+ * Only for a project that asked for it: `registerDatabase` in `rebase.json`,
+ * or a registration an earlier `--register` left, which is kept current. The
+ * registration lives in gitignored `config/generated/`, so a fresh clone (a CI
+ * job) has none until something writes it, and a bundle compiled without it
+ * types `context.data` as untyped rows: callbacks that read a typed column
+ * fail to compile there while they compile locally.
+ *
+ * Returns the directory written, or null when there was nothing to do.
+ * Throws when a `register.ts` there is not ours, as `generate-sdk` refuses.
+ */
+export async function writeRegistrationForBuild(collectionsDir: string, registerDatabase: boolean): Promise<string | null> {
+    const dir = registrationDir(collectionsDir);
+    if (!registerDatabase && !hasRegistration(dir)) return null;
+    if (!fs.existsSync(collectionsDir)) return null;
+    const collections = await loadCollections(collectionsDir);
+    if (collections.length === 0) return null;
+    collections.sort((a, b) => a.slug.localeCompare(b.slug));
+    const databaseTypes = generateSDK(collections, { includeReadme: false })
+        .find((file) => file.path === "database.types.ts")?.content;
+    if (databaseTypes === undefined) return null;
+    writeRegistration(dir, databaseTypes);
+    return dir;
+}
+
+/**
  * Whether `rebase.json` asks for the registration (`registerDatabase: true` on
  * the backend app). That is what survives a clone: `generated/` is gitignored,
  * so a `register.ts` from an earlier run is not there to say it.
