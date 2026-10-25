@@ -64,7 +64,7 @@ const authors: AdminCollection = {
 
 type Row = Record<string, unknown>;
 let rows: Record<string, Row[]>;
-const saves: { path: string, values: Row }[] = [];
+const saves: { path: string, id?: unknown, values: Row }[] = [];
 
 function keyOf(path: string): string {
     return path === "authors" ? "handle" : "id";
@@ -75,7 +75,7 @@ const driver: DataDriver = {
     fetchCollection: async ({ path }) => rows[path] ?? [],
     fetchOne: async ({ path, id }) => (rows[path] ?? []).find(r => String(r[keyOf(path)]) === String(id)),
     save: async ({ path, values, id: savedId }) => {
-        saves.push({ path, values: { ...values } });
+        saves.push({ path, id: savedId, values: { ...values } });
         const key = keyOf(path);
         const id = savedId ?? values[key];
         const saved = { ...(rows[path] ?? []).find(r => String(r[key]) === String(id)), ...values, [key]: id };
@@ -202,6 +202,25 @@ describe("one record's form in a page of the host app", () => {
         await waitFor(() => expect(onSaved).toHaveBeenCalledTimes(2));
         expect(rows.posts.filter(r => r.id === "site")).toEqual([expect.objectContaining({ title: "My site, renamed" })]);
         expect(rows.posts).toHaveLength(3);
+    });
+
+    it("saves the record it shows after its entityId changes", async () => {
+        // A host route /posts/:id moving from p1 to p2 re-renders the panel
+        // with another id and no remount. The form showed p2 and saved into p1.
+        const { rerender } = render(<Page><EntityFormPanel collection={posts} entityId={"p1"}/></Page>);
+        await screen.findByDisplayValue("Hello world");
+
+        rerender(<Page><EntityFormPanel collection={posts} entityId={"p2"}/></Page>);
+        const title = await screen.findByDisplayValue("Second post");
+        await act(async () => {
+            fireEvent.change(title, { target: { value: "Second post, edited" } });
+        });
+        fireEvent.click(screen.getByRole("button", { name: /save/i }));
+
+        await waitFor(() => expect(saves).toHaveLength(1));
+        expect(saves[0]).toEqual(expect.objectContaining({ path: "posts", id: "p2" }));
+        expect(rows.posts.find(r => r.id === "p1")).toEqual(expect.objectContaining({ title: "Hello world" }));
+        expect(rows.posts.find(r => r.id === "p2")).toEqual(expect.objectContaining({ title: "Second post, edited" }));
     });
 
     it("creates a record when given no id", async () => {

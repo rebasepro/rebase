@@ -89,14 +89,19 @@ export function EntityFormPanel<M extends Record<string, unknown> = Record<strin
     // one above has settled without this collection.
     const needsOwnScope = !inScope
         || (!navigationState.loading && !isRegistered(collectionRegistry.collections, props.path ?? collection.slug));
+    // One form per record: the binding keeps the id and status it mounted
+    // with, so a page that hands over another id (a route `/posts/:id` going
+    // from p1 to p2) gets a fresh form instead of one that shows p2 and saves
+    // into p1. Keyed on the prop, so the id a create assigns keeps the form.
+    const recordKey = `${props.path ?? collection.slug}/${props.entityId ?? "new"}`;
     if (needsOwnScope) {
         return (
             <CollectionsProvider collections={ownCollections}>
-                <EntityFormPanelInScope {...props}/>
+                <EntityFormPanelInScope key={recordKey} {...props}/>
             </CollectionsProvider>
         );
     }
-    return <EntityFormPanelInScope {...props}/>;
+    return <EntityFormPanelInScope key={recordKey} {...props}/>;
 }
 
 function EntityFormPanelInScope<M extends Record<string, unknown>>({
