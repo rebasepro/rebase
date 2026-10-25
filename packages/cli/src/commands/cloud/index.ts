@@ -27,6 +27,7 @@ import { debugCommand, printDebugHelp } from "./debug";
 import { cronCommand } from "./cron";
 import { previewsCommand } from "./previews";
 import { usageCommand } from "./usage";
+import { activityCommand } from "./activity";
 import { notificationsCommand } from "./notifications";
 import {
     statusCommand,
@@ -70,6 +71,8 @@ import { ACTION_HELP, printActionHelp } from "./action-help";
  */
 export const CLOUD_VALUE_FLAGS = {
     "--access-key-id": String,
+    "--action": String,
+    "--actor": String,
     "--autoscale-cpu-target": String,
     "--autoscale-max": String,
     "--backup-access-key-id": String,
@@ -77,6 +80,7 @@ export const CLOUD_VALUE_FLAGS = {
     "--backup-endpoint": String,
     "--backup-secret-access-key": String,
     "--base-domain": String,
+    "--before": String,
     "--branch": String,
     "--bucket": String,
     "--bundle-dir": String,
@@ -427,6 +431,9 @@ export async function cloudCommand(subcommand: string | undefined, rawArgs: stri
         case "usage":
             await usageCommand(rawArgs);
             break;
+        case "activity":
+            await activityCommand(rawArgs);
+            break;
         case "billing":
             await billingCommand(rawArgs);
             break;
@@ -538,6 +545,7 @@ export const CLOUD_GROUPS: HelpAction[] = [
     { action: "settings", section: "Config", description: "Name, subdomain, repository, branch" },
 
     { action: "orgs", section: "Organizations", description: "Organizations you belong to, and their members" },
+    { action: "activity", section: "Organizations", description: "Who did what in the organization: deploys, env vars, domains, backups, members. Owners and admins" },
 
     { action: "db", section: "Data", description: "Attach a database, back it up, restore, point-in-time recovery" },
     { action: "storage", section: "Data", description: "The project's object storage" },

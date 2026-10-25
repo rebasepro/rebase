@@ -31,6 +31,7 @@ import { CLAIM_FLAGS } from "./claim";
 import { CRON_LIST_FLAGS, CRON_LOGS_FLAGS } from "./cron";
 import { PREVIEWS_LIST_FLAGS, PREVIEWS_DELETE_FLAGS } from "./previews";
 import { USAGE_FLAGS, USAGE_ACTIONS } from "./usage";
+import { ACTIVITY_FLAGS } from "./activity";
 import { NOTIFICATIONS_ADD_FLAGS } from "./notifications";
 
 /**
@@ -77,6 +78,7 @@ const SPECS: Record<string, Record<string, unknown> | null> = {
     "notifications remove": {},
     billing: { "--limit": Number },
     usage: USAGE_FLAGS,
+    activity: ACTIVITY_FLAGS,
     logs: LOGS_FLAGS,
     status: null,
     "clusters verify": null,

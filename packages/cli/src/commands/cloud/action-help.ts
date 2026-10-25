@@ -737,6 +737,34 @@ export const ACTION_HELP: Record<string, ActionHelp> = {
         ]
     },
 
+    activity: {
+        command: "cloud activity",
+        usage: "cloud activity [--project <id|slug>] [--action <area|action>] [--actor <email>] [--limit <n>]",
+        summary:
+            "The selected organization's audit log, newest first: who deployed, rolled back, set or deleted an "
+            + "environment variable (by name, never by value), added or removed a domain, created, restored or "
+            + "downloaded a backup, changed compute, stopped or deleted a project, added a member or changed a role, "
+            + "and created or revoked an access token. Owners and admins of the organization.",
+        flags: [
+            ["--action <area|action>", "An area (deploy, deploy_hook, env, domain, backup, pitr, database, extension, storage, project, org, member, token) or a full action such as env.set"],
+            ["--actor <email>", "Only what this person did, their tokens included"],
+            ["--limit <n>", "Events per page, 1 to 100 (default 50)"],
+            ["--before <cursor>", "The next page: the cursor the previous page printed"],
+            ["--org <id>", "Another organization than the selected one"]
+        ],
+        examples: [
+            "rebase cloud activity",
+            "rebase cloud activity --action env --json",
+            "rebase cloud activity --project shop --actor ana@example.com"
+        ],
+        notes: [
+            "--project narrows to one project's events; a deleted project's id still works.",
+            "Times are UTC. A project that was deleted still shows by the name it had.",
+            "It reads with your login: no access-token capability includes it, so REBASE_TOKEN is refused.",
+            "The same log is the Activity page in the console."
+        ]
+    },
+
     /* ── The graph, and the dials ───────────────────────────────────────
      *
      * `resources` is what the project declares against what the platform
