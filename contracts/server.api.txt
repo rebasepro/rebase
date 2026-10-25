@@ -726,7 +726,7 @@ interface BootstrappedAuth { authRepository, emailService, schemaHealthCheck, us
 interface BranchAdmin { createBranch, deleteBranch, diffBranch, getBranchInfo, listBranches, mergeBranch }
 interface BranchDiff { branch, branchDatabase, computedAt, data, fingerprint, forkPointKnown, sampleLimit, schema, schemas, targetDatabase }
 interface BranchDiffOptions { maxRowsPerTable, sampleLimit, schemas }
-interface BranchInfo { createdAt, database, name, parentDatabase, sizeBytes }
+interface BranchInfo { createdAt, database, forkXid, name, parentDatabase, sizeBytes }
 interface BranchMergeBlock { code, message }
 interface BranchMergeOptions { expectedFingerprint, maxRowsPerTable, onConflict, schemas, skipBlocked }
 interface BranchMergeResult { branch, conflictsKept, schemaChangesNotMerged, skipped, tables, targetDatabase, warnings }
