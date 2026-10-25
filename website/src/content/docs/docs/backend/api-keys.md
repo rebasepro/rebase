@@ -255,7 +255,7 @@ and covers every step of a resumable (TUS) upload, including the offset check
 and the cancel. `storage:delete` deletes. The target is a storage source id. The
 default source's id is `(default)`, so `storage:read:(default)` reads the default
 source only, and `storage:write:avatars` writes a source named `avatars`.
-After the scope check, [`storageAuthorize`](/docs/backend/storage/#per-object-authorization)
+After the scope check, [`storageAuthorize`](/docs/backend/storage-authorization/)
 still runs, with the key's identity.
 
 ### Functions

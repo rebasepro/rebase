@@ -286,7 +286,7 @@ declared in `config/resources.ts`; see
 
 A deploy with storage is refused until the project says who may read and write
 files. The scaffold's `config/storage.ts` exports a `storageAuthorize` hook for
-this. See [Per-Object Authorization](/docs/backend/storage/#per-object-authorization).
+this. See [Per-Object Authorization](/docs/backend/storage-authorization/).
 
 **How files are served.** Your backend serves every file at
 `GET /api/storage/file/<key>`. It reads the object from the bucket and streams

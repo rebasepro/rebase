@@ -183,6 +183,7 @@ export default defineConfig({
                         { label: "Auth endpoints", slug: "docs/backend/auth-endpoints" },
                         { label: "Custom auth adapters", slug: "docs/backend/auth-adapters" },
                         { label: "Storage Configuration", slug: "docs/backend/storage" },
+                        { label: "Storage Authorization", slug: "docs/backend/storage-authorization" },
                         { label: "Storage caching and CDNs", slug: "docs/backend/storage-caching" },
                         { label: "Resumable uploads (TUS)", slug: "docs/backend/storage-resumable-uploads" },
                         { label: "Multiple Sources", slug: "docs/backend/multiple-sources" },

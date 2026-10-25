@@ -17,7 +17,7 @@ Scopes come in two planes, and a person holds them differently.
 **The data plane** is `data:*`, `storage:*` and `functions:invoke`. Every
 signed-in person holds all of it. What a person may do with a row is decided by
 the collection's [security rules](/docs/collections/security-rules/), row by row,
-and what they may do with a file by the [storage policies](/docs/backend/storage/#per-object-authorization).
+and what they may do with a file by the [storage policies](/docs/backend/storage-authorization/).
 A scope never decides that for a person. On a key or a token, data-plane scopes
 narrow: a key that holds only `data:read:posts` reads `posts` and nothing else,
 whatever the rules would allow.
