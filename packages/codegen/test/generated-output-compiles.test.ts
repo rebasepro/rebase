@@ -419,6 +419,44 @@ describe("the generated write types, per relation kind", () => {
             profile: {
                 type: "relation",
                 relation: { kind: "hasOne", target: () => profiles, foreignKeyOnTarget: "author_id" }
+            },
+            profileVia: {
+                type: "relation",
+                relation: {
+                    kind: "via", cardinality: "one", target: () => profiles,
+                    joinPath: [{ table: "profiles", on: { from: "id", to: "author_id" } }]
+                }
+            },
+            teamProfile: {
+                type: "relation",
+                relation: {
+                    kind: "via", cardinality: "one", target: () => profiles,
+                    joinPath: [
+                        { table: "teams", on: { from: "team_id", to: "id" } },
+                        { table: "profiles", on: { from: "id", to: "team_id" } }
+                    ]
+                }
+            },
+            commentsVia: {
+                type: "relation",
+                relation: {
+                    kind: "via", cardinality: "many", target: () => comments,
+                    joinPath: [
+                        { table: "authors_comments", on: { from: "id", to: "author_id" } },
+                        { table: "comments", on: { from: "comment_id", to: "id" } }
+                    ]
+                }
+            },
+            roleComments: {
+                type: "relation",
+                relation: {
+                    kind: "via", cardinality: "many", target: () => comments,
+                    joinPath: [
+                        { table: "author_roles", on: { from: "id", to: "author_id" } },
+                        { table: "roles_comments", on: { from: "role_id", to: "role_id" } },
+                        { table: "comments", on: { from: "comment_id", to: "id" } }
+                    ]
+                }
             }
         }
     };
@@ -527,6 +565,26 @@ describe("the generated write types, per relation kind", () => {
             // @ts-expect-error a profile's id is a number
             const wrongType: Database["authors"]["Update"] = { profile: "9" };
             export { link, unlink, onCreate, optional, wrongType };
+        `)).toEqual([]);
+    });
+
+    it("writes a single-hop via as the server does, and leaves a multi-hop one read-only", () => {
+        // To-one in one step: the target holds the key, written as a hasOne.
+        // To-many through one junction: written as its rows. Anything longer
+        // is refused with RELATION_NOT_WRITABLE, so it is on neither type.
+        expect(compileWithConsumer(schema(), `
+            import type { Database } from "./database.types";
+            type Update = Database["authors"]["Update"];
+            const toOne: Update = { profileVia: 9 };
+            const unlink: Update = { profileVia: null };
+            const toMany: Update = { commentsVia: [1, { id: 2 }] };
+            // @ts-expect-error a multi-hop to-one via is read-only
+            const multiOne: Update = { teamProfile: 9 };
+            // @ts-expect-error a multi-hop to-many via is read-only
+            const multiMany: Update = { roleComments: [1] };
+            // @ts-expect-error a via declares no junction payload
+            const pivot: Update = { commentsVia: [{ id: 1, _pivot: { position: 1 } }] };
+            export { toOne, unlink, toMany, multiOne, multiMany, pivot };
         `)).toEqual([]);
     });
 });

@@ -427,13 +427,13 @@ describe("Nested path writes (E2E)", () => {
 
     it("rejects a write through a `via` relation, to-many included", async () => {
         // `posts_via_join` is a to-many, so a guard that only checked
-        // cardinality let it through — while its type says writable: false.
-        // The guard reads the flag now.
+        // cardinality let it through. The nested door refuses every `via` by
+        // kind: it has no way to link a child through a join chain.
         await expect(driver.save({
             path: "authors/a-1/posts_via_join",
             values: { id: "p-via", title: "nope" },
             status: "new"
-        } as never)).rejects.toThrow(/will not infer how to write/);
+        } as never)).rejects.toThrow(/nested path does not write through/);
 
         expect(await one("SELECT * FROM public.posts WHERE id = 'p-via'")).toBeUndefined();
     });

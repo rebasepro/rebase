@@ -35,6 +35,17 @@ export const authors = defineCollection({
             name: "Profile",
             type: "relation",
             relation: { kind: "hasOne", target: (): AnyCollectionConfig => profiles, foreignKeyOnTarget: "author_id" }
+        },
+        // A single-hop to-one `via`: the target holds the key, so it is writable.
+        profileVia: {
+            name: "Profile (via)",
+            type: "relation",
+            relation: {
+                kind: "via",
+                cardinality: "one",
+                target: (): AnyCollectionConfig => profiles,
+                joinPath: [{ table: "profiles", on: { from: "id", to: "author_id" } }]
+            }
         }
     }
 });
@@ -85,6 +96,20 @@ export const posts = defineCollection({
                 target: () => tags,
                 through: { properties: { position: { name: "Position", type: "number" } } }
             }
+        },
+        // A single-hop to-many `via`: one junction table holds the links.
+        tagsVia: {
+            name: "Tags (via)",
+            type: "relation",
+            relation: {
+                kind: "via",
+                cardinality: "many",
+                target: () => tags,
+                joinPath: [
+                    { table: "posts_tags", on: { from: "id", to: "posts_id" } },
+                    { table: "tags", on: { from: "tags_id", to: "id" } }
+                ]
+            }
         }
     }
 });
@@ -113,8 +138,8 @@ export const myNotes = defineCollection({
 /**
  * Every relation kind's write seam that `posts` does not already cross: a
  * required `belongsTo` (either spelling satisfies it), one hidden from the API
- * and one nobody may write (their foreign key goes with them), and a `via`,
- * which is read-only.
+ * and one nobody may write (their foreign key goes with them), and a multi-hop
+ * `via`, which is read-only.
  */
 export const comments = defineCollection({
     name: "Comments",

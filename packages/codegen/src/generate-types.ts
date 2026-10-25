@@ -838,13 +838,17 @@ function emitWritableRelations(
     // target's foreign key at this row (`inverseRelationUpdates`), and `null`
     // unlinks it. Its resolved relation says `writable: true`, but only
     // `belongsTo` and the to-many kinds were emitted, so the write the server
-    // performs was a type error. Keyed by the property, as the second
-    // `belongsTo` spelling is: the write transformer only recognises the
-    // relation through the property that declares it.
+    // performs was a type error. A single-hop to-one `via` (one step, the
+    // target holds the key) is written the same way, by the join-path writer.
+    // Keyed by the property, as the second `belongsTo` spelling is: the write
+    // transformer only recognises the relation through the property that
+    // declares it.
     for (const [key, rawProp] of Object.entries(properties)) {
         if ((rawProp as Property).type !== "relation" || emittedKeys.has(key)) continue;
         const relation = findRelation(resolvedRelations, key);
-        if (relation?.kind !== "hasOne") continue;
+        const toOneWritable = relation?.kind === "hasOne"
+            || (relation?.kind === "via" && relation.cardinality === "one" && relation.writable);
+        if (!relation || !toOneWritable) continue;
         lines.push(line(key, `${foreignKeyType(relation)} | null`, true));
         emittedKeys.add(key);
     }
@@ -853,8 +857,10 @@ function emitWritableRelations(
     // this row) and `manyToMany` (junction rows). The server writes both on a
     // create and an update — bare keys, or `{ id }`, or `{ id, _pivot }` where
     // the junction declares payload columns — but only `belongsTo` was
-    // emitted, so the field a read returns could not be written back. A `via`
-    // is read-only (`writable: false`), and stays off.
+    // emitted, so the field a read returns could not be written back. A
+    // single-hop to-many `via` is written as its one junction's rows and
+    // carries no payload; a multi-hop one is read-only (`writable: false`) and
+    // stays off.
     for (const [key, relation] of Object.entries(resolvedRelations)) {
         if (relation.cardinality !== "many" || !relation.writable) continue;
         if (emittedKeys.has(key)) continue;

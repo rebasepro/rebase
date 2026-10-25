@@ -230,9 +230,19 @@ export async function hasOneWriteProbes(): Promise<void> {
     await client.data.authors.update(1, { profile: "9" });
 }
 
-/** A `via` is read-only on every door (RELATION_NOT_WRITABLE). */
+/**
+ * A single-hop `via` is written as the server writes it — to-one by naming the
+ * target (the target holds the key), to-many as a list of ids through its one
+ * junction — and a multi-hop one is read-only (RELATION_NOT_WRITABLE).
+ */
 export async function viaWriteProbes(): Promise<void> {
-    // @ts-expect-error — not writable through the flat door
+    await client.data.authors.update(1, { profileVia: 9 });
+    await client.data.authors.update(1, { profileVia: null });
+    await posts.update("p1", { tagsVia: ["tag-uuid"] });
+    await posts.create({ title: "t", tagsVia: [{ id: "tag-uuid" }] });
+    // @ts-expect-error — a via declares no junction payload
+    await posts.update("p1", { tagsVia: [{ id: "tag-uuid", _pivot: { position: 1 } }] });
+    // @ts-expect-error — a multi-hop via is not writable
     await client.data.comments.update(1, { postTags: ["t"] });
     // @ts-expect-error — nor on a create
     await client.data.comments.create({ body: "b", post: "p1", postTags: ["t"] });

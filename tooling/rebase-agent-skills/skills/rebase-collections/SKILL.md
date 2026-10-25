@@ -1248,7 +1248,7 @@ The link goes under `relation`, and its `kind` decides which fields apply.
 | `localKey` | `string` | `<relationName>_id` | `belongsTo` only — column on THIS table |
 | `foreignKeyOnTarget` | `string` | `<thisCollection>_id` | `hasOne`/`hasMany` only — column on the TARGET's table |
 | `through` | `{ table?, sourceColumn?, targetColumn? }` | derived | `manyToMany` only; `sourceColumn` names THIS collection |
-| `joinPath` | `JoinStep[]` | — | `via` only; read-only |
+| `joinPath` | `JoinStep[]` | — | `via` only; writable when single-hop, read-only otherwise |
 | `cardinality` | `"one" \| "many"` | — | `via` only — a join chain cannot imply it |
 | `relationName` | `string` | property key | The name it is addressed by: `include`, admin tab, nested path segment |
 | `onDelete` | `OnAction` | `"restrict"` if required, else `"set null"` | Cascade rule on delete |
@@ -1354,7 +1354,7 @@ customer: {
 }
 ```
 
-A `via` relation is read-only: a join chain does not say which row to write.
+A single-hop `via` is writable through a create or update: a to-one chain of one step (the target holds the key; send the target's id or `null`) or a to-many chain through one junction table (send a list of ids, no `_pivot`). A longer chain is read-only — a write naming it is refused with `400 RELATION_NOT_WRITABLE` — because it does not say which row to write. A nested write through any `via` is refused.
 
 > **See full documentation:** [Relations](https://rebase.pro/docs/collections/relations)
 

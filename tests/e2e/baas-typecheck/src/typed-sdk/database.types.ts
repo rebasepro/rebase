@@ -13,6 +13,7 @@ export interface Database {
       createdAt?: string | null;
       posts?: Array<Database["posts"]["Row"]>;
       profile?: Database["profiles"]["Row"];
+      profileVia?: Database["profiles"]["Row"];
     };
     Insert: {
       id?: number;
@@ -20,6 +21,7 @@ export interface Database {
       salary?: number | null;
       createdAt?: string | Date | null;
       profile?: number | null;
+      profileVia?: number | null;
       posts?: Array<string | { id: string }>;
     };
     Update: {
@@ -27,11 +29,13 @@ export interface Database {
       salary?: number | null;
       createdAt?: string | Date | null;
       profile?: number | null;
+      profileVia?: number | null;
       posts?: Array<string | { id: string }>;
     };
     Relations: {
       posts: "posts";
       profile: "profiles";
+      profileVia: "profiles";
     };
     Slug: "authors";
   };
@@ -109,6 +113,7 @@ export interface Database {
       authorId?: number | null;
       author?: Database["authors"]["Row"];
       tags?: Array<Database["tags"]["Row"] & { _pivot?: { position?: number | null; } }>;
+      tagsVia?: Array<Database["tags"]["Row"]>;
     };
     Insert: {
       id?: string;
@@ -122,6 +127,7 @@ export interface Database {
       authorId?: number | null;
       author?: number | null;
       tags?: Array<string | { id: string; _pivot?: { position?: number | null; } }>;
+      tagsVia?: Array<string | { id: string }>;
     };
     Update: {
       title?: string;
@@ -134,10 +140,12 @@ export interface Database {
       authorId?: number | null;
       author?: number | null;
       tags?: Array<string | { id: string; _pivot?: { position?: number | null; } }>;
+      tagsVia?: Array<string | { id: string }>;
     };
     Relations: {
       author: "authors";
       tags: "tags";
+      tagsVia: "tags";
     };
     Slug: "posts";
   };
