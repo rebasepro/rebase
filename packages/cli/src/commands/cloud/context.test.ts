@@ -20,7 +20,9 @@ import {
     resolveCloudUrl,
     setJsonModeForTest,
     type CloudClient,
-    billingAccountIdOf
+    billingAccountIdOf,
+    getContextOrg,
+    setContextOrg
 } from "./context";
 import { printEnvHelp } from "./env";
 
@@ -386,5 +388,44 @@ describe("billingAccountIdOf", () => {
     it("has no answer for a row without one", () => {
         expect(billingAccountIdOf({ id: "org1" })).toBeUndefined();
         expect(billingAccountIdOf(undefined)).toBeUndefined();
+    });
+});
+
+/**
+ * `~/.rebase/credentials.json` holds the login for every host, and every
+ * command rewrites the whole file. Written in place, a reader in another
+ * process — MCP runs cloud tools concurrently, and `init` stores a grant while
+ * another command refreshes a session — could read it between the truncate
+ * and the write, take it for empty, and write back a file without the login.
+ * Two processes rewriting it 5,000 times each lost the session on every run.
+ * The same in-place write left an empty file behind a disk-full error.
+ */
+describe("the credentials file is replaced, never rewritten in place", () => {
+    afterEach(() => vi.restoreAllMocks());
+
+    it("keeps the stored login when a write fails partway", () => {
+        const home = fs.mkdtempSync(path.join(os.tmpdir(), "rebase-creds-"));
+        vi.spyOn(os, "homedir").mockReturnValue(home);
+        const file = path.join(home, ".rebase", "credentials.json");
+        fs.mkdirSync(path.dirname(file), { recursive: true });
+        const stored = { current: "https://app.rebase.pro",
+            contexts: { "https://app.rebase.pro": { auth: "{\"refreshToken\":\"kept\"}", org: "1" } } };
+        fs.writeFileSync(file, JSON.stringify(stored));
+
+        // What a full disk does to a write: some bytes land, then ENOSPC.
+        const realWrite = fs.writeFileSync;
+        vi.spyOn(fs, "writeFileSync").mockImplementation(((target: fs.PathOrFileDescriptor, data: string, options?: fs.WriteFileOptions) => {
+            realWrite(target, String(data).slice(0, 10), options);
+            throw Object.assign(new Error("ENOSPC: no space left on device, write"), { code: "ENOSPC" });
+        }) as typeof fs.writeFileSync);
+
+        expect(() => setContextOrg("https://app.rebase.pro", "2")).toThrow(/ENOSPC/);
+        vi.restoreAllMocks();
+        vi.spyOn(os, "homedir").mockReturnValue(home);
+
+        expect(JSON.parse(fs.readFileSync(file, "utf-8"))).toEqual(stored);
+        expect(getContextOrg("https://app.rebase.pro")).toBe("1");
+        // No half-written temporary file is left beside it.
+        expect(fs.readdirSync(path.dirname(file))).toEqual(["credentials.json"]);
     });
 });

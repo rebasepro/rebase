@@ -127,15 +127,31 @@ function readCredentials(): CredentialsFile {
     }
 }
 
+/**
+ * Replace the credentials file with `data`: written beside it, then renamed
+ * over it. Every command reads the whole file and writes it back, and several
+ * may run at once (MCP runs cloud tools concurrently). Written in place, a
+ * reader landing between the truncate and the write saw a half file, read it
+ * as empty, and wrote back one without the login and the grants; a disk-full
+ * error left it empty. A rename is atomic: a reader sees the old file or the
+ * new one.
+ */
 function writeCredentials(data: CredentialsFile): void {
     const file = credentialsPath();
     fs.mkdirSync(path.dirname(file), { recursive: true });
-    // Written with private perms — this file holds refresh tokens.
-    fs.writeFileSync(file, JSON.stringify(data, null, 2), { mode: 0o600 });
+    const temporary = `${file}.${process.pid}.${Date.now()}.tmp`;
     try {
-        fs.chmodSync(file, 0o600);
-    } catch {
-        // best effort on platforms without chmod semantics
+        // Written with private perms — this file holds refresh tokens.
+        fs.writeFileSync(temporary, JSON.stringify(data, null, 2), { mode: 0o600 });
+        try {
+            fs.chmodSync(temporary, 0o600);
+        } catch {
+            // best effort on platforms without chmod semantics
+        }
+        fs.renameSync(temporary, file);
+    } catch (error) {
+        fs.rmSync(temporary, { force: true });
+        throw error;
     }
 }
 
