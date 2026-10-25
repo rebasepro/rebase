@@ -220,3 +220,21 @@ test("the real CLI's surface is read the same way", () => {
     assert.ok(flags.get("generate-sdk")?.has("--output"), "generate-sdk's spec is in cli.ts");
     assert.ok(flags.has("telemetry"), "a spec with no flags still says which flags are accepted: none");
 });
+
+test("a variable the fence fills with `read` is assigned", () => {
+    // `cli/cloud.md` reads a secret with `read -rs STRIPE_KEY` so it never
+    // reaches the command line, then pipes `$STRIPE_KEY` into `env set --stdin`.
+    // Only `NAME=` counted as an assignment, so the page was told to define a
+    // variable its own block had just defined.
+    const undefinedVar = (name) => `\`$${name}\` is not defined by any shipped \`.env*\` or scaffold file, not assigned ` +
+        "in this block, and not explained on this page";
+    assert.deepEqual(findingsFor(
+        "```bash\n" +
+        "read -rs STRIPE_KEY   # paste the value\n" +
+        "printf %s \"$STRIPE_KEY\" | rebase cloud deploy\n" +
+        "read FIRST SECOND\n" +
+        "echo \"$FIRST $SECOND\"\n" +
+        "echo \"$NEVER_READ\"\n" +
+        "```\n"
+    ).map(f => f.replace(/ — .*/, "")).filter(f => f.includes("is not defined")), [`6: ${undefinedVar("NEVER_READ")}`.split(" — ")[0]]);
+});
