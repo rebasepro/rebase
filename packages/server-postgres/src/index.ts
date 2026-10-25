@@ -37,6 +37,13 @@ export type { UnmigratedChange } from "./schema/migration-freshness";
 export { compareMigrationVersions, migrationVersionOf } from "./schema/migrate-baseline";
 
 /**
+ * Whether a policy name is one Rebase generates from a collection's
+ * `securityRules` — `rebase verify --live` reads such a public-read policy as
+ * what the rule says rather than as a hand-written hole.
+ */
+export { isGeneratedPolicyName } from "./security/policy-drift";
+
+/**
  * The app-role provisioning boot performs, for callers that restore a database
  * outside a boot.
  *

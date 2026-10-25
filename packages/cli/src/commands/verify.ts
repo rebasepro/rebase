@@ -110,6 +110,12 @@ export interface VerifyOptions {
     databaseUrl?: string;
     /** Why no `databaseUrl` could be resolved for `--live`, when resolving it failed. */
     databaseUnavailable?: string;
+    /**
+     * Whether the backend refuses a request with no token (`AUTH_REQUIRE`, on
+     * unless set to `false`). Decides how a Rebase-compiled public read reads.
+     * Defaults to true, the runtime's default.
+     */
+    authRequired?: boolean;
 }
 
 const STEP_TITLES: Record<VerifyStepId, string> = {
@@ -597,8 +603,33 @@ async function databaseUnreachable(databaseUrl: string): Promise<string | null> 
     }
 }
 
-async function checkLive(databaseUrl: string, step: VerifyStep): Promise<VerifyFinding[]> {
+/**
+ * A `USING (true)` read policy Rebase compiled from an `access: "public"`
+ * select rule, on a backend that refuses a request with no token.
+ *
+ * rls-check reads the policy alone, and for the role every signed-in request
+ * runs as it is "every row to everyone": critical. But the API answers 401
+ * before RLS is consulted unless `AUTH_REQUIRE=false`, so what it grants is
+ * every row to every *signed-in* user — exactly what step 2 accepts as a rule
+ * said on purpose, and what boot reports as an info line. A fresh blog
+ * scaffold failed its own `verify --live` with three such errors. It is a
+ * warning here, as an unfiltered read is in step 2; with `AUTH_REQUIRE=false`
+ * the rows really are public and it stays an error.
+ */
+function isTokenGatedPublicRead(
+    finding: { id: string; target: { table?: string; policy?: string } },
+    authRequired: boolean,
+    isGeneratedPolicyName: (name: string, table: string) => boolean
+): boolean {
+    if (!authRequired || finding.id !== "policy-always-true") return false;
+    const { table, policy } = finding.target;
+    if (!table || !policy) return false;
+    return isGeneratedPolicyName(policy, table) && policy.startsWith(`${table}_select_`);
+}
+
+async function checkLive(databaseUrl: string, step: VerifyStep, authRequired: boolean): Promise<VerifyFinding[]> {
     const { scan, CHECKS } = await import("@rebasepro/rls-check");
+    const { isGeneratedPolicyName } = await import("@rebasepro/server-postgres");
     let result: Awaited<ReturnType<typeof scan>>;
     try {
         result = await scan({ connectionString: databaseUrl, statementTimeoutMs: 10_000 });
@@ -618,11 +649,15 @@ async function checkLive(databaseUrl: string, step: VerifyStep): Promise<VerifyF
     for (const finding of result.findings) {
         const severity = liveSeverity(finding.severity);
         if (!severity) continue;
+        const tokenGated = severity === "error" && isTokenGatedPublicRead(finding, authRequired, isGeneratedPolicyName);
         findings.push({
             step: "live",
             check: finding.id,
-            severity,
-            message: finding.title,
+            severity: tokenGated ? "warning" : severity,
+            message: tokenGated
+                ? `${finding.title} — compiled from an \`access: "public"\` read rule: every signed-in user reads every row. ` +
+                    "A request with no token is refused by the API (AUTH_REQUIRE is on), so it is not an anonymous read."
+                : finding.title,
             ...(finding.fix && { fix: finding.fix }),
             path: finding.target.table ? `${finding.target.schema}.${finding.target.table}` : finding.target.schema
         });
@@ -732,7 +767,7 @@ export async function runVerify(options: VerifyOptions): Promise<VerifyReport> {
         liveStep.status = "skipped";
         liveStep.detail = "pass --live to audit the database";
     } else if (liveUrl) {
-        findings.push(...await checkLive(liveUrl, liveStep));
+        findings.push(...await checkLive(liveUrl, liveStep, options.authRequired ?? true));
     }
 
     steps.forEach(step => settle(step, findings));
@@ -888,12 +923,14 @@ export async function verifyCommand(rawArgs: string[]): Promise<void> {
         })
         : {};
 
+    const authSetting = process.env.AUTH_REQUIRE ?? readEnvFile(projectRoot).AUTH_REQUIRE;
     const report = await runVerify({
         projectRoot,
         collectionsDir,
         backendDir,
         live,
-        ...database
+        ...database,
+        authRequired: authSetting?.trim() !== "false"
     });
 
     if (flags["--json"]) {
