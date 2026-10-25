@@ -17,7 +17,8 @@ import { fileURLToPath } from "url";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { createRebaseApp, type TemplatePreset } from "./init";
-import { runVerify, verifyCommand, type VerifyReport } from "./verify";
+import { pendingMigrations, runVerify, verifyCommand, type VerifyReport } from "./verify";
+import { compareMigrationVersions, migrationVersionOf } from "@rebasepro/server-postgres";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const PACKAGE_ROOT = path.resolve(HERE, "..", "..");
@@ -269,6 +270,30 @@ describe("rebase verify: migration freshness", () => {
         const report = await verify({ backend: true });
         expect(report.ok).toBe(true);
         expect(report.steps.find(s => s.id === "migrations")).toMatchObject({ status: "skipped" });
+    });
+});
+
+describe("rebase verify --live: which migrations are applied", () => {
+    const files = ["20261025000100_init.sql", "20261025000126_add_tags.sql", "20261026090000_add_slug.sql"];
+    const pending = (revisions: { version: string; type: number }[]) =>
+        pendingMigrations(files, revisions, compareMigrationVersions, migrationVersionOf);
+
+    it("counts every migration at or behind a baseline as applied, as Atlas does", () => {
+        // `rebase db migrate --baseline 20261025000126` records that version alone, type 1.
+        expect(pending([{ version: "20261025000126", type: 1 }])).toEqual(["20261026090000_add_slug.sql"]);
+    });
+
+    it("still names a migration past the baseline, and one with no row and no baseline", () => {
+        expect(pending([{ version: "20261025000100", type: 2 }])).toEqual(["20261025000126_add_tags.sql", "20261026090000_add_slug.sql"]);
+        expect(pending([])).toEqual(files);
+    });
+
+    it("reads executed and `migrate set` rows by membership", () => {
+        expect(pending([
+            { version: "20261025000100", type: 4 },
+            { version: "20261025000126", type: 4 },
+            { version: "20261026090000", type: 2 }
+        ])).toEqual([]);
     });
 });
 

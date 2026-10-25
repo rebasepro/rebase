@@ -408,9 +408,44 @@ function checkRls(loaded: LoadedCollections): VerifyFinding[] {
 
 const POSTGRES_PLUGIN = "@rebasepro/server-postgres";
 
-/** `20260906101530_init.sql` → `20260906101530`, the version Atlas records. */
-function migrationVersion(file: string): string {
-    return file.split("_")[0];
+/** One row of `rebase.atlas_schema_revisions`, as far as "applied" needs it. */
+export interface AppliedRevision {
+    version: string;
+    /** Atlas's revision type, a bit set: 1 baseline, 2 executed, 4 resolved (`migrate set`). */
+    type: number;
+}
+
+/** Atlas's baseline bit in `atlas_schema_revisions.type`. */
+const REVISION_TYPE_BASELINE = 1;
+
+/**
+ * The migration files the database has not run, as Atlas's own `migrate status`
+ * counts them.
+ *
+ * A file is applied when its version has a row, or when it is at or behind the
+ * newest *baseline* row: `migrate apply --baseline V` records V alone, and
+ * means "everything up to V is already here". `rebase db migrate --baseline` is
+ * what the CLI prescribes for a booted database, so set membership alone
+ * reported the earlier migrations of every baselined database as not applied —
+ * and prescribed `rebase db migrate`, which answers "No migration files to
+ * execute". That run failed forever.
+ */
+export function pendingMigrations(
+    files: readonly string[],
+    revisions: readonly AppliedRevision[],
+    compare: (a: string, b: string) => number,
+    versionOf: (file: string) => string
+): string[] {
+    const recorded = new Set(revisions.map(row => row.version));
+    const baseline = revisions
+        .filter(row => (Number(row.type) & REVISION_TYPE_BASELINE) !== 0)
+        .map(row => row.version)
+        .reduce<string | null>((newest, version) => (newest === null || compare(version, newest) > 0 ? version : newest), null);
+    return files.filter((file) => {
+        const version = versionOf(file);
+        if (recorded.has(version)) return false;
+        return baseline === null || compare(version, baseline) > 0;
+    });
 }
 
 async function checkMigrations(
@@ -503,11 +538,16 @@ async function checkAppliedMigrations(databaseUrl: string, files: string[]): Pro
                 fix: "`rebase db migrate --baseline <version>` adopts an existing database; `rebase db migrate` applies the migrations to a new one."
             }];
         }
-        const applied = await client.query<{ version: string }>(
-            "SELECT version FROM rebase.atlas_schema_revisions WHERE error IS NULL OR error = ''"
+        const applied = await client.query<{ version: string; type: string | number }>(
+            "SELECT version, type FROM rebase.atlas_schema_revisions WHERE error IS NULL OR error = ''"
         );
-        const done = new Set(applied.rows.map(row => row.version));
-        const pending = files.filter(f => !done.has(migrationVersion(f)));
+        const { compareMigrationVersions, migrationVersionOf } = await import("@rebasepro/server-postgres");
+        const pending = pendingMigrations(
+            files,
+            applied.rows.map(row => ({ version: row.version, type: Number(row.type) })),
+            compareMigrationVersions,
+            migrationVersionOf
+        );
         if (pending.length === 0) return [];
         return [{
             step: "migrations",

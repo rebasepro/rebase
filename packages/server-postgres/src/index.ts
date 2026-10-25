@@ -30,6 +30,13 @@ export { findUnmigratedSchema } from "./schema/migration-freshness";
 export type { UnmigratedChange } from "./schema/migration-freshness";
 
 /**
+ * Atlas's version order and the version a migration file records, for a
+ * caller that reads `rebase.atlas_schema_revisions` itself — `rebase verify
+ * --live` counts a baselined database's earlier migrations as applied.
+ */
+export { compareMigrationVersions, migrationVersionOf } from "./schema/migrate-baseline";
+
+/**
  * The app-role provisioning boot performs, for callers that restore a database
  * outside a boot.
  *
