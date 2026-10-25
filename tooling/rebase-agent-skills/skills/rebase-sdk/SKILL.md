@@ -117,7 +117,7 @@ Passing your generated `Database` type maps camelCase collection names (e.g. `po
 | `fetch` | `typeof fetch` | Global `fetch` | Custom fetch implementation |
 | `onUnauthorized` | `() => Promise<boolean>` | The client's own session refresh | Handler called on 401 responses and socket auth errors; resolve `true` to retry with the token resolved again |
 | `realtime` | `boolean` | `true` | Open the WebSocket. Set `false` in one-shot scripts, or the process will not exit |
-| `collections` | `Record<string, string>` | — | Maps accessor names to collection slugs |
+| `collections` | `Record<string, string>` | — | Maps accessor names to collection slugs. **Required for a typed client**: pass the generated `collectionsDictionary` |
 | `offline` | `boolean \| OfflineConfig` | `false` | Local-first sync — see **Offline & Local-First Sync** below |
 
 ### Server-Side Usage
@@ -127,6 +127,7 @@ For server-side scripts or service-to-service calls, pass a service key as the `
 ```typescript
 const rebase = createRebaseClient<Database>({
     baseUrl: 'https://api.myapp.com',
+    collections: collectionsDictionary,
     token: process.env.REBASE_SERVICE_KEY,
 });
 ```
@@ -698,6 +699,7 @@ Opt in with one option. It is **off by default**, so nothing below applies unles
 ```typescript
 const rebase = createRebaseClient<Database>({
     baseUrl: API_URL,
+    collections: collectionsDictionary,
     offline: true,
 });
 ```
@@ -916,10 +918,10 @@ A common pattern for using the SDK in a React application:
 ```typescript
 // src/client.ts
 import { createRebaseClient } from '@rebasepro/client';
-import type { Database } from './generated/sdk/database.types';
+import { collectionsDictionary, type Database } from './generated/sdk/database.types';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
-export const rebase = createRebaseClient<Database>({ baseUrl: API_URL });
+export const rebase = createRebaseClient<Database>({ baseUrl: API_URL, collections: collectionsDictionary });
 ```
 
 ```typescript

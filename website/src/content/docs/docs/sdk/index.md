@@ -104,7 +104,7 @@ const { data } = await client.data.products.find();
 
 When `Database` is supplied, `createRebaseClient` returns a `CreateRebaseClientResult<DB>` instance. This maps camelCase collection accessors directly on `client.data` to their corresponding types, giving you full autocomplete on collection operations and types (e.g. `client.data.products.find()`).
 
-`collectionsDictionary` maps each accessor back to the slug the wire uses. Pass it whenever a slug is not already a valid property name — `my-notes` is reachable as `client.data.myNotes` only because the dictionary says so.
+`collectionsDictionary` maps each accessor back to the slug the wire uses. **`collections` is required for a typed client.** The types offer every accessor whether you pass it or not, but without it `client.data.myNotes` is sent to `/data/my_notes`, the accessor in snake_case, so a slug like `my-notes` or a renamed accessor answers 404. The client warns once, naming the accessor and the fix. A later version will make `collections` required in the types when `Database` is supplied.
 
 A few names on `client.data` are taken: `collection` is the dynamic `collection(slug)` function, and `then`, `toJSON` and `$$typeof` are left alone for promise and serialisation checks. A collection whose accessor would be one of them is generated as `<name>Collection` — the `collection` slug is `client.data.collectionCollection` — and `generate-sdk` prints a warning naming both. `client.data.collection("collection")` reaches it too.
 

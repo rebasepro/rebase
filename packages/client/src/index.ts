@@ -187,10 +187,17 @@ export interface CreateRebaseClientOptions extends RebaseClientConfig {
      */
     storageSources?: StorageSourceDefinition[];
     /**
-     * Maps camelCase property names / safe identifiers to the actual
-     * collection slugs on the server (e.g. `{ companyMembers: "company-members" }`).
-     * If provided, the data layer proxy will resolve property accessors to their
-     * correct slugs via this map before falling back to automatic snake_casing.
+     * Maps each `client.data` accessor to the collection slug the server
+     * serves (e.g. `{ companyMembers: "company-members" }`): the generated
+     * `collectionsDictionary`.
+     *
+     * **Required for a typed client** (`createRebaseClient<Database>`). The
+     * types offer every accessor, but without the map the proxy sends
+     * `client.data.companyMembers` to `/data/company_members`, so a kebab-case
+     * slug or a renamed accessor (`collectionCollection`) answers 404; a
+     * one-time warning names the accessor. With the map, an unknown accessor
+     * throws `UNKNOWN_COLLECTION` with a suggestion. A later version will make
+     * it required in the types when `Database` is supplied.
      */
     collections?: Record<string, string>;
     /**
@@ -826,15 +833,22 @@ export function createRebaseClient<DB = Record<string, unknown>>(options: Create
             }
             // Untyped fallback: convert camelCase property names to snake_case slugs.
             // e.g. `companyMembers` → `company_members`
+            const slug = toSnakeCase(prop);
             if (!untypedWarned) {
                 untypedWarned = true;
+                // Once per client, and it names everything needed to act:
+                // which accessor, where it went, and the two fixes. A typed
+                // client (`createRebaseClient<Database>`) without the
+                // dictionary compiles every accessor and 404s on any slug that
+                // is not the accessor in snake_case.
                 console.warn(
-                    `[Rebase] Untyped data access detected (client.data.${prop}). ` +
-                    `Collection names are resolved via snake_case conversion, which may cause silent 404s at request time. ` +
-                    `Pass a \`collections\` dictionary to createRebaseClient() or use the generated SDK for type-safe access.`
+                    `[Rebase] Untyped data access detected: client.data.${prop} was sent to /data/${slug}, ` +
+                    `its name in snake_case, because this client has no \`collections\` dictionary. ` +
+                    `A collection whose slug is not that (a kebab-case slug, a renamed accessor) answers 404. ` +
+                    `With generated types, pass \`collections: collectionsDictionary\` (from generated/sdk/database.types) ` +
+                    `to createRebaseClient(); a typed client needs it. Otherwise use client.data.collection("<slug>").`
                 );
             }
-            const slug = toSnakeCase(prop);
             return collection(slug);
         },
         // `"posts" in client.data` answers what `get` serves: with a
