@@ -543,8 +543,14 @@ export interface RebaseClient<DB = unknown> {
     /**
      * Execute raw SQL against the database.
      * Only available server-side with a SQL database.
+     *
+     * The same options as {@link RebaseServerClient.sql}: pass values through
+     * `params` as `$1`, `$2`, … rather than into the query text. This is what
+     * a collection callback's `context.client.sql` is typed by, and it used to
+     * have no `params`, so the one typed way to run SQL from a hook left
+     * interpolating row values into the string as the way to write it.
      */
-    sql?(query: string, options?: { database?: string; role?: string }): Promise<Record<string, unknown>[]>;
+    sql?(query: string, options?: { database?: ResourceRef; role?: string; params?: unknown[] }): Promise<Record<string, unknown>[]>;
 }
 
 // ─── RebaseServerClient ──────────────────────────────────────────────────────
