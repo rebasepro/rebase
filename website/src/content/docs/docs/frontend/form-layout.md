@@ -15,8 +15,9 @@ The entity form is generated from your properties:
   neighbouring fields with the same small editor — two numbers, two switches,
   two dates of the same mode, two selects with short options — share a row
 
-A field with a long label, help text over 60 characters, `conditions` or a
-custom `Field` is never paired, and neither is any free-text string: nothing in
+A field with a long label, help text over 60 characters, `conditions`, a
+field-level `access` rule or `excludeFromApi` (the form renders nothing for a
+user who may not read it), or a custom `Field` is never paired, and neither is any free-text string: nothing in
 a schema tells a short branch name from a long URL. The form never looks at
 which property is the title. Any other columns are something the collection asks
 for, field by field, with `admin.span` — set from what each field holds, as
