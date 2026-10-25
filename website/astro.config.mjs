@@ -203,6 +203,7 @@ export default defineConfig({
                         { label: "Entity History", slug: "docs/backend/history" },
                         { label: "Database Branching", slug: "docs/backend/branching" },
                         { label: "Custom Server Integration", slug: "docs/backend/custom-server" },
+                        { label: "Embedding the Postgres Driver", slug: "docs/backend/embedding-postgres-driver" },
                         { label: "Scripts and the Console", slug: "docs/backend/scripts" }
                     ]
                 },
@@ -277,6 +278,7 @@ export default defineConfig({
                         { label: "Overview", slug: "docs/ai" },
                         { label: "MCP Server", slug: "docs/ai/mcp" },
                         { label: "MCP tool reference", slug: "docs/ai/mcp-tool-reference" },
+                        { label: "Remote MCP endpoint", slug: "docs/ai/remote-mcp" },
                         { label: "Agent Skills", slug: "docs/ai/skills" },
                         { label: "AI Instruction Files", slug: "docs/ai/instruction-files" }
                     ]

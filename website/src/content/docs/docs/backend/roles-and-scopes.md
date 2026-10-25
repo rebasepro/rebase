@@ -272,7 +272,7 @@ the users collection, service keys).
 | A person's session | the person | the data plane, every app scope, and their roles' scopes. An admin holds everything |
 | [Service key](/docs/backend/api-keys/#service-keys) `rk_live_…` | `api-key:<id>`, with the RLS roles `service` plus its own `roles` | exactly its scopes |
 | [Personal key](/docs/backend/api-keys/#personal-keys) `rk_live_…` | its owner, with the owner's roles as they are at each request | its scopes, cut down to what the owner holds now |
-| [MCP token](/docs/ai/mcp/#the-remote-endpoint) | the person who connected it | `data:read`, `data:write`, `data:delete` as granted, optionally per collection |
+| [MCP token](/docs/ai/remote-mcp/) | the person who connected it | `data:read`, `data:write`, `data:delete` as granted, optionally per collection |
 | `REBASE_SERVICE_KEY` | `service`, with the `admin` role | everything |
 
 A key or a token never bypasses row-level security. Its scopes are one ceiling,

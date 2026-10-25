@@ -79,6 +79,7 @@ export const MCP_REFERENCE_PAGE = "website/src/content/docs/docs/ai/mcp-tool-ref
 export const MCP_COUNT_PAGES = [
     MCP_REFERENCE_PAGE,
     "website/src/content/docs/docs/ai/mcp.md",
+    "website/src/content/docs/docs/ai/remote-mcp.md",
     "website/src/content/docs/docs/ai/index.md",
     "website/src/content/docs/docs/compatibility.md"
 ];

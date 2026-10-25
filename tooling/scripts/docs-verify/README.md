@@ -149,7 +149,7 @@ which listed 20 of 42 tools while it was hand-written. The website's
 tables) and is held to `ALL_TOOLS` by content instead: every registered tool
 has a row under its group, each heading's count is its row count, and ⚠ marks
 exactly the gated tools. The tool and group counts in the prose of the English
-MCP pages (`ai/mcp.md`, `ai/index.md`, `compatibility.md`) are checked against
+MCP pages (`ai/mcp.md`, `ai/remote-mcp.md`, `ai/index.md`, `compatibility.md`) are checked against
 `ALL_TOOLS`, and the remote endpoint's against the server's `mcp-tools.ts`. The
 page said 42 tools in nine groups while the server registered 44 in ten, and
 this stage could not see it.

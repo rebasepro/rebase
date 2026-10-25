@@ -30,7 +30,7 @@ curl "$API_URL/api/data/orders" \
 ```
 
 The same key works on the REST API, storage, custom functions, the admin
-surfaces its scopes reach, the realtime WebSocket and the [`/mcp` endpoint](/docs/ai/mcp/#the-remote-endpoint).
+surfaces its scopes reach, the realtime WebSocket and the [`/mcp` endpoint](/docs/ai/remote-mcp/).
 
 ## Service keys
 
@@ -158,7 +158,7 @@ window, and every door counts against it in one bucket, `api-key:<id>`:
 - its data frames on the realtime socket: fetches, counts, saves and deletes,
   and subscriptions and channel-history requests past each socket's
   [allowance](/docs/backend/realtime/#what-a-write-costs-and-the-limits);
-- its requests to [`/mcp`](/docs/ai/mcp/#the-remote-endpoint).
+- its requests to [`/mcp`](/docs/ai/remote-mcp/).
 
 Without a `rate_limit` the bucket holds the server's API-key default, 1000. A
 personal key has no `rate_limit` of its own, and counts in its own bucket at that
