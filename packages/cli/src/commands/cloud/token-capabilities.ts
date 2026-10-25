@@ -161,3 +161,18 @@ export function capabilitiesInScopes(scopes: readonly string[]): Array<{ project
             TOKEN_CAPABILITIES[capability].scopes(projectId).every(scope => held.has(scope)))
     }));
 }
+
+/**
+ * Whether a token's scopes reach one project: a project scope narrowed to it,
+ * or an unnarrowed one, which reaches every project.
+ *
+ * What decides, in a directory `rebase cloud init --claim` linked, whether
+ * `REBASE_TOKEN` or the token stored for that project acts on it: a
+ * `REBASE_TOKEN` made for other projects would be refused on this one.
+ */
+export function scopesReachProject(scopes: readonly string[], projectId: string): boolean {
+    return scopes.some(scope => {
+        const match = /^project:[a-z][a-z0-9-]*(?::(.+))?$/.exec(scope);
+        return match !== null && (match[1] === undefined || match[1] === projectId);
+    });
+}

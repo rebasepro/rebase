@@ -33,7 +33,7 @@ import {
     type InitDeps,
     type ProvisionedProject
 } from "./init";
-import { ephemeralGrantFor, forgetEphemeralGrant, initOutputMode, readLink, requireClient } from "./context";
+import { ephemeralGrantFor, forgetEphemeralGrant, initOutputMode, readLink, requireClient, resetTokenScopesForTest } from "./context";
 
 class Exited extends Error {
     constructor(readonly code: number) {
@@ -119,6 +119,7 @@ beforeEach(() => {
     delete process.env.REBASE_TOKEN;
     delete process.env[INIT_CHILD_DEPLOY_ENV];
     process.env.REBASE_JSON = "1";
+    resetTokenScopesForTest();
 
     sent = [];
     said = [];
@@ -536,6 +537,92 @@ describe("with REBASE_TOKEN in the environment", () => {
         await client.data.collection("projects").find({ limit: 1 });
         expect(sent.at(-1)?.authorization).toBe("Bearer rk_live_other_projects");
         expect(said.join("\n")).toContain(`REBASE_TOKEN is set, so it is used instead of the token`);
+    });
+
+    /** The control plane answering `/api/auth/scopes` with `held`, and `{ data: [] }` to anything else. */
+    function tokenHolds(held: string[]): void {
+        respond = (request) => request.path === "/api/auth/scopes"
+            ? json(200, { scopes: [], held })
+            : json(200, { data: [] });
+    }
+
+    it("uses the project's own token when REBASE_TOKEN holds nothing on the linked project, and says so once", async () => {
+        await init(["--claim", "--no-deploy"]);
+        process.env.REBASE_TOKEN = "rk_live_other_projects";
+        tokenHolds(["data:read:projects", "project:deploy:proj_someone_else", "project:read:proj_someone_else"]);
+        said = [];
+        sent = [];
+
+        const first = await requireClient(line("status"));
+        await first.client.data.collection("projects").find({ limit: 1 });
+        expect(sent.at(-1)?.authorization).toBe(`Bearer ${PROVISIONED.apiKey}`);
+        const second = await requireClient(line("logs"));
+        await second.client.data.collection("projects").find({ limit: 1 });
+        expect(sent.at(-1)?.authorization).toBe(`Bearer ${PROVISIONED.apiKey}`);
+
+        // One scopes call for the process, asked with REBASE_TOKEN.
+        const asked = sent.filter(request => request.path === "/api/auth/scopes");
+        expect(asked).toHaveLength(1);
+        expect(asked[0].authorization).toBe("Bearer rk_live_other_projects");
+        const told = said.join("\n");
+        expect(told.match(/holds no scope on project proj_eph/g)).toHaveLength(1);
+        expect(told).not.toContain("so it is used instead of the token");
+    });
+
+    it("keeps REBASE_TOKEN when it reaches the linked project", async () => {
+        await init(["--claim", "--no-deploy"]);
+        process.env.REBASE_TOKEN = "rk_live_also_this_one";
+        tokenHolds(["data:read:projects", `project:deploy:${PROVISIONED.projectId}`]);
+        said = [];
+        const { client } = await requireClient(line("status"));
+        await client.data.collection("projects").find({ limit: 1 });
+        expect(sent.at(-1)?.authorization).toBe("Bearer rk_live_also_this_one");
+        expect(said.join("\n")).toContain("REBASE_TOKEN is set, so it is used instead of the token");
+    });
+
+    it("keeps REBASE_TOKEN when it holds an unnarrowed project scope", async () => {
+        await init(["--claim", "--no-deploy"]);
+        process.env.REBASE_TOKEN = "rk_live_every_project";
+        tokenHolds(["project:read"]);
+        const { client } = await requireClient(line("status"));
+        await client.data.collection("projects").find({ limit: 1 });
+        expect(sent.at(-1)?.authorization).toBe("Bearer rk_live_every_project");
+    });
+
+    it("keeps REBASE_TOKEN for a command aimed at another project with --project", async () => {
+        await init(["--claim", "--no-deploy"]);
+        process.env.REBASE_TOKEN = "rk_live_other_projects";
+        tokenHolds(["project:deploy:proj_someone_else"]);
+        sent = [];
+        const { client } = await requireClient(line("logs", "--project", "someone-elses-shop"));
+        await client.data.collection("projects").find({ limit: 1 });
+        expect(sent.at(-1)?.authorization).toBe("Bearer rk_live_other_projects");
+        expect(sent.some(request => request.path === "/api/auth/scopes")).toBe(false);
+    });
+
+    it("keeps REBASE_TOKEN when the control plane cannot say what it holds", async () => {
+        await init(["--claim", "--no-deploy"]);
+        process.env.REBASE_TOKEN = "rk_live_other_projects";
+        respond = (request) => request.path === "/api/auth/scopes"
+            ? json(502, { error: { code: "upstream_error", message: "Bad gateway" } })
+            : json(200, { data: [] });
+        const { client } = await requireClient(line("status"));
+        await client.data.collection("projects").find({ limit: 1 });
+        expect(sent.at(-1)?.authorization).toBe("Bearer rk_live_other_projects");
+    });
+
+    it("whoami reports the project's token when that is what is used", async () => {
+        await init(["--claim", "--no-deploy"]);
+        process.env.REBASE_TOKEN = "rk_live_other_projects";
+        respond = (request) => {
+            if (request.path !== "/api/auth/scopes") return json(404, { error: { code: "NOT_FOUND", message: "no route" } });
+            return request.authorization === "Bearer rk_live_other_projects"
+                ? json(200, { held: ["project:deploy:proj_someone_else"] })
+                : json(200, { held: [`project:deploy:${PROVISIONED.projectId}`] });
+        };
+        said = [];
+        await cloudCommand("whoami", line("whoami"));
+        expect(printedJson()).toMatchObject({ credential: "ephemeral", projectId: PROVISIONED.projectId });
     });
 });
 

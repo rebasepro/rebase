@@ -28,6 +28,7 @@ import {
     requireInteractive,
     envToken,
     linkedEphemeralGrant,
+    grantProjectOf,
     appKeyExpiryNote,
     projectDotenvSetsAppKey,
     TOKEN_ENV,
@@ -276,7 +277,9 @@ maxPositionals: 0 });
     const { client, url } = await requireClient(rawArgs);
     // A token is not a session: `/auth/me` takes only a person's login, so the
     // question a token can answer is what it holds.
-    if (envToken()) {
+    // Unless `requireClient` set REBASE_TOKEN aside for the linked project's
+    // own token, because it holds nothing on that project.
+    if (envToken() && !grantProjectOf(client)) {
         await whoamiToken(client, url);
         return;
     }

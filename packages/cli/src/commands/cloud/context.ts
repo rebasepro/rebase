@@ -26,6 +26,7 @@ import { parseCommandArgs } from "../../utils/args";
 import { cliUserAgent } from "../../utils/version";
 import { summarizeError, wantsRawError } from "./errors";
 import { parseEnvBoolean } from "@rebasepro/types";
+import { scopesReachProject } from "./token-capabilities";
 
 /* ═══════════════════════════════════════════════════════════════
    Constants & paths
@@ -457,6 +458,18 @@ export function envToken(): string | undefined {
 /** The token each token-authenticated client was built with — see {@link freshAccessToken}. */
 const STATIC_TOKENS = new WeakMap<object, string>();
 
+/** The project each client built from an `init --claim` grant acts for — see {@link grantProjectOf}. */
+const GRANT_CLIENTS = new WeakMap<object, string>();
+
+/**
+ * The project whose `rebase cloud init --claim` token a client holds, or
+ * undefined for a session or `REBASE_TOKEN`: what `whoami` reports, since
+ * {@link requireClient} may pick the grant over `REBASE_TOKEN`.
+ */
+export function grantProjectOf(client: object): string | undefined {
+    return GRANT_CLIENTS.get(client);
+}
+
 /**
  * A client that sends `token` as its bearer and nothing else.
  *
@@ -482,7 +495,60 @@ export function createTokenClient(url: string, token: string, ephemeralProjectId
         ? explainRefusedGrant(url, ephemeralProjectId, token)
         : explainRefusedToken(url, token));
     STATIC_TOKENS.set(client, token);
+    if (ephemeralProjectId) GRANT_CLIENTS.set(client, ephemeralProjectId);
     return client;
+}
+
+/** What `/api/auth/scopes` said each token holds, asked once per process. */
+const TOKEN_SCOPES = new Map<string, Promise<string[] | undefined>>();
+
+/** The projects already told that `REBASE_TOKEN` was set aside for their own token. */
+const TOLD_GRANT_PREFERRED = new Set<string>();
+
+/**
+ * The scopes the control plane says a token holds — one `/api/auth/scopes`
+ * request per token and host for the life of the process — or undefined when
+ * it could not say: refused, unreachable, or an answer without `held`.
+ */
+function tokenScopes(url: string, token: string): Promise<string[] | undefined> {
+    const key = `${url}\n${token}`;
+    let pending = TOKEN_SCOPES.get(key);
+    if (!pending) {
+        pending = (async () => {
+            try {
+                const res = await fetch(`${url}/api/auth/scopes`, {
+                    headers: { Authorization: `Bearer ${token}`, "User-Agent": cliUserAgent() }
+                });
+                if (!res.ok) return undefined;
+                const body: unknown = await res.json();
+                const held = typeof body === "object" && body !== null ? (body as { held?: unknown }).held : undefined;
+                return Array.isArray(held) && held.every(s => typeof s === "string") ? held : undefined;
+            } catch {
+                return undefined;
+            }
+        })();
+        TOKEN_SCOPES.set(key, pending);
+    }
+    return pending;
+}
+
+/** Forget what {@link tokenScopes} asked and who was told — each test is a new process. */
+export function resetTokenScopesForTest(): void {
+    TOKEN_SCOPES.clear();
+    TOLD_GRANT_PREFERRED.clear();
+}
+
+/**
+ * Whether a command line names a project other than the linked one with
+ * `--project`: the grant acts only on its own project, so such a command
+ * keeps `REBASE_TOKEN` whatever it holds.
+ */
+function namesAnotherProject(rawArgs: string[], projectId: string): boolean {
+    const parsed = arg({ "--project": String, "-p": "--project" }, { argv: rawArgs.slice(2), permissive: true });
+    const ref = parsed["--project"];
+    if (!ref) return false;
+    const link = readLink();
+    return ref !== projectId && ref !== link?.slug;
 }
 
 /**
@@ -625,7 +691,10 @@ async function explainRefusedGrant(url: string, projectId: string, token: string
  * Return an authenticated client for the resolved host.
  *
  * With `REBASE_TOKEN` set, that token is the credential for every request and
- * the stored login is not consulted at all. Next, a directory linked to a
+ * the stored login is not consulted at all — except in a directory linked to a
+ * project `init --claim` provisioned, when `REBASE_TOKEN` holds no scope on that
+ * project (one `/api/auth/scopes` call): the project's own token acts there
+ * instead, and the command says so once. Next, a directory linked to a
  * project `rebase cloud init --claim` provisioned uses the token stored for it
  * (see {@link EphemeralGrant}) until it expires: nobody can sign in as that
  * project's owner, so a login could not reach it anyway. Otherwise it is the
@@ -645,11 +714,26 @@ export async function requireClient(rawArgs: string[]): Promise<{ client: CloudC
     // against.
     refuseDirectLink(rawArgs);
     const url = resolveCloudUrl(rawArgs);
-    // REBASE_TOKEN wins, as documented — but a token held for other projects
-    // has no scope on the one `init --claim` linked here, and its refusal
-    // would never say what displaced the project's own token.
+    // REBASE_TOKEN wins, as documented — unless it holds no scope on the
+    // project `init --claim` linked here, which it would only be refused on:
+    // a CI token made for other projects, set in the shell. Then the
+    // project's own token acts, and the command says so once. When the
+    // control plane cannot say what REBASE_TOKEN holds, it still wins.
     const displaced = linkedEphemeralGrant(url);
     if (displaced) {
+        if (!namesAnotherProject(rawArgs, displaced.projectId)) {
+            const held = await tokenScopes(url, token);
+            if (held && !scopesReachProject(held, displaced.projectId)) {
+                if (!TOLD_GRANT_PREFERRED.has(displaced.projectId)) {
+                    TOLD_GRANT_PREFERRED.add(displaced.projectId);
+                    warn(
+                        `${TOKEN_ENV} holds no scope on project ${displaced.projectId}, so the token \`rebase cloud init --claim\` stored for it is used instead.`,
+                        `Pass --project to act on another project with ${TOKEN_ENV}, or give ${TOKEN_ENV} a capability on this one.`
+                    );
+                }
+                return { client: createTokenClient(url, displaced.grant.token, displaced.projectId), url };
+            }
+        }
         warn(
             `${TOKEN_ENV} is set, so it is used instead of the token \`rebase cloud init --claim\` stored for project ${displaced.projectId}.`,
             `Unset ${TOKEN_ENV} to act on that project with its own token.`

@@ -462,7 +462,9 @@ the directory they run in.
 
 **Whose authority.** Whatever the CLI resolves in that directory: `REBASE_TOKEN`
 when it is set, then the token `rebase cloud init --claim` stored for an
-unclaimed project, then the `rebase cloud login` session. The control plane
+unclaimed project, then the `rebase cloud login` session. In that unclaimed
+project's directory, a `REBASE_TOKEN` that holds no scope on the project is set
+aside for the project's own token. The control plane
 checks each call as it checks the CLI's, so with a token made by
 `rebase cloud tokens create --can logs` an assistant can read logs, and the
 control plane refuses its deploys, variables and rollbacks. No credential, or a refused one, comes back as an error that says what the

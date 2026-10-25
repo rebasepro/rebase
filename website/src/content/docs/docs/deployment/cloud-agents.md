@@ -111,9 +111,12 @@ and runs `db info`. It reads nothing secret back: not a variable's value (the
 service key included), not the database password, and it cannot open
 `db connect` or a preview. It is kept in
 `~/.rebase/credentials.json`, never in the repository, and `rebase cloud`
-commands in the linked directory use it on their own (`REBASE_TOKEN`, when set,
-still wins, and those commands warn that it did; the deploy `init --claim` runs
-always uses the project's own token). It expires with the project. `rebase cloud whoami` in that directory shows the project, what the
+commands in the linked directory use it on their own. `REBASE_TOKEN`, when set,
+still wins if it holds a scope on that project, and those commands warn that it
+did; when it holds none (a CI token made for other projects), the project's own
+token is used and the first command says so. A command given `--project` for
+another project keeps `REBASE_TOKEN`, and the deploy `init --claim` runs always
+uses the project's own token. It expires with the project. `rebase cloud whoami` in that directory shows the project, what the
 token may do, the claim URL and when the project expires. A command that needs a
 person's session refuses with `session_required` and keeps the token; it is
 forgotten only once the control plane refuses it everywhere, after a claim or at
