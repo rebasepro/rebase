@@ -651,7 +651,7 @@ export class RebaseRealtimeChannel {
                     // messages live; a hole filled from history keeps to that.
                     // So is one sent from this channel's socket before a
                     // reconnect.
-                    if (ownId !== undefined && (entry.senderId === ownId || this.ownSenderIds.has(entry.senderId))) continue;
+                    if (ownId !== undefined && (entry.senderId === ownId || (entry.senderId !== undefined && this.ownSenderIds.has(entry.senderId)))) continue;
                     this.deliver({
                         event: entry.event,
                         payload: entry.payload,
