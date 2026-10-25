@@ -103,6 +103,19 @@ describe("env configuration and localhost validation", () => {
         expect(env.DATABASE_URL).toBe("postgresql://db.my-app.com:5432/rebase");
     });
 
+    it("generates no JWT_SECRET in production, and refuses the boot naming it", () => {
+        // Secrets are generated outside production only, so a production boot
+        // without one is refused by the schema itself — this is the message
+        // an operator sees, and the one the docs and skills quote.
+        process.env.NODE_ENV = "production";
+        process.env.DATABASE_URL = "postgresql://db.my-app.com:5432/rebase";
+        process.env.FRONTEND_URL = "https://my-app.com";
+        delete process.env.JWT_SECRET;
+
+        expect(() => loadEnv()).toThrow(/JWT_SECRET: is required/);
+        expect(process.env.JWT_SECRET).toBeUndefined();
+    });
+
     it("names the escape hatch for a database on the same host", () => {
         // A single VPS with Postgres on the same machine is the most common
         // self-hosted topology, and the refusal used to stop there: it said

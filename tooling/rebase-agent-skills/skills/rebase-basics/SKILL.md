@@ -318,7 +318,7 @@ Read these when you need them, not before.
 ### JWT & Authentication
 
 - **`JWT_SECRET must be at least 32 characters long`:** Generate one with `node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"` and set it in `.env`.
-- **`JWT_SECRET must be explicitly set in production`:** Auto-generated dev secrets are blocked in production. Set the value explicitly in `.env`.
+- **`JWT_SECRET: is required` in production:** Secrets are generated only outside production. Set the value explicitly in the production environment.
 - **Tokens invalidated on restart:** `rebase init` writes `JWT_SECRET` into `.env`, and outside production a `JWT_SECRET` left unset is generated once and cached in `.rebase-dev-secrets.json`, so sessions survive a restart. They do not only when that file cannot be written (a read-only or containerised working directory); boot then warns that the secrets are ephemeral. Set `JWT_SECRET` in `.env` to fix it.
 - **`REBASE_SERVICE_KEY is too short`:** Must be ≥32 characters. Generate with `node -e "console.log(require('crypto').randomBytes(48).toString('base64'))"`.
 
