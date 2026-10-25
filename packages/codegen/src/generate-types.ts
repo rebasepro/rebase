@@ -834,6 +834,21 @@ function emitWritableRelations(
         if (relation?.kind === "belongsTo" && relation.localKey) emit(key, relation);
     }
 
+    // A `hasOne` is written by naming the target row: the server points the
+    // target's foreign key at this row (`inverseRelationUpdates`), and `null`
+    // unlinks it. Its resolved relation says `writable: true`, but only
+    // `belongsTo` and the to-many kinds were emitted, so the write the server
+    // performs was a type error. Keyed by the property, as the second
+    // `belongsTo` spelling is: the write transformer only recognises the
+    // relation through the property that declares it.
+    for (const [key, rawProp] of Object.entries(properties)) {
+        if ((rawProp as Property).type !== "relation" || emittedKeys.has(key)) continue;
+        const relation = findRelation(resolvedRelations, key);
+        if (relation?.kind !== "hasOne") continue;
+        lines.push(line(key, `${foreignKeyType(relation)} | null`, true));
+        emittedKeys.add(key);
+    }
+
     // A to-many membership: `hasMany` (the targets' foreign key is pointed at
     // this row) and `manyToMany` (junction rows). The server writes both on a
     // create and an update — bare keys, or `{ id }`, or `{ id, _pivot }` where

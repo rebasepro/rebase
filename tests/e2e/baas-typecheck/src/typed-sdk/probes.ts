@@ -221,6 +221,15 @@ export async function closedRelationProbes(): Promise<number | null | undefined>
     return data[0].reviewerId;
 }
 
+/** A `hasOne` is written by naming the target: the server points its foreign key here. */
+export async function hasOneWriteProbes(): Promise<void> {
+    await client.data.authors.update(1, { profile: 9 });
+    await client.data.authors.update(1, { profile: null });
+    await client.data.authors.create({ name: "a", profile: 9 });
+    // @ts-expect-error — a profile's id is a number
+    await client.data.authors.update(1, { profile: "9" });
+}
+
 /** A `via` is read-only on every door (RELATION_NOT_WRITABLE). */
 export async function viaWriteProbes(): Promise<void> {
     // @ts-expect-error — not writable through the flat door

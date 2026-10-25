@@ -415,8 +415,16 @@ describe("the generated write types, per relation kind", () => {
         slug: "authors",
         properties: {
             id: { type: "number", isId: "increment" },
-            name: { type: "string", validation: { required: true } }
+            name: { type: "string", validation: { required: true } },
+            profile: {
+                type: "relation",
+                relation: { kind: "hasOne", target: () => profiles, foreignKeyOnTarget: "author_id" }
+            }
         }
+    };
+    const profiles: Record<string, unknown> = {
+        slug: "profiles",
+        properties: { id: { type: "number", isId: "increment" } }
     };
     const comments: Record<string, unknown> = {
         slug: "comments",
@@ -453,7 +461,7 @@ describe("the generated write types, per relation kind", () => {
         }
     };
 
-    const schema = () => generateTypedefs([authors, comments, posts] as unknown as CollectionConfig[]);
+    const schema = () => generateTypedefs([authors, comments, posts, profiles] as unknown as CollectionConfig[]);
 
     it("satisfies a required belongsTo with either spelling, and with neither refuses", () => {
         // The server's required check reads both the foreign key and the
@@ -503,6 +511,22 @@ describe("the generated write types, per relation kind", () => {
             const include: IncludeFor<"posts"> = ["moderator"];
             const readable: IncludeFor<"posts"> = ["reviewer"];
             export { reviewer, hidden, closed, closedByName, include, readable };
+        `)).toEqual([]);
+    });
+
+    it("writes a hasOne by naming the target row, and unlinks it with null", () => {
+        // The server points the target's foreign key at this row
+        // (`inverseRelationUpdates`); the resolved relation says
+        // `writable: true`. Only belongsTo and the to-many kinds were emitted.
+        expect(compileWithConsumer(schema(), `
+            import type { Database } from "./database.types";
+            const link: Database["authors"]["Update"] = { profile: 9 };
+            const unlink: Database["authors"]["Update"] = { profile: null };
+            const onCreate: Database["authors"]["Insert"] = { name: "a", profile: 9 };
+            const optional: Database["authors"]["Insert"] = { name: "a" };
+            // @ts-expect-error a profile's id is a number
+            const wrongType: Database["authors"]["Update"] = { profile: "9" };
+            export { link, unlink, onCreate, optional, wrongType };
         `)).toEqual([]);
     });
 });

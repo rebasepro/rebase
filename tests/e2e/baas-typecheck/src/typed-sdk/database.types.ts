@@ -19,12 +19,14 @@ export interface Database {
       name: string;
       salary?: number | null;
       createdAt?: string | Date | null;
+      profile?: number | null;
       posts?: Array<string | { id: string }>;
     };
     Update: {
       name?: string;
       salary?: number | null;
       createdAt?: string | Date | null;
+      profile?: number | null;
       posts?: Array<string | { id: string }>;
     };
     Relations: {
