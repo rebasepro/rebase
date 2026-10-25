@@ -97,7 +97,7 @@ the ID you got. Read the response header.
 | `CHALLENGE_EXHAUSTED` | 401 | Too many wrong codes against one MFA challenge. | Start a new challenge. |
 | `EMAIL_EXISTS` | 409 | An account with that address already exists — on registration, on an address change, and on following an address-change link when another account took the address while it waited. | Sign in, or start a password reset; for an address change, pick another address. |
 | `EMAIL_NOT_CONFIGURED` | 503 | Magic links or OTP were requested and the server has no mail transport. | Configure SMTP, or use another sign-in method. |
-| `EMAIL_NOT_VERIFIED` | 403 | The account exists and its address is unverified. | Verify the address. |
+| `EMAIL_NOT_VERIFIED` | 403 | An OAuth sign-in found an account with the same address, and the provider did not verify that address, so it is not linked. | Sign in with the existing method, then `POST /auth/link/<provider>`. |
 | `FACTOR_NOT_VERIFIED` | 400 | The MFA factor was enrolled but never confirmed. | Confirm the factor. |
 | `IDENTITY_ALREADY_LINKED` | 409 | That OAuth identity belongs to another account. | Sign in with it, or unlink it there first. |
 | `IMPERSONATION_FORBIDDEN` | 403 | A request sent `x-rebase-impersonate` and its caller may not run a request as another user. Only a signed-in administrator's own session may, never an API key or the service key. | Send it with an administrator's session, or leave the header out. |

@@ -433,24 +433,23 @@ a trailing slash are ignored.
 
 What happens when someone registers with email/password as `ada@example.com`,
 then later clicks "Sign in with Google" on a Google account with that same
-address? Rebase **links the two into one account** — but only when the provider
-asserts the email as verified *and* the account's own address has been verified.
-It never silently creates a second account for the same address.
+address? Rebase **links the two into one account**, but only when the provider
+asserts the email as verified. It never silently creates a second account for
+the same address.
 
 On `POST /api/auth/<provider>` the resolution order is:
 
-1. **Known provider identity** — if this exact provider identity has signed in
+1. **Known provider identity**: if this exact provider identity has signed in
    before, that user is returned. The email is not consulted.
-2. **Existing account with the same email, both sides verified** — the
-   provider verified the email, and so has the account. The identity is
-   attached to the existing account and the user is signed in to it. One
-   account, two ways in.
-3. **Existing account with the same email, either side unverified** —
-   rejected with `403 EMAIL_NOT_VERIFIED`. Nothing is created or modified.
-   `details.reason` says which side: `provider-email-unverified`, or
-   `local-account-unverified` (the account has a password) /
-   `local-account-unverified-passwordless` (it does not).
-4. **No account with that email** — a new account is created, verified if the
+2. **Existing account with the same email, provider verified the email**: the
+   identity is attached to the existing account and the user is signed in to
+   it. One account, two ways in. If the account's own address was not
+   verified yet, this sign-in verifies it, and first removes what nobody
+   proved (see below).
+3. **Existing account with the same email, provider did not verify it**:
+   rejected with `403 EMAIL_NOT_VERIFIED` and `details.reason`
+   `provider-email-unverified`. Nothing is created or modified.
+4. **No account with that email**: a new account is created, verified if the
    provider verified the email.
 
 Step 3 is the security-critical case. If an unverified provider email were
@@ -460,17 +459,20 @@ own could take over the matching Rebase account. Google always asserts
 Google sign-in; step 3 mostly catches providers that let users supply an
 arbitrary unconfirmed address.
 
-The account's side matters for the same reason. Nothing verifies the address
+The account's side matters too. Nothing verifies the address
 `POST /auth/register` is given, so anyone can register someone else's address
 with a password, or sign in as it through a provider that does not vouch for
-it, and wait. Linking the owner's Google sign-in onto that account would leave
-the other person's way in on it.
+it, and wait. Linking the owner's Google sign-in onto that account must not
+leave the other person's way in on it.
 
-A verification link, a magic link, an email code or a password reset proves
-the address and verifies the account. On an account that was not verified yet,
-the first such proof removes the password (a reset sets the new one) and every
-linked identity whose provider did not verify that address, and ends every
-session, before it marks the account verified. After that, step 2 applies.
+A provider that verified the address, a verification link, a magic link, an
+email code or a password reset all prove the address and verify the account.
+On an account that was not verified yet, the first such proof removes the
+password (a reset sets the new one) and every linked identity whose provider
+did not verify that address, and ends every session, before it marks the
+account verified. So someone who registered with a password and never verified
+the address, then signs in with Google, loses that password and signs in with
+Google (or a reset) from then on.
 
 A verification link keeps what the person following it also proves: a live
 session of the account, or its password. See [Email verification](/docs/backend/email-verification/). Accounts created by an

@@ -918,25 +918,29 @@ displayName: user.displayName });
                             existingUser: user
                         });
                         if (!decision.allowed) {
-                            const why = decision.reason === "provider-email-unverified"
-                                ? `${provider.id} has not verified this email address, so it cannot be linked automatically.`
-                                : "That account's email address was never verified, so it cannot be linked automatically.";
                             // The message is for whoever reads the API response,
                             // and names the endpoint. A login screen shows its
-                            // own words instead, chosen by `details.reason`:
-                            // "local-account-unverified" means the account
-                            // behind this address signs in with a password, and
-                            // "local-account-unverified-passwordless" that it
-                            // does not.
+                            // own words instead, chosen by `details.reason`.
                             throw new ApiError(
                                 403,
                                 "EMAIL_NOT_VERIFIED",
-                                `An account with this email already exists with a different sign-in method. ${why} Sign in with your existing method, then POST to /auth/link/${provider.id} to link ${provider.id} to your account.`,
+                                `An account with this email already exists with a different sign-in method. ${provider.id} has not verified this email address, so it cannot be linked automatically. Sign in with your existing method, then POST to /auth/link/${provider.id} to link ${provider.id} to your account.`,
                                 {
                                     reason: decision.reason,
                                     provider: provider.id
                                 }
                             );
+                        }
+                        if (decision.provesAddress) {
+                            // The provider vouched for an address nobody had
+                            // proven on this account. That is the owner proving
+                            // it, so it settles the account as an email code
+                            // does — the password and every identity whose
+                            // provider did not vouch go, every session ends —
+                            // before this identity is linked and signed in.
+                            // A store that cannot detach refuses with 409 here.
+                            await confirmAddressOwnership(authRepo, user, null);
+                            user = { ...user, emailVerified: true, passwordHash: null };
                         }
                         // Link Provider to existing account
                         await authRepo.linkUserIdentity(user.id, provider.id, externalUser.providerId, identityProfileData(externalUser));

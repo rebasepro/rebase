@@ -7,10 +7,10 @@
  * can make an account for someone else's address, and then wait:
  *
  *  - **OAuth.** The attacker signs in with Spotify as `victim@corp.com`, which
- *    makes a password-less, unverified account. When the victim later signs in
- *    with Google, which does vouch for the address, the account was
- *    auto-linked because it had no password — and the attacker's Spotify
- *    identity went on signing in to the same account.
+ *    makes a password-less, unverified account, or registers the address with
+ *    a password. When the victim later signs in with Google, which does vouch
+ *    for the address, that sign-in is the owner's proof of the address, and
+ *    the attacker's Spotify identity or password must not survive it.
  *  - **Magic link and email code.** The attacker registers the victim's address
  *    with a password. When the victim signs in by a link or a code from their
  *    inbox, the account was marked verified and the attacker's password went on
@@ -155,30 +155,82 @@ async function aMinuteAgo<T>(act: () => Promise<T>): Promise<T> {
     }
 }
 
-describe("OAuth sign-in does not auto-link onto an account whose address nobody proved", () => {
-    it("refuses Google onto the account the attacker made through Spotify", async () => {
+describe("a sign-in through a provider that vouches for the address proves it", () => {
+    // Google vouching for the victim's address is the same proof as a code
+    // read out of their inbox: only the inbox's owner holds that Google
+    // account. So it settles the account the way an email code does — what
+    // nobody proved goes, every session ends — and only then signs the owner in.
+    it("and the password the attacker registered with stops working", async () => {
         const w = world();
+        const attacker = await aMinuteAgo(() => w.register(ATTACKER_PASSWORD));
+
+        const owner = await w.oauth("google");
+
+        expect(owner.status).toBe(200);
+        expect(owner.uid).toBe(attacker.uid);
+        expect(w.store.users.get(owner.uid!)?.emailVerified).toBe(true);
+        expect(w.store.providersOf(owner.uid!)).toEqual(["google"]);
+        expect((await w.login(ATTACKER_PASSWORD)).status).toBe(401);
+        expect((await w.refresh(attacker.refreshToken!)).status).toBe(401);
+        expect(await w.me(attacker.accessToken!)).toBe(401);
+        expect(await w.me(owner.accessToken!)).toBe(200);
+    });
+
+    it("and the identity the attacker signed up with through Spotify is detached", async () => {
+        const w = world();
+        const attacker = await aMinuteAgo(() => w.oauth("spotify"));
+
+        const owner = await w.oauth("google");
+
+        expect(owner.status).toBe(200);
+        expect(owner.uid).toBe(attacker.uid);
+        expect(w.store.providersOf(owner.uid!)).toEqual(["google"]);
+        expect((await w.refresh(attacker.refreshToken!)).status).toBe(401);
+        // Spotify again: the identity is gone, and Spotify does not vouch for
+        // the address, so it is not linked back.
+        const again = await w.oauth("spotify");
+        expect(again.status).toBe(403);
+        expect(again.reason).toBe("provider-email-unverified");
+        expect(again.uid).toBeUndefined();
+    });
+
+    it("never from a provider that does not vouch for it", async () => {
+        const w = world();
+        const registered = await w.register(OWNER_PASSWORD);
+
+        const spotify = await w.oauth("spotify");
+
+        expect(spotify.status).toBe(403);
+        expect(spotify.reason).toBe("provider-email-unverified");
+        expect(w.store.users.get(registered.uid!)?.emailVerified).toBe(false);
+        expect(w.store.providersOf(registered.uid!)).toEqual([]);
+        expect((await w.login(OWNER_PASSWORD)).status).toBe(200);
+    });
+
+    it("is refused, account untouched, by a store that cannot detach the attacker's identity", async () => {
+        const w = world({ unlinkIdentities: false });
         const attacker = await w.oauth("spotify");
-        expect(attacker.status).toBe(200);
 
-        const victim = await w.oauth("google");
+        const owner = await w.oauth("google");
 
-        expect(victim.status).toBe(403);
-        expect(victim.code).toBe("EMAIL_NOT_VERIFIED");
-        // Not "sign in with your password": this account has none.
-        expect(victim.reason).toBe("local-account-unverified-passwordless");
+        expect(owner.status).toBe(409);
+        expect(owner.code).toBe("UNVERIFIED_IDENTITIES");
+        expect(owner.accessToken).toBeUndefined();
+        expect(w.store.users.get(attacker.uid!)?.emailVerified).toBe(false);
         expect(w.store.providersOf(attacker.uid!)).toEqual(["spotify"]);
     });
 
-    it("still links Google onto an account whose address was proven", async () => {
+    it("still links Google onto an account whose address was proven, keeping its password", async () => {
         const w = world();
         const owner = await w.register(OWNER_PASSWORD);
         await w.magicLink(owner.uid!);
+        await w.resetPassword(owner.uid!, OWNER_PASSWORD);
 
         const google = await w.oauth("google");
 
         expect(google.status).toBe(200);
         expect(google.uid).toBe(owner.uid);
+        expect((await w.login(OWNER_PASSWORD)).status).toBe(200);
     });
 });
 
