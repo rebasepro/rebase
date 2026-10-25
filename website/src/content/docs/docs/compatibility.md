@@ -348,7 +348,7 @@ None of the above is a convention — each has a test that fails when it breaks:
 | `pnpm check:derived-names` | every column, constraint, junction, enum and policy name the framework derives — and that boot and `db push` derive them identically |
 | `pnpm rls:check` | the generated schema's policies |
 | `pnpm check:api-surface` | every export, and its members, of the five packages the image supplies — `@rebasepro/server`, `types`, `client`, `common`, `utils` — plus the `@rebasepro/server/functions` entry point, against the six sections of `contracts/server.api.txt`. These are the packages `infra/docker/entrypoint.mjs` symlinks over a deployed bundle's own copies, so removing an export from one is not a compile error for anyone — it is a boot failure across the fleet, during a rollout nobody asked for |
-| `pnpm test:gates` | the gates' own tests, over fixtures — forty-four files, `check:api-surface` and the release-bump check below among them — so a gate that stops seeing what it guards fails here. `check:api-surface` spent its whole life unable to see a member disappear from `const rebase` |
+| `pnpm test:gates` | the gates' own tests, over fixtures — forty-seven files, `check:api-surface` and the release-bump check below among them — so a gate that stops seeing what it guards fails here. `check:api-surface` spent its whole life unable to see a member disappear from `const rebase` |
 | `node tooling/scripts/check-release-bump.mjs` | that the bump level a release ships under matches what the release did to the baselines above — run by `publish.yml` before the changelog is stamped |
 | saas CI | the control plane built against this repo's `main`, on its own pushes and nightly |
 

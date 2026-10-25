@@ -810,7 +810,7 @@ image. A project that has ejected owns these decisions in its own code instead.
 | `REALTIME_CDC` | Database-level change capture: `auto` (enable where the connection supports it, silently fall back otherwise), `trigger` (force it, warn if impossible), `wal` (degrades to `trigger` today), `off`. See [Realtime](/docs/backend/realtime-cdc/). Wins over `realtime.cdc`. | `auto` |
 | `REALTIME_CHANNEL_BUS` | Cross-instance transport for broadcast channels and presence: `memory` or `postgres`. Ignored when `realtime.bus` was given a constructed transport. | `memory` |
 | `REALTIME_MAX_SUBSCRIPTIONS_PER_SOCKET` | How many subscriptions one realtime socket may hold; the next is refused with `TOO_MANY_SUBSCRIPTIONS`. A positive whole number — anything else stops the server at boot. Wins over `realtime.maxSubscriptionsPerSocket`. See [Realtime](/docs/backend/realtime#what-a-write-costs-and-the-limits). | `1000` |
-| `REALTIME_MAX_SOCKETS_PER_USER` | How many realtime sockets one user may hold open on one server instance. The next one's sign-in is refused with `TOO_MANY_SOCKETS` and the socket closed (4002); the SDK keeps retrying, so it gets in when another closes. A positive whole number — anything else stops the server at boot. Wins over `realtime.maxSocketsPerUser`. | No ceiling |
+| `REALTIME_MAX_SOCKETS_PER_USER` | How many realtime sockets one user, or one API key, may hold open on one server instance. The next one's sign-in is refused with `TOO_MANY_SOCKETS` and the socket closed (4002); the SDK keeps retrying, so it gets in when another closes. A positive whole number — anything else stops the server at boot. Wins over `realtime.maxSocketsPerUser`. | No ceiling |
 | `REALTIME_REFETCH_MAX_WAIT_MS` | The longest a change waits for the refetch that delivers it to live subscribers, in ms. A refetch waits for 300 ms without a change, and at most this long under a steady stream of writes. A positive whole number — anything else stops the server at boot. Wins over `realtime.refetchMaxWaitMs`. | `1000` |
 | `REALTIME_RECOUNT_INTERVAL_MS` | How long a big list subscription's total may be reused before it is counted again, in ms; frames that reuse it carry `meta.totalAsOf`. Unset, every frame counts. Wins over `realtime.recountIntervalMs`. | Unset |
 | `REALTIME_RECOUNT_MIN_ROWS` | The smallest last total `REALTIME_RECOUNT_INTERVAL_MS` applies to; smaller lists are counted on every frame. Wins over `realtime.recountMinRows`. | `100000` |
@@ -950,7 +950,7 @@ Read by `rebase`, not by the server. Nothing here affects a deployment.
 | `REBASE_CLOUD_URL` | The control plane `rebase cloud` talks to. | — |
 | `REBASE_CLOUD_EMAIL` | The account `rebase cloud login` signs in as, instead of prompting. | — |
 | `REBASE_CLOUD_PASSWORD` | Its password, so a secret store can hand it over without it reaching the shell's history. | — |
-| `REBASE_TOKEN` | A token from `rebase cloud tokens create`. Set, every `rebase cloud` command authenticates with it instead of the `rebase cloud login` session, and never reads or writes the stored session. The way to run `rebase cloud` in CI — see [CI and agents](/docs/deployment/cloud/#ci-and-agents). The [MCP server](/docs/ai/mcp/) reads the same name as an alias of `REBASE_API_TOKEN`. | — |
+| `REBASE_TOKEN` | A token from `rebase cloud tokens create`. Set, every `rebase cloud` command authenticates with it instead of the `rebase cloud login` session, and never reads or writes the stored session. The way to run `rebase cloud` in CI — see [CI and agents](/docs/deployment/cloud/#ci-and-agents). The [MCP server](/docs/ai/mcp/) passes it to the CLI its cloud tools spawn, and never sends it to the app: set `REBASE_API_TOKEN` for that. | — |
 | `REBASE_DEBUG` | `1` prints the underlying error and request detail instead of the short message. The first thing to set when a `rebase cloud` command fails unhelpfully. | — |
 | `REBASE_ATLAS_DEV_URL` | The empty database `rebase db push`, `db generate` and `db migrate` plan against, instead of the `<db>_dev_diff` they create beside `DATABASE_URL`. Rebase neither creates nor drops a database named here, and refuses one equal to `DATABASE_URL`. On the managed development database the CLI sets it to a throwaway in-memory PGlite of its own. Set it where `CREATE DATABASE` is not granted. | `<db>_dev_diff` |
 | `REBASE_DEV_NO_DB` | `rebase dev` starts no database and provisions nothing — you bring your own. Same as `--no-db`. | — |
@@ -3725,7 +3725,7 @@ The three ratings mean:
 | Offline sync | Beta | Mutations carry idempotency keys the server honours, and the data-loss defects found in the July audit are fixed. The conflict model is last-write-wins with no per-field merge |
 | Entity history | Stable | Snapshot-based, gated by its own suite |
 | Functions and crons | Stable | The portable entry point (`@rebasepro/server/functions`) is a versioned contract with its own API-surface section |
-| MCP server + agent skills | Beta | `@rebasepro/mcp` runs over stdio: forty-four tools, bearer auth per project, destructive tools refuse non-local targets unless opted in. Since 0.21 the server can also mount a remote `/mcp` endpoint — OAuth 2.1, eight data tools, every call under the signed-in person's own RLS — off unless `REBASE_MCP_ENABLED=true`, and Postgres only |
+| MCP server + agent skills | Beta | `@rebasepro/mcp` runs over stdio: fifty-one tools, bearer auth per project, destructive tools refuse non-local targets unless opted in. Since 0.21 the server can also mount a remote `/mcp` endpoint — OAuth 2.1, eight data tools, every call under the signed-in person's own RLS — off unless `REBASE_MCP_ENABLED=true`, and Postgres only |
 | Studio (SQL, schema, RLS, API explorer) | Beta | Used daily against real projects. Branching is present in the OSS package and deliberately not exposed in Rebase Cloud, because moving a running deployment onto a branch has no story yet |
 | CMS + admin panel | Beta | Complete for CRUD, relations, storage fields and roles. **The data table has no grid semantics** — no `role`, no `aria-rowindex`, `tabIndex` stripped — so keyboard and screen-reader users cannot operate the main view. No drafts, no per-locale content, no block rich-text |
 | PGlite managed dev database | Beta | Zero-setup `rebase dev` with no Docker. One session at a time, so requests serialize and concurrency cannot be reproduced against it; Atlas-backed commands (`db push`, `generate`, `migrate`) plan against a throwaway second PGlite started for the command (on 0.24 they refuse the managed database); `db branch` does not work there and says so |
@@ -4007,7 +4007,7 @@ None of the above is a convention — each has a test that fails when it breaks:
 | `pnpm check:derived-names` | every column, constraint, junction, enum and policy name the framework derives — and that boot and `db push` derive them identically |
 | `pnpm rls:check` | the generated schema's policies |
 | `pnpm check:api-surface` | every export, and its members, of the five packages the image supplies — `@rebasepro/server`, `types`, `client`, `common`, `utils` — plus the `@rebasepro/server/functions` entry point, against the six sections of `contracts/server.api.txt`. These are the packages `infra/docker/entrypoint.mjs` symlinks over a deployed bundle's own copies, so removing an export from one is not a compile error for anyone — it is a boot failure across the fleet, during a rollout nobody asked for |
-| `pnpm test:gates` | the gates' own tests, over fixtures — forty-four files, `check:api-surface` and the release-bump check below among them — so a gate that stops seeing what it guards fails here. `check:api-surface` spent its whole life unable to see a member disappear from `const rebase` |
+| `pnpm test:gates` | the gates' own tests, over fixtures — forty-seven files, `check:api-surface` and the release-bump check below among them — so a gate that stops seeing what it guards fails here. `check:api-surface` spent its whole life unable to see a member disappear from `const rebase` |
 | `node tooling/scripts/check-release-bump.mjs` | that the bump level a release ships under matches what the release did to the baselines above — run by `publish.yml` before the changelog is stamped |
 | saas CI | the control plane built against this repo's `main`, on its own pushes and nightly |
 
@@ -4073,18 +4073,30 @@ yet, listed so that nobody reads a promise into them:
 ##### Studio
 
 - **Review a database branch like a pull request, and merge it.** Picking a
-  branch in Studio's Branches pane shows what it changed against the database
-  it was made from: its tables, columns and RLS policies as SQL, side by side,
-  and per table the rows it inserted, updated and deleted, with samples. Rows
-  the parent changed on its own meanwhile are counted apart, and rows both
-  sides changed are conflicts — each row's transaction id says which side
-  wrote it. **Merge** writes the branch's rows to the parent in one statement,
-  all or none: the parent's own changes are kept, a conflict writes nothing
-  unless you choose which side wins, and a diff that went stale writes nothing.
-  Schema and policies are never merged. The same diff is `rebase db branch
-  diff`, `GET /api/admin/branches/:name/diff`, the read-only MCP tool
+  branch in Studio's Branches pane shows what it changed against the database it
+  was made from: its tables, columns, constraints, indexes, triggers, enum
+  labels, views, functions and RLS policies as SQL, side by side, and per table
+  the rows it inserted, updated and deleted, with samples. Rows the parent
+  changed on its own meanwhile are counted apart, and rows both sides changed
+  are conflicts — each row's transaction id says which side wrote it. **Merge**
+  writes the branch's rows to the parent in one statement, all or none: the
+  parent's own changes are kept, a conflict writes nothing unless you choose
+  which side wins, and a diff that went stale writes nothing. A row the branch
+  deleted that newer parent rows still reference is a conflict as well
+  (`referencedBy` on the diff), so a merge never removes them through a foreign
+  key unless you choose the branch's side, and then its `warnings` list what
+  `ON DELETE` reached. A table that cannot be matched row by row, or was
+  rewritten since the fork (`TABLE_REWRITTEN`), blocks the merge. A merge the
+  parent refuses answers `409 BRANCH_MERGE_FAILED` naming the table and
+  constraint. Schema and policies are never merged. Reading the diff needs
+  `database:write`, like the merge, because its samples are rows of both
+  databases read outside row-level security; samples are capped at 1,000 rows a
+  table, and a column named like a credential (`password_hash`, `*_token`,
+  `*secret*`) shows `[redacted]`. The same diff is `rebase db branch diff`,
+  `GET /api/admin/branches/:name/diff`, the read-only MCP tool
   `rebase_db_branch_diff`, and `diffBranch` on the driver's admin; see
-  [Reviewing and merging a branch](/docs/backend/branching/#reviewing-and-merging-a-branch).
+  [Reviewing and merging a
+  branch](/docs/backend/branching/#reviewing-and-merging-a-branch).
 
 ##### Admin (CMS & app)
 
@@ -4099,8 +4111,9 @@ yet, listed so that nobody reads a promise into them:
 - **`EntityFormPanel` creates a record under the id it is given when no record
   has it yet.** A record kept at a known key — a settings singleton, a profile
   keyed by its user's uid — said "not found" until something seeded it; now the
-  first save creates it there. Where the collection marks a key property
-  `isId`, the id is that property's value, set and locked.
+  first save creates it there. Where the collection marks a key property `isId`,
+  the id is that property's value, set and locked. The form is disabled where
+  creating is not allowed, including while access is simulated.
 - **The leaf parts of two overridable components are exported**, so a copy of
   the component compiles with package imports: `NavigationCard` and
   `SmallNavigationCard` (`HomePage.CollectionCard`), and
@@ -4141,42 +4154,65 @@ yet, listed so that nobody reads a promise into them:
   `Collection.View`, `DetailView` and `HomePage`'s drag-and-drop stay
   uncopyable on purpose; the recipes README says why and what to customize
   instead. A test fails when a part that copies stops copying.
-- **"Simulate access" in the app bar: see every collection as a role, a user
-  or a service key.** Pick one and every data view reloads showing only the
-  rows and fields it can read, under a banner that counts the collections it
-  cannot see and the columns masked from it. `client.simulate()` is the client
-  behind it.
+- **"Simulate access" in the app bar: see every collection as a role, a user or
+  a service key.** Pick one and every data view reloads showing only the rows
+  and fields it can read, under a banner that counts the collections it cannot
+  see and the columns masked from it. Simulation is read-only: the form, Revert
+  and every other edit are off while it is on, and a record's History tab and
+  its "last edited by" are read as the simulated identity too.
+  `client.simulate()` is the client behind it, typed by your `Database` and
+  closable.
+- **`escapeCsvFormula` and `unescapeCsvFormula` are exported from
+  `@rebasepro/utils`,** so code outside the admin writes CSV with the same
+  formula escaping. `@rebasepro/cms` still exports both.
 
 ##### Server
 
-- **The RLS simulator: an administrator's data request can run as a role, a
-  user or a service key.** `x-rebase-simulate-role`, `x-rebase-simulate-user-id`
-  and `x-rebase-simulate-api-key-id` on the data API and custom functions run
-  the request through the real policies as that identity (`customer` holding
-  uid `u_1` need not be an account), and a key's scopes apply as they would to
-  the key. The response's `x-rebase-simulated-context` names the role, the uid
-  and the fields that identity's roles cannot read. Anyone but an
+- **The RLS simulator: an administrator's data request can run as a role, a user
+  or a service key.** `x-rebase-simulate-role`, `x-rebase-simulate-user-id` and
+  `x-rebase-simulate-api-key-id` on the data API and custom functions run the
+  request through the real policies as that identity (`customer` holding uid
+  `u_1` need not be an account), and a key's scopes apply as they would to the
+  key. Simulation is read-only: a write, delete, batch, history revert or
+  non-GET function call carrying the headers gets `403 SIMULATION_READ_ONLY`.
+  Simulating `anon` simulates no session, so a function's `requireAuth` refuses
+  it, and a simulated request spends the administrator's rate limit, not the
+  simulated key's. The response's `x-rebase-simulated-context` names the role,
+  the uid and the fields that identity's roles cannot read. Anyone but an
   administrator's own session gets `403 SIMULATION_FORBIDDEN`, and every other
   route refuses the headers. `/api/admin/rls-simulator` lists what can be
   simulated and previews each collection's visible rows and masked fields.
 - **`REBASE_PROVISION`: set it to `false` and Rebase changes nothing in your
-  database.** For a
-  database whose schema changes only through your own change process. No
-  table, column, index, function, trigger, policy, role or grant is created or
-  altered, at boot or later. That includes the framework's own tables, which
-  `REBASE_MIGRATE_ON_BOOT=none` still keeps current, and the tables the runtime
-  used to create on first use: idempotency keys, cron claims and the shared
-  rate-limit counters. The runtime reads what is there and names what is
-  missing. Missing auth tables, or a request role that can reach
-  `rebase.refresh_tokens` or `rebase.api_keys`, stop the boot, with the
-  `REVOKE` to run. A missing optional table turns its feature off and says so.
-  The schema comes from a provisioning run your process controls:
+  database.** For a database whose schema changes only through your own change
+  process. No table, column, index, function, trigger, policy, role or grant is
+  created or altered, at boot or later. That includes the framework's own
+  tables, which `REBASE_MIGRATE_ON_BOOT=none` still keeps current, and the
+  tables the runtime used to create on first use: idempotency keys, cron claims
+  and the shared rate-limit counters. The runtime reads what is there and names
+  what is missing. Missing auth tables, or a request role that can reach
+  `rebase.refresh_tokens` or `rebase.api_keys`, stop the boot, with the `REVOKE`
+  to run. A missing optional table turns its feature off and says so. The schema
+  comes from a provisioning run your process controls:
   `REBASE_PROVISION_ONLY=true` with `REBASE_PROVISION_SQL_OUT=<file>` writes
   every schema change the run made as a SQL script to review and apply with
   `psql`. That run no longer starts cron or the job queue, and now creates the
   first-use tables too. `initializeRebaseBackend` reads the variable as well; a
-  server built with `createRebaseBackend` passes `provision: false`. See
-  [When only your change process may change the database](/docs/deployment/self-hosting/#when-only-your-change-process-may-change-the-database).
+  server built with `createRebaseBackend` passes `provision: false`. Studio's
+  schema change dialog then commits a change as source only, for your process to
+  apply. See [When only your change process may change the
+  database](/docs/deployment/self-hosting/#when-only-your-change-process-may-change-the-database).
+- **`openRebase({ callbacks })` runs the project's global callbacks on a
+  script's writes,** as the server does for an API write.
+- **Optional driver hooks for whole-store sweeps: `DataDriver.scanStoredRows`,
+  `StorageController.storageLocation` and the history service's
+  `scanStoredValues`.** `rebase storage orphans` reads rows through them as
+  stored, past any read hook.
+- **For realtime adapter authors: `RealtimeSocketOptions.runInScope` and
+  `RealtimeProvider.setScopeRunner`,** so a hook reached over your transport
+  sees its own backend as `rebase`. `devEmailSinkFor(sendEmail)` in
+  `@rebasepro/server`'s email exports gives a backend its own development
+  mailbox.
+
 ##### CLI
 
 - **`rebase cloud deploy` checks a static app's JavaScript before uploading
@@ -4194,12 +4230,17 @@ yet, listed so that nobody reads a promise into them:
   deployed on its own records no bundle, so it cannot be rolled back yet; its
   deploy says so and suggests deploying the last good version again.
 
-- **`rebase cloud deploy --preview` serves a build at its own address and
-  leaves production alone.** Before, the only way to see a change on the
-  platform was to ship it to production. The new flag prints an address like
-  `https://<project>--<name>.rebase.website`, and `--preview-name` keeps the same
-  address across deploys. A static app's preview calls the production backend.
-  A backend preview runs its own backend, on an empty database of its own.
+- **`rebase cloud deploy --preview` serves a build at its own address and leaves
+  production alone.** Before, the only way to see a change on the platform was
+  to ship it to production. The new flag prints an address like
+  `https://<project>--<name>.rebase.website`, and `--preview-name` keeps the
+  same address across deploys. A preview runs its own backend, on an empty
+  database of its own. Rebase Cloud does not serve a static app's own preview
+  yet, so `rebase cloud deploy <app> --preview` for a static app is refused with
+  `PREVIEW_STATIC_UNSERVED` and publishes nothing. The deploy checks that the
+  preview's address answers before calling it live, as a production deploy does.
+  `--can deploy`, `--can env` and `--can logs` tokens cover previews; a token
+  created before this release must be created again to use them.
   `rebase cloud previews` lists and deletes previews. A preview is started
   through its own control-plane function, never through `deploy`, so a control
   plane without previews refuses it with `previews_unavailable` and nothing
@@ -4223,21 +4264,100 @@ yet, listed so that nobody reads a promise into them:
   `${NPM_TOKEN}`, set with `rebase cloud env set NPM_TOKEN=… --secret`; a
   literal token fails the build, because the bundle is uploaded with the code.
 
+- **`rebase cloud login --code` signs in with a 6-digit code emailed to you,**
+  for accounts made with Google, GitHub or LinkedIn, which have no password. At
+  a terminal, `rebase cloud login` offers "Password" or "Email me a code" when
+  the control plane sends codes. With two-factor authentication on, either path
+  asks for the authenticator or recovery code; without a terminal it exits
+  `mfa_required` and names access tokens. A refused password now names `--code`
+  and access tokens (`REBASE_TOKEN`).
+
+- **`rebase cloud activity` prints the organization's audit log:** deploys,
+  rollbacks, env var changes (names only), domains, backups, point-in-time
+  restores, database password reveals, project and member changes and access
+  tokens, each with who and when. `--project`, `--action`, `--actor`, `--limit`,
+  `--before` and `--org` filter it, and `--json` works. Owners and admins can
+  read it, here and on the console's Activity page.
+
+- **`rebase cloud orgs members invite` invites anyone to an organization by
+  email** (`--role admin|member`). Someone with a verified Rebase account is
+  added at once; anyone else gets a single-use link, valid 7 days, that only an
+  account which verified the invited address can accept. `orgs members remove`,
+  `orgs members role` and `rebase cloud orgs invites` (list, revoke, resend)
+  manage the rest, and `orgs members` shows emails.
+
+- **`rebase cloud billing invoices` and `rebase cloud billing upcoming`** list
+  the organization's issued invoices with Stripe's hosted page, and preview each
+  subscription's next invoice. Owner or admin only; `--json` works.
+
+- **`rebase cloud usage` prints this month's requests against the included
+  allowance,** the overage so far and the projected month-end figure, for the
+  linked project or, with `org`, every project in the organization.
+  `--month YYYY-MM` picks another month, `--json` works, and the figures carry
+  their known accuracy limits as `caveats`.
+
+- **`rebase cloud logs --runtime -f` follows the running app's log from every
+  pod until Ctrl-C.** Each line shows once, pods that start, stop or restart are
+  announced, a restarted container's last lines are printed and dropped
+  connections are retried. `--runtime` also takes `--since 5m|<RFC3339>`,
+  `--tail <n>`, `--grep <text|/re/>`, `--level` and `--previous`. With `--json`
+  a follow prints NDJSON, and a snapshot adds `pods`, `state`, `message`,
+  `truncated`, `preview` and `nextSinceTime` beside `logs`.
+  `rebase cloud logs --preview [name]` prints or follows a preview's build log,
+  and with `--runtime` its backend's log.
+
+- **`rebase cloud notifications` sends a project's deploy, backup, billing and
+  usage events to Slack, Discord or any https URL,** signed with
+  `X-Webhook-Signature`:
+  `add <url> [--events …] [--format json|slack] [--name …]`, `list`, `test <id>`
+  and `remove <id>`.
+
+- **`rebase cloud claim` prints the claim link of the project
+  `rebase cloud init --claim` provisioned here,** with the time left (`--open`
+  opens it), and refuses with `already_claimed` once someone has claimed it.
+
+- **`rebase cloud env set KEY --stdin` reads the value from standard input,**
+  keeping it out of `ps` and shell history.
+
+##### Client SDK
+
+- **`client.admin.listUsers({ role, ids })` filters by role and resolves a known
+  set of users** in one round trip, sent as `?role=` and `?ids=a,b`.
+
+##### MCP
+
+- **Cloud tools past provisioning: `rebase_cloud_status`, `rebase_cloud_deploy`,
+  `rebase_cloud_logs`, `rebase_cloud_env_list`, `rebase_cloud_env_set`,
+  `rebase_cloud_deployments_list` and `rebase_cloud_rollback`.** An agent can
+  check, deploy, read logs, configure and roll back the project its directory is
+  linked to without shelling out. They use the CLI's credential and the control
+  plane's own permissions, env values travel through stdin and are never
+  returned, and logs are one snapshot. Every cloud tool,
+  `rebase_cloud_provision` included, refuses arguments its schema does not
+  declare.
+
+##### Helm chart
+
+- **`networkPolicy.ingressNamespace` lets the chart's NetworkPolicy admit an
+  ingress controller other than ingress-nginx,** such as k3s's Traefik in
+  `kube-system`.
+
 #### Changed
 
 ##### Admin (CMS & app)
 
-- **Form fields are full width unless they are a pair of like compact
-  fields, or the collection sets `admin.span`.** The form used to guess widths
-  from property types — strings, dates and relations at half, numbers and
-  booleans at a quarter, the title property full — and paired fields that had
-  nothing to do with each other: Namespace beside Custom Domain, Git Branch
-  beside Git Repository URL. Now a field takes the whole row unless it and its
-  neighbour have the same small editor (two numbers, two switches, two dates of
-  the same mode, two selects with short options) and neither has a long label,
-  long help text, `conditions` or a custom `Field`. Free-text strings are never
-  paired, nothing reads the title property, and rows are no longer stretched to
-  close a gap. A span written on a property is used as written.
+- **Form fields are full width unless they are a pair of like compact fields, or
+  the collection sets `admin.span`.** The form used to guess widths from
+  property types — strings, dates and relations at half, numbers and booleans at
+  a quarter, the title property full — and paired fields that had nothing to do
+  with each other: Namespace beside Custom Domain, Git Branch beside Git
+  Repository URL. Now a field takes the whole row unless it and its neighbour
+  have the same small editor (two numbers, two switches, two dates of the same
+  mode, two selects with short options) and neither has a long label, long help
+  text, `conditions`, a custom `Field`, a field-level `access` rule or
+  `excludeFromApi`. Free-text strings are never paired, nothing reads the title
+  property, and rows are no longer stretched to close a gap. A span written on a
+  property is used as written.
 
 ##### CLI
 
@@ -4252,11 +4372,55 @@ yet, listed so that nobody reads a promise into them:
   `project`, `apps`, `durationMs`, `live` and `liveChecks`. A piped run without
   either says on stderr how to get JSON back. Every other `rebase cloud`
   command still switches to JSON when piped.
+- **A destructive db push approved by its --yes flag now warns.**
+  `rebase db push --yes` warns, once per process, when it approves a destructive
+  change. From the next release `--yes` approves only non-destructive pushes;
+  pass `--allow-destructive` for the rest.
+- **The cloud webhooks command is retired.** `rebase cloud webhooks` never
+  delivered anything. Every action now exits 1 with code `command_retired` and
+  names `rebase cloud notifications`, and a `WebhookDispatcher` in app code for
+  row changes.
+- **Local commands warn when .env points them at the linked cloud project.**
+  `rebase api-keys`, `rebase storage` and `rebase auth reset-password` say so on
+  stderr when `.env`'s `REBASE_BASE_URL` is the address of the cloud project
+  `init --claim` linked; which address wins is unchanged.
+
+##### Server
+
+- **A create or update naming a multi-hop via relation is refused with a 400.**
+  A `via` chain longer than one link (a to-many chain with no single junction
+  table, or a to-one chain of two or more steps) failed inside the transaction
+  as `500 RELATION_MISCONFIGURED`, telling you to run `rebase schema generate`;
+  a two-step to-one chain was written by re-pointing the target's key at the
+  first step's column. Both are now refused up front with
+  `400 RELATION_NOT_WRITABLE`, naming the field. Single-hop `via` writes (to-one
+  in one step, to-many through one junction table) work as before, the generated
+  SDK now types them, and the admin form disables the picker of a multi-hop
+  `via`.
+- **Role names with a comma, a brace, a double quote, a backslash or a control
+  character are refused.** Users, the users collection and service keys answer
+  `400 INVALID_ROLE` for one, and for an empty name. Roles are now stored as
+  bound parameters (see Security).
+- **Local storage listing page tokens have a new format** (`n.…`). A token
+  issued before the upgrade is refused with `400 INVALID_LIST_OPTIONS`; start
+  the listing over.
+- **The realtime per-user socket ceiling counts each API key's sockets against
+  that key,** not against the account that made it
+  (`REALTIME_MAX_SOCKETS_PER_USER`).
 
 #### Fixed
 
 ##### Runtime
 
+- **The Helm chart's migration Job starts.** It ran as `REBASE_ROLE=worker`
+  with `REBASE_MIGRATE_ON_BOOT=ensure`, and the runtime refuses that pair, so
+  every default `helm install` and `helm upgrade` stopped at its pre-install
+  hook. Even admitted, a `worker` would have created no collection tables. The
+  Job now runs as `all`, with cron and the job workers off, and exits once the
+  schema is in place, so it also creates the tables each surface owns.
+  `check:chart` now runs every rendered unit's env through the runtime's own
+  role rules, and fails on a refusal, or on a schema that no unit or two units
+  would create.
 - **The request role no longer gets write access to `rebase.schema_meta` on
   first boot.** On a backend without auth, the collection schema stamp created
   that table after boot's last sweep of the request role's grants. So
@@ -4270,6 +4434,60 @@ yet, listed so that nobody reads a promise into them:
   the bundle, so `import { Hono } from "hono"` failed with "Cannot find
   package" and the function's route answered 404. Both are now linked in at
   boot, like `@rebasepro/server` and `zod`.
+- **A raw SQL call naming a data source runs on that source's own connection.**
+  `rebase.sql(query, { database: analytics })` treated the key as a database
+  name on the default source's server: "database does not exist", or the wrong
+  database, silently. A key that is no configured source is refused by name, and
+  `openRebase(...).sql` refuses a source it did not open.
+- **Hooks reached over the realtime socket, a live query's refetch or MCP see
+  their own backend as `rebase`,** as they do over REST. With several backends
+  in one process they reached the process default, or threw "server not
+  initialized yet".
+- **In a split deployment, the api forwards every Set-Cookie a function sets,**
+  not only the last one, so a sign-in that sets a session and a CSRF cookie
+  works through the api. An unreachable functions upstream answers the standard
+  error envelope, with a `requestId`.
+- **A graceful shutdown waits for the work a request handed to `waitUntil`**
+  while it was still in flight at SIGTERM.
+- **On a process whose role turns a surface off, the in-process client says
+  so.** On a `worker` or `functions` process, `rebase.functions`, `.auth`,
+  `.admin` and `.cron` name the surface that is off and what to do, instead of
+  "No route for …".
+- **`createRebaseBackend` no longer writes the users collection it discovers
+  back into the caller's `auth` object,** and each backend's development mailbox
+  (`/api/admin/dev/emails`) serves its own captured mail, not that of whichever
+  backend registered last.
+- **Impersonating a user or key spends the administrator's rate limit, not the
+  target's,** so a production key's `rate_limit` is no longer consumed by an
+  admin acting as it.
+- **Live schema editing from a built bundle refuses a second change while one is
+  committed and not deployed,** also after a restart, on another replica, and
+  when a developer pushed the change. The guard was a flag in process memory; it
+  now compares the repository's `schema.generated.ts` with what the running
+  collections generate, and the refusal names the file and the command that
+  brings it back in step.
+- **Storage orphan deletion no longer deletes files that rows still name.**
+  `rebase storage orphans --delete` read rows through `beforeQuery` and
+  `afterRead` hooks, so a file a hook hid was called an orphan. The scan now
+  reads rows as stored, a collection with read hooks on a driver that cannot
+  read past them blocks the delete (`409 STORAGE_SCAN_INCOMPLETE`), and a file
+  only a row's history names is no longer an orphan, so a revert cannot restore
+  a row pointing at a deleted file.
+- **Moving storage with --delete-source moves every file, and never deletes them
+  all.** `rebase storage move --delete-source` moved half of a local source per
+  run, because its page token was an index into a folder the move was shrinking.
+  Between two sources that store in the same bucket or directory it deleted
+  every file; that move is now refused with `400 STORAGE_SAME_LOCATION`.
+- **The OpenAPI create body names every relation the server writes:** a
+  `hasOne`, the to-many memberships (with a `manyToMany`'s `_pivot`) and a
+  single-hop `via`, not only `belongsTo`, matching the generated SDK's `Insert`.
+- **Remote MCP can find a trashed row to restore.** `delete_document` no longer
+  tells the model that every delete is permanent, and `query_collection` and
+  `count_documents` take `deleted: "include" | "only"`.
+- **The MCP consent screen shows the server's sign-in error instead of "[object
+  Object]",** and accounts with a second factor can consent: the screen asks for
+  an authenticator or recovery code. An account that only signs in with a social
+  provider or a magic link is told to set a password first.
 
 ##### CLI
 
@@ -4318,6 +4536,63 @@ yet, listed so that nobody reads a promise into them:
   project's storage and its port and none of the code it runs. Both wordings are
   shown now.
 
+- **Every command reads the collections where `rebase.json` puts the backend's
+  config,** not only `config/collections`: verify, doctor, generate-sdk,
+  console, `db push` and `db generate`, `schema generate`, dev's regeneration
+  and the Claude Code hook.
+
+- **A database push leaves alone the DEFAULT of a column declared
+  `databaseDefault: true`.** `rebase db push` planned `DROP DEFAULT`, and
+  creates that left the field to the database then failed on NOT NULL. A DEFAULT
+  on an undeclared column is still removed.
+
+- **The live RLS audit no longer leaves the managed dev database read-only.**
+  After `rebase verify --live` or `npx @rebasepro/rls-check "$(rebase db url)"`,
+  every write failed with 25006 until `rebase db stop`.
+
+- **Project verification fails when it has nothing to check.** `rebase verify`
+  refuses a `--collections` path that does not exist (it reported 0 errors), and
+  `rebase verify --live` fails when the database is missing or does not answer
+  (it skipped and exited 0). The live audit reads the database the `db` commands
+  resolve, the managed one included, takes `--database-url` and `--docker`, and
+  counts a baselined database's earlier migrations as applied. A fresh blog
+  scaffold passes it: a compiled `access: "public"` read is a warning while the
+  API requires a token, and an error with `AUTH_REQUIRE=false`, read as every
+  boolean env var is read.
+
+- **The dev server no longer prints "Schema and SDK types regenerated" after a
+  failed regeneration.**
+
+- **The Claude Code collection guardrail runs on Windows, and stops blocking
+  edits it cannot check:** in a project whose dependencies are not installed
+  yet, or whose CLI predates `rebase verify`, it skips with a note.
+
+- **Rewriting `rebase.json` keeps the app fields this CLI does not model,** so
+  `generate-sdk --register`, `apps init --force` and `eject` no longer delete
+  them.
+
+- **A mistyped flag under --json puts the error envelope on stdout,** as the CLI
+  promises for every exit.
+
+- **A view label with braces, angle brackets, an ampersand or a comment end
+  still compiles.** `rebase generate view --name` now quotes the label.
+
+- **The skills installer updates a hook an earlier CLI wrote,** instead of
+  reporting it as edited by you (`rebase skills --hooks`).
+
+- **Commands in a directory `init --claim` provisioned keep its token and claim
+  link.** `rebase cloud whoami` and `projects create` deleted both; `whoami` and
+  `status` now show the project, its claim URL and the expiry, `unlink` warns
+  that an unclaimed project keeps running, a second `init --claim` points at the
+  existing claim, and every command that knows says when the project's
+  `REBASE_API_TOKEN` expires and how to replace it. `init --claim` deploys with
+  the new project's own token even when `REBASE_TOKEN` is set, and commands warn
+  when `REBASE_TOKEN` displaces it. After a claim, a signed-in claimer is told
+  to run the command again instead of to sign in.
+
+- **A bundle deploy blocked by another deploy names it and how to cancel it,**
+  and a `402` points at `rebase cloud billing setup`.
+
 ##### Client SDK
 
 - **A public page no longer prints the client's connection messages to every
@@ -4329,6 +4604,36 @@ yet, listed so that nobody reads a promise into them:
   the site, with `localStorage.setItem("rebase_debug", "1")`;
   `globalThis.__REBASE_DEBUG__` and `__REBASE_DEBUG_REALTIME__` work too.
   Warnings and errors are printed as before.
+- **A required belongsTo is satisfied by either spelling on a typed create.**
+  With `author` declared `validation: { required: true }`, the generated
+  `Insert` required both `authorId` and `author`, so only a body naming the row
+  twice compiled, on `client.data`, `batch()` and `context.data` alike. Either
+  spelling now compiles; neither (or `null`) is still an error. Regenerate with
+  `rebase generate-sdk`.
+- **A closed to-one relation's foreign key leaves the generated types, as it
+  leaves the API.** An `excludeFromApi` `belongsTo` no longer puts its key on
+  `Row`, `Insert` or `Update`, a `write: []` one no longer offers its key on
+  writes, and `IncludeFor` no longer offers an `excludeFromApi` relation the
+  server answers `UNKNOWN_RELATION`.
+- **A hasOne relation is writable on a typed create and update.**
+  `client.data.users.update(1, { profile: 9 })` (and `null` to unlink) compiles,
+  as the server already performed it.
+- **A collection callback's client takes SQL bind parameters.**
+  `context.client.sql(q, { params })` was a type error while `rebase.sql`
+  accepted it.
+- **An offline edit or delete made after a queued create lost its answer is no
+  longer lost,** with `replayBatchSize` too. A caller's own `ifMatch` on
+  `update()` and `delete()` survives the queue, with or without `onConflict`;
+  without it, a 412 is reported to `onSyncError`. `findById()` on an
+  offline-enabled client keeps the row's version (`etagOf`).
+- **A socket refused for too many connections backs off and says so.** Over
+  `REALTIME_MAX_SOCKETS_PER_USER`, the client redialled every second unseen; it
+  now backs off up to 30 s and reports `CONNECTION_LOST`
+  (`details.reason: "TOO_MANY_SOCKETS"`) to its subscriptions and
+  `onConnectionLost`.
+- **With a recount interval set, a list's total is counted again when the
+  interval is up,** not left stale until the next write
+  (`REALTIME_RECOUNT_INTERVAL_MS`, and `listenCount()`).
 
 ##### Admin (CMS & app)
 
@@ -4368,6 +4673,64 @@ yet, listed so that nobody reads a promise into them:
   the URL on `#new_side`. A dirty record still asks before the panel leaves it.
   `useUnsavedChangesDialog` now also takes a function for `when`, read at the
   moment of navigation.
+
+- **`EntityFormPanel` saves the record it shows after its `entityId` changes.**
+  It saved into the previous record, or answered 412 on every save; changing
+  `entityId` now remounts the form. `EntityFormPanel` and `CollectionPanel` also
+  open a subcollection by its full path (`posts/p1/comments`) inside a scope
+  that holds its parent.
+
+##### MCP
+
+- **`rebase_cloud_provision` says what to do when the control plane refuses**
+  (provisioning not enabled, rate limited, already linked), takes names up to
+  200 characters, and is no longer refused when the active project already
+  points at a remote app.
+
+#### Security
+
+- **A role holding users:write can no longer grant itself, or anyone, admin.** A
+  role name like `"support,admin"`, a nested array or a quoted name was written
+  into the roles array literal as more than one role. Roles are now stored as
+  bound parameters, and such names are refused (see Changed).
+- **A route group mounted on its own refuses impersonation and simulation it
+  cannot honour.** `backend.routes.storage()`, `routes.admin()` and the others
+  answered a request carrying `x-rebase-impersonate` or `x-rebase-simulate-*` as
+  the administrator. `refuseUnhonouredImpersonation` and
+  `reportSimulatedContext` are exported for your own groups.
+- **A role with keys:write can no longer change or revoke a service key that
+  outranks it.** A key holding a role or scope the caller does not answers
+  `403 KEY_OUTRANKS_CALLER`.
+- **The remote MCP consent screen shows the host the authorization code is sent
+  to,** and says that host is not verified. A client registered as "Claude" with
+  any https redirect looked identical to the real one.
+- **AI Autofill sends only the values of declared, unlocked properties.**
+  Read-only or hidden properties that also had `dynamicProps`, and columns the
+  collection does not declare, were sent to the AI service
+  (`@rebasepro/plugin-ai`).
+- **The MCP server sends the project's local service key only to a loopback
+  backend.** After `rebase cloud init --claim` without a deploy,
+  `@rebasepro/mcp` sent it to the cloud project; it now says on stderr to set
+  `REBASE_API_TOKEN`.
+- **The MCP server no longer sends the CLI's control-plane token to the app.**
+  `REBASE_TOKEN` was accepted as the app's API key, so the token that can deploy
+  and read secrets reached every backend the MCP server called. Set
+  `REBASE_API_TOKEN` for the app; the server says so once on stderr when only
+  `REBASE_TOKEN` is set. Setups that relied on the alias stop authenticating
+  with the app.
+- **Every CSV the product writes escapes spreadsheet formulas,** as the admin's
+  export already did: the SQL console's Export CSV, Copy as CSV and Download
+  full result as CSV prefix `'` to a cell starting with `=`, `+`, `-`, `@`, a
+  tab or a carriage return, while signed numbers stay numbers. Such cells are no
+  longer byte-identical to `COPY … CSV`.
+- **A cloud claim's .env is private and keeps your token.**
+  `rebase cloud init --claim` creates `.env` with mode 0600 and no longer
+  overwrites a `REBASE_API_TOKEN` already in it.
+
+#### Documentation
+
+- **Embedding the Postgres Driver and The Remote MCP Endpoint are pages of their
+  own.**
 
 ### [0.25.1] - 2026-10-14
 
@@ -19110,7 +19473,7 @@ A few names on `client.data` are taken: `collection` is the dynamic `collection(
 
 A property key *you* wrote is your key, whatever its shape — nothing renames a name you chose. The two keys that are derived rather than declared, a relation's foreign key and a column read back by introspection, are camelCase.
 
-`Row` describes a read, `Insert` a `create()` and `Update` an `update()` — they are not the same shape. A column that is not required is `T | null` on all three, so a write can clear it; the primary key is always present on a read and never settable on an update; a `belongsTo` target can be written either as the relation (`{ author: 5 }`) or as its foreign key (`{ authorId: 5 }`); and a `hasMany` or `manyToMany` membership is written as a list of target ids or `{ id }` objects (`{ tags: ["t-1"] }`), each carrying a `_pivot` when the junction declares payload columns. A field nobody may write (`access: { write: [] }`) is on neither `Insert` nor `Update`. A `date` column reads as an ISO string, and a write takes either that string or a `Date`.
+`Row` describes a read, `Insert` a `create()` and `Update` an `update()` — they are not the same shape. A column that is not required is `T | null` on all three, so a write can clear it; the primary key is always present on a read and never settable on an update; a `belongsTo` target can be written either as the relation (`{ author: 5 }`) or as its foreign key (`{ authorId: 5 }`), and a required one is satisfied by either; a `hasOne` is written by naming the target row (`{ profile: 9 }`), or `null` to unlink it; a single-hop `via` is written as the kind it stands in for (to-one: the target's id or `null`; to-many: a list of ids), and a multi-hop one is read-only and on neither; and a `hasMany` or `manyToMany` membership is written as a list of target ids or `{ id }` objects (`{ tags: ["t-1"] }`), each carrying a `_pivot` when the junction declares payload columns. A field nobody may write (`access: { write: [] }`) is on neither `Insert` nor `Update`. A `date` column reads as an ISO string, and a write takes either that string or a `Date`.
 
 ### Quick Example
 
@@ -20472,7 +20835,7 @@ All property types share these options:
 | `name` | `string` | Display label. Defaults to the property key, prettified — `publishDate` → "Publish Date". Set it when that derivation is wrong: `"URL"` rather than "Url". |
 | `description` | `string` | Help text shown below the field |
 | `defaultValue` | `any` | Default value for new entities. A literal one — a string, number, boolean, date, enum id, or a `map`/`array` document stored as JSON — also becomes the column's `DEFAULT`, so a row inserted by anything that is not the admin panel (the REST API, a seed, `psql`) gets it too |
-| `databaseDefault` | `boolean \| SqlExpression` | The database fills the column when a create leaves it empty: a `NOT NULL DEFAULT <expression>` column such as `gen_random_uuid()` or `nextval(…)`. A `required` field with it may be left out of a create, by the admin form and by the API, and a `null` sent on create is left to the database; it stays required on edit, and the generated `Insert` type makes it optional. Give the expression in the template form `isId` takes, ``databaseDefault: "sql`gen_random_uuid()`"``, and the schema planner writes it as the column's `DEFAULT`, so `rebase db push` keeps it. `true` declares a `DEFAULT` written elsewhere and writes none, so a push plans dropping it. "Import from table" and `rebase schema introspect` set the expression they read |
+| `databaseDefault` | `boolean \| SqlExpression` | The database fills the column when a create leaves it empty: a `NOT NULL DEFAULT <expression>` column such as `gen_random_uuid()` or `nextval(…)`. A `required` field with it may be left out of a create, by the admin form and by the API, and a `null` sent on create is left to the database; it stays required on edit, and the generated `Insert` type makes it optional. Give the expression in the template form `isId` takes, ``databaseDefault: "sql`gen_random_uuid()`"``, and the schema planner writes it as the column's `DEFAULT`, so `rebase db push` keeps it. `true` declares a `DEFAULT` written elsewhere: the planner writes none, and `rebase db push` leaves the one the database holds as it is. "Import from table" and `rebase schema introspect` set the expression they read |
 | `validation` | `object` | Validation rules |
 | `propertyConfig` | `string` | Registered property config key |
 | `columnName` | `string` | Explicit database column name (bypasses snake_case conversion) |
@@ -21532,7 +21895,7 @@ one row or many come back, and what a write through it may touch.
 | `hasOne` | on the **target's** table | one | `foreignKeyOnTarget`, defaults to the singular of this collection plus `_id` (`users` → `user_id`) |
 | `hasMany` | on the **target's** table | many | children belong to this parent alone |
 | `manyToMany` | in a **junction table** | many | rows are shared; you own the link |
-| `via` | an explicit `joinPath` | either | read-only; state `cardinality` yourself |
+| `via` | an explicit `joinPath` | either | writable when single-hop, read-only otherwise; state `cardinality` yourself |
 
 Every field is optional except `kind` and `target` (and, on `via`, `cardinality`
 and `joinPath`) — the rest is derived.
@@ -21589,7 +21952,8 @@ relations: [
 `sourceKey` is the mirror of `localKey` on `belongsTo`: that one names the
 column this side reads *from*, this one names the column the other side points
 *at*. Without it a link like the above is not expressible as `hasMany` at all
-and has to drop to [`via`](#via--an-explicit-join-chain), which is read-only.
+and has to drop to [`via`](#via--an-explicit-join-chain), which is read-only for
+a chain like this one.
 
 The column must be unique. A link that addresses more than one source row
 cannot say which one a related row belongs to, and Postgres will not accept a
@@ -21626,8 +21990,23 @@ view** — `sourceColumn` always names *this* collection:
 #### via — an explicit join chain
 
 For links the four shapes above cannot express: multi-hop paths, composite keys,
-or a join whose condition is not a plain foreign key. Read-only — Rebase will
-not infer how to write through an arbitrary chain.
+or a join whose condition is not a plain foreign key.
+
+A **single-hop** chain is writable through a create or update, the way the kind
+it stands in for is written:
+
+- a **to-one** chain of **one step** — the target row holds the key, so
+  `{ badge: "b-1" }` points that row's column at this one, and `null` unlinks it,
+  as a `hasOne` write does;
+- a **to-many** chain of **two steps through one table** between the ends — that
+  table holds the links, so `{ tags: ["t-1", "t-2"] }` sets them as its rows, as a
+  `manyToMany` write does (a `via` carries no `_pivot`).
+
+Anything longer is **read-only**: Rebase will not infer how to write through an
+arbitrary chain. A create or update naming one is refused with
+`400 RELATION_NOT_WRITABLE`, and the admin form shows the field without a picker.
+A nested write (`PATCH users/1/permissions/3`) through any `via` is refused the
+same way.
 
 ```typescript
 {
@@ -21709,7 +22088,9 @@ properties: {
 ### Multi-Hop Joins
 
 For relationships that traverse multiple tables, use `kind: "via"` with a `joinPath`.
-These are read-only: Rebase will not infer how to write through an arbitrary chain.
+A chain longer than one link is read-only: Rebase will not infer how to write
+through an arbitrary chain (see [via](#via--an-explicit-join-chain) for the
+single-hop chains it does write).
 
 ```typescript
 // Users → Permissions through Roles
@@ -22011,7 +22392,7 @@ interface ViaRelation extends RelationBase {
 What you write above is the *authoring* shape. Internally Rebase works with
 `ResolvedRelation`: the same link with every default filled in and nothing
 optional, plus `cardinality`, `targetSlug`, and two flags — `writable` (false
-only for `via`) and `shared` (true when the target rows belong to other parents
+only for a multi-hop `via`) and `shared` (true when the target rows belong to other parents
 too, so a removal unlinks rather than deletes).
 
 `sourceKey` is the one exception to "nothing optional": its default is the
@@ -24301,8 +24682,9 @@ await backend.attachRealtime(server);
 backend.start();                                // cron, job workers, sweeps
 ```
 
-A group carries its own auth context, rate limits and admin gate, so
-`getDriver(c)` works in a group mounted anywhere. What it does not carry is the
+A group carries its own auth context, rate limits and admin gate, and refuses
+the impersonation and simulation headers unless it is the data or functions
+group, so `getDriver(c)` works in a group mounted anywhere. What it does not carry is the
 process-wide middleware `mount()` adds: the body limit, compression, CSRF and
 the error envelope are yours to add when you mount groups one by one.
 
@@ -25363,7 +25745,7 @@ curl "$API_URL/api/data/orders" \
 ```
 
 The same key works on the REST API, storage, custom functions, the admin
-surfaces its scopes reach, the realtime WebSocket and the [`/mcp` endpoint](/docs/ai/mcp/#the-remote-endpoint).
+surfaces its scopes reach, the realtime WebSocket and the [`/mcp` endpoint](/docs/ai/remote-mcp/).
 
 ### Service keys
 
@@ -25491,7 +25873,7 @@ window, and every door counts against it in one bucket, `api-key:<id>`:
 - its data frames on the realtime socket: fetches, counts, saves and deletes,
   and subscriptions and channel-history requests past each socket's
   [allowance](/docs/backend/realtime/#what-a-write-costs-and-the-limits);
-- its requests to [`/mcp`](/docs/ai/mcp/#the-remote-endpoint).
+- its requests to [`/mcp`](/docs/ai/remote-mcp/).
 
 Without a `rate_limit` the bucket holds the server's API-key default, 1000. A
 personal key has no `rate_limit` of its own, and counts in its own bucket at that
@@ -25500,6 +25882,11 @@ default. Past the limit an HTTP request answers `429` and a socket frame
 
 The admin routes under `/api/admin`, and the socket's admin messages such as the
 SQL editor's, are not rate limited.
+
+An administrator simulating a key ("Simulate access", `x-rebase-simulate-api-key-id`)
+spends their own allowance, not the key's: the integration running on that key
+keeps its whole budget. Simulating or impersonating a user is charged to the
+administrator the same way.
 
 ### Personal keys
 
@@ -25639,6 +26026,8 @@ Every key is checked against whoever creates it, the same way on both routes:
 | `400 KEY_MANAGEMENT_SCOPE` | `keys:read` or `keys:write` was asked for |
 | `403 SCOPE_EXCEEDS_CREATOR` | A scope the creator does not hold. A key never holds more than the account that made it |
 | `403 ROLE_EXCEEDS_CREATOR` | A service-key role the creator does not hold, when the creator is not an admin |
+| `400 INVALID_ROLE` | A role name is empty or contains `,` `{` `}` `"` `\` or a control character, which RLS would read back as other roles |
+| `403 KEY_OUTRANKS_CALLER` | On a change (`PUT`) or a revoke (`DELETE`): the key already holds a role or scope the caller does not, and the caller is not an admin |
 
 A request the key itself lacks a scope for answers `403 SCOPE_MISSING`, with the
 scope in `details.requiredScope`. See [Error codes](/docs/backend/errors/#authentication-and-accounts).
@@ -25806,6 +26195,7 @@ the ID you got. Read the response header.
 | `IMPERSONATION_UNSUPPORTED` | 400 | `x-rebase-impersonate` was sent to a route that cannot run as another user. Only the data API and custom functions honour it, and the realtime socket honours `impersonate` on `AUTHENTICATE`. | Send the request without the header. |
 | `SIMULATION_FORBIDDEN` | 403 | A request sent an `x-rebase-simulate-*` header (the RLS simulator), or asked `/api/admin/rls-simulator`, and its caller may not simulate access. Only a signed-in administrator's own session may, never an API key or the service key. | Send it with an administrator's session, or leave the headers out. |
 | `SIMULATION_INVALID` | 400 | The simulation was malformed: a header sent empty, `x-rebase-simulate-api-key-id` combined with a role or user id, or simulation combined with `x-rebase-impersonate`. | Name one role (optionally with a uid), one user id, or one API key id. |
+| `SIMULATION_READ_ONLY` | 403 | A write, delete, `_batch`, history revert, or a custom function called by any verb but `GET`/`HEAD`/`OPTIONS`, carried an `x-rebase-simulate-*` header. Simulated access is read-only: the write would run as the simulated identity, not as the administrator. Reads, including `POST …/query` and `…/count`, still run. On 0.25 the write ran as the simulated identity. | Stop simulating to make changes. |
 | `SIMULATION_TARGET_NOT_FOUND` | 404 | The simulation names no active user (a user id sent without a role) or no live API key. | Check the id, or send a role with the uid to simulate a uid that has no account. |
 | `SIMULATION_UNAVAILABLE` | 501 | This backend cannot simulate access: its `AuthAdapter` has no `resolveUser` to confirm an administrator, or a key was named on a backend with no API keys. | Implement `resolveUser`, or leave the headers out. |
 | `SIMULATION_UNSUPPORTED` | 400 | An `x-rebase-simulate-*` header was sent to a route that cannot run with simulated access. Only the data API and custom functions honour them. | Send the request without the headers. |
@@ -25816,7 +26206,9 @@ the ID you got. Read the response header.
 | `INVALID_PLATFORM_TOKEN` | 401 | An `rpt_` platform token was refused: a bad signature, the wrong audience, expired, or a lifetime over the ceiling. The message says which. | Have the platform mint a fresh one — on Rebase Cloud, run the command again. |
 | `INVALID_SCOPES` | 400 | A key was asked for something that is not a scope: malformed, unknown, or with a target the scope does not take. `details.problems` says which and why; `details.validScopes` lists the scopes a key may hold. It leaves out `keys:read` and `keys:write`, which no key can hold; on 0.24 it lists them. | Use a name from the list. See [Roles and scopes](/docs/backend/roles-and-scopes/). |
 | `INVALID_TOKEN` | 400 / 401 | A verification, reset, magic-link or address-change token is malformed, unknown, spent or expired (400). An OAuth provider credential or a refresh token that does not verify is a 401. | Request a fresh link, or sign in again. |
+| `INVALID_ROLE` | 400 | A role name being written is not a string, is empty, or contains `,` `{` `}` `"` `\` or a control character. Those characters would be read back as other roles: a role travels in a Postgres `text[]` and in the comma-joined list RLS policies split, so `"support,admin"` would come back as `admin`. On 0.25 such a name was stored. `details.problems` names each one. | Rename the role. Any other name is accepted. |
 | `KEY_MANAGEMENT_SCOPE` | 400 | A key was asked for `keys:read` or `keys:write`. No key may manage keys. `details.scopes` names them. | Leave them out. |
+| `KEY_OUTRANKS_CALLER` | 403 | A holder of `keys:write` tried to change or revoke a service key that holds a role or scope they do not. Only an admin manages any key. `details.roles` and `details.scopes` name what the key holds beyond the caller. On 0.25 the change went through. | Have an admin, or someone who holds them, change the key. |
 | `LAST_ADMIN` | 403 | The change would leave the project with no admin. | Promote someone else first. |
 | `MFA_REQUIRED` | 401 | The password was right and the account has a verified second factor, so sign-in is only half done. `details` carries a short-lived token scoped to the MFA challenge — it is not a session. | Open a challenge and answer it; the challenge response issues the session. |
 | `NO_SESSION` | 401 | No session cookie or refresh token was presented. Normal on a first page load. | Sign in. |
@@ -25921,7 +26313,7 @@ the ID you got. Read the response header.
 | `RELATION_HAS_NO_PIVOT` | 400 | The write carried a link payload, but the path does not reach its target through a `manyToMany` that declares `through.properties` — so there is no junction row to put it on. | Declare `through.properties` on the relation, or drop the payload from the write. See [Relations](/docs/collections/relations/). |
 | `RELATION_MISCONFIGURED` | 500 | A relation does not resolve against the registered schema. The operation is refused rather than skipped: dropping it would report success for a write that never happened, or emptiness for rows that exist. | Run `rebase schema generate` if the generated schema is older than the database. |
 | `RELATION_NOT_UNLINKABLE` | 400 | The relation cannot be unlinked from this side. | Write from the owning side. |
-| `RELATION_NOT_WRITABLE` | 400 | The nested path is not a writable relation. | See [Relations](/docs/collections/relations/). |
+| `RELATION_NOT_WRITABLE` | 400 | The nested path is not a writable relation, or a create or update names a multi-hop `via` relation — only single-hop `via` relations are writable. `details.fields` lists the `via` keys. Nothing was written. | Write the rows the chain joins directly. See [Relations](/docs/collections/relations/#via--an-explicit-join-chain). |
 | `RELATION_PIVOT_UNSUPPORTED` | 400 | The relation declares junction columns, but this data source cannot write them. | The link itself still works; only the payload on it does not. Check the driver's capabilities. |
 | `RELATION_SOURCE_KEY_EMPTY` | 400 | A relation write had no source key to hang the link on. | Save the parent row first. |
 | `RESULT_TOO_LARGE` | — | A statement sent over the realtime socket's `EXECUTE_SQL` — `admin.executeSql` from a client, the admin panel's catalogue reads — returned more than 128 MB of rows, so none of it was sent. Delivered as a WebSocket `ERROR` frame. The SQL console's own runs are not refused: they show the first rows. | Add a `LIMIT`, or select fewer columns, and read the result in parts. |
@@ -25989,6 +26381,7 @@ the message names the constraint.
 | `STORAGE_FILE_TYPE_REFUSED` | 400 | The upload's type is not in the property's `acceptedFiles`, or not in the storage source's own `allowedMimeTypes`. `details` carries the property (or the source's list), the accepted list and the content type sent. | Upload an accepted type, or widen `acceptedFiles` / `allowedMimeTypes`. |
 | `STORAGE_MISCONFIGURED` | 502 | The S3 or GCS bucket this source is configured with does not exist, or the provider refused this deployment's credentials for it. The message names the bucket; `details.reason` is `NoSuchBucket` or the provider's refusal. A missing bucket used to read as "file not found" on every file. | Fix the bucket name (`S3_BUCKET` / `GCS_BUCKET`, `__<KEY>` for a named source) or the credentials' permissions. |
 | `STORAGE_NOT_CONFIGURED` | 501 / 503 | No storage backend is configured on this server, or none is the default and the request names no storage source; the message names the sources that are served (501). A resumable upload whose source disappeared before it finished is a 503. | Configure S3, GCS, or local storage, or name a source with `?storageId=`. |
+| `STORAGE_SAME_LOCATION` | 400 | `POST /api/admin/storage/move` with `deleteSource` (`rebase storage move --delete-source`) between two sources that store in the same bucket or directory. Every file would count as already in the target, being the same file, and deleting the source's copy would delete the only one. Nothing was moved or deleted. | Point the property at the other source; its files are already there. |
 | `STORAGE_SCAN_INCOMPLETE` | 409 | `DELETE /api/admin/storage/orphans` (`rebase storage orphans --delete`) could not read every collection, so a file one of them names would look unused. Nothing was deleted; `details.unscanned` names each collection and why it could not be read. | Fix what stops those collections from being read, and run it again. |
 | `STORAGE_SOURCE_NOT_CONFIGURED` | 501 | The storage source is declared but has no credentials here. | Set that source's environment variables. |
 | `STORAGE_WRITE_FAILED` | 502 | The storage backend refused or dropped the write. | Check its own logs and credentials. |
@@ -26021,8 +26414,9 @@ so a panel can grey the feature out instead of showing an error.
 | `ADMIN_SURFACE_UNAVAILABLE` | 501 | An admin-only surface was called on a server with no authentication configured, so nothing can tell an admin from a stranger. | Set `auth.jwtSecret`, or pass an `AuthAdapter`. |
 | `BRANCH_DIFF_STALE` | 409 | `POST /api/admin/branches/:name/merge` was sent the fingerprint of a diff that is no longer true: the branch or its parent changed since. Nothing was written. | Read the diff again, review it, and merge with its new `fingerprint`. |
 | `BRANCH_DIFF_UNSUPPORTED` | 501 | The data source cannot compare branches: it has no SQL, or no branching (no admin connection). | Use a Postgres backend with `adminConnectionString` set. |
-| `BRANCH_MERGE_BLOCKED` | 409 | A table with rows the branch changed cannot be merged — added or dropped by the branch, columns or primary key that differ, no primary key, or too many rows to match. `details.tables` names each, with why. Nothing was written. | Apply the schema with your migrations first, or merge with `skipBlocked: true` to leave those tables alone. |
+| `BRANCH_MERGE_BLOCKED` | 409 | A table that differs cannot be merged — added or dropped by the branch, columns or primary key that differ, no primary key, too many rows to match, or rewritten since the branch was made (`TABLE_REWRITTEN`). A table whose rows could not be matched blocks even when its counts read 0: they are unknown, not zero. `details.tables` names each, with why. Nothing was written. | Apply the schema with your migrations first, or merge with `skipBlocked: true` to leave those tables alone. |
 | `BRANCH_MERGE_CONFLICT` | 409 | Rows were changed on both the branch and its parent, and `onConflict` was `"abort"` (the default); or the parent refused part of the merge — a row changed meanwhile, a trigger skipped it, a policy hid it. Nothing was written. | Choose which side wins with `onConflict: "branch"` or `"target"`, or read the diff again. |
+| `BRANCH_MERGE_FAILED` | 409 | The parent refused the branch's rows inside the merge statement — a constraint, an enum label or a foreign key it holds and the branch's rows break, usually because the two schemas differ. `details` carries `sqlState`, `table`, `constraint` and `detail`. Nothing was written. | Read the diff's schema changes, bring the parent's schema in line with your migrations, or fix the branch's rows, then merge again. |
 | `BRANCH_NOT_FOUND` | 404 | No branch has that name in the registry. | `rebase db branch list`, or the Branches pane, lists the ones there are. |
 | `CONTRACT_UNAVAILABLE` | 404 | The project contract is served only when authentication is configured — it describes every table and relation. | Configure auth. `/meta/schema-version` is always served. |
 | `DEV_MAILBOX_UNAVAILABLE` | 501 | No development mailbox is active. Mail is captured only when `SMTP_HOST` is unset and `NODE_ENV` is not production. | Unset `SMTP_HOST` in development, or read the real inbox. |
@@ -26052,11 +26446,12 @@ own.
 
 | Code | Status | Means | Do |
 | --- | --- | --- | --- |
-| `COLUMNS_DIFFER` | — | The table's columns differ between the branch and its parent. Rows are compared on the columns they share. | Apply the schema to the parent with your migrations (`rebase db push`), then merge. |
+| `COLUMNS_DIFFER` | — | The table's columns differ between the branch and its parent. Rows are compared on the columns they share. | Add the missing columns to the parent with your migrations (`rebase db push`), then merge. A migration that rewrites the table — a column type change — turns it into `TABLE_REWRITTEN`: merge before such a change, or make the branch again after it. |
 | `NO_PRIMARY_KEY` | — | The table has no primary key, so rows cannot be matched one by one; the diff gives its row counts only. | Give the table a primary key, or move its rows by hand. |
 | `PRIMARY_KEY_DIFFERS` | — | The primary key's columns, or their types, differ between the two. | Apply the schema to the parent first. |
 | `TABLE_ADDED` | — | The branch created the table. A merge never creates one. | Create it on the parent with your migrations, then merge its rows. |
 | `TABLE_DROPPED` | — | The branch dropped the table. A merge never drops one. | Drop it with your migrations. |
+| `TABLE_REWRITTEN` | — | One side wrote every row of the table anew after the branch was made — a column type change, an `ADD COLUMN` with a volatile default, `VACUUM FULL`, `CLUSTER` — so every row reads as written since and which side changed which row can no longer be told. | Merge the branch before such a migration, or make the branch again from the parent after it. |
 | `TOO_LARGE` | — | The table holds more rows on a side than a diff matches one by one (100,000 by default, `maxRowsPerTable`). | Raise `maxRowsPerTable` on both the diff and the merge, or move the rows another way. |
 
 ### Generic codes
@@ -26228,7 +26623,7 @@ a collection reaches none of this. See [Roles and scopes](/docs/backend/roles-an
 | `POST` | `/api/admin/backups/download-url` | `backups:read` | A link to one backup, `{ key }` → `{ url, token, expiresIn }`, good for 60 seconds — [Backups](/docs/deployment/backups/#download-a-backup) |
 | `GET` | `/api/admin/storage/orphans` | `database:read` | Stored files no row names, `?storageId=&olderThanHours=` — what `rebase storage orphans` prints |
 | `DELETE` | `/api/admin/storage/orphans` | `database:write` | Finds them again and deletes them; `409 STORAGE_SCAN_INCOMPLETE` when a collection could not be read |
-| `POST` | `/api/admin/storage/move` | `database:write` | Copies a folder to another source under the same keys, a page per call — what `rebase storage move` sends |
+| `POST` | `/api/admin/storage/move` | `database:write` | Copies a folder to another source under the same keys, a page per call — what `rebase storage move` sends; `400 STORAGE_SAME_LOCATION` for `deleteSource` between two sources that store in the same place |
 | `GET` | `/api/admin/logs` | `logs:read` | The recent log buffer |
 | `GET` | `/api/admin/logs/latest` | `logs:read` | The most recent entries |
 | `GET` | `/api/admin/logs/stream` | `logs:read` | Server-sent events |
@@ -26236,7 +26631,7 @@ a collection reaches none of this. See [Roles and scopes](/docs/backend/roles-an
 | `GET` | `/api/admin/rls-simulator/options` | `schema:read` | Roles, users' rule roles and live service keys an administrator can simulate |
 | `POST` | `/api/admin/rls-simulator/preview` | `schema:read` | Each collection as `{ role?, userId?, apiKeyId? }` reaches it: visible rows against the caller's, hidden by scope or RLS, masked fields. Administrator's session only |
 | `POST` | `/api/admin/sql/csv` | `database:write` | Streams one read-only query's whole result as CSV — [Studio](/docs/studio/)'s "Download full result as CSV" |
-| `GET` | `/api/admin/branches/:name/diff` | `database:read` | What a [branch](/docs/backend/branching/#reviewing-and-merging-a-branch) changed: schema, policies and rows, `?sampleLimit=&schemas=&maxRowsPerTable=` |
+| `GET` | `/api/admin/branches/:name/diff` | `database:write` | What a [branch](/docs/backend/branching/#reviewing-and-merging-a-branch) changed: schema, policies and rows, `?sampleLimit=&schemas=&maxRowsPerTable=` |
 | `POST` | `/api/admin/branches/:name/merge` | `database:write` | Writes the branch's rows to its parent, `{ expectedFingerprint, onConflict?, skipBlocked? }`; `409` when either side changed since the diff, or rows conflict |
 | `GET` | `/api/admin/schema/status` | `schema:read` | [Live schema editing](/docs/backend/live-schema-editing/) |
 | `POST` | `/api/admin/schema/plan` | `schema:read` | Plans a change; never applies one |
@@ -26495,6 +26890,11 @@ default, which makes every later insert fail until it is dropped or made
 nullable. A change without one (moving a primary key, a relation whose link
 column nothing creates) cannot be written to the source alone.
 
+On a deployment that changes nothing in its database (`REBASE_PROVISION=false`)
+no change is applied from the panel, so every change goes this way: the
+dialog's main button reads **Commit** and sends `"sourceOnly": true`, and the
+process that changes that database applies the schema.
+
 Deleting a collection from the admin panel takes the same path: `/apply` with
 `"remove": true` and `"sourceOnly": true` deletes the collection's file and its
 entry in `index.ts` and commits both; the table and its rows stay. It is
@@ -26702,11 +27102,21 @@ was built with until your pipeline builds and deploys the commit. The database
 has the change at once; the admin panel and the API see the new collection
 definition after that deploy.
 
-So a deployment makes **one change per deploy**. After a commit lands, the next
-apply is refused with `SCHEMA_CHANGE_FAILED`, naming the commit, until a process
-running that commit replaces this one. A second change planned against the
-collections this deployment still runs would commit generated schema files that
-leave the first change out. Planning stays available meanwhile.
+So a deployment makes **one change per deploy**. A second change planned against
+the collections this deployment still runs would commit generated schema files
+that leave the first change out. Each apply therefore renders
+`schema.generated.ts` from the collections this deployment runs and compares it
+with the repository's copy. When they differ, the apply is refused with
+`SCHEMA_CHANGE_FAILED`, naming the file, until a process running that commit
+replaces this one. The check reads the repository, not this process's memory,
+so it holds across a restart, across replicas, and for a change a developer
+pushed that is not deployed yet. Planning stays available meanwhile.
+
+The copies also differ when the file was generated by another Rebase version,
+reformatted, or edited by hand. If nothing is waiting to deploy, run
+`rebase schema generate` with the version the deployment runs, commit the
+result, and deploy it. Line endings and trailing whitespace do not count as a
+difference.
 
 #### Committing to a remote repository
 
@@ -27635,6 +28045,9 @@ For keys:
   is an admin. Otherwise `403 ROLE_EXCEEDS_CREATOR`.
 - `keys:read` and `keys:write` never go on a key. A key that manages keys could
   mint its own successor. `400 KEY_MANAGEMENT_SCOPE`.
+- A holder of `keys:write` cannot change or revoke a key that holds a role or
+  scope they do not, unless they are an admin: `403 KEY_OUTRANKS_CALLER`.
+  Without this, they could widen an admin-role key to every data scope.
 
 For accounts, a holder of `users:write`:
 
@@ -27644,6 +28057,11 @@ For accounts, a holder of `users:write`:
   admin's password and sign in as them.
 - cannot grant roles that hold more than they do, `admin` included: `403 ROLE_EXCEEDS_CALLER`.
 
+A role name may be anything except a name that would be read back as other
+roles: an empty name, or one containing `,` `{` `}` `"` `\` or a control
+character, is refused with `400 INVALID_ROLE` wherever a role is written (users,
+the users collection, service keys).
+
 ### How each credential holds scopes
 
 | Credential | Acts as | Holds |
@@ -27651,7 +28069,7 @@ For accounts, a holder of `users:write`:
 | A person's session | the person | the data plane, every app scope, and their roles' scopes. An admin holds everything |
 | [Service key](/docs/backend/api-keys/#service-keys) `rk_live_…` | `api-key:<id>`, with the RLS roles `service` plus its own `roles` | exactly its scopes |
 | [Personal key](/docs/backend/api-keys/#personal-keys) `rk_live_…` | its owner, with the owner's roles as they are at each request | its scopes, cut down to what the owner holds now |
-| [MCP token](/docs/ai/mcp/#the-remote-endpoint) | the person who connected it | `data:read`, `data:write`, `data:delete` as granted, optionally per collection |
+| [MCP token](/docs/ai/remote-mcp/) | the person who connected it | `data:read`, `data:write`, `data:delete` as granted, optionally per collection |
 | `REBASE_SERVICE_KEY` | `service`, with the `admin` role | everything |
 
 A key or a token never bypasses row-level security. Its scopes are one ceiling,
@@ -29277,6 +29695,12 @@ export default defineFunction((app, { rebase }) => {
 });
 ```
 
+`{ database: analytics }` runs the query on that source's own connection —
+whatever `DATABASE_URL__ANALYTICS` points at, on whichever server — and no
+option runs it on the default one. A key that names no configured source is
+refused with an error that lists the ones there are. Up to 0.25.1 the key was
+read as a database name on the default source's server instead.
+
 #### Seeing what you declared
 
 ```bash
@@ -29899,7 +30323,7 @@ states of the collection.
 
 When the count itself fails, the frame carries `partial: true` and no `total`;
 that is not a subscription error, and a client should keep the last real total
-rather than substituting the page length. On a big table the count is most of what a frame costs. With `REALTIME_RECOUNT_INTERVAL_MS` set, a list whose last total was at least `REALTIME_RECOUNT_MIN_ROWS` (100,000 by default) reuses that total for the interval instead of counting on every write, and such a frame carries `meta.totalAsOf`, when the total was taken. Unset, as by default, every frame counts.
+rather than substituting the page length. On a big table the count is most of what a frame costs. With `REALTIME_RECOUNT_INTERVAL_MS` set, a list whose last total was at least `REALTIME_RECOUNT_MIN_ROWS` (100,000 by default) reuses that total for the interval instead of counting on every write, and such a frame carries `meta.totalAsOf`, when the total was taken. When the interval is up, a list whose last frame reused the total is counted again and sent the new total, whether or not anything was written since. Unset, as by default, every frame counts.
 
 #### What a write costs, and the limits
 
@@ -29938,7 +30362,7 @@ start to lag. Beyond that, prefer narrower subscriptions (a page, a filter on
 the user's own rows) or a [broadcast channel](#broadcast-channels) carrying the
 change for clients to re-fetch on their own schedule.
 
-**One socket may hold at most 1,000 subscriptions.** The next is refused with an error frame coded `TOO_MANY_SUBSCRIPTIONS`; re-subscribing under an id the socket already holds replaces that subscription and does not count again. The SDK shares identical subscriptions on a socket, so this counts the distinct lists and records a page has open. Change it with `REALTIME_MAX_SUBSCRIPTIONS_PER_SOCKET` or `realtime.maxSubscriptionsPerSocket` on the Postgres adapter (the environment variable wins); a value that is not a positive whole number stops the server at boot. On 0.23 a socket's subscriptions are not limited. **The sockets one user holds can be limited too**, per server instance: set `REALTIME_MAX_SOCKETS_PER_USER` (or `realtime.maxSocketsPerUser`), and a sign-in past it is refused with `TOO_MANY_SOCKETS` and the socket closed with 4002. Unset, as by default, there is no ceiling.
+**One socket may hold at most 1,000 subscriptions.** The next is refused with an error frame coded `TOO_MANY_SUBSCRIPTIONS`; re-subscribing under an id the socket already holds replaces that subscription and does not count again. The SDK shares identical subscriptions on a socket, so this counts the distinct lists and records a page has open. Change it with `REALTIME_MAX_SUBSCRIPTIONS_PER_SOCKET` or `realtime.maxSubscriptionsPerSocket` on the Postgres adapter (the environment variable wins); a value that is not a positive whole number stops the server at boot. On 0.23 a socket's subscriptions are not limited. **The sockets one user holds can be limited too**, per server instance: set `REALTIME_MAX_SOCKETS_PER_USER` (or `realtime.maxSocketsPerUser`), and a sign-in past it is refused with `TOO_MANY_SOCKETS` and the socket closed with 4002. Sockets signed in with an API key count against that key, each key on its own, not against the account that made it; the service key is one credential, so all of its sockets count together. The SDK tells every live subscription and `onConnectionLost` at once, with a `CONNECTION_LOST` error whose `details.reason` is `TOO_MANY_SOCKETS`, and keeps retrying, waiting longer each time up to 30 s, so the tab gets in once another socket closes. Unset, as by default, there is no ceiling.
 
 A subscription id is the socket's own: two clients that both name a subscription `"sub-1"` each keep theirs, and an `unsubscribe` ends only the sender's.
 
@@ -33875,12 +34299,20 @@ database without touching the real one. Before any of it reaches the database
 the branch was made from, you can see what changed and merge it from
 [Studio](/docs/studio/): open **Branches** and pick one.
 
-- **Schema & RLS policies** lists every table, column, primary key and policy
-  the branch added, dropped or altered, as SQL, with the parent's definition
-  beside the branch's.
+- **Schema & RLS policies** lists every table, column, primary key,
+  constraint (unique, foreign key, check, exclusion), index, trigger, policy,
+  enum type (with its labels), view and function the branch added, dropped or
+  altered, as SQL, with the parent's definition beside the branch's.
 - **Data changes** counts, per table, the rows the branch inserted, updated and
-  deleted, matched by primary key, and shows up to 100 of them per table with
-  the columns that changed.
+  deleted, matched by primary key, and shows up to 100 of them per table (at
+  most 1,000 when you ask for more) with the columns that changed. A column
+  named like a credential — `password_hash`, a `*_token`, anything with
+  `secret` in it, a `*_hash` — shows `[redacted]` instead of its value.
+
+Reviewing a branch needs the `database:write` scope, the one that runs SQL as
+the database owner: the samples are rows of both databases, read outside
+row-level security. `database:read` lists branches but does not read their
+rows.
 
 The same diff is `rebase db branch diff <name>` in a terminal, `GET
 /api/admin/branches/<name>/diff` over HTTP, the `rebase_db_branch_diff` MCP
@@ -33922,19 +34354,39 @@ parent. What wins:
 - **Rows only the branch changed** are written: inserted, overwritten or
   deleted.
 - **Rows only the parent changed** since the branch was made are left exactly as
-  they are.
+  they are — unless one references a row the branch deleted, which is a
+  conflict (below).
 - **Rows both changed** are conflicts. By default the merge writes nothing at
   all; choose `onConflict: "branch"` to write the branch's row over the
   parent's, or `"target"` to keep the parent's.
+- **A row the branch deleted that the parent's newer rows still reference** is
+  a conflict too. Say the branch deleted an author, and the parent has since
+  written a post by them: deleting the author on the parent would cascade into
+  that post, null its column, or fail on the foreign key. The diff counts the
+  author as a conflict and names the referencing rows (`referencedBy`: the
+  table, the foreign key, its `ON DELETE` and how many rows). By default the
+  merge refuses, naming the table, the rows and the way out; `"target"` keeps
+  the author, and with it the post; `"branch"` deletes the author, lets the
+  foreign key do what it says, and lists what it reached in `warnings`.
 - **Schema and policy changes are never merged.** They belong to your
   collections and their migrations: apply them with `rebase db push` (or
   `migrate`), then merge the rows.
 
 A table whose rows cannot be matched blocks the merge: one the branch added or
 dropped, one whose columns or primary key differ between the two, one with no
-primary key, or one with more than 100,000 rows on a side. Pass `skipBlocked`
-(in Studio, tick **Merge the other tables**) to merge the rest and leave those
-alone.
+primary key, or one with more than 100,000 rows on a side. Its counts read 0,
+because which rows changed is not known; `rowCounts` gives each side's row
+count. A table like that which only the parent changed — the branch wrote none
+of its rows, and the ones from before the fork are the same — is not blocked.
+Pass `skipBlocked` (in Studio, tick **Merge the other tables**) to merge the
+rest and leave those alone.
+
+A table rewritten since the branch was made is blocked too (`TABLE_REWRITTEN`).
+A column type change, an `ADD COLUMN` with a volatile default, `VACUUM FULL` or
+`CLUSTER` writes every row anew, so every row reads as written since and which
+side changed what can no longer be told. When the branch changed a column's
+type, merge its rows before applying that change to the parent, or make the
+branch again after it.
 
 Every write happens in one statement on the parent — all of it, or none of it,
 foreign keys checked at its end. A merge carries the `fingerprint` of the diff
@@ -34014,8 +34466,8 @@ use it.
 When it is not, take one step down. Every part of that call is a public piece
 you can call yourself: build the backend, then mount all of it or only the
 route groups you want, at the paths you want, and decide which process starts
-the timers. The last section goes one step further and embeds the Postgres
-driver alone in an Express app.
+the timers. [Embedding the Postgres Driver](/docs/backend/embedding-postgres-driver/)
+goes one step further and opens the Postgres driver alone in an Express app.
 
 ### Environment Configuration
 
@@ -34086,7 +34538,12 @@ exported.
 import { createRebaseBackend, installUnhandledRejectionHandler, setDefaultBackend } from "@rebasepro/server";
 
 installUnhandledRejectionHandler();
-const backend = await createRebaseBackend({ ...options, provision: true });
+const backend = await createRebaseBackend({
+    ...options,
+    // `false` or `{ collections: false, realtime: false }` in the cases
+    // the `provision` section below lists.
+    provision: true
+});
 setDefaultBackend(backend);
 backend.mount(app, { basePath: "/api" });
 await backend.attachRealtime(server);
@@ -34289,6 +34746,12 @@ parameterised path such as `/:tenant/data` too. A group also reads where it was
 mounted, so the data API still routes each collection to its data source and
 the functions listing names the paths it is really served at.
 
+A group also refuses `x-rebase-impersonate` and `x-rebase-simulate-*` itself
+(`400 IMPERSONATION_UNSUPPORTED` / `SIMULATION_UNSUPPORTED`), unless it is the
+data or functions group, which honour them; on 0.25 a group mounted alone
+answered as the administrator. `refuseUnhonouredImpersonation(honouredMounts)`
+from `@rebasepro/server` does the same for routes of your own.
+
 What a group does not carry is the process-wide middleware `mount()` puts in
 front of everything. Mounting groups one by one, add what you want of it
 yourself: a body limit (`bodyLimit` from `hono/body-limit`), compression, and
@@ -34356,6 +34819,14 @@ app.route("/b/data", b.routes.data());   // a session from `a` is a 401 here
 A backend given no `auth.jwtSecret`, such as one whose `auth` is an adapter,
 signs nothing of its own, so its `services.jwt` follows the process default.
 
+**Resources are the process's.** The `database()`, `bucket()`, `topic()` and
+`queue()` declarations in `config/resources.ts` are module-level values, and
+every backend in the process reads all of them: a backend whose own project
+declares no topic still turns its job queue on for another project's topic,
+and refuses to boot if its driver cannot carry one. Run one project's
+resources per process. Several backends of that one project, each on its own
+database, are fine.
+
 **Where `rebase` goes.** Inside a request, a cron run or a job that a backend
 serves, `rebase`, whether imported from `@rebasepro/server` or received as
 `ctx.rebase`, is that backend, and so are topic `publish` and queue `enqueue`.
@@ -34419,17 +34890,66 @@ deadlocks. A backend from `createRebaseBackend` closes a server only when you
 pass it, `backend.shutdown(timeoutMs, { server })`, as in the example at the
 top of this page.
 
-### Embedding the Postgres driver in Express
+### Embedding the Postgres driver
 
-One step further down, `@rebasepro/server-postgres` works without the Rebase server at all. It depends on Drizzle and Node's `http.Server`, so you can open the data driver and the realtime socket inside Express, Fastify or plain Node. At this level you assemble the backend yourself: there are no auth routes, no storage and no admin API unless you build them.
+One step further down, `@rebasepro/server-postgres` works without the Rebase
+server at all: open its data driver and realtime socket inside Express, Fastify
+or plain Node, and assemble the rest yourself. See
+[Embedding the Postgres Driver](/docs/backend/embedding-postgres-driver/).
 
-#### 1. Installation
+### CORS for a browser frontend
+
+A custom server owns its CORS config, and a frontend on another origin can read
+only the response headers it exposes. Expose the ones the SDK reads, or
+`etagOf(row)` is always `undefined` there — an `ifMatch` write then goes out
+with no `If-Match` — and a 429 loses its `Retry-After`:
+
+```typescript
+import express from "express";
+import cors from "cors";
+import { CORS_EXPOSED_HEADERS } from "@rebasepro/server";
+
+const app = express();
+app.use(cors({
+    origin: ["https://app.example.com"],
+    credentials: true,
+    exposedHeaders: [...CORS_EXPOSED_HEADERS]
+}));
+```
+
+`CORS_EXPOSED_HEADERS` is the list the runtime itself exposes, so a
+header the SDK starts reading in a later version reaches your frontend without
+a change here. It is `ETag`, `Retry-After`, `X-Request-ID`, the three
+`X-RateLimit-*` headers and `Preference-Applied`, plus `Location`,
+`Upload-Offset` and `Rebase-Upload-Result`, which a resumable upload (files over
+8 MiB) answers in, and `X-Rebase-Simulated-Context`, which names what an
+administrator's simulated request ran as. Without the three upload headers the
+SDK cannot follow an upload from another origin, and sends every file as one
+multipart request instead. On 0.24,
+write the list out by hand.
+
+The Rebase runtime and the ejected backend send this list already. On 0.23
+they expose none of these headers, so a frontend on another origin reads no `ETag`.
+
+### Related
+
+- [Embedding the Postgres Driver](/docs/backend/embedding-postgres-driver/) — the data driver and realtime socket alone, in Express
+- [Scripts and the Console](/docs/backend/scripts/) — the project's data from a script, a test or a REPL, with no server
+- [Backend Overview](/docs/backend/) — where each option lives when the runtime boots instead
+- [Split Processes](/docs/deployment/split-processes/) — the roles a custom server has to reproduce
+- [Storage Configuration](/docs/backend/storage/) — the sources a custom server must resolve itself
+
+## Embedding the Postgres Driver
+
+One step below a [custom server](/docs/backend/custom-server/), `@rebasepro/server-postgres` works without the Rebase server at all. It depends on Drizzle and Node's `http.Server`, so you can open the data driver and the realtime socket inside Express, Fastify or plain Node. At this level you assemble the backend yourself: there are no auth routes, no storage and no admin API unless you build them.
+
+### Installation
 
 ```bash
 npm install @rebasepro/server-postgres @rebasepro/types express pg drizzle-orm
 ```
 
-#### 2. Opening the driver and the socket
+### Opening the driver and the socket
 
 `openPostgresDriver`
 and `postgresDriverConfigFromEnv` are exported. On 0.24, open the driver with
@@ -34537,60 +35057,21 @@ startServer();
 
 It creates no collection table, so against a database without one `POST /api/products` answers `500` "Table not found for collection 'products'". Create the tables first. `rebase db push` does it from a Rebase project whose `config/collections` declares them. In this server, `await createPostgresAdapter(pgConfig).ensureCollectionSchema?.(collections)` before `openPostgresDriver` adds the tables and columns the database lacks, as the Rebase server's boot does, and changes nothing that exists.
 
----
-
-### Key Backend Concepts
-
-#### Read Replica Connections
+### Read Replica Connections
 Set `readConnectionString` on the driver config, or the `DATABASE_READ_URL` environment variable, which the server's boot and `postgresDriverConfigFromEnv` read into it, and the driver opens a second connection pool against your read replica, under `internals.readDb`. Reads go to the replica; writes stay on the primary.
 
 The `readConnectionString` option is honoured. On 0.24 it was declared and ignored, and only `DATABASE_READ_URL` worked.
 
-#### Drizzle Integration
+### Drizzle Integration
 You do not have to choose between Rebase and Drizzle. The driver compiles your schemas dynamically, and `internals.db` is the Drizzle `NodePgDatabase` client, typed, for raw SQL or type-safe Drizzle builders alongside Rebase's REST services.
 
-#### Graceful Connection Draining
+### Graceful Connection Draining
 In serverless environments or orchestrators (like Kubernetes), terminating pods can result in broken connections. Always implement signal handlers that call `internals.realtimeService.stopListening()` (which ends the dedicated pg LISTEN client) and `pool.end()`, so you do not leak connection slots on your database server.
-
-#### CORS for a browser frontend
-A custom server owns its CORS config, and a frontend on another origin can read
-only the response headers it exposes. Expose the ones the SDK reads, or
-`etagOf(row)` is always `undefined` there — an `ifMatch` write then goes out
-with no `If-Match` — and a 429 loses its `Retry-After`:
-
-```typescript
-import express from "express";
-import cors from "cors";
-import { CORS_EXPOSED_HEADERS } from "@rebasepro/server";
-
-const app = express();
-app.use(cors({
-    origin: ["https://app.example.com"],
-    credentials: true,
-    exposedHeaders: [...CORS_EXPOSED_HEADERS]
-}));
-```
-
-`CORS_EXPOSED_HEADERS` is the list the runtime itself exposes, so a
-header the SDK starts reading in a later version reaches your frontend without
-a change here. It is `ETag`, `Retry-After`, `X-Request-ID`, the three
-`X-RateLimit-*` headers and `Preference-Applied`, plus `Location`,
-`Upload-Offset` and `Rebase-Upload-Result`, which a resumable upload (files over
-8 MiB) answers in, and `X-Rebase-Simulated-Context`, which names what an
-administrator's simulated request ran as. Without the three upload headers the
-SDK cannot follow an upload from another origin, and sends every file as one
-multipart request instead. On 0.24,
-write the list out by hand.
-
-The Rebase runtime and the ejected backend send this list already. On 0.23
-they expose none of these headers, so a frontend on another origin reads no `ETag`.
 
 ### Related
 
+- [Custom Server Integration](/docs/backend/custom-server/) — the whole Rebase backend, built from public pieces in your own server
 - [Scripts and the Console](/docs/backend/scripts/) — the project's data from a script, a test or a REPL, with no server
-- [Backend Overview](/docs/backend/) — where each option lives when the runtime boots instead
-- [Split Processes](/docs/deployment/split-processes/) — the roles a custom server has to reproduce
-- [Storage Configuration](/docs/backend/storage/) — the sources a custom server must resolve itself
 
 ## Scripts and the Console
 
@@ -34720,7 +35201,7 @@ DATABASE_URL="$(pnpm exec rebase db url)" pnpm exec tsx scripts/publish-drafts.t
 | Member | What it does |
 |---|---|
 | `dataAsAdmin` | Every collection, read and written as the server's service identity (`{ uid: "service", roles: ["admin"] }`): admin, and still evaluated by your RLS policies, exactly like `rebase.dataAsAdmin` in a function |
-| `sql(query, { params })` | Raw SQL on the owner connection, with the same calling convention as `rebase.sql` in a function |
+| `sql(query, { params })` | Raw SQL on the owner connection, with the same calling convention as `rebase.sql` in a function. It runs on the one data source opened: `{ database }` naming any other is refused |
 | `withAuth(user)` | Resolves to `{ data }`: the collections as that user sees them. Every read and write runs as them, filtered by row-level security, as an HTTP request from that user would be |
 | `collections` | The collections it was opened with |
 | `close()` | Ends the connection pool `openRebase` created. Safe to call twice |
@@ -34734,6 +35215,7 @@ Its options:
 | `collections` | The project's collections. An empty array reads them from the database instead, as a server with no collection files does, and serves them read-only |
 | `pool` | Pool settings, with `databaseUrl` |
 | `dataSourceKey` | The data source these collections are served from. Default `(default)` |
+| `callbacks` | The project's global callbacks, the `callbacks` your `config/index.ts` exports. The server runs them ahead of every collection's own hooks; pass them here and a script write runs them too |
 
 `openRebase` reads no environment variable. The `DATABASE_URL` above is read by
 your script, and settings such as `REBASE_DB_POOL_MAX` or `REALTIME_CDC` change
@@ -34858,9 +35340,18 @@ and in its hourly sweep.
 
 #### What it leaves out
 
-`openRebase` opens the data layer and nothing else. It starts no realtime, so
-its writes are not announced to live queries. Storage, email, auth
+`openRebase` opens the data layer and nothing else. It starts no realtime of its
+own, but its writes still reach live queries: the database's change-capture
+triggers announce every write, whoever made it, so subscribers on a running
+server refetch after a backfill too. Only with `REALTIME_CDC=off` on that server
+are they not announced. See
+[Database change capture](/docs/backend/realtime-cdc/). Storage, email, auth
 administration and your functions are not on it.
+
+Collection callbacks run on every write, as on the server. The project's global
+`callbacks` run only when you pass them as the `callbacks` option.
+`rebase console` does not read `config/index.ts`, so a global `beforeSave`
+does not run on its writes.
 
 When a script needs those too, build the backend without serving it:
 `createRebaseBackend({ …, provision: false })` gives you `backend.rebase`, the
@@ -36295,18 +36786,47 @@ To add or remove role options, update the `enum` map in your users collection an
 
 A role in this list is a name your [security rules](/docs/collections/security-rules) can match. What it may do beyond its rows (manage users, read logs, change the schema) is declared separately, under `auth.roles` on the same collection. `admin` is built in and holds everything. See [Roles and scopes](/docs/backend/roles-and-scopes).
 
-### Role Simulation (Dev Mode)
+### Testing access: Simulate access
 
-In developer mode, you can simulate different roles without logging out. This is useful for testing RLS policies:
+To check what a role, a user or a service key can read, an administrator uses
+**Simulate access**, the pill above your avatar in the admin panel's drawer (in
+the app bar on a small screen, or when the shell has no drawer). Pick a role
+(with an optional user id, which need not be an account), a user, or a live
+service key.
+Every data view, and a record's History tab, then reads through the server as
+that identity, against the real row-level security policies: a grid shows
+exactly the rows it can read,
+fields its roles cannot read are masked, and the banner counts the collections
+it sees nothing in. The server checks on every request that you are an
+administrator.
+
+Simulated access is read-only. While it is on, the views offer no create, edit,
+delete or history revert, and the server refuses any write that carries a simulation with
+`403 SIMULATION_READ_ONLY`, so nothing is saved as someone else. Stop simulating
+to make changes.
+
+What it does not simulate: the data API's `requireAuth` gate, which lets a
+simulated anonymous caller past so you see what the rows' policies give it
+(a custom function sees it as no session, as a real anonymous caller is);
+storage, whose files are read as you, with uploads off while simulating; and
+live updates, which pause until you stop.
+
+The same thing from code, on the SDK, is `client.simulate()`. It derives a
+client whose requests carry the simulation, and only an administrator's own
+session may use it:
 
 ```typescript
-import { useBuildEffectiveRoleController } from "@rebasepro/app";
-
-const effectiveRoleController = useBuildEffectiveRoleController();
-
-// When active, the UI behaves as if the current user has this role
-effectiveRoleController.setEffectiveRole("editor");
+const asCustomer = client.simulate({ role: "customer", userId: "u_1" });
+const { data } = await asCustomer.data.collection("tickets").find();
+asCustomer.close();
 ```
+
+The derived client is typed by the same `Database` as the one it came from, and
+is a client of its own: `close()` it when you are done.
+
+The effective-role switch (`useBuildEffectiveRoleController`) is not an RLS
+tester: it only changes which Studio views the navigation lists, sends nothing
+to the server, and evaluates no policy.
 
 ### Next Steps
 
@@ -36898,8 +37418,9 @@ The entity form is generated from your properties:
   neighbouring fields with the same small editor — two numbers, two switches,
   two dates of the same mode, two selects with short options — share a row
 
-A field with a long label, help text over 60 characters, `conditions` or a
-custom `Field` is never paired, and neither is any free-text string: nothing in
+A field with a long label, help text over 60 characters, `conditions`, a
+field-level `access` rule or `excludeFromApi` (the form renders nothing for a
+user who may not read it), or a custom `Field` is never paired, and neither is any free-text string: nothing in
 a schema tells a short branch name from a long URL. The form never looks at
 which property is the title. Any other columns are something the collection asks
 for, field by field, with `admin.span` — set from what each field holds, as
@@ -37909,7 +38430,9 @@ one. Another plugin can give markdown fields a controller the same way, with
 
 :::caution[This one sends data off your machine]
 Autofill posts the entity's field values to a hosted service to generate a
-suggestion. By default that service is **`https://app.rebase.pro/api/functions/ai`**,
+suggestion: the values of declared properties only, never of a read-only,
+disabled or hidden one, one with `dynamicProps`, or a column the collection does
+not declare. By default that service is **`https://app.rebase.pro/api/functions/ai`**,
 which Rebase runs — free to use, no configuration, and no credential attached:
 the requests are anonymous, bounded by rate limit rather than by identity. Your
 JWT is not sent. The editor's slash autocomplete posts text too: up to 8,000
@@ -38490,7 +39013,11 @@ function EditForm() {
 
 ### `useEffectiveRoleController`
 
-Switch roles at runtime to preview permissions and test Row-Level Security (RLS) policies locally without signing out.
+Switch the role the admin panel's navigation is built for, without signing out:
+which Studio views it lists. It sends nothing to the server and evaluates no
+row-level security policy, so a data view still shows what you can read. To
+test RLS, use **Simulate access** (above your avatar in the drawer), or `client.simulate()` from
+code; see [Testing access](/docs/frontend/authentication/#testing-access-simulate-access).
 
 ```typescript
 import { useEffectiveRoleController } from "@rebasepro/app";
@@ -38646,7 +39173,7 @@ open costs nothing.
 
 | Tab | Slug | Group | What it does |
 |-----|------|-------|--------------|
-| SQL Console | `sql` | Database | Run raw SQL against your PostgreSQL database and read results in a table. The table shows the last statement's result, up to its first 10,000 rows or 32 MB of values; a longer result says how many rows there were, and copy and export include only the rows shown. Such a result also offers **Download full result as CSV**: the server streams the whole of it through a read-only cursor (`POST /api/admin/sql/csv`), one query at a time, on a Postgres server of your own rather than the in-process development database. Values are the database's text, as psql shows them, and **Export JSON** writes them so; **Export typed JSON** writes each value read by its column's type — integers and numerics a JSON number holds exactly, booleans, `json`/`jsonb` as JSON — and keeps every other value as text. While a run is in flight, **Cancel run** gives the console back at once; a server that takes the socket's `CANCEL_SQL` frame (it lists `cancel_sql` in the `hello` it answers the socket with) also stops the statement with `pg_cancel_backend`. The in-process development database cannot be interrupted, and an older server is left to finish the statement within its `statement_timeout` |
+| SQL Console | `sql` | Database | Run raw SQL against your PostgreSQL database and read results in a table. The table shows the last statement's result, up to its first 10,000 rows or 32 MB of values; a longer result says how many rows there were, and copy and export include only the rows shown. Such a result also offers **Download full result as CSV**: the server streams the whole of it through a read-only cursor (`POST /api/admin/sql/csv`), one query at a time, on a Postgres server of your own rather than the in-process development database. Values are the database's text, as psql shows them, and **Export JSON** writes them so; **Export typed JSON** writes each value read by its column's type — integers and numerics a JSON number holds exactly, booleans, `json`/`jsonb` as JSON — and keeps every other value as text. In every CSV (export, copy and the full download), a value a spreadsheet would run as a formula (one starting with `=`, `+`, `-`, `@`, a tab or a carriage return, other than a signed number) is written with a leading `'`, as the collection export writes it. While a run is in flight, **Cancel run** gives the console back at once; a server that takes the socket's `CANCEL_SQL` frame (it lists `cancel_sql` in the `hello` it answers the socket with) also stops the statement with `pg_cancel_backend`. The in-process development database cannot be interrupted, and an older server is left to finish the statement within its `statement_timeout` |
 | RLS Policies | `rls` | Database | Inspect and manage Row Level Security policies for your tables. A policy is listed as the database holds it, badged **Differs from code** where that is not what the project declares. A policy Rebase generates cannot be edited straight in the database, and on a table Rebase manages a banner says that each server start and `rebase db push` re-apply the declared policies |
 | Schema Visualizer | `schema-visualizer` | Database | Entity diagram of your collections and their relations, drawn from the collection definitions: tables, columns, types and relations are as the collections declare them. Only the RLS markers are read from the database. The layout runs in a web worker, so the page stays responsive while a large diagram is arranged. A schema of more than 300 tables is drawn one table's neighbourhood at a time — the tables one or two relations away — starting from the most connected table; pick another table in the list to move |
 | Branches | `branches` | Database | Create and manage [database branches](/docs/backend/branching), and review one like a pull request: its schema and RLS policy changes side by side, the rows it inserted, updated and deleted, and a merge into the database it was made from that says what wins first — see [Reviewing and merging a branch](/docs/backend/branching/#reviewing-and-merging-a-branch) |
@@ -44270,7 +44797,7 @@ A few names on `client.data` are taken: `collection` is the dynamic `collection(
 
 A property key *you* wrote is your key, whatever its shape — nothing renames a name you chose. The two keys that are derived rather than declared, a relation's foreign key and a column read back by introspection, are camelCase.
 
-`Row` describes a read, `Insert` a `create()` and `Update` an `update()` — they are not the same shape. A column that is not required is `T | null` on all three, so a write can clear it; the primary key is always present on a read and never settable on an update; a `belongsTo` target can be written either as the relation (`{ author: 5 }`) or as its foreign key (`{ authorId: 5 }`); and a `hasMany` or `manyToMany` membership is written as a list of target ids or `{ id }` objects (`{ tags: ["t-1"] }`), each carrying a `_pivot` when the junction declares payload columns. A field nobody may write (`access: { write: [] }`) is on neither `Insert` nor `Update`. A `date` column reads as an ISO string, and a write takes either that string or a `Date`.
+`Row` describes a read, `Insert` a `create()` and `Update` an `update()` — they are not the same shape. A column that is not required is `T | null` on all three, so a write can clear it; the primary key is always present on a read and never settable on an update; a `belongsTo` target can be written either as the relation (`{ author: 5 }`) or as its foreign key (`{ authorId: 5 }`), and a required one is satisfied by either; a `hasOne` is written by naming the target row (`{ profile: 9 }`), or `null` to unlink it; a single-hop `via` is written as the kind it stands in for (to-one: the target's id or `null`; to-many: a list of ids), and a multi-hop one is read-only and on neither; and a `hasMany` or `manyToMany` membership is written as a list of target ids or `{ id }` objects (`{ tags: ["t-1"] }`), each carrying a `_pivot` when the junction declares payload columns. A field nobody may write (`access: { write: [] }`) is on neither `Insert` nor `Update`. A `date` column reads as an ISO string, and a write takes either that string or a `Date`.
 
 ### Quick Example
 
@@ -47421,7 +47948,7 @@ A row someone else deleted is the one case that is not rolled back. A queued `de
 
 The cascade is narrow: an `update` is discarded along with the write it edited, because it can only fail the same way. A later `create` or `delete` for the same row stands on its own and is kept. A refused `create` of a row created offline also takes with it every queued write, in any collection, whose values reference the row's temporary id. A discarded write was never sent. It is reported with a `RebaseApiError` whose `code` is `DEPENDENCY_REJECTED` and whose `cause` is the refusal that doomed it, so you can tell it from the write the server actually refused. On 0.23 it carries the refused write's own error instead.
 
-Consecutive edits to one row while offline are merged into a single queued write, so a form being typed into does not grow the queue. If the server refuses the merged write over its contents (a 400, 403 or 422 — say, a field removed by a schema change while the user was offline), the engine splits it back into the separate edits and replays each one. Only the edit the server refuses is rolled back and reported; the others are kept.
+Consecutive edits to one row while offline are merged into a single queued write, so a form being typed into does not grow the queue. A write the queue has started sending is not merged into: an edit made after a replay attempt whose answer was lost queues as an update of its own, and a delete of a row created offline is sent rather than cancelled against its create, since the server may already hold the row. If the server refuses the merged write over its contents (a 400, 403 or 422 — say, a field removed by a schema change while the user was offline), the engine splits it back into the separate edits and replays each one. Only the edit the server refuses is rolled back and reported; the others are kept.
 
 #### Conflicts
 
@@ -47444,7 +47971,7 @@ const client = createRebaseClient({
 
 The queue waits while `onConflict` runs, so it can ask the user. If it throws, the edit is overwritten.
 
-The version an edit is made against is the one the row's last read reported: `findById()`, a `listenById()` frame, or the answer to an earlier `update()`. A row last read in a `find()` or `listen()` list has no version, and neither has an edit made on top of another queued write to the same row. Those replay without a precondition. An `ifMatch` you pass to `update()` yourself is kept when the edit queues.
+The version an edit is made against is the one the row's last read reported: `findById()`, a `listenById()` frame, or the answer to an earlier `update()`. A row last read in a `find()` or `listen()` list has no version, and neither has an edit made on top of another queued write to the same row. Those replay without a precondition. An `ifMatch` you pass to `update()` or `delete()` yourself is kept when the write queues, with or without `onConflict`, and `findById()` on an offline-enabled client returns the row with its version, so `etagOf(row)` works as it does online. Without `onConflict`, a queued write refused over your own `ifMatch` is rolled back and reported to `onSyncError` with a 412 `PRECONDITION_FAILED`.
 
 A failure that is merely temporary — a 429, a 503, a dropped connection — is not a rejection. Those stay queued and are retried; only after `maxRetries` deferrals does a write get rolled back.
 
@@ -47818,7 +48345,7 @@ problems. It is worth knowing which one you are reaching for:
 
 | | What it is | Who consumes it |
 |---|---|---|
-| [**MCP server**](/docs/ai/mcp) | A stdio Model Context Protocol server with 44 tools over your schema, data, users, storage, cron and dev server | An assistant, at runtime |
+| [**MCP server**](/docs/ai/mcp) | A stdio Model Context Protocol server with 51 tools over your schema, data, users, storage, cron, dev server and Rebase Cloud project | An assistant, at runtime |
 | [**Agent skills**](/docs/ai/skills) | 23 Markdown skill files written into your repo by `rebase skills install` | An assistant, as reference material |
 | [**Instruction files**](/docs/ai/instruction-files) | `ai-instructions.md` plus per-assistant pointer files, written by `rebase init` | An assistant, as always-on rules |
 | [**API keys**](/docs/backend/api-keys) | Machine credentials holding [scopes](/docs/backend/roles-and-scopes), per collection and per operation | Anything calling the HTTP API |
@@ -47920,7 +48447,7 @@ shows you the config block.
 
 A deployed backend can also serve MCP itself, over HTTP, to the people who use
 your application. That is a different thing with a different credential model:
-see [The remote endpoint](#the-remote-endpoint).
+see [The Remote MCP Endpoint](/docs/ai/remote-mcp/).
 
 ### Connecting a client
 
@@ -48069,10 +48596,18 @@ only switch in the package opts *in* to more reach rather than less.
 
 Which credential that is, in priority order:
 
-1. `REBASE_API_TOKEN` / `REBASE_TOKEN` from the environment
+1. `REBASE_API_TOKEN` from the environment. `REBASE_TOKEN` is not read here:
+   it is the CLI's control-plane token, and it is never sent to the app (the
+   server says so once on stderr when it is the only one set). The cloud tools
+   still pass it to the CLI they spawn, which sends it to the control plane.
 2. `REBASE_SERVICE_KEY` read out of the project's `.env`
 3. The service key auto-discovered from `.rebase/state.json` while `rebase dev`
    is running
+
+2 and 3 are this machine's dev backend's key, used only when the target is on
+loopback. When `REBASE_BASE_URL` points elsewhere — <span class="since-badge" data-since="0.26">Since 0.26</span> `rebase cloud init --claim`
+writes the cloud project's address, and no `REBASE_API_TOKEN` until a deploy
+succeeds — the server sends no token and says so once on stderr.
 
 A token you register for a project **wins over auto-discovery**. Discovery only
 fills a gap.
@@ -48202,9 +48737,15 @@ gated, so a tool added later arrives protected by default.
   `rebase_db_branch_list`, `rebase_db_branch_info`, `rebase_db_branch_diff`, `list_documents`,
   `get_document`, `list_users`, `list_roles`, `storage_list_objects`,
   `storage_get_download_url`, `cron_list_jobs`, `cron_get_job`, `cron_get_job_logs`,
-  `rebase_dev_logs`.
-- **Not gated — local only:** `rebase_schema_introspect`, `rebase_schema_generate`, `rebase_db_generate`,
-  `rebase_generate_sdk`, `rebase_db_branch_switch`, the dev-server tools and the project-registry tools.
+  `rebase_dev_logs`, and <span class="since-badge" data-since="0.26">Since 0.26</span> the Rebase Cloud reads `rebase_cloud_status`,
+  `rebase_cloud_logs`, `rebase_cloud_env_list`, `rebase_cloud_deployments_list`.
+- **Not gated — Rebase Cloud writes:** `rebase_cloud_provision`,
+  `rebase_cloud_deploy`, `rebase_cloud_env_set`, `rebase_cloud_rollback`.
+  Provisioning creates a project; the others change a production project. None
+  of them goes through `baseUrl` or `DATABASE_URL`, which are all the gate can
+  check. See [Rebase Cloud](#rebase-cloud) for what stands in front of them.
+- **Not gated — local only:** `rebase_schema_introspect`, `rebase_db_branch_switch`, `rebase_schema_generate`, `rebase_db_generate`,
+  `rebase_generate_sdk`, the dev-server tools and the project-registry tools.
   These write local files or local state and have no remote target to check.
 - **Gated against `DATABASE_URL`:** the remaining CLI tools — `rebase_db_push`,
   `rebase_db_migrate`, `rebase_db_branch_create`, `rebase_db_branch_delete`.
@@ -48212,8 +48753,7 @@ gated, so a tool added later arrives protected by default.
   `create_document`, `update_document`, `delete_document`, `create_user`,
   `update_user`, `delete_user`, `rebase_auth_reset_password`,
   `storage_delete_object`, `cron_trigger_job`, `cron_toggle_job`,
-  `invoke_function` — and `rebase_cloud_provision`, which spawns `rebase cloud`
-  but is checked against `baseUrl` too.
+  and `invoke_function`.
 
 The two targets are not interchangeable. CLI tools never see `baseUrl`, so a
 localhost backend sitting next to a production `DATABASE_URL` is checked against
@@ -48276,7 +48816,7 @@ shaped like a marker is broken with a zero-width space, so a row that prints
 `<<<END_UNTRUSTED_DATA>>>` cannot end the envelope early and put what follows it
 outside.
 
-The [remote endpoint](#the-remote-endpoint) fences its tool results the same
+The [remote endpoint](/docs/ai/remote-mcp/) fences its tool results the same
 way and says so to the client; its `structuredContent` carries the plain result.
 `list_collections` and
 `describe_collection` are the exceptions: only a model reads them, so they are
@@ -48318,9 +48858,88 @@ Tokens are stored in that registry **in plaintext**. It is a file in your home
 directory holding admin credentials for every project you have registered; treat
 it accordingly.
 
+### Rebase Cloud
+
+<span class="since-badge" data-since="0.26">Since 0.26</span>
+
+Eight tools take an app from this directory to a live backend on
+[Rebase Cloud](/docs/deployment/cloud/) and keep it running. Each one spawns
+`rebase cloud <command> --json` in the active project directory: the same
+command a person runs, so there is no second implementation to drift from it.
+
+| Tool | Runs | Changes the project |
+|---|---|---|
+| `rebase_cloud_provision` | `rebase cloud init --claim` | Creates one, with no account |
+| `rebase_cloud_status` | `rebase cloud status` | No |
+| `rebase_cloud_deploy` | `rebase cloud deploy` | Yes |
+| `rebase_cloud_logs` | `rebase cloud logs [--runtime]` | No |
+| `rebase_cloud_env_list` | `rebase cloud env list` | No |
+| `rebase_cloud_env_set` | `rebase cloud env set KEY --stdin` | Yes, from the next deploy |
+| `rebase_cloud_deployments_list` | `rebase cloud deployments list` | No |
+| `rebase_cloud_rollback` | `rebase cloud rollback --yes` | Yes |
+
+The usual agent journey is: `rebase_cloud_provision`, then give the user the
+claim URL; `rebase_cloud_status` to see the project (while it is unclaimed,
+`unclaimed` carries the claim URL and when it is deleted); `rebase_cloud_deploy`
+after a change; `rebase_cloud_logs` when something misbehaves; and
+`rebase_cloud_rollback` when production is broken.
+
+**What they act on.** The project the active directory is linked to in
+`.rebase/cloud.json`. None of them takes a project id or a directory, so an
+assistant cannot point them at another project than the one the directory is
+linked to. Switching the active project with `rebase_project_switch` switches
+the directory they run in.
+
+**Whose authority.** Whatever the CLI resolves in that directory: `REBASE_TOKEN`
+when it is set, then the token `rebase cloud init --claim` stored for an
+unclaimed project, then the `rebase cloud login` session. The control plane
+checks each call as it checks the CLI's, so with a token made by
+`rebase cloud tokens create --can logs` an assistant can read logs, and the
+control plane refuses its deploys, variables and rollbacks. No credential, or a refused one, comes back as an error that says what the
+user has to do (`rebase cloud login`, or claiming the project).
+
+**Why the loopback gate does not apply.** The gate checks the app's `baseUrl` and
+the CLI's `DATABASE_URL`; these tools use neither. After `rebase_cloud_provision`,
+`REBASE_BASE_URL` points at the new cloud project, so gating on it would refuse
+the very deploy the journey needs. Provisioning itself only creates: it touches
+no existing app or database, and the CLI still refuses it in a directory that
+is already linked. A deploy, a variable and a rollback each
+change production. What stands in front of them is the credential above and
+your MCP client's tool approval. To keep an assistant from changing a cloud
+project, set `REBASE_TOKEN` in the server's environment to a token without the
+`deploy` and `env` capabilities.
+
+Each tool is a snapshot:
+
+- `rebase_cloud_logs` never follows. Its result carries `nextSinceTime`; pass it
+  back as `since` to read what came after. It returns the last 200 lines unless
+  `tail` says otherwise. `source: "build"` returns the latest build log instead.
+- `rebase_cloud_deploy` follows the deployment to the end and checks that the new
+  version answers. `wait: false` returns as soon as the deployment is triggered.
+  It never ejects a project from the managed runtime, deploys an older framework
+  release, or skips the build checks: those are the user's decisions, and a
+  refusal that needs one says so.
+- `rebase_cloud_rollback` passes `--yes`. The tool call is the confirmation, since
+  there is no terminal to ask at.
+
+`rebase_cloud_env_set` writes the value to the CLI's standard input, so it is
+never on a command line where `ps` would show it, and the value is cut out of
+anything the tool returns. Its result says what was stored (the key, whether it
+is secret, whether a redeploy is pending), never the value. `rebase_cloud_env_list`
+lists keys only. A CLI older than `env set --stdin` is refused with a message to
+upgrade it; the value is not sent another way.
+
+Results come back in the [untrusted-data envelope](#untrusted-data-marking),
+behind one line from the server on what to do next. A refusal is a tool error
+that carries the CLI's code, such as `no_project`, `token_rejected`,
+`managed_project` or `deploy_failed`. When the server recognises the code, it
+adds the next step, then the CLI's own message. Every tool checks its arguments
+against the schema it advertises before anything is spawned, and refuses an
+argument it does not declare.
+
 ### Tool reference
 
-44 tools, in ten groups: schema and database, schema planning, documents, users
+51 tools, in ten groups: schema and database, schema planning, documents, users
 and roles, storage, cron, functions, the dev server, the project registry and
 Rebase Cloud.
 Each one, with what it needs and whether the gate refuses it against a non-local
@@ -48349,75 +48968,10 @@ see the resource offered.
 
 ### The remote endpoint
 
-Everything above is a developer tool: it runs on your machine and holds a service
-key or an API key. A deployed backend can also serve MCP itself, at `/mcp`, for
-the people who use your application. An assistant one of them connects reads and
-writes the project **as that person**, and every call runs under their own
-row-level security.
-
-It is off unless you turn it on, and both variables are required:
-
-```bash
-REBASE_MCP_ENABLED=true
-REBASE_PUBLIC_URL=https://app.example.com   # this deployment's real origin
-```
-
-Without `REBASE_PUBLIC_URL`, a JWT secret, or a data driver that can scope a query
-to one user, the endpoint declines to mount and says why in the boot log. No
-`REBASE_ROLE` turns it on.
-
-- **OAuth, with a consent screen.** A client finds the authorization server
-  through `/.well-known/oauth-protected-resource`, registers itself (dynamic
-  registration is on by default; `REBASE_MCP_OPEN_REGISTRATION=false` limits it
-  to clients you register), and sends the person to a consent screen that signs
-  them in through your existing `/auth/login`.
-- **Eight tools, three scopes.** The same [scopes](/docs/backend/roles-and-scopes/)
-  every credential uses. `data:read` offers `list_collections`, `describe_collection`,
-  `query_collection`, `count_documents` and `get_document`; `data:write` adds `create_document` and
-  `update_document`; `data:delete` adds `delete_document`. A client that asks for
-  nothing gets `data:read`. Each one narrows to a collection: `data:read:posts`
-  lists, describes and reads `posts` and nothing else. A scope decides which tools are
-  offered and which collections they reach, not which rows: an empty list can be
-  RLS working, and `data:write` still cannot write a row the person could not.
-- **Grants made before 0.24 keep their reach.** `mcp:read` is read as
-  `data:read`, and `mcp:write` as `data:write data:delete`, on stored grants and
-  on tokens already issued.
-- **An API key works too.** `/mcp` also accepts `Authorization: Bearer rk_…`, for
-  a client configured with a header rather than an OAuth flow. The key reaches
-  the tools its `data:*` scopes cover, as whoever it acts as: a
-  [personal key](/docs/backend/api-keys/#personal-keys) as its owner, a service key
-  as `api-key:<id>`.
-- **The SDK's vocabulary, REST's answers.** The tools take what the SDK takes —
-  `where` (`{"status": ["==", "paid"]}`), `orderBy` (`["created_at", "desc"]` or
-  `"created_at:desc"`), `limit`, `offset`, `searchString`, and `data` for a
-  write — and read through `GET /api/data/<collection>`'s path, so a row comes
-  back as REST serves it (ISO dates, a `belongsTo` as its foreign key, e.g.
-  `authorId`) and can be sent back in an update unchanged. `query_collection`
-  answers `{ data, meta }` with `meta.total` and `meta.hasMore`, and `count_documents`
-  `{ count }`. As on REST, a `limit` above 1000, an undeclared argument and an
-  edit or delete of a trashed row (404) are refused; setting the soft-delete
-  field to `null` restores it.
-- **The listing names the collections; `describe_collection` gives one's schema.**
-  `list_collections` answers each collection's `name`, `title` and `description`,
-  and `describe_collection { collection }` that collection's OpenAPI `row` and
-  `create` schemas, plus `softDeleteField` where rows go to a trash. The tool
-  descriptions tell the model to describe a collection before writing to it. A
-  200-collection project's listing is about 5k tokens, and each description
-  under 1k; with every schema in the listing it was about 150k.
-- **A token for this endpoint only.** An MCP access token is refused by
-  `/api/data`, `/api/admin` and the WebSocket, so connecting an assistant does not
-  hand it a session.
-
-One limit. Disconnecting a client (`DELETE /api/oauth/grants/:clientId`, with the
-person's own session) revokes its refresh tokens at once, but an access token
-already issued keeps working until it expires, within the hour. The same hour
-bounds everything else: every refresh re-reads the person's roles, and refuses
-an account that was deleted or a grant older than its last "sign out everywhere"
-or password change. So a demotion or a sign-out reaches a connected client
-within one access-token lifetime. A guest session cannot consent at all.
-
-The routes are in [Endpoints](/docs/backend/endpoints/#mcp-surface) and the
-variables in [Configuration](/docs/getting-started/configuration/#mcp-surface).
+A deployed backend can also serve MCP itself, at `/mcp`, to the people who use
+your application, each connecting as themselves under their own row-level
+security. That has its own page:
+[The Remote MCP Endpoint](/docs/ai/remote-mcp/).
 
 ### Recommended setup
 
@@ -48435,7 +48989,7 @@ The tools [`@rebasepro/mcp`](/docs/ai/mcp) offers an assistant. How it connects,
 which credential it holds and how the [loopback gate](/docs/ai/mcp#the-loopback-gate)
 decides what ⚠ means are on the [MCP server](/docs/ai/mcp) page.
 
-44 tools, in ten groups. Tools marked ⚠ are refused against non-local targets
+51 tools, in ten groups. Tools marked ⚠ are refused against non-local targets
 unless you opt out.
 
 ### Schema & database (13)
@@ -48550,13 +49104,112 @@ rather than acting on a target itself. An assistant can therefore switch to a
 remote project without tripping the gate — it just cannot then run a destructive
 tool there.
 
-### Rebase Cloud (1)
+### Rebase Cloud (8)
 
-Spawns `rebase cloud` in the active project directory.
+<span class="since-badge" data-since="0.26">Since 0.26</span>
+
+Spawn `rebase cloud … --json` in the active project directory, against the
+project it is linked to, with the CLI's own credential. See
+[Rebase Cloud](/docs/ai/mcp#rebase-cloud) for what they act on and why none of
+them is gated.
 
 | Tool | Required | Description |
 |---|---|---|
-| `rebase_cloud_provision` ⚠ | — | Provision an unclaimed Rebase Cloud project with no account (`rebase cloud init --claim`), write `REBASE_BASE_URL` and `REBASE_API_TOKEN` into `.env`, and deploy the collections; optional `name`, `deploy` |
+| `rebase_cloud_provision` | — | A live backend with no account (`rebase cloud init --claim`): the live URL, the admin URL and a claim URL (`name`, `deploy`) |
+| `rebase_cloud_status` | — | The linked project's URL, status, last deploy, runtime, database, storage, and its claim URL while unclaimed |
+| `rebase_cloud_deploy` | — | Deploy and follow it to the end (`app`, `bundle`, `message`, `wait`, `timeoutSeconds`, `preview`, `previewName`) |
+| `rebase_cloud_logs` | — | One snapshot of the runtime log, or the latest build log (`source`, `since`, `tail`, `grep`, `level`, `previous`, `preview`). Never follows |
+| `rebase_cloud_env_list` | — | Variable keys, never values (`preview`) |
+| `rebase_cloud_env_set` | `key`, `value` | Set one variable; the value goes through stdin and is never returned (`secret`, `preview`) |
+| `rebase_cloud_deployments_list` | — | Recent deployments, and which ones can be rolled back to (`limit`) |
+| `rebase_cloud_rollback` | — | Put a previous successful deployment back into service (`deploymentId`) |
+
+`rebase_cloud_provision` creates a project and links this directory. It never
+reads the active project's `baseUrl`, so the gate does not check it; the CLI
+refuses it in a directory that is already linked.
+
+## The Remote MCP Endpoint
+
+The [MCP server](/docs/ai/mcp/) is a developer tool: it runs on your machine and holds a service
+key or an API key. A deployed backend can also serve MCP itself, at `/mcp`, for
+the people who use your application. An assistant one of them connects reads and
+writes the project **as that person**, and every call runs under their own
+row-level security.
+
+It is off unless you turn it on, and both variables are required:
+
+```bash
+REBASE_MCP_ENABLED=true
+REBASE_PUBLIC_URL=https://app.example.com   # this deployment's real origin
+```
+
+Without `REBASE_PUBLIC_URL`, a JWT secret, or a data driver that can scope a query
+to one user, the endpoint declines to mount and says why in the boot log. No
+`REBASE_ROLE` turns it on.
+
+- **OAuth, with a consent screen.** A client finds the authorization server
+  through `/.well-known/oauth-protected-resource`, registers itself (dynamic
+  registration is on by default; `REBASE_MCP_OPEN_REGISTRATION=false` limits it
+  to clients you register), and sends the person to a consent screen that signs
+  them in through your existing `/auth/login`. An account with a second factor
+  is then asked for its authenticator code or a recovery code, through the
+  existing `/auth/mfa/challenge` routes. The screen signs in with a password
+  only: someone who has only ever used Google, GitHub or an email link sets one
+  first with `/auth/forgot-password` (your app's "Forgot password"), and the
+  screen tells them so. It also names the host the authorization code is sent
+  to, and says that host is not verified: anyone may register a client under
+  any name, so the host is the part a person can check.
+- **Eight tools, three scopes.** The same [scopes](/docs/backend/roles-and-scopes/)
+  every credential uses. `data:read` offers `list_collections`, `describe_collection`,
+  `query_collection`, `count_documents` and `get_document`; `data:write` adds `create_document` and
+  `update_document`; `data:delete` adds `delete_document`. A client that asks for
+  nothing gets `data:read`. Each one narrows to a collection: `data:read:posts`
+  lists, describes and reads `posts` and nothing else. A scope decides which tools are
+  offered and which collections they reach, not which rows: an empty list can be
+  RLS working, and `data:write` still cannot write a row the person could not.
+- **Grants made before 0.24 keep their reach.** `mcp:read` is read as
+  `data:read`, and `mcp:write` as `data:write data:delete`, on stored grants and
+  on tokens already issued.
+- **An API key works too.** `/mcp` also accepts `Authorization: Bearer rk_…`, for
+  a client configured with a header rather than an OAuth flow. The key reaches
+  the tools its `data:*` scopes cover, as whoever it acts as: a
+  [personal key](/docs/backend/api-keys/#personal-keys) as its owner, a service key
+  as `api-key:<id>`.
+- **The SDK's vocabulary, REST's answers.** The tools take what the SDK takes —
+  `where` (`{"status": ["==", "paid"]}`), `orderBy` (`["created_at", "desc"]` or
+  `"created_at:desc"`), `limit`, `offset`, `searchString`, and `data` for a
+  write — and read through `GET /api/data/<collection>`'s path, so a row comes
+  back as REST serves it (ISO dates, a `belongsTo` as its foreign key, e.g.
+  `authorId`) and can be sent back in an update unchanged. `query_collection`
+  answers `{ data, meta }` with `meta.total` and `meta.hasMore`, and `count_documents`
+  `{ count }`. As on REST, a `limit` above 1000, an undeclared argument and an
+  edit or delete of a trashed row (404) are refused; setting the soft-delete
+  field to `null` restores it. `deleted: "only"` (or `"include"`) on
+  `query_collection` and `count_documents` reads the trash, as REST's
+  `?deleted=` does, so a row `delete_document` trashed can be found again to
+  restore. Its description tells the model the delete is permanent only where
+  the collection has no soft-delete field.
+- **The listing names the collections; `describe_collection` gives one's schema.**
+  `list_collections` answers each collection's `name`, `title` and `description`,
+  and `describe_collection { collection }` that collection's OpenAPI `row` and
+  `create` schemas, plus `softDeleteField` where rows go to a trash. The tool
+  descriptions tell the model to describe a collection before writing to it. A
+  200-collection project's listing is about 5k tokens, and each description
+  under 1k; with every schema in the listing it was about 150k.
+- **A token for this endpoint only.** An MCP access token is refused by
+  `/api/data`, `/api/admin` and the WebSocket, so connecting an assistant does not
+  hand it a session.
+
+One limit. Disconnecting a client (`DELETE /api/oauth/grants/:clientId`, with the
+person's own session) revokes its refresh tokens at once, but an access token
+already issued keeps working until it expires, within the hour. The same hour
+bounds everything else: every refresh re-reads the person's roles, and refuses
+an account that was deleted or a grant older than its last "sign out everywhere"
+or password change. So a demotion or a sign-out reaches a connected client
+within one access-token lifetime. A guest session cannot consent at all.
+
+The routes are in [Endpoints](/docs/backend/endpoints/#mcp-surface) and the
+variables in [Configuration](/docs/getting-started/configuration/#mcp-surface).
 
 ## Agent Skills
 
@@ -49309,6 +49962,7 @@ deployed database.
 rebase verify
 rebase verify --json
 rebase verify --live
+rebase verify --live --database-url postgresql://…
 ```
 
 Whether the collections are safe to ship, in one fast command for CI and for an
@@ -49319,7 +49973,7 @@ AI agent's hooks. Offline by default, and it never changes anything.
 | Collection config | A file under `config/collections/` that does not load, or that the boot validator rejects — with unknown keys as errors, so a misspelt option or a UI option written outside `admin: { … }` (a top-level `widget`) is caught here rather than silently ignored. |
 | RLS coverage | A collection with no `securityRules` that inherits none, or one with a `user_id`, `owner_id`, `organization_id` or `tenant_id` column that relies on directory defaults instead. A rule that lets a role read every row of such a table is a warning. |
 | Migration freshness | A table or column the collections declare that no file in `backend/drizzle/migrations` creates, or one they dropped that a migration still creates. Skipped for a project with no migrations yet. |
-| Live RLS audit | With `--live`: the [`rls-check`](/docs/rls-check) catalogue against `DATABASE_URL`, and whether every migration has been applied. |
+| Live RLS audit | With `--live`: the [`rls-check`](/docs/rls-check) catalogue against the project's database, and whether every migration has been applied. The database is resolved as the `db` commands resolve it — `--database-url`, `DATABASE_URL`, `--docker`, otherwise the managed development database. A database that is not configured or does not answer is an error, not a skip: the audit was asked for. A `USING (true)` read policy compiled from an `access: "public"` rule is a warning while the API requires a token (`AUTH_REQUIRE`, on by default) — every signed-in user reads every row — and an error with `AUTH_REQUIRE=false`, where the rows are anonymous. |
 
 `--json` prints one object — every step, and every finding with its `file`, the
 dotted `path` into the collection config, and the `fix` — so an agent can repair
@@ -49370,20 +50024,24 @@ rebase storage move --from "(default)" --to media --prefix avatars
 rebase storage move --from "(default)" --to media --prefix avatars --delete-source
 ```
 
-`orphans` reads every row of every collection, soft-deleted rows included, and
-lists the files of one source (`--source`, the default source when left out)
-that no string in any row names: a key, a URL, a `rebase-storage:` reference in
-a text. Files newer than `--older-than` hours (24 by default) are left out,
+`orphans` reads every row of every collection as stored (soft-deleted rows
+included, past every `beforeQuery` and `afterRead` hook) and every
+[history](/docs/backend/history/) entry, since a revert restores what it holds.
+It lists the files of one source (`--source`, the default source when left out)
+that no string in any of them names: a key, a URL, a `rebase-storage:`
+reference in a text. Files newer than `--older-than` hours (24 by default) are left out,
 because the admin panel uploads a file before the row that names it is saved.
 `--delete` asks before it deletes (`--yes` skips the question, and is required
 with no terminal), the server finds the files again first, and nothing is
-deleted while a collection cannot be read. Files that only your own tables
+deleted while a collection cannot be read — a collection with read hooks on a
+data source whose driver cannot read past them counts as unread. Files that only your own tables
 outside collections name look unused: check before deleting.
 
 `move` copies the files under `--prefix` to another source under the same keys,
 a page at a time. A file the target already holds at the same size is skipped,
 so a stopped move resumes by running it again; `--delete-source` deletes each
-file from the source once the target holds it. Both need `database:read`, and
+file from the source once the target holds it, and is refused when the two
+sources store in the same bucket or directory. Both need `database:read`, and
 deleting or moving `database:write`, which the service key holds.
 
 #### `rebase skills install`
@@ -49700,8 +50358,9 @@ pass `--yes`, and exits 1; on 0.24 it says "Nothing was changed." and exits 0.
 they create no `rebase` schema there. On 0.24 they create the registry.
 
 `diff` shows what a branch changed against the database it was made from:
-tables, columns and RLS policies added, dropped or altered, and per table the
-rows it inserted, updated and deleted. Rows the parent changed on its own since
+tables, columns, constraints, indexes, triggers, RLS policies, enum types,
+views and functions added, dropped or altered, and per table the rows it
+inserted, updated and deleted. Rows the parent changed on its own since
 are counted apart, and rows both changed are conflicts. `--json` prints the
 whole diff, with up to `--sample-limit` rows a table (default 100). It reads
 both databases and changes neither; merging is in Studio — see
@@ -49758,10 +50417,17 @@ specific control plane (or `REBASE_CLOUD_URL`), and `--project, -p <id>`.
 
 ```bash
 rebase cloud login      # sign in to the control plane
+rebase cloud login --code   # with an emailed 6-digit code: accounts made with Google, GitHub or LinkedIn
 rebase cloud logout     # sign out
 rebase cloud whoami     # the current session, or what REBASE_TOKEN may do
 rebase cloud tokens create --can deploy,logs   # a token for CI, shown once
 ```
+
+At a terminal with no password given, <span class="since-badge" data-since="0.26">Since 0.26</span> `login` asks whether to use your password
+or a code the control plane emails you. With two-factor authentication on, it
+then asks for your authenticator code (or a recovery code). Without a terminal
+neither can be typed: set `REBASE_TOKEN` to an access token made in the console
+under Settings → Access tokens. See [Rebase Cloud](/docs/deployment/cloud#link-a-project).
 
 ### Project link
 
@@ -49777,11 +50443,24 @@ rebase cloud open         # open the dashboard in a browser
 
 ```bash
 rebase cloud init --claim [--name <name>]   # a live backend with no account, and a link to claim it within 72 hours
+rebase cloud claim [--open]                 # that link again, and how long is left
 rebase cloud projects list
 rebase cloud projects create [--link]
 rebase cloud projects info [id]
 rebase cloud projects delete [id]
 ```
+
+<span class="since-badge" data-since="0.26">Since 0.26</span> `claim` prints the claim link of the project `init --claim` provisioned in this
+directory, and the time left before it is deleted unclaimed (`Unclaimed: deleted
+in 41h`). `--open` also opens it in a browser. The link is kept only on the
+machine that ran `init --claim`, in `~/.rebase/credentials.json`; the control
+plane stores a hash of it and cannot print it again. Before answering, `claim`
+asks the control plane whether the project's own token still works. A claim
+revokes that token, so once someone has claimed the project, `claim` refuses
+with `already_claimed` instead of printing a dead link. It also refuses once the
+window has ended (`claim_expired`), and in a directory with no claim link
+(`no_claim_link`). `rebase cloud status` and `rebase cloud whoami` show the same
+link while the project is unclaimed.
 
 ### Deploy and observe
 
@@ -49789,7 +50468,7 @@ rebase cloud projects delete [id]
 rebase cloud deploy [app] [--source .]   # deploy an app and stream build logs
 rebase cloud deploy [app] --preview [--preview-name <name>]  # its own address; production untouched
 rebase cloud previews [list|delete <name>]
-rebase cloud logs [--runtime] [-f]       # build logs, or the running process's
+rebase cloud logs [--runtime] [-f] [--preview [name]]  # build log, or what the app prints
 rebase cloud deployments list [--limit N|--all]
 rebase cloud rollback [id] [-y]          # back to a successful deploy
 rebase cloud cancel [-y]                 # cancel the in-flight build
@@ -49821,9 +50500,47 @@ its own cannot be rolled back yet; see
 [Roll back](/docs/deployment/cloud#roll-back).
 
 `--preview` serves the build at `https://<project>--<name>.rebase.website` and
-leaves production alone. A preview of a static app calls the production backend.
-A preview of the backend runs its own backend, on an empty database of its own.
+leaves production alone. A preview of the backend runs its own backend, on an
+empty database of its own, with its static apps folded in. A static app cannot be
+previewed on its own on Rebase Cloud yet: `rebase cloud deploy <app> --preview`
+is refused with `PREVIEW_STATIC_UNSERVED` and publishes nothing. A backend
+preview is billed as one more app unit at the default size while it exists;
+`rebase cloud previews delete <name>` stops it.
 See [Preview a change](/docs/deployment/cloud/#preview-a-change).
+
+#### Logs
+
+`rebase cloud logs` prints the latest build log, and `-f` tails a build that is
+still running. `--runtime` reads what the app prints instead, from every pod
+behind it, each line tagged with its pod:
+
+```bash
+rebase cloud logs --runtime -f                    # follow until Ctrl-C (exits 0)
+rebase cloud logs --runtime --since 15m --grep timeout
+rebase cloud logs --runtime -f --level error      # errors only
+rebase cloud logs --runtime --previous            # a restarted container's last run
+```
+
+- `--since` takes a duration (`30s`, `5m`, `1h`) or an RFC3339 time.
+- `--tail <n>` is the lines per pod to start from (the control plane caps it at 2000).
+- `--grep` keeps lines containing the text, in any case; write `/re/flags` for a
+  regular expression.
+- `--level error|warn|info|debug` keeps lines at that severity or worse. It reads
+  the structured `severity` a Rebase backend logs, a level word at the start of a
+  plain line, or an error shape such as `TypeError:`. Lines with none are left out.
+
+<span class="since-badge" data-since="0.26">Since 0.26</span> A follow polls every two seconds and prints each line once. It announces pods
+that start, stop or restart. When a container restarts it also prints the last
+lines of the instance that died, where the reason usually is. It waits while no
+pod is running, and after a dropped connection it retries with backoff and
+resumes where it left off. With `--json`, a follow prints one JSON object per
+line (NDJSON): `{"type":"line","ts","pod","text"}` for each log line, and
+`{"type":"event","event":…}` for the rest.
+
+`--preview <name>` reads a preview instead of production. Use the preview's
+name, or the deployment id a preview deploy printed. On its own, `--preview`
+reads the project's only preview. A static preview has a build log but no
+runtime log, because it runs no server.
 
 ### Config
 
@@ -49840,11 +50557,52 @@ A backend preview starts from production's variables, live keys included.
 back production's value, and `env list --preview` shows the differences.
 Production is never changed by any of them.
 
+<span class="since-badge" data-since="0.26">Since 0.26</span> `env set KEY --stdin` reads the value from standard input instead of the
+command line, where `ps` and your shell history would show it:
+
+```bash
+read -rs STRIPE_KEY   # paste the value; nothing is echoed
+printf %s "$STRIPE_KEY" | rebase cloud env set STRIPE_KEY --stdin --secret
+```
+
+One trailing newline is dropped. The MCP server's `rebase_cloud_env_set` sets
+values this way.
+
 ### Organizations
 
 ```bash
-rebase cloud orgs list | create | members
+rebase cloud orgs list | create
+rebase cloud orgs members [list] | invite <email> [--role admin|member] | remove <email|uid> | role <email|uid> <role>
+rebase cloud orgs invites [list] | revoke <id|email> | resend <id|email>
+rebase cloud activity [--project <id|slug>] [--action <area|action>] [--actor <email>] [--limit N] [--before <cursor>]
 ```
+
+<span class="since-badge" data-since="0.26">Since 0.26</span> `members invite` adds someone whose Rebase account has the address verified,
+and otherwise opens an invitation and prints its link: single use, valid 7 days,
+accepted only by an account that has verified that address. The output (and
+`emailDelivery` in `--json`) says whether it was emailed; when it was not, a
+warning says to send the link yourself. `--role` is `admin` or `member`
+(default); `owner` only adds an existing verified account, and only an owner
+may grant it. `invites resend` gives a new link and the old one stops working.
+Inviting and `invites` need a `rebase cloud login` session; `REBASE_TOKEN` is
+refused. Inviting, resending and revoking take the owner or admin role; listing
+takes any member.
+`members remove` asks first (`--yes` skips it); removing or demoting an owner
+takes an owner, and the last owner stays. `--org <id>` picks an organization
+other than the selected one.
+
+<span class="since-badge" data-since="0.26">Since 0.26</span> `activity` is the selected organization's audit log, newest first: who
+deployed, rolled back, set, deleted or revealed an environment variable (by
+name, never by value), changed a domain, created, restored or downloaded a
+backup, changed a project's compute, stopped or deleted a project, changed a
+member's role, or created or revoked an access token. `--action` takes an area
+(`deploy`, `deploy_hook`, `env`, `domain`, `backup`, `pitr`, `database`,
+`extension`, `storage`, `project`, `org`, `member`, `invite`, `token`) or a full action
+such as `env.set`. A page holds up to 100 entries (`--limit`, default 50); the
+output prints the `--before` cursor for the next one. `--json` is one value,
+`{ org, events, nextCursor }`. It needs the organization's owner or admin role
+and reads with your login: no access-token capability includes it. The
+console's **Activity** page shows the same log.
 
 ### Databases
 
@@ -49887,18 +50645,55 @@ rebase cloud compute set        # change it
 tiers: everything is priced per resource. See
 [Rebase Cloud](/docs/deployment/cloud/).
 
-### Storage, webhooks, clusters and billing
+### Storage, notifications, clusters, billing and usage
 
 ```bash
 rebase cloud storage             # list storage buckets
 rebase cloud storage create      # provision platform-managed storage
 rebase cloud storage attach      # attach your own S3-compatible bucket
-rebase cloud webhooks list | create | delete
+rebase cloud notifications [list] | add <url> | test <id> | remove <id>   # deploy, backup, billing and usage events to Slack, Discord or any URL
+rebase cloud webhooks            # retired: exits 1 (`command_retired`) and names `notifications`
 rebase cloud clusters list | add | verify   # the clusters tenants run on; `add` registers one from a kubeconfig
 rebase cloud billing             # the billing account and card on file
 rebase cloud billing setup       # attach a card, one-time, opens a browser
 rebase cloud billing checkout    # a Stripe session for one project
+rebase cloud billing invoices [--limit N]   # issued invoices, newest first, with Stripe's hosted page
+rebase cloud billing upcoming    # a preview of each subscription's next invoice
+rebase cloud usage [--month YYYY-MM]   # requests used this month against the allowance, and the overage so far
+rebase cloud usage org           # every project of the selected organization, with the total
 ```
+
+<span class="since-badge" data-since="0.26">Since 0.26</span> `notifications add <url>` sends the linked project's events to a URL. `--events`
+takes a comma-separated list of `deploy.failed` (the default),
+`deploy.succeeded`, `deploy.rolled_back`, `backup.unhealthy`,
+`billing.payment_failed` and `usage.threshold`. `--format slack` sends
+`{ "text" }` alone instead of the event JSON, which also carries a `text`. The URL
+is a positional argument because `--url` names the control plane. `add` prints
+the signing secret once; `--json` returns `{ projectId, webhook, secret }`.
+`test <id>` exits 1 with code `delivery_failed` when the receiver did not accept
+the test event. Listing is open to any member of the organization; `add`, `test`
+and `remove` need the owner or admin role. These routes take your
+`rebase cloud login`: no access-token capability includes them. See
+[Cloud notifications](/docs/deployment/cloud-notifications/).
+
+<span class="since-badge" data-since="0.26">Since 0.26</span> `billing invoices` and `billing upcoming` read the same Stripe data as the
+console's Billing page, and are open to the organization's owners and admins
+only. Amounts in `--json` are in the currency's minor unit (cents), exactly as
+Stripe sends them. Draft invoices are not listed; the preview is computed by
+Stripe and its metered lines keep growing until the period closes.
+
+<span class="since-badge" data-since="0.26">Since 0.26</span> `usage` reads what the linked project (or `--project`) has used in a calendar
+month, in UTC: requests against the included allowance, 5xx errors, the overage
+so far in euros and, for the month in progress, where it is heading at this
+pace (an estimate). The overage is the overage report's own calculation, the
+one that tells Stripe what to bill, and lands on the following month's invoice.
+`usage org` lists every project of the organization selected with `rebase cloud
+use`, and the total. Any member of the organization can read it, with their
+login: no access-token capability includes it yet, so `REBASE_TOKEN` is refused.
+`--month` takes a past month. The answer carries `caveats`, each with a `code`: `storage_not_measured`
+(object storage reads 0), `multi_pod_undercount` (requests served while two or
+more app pods run are not counted), `partial_days`, `metering_off`,
+`overage_billing_off`, `not_billed` and `billed_next_month`.
 
 ## Schema Generation
 
@@ -50077,7 +50872,9 @@ rebase db push
   before the drop of a CHECK or EXCLUDE constraint the database holds: no row
   is lost, but from then on the database accepts the rows it refused.
   It asks on a terminal, where Ctrl-C or Ctrl-D answers no, and refuses
-  otherwise; `--allow-destructive` (or `--yes`) applies it anyway. A push that
+  otherwise; `--allow-destructive` applies it anyway. `--yes` still does too in
+  this release, with a deprecation warning; from the next release it approves
+  only pushes that destroy nothing. A push that
   stops there drops its scratch `<db>_dev_diff` database on the way out
 - Switches row-level security on for every collection table, junctions included, right after the
   schema change and before any step that can fail, so a push that stops part-way leaves a new table
@@ -51711,7 +52508,9 @@ Once the records are published:
 rebase cloud domains verify admin.example.com
 ```
 
-`rebase cloud domains list` prints the records again if you lose them. When
+`rebase cloud domains list` prints the records again if you lose them. A
+hostname that is not verified within 7 days of being registered is released,
+and the next deploy registers it again. When
 verification passes, the platform issues the HTTPS certificate for the
 hostname; there is nothing to upload. Until then `admin` answers nowhere, since
 the one hostname it answers on does not reach the project yet — the rest of
@@ -51721,8 +52520,15 @@ The console follows the app onto its hostname: the *Open CMS* link and the CMS
 address on the project's overview are `https://admin.example.com/`, not the
 project host.
 
-A hostname that another project already holds fails the deploy before anything
-rolls out, and so does one under the platform's own domain. Taking the app out
+A hostname that another project has verified fails the deploy before anything
+rolls out, and so does one under the platform's own domain. One that another
+project registered and never verified does not stand in your way: the refusal
+gives you a TXT record for your project, and once it exists the next deploy (or
+`rebase cloud domains add`) takes the hostname. Adding a hostname
+the project does not have yet changes the project's domains, which an access
+token made with `--can deploy` may not do: from CI, add the hostname once with
+`rebase cloud domains add` while signed in, and the token then deploys it like
+any hostname already on the project. Taking the app out
 of `rebase.json` leaves the hostname registered on the project; remove it with
 `rebase cloud domains remove admin.example.com`.
 
@@ -52341,9 +53147,46 @@ before sending your email and password there. Without a terminal, or with
 `--json`, it refuses with `unknown_control_plane`; pass `--url <host>` (or set
 `REBASE_CLOUD_URL`) to sign in there on purpose.
 
+**Signed up with Google, GitHub or LinkedIn?** <span class="since-badge" data-since="0.26">Since 0.26</span> Your account has no password, so
+sign in with a code instead:
+
+```bash
+rebase cloud login --code --email me@example.com
+```
+
+The control plane emails you a 6-digit code, good for ten minutes, and you type
+it at the prompt. Run plainly at a terminal, `rebase cloud login` asks whether
+to use your password or a code. Codes need the control plane to be able to send
+email; if it cannot, `--code` says so and exits with `otp_unavailable`.
+
+If you turned on two-factor authentication, `login` then asks for the code from
+your authenticator app, or one of your recovery codes, whichever way you signed
+in. Neither a sign-in code nor a second factor can be typed without a terminal.
+For a script, create an access token in the console (**Settings → Access
+tokens**) and set `REBASE_TOKEN`; see [CI and agents](/docs/deployment/cloud-agents/#ci-and-agents).
+
+A wrong password answers `invalid_credentials` with the same two ways in, since
+the usual cause is an account that never had one.
+
 `billing setup` attaches a card to the organization, once. It is first in the
 sequence on purpose: the first deploy of a project is refused without one, and
 finding that out after a bundle has finished uploading is the worse order.
+
+After that, the console's **Billing** page lists the organization's invoices,
+each with Stripe's hosted page and PDF, and previews the next invoice of every
+project. `rebase cloud billing invoices` and `rebase cloud billing upcoming`
+print the same. Both are for the organization's owners and admins.
+
+What a project has used shows on its overview, under **Usage this month**, and
+for every project at once on the **Billing** page: requests against the
+included allowance (the bar turns amber at 80%), 5xx errors, the overage so far
+and where the month is heading at this pace. The overage is computed by the
+same code that reports it to Stripe, so it is what the invoice will carry; it
+appears on the invoice of the month after. `rebase cloud usage` prints the
+same, and `rebase cloud usage org` the whole organization. Any member can read
+it. The figures say what they cannot see yet: object storage is not measured,
+so no storage overage is billed; while a project runs two or more app pods,
+its requests are not counted; and a day with missed samples undercounts.
 
 An existing project links without creating one:
 
@@ -52412,6 +53255,8 @@ stops instead.
 
 #### The syntax check before the upload
 
+<span class="since-badge" data-since="0.26">Since 0.26</span>
+
 A static app's files are served exactly as they are. When its `build` only
 copies hand-written scripts into `output`, nothing has parsed them, and a file
 with a typo in it goes live and stops the page from loading. So before anything
@@ -52438,9 +53283,9 @@ under `node_modules` is read, and neither is a prebuilt `--bundle-dir`.
 Watch it:
 
 ```bash
-rebase cloud logs            # the build log
-rebase cloud logs --runtime  # what the running container is printing
-rebase cloud status          # what the platform thinks the project is doing
+rebase cloud logs               # the build log
+rebase cloud logs --runtime -f  # what the running app prints, live, until Ctrl-C
+rebase cloud status             # what the platform thinks the project is doing
 ```
 
 `status` reports `blockedOn` and `nextAction`. When `blockedOn` is `null` the
@@ -52469,13 +53314,16 @@ rebase cloud deploy --preview-name new-checkout
 
 What a preview talks to depends on what you deployed:
 
-- **`rebase cloud deploy web --preview`** previews one static app. Its pages call
-  the **production** backend: a sign-in there is a real session, and anything
-  written there is production data.
 - **`rebase cloud deploy --preview`** previews the backend, with its static apps
   folded in, the same way production runs them. It gets a backend of its own on
   an **empty database of its own**, never production's. Booting against
   production's database would apply the preview's schema and access rules to it.
+- **`rebase cloud deploy web --preview`** would preview one static app on its
+  own, its pages calling the **production** backend. That needs a control plane
+  that serves static sites by themselves, and Rebase Cloud does not yet: it
+  refuses with `PREVIEW_STATIC_UNSERVED` and publishes nothing. Preview the
+  backend instead, which serves the static apps folded into it; a project with
+  no managed backend cannot be previewed yet.
 
 A preview uploads no source and registers no apps or hostnames, because each of
 those would change the production project. `--source` and `--eject` cannot be
@@ -52483,10 +53331,37 @@ combined with `--preview`. Each builds a container image for production.
 
 ```bash
 rebase cloud previews                      # name, address, app, backend, expiry
+rebase cloud logs --preview new-checkout   # its build log; -f follows a build still running
+rebase cloud logs --runtime --preview new-checkout -f  # what its backend prints
 rebase cloud previews delete new-checkout  # stops serving it and drops its database
 ```
 
+`rebase cloud logs` without `--preview` is always production's.
+
+The console's **Deployments** page lists the same previews, and opens, shows the
+build log of, or deletes each one. Creating one stays a CLI step.
+
 A preview expires a week after it was last deployed to.
+
+When it finishes, the deploy checks that the preview's address answers, as a
+production deploy does (`--live-timeout <seconds>`, `0` to skip). A new
+preview's certificate can take a minute or two, so a deploy that succeeded can
+say the address does not answer yet.
+
+A backend preview is billed like one app unit at the default size (100m of CPU
+and 384 MiB of memory, at your app's rate for its region and capacity),
+prorated for as long as it exists, and it appears in the project's monthly
+quote in the console. Starting one needs a card on file, as a production deploy
+does. A first deploy that
+fails before anything runs is removed rather than billed. A project may run
+three backend previews at once.
+
+A backend preview's database is a second database on **production's** Postgres:
+its own data, but the same instance and the same disk. It is limited to 10
+connections, so previews cannot use up production's, but its size is not
+limited: a preview that loads a large fixture fills production's disk too.
+Delete previews you no longer need. Extensions installed on production are not
+installed in a preview's database.
 
 Previews are rolling out. A control plane that does not serve them yet refuses
 `--preview` with `previews_unavailable` and deploys nothing.
@@ -52537,6 +53412,202 @@ A rollback appends a new deployment rather than rewinding history, and waits for
 the restored version to serve before reporting success. Follow it with
 `rebase cloud logs -f`.
 
+### Restore the database to a point in time
+
+A managed database can be recovered to any minute inside its recovery window,
+from **Database → Backups** in the console or with the CLI:
+`rebase cloud db pitr status | restore --target <ISO> | cutover | discard`.
+It takes two steps. First a recovered copy is staged beside the live database;
+your app keeps running on the live one, and the copy's storage is billed until
+you cut over or discard it.
+Then, once the copy is ready, cutting over repoints the app at it and restarts
+it. Anything written after the target time is not in the copy. The original
+database is kept as the way back, and keeps billing storage; switching back,
+removing it, or a second restore goes through support. Only an owner or admin
+can stage, cut over or discard, and the console asks for the project's name
+before it cuts over.
+
+### Secure your account
+
+Your console account can reach production databases, secrets and billing, so
+protect it like one. Open **Account security** from the menu under your avatar
+in the console (or go to `/account`). The page is yours, not an
+organization's: what you set there applies in every organization you belong to.
+
+- **Two-step verification.** Turn it on with any authenticator app (1Password,
+  Google Authenticator, Authy). The page shows a setup key to add to the app, or a
+  link that opens the app with the key filled in on a phone, then asks for the
+  6-digit code the app shows. From then on, every sign-in asks for a code,
+  whether you sign in with a password, Google or GitHub.
+- **Recovery codes.** Turning it on gives you ten single-use codes, shown once.
+  Each one signs you in in place of the authenticator code if you lose your
+  phone, so save them before you close the dialog. **New recovery codes**
+  replaces them, and the old ones stop working. Turning two-step verification
+  off and getting new codes both ask for a code first.
+- **Password.** Changing it signs you out on every other device. An account
+  created with Google, GitHub or LinkedIn has no password; the page offers to
+  email you a link to set one.
+- **Signed-in devices.** Every browser and terminal signed in to your account,
+  with its address and when it signed in. Sign out any device you do not
+  recognise, or all of them at once.
+
+[Access tokens](/docs/deployment/cloud-agents/#ci-and-agents) are not sessions and do not ask for a second
+factor, so CI keeps deploying after you turn it on. Revoke a token you no longer
+trust under **Settings → Access tokens**.
+
+### Invite your team
+
+**Members → Invite member** adds someone whose Rebase account has the address
+verified; anyone else gets a link to copy (emailed when this control plane sends
+email) that works once, for 7 days, only for an account that verifies that
+address. Owners and admins resend or revoke it under **Pending invitations**;
+from a terminal, <span class="since-badge" data-since="0.26">Since 0.26</span> [`rebase cloud orgs members invite`](/docs/cli/cloud/#organizations).
+
+### See who did what
+
+The console's **Activity** page and <span class="since-badge" data-since="0.26">Since 0.26</span> `rebase cloud activity` show the
+organization's owners and admins who deployed, set or revealed an environment
+variable (by name, never by value), changed a domain, restored a backup,
+resized, stopped or deleted a project, changed a member's role, or created a
+token, and when. A project's **Settings** links to its own entries; an entry
+about a deleted project stays. The filters are in
+[`rebase cloud`](/docs/cli/cloud/#organizations).
+
+### CI and agents
+
+A CI job or an agent should not carry your password. Give it a token narrowed to
+a few actions on one project, created from a signed-in terminal with
+`rebase cloud tokens create --project shop --can deploy,logs`, and set it as
+`REBASE_TOKEN`. The capabilities, a GitHub Actions workflow and what stays with
+a signed-in person are in
+[CI and agents](/docs/deployment/cloud-agents/#ci-and-agents).
+
+### A backend with no account
+
+<span class="since-badge" data-since="0.26">Since 0.26</span>
+
+`rebase cloud init --claim` gives an app a live backend before anyone has signed
+up, and prints a claim URL for the person to keep it; a project nobody claims
+within 72 hours is deleted. What the unclaimed project's token may do, the
+`REBASE_API_TOKEN` it writes and what claiming changes are in
+[A backend with no account](/docs/deployment/cloud-agents/#a-backend-with-no-account).
+
+### Compute, and what it costs
+
+A project is priced from what it reserves, not from a tier. `compute` prints
+every dial and the control plane's own itemised quote for them. (`rebase cloud
+resources` is a different thing: the databases and buckets the code declares,
+and whether each is provisioned — see the [CLI reference](/docs/cli/cloud/).)
+
+```bash
+rebase cloud compute
+rebase cloud compute set --cpu 500m --memory 2Gi
+```
+
+| Dial | Unit, and what it means |
+|---|---|
+| `--cpu`, `--memory` | App request per instance, e.g. `500m` and `2Gi`. Empty means the platform default — `100m` and `384Mi`, bursting to 2 CPU and `2Gi` |
+| `--replicas` | Instances that always exist: the autoscaler's floor, and what the project is billed for |
+| `--autoscale-max` | 1–16. The ceiling it may reach. Instances the autoscaler adds above `--replicas` are not billed today. `--no-autoscale` turns it off |
+| `--autoscale-cpu-target` | 10–95. The CPU utilisation the autoscaler holds, against the request rather than the limit. Empty means 70 |
+| `--spot` | `true` or `false`. Preemptible capacity: cheaper, and restarted without notice |
+| `--db-instances` | 1–3. `1` is a single instance with no failover; `2` adds an automatic standby |
+| `--db-cpu`, `--db-memory` | Per database instance. Empty means `160m` and `1Gi` |
+
+An empty dial is not the same as one pinned to the same number: an empty dial
+follows the platform default and moves when it moves.
+
+Nothing is validated by the CLI, on purpose — the limits belong to the cluster a
+project runs on, and they differ between providers. The control plane refuses a
+value it cannot honour and names the field. Run `rebase cloud compute` to see
+the €/month before and after; a change applies immediately, prorated from today,
+except one that restarts the database, which waits for a maintenance window.
+
+### The rest of the surface
+
+| Command group | What it covers |
+|---|---|
+| `login`, `logout`, `whoami` | Your session |
+| `tokens` | Tokens for CI and agents, each narrowed to one project. See [CI and agents](/docs/deployment/cloud-agents/#ci-and-agents) |
+| `link`, `unlink`, `use`, `open` | Binding this directory to a project, selecting an organization, opening the console |
+| `init`, `claim` | With `--claim`: a live backend with no account, and a link to claim it; `claim` prints that link again. See [A backend with no account](/docs/deployment/cloud-agents/#a-backend-with-no-account) |
+| `projects` | Create, list, inspect, delete |
+| `deploy`, `logs`, `deployments`, `rollback`, `cancel` | Shipping and watching |
+| `previews` | Builds served on their own address by `deploy --preview`, and deleting them. See [Preview a change](#preview-a-change) |
+| `start`, `stop`, `restart` | Pausing a project and bringing it back |
+| `status`, `metrics`, `debug` | What it is doing, and why it is not |
+| `cron` | The deployed app's cron jobs and their recorded runs, read with your `rebase cloud` login. Read-only |
+| `env` | Environment variables. `list` never prints values; `--secret` is write-only |
+| `domains` | Custom domains, the DNS records to add, and verification. A project can answer on several, each verified on its own; `verify` and `remove` take the domain to act on, which may be left out only when there is one (for `verify`, one still pending). `list --json` returns `{ projectId, tenantHost, domains: [...] }` |
+| `db` | Attach or create a database, connect to it from your machine, backups, restore, and point-in-time recovery |
+| `extensions` | The Postgres extension allowlist |
+| `storage` | The project's bucket |
+| `resources` | Which databases and buckets the platform holds, against what the code declares |
+| `compute` | What this project reserves, what it costs, and how to change it |
+| `usage` | Requests used this month against the included allowance, and the overage so far, as the invoice counts it. `usage org` lists every project of the organization |
+| `clusters` | The clusters tenants run on. Platform-admin only |
+| `settings`, `orgs`, `billing` | Project settings, organizations and their members and invitations, payment |
+| `activity` | The organization's audit log: who deployed, changed an environment variable (by name), a domain, a backup, a member or a token. Owners and admins. See [See who did what](#see-who-did-what) |
+| `notifications`, `webhooks` | Where the project's events are POSTed: Slack, Discord or any https URL ([Cloud notifications](/docs/deployment/cloud-notifications/)). `webhooks` is retired and exits 1 with code `command_retired` |
+
+Every group in that table answers `--help` with a page of its own — a usage line,
+its flags, and examples — and `--help` never runs the command. A test holds the
+index to the pages, so a group added without one fails the build rather than
+answering with the table of contents. `verify:docs` holds the table itself to
+that index: every group the CLI dispatches appears here exactly once, so a group
+added without a row fails the build too.
+
+Piped, `--help` answers in JSON instead: the same usage line, flags and examples
+as a structure to read rather than sixty lines of terminal escapes.
+
+### What the beta does not include
+
+Stated plainly, because finding out later is worse:
+
+- **No region choice.** Everything runs in one region today. The placement model
+  exists in the platform, but a project cannot pick a region.
+  `projects create --provider` and `--region` are not the exception they look
+  like: they record which of the control plane's registered deploy targets a
+  project belongs to, and there is one, so both default to it and neither moves a
+  project anywhere else. `rebase cloud projects create --help` says the same.
+- **Not self-serve.** Access is granted in batches; there is no sign-up-and-pay.
+- **No published SLA**, and no SOC 2. If you need either, say so when you request
+  access rather than assuming.
+- **No branch deploys**, and no first-party GitHub App. Deploy hooks — secret URLs
+  you point a repository webhook at — are the supported automation. [Preview
+  deploys](#preview-a-change) are rolling out and are started from the CLI.
+- **Tokens act as a person.** A [token](/docs/deployment/cloud-agents/#ci-and-agents) is minted by an account
+  and acts as it; there is no organization-owned machine identity yet. If you
+  sign in from CI instead, pass `REBASE_CLOUD_EMAIL` and `REBASE_CLOUD_PASSWORD`
+  from a secret store — `--password` puts the password in your shell history and
+  in the process table, and says so before it signs you in. If the repository's
+  `.rebase/cloud.json` names a control plane other than the platform's own, pass
+  it as `--url` too: without a terminal, `login` refuses to send a password to a
+  host that only the checked-out file named.
+- **No public database endpoint.** A managed database is not exposed to the
+  internet, so the host the console shows is your backend's address for it and
+  resolves to nothing on your machine. `rebase cloud db connect` opens a local
+  port that is that database, tunnelled through the control plane, for as long
+  as you leave it running — but there is no permanent hostname a third-party
+  service can connect to. That tunnel, and the password behind
+  `rebase cloud db info --reveal`, both need the organization's owner or admin
+  role: the same one Studio's SQL editor asks for, because all three end at a
+  session on your production data.
+
+### Self-hosting instead
+
+Nothing here is a lock-in. The [self-hosting guide](/docs/deployment/self-hosting/)
+runs the identical image and bundle with `docker compose`, and the
+[Kubernetes guide](/docs/deployment/kubernetes/) renders the same topology from
+the Helm chart.
+
+## CI, Agents and Claimable Backends
+
+A [Rebase Cloud](/docs/deployment/cloud/) project does not need a person at a
+terminal to deploy. A CI job or an agent acts with a token narrowed to a few
+actions on one project, and an agent can create a project before anyone has an
+account, then hand over a link to claim it.
+
 ### CI and agents
 
 A CI job or an agent should not carry your password. Give it a token
@@ -52579,9 +53650,9 @@ jobs:
 
 | Capability | What the token may do |
 |---|---|
-| `deploy` | Deploy the project and follow its builds: `deploy`, `deployments` |
+| `deploy` | Deploy the project and follow its builds: `deploy` (`--preview` included), `deployments`, `previews` |
 | `logs` | Read build and runtime logs, cron history, and live metrics: `logs`, `cron`, `metrics` |
-| `env` | Read and change environment variables, secrets included |
+| `env` | Read and change environment variables, secrets included, and previews' own (`--preview`) |
 | `database` | `db list`, `db info` and `db connect`, which includes the database password |
 | `backups` | List, create, inspect and download backups, and read the point-in-time window |
 
@@ -52606,6 +53677,8 @@ project. `rebase cloud tokens revoke <id> --yes` stops it at once.
 
 ### A backend with no account
 
+<span class="since-badge" data-since="0.26">Since 0.26</span>
+
 An agent that has built an app can give it a live backend before anyone has
 signed up, and hand the person it works for a link to keep it:
 
@@ -52618,24 +53691,53 @@ its live address, links the directory, and deploys the local collections with
 `rebase cloud deploy --bundle`. It prints the live URL, the admin panel URL and a
 **claim URL**. Whoever opens the claim URL and signs in can move the project into
 one of their organizations. The link works once. A project nobody claims within
-72 hours is deleted, database included. The MCP server's `rebase_cloud_provision`
-tool runs the same command and returns the same URLs.
+72 hours is deleted, database included. `rebase cloud claim` prints the claim
+URL again with the time left, and `--open` opens it. The MCP server's
+`rebase_cloud_provision` tool runs the same command and returns the same URLs;
+its other cloud tools then check, deploy, read logs, set variables and roll back
+the project without a login (see [MCP server](/docs/ai/mcp#rebase-cloud)).
+
+`REBASE_BASE_URL` in `.env` is also where `rebase api-keys`, `rebase storage`
+and `rebase auth reset-password` send the local service key, so after `init
+--claim` they go to the cloud project, which does not take that key. They say so
+when they do; set `REBASE_BASE_URL` in the shell to reach a local backend
+instead.
 
 Until the project is claimed it belongs to no account. Its token is narrowed to
-that one project and to `deploy`, `logs`, `env` and `database`. It is kept in
+that one project: it deploys, reads logs and metrics, sets environment variables
+and runs `db info`. It reads nothing secret back: not a variable's value (the
+service key included), not the database password, and it cannot open
+`db connect` or a preview. It is kept in
 `~/.rebase/credentials.json`, never in the repository, and `rebase cloud`
-commands in the linked directory use it on their own. It expires with the
-project.
+commands in the linked directory use it on their own (`REBASE_TOKEN`, when set,
+still wins, and those commands warn that it did; the deploy `init --claim` runs
+always uses the project's own token). It expires with the project. `rebase cloud whoami` in that directory shows the project, what the
+token may do, the claim URL and when the project expires. A command that needs a
+person's session refuses with `session_required` and keeps the token; it is
+forgotten only once the control plane refuses it everywhere, after a claim or at
+expiry, and the claim URL is printed as it goes. `rebase cloud status` shows the
+claim URL and the expiry too (`unclaimed` in `--json`). `rebase cloud unlink`
+does not delete an unclaimed project: it warns that the project keeps running
+until it expires and prints the claim URL, and `init --claim` in a directory
+that is already linked to one points at its claim URL instead of provisioning a
+second. Until the claim, the app reaches the internet on ports 80 and 443 only;
+the mail ports every other project has (465, 587 and 993) open when the project
+is claimed.
 
 Once the deploy has built the app, the command also sets `REBASE_API_TOKEN` in
 `.env`: a key minted on the app itself, which is what the MCP server and the SDK
-send to it. It reads and writes data (`data:read`, `data:write`) through the
+send to it. A `REBASE_API_TOKEN` already in `.env` is kept and none is minted,
+and a `.env` the command creates is readable by you alone. It reads and writes data (`data:read`, `data:write`) through the
 app's row-level security, as a caller who is neither a person nor an admin. It
 holds nothing of the admin plane, and it expires with the claim window. With
 `--no-deploy`, or when that first deploy fails, there is no key yet: the next
 `rebase cloud deploy` that succeeds in the directory asks for one, as long as the
-project is unclaimed and `.env` sets no `REBASE_API_TOKEN` already. Once the
-project is yours, create the keys you want in its admin panel.
+project is unclaimed and `.env` sets no `REBASE_API_TOKEN` already. The key
+expires at the end of the claim window even when the project is claimed sooner,
+so the MCP server and the SDK start getting 401 from the app then; `init`,
+`deploy`, `status` and `whoami` print the date, and so does the refusal that
+follows a claim. Once the project is yours, create a permanent key in its admin
+panel and put it in `.env` as `REBASE_API_TOKEN` in place of the agent's.
 
 Claiming takes a signed-in browser session, not a token, and a payment method on
 the organization the project moves into. From the claim onwards the project is
@@ -52645,113 +53747,71 @@ billed like any other. Claiming also revokes the agent's token: sign in with
 Provisioning without an account is bounded per address and in total, and a
 control plane that has not switched it on refuses with a message saying so.
 
-### Compute, and what it costs
+## Cloud Notifications
 
-A project is priced from what it reserves, not from a tier. `compute` prints
-every dial and the control plane's own itemised quote for them. (`rebase cloud
-resources` is a different thing: the databases and buckets the code declares,
-and whether each is provisioned — see the [CLI reference](/docs/cli/cloud/).)
+The platform tells people when a deploy fails, a database stops backing up, a
+payment is declined, or a project passes 80% and then 100% of its allowance for
+the month.
+It is part of [Rebase Cloud](/docs/deployment/cloud/), and every command here
+is in the [CLI's cloud reference](/docs/cli/cloud/).
+
+### Webhooks
+
+<span class="since-badge" data-since="0.26">Since 0.26</span>
+
+A project can send these events to a Slack or Discord incoming
+webhook, or to any https URL, from **Settings → Notifications** in the console
+or with the CLI:
 
 ```bash
-rebase cloud compute
-rebase cloud compute set --cpu 500m --memory 2Gi
+rebase cloud notifications add https://hooks.slack.com/services/T000/B000/XXXX
+rebase cloud notifications add https://ops.example.com/rebase --events deploy.failed,backup.unhealthy
+rebase cloud notifications test <id>
+rebase cloud notifications            # each destination, and how its last delivery went
+rebase cloud notifications remove <id>
 ```
 
-| Dial | Unit, and what it means |
-|---|---|
-| `--cpu`, `--memory` | App request per instance, e.g. `500m` and `2Gi`. Empty means the platform default — `100m` and `384Mi`, bursting to 2 CPU and `2Gi` |
-| `--replicas` | Instances that always exist: the autoscaler's floor, and what the project is billed for at rest |
-| `--autoscale-max` | 1–16. The ceiling it may reach, and the worst case it may be billed. `--no-autoscale` turns it off |
-| `--autoscale-cpu-target` | 10–95. The CPU utilisation the autoscaler holds, against the request rather than the limit. Empty means 70 |
-| `--spot` | `true` or `false`. Preemptible capacity: cheaper, and restarted without notice |
-| `--db-instances` | 1–3. `1` is a single instance with no failover; `2` adds an automatic standby |
-| `--db-cpu`, `--db-memory` | Per database instance. Empty means `160m` and `1Gi` |
+The events are `deploy.failed` (the default), `deploy.succeeded`,
+`deploy.rolled_back`, `backup.unhealthy`, `billing.payment_failed` and
+`usage.threshold`. Each POST is JSON with a `type`, the `project`, the facts of
+the event, a console `url` and a one-line `text`. Slack shows the `text` as the
+message, so a Slack incoming-webhook URL works without any setup. For Discord,
+add `/slack` to the end of its webhook URL. `--format slack` sends `{ "text" }`
+alone, for a receiver that rejects fields it does not know. A build log never
+goes into a webhook.
 
-An empty dial is not the same as one pinned to the same number: an empty dial
-follows the platform default and moves when it moves.
+Every POST is signed: `X-Webhook-Signature: sha256=<hex HMAC-SHA256 of the raw
+body>`, with the secret shown once when the destination is added. It also
+carries `X-Webhook-Event` and an `X-Webhook-Delivery` id that stays the same
+across the retries of one delivery. A delivery is tried three times, 1 and 5
+seconds apart, 5 seconds each. A 4xx other than 429, a redirect or a refused
+address is not retried. The URL must be https. The control plane refuses one that resolves to
+a private, loopback, link-local or cloud-metadata address, both when it is
+added and on the address each delivery connects to. Any member of the
+organization can list a project's destinations, with their URLs masked.
+Adding, testing and removing one needs the owner or admin role.
 
-Nothing is validated by the CLI, on purpose — the limits belong to the cluster a
-project runs on, and they differ between providers. The control plane refuses a
-value it cannot honour and names the field. Run `rebase cloud compute` to see
-the €/month before and after; a change applies immediately, prorated from today,
-except one that restarts the database, which waits for a maintenance window.
+### Email
 
-### The rest of the surface
+Each member chooses which emails they get, per organization, under
+**Account → Notifications** in the console. Failures are on by default: a
+failed deploy goes to whoever started it and to the owners and admins. A
+successful deploy is off by default, and when turned on goes only to whoever
+started it. A declined payment goes to owners and the billing email, once per
+invoice. A broken backup goes to owners and admins at most once a day per
+database. Each usage mark is sent once a month per project. A control plane
+with no outgoing mail configured sends no email at all, and that page says so.
+Webhooks work either way.
 
-| Command group | What it covers |
-|---|---|
-| `login`, `logout`, `whoami` | Your session |
-| `tokens` | Tokens for CI and agents, each narrowed to one project. See [CI and agents](#ci-and-agents) |
-| `link`, `unlink`, `use`, `open` | Binding this directory to a project, selecting an organization, opening the console |
-| `init` | With `--claim`: a live backend with no account, and a link to claim it. See [A backend with no account](#a-backend-with-no-account) |
-| `projects` | Create, list, inspect, delete |
-| `deploy`, `logs`, `deployments`, `rollback`, `cancel` | Shipping and watching |
-| `previews` | Builds served on their own address by `deploy --preview`, and deleting them. See [Preview a change](#preview-a-change) |
-| `start`, `stop`, `restart` | Pausing a project and bringing it back |
-| `status`, `metrics`, `debug` | What it is doing, and why it is not |
-| `cron` | The deployed app's cron jobs and their recorded runs, read with your `rebase cloud` login. Read-only |
-| `env` | Environment variables. `list` never prints values; `--secret` is write-only |
-| `domains` | Custom domains, the DNS records to add, and verification. A project can answer on several, each verified on its own; `verify` and `remove` take the domain to act on, which may be left out only when there is one (for `verify`, one still pending). `list --json` returns `{ projectId, tenantHost, domains: [...] }` |
-| `db` | Attach or create a database, connect to it from your machine, backups, restore, and point-in-time recovery |
-| `extensions` | The Postgres extension allowlist |
-| `storage` | The project's bucket |
-| `resources` | Which databases and buckets the platform holds, against what the code declares |
-| `compute` | What this project reserves, what it costs, and how to change it |
-| `clusters` | The clusters tenants run on. Platform-admin only |
-| `settings`, `orgs`, `webhooks`, `billing` | Project settings, organizations, deploy hooks, payment |
+Each event reaches each person or destination once, however many times it is
+reported. A deploy cancelled by a person, and a platform upgrade that
+succeeded, are not reported.
 
-Every group in that table answers `--help` with a page of its own — a usage line,
-its flags, and examples — and `--help` never runs the command. A test holds the
-index to the pages, so a group added without one fails the build rather than
-answering with the table of contents. `verify:docs` holds the table itself to
-that index: every group the CLI dispatches appears here exactly once, so a group
-added without a row fails the build too.
+`rebase cloud webhooks` is retired. It never delivered anything, and every
+action now exits 1 with code `command_retired`. To get a POST when rows change
+in your app's own tables, use a `WebhookDispatcher` in your app's code (see
+[the webhook recipe](/docs/recipes/webhooks/)).
 
-Piped, `--help` answers in JSON instead: the same usage line, flags and examples
-as a structure to read rather than sixty lines of terminal escapes.
-
-### What the beta does not include
-
-Stated plainly, because finding out later is worse:
-
-- **No region choice.** Everything runs in one region today. The placement model
-  exists in the platform, but a project cannot pick a region.
-  `projects create --provider` and `--region` are not the exception they look
-  like: they record which of the control plane's registered deploy targets a
-  project belongs to, and there is one, so both default to it and neither moves a
-  project anywhere else. `rebase cloud projects create --help` says the same.
-- **Not self-serve.** Access is granted in batches; there is no sign-up-and-pay.
-- **No published SLA**, and no SOC 2. If you need either, say so when you request
-  access rather than assuming.
-- **No branch deploys**, and no first-party GitHub App. Deploy hooks — secret URLs
-  you point a repository webhook at — are the supported automation. [Preview
-  deploys](#preview-a-change) are rolling out and are started from the CLI.
-- **Tokens act as a person.** A [token](#ci-and-agents) is minted by an account
-  and acts as it; there is no organization-owned machine identity yet. If you
-  sign in from CI instead, pass `REBASE_CLOUD_EMAIL` and `REBASE_CLOUD_PASSWORD`
-  from a secret store — `--password` puts the password in your shell history and
-  in the process table, and says so before it signs you in. If the repository's
-  `.rebase/cloud.json` names a control plane other than the platform's own, pass
-  it as `--url` too: without a terminal, `login` refuses to send a password to a
-  host that only the checked-out file named.
-- **Point-in-time recovery is CLI-only.** The console shows backups; the staged
-  PITR workflow is `rebase cloud db pitr`.
-- **No public database endpoint.** A managed database is not exposed to the
-  internet, so the host the console shows is your backend's address for it and
-  resolves to nothing on your machine. `rebase cloud db connect` opens a local
-  port that is that database, tunnelled through the control plane, for as long
-  as you leave it running — but there is no permanent hostname a third-party
-  service can connect to. That tunnel, and the password behind
-  `rebase cloud db info --reveal`, both need the organization's owner or admin
-  role: the same one Studio's SQL editor asks for, because all three end at a
-  session on your production data.
-
-### Self-hosting instead
-
-Nothing here is a lock-in. The [self-hosting guide](/docs/deployment/self-hosting/)
-runs the identical image and bundle with `docker compose`, and the
-[Kubernetes guide](/docs/deployment/kubernetes/) renders the same topology from
-the Helm chart.
 
 ## Managed backend runtime
 
@@ -53123,9 +54183,18 @@ are allowed to any internet address on these TCP ports only:
 | 993 | IMAP over TLS |
 
 Everything else is blocked. That includes port 25, plain IMAP, and databases or
-caches on their own ports: a PostgreSQL on 5432, Redis on 6379 or MongoDB on
-27017 outside Rebase Cloud cannot be reached. The cloud metadata address
-(`169.254.169.254`) is blocked too.
+caches on their own ports: Redis on 6379 or MongoDB on 27017 outside Rebase
+Cloud cannot be reached. The cloud metadata address (`169.254.169.254`) is
+blocked too.
+
+The one exception is your own database. If the project brings its own
+PostgreSQL (BYODB), each deploy also allows connections to that database's
+host on the port in its connection string, and to nothing else on that port.
+The host is resolved to its IP addresses when you deploy, so if your provider
+moves the database to another address, deploy again. The database must accept
+connections from the internet: the app connects to the connection string
+directly. The SSH bastion settings are used only by the connection test, not
+by the deployed app.
 
 The platform adds no proxy and no outbound rate limit; the services you call
 have their own. Pass `getSignal(c)` to `fetch` so a call stops when its request
@@ -53903,6 +54972,14 @@ turn it off on the API:
       REBASE_ROLE: worker
       REBASE_MIGRATE_ON_BOOT: none
 ```
+
+A job that moves to a worker keeps `rebase.dataAsAdmin`, `rebase.sql`,
+`rebase.storage` and `rebase.email`, which talk to the database, the buckets and
+the mail server directly. It loses `rebase.functions`, `rebase.auth`,
+`rebase.admin` and `rebase.cron`: those dispatch into the process's own routes,
+and a worker serves none, so a call answers `404 NOT_FOUND` naming the surface
+that is off. Call a function over HTTP on the API instead, or leave a job that
+needs one where its surface is on.
 
 A `functions` process never runs either. It is scaled by request load and
 replaced at will, and giving it scheduled work would make its replica count mean
