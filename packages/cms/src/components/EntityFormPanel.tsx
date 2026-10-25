@@ -160,8 +160,8 @@ function EntityFormPanelInScope<M extends Record<string, unknown>>({
 
     const navigateBack = useCallback(() => onClose?.(), [onClose]);
     const saveAsNew = useCallback(() => {
-        const values = typedValues.current ?? lastSeenEntity?.values;
-        setAsNew(previous => ({ values: { ...values }, n: (previous?.n ?? 0) + 1 }));
+        const values: Partial<M> = typedValues.current ?? lastSeenEntity?.values ?? {};
+        setAsNew(previous => ({ values, n: (previous?.n ?? 0) + 1 }));
     }, [lastSeenEntity]);
 
     if (!collection) {
