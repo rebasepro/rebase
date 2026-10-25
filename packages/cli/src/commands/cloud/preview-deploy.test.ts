@@ -65,6 +65,8 @@ let previewHealth: Response | (() => Response);
 let listed: unknown[];
 /** What `pricing/quote` answers a batch of project rows with. */
 let quote: (rows: Array<Record<string, unknown>>) => unknown;
+/** Each `pricing/quote` request: its credential, if any, and its body. */
+let quoteRequests: Array<{ authorization: string | null; body: Array<Record<string, unknown>> }>;
 
 function write(root: string, relative: string, content: string): void {
     const file = path.join(root, relative);
@@ -120,8 +122,13 @@ beforeEach(() => {
     }) as never);
     context.setJsonModeForTest(false);
 
-    vi.stubGlobal("fetch", vi.fn(async (url: string) => {
+    quoteRequests = [];
+    vi.stubGlobal("fetch", vi.fn(async (url: string, init?: RequestInit) => {
         requests.push(url);
+        if (url === "https://cp.example/api/functions/pricing/quote") {
+            quoteRequests.push({ authorization: new Headers(init?.headers).get("Authorization"), body: JSON.parse(String(init?.body)) });
+            return new Response(JSON.stringify(quote(JSON.parse(String(init?.body)))));
+        }
         if (url.includes("/deploy/bundle/upload")) return new Response(JSON.stringify({ bundleId: "b1" }));
         if (url.includes("/deploy/source/upload")) return new Response(JSON.stringify({ sourceId: "0123456789abcdef0123456789abcdef" }));
         if (url === `${PREVIEW.url}/api/health`) return typeof previewHealth === "function" ? previewHealth() : previewHealth;
@@ -130,8 +137,7 @@ beforeEach(() => {
 
     listed = [PREVIEW];
     quote = (rows) => ({ quotes: rows.map(r => ({ lines: [], totalEur: 30 + 4.5 * Number(r.backendPreviews), backendPreviews: r.backendPreviews })) });
-    invoke = vi.fn(async (name: string, body: unknown, options?: { method?: string }) => {
-        if (name === "pricing") return quote(body as Array<Record<string, unknown>>);
+    invoke = vi.fn(async (name: string, _body: unknown, options?: { method?: string }) => {
         if (name === "previews" && options?.method === "GET") return { previews: listed };
         return name === "previews"
             ? { success: true, deployment: { id: "pd1" }, preview: PREVIEW }
@@ -175,19 +181,21 @@ function deploy(...flags: string[]): Promise<void> {
  * not triggers.
  */
 function triggered(): { name: string; body: Record<string, unknown>; options: unknown } {
-    const triggers = invoke.mock.calls.filter(([name, , options]) =>
-        name !== "pricing" && (options as { method?: string } | undefined)?.method !== "GET");
+    const triggers = invoke.mock.calls.filter(([, , options]) =>
+        (options as { method?: string } | undefined)?.method !== "GET");
     expect(triggers).toHaveLength(1);
     const [name, body, options] = triggers[0] as [string, Record<string, unknown>, unknown];
     return { name, body, options };
 }
 
-/** The batch of project rows the preview's price was asked for. */
+/**
+ * The batch of project rows the preview's price was asked for — with no
+ * credential: the route is public, and a token would be refused on it.
+ */
 function quoted(): Array<Record<string, unknown>> {
-    const call = invoke.mock.calls.find(([name]) => name === "pricing");
-    expect(call).toBeDefined();
-    expect(call?.[2]).toEqual({ method: "POST", path: "quote" });
-    return call?.[1] as Array<Record<string, unknown>>;
+    expect(quoteRequests).toHaveLength(1);
+    expect(quoteRequests[0].authorization).toBeNull();
+    return quoteRequests[0].body;
 }
 
 const routeMissing = () => Object.assign(new Error("No route for POST /api/functions/previews/proj_1 on this backend."), { status: 404 });
@@ -381,7 +389,7 @@ describe("what a preview costs", () => {
 
         await deploy("game", "--preview", "--no-follow");
 
-        expect(invoke.mock.calls.some(([name]) => name === "pricing")).toBe(false);
+        expect(quoteRequests).toHaveLength(0);
         expect(said.join("\n")).not.toContain("/month");
     });
 });

@@ -38,6 +38,7 @@ import {
     type CloudClient
 } from "./context";
 import { isMissingRoute } from "./cron";
+import { cliUserAgent } from "../../utils/version";
 
 /** The control-plane function that creates, lists and deletes previews. */
 export const PREVIEWS_FUNCTION = "previews";
@@ -291,8 +292,13 @@ const cents = (eur: number) => Math.round(eur * 100) / 100;
  * they change. One batched call, best-effort: a control plane that does not
  * price previews (its answer does not echo the count it was sent) or cannot be
  * asked leaves the numbers null, and the rule and the docs carry the answer.
+ *
+ * The quote is asked with no credential. The route is public — it prices a
+ * hypothetical and reads nobody's data — and an access token would be refused
+ * on it, holding no `functions:invoke:pricing`: no token capability names it,
+ * and none needs to.
  */
-export async function previewCost(client: CloudClient, projectId: string): Promise<PreviewCost> {
+export async function previewCost(client: CloudClient, url: string, projectId: string): Promise<PreviewCost> {
     const cost: PreviewCost = {
         perPreviewMonthlyEur: null,
         backendPreviews: null,
@@ -323,12 +329,14 @@ export async function previewCost(client: CloudClient, projectId: string): Promi
     if (cost.backendPreviews !== null && cost.backendPreviews > 1) counts.push(cost.backendPreviews);
     let quotes: Array<QuoteAnswer | null>;
     try {
-        const res = await client.functions.invoke<unknown>(
-            "pricing",
-            counts.map(backendPreviews => ({ ...project, backendPreviews })),
-            { method: "POST", path: "quote" }
-        );
-        quotes = isRecord(res) && Array.isArray(res.quotes) ? res.quotes.map(quoteAnswerFrom) : [];
+        const res = await fetch(`${url}/api/functions/pricing/quote`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json", "User-Agent": cliUserAgent() },
+            body: JSON.stringify(counts.map(backendPreviews => ({ ...project, backendPreviews })))
+        });
+        if (!res.ok) return cost;
+        const body: unknown = await res.json();
+        quotes = isRecord(body) && Array.isArray(body.quotes) ? body.quotes.map(quoteAnswerFrom) : [];
     } catch {
         return cost;
     }

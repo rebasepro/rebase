@@ -222,9 +222,22 @@ function app(method: string, url: URL, init?: RequestInit): Response {
     return json(404, { error: { code: "NOT_FOUND", message: `no route ${method} ${url.pathname}` } });
 }
 
+/**
+ * Control-plane routes anybody may call: they read nobody's data, and the CLI
+ * calls them with no credential, since a token holding no scope for them
+ * would be refused.
+ */
+const PUBLIC_ROUTES = new Set(["POST /api/functions/pricing/quote"]);
+
 function controlPlane(input: RequestInfo | URL, init?: RequestInit): Response {
     const url = new URL(String(input));
     const method = init?.method ?? "GET";
+    if (url.origin === cp && PUBLIC_ROUTES.has(`${method} ${url.pathname}`)) {
+        sent.push({ method, url, scope: `public:${method} ${url.pathname}` });
+        expect(new Headers(init?.headers).get("Authorization")).toBeNull();
+        const rows = JSON.parse(String(init?.body)) as Array<{ backendPreviews: number }>;
+        return json(200, { quotes: rows.map(row => ({ lines: [], totalEur: 20 + 5 * row.backendPreviews, backendPreviews: row.backendPreviews })) });
+    }
     const scope = requiredScope(method, url);
     sent.push({ method, url, scope });
     if (url.origin === APP || url.origin === PREVIEW_APP) return app(method, url, init);
@@ -408,10 +421,10 @@ describe("each capability covers its commands", () => {
 
         expect(requests.length, "the command made no request, so this proves nothing").toBeGreaterThan(0);
         for (const request of requests) {
-            expect(request.scope, `${request.method} ${request.url.href}`).toMatch(/^(data|functions|app):/);
+            expect(request.scope, `${request.method} ${request.url.href}`).toMatch(/^(data|functions|app|public):/);
         }
         const gaps = requests
-            .filter(request => !request.scope.startsWith("app:"))
+            .filter(request => !request.scope.startsWith("app:") && !request.scope.startsWith("public:"))
             .filter(request => !grants(held, request.scope) && !BEST_EFFORT[request.scope])
             .map(request => `${request.method} ${request.url.pathname} needs ${request.scope}`);
         expect(gaps, `--can ${capability} does not cover what the command calls`).toEqual([]);
@@ -422,7 +435,7 @@ describe("each capability covers its commands", () => {
         // command still finishes — `process.exit` would have thrown here.
         const requests = await run(prepare(line), capability, true);
         const refused = requests
-            .filter(request => !request.scope.startsWith("app:") && !grants(held, request.scope))
+            .filter(request => !request.scope.startsWith("app:") && !request.scope.startsWith("public:") && !grants(held, request.scope))
             .map(request => request.scope);
         expect(refused.every(scope => BEST_EFFORT[scope])).toBe(true);
         expect(said.join("\n")).not.toMatch(/SCOPE_MISSING|does not hold/);
@@ -433,6 +446,14 @@ describe("each capability covers its commands", () => {
         for (const scope of Object.keys(BEST_EFFORT)) {
             expect(requests.map(request => request.scope)).toContain(scope);
         }
+    });
+
+    it("prices a preview on the public quote route, so the public list cannot go stale", async () => {
+        const line = COMMANDS.deploy.find(words => words.includes("--preview-name"));
+        expect(line).toBeDefined();
+        const requests = await run(prepare(line ?? []), "deploy", true);
+        expect(requests.map(request => request.scope)).toContain("public:POST /api/functions/pricing/quote");
+        expect(said.join("\n")).toContain("€5.00/month");
     });
 
     it("never touches the login a person keeps on this machine", async () => {

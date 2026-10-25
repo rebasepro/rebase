@@ -896,7 +896,7 @@ async function triggerAndFollowPreview(opts: {
     // What it costs, in the control plane's numbers. Only a backend preview
     // is billed: one that is only files runs no pod of its own.
     const costOf = async (): Promise<PreviewCost | null> =>
-        preview.backend === "production" ? null : previewCost(client, projectId);
+        preview.backend === "production" ? null : previewCost(client, opts.url, projectId);
 
     if (!opts.follow) {
         const cost = await costOf();
