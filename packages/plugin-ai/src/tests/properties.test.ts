@@ -557,3 +557,47 @@ value: "Hi" }] });
 type: "string" });
     });
 });
+
+/**
+ * Values travel on an allow-list: a key the property map declares and does not
+ * lock. The old filter was a deny-list over the map, so anything the map could
+ * not describe went out by default — a property with `dynamicProps` (skipped by
+ * the serializer, so its `admin.readOnly` was never read) and any column that is
+ * no declared property at all.
+ */
+describe("values sent to the service — only what the map declares and does not lock", () => {
+
+    it("keeps the value of a read-only or hidden property with dynamicProps at home", () => {
+        const properties = {
+            title: { type: "string", name: "Title" },
+            internalNote: {
+                type: "string",
+                name: "Internal note",
+                admin: { readOnly: true },
+                dynamicProps: () => ({})
+            },
+            secretTier: {
+                type: "string",
+                name: "Tier",
+                admin: { disabled: { hidden: true } },
+                dynamicProps: () => ({})
+            }
+        } as unknown as Properties;
+        const values = { title: "Hello", internalNote: "customer owes 40k, do not tell", secretTier: "vip" };
+
+        const simplified = getSimplifiedProperties(properties, values);
+        const sent = omitDisabledValues(flatMapEntityValues(values), simplified);
+        expect(sent).toEqual({ title: "Hello" });
+    });
+
+    it("does not send a key that is no declared property", () => {
+        const properties = {
+            title: { type: "string", name: "Title" },
+            seo: { type: "map", name: "SEO", properties: { title: { type: "string", name: "SEO title" } } }
+        } as unknown as Properties;
+        const values = { title: "Hello", stripe_customer_id: "cus_123", seo: { title: "T", draftNotes: "x" } };
+
+        const sent = omitDisabledValues(flatMapEntityValues(values), getSimplifiedProperties(properties, values));
+        expect(sent).toEqual({ title: "Hello", "seo.title": "T" });
+    });
+});
