@@ -175,7 +175,21 @@ values this way.
 
 ```bash
 rebase cloud orgs list | create | members
+rebase cloud activity [--project <id|slug>] [--action <area|action>] [--actor <email>] [--limit N] [--before <cursor>]
 ```
+
+`activity` is the selected organization's audit log, newest first: who
+deployed, rolled back, set, deleted or revealed an environment variable (by
+name, never by value), changed a domain, created, restored or downloaded a
+backup, changed a project's compute, stopped or deleted a project, changed a
+member's role, or created or revoked an access token. `--action` takes an area
+(`deploy`, `deploy_hook`, `env`, `domain`, `backup`, `pitr`, `database`,
+`extension`, `storage`, `project`, `org`, `member`, `token`) or a full action
+such as `env.set`. A page holds up to 100 entries (`--limit`, default 50); the
+output prints the `--before` cursor for the next one. `--json` is one value,
+`{ org, events, nextCursor }`. It needs the organization's owner or admin role
+and reads with your login: no access-token capability includes it. The
+console's **Activity** page shows the same log.
 
 ## Databases
 

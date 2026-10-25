@@ -366,6 +366,16 @@ organization's: what you set there applies in every organization you belong to.
 factor, so CI keeps deploying after you turn it on. Revoke a token you no longer
 trust under **Settings → Access tokens**.
 
+## See who did what
+
+The console's **Activity** page and `rebase cloud activity` show the
+organization's owners and admins who deployed, set or revealed an environment
+variable (by name, never by value), changed a domain, restored a backup,
+resized, stopped or deleted a project, changed a member's role, or created a
+token, and when. A project's **Settings** links to its own entries; an entry
+about a deleted project stays. The filters are in
+[`rebase cloud`](/docs/cli/cloud/#organizations).
+
 ## CI and agents
 
 A CI job or an agent should not carry your password. Give it a token
@@ -558,6 +568,7 @@ except one that restarts the database, which waits for a maintenance window.
 | `usage` | Requests used this month against the included allowance, and the overage so far, as the invoice counts it. `usage org` lists every project of the organization |
 | `clusters` | The clusters tenants run on. Platform-admin only |
 | `settings`, `orgs`, `billing` | Project settings, organizations, payment |
+| `activity` | The organization's audit log: who deployed, changed an environment variable (by name), a domain, a backup, a member or a token. Owners and admins. See [See who did what](#see-who-did-what) |
 | `notifications`, `webhooks` | Where the project's events are POSTed: Slack, Discord or any https URL ([Cloud notifications](/docs/deployment/cloud-notifications/)). `webhooks` is retired and exits 1 with code `command_retired` |
 
 Every group in that table answers `--help` with a page of its own — a usage line,
