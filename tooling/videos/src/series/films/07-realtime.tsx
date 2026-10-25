@@ -25,7 +25,7 @@ const GREEN = "#34D399";
 const SCRIPT = lines([
     ["hook", "Realtime is easy to demo, and hard to secure."],
     ["listen", "In Rebase, a client listens to a query, and gets new results whenever the data changes."],
-    ["keys", "When a row changes, the database announces which row it was, never what's in it."],
+    ["keys", "When a row is written, the database announces which row it was, never what's in it."],
     ["rerun", "Then each subscriber's query runs again, as that subscriber, under their own policies."],
     ["hidden", "So a row someone isn't allowed to see never reaches their screen."],
     ["nothing", "The rules are the same Postgres policies as before, so realtime needs no rules of its own."],

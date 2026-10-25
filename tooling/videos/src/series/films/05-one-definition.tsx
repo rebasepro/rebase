@@ -29,8 +29,8 @@ const GREEN = "#34D399";
 
 const SCRIPT = lines([
     ["hook", "How many times have you described the same table? Once for the database, once for the API, and once more for the types."],
-    ["once", "In Rebase you describe it once, in one TypeScript file."],
-    ["becomes", "That file becomes the Drizzle schema, the REST routes, the OpenAPI spec, the typed SDK and the Postgres policies."],
+    ["once", "With Rebase, you describe it once, in a single TypeScript file."],
+    ["becomes", "From it come the Drizzle schema, the REST routes, the OpenAPI spec, the typed SDK and the Postgres policies."],
     ["panel", "If you want one, the same file also renders an admin panel."],
     ["change", "Change a field, and every surface follows, because there is no second model to keep in sync."],
     ["close", "Rebase is open source. You write the table down once, and the rest is generated."],

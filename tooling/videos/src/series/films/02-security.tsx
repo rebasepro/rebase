@@ -32,7 +32,7 @@ const SCRIPT = lines([
     ["rule", "Rebase puts the rule in the collection, right next to the table it protects."],
     ["policy", "Then it becomes a real Postgres policy, and the database checks it on every request."],
     ["everyone", "Your app, your admin panel and your agents all reach the data through those policies."],
-    ["lock", "If row-level security can't be switched on for a table, Rebase locks the table instead of serving it."],
+    ["lock", "If a table can't get row-level security, Rebase locks it rather than serve it unprotected."],
     ["close", "Rebase is open source. Your rules live in Postgres, where nobody can forget to call them."],
 ]);
 

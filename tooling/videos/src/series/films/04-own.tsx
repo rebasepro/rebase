@@ -25,7 +25,7 @@ const SCRIPT = lines([
     ["hook", "Before you pick a backend, ask who holds the keys."],
     ["licence", "Rebase is MIT licensed. The code is yours to read, change and run."],
     ["data", "Your data lives in plain Postgres tables, in a database you choose: your own server, Neon, Supabase, RDS or Cloud SQL."],
-    ["run", "The server runs anywhere a container runs, with guides for AWS, Google Cloud, Azure, Fly, Railway and Hetzner."],
+    ["run", "You can deploy it anywhere a container runs, with guides for AWS, Google Cloud, Azure, Fly, Railway and Hetzner."],
     ["backup", "Backups are standard Postgres dumps: one command takes them, and another restores them."],
     ["eject", "And rebase eject writes the entry point, the Dockerfile and the compose file into your repo."],
     ["close", "No vendor sits between you and your data. Rebase is open source, and the backend is yours."],

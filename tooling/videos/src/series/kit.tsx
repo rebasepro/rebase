@@ -668,6 +668,15 @@ export function useBody(lines = 1): { x: number; y: number; w: number; format: F
     return { x, y: y + lines * lh + (format === "tall" ? 48 : 56), w, format };
 }
 
+/** The body under a given headline: as many lines down as the headline will
+ *  take at this format. Instrument Sans sets about 0.44em a character here
+ *  (measured off the stills), so a line holds ~41 characters wide, ~30 tall. */
+export function useBodyFor(headline: string): { x: number; y: number; w: number; format: Format } {
+    const { w, format } = useStage();
+    const perLine = Math.floor(w / (HEADLINE[format] * 0.44));
+    return useBody(Math.max(1, Math.ceil(headline.length / perLine)));
+}
+
 /* ── more building blocks ───────────────────────────────────────────── */
 
 /**
