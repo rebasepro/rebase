@@ -272,7 +272,19 @@ type TypedDataLayer<DB> = {
  * capabilities populated and the `data` layer narrowed to provide
  * typed collection accessors when a `DB` schema generic is supplied.
  */
-export type CreateRebaseClientResult<DB = Record<string, unknown>> = Omit<RebaseClient<DB>, "data" | "email"> & {
+export type CreateRebaseClientResult<DB = Record<string, unknown>> = Omit<RebaseClient<DB>, "data" | "email" | "simulate"> & {
+    /**
+     * A client whose data requests run with simulated access — as a role, a
+     * uid holding a role, or a service key — for an administrator checking
+     * what row-level security lets that identity read. See
+     * {@link RebaseClient.simulate} for what the server honours and refuses.
+     *
+     * Always present here, typed by the same `Database` (it is built with the
+     * same `collections` dictionary), and closable: it is a client of its own,
+     * so release it with `close()` when done. On `RebaseClient` it is optional
+     * and untyped, because a server-side client has none.
+     */
+    simulate: (simulation: AccessSimulation) => CreateRebaseClientResult<DB>;
     /**
      * Send this token from now on, over HTTP and on the realtime socket. An
      * open socket is rebuilt to authenticate with it. A token getter, when one
@@ -919,13 +931,13 @@ export function createRebaseClient<DB = Record<string, unknown>>(options: Create
             onUnauthorized = handler;
         },
         resolveToken: transport.resolveToken,
-        simulate: (simulation: AccessSimulation): RebaseClient<Record<string, unknown>> => {
+        simulate: (simulation: AccessSimulation): CreateRebaseClientResult<DB> => {
             // A data client and nothing more: no socket (the server honours
             // the headers over HTTP only), no offline store (simulated rows
             // must never land in the administrator's cache), no session of its
             // own — the token is this client's, asked for on every request, so
             // this client's session is the one that refreshes.
-            const derived = createRebaseClient({
+            const derived = createRebaseClient<DB>({
                 baseUrl: options.baseUrl,
                 apiPath: options.apiPath,
                 fetch: options.fetch,

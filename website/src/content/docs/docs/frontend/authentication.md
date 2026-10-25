@@ -142,11 +142,13 @@ client whose requests carry the simulation, and only an administrator's own
 session may use it:
 
 ```typescript
-const asCustomer = client.simulate?.({ role: "customer", userId: "u_1" });
-if (asCustomer) {
-    const { data } = await asCustomer.data.collection("tickets").find();
-}
+const asCustomer = client.simulate({ role: "customer", userId: "u_1" });
+const { data } = await asCustomer.data.collection("tickets").find();
+asCustomer.close();
 ```
+
+The derived client is typed by the same `Database` as the one it came from, and
+is a client of its own: `close()` it when you are done.
 
 The effective-role switch (`useBuildEffectiveRoleController`) is not an RLS
 tester: it only changes which Studio views the navigation lists, sends nothing

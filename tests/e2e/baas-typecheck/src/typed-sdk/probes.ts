@@ -237,3 +237,17 @@ export async function viaWriteProbes(): Promise<void> {
     // @ts-expect-error — nor on a create
     await client.data.comments.create({ body: "b", post: "p1", postTags: ["t"] });
 }
+
+/**
+ * `simulate()` on a typed client: always there, typed by the same `Database`,
+ * and closable — its docblock says to `close()` it when done.
+ */
+export async function simulateProbes(): Promise<string> {
+    const asEditor = client.simulate({ role: "editor" });
+    const { data } = await asEditor.data.orderItems.find();
+    const sku: string = data[0].sku;
+    // @ts-expect-error — still typed: not a column of order_items
+    await asEditor.data.orderItems.find({ where: { skuu: ["==", "x"] } });
+    asEditor.close();
+    return sku;
+}
