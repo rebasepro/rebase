@@ -193,8 +193,10 @@ const APP_KEY_RETRY_DELAY_MS = 5_000;
  * an admin, expiring with the claim window. Never fatal: the project and its
  * claim link stand without it, so a refusal comes back as an outcome to report.
  *
- * Asks again only while the app is not answering yet (503), the state a
- * rollout that has just finished can still be in.
+ * Asks again only while the app is not answering yet, the state a rollout
+ * that has just finished can still be in: a 503 from the control plane (the
+ * app did not answer), or a 502/504 (the app's gateway answered for it — the
+ * control plane passes any non-2xx from the app on as 502).
  */
 export async function requestAppKey(
     url: string,
@@ -234,7 +236,7 @@ export async function requestAppKey(
         if (res.status === 404 && !refusal) {
             return { ok: false, code: "not_supported", message: `${url} does not mint keys for an unclaimed project's app.` };
         }
-        if (res.status !== 503) return last;
+        if (res.status !== 502 && res.status !== 503 && res.status !== 504) return last;
     }
     return last;
 }

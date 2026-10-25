@@ -636,6 +636,19 @@ describe("asking for the app's key", () => {
         expect(waits).toHaveLength(2);
     });
 
+    it("asks again while the app's gateway answers for it, which the control plane passes on as 502", async () => {
+        // A mint that races the rollout: the tenant's ingress answers 503 with
+        // no ready pod, and the control plane reports any non-2xx from the app
+        // as 502. Only 503 was asked again, so the key was given up on at once.
+        let calls = 0;
+        respond = () => ++calls === 1
+            ? json(502, { error: { code: "upstream_error", message: "The project's app could not mint a key (503)." } })
+            : json(201, APP_KEY);
+        const outcome = await requestAppKey(CP, "rk_live_x", "p1", { attempts: 3, sleep: async () => {} });
+        expect(outcome).toEqual({ ok: true, key: APP_KEY });
+        expect(sent).toHaveLength(2);
+    });
+
     it("does not ask again on any other refusal", async () => {
         respond = () => json(404, { error: { code: "not_found", message: "This project is not waiting to be claimed." } });
         const outcome = await requestAppKey(CP, "rk_live_x", "p1", { attempts: 3, sleep: async () => {} });
