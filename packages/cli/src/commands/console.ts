@@ -16,6 +16,7 @@ import path from "path";
 import { parseCommandArgs, wantsHelp } from "../utils/args";
 import { argsFromCommand } from "../utils/command-words";
 import { COLLECTIONS_FLAG_HELP, refuseMissingCollectionsPath } from "../utils/path-flags";
+import { collectionsDirArgs } from "../utils/collections-dir";
 import { reportSpawnFailure } from "../utils/spawn-error";
 import { DEV_DATABASE_KIND_ENV, managedNotices, prepareDatabaseEnv } from "../dev-db/prepare";
 import { absolutizeLocalPathArgs, ensureDockerDatabase, resolveDriverCli, spawnDriverCli } from "./db";
@@ -115,8 +116,10 @@ export async function consoleCommand(rawArgs: string[]): Promise<void> {
     resolved.env[DEV_DATABASE_KIND_ENV] = prepared.database.kind;
     for (const line of managedNotices(prepared)) say(line);
 
+    const typedArgs = absolutizeLocalPathArgs(argsFromCommand(rawArgs, "console"), process.cwd());
     const childArgs = [
-        ...absolutizeLocalPathArgs(argsFromCommand(rawArgs, "console"), process.cwd()),
+        ...typedArgs,
+        ...collectionsDirArgs(projectRoot, typedArgs),
         `--history=${consoleHistoryPath(projectRoot)}`
     ];
 

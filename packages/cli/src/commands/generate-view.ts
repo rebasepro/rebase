@@ -36,7 +36,8 @@ import path from "path";
 import { fileURLToPath } from "url";
 import chalk from "chalk";
 
-import { cmsMountOf, findBackendApp, loadManifest, resolveBackendPaths, DEFAULT_CONFIG_DIR } from "../manifest";
+import { cmsMountOf, loadManifest } from "../manifest";
+import { resolveCollectionsDir } from "../utils/collections-dir";
 import { requireProjectRoot } from "../utils/project";
 import { parseCommandArgs, UsageError, wantsHelp } from "../utils/args";
 
@@ -292,16 +293,8 @@ export function resolveFrontendDir(projectRoot: string): string | undefined {
     return fs.existsSync(path.join(fallback, "src")) ? fallback : undefined;
 }
 
-/** `<config>/collections`, as the backend app declares it. */
-export function resolveCollectionsDir(projectRoot: string): string {
-    try {
-        const backend = findBackendApp(loadManifest(projectRoot).manifest);
-        if (backend) return path.join(projectRoot, resolveBackendPaths(backend.app, projectRoot).config, "collections");
-    } catch {
-        // fall through to the default
-    }
-    return path.join(projectRoot, DEFAULT_CONFIG_DIR, "collections");
-}
+/** `<config>/collections`, as the backend app declares it — one resolver for every command. */
+export { resolveCollectionsDir };
 
 function collectionFiles(dir: string): string[] {
     if (!fs.existsSync(dir)) return [];

@@ -24,6 +24,7 @@ import { analyseFunctionsDirectory, summarisePortability } from "../function-por
 import { reportSpawnFailure } from "../utils/spawn-error";
 import { argsFromCommand } from "../utils/command-words";
 import { COLLECTIONS_FLAG_HELP, refuseMissingCollectionsPath } from "../utils/path-flags";
+import { collectionsDirArgs, resolveCollectionsDir } from "../utils/collections-dir";
 import { absolutizeLocalPathArgs, DATABASE_SOURCE_ENV } from "./db";
 import { parseCommandArgs, wantsHelp } from "../utils/args";
 import { loadManifest, findBackendApp, resolveBackendPaths } from "../manifest";
@@ -384,7 +385,7 @@ export function hasDeclaredCollections(projectRoot: string): boolean {
  * the right failure for a check that only ever reports.
  */
 function readDeclaredSlugs(projectRoot: string): Array<{ slug: string }> {
-    const dir = path.join(projectRoot, "config", "collections");
+    const dir = resolveCollectionsDir(projectRoot);
     if (!fs.existsSync(dir)) return [];
     const slugs: Array<{ slug: string }> = [];
     let entries: string[];
@@ -456,8 +457,9 @@ const DOCTOR_FLAG_HELP: Record<string, string> = {
  * The line handed to the driver, every path on it resolved from where the
  * command was run — the driver runs in `backend/`. See `utils/path-flags.ts`.
  */
-export function doctorDriverArgs(rawArgs: string[], cwd: string): string[] {
-    return absolutizeLocalPathArgs(argsFromCommand(rawArgs, "doctor"), cwd, ["--collections", "-c", "--schema", "-s", "--sdk", "-k"]);
+export function doctorDriverArgs(rawArgs: string[], cwd: string, projectRoot?: string): string[] {
+    const args = absolutizeLocalPathArgs(argsFromCommand(rawArgs, "doctor"), cwd, ["--collections", "-c", "--schema", "-s", "--sdk", "-k"]);
+    return projectRoot ? [...args, ...collectionsDirArgs(projectRoot, args)] : args;
 }
 
 /** `--collections, -c` — the aliases, resolved from the spec rather than retyped. */
@@ -618,13 +620,13 @@ export async function doctorCommand(rawArgs: string[]): Promise<void> {
             if (!tsxBin) {
                 exitDependenciesNotInstalled(projectRoot);
             }
-            await execa(tsxBin, [pluginCli, ...doctorDriverArgs(rawArgs, process.cwd())], {
+            await execa(tsxBin, [pluginCli, ...doctorDriverArgs(rawArgs, process.cwd(), projectRoot)], {
                 cwd: backendDir,
                 stdio: "inherit",
                 env
             });
         } else {
-            await execa("node", [pluginCli, ...doctorDriverArgs(rawArgs, process.cwd())], {
+            await execa("node", [pluginCli, ...doctorDriverArgs(rawArgs, process.cwd(), projectRoot)], {
                 cwd: backendDir,
                 stdio: "inherit",
                 env

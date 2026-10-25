@@ -43,6 +43,7 @@ import { parseCommandArgs, wantsHelp } from "../utils/args";
 import { failAsJson, findBackendDir, getActiveBackendPlugin, readEnvFile, requireProjectRoot } from "../utils/project";
 import { COLLECTIONS_FLAG_HELP, missingCollectionsPath } from "../utils/path-flags";
 import { isLoadedCollectionFile } from "../utils/collection-drift";
+import { resolveCollectionsDir } from "../utils/collections-dir";
 
 /** The flags `rebase verify` takes. */
 export const VERIFY_FLAGS = {
@@ -877,7 +878,7 @@ export async function verifyCommand(rawArgs: string[]): Promise<void> {
     }
     const collectionsDir = flags["--collections"]
         ? path.resolve(process.cwd(), flags["--collections"])
-        : path.join(projectRoot, "config", "collections");
+        : resolveCollectionsDir(projectRoot);
     const live = flags["--live"] === true;
     const database = live
         ? await resolveLiveDatabase(projectRoot, rawArgs, {

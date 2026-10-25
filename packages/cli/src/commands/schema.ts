@@ -21,6 +21,7 @@ import { unknownCommand } from "../utils/unknown-command";
 import { DEV_DATABASE_KIND_ENV, devDatabaseKind, managedNotices, prepareDatabaseEnv } from "../dev-db/prepare";
 import { absolutizeLocalPathArgs } from "./db";
 import { COLLECTIONS_FLAG_HELP, refuseMissingCollectionsPath } from "../utils/path-flags";
+import { collectionsDirArgs } from "../utils/collections-dir";
 
 /**
  * The line handed to the driver, its paths resolved from where the command was
@@ -122,9 +123,10 @@ export async function schemaCommand(subcommand: string | undefined, rawArgs: str
         // The one spawn, shared with `db`. This file used to carry its own copy
         // of the tsx-or-node decision; three copies of that rule existed and two
         // were fixed while the third went on spawning plain node.
+        const driverArgs = schemaDriverArgs(rawArgs, process.cwd());
         await spawnDriverCli(
             { projectRoot, backendDir, pluginCli, env },
-            schemaDriverArgs(rawArgs, process.cwd())
+            [...driverArgs, ...collectionsDirArgs(projectRoot, driverArgs)]
         );
     } catch (error) {
         // A child that ran and exited non-zero already printed its diagnostics

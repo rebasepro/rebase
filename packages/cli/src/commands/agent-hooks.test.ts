@@ -148,6 +148,21 @@ describe("post-edit-collection.sh", () => {
         expect(result.stderr).not.toContain("Fix them in config/collections/");
     });
 
+    it("checks the collections where rebase.json moved the backend's config", () => {
+        fs.writeFileSync(path.join(project, "rebase.json"), JSON.stringify({
+            rebase: "^1", apps: { backend: { type: "backend", runtime: "managed", config: "shared" } }
+        }));
+        fakeRebase(1, "✗ shared/collections/posts.ts → posts.securityRules  missing.");
+        const result = runHook(path.join(project, "shared", "collections", "posts.ts"));
+        expect(result.status).toBe(2);
+        expect(fs.readFileSync(path.join(project, "ran"), "utf-8").trim()).toBe("verify --quiet");
+        expect(result.stderr).toContain("Fix them in shared/collections/");
+
+        fs.rmSync(path.join(project, "ran"));
+        expect(runHook(path.join(project, "config", "collections", "posts.ts")).status).toBe(0);
+        expect(fs.existsSync(path.join(project, "ran"))).toBe(false);
+    });
+
     it("checks an edit Claude Code reports with a Windows path", () => {
         fakeRebase(1, "✗ config/collections/posts.ts → posts.securityRules  missing.");
         const result = runHook("C:\\Users\\me\\shop\\config\\collections\\posts.ts");

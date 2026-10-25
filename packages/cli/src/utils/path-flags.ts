@@ -21,7 +21,7 @@ import chalk from "chalk";
 export const COLLECTIONS_PATH_RULE = "relative paths are resolved from where you run the command";
 
 /** The `--collections` line of a help page. */
-export const COLLECTIONS_FLAG_HELP = `Collections directory (default: config/collections); ${COLLECTIONS_PATH_RULE}`;
+export const COLLECTIONS_FLAG_HELP = `Collections directory (default: config/collections, or <config>/collections when rebase.json moves the backend's config); ${COLLECTIONS_PATH_RULE}`;
 
 /** The flags that carry a collections path, in every spelling the driver accepts. */
 const COLLECTIONS_FLAGS = ["--collections", "-c"];

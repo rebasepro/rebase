@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Rebase guardrail for Claude Code, installed by `rebase init` and `rebase skills --hooks`.
 #
-# After Claude Code edits a file under config/collections/, this runs
+# After Claude Code edits a collection file — under config/collections/, or
+# <config>/collections/ when rebase.json moves the backend's config — this runs
 # `rebase verify --quiet` and hands any problem straight back to the agent:
 # an option that does not exist, a UI widget written outside `admin: { ... }`,
 # a collection with no `securityRules`, a migration the collections have moved
@@ -14,25 +15,40 @@ set -u
 
 input="$(cat)"
 
-# The edited file, from the tool call Claude Code passes on stdin. Node rather
-# than jq: every Rebase project has Node, not every machine has jq.
-file="$(printf '%s' "$input" | node -e '
+# The edited file, from the tool call Claude Code passes on stdin, and the
+# backend's config directory, from rebase.json (`apps.<backend>.config`, by
+# default `config`) — the runtime and `rebase verify` read the collections from
+# there, so a project that moved them is still checked. Node rather than jq:
+# every Rebase project has Node, not every machine has jq.
+parsed="$(printf '%s' "$input" | node -e '
 let raw = "";
 process.stdin.on("data", chunk => { raw += chunk; });
 process.stdin.on("end", () => {
+    let config = "config";
+    try {
+        const manifest = JSON.parse(require("fs").readFileSync(require("path").join(process.env.CLAUDE_PROJECT_DIR || ".", "rebase.json"), "utf8"));
+        const backend = Object.values(manifest.apps || {}).find(app => app && app.type === "backend");
+        if (backend && typeof backend.config === "string" && backend.config) config = backend.config.replace(/\\/g, "/").replace(/^\.\//, "").replace(/\/+$/, "");
+    } catch {
+        // No rebase.json, or one this cannot read: the conventional layout.
+    }
+    let file = "";
     try {
         const toolInput = JSON.parse(raw).tool_input || {};
         // Forward slashes on every OS: on Windows the path arrives as
         // C:\Users\me\shop\config\collections\posts.ts, which the case below never matched.
-        process.stdout.write(String(toolInput.file_path || toolInput.notebook_path || "").replace(/\\/g, "/"));
+        file = String(toolInput.file_path || toolInput.notebook_path || "").replace(/\\/g, "/");
     } catch {
         // Not a tool call this hook understands: nothing to check.
     }
+    process.stdout.write(config + "\n" + file);
 });
 ')"
+config_dir="${parsed%%$'\n'*}"
+file="${parsed#*$'\n'}"
 
 case "$file" in
-    */config/collections/* | config/collections/*) ;;
+    */"$config_dir"/collections/* | "$config_dir"/collections/*) ;;
     *) exit 0 ;;
 esac
 
@@ -72,6 +88,6 @@ fi
     echo "$output"
     echo ""
     echo "Each problem names its file, the path inside the collection config, and the fix."
-    echo "Fix them in config/collections/ before moving on; run \`rebase verify\` for the full report."
+    echo "Fix them in ${config_dir}/collections/ before moving on; run \`rebase verify\` for the full report."
 } >&2
 exit 2

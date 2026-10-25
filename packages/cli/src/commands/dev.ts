@@ -63,6 +63,7 @@ import { detectPackageManager, getPMCommands } from "../utils/package-manager";
 import { parseCommandArgs, switchOn, UsageError, wantsHelp } from "../utils/args";
 import { Refusal } from "../utils/refusal";
 import { affectsSqlSchema } from "../utils/collection-drift";
+import { collectionsDirArgs, resolveCollectionsDir, resolveConfigDir } from "../utils/collections-dir";
 import { BootRetry } from "../utils/boot-retry";
 import { ensureDevDatabase, probeTcp } from "../utils/dev-preflight";
 import { DEV_BACKEND_URL_ENV, getProjectPort } from "../utils/dev-server";
@@ -295,13 +296,13 @@ export function devWatchIncludes(
     const dirs = [paths.REBASE_DEV_FUNCTIONS, paths.REBASE_DEV_CRONS]
         .filter((entry): entry is string => Boolean(entry))
         .map(entry => path.resolve(projectRoot, entry));
-    dirs.push(path.join(projectRoot, "config"));
+    dirs.push(path.join(projectRoot, resolveConfigDir(projectRoot)));
     return dirs;
 }
 
 /** Where dev watches the collections it regenerates the schema and SDK from. */
 function devCollectionsDir(projectRoot: string): string {
-    return path.join(projectRoot, "config", "collections");
+    return resolveCollectionsDir(projectRoot);
 }
 
 /**
@@ -916,7 +917,7 @@ function readEnvVar(projectRoot: string, name: string): string | undefined {
  * mode serves whatever the database already has.
  */
 function projectHasCollections(projectRoot: string): boolean {
-    const collectionsDir = path.join(projectRoot, "config", "collections");
+    const collectionsDir = devCollectionsDir(projectRoot);
     return fs.existsSync(collectionsDir)
         && fs.readdirSync(collectionsDir).some(name => /\.(ts|js|mts|mjs)$/.test(name) && !name.startsWith("index."));
 }
@@ -1849,7 +1850,8 @@ export async function devCommand(rawArgs: string[]): Promise<void> {
             const activePlugin = getActiveBackendPlugin(backendDir);
             const pluginCli = activePlugin ? resolvePluginCliScript(backendDir, activePlugin) : null;
             if (pluginCli && needsStaleSchemaPreflight(schemaGeneration)) {
-                await execa(tsxBin, [pluginCli, "schema", "stale", "--fix"], {
+                const staleArgs = ["schema", "stale", "--fix"];
+                await execa(tsxBin, [pluginCli, ...staleArgs, ...collectionsDirArgs(projectRoot, staleArgs)], {
                     cwd: backendDir,
                     stdio: "inherit",
                     env

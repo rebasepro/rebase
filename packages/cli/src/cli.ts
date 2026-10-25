@@ -325,7 +325,8 @@ async function dispatch(
             const sdkRoot = sdkHelp ? process.cwd() : requireProjectRoot();
             const { generateSdkCommand } = await import("./commands/generate_sdk");
             await generateSdkCommand({
-                collectionsDir: sdkArgs["--collections"] || path.join(sdkRoot, "config/collections"),
+                collectionsDir: sdkArgs["--collections"]
+                    || (sdkHelp ? path.join(sdkRoot, "config/collections") : (await import("./utils/collections-dir")).resolveCollectionsDir(sdkRoot)),
                 output: sdkArgs["--output"] || path.join(sdkRoot, "generated/sdk"),
                 from: sdkArgs["--from"],
                 token: sdkArgs["--token"],
