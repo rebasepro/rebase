@@ -55,11 +55,17 @@ esac
 cd "${CLAUDE_PROJECT_DIR:-.}" || exit 0
 
 # The project's own CLI, pinned with the rest of its @rebasepro packages.
-if [ -x node_modules/.bin/rebase ]; then
-    output="$(node_modules/.bin/rebase verify --quiet 2>&1)"
-else
-    output="$(npx --no rebase verify --quiet 2>&1)"
+#
+# Not installed yet is the state `rebase init --yes` leaves, and it is not a
+# problem in the collections the agent just edited, so it never blocks the
+# edit. There is no `npx` fallback: `npx --no rebase` with nothing installed
+# exits 1 ("could not determine executable to run"), which read as a failed
+# verify and told the agent to fix collections that were fine.
+if [ ! -x node_modules/.bin/rebase ]; then
+    echo "Rebase guardrail skipped: this project's dependencies are not installed (no node_modules/.bin/rebase). Run the install — pnpm install, or your package manager's — to check collections after each edit." >&2
+    exit 0
 fi
+output="$(node_modules/.bin/rebase verify --quiet 2>&1)"
 status=$?
 
 if [ "$status" -eq 0 ]; then
@@ -67,9 +73,9 @@ if [ "$status" -eq 0 ]; then
 fi
 
 # A project pinned to a CLI from before `rebase verify` answers "Unknown
-# command", and one with no CLI installed cannot run it at all. Neither is a
-# problem in the collections the agent just edited, so neither blocks the edit:
-# say why the check was skipped, and go on.
+# command", and a CLI whose interpreter is missing cannot run at all (127).
+# Neither is a problem in the collections the agent just edited, so neither
+# blocks the edit: say why the check was skipped, and go on.
 case "$output" in
     *"Unknown command"*verify*)
         echo "Rebase guardrail skipped: this project's @rebasepro/cli predates \`rebase verify\`. Upgrade it with \`rebase upgrade\` to check collections after each edit." >&2
@@ -77,7 +83,7 @@ case "$output" in
         ;;
 esac
 if [ "$status" -eq 127 ]; then
-    echo "Rebase guardrail skipped: no rebase CLI found in this project. Install @rebasepro/cli to check collections after each edit." >&2
+    echo "Rebase guardrail skipped: this project's rebase CLI could not be run. Reinstall the dependencies to check collections after each edit." >&2
     exit 0
 fi
 

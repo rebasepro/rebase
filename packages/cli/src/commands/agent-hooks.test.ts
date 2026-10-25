@@ -163,6 +163,28 @@ describe("post-edit-collection.sh", () => {
         expect(fs.existsSync(path.join(project, "ran"))).toBe(false);
     });
 
+    it("does not block the edit in a project whose dependencies are not installed yet", () => {
+        // What `rebase init --yes` leaves: no node_modules at all. A stand-in
+        // `npx` on PATH that fails the way npm does proves nothing reaches it.
+        const bin = path.join(project, "fake-bin");
+        fs.mkdirSync(bin);
+        fs.writeFileSync(path.join(bin, "npx"), [
+            "#!/usr/bin/env bash",
+            `echo ran > "${path.join(project, "ran")}"`,
+            "echo 'npm error could not determine executable to run' >&2",
+            "exit 1"
+        ].join("\n"), { mode: 0o755 });
+        const result = spawnSync("bash", [path.join(TEMPLATE, AGENT_HOOK_SCRIPT)], {
+            input: JSON.stringify({ tool_name: "Edit", tool_input: { file_path: path.join(project, "config", "collections", "posts.ts") } }),
+            env: { ...process.env, CLAUDE_PROJECT_DIR: project, PATH: `${bin}${path.delimiter}${process.env.PATH ?? ""}` },
+            encoding: "utf-8"
+        });
+        expect(result.status).toBe(0);
+        expect(result.stderr).toContain("dependencies are not installed");
+        expect(result.stderr).not.toContain("Fix them in");
+        expect(fs.existsSync(path.join(project, "ran"))).toBe(false);
+    });
+
     it("checks an edit Claude Code reports with a Windows path", () => {
         fakeRebase(1, "✗ config/collections/posts.ts → posts.securityRules  missing.");
         const result = runHook("C:\\Users\\me\\shop\\config\\collections\\posts.ts");
