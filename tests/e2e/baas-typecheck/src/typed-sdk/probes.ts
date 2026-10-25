@@ -200,6 +200,27 @@ export async function requiredBelongsToProbes(): Promise<string> {
     return data[0].postId;
 }
 
+/**
+ * A to-one relation closed to the API takes its foreign key with it, as the
+ * server's read strip and write refusal do: hidden from every read and refused
+ * on every write (`excludeFromApi`), or readable but refused on every write
+ * (`access: { write: [] }`).
+ */
+export async function closedRelationProbes(): Promise<number | null | undefined> {
+    const comments = client.data.comments;
+    const { data } = await comments.find();
+    // @ts-expect-error — stripped from every read
+    void data[0].moderatorId;
+    // @ts-expect-error — refused on a write (VALIDATION_EXCLUDED_FIELDS)
+    await comments.update(1, { moderatorId: 1 });
+    // @ts-expect-error — nobody may write the reviewer's key
+    await comments.update(1, { reviewerId: 1 });
+    // @ts-expect-error — nor under the relation's name
+    await comments.update(1, { reviewer: 1 });
+    // Readable, so still on the row.
+    return data[0].reviewerId;
+}
+
 /** A `via` is read-only on every door (RELATION_NOT_WRITABLE). */
 export async function viaWriteProbes(): Promise<void> {
     // @ts-expect-error — not writable through the flat door

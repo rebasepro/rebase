@@ -1,5 +1,5 @@
 import { getDeclaredSubcollections, CollectionConfig, Property, Properties, MapProperty, ArrayProperty, StringProperty, NumberProperty, ResolvedRelation } from "@rebasepro/types";
-import { effectiveAccess, fieldKeyForColumn, findRelation, isRelationRequired, resolveCollectionRelations, sortCollectionsBySlug } from "@rebasepro/common";
+import { effectiveAccess, fieldKeyForColumn, findRelation, isRelationRequired, resolveCollectionRelations, restrictedFieldNames, sortCollectionsBySlug } from "@rebasepro/common";
 import { toCollectionAccessor, toSafeIdentifier } from "./utils";
 
 /**
@@ -303,20 +303,41 @@ function line(key: string, type: string, optional: boolean): string {
  * reader who holds `hr` and one who does not. The server is the enforcement
  * point; the types describe the surface a caller may name.
  *
- * Keyed by the property name *and* by its column name, the same pair the
- * server's `stripUnreadable` deletes, so a foreign key or a relation addressed
- * under the column name cannot put the property back.
+ * Every spelling the server restricts, read from the server's own function
+ * (`restrictedFieldNames`): the property name, its column name, and — for a
+ * closed to-one relation — the foreign key that names the same row. Keying on
+ * the property and column alone, which this used to, kept `authorId` on all
+ * three types for an `excludeFromApi` `author`, though the server strips it
+ * from every read and refuses it on every write.
  */
-function excludedApiKeys(properties: Properties): Set<string> {
-    const excluded = new Set<string>();
-    for (const [key, rawProp] of Object.entries(properties)) {
-        const prop = rawProp as Property;
-        const access = effectiveAccess(prop);
-        if (access?.read?.length !== 0 || access?.write?.length !== 0) continue;
-        excluded.add(key);
-        if (prop.columnName) excluded.add(prop.columnName);
+function excludedApiKeys(collection: CollectionConfig): Set<string> {
+    const unreadable = closedNames(collection, "read");
+    const unwritable = closedNames(collection, "write");
+    return new Set([...unreadable].filter(name => unwritable.has(name)));
+}
+
+/**
+ * The names nobody may read (or write), as the server judges them: no viewer
+ * is the trusted plane, which every role-naming rule admits, so what is left
+ * is exactly the empty rules.
+ *
+ * `restrictedFieldNames` resolves the relations of a closed relation property
+ * to find its foreign key. When those cannot be resolved — already warned
+ * about by the caller — the property and column names are still closed.
+ */
+function closedNames(collection: CollectionConfig, kind: "read" | "write"): Set<string> {
+    try {
+        return restrictedFieldNames(collection, undefined, kind).refused;
+    } catch {
+        const names = new Set<string>();
+        for (const [key, rawProp] of Object.entries((collection.properties ?? {}) as Properties)) {
+            const prop = rawProp as Property;
+            if (effectiveAccess(prop)?.[kind]?.length !== 0) continue;
+            names.add(key);
+            if (prop.columnName) names.add(prop.columnName);
+        }
+        return names;
     }
-    return excluded;
 }
 
 /**
@@ -329,17 +350,11 @@ function excludedApiKeys(properties: Properties): Set<string> {
  * generated `create({ computed })` compiled and could only ever be a 400.
  *
  * A write rule naming *roles* is not this: some caller can write it, and one
- * generated shape cannot say which.
+ * generated shape cannot say which. A closed to-one relation's foreign key is:
+ * the server refuses `reviewerId` exactly as it refuses `reviewer`.
  */
-function unwritableKeys(properties: Properties): Set<string> {
-    const unwritable = new Set<string>();
-    for (const [key, rawProp] of Object.entries(properties)) {
-        const prop = rawProp as Property;
-        if (effectiveAccess(prop)?.write?.length !== 0) continue;
-        unwritable.add(key);
-        if (prop.columnName) unwritable.add(prop.columnName);
-    }
-    return unwritable;
+function unwritableKeys(collection: CollectionConfig): Set<string> {
+    return closedNames(collection, "write");
 }
 
 export function generateTypedefs(input: CollectionConfig[]): string {
@@ -456,7 +471,7 @@ export function generateTypedefs(input: CollectionConfig[]): string {
         // set means every later pass (foreign keys, relations, unresolved
         // relations) skips them too, since each of those already refuses to
         // emit a key twice.
-        const excluded = excludedApiKeys(properties);
+        const excluded = excludedApiKeys(collection);
         for (const key of excluded) emittedKeys.add(key);
 
         // 1. Direct properties
@@ -535,7 +550,7 @@ export function generateTypedefs(input: CollectionConfig[]): string {
         // property is off the API surface in both directions, so a generated
         // client never names it — and minus every field nobody may write.
         lines.push("    Insert: {");
-        const notWritable = new Set([...excluded, ...unwritableKeys(properties)]);
+        const notWritable = new Set([...excluded, ...unwritableKeys(collection)]);
         emittedKeys.clear();
         for (const key of notWritable) emittedKeys.add(key);
 
@@ -592,12 +607,17 @@ export function generateTypedefs(input: CollectionConfig[]): string {
         // the same type for `keyof` (never), but `{}` is what typescript-eslint's
         // recommended `no-empty-object-type` refuses, in every project that
         // lints its generated SDK.
-        if (Object.keys(resolvedRelations).length === 0) {
+        //
+        // An `excludeFromApi` relation is left out: the server answers an
+        // include naming one as it answers a typo (`UNKNOWN_RELATION`), so
+        // `IncludeFor` must not offer it.
+        const includable = Object.entries(resolvedRelations).filter(([key]) => !excluded.has(key));
+        if (includable.length === 0) {
             lines.push("    Relations: Record<never, never>;");
         } else {
             lines.push("    Relations: {");
         }
-        for (const [key, relation] of Object.entries(resolvedRelations)) {
+        for (const [key, relation] of includable) {
             const target = resolveTargetCollection(relation);
             const slug = target?.slug ?? relation.targetSlug;
             const accessor = slug ? accessors.get(slug) : undefined;
@@ -606,7 +626,7 @@ export function generateTypedefs(input: CollectionConfig[]): string {
             // something that does not exist.
             lines.push(`      ${emitKey(key)}: ${accessor ? emitString(accessor) : "never"};`);
         }
-        if (Object.keys(resolvedRelations).length > 0) lines.push("    };");
+        if (includable.length > 0) lines.push("    };");
 
         // ── Slug ──
         //

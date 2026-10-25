@@ -38,7 +38,6 @@ export interface Database {
       id: number;
       body: string;
       postId: string;
-      moderatorId?: number | null;
       reviewerId?: number | null;
       post?: Database["posts"]["Row"];
       reviewer?: Database["authors"]["Row"];
@@ -48,20 +47,15 @@ export interface Database {
       id?: number;
       body: string;
       postId?: string;
-      moderatorId?: number | null;
-      reviewerId?: number | null;
       post?: string;
     } & ({ postId: string } | { post: string });
     Update: {
       body?: string;
       postId?: string;
-      moderatorId?: number | null;
-      reviewerId?: number | null;
       post?: string;
     };
     Relations: {
       post: "posts";
-      moderator: "authors";
       reviewer: "authors";
       postTags: "tags";
     };

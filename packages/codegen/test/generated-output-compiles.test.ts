@@ -439,7 +439,17 @@ describe("the generated write types, per relation kind", () => {
         slug: "posts",
         properties: {
             id: { type: "string", isId: "uuid" },
-            title: { type: "string", validation: { required: true } }
+            title: { type: "string", validation: { required: true } },
+            moderator: {
+                type: "relation",
+                excludeFromApi: true,
+                relation: { kind: "belongsTo", target: () => authors, localKey: "moderator_id" }
+            },
+            reviewer: {
+                type: "relation",
+                access: { write: [] },
+                relation: { kind: "belongsTo", target: () => authors, localKey: "reviewer_id" }
+            }
         }
     };
 
@@ -467,6 +477,32 @@ describe("the generated write types, per relation kind", () => {
             // An update may name neither.
             const update: Database["comments"]["Update"] = { body: "c" };
             export { byKey, byRelation, mixed, both, noPost, nullPost, wrongType, keys, update };
+        `)).toEqual([]);
+    });
+
+    it("takes a closed to-one relation's foreign key with it, as the server does", () => {
+        // The server's read strip and write refusal (`restrictedFieldNames`,
+        // `apiHiddenFieldNames`) restrict the foreign key of a closed
+        // belongsTo alongside the relation: `moderatorId` is stripped from
+        // every read and refused on every write, `reviewerId` is readable and
+        // refused on every write. The generator used to key on the property
+        // name and column only, and kept both foreign keys everywhere.
+        expect(compileWithConsumer(schema(), `
+            import type { Database, IncludeFor } from "./database.types";
+            declare const row: Database["posts"]["Row"];
+            const reviewer: number | null | undefined = row.reviewerId;
+            // @ts-expect-error stripped from every read
+            void row.moderatorId;
+            // @ts-expect-error refused on a create
+            const hidden: Database["posts"]["Insert"] = { title: "t", moderatorId: 1 };
+            // @ts-expect-error refused on an update
+            const closed: Database["posts"]["Update"] = { reviewerId: 1 };
+            // @ts-expect-error nor under the relation's name
+            const closedByName: Database["posts"]["Update"] = { reviewer: 1 };
+            // @ts-expect-error a hidden relation cannot be included (UNKNOWN_RELATION)
+            const include: IncludeFor<"posts"> = ["moderator"];
+            const readable: IncludeFor<"posts"> = ["reviewer"];
+            export { reviewer, hidden, closed, closedByName, include, readable };
         `)).toEqual([]);
     });
 });

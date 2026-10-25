@@ -1017,12 +1017,17 @@ describe("excludeFromApi keeps a property off every generated type", () => {
         expect(block(generated, "Update")).toContain("owner");
     });
 
-    it("keeps a foreign key whose own column is not excluded", () => {
-        // The excluded `auditor` relation stores its key in the `auditor_id`
-        // column, which nothing marked, and serves it as `auditorId`. The
-        // server serves it, so the type says so: excluding a relation is not
-        // a claim about a different column.
-        expect(block(generated, "Row")).toContain("auditorId");
+    it("drops the foreign key of an excluded to-one relation, as the server does", () => {
+        // The excluded `auditor` relation stores its key in `auditor_id`,
+        // served as `auditorId`. `auditorId: 7` names the auditor exactly as
+        // `auditor: 7` does, so the server's read strip removes it from every
+        // row and its write refusal answers it VALIDATION_EXCLUDED_FIELDS
+        // (`restrictedFieldNames` in @rebasepro/common). This test used to
+        // pin the opposite, from before the server took the key with the
+        // relation; the generated types described a field nobody is served.
+        for (const name of ["Row", "Insert", "Update"] as const) {
+            expect(block(generated, name)).not.toContain("auditorId");
+        }
     });
 });
 
