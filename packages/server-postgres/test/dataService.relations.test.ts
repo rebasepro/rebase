@@ -869,23 +869,22 @@ name: "Jane Author" }]);
                 name: "Posts with a two-hop profile",
                 table: "posts",
                 properties: {
-                    id: { type: "number" },
+                    id: { type: "number", isId: true },
                     title: { type: "string" },
-                    authorProfile: { type: "relation", relationName: "authorProfile" }
-                },
-                relations: [
-                    {
-                        kind: "via",
-                        relationName: "authorProfile",
-                        target: () => userProfilesCollection,
-                        cardinality: "one",
-                        joinPath: [
-                            { table: "authors", on: { from: "posts.author_id", to: "authors.id" } },
-                            { table: "user_profiles", on: { from: "authors.id", to: "user_profiles.user_id" } }
-                        ]
+                    authorProfile: {
+                        type: "relation",
+                        relation: {
+                            kind: "via",
+                            relationName: "authorProfile",
+                            target: () => userProfilesCollection,
+                            cardinality: "one",
+                            joinPath: [
+                                { table: "authors", on: { from: "posts.author_id", to: "authors.id" } },
+                                { table: "user_profiles", on: { from: "authors.id", to: "user_profiles.user_id" } }
+                            ]
+                        }
                     }
-                ],
-                idField: "id"
+                }
             };
 
             it("refuses a multi-hop to-one via with 400 RELATION_NOT_WRITABLE", async () => {

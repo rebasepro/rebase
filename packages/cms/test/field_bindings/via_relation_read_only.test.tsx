@@ -90,11 +90,14 @@ const belongsTo = {
 };
 
 function renderField(property: unknown) {
-    return render(<RebaseI18nProvider locale={"en"}><RelationFieldBinding {...fieldProps(property)}/></RebaseI18nProvider>);
+    const props: React.ComponentProps<typeof RelationFieldBinding> = fieldProps(property);
+    return render(<RebaseI18nProvider locale={"en"}><RelationFieldBinding {...props}/></RebaseI18nProvider>);
 }
 
 describe("a via relation in the form", () => {
-    beforeEach(() => openDialog.mockClear());
+    beforeEach(() => {
+        openDialog.mockClear();
+    });
 
     it("does not open a picker for a multi-hop chain", () => {
         renderField(multiHop);
