@@ -1703,6 +1703,13 @@ export async function computeCommand(action: string | undefined, rawArgs: string
                     ["App CPU", dialLine(project!.cpu)],
                     ["App memory", dialLine(project!.memory)],
                     ["App replicas", dialLine(project!.replicaCount)],
+                    // No ceiling is no autoscaler: `--no-autoscale` clears it.
+                    ["Autoscale ceiling", project!.autoscaleMaxReplicas === null || project!.autoscaleMaxReplicas === undefined
+                        ? chalk.gray("off")
+                        : dialLine(project!.autoscaleMaxReplicas)],
+                    ["Autoscale CPU target", project!.autoscaleTargetCpuPercent === null || project!.autoscaleTargetCpuPercent === undefined
+                        ? dialLine(undefined)
+                        : `${dialLine(project!.autoscaleTargetCpuPercent)}%`],
                     ["Capacity", dialLine(project!.preemptible, { true: "spot", false: "on demand" })],
                     ["Database instances", dialLine(project!.databaseInstances)],
                     ["Database CPU", dialLine(project!.databaseCpu)],
@@ -1731,6 +1738,8 @@ export async function computeCommand(action: string | undefined, rawArgs: string
                 cpu: project!.cpu ?? null,
                 memory: project!.memory ?? null,
                 replicaCount: project!.replicaCount ?? null,
+                autoscaleMaxReplicas: project!.autoscaleMaxReplicas ?? null,
+                autoscaleTargetCpuPercent: project!.autoscaleTargetCpuPercent ?? null,
                 preemptible: project!.preemptible ?? null,
                 // Retired: always null since the control plane cleared the
                 // column. Kept so a script reading the field does not break.
