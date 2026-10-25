@@ -56,4 +56,32 @@ describe("listBackups, local destination", () => {
         ]);
         expect(fs.readdirSync(dir).sort()).toEqual(["notes.txt", "rebase-app-20260714T030000Z.dump"]);
     });
+
+    it("prunes only backups it named, and a foreign dump holds no keepMinimum slot", async () => {
+        // A dump someone else left in the folder — a manual pg_dump, a copy from
+        // another tool. Its mtime is older than the cutoff and newer than every
+        // backup, so dated by mtime it was both pruned and counted as the
+        // newest backup kept, pushing a real one out of retention.
+        const foreign = path.join(dir, "before-migration.dump");
+        fs.writeFileSync(foreign, "manual");
+        fs.writeFileSync(path.join(dir, "before-migration.globals.sql"), "roles");
+        const mtime = new Date("2026-08-01T00:00:00Z");
+        fs.utimesSync(foreign, mtime, mtime);
+
+        const removed = await pruneBackups(
+            { kind: "local", path: dir },
+            { keepMinimum: 1, retentionDays: 1, now: new Date("2026-10-01T00:00:00Z") }
+        );
+
+        expect(removed.map((k) => path.basename(k)).sort()).toEqual([
+            "rebase-app-20260101T000000Z.dump",
+            "rebase-app-20260301T000000Z.dump"
+        ]);
+        expect(fs.readdirSync(dir).sort()).toEqual([
+            "before-migration.dump",
+            "before-migration.globals.sql",
+            "notes.txt",
+            "rebase-app-20260714T030000Z.dump"
+        ]);
+    });
 });

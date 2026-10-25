@@ -895,7 +895,12 @@ export async function pruneBackups(
     options: RetentionOptions,
     storage?: StorageController
 ): Promise<string[]> {
-    const backups = await listBackups(dest, storage);
+    // Only backups this tool named. A local listing dates any `.dump` by its
+    // mtime, so a foreign dump in the folder — a manual pg_dump, another
+    // tool's — was ranked like a backup: pruned once old enough, and counted
+    // in `keepMinimum` while new, pushing a real backup out of retention.
+    const backups = (await listBackups(dest, storage))
+        .filter((backup) => parseBackupTimestamp(backup.key) !== null);
     const toDelete = selectBackupsToPrune(backups, options);
 
     // Delete each dump together with its `.globals.sql` sidecar (pruneWith
