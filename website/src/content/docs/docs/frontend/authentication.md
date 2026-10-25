@@ -115,8 +115,10 @@ A role in this list is a name your [security rules](/docs/collections/security-r
 ## Testing access: Simulate access
 
 To check what a role, a user or a service key can read, an administrator uses
-**Simulate access**, the pill in the admin panel's app bar. Pick a role (with an
-optional user id, which need not be an account), a user, or a live service key.
+**Simulate access**, the pill above your avatar in the admin panel's drawer (in
+the app bar on a small screen, or when the shell has no drawer). Pick a role
+(with an optional user id, which need not be an account), a user, or a live
+service key.
 Every data view, and a record's History tab, then reads through the server as
 that identity, against the real row-level security policies: a grid shows
 exactly the rows it can read,

@@ -479,7 +479,7 @@ function EditForm() {
 Switch the role the admin panel's navigation is built for, without signing out:
 which Studio views it lists. It sends nothing to the server and evaluates no
 row-level security policy, so a data view still shows what you can read. To
-test RLS, use **Simulate access** in the app bar, or `client.simulate()` from
+test RLS, use **Simulate access** (above your avatar in the drawer), or `client.simulate()` from
 code; see [Testing access](/docs/frontend/authentication/#testing-access-simulate-access).
 
 ```typescript
