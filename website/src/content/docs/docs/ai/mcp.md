@@ -174,6 +174,11 @@ Which credential that is, in priority order:
 3. The service key auto-discovered from `.rebase/state.json` while `rebase dev`
    is running
 
+2 and 3 are this machine's dev backend's key, used only when the target is on
+loopback. When `REBASE_BASE_URL` points elsewhere — `rebase cloud init --claim`
+writes the cloud project's address, and no `REBASE_API_TOKEN` until a deploy
+succeeds — the server sends no token and says so once on stderr.
+
 A token you register for a project **wins over auto-discovery**. Discovery only
 fills a gap.
 

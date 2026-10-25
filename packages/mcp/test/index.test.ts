@@ -1536,6 +1536,44 @@ describe("the environment block outranks the persisted registry", () => {
         rmSync(dir, { recursive: true, force: true });
     });
 
+    it("does not send the local service key to a remote REBASE_BASE_URL", async () => {
+        // `rebase cloud init --claim` (or rebase_cloud_provision with
+        // deploy: false) writes REBASE_BASE_URL for the cloud tenant and mints
+        // no REBASE_API_TOKEN. The .env's REBASE_SERVICE_KEY is this machine's
+        // dev backend's admin secret; the tenant does not take it, and runs
+        // agent-written code that must never see it.
+        const dir = mkdtempSync(join(tmpdir(), "rebase-mcp-env-"));
+        writeFileSync(join(dir, ".env"), `REBASE_SERVICE_KEY=${"s".repeat(40)}\n`);
+        const warn = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+        const mod = await bootWith(persistedDefault(join(dir, "stale")), {
+            REBASE_PROJECT_DIR: dir,
+            REBASE_BASE_URL: "https://todo-x.rebase.website"
+        });
+
+        const current = await currentProject(mod);
+        expect(current.baseUrl).toBe("https://todo-x.rebase.website");
+        expect(current.hasToken).toBe(false);
+        const written = warn.mock.calls.map((c) => String(c[0])).join("");
+        expect(written).toContain("REBASE_API_TOKEN");
+        expect(written).toContain("todo-x.rebase.website");
+        warn.mockRestore();
+        rmSync(dir, { recursive: true, force: true });
+    });
+
+    it("still uses the local service key for a loopback REBASE_BASE_URL", async () => {
+        const dir = mkdtempSync(join(tmpdir(), "rebase-mcp-env-"));
+        writeFileSync(join(dir, ".env"), `REBASE_SERVICE_KEY=${"s".repeat(40)}\n`);
+        const mod = await bootWith(persistedDefault(join(dir, "stale")), {
+            REBASE_PROJECT_DIR: dir,
+            REBASE_BASE_URL: "http://localhost:4321"
+        });
+
+        const current = await currentProject(mod);
+        expect(current.hasToken).toBe(true);
+        expect(current.tokenPrefix).toBe("ssssssss...");
+        rmSync(dir, { recursive: true, force: true });
+    });
+
     it("keeps the persisted default when the client declares none of the three", async () => {
         const dir = mkdtempSync(join(tmpdir(), "rebase-mcp-env-"));
         const mod = await bootWith(persistedDefault(join(dir, "kept")), {});
@@ -1740,6 +1778,14 @@ describe("local discovery fills gaps only", () => {
         expect(written).toContain("http://localhost:3070");
         expect(written).toContain("registered URL wins");
         warn.mockRestore();
+    });
+
+    it("does not fill an empty token with the dev server's key for a remote baseUrl", () => {
+        // The discovered key is the local dev server's admin secret; a project
+        // registered against another host has no use for it.
+        const resolved = autoDiscoverLocal({ ...registered, token: "" }, devState);
+        expect(resolved.baseUrl).toBe("https://staging.example.com");
+        expect(resolved.token).toBe("");
     });
 
     it("leaves the project alone when no dev server is running", () => {

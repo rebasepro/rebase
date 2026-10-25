@@ -337,18 +337,21 @@ export function autoDiscoverLocal(
         }
     }
 
+    const baseUrl = project.baseUrl || state.baseUrl;
     return {
         ...project,
         // A registered baseUrl wins over the discovered one, for the same
         // reason the token does.
-        baseUrl: project.baseUrl || state.baseUrl,
+        baseUrl,
         // A registered token wins over the discovered one. What discovery finds
         // is the dev server's *service key* — the unscoped admin secret — so
         // letting it win meant a deliberately narrow API key registered for
         // this project was silently upgraded to full admin on every call.
         // Discovery now only fills a gap, which is all the zero-config story
-        // ever needed it to do.
-        token: project.token || state.serviceKey || ""
+        // ever needed it to do — and only for a loopback target: the key is
+        // this machine's dev server's, and a project registered against
+        // another host has no use for it.
+        token: project.token || (baseUrl && isLocalTarget(baseUrl) ? state.serviceKey : "") || ""
     };
 }
 
@@ -565,7 +568,21 @@ function initializeRegistry(): void {
 
     if (fromEnv || CWD_IS_PROJECT || !registry.projects["default"]) {
         defaultIsDerived = true;
-        const envServiceKey = readServiceKeyFromEnv(ENV_PROJECT_DIR);
+        // The `.env`'s REBASE_SERVICE_KEY is the admin secret of this
+        // machine's dev backend. It is a credential for a loopback target only:
+        // `rebase cloud init --claim` writes a cloud REBASE_BASE_URL and, when
+        // nothing was deployed, no REBASE_API_TOKEN, and the tenant it points
+        // at runs agent-written code. A key for one backend is not sent to
+        // another — the rule REBASE_TOKEN already follows (`envAppToken`).
+        const remoteBase = Boolean(ENV_BASE_URL) && !isLocalTarget(ENV_BASE_URL);
+        const envServiceKey = remoteBase ? undefined : readServiceKeyFromEnv(ENV_PROJECT_DIR);
+        if (remoteBase && !ENV_API_TOKEN && readServiceKeyFromEnv(ENV_PROJECT_DIR)) {
+            process.stderr.write(
+                `[rebase-mcp] REBASE_BASE_URL points at ${redactUrl(ENV_BASE_URL)}, but REBASE_API_TOKEN is not set. ` +
+                "The .env's REBASE_SERVICE_KEY is this machine's dev backend's key and is not sent there. " +
+                "Run `rebase cloud deploy` (the first deploy of an unclaimed project writes REBASE_API_TOKEN) or set REBASE_API_TOKEN.\n"
+            );
+        }
         registry.projects["default"] = {
             name: "default",
             projectDir: ENV_PROJECT_DIR,
