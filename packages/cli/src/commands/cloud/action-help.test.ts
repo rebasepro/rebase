@@ -29,6 +29,7 @@ import { CREATE_TOKEN_FLAGS } from "./tokens";
 import { INIT_FLAGS } from "./init";
 import { CRON_LIST_FLAGS, CRON_LOGS_FLAGS } from "./cron";
 import { PREVIEWS_LIST_FLAGS, PREVIEWS_DELETE_FLAGS } from "./previews";
+import { USAGE_FLAGS, USAGE_ACTIONS } from "./usage";
 
 /**
  * Which spec backs which page.
@@ -70,6 +71,7 @@ const SPECS: Record<string, Record<string, unknown> | null> = {
     "webhooks create": { "--name": String, "--table": String, "--endpoint": String, "--events": String },
     "webhooks delete": {},
     billing: { "--limit": Number },
+    usage: USAGE_FLAGS,
     logs: LOGS_FLAGS,
     status: null,
     "clusters verify": null,
@@ -510,7 +512,8 @@ describe("ACTION_HELP", () => {
      * commands that do not exist, answering as if they did.
      */
     it.each([
-        ["billing", BILLING_ACTIONS]
+        ["billing", BILLING_ACTIONS],
+        ["usage", USAGE_ACTIONS]
     ])("%s's usage line names the actions it dispatches", (key, dispatched) => {
         expect(actionWordsIn(ACTION_HELP[key].usage).sort()).toEqual([...dispatched].sort());
     });

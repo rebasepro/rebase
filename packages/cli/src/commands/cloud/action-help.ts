@@ -663,6 +663,30 @@ export const ACTION_HELP: Record<string, ActionHelp> = {
         ]
     },
 
+    usage: {
+        command: "cloud usage",
+        usage: "cloud usage [org] [--month YYYY-MM]",
+        summary:
+            "Requests the linked project has used this month (UTC) against its included allowance, the 5xx errors, "
+            + "the overage so far and where the month is heading at this pace. `org` lists every project of the "
+            + "selected organization with the organization's total. The overage is counted exactly as the invoice "
+            + "counts it; the month-end figure is an estimate. Read-only; any member of the organization.",
+        flags: [
+            ["--month <YYYY-MM>", "A past month instead of the current one"]
+        ],
+        examples: [
+            "rebase cloud usage",
+            "rebase cloud usage --month 2026-09 --json",
+            "rebase cloud usage org"
+        ],
+        notes: [
+            "The figures carry their limits as `caveats`: object storage is not measured yet, a project that can run "
+            + "two or more app pods undercounts requests, and days with missed samples are partial.",
+            "A month's overage is billed on the following month's invoice.",
+            "It reads with your login: no access-token capability includes it yet, so REBASE_TOKEN is refused."
+        ]
+    },
+
     /* ── The graph, and the dials ───────────────────────────────────────
      *
      * `resources` is what the project declares against what the platform

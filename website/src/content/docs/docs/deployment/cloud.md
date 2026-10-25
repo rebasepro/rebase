@@ -91,6 +91,17 @@ each with Stripe's hosted page and PDF, and previews the next invoice of every
 project. `rebase cloud billing invoices` and `rebase cloud billing upcoming`
 print the same. Both are for the organization's owners and admins.
 
+What a project has used shows on its overview, under **Usage this month**, and
+for every project at once on the **Billing** page: requests against the
+included allowance (the bar turns amber at 80%), 5xx errors, the overage so far
+and where the month is heading at this pace. The overage is computed by the
+same code that reports it to Stripe, so it is what the invoice will carry; it
+appears on the invoice of the month after. `rebase cloud usage` prints the
+same, and `rebase cloud usage org` the whole organization. Any member can read
+it. The figures say what they cannot see yet: object storage is not measured,
+so no storage overage is billed; while a project runs two or more app pods,
+its requests are not counted; and a day with missed samples undercounts.
+
 An existing project links without creating one:
 
 ```bash
@@ -541,6 +552,7 @@ except one that restarts the database, which waits for a maintenance window.
 | `storage` | The project's bucket |
 | `resources` | Which databases and buckets the platform holds, against what the code declares |
 | `compute` | What this project reserves, what it costs, and how to change it |
+| `usage` | Requests used this month against the included allowance, and the overage so far, as the invoice counts it. `usage org` lists every project of the organization |
 | `clusters` | The clusters tenants run on. Platform-admin only |
 | `settings`, `orgs`, `webhooks`, `billing` | Project settings, organizations, deploy hooks, payment |
 

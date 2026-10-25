@@ -25,6 +25,7 @@ import { powerCommand } from "./power";
 import { debugCommand, printDebugHelp } from "./debug";
 import { cronCommand } from "./cron";
 import { previewsCommand } from "./previews";
+import { usageCommand } from "./usage";
 import {
     statusCommand,
     metricsCommand,
@@ -99,6 +100,7 @@ export const CLOUD_VALUE_FLAGS = {
     "--live-timeout": String,
     "--memory": String,
     "--message": String,
+    "--month": String,
     "--name": String,
     "--org": String,
     "--output": String,
@@ -414,6 +416,9 @@ export async function cloudCommand(subcommand: string | undefined, rawArgs: stri
         case "clusters":
             await clustersCommand(action, rawArgs);
             break;
+        case "usage":
+            await usageCommand(rawArgs);
+            break;
         case "billing":
             await billingCommand(rawArgs);
             break;
@@ -536,7 +541,8 @@ export const CLOUD_GROUPS: HelpAction[] = [
     { action: "resources", section: "Other resources", description: "What the code declares against what the platform provisioned" },
     { action: "compute", section: "Other resources", description: "What this project reserves, what it costs, and how to change it" },
     { action: "clusters", section: "Other resources", description: "The clusters tenants run on. Platform-admin only" },
-    { action: "billing", section: "Other resources", description: "The organization's billing account and card on file" }
+    { action: "billing", section: "Other resources", description: "The organization's billing account and card on file" },
+    { action: "usage", section: "Other resources", args: "[org]", description: "Requests used this month against the allowance, and the overage so far" }
 ];
 
 /** The dispatch words alone — what `--help` routing and the tests iterate. */

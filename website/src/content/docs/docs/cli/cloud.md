@@ -1,7 +1,7 @@
 ---
 title: rebase cloud
 sidebar_label: rebase cloud
-description: The command groups for Rebase Cloud in the CLI — auth, project link, deploys, config, organizations, databases, resources, compute, storage, webhooks, clusters and billing.
+description: The command groups for Rebase Cloud in the CLI — auth, project link, deploys, config, organizations, databases, resources, compute, storage, webhooks, clusters, billing and usage.
 ---
 
 Everything to do with Rebase Cloud, which is in private beta. See the
@@ -194,7 +194,7 @@ rebase cloud compute set        # change it
 tiers: everything is priced per resource. See
 [Rebase Cloud](/docs/deployment/cloud/).
 
-## Storage, webhooks, clusters and billing
+## Storage, webhooks, clusters, billing and usage
 
 ```bash
 rebase cloud storage             # list storage buckets
@@ -207,6 +207,8 @@ rebase cloud billing setup       # attach a card, one-time, opens a browser
 rebase cloud billing checkout    # a Stripe session for one project
 rebase cloud billing invoices [--limit N]   # issued invoices, newest first, with Stripe's hosted page
 rebase cloud billing upcoming    # a preview of each subscription's next invoice
+rebase cloud usage [--month YYYY-MM]   # requests used this month against the allowance, and the overage so far
+rebase cloud usage org           # every project of the selected organization, with the total
 ```
 
 `billing invoices` and `billing upcoming` read the same Stripe data as the
@@ -214,3 +216,16 @@ console's Billing page, and are open to the organization's owners and admins
 only. Amounts in `--json` are in the currency's minor unit (cents), exactly as
 Stripe sends them. Draft invoices are not listed; the preview is computed by
 Stripe and its metered lines keep growing until the period closes.
+
+`usage` reads what the linked project (or `--project`) has used in a calendar
+month, in UTC: requests against the included allowance, 5xx errors, the overage
+so far in euros and, for the month in progress, where it is heading at this
+pace (an estimate). The overage is the overage report's own calculation, the
+one that tells Stripe what to bill, and lands on the following month's invoice.
+`usage org` lists every project of the organization selected with `rebase cloud
+use`, and the total. Any member of the organization can read it, with their
+login: no access-token capability includes it yet, so `REBASE_TOKEN` is refused.
+`--month` takes a past month. The answer carries `caveats`, each with a `code`: `storage_not_measured`
+(object storage reads 0), `multi_pod_undercount` (requests served while two or
+more app pods run are not counted), `partial_days`, `metering_off`,
+`overage_billing_off`, `not_billed` and `billed_next_month`.
