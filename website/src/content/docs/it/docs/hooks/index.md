@@ -1,5 +1,5 @@
 ---
-sourceHash: f3af5fc4d4e8aac0
+sourceHash: c8644465af03e13a
 title: Riferimento degli Hook
 sidebar_label: Hooks
 description: Hook React forniti da Rebase per accedere ad autenticazione, dati, navigazione, pannelli laterali, storage e stato della UI.
@@ -93,7 +93,7 @@ function ProductList() {
 | Parametro | Tipo | Descrizione |
 |-----------|------|-------------|
 | `path` | `string` | Percorso assoluto della collezione (es. `"products"`). |
-| `collection` | `CollectionConfig` | L'oggetto di definizione della collezione. |
+| `collection` | `AdminCollection` | L'oggetto di definizione della collezione. |
 | `itemCount` | `number` | Opzionale. Numero di entità da caricare (limite SQL). |
 | `offset` | `number` | Opzionale. Numero di elementi da saltare. |
 | `page` | `number` | Opzionale. Numero di pagina (a partire da 1), alternativa a `offset`. |
@@ -145,7 +145,7 @@ function ProductDetail({ productId }) {
 |-----------|------|-------------|
 | `path` | `string` | Percorso assoluto della collezione. |
 | `entityId` | `string \| number` | L'ID dell'entità da caricare. |
-| `collection` | `CollectionConfig` | L'oggetto di definizione della collezione. |
+| `collection` | `AdminCollection` | L'oggetto di definizione della collezione. |
 | `useCache` | `boolean` | Opzionale. Se `true` e l'entità è in cache, salta l'aggiornamento in background. (Predefinito: `false`). |
 
 ### Utilità della cache
@@ -416,7 +416,7 @@ function CategorySelector({ onSelect }) {
 | Opzione | Tipo | Descrizione |
 |--------|------|-------------|
 | `path` | `string` | Percorso assoluto della collezione. |
-| `collection` | `CollectionConfig` | Definizione della collezione di destinazione. |
+| `collection` | `AdminCollection` | Definizione della collezione di destinazione. |
 | `fixedFilter` | `FilterValues` | Opzionale. Filtri statici per restringere i risultati della ricerca. |
 | `pageSize` | `number` | Opzionale. Numero di elementi per pagina. (Predefinito: `10`). |
 | `getLabelFromEntity` | `(entity) => string` | Opzionale. Personalizza il testo dell'etichetta mostrata. |

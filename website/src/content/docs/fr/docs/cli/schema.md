@@ -1,5 +1,5 @@
 ---
-sourceHash: 36aded03c38207a4
+sourceHash: 882f81a3b9bbe750
 title: Génération de schéma
 sidebar_label: Génération de schéma
 description: Générez des schémas Drizzle ORM à partir des définitions de collections, créez des migrations SQL et gardez votre base de données synchronisée avec la CLI Rebase.
@@ -23,7 +23,7 @@ Vos définitions de collections dans `config/collections/` décrivent les tables
 
 ### 2. Schéma Drizzle → Migrations
 
-À partir du schéma Drizzle généré, `db generate` compare avec les migrations déjà présentes dans `drizzle/migrations/`, rejouées sur une base de données jetable, et produit des fichiers de migration SQL horodatés. Elle ne lit jamais votre base de données : une colonne que le démarrage ou `db push` a déjà ajoutée ressort quand même en `ADD COLUMN`.
+À partir du schéma Drizzle généré, `db generate` compare avec les migrations déjà présentes dans `backend/drizzle/migrations/`, rejouées sur une base de données jetable, et produit des fichiers de migration SQL horodatés. Elle ne lit jamais votre base de données : une colonne que le démarrage ou `db push` a déjà ajoutée ressort quand même en `ADD COLUMN`.
 
 ### 3. Migrations → PostgreSQL
 
@@ -83,7 +83,7 @@ rebase schema introspect
 ```
 
 **Ce qu'elle fait :**
-- Se connecte à votre base de données (en utilisant la chaîne de connexion de votre `.env`)
+- Se connecte à la base de données de ce projet, celle qu'affiche `rebase db url` (la base gérée est démarrée si c'est elle) ; `--database-url` en désigne une autre, et `--docker` utilise celle du compose
 - Inspecte toutes les tables, colonnes, types et clés étrangères
 - Génère des fichiers de définition de collections
 - Lit les politiques
@@ -136,6 +136,9 @@ rebase schema introspect
 | `--output, -o` | Répertoire de sortie pour les fichiers de collections générés |
 | `--schema` | Le schéma Postgres à lire (par défaut : `public`) |
 | `--force, -f` | Écrase les fichiers de collections qui existent déjà ; sans cette option, un fichier existant est ignoré |
+| `--database-url` | Lit cette base de données au lieu de celle du projet |
+| `--docker` | Lit la base de données du compose, en la démarrant si nécessaire |
+| `--data-inference` / `--no-data-inference` | Échantillonne jusqu'à 100 lignes par table pour détecter les formats, les contraintes et les réglages de l'interface, ou ne lit que la structure. Sans l'une ni l'autre, la commande demande, et sans terminal elle ne lit que la structure |
 
 C'est utile lors de l'adoption de Rebase sur une base de données existante — introspectez d'abord, puis personnalisez les collections générées.
 
@@ -249,7 +252,7 @@ rebase db generate
 
 **Ce qu'elle fait :**
 - Compare le schéma Drizzle avec l'état que construisent les migrations de `drizzle/migrations/`, pas avec votre base de données
-- Produit des fichiers de migration SQL horodatés dans `drizzle/migrations/`
+- Produit des fichiers de migration SQL horodatés dans `backend/drizzle/migrations/`
 - Les fichiers peuvent être examinés, modifiés et validés dans le contrôle de version
 - Nomme chaque
   instruction de la nouvelle migration qui détruit des données, avec la vérification
@@ -365,7 +368,7 @@ Exécutez `doctor` chaque fois que quelque chose semble désynchronisé. Il indi
 
 La comparaison avec la base de données inclut celle que fait le démarrage avant d'avertir que `schema.generated.ts` et la base de données divergent, exécutée par le même code. Chaque différence dont le démarrage avertit figure donc aussi dans le rapport, dans les mêmes termes : une colonne NOT NULL d'un côté et nullable de l'autre, et une colonne que la base de données possède encore mais que le fichier n'a plus (le démarrage n'en supprime jamais, si bien qu'une propriété renommée laisse derrière elle son ancienne colonne). Chacune est un avertissement, et le correctif nomme `rebase db push`.
 
-La comparaison avec la base de données nécessite `DATABASE_URL` (ou `ADMIN_CONNECTION_STRING`). Sans l'une d'elles, cette phase est signalée comme **ignorée** plutôt que réussie, et l'exécution ne se termine jamais par « All schemas are in sync » — une vérification qui n'a pas eu lieu n'est pas un certificat de bonne santé.
+La comparaison avec la base de données lit la base du projet, résolue comme le fait `rebase db url` — sur un scaffold neuf, la base gérée, que `doctor` démarre. Lorsqu'aucune ne peut être résolue, cette phase est signalée comme **ignorée** plutôt que réussie, et l'exécution ne se termine jamais par « All schemas are in sync » — une vérification qui n'a pas eu lieu n'est pas un certificat de bonne santé.
 
 Il nomme aussi chaque collection sans [bloc `search`](/docs/backend/search) dont la table contient plus d'environ 10 000 lignes. Une recherche dans ce cas — la zone de recherche de l'admin, `.search()`, `?searchString=` — est un `ILIKE '%term%'` sur les colonnes de texte, qu'aucun index ne peut servir ; chacune lit donc toute la table, et son comptage la relit (environ un tiers de seconde pour 100 000 lignes, croissant avec la table). Le nombre de lignes est l'estimation de Postgres lui-même, la vérification ne parcourt donc rien. C'est une indication : elle ne change pas le code de sortie, et rien n'est indexé pour vous.
 
@@ -454,9 +457,9 @@ rebase schema generate
 # 3. Generate SQL migration files
 rebase db generate
 
-# 4. Review the generated SQL in drizzle/migrations/
+# 4. Review the generated SQL in backend/drizzle/migrations/
 # 5. Commit the migration to version control
-git add drizzle/migrations/
+git add backend/drizzle/migrations/
 
 # 6. Apply in production
 #    A database Rebase has already booted needs a baseline the first time —

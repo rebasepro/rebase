@@ -145,7 +145,7 @@ export const ACTION_HELP: Record<string, ActionHelp> = {
             ["--db-instances <n>", "Database instance count"],
             ["--db-cpu <n>", "vCPU per database instance"],
             ["--db-memory <size>", "Memory per database instance"],
-            ["--storage <size>", "Database volume size"]
+            ["--storage <mode>", "Object storage: shared-prefix or dedicated-bucket"]
         ],
         examples: [
             "rebase cloud projects create --name \"Shop\" --subdomain shop --link",
@@ -830,9 +830,9 @@ export const ACTION_HELP: Record<string, ActionHelp> = {
             ["--replicas <n>", "Instances that always exist — the autoscaler's floor, and what is billed at rest"],
             ["--spot <true|false>", "Preemptible capacity: cheaper, and restarted without notice"],
             ["--db-instances <n>", "1–3. 1 is a single instance with no failover; 2 adds an automatic standby"],
-            ["--db-cpu <n>", "Database CPU request per instance. Default: 500m"],
-            ["--db-memory <size>", "Database memory request per instance. Default: 2Gi"],
-            ["--storage <size>", "Database volume size"],
+            ["--db-cpu <n>", "Database CPU request per instance. Default: 160m"],
+            ["--db-memory <size>", "Database memory request per instance. Default: 1Gi"],
+            ["--storage <mode>", "Object storage: shared-prefix or dedicated-bucket"],
             ["--autoscale-max <n>", "1–16. The ceiling the app may reach, and the worst case it may be billed"],
             ["--autoscale-cpu-target <pct>", "10–95. CPU utilisation the autoscaler holds, against the request. Default: 70"],
             ["--no-autoscale", "Turn autoscaling off. The only way to: a ceiling at or below --replicas is refused"]

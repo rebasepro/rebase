@@ -1,5 +1,5 @@
 ---
-sourceHash: f02c2b6d0bb6de5f
+sourceHash: 819343e76e0e61e9
 title: Runtime di backend gestito
 sidebar_label: Runtime gestito
 description: Cosa può e non può fare un backend con runtime "managed" su Rebase Cloud — pacchetti e binari, memoria e CPU, timeout e dimensioni del body, filesystem, stato in memoria, secret, storage per i file generati e rete in uscita.
@@ -51,7 +51,7 @@ Da ciò conseguono quattro aspetti:
 
 - **Gli script di installazione non vengono mai eseguiti.** L'installazione utilizza `--ignore-scripts`. Un pacchetto che scarica un binario o compila qualcosa in `postinstall` verrà installato senza eseguire tale operazione.
 - **Vengono installate solo versioni da registry.** Una dipendenza `file:`, `link:`, `git+…` o `github:` fa fallire la build, poiché il runtime non ha modo di risolverla.
-- **Alcuni pacchetti provengono dall'immagine, non dal tuo progetto.** `@rebasepro/*`, `hono`, `@hono/node-server` e `zod` vengono rimossi dalle dipendenze del bundle e vengono collegate le copie interne all'immagine; pertanto la tua versione non verrà applicata. Anche `typescript` e `tsx` vengono rimossi, in quanto strumenti di build.
+- **Alcuni pacchetti provengono dall'immagine, non dal tuo progetto.** `@rebasepro/server`, `@rebasepro/types`, `@rebasepro/client`, `@rebasepro/common`, `@rebasepro/utils`, `hono`, `@hono/node-server` e `zod` vengono rimossi dalle dipendenze del bundle e vengono collegate le copie interne all'immagine; pertanto la tua versione non verrà applicata. Gli altri pacchetti `@rebasepro/*`, come il driver del database, vengono installati dal tuo `package.json` come qualsiasi dipendenza. Anche `typescript` e `tsx` vengono rimossi, in quanto strumenti di build.
 - **I pacchetti privati richiedono un file `.npmrc`.** `rebase build` copia il file `.npmrc` del progetto (e `backend/.npmrc`) all'interno del bundle, affinché l'installazione utilizzi le stesse impostazioni di registry della tua macchina. Ogni credenziale al suo interno deve essere un riferimento a una variabile d'ambiente, mai il token in chiaro; un token letterale farà fallire la build, poiché il bundle viene caricato insieme al tuo codice:
 
   ```ini title=".npmrc"
@@ -88,7 +88,7 @@ Se una funzionalità richiede un binario, utilizza un'API ospitata esternamente 
 Ogni progetto viene eseguito nei propri pod dedicati. Memoria e CPU sono allocate per istanza e possono essere configurate tramite i [parametri di calcolo](/docs/deployment/cloud/#compute-and-what-it-costs):
 
 ```bash
-rebase cloud compute                              # le risorse attualmente riservate dal progetto
+rebase cloud compute                              # what the project reserves now
 rebase cloud compute set --cpu 500m --memory 1Gi
 ```
 
@@ -132,7 +132,7 @@ Utilizzalo per file temporanei durante la gestione di una singola richiesta. Non
 |---|---|---|
 | Timeout della funzione | 30 s, poi `504` con codice `FUNCTION_TIMEOUT` | `REBASE_FUNCTIONS_TIMEOUT_MS` (`0` lo disattiva) |
 | Attesa sulla tua istanza, a livello di edge | 10 minuti tra letture o scritture | Fisso |
-| Body della richiesta, tutte le route `/api/*` | 10 MiB, poi `413 PAYLOAD_TOO_LARGE` | `REBASE_MAX_BODY_SIZE`, in byte |
+| Body della richiesta, route `/api/*` senza un limite proprio | 10 MiB, poi `413 PAYLOAD_TOO_LARGE` | `REBASE_MAX_BODY_SIZE`, in byte |
 | Body della richiesta a livello di edge | 64 MiB | Fisso |
 | Singolo file tramite `POST /api/storage/upload` | 50 MB | `STORAGE_MAX_FILE_SIZE` |
 | Chiamate anonime a `/api/functions/*` | 3000 per IP ogni 15 minuti | `rateLimit.anonymousFunctions` |
@@ -150,9 +150,9 @@ Puoi impostarli tramite la CLI o dalla console. Non esiste un campo dedicato a e
 
 ```bash
 rebase cloud env set TTS_API_URL=https://api.example.com/v1/speech
-rebase cloud env set TTS_API_KEY=sk-… --secret   # write-only: non verrà mai più mostrato
-rebase cloud env list                            # solo i nomi, mai i valori
-rebase cloud deploy                              # applica le modifiche
+rebase cloud env set TTS_API_KEY=sk-… --secret   # write-only: never shown again
+rebase cloud env list                            # names only, never values
+rebase cloud deploy                              # applies the change
 ```
 
 - **Le modifiche vengono applicate al deploy successivo.** Le istanze in esecuzione mantengono i valori con cui sono state avviate. I comandi `set` e `unset` lo segnalano esplicitamente (`Pending redeploy`).
@@ -182,8 +182,8 @@ La lettura di `process.env` nello scope del modulo che restituisca un valore vuo
 Un progetto Cloud ottiene lo storage per i file non appena viene creato:
 
 ```bash
-rebase cloud storage create   # un bucket gestito e le relative credenziali
-rebase cloud deploy           # il backend in esecuzione riceve le credenziali al deploy
+rebase cloud storage create   # a managed bucket and its credentials
+rebase cloud deploy           # the running backend gets the credentials at deploy
 ```
 
 In alternativa, puoi collegare il progetto a un bucket di tua proprietà tramite `rebase cloud storage attach` (S3, R2, MinIO o qualsiasi bucket compatibile con S3). Senza una di queste configurazioni, i tentativi di upload risponderanno con `501 STORAGE_NOT_CONFIGURED`. Ulteriori bucket possono essere dichiarati in `config/resources.ts`; consulta [Bucket multipli](/docs/backend/storage/#several-buckets).

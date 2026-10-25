@@ -1,5 +1,5 @@
 ---
-sourceHash: eeb3c8895a643633
+sourceHash: 75edbe600ee52a3e
 title: Índice de endpoints
 sidebar_label: Índice de endpoints
 description: Cada rota HTTP montada por um backend Rebase — dados, autenticação, armazenamento, administração, meta — com a restrição de acesso (gate) de cada uma e a página que a explica.
@@ -35,7 +35,6 @@ fixa. `:slug` é o `slug` de uma coleção.
 
 | Método | Caminho | Gate | Mais |
 |---|---|---|---|
-| `GET` | `/api/data/collections` | session | [REST API](/docs/backend/api/) |
 | `GET` | `/api/data/:slug` | RLS | [Querying](/docs/backend/filtering/) |
 | `POST` | `/api/data/:slug` | RLS | [REST API](/docs/backend/api/) |
 | `POST` | `/api/data/:slug/query` | RLS | A listagem, com os parâmetros de consulta no corpo — [Consultas longas demais para uma URL](/docs/backend/vector-search/#queries-too-long-for-a-url) |
@@ -58,7 +57,7 @@ que `aggregate` não seja interpretado como o id de uma entidade. `?select=` e `
 seus parâmetros, e `select` é obrigatório em `/aggregate`.
 
 Busca textual, busca vetorial, inclusão de relações e seleção de campos *são* parâmetros
-de consulta em `GET /api/data/:slug` em vez de rotas — `search`,
+de consulta em `GET /api/data/:slug` em vez de rotas — `searchString`,
 `vector_search`, `include`, `fields`. Consulte [REST API](/docs/backend/api/).
 
 Um projeto que não declara coleções e não faz introspecção de nenhuma atende a este prefixo
@@ -81,6 +80,8 @@ como um único `404 NO_COLLECTIONS`. Consulte [Backend only](/docs/getting-start
 | `POST` | `/api/auth/forgot-password` | none | [Authentication](/docs/backend/authentication/) |
 | `POST` | `/api/auth/reset-password` | none (um token de redefinição) | [Authentication](/docs/backend/authentication/) |
 | `POST` | `/api/auth/change-password` | session | [Authentication](/docs/backend/authentication/) |
+| `POST` | `/api/auth/change-email` | session | Envia por e-mail um link de confirmação para o novo endereço — [Alterando um endereço de e-mail](/docs/backend/auth-endpoints/#changing-an-email-address) |
+| `POST` | `/api/auth/confirm-email-change` | none (um token de link) | Move a conta para o novo endereço — [Alterando um endereço de e-mail](/docs/backend/auth-endpoints/#changing-an-email-address) |
 | `POST` | `/api/auth/send-verification` | session | [Authentication](/docs/backend/authentication/) |
 | `GET` | `/api/auth/verify-email` | none (um token de verificação) | [Authentication](/docs/backend/authentication/) |
 | `POST` | `/api/auth/verify-email` | none (um token de verificação, e uma sessão ou a senha para mantê-la) | [Verificação de e-mail](/docs/backend/email-verification/) |
@@ -136,12 +137,12 @@ uma coleção não acessa nada disso. Consulte [Papéis e escopos](/docs/backend
 | `PUT` | `/api/admin/cron/:id` | `cron:write` | Habilita ou desabilita um job |
 | `GET` | `/api/admin/cron/:id/logs` | `cron:read` | [Cron Jobs](/docs/backend/cron-jobs/) |
 | `POST` | `/api/admin/cron/:id/trigger` | `cron:write` | Executa um job agora. `?async=1` responde `202` assim que ele começa — [Cron Jobs API](/docs/backend/cron-jobs-api/#example-trigger-a-job-manually) |
-| `GET` | `/api/admin/storage/orphans` | `database:read` | Arquivos armazenados que nenhuma linha nomeia, `?storageId=&olderThanHours=` — o que `rebase storage orphans` imprime |
-| `DELETE` | `/api/admin/storage/orphans` | `database:write` | Encontra-os de novo e os exclui; `409 STORAGE_SCAN_INCOMPLETE` quando uma collection não pôde ser lida |
-| `POST` | `/api/admin/storage/move` | `database:write` | Copia uma pasta para outra fonte sob as mesmas chaves, uma página por chamada — o que `rebase storage move` envia |
 | `GET` | `/api/admin/backups` | `backups:read` | Inventário de backups |
 | `GET` | `/api/admin/backups/download` | `backups:read` | Transmite um backup via stream. Com `?token=` de um link de download, nenhum cabeçalho é necessário, apenas para esse backup |
 | `POST` | `/api/admin/backups/download-url` | `backups:read` | Um link para um backup, `{ key }` → `{ url, token, expiresIn }`, válido por 60 segundos — [Backups](/docs/deployment/backups/#download-a-backup) |
+| `GET` | `/api/admin/storage/orphans` | `database:read` | Arquivos armazenados que nenhuma linha nomeia, `?storageId=&olderThanHours=` — o que `rebase storage orphans` imprime |
+| `DELETE` | `/api/admin/storage/orphans` | `database:write` | Encontra-os de novo e os exclui; `409 STORAGE_SCAN_INCOMPLETE` quando uma collection não pôde ser lida |
+| `POST` | `/api/admin/storage/move` | `database:write` | Copia uma pasta para outra fonte sob as mesmas chaves, uma página por chamada — o que `rebase storage move` envia |
 | `GET` | `/api/admin/logs` | `logs:read` | O buffer de logs recentes |
 | `GET` | `/api/admin/logs/latest` | `logs:read` | As entradas mais recentes |
 | `GET` | `/api/admin/logs/stream` | `logs:read` | Server-sent events |
@@ -185,17 +186,20 @@ existem para projetos que ainda não migraram; escreva código novo usando o cam
 | `DELETE` | `/api/storage/tus/:id` | o proprietário do upload | Uploads retomáveis: cancelamento |
 
 Uma implantação sem armazenamento configurado responde a este prefixo com um `501` informando a
-variável necessária, em vez de responder com 404 como se o recurso não existisse.
+variável necessária, em vez de responder com 404 como se o recurso não existisse —
+exceto `GET /api/storage/sources`, que responde `200` com uma lista vazia.
 
 ## Funções (Functions)
 
 | Método | Caminho | Gate | Mais |
 |---|---|---|---|
+| `GET` | `/api/functions` | session | Os nomes das funções atendidas e quantos arquivos falharam ao carregar |
 | any | `/api/functions/<name>` | o que a função declarar. Uma chave de API também precisa de `functions:invoke` | [Custom Functions](/docs/backend/custom-functions/) |
 
 Uma rota por arquivo em `backend/functions/`, logo os caminhos vêm do seu
-projeto. `GET /api/functions` **não** os lista: o inventário de endpoints
-personalizados de uma implantação não é público.
+projeto. `GET /api/functions` os lista apenas para um chamador autenticado — uma
+sessão, uma chave de API ou a chave de serviço — e responde `401` a qualquer outro: o
+inventário de endpoints personalizados de uma implantação não é público.
 
 ## Metadados e operações
 
@@ -203,9 +207,9 @@ personalizados de uma implantação não é público.
 |---|---|---|---|
 | `GET` | `/livez` | none | Apenas verificação de atividade (liveness): este processo está rodando. Não toca no banco de dados, razão pela qual é o caminho de verificação que um contêiner deve usar — `RUNTIME_LIVENESS_PATH` |
 | `GET` | `/health`, `/api/health` | none | Atividade (liveness) e prontidão (readiness). Informa todas as fontes de dados configuradas, não apenas a padrão |
-| `GET` | `/api/docs` | none (`schema:read` em produção) | O documento OpenAPI 3.0 |
-| `GET` | `/api/swagger` | none | Swagger UI. Apenas em desenvolvimento a menos que `REBASE_ENABLE_SWAGGER` |
-| `GET` | `/api/meta/schema-version` | none | O hash de esquema a partir do qual este backend foi construído, e nada mais |
+| `GET` | `/api/docs` | none (`schema:read` quando `enableSwagger` é `false`, o padrão do runtime em produção) | O documento OpenAPI 3.0 |
+| `GET` | `/api/swagger` | none | Swagger UI. Apenas fora de produção; `REBASE_ENABLE_SWAGGER` não consegue ativá-lo em produção |
+| `GET` | `/api/meta/schema-version` | none | O hash de esquema a partir do qual este backend foi construído e a versão do runtime, e nada mais |
 | `GET` | `/api/meta/contract` | `schema:read` | O contrato completo de coleções, para `rebase generate-sdk --from`. `404` quando nenhuma autenticação está configurada |
 | `GET` | `/metrics` | `REBASE_METRICS_TOKEN` quando definido | Métricas Prometheus, quando `REBASE_METRICS=true` |
 | `GET` | `/metrics/history` | `REBASE_METRICS_TOKEN` quando definido | As séries gravadas por trás dos gráficos do Studio. `501` em um runtime sem backend |

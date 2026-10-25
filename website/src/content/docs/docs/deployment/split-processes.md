@@ -302,9 +302,10 @@ rule you follow rather than one the runtime can enforce.
 ## Upgrading
 
 Unchanged: every process runs the same published image, so an upgrade is the same
-tag change on each of them. Roll the `api` last if you want the schema
-provisioning to happen against the new version first — though in practice the
-order does not matter, because the schema step is additive and idempotent.
+tag change on each of them. Roll the process that owns the schema — the `api`,
+or the migration Job — first, so the new version's schema is in place before
+the other processes run against it: a unit may lag, never lead (see
+[The rule](#the-rule)).
 
 ## Related
 

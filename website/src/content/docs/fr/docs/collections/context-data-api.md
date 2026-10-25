@@ -1,5 +1,5 @@
 ---
-sourceHash: fa5ea5eeb92e1460
+sourceHash: d672b029e72aca9e
 title: L'API context.data
 sidebar_label: API context.data
 description: Lisez et écrivez d'autres collections depuis un callback avec context.data — ses méthodes, les privilèges avec lesquels il s'exécute, la sémantique transactionnelle et la connexion qu'un callback retient.
@@ -33,10 +33,10 @@ Chaque accesseur de collection (`context.data.<slug>`) fournit ces méthodes :
 
 | Méthode | Signature | Description |
 |---|---|---|
-| `.find()` | `find(params?: FindParams) → FindResponse` | Interroger les entités avec des filtres, du tri et de la pagination |
-| `.findById()` | `findById(id: string \| number) → Entity \| undefined` | Récupérer une entité unique par son ID |
-| `.create()` | `create(data: Partial<Values>, id?: string) → Entity` | Créer une nouvelle entité |
-| `.update()` | `update(id: string \| number, data: Partial<Values>) → Entity` | Mettre à jour une entité existante |
+| `.find()` | `find(params?: FindParams) → FindResult` | Interroger les entités avec des filtres, du tri et de la pagination |
+| `.findById()` | `findById(id: string \| number) → Row \| undefined` | Récupérer une ligne unique par son ID |
+| `.create()` | `create(data: Insert, id?: string \| number) → Row` | Créer une nouvelle ligne, et la renvoyer telle qu'elle est stockée |
+| `.update()` | `update(id: string \| number, data: Update) → Row` | Mettre à jour une ligne existante, et la renvoyer telle qu'elle est stockée |
 | `.delete()` | `delete(id: string \| number) → void` | Supprimer un enregistrement |
 | `.count()` | `count(params?: FindParams) → number` | Compter les entités correspondantes |
 | `.listen()` | `listen(params, onUpdate, onError?) → unsubscribe` | Abonnement en temps réel (si pris en charge) |

@@ -18,7 +18,7 @@
 set -euo pipefail
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-ROOT="$(cd "$HERE/.." && pwd)"
+ROOT="$(cd "$HERE/../.." && pwd)"   # the project root: this file is infra/docker/quickstart.sh
 COMPOSE_FILE="$HERE/docker-compose.selfhost.yml"
 ENV_FILE="$HERE/.env"
 

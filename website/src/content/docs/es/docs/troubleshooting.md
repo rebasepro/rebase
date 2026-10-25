@@ -1,5 +1,5 @@
 ---
-sourceHash: 648de86871ab3d3d
+sourceHash: fdbf8e3627811576
 slug: es/docs/troubleshooting
 title: Solución de problemas
 description: Los fallos que impiden que un backend de Rebase se inicie o preste servicio — una base de datos inaccesible, credenciales incorrectas, una extensión faltante, un rechazo de RLS, desfase de esquema (schema drift), un puerto ocupado, una función que no carga — y cómo se ve cada uno.
@@ -143,10 +143,11 @@ Pasa `--port` para fijar uno o detén el otro proceso. En producción no hay rei
 
 ## El backend falló y `rebase dev` continuó ejecutándose
 
-Un backend que arroja una excepción al arrancar no detiene el observador (watcher): imprime la traza de pila y espera un cambio de archivo. `rebase dev` reporta esto:
+Un backend que arroja una excepción al arrancar no detiene el observador (watcher): imprime la traza de pila y espera un cambio de archivo. Cuando el backend no se ha anunciado en
+`REBASE_DEV_READY_TIMEOUT_MS` (30 segundos por defecto), `rebase dev` reporta esto:
 
 ```
-  ✗ The backend crashed on startup.
+  ✗ The backend has not started after 30s.
     Fix the error above; the watcher restarts it on the next change.
 ```
 

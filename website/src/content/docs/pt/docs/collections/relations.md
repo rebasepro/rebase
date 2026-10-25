@@ -1,5 +1,5 @@
 ---
-sourceHash: e3130fcc43e901ed
+sourceHash: f37fbfe1270f8317
 title: Relações
 sidebar_label: Relações
 description: Defina relações SQL um-para-um, um-para-muitos e muitos-para-muitos entre coleções com chaves estrangeiras, tabelas de junção e junções multi-salto.
@@ -79,7 +79,8 @@ uma linha ou muitas, e o que uma escrita através dela pode tocar.
 | `manyToMany` | numa **tabela de junção** | muitas | as linhas são compartilhadas; o vínculo é seu |
 | `via` | um `joinPath` explícito | qualquer | somente leitura; declare você mesmo a `cardinality` |
 
-Todo campo é opcional exceto `kind` e `target` — o resto é derivado.
+Todo campo é opcional exceto `kind` e `target` (e, em `via`, `cardinality`
+e `joinPath`) — o resto é derivado.
 
 ### belongsTo — a chave está nesta tabela
 
@@ -354,7 +355,7 @@ que você pede de propósito:
     kind: "belongsTo",
     relationName: "order",
     target: () => ordersCollection,
-    // Um item de pedido não faz sentido sem o seu pedido — diga isso.
+    // A line item is meaningless without its order — say so.
     onDelete: "cascade"
 }
 ```
@@ -412,7 +413,7 @@ for (const article of data) {
 }
 ```
 
-> Os nomes das relações passados para `include()` devem corresponder ao `relationName` definido no array `relations` da coleção.
+> Os nomes das relações passados para `include()` devem corresponder ao nome da relação: o `relationName` de uma entrada do array `relations` da coleção, ou a chave da propriedade que a declara inline.
 
 Para a referência completa do construtor de consultas (filtragem, classificação, paginação, tempo real), consulte a [documentação do SDK tipado](/docs/sdk).
 
@@ -540,7 +541,12 @@ interface HasManyRelation extends RelationBase {
 
 interface ManyToManyRelation extends RelationBase {
     kind: "manyToMany";
-    through?: { table?: string; sourceColumn?: string; targetColumn?: string };
+    through?: {
+        table?: string;
+        sourceColumn?: string;
+        targetColumn?: string;
+        properties?: Properties;    // extra columns on the junction row, served under `_pivot`
+    };
 }
 
 interface ViaRelation extends RelationBase {

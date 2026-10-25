@@ -1,5 +1,5 @@
 ---
-sourceHash: acd1967fc17b4924
+sourceHash: b95e3733ef1e2cda
 slug: de/docs/upgrading/0-23-to-0-24
 title: Upgrade von 0.23 auf 0.24
 sidebar_label: 0.23 → 0.24
@@ -177,7 +177,7 @@ ihren Schlüssel. Ein Upsert, dessen Schlüssel zu einer solchen Zeile gehörte,
 die verborgene Zeile und antwortete `201 Created`, sodass die Zeile gelöscht blieb und der
 Aufrufer einen Erfolg sah. Er wird nun mit `409 ROW_IN_TRASH` abgelehnt, und nichts wird
 geschrieben, an jeder Upsert-Tür: `?on_conflict=`, `/bulk`, `/_batch`, das SDK, der
-Socket und `rebase.data` oder `context.data` auf dem Server.
+Socket und `rebase.dataAsAdmin` oder `context.data` auf dem Server.
 
 **Was zu ändern ist:** nichts, es sei denn, etwas führt einen Upsert in eine Soft-Delete-Collection aus und erwartet, eine Zeile zurückzuholen.
 Stellen Sie die Zeile zuerst wieder her, mit einem Update, das ihr Soft-Delete-Feld auf `null` setzt, und führen Sie dann den Upsert aus. Oder löschen Sie sie mit
@@ -192,7 +192,7 @@ Stellen Sie die Zeile zuerst wieder her, mit einem Update, das ihr Soft-Delete-F
 ## 49. Ein Update, das den Schlüssel einer Zeile ändert, wird mit `400 KEY_IMMUTABLE` abgelehnt
 
 Ein Update, dessen Body den Schlüssel der Zeile mit einem anderen Wert nannte, oder ein `beforeSave`,
-der ihn änderte, antwortete mit `500`. In-Process, über `rebase.data`, war die Zeile
+der ihn änderte, antwortete mit `500`. In-Process, über `rebase.dataAsAdmin`, war die Zeile
 bereits auf den neuen Schlüssel umgezogen, als der Schreibvorgang warf. Jede Tür lehnt es nun
 mit `400 KEY_IMMUTABLE` ab, bevor ein Hook läuft, unter Nennung des Feldes, und nichts wird
 geschrieben. Das Senden des Schlüssels, den die Zeile bereits hat, wird weiterhin akzeptiert.
@@ -368,7 +368,7 @@ Siehe [Der Remote-Endpunkt](/docs/ai/mcp/#the-remote-endpoint).
 
 ## 57. In-Process-Schreibvorgänge lehnen `ifMatch` und `idempotencyKey` ab
 
-Ein Schreibvorgang über `context.data` in einem Callback oder `rebase.data` in einer Funktion,
+Ein Schreibvorgang über `context.data` in einem Callback oder `rebase.dataAsAdmin` in einer Funktion,
 einem Cron-Job oder einem Seed verlässt den Prozess nie: Es gibt kein `If-Match` zu prüfen und
 keinen Idempotenz-Store. Beide Optionen wurden stillschweigend ignoriert, sodass ein bedingter Schreibvorgang
 dort unbedingt war. Sie werfen nun `UNSUPPORTED_OPTION`, bevor etwas geschrieben wird.
@@ -383,7 +383,7 @@ Client, der beides berücksichtigt.
 ```
 
 ```bash
-grep -rnE "(context|rebase)\.data\..*(ifMatch|idempotencyKey)" --exclude-dir=node_modules .
+grep -rnE "(context\.data|rebase\.dataAsAdmin)\..*(ifMatch|idempotencyKey)" --exclude-dir=node_modules .
 ```
 
 ## 58. `Button` und `IconButton` sind gegen das Element typisiert, das sie rendern

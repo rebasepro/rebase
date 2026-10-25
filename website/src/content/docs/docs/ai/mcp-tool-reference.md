@@ -28,7 +28,7 @@ Spawn the Rebase CLI in the active project directory.
 | `rebase_db_branch_list` | — | List database branches (admins only) |
 | `rebase_db_branch_delete` ⚠ | `name` | Delete a database branch (admins only) |
 | `rebase_db_branch_info` | `name` | Branch information and status (admins only) |
-| `rebase_db_branch_diff` | `name` | What a branch changed against the database it was made from: the schema as SQL, and per table the rows it inserted, updated and deleted (admins only) |
+| `rebase_db_branch_diff` | `name` | What a branch changed against the database it was made from — schema, policies and rows, with conflicts; changes neither (admins only) |
 | `rebase_db_branch_switch` | — | Point this checkout at a branch, or back at the main database (admins only) |
 
 ## Schema planning (1)
@@ -113,7 +113,7 @@ chose. Its blast radius is whatever your functions do.
 |---|---|---|
 | `rebase_project_list` | — | List registered projects and show the active one |
 | `rebase_project_switch` | `name` | Change the active project |
-| `rebase_project_add` | `name` | Register a project (`baseUrl`, optional `projectDir`, `token`) |
+| `rebase_project_add` | `name` | Register a project (optional `projectDir`, `baseUrl`, `token`) |
 | `rebase_project_remove` | `name` | Remove a project (the default project cannot be removed) |
 | `rebase_project_current` | — | Show the active project and its auth status |
 | `rebase_project_status` | — | Health-check the active backend |

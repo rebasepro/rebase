@@ -172,7 +172,7 @@ the main column.
 | `admin.form.sections` | `FormSection[]` | Titled groups for the main column |
 | `admin.form.showRecordMeta` | `boolean` | Show id/created/updated at the foot of the rail |
 
-`FormSection` is `{ key, title?, properties, collapsed?, collapsible? }`.
+`FormSection` is `{ key, title?, properties, collapsed?, collapsible?, readVariant? }`. `readVariant: "summary"` stacks the section's fields as label/value rows in the record's read-only view; the default, `"grid"`, uses the form's grid.
 
 ## Related
 

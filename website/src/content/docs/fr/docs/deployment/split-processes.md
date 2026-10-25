@@ -1,5 +1,5 @@
 ---
-sourceHash: 8dc5279c89b40f48
+sourceHash: 8c0fc8ebbe0f0b10
 title: Séparation en plusieurs processus
 sidebar_label: Processus séparés
 description: Exécutez un seul bundle sous forme de plusieurs processus coopérants — une API, un niveau de fonctions, un worker — à partir de la même image d'exécution publiée, afin qu'une fonction personnalisée lourde ne vienne plus concurrencer l'API de données.
@@ -294,9 +294,10 @@ règle que vous devez respecter plutôt qu'une contrainte imposée par le runtim
 ## Mise à niveau
 
 Ce point est inchangé : chaque processus exécute la même image publiée, une mise à niveau correspond donc au même
-changement de tag sur chacun d'eux. Déployez l'`api` en dernier si vous souhaitez que le
-provisionnement du schéma s'effectue d'abord avec la nouvelle version — bien qu'en pratique
-l'ordre n'ait pas d'importance, car l'étape de mise à jour du schéma est cumulative et idempotente.
+changement de tag sur chacun d'eux. Déployez en premier le processus qui possède le schéma — l'`api`,
+ou le Job de migration — afin que le schéma de la nouvelle version soit en place avant que
+les autres processus ne s'exécutent contre lui : une unité peut être en retard, jamais en avance (voir
+[La règle](#la-règle)).
 
 ## Liens associés
 

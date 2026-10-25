@@ -1,5 +1,5 @@
 ---
-sourceHash: 8dc5279c89b40f48
+sourceHash: 8c0fc8ebbe0f0b10
 title: Aufteilen in mehrere Prozesse
 sidebar_label: Prozesse aufteilen
 description: Führen Sie ein Bundle als mehrere zusammenarbeitende Prozesse aus – eine API, eine Functions-Ebene, ein Worker – aus demselben veröffentlichten Runtime-Image, damit eine rechenintensive benutzerdefinierte Funktion nicht mehr mit der Daten-API konkurriert.
@@ -287,9 +287,10 @@ Regel, die Sie befolgen müssen, und keine, die von der Runtime erzwungen werden
 ## Upgrades
 
 Unverändert: Jeder Prozess führt dasselbe veröffentlichte Image aus, daher besteht ein Upgrade aus
-derselben Tag-Änderung bei jedem von ihnen. Rollen Sie die `api` zuletzt aus, wenn die Schemabereitstellung
-zuerst mit der neuen Version erfolgen soll – in der Praxis spielt die Reihenfolge jedoch keine Rolle,
-da der Schemaschritt additiv und idempotent ist.
+derselben Tag-Änderung bei jedem von ihnen. Rollen Sie zuerst den Prozess aus, der das Schema besitzt – die `api`
+oder den Migrations-Job –, damit das Schema der neuen Version vorhanden ist, bevor die
+anderen Prozesse dagegen laufen: Eine Einheit darf zurückliegen, niemals vorauseilen (siehe
+[Die Regel](#die-regel)).
 
 ## Verwandte Themen
 

@@ -1,8 +1,8 @@
 ---
-sourceHash: 22ec003847a742c2
+sourceHash: 2f29788275d0b4db
 title: Tiempo real entre instancias
 sidebar_label: Tiempo real entre instancias
-description:"\"Cómo los canales de difusión (broadcast) y la presencia sobreviven a más de un proceso de servidor: el bus LISTEN/NOTIFY, qué posee cada instancia y cómo escribir tu propio transporte.\""
+description: "Cómo los canales de difusión (broadcast) y la presencia sobreviven a más de un proceso de servidor: el bus LISTEN/NOTIFY, qué posee cada instancia y cómo escribir tu propio transporte."
 ---
 
 ## Difusión entre instancias y arquitectura LISTEN/NOTIFY
@@ -17,7 +17,7 @@ Dado que los agrupadores de conexiones como **pgBouncer** no admiten el modelo d
 
 ### Mecánica de notificaciones y estructura del payload
 
-Cuando se modifica un registro en la Instancia A, esta transmite una notificación en el canal `rebase_entity_changes`. Para minimizar la sobrecarga en la base de datos y el ancho de banda de la red, el payload de la notificación se mantiene extremadamente compacto:
+Con la [captura de cambios de la base de datos](/docs/backend/realtime-cdc/) activa —el valor predeterminado siempre que el rol de la base de datos pueda crear triggers—, cada instancia oye cada commit en el canal `rebase_cdc`, y no se envía nada de lo que sigue. Sin ella, cuando se modifica un registro en la Instancia A, esta transmite una notificación en el canal `rebase_entity_changes`. Para minimizar la sobrecarga en la base de datos y el ancho de banda de la red, el payload de la notificación se mantiene extremadamente compacto:
 
 ```json
 {
@@ -109,7 +109,7 @@ La ventana está configurada por defecto en 10 ms y no es un ajuste crítico: 5 
 
 ```typescript
 realtime: {
-    bus: { type: "postgres", batchWindowMs: 20 }   // 0 desactiva la fusión
+    bus: { type: "postgres", batchWindowMs: 20 }   // 0 disables coalescing
 }
 ```
 
@@ -127,17 +127,17 @@ export class MyChannelBus implements ChannelBus {
     readonly maxFrameBytes = Infinity;
 
     async start(handler: ChannelBusHandler): Promise<void> {
-        // Conectar. Rechazar si no es posible; quien llama recurre a la entrega
-        // dentro del proceso, lo cual es mucho mejor que un clúster que cree
-        // estar conectado y silenciosamente no lo esté.
+        // Connect. Reject if you cannot — the caller falls back to in-process
+        // delivery, which is far better than a cluster that believes it is
+        // connected and silently is not.
     }
 
     async publish(frame: ChannelBusFrame): Promise<void> {
-        // Alcanzar a todas las demás instancias, o rechazar.
+        // Reach every other instance, or reject.
     }
 
     async stop(): Promise<void> {
-        // Idempotente; liberar cualquier elemento que mantenga abierto el bucle de eventos.
+        // Idempotent; release anything holding the event loop open.
     }
 }
 ```

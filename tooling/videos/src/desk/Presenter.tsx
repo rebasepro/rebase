@@ -151,7 +151,7 @@ export const Presenter: React.FC<{ take?: Take | null; live?: LiveFeed | null }>
 /** The camera, live, on the recording page. Mirrored, as every self-view
  *  is — the recording itself is not — and muted, so the room is not fed
  *  back into the microphone. */
-const LiveCamera: React.FC<{ stream: MediaStream }> = ({ stream }) => {
+export const LiveCamera: React.FC<{ stream: MediaStream }> = ({ stream }) => {
     const ref = useRef<HTMLVideoElement>(null);
     useEffect(() => {
         const video = ref.current;
@@ -172,10 +172,10 @@ const LiveCamera: React.FC<{ stream: MediaStream }> = ({ stream }) => {
 
 /** Stands in for the take: a quiet surface with a head-and-shoulders
  *  silhouette where the face will be, so framing can be judged now. */
-const Placeholder: React.FC<{ stage: string }> = ({ stage }) => (
+export const Placeholder: React.FC<{ stage: string }> = ({ stage }) => (
     <AbsoluteFill
         style={{
-            background: "radial-gradient(ellipse at 50% 42%, #1B1E25 0%, #0B0C0F 70%)",
+            background: `radial-gradient(ellipse at 50% 42%, ${SURFACE.card} 0%, ${SURFACE.frame} 70%)`,
             alignItems: "center",
             justifyContent: "center",
         }}

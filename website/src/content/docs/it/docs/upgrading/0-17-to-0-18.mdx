@@ -1,5 +1,5 @@
 ---
-sourceHash: 056364d861650668
+sourceHash: 8361698c6e191ecf
 slug: it/docs/upgrading/0-17-to-0-18
 title: Aggiornare da 0.17 a 0.18
 sidebar_label: 0.17 → 0.18
@@ -9,34 +9,55 @@ description: Ogni modifica incompatibile della 0.18, e cosa fare per ciascuna.
 # Aggiornare 0.17 → 0.18
 
 **La 0.18.0 è pubblicata.** Sono le voci `### Breaking` della sua
-[sezione del changelog](/it/docs/changelog/), una alla volta, con ciò che ciascuna
-ti chiede di modificare. In 0.x è la minor a rompere, quindi questo è il muro tra
-la 0.17.3 e la 0.18.0: leggilo prima di aggiornare, non dopo.
+[sezione del changelog](/docs/changelog/), una alla volta, con ciò che ciascuna
+ti chiede di modificare. In 0.x è la minor a rompere, quindi questo è il muro
+tra la 0.17.3 e la 0.18.0: leggilo prima di aggiornare, non dopo.
+
+Ognuna di esse è un errore di compilazione o un avvio rifiutato, non un cambio
+silenzioso di comportamento, tranne l'ultima, che riscrive un vincolo che il
+prossimo `db push` pianificherà per te.
+
+---
 
 ## 20. `defineCollection` ha una sola firma
 
-Erano tre overload — Postgres, Firestore, MongoDB — e ora è una sola, discriminata
-su `engine` (Postgres quando manca).
+Erano tre overload — Postgres, Firestore, MongoDB — e una chiamata errata
+produceva un'unica diagnostica su `defineCollection(`, che elencava il primo
+errore di ciascun overload. Ora c'è una sola firma, discriminata su `engine`
+(Postgres quando manca), e gli errori vengono segnalati sulla chiave sbagliata,
+tutti insieme.
 
-**Cosa cambiare:** nulla in una chiamata che già compilava; cambia dove atterra
-l'errore, ora sulla chiave sbagliata e non su `defineCollection(`.
-`UnknownPropertyKey` ora si chiama `NoSuchKey`: solo il codice che importava il
-vecchio nome ha qualcosa da modificare.
+**Cosa cambiare:** nulla, in una chiamata che già compilava. Cambia dove
+atterra la sottolineatura rossa. Con essa si sono spostati due export di tipo:
+`UnknownPropertyKey` ora si chiama `NoSuchKey` (e ha un membro `didYouMean`), e
+`PropertyTypeNotOnThisEngine` è nuovo. Entrambi sono meccanismi interni del
+builder, quindi solo il codice che importava il vecchio nome ha qualcosa da
+modificare.
 
 ## 21. `defineCollection` continua a controllare dopo la prima proprietà errata
 
-Una sola proprietà sbagliata faceva collassare l'entità inferita a
-`Record<string, unknown>` e spegneva ogni altro controllo.
+Il builder vincolava la propria mappa di proprietà, e un vincolo che TypeScript
+non riesce a soddisfare è uno da cui ripiega in silenzio — così un singolo
+`defaultValue` errato allargava l'entità inferita a `Record<string, unknown>` e
+spegneva ogni controllo su `display.title`, `listProperties`, `propertiesOrder`
+e `previewProperties`.
 
 **Cosa cambiare:** niente da scrivere, ma aspettati errori *nuovi* in file di
 collection che prima compilavano. Erano già sbagliati allora; il compilatore
-aveva smesso di guardare.
+aveva smesso di guardare. Correggi la proprietà indicata dal primo errore e
+ricompila — il resto di quel file viene controllato per la prima volta.
 
 ## 22. Il campo di collegamento di una relazione deve appartenere al suo `kind`
 
-`{ kind: "belongsTo", foreignKeyOnTarget: … }` non compila più.
+`Relation` è un'unione chiusa dalla 0.11 — `belongsTo` possiede `localKey`,
+`hasOne`/`hasMany` possiedono `foreignKeyOnTarget`, `manyToMany` possiede
+`through`, `via` possiede `joinPath` — ma il controllo delle proprietà in
+eccesso veniva eseguito sull'unione nel suo complesso, quindi
+`{ kind: "belongsTo", foreignKeyOnTarget: "author_id" }` compilava e poi si
+risolveva in un collegamento diverso da quello scritto.
 
-**Cosa cambiare:** scrivi il campo che quel tipo di relazione possiede.
+**Cosa cambiare:** scrivi il campo di collegamento che quel tipo di relazione
+possiede.
 
 ```diff lang="ts"
   author: {
@@ -46,12 +67,18 @@ aveva smesso di guardare.
   }
 ```
 
-Il validatore di avvio le rifiutava già: se il tuo progetto parte oggi, compila
-oggi.
+Il validatore di avvio le rifiutava già, quindi questo sposta la segnalazione da
+un deploy fallito a un errore di compilazione. Se il tuo progetto parte oggi,
+compila oggi.
 
 ## 23. La `validation` di una relazione sale sulla proprietà
 
 `RelationBase.validation` e `ResolvedRelationBase.validation` sono rimossi.
+C'erano due posti dove scrivere `required` e due generatori che ne leggevano
+uno diverso: il DDL interrogava la proprietà (così la colonna risultava
+`NOT NULL`) mentre il generatore di tipi dell'SDK interrogava la relazione (così il
+tipo `Insert` generato rendeva il campo opzionale), e un `create()` che
+ometteva la relazione passava il controllo dei tipi e poi falliva sul database.
 
 **Cosa cambiare:** spostala di un livello, accanto a quella di ogni altro campo.
 
@@ -64,16 +91,24 @@ oggi.
   }
 ```
 
-L'avvio rifiuta la vecchia chiave per nome. Il codice che chiedeva a una relazione
-se fosse obbligatoria ora usa
+L'avvio rifiuta la vecchia chiave per nome anziché ignorarla. Il codice che
+chiedeva a una relazione se fosse obbligatoria ora usa
 `import { isRelationRequired, relationDeclaringProperty } from "@rebasepro/common"`.
 
 ## 24. Un `belongsTo` obbligatorio cancella con `RESTRICT`, non `CASCADE`
 
-**Questa è una modifica DDL.** Il prossimo `rebase db push` pianifica una
-ricostruzione del vincolo per ogni relazione obbligatoria che non ha mai indicato
-un `onDelete`, e dopo di essa le cancellazioni del padre iniziano a fallire dove
-prima andavano in cascata.
+`validation: { required: true }` dice che il figlio non può esistere senza un
+padre. Non dice che eliminare il padre debba eliminare il figlio — ma è ciò che
+il generatore deduceva, quindi ogni `DELETE FROM authors` andava in cascata sui
+post, sui loro commenti e su tutto ciò che vi era appeso. Ora il valore
+predefinito è `RESTRICT`: l'eliminazione fallisce e indica il vincolo. Le
+relazioni opzionali non cambiano (`SET NULL`), e neppure la tabella di giunzione
+di un `manyToMany` (`CASCADE` — la riga che elimina è il collegamento).
+
+**Questa è una modifica DDL.** Il prossimo `rebase db push` pianifica un
+`DROP CONSTRAINT` / `ADD CONSTRAINT` per ogni relazione obbligatoria che non ha
+mai indicato un `onDelete`, e dopo di essa le cancellazioni del padre iniziano a
+fallire dove prima andavano in cascata.
 
 **Cosa cambiare:** per mantenere il comportamento precedente, scrivilo.
 
@@ -82,7 +117,7 @@ prima andavano in cascata.
 + relation: { kind: "belongsTo", onDelete: "cascade", target: () => authors }
 ```
 
-Poi rileggi il piano prima di applicarlo — `rebase db push` stampa le istruzioni.
+Poi leggi il piano prima di applicarlo — `rebase db push` stampa le istruzioni.
 
 ## 25. Il minimo di Node è `>=22.22.0`
 
@@ -95,71 +130,71 @@ risponde a un disallineamento di engines con `[WARN] Unsupported engine` e
 installa comunque, quindi l'errore non arriva all'installazione: arriva dopo, in
 un punto in cui Node non viene mai nominato.
 
-
 ## 26. `rebase.data` non esiste più a runtime
 
-`RebaseServerClient` ha tolto `data` dal proprio tipo perché il codice server
-debba dire sotto quale identità gira una lettura, e la proprietà era poi rimasta
-sull'oggetto come alias a runtime. Ora viene cancellata al boot: `rebase.data` è
-`undefined`.
+`RebaseServerClient` ha tolto `data` dal proprio tipo perché il codice lato
+server debba dire sotto quale identità gira una lettura, e la proprietà era poi
+rimasta sull'oggetto come alias a runtime. Ora viene cancellata al boot:
+`rebase.data` è `undefined`.
 
 **Cosa cambiare:** nel codice server — funzioni, cron, callback — scrivi
 `rebase.dataAsAdmin` dove intendi il piano di amministrazione e `context.data`
 dove intendi quello del chiamante. Il codice tipizzato riceveva l'errore già dal
 cambio di tipo; quello che si rompe adesso è il codice non tipizzato, e
-l'`ai-instructions.md` di uno scaffold, che dice ancora a un assistente di usare
-`rebase.data.<slug>`. Quel file lo scrive `rebase init`: rigeneralo o correggi la
-regola a mano. Il codice browser non cambia: `rebase.data` nell'SDK tipizzato è il
-piano dell'utente e resta.
+l'`ai-instructions.md` di uno scaffold che dice ancora a un assistente di usare
+`rebase.data.<slug>` — `rebase init` riscrive quel file, quindi rigeneralo o
+correggi la regola a mano. Il codice browser non cambia: `rebase.data` nell'SDK
+tipizzato è il piano dell'utente e resta.
 
 ## 27. `@rebasepro/cli` pubblica tre export
 
 `src/index.ts` riesportava sedici moduli e metteva 95 nomi su npm. Ora esporta
 `entry`, `manifest` e `bundle`.
 
-**Cosa cambiare:** nulla, a meno che tu non importi da `@rebasepro/cli` — cosa
-improbabile, dato che non lo facevano né questo repository né il control plane.
-Se lo fai: la CLI è un binario. Invoca `rebase <command>` come processo invece di
-importare le sue funzioni di comando, le cui firme non sono mai state un
+**Cosa cambiare:** nulla, a meno che tu non faccia `import` da `@rebasepro/cli`
+— cosa improbabile, dato che non lo facevano né questo repository né il control
+plane. Se lo fai, la CLI è un binario: invoca `rebase <command>` come processo
+invece di chiamare le sue funzioni di comando, le cui firme non sono mai state un
 contratto.
 
 ## 28. Gli intervalli dei peer sono caret
 
 `ui`, `forms`, `firebase`, `plugin-insights` e `cms-types` dichiaravano
 `react >=19.0.0`, un intervallo la cui metà inferiore non può soddisfare `app` e
-`cms` a 19.2.7: un installer che sceglieva 19.0.0 produceva un albero che si
-risolveva pulito e si rompeva al render. Tutti e cinque dicono `^19.2.7`. Il peer
-`typescript` di `@rebasepro/app` passa da `>=5.0.0` a `^6.0.0`.
+`cms` a 19.2.7 — quindi un installer che sceglieva 19.0.0 produceva un albero che
+si risolveva pulito e si rompeva al render. Tutti e cinque dicono `^19.2.7`. Il
+peer `typescript` di `@rebasepro/app` passa da `>=5.0.0` a `^6.0.0`.
 
-**Cosa cambiare:** stare su React 19.2.7 o successivo, e su TypeScript 6 se usi
-il plugin Vite di `@rebasepro/app`. Se la tua installazione risolveva React
-19.0.x vedrai un avviso di peer finché non sali; quell'avviso è l'albero che
-stavi già eseguendo, detto ad alta voce.
+**Cosa cambiare:** stai su React 19.2.7 o successivo, e su TypeScript 6 se usi il
+plugin Vite di `@rebasepro/app`. Se la tua installazione risolveva React 19.0.x
+vedrai ora un avviso di peer finché non sali di versione; quell'avviso è l'albero
+che stavi già eseguendo, detto ad alta voce.
 
 ## 29. `rebase cloud webhooks create` prende `--endpoint`
 
-`--url` nomina il control plane per tutta questa famiglia di comandi, quindi il
+`--url` nomina il control plane per tutti i comandi di questa famiglia, quindi il
 secondo `--url` che questo dichiarava per l'endpoint del cliente non poteva mai
-vincere: l'esempio documentato mandava l'URL del webhook al client come host su
+vincere: l'esempio documentato inviava l'URL del webhook al client come host su
 cui autenticarsi.
 
 **Cosa cambiare:** `rebase cloud webhooks create --endpoint https://…` in ogni
-script che ne crea uno. La vecchia grafia non poteva funzionare: non c'è
-comportamento da preservare, solo righe da correggere.
+script che ne crea uno. La vecchia grafia non poteva funzionare, quindi non c'è
+comportamento da preservare — solo righe da correggere.
 
 ## 30. `serializeFilter` emette in modo stretto
 
-Il leaf encoder condiviso parsifica in modo permissivo, perché uno short code
-arriva dalla rete, ed emette in modo stretto, perché chi lo passa al
-serializzatore ha costruito la condizione a mano.
-`serializeFilter({ a: ["gt", 5] })` solleva invece di restituire `gte`.
+Il leaf encoder condiviso interpreta in modo permissivo, perché uno short code
+arriva dalla rete, ed emette in modo stretto, perché chi ne passa uno al
+serializzatore ha costruito la condizione a mano. `serializeFilter({ a: ["gt", 5] })`
+solleva un errore invece di restituire `gte`.
 
 **Cosa cambiare:** solo se chiami direttamente i serializzatori di
-`@rebasepro/common`. Usa i nomi di operatore che i tipi dichiarano (`gt`, `gte`,
-`lt`, `lte`, …) invece degli short code REST. I query builder e l'SDK li
-scrivevano già così; la novità è che la grafia sbagliata ora lo dice.
+`@rebasepro/common`. Usa i nomi di operatore che i tipi dichiarano (`>`, `>=`,
+`<`, `<=`, …) invece degli short code REST (`gt`, `gte`, …). I query builder e
+l'SDK li scrivevano già così; la novità è che la grafia sbagliata ora lo dice.
 
 ---
 
-**Avanti:** [Quale salto](/it/docs/upgrading/) ·
-[Changelog](/it/docs/changelog/).
+**Avanti:** [la checklist di aggiornamento](/docs/upgrading/#upgrade-checklist) ·
+[0.14 → 0.17](/docs/upgrading/0-14-to-0-17/), il passaggio precedente a questo ·
+[Changelog](/docs/changelog/), le note di rilascio che queste sezioni riassumono.

@@ -27,7 +27,7 @@ for the backend.
 | Replace the login page | `components` (`Auth.LoginView`) | app | [Component Overrides](/docs/frontend/component-overrides) |
 | Replace the home page | `components` (`HomePage`) | app | [Component Overrides](/docs/frontend/component-overrides) |
 | Change how one collection's form looks entirely | `formView` | collection | [below](#formview) |
-| Swap one component inside one collection | `collection.components` | collection | [Component Overrides](/docs/frontend/component-overrides) |
+| Swap one component inside one collection | `admin.components` | collection | [Component Overrides](/docs/frontend/component-overrides) |
 | Set default component overrides for all collections | `components` (collection-scoped names) | app | [Component Overrides](/docs/frontend/component-overrides) |
 | Add a button to the collection toolbar | collection `Actions` | collection | [Entity Actions](/docs/frontend/entity-actions#collection-actions) |
 | Inject UI at a collection toolbar slot | `collection.actions` slot | app/plugin | [Slots](/docs/frontend/slots) |
@@ -55,7 +55,7 @@ colour is invisible in one of the two themes. See
 
 **Scope:** app.
 
-A plugin bundles collections, views, component overrides, slot contributions, auth, data sources, providers, hooks, and lifecycle callbacks into a single installable unit. All other mechanisms listed here can be contributed through a plugin's interface.
+A plugin bundles injected or modified collections, views, slot contributions, field wrappers, providers, hooks, and lifecycle callbacks into a single installable unit. Component overrides, entity views, entity actions and `propertyConfigs` are not plugin fields: they go on `<Rebase>` or on the collection.
 
 → [Plugins reference](/docs/plugins)
 
@@ -98,7 +98,7 @@ Two modes: **Eject** (full replacement) or **Wrap** (augment the original).
 - `EntityPreview`
 - `Entity.MissingReference`
 
-**Precedence:** Collection-level `components` override app-level defaults for the same component name (simple object spread — collection values overwrite global values). App-only component names (`Shell.*`, `HomePage`, `Auth.*`) can only be overridden at the `<Rebase>` level.
+**Precedence:** Collection-level `components` apply on top of app-level defaults for the same component name: a collection replacement replaces both, and a collection `wrap: true` override wraps the app-level one. App-only component names (`Shell.*`, `HomePage`, `Auth.*`) can only be overridden at the `<Rebase>` level.
 
 → [Component Overrides](/docs/frontend/component-overrides)
 
@@ -106,7 +106,7 @@ Two modes: **Eject** (full replacement) or **Wrap** (augment the original).
 
 **Scope:** entity (adds tabs).
 
-Custom views that appear as tabs in the entity detail page. Can be defined globally on `<Rebase>` or per-collection.
+Custom views that appear as tabs in the entity detail page. Defined per collection, or registered once on `<Rebase entityViews>` (or `<RebaseCMS entityViews>`) and named by `key` in a collection's `admin.entityViews`.
 
 → [Entity Views](/docs/frontend/entity-views)
 
@@ -114,7 +114,7 @@ Custom views that appear as tabs in the entity detail page. Can be defined globa
 
 **Scope:** entity.
 
-Custom action buttons on individual entities (publish, archive, clone, etc.). Can be defined globally or per-collection.
+Custom action buttons on individual entities (publish, archive, clone, etc.). Defined per collection, or registered once on `<Rebase entityActions>` (or `<RebaseCMS entityActions>`) and named by `key` in a collection's `admin.entityActions`.
 
 → [Entity Actions](/docs/frontend/entity-actions)
 
@@ -201,7 +201,7 @@ const collection = {
 
 ```
 
-Use when you need a completely custom layout for one collection's entity editing experience. For smaller tweaks, prefer `collection.components` with `Entity.Form` override instead.
+Use when you need a completely custom layout for one collection's entity editing experience. For smaller tweaks, prefer `admin.components` with `Entity.Form` override instead.
 
 The Builder is rendered inside the record's form and receives its live `formContext`: write with `formContext.setFieldValue`, and the bar's Save stores the record. Where the record cannot be edited — the read-only detail view, or a user without edit permission — `formContext.disabled` is `true` and writes throw. Set `includeActions: false` if your Builder saves on its own through `formContext.submit()`.
 
@@ -238,7 +238,7 @@ panel shows, this is the wrong page. The server has its own ladder:
 
 ## Precedence Summary
 
-- **`collection.components` applies over global `components`** inside that collection. A collection replacement replaces both; a collection `wrap: true` override wraps the global override when there is one (on 0.24 it wraps the built-in, and the global override is skipped). See [Component Overrides](/docs/frontend/component-overrides#when-both-scopes-override-a-component).
+- **A collection's `admin.components` applies over global `components`** inside that collection. A collection replacement replaces both; a collection `wrap: true` override wraps the global override when there is one (on 0.24 it wraps the built-in, and the global override is skipped). See [Component Overrides](/docs/frontend/component-overrides#when-both-scopes-override-a-component).
 - **Collection `Actions` and `collection.actions` slot are additive** — `Actions` render first, then slot contributions.
-- **Collection-level `entityActions` and `entityViews` extend (not replace) global ones.**
+- **App-level `entityActions` and `entityViews` are a registry, not defaults:** a collection shows one only when its own `admin.entityActions` / `admin.entityViews` names its `key`.
 - **Plugins apply in the order of the `plugins` array**, not by `key`. Slot contributions render by their `order` (lower first, 50 by default), and ties keep that order. Field wrappers from several plugins compose in that order, the first plugin's innermost; on 0.24 only the last wrapper rendered. See [Plugins](/docs/plugins#field-wrappers-from-several-plugins).

@@ -19,6 +19,11 @@ The backend uses a **two-step process**:
 1. **`rebase schema generate`** reads your Rebase collection definitions and generates a Drizzle ORM schema file (`schema.generated.ts`)
 2. **`rebase db push`** or **`rebase db generate` + `rebase db migrate`** applies the schema to the database
 
+The backend also applies the additive part at every boot, on any database: missing
+tables, columns and enum types, and the collections' RLS policies
+(`REBASE_MIGRATE_ON_BOOT=ensure`, the default; `none` opts out). It never drops,
+renames or narrows — that is what step 2 is for.
+
 On the way, `db push` and `db generate` render the collections to SQL in `.rebase/sql/`
 beside the backend (`backend/.rebase/sql/` in a scaffolded project): `schema.sql` is
 Atlas's desired state, and `policies.sql`, `search.sql`, `vector.sql` and `triggers.sql`
@@ -28,8 +33,11 @@ are what you commit, in `drizzle/migrations/`.
 
 ## Prerequisites
 
-- PostgreSQL 14+ (local or Docker)
-- `DATABASE_URL` environment variable set in the project root's `.env` file
+- A PostgreSQL to run against — or none: with `DATABASE_URL` unset (how `rebase init`
+  leaves `.env`), `rebase dev` starts a managed PostgreSQL (PGlite) under `.rebase/`,
+  and every command below but `db branch` finds it. `rebase db url` prints whichever one is in use
+- For your own PostgreSQL (local, Docker, or a cloud one): PostgreSQL 14+, and
+  `DATABASE_URL` set in the project root's `.env` file
 - pnpm installed
 
 ## Quick Start (Development)
@@ -68,7 +76,7 @@ rebase db migrate
 | `rebase db push` | Apply schema directly to DB | Development |
 | `rebase db generate` | Generate schema + create SQL migration files | Production prep |
 | `rebase db migrate` | Run pending migrations | Production deploy |
-| `rebase db branch` | Create / list / inspect / switch / delete / prune a database branch | Feature work (needs a real PostgreSQL) |
+| `rebase db branch` | Create / list / inspect / diff / switch / delete / prune a database branch | Feature work (needs a real PostgreSQL) |
 | `rebase db backup` | Write a backup of the current database (default `./backups` where you run `rebase`) | Before a risky change |
 | `rebase db backups list` | List the backups taken so far | Picking one to restore |
 | `rebase db restore` | Restore the database from a backup | Recovery |
@@ -190,9 +198,12 @@ All three connection functions accept an optional `PostgresPoolConfig` for progr
 | `max` | `number` | `20` (`10` for replica, `5` for direct) | Maximum connections in the pool |
 | `idleTimeoutMillis` | `number` | `30000` | Close idle connections after this many ms |
 | `connectionTimeoutMillis` | `number` | `10000` | Abort connection attempts after this many ms |
-| `queryTimeout` | `number` | `30000` | Per-query timeout in ms |
-| `statementTimeout` | `number` | `30000` | Per-statement timeout in ms |
+| `queryTimeout` | `number` | `60000` | Client-side read timeout in ms — kept above `statementTimeout`, as a backstop for a dead network |
+| `statementTimeout` | `number` | `30000` | Server-side `statement_timeout` in ms |
 | `keepAlive` | `boolean` | `true` | Enable TCP keep-alive |
+| `searchPath` | `string \| false` | `"public"` | `search_path` pinned on every connection; `false` sends none |
+
+`REBASE_DB_POOL_MAX`, when set, is a ceiling on every pool's `max` in the process.
 
 ## DatabasePoolManager
 
@@ -323,7 +334,9 @@ The config object passed to both `createPostgresAdapter()` and `createPostgresBo
 | Property | Type | Required | Description |
 |----------|------|----------|-------------|
 | `connection` | `NodePgDatabase` | ✅ | Drizzle database connection from `createPostgresDatabaseConnection()` |
-| `schema` | `{ tables, enums, relations }` | ✅ | Generated Drizzle schema objects |
+| `schema` | `{ tables, enums, relations }` | No | The generated Drizzle schema — for diagnostics only: the driver reads the tables it serves from the database, and this only lets it warn when `schema.generated.ts` no longer describes the database |
+| `introspectionSchema` | `string` | No | The Postgres schema read when collections are derived from the database. Default `public` |
+| `unknownFilterFields` | `"error" \| "warn"` | No | A filter field that resolves to no column. Default `"error"`; `"warn"` drops it |
 | `connectionString` | `string` | No | Primary connection URL — enables LISTEN/NOTIFY realtime |
 | `adminConnectionString` | `string` | No | Admin-level connection — enables `DatabasePoolManager`, SQL editor, branching |
 | `readConnectionString` | `string` | No | A read replica: reads go there, writes stay on the primary. At boot `DATABASE_READ_URL` fills it when unset. Honoured since 0.25 — before, only the variable worked |
@@ -393,15 +406,14 @@ The full `RebaseBackendConfig` table — every option, its default, and what the
 
 | Property | Type | Default | Description |
 |----------|------|---------|-------------|
-| `collection` | `CollectionConfig` | Built-in `rebase.users` | Auth users collection |
-| `jwtSecret` | `string` | Auto-generated in dev | JWT signing secret (≥32 chars) |
+| `collection` | `CollectionConfig` | `defaultUsersCollection` (table `rebase.users`) | Auth users collection |
+| `jwtSecret` | `string` | — (`loadEnv()` generates `JWT_SECRET` in dev) | JWT signing secret (≥32 chars) |
 | `accessExpiresIn` | `string` | `"1h"` | Access token TTL |
 | `refreshExpiresIn` | `string` | `"30d"` | Refresh token TTL |
 | `requireAuth` | `boolean` | `true` | Require auth for data routes |
 | `allowRegistration` | `boolean` | **`false`** | Enable user self-registration |
-| `serviceKey` | `string` | `REBASE_SERVICE_KEY` env | Service-to-service auth key (≥32 chars) |
+| `serviceKey` | `string` | — (the runtime passes `REBASE_SERVICE_KEY`) | Service-to-service auth key (≥32 chars). Unset, the backend generates an internal per-boot key for the singleton's control-plane calls only |
 | `defaultRole` | `string` | — | Default role for new users |
-| `seedDefaultRoles` | `boolean` | — | Seed default roles on startup |
 | `email` | `EmailConfig` | — | SMTP email configuration |
 | `google` | `{ clientId, clientSecret? }` | — | Google OAuth |
 | `github` | `{ clientId, clientSecret }` | — | GitHub OAuth |
@@ -509,46 +521,25 @@ In non-production mode, `loadEnv()` **auto-generates** `JWT_SECRET` and `REBASE_
 |------|---------------|
 | `CORS_ORIGINS` or `FRONTEND_URL` required | `CORS_ORIGINS or FRONTEND_URL must be set in production to secure the API.` |
 | Auto-generated secrets blocked | `JWT_SECRET, REBASE_SERVICE_KEY must be explicitly set in production.` |
-| No localhost URLs (unless `ALLOW_LOCALHOST_IN_PRODUCTION=true`) | `Environment variable DATABASE_URL contains a local/loopback URL...` |
+| No localhost URLs (unless `ALLOW_LOCALHOST_IN_PRODUCTION=true`) | `Environment variable DATABASE_URL points at a local/loopback host...` |
 
-## Drizzle Configuration
+## Migrations and Atlas (there is no `drizzle.config.ts`)
 
-The `drizzle.config.ts` in `app/backend/` is configured to:
-- **Only manage tables defined in your schema** — other tables (like internal `rebase.*` tables) are ignored via `tablesFilter`
-- **Auto-detect schemas** from collection definitions (e.g., `public`, custom schemas)
-- Use the `DATABASE_URL` from your `.env` file
-- Output migrations to `./drizzle/`
-- Ignore PostgreSQL roles (`entities.roles: false`)
-- Filter PostGIS extension tables
+A project has no `drizzle.config.ts` and runs no `drizzle-kit`: do not create one.
+`db push`, `db generate` and `db migrate` drive [Atlas](https://atlasgo.io)
+(`@ariga/atlas`, a dependency of `backend/package.json`) from the collections:
 
-```typescript
-import "dotenv/config";
-import { defineConfig } from "drizzle-kit";
-import { tables } from "./src/schema.generated";
-import { getTableName } from "drizzle-orm";
-import { getTableConfig, PgTable } from "drizzle-orm/pg-core";
-
-const tableNames = Object.values(tables)
-    .filter(table => getTableConfig(table as PgTable).schema !== "rebase")
-    .map(table => getTableName(table as PgTable));
-
-const schemas = Array.from(new Set(
-    Object.values(tables)
-        .map(table => getTableConfig(table as PgTable).schema || "public")
-        .filter(schema => schema !== "rebase")
-));
-
-export default defineConfig({
-    schema: "./src/schema.generated.ts",
-    out: "./drizzle",
-    dialect: "postgresql",
-    dbCredentials: { url: process.env.DATABASE_URL! },
-    tablesFilter: tableNames,
-    schemaFilter: schemas.length > 0 ? schemas : ["public"],
-    entities: { roles: false },
-    extensionsFilters: ["postgis"]
-});
-```
+- The desired state is `.rebase/sql/schema.sql`, rendered from the collections on
+  every run (see above). Migrations go to `backend/drizzle/migrations/`, with
+  Atlas's `atlas.sum` beside them.
+- Atlas plans against a second, empty database: `<db>_dev_diff` on a real server,
+  a throwaway in-memory PGlite on the managed one, or the one
+  `REBASE_ATLAS_DEV_URL` names.
+- **Only tables that back a collection (or its many-to-many junctions) are in
+  scope.** Every other table is excluded from the diff, so Atlas never drops it;
+  the `rebase` schema (auth tables, RLS helpers, Atlas's revision table) is never
+  touched. If the database cannot be read to build that list, the command fails
+  rather than plan without it.
 
 ## Entity History (Audit Trail)
 
@@ -569,12 +560,12 @@ const backend = await initializeRebaseBackend({
 
 When enabled:
 - The bootstrapper auto-creates a `rebase.entity_history` table
-- Every `INSERT`, `UPDATE`, `DELETE` is recorded with before/after entities
-- History is queryable via the `/:slug/:entityId/history` REST endpoint
+- Every `INSERT`, `UPDATE`, `DELETE` on a collection that declares `history: true` is recorded with before/after entities
+- History is queryable via the `GET /api/data/:slug/:id/history` REST endpoint
 
 ## Health Check
 
-The backend exposes a `/health` endpoint that returns:
+The runtime exposes `/health` (and `/api/health`), which returns — `details` only outside production:
 
 ```json
 {
@@ -691,7 +682,7 @@ The `shutdown(timeoutMs?: number, options?: { server })` method (default timeout
 
 ### 1. SQL Editor Permission Denied (`permission denied for table <name>`)
 - **Symptoms:** You can view data in the collection/CMS spreadsheet view, but running custom SQL queries (like `SELECT * FROM table;`) in the Rebase Studio SQL Editor throws `cause: error: permission denied for table <table_name>`.
-- **Cause:** Rebase tries to switch database roles to match the active user's role (e.g., `SET LOCAL ROLE "admin"`). If you are using custom auth (roles defined only in the database `rebase.roles` table rather than actual PostgreSQL roles), or if the database-level role doesn't have `SELECT` privileges, the query fails. The CMS view does not trigger role-switching and runs under the main connection user (which is typically a superuser/owner and bypasses RLS).
+- **Cause:** Rebase tries to switch database roles to match the active user's role (e.g., `SET LOCAL ROLE "admin"`). If you are using custom auth (roles defined only in the database `rebase.roles` table rather than actual PostgreSQL roles), or if the database-level role doesn't have `SELECT` privileges, the query fails. The collection views do not switch to a role named after yours: they go through the data API, which runs every request as `rebase_user` under the collections' RLS policies, so they keep working.
 - **Solution:** Add `DISABLE_DB_ROLE_SWITCHING=true` to your backend `.env` configuration. This skips role switching, executing queries under the connection owner user.
 
 ### 2. SQL Editor/Studio Schema Fetch Failed (`Cross-database execution requires adminConnectionString`)

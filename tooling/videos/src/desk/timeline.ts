@@ -12,7 +12,16 @@ import {
     type Cue,
     type View,
 } from "./beats";
-import { DESK_FRAMES_PER_WORD, DESK_NARRATION, type LineId } from "./script";
+import { DESK_FRAMES_PER_WORD, DESK_NARRATION } from "./script";
+import {
+    assertSameScript,
+    authoredTiming,
+    checkCues,
+    cueFrame as spokenCueFrame,
+    cueMoment as spokenCueMoment,
+    LIVE_HORIZON,
+    type Timing,
+} from "../spoken/narration";
 
 /**
  * THE TIMELINE — every frame on the desk, computed from when the words were
@@ -47,43 +56,13 @@ import { DESK_FRAMES_PER_WORD, DESK_NARRATION, type LineId } from "./script";
  * camera holds, the window waits. Nothing on screen depends on the future.
  */
 
-/** When one line of the script was said, in film frames. */
-export interface SpokenLine {
-    /** The frame each word started. Live, only the words said so far. */
-    words: number[];
-    /** The frame the last word ended. Absent while the line is being said. */
-    end?: number;
-    /** LIVE ONLY: the frame each word became known. */
-    heard?: number[];
-    /** LIVE ONLY: the frame the end became known. */
-    endHeard?: number;
-}
-
-export interface Timing {
-    /** One entry per line of DESK_NARRATION, in order; null until said. */
-    lines: (SpokenLine | null)[];
-    /** The timing is still being written — the recording page is listening. */
-    live?: boolean;
-    /** A TAKE's: the words of each line as they were when it was read. A
-     *  take's frames belong to those words — word 11 of a line is whatever
-     *  word 11 was then — so a take read from an earlier script cannot be
-     *  timed against this one, and says so (buildDeskTimeline). */
-    script?: string[][];
-}
+export type { SpokenLine, Timing } from "../spoken/narration";
 
 /** The read the film was authored at: nine frames a word from each line's
  *  `at`, and a line ends where its next word would have started. */
-export const AUTHORED: Timing = {
-    lines: DESK_NARRATION.map((l) => ({
-        words: l.words.map((_, i) => l.at + i * DESK_FRAMES_PER_WORD),
-        end: l.at + l.words.length * DESK_FRAMES_PER_WORD,
-    })),
-};
+export const AUTHORED: Timing = authoredTiming(DESK_NARRATION, DESK_FRAMES_PER_WORD);
 
-/** How far a live film may run with no end in sight: ten minutes. Anything
- *  that lasts "until the end of the film" lasts this long until the end is
- *  known. */
-export const LIVE_HORIZON = 30 * 60 * 10;
+export { LIVE_HORIZON } from "../spoken/narration";
 
 /** How long the camera recedes under the close when the close's length is
  *  not known yet (live): what the authored close gives it. A take's close
@@ -98,40 +77,13 @@ const MIN_HOLD = 12;
 
 /* ── cues → frames ───────────────────────────────────────────────────── */
 
-const LINE_INDEX = new Map<LineId, number>(DESK_NARRATION.map((l, i) => [l.id, i]));
-
-const bare = (w: string) => w.toLowerCase().replace(/[^a-z0-9]/g, "");
-
-function wordIndex(line: LineId, word: string | number | undefined): number {
-    if (word === undefined) return 0;
-    const words = DESK_NARRATION[LINE_INDEX.get(line) ?? -1]?.words;
-    if (!words) throw new Error(`timeline: no line "${line}"`);
-    const i = typeof word === "number" ? word : words.findIndex((w) => bare(w) === bare(word));
-    if (i < 0 || i >= words.length) throw new Error(`timeline: no word "${word}" in line "${line}"`);
-    return i;
-}
-
-/** Where a cue falls — `at` — and the earliest anything hanging off it may
- *  start — `floor`, the frame its word was heard (live), else -Infinity.
- *  Null if the word has not been said. */
-function cueMoment(t: Timing, cue: Cue): { at: number; floor: number } | null {
-    const line = t.lines[LINE_INDEX.get(cue.line) ?? -1];
-    if (!line) return null;
-    if (cue.end) {
-        if (line.end === undefined) return null;
-        return { at: line.end + cue.plus, floor: line.endHeard ?? -Infinity };
-    }
-    const w = wordIndex(cue.line, cue.word);
-    if (w >= line.words.length) return null;
-    return { at: line.words[w] + cue.plus, floor: line.heard?.[w] ?? -Infinity };
-}
-
 /** A cue's frame under this timing, or null if its word has not been said.
  *  Never earlier than the word was heard. */
 export function cueFrame(t: Timing, cue: Cue): number | null {
-    const m = cueMoment(t, cue);
-    return m && Math.round(Math.max(m.at, m.floor));
+    return spokenCueFrame(DESK_NARRATION, t, cue);
 }
+
+const cueMoment = (t: Timing, cue: Cue) => spokenCueMoment(DESK_NARRATION, t, cue);
 
 /* ── the cues the desk hangs its windows on ──────────────────────────── */
 
@@ -246,29 +198,12 @@ function placeBeats(t: Timing): PlacedBeat[] {
 
 const timelines = new WeakMap<Timing, DeskTimeline>();
 
-/** A take read from other words than script.ts has now cannot be timed
- *  against it: cues find their words by position, and positions moved.
- *  Rendering it anyway would put the scan's tally, the refusal and the
- *  two people's rows on the wrong words — silently. So it stops, here. */
-function assertSameScript(script: string[][]) {
-    DESK_NARRATION.forEach((line, i) => {
-        const read = script[i];
-        if (!read || read.join(" ") !== line.words.join(" ")) {
-            throw new Error(
-                `This take was read from a different script: line "${line.id}" was ` +
-                    `"${(read ?? []).join(" ")}", and is now "${line.words.join(" ")}". ` +
-                    "Its timing belongs to the words it was read from — record it again with the current script.",
-            );
-        }
-    });
-}
-
 /** The desk's timeline under a timing. Memoised on the timing object, so a
  *  component can call it every frame. */
 export function buildDeskTimeline(t: Timing): DeskTimeline {
     const cached = timelines.get(t);
     if (cached) return cached;
-    if (t.script) assertSameScript(t.script);
+    if (t.script) assertSameScript(DESK_NARRATION, t.script);
 
     const beats = placeBeats(t);
     const byId = new Map(beats.map((b) => [b.id, b]));
@@ -372,7 +307,7 @@ export function buildDeskTimeline(t: Timing): DeskTimeline {
 
 /** Fails at import, not mid-render, if a cue names a word the script no
  *  longer has — the script is edited far more often than this file. */
-for (const b of BEATS) wordIndex(b.at.line, b.at.word);
+checkCues(DESK_NARRATION, BEATS.map((b) => b.at));
 
 /* ── in React ────────────────────────────────────────────────────────── */
 

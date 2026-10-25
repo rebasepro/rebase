@@ -1,5 +1,5 @@
 ---
-sourceHash: fef2eb56c7043526
+sourceHash: a6f7e70d9dfb90ae
 title: Formular-Layout
 sidebar_label: Formular-Layout
 description: Steuern Sie die Anordnung des Entitätsformulars – Spaltenbreiten, Abschnitte und die Metadaten-Leiste.
@@ -172,7 +172,7 @@ der Hauptspalte zu belassen.
 | `admin.form.sections` | `FormSection[]` | Betitelte Gruppen für die Hauptspalte |
 | `admin.form.showRecordMeta` | `boolean` | ID/Erstellt/Aktualisiert am Ende der Leiste anzeigen |
 
-`FormSection` ist `{ key, title?, properties, collapsed?, collapsible? }`.
+`FormSection` ist `{ key, title?, properties, collapsed?, collapsible?, readVariant? }`. `readVariant: "summary"` stapelt die Felder des Abschnitts in der schreibgeschützten Ansicht des Datensatzes als Label/Wert-Zeilen; der Standard, `"grid"`, verwendet das Raster des Formulars.
 
 ## Verwandte Themen
 

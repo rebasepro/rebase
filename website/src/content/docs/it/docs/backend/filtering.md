@@ -1,5 +1,5 @@
 ---
-sourceHash: ebc75b9bd33595a6
+sourceHash: f4fe63c58f66c539
 title: Filtraggio nell'API REST
 sidebar_label: Filtraggio
 description: Filtra le liste dell'API REST con operatori in stile PostgREST, gruppi or/and e il dialetto JSON where, e scopri come si combinano i filtri.
@@ -56,7 +56,7 @@ I quattro operatori di pattern confrontano testo. Una colonna enum viene confron
 per valore (`?status=like.draft%25`); su un numero, una data o qualsiasi altra colonna
 che non sia testo sono un 400 `INVALID_FILTER_OPERATOR`.
 
-`isnull` e `notnull` ignorano il rispettivo valore — l'operatore costituisce l'intera condizione e qualsiasi cosa dopo il punto viene scartata. L'SDK scrive `.null`, quindi è questa la dicitura che vedrai transitare in rete.
+`isnull` e `notnull` non accettano alcun operando — l'operatore costituisce l'intera condizione, e `.null`, `.true`, `.false` o nulla dopo il punto significano tutti la stessa cosa. L'SDK scrive `.null`, quindi è questa la dicitura che vedrai transitare in rete. Qualsiasi altra cosa dopo il punto non è un operando che accettano, quindi l'intera stringa viene letta come valore: `?reason=notnull.reason` corrisponde al testo `notnull.reason`.
 
 :::caution[`eq.null` è la stringa di quattro caratteri, non `IS NULL`]
 `?deleted_at=eq.null` cerca il testo letterale `null`. In SQL `= NULL` non è mai vero, quindi nessuna interpretazione di `eq.null` può indicare il test di nullità — usa `isnull` per quello scopo. L'SDK serializza `.where("deleted_at", "==", null)` come `isnull.null` esattamente per questo motivo.
@@ -116,13 +116,15 @@ Un `where` malformato restituisce un errore 400 `INVALID_WHERE`, e non un filtro
 
 ## Come si combinano i filtri
 
-`?field=op.value`, `?where=`, `?or=`/`?and=` e `?searchString=` sono indipendenti, e ciascuno di essi presente deve corrispondere:
+`?field=op.value`, `?where=`, `?or=`/`?and=`/`?not=` e `?searchString=` sono indipendenti, e ciascuno di essi presente deve corrispondere:
 
 ```text
 (field filters and `where`, AND-ed together)
   AND (the logical group)
   AND (the search string)
 ```
+
+L'unica eccezione è un campo indicato sia in `?field=op.value` sia in `where`: lì il parametro di query **sostituisce** la condizione di `where` su quel campo, essendo la richiesta più specifica, invece di essere combinato in AND con essa.
 
 Non c'è modo di applicare l'operatore OR tra questi gruppi. Qualsiasi condizione che non sia un semplice AND di questi gruppi deve essere inserita all'interno di un unico albero `or=`/`and=`.
 

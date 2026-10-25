@@ -79,6 +79,32 @@ const { data } = await client.data.posts.include({
 
 `true` è la forma abbreviata per "carica tutto": `{ author: true }` e `["author"]` rappresentano la stessa richiesta.
 
+### Contare ciò che un limite lascia fuori
+
+Un `limit` limita
+ciò che viene inviato, e `count: true` dice quanto è stato lasciato fuori. È ciò di cui una lista
+ha bisogno per mostrare quattro tag e un «+33»:
+
+```typescript
+const { data } = await client.data.posts.include({
+    tags: { limit: 4, count: true }
+}).find();
+
+// data[0] → { id: 1, title: "…", tags: [ …4 rows ], _count: { tags: 37 } }
+```
+
+- `_count` è un solo oggetto per riga, con chiave il nome della relazione. Contare due relazioni
+  aggiunge due chiavi.
+- Il totale viene contato nella stessa istruzione SQL che legge le righe. Copre
+  le stesse righe che restituirebbe una lettura senza il `limit`: il `where` dell'include,
+  il soft delete e la row-level security si applicano tutti. Richiederlo non aggiunge alcuna query.
+- Senza un `limit`, il totale è il numero di righe restituite.
+- `count` funziona solo sulle relazioni to-many. Su una relazione to-one restituisce un
+  400 `INVALID_INCLUDE`. Lo stesso vale per una collezione che ha una proprietà chiamata
+  `_count`, perché il totale la sovrascriverebbe.
+- Una relazione che il chiamante non può leggere (accesso ai campi) viene lasciata fuori da `_count`,
+  nello stesso modo in cui lo sono le sue righe.
+
 ### I nomi di relazione sconosciuti vengono rifiutati
 
 Un nome che non corrisponde a una relazione della collezione restituisce un errore **400 `UNKNOWN_RELATION`**, a ogni livello dell'albero — anche all'interno di un `include` annidato. In passato veniva ignorato, rispondendo con un 200 con il campo semplicemente mancante, ma un campo di relazione assente è indistinguibile da una riga che effettivamente non ha alcuna riga correlata. Un errore di battitura appariva quindi esattamente come dati vuoti.
@@ -175,32 +201,6 @@ const typo: IncludeFor<"posts"> = { comments: { include: { authr: true } } };
 ```
 
 `IncludeFor<A>` vincola le chiavi di un include alle relazioni esistenti, a qualsiasi livello — e un client tipizzato controlla `include` nello stesso modo, sia in `find({ include })` sia in `.include(...)`, così `posts.include("authr")` è un errore di compilazione invece di un 400 `UNKNOWN_RELATION`. Le righe restituite da una lettura continuano a tipizzare ogni relazione come facoltativa; `RowWith<A, I>` è quella riga con ogni relazione inclusa resa **obbligatoria**, per annotare ciò che leggi — pertanto, dopo aver richiesto l'autore, una `RowWith<"posts", ["author"]>` non richiede `?.` su `row.author.name`. Sulla 0.23 `RowWith` non esiste, e un `include` scritto in modo errato sul client è un 400 a runtime.
-
-### Contare ciò che un limite lascia fuori
-
-Un `limit` limita
-ciò che viene inviato, e `count: true` dice quanto è stato lasciato fuori. È ciò di cui una lista
-ha bisogno per mostrare quattro tag e un «+33»:
-
-```typescript
-const { data } = await client.data.posts.include({
-    tags: { limit: 4, count: true }
-}).find();
-
-// data[0] → { id: 1, title: "…", tags: [ …4 rows ], _count: { tags: 37 } }
-```
-
-- `_count` è un solo oggetto per riga, con chiave il nome della relazione. Contare due relazioni
-  aggiunge due chiavi.
-- Il totale viene contato nella stessa istruzione SQL che legge le righe. Copre
-  le stesse righe che restituirebbe una lettura senza il `limit`: il `where` dell'include,
-  il soft delete e la row-level security si applicano tutti. Richiederlo non aggiunge alcuna query.
-- Senza un `limit`, il totale è il numero di righe restituite.
-- `count` funziona solo sulle relazioni to-many. Su una relazione to-one restituisce un
-  400 `INVALID_INCLUDE`. Lo stesso vale per una collezione che ha una proprietà chiamata
-  `_count`, perché il totale la sovrascriverebbe.
-- Una relazione che il chiamante non può leggere (accesso ai campi) viene lasciata fuori da `_count`,
-  nello stesso modo in cui lo sono le sue righe.
 
 Senza un `Database` generato, `include` rimane un semplice `string[]` o albero: un tipo di riga scritto a mano non contiene relazioni da verificare e l'errore 400 del server funge da protezione finale.
 

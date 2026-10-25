@@ -1,5 +1,5 @@
 ---
-sourceHash: 8b0cf8dec1186f45
+sourceHash: 4527233b1773b5c2
 title: Datenbank-Befehle
 sidebar_label: Datenbank-Befehle
 description: Die rebase-db-Befehle — push, generate und migrate, Backups und Wiederherstellungen, eine Kopie ziehen, der Verbindungsstring, die verwaltete Entwicklungsdatenbank und Branches.
@@ -48,7 +48,7 @@ Generiert SQL-Migrationsdateien aus Schema-Änderungen:
 rebase db generate
 ```
 
-Erstellt mit Zeitstempeln versehene Migrationsdateien in `drizzle/migrations/`, die überprüft und committed werden können.
+Erstellt mit Zeitstempeln versehene Migrationsdateien in `backend/drizzle/migrations/`, die überprüft und committed werden können.
 
 ### `rebase db migrate`
 

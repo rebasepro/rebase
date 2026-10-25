@@ -1,5 +1,5 @@
 ---
-sourceHash: f66784a0d8158afb
+sourceHash: 5e1a0bbb522c32d0
 title: Ambiente e Configuração
 sidebar_label: Configuração
 description: Todas as variáveis de ambiente e opções de configuração para projetos Rebase.
@@ -70,7 +70,7 @@ Toda a configuração é feita por meio de variáveis de ambiente no seu arquivo
 | `LOG_LEVEL` | Verbosidade do log: `error`, `warn`, `info`, `debug` | `info` |
 | `REBASE_LOG_RAW_QUERIES` | Exibe o SQL por trás de uma linha `Failed query: [redacted]`. Cada instrução que falha é ocultada por padrão, pois uma consulta com falha carrega seus parâmetros vinculados — um e-mail, um hash de senha. Defina como `true` ao diagnosticar uma falha de DDL, RLS ou change-capture. Ignorada quando `NODE_ENV=production`. | `false` |
 | `NODE_ENV` | Ambiente: `development`, `production` ou `test` | `development` |
-| `CORS_ORIGINS` | Lista separada por vírgulas de origens permitidas. **Obrigatória em produção** se diferente do domínio do backend. Em desenvolvimento, ela é *adicionada ao* localhost — veja abaixo. | — |
+| `CORS_ORIGINS` | Lista separada por vírgulas de origens permitidas. **Obrigatória em produção**, a menos que `FRONTEND_URL` esteja definida: uma inicialização em produção sem nenhuma das duas se recusa a iniciar. Em desenvolvimento, ela é *adicionada ao* localhost — veja abaixo. | — |
 | `FRONTEND_URL` | URL da aplicação frontend. Usada como uma alternativa a CORS_ORIGINS, em ambos os ambientes. | — |
 | `ADMIN_CONNECTION_STRING` | String de conexão com o banco de dados com privilégios administrativos (usada para introspecção de schema e operações administrativas). O banco que ela nomeia não é aquele que o console SQL considera atual, nem o que uma nova branch copia por padrão: ambos são o banco de dados no qual a própria conexão da aplicação está (veja `REBASE_BRANCH_PARENT_DATABASE` para um servidor em uma branch). | `DATABASE_URL` |
 | `DISABLE_DB_ROLE_SWITCHING` | Desativa a troca de papéis (roles) do PostgreSQL no Editor SQL (útil para autenticação personalizada onde os papéis do BD não são mapeados). O console SQL do Studio então informa que as linhas foram lidas como o proprietário da conexão, exibe seu nome e desabilita o seletor de papéis. | `false` |
@@ -84,8 +84,8 @@ substituído. Assim, a variável funciona da mesma forma em ambos os ambientes, 
 casos que precisam dela em desenvolvimento são os comuns:
 
 ```bash
-# Um celular na LAN, a máquina de um colega, um túnel ngrok,
-# uma porta encaminhada do Codespaces — todas origens que não são localhost.
+# A phone on the LAN, a colleague's machine, an ngrok tunnel,
+# a forwarded Codespaces port — all non-localhost origins.
 CORS_ORIGINS=http://192.168.1.5:5173
 ```
 
@@ -272,7 +272,7 @@ combinações recusam a inicialização — está documentado em
 | Variável | Descrição | Padrão |
 |----------|-----------|--------|
 | `REBASE_ROLE` | Qual parte este processo atende: `all`, `api`, `functions` ou `worker`. | `all` |
-| `REBASE_CRON_SCHEDULER` | Sobrescreve se *este* processo executa os timers de cron. Indefinido segue o papel (`REBASE_ROLE`). | — |
+| `REBASE_CRON_SCHEDULER` | Sobrescreve se *este* processo executa os timers de cron. Indefinido segue o papel. | — |
 | `REBASE_JOB_WORKERS` | Sobrescreve se este processo executa workers da fila de tarefas. Indefinido segue o papel. | — |
 | `REBASE_FUNCTIONS_ONLY` | Atende apenas as funções personalizadas especificadas neste processo. | — |
 | `REBASE_FUNCTIONS_EXCLUDE` | Atende todas as funções personalizadas, exceto as especificadas. | — |
@@ -386,7 +386,7 @@ Lido pelo `rebase`, não pelo servidor. Nada aqui afeta uma implantação.
 
 ## Segredos em desenvolvimento
 
-`JWT_SECRET` e `REBASE_SERVICE_KEY` são obrigatórios em produção e gerados
+`JWT_SECRET` é obrigatório em produção. Ele e `REBASE_SERVICE_KEY` são gerados
 automaticamente fora dela, para que você possa começar sem precisar configurar nada.
 
 Esses valores gerados ficam armazenados em cache em `.rebase-dev-secrets.json`, ao lado de
@@ -401,13 +401,13 @@ da sua própria aplicação e invalidava qualquer chave de API recém-criada.
 - Se o arquivo não puder ser gravado — como em um contêiner somente leitura —, o servidor iniciará
   de qualquer forma com um segredo temporário, exatamente como fazia antes.
 
-Nada é mantido em cache em produção ou sob um executor de testes. Em produção, uma inicialização
-que precise gerar qualquer um dos segredos continuará falhando e indicando o nome da variável, comportamento que
+Nada é mantido em cache em produção ou sob um executor de testes. Em produção, nada é gerado
+também: uma inicialização sem `JWT_SECRET` falha, indicando o nome da variável, e isso
 permanece inalterado:
 
 ```
-JWT_SECRET must be explicitly set in production.
-Do not rely on auto-generated secrets outside development.
+The environment is not valid:
+  JWT_SECRET: is required
 ```
 
 ## Objeto de Configuração do Backend

@@ -1,5 +1,5 @@
 ---
-sourceHash: e6c4f1132a6e61eb
+sourceHash: 6f3e503eb493c0cf
 title: Integration eines eigenen Servers
 sidebar_label: Eigener Server
 description: Bauen Sie das Rebase-Backend aus öffentlichen Bausteinen in Ihrem eigenen Server – createRebaseBackend, seine Routengruppen, mount, attachRealtime und start – oder betten Sie den Postgres-Treiber in Express ein.
@@ -53,17 +53,17 @@ Der Import von `z` aus `@rebasepro/server` ist neu. In Version 0.17 und
 früher exportierte das Paket kein `z`: Importieren Sie es aus `zod` passend zur Major-Version,
 die die Runtime verwendet, und lassen Sie Ihren Bundler die beiden Kopien deduplizieren.
 
-:::caution[Das `z`, mit dem Sie erweitern, muss das Zod der Runtime sein]
-Zwei gleichzeitig geladene Kopien von Zod sind die einzige Ursache dafür, dass dieser Aufruf fehlschlägt – und früher geschah dies stillschweigend. `.merge()` akzeptiert ein Schema der anderen Kopie (die Strukturen sind identisch), und anschließend lehnt `.parse()` jedes Feld mit einem `.default()` ab, da ein Standardwert anhand der Klassenidentität erkannt wird. Der Server fuhr hoch, meldete Erfolg und führte keinen seiner Crons aus; keine Fehlermeldung erwähnte Zod.
+:::caution[Zwei Kopien von Zod]
+Zwei gleichzeitig geladene Kopien von Zod haben diesen Aufruf früher stillschweigend kaputt gemacht. `loadEnv` kombinierte die Schemas mit `.merge()`, das ein Schema der anderen Kopie akzeptiert und anschließend jedes Feld mit einem `.default()` ablehnt. Der Server fuhr hoch, meldete Erfolg und führte keinen seiner Crons aus; keine Fehlermeldung erwähnte Zod.
 
-Die Runtime stellt `zod` bereit. Die `backend/package.json` des Scaffolds führt es in dem Bereich auf, den `@rebasepro/server` verwendet, sodass eine einzige Kopie installiert wird: Halten Sie die beiden gleich. `loadEnv` verweigert jetzt beim Start ein fremdes Schema mit einer Meldung, die die Lösung nennt, anstatt es zu akzeptieren und nur die Hälfte davon zu validieren.
+`loadEnv` validiert jetzt das Basisschema und Ihr `extend`-Schema jeweils mit einem eigenen `.parse()`, sodass ein Schema, das von einer anderen Kopie von Zod erstellt wurde, funktioniert. Die Runtime stellt `zod` bereit, und die `backend/package.json` des Scaffolds führt es in dem Bereich auf, den `@rebasepro/server` verwendet, sodass eine einzige Kopie installiert wird: Halten Sie die beiden gleich.
 :::
 
 **Wichtigste Verhaltensweisen:**
 - Generiert in der Entwicklungsumgebung `JWT_SECRET` und `REBASE_SERVICE_KEY`, wenn sie nicht gesetzt sind, sodass Sie ohne manuelle Einrichtung starten können, und legt sie in `.rebase-dev-secrets.json` ab, damit ein Neustart niemanden abmeldet.
 - Blockiert automatisch generierte Secrets in der Produktionsumgebung – Sie müssen diese explizit setzen.
 - Prüft, ob in der Produktionsumgebung `CORS_ORIGINS` oder `FRONTEND_URL` gesetzt ist.
-- Verweigert ein `extend`-Schema, das von einer anderen Kopie von Zod erstellt wurde.
+- Verweigert einen `extend`-Wert, der kein Zod-Schema ist.
 - Wirft einen `Error`, der jede fehlende oder falsche Variable nennt, etwa `DATABASE_URL: is required`, mit den Issues von Zod in seiner Eigenschaft `issues`. Unter 0.24 wirft es Zods eigenen `ZodError`, der keine Variable nennt, wenn niemand ihn abfängt.
 
 Die vollständige Liste der unterstützten Variablen finden Sie in der `.env.example`-Datei der bereitgestellten Scaffold-App.
@@ -222,7 +222,7 @@ ein Aufruf, den Sie machen oder weglassen:
 | `backend.shutdown(timeoutMs, { server })` | Stoppt, was `start()` und `attachRealtime()` gestartet haben, und wartet auf laufende Cron-Läufe und Jobs. Schließt `server` nur, wenn Sie ihn übergeben. | |
 
 Der Standard-`path` des Sockets ist der Basispfad, der an `mount()` übergeben wurde,
-ohne ein abschließendes `/api`, sodass `/api` zu `/` und `/x/api` zu `/x` wird. Dort
+ohne ein abschließendes `/api`, sodass `/api` zu `/` und `/x/api` zu `/x` wird; ein Basispfad, der nicht auf `/api` endet, ergibt `/`. Dort
 wählt sich das SDK ein, denn es verbindet sich mit seiner `baseUrl`, während seine
 HTTP-Requests an `${baseUrl}/api` gehen. Ein Upgrade auf jeden anderen Pfad bleibt den
 übrigen `upgrade`-Listenern des Servers überlassen, sodass Ihre App auf demselben
@@ -591,7 +591,8 @@ Header, den das SDK in einer späteren Version zu lesen beginnt, erreicht Ihr Fr
 Änderung an dieser Stelle. Sie besteht aus `ETag`, `Retry-After`, `X-Request-ID`, den drei
 `X-RateLimit-*`-Headern und `Preference-Applied`, dazu `Location`,
 `Upload-Offset` und `Rebase-Upload-Result`, worin eine fortsetzbare Übertragung (Dateien über
-8 MiB) antwortet. Ohne diese drei kann das SDK keine Übertragung von einem anderen Origin aus
+8 MiB) antwortet, sowie `X-Rebase-Simulated-Context`, das benennt, als was die simulierte Anfrage
+eines Administrators ausgeführt wurde. Ohne die drei Upload-Header kann das SDK keine Übertragung von einem anderen Origin aus
 verfolgen und sendet jede Datei stattdessen als eine einzige Multipart-Anfrage. Schreiben Sie die
 Liste auf 0.24 von Hand aus.
 

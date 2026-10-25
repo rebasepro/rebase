@@ -1,5 +1,5 @@
 ---
-sourceHash: c35ed2ce1194af56
+sourceHash: 6ac0abb490b5801e
 title: Authentification et connexion
 sidebar_label: Authentification et connexion
 description: Configurez le contrôleur d'authentification, la vue de connexion et la simulation de rôles dans votre frontend React Rebase.
@@ -35,7 +35,7 @@ authController.signOut()      // Log out
 authController.getAuthToken() // Get current JWT for API calls
 ```
 
-Passez l'`authController` au contrôleur de navigation Rebase pour restreindre l'accès à l'ensemble du panneau d'administration derrière une authentification.
+Passez l'`authController` à `<Rebase authController>`. `<RebaseShell>` (ou `<RebaseAuthGate>` dans une mise en page manuelle) l'y lit et restreint l'accès à l'ensemble du panneau d'administration derrière une authentification.
 
 ## Votre propre fournisseur d'authentification
 

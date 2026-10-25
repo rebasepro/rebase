@@ -1,5 +1,5 @@
 ---
-sourceHash: bf72686388b55887
+sourceHash: be8f292cf1e7986c
 title: Vue d'ensemble du backend
 sidebar_label: Backend
 description: Le backend Rebase fournit un serveur complet avec API REST, authentification, stockage, temps réel via WebSocket et historique des entités — le tout initialisé avec un seul appel de fonction.
@@ -65,6 +65,7 @@ Les deux voies aboutissent au même `RebaseBackendConfig`. En voici la correspon
 | `basePath` | `REBASE_BASE_PATH` (par défaut `/api`) |
 | `collections`, `collectionsDir` | le répertoire `config/collections/`, déclaré par `rebase.json` |
 | `functions`, `functionsDir` | `backend/functions/` |
+| `functionsTimeoutMs` | `REBASE_FUNCTIONS_TIMEOUT_MS` |
 | `crons`, `cronsDir` | `backend/crons/` |
 | `bootstrappers`, `database` | `DATABASE_URL`, plus une déclaration `database("<key>")` dans `config/resources.ts` pour chaque base de données au-delà de celle par défaut |
 | `auth` | `JWT_SECRET`, les variables `OAUTH_*` et `config/collections/users` |
@@ -73,12 +74,15 @@ Les deux voies aboutissent au même `RebaseBackendConfig`. En voici la correspon
 | `storagePublicRead` | `STORAGE_PUBLIC_READ` |
 | `storageRenditionCache` | `STORAGE_RENDITION_CACHE` |
 | `storageInsecureAllowAnyAuthenticated` | `STORAGE_ALLOW_ANY_AUTHENTICATED` |
+| `storageDownloadTokenTtl` | `STORAGE_DOWNLOAD_TOKEN_TTL` |
 | `callbacks` | `export const callbacks` depuis `config/index.ts` |
 | `history` | `REBASE_HISTORY` (activé par défaut) — sous forme booléenne uniquement |
 | `enableSwagger` | `REBASE_ENABLE_SWAGGER` ; non défini signifie activé hors production |
 | `compression` | `REBASE_COMPRESSION` |
 | `maxBodySize` | `REBASE_MAX_BODY_SIZE` |
 | `logging` | `LOG_LEVEL` |
+| `liveSchema` | `REBASE_LIVE_SCHEMA_REPOSITORY` et ses identifiants `REBASE_LIVE_SCHEMA_*` — sous la forme dépôt uniquement |
+| `rlsAudit` | `REBASE_RLS_AUDIT` |
 | `provisionSchema`, `surfaces`, `ownership`, `functionsSelection`, `functionsUpstream` | `REBASE_ROLE` — voir [Processus séparés](/docs/deployment/split-processes/) |
 | `corsHandled` | Le CORS est installé par le runtime à partir de `CORS_ORIGINS` |
 | `schemaVersion`, `runtimeVersion` | le build inscrit les deux dans le bundle |
@@ -88,8 +92,8 @@ Les deux voies aboutissent au même `RebaseBackendConfig`. En voici la correspon
 
 Celles-ci ne disposent d'aucune variable d'environnement ni d'aucun export de configuration. Elles ne sont accessibles que depuis un appel manuel à `initializeRebaseBackend` — lors d'un `rebase eject`, ou dans un [serveur personnalisé](/docs/backend/custom-server/) :
 
-`rateLimit` · `jobs` · `csrf` · `cronPersistence` · `functionsTimeoutMs` ·
-`storagePolicies` · `storageTriggers` · `baas` · `liveSchema` · `rlsAudit` ·
+`rateLimit` · `jobs` · `csrf` · `cronPersistence` ·
+`storagePolicies` · `storageTriggers` · `baas` ·
 `history` sous sa forme d'objet (`{ retention }`)
 
 `schemaEditor` est obligatoirement désactivé dans un bundle compilé : l'éditeur réécrit les fichiers *sources* des collections, or un bundle ne contient que des sorties compilées.
@@ -105,8 +109,8 @@ Après l'initialisation, ces routes sont montées :
 | `/api/storage/*` | Téléversement, téléchargement et suppression de fichiers |
 | `/api/data/:slug` | Opérations CRUD par collection (GET, POST, PATCH, DELETE) |
 | `/api/data/:slug/:id/history` | Historique des modifications de l'entité (si activé) |
-| `/api/docs` | Spécification OpenAPI (lorsque `enableSwagger: true`) |
-| `/api/swagger` | Interface Swagger UI (mode développement, lorsque `enableSwagger: true`) |
+| `/api/docs` | Spécification OpenAPI (publique sauf si `enableSwagger: false`, ce qui la place derrière `schema:read`) |
+| `/api/swagger` | Interface Swagger UI (hors production uniquement) |
 | `/api/meta/contract` | Schéma des collections du projet (exige `schema:read`) |
 | `/api/meta/schema-version` | Chaîne de version pour ce schéma (non authentifié) |
 | `/api/functions/*` | Routes de fonctions personnalisées (lorsque `functions` ou `functionsDir` est défini) |
@@ -123,13 +127,13 @@ Lorsque vous invoquez `initializeRebaseBackend()`, le framework déclenche une s
 [Start Boot]
      │
      ▼
-1. ENV validation (Zod parsing of jwt, databases, cors)
+1. Configuration (the database adapter, the auth and storage options you passed)
      │
      ▼
-2. Dynamic Collection Loading (Chokidar watches .ts files, AST parsing)
+2. Collection Loading (imports each file in collectionsDir, strict-validates every collection)
      │
      ▼
-3. Database Bootstrapping (Acquires advisory lock, creates schemas/auth/helper SQL functions)
+3. Database Bootstrapping (creates schemas/auth/helper SQL functions, as `provision` allows)
      │
      ▼
 4. Service Initialization (Auth, Storage S3/Local client instances, Cron store seeding)
@@ -162,7 +166,12 @@ Deux sondes, répondant à deux questions différentes.
 
 Placer une sonde de vivacité sur `/health` est une erreur importante à souligner : une saute d'humeur passagère de la base de données pousserait l'orchestrateur à tuer un processus par ailleurs sain, transformant une courte panne en boucle de redémarrage.
 
-`/health` n'est pas authentifié, il ne publie donc que le verdict et non la cause — en dehors du développement, il indique quelle source de données est dégradée, rien de plus. Le message d'erreur du pilote mentionne l'hôte, le port, le nom de la base de données et le rôle, et cette information est dirigée vers les logs. Les deux chemins sont également exposés sous `basePath` (`/api/health`).
+`/health` n'est pas authentifié, il ne publie donc que le verdict et non la cause — en dehors du développement, il indique quelle source de données est dégradée, rien de plus. Le message d'erreur du pilote mentionne l'hôte, le port, le nom de la base de données et le rôle, et cette information est dirigée vers les logs. `/health` est également exposé sous `basePath` (`/api/health`) ;
+`/livez` ne l'est pas.
+
+Les deux sondes sont celles du runtime managé. Un `backend/src/index.ts` éjecté sert
+`/health` et `/api/health` lui-même, en sondant uniquement la base de données par défaut, et n'a
+aucun `/livez` tant que vous n'en ajoutez pas un.
 
 ---
 

@@ -1,5 +1,5 @@
 ---
-sourceHash: 6cb1ed423c284379
+sourceHash: 87b274f81d5501d1
 title: Apps und Repositories
 sidebar_label: Apps & Repositories
 description: Ein Projekt besteht aus einem Backend und den Apps, die damit kommunizieren, welche jeweils in ihrem eigenen Repository liegen können.
@@ -211,7 +211,7 @@ werden diese Pfade nach einem Hostnamen genauso abgelehnt wie allein:
 
 Alles andere an `path` gilt für den Teil nach dem Hostnamen. Die App wird
 weiterhin dafür gebaut: `https://admin.example.com` wird mit `REBASE_APP_BASE`
-gleich `/` gebaut, `https://admin.example.com/cms` mit `/cms`, und ein Bundler,
+gleich `/` gebaut, `https://admin.example.com/cms` mit `/cms/`, und ein Bundler,
 der das ignoriert, liefert weiterhin eine weiße Seite. `cms` ist ein Pfad auf dem
 Hostnamen der App, innerhalb dieses Pfadteils. Die URL muss mit `https://`
 beginnen und einen Hostnamen und einen Pfad enthalten, sonst nichts – keinen
@@ -367,7 +367,7 @@ gebaut wurde.
 Jedes generierte SDK zeichnet das Schema auf, aus dem es stammt:
 
 ```ts
-// src/rebase/schema.meta.ts — generated
+// generated/sdk/schema.meta.ts — generated
 export const SCHEMA_VERSION = "v1:c5d97d0f96b7f87a";
 ```
 
@@ -376,7 +376,7 @@ ein Versionsstempel nichts über das Schema preisgibt, für das er steht:
 
 ```bash
 curl -s https://api.example.com/api/meta/schema-version
-# {"schemaVersion":"v1:c5d97d0f96b7f87a"}
+# {"schemaVersion":"v1:c5d97d0f96b7f87a","runtime":{"version":"0.25.1","contract":1}}
 ```
 
 Der Vergleich der beiden in der CI macht aus einer unbemerkten Diskrepanz eine

@@ -1,5 +1,5 @@
 ---
-sourceHash: 3d6a5a62a25e5b8c
+sourceHash: 6c024c2a337ce83c
 title: Verifica email
 sidebar_label: Verifica email
 description: "Come un account dimostra il proprio indirizzo email: il link inviato alla registrazione, cosa mantiene e rimuove seguirlo, e la registrazione confirm-first con requireEmailVerification."
@@ -44,7 +44,9 @@ Chi si registra segue il link e inserisce la propria password
 Con l'opzione disattivata, che è il valore predefinito, un indirizzo che ha già un account riceve
 risposta `409 EMAIL_EXISTS`, come prima.
 
-Per risolvere un rifiuto al passaggio 3, l'utente effettua l'accesso con il metodo esistente e invoca l'endpoint esplicito di collegamento:
+Per risolvere un rifiuto al passaggio 3 (`403 EMAIL_NOT_VERIFIED`, vedi
+[Collegamento degli account](/docs/backend/authentication/#account-linking-across-sign-in-methods)),
+l'utente effettua l'accesso con il metodo esistente e invoca l'endpoint esplicito di collegamento:
 
 ```http
 POST /api/auth/link/google

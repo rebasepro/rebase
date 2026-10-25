@@ -255,7 +255,7 @@ else await client.data.users.update(String(found.id), user);
 A read naming both `page` and `offset` is now refused. The server answers
 `400 PAGE_WITH_OFFSET`, and the SDK refuses the pair before any request, with a
 `RebaseClientError` carrying the same code: over HTTP, in-process
-(`rebase.data`) and offline. Before, `page` won and the `offset` was dropped
+(`rebase.dataAsAdmin`) and offline. Before, `page` won and the `offset` was dropped
 without a word.
 
 **Who is affected:** code that sends both, for example a `find({ page, offset })`
@@ -356,7 +356,7 @@ example a form or an import that sends every column whether filled or not.
 should apply, or drop `required` from fields that may legitimately be empty.
 Collections that declare a `beforeSave` are not checked at the boundary (the
 hook may fill the value), as before. Server code writing in-process
-(`rebase.data`) is not affected.
+(`rebase.dataAsAdmin`) is not affected.
 
 ## 83. `QueryBuilder` and `createBackups` are no longer exported from `@rebasepro/client`
 

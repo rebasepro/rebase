@@ -1,5 +1,5 @@
 ---
-sourceHash: 0a56c2d3dea31616
+sourceHash: be1f8cd1b6c6a95b
 title: Realtime & WebSocket
 sidebar_label: Realtime
 description: Sincronizzazione dei dati in tempo reale, canali di broadcast e tracciamento della presenza tramite WebSocket.
@@ -65,8 +65,8 @@ const unsubscribe = client.data.products.listen(
 );
 ```
 
-Il callback riceve un `FindResponse<M>` contenente:
-- `data` — Array di oggetti `Entity<M>`.
+Il callback riceve un `FindResult<M>` contenente:
+- `data` — Le righe, in forma piatta, come le restituisce `find()` (`row.name`, non `row.values.name`).
 - `meta` — Informazioni di paginazione (`total`, `limit`, `offset`, `hasMore`).
 
 ### Sottoscrivere una collezione con filtri
@@ -149,7 +149,7 @@ const unsubscribe = client.data.orders
 ```
 
 :::note
-Il metodo `.listen()` sul query builder è disponibile solo quando `RebaseClient` è configurato con un `websocketUrl`. Se la connessione WebSocket non è configurata, la chiamata a `.listen()` genererà un errore.
+`.listen()` — sia sul query builder sia sull'accessor della collezione — richiede il WebSocket del client. Il client ricava il suo URL da `baseUrl` a meno che non venga fornito `websocketUrl`. Su un client creato con `realtime: false`, o che non ha potuto ricavare alcun URL, la chiamata a `.listen()` genera un errore.
 :::
 
 ## Distribuzione degli aggiornamenti: Patch istantanea + Refetch di correttezza
@@ -393,7 +393,7 @@ La presence tiene traccia di quali utenti sono attualmente online in un canale e
 | `presence_track`  | Client → Server | Avvia il tracciamento della presenza con stato personalizzato |
 | `presence_untrack`| Client → Server | Interrompi il tracciamento della presenza            |
 | `presence_state`  | Client → Server | Richiedi lo stato completo della presenza per un canale |
-| `presence_state`  | Server → Client | Entità completa di tutte le presenze in un canale    |
+| `presence_state`  | Server → Client | Ogni presenza del canale, per intero                 |
 | `presence_diff`   | Server → Client | Aggiornamento incrementale (ingressi e uscite)       |
 
 Quando un client invia `presence_track`, il server lo unisce automaticamente al canale (senza necessità di una chiamata separata a `join_channel`) e trasmette in broadcast un `presence_diff` a tutti i membri del canale. L'SDK rinvia il proprio stato ogni ~20 secondi come heartbeat; un heartbeat il cui stato è invariato aggiorna soltanto il timeout del client e non invia alcun `presence_diff`.
@@ -450,7 +450,7 @@ disconnessi vengono accodati e inviati dopo la riconnessione:
 | `connecting` | In fase di chiamata, senza alcuna interruzione in corso. |
 | `connected` | Il socket è aperto. |
 | `reconnecting` | Il socket è caduto e il client sta ricomponendo. Non è stato ancora segnalato nulla. |
-| `disconnected` | L'interruzione dura da circa 15 secondi o più. `CONNECTION_LOST` è stato segnalato, e il client continua a ricomporre. |
+| `disconnected` | L'interruzione dura da 14 secondi o più. `CONNECTION_LOST` è stato segnalato, e il client continua a ricomporre. |
 | `closed` | È stato chiamato `client.close()`. Definitivo. |
 
 È possibile ascoltare gli eventi del ciclo di vita della connessione:
@@ -495,15 +495,15 @@ L'esecuzione di più istanze — il bus LISTEN/NOTIFY, il comportamento della pr
 
 ## Acquisizione delle modifiche a livello di database (CDC)
 
-→ [Acquisizione delle modifiche a livello di database (CDC)](/docs/backend/realtime-cdc/)
+Ogni scrittura confermata emette eventi realtime, comunque sia stata effettuata: REST, l'SDK, Studio, `psql`, un cron job in un altro servizio. Come funziona l'acquisizione, l'impostazione `REALTIME_CDC` e di cosa ha bisogno: [Acquisizione delle modifiche a livello di database](/docs/backend/realtime-cdc/).
 
 ## Timeout delle richieste in sospeso (Pending Request Timeout)
 
 Per evitare che le richieste dei client rimangano bloccate a tempo indeterminato, tutte le operazioni WebSocket in sospeso che prevedono una risposta dal server (come il recupero occasionale di collezioni `FETCH_COLLECTION`, il recupero di singole entità `FETCH_ONE`, creazione/aggiornamento `SAVE`, eliminazioni `DELETE`, conteggi `COUNT` e controlli di univocità `CHECK_UNIQUE_FIELD`) hanno un timeout predefinito di 30 secondi.
 
-Se il server non risponde entro questa finestra di 30 secondi, il client elimina automaticamente la richiesta in sospeso e rifiuta la promise con un `ApiError` contenente il messaggio `"Request timed out"`.
+Se il server non risponde entro questa finestra di 30 secondi, il client elimina automaticamente la richiesta in sospeso e rifiuta la promise con un `RebaseApiError` il cui codice è `REQUEST_TIMEOUT`.
 
-I messaggi unidirezionali che non prevedono una risposta (come `subscribe_collection`, `subscribe_one`, `unsubscribe`, `join_channel`, `leave_channel`, `broadcast`, `presence_track`, `presence_untrack` e `presence_state`) si risolvono immediatamente al momento dell'invio e non attivano timeout.
+I messaggi unidirezionali che non prevedono una risposta (come `subscribe_collection`, `subscribe_one`, `unsubscribe`, `join_channel`, `leave_channel`, `broadcast`, `presence_track`, `presence_untrack`, `presence_state` e `channel_history`) si risolvono immediatamente al momento dell'invio e non attivano questo timeout. Una sottoscrizione il cui primo frame non è arrivato 30 secondi dopo l'invio della sua richiesta fallisce invece, con `SUBSCRIPTION_TIMEOUT` sul suo `onError`.
 
 ### Quando un frame di canale viene rifiutato
 
@@ -523,7 +523,7 @@ channel.onError((error) => {
 | Codice | Significato |
 |------|-------|
 | `CHANNEL_FORBIDDEN` | Non sei un membro del canale — unisciti prima di trasmettere o leggerne la cronologia |
-| `RATE_LIMITED` | Superato il budget di frame del canale indicato sopra o, per una richiesta di cronologia, il [rate limit dei dati](#cosa-costa-una-scrittura-e-i-limiti) |
+| `RATE_LIMITED` | Superato il budget di frame del canale (7.200 frame di canale al minuto per socket) o, per una richiesta di cronologia, il [rate limit dei dati](#cosa-costa-una-scrittura-e-i-limiti) |
 | `CHANNEL_HISTORY_WRITE_FAILED` | Un broadcast conservato non ha potuto essere salvato, quindi è stato scartato |
 | `CHANNEL_HISTORY_READ_FAILED` | Impossibile soddisfare una richiesta di recupero (catch-up) |
 | `CHANNEL_HISTORY_GAP` | Generato dal client: un recupero (catch-up) ha rilevato che il server non conserva più messaggi che questo client non ha mai ricevuto. `details` è `{ from, to }`, i numeri di sequenza persi. Risincronizza lo stato del canale dalla sua fonte di verità |

@@ -1,5 +1,5 @@
 ---
-sourceHash: 6cb1ed423c284379
+sourceHash: 87b274f81d5501d1
 title: App e repository
 sidebar_label: App & repository
 description: Un progetto è un backend insieme alle app che comunicano con esso, ognuna delle quali può risiedere nel proprio repository.
@@ -211,7 +211,7 @@ come da soli: `https://admin.example.com/api` non è più valido di `/api`.
 Tutto il resto di `path` si applica alla parte dopo l'hostname. L'app viene
 comunque compilata per quella parte: `https://admin.example.com` viene compilato
 con `REBASE_APP_BASE` impostato a `/`, `https://admin.example.com/cms` con
-`/cms`, e un bundler che lo ignora produce comunque una pagina vuota. `cms` è un
+`/cms/`, e un bundler che lo ignora produce comunque una pagina vuota. `cms` è un
 percorso sull'hostname dell'app, all'interno di quella parte di percorso. L'URL
 deve essere `https://` e contenere un hostname e un percorso e nient'altro:
 niente porta, query o frammento. Un `admin.example.com` scritto da solo viene
@@ -364,7 +364,7 @@ struttura.
 Ogni SDK generato memorizza lo schema da cui proviene:
 
 ```ts
-// src/rebase/schema.meta.ts — generated
+// generated/sdk/schema.meta.ts — generated
 export const SCHEMA_VERSION = "v1:c5d97d0f96b7f87a";
 ```
 
@@ -373,7 +373,7 @@ un identificatore di versione non rivela nulla sullo schema che rappresenta:
 
 ```bash
 curl -s https://api.example.com/api/meta/schema-version
-# {"schemaVersion":"v1:c5d97d0f96b7f87a"}
+# {"schemaVersion":"v1:c5d97d0f96b7f87a","runtime":{"version":"0.25.1","contract":1}}
 ```
 
 Confrontare i due valori in CI trasforma una mancata corrispondenza silenziosa in un

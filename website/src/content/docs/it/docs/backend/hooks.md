@@ -1,5 +1,5 @@
 ---
-sourceHash: b0d41379c997dc49
+sourceHash: 7745e401ff93e847
 title: Hook di backend globali
 sidebar_label: Hook globali
 description: Applica callback di ciclo di vita trasversali a ogni collection a livello server utilizzando CollectionCallbacks.
@@ -95,13 +95,13 @@ Ogni callback riceve un singolo oggetto props. Campi comuni:
 | `collection` | `CollectionConfig` | Tutti i callback |
 | `path` | `string` | Tutti i callback |
 | `row` | `Record<string, unknown>` | `afterRead`, `beforeDelete`, `afterDelete` |
-| `id` | `string` | `beforeSave` (opzionale), `afterSave`, `afterSaveError`, `beforeDelete`, `afterDelete` |
+| `id` | `string \| number` | `beforeSave` (opzionale), `afterSave`, `afterSaveError` (opzionale), `beforeDelete`, `afterDelete` |
 | `values` | `EntityValues` | `beforeSave`, `afterSave`, `afterSaveError` |
 | `previousValues` | `EntityValues` (opzionale) | `beforeSave`, `afterSave`, `afterSaveError` |
-| `status` | `"new" \| "existing"` | `beforeSave`, `afterSave`, `afterSaveError` |
+| `status` | `"new" \| "existing" \| "copy"` | `beforeSave`, `afterSave`, `afterSaveError` |
 | `context` | `RebaseCallContext` | Tutti i callback |
 
-`context.user` contiene l'utente autenticato (`uid`, `roles`, ecc.), oppure è `undefined` per le richieste pubbliche.
+`context.user` contiene l'utente autenticato (`uid`, `roles`, ecc.), Una richiesta senza token, dove l'API la lascia passare, porta l'identità anonima `{ uid: "anonymous", roles: ["anon"] }` anziché `undefined`.
 
 `collection` è sempre presente. Un callback globale scatta per ogni collection, quindi
 è l'unico livello registrato indipendentemente da ciascuna di esse — ma non

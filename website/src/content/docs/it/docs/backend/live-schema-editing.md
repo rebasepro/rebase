@@ -1,5 +1,5 @@
 ---
-sourceHash: fcc8e36632d57207
+sourceHash: f833e803807f9ac4
 title: Modifica dello schema live
 description: "Crea e modifica collection a fronte di un backend in esecuzione: prima committate nel repository, poi applicate."
 ---
@@ -374,7 +374,7 @@ Due aspetti rendono sicura l'esecuzione a fronte di un repository su cui sta lav
 
 - Solo modifiche additive. Tutto il resto viene rifiutato con una motivazione, poiché il percorso di ensure è l'unico elemento a modificare uno schema e può eseguire solo aggiunte.
 - Non viene scritto alcun file di migrazione. Un progetto configurato tramite boot-ensure non ne ha bisogno; un progetto configurato con migrazioni dovrebbe eseguire `rebase db generate`, che ne genera uno tramite Atlas con l'hash di integrità richiesto da Atlas.
-- Solo Postgres. La funzionalità viene rilevata sul driver, e gli altri motori rispondono con `SCHEMA_EDITING_UNSUPPORTED`.
+- Postgres e MongoDB (vedi [MongoDB](#mongodb)). La funzionalità viene rilevata sul driver, e gli altri motori rispondono con `SCHEMA_EDITING_UNSUPPORTED`.
 
 ## Correlati
 

@@ -61,9 +61,12 @@ lockfile). Four things follow from that:
 - **Only registry versions install.** A `file:`, `link:`, `git+…` or `github:`
   dependency fails the build, because the runtime has nothing to resolve it
   against.
-- **Some packages come from the image, not from you.** `@rebasepro/*`, `hono`,
-  `@hono/node-server` and `zod` are removed from the bundle's dependencies and
-  the image's own copies are linked in, so your version of them does not apply.
+- **Some packages come from the image, not from you.** `@rebasepro/server`,
+  `@rebasepro/types`, `@rebasepro/client`, `@rebasepro/common`,
+  `@rebasepro/utils`, `hono`, `@hono/node-server` and `zod` are removed from the
+  bundle's dependencies and the image's own copies are linked in, so your
+  version of them does not apply. Other `@rebasepro/*` packages, such as the
+  database driver, install from your `package.json` like any dependency.
   `typescript` and `tsx` are removed too; they are build tools.
 - **Private packages need an `.npmrc`.** `rebase build` copies the project's
   `.npmrc` (and `backend/.npmrc`) into the bundle, so the install uses the same
@@ -193,7 +196,7 @@ deploys or as storage for uploads. That is also why
 |---|---|---|
 | Function timeout | 30 s, then `504` with code `FUNCTION_TIMEOUT` | `REBASE_FUNCTIONS_TIMEOUT_MS` (`0` turns it off) |
 | Waiting on your instance, at the edge | 10 minutes between reads or writes | Fixed |
-| Request body, all `/api/*` routes | 10 MiB, then `413 PAYLOAD_TOO_LARGE` | `REBASE_MAX_BODY_SIZE`, in bytes |
+| Request body, `/api/*` routes without a limit of their own | 10 MiB, then `413 PAYLOAD_TOO_LARGE` | `REBASE_MAX_BODY_SIZE`, in bytes |
 | Request body at the edge | 64 MiB | Fixed |
 | One file through `POST /api/storage/upload` | 50 MB | `STORAGE_MAX_FILE_SIZE` |
 | Anonymous calls to `/api/functions/*` | 3000 per IP per 15 minutes | `rateLimit.anonymousFunctions` |

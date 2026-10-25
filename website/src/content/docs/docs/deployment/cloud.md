@@ -132,6 +132,7 @@ live there:
     backend  backend  https://songbuzz.rebase.website/api  live
 
   ✓ Live: the new version answers on every address above.
+  Something wrong? `rebase cloud rollback` puts the previous deployment back.
 ```
 
 "Live" means the address answered after the build: a backend's `/api/health`
@@ -427,7 +428,7 @@ jobs:
 | Capability | What the token may do |
 |---|---|
 | `deploy` | Deploy the project and follow its builds: `deploy` (`--preview` included), `deployments`, `previews` |
-| `logs` | Read build and runtime logs, and live metrics: `logs`, `metrics` |
+| `logs` | Read build and runtime logs, cron history, and live metrics: `logs`, `cron`, `metrics` |
 | `env` | Read and change environment variables, secrets included, and previews' own (`--preview`) |
 | `database` | `db list`, `db info` and `db connect`, which includes the database password |
 | `backups` | List, create, inspect and download backups, and read the point-in-time window |
@@ -541,7 +542,7 @@ rebase cloud compute set --cpu 500m --memory 2Gi
 | `--autoscale-cpu-target` | 10–95. The CPU utilisation the autoscaler holds, against the request rather than the limit. Empty means 70 |
 | `--spot` | `true` or `false`. Preemptible capacity: cheaper, and restarted without notice |
 | `--db-instances` | 1–3. `1` is a single instance with no failover; `2` adds an automatic standby |
-| `--db-cpu`, `--db-memory`, `--storage` | Per database instance. Empty means `500m`, `2Gi` and the default volume |
+| `--db-cpu`, `--db-memory` | Per database instance. Empty means `160m` and `1Gi` |
 
 An empty dial is not the same as one pinned to the same number: an empty dial
 follows the platform default and moves when it moves.

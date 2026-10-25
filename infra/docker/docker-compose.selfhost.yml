@@ -258,7 +258,7 @@ services:
       # from the start — worth doing, because a compromised hook then cannot
       # rewrite the code that runs after the next restart:
       #
-      #     ../dist-bundle:/bundle:ro
+      #     ../../dist-bundle:/bundle:ro
       #
       # Left writable here because `rebase build --no-vendor` produces a bundle
       # that installs its dependencies on first start instead (40-60s per start),
@@ -268,11 +268,11 @@ services:
       #     FROM rebasepro/server:${REBASE_VERSION}
       #     COPY dist-bundle /bundle
       # Relative paths resolve against this file's directory, so the default is
-      # the `dist-bundle` beside it in a normal project layout. REBASE_BUNDLE_DIR
+      # the project root's `dist-bundle`, two levels up from infra/docker/. REBASE_BUNDLE_DIR
       # overrides it — an absolute path when your bundle lives somewhere else,
       # which is also how the acceptance gate points at this repository's own
       # reference app.
-      - ${REBASE_BUNDLE_DIR:-../dist-bundle}:/bundle
+      - ${REBASE_BUNDLE_DIR:-../../dist-bundle}:/bundle
     ports:
       - "${PORT:-8080}:8080"
 
@@ -320,7 +320,7 @@ services:
   #     # one. A name that is not in the bundle refuses to boot.
   #     # REBASE_FUNCTIONS_ONLY: send-invoice
   #   volumes:
-  #     - ../dist-bundle:/bundle
+  #     - ../../dist-bundle:/bundle
   #
   # A third process, for taking cron and the job queue off the request path
   # entirely. Optional: `api` runs both by default, and both are already safe to
@@ -344,7 +344,7 @@ services:
   #     CORS_ORIGINS: ${CORS_ORIGINS}
   #     PORT: 8080
   #   volumes:
-  #     - ../dist-bundle:/bundle
+  #     - ../../dist-bundle:/bundle
 
 volumes:
   db-data:

@@ -1,5 +1,5 @@
 ---
-sourceHash: cc1736a186791d89
+sourceHash: afd1a90c05fb48c3
 title: Configurazione dello storage
 sidebar_label: Configurazione dello storage
 description: Configura backend di storage per filesystem locale, compatibili con S3 o GCS/Firebase Storage per il caricamento di file, immagini e contenuti multimediali.
@@ -16,7 +16,7 @@ Rebase supporta tre backend di storage:
 ## Configurazione
 
 :::note[Dove va inserito]
-**Runtime gestito** — le variabili `STORAGE_*` in `.env` (`STORAGE_TYPE`, `STORAGE_BUCKET` o `S3_BUCKET` / `GCS_BUCKET`, `STORAGE_PATH`, `STORAGE_PUBLIC_READ`, … — aggiungi a ciascuna di esse il suffisso `__<KEY>` per una sorgente con nome), più una dichiarazione `bucket("<key>")` in `config/resources.ts` per ogni bucket oltre a quello predefinito, ed `export const storageAuthorize` da `config/index.ts`. `storageAuthorize` non ha intenzionalmente una forma basata su variabili d'ambiente: nessuna variabile può esprimere "questo utente può leggere questa chiave".
+**Runtime gestito** — le variabili `STORAGE_*` in `.env` (`STORAGE_TYPE`, `S3_BUCKET` / `GCS_BUCKET`, `STORAGE_PATH`, `STORAGE_PUBLIC_READ`, … — aggiungi a ciascuna di esse il suffisso `__<KEY>` per una sorgente con nome), più una dichiarazione `bucket("<key>")` in `config/resources.ts` per ogni bucket oltre a quello predefinito, ed `export const storageAuthorize` da `config/index.ts`. `storageAuthorize` non ha intenzionalmente una forma basata su variabili d'ambiente: nessuna variabile può esprimere "questo utente può leggere questa chiave".
 
 **Ejected** — il blocco `storage` in `initializeRebaseBackend({ … })`. `storagePolicies` e `storageTriggers` sono disponibili solo in modalità ejected.
 
@@ -99,7 +99,7 @@ image: {
 
 | Metodo | Percorso | Descrizione |
 |--------|------|-------------|
-| `POST` | `/api/storage/upload` | Caricamento diretto di file, un unico body `multipart/form-data`: `file` (obbligatorio); `key`, la chiave dell'oggetto, cartelle comprese (`author_pictures/ada.jpg`), altrimenti il nome del file nella radice; `bucket`, altrimenti quello predefinito; `storageId`; e `metadata_<name>` per i metadati personalizzati. Qualsiasi altro campo viene ignorato: non esiste un campo `path` |
+| `POST` | `/api/storage/upload` | Caricamento diretto di file, un unico body `multipart/form-data`: `file` (obbligatorio); `key`, la chiave dell'oggetto, cartelle comprese (`author_pictures/ada.jpg`), altrimenti il nome del file nella radice; `bucket`, altrimenti quello predefinito; `storageId`; `collection` e `property`, che vincolano il file ai valori `maxSize` e `acceptedFiles` di quella proprietà; e `metadata_<name>` per i metadati personalizzati. Qualsiasi altro campo viene ignorato: non esiste un campo `path` |
 | `POST` | `/api/storage/upload?storageId=<key>` | Caricamento su uno specifico backend con nome |
 | `GET` | `/api/storage/file/*` | Recupera un file — tutto ciò che segue `/file/` è la chiave dell'oggetto |
 | `GET` | `/api/storage/file/*?storageId=<key>` | Recupera un file da uno specifico backend |
@@ -263,8 +263,8 @@ Indirizza una proprietà a una sorgente con `storageSource`:
 ```ts
 {
     name: "Cover",
-    dataType: "string",
-    storage: { storageSource: "media", acceptedFiles: ["image/*"] }
+    type: "string",
+    storage: { storagePath: "covers", storageSource: "media", acceptedFiles: ["image/*"] }
 }
 ```
 
@@ -291,7 +291,7 @@ Solo le variabili con ambito account (account-scoped) utilizzano il fallback —
 
 ## Sorgenti di storage nel frontend
 
-Quando si utilizzano più backend di storage, passa `storageSources` al provider `<Rebase>` in modo che il frontend sappia come instradare i caricamenti direttamente:
+Il frontend apprende le sorgenti del server da `GET /api/storage/sources`, quindi una sorgente `server` non richiede alcuna voce. Passa `storageSources` al provider `<Rebase>` per una sorgente `direct`, che carica direttamente sul proprio provider, oppure per impostare tu stesso un'etichetta o un trasporto:
 
 ```tsx
 import { Rebase } from "@rebasepro/app";
@@ -310,7 +310,7 @@ import { Rebase } from "@rebasepro/app";
 </Rebase>
 ```
 
-La proprietà `key` di ciascuna sorgente deve corrispondere a una chiave backend registrata nella mappa `storage` del server. Il contesto React `StorageSourcesContext` risolve la sorgente attiva per ciascun campo di caricamento.
+La proprietà `key` di una sorgente `server` deve corrispondere a una chiave backend registrata nella mappa `storage` del server. Il contesto React `StorageSourcesContext` risolve la sorgente attiva per ciascun campo di caricamento.
 
 ## Caching e CDN
 
@@ -345,7 +345,7 @@ storagePolicies: [
 ]
 ```
 
-**Una chiave che non corrisponde ad alcuna policy viene rifiutata.** Ogni estensione dei permessi richiede una riga esplicita, e un errore nega l'accesso anziché concederlo.
+**Una chiave che non corrisponde ad alcuna policy viene rifiutata**, a meno che un hook `storageAuthorize` non la consenta: l'hook viene interpellato solo quando nessuna policy corrisponde, e nessuno dei due può restringere l'altro. Ogni estensione dei permessi richiede una riga esplicita, e un errore nega l'accesso anziché concederlo.
 
 I pattern effettuano la corrispondenza **per segmento, mai per sottostringa** — `public/**` non corrisponde a `publicity/secret.png`:
 
@@ -407,7 +407,7 @@ Informazioni utili:
 - **Un percorso è pubblico solo quando lo è la chiave a cui fa riferimento.** Il prefisso `public/` viene verificato sulla chiave canonica servita dalla route — dopo che il segmento iniziale del bucket `default/` è stato rimosso e sequenze come `//`, `./` e lo `/` iniziale sono state normalizzate — mai sull'URL così come scritto. `/api/storage/file/notes://public/x.txt` fa riferimento alla chiave privata `notes:/public/x.txt`, e la chiave `default/public/x.txt` (raggiunta come `/api/storage/file/default/default/public/x.txt`) risiede in una cartella denominata `default`; nessuna delle due è pubblica. All'interno di un hook, verifica la `key` ricevuta con `isPublicStorageKey` da `@rebasepro/types` — `isPublicStoragePath` analizza un percorso o URL lato client, e interpreterebbe entrambi come pubblici.
 - **`list` è vincolato al prefisso.** L'elenco è la modalità con cui si scoprono chiavi di cui non si conosceva l'esistenza.
 - **I caricamenti ripristinabili (TUS) sono vincolati al momento della creazione**, evitando che un caricamento rifiutato lasci file temporanei residui.
-- L'omissione dell'hook preserva il comportamento precedente, non impattando sulle applicazioni single-tenant.
+- Omettere l'hook (e `storagePolicies`) lascia l'oggetto senza alcun controllo per singolo oggetto, quindi in produzione l'avvio viene rifiutato a meno che non sia impostato `storagePublicRead` o `storageInsecureAllowAnyAuthenticated`.
 
 ### Chiavi API e token
 

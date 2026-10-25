@@ -175,7 +175,7 @@ Como uma string de busca é comparada com os campos especificados.
 | `mode` | Corresponde | Encontra `Muñoz` a partir de `munoz` | Encontra `sebastian` a partir de `seb` |
 |---|---|---|---|
 | `"fts"` (padrão) | lexemas inteiros, via o `tsvector` e seu índice GIN | com `unaccent` | não |
-| `"hybrid"` | isso, `OU` uma correspondência de substring nos mesmos campos | **sempre** | **sim** |
+| `"hybrid"` | isso, `OR` uma correspondência de substring nos mesmos campos | **sempre** | **sim** |
 
 ```typescript
 search: {

@@ -1,5 +1,5 @@
 ---
-sourceHash: f66784a0d8158afb
+sourceHash: 5e1a0bbb522c32d0
 title: Environnement & Configuration
 sidebar_label: Configuration
 description: Toutes les variables d'environnement et options de configuration pour les projets Rebase.
@@ -70,7 +70,7 @@ Toute la configuration s'effectue via des variables d'environnement dans votre f
 | `LOG_LEVEL` | Niveau de verbosité des logs : `error`, `warn`, `info`, `debug` | `info` |
 | `REBASE_LOG_RAW_QUERIES` | Affiche le SQL derrière une ligne `Failed query: [redacted]`. Chaque instruction en échec est masquée par défaut, car une requête échouée contient ses paramètres liés — un e-mail, un hash de mot de passe. Définissez-la sur `true` lors du diagnostic d'une panne de DDL, de RLS ou de capture de modifications. Ignorée lorsque `NODE_ENV=production`. | `false` |
 | `NODE_ENV` | Environnement : `development`, `production`, ou `test` | `development` |
-| `CORS_ORIGINS` | Liste d'origines autorisées séparées par des virgules. **Requise en production** si différente du domaine backend. En développement, elle est *ajoutée à* localhost — voir ci-dessous. | — |
+| `CORS_ORIGINS` | Liste d'origines autorisées séparées par des virgules. **Requise en production** sauf si `FRONTEND_URL` est défini : un démarrage en production avec ni l'un ni l'autre refuse de se lancer. En développement, elle est *ajoutée à* localhost — voir ci-dessous. | — |
 | `FRONTEND_URL` | URL de l'application frontend. Utilisée comme alternative à CORS_ORIGINS, dans les deux environnements. | — |
 | `ADMIN_CONNECTION_STRING` | Chaîne de connexion à la base de données au niveau admin (utilisée pour l'introspection du schéma et les opérations d'administration). La base de données qu'elle désigne n'est ni celle que la console SQL considère comme actuelle, ni celle qu'une nouvelle branche copie par défaut : les deux correspondent à la base sur laquelle repose la connexion de l'application (voir `REBASE_BRANCH_PARENT_DATABASE` pour un serveur sur une branche). | `DATABASE_URL` |
 | `DISABLE_DB_ROLE_SWITCHING` | Désactive le changement de rôle PostgreSQL dans l'éditeur SQL (utile pour l'authentification personnalisée où les rôles DB ne sont pas mappés). La console SQL de Studio indique alors que les lignes ont été lues en tant que propriétaire de la connexion, le nomme, et grise son sélecteur de rôle. | `false` |
@@ -84,8 +84,8 @@ substitué. Ainsi, la variable fonctionne de la même manière dans les deux env
 cas nécessitant son utilisation en développement sont les cas habituels :
 
 ```bash
-# Un téléphone sur le réseau local, la machine d'un collègue, un tunnel ngrok,
-# un port Codespaces redirigé — toutes des origines non-localhost.
+# A phone on the LAN, a colleague's machine, an ngrok tunnel,
+# a forwarded Codespaces port — all non-localhost origins.
 CORS_ORIGINS=http://192.168.1.5:5173
 ```
 
@@ -387,8 +387,8 @@ Lu par `rebase`, pas par le serveur. Rien ici n'affecte un déploiement.
 
 ## Les secrets en développement
 
-`JWT_SECRET` et `REBASE_SERVICE_KEY` sont requis en production et générés
-pour vous hors de celle-ci, afin que vous puissiez démarrer sans rien avoir à configurer.
+`JWT_SECRET` est requis en production. Lui et `REBASE_SERVICE_KEY` sont
+générés pour vous hors de celle-ci, afin que vous puissiez démarrer sans rien avoir à configurer.
 
 Ces valeurs générées sont mises en cache dans `.rebase-dev-secrets.json`, aux côtés de
 `.rebase-dev-port` et `.rebase-dev-url` et ignorées par git avec ces derniers. Auparavant, elles
@@ -402,13 +402,13 @@ de votre propre application et invalidait toute clé d'API que vous veniez de cr
 - Si le fichier ne peut pas être écrit — par exemple dans un conteneur en lecture seule —, le serveur démarre
   quand même avec un secret éphémère, exactement comme auparavant.
 
-Rien n'est mis en cache en production, ni sous un exécuteur de tests. En production, un démarrage
-qui devrait générer l'un des secrets échoue toujours en indiquant le nom de la variable, ce comportement
-restant inchangé :
+Rien n'est mis en cache en production, ni sous un exécuteur de tests. En production, rien n'est
+généré non plus : un démarrage sans `JWT_SECRET` échoue, en indiquant le nom de la variable, et ce comportement
+reste inchangé :
 
 ```
-JWT_SECRET must be explicitly set in production.
-Do not rely on auto-generated secrets outside development.
+The environment is not valid:
+  JWT_SECRET: is required
 ```
 
 ## Objet de configuration Backend

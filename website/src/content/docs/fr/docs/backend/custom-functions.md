@@ -1,5 +1,5 @@
 ---
-sourceHash: 9eaa953076c5923b
+sourceHash: 22d7c8bbab763065
 title: Fonctions personnalisées
 sidebar_label: Fonctions personnalisées
 description: Ajoutez des points de terminaison d'API Hono personnalisés aux côtés de vos routes CRUD Rebase. Découverte automatique à partir d'un répertoire, avec un accès complet à l'instance backend.
@@ -97,7 +97,7 @@ Voir [Portabilité du runtime](#portabilité-du-runtime) pour le contrat complet
 ## Configuration
 
 :::note[Où cela se configure]
-**Runtime managé :** rien à configurer — le runtime découvre `backend/functions/` de lui-même (`functions` dans l'entrée `rebase.json` de l'application backend si vous l'avez déplacé). `REBASE_FUNCTIONS_ONLY` / `REBASE_FUNCTIONS_EXCLUDE` restreignent celles qu'un processus dessert.
+**Runtime managé :** rien à configurer — le runtime découvre `backend/functions/` de lui-même (`functions` dans l'entrée `rebase.json` de l'application backend si vous l'avez déplacé). `REBASE_FUNCTIONS_ONLY` / `REBASE_FUNCTIONS_EXCLUDE` restreignent celles que dessert un processus `REBASE_ROLE=functions` ; tout autre rôle refuse de démarrer si elles sont définies.
 **Éjecté :** `initializeRebaseBackend({ functionsDir })`, ou `functions` (ci-dessous), dans `backend/src/index.ts`.
 :::
 
@@ -562,7 +562,7 @@ declare function notifyFulfilment(url: string, session: Record<string, string>):
 
 ## Débogage
 
-Lorsqu'une fonction est chargée avec succès, vous verrez :
+Lorsque les fonctions se chargent, le démarrage journalise `Loaded custom functions` avec leur nombre. La ligne propre à chaque fonction est journalisée au niveau `debug` (`LOG_LEVEL=debug`) :
 
 ```
 ⚡ Loaded function route: hello
@@ -575,6 +575,8 @@ Si le chargement échoue, le chargeur fournit une sortie de diagnostic :
   export type: object (SomeClass)
   prototype methods: constructor, someMethod
   Hint: ensure the function exports a Hono app created with the same hono version as the server.
+  Author with `defineFunction(...)` from @rebasepro/server/functions for a typed, checked contract.
+  The loader checks for .fetch() and .routes — any Hono-compatible app will work.
 ```
 
 Le routeur est monté pour le **répertoire**, pas pour les fonctions qu'il contient. Si l'importation de tous les fichiers échoue — une seule variable d'environnement manquante au niveau du module suffit pour tous les bloquer — `GET /api/functions` répond toujours `200` avec une liste vide et un compteur `skipped`, ce qui permet de distinguer "rien n'a pu être chargé" de "ce build ne comportait aucune fonction". Le listage lui-même nécessite un appelant connecté, une clé d'API détenant la simple portée `functions:invoke`, ou la clé de service — les fonctions restent appelables par quiconque y est autorisé, mais leur inventaire n'est pas public. Les explications détaillées restent consignées dans le journal de démarrage.

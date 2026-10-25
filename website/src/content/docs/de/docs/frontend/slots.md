@@ -1,5 +1,5 @@
 ---
-sourceHash: e229c0d2b62d6bee
+sourceHash: f4db6595d67f35d9
 title: Slots
 sidebar_label: Slots
 description: Referenz für alle in Rebase verfügbaren UI-Erweiterungspunkt-Slots – benannte Positionen, an denen Sie benutzerdefinierte Komponenten einfügen können.
@@ -123,7 +123,7 @@ Filter-Sidebar, in die es gerendert werden könnte.
 
 ## Referenz der Slot-Props
 
-Alle Slot-Prop-Typen werden aus `@rebasepro/types` exportiert und können für typsichere Slot-Komponenten importiert werden:
+Alle Slot-Prop-Typen werden aus `@rebasepro/cms-types` exportiert und können für typsichere Slot-Komponenten importiert werden:
 
 ```typescript
 import type { CollectionActionsProps, NavigationSlotProps } from "@rebasepro/cms-types";

@@ -65,7 +65,7 @@ const client = createRebaseClient({
 Standardmäßig gibt der Client nichts über seine Realtime-Verbindung aus, sodass eine öffentliche Seite in der Konsole eines Besuchers nichts über ihr Backend verrät. Warnungen und Fehler werden immer ausgegeben. Um zu sehen, wie die Verbindung aufgebaut, angemeldet, getrennt und neu gewählt wird, übergeben Sie `debug: true` – oder schalten Sie es in einem einzelnen Browser ein, ohne die Seite zu ändern, indem Sie dies in seiner Konsole ausführen:
 
 ```js
-localStorage.setItem("rebase_debug", "1"); // localStorage.removeItem("rebase_debug") zum Beenden
+localStorage.setItem("rebase_debug", "1"); // localStorage.removeItem("rebase_debug") to stop
 ```
 
 Es gilt ab der nächsten Zeile, die der Client protokolliert; eine bereits verbundene Seite muss nicht neu geladen werden. Außerhalb eines Browsers setzen Sie `globalThis.__REBASE_DEBUG__ = true`. Browser zeigen `console.debug` nur auf der Stufe „Ausführlich“ (Verbose) an.

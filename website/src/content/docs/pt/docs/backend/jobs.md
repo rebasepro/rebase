@@ -21,6 +21,19 @@ Use-o para trabalhos que não podem ser perdidos e não devem acontecer dentro d
 
 ## Habilitando
 
+:::note[Onde isso se aplica]
+**Runtime gerenciado** — em lugar nenhum. `jobs` recebe *funções* handler, que nenhuma
+variável de ambiente e nenhum export de `config/index.ts` consegue transportar, de modo que um
+projeto gerado pelo scaffold não pode habilitar a fila. Execute `rebase eject` (ou escreva um
+[servidor personalizado](/docs/backend/custom-server/)) para alcançá-la. `REBASE_JOB_WORKERS`
+no `.env` apenas decide se os workers de uma fila já habilitada rodam *neste*
+processo.
+
+**Ejetado** — o bloco `jobs` em `initializeRebaseBackend({ … })`, como abaixo.
+
+O mapa completo está na [Visão Geral do Backend](/docs/backend/#where-each-option-lives).
+:::
+
 ```typescript no-verify
 await initializeRebaseBackend({
     jobs: {

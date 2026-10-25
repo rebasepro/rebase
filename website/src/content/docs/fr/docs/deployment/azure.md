@@ -1,5 +1,5 @@
 ---
-sourceHash: 8f4a068442f3d703
+sourceHash: 63e2253a58fb0c76
 title: Déployer Rebase sur Microsoft Azure
 description: Déployez votre instance Rebase en toute sécurité sur Azure à l'aide d'Azure Database for PostgreSQL et d'Azure Container Apps.
 sidebar_label: Azure
@@ -98,7 +98,7 @@ L'image de runtime étant distribuée sans la CLI, ces commandes ne s'exécutent
 
 ## Stockage de fichiers
 
-Les réplicas de Container Apps ne disposent pas de disque persistant ; le stockage local de fichiers entraîne donc une perte silencieuse de données, raison pour laquelle le runtime le refuse en production. Créez un compte Azure Storage et utilisez son interface compatible S3, ou un bucket compatible S3 dans la même région, avec `STORAGE_TYPE=s3` — voir [Stockage](/docs/backend/storage).
+Les réplicas de Container Apps ne disposent pas de disque persistant ; le stockage local de fichiers entraîne donc une perte silencieuse de données, raison pour laquelle le runtime le refuse en production. Azure Blob Storage ne parle pas l'API S3 : utilisez donc un bucket compatible S3 dans la même région avec `STORAGE_TYPE=s3` et son `S3_ENDPOINT` — voir [Stockage](/docs/backend/storage).
 
 ## Prochaines étapes
 

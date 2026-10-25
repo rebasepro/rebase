@@ -1,5 +1,5 @@
 ---
-sourceHash: b9946294a0d71b07
+sourceHash: abcf5a5d3cbcd742
 title: Déployer Rebase sur Hetzner Cloud
 description: Déployez Rebase sur Hetzner Cloud avec Terraform ou Docker Compose, pour d'excellentes performances basées dans l'UE et la souveraineté des données.
 sidebar_label: Hetzner Cloud
@@ -20,8 +20,10 @@ module "rebase" {
   domain          = "api.example.com"
   cors_origins    = ["https://app.example.com"]
   ssh_public_keys = [file(pathexpand("~/.ssh/id_ed25519.pub"))]
+  admin_email     = "you@example.com"
 
-  bundle_url = "https://storage.example.com/bundles/app-1.4.0.tar.gz"
+  bundle_url      = "https://storage.example.com/bundles/app-1.4.0.tar.gz"
+  runtime_version = "0.25.1" # required with bundle_url: `latest` is refused at plan
 
   s3_bucket            = "example-uploads"
   s3_access_key_id     = var.s3_access_key_id
@@ -92,7 +94,7 @@ docker compose -f infra/docker/docker-compose.selfhost.yml --env-file .env up -d
 
 Le runtime écoute sur le port 8080 à l'intérieur du réseau Compose.
 
-`REBASE_SERVICE_KEY` contourne la sécurité au niveau des lignes (row-level security). Considérez-le comme un identifiant de superutilisateur de base de données, et non comme une clé d'API.
+`REBASE_SERVICE_KEY` agit comme administrateur sur chaque collection : il ne contourne pas la sécurité au niveau des lignes (row-level security), mais il passe chaque politique par défaut que passe le rôle `admin`. Considérez-le comme un identifiant d'administrateur, et non comme une clé d'API.
 
 ## 5. Terminer le TLS avec Caddy
 
@@ -120,7 +122,7 @@ Faites pointer l'enregistrement A de ce domaine vers le serveur avant de démarr
 
 ## Le stockage n'est pas facultatif
 
-Le runtime **refuse de démarrer en production** si le stockage local est configuré, car le système de fichiers du conteneur est détruit à chaque redémarrage et un backend local en production équivaut à une perte silencieuse de données.
+Le runtime **n'enregistre pas le stockage local en production**, car le système de fichiers du conteneur est détruit à chaque redémarrage et un backend local en production équivaut à une perte silencieuse de données. Tant qu'aucun bucket n'est configuré, les téléversements répondent `501 STORAGE_NOT_CONFIGURED`.
 
 Hetzner Object Storage est compatible S3 et réside dans les mêmes centres de données, ce qui en fait l'association naturelle :
 
@@ -133,7 +135,7 @@ S3_ACCESS_KEY_ID=...
 S3_SECRET_ACCESS_KEY=...
 ```
 
-Si votre projet ne stocke aucun fichier téléversé, définissez `FORCE_LOCAL_STORAGE=true` pour le spécifier explicitement. Consultez [Storage](/docs/backend/storage) pour une vue d'ensemble complète.
+Si votre projet ne stocke aucun fichier téléversé, laissez le stockage non défini et il reste désactivé. `FORCE_LOCAL_STORAGE=true` n'est pas une reconnaissance explicite : il enregistre quand même le stockage local, ne le définissez donc qu'avec un volume durable monté au-dessus de `STORAGE_PATH` (le module Terraform demande `force_local_storage = true` lorsqu'il n'a pas de bucket). Consultez [Storage](/docs/backend/storage) pour une vue d'ensemble complète.
 
 ## Ce que le démarrage fait à votre schéma
 
@@ -143,7 +145,7 @@ Ce que le démarrage ne fait délibérément jamais, c'est quoi que ce soit de d
 
 Une seule chose nécessite donc encore [`rebase db push`](/docs/architecture/schema-as-code), exécuté depuis une copie de travail locale ou un pipeline CI où la validation des changements destructifs et une sauvegarde sont à portée de main : toute modification qui n'est pas purement additive — une colonne renommée, un type restreint, un champ supprimé.
 
-Si le module ou le fichier Compose lie Postgres à l'interface de bouclage (loopback) — ce que font les deux —, accédez-y via un tunnel SSH :
+Le module lie Postgres à l'interface de bouclage (loopback). Le fichier Compose le publie sur toutes les interfaces (`${POSTGRES_PORT:-5432}:5432`), réduisez donc ce mappage à `127.0.0.1:5432:5432` ou supprimez-le. Accédez-y ensuite via un tunnel SSH :
 
 ```bash
 ssh -N -L 5433:127.0.0.1:5432 root@<your-server-ip>

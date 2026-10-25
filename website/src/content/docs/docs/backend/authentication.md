@@ -94,6 +94,7 @@ const backend = await initializeRebaseBackend({
 | `disableSelfRegistration` | `boolean` | `false` | Kill switch: also closes the first-user bootstrap window that `allowRegistration: false` leaves open |
 | `allowAnonymous` | `boolean` | `false` | Enable `POST /api/auth/anonymous`. Deliberately not gated by `allowRegistration` — a public read-mostly app can want sessions without accounts. Turning a guest into an account (`POST /api/auth/anonymous/link`) is registration, and needs `allowRegistration` too — and `allowAnonymous` still on: switched off, it also refuses the guests already signed in, so none can become an account (`403 ANONYMOUS_AUTH_DISABLED`) |
 | `allowUserLookup` | `boolean` | `false` | Mount `POST /api/auth/find-user` for invite-by-email flows |
+| `captcha` | `CaptchaConfig` | — | Bot protection on the routes that send mail — see [Bot protection](#bot-protection) |
 | `defaultRole` | `string` | — | Role given to a newly registered user when none is specified. It may not be `admin`, or a declared role that holds an admin-plane scope: the boot refuses both |
 | `serviceKey` | `string` | — | Static key for server-to-server calls — see [Service Key Authentication](/docs/backend/auth-endpoints/#service-key-authentication) |
 | `email` | `EmailConfig` | — | SMTP, for password reset, verification, invitations and magic links |
@@ -387,6 +388,8 @@ DISCORD_CLIENT_SECRET=…
 `GET /api/auth/config` then lists `discord` in `enabledProviders`, which is how
 to check that a pair arrived.
 
+Google is configured by `GOOGLE_CLIENT_ID` alone: its ID-token flow needs no secret, so `GOOGLE_CLIENT_SECRET` is optional.
+
 Apple is the exception: it has no static client secret, because Rebase signs a
 short-lived ES256 JWT for each token exchange. It needs all four of
 `APPLE_CLIENT_ID`, `APPLE_TEAM_ID`, `APPLE_KEY_ID` and `APPLE_PRIVATE_KEY` — the
@@ -394,7 +397,7 @@ short-lived ES256 JWT for each token exchange. It needs all four of
 
 Two options have no environment spelling and need the `auth` block (so, an
 ejected or code-configured backend): `microsoft.tenantId`, which otherwise
-defaults to `common` and reports every address as unverified, and
+defaults to `common` and accepts every Entra tenant (with any tenant, an address counts as verified only when the app registration emits the `xms_edov` claim), and
 `gitlab.baseUrl`, for a self-hosted instance.
 
 Each named field is resolved at startup into `auth.providers`, which is the
@@ -488,11 +491,13 @@ also proves. `requireEmailVerification` makes registration confirm-first. See
 
 ## Auto-Created Tables
 
-On first startup, Rebase automatically provisions the `auth` schema and the following tables in the database (bound to the schema defined in your collection, e.g., `rebase`):
+On first startup, Rebase automatically provisions the `rebase` schema and the following tables in the database (bound to the schema defined in your collection, e.g., `rebase`):
 
 - **`rebase.users`** — User accounts with email, password hash, metadata, and a `roles` text[] column (roles are stored as inline text arrays to optimize queries and avoid joins).
+- **`rebase.user_identities`** — The OAuth identities linked to each account, one row per provider identity.
 - **`rebase.refresh_tokens`** — Long-lived sessions carrying hashed refresh tokens, user agents, and IP addresses. Includes a unique index on `token_hash`. One sign-in is one `session_id`, shared by every token rotated out of it; there is no per-device constraint, so two browsers behind one address are two sessions. Every token of a session also carries its assurance level (`aal`) and how it was signed in (`method`, which `providerId` reports).
 - **`rebase.password_reset_tokens`** — Expirable single-use tokens for password recovery flows.
+- **`rebase.magic_link_tokens`** — Expirable single-use tokens for magic-link sign-in.
 - **`rebase.mfa_factors`** — Enrolled multi-factor authentication methods (e.g. TOTP secrets encrypted with AES-256).
 - **`rebase.mfa_challenges`** — Verification logs tracking active MFA verification attempts.
 - **`rebase.recovery_codes`** — Hashed multi-factor backup/recovery codes.
@@ -500,7 +505,7 @@ On first startup, Rebase automatically provisions the `auth` schema and the foll
 
 Tokens that expire — reset links, magic links and email codes, refresh tokens,
 MFA challenges — are deleted once an hour after they expire. The sweep runs on
-the process that owns the timers (the `worker` role in a split deployment) and
+the processes that own the timers (every role but `functions` in a split deployment, unless `REBASE_CRON_SCHEDULER=false` takes them off the `api`) and
 on one instance of the fleet: each hour is claimed in `rebase.cron_claims`
 under the job id `rebase:auth:expired-tokens`, as a cron slot is. With
 `cronPersistence: false` there is no claims table, and every such instance

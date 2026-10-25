@@ -1,5 +1,5 @@
 ---
-sourceHash: b2aa1062d257415a
+sourceHash: 791588f79f48d44f
 title: O Rebase não faz X
 sidebar_label: Estendendo o servidor
 description: A escada de extensão do lado do servidor — declaração, callback de coleção, função customizada, suas próprias rotas, seu próprio servidor, eject — com o que cada um pode e não pode alcançar.
@@ -57,7 +57,7 @@ renderiza e o `rebase doctor` a compara com o banco de dados ativo.
 | Decidir quem pode ler ou escrever uma linha | `securityRules` | [Autenticação](/docs/backend/authentication) |
 | Buscar texto adequadamente — acentos, JSONB, ranqueamento, substrings | um bloco `search` | [Busca](/docs/backend/search) |
 | Encontrar linhas por significado | uma propriedade `vector` | [Busca](/docs/backend/search) |
-| Manter linhas excluídas | `softDelete` | [Escritas](/docs/backend/writes) |
+| Manter linhas excluídas | `softDelete` | [Exclusão lógica](/docs/collections/soft-delete) |
 | Registrar quem alterou o quê | `history` | [Histórico](/docs/backend/history) |
 | Executar algo em um agendamento | um arquivo de cron job | [Cron Jobs](/docs/backend/cron-jobs) |
 | Executar algo após uma escrita, fora de banda | um job | [Jobs](/docs/backend/jobs) |
@@ -104,7 +104,7 @@ callbacks: {
 }
 ```
 
-Vale a pena conhecer três propriedades antes de depender dele:
+Vale a pena conhecer quatro propriedades antes de depender dele:
 
 - **Ele só pode restringir.** O valor de retorno é um filtro a ser adicionado com AND, e não
   há estrutura que ele possa retornar que amplie a leitura. Isso é deliberado: um hook que

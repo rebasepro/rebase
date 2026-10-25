@@ -1,6 +1,8 @@
 {{- if eq (include "rebase.jobOwnsSchema" .) "true" }}
 {{/*
-Schema provisioning as a Job, so nothing on the request path owns DDL.
+Schema provisioning as a Job, so nothing on the request path owns the
+collection schema. (The pods still keep the framework's own tables current at
+boot; `provision: false` is the setting that stops that too.)
 
 The runtime already refuses to boot a non-provisioning role that would also
 provision — N processes racing `CREATE … IF NOT EXISTS` is a state nobody
@@ -58,17 +60,25 @@ spec:
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           securityContext:
             {{- toYaml .Values.securityContext | nindent 12 }}
-          {{/* The `worker` role mounts no HTTP surface, which is what makes it
-               the right shape for a process that should provision and exit
-               rather than start answering requests while it does. The schema
-               work itself is driven by REBASE_MIGRATE_ON_BOOT below, which the
-               role would otherwise force to "none" — so it is set explicitly
-               after, and this is the one place in the chart where a unit
-               provisions without being the api. */}}
+          {{/* `all`, because this run provisions for every unit at once: the
+               collection schema, and the tables each surface owns (MCP's OAuth
+               tables among them) — a role that mounts less creates less. It
+               never answers a request: REBASE_PROVISION_ONLY exits before a
+               socket is bound, whatever the role.
+
+               It used to be `worker`, and the runtime refused it on every
+               install: a role that is not the schema's owner may not also set
+               REBASE_MIGRATE_ON_BOOT, and `worker` is not the owner — so even
+               admitted, it would have provisioned no collection tables. Cron
+               and the job workers are switched off below, so this process runs
+               none of the project's background work while it is up.
+
+               `check:chart` resolves this env with the runtime's own role rules
+               and fails if it is refused or does not own the schema. */}}
           env:
             {{- include "rebase.commonEnv" (dict "root" . "unit" dict) | nindent 12 }}
             - name: REBASE_ROLE
-              value: "worker"
+              value: "all"
             - name: REBASE_MIGRATE_ON_BOOT
               value: {{ .Values.migrationJob.mode | quote }}
             - name: REBASE_CRON_SCHEDULER

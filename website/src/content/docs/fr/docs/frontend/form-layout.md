@@ -1,5 +1,5 @@
 ---
-sourceHash: fef2eb56c7043526
+sourceHash: a6f7e70d9dfb90ae
 title: Disposition du formulaire
 sidebar_label: Disposition du formulaire
 description: Contrôlez l'agencement du formulaire d'entité — largeurs de colonnes, sections et rail de métadonnées.
@@ -141,7 +141,7 @@ Définissez `sidebar: []` pour désactiver complètement le rail généré et co
 | `admin.form.sections` | `FormSection[]` | Groupes avec titre pour la colonne principale |
 | `admin.form.showRecordMeta` | `boolean` | Affiche id/créé/mis à jour au bas du rail |
 
-`FormSection` correspond à `{ key, title?, properties, collapsed?, collapsible? }`.
+`FormSection` correspond à `{ key, title?, properties, collapsed?, collapsible?, readVariant? }`. `readVariant: "summary"` empile les champs de la section sous forme de lignes libellé/valeur dans la vue en lecture seule de l'enregistrement ; la valeur par défaut, `"grid"`, utilise la grille du formulaire.
 
 ## Liens associés
 

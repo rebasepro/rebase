@@ -1,5 +1,5 @@
 ---
-sourceHash: 9210bf054bc3c431
+sourceHash: de64511406443392
 title: Referencia de la CLI
 sidebar_label: CLI
 description: Comandos de Rebase CLI para inicialización de proyectos, generación de esquemas, migraciones de bases de datos y generación de SDK.
@@ -77,7 +77,7 @@ El bundle es el artefacto que despliegas — la imagen del runtime lo carga, por
 |------|--------|
 | `--output <dir>` (o `--out`) | Escribe el bundle en un lugar distinto a `dist-bundle/` (una aplicación a la vez) |
 | `--vendor` | Siempre instala e incluye las dependencias del bundle |
-| `--no-vendor` | Nunca empaqueta dependencias (no vendor); el pod las instala en el primer inicio |
+| `--no-vendor` | Nunca empaqueta dependencias (no vendor); el pod las instala en cada inicio |
 | `--skip-type-check` | Omite la comprobación de tipos (más rápido, menos seguro) |
 | `--no-static` | No integra el frontend en el bundle del backend (cada aplicación estática obtiene igualmente su propio bundle) |
 | `--skip-static-build` | Integra el frontend como ya compilado, sin ejecutar su comando de compilación |
@@ -288,7 +288,8 @@ El comando que se debe ejecutar cuando algo no funciona bien y aún no sabes qu�
 | Cadenas de conexión | Un `=` no codificado en un parámetro de URL, que las propias herramientas de PostgreSQL se niegan a parsear — provocando que los respaldos y `psql` fallen mientras la aplicación sigue funcionando. |
 | Funciones personalizadas | Lo que cada función necesita de su host y cuáles de ellas no se ejecutarían en un edge runtime. |
 
-**Contra la base de datos**, cuando `DATABASE_URL` está configurada:
+**Contra la base de datos** — la propia del proyecto, resuelta como la resuelve `rebase db url`, de modo que en un scaffold nuevo es la base de datos gestionada, que `doctor`
+inicia:
 
 | Comprobación | Por qué |
 | --- | --- |
@@ -301,7 +302,7 @@ El comando que se debe ejecutar cuando algo no funciona bien y aún no sabes qu�
 
 Si la base de datos no es accesible, sus fases se reportan como omitidas con el motivo y el resto se sigue ejecutando — consulta [Resolución de problemas](/docs/troubleshooting/).
 
-Finaliza con código distinto de cero cuando una comprobación detecta un error o cuando una fase no pudo ejecutarse porque la base de datos indicada rechaza las conexiones. Una fase omitida debido a que no definiste `DATABASE_URL` no se considera un fallo.
+Finaliza con código distinto de cero cuando una comprobación detecta un error o cuando una fase no pudo ejecutarse porque la base de datos indicada rechaza las conexiones. Una fase omitida porque no se pudo resolver ninguna base de datos no se considera un fallo.
 
 `rebase doctor --policies` ejecuta únicamente las comprobaciones de RLS — sin diferencias de esquema ni tipos de SDK — y falla de forma restrictiva (fail closed), lo que lo convierte en la opción adecuada para usar como control (gate) en CI contra una base de datos desplegada.
 

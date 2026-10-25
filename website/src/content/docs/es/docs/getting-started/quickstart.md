@@ -1,5 +1,5 @@
 ---
-sourceHash: 44951a600db63629
+sourceHash: 0199b2905455975d
 title: Inicio rápido
 sidebar_label: Inicio rápido
 description: Crea un nuevo proyecto de Rebase y ponlo en marcha localmente en menos de 2 minutos.
@@ -33,7 +33,7 @@ No es necesario instalar ninguna base de datos ni Docker. `rebase dev` ejecuta u
 `init` genera un archivo `.env` listo para usar en la raíz del proyecto con un `JWT_SECRET` real, una contraseña de base de datos y un puerto libre para la base de datos local. No necesitas crear ni editar nada para comenzar.
 
 :::caution
-No ejecutes `cp .env.example .env`. `.env.example` es una referencia de las variables disponibles; copiarlo sobre tu `.env` descarta los secretos generados y apunta `DATABASE_URL` a una base de datos que no existe. Edita `.env` directamente si deseas cambiar algún valor.
+No ejecutes `cp .env.example .env`. `.env.example` es una referencia de las variables disponibles; copiarlo sobre tu `.env` descarta los secretos generados —`JWT_SECRET`, la clave de servicio, la contraseña de la base de datos y las credenciales del primer administrador, todos en blanco o comentados allí—. Edita `.env` directamente si deseas cambiar algún valor.
 :::
 
 ## Inicia los servidores de desarrollo

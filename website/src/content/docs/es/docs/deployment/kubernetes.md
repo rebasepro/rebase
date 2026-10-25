@@ -1,5 +1,5 @@
 ---
-sourceHash: ce1b04dc7278a010
+sourceHash: 5764a95deb8e4e9c
 title: Kubernetes
 sidebar_label: Kubernetes
 description: Despliega Rebase en un clúster de Kubernetes con el chart oficial de Helm — uno o varios Deployments, un Job de migración que gestiona el esquema y aplicaciones estáticas en el mismo host.
@@ -21,9 +21,26 @@ helm install rebase oci://registry-1.docker.io/rebasepro/rebase \
   --set config.databaseUrl='postgres://user:pass@host:5432/db' \
   --set config.jwtSecret="$(openssl rand -hex 32)" \
   --set config.serviceKey="$(openssl rand -hex 32)" \
+  --set config.adminEmail=you@example.com \
+  --set config.adminPassword="$(openssl rand -hex 16)" \
   --set ingress.host=api.example.com \
   --set image.repository=my-registry/my-app
 ```
+
+El chart se entrega con el autorregistro desactivado, así que una release tiene que nombrar la cuenta
+con la que inicia sesión su operador; de lo contrario arranca con una tabla de usuarios vacía y
+sin ninguna forma de producir el primer llamante autenticado. `config.adminPassword` debe tener
+al menos 12 caracteres, y `config.adminEmail` necesita un punto en su dominio: la
+ruta de login analiza su cuerpo con `z.string().email()`, así que `admin@localhost`
+es una cuenta en la que nadie podría iniciar sesión y el runtime se niega a crearla. Ambos
+son rechazos en tiempo de renderizado y no sorpresas en
+tiempo de ejecución — consulta [lo que el chart se niega a
+renderizar](#lo-que-el-chart-se-niega-a-renderizar). Inicia sesión y cambia la contraseña;
+estos valores acaban en un Secret.
+
+Gestiónalos por separado apuntando `existingSecret` a un Secret
+que contenga `REBASE_ADMIN_EMAIL` y `REBASE_ADMIN_PASSWORD` junto con
+`DATABASE_URL` y el resto.
 
 El chart despliega **únicamente el runtime**. No despliega Postgres — utiliza
 CloudNativePG, una base de datos gestionada o tu propio StatefulSet, y apunta
@@ -31,14 +48,20 @@ CloudNativePG, una base de datos gestionada o tu propio StatefulSet, y apunta
 asumiría la responsabilidad de tus copias de seguridad y tu conmutación por error
 (failover), lo cual es una promesa mucho mayor que simplemente "ejecutar la aplicación".
 
-> **Madurez.** El chart pasa por linting y renderizado en CI contra Helm v4.2.4 —
-> para cada topología documentada y un caso para cada rechazo listado a continuación.
-> **Aún no se ha probado en un clúster en vivo**. Considéralo como un punto de
-> partida bien testeado en lugar de una opción predeterminada probada en producción, y consulta
+> **Madurez.** En CI se comprueban dos cosas por separado, y una tercera no.
+> El chart pasa por linting y renderizado contra Helm v4.2.4 — cada topología
+> documentada en esta página, incluido el comando de instalación anterior, y un caso
+> que alcanza cada rechazo listado a continuación. La imagen del runtime que
+> despliega el chart se construye y se arranca contra un Postgres real, de las dos
+> formas en que puede llegar un bundle. Lo que **nunca se ha ejecutado es el chart
+> contra un clúster en vivo**: nada ha programado estos manifiestos, así que las
+> probes, el orden del Job de migración previo a la instalación y el ingress son
+> correctos como YAML y no están probados como despliegue. Considéralo un punto
+> de partida bien testeado en lugar de una opción predeterminada probada en producción, y lee
 > [Self-Hosting](/docs/deployment/self-hosting) para conocer la alternativa que sí lo está.
 
 Para trabajar desde un repositorio clonado (checkout) — un chart modificado o una
-instalación aislada (air-gapped) —, `helm install rebase ./charts/rebase` acepta los mismos valores.
+instalación aislada (air-gapped) —, `helm install rebase ./infra/charts/rebase` acepta los mismos valores.
 
 ## Cómo incluir tu proyecto en el pod
 
@@ -120,12 +143,19 @@ El backend no se reinicia.
 
 `migrationJob.enabled` (el valor predeterminado) ejecuta un Job con hook
 `pre-install,pre-upgrade` que aprovisiona y finaliza, y cada pod arranca con
-`REBASE_MIGRATE_ON_BOOT=none`. Nada en la ruta de las peticiones gestiona el DDL,
+`REBASE_MIGRATE_ON_BOOT=none`. Nada en la ruta de las peticiones gestiona el esquema de las colecciones,
 lo que supone la solución más limpia a "exactamente un proceso aprovisiona el esquema"
-— deja de ser una regla que alguien tenga que recordar.
+— deja de ser una regla que alguien tenga que recordar. Los pods siguen manteniendo al día en el arranque las tablas
+propias del framework (auth, claves de API, jobs, cron); `provision: false` detiene eso también,
+no renderiza ningún Job y deja el esquema a una
+[ejecución de aprovisionamiento](/docs/deployment/self-hosting/#when-only-your-change-process-may-change-the-database)
+bajo tu propio proceso de cambios.
 
-`mode: ensure` crea lo que falta. `mode: push` también aplica cambios en el
-esquema de las colecciones y **es destructivo**; no es el valor predeterminado.
+`mode: ensure` crea lo que falta, de forma aditiva, y es el único modo que acepta la
+imagen del runtime. `push` se rechaza al arrancar: aplicar cambios en el esquema de las
+colecciones es destructivo, y `rebase db push` desde un checkout o CI simula el cambio,
+rechaza los destructivos sin confirmación y puede hacer antes una copia de seguridad —
+nada de lo cual puede hacer un pod que arranca sin supervisión.
 
 ## Lo que el chart se niega a renderizar
 
@@ -139,6 +169,13 @@ lugar, `helm install` falla, indicando el valor que se debe cambiar:
 - `bundle.mode=image` mientras `image.repository` sigue siendo la imagen base del runtime
 - `ingress.enabled` sin host, o `bundle.mode=url` sin URL
 - un `migrationJob.mode` o `sharedState.rateLimitStore` no reconocido
+- ningún `config.adminEmail` con el autorregistro desactivado — una release en la que nadie puede
+  iniciar sesión. Define los dos valores de administrador, o `config.allowSelfRegistration=true`
+  entendiendo que la primera persona que llegue al formulario de registro se convierte en su
+  administrador
+- un `config.adminPassword` de menos de 12 caracteres, o un `config.adminEmail` cuyo
+  dominio no tiene punto. El runtime se niega a crear cualquiera de los dos, en el arranque, y deja la
+  misma release bloqueada
 
 ## Lo que el chart no puede hacer por ti
 

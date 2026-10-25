@@ -43,7 +43,7 @@ All auth endpoints are mounted at `/api/auth/`:
 | `GET` | `/api/auth/keys` | The caller's own [personal API keys](/docs/backend/api-keys/#personal-keys) |
 | `POST` | `/api/auth/keys` | Create a personal key. `403 PERSONAL_KEYS_DISABLED` unless the users collection sets `auth.personalKeys` |
 | `DELETE` | `/api/auth/keys/:id` | Revoke one of the caller's own keys |
-| `GET` | `/.well-known/jwks.json` | The public JWKS — mounted at the root, not under `basePath`, because that is where a verifier looks. Present when [asymmetric signing](#asymmetric-tokens-and-jwks) is configured |
+| `GET` | `/.well-known/jwks.json` | The public JWKS — mounted at the root, not under `basePath`, because that is where a verifier looks. Mounted whenever the backend mints its own tokens; an empty key set until [asymmetric signing](#asymmetric-tokens-and-jwks) is configured |
 | `POST` | `/api/auth/mfa/enroll` | Start TOTP enrolment (returns the secret and recovery codes) |
 | `POST` | `/api/auth/mfa/verify` | Confirm an enrolment with a code from the authenticator |
 | `GET` | `/api/auth/mfa/factors` | List the caller's enrolled factors |
@@ -183,8 +183,8 @@ string in the body. The access token is unaffected.
 
 **A second factor gates sign-in, not just individual operations.** Once an
 account has one *verified* TOTP factor, no route issues it a session until a
-code is presented — password login, every OAuth provider, magic link and
-anonymous-link all refuse with `401 MFA_REQUIRED`:
+code is presented — password login, every OAuth provider, magic link, email
+code and anonymous-link all refuse with `401 MFA_REQUIRED`:
 
 ```json
 {
@@ -264,26 +264,32 @@ accounts; enable it only when your invite UX needs it.
 
 Rebase bridges request authentication directly down to PostgreSQL Row-Level Security (RLS). Every database query executed through a user-scoped driver runs inside a database transaction (`db.transaction()`) that configures transaction-local configuration parameters:
 
-*   `app.user_id` — The authenticated user's unique ID (`uid`). Defaults to `'anon'` for unauthenticated requests.
+*   `app.uid` — The authenticated user's unique ID (`uid`). Defaults to `'anonymous'` for unauthenticated requests. The pre-rename `app.user_id` is still written alongside it, for policies compiled before the rename.
 *   `app.user_roles` — A comma-separated string listing the user's assigned roles.
-*   `app.jwt` — A JSON string containing the full JWT claims payload (`{"sub": "<uid>", "roles": [...]}`).
+*   `app.is_anonymous` — `'true'` for a guest session (anonymous sign-in), `'false'` otherwise.
+*   `app.jwt` — A JSON string with the token's custom claims plus `sub`, `roles` and `is_anonymous` (`{"sub": "<uid>", "roles": [...], "is_anonymous": false, …}`).
 
 These parameters are configured locally for the duration of the transaction using Postgres's `set_config` function:
 ```sql
 SELECT 
+    set_config('app.uid', $1, true),
     set_config('app.user_id', $1, true),
     set_config('app.user_roles', $2, true),
-    set_config('app.jwt', $3, true);
+    set_config('app.is_anonymous', $3, true),
+    set_config('app.jwt', $4, true);
 ```
 
 ### PostgreSQL Policy Helper Functions
 
-To make writing Row-Level Security policies simple, Rebase creates helper functions under the `auth` schema during database bootstrapping:
+To make writing Row-Level Security policies simple, Rebase creates helper functions under the `rebase` schema during database bootstrapping:
 
 *   **`rebase.uid()`** — Returns the authenticated user's ID as `text`, or `NULL` if not set:
     ```sql
     CREATE OR REPLACE FUNCTION rebase.uid() RETURNS text AS $$
-        SELECT NULLIF(current_setting('app.user_id', true), '');
+        SELECT COALESCE(
+            NULLIF(current_setting('app.uid', true), ''),
+            NULLIF(current_setting('app.user_id', true), '')
+        );
     $$ LANGUAGE sql STABLE;
     ```
 *   **`rebase.roles()`** — Returns the comma-separated roles string:
@@ -298,6 +304,7 @@ To make writing Row-Level Security policies simple, Rebase creates helper functi
         SELECT COALESCE(NULLIF(current_setting('app.jwt', true), ''), '{}')::jsonb;
     $$ LANGUAGE sql STABLE;
     ```
+*   **`rebase.is_anonymous()`** — Whether the caller is a guest, as `boolean` (`false` when not set), so a policy can say `NOT rebase.is_anonymous()`.
 
 You can use these helpers directly in your custom security rules or database migrations:
 ```sql

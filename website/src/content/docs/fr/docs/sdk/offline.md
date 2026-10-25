@@ -161,8 +161,6 @@ La cascade est étroite : un `update` est écarté en même temps que l'écritur
 
 Des modifications consécutives sur une même ligne pendant la déconnexion sont fusionnées en une seule écriture mise en file d'attente, de sorte qu'un formulaire en cours de saisie ne fait pas grossir la file. Si le serveur refuse l'écriture fusionnée en raison de son contenu (un 400, 403 ou 422 — par exemple un champ supprimé par un changement de schéma pendant que l'utilisateur était hors ligne), le moteur la scinde à nouveau en modifications séparées et rejoue chacune d'elles. Seule la modification que le serveur refuse est annulée et signalée ; les autres sont conservées.
 
-Un échec simplement temporaire — un 429, un 503, une connexion coupée — n'est pas un rejet. Ces écritures restent en file d'attente et sont réessayées ; ce n'est qu'après `maxRetries` reports qu'une écriture est annulée.
-
 ### Conflits
 
 Par défaut, une modification mise en file d'attente hors ligne écrase ce que le serveur possède pour les champs qu'elle change, même si quelqu'un d'autre les a modifiés entre-temps. Pour le savoir plutôt, passez `onConflict`. Un `update` en file d'attente est alors rejoué avec `If-Match`, la version de la ligne sur laquelle il a été fait, et lorsque la ligne a changé depuis, le serveur le refuse avec un 412 et `onConflict` tranche :
@@ -185,6 +183,8 @@ const client = createRebaseClient({
 La file attend pendant que `onConflict` s'exécute, il peut donc interroger l'utilisateur. S'il lève une exception, la modification est écrasée.
 
 La version sur laquelle une modification est faite est celle qu'a rapportée la dernière lecture de la ligne : `findById()`, une trame `listenById()`, ou la réponse d'un `update()` antérieur. Une ligne lue en dernier dans une liste `find()` ou `listen()` n'a pas de version, pas plus qu'une modification faite par-dessus une autre écriture en file sur la même ligne. Celles-ci sont rejouées sans précondition. Un `ifMatch` que vous passez vous-même à `update()` est conservé lorsque la modification est mise en file.
+
+Un échec simplement temporaire — un 429, un 503, une connexion coupée — n'est pas un rejet. Ces écritures restent en file d'attente et sont réessayées ; ce n'est qu'après `maxRetries` reports qu'une écriture est annulée.
 
 ## Onglets multiples
 
@@ -287,7 +287,8 @@ Le client n'est pas une réplique de votre base de données, et il ne prétend p
 - **La corbeille a besoin du serveur.** La base locale ne contient que des lignes actives : `trash.find()`, `trash.count()`, `trash.restore()` et `trash.purge()` (voir [suppression logique](/docs/collections/soft-delete#from-the-sdk)) ne sont donc jamais traités localement ni mis en file ; hors ligne, ils échouent avec l'erreur `OFFLINE`. La restauration ou la purge d'une ligne dont une écriture est encore en file synchronise d'abord la file, et est refusée avec `TRASH_PENDING_WRITE` si l'écriture ne peut pas encore être envoyée.
 - **Le rejeu est « au moins une fois ».** Une écriture qui atteint le serveur mais dont la réponse se perd peut être renvoyée. Préférez des écritures idempotentes (`createMany` avec `upsert`) là où des doublons poseraient problème.
 - **Un upsert sur une clé naturelle a besoin du serveur.** Seul le serveur peut trouver la ligne que désigne une cible `onConflict`, donc `upsert()` sur une clé naturelle (ou sans l'identifiant de la ligne), et un `createMany()` avec `onConflict` jamais envoyé, sont refusés hors ligne avec `OFFLINE_UPSERT_UNSUPPORTED`. Un upsert sur la clé primaire, avec la clé dans chaque ligne, est mis en file d'attente.
-- **Les lectures locales appliquent la sémantique de Postgres, pas les données de la base.** Les filtres sont évalués comme SQL le ferait — les comparaisons avec `NULL` sont inconnues, `ORDER BY` place les valeurs nulles en dernier en ordre croissant — mais sur la copie des lignes détenue par le client, qui peut être obsolète.
+- **Les lectures locales appliquent la sémantique de Postgres, pas les données de la base.** Les filtres sont évalués comme SQL le ferait — les comparaisons avec `NULL` sont inconnues, `ORDER BY` place les valeurs nulles en dernier en ordre croissant et départage les égalités restantes par l'identifiant de ligne décroissant, exactement comme le fait le serveur — mais sur la copie des lignes détenue par le client, qui peut être obsolète.
+- **Un tri que le client ne peut pas reproduire n'est pas appliqué.** Ordonner du texte revient au serveur : PostgreSQL le trie selon la collation de la *base de données*, que ce processus n'a jamais reçue, et sous la collation C `Banana` se classe avant `apple` là où un collator JavaScript dit le contraire. Lorsqu'une colonne de tri ne peut pas être comparée numériquement, les lignes gardent l'ordre envoyé par le serveur, et le résultat est marqué `partial` au lieu d'être présenté comme la page triée qui avait été demandée. Chaque clé d'un tri multi-colonnes doit être reproductible, et pas seulement la première — un tri que le côté local ne peut approuver que jusqu'à sa deuxième colonne est un tri sur lequel il est en désaccord.
 
 ## Recette : un indicateur hors ligne
 

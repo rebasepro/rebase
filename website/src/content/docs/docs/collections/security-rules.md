@@ -85,7 +85,7 @@ This generates: `USING ((user_id)::text = (SELECT rebase.uid()))` — see
 
 ### Public Access
 
-Allow anyone (including unauthenticated users) to read:
+Put no row filter on reads, so every caller the API lets in reads every row:
 
 ```typescript
 securityRules: [
@@ -94,6 +94,11 @@ securityRules: [
 ```
 
 This generates: `USING (true)`
+
+It widens which rows a caller sees, not who may call. By default the API still
+answers 401 to a request with no token. Set `AUTH_REQUIRE=false`
+(`auth.requireAuth: false`) to remove that gate and let the policies alone
+decide; then an unauthenticated caller reads these rows too.
 
 ### Authenticated Access
 
@@ -182,7 +187,8 @@ Imported from `@rebasepro/types`. Expressions compose; operands are the leaves.
 | `policy.outerField(name)` | inside `existsIn`, a column of the outer row |
 | `policy.literal(value)` | a string, number, boolean or `null` |
 | `policy.authUid()` | `rebase.uid()` |
-| `policy.authRoles()` | `rebase.roles()` |
+| `policy.authRoles()` | the caller's roles as an array, `string_to_array(rebase.roles(), ',')` |
+| `policy.authClaim(name)` | a custom claim on the session token, `NULLIF(rebase.jwt() ->> '<name>', '')`, cast to the type of the column it is compared with |
 
 #### Evaluated once per statement
 
@@ -384,7 +390,7 @@ securityRules: [
 
 ## Anonymous Access (Public Inserts)
 
-A common need is allowing **unauthenticated users** to submit data — contact forms, newsletter signups, public applications. Rebase provides a clean pattern for this.
+A common need is allowing **unauthenticated users** to submit data — contact forms, newsletter signups, public applications. Rebase provides a clean pattern for this. A request with no token reaches these policies only when `AUTH_REQUIRE=false` (`auth.requireAuth: false`); otherwise the API answers it with a 401 first.
 
 ### Recommended: a raw `withCheck` rule
 
@@ -413,7 +419,7 @@ const contactMessagesCollection = defineCollection({
 });
 ```
 
-The `access: "public"` shortcut generates a policy that allows the operation without requiring authentication.
+The `access: "public"` shortcut generates a policy with no row filter. Whether a caller with no token reaches it is `AUTH_REQUIRE`, not the policy.
 
 ### For Lead Capture / Signups
 
@@ -438,11 +444,11 @@ const leadSignupsCollection = defineCollection({
 
 ### How Anonymous Requests Work
 
-When a request arrives without a JWT token, the Rebase backend sets the PostgreSQL session variables to:
+When a request arrives without a JWT token (and `AUTH_REQUIRE=false` lets it through), the Rebase backend sets the PostgreSQL session variables to:
 
 | Variable | Value |
 |----------|-------|
-| `app.user_id` | `'anonymous'` |
+| `app.uid` (and its legacy alias `app.user_id`) | `'anonymous'` |
 | `app.user_roles` | `''` (empty) |
 
 This means:

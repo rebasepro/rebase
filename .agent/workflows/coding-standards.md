@@ -19,7 +19,7 @@ When contributing to the Rebase monorepo, you MUST adhere strictly to the follow
   if (!isSQLAdmin(admin)) {
       throw new Error("Native SQL execution is not available on the current data driver.");
   }
-  const results = await admin.executeSql(sql, params);
+  const results = await admin.executeSql(sql, { params });
   ```
 
 ## 2. Framework Configuration Completeness

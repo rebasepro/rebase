@@ -1,5 +1,5 @@
 ---
-sourceHash: 0b96e438f37a5cac
+sourceHash: 70ff1f5bc92ce503
 title: Datenimport & -export
 sidebar_label: Datenimport & -export
 description: Importieren Sie Daten aus CSV-, JSON- und Excel-Dateien in Ihre Collections und exportieren Sie Collection-Daten nach CSV oder JSON mit optionalen berechneten Feldern.
@@ -9,7 +9,7 @@ description: Importieren Sie Daten aus CSV-, JSON- und Excel-Dateien in Ihre Col
 
 Rebase enthält integrierte Tools für den Datenimport und -export, auf die direkt über das Admin-Panel zugegriffen werden kann. Der Import unterstützt CSV-, JSON- und Excel-Dateien mit einem Assistenten für das Spalten-Mapping. Der Export unterstützt CSV und JSON mit optionalen berechneten Feldern.
 
-Beide Funktionen sind für jede Collection verfügbar. Der Export kann pro Collection mit berechneten Feldern konfiguriert werden; keine von beiden kann pro Collection deaktiviert werden.
+Beide Funktionen sind für jede Collection verfügbar. Der Export kann pro Collection mit berechneten Feldern konfiguriert oder mit `exportable: false` abgeschaltet werden; der Import kann nicht pro Collection abgeschaltet werden.
 
 ## Daten importieren
 
@@ -126,7 +126,7 @@ Alle aktiven Filter in der Collection-Ansicht werden auf den Export angewendet. 
 
 ### Export-Konfiguration
 
-Der Export ist für jede Collection verfügbar. Er wird über `admin.exportable` konfiguriert: Übergeben Sie ein `ExportConfig`-Objekt, um berechnete Spalten hinzuzufügen (siehe unten). Der Typ akzeptiert auch einen booleschen Wert, dieser wird jedoch nicht ausgewertet – `exportable: false` entfernt die Schaltfläche **Export** nicht.
+Der Export ist für jede Collection verfügbar, sofern Sie ihn nicht abschalten. Er wird über `admin.exportable` konfiguriert: `exportable: false` entfernt die Schaltfläche **Export**, und ein `ExportConfig` behält sie bei und fügt berechnete Spalten hinzu (siehe unten).
 
 ### Berechnete Felder hinzufügen
 

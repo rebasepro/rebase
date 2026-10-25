@@ -21,6 +21,14 @@ No hay nada que instalar ni nada que ejecutar junto a Postgres. Un trabajo encol
 
 ## Habilitación
 
+:::note[Dónde va esto]
+**Runtime gestionado**: en ninguna parte. `jobs` recibe *funciones* handler, que ninguna variable de entorno ni exportación de `config/index.ts` puede transportar, así que un proyecto generado mediante scaffolding no puede habilitar la cola. Ejecuta `rebase eject` (o escribe un [servidor personalizado](/docs/backend/custom-server/)) para acceder a ella. `REBASE_JOB_WORKERS` en `.env` solo decide si los workers de una cola ya habilitada se ejecutan en *este* proceso.
+
+**Ejected**: el bloque `jobs` en `initializeRebaseBackend({ … })`, como se muestra a continuación.
+
+El mapa completo está en la [Descripción general del backend](/docs/backend/#where-each-option-lives).
+:::
+
 ```typescript no-verify
 await initializeRebaseBackend({
     jobs: {

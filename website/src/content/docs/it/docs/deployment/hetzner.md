@@ -1,5 +1,5 @@
 ---
-sourceHash: b9946294a0d71b07
+sourceHash: abcf5a5d3cbcd742
 title: Deploy di Rebase su Hetzner Cloud
 description: Esegui il deploy di Rebase su Hetzner Cloud con Terraform o Docker Compose, per prestazioni eccellenti basate nell'UE e sovranità dei dati.
 sidebar_label: Hetzner Cloud
@@ -20,8 +20,10 @@ module "rebase" {
   domain          = "api.example.com"
   cors_origins    = ["https://app.example.com"]
   ssh_public_keys = [file(pathexpand("~/.ssh/id_ed25519.pub"))]
+  admin_email     = "you@example.com"
 
-  bundle_url = "https://storage.example.com/bundles/app-1.4.0.tar.gz"
+  bundle_url      = "https://storage.example.com/bundles/app-1.4.0.tar.gz"
+  runtime_version = "0.25.1" # required with bundle_url: `latest` is refused at plan
 
   s3_bucket            = "example-uploads"
   s3_access_key_id     = var.s3_access_key_id
@@ -100,7 +102,7 @@ docker compose -f infra/docker/docker-compose.selfhost.yml --env-file .env up -d
 
 Il runtime rimane in ascolto sulla porta 8080 all'interno della rete Compose.
 
-`REBASE_SERVICE_KEY` bypassa la row-level security. Trattala come una credenziale da superuser del database, non come una semplice chiave API.
+`REBASE_SERVICE_KEY` agisce come amministratore su ogni collezione: non bypassa la row-level security, ma supera ogni policy predefinita che supera il ruolo `admin`. Trattala come una credenziale admin, non come una semplice chiave API.
 
 ## 5. Terminare TLS con Caddy
 
@@ -128,7 +130,7 @@ Fai puntare il record A del dominio al server prima di avviare Caddy, altrimenti
 
 ## Lo storage non è opzionale
 
-Il runtime **si rifiuta di avviarsi in produzione** se è configurato lo storage locale, poiché il filesystem del container viene distrutto a ogni riavvio e un backend locale in produzione causerebbe una perdita silenziosa di dati.
+Il runtime **non registra lo storage locale in produzione**, poiché il filesystem del container viene distrutto a ogni riavvio e un backend locale in produzione causerebbe una perdita silenziosa di dati. Finché non viene configurato un bucket, i caricamenti rispondono `501 STORAGE_NOT_CONFIGURED`.
 
 L'Object Storage di Hetzner è compatibile con S3 e risiede negli stessi data center, rappresentando quindi l'abbinamento naturale:
 
@@ -141,7 +143,7 @@ S3_ACCESS_KEY_ID=...
 S3_SECRET_ACCESS_KEY=...
 ```
 
-Se il tuo progetto non gestisce alcun caricamento di file, imposta `FORCE_LOCAL_STORAGE=true` per confermarlo esplicitamente. Consulta [Storage](/docs/backend/storage) per il quadro completo.
+Se il tuo progetto non gestisce alcun caricamento di file, lascia lo storage non impostato e resterà disattivato. `FORCE_LOCAL_STORAGE=true` non è una conferma: registra comunque lo storage locale, quindi impostalo solo con un volume durevole montato sopra `STORAGE_PATH` (il modulo Terraform richiede `force_local_storage = true` quando non ha un bucket). Consulta [Storage](/docs/backend/storage) per il quadro completo.
 
 ## Cosa comporta l'avvio per il tuo schema
 
@@ -151,7 +153,7 @@ Ciò che la procedura di avvio evita deliberatamente è qualsiasi operazione dis
 
 Una cosa richiede quindi ancora l'esecuzione di [`rebase db push`](/docs/architecture/schema-as-code), avviato da un checkout locale o dalla CI, dove il controllo per i cambiamenti distruttivi e un backup siano a portata di mano: qualsiasi modifica che non sia puramente additiva — una colonna rinominata, un tipo ristretto, un campo rimosso.
 
-Se il modulo o il file Compose hanno associato Postgres all'interfaccia di loopback (come fanno entrambi), connettiti tramite un tunnel SSH:
+Il modulo associa Postgres al loopback. Il file Compose lo pubblica su ogni interfaccia (`${POSTGRES_PORT:-5432}:5432`), quindi restringi quella mappatura a `127.0.0.1:5432:5432` oppure rimuovila. Poi connettiti tramite un tunnel SSH:
 
 ```bash
 ssh -N -L 5433:127.0.0.1:5432 root@<your-server-ip>

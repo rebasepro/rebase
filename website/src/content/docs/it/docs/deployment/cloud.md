@@ -1,5 +1,5 @@
 ---
-sourceHash: 65ad924b56043f2e
+sourceHash: 1959160bec263545
 title: Rebase Cloud
 sidebar_label: Rebase Cloud
 description: Rebase Cloud è lo stesso Rebase, gestito per te. Di cosa si tratta, come collegare e distribuire un progetto, e cosa la beta privata non include ancora.
@@ -95,13 +95,12 @@ Termina indicando dove risponde ora ogni app e se la nuova versione è live:
     backend  backend  https://songbuzz.rebase.website/api  live
 
   ✓ Live: the new version answers on every address above.
+  Something wrong? `rebase cloud rollback` puts the previous deployment back.
 ```
 
 "Live" significa che l'indirizzo ha risposto dopo il build: `/api/health` del backend ha restituito `ok` e la pagina di un'app statica si è caricata (da questo deployment, quando è la piattaforma a servirla). Il controllo attende fino a `--live-timeout` secondi, 60 di default; `0` lo salta. Se un'app non risponde in tempo il deploy esce comunque con codice zero, perché il deployment è riuscito, e l'ultima riga dice quale app non ha risposto e perché. Un deploy fallito termina invece con una riga che indica l'app e il motivo, con `rebase cloud logs` per il log completo del build.
 
 Gli script passano `--json` per ottenere un oggetto con gli stessi dati — `apps`, `hosts`, `live`, `liveChecks`, `durationMs` e l'id del deployment. A differenza del resto di `rebase cloud`, `deploy` non passa da solo a JSON in una pipe.
-
-Per distribuire un artefatto compilato in precedenza — ad esempio, un job di CI che compila una sola volta ed esegue il deploy due volte — punta alla directory anziché ricompilare:
 
 Ciò che tale runtime consente — pacchetti e moduli nativi, memoria e istanze, timeout e dimensioni del body, filesystem, secret, storage e rete in uscita — è descritto nella relativa pagina:
 [Runtime backend gestito](/docs/deployment/managed-runtime/).
@@ -137,14 +136,58 @@ Con `--json` il `code` dell'errore è `syntax_error`. Gli script inline che un b
 Monitora l'avanzamento:
 
 ```bash
-rebase cloud logs            # il log di build
-rebase cloud logs --runtime  # l'output del container in esecuzione
-rebase cloud status          # lo stato del progetto secondo la piattaforma
+rebase cloud logs            # the build log
+rebase cloud logs --runtime  # what the running container is printing
+rebase cloud status          # what the platform thinks the project is doing
 ```
 
 `status` riporta `blockedOn` e `nextAction`. Quando `blockedOn` è `null`, la
 piattaforma sta lavorando regolarmente ed eseguire un polling è la procedura corretta; quando indica
 un valore, significa che qualcosa è in attesa di un tuo intervento.
+
+## Anteprima di una modifica
+
+<span class="since-badge" data-since="0.26">Dalla versione 0.26</span>
+
+```bash
+rebase cloud deploy --preview
+```
+
+Compila e carica esattamente ciò che farebbe `deploy`, ma lo serve a un indirizzo
+tutto suo, come `https://shop--k3x9ab.rebase.website`. La produzione continua a servire
+ciò che serviva prima. Il deploy stampa l'indirizzo dell'anteprima al termine della
+build.
+
+Per mantenere lo stesso indirizzo tra un deploy e l'altro, dai un nome all'anteprima.
+Eseguire di nuovo il deploy con lo stesso nome la aggiorna:
+
+```bash
+rebase cloud deploy --preview-name new-checkout
+```
+
+Ciò con cui un'anteprima comunica dipende da ciò che hai distribuito:
+
+- **`rebase cloud deploy web --preview`** mostra l'anteprima di una singola app statica. Le sue pagine chiamano
+  il backend di **produzione**: un accesso lì è una sessione reale, e tutto ciò che
+  vi viene scritto è dato di produzione.
+- **`rebase cloud deploy --preview`** mostra l'anteprima del backend, con le sue app statiche
+  incorporate, nello stesso modo in cui la produzione le esegue. Ottiene un backend proprio su
+  un **database vuoto tutto suo**, mai quello di produzione. Avviarsi sul database di
+  produzione applicherebbe a quest'ultimo lo schema e le regole di accesso dell'anteprima.
+
+Un'anteprima non carica sorgenti e non registra app né hostname, perché ciascuna di
+queste operazioni modificherebbe il progetto di produzione. `--source` e `--eject` non possono essere
+combinati con `--preview`. Ciascuno compila un'immagine container per la produzione.
+
+```bash
+rebase cloud previews                      # name, address, app, backend, expiry
+rebase cloud previews delete new-checkout  # stops serving it and drops its database
+```
+
+Un'anteprima scade una settimana dopo l'ultimo deploy effettuato su di essa.
+
+Le anteprime sono in fase di rilascio. Un control plane che non le serve ancora rifiuta
+`--preview` con `previews_unavailable` e non distribuisce nulla.
 
 ## Rollback
 
@@ -224,7 +267,7 @@ jobs:
 | Capacità | Cosa può fare il token |
 |---|---|
 | `deploy` | Distribuire il progetto e seguirne le build: `deploy`, `deployments` |
-| `logs` | Leggere i log di build e runtime, e le metriche in tempo reale: `logs`, `metrics` |
+| `logs` | Leggere i log di build e runtime, la cronologia dei cron e le metriche in tempo reale: `logs`, `cron`, `metrics` |
 | `env` | Leggere e modificare le variabili d'ambiente, inclusi i secret |
 | `database` | `db list`, `db info` e `db connect`, che include la password del database |
 | `backups` | Elencare, creare, ispezionare e scaricare backup, e consultare la finestra temporale per il PITR |
@@ -286,7 +329,7 @@ rebase cloud compute set --cpu 500m --memory 2Gi
 | `--autoscale-cpu-target` | 10–95. L'utilizzo di CPU mantenuto dall'autoscaler, calcolato sulla richiesta anziché sul limite. Vuoto indica 70 |
 | `--spot` | `true` o `false`. Capacità preemptible: più economica, ma soggetta a riavvio senza preavviso |
 | `--db-instances` | 1–3. `1` corrisponde a un'istanza singola senza failover; `2` aggiunge uno standby automatico |
-| `--db-cpu`, `--db-memory`, `--storage` | Per istanza di database. Vuoto corrisponde a `500m`, `2Gi` e al volume predefinito |
+| `--db-cpu`, `--db-memory` | Per istanza di database. Vuoto corrisponde a `160m` e `1Gi` |
 
 Un parametro lasciato vuoto non equivale a uno impostato sullo stesso valore numerico: un parametro
 vuoto segue il valore predefinito della piattaforma e si aggiorna con esso.
@@ -302,11 +345,12 @@ da oggi, ad eccezione di quelle che comportano il riavvio del database, che atte
 | Gruppo di comandi | Cosa copre |
 |---|---|
 | `login`, `logout`, `whoami` | La tua sessione |
-| `init` | Con `--claim`: un backend attivo senza account e un link per rivendicarlo. Vedi [Un backend senza account](#un-backend-senza-account) |
 | `tokens` | Token per CI e agenti, ciascuno limitato a un singolo progetto. Vedi [CI e agenti](#ci-e-agenti) |
 | `link`, `unlink`, `use`, `open` | Associazione della directory a un progetto, selezione di un'organizzazione, apertura della console |
+| `init` | Con `--claim`: un backend attivo senza account e un link per rivendicarlo. Vedi [Un backend senza account](#un-backend-senza-account) |
 | `projects` | Creazione, elenco, ispezione, eliminazione |
 | `deploy`, `logs`, `deployments`, `rollback`, `cancel` | Distribuzione e monitoraggio |
+| `previews` | Build servite al proprio indirizzo da `deploy --preview`, e la loro eliminazione. Vedi [Anteprima di una modifica](#anteprima-di-una-modifica) |
 | `start`, `stop`, `restart` | Sospensione di un progetto e ripristino |
 | `status`, `metrics`, `debug` | Stato di esecuzione e diagnostica di eventuali errori |
 | `cron` | Cron job dell'applicazione distribuita e relative esecuzioni registrate, consultati tramite l'account `rebase cloud`. Sola lettura |
@@ -343,8 +387,9 @@ Chiarito in modo trasparente, per evitare sorprese successive:
 - **Nessun self-service.** L'accesso viene accordato a scaglioni; non è possibile iscriversi e pagare autonomamente.
 - **Nessun SLA pubblico** e nessuna certificazione SOC 2. Se hai bisogno di uno di questi requisiti,
   segnalalo nella richiesta di accesso anziché darlo per scontato.
-- **Nessun deploy di anteprima o per branch** e nessuna GitHub App proprietaria. I deploy hook —
-  URL segreti a cui puntare un webhook del repository — rappresentano il metodo di automazione supportato.
+- **Nessun deploy per branch**, e nessuna GitHub App proprietaria. I deploy hook —
+  URL segreti a cui puntare un webhook del repository — rappresentano il metodo di automazione supportato. I [deploy
+  di anteprima](#anteprima-di-una-modifica) sono in fase di rilascio e si avviano dalla CLI.
 - **I token agiscono a nome di una persona.** Un [token](#ci-e-agenti) viene generato da un account
   e opera per suo conto; non esistono ancora identità macchina a livello di organizzazione. Se
   effettui l'accesso da CI, passa `REBASE_CLOUD_EMAIL` e `REBASE_CLOUD_PASSWORD`

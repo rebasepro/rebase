@@ -1,5 +1,5 @@
 ---
-sourceHash: f02c2b6d0bb6de5f
+sourceHash: 819343e76e0e61e9
 title: Managed-Backend-Runtime
 sidebar_label: Managed Runtime
 description: Was ein Backend mit der Runtime „managed“ auf Rebase Cloud kann und was nicht — Pakete und Binärdateien, Arbeitsspeicher und CPU, Timeouts und Body-Größen, das Dateisystem, In-Memory-Status, Secrets, Speicher für generierte Dateien und ausgehender Netzwerkverkehr.
@@ -60,9 +60,12 @@ Lockfile). Daraus ergeben sich vier Konsequenzen:
   diese Schritte installiert.
 - **Nur Registry-Versionen werden installiert.** Eine `file:`, `link:`, `git+…` oder `github:`-Abhängigkeit
   führt zum Abbruch des Builds, da die Runtime über keine Quelle verfügt, um sie aufzulösen.
-- **Manche Pakete stammen aus dem Image, nicht von Ihnen.** `@rebasepro/*`, `hono`,
-  `@hono/node-server` und `zod` werden aus den Abhängigkeiten des Bundles entfernt und
-  die Kopien des Images werden verlinkt, sodass Ihre Version davon nicht greift.
+- **Manche Pakete stammen aus dem Image, nicht von Ihnen.** `@rebasepro/server`,
+  `@rebasepro/types`, `@rebasepro/client`, `@rebasepro/common`,
+  `@rebasepro/utils`, `hono`, `@hono/node-server` und `zod` werden aus den Abhängigkeiten des
+  Bundles entfernt und die Kopien des Images werden verlinkt, sodass Ihre Version davon nicht
+  greift. Andere `@rebasepro/*`-Pakete, etwa der Datenbanktreiber, werden wie jede Abhängigkeit
+  aus Ihrer `package.json` installiert.
   `typescript` und `tsx` werden ebenfalls entfernt; sie sind Build-Tools.
 - **Private Pakete erfordern eine `.npmrc`.** `rebase build` kopiert die `.npmrc` des Projekts
   (und `backend/.npmrc`) in das Bundle, sodass die Installation dieselben
@@ -126,7 +129,7 @@ Jedes Projekt läuft in seinen eigenen Pods. Arbeitsspeicher und CPU gelten pro 
 über die [Compute-Einstellungen](/docs/deployment/cloud/#compute-and-what-it-costs) konfiguriert:
 
 ```bash
-rebase cloud compute                              # was das Projekt aktuell reserviert
+rebase cloud compute                              # what the project reserves now
 rebase cloud compute set --cpu 500m --memory 1Gi
 ```
 
@@ -192,7 +195,7 @@ Deploys hinweg oder als Speicher für Uploads. Das ist auch der Grund, warum
 |---|---|---|
 | Funktions-Timeout | 30 s, danach `504` mit Code `FUNCTION_TIMEOUT` | `REBASE_FUNCTIONS_TIMEOUT_MS` (`0` deaktiviert es) |
 | Warten auf Ihre Instanz am Edge | 10 Minuten zwischen Lese- oder Schreibvorgängen | Fest |
-| Request-Body, alle `/api/*`-Routen | 10 MiB, danach `413 PAYLOAD_TOO_LARGE` | `REBASE_MAX_BODY_SIZE`, in Bytes |
+| Request-Body, `/api/*`-Routen ohne eigenes Limit | 10 MiB, danach `413 PAYLOAD_TOO_LARGE` | `REBASE_MAX_BODY_SIZE`, in Bytes |
 | Request-Body am Edge | 64 MiB | Fest |
 | Einzelne Datei über `POST /api/storage/upload` | 50 MB | `STORAGE_MAX_FILE_SIZE` |
 | Anonyme Aufrufe an `/api/functions/*` | 3000 pro IP pro 15 Minuten | `rateLimit.anonymousFunctions` |
@@ -223,9 +226,9 @@ Setzen Sie diese über das CLI oder in der Konsole. Es gibt dafür kein Feld in
 
 ```bash
 rebase cloud env set TTS_API_URL=https://api.example.com/v1/speech
-rebase cloud env set TTS_API_KEY=sk-… --secret   # write-only: wird nie wieder angezeigt
-rebase cloud env list                            # nur Namen, niemals Werte
-rebase cloud deploy                              # wendet die Änderung an
+rebase cloud env set TTS_API_KEY=sk-… --secret   # write-only: never shown again
+rebase cloud env list                            # names only, never values
+rebase cloud deploy                              # applies the change
 ```
 
 - **Eine Änderung wird beim nächsten Deploy wirksam.** Laufende Instanzen behalten die Werte,
@@ -270,8 +273,8 @@ nicht geladen werden kann und ihre Routen mit `404` antworten. Siehe
 Ein Cloud-Projekt erhält Dateispeicher, sobald Sie ihn anlegen:
 
 ```bash
-rebase cloud storage create   # ein Managed Bucket und seine Zugangsdaten
-rebase cloud deploy           # das laufende Backend erhält die Zugangsdaten beim Deploy
+rebase cloud storage create   # a managed bucket and its credentials
+rebase cloud deploy           # the running backend gets the credentials at deploy
 ```
 
 Oder verknüpfen Sie das Projekt über `rebase cloud storage attach` mit einem Bucket, den Sie bereits besitzen

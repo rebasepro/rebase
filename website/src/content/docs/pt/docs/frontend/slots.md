@@ -1,5 +1,5 @@
 ---
-sourceHash: e229c0d2b62d6bee
+sourceHash: f4db6595d67f35d9
 title: Slots
 sidebar_label: Slots
 description: Referência para todos os slots de pontos de extensão de UI disponíveis no Rebase — locais nomeados onde você pode injetar componentes customizados.
@@ -123,7 +123,7 @@ uma barra lateral de filtros para que ele seja renderizado nela.
 
 ## Referência de Props dos Slots
 
-Todos os tipos de props de slot são exportados de `@rebasepro/types` e podem ser importados para componentes de slot com tipagem segura:
+Todos os tipos de props de slot são exportados de `@rebasepro/cms-types` e podem ser importados para componentes de slot com tipagem segura:
 
 ```typescript
 import type { CollectionActionsProps, NavigationSlotProps } from "@rebasepro/cms-types";

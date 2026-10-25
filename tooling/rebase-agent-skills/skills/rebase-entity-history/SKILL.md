@@ -53,9 +53,9 @@ history: { retention: 30 },
 On each collection that should be tracked, set `history: true`:
 
 ```typescript
-import { PostgresCollectionConfig } from "@rebasepro/types";
+import { defineCollection } from "@rebasepro/cms-types";
 
-const productsCollection: PostgresCollectionConfig = {
+const productsCollection = defineCollection({
     slug: "products",
     name: "Products",
     table: "products",
@@ -68,7 +68,7 @@ const productsCollection: PostgresCollectionConfig = {
         price: { type: "number", name: "Price" },
         status: { type: "string", name: "Status" },
     },
-};
+});
 ```
 
 > **WARNING FOR AGENTS:** Setting `history: true` on a collection has **no effect** if the global `history` flag is not also set in the backend config. Both must be enabled.
@@ -104,7 +104,7 @@ Each history entry has the following structure:
 | `entity_id` | `string` | The ID of the entity this entry belongs to |
 | `action` | `"create" \| "update" \| "delete"` | What operation was performed |
 | `changed_fields` | `string[] \| null` | Array of field names that changed (only for updates) |
-| `values` | `Record<string, unknown> \| null` | Full entity values at the time of the change (for a delete, the deleted entity) |
+| `values` | `Record<string, unknown> \| null` | Full entity values at the time of the change (for a delete, the deleted entity) — the row as the REST API serves it. A relation is kept as a reference (`{ "__type": "relation", "id", "path" }`), never the related row's values |
 | `previous_values` | `Record<string, unknown> \| null` | On an update, what the changed fields held before it (`null` for creates and deletes) — see `format` |
 | `updated_by` | `string \| null` | UID of the user who made the change |
 | `updated_at` | `string` (ISO 8601) | Timestamp of when the change was recorded |
@@ -146,7 +146,7 @@ GET /api/data/:slug/:entityId/history
 
 | Query Parameter | Type | Default | Description |
 |-----------------|------|---------|-------------|
-| `limit` | `number` | `20` | Number of entries to return (max `100`) |
+| `limit` | `number` | `20` | Number of entries to return (max `100`; above it the request is refused with `400 INVALID_LIMIT`) |
 | `offset` | `number` | `0` | Number of entries to skip |
 
 **Response:**
@@ -180,8 +180,11 @@ GET /api/data/:slug/:entityId/history
 
 | Status | Condition |
 |--------|-----------|
-| `404` | Collection slug not found |
-| `400` | History not enabled for this collection |
+| `404` | Collection slug not found, or the entity does not exist / the caller may not read it (RLS — a 404, not a 403, so its existence is not confirmed) |
+| `400` | History not enabled for this collection, or `limit` above 100 (`INVALID_LIMIT`) |
+| `403` | `SCOPE_MISSING` — an API key without `data:read` on the collection |
+
+Access is the row's: the route reads the entity through the caller's RLS-scoped driver first (a row in the trash included), and only then the history table.
 
 ### Revert to a Historical Version
 
@@ -195,21 +198,21 @@ No request body is needed. The server fetches the stored `values` from the histo
 
 ```json
 {
-    "data": {
-        "id": "42",
-        "values": { "name": "Widget", "price": 19.99, "status": "draft" }
-    },
+    "data": { "id": 42, "name": "Widget", "price": 19.99, "status": "draft" },
     "meta": {
         "reverted_from": "abc-123"
     }
 }
 ```
 
+`data` is the saved row, flat, as the data API returns it. An entry recorded by an older version can hold keys the row has no column for (an `afterRead`-computed field, a relation stored as the admin's view of it); the revert leaves them out and names them in `meta.dropped_fields`.
+
 **Error Responses:**
 
 | Status | Condition |
 |--------|-----------|
-| `404` | Collection or history entry not found |
+| `404` | Collection, entity (or one the caller may not read) or history entry not found |
+| `403` | `SCOPE_MISSING` — an API key without `data:write` on the collection |
 | `400` | History not enabled for the collection |
 | `400` | History entry belongs to a different entity (cross-entity revert blocked) |
 | `400` | History entry has no stored values |
@@ -254,7 +257,7 @@ async function revertEntity(slug: string, entityId: string, historyId: string, t
         }
     );
     const result = await response.json();
-    // result.data — the reverted entity
+    // result.data — the reverted row, flat
     // result.meta.reverted_from — the history entry ID used
     return result;
 }
@@ -266,7 +269,7 @@ History entries are returned in **reverse chronological order** (newest first).
 
 | Parameter | Default | Maximum | Minimum |
 |-----------|---------|---------|---------|
-| `limit` | `20` | `100` | N/A (clamped with `Math.min`) |
+| `limit` | `20` | `100` (above it: `400 INVALID_LIMIT`, not clamped) | — |
 | `offset` | `0` | N/A | `0` (clamped with `Math.max`) |
 
 Use the `meta.hasMore` boolean in the response to determine if more pages are available:
@@ -316,7 +319,7 @@ CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_history_updated_at
     ON rebase.entity_history(updated_at);
 ```
 
-> **IMPORTANT FOR AGENTS:** The `rebase.entity_history` table is **auto-created** on server startup when history is enabled. You do NOT need to create it manually or include it in migrations. The `rebase` schema is also created automatically if it doesn't exist.
+> **IMPORTANT FOR AGENTS:** The `rebase.entity_history` table is **auto-created** on server startup when history is enabled. You do NOT need to create it manually or include it in migrations. The `rebase` schema is also created automatically if it doesn't exist. The exception is a server running with `REBASE_PROVISION=false`, which changes nothing in its database: it uses the table an earlier provisioning boot created, and where there is none, writes to a collection with `history: true` are refused.
 
 ### Storage Characteristics
 
@@ -402,6 +405,7 @@ import { getRequestListener } from "@hono/node-server";
 import { createServer } from "http";
 import { initializeRebaseBackend, loadEnv } from "@rebasepro/server";
 import { createPostgresAdapter } from "@rebasepro/server-postgres";
+import { defineCollection } from "@rebasepro/cms-types";
 import { defaultUsersCollection } from "@rebasepro/common";
 import dotenv from "dotenv";
 
@@ -412,29 +416,29 @@ const app = new Hono<HonoEnv>();
 const server = createServer(getRequestListener(app.fetch));
 
 // Collection with history enabled
-const productsCollection = {
+const productsCollection = defineCollection({
     slug: "products",
     name: "Products",
     table: "products",
     history: true,  // ← Per-collection opt-in
     properties: {
-        name: { type: "string" as const, name: "Name" },
-        price: { type: "number" as const, name: "Price" },
-        description: { type: "string" as const, name: "Description" },
+        name: { type: "string", name: "Name" },
+        price: { type: "number", name: "Price" },
+        description: { type: "string", name: "Description" },
     },
-};
+});
 
 // Collection WITHOUT history
-const logsCollection = {
+const logsCollection = defineCollection({
     slug: "logs",
     name: "Logs",
     table: "logs",
     // history: false (default) — high-volume tables shouldn't track history
     properties: {
-        message: { type: "string" as const, name: "Message" },
-        level: { type: "string" as const, name: "Level" },
+        message: { type: "string", name: "Message" },
+        level: { type: "string", name: "Level" },
     },
-};
+});
 
 await initializeRebaseBackend({
     app,
@@ -468,7 +472,7 @@ console.log(`Server running at http://localhost:${env.PORT}`);
 
 ### Storage Growth
 
-- Each history entry stores **full JSONB entities** of both current and previous values. For entities with large text fields or complex nested structures, this can grow quickly.
+- Each history entry stores the **full JSONB entity** in `values`; an update's `previous_values` adds only the changed fields (`format: 2`, since 0.25 — older entries hold the whole previous entity too). For entities with large text fields or complex nested structures, this can grow quickly.
 - Default retention limits: **200 entries per entity** and **90 days TTL**. Adjust these based on your use case.
 - All collections share the single `rebase.entity_history` table — monitor its size with:
 

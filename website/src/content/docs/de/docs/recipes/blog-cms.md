@@ -1,5 +1,5 @@
 ---
-sourceHash: fb83f7a9f5e95709
+sourceHash: ff3d56f359f32429
 title: "Rezept: Blog-CMS"
 sidebar_label: Blog-CMS
 description: Erstellen Sie ein vollständiges Blog-CMS mit Artikeln, Autoren, Kategorien, Rich-Text-Bearbeitung und Bild-Uploads.
@@ -56,6 +56,7 @@ export const authorsCollection = defineCollection({
     }
 });
 
+export default authorsCollection;
 ```
 
 ### Kategorien
@@ -94,12 +95,15 @@ export const categoriesCollection = defineCollection({
     }
 });
 
+export default categoriesCollection;
 ```
 
 ### Artikel
 
 ```typescript
 import { defineCollection } from "@rebasepro/cms-types";
+import authorsCollection from "./authors";
+import categoriesCollection from "./categories";
 // The row shape, so callbacks below see typed `values` instead of `unknown`.
 type Article = {
     title: string;
@@ -215,11 +219,14 @@ export const articlesCollection = defineCollection({
     }
 });
 
+export default articlesCollection;
 ```
 
 ## Einrichtung
 
-1. Speichern Sie die drei Dateien in `config/collections/`. Fügen Sie sie dem
+1. Speichern Sie die drei Dateien in `config/collections/` — `authors.ts`, `categories.ts`
+   und `articles.ts`; jede muss ihre Collection per Default-Export exportieren, sonst
+   verweigert der Bootvorgang das Verzeichnis. Fügen Sie sie dem
    `collections`-Array in `config/collections/index.ts` hinzu, um zu bestimmen,
    wo sie in der Navigation erscheinen — jede Datei im Verzeichnis wird in
    jedem Fall geladen.

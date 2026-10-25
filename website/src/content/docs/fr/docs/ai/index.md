@@ -1,5 +1,5 @@
 ---
-sourceHash: 289adf93a568aac7
+sourceHash: 9d4730f8239c48ed
 title: IA et agents
 sidebar_label: Aperçu
 description: Ce que Rebase fournit pour les assistants de code IA et les agents autonomes — un serveur MCP, des compétences d'agent locales au projet, des fichiers d'instructions échafaudés et le modèle d'identifiants qui détermine ce à quoi un agent peut réellement accéder.
@@ -10,8 +10,8 @@ problèmes différents. Il est utile de savoir lequel vous utilisez :
 
 | | Ce que c'est | Qui le consomme |
 |---|---|---|
-| [**Serveur MCP**](/docs/ai/mcp) | Un serveur Model Context Protocol stdio doté de 42 outils couvrant votre schéma, vos données, vos utilisateurs, votre stockage, vos crons et votre serveur de développement | Un assistant, au moment de l'exécution |
-| [**Compétences d'agent**](/docs/ai/skills) | 21 fichiers de compétences Markdown écrits dans votre dépôt par `rebase skills install` | Un assistant, comme documentation de référence |
+| [**Serveur MCP**](/docs/ai/mcp) | Un serveur Model Context Protocol stdio doté de 44 outils couvrant votre schéma, vos données, vos utilisateurs, votre stockage, vos crons et votre serveur de développement | Un assistant, au moment de l'exécution |
+| [**Compétences d'agent**](/docs/ai/skills) | 23 fichiers de compétences Markdown écrits dans votre dépôt par `rebase skills install` | Un assistant, comme documentation de référence |
 | [**Fichiers d'instructions**](/docs/ai/instruction-files) | `ai-instructions.md` ainsi que des fichiers de pointeurs spécifiques à chaque assistant, générés par `rebase init` | Un assistant, comme règles permanentes |
 | [**Clés d'API**](/docs/backend/api-keys) | Identifiants machine qui détiennent des [portées](/docs/backend/roles-and-scopes), par collection et par opération | Tout ce qui appelle l'API HTTP |
 
@@ -92,5 +92,5 @@ d'un mécanisme distinct et les deux n'interagissent pas.
 ## Où aller ensuite
 
 - [Serveur MCP](/docs/ai/mcp) — connecter Claude Code, Cursor ou n'importe quel client MCP
-- [Compétences d'agent](/docs/ai/skills) — `rebase skills install` et les 21 compétences
+- [Compétences d'agent](/docs/ai/skills) — `rebase skills install` et les 23 compétences
 - [Fichiers d'instructions pour l'IA](/docs/ai/instruction-files) — le modèle de règles échafaudées

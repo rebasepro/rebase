@@ -1,5 +1,5 @@
 ---
-sourceHash: e6d2447955c86775
+sourceHash: 96a224ca982e3d25
 title: Rôles et portées
 sidebar_label: Rôles et portées
 description: "Ce qu'un appelant peut faire : le plan des données que détient chaque personne, le plan d'administration que les rôles accordent, les portées qu'une application déclare pour elle-même, et la façon dont chaque identifiant les porte."
@@ -252,10 +252,10 @@ Pour les clés :
 
 Pour les comptes, un détenteur de `users:write` :
 
-- ne peut pas modifier, réinitialiser ou supprimer un compte qui détient un rôle ou une portée
-  qu'il ne détient pas : `403 ACCOUNT_OUTRANKS_CALLER`. Sans cela, un rôle de support pourrait
+- ne peut pas modifier, réinitialiser ou supprimer un compte dont les rôles détiennent une portée
+  qu'il ne détient pas, ou `admin` s'il n'est pas administrateur : `403 ACCOUNT_OUTRANKS_CALLER`. Sans cela, un rôle de support pourrait
   réinitialiser le mot de passe d'un administrateur et se connecter à sa place.
-- ne peut pas accorder des rôles qui détiennent plus que lui : `403 ROLE_EXCEEDS_CALLER`.
+- ne peut pas accorder des rôles qui détiennent plus que lui, `admin` compris : `403 ROLE_EXCEEDS_CALLER`.
 
 ## Comment chaque identifiant détient des portées
 

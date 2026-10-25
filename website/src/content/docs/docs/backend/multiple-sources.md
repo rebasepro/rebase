@@ -41,9 +41,8 @@ signups.subscription("send-welcome", async (event) => {
 });
 ```
 
-`queue()` is new. `database()`, `bucket()` and `topic()`
-have been declarable since 0.17, so a project on the released version declares
-those three and reaches background work through `jobs.tasks` instead.
+`database()`, `bucket()` and `topic()` have been declarable since 0.17, and
+`queue()` since 0.18.
 
 Then point a collection at one, by handle — the same name, spelled once:
 
@@ -68,7 +67,7 @@ import { media } from "../resources";
 coverImage: {
     name: "Cover image",
     type: "string",
-    storage: { storageSource: media, acceptedFiles: ["image/*"] }
+    storage: { storagePath: "covers", storageSource: media, acceptedFiles: ["image/*"] }
 }
 ```
 
@@ -235,7 +234,7 @@ The engine comes from the declaration, so there is no `STORAGE_TYPE` to set.
 A storage property that names no `storageSource` writes to the **default**
 bucket. Declaring named buckets never moves it. The default keeps its own
 configuration whatever `config/resources.ts` declares: `STORAGE_TYPE`,
-`STORAGE_PATH` (`./uploads` when unset), and the unsuffixed `S3_*` / `GCS_*`
+`STORAGE_PATH` (`<project>/uploads` when unset), and the unsuffixed `S3_*` / `GCS_*`
 variables. Adding `bucket("media", { engine: "s3" })` to a project that already
 has files in `./uploads` leaves them where they are and still served. `media`
 reads its own `__MEDIA` variables and, in development, stands in as its own
@@ -302,8 +301,8 @@ await signups.publish({ userId });
 ```
 
 A queue is the other shape of background work: a work list with **one
-handler**, where the caller holds the job's id. Queues are new
- — topics shipped in 0.17.
+handler**, where the caller holds the job's id. Queues shipped in 0.18,
+topics in 0.17.
 
 ```ts
 export const thumbnails = queue<{ key: string }>("thumbnails");
@@ -384,8 +383,8 @@ export const storageAuthorize: StorageAuthorize = async ({ key, user, operation 
 
 Two environment escapes exist for the cases where that really is the model:
 
-- `STORAGE_PUBLIC_READ=true` — the bucket is a public, read-only CDN. Writes,
-  deletes and listing still require authentication.
+- `STORAGE_PUBLIC_READ=true` — the bucket is a public, read-only CDN. Without a
+  `storageAuthorize` hook, writes, deletes and listing are for admins only.
 - `STORAGE_ALLOW_ANY_AUTHENTICATED=true` — every signed-in user is trusted with
   every file. Defensible for a single-tenant app, never for a multi-tenant one.
 

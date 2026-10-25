@@ -1,5 +1,5 @@
 ---
-sourceHash: cc1736a186791d89
+sourceHash: afd1a90c05fb48c3
 title: Configuración de Storage
 sidebar_label: Configuración de Storage
 description: Configura backends de sistema de archivos local, compatibles con S3 o GCS/Firebase Storage para subidas de archivos, imágenes y medios.
@@ -16,7 +16,7 @@ Rebase admite tres backends de almacenamiento (storage):
 ## Configuración
 
 :::note[Dónde va esto]
-**Runtime gestionado** — las variables `STORAGE_*` en `.env` (`STORAGE_TYPE`, `STORAGE_BUCKET` o `S3_BUCKET` / `GCS_BUCKET`, `STORAGE_PATH`, `STORAGE_PUBLIC_READ`, … — añade el sufijo `__<KEY>` a cualquiera de ellas para un origen con nombre), más una declaración `bucket("<key>")` en `config/resources.ts` para cada bucket además del predeterminado, y `export const storageAuthorize` desde `config/index.ts`. `storageAuthorize` no tiene una variante en variable de entorno a propósito: ninguna variable puede expresar "este usuario puede leer esta clave".
+**Runtime gestionado** — las variables `STORAGE_*` en `.env` (`STORAGE_TYPE`, `S3_BUCKET` / `GCS_BUCKET`, `STORAGE_PATH`, `STORAGE_PUBLIC_READ`, … — añade el sufijo `__<KEY>` a cualquiera de ellas para un origen con nombre), más una declaración `bucket("<key>")` en `config/resources.ts` para cada bucket además del predeterminado, y `export const storageAuthorize` desde `config/index.ts`. `storageAuthorize` no tiene una variante en variable de entorno a propósito: ninguna variable puede expresar "este usuario puede leer esta clave".
 
 **Ejected** — el bloque `storage` en `initializeRebaseBackend({ … })`. `storagePolicies` y `storageTriggers` son exclusivos del modo ejected.
 
@@ -99,7 +99,7 @@ image: {
 
 | Método | Ruta | Descripción |
 |--------|------|-------------|
-| `POST` | `/api/storage/upload` | Subida directa de archivos, un único cuerpo `multipart/form-data`: `file` (obligatorio); `key`, la clave del objeto, carpetas incluidas (`author_pictures/ada.jpg`), si no el nombre del archivo en la raíz; `bucket`, si no el bucket por defecto; `storageId`; y `metadata_<name>` para metadatos personalizados. Cualquier otro campo se ignora: no existe un campo `path` |
+| `POST` | `/api/storage/upload` | Subida directa de archivos, un único cuerpo `multipart/form-data`: `file` (obligatorio); `key`, la clave del objeto, carpetas incluidas (`author_pictures/ada.jpg`), si no el nombre del archivo en la raíz; `bucket`, si no el bucket por defecto; `storageId`; `collection` y `property`, que limitan el archivo al `maxSize` y los `acceptedFiles` de esa propiedad; y `metadata_<name>` para metadatos personalizados. Cualquier otro campo se ignora: no existe un campo `path` |
 | `POST` | `/api/storage/upload?storageId=<key>` | Subida a un backend específico con nombre |
 | `GET` | `/api/storage/file/*` | Recuperar un archivo — todo lo que sigue a `/file/` es la clave del objeto |
 | `GET` | `/api/storage/file/*?storageId=<key>` | Recuperar un archivo desde un backend específico |
@@ -362,8 +362,8 @@ Enruta una propiedad a un origen con `storageSource`:
 ```ts
 {
     name: "Cover",
-    dataType: "string",
-    storage: { storageSource: "media", acceptedFiles: ["image/*"] }
+    type: "string",
+    storage: { storagePath: "covers", storageSource: "media", acceptedFiles: ["image/*"] }
 }
 ```
 
@@ -401,7 +401,7 @@ de modo que un origen puede cambiar de proveedor sin afectar a los demás.
 
 ## Orígenes de almacenamiento en el Frontend
 
-Al usar múltiples backends de almacenamiento, pasa `storageSources` al proveedor `<Rebase>` para que el frontend sepa cómo enrutar las subidas directamente:
+El frontend conoce los orígenes del servidor a través de `GET /api/storage/sources`, por lo que un origen `server` no necesita ninguna entrada. Pasa `storageSources` al proveedor `<Rebase>` para un origen `direct`, que sube directamente a su proveedor, o para definir tú mismo una etiqueta o un transporte:
 
 ```tsx
 import { Rebase } from "@rebasepro/app";
@@ -420,7 +420,7 @@ import { Rebase } from "@rebasepro/app";
 </Rebase>
 ```
 
-El `key` de cada origen debe coincidir con una clave de backend registrada en el mapa `storage` del servidor. El contexto de React `StorageSourcesContext` resuelve el origen activo para cada campo de subida.
+El `key` de un origen `server` debe coincidir con una clave de backend registrada en el mapa `storage` del servidor. El contexto de React `StorageSourcesContext` resuelve el origen activo para cada campo de subida.
 
 ## Caché y CDNs
 
@@ -458,8 +458,7 @@ storagePolicies: [
 ]
 ```
 
-**Cualquier clave que no coincida con ninguna política es rechazada.** Cada ampliación de permisos es una línea explícita,
-y cualquier error deniega el acceso en lugar de concederlo.
+**Cualquier clave que no coincida con ninguna política es rechazada**, a menos que un hook `storageAuthorize` la permita: el hook solo se consulta cuando ninguna política coincidió, y ninguno de los dos puede restringir al otro. Cada ampliación de permisos es una línea explícita, y cualquier error deniega el acceso en lugar de concederlo.
 
 Los patrones coinciden **por segmento, nunca por subcadena** — `public/**` no coincide con
 `publicity/secret.png`:
@@ -533,7 +532,7 @@ Aspectos importantes a tener en cuenta:
 - **Una ruta es pública cuando la clave que nombra lo es.** El prefijo `public/` se evalúa sobre la clave canónica que sirve la ruta —después de extraer el segmento de bucket `default/` inicial y de simplificar `//`, `./` y una `/` inicial—, nunca sobre la URL tal como fue escrita. `/api/storage/file/notes://public/x.txt` nombra la clave privada `notes:/public/x.txt`, y la clave `default/public/x.txt` (a la que se accede como `/api/storage/file/default/default/public/x.txt`) reside en una carpeta llamada `default`; ninguna de ellas es pública. En un hook, evalúa la `key` recibida mediante `isPublicStorageKey` de `@rebasepro/types` — `isPublicStoragePath` interpreta una ruta o URL del lado del cliente, y consideraría ambas como públicas.
 - **`list` se restringe según el prefijo.** Listar es la forma de descubrir claves que nadie te comunicó.
 - **Las subidas reanudables (TUS) se restringen al momento de creación**, de modo que una subida rechazada no deja archivos temporales.
-- Omitir el hook preserva el comportamiento previo, por lo que las aplicaciones single-tenant no se ven afectadas.
+- Omitir el hook (y `storagePolicies`) no deja ninguna comprobación por objeto, por lo que producción se niega a arrancar a menos que se defina `storagePublicRead` o `storageInsecureAllowAnyAuthenticated`.
 
 ### Claves de API y tokens
 

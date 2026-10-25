@@ -1,5 +1,5 @@
 ---
-sourceHash: 6cb1ed423c284379
+sourceHash: 87b274f81d5501d1
 title: Applications et dépôts
 sidebar_label: Apps & dépôts
 description: Un projet est un backend accompagné des applications qui communiquent avec lui, chacune pouvant résider dans son propre dépôt.
@@ -153,7 +153,7 @@ Dans l'exemple, les deux applications sont sur `/`, donc sur `admin.example.com`
 
 Le backend n'est pas une application, et un nom d'hôte ne le déplace pas. `/api`, `/health` et les autres chemins réservés par le backend reçoivent une réponse avant qu'aucune application ne soit consultée, sur tous les noms d'hôte ; `https://admin.example.com/api` est donc la même API que `https://example.com/api`. Une application qui appelle sa propre origine — le `VITE_API_URL` vide du scaffold — n'a besoin ni d'une URL d'API à elle ni d'aucun réglage CORS. Pour la même raison, ces chemins sont refusés après un nom d'hôte tout comme seuls : `https://admin.example.com/api` n'est pas plus valide que `/api`.
 
-Tout le reste de ce qui concerne `path` s'applique à la partie située après le nom d'hôte. L'application est toujours compilée pour elle : `https://admin.example.com` est compilé avec `REBASE_APP_BASE` à `/`, `https://admin.example.com/cms` avec `/cms`, et un bundler qui l'ignore donne toujours une page blanche. `cms` est un chemin sur le nom d'hôte de l'application, à l'intérieur de cette partie chemin. L'URL doit commencer par `https://` et contenir un nom d'hôte et un chemin, rien d'autre — ni port, ni query, ni fragment. Un `admin.example.com` seul est refusé, avec l'URL qu'il aurait dû être.
+Tout le reste de ce qui concerne `path` s'applique à la partie située après le nom d'hôte. L'application est toujours compilée pour elle : `https://admin.example.com` est compilé avec `REBASE_APP_BASE` à `/`, `https://admin.example.com/cms` avec `/cms/`, et un bundler qui l'ignore donne toujours une page blanche. `cms` est un chemin sur le nom d'hôte de l'application, à l'intérieur de cette partie chemin. L'URL doit commencer par `https://` et contenir un nom d'hôte et un chemin, rien d'autre — ni port, ni query, ni fragment. Un `admin.example.com` seul est refusé, avec l'URL qu'il aurait dû être.
 
 Sous `rebase dev`, rien n'est routé par nom d'hôte. Il lance l'application de `frontend/` à la racine d'un port de localhost, comme toujours, et pour une application dotée d'un nom d'hôte sa bannière affiche aussi l'adresse `https://` qu'elle aura une fois déployée.
 
@@ -258,7 +258,7 @@ Séparer les dépôts a un inconvénient qui mérite d'être souligné : un chan
 Chaque SDK généré enregistre le schéma dont il est issu :
 
 ```ts
-// src/rebase/schema.meta.ts — generated
+// generated/sdk/schema.meta.ts — generated
 export const SCHEMA_VERSION = "v1:c5d97d0f96b7f87a";
 ```
 
@@ -266,7 +266,7 @@ Et chaque projet publie son schéma actuel, sans authentification, car un identi
 
 ```bash
 curl -s https://api.example.com/api/meta/schema-version
-# {"schemaVersion":"v1:c5d97d0f96b7f87a"}
+# {"schemaVersion":"v1:c5d97d0f96b7f87a","runtime":{"version":"0.25.1","contract":1}}
 ```
 
 Comparer les deux dans la CI transforme une incompatibilité silencieuse en un échec de vérification. L'identifiant change lorsque les types générés sont susceptibles de changer — une nouvelle propriété, une relation modifiée — et délibérément *pas* lorsqu'un hook, une règle de sécurité ou une icône change, évitant ainsi les fausses alertes.

@@ -68,11 +68,11 @@ sobrevive a reinicios y redespliegues: una tarea pausada en Studio sigue pausada
 imprimió `rebase dev`; consulta la [API REST](/docs/backend/cron-jobs-api/).
 
 ```bash
-# Pausar, para todos los procesos, hasta que alguien la reanude
+# Pause, for every process, until someone resumes it
 curl -X PUT -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
     -d '{ "enabled": false }' "$API_URL/api/admin/cron/health-check"
 
-# Dejar de sobrescribir: volver a seguir el `enabled` que declara el archivo de la tarea
+# Stop overriding: follow the `enabled` the job's file declares again
 curl -X PUT -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
     -d '{ "enabled": null }' "$API_URL/api/admin/cron/health-check"
 ```

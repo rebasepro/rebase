@@ -1,5 +1,5 @@
 ---
-sourceHash: 7f10dbaa07451bc9
+sourceHash: 4b28c5fe78adb3d0
 title: Database e Bucket Multipli
 sidebar_label: Sorgenti Multiple
 description: Indirizza le collection a database diversi e le proprietà a bucket di archiviazione diversi, configurando ciascuno dall'ambiente.
@@ -36,7 +36,7 @@ signups.subscription("send-welcome", async (event) => {
 });
 ```
 
-`queue()` è nuovo. `database()`, `bucket()` e `topic()` sono dichiarabili dalla versione 0.17, quindi un progetto sulla versione rilasciata dichiara questi tre e gestisce i processi in background tramite `jobs.tasks`.
+`database()`, `bucket()` e `topic()` sono dichiarabili dalla versione 0.17, e `queue()` dalla 0.18.
 
 Quindi punta una collection a una risorsa, tramite l'handle — lo stesso nome, scritto una sola volta:
 
@@ -61,7 +61,7 @@ import { media } from "../resources";
 coverImage: {
     name: "Cover image",
     type: "string",
-    storage: { storageSource: media, acceptedFiles: ["image/*"] }
+    storage: { storagePath: "covers", storageSource: media, acceptedFiles: ["image/*"] }
 }
 ```
 
@@ -184,7 +184,7 @@ L'engine viene ricavato dalla dichiarazione, quindi non c'è alcun `STORAGE_TYPE
 
 Una proprietà di storage che non specifica alcuna `storageSource` scrive nel bucket di **default**.
 Dichiarare bucket con nome non lo sposta mai. Il default mantiene la propria configurazione
-qualunque cosa dichiari `config/resources.ts`: `STORAGE_TYPE`, `STORAGE_PATH` (`./uploads`
+qualunque cosa dichiari `config/resources.ts`: `STORAGE_TYPE`, `STORAGE_PATH` (`<project>/uploads`
 quando non è impostato) e le variabili `S3_*` / `GCS_*` senza suffisso. Aggiungere
 `bucket("media", { engine: "s3" })` a un progetto che ha già file in `./uploads` li lascia
 dove sono e ancora serviti. `media` legge le proprie variabili `__MEDIA` e, in sviluppo, fa le
@@ -237,7 +237,7 @@ Un topic viene distribuito tramite la coda di job persistente (durable job queue
 await signups.publish({ userId });
 ```
 
-Una coda è l'altra forma di elaborazione in background: un elenco di lavoro con **un solo gestore (handler)**, in cui il chiamante detiene l'id del job. Le code sono una novità — i topic sono stati introdotti nella versione 0.17.
+Una coda è l'altra forma di elaborazione in background: un elenco di lavoro con **un solo gestore (handler)**, in cui il chiamante detiene l'id del job. Le code sono state introdotte nella versione 0.18, i topic nella 0.17.
 
 ```ts
 export const thumbnails = queue<{ key: string }>("thumbnails");
@@ -292,7 +292,7 @@ export const storageAuthorize: StorageAuthorize = async ({ key, user, operation 
 
 Esistono due vie d'uscita (escape hatch) tramite variabili d'ambiente per i casi in cui questo sia effettivamente il modello desiderato:
 
-- `STORAGE_PUBLIC_READ=true` — il bucket è un CDN pubblico di sola lettura. Scritture, eliminazioni e listing richiedono comunque l'autenticazione.
+- `STORAGE_PUBLIC_READ=true` — il bucket è un CDN pubblico di sola lettura. Senza un hook `storageAuthorize`, scritture, eliminazioni e listing sono riservati agli admin.
 - `STORAGE_ALLOW_ANY_AUTHENTICATED=true` — ogni utente autenticato è autorizzato su ogni file. Difendibile per un'app a tenant singolo, mai per una multi-tenant.
 
 ## Storage in produzione

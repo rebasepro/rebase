@@ -1,5 +1,5 @@
 ---
-sourceHash: b0d41379c997dc49
+sourceHash: 7745e401ff93e847
 title: Globale Backend-Hooks
 sidebar_label: Globale Hooks
 description: Wenden Sie querschnittliche Lifecycle-Callbacks auf Serverebene mithilfe von CollectionCallbacks auf jede Collection an.
@@ -95,13 +95,13 @@ Jeder Callback erhält ein einzelnes Props-Objekt. Gemeinsame Felder:
 | `collection` | `CollectionConfig` | Allen Callbacks |
 | `path` | `string` | Allen Callbacks |
 | `row` | `Record<string, unknown>` | `afterRead`, `beforeDelete`, `afterDelete` |
-| `id` | `string` | `beforeSave` (optional), `afterSave`, `afterSaveError`, `beforeDelete`, `afterDelete` |
+| `id` | `string \| number` | `beforeSave` (optional), `afterSave`, `afterSaveError` (optional), `beforeDelete`, `afterDelete` |
 | `values` | `EntityValues` | `beforeSave`, `afterSave`, `afterSaveError` |
 | `previousValues` | `EntityValues` (optional) | `beforeSave`, `afterSave`, `afterSaveError` |
-| `status` | `"new" \| "existing"` | `beforeSave`, `afterSave`, `afterSaveError` |
+| `status` | `"new" \| "existing" \| "copy"` | `beforeSave`, `afterSave`, `afterSaveError` |
 | `context` | `RebaseCallContext` | Allen Callbacks |
 
-`context.user` enthält den authentifizierten Benutzer (`uid`, `roles` usw.) oder ist bei öffentlichen Anfragen `undefined`.
+`context.user` enthält den authentifizierten Benutzer (`uid`, `roles` usw.). Eine Anfrage ohne Token, wo die API sie zulässt, trägt die anonyme Identität `{ uid: "anonymous", roles: ["anon"] }` statt `undefined`.
 
 `collection` ist immer vorhanden. Ein globaler Callback wird für jede Collection ausgelöst, ist also
 die einzige Ebene, die unabhängig von einer bestimmten Collection registriert wird – dennoch wird ihm
@@ -155,6 +155,14 @@ zusammen committet oder gar nicht.
 - **`afterSave`, `afterDelete`** — Werden *vor* dem Commit ausgeführt und abgewartet. Ein Fehler (throw) an dieser Stelle rollt die Zeile zurück und antwortet ebenfalls mit **400 `CALLBACK_REJECTED`**, wobei `details.stage` den Hook benennt. Sie halten die Transaktion während ihrer Ausführung offen; ein langsamer Hook blockiert somit Sperren (Locks).
 - **`afterSaveError`** — Wird ausgeführt, wenn das Speichern fehlgeschlagen ist, auf dem Rückweg. Bei einem Request läuft er, nachdem die Transaktion des fehlgeschlagenen Schreibvorgangs zurückgerollt wurde, mit einem `context`, dessen Aufrufe jeweils eine eigene Transaktion sind, sodass ein Job, den er einreiht, um den Fehler zu melden, erhalten bleibt. Ein Fehler (throw) aus ihm wird protokolliert; der Aufrufer erhält den eigenen Fehler des Speichervorgangs.
 
+:::caution[Diese Seite besagte früher das Gegenteil]
+Frühere Versionen besagten, dass `afterSave` und `afterDelete` „nach dem Commit der Transaktion ausgeführt werden“
+und „die HTTP-Antwort nicht blockieren“. Beides war nie der Fall. Code, der
+auf Basis dieser Aussage geschrieben wurde – etwa ein Webhook-Aufruf in `afterSave` –, hielt
+eine Datenbanktransaktion für die Dauer eines HTTP-Roundtrips offen
+und rollte die Zeile jedes Mal zurück, wenn die Gegenstelle nicht erreichbar war.
+:::
+
 ### Wann `afterSaveError` ausgeführt wird
 
 Er meldet einen Speichervorgang, der **auf Datenbankebene oder danach** fehlgeschlagen ist — ab dem INSERT- oder UPDATE-Statement. Ein Speichervorgang, der vor diesem Punkt abgelehnt wurde, hat die Datenbank nie erreicht, daher wird der Hook darüber nicht informiert.
@@ -168,14 +176,6 @@ Er meldet einen Speichervorgang, der **auf Datenbankebene oder danach** fehlgesc
 | | Ein Löschvorgang — dafür gibt es kein Gegenstück |
 
 Bei einem Bulk- oder `_batch`-Schreibvorgang wird er für die Zeile ausgeführt, die fehlgeschlagen ist; die Zeilen davor werden mit dem Batch zurückgerollt und nicht gemeldet.
-
-:::caution[Diese Seite besagte früher das Gegenteil]
-Frühere Versionen besagten, dass `afterSave` und `afterDelete` „nach dem Commit der Transaktion ausgeführt werden“
-und „die HTTP-Antwort nicht blockieren“. Beides war nie der Fall. Code, der
-auf Basis dieser Aussage geschrieben wurde – etwa ein Webhook-Aufruf in `afterSave` –, hielt
-eine Datenbanktransaktion für die Dauer eines HTTP-Roundtrips offen
-und rollte die Zeile jedes Mal zurück, wenn die Gegenstelle nicht erreichbar war.
-:::
 
 ### Seiteneffekte, die die Transaktion nicht blockieren dürfen
 

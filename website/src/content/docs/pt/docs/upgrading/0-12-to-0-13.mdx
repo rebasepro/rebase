@@ -1,5 +1,5 @@
 ---
-sourceHash: 4bf1765ebe335262
+sourceHash: a06dcf9dc5b9440c
 slug: pt/docs/upgrading/0-12-to-0-13
 title: Atualizando de 0.12 para 0.13
 sidebar_label: 0.12 → 0.13
@@ -399,7 +399,7 @@ Apenas caminhos de importação — nenhum comportamento foi alterado com eles.
 | `@rebasepro/mcp-server` | `@rebasepro/mcp` |
 | `@rebasepro/plugin-data-enhancement` | `@rebasepro/plugin-ai` |
 
-Inalterados: `types`, `utils`, `common`, `client`, `admin`, `admin`, `studio`,
+Inalterados: `types`, `utils`, `common`, `client`, `ui`, `admin`, `studio`,
 `cli`, `plugin-insights`.
 
 Os nomes descontinuados foram marcados como deprecated no npm, portanto a instalação
@@ -410,7 +410,7 @@ Além disso, **`@rebasepro/auth` foi removido**. `useRebaseAuthController`,
 `@rebasepro/app`, ao lado dos componentes `RebaseAuth` e `LoginView` com os quais
 são utilizados.
 
-**`RebaseCMS` agora é `RebaseCMS`.** `mode: "cms"` em `RebaseBackendConfig` permanece
+**`RebaseCMS` agora é `RebaseAdmin`** (e volta a ser `RebaseCMS` na [0.17](/docs/upgrading/0-14-to-0-17/)). `mode: "cms"` em `RebaseBackendConfig` permanece
 inalterado — descreve de onde vêm as coleções, não a UI.
 
 ---

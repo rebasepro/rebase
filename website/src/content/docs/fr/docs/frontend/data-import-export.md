@@ -1,5 +1,5 @@
 ---
-sourceHash: 0b96e438f37a5cac
+sourceHash: 70ff1f5bc92ce503
 title: Import et export de données
 sidebar_label: Import et export de données
 description: Importez des données depuis des fichiers CSV, JSON et Excel dans vos collections, et exportez les données de vos collections au format CSV ou JSON avec des champs calculés optionnels.
@@ -9,7 +9,7 @@ description: Importez des données depuis des fichiers CSV, JSON et Excel dans v
 
 Rebase inclut des outils intégrés d'importation et d'exportation de données accessibles directement depuis le panneau d'administration. L'importation prend en charge les fichiers CSV, JSON et Excel avec un assistant de mappage de colonnes. L'exportation prend en charge les formats CSV et JSON avec des champs calculés optionnels.
 
-Les deux fonctionnalités sont disponibles sur chaque collection. L'exportation peut être configurée par collection avec des champs calculés ; aucune des deux ne peut être désactivée par collection.
+Les deux fonctionnalités sont disponibles sur chaque collection. L'exportation peut être configurée par collection avec des champs calculés, ou désactivée avec `exportable: false` ; l'importation ne peut pas être désactivée par collection.
 
 ## Importer des données
 
@@ -103,7 +103,7 @@ Tous les filtres actifs dans la vue de la collection sont appliqués à l'export
 
 ### Configuration de l'exportation
 
-L'exportation est disponible sur chaque collection. `admin.exportable` permet de la configurer : fournissez-lui un `ExportConfig` pour ajouter des colonnes calculées, comme indiqué ci-dessous. Le type accepte également un booléen, mais rien ne le lit — `exportable: false` ne supprime pas le bouton **Export**.
+L'exportation est disponible sur chaque collection, sauf si vous la désactivez. `admin.exportable` permet de la configurer : `exportable: false` supprime le bouton **Export**, et un `ExportConfig` le conserve et ajoute des colonnes calculées, comme indiqué ci-dessous.
 
 ### Ajouter des champs calculés
 

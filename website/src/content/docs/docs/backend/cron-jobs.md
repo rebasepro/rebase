@@ -157,8 +157,8 @@ interface CronJobDefinition {
     // loads rather than read as local time.
     timezone?: string;
 
-    // Human-readable name shown in Studio
-    name: string;
+    // Human-readable name shown in Studio (default: the job id, the file's name)
+    name?: string;
 
     // Optional description shown in Studio
     description?: string;
@@ -369,7 +369,7 @@ runs beside a scheduled run are on [Cron across instances](/docs/backend/cron-ac
   `Error: Cron job "<id>" timed out after <N>ms`
   The abort is the half that stops the *work*; the rejection only stops the scheduler waiting. A handler that ignores `ctx.signal` keeps running past its own run.
 - **Shutdown**: `backend.shutdown()` waits for a run in flight, within the same budget as the job queue (two-thirds of the shutdown timeout). A run still going when it runs out has `ctx.signal` aborted and is recorded as failed, with the reason. Its slot stays claimed, so no other instance re-runs it.
-- **Fail-Safe Try/Catch**: Each job handler runs inside an isolated wrapper. Any uncaught exceptions are intercepted, formatting the error traceback into a string, setting the job status to `"error"`, and updating the job's failure counter. A crash inside a single cron task will never crash the scheduler loop or the primary Hono HTTP web server.
+- **Fail-Safe Try/Catch**: Each job handler runs inside an isolated wrapper. Any uncaught exceptions are intercepted, recording the error's message (redacted) as a string, setting the job status to `"error"`, and updating the job's failure counter. A crash inside a single cron task will never crash the scheduler loop or the primary Hono HTTP web server.
 - **In-Memory Ring Buffer**: The scheduler maintains a ring buffer containing the last **50 runs** per job. This buffer is kept in memory to allow near-instant reads from Rebase Studio.
 
 ---
@@ -388,7 +388,7 @@ CREATE TABLE IF NOT EXISTS rebase.cron_logs (
     finished_at  TIMESTAMPTZ NOT NULL,
     duration_ms  INTEGER NOT NULL,
     success      BOOLEAN NOT NULL DEFAULT true,
-    error        TEXT,                                 -- Stack trace or error message
+    error        TEXT,                                 -- The error's message, redacted
     result       JSONB,                                -- Return value of handler
     logs         JSONB,                                -- Ring buffer array of ctx.log outputs
     manual       BOOLEAN NOT NULL DEFAULT false        -- True if triggered from Studio/REST

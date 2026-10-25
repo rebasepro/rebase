@@ -19,10 +19,10 @@ Properties define the columns in your database table and how they are rendered i
 
 | Type | Description | PostgreSQL Column |
 |------|-------------|-------------------|
-| `string` | Text, select, markdown, file upload, URL, email | `text` by default; `varchar`, `char` or `uuid` with `columnType` |
+| `string` | Text, select, markdown, file upload, URL, email | `text` by default; `varchar`, `char` or `uuid` with `columnType`; a Postgres enum type (`<table>_<column>`) with `enum` |
 | `number` | Integer, decimal, currency | `integer`, `numeric`, `bigint`, `serial` |
 | `boolean` | True/false toggle | `boolean` |
-| `date` | Date, datetime, timestamp | `timestamp`, `date` |
+| `date` | Date, datetime, timestamp | `timestamptz` by default; `date` or `time` with `columnType` |
 | `array` | Ordered list of values | A native array (`text[]`, `integer[]`, `numeric[]`, `boolean[]`) when `of` is one string, number or boolean property; `jsonb` otherwise |
 | `map` | Key-value object | `jsonb` |
 | `geopoint` | Latitude/longitude pair | `jsonb` |
@@ -40,7 +40,7 @@ All property types share these options:
 | `type` | `string` | **Required.** Data type (see above) |
 | `name` | `string` | Display label. Defaults to the property key, prettified — `publishDate` → "Publish Date". Set it when that derivation is wrong: `"URL"` rather than "Url". |
 | `description` | `string` | Help text shown below the field |
-| `defaultValue` | `any` | Default value for new entities. A literal one — a string, number, boolean, date, enum id, or a `map`/`array` document — also becomes the column's `DEFAULT`, so a row inserted by anything that is not the admin panel (the REST API, a seed, `psql`) gets it too |
+| `defaultValue` | `any` | Default value for new entities. A literal one — a string, number, boolean, date, enum id, or a `map`/`array` document stored as JSON — also becomes the column's `DEFAULT`, so a row inserted by anything that is not the admin panel (the REST API, a seed, `psql`) gets it too |
 | `databaseDefault` | `boolean \| SqlExpression` | The database fills the column when a create leaves it empty: a `NOT NULL DEFAULT <expression>` column such as `gen_random_uuid()` or `nextval(…)`. A `required` field with it may be left out of a create, by the admin form and by the API, and a `null` sent on create is left to the database; it stays required on edit, and the generated `Insert` type makes it optional. Give the expression in the template form `isId` takes, ``databaseDefault: "sql`gen_random_uuid()`"``, and the schema planner writes it as the column's `DEFAULT`, so `rebase db push` keeps it. `true` declares a `DEFAULT` written elsewhere: the planner writes none, and `rebase db push` leaves the one the database holds as it is. "Import from table" and `rebase schema introspect` set the expression they read |
 | `validation` | `object` | Validation rules |
 | `propertyConfig` | `string` | Registered property config key |
@@ -88,9 +88,9 @@ price: {
 | `admin.hideFromCollection` | `boolean` | Hide from table view. Display only: a hidden relation property's related rows are still embedded in the list read (see [Relations](/docs/collections/relations)) |
 | `admin.columnWidth` | `number` | Column width in pixels (table view) |
 | `admin.span` | `1 \| 2 \| 3 \| 4` | Field width over the four-column form grid |
-| `admin.Field` | `React.ComponentType` | Custom field component |
-| `admin.Preview` | `React.ComponentType` | Custom table cell component |
-| `admin.Filter` | `React.ComponentType` | Custom filter field for this property. Wins over the collection-level `Collection.FilterField` override and the built-in per-type field |
+| `admin.Field` | `ComponentRef` | Custom field component |
+| `admin.Preview` | `ComponentRef` | Custom table cell component |
+| `admin.Filter` | `ComponentRef` | Custom filter field for this property. Wins over the collection-level `Collection.FilterField` override and the built-in per-type field |
 | `admin.filterOperators` | `WhereFilterOp[]` | Narrow the operators offered when filtering on this property. The offered set is the **intersection** of the engine's capabilities, the type's defaults and this list — you can only restrict, never add an operator the engine cannot run. `[]` disables filtering on the property |
 | `admin.customProps` | `unknown` | Anything your own `Field` or `Preview` needs. Rebase passes it through untouched |
 
@@ -261,7 +261,7 @@ locales: {
 | `userSelect` | `boolean` | Render as a user picker. The value is a plain string column holding the user id — nothing resolves or checks it on the way in. **Admin form only — not enforced by the API or the database.** The picker lists users' names, emails and avatars to anyone who may write the collection, through [`GET /api/admin/users/pick`](/docs/backend/auth-endpoints/), without the `users:read` scope. A collection whose write rules are raw SQL does not count, since they cannot be judged ahead: there only `users:read` holders can pick. |
 | `admin.previewAsTag` | `boolean` | Render this string as a tag in previews |
 | `admin.clearable` | `boolean` | Add an icon to clear the value (set to null) |
-| `admin.urlPreview` | `PreviewType` | How to render a string that holds a URL: a link, or an inline image, audio or video preview. Presentation only — whether the value *is* a URL is the `url` flag on the property, which is what the OpenAPI contract is generated from |
+| `admin.urlPreview` | `PreviewType \| boolean` | How to render a string that holds a URL: `true` for a link, or `"image"`, `"video"`, `"audio"` or `"file"` for an inline preview. Presentation only — whether the value *is* a URL is the `url` flag on the property, which is what the OpenAPI contract is generated from |
 
 ### Audit columns
 

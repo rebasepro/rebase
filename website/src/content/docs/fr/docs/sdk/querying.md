@@ -1,5 +1,5 @@
 ---
-sourceHash: dc64725d910c68e0
+sourceHash: aecc5f68b6d9adc0
 title: Interroger les données
 sidebar_label: Interroger les données
 description: Opérations CRUD, constructeur de requêtes fluide, opérateurs de filtrage, tri, sélection de colonnes et agrégats avec le SDK typé de Rebase.
@@ -410,7 +410,7 @@ const byCustomer = await client.data.orders.aggregate({
 byCustomer.meta; // { limit: 200, offset: 0, hasMore: true } — page on with offset: 200
 ```
 
-Le résultat reste un tableau de lignes ; `meta` en est une propriété non énumérable, de sorte qu'un spread ou un `JSON.stringify` ne voit que les lignes. Elle est présente chaque fois que les groupes ont été tronqués par un `limit`. Sans `groupBy`, il n'y a qu'une seule ligne, `limit` ne fait rien et `offset` est refusé. Dans une fonction serveur (`rebase.data`, `context.data`), un agrégat groupé sans `limit` renvoie chaque groupe. Sur la 0.23 il n'y a ni `meta` ni `offset`, si bien qu'une liste de groupes tronquée à la limite paraît complète. `include` n'est pas envoyé avec un agrégat : il n'a pas de relations à charger. Le SDK ne trie pas encore les groupes ; en HTTP, ils peuvent aussi être triés — voir [Agrégats et recherche](/docs/sdk/aggregates-and-search/).
+Le résultat reste un tableau de lignes ; `meta` en est une propriété non énumérable, de sorte qu'un spread ou un `JSON.stringify` ne voit que les lignes. Elle est présente chaque fois que les groupes ont été tronqués par un `limit`. Sans `groupBy`, il n'y a qu'une seule ligne, `limit` ne fait rien et `offset` est refusé. Dans une fonction serveur (`rebase.data`, `context.data`), un agrégat groupé sans `limit` renvoie chaque groupe. Sur la 0.23 il n'y a ni `meta` ni `offset`, si bien qu'une liste de groupes tronquée à la limite paraît complète. `include` n'est pas envoyé avec un agrégat : il n'a pas de relations à charger. Les groupes peuvent être triés avec `orderBy`, par une colonne de `groupBy` ou par la clé d'un agrégat — voir [Agrégats et recherche](/docs/sdk/aggregates-and-search/).
 
 Tout l'intérêt est de ne pas récupérer les lignes pour ensuite les réduire. « Le chiffre d'affaires par statut » sur un million de commandes correspond ici à une seule requête et une seule ligne par statut, contre un `findAll()` suivi d'une boucle ailleurs — ce qui s'avère erroné en présence d'un `limit` et hors de prix sans lui. Cela passe par le même gestionnaire limité à la requête que toutes les autres lectures, de sorte que la sécurité au niveau des lignes s'applique aux lignes agrégées.
 

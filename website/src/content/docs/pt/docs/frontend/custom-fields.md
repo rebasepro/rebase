@@ -1,5 +1,5 @@
 ---
-sourceHash: db02ecc36f64f46c
+sourceHash: af7e2ab87a0b3b4f
 title: Campos Personalizados
 sidebar_label: Campos Personalizados
 description: Crie campos de formulário personalizados para edição de entidades com acesso total ao contexto do formulário, valores da entidade e hooks do Rebase.
@@ -47,7 +47,7 @@ function ColorPickerField({ value, setValue, error, showError }: FieldProps<Stri
 | `property` | `Property` | A configuração da propriedade |
 | `context` | `FormContext` | Contexto completo do formulário com todos os valores da entidade |
 | `disabled` | `boolean` | O campo é somente leitura |
-| `tableMode` | `boolean` | Renderização dentro da planilha (modo compacto) |
+| `minimalistView` | `boolean` | Renderização no editor de células em popup da tabela (modo compacto) |
 
 ## Registrando um Campo Personalizado
 
@@ -80,8 +80,8 @@ properties: {
         type: "string",
         name: "Brand Color",
         admin: {
-            Field: () => import("../../../frontend/src/ColorPickerField"),
-            Preview: () => import("../../../frontend/src/ColorPreview")
+            Field: () => import("../../frontend/src/ColorPickerField"),
+            Preview: () => import("../../frontend/src/ColorPreview")
         }
     }
 }
@@ -145,12 +145,12 @@ function PriceWithTaxField({ value, setValue, context }: FieldProps<NumberProper
 
 ## Modo Tabela
 
-Ao renderizar na visualização de planilha, os campos devem ser compactos. Verifique `tableMode`:
+Um campo personalizado não é desenhado dentro de uma célula da tabela: a célula mostra o valor (ou o seu `Preview`), e editá-la abre o campo em um popup com `minimalistView` definido. Mantenha-o compacto ali:
 
 ```tsx
 function MyField({ value, setValue, minimalistView }: FieldProps<StringProperty>) {
     if (minimalistView) {
-        return <span onClick={() => { /* open editor */ }}>{value}</span>;
+        return <input value={value ?? ""} onChange={(e) => setValue(e.target.value)}/>;
     }
 
     return (
@@ -180,7 +180,7 @@ function ColorPreview({ value }: { value: string }) {
     );
 }
 
-// Registre-o
+// Register it
 properties: {
     color: {
         type: "string",

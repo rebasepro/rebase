@@ -24,7 +24,7 @@ The realtime pipeline has three stages:
 2. **Server fan-out** — The `RealtimeService` detects the change and fans out to every active WebSocket subscription matching the affected collection or entity.
 3. **Client callback** — The client SDK fires the registered `onUpdate` callback with fresh data.
 
-For multi-instance deployments, PostgreSQL `LISTEN/NOTIFY` broadcasts **row changes** across server instances via the `rebase_entity_changes` channel.
+For multi-instance deployments, PostgreSQL `LISTEN/NOTIFY` broadcasts **row changes** across server instances: on the `rebase_cdc` channel when database-level change capture is active (the default wherever the database role can create triggers), otherwise via the `rebase_entity_changes` channel.
 
 > **IMPORTANT FOR AGENTS:** That covers collection/entity subscriptions only. **Broadcast channels and presence are per-instance unless a channel bus is configured** — see [Multi-instance channels](#multi-instance-channels-and-presence). This is the single most likely cause of "collaboration works locally but not in production": behind a load balancer, two clients on different replicas see an empty room and nothing errors.
 
@@ -90,9 +90,9 @@ replacing the first key.
 The server validates the *shape* of `orderBy` when the subscribe frame arrives
 and answers a malformed one with an error frame (`INVALID_ORDER_BY`) instead of
 subscribing. This matters more here than on the REST route: a
-`collection_update` frame carries rows and nothing else — no `total`, no
-`hasMore` — so a subscriber handed rows in no particular order has no way to
-learn that its sort was dropped.
+`collection_update` frame carries rows and page metadata but nothing about how
+they were sorted, so a subscriber handed rows in no particular order has no way
+to learn that its sort was dropped.
 
 ### `listen()` Signature
 
@@ -138,7 +138,8 @@ const unsubscribe = client.data.products.listenById(
 listenById(
     id: string | number,
     onUpdate: (row: M | undefined) => void,
-    onError?: (error: Error) => void
+    onError?: (error: Error) => void,
+    options?: { include?: IncludeSpec }   // relations to load into the row
 ): () => void   // returns unsubscribe function
 ```
 
@@ -199,11 +200,11 @@ listen(
 ): () => void
 ```
 
-> **IMPORTANT FOR AGENTS:** The `.listen()` method on the query builder is only available when the `RebaseClient` is configured with a `websocketUrl`. If the WebSocket is not configured, calling `.listen()` throws: `"Listen is only available when RebaseClient is configured with a websocketUrl."`
+> **IMPORTANT FOR AGENTS:** `.listen()` (on the query builder and on the collection) needs a socket. Realtime is on by default and `websocketUrl` defaults to one derived from `baseUrl`, so this only bites a client created with `realtime: false`, or one whose `baseUrl` is relative outside a browser. There, calling `.listen()` throws a `RebaseClientError` with code `REALTIME_DISABLED`: `"Listen is only available when RebaseClient is configured with a websocketUrl, and not when it was created with realtime: false."`
 
 ## Update Delivery: Instant Patch + Correctness Refetch
 
-Every update a subscriber receives is a **debounced refetch under the subscriber's own scope**. When a row changes, the server waits out a 300ms debounce window (`REFETCH_DEBOUNCE_MS`), re-runs the subscription's query with its original filters and sort order *as that subscriber* (so RLS binds the reader, not the writer), and sends the result as `collection_update` (or `single_update` for a `listenById`). Multiple rapid mutations within the 300ms window are coalesced into a single database query.
+Every update a subscriber receives is a **debounced refetch under the subscriber's own scope**. When a row changes, the server waits out a 300ms debounce window (`REFETCH_DEBOUNCE_MS`), re-runs the subscription's query with its original filters and sort order *as that subscriber* (so RLS binds the reader, not the writer), and sends the result as `collection_update` (or `single_update` for a `listenById`). Multiple rapid mutations within the 300ms window are coalesced into a single database query. The window waits for 300ms without a further change, but never more than **1s** after the first one (`REALTIME_REFETCH_MAX_WAIT_MS` / `realtime.refetchMaxWaitMs`), so a collection written several times a second still sends a frame at least once a second.
 
 There used to be an instant row patch (`collection_patch`) ahead of the refetch. Nothing sends it any more: it carried the row as the *writer* had read it, which a subscriber the row's RLS hides could see. The type is still declared; do not wait for the frame.
 
@@ -218,7 +219,7 @@ The client SDK automatically deduplicates subscriptions:
 
 Deduplication keys are computed deterministically:
 - **Collection subscriptions:** JSON of every query field (`path`, `filter`, `logical`, `limit`, `offset`, `orderBy`, `searchString`, …) plus `collection.name`, with sorted keys.
-- **Row subscriptions:** `"${path}|${id}"`.
+- **Row subscriptions:** `"${path}|${id}"`, plus `|${JSON.stringify(include)}` when an `include` is given.
 
 ## WebSocket Protocol (Raw / Low-Level)
 
@@ -263,6 +264,7 @@ Auth error codes:
 |------|---------|
 | `INVALID_INPUT` | No token provided |
 | `INVALID_TOKEN` | Token is invalid or expired |
+| `SESSION_REVOKED` / `ACCOUNT_DISABLED` | Built-in auth: the session was signed out or revoked (or its account deleted), or the account is disabled |
 
 ### Subscribe to a Collection
 
@@ -326,6 +328,14 @@ ws.onmessage = (event) => {
             console.error("Error:", message.payload?.error?.message);
             console.error("Code:", message.payload?.error?.code);
             break;
+
+        case "error":
+            // A refused subscription or channel frame (INVALID_ORDER_BY,
+            // TOO_MANY_SUBSCRIPTIONS, CHANNEL_FORBIDDEN, …), addressed by
+            // `subscriptionId` or `channel`. `payload.error` is
+            // `{ message, code }`, or a bare string when there is no code.
+            console.error("Refused:", message.subscriptionId ?? message.channel, message.payload?.error);
+            break;
     }
 };
 ```
@@ -337,7 +347,7 @@ ws.onmessage = (event) => {
 | Type | Payload | Description |
 |------|---------|-------------|
 | `AUTHENTICATE` | `{ token }` | Authenticate the WebSocket session with a JWT |
-| `subscribe_collection` | `{ subscriptionId, path, filter?, orderBy?, order?, limit?, offset?, startAfter?, searchString? }` | Subscribe to collection changes |
+| `subscribe_collection` | `{ subscriptionId, path, filter?, logical?, orderBy?, order?, limit?, offset?, page?, startAfter?, searchString?, include?, fields? }` | Subscribe to collection changes |
 | `subscribe_one` | `{ subscriptionId, path, id }` | Subscribe to a single row |
 | `unsubscribe` | `{ subscriptionId }` | Unsubscribe from a subscription |
 | `join_channel` | `{ channel }` | Join a broadcast channel |
@@ -350,15 +360,16 @@ ws.onmessage = (event) => {
 | `FETCH_COLLECTION` | `{ path, filter?, orderBy?, limit?, offset?, … }` | One-shot collection fetch (request/response) |
 | `FETCH_ONE` | `{ path, id }` | One-shot row fetch |
 | `SAVE` | `{ path, id?, values, status }` | Create or update a row |
-| `DELETE` | `{ row: { id, path } }` | Delete a row |
+| `DELETE` | `{ row: { id, path }, hard? }` | Delete a row |
 | `COUNT` | `{ path, filter?, … }` | Count rows matching criteria |
 | `CHECK_UNIQUE_FIELD` | `{ path, name, value, id?, collection? }` | Check field uniqueness |
 
 > **IMPORTANT FOR AGENTS:** the one-shot operations are named `FETCH_ONE`,
 > `SAVE`, `DELETE` and `COUNT` — **not** `FETCH_ENTITY`, `SAVE_ENTITY`,
 > `DELETE_ENTITY` or `COUNT_ENTITIES`. The server's dispatch is a `switch` on the
-> exact string, so a wrong name is an unhandled message, not an error you can see.
-> The admin/studio surface adds `EXECUTE_SQL`, `FETCH_DATABASES`,
+> exact string, so a wrong name is answered with an `ERROR` frame coded
+> `UNKNOWN_MESSAGE_TYPE`, never with the result you wanted.
+> The admin/studio surface adds `EXECUTE_SQL`, `CANCEL_SQL`, `FETCH_DATABASES`,
 > `FETCH_CURRENT_DATABASE`, `FETCH_TABLE_METADATA`, `FETCH_UNMAPPED_TABLES`,
 > `FETCH_ROLES`, `FETCH_APPLICATION_ROLES`, `LIST_BRANCHES`, `CREATE_BRANCH` and
 > `DELETE_BRANCH`.
@@ -370,9 +381,13 @@ ws.onmessage = (event) => {
 | `AUTH_SUCCESS` | `{ requestId, payload: { uid, roles } }` | Authentication successful |
 | `AUTH_ERROR` | `{ requestId, payload: { error: { message, code } } }` | Authentication failed |
 | `collection_update` | `{ subscriptionId, rows, pks?, meta? }` | The subscription's rows, re-read under the subscriber's scope. `pks` names the key columns; `meta` carries `total`/`hasMore` |
-| `single_update` | `{ subscriptionId, row }` | A row subscription's row, or `null` if deleted |
+| `single_update` | `{ subscriptionId, row, etag? }` | A row subscription's row, or `null` if deleted. `etag` only when `subscribe_one` asked with `etag: true` |
 | `collection_patch` | `{ subscriptionId, id, row, pks? }` | Declared in the types, **sent by nothing** — every delivery is a refetch |
+| `error` | `{ subscriptionId?, channel?, payload: { error } }` | A refused subscription or channel frame (lowercase `type`). `error` is `{ message, code }`, or a bare string with no code |
 | `broadcast` | `{ channel, event, payload, seq? }` | Broadcast from another channel member. `seq` is present only on retained channels |
+| `broadcast_ack` | `{ channel, seq }` | Sent to the sender of a retained broadcast in place of its own message, only to a socket that opted into `channel_seq` |
+| `hello` | `{ capabilities, heartbeatMs?, clientId? }` | First frame to a socket that opened with `?rebase_caps=…` (`heartbeat`, `channel_seq`, `cancel_sql`), listing the ones honoured |
+| `heartbeat` | — | Every `heartbeatMs` (30s) to a socket that opted into `heartbeat` |
 | `presence_state` | `{ channel, presences }` | Full presence entity |
 | `presence_diff` | `{ channel, joins, leaves }` | Incremental presence update |
 | `channel_history` | `{ channel, messages, retained, latestSeq? }` | Retained messages a client missed. `retained: false` means the channel keeps no history |
@@ -391,7 +406,8 @@ ws.onmessage = (event) => {
 | `INVALID_INPUT` | Missing required field |
 | `INVALID_TOKEN` | JWT invalid or expired |
 | `UNAUTHORIZED` | Authentication required but session not authenticated |
-| `FORBIDDEN` | Admin access required for this operation |
+| `SCOPE_MISSING` | The session lacks the scope the frame needs (`database:read` / `database:write` for the admin-plane types; `data:*` for an API key) |
+| `UNKNOWN_MESSAGE_TYPE` | The `type` is not one the server handles |
 | `RATE_LIMITED` | Too many requests (see Rate Limiting) |
 | `INTERNAL_ERROR` | Unexpected server error |
 | `NOT_SUPPORTED` | Operation not available for this driver |
@@ -399,19 +415,21 @@ ws.onmessage = (event) => {
 
 ### Admin-Only Message Types
 
-These message types require the authenticated user to have the `admin` role:
+These message types run outside RLS and need a scope, refused with `SCOPE_MISSING` otherwise. The `admin` role holds both scopes; another role holds them only when the access model grants them:
 
-| Type | Description |
-|------|-------------|
-| `EXECUTE_SQL` | Execute raw SQL |
-| `FETCH_DATABASES` | List available databases |
-| `FETCH_ROLES` | List available roles |
-| `FETCH_UNMAPPED_TABLES` | List tables not mapped to collections |
-| `FETCH_TABLE_METADATA` | Get column/FK metadata for a table |
-| `FETCH_CURRENT_DATABASE` | Get the current database name |
-| `CREATE_BRANCH` | Create a database branch |
-| `DELETE_BRANCH` | Delete a database branch |
-| `LIST_BRANCHES` | List all database branches |
+| Type | Scope | Description |
+|------|-------|-------------|
+| `EXECUTE_SQL` | `database:write` | Execute raw SQL |
+| `CANCEL_SQL` | `database:write` | Stop this socket's in-flight `EXECUTE_SQL` console run |
+| `FETCH_DATABASES` | `database:read` | List available databases |
+| `FETCH_ROLES` | `database:read` | List available roles |
+| `FETCH_APPLICATION_ROLES` | `database:read` | List the roles held by application users |
+| `FETCH_UNMAPPED_TABLES` | `database:read` | List tables not mapped to collections |
+| `FETCH_TABLE_METADATA` | `database:read` | Get column/FK metadata for a table |
+| `FETCH_CURRENT_DATABASE` | `database:read` | Get the current database name |
+| `CREATE_BRANCH` | `database:write` | Create a database branch |
+| `DELETE_BRANCH` | `database:write` | Delete a database branch |
+| `LIST_BRANCHES` | `database:read` | List all database branches |
 
 ## Broadcast Channels
 
@@ -694,6 +712,7 @@ The WebSocket server enforces per-client rate limiting:
 | Setting | Value |
 |---------|-------|
 | Max messages per window | **2000** (`WS_RATE_LIMIT`) |
+| Max channel frames per window (`join_channel`, `broadcast`, `presence_*`, `channel_history`, …), counted separately | **7200** (`WS_CHANNEL_RATE_LIMIT`) |
 | Window duration | **60 seconds** (`WS_RATE_WINDOW_MS`) |
 
 When the limit is exceeded, the server responds with:
@@ -705,7 +724,7 @@ When the limit is exceeded, the server responds with:
 }
 ```
 
-The window is a sliding window — the counter resets after 60 seconds of the window start.
+The window is a fixed window — the counter resets after 60 seconds of the window start. A channel frame past its budget is answered `"Too many channel messages. Please slow down."`, also coded `RATE_LIMITED`. Separately, the one-shot data frames (`FETCH_COLLECTION`, `FETCH_ONE`, `COUNT`, `SAVE`, `DELETE`, `CHECK_UNIQUE_FIELD`) count against the caller's data rate limit, shared with their HTTP requests and other sockets; `subscribe_collection`, `subscribe_one` and `channel_history` count there too once the socket's own allowance (1,000, refilled over 15 minutes) is spent.
 
 ## Auto-Reconnect Behavior
 
@@ -713,21 +732,22 @@ The client SDK (`RebaseWebSocketClient`) automatically reconnects when the conne
 
 | Setting | Value |
 |---------|-------|
-| Initial delay | **1 second** |
-| Backoff formula | `min(1000 * 2^attempt, 30000)` ms |
+| First step | **2 seconds** |
+| Backoff formula | step = `min(1000 * 2^attempt, 30000)` ms, attempt counted from 1; the delay is drawn at random between 250 ms and the step (full jitter) |
 | Maximum delay | **30 seconds** |
-| Maximum attempts | **5** (`maxReconnectAttempts`) |
+| Maximum attempts | **5** (`maxReconnectAttempts`) — only while nothing is registered. With a live subscription or joined channel the client keeps redialling at the 30s ceiling for as long as the outage lasts |
+| Outage report | After **14 seconds** down, every live subscription's and channel's `onError` gets one `CONNECTION_LOST`; the registration is kept |
 
 ### Reconnection sequence:
 
 1. Connection drops → `onclose` fires.
-2. Client sets `isAuthenticated = false` and queues pending requests.
-3. Reconnect after exponential backoff delay.
+2. Client sets `isAuthenticated = false`. Requests already written to the dead socket are rejected with `CONNECTION_LOST` and **not** re-sent (the server may have run them). Requests made while down wait in a queue, for up to 30s from the call, then fail with `REQUEST_TIMEOUT`.
+3. Reconnect after the backoff delay.
 4. On successful reconnect:
    - Auto-authenticates if `getAuthToken` is configured.
-   - Calls `resubscribeAll()` — all active collection and entity subscriptions are re-registered with fresh subscription IDs.
-   - Processes the queued message queue.
    - Emits `"reconnect"` event.
+   - Processes the queued message queue.
+   - Calls `resubscribeAll()` — all active collection and entity subscriptions are re-registered with fresh subscription IDs.
 
 ### Connection Lifecycle Events
 
@@ -781,22 +801,26 @@ When the server returns an `AUTH_ERROR` or `UNAUTHORIZED` error for any request 
 2. If the refresh succeeds, the failed request is retried automatically.
 3. If the refresh fails, the error is propagated to the callback.
 
-A session that was **refused**, not merely expired, is not refreshed and retried. The socket refuses a signed-out or revoked session with `SESSION_REVOKED` and a disabled account with `ACCOUNT_DISABLED` (0.26+, as the HTTP routes do; 0.25 says `INVALID_TOKEN`). The SDK warns once, does not ask again with the same token, and passes the error, with its `code`, straight to `listen()`'s `onError`. Handle those two codes as "sign the user out", not "try again".
+A session that was **refused**, not merely expired, is not refreshed and retried. The socket refuses a signed-out or revoked session with `SESSION_REVOKED` and a disabled account with `ACCOUNT_DISABLED` (0.25.1+, as the HTTP routes do; 0.25.0 and earlier say `INVALID_TOKEN`). The SDK warns once, does not ask again with the same token, and passes the error, with its `code`, straight to `listen()`'s `onError`. Handle those two codes as "sign the user out", not "try again".
 
 ## Client Configuration
 
 ### `RebaseWebSocketConfig`
 
 This is the config of the low-level `RebaseWebSocketClient`, which
-`createRebaseClient()` constructs for you. Only `websocketUrl` is also a
-`createRebaseClient()` option — the rest are wired internally.
+`createRebaseClient()` constructs for you. `websocketUrl` (derived from
+`baseUrl` when omitted), `onUnauthorized`, `impersonate` and `debug` are also
+`createRebaseClient()` options; `getAuthToken` is wired to the client's own
+token resolution.
 
 | Property | Type | Required | Description |
 |----------|------|----------|-------------|
 | `websocketUrl` | `string` | Yes | WebSocket server URL (e.g., `"ws://localhost:3001"`) |
-| `getAuthToken` | `() => Promise<string>` | No | Async function that returns the current JWT token |
+| `getAuthToken` | `() => Promise<string \| null>` | No | Async function that returns the current JWT token; a falsy answer leaves the socket anonymous |
 | `WebSocket` | `typeof WebSocket` | No | Custom WebSocket constructor. **Only reachable when you construct `RebaseWebSocketClient` yourself** — `createRebaseClient()` does not forward it. |
 | `onUnauthorized` | `() => Promise<boolean>` | No | Called on auth failure; return `true` if token was refreshed |
+| `impersonate` | `string` | No | Sign in as this user id rather than the token's own; sent with every `AUTHENTICATE` |
+| `debug` | `boolean` | No | Log the connection's progress with `console.debug` |
 
 ### Using in Node.js
 
@@ -868,14 +892,16 @@ With more than one realtime-capable engine in a single instance (e.g. Postgres +
 
 ### Cross-Instance Broadcasting
 
-For multi-instance deployments (behind a load balancer), Rebase uses PostgreSQL `LISTEN/NOTIFY` to synchronize changes:
+For multi-instance deployments (behind a load balancer), Rebase uses PostgreSQL `LISTEN/NOTIFY` to synchronize changes.
+
+With database-level change capture active (`REALTIME_CDC=auto`, the default, wherever the role can create triggers), every instance listens on `rebase_cdc`, which the capture triggers publish to — so a write is heard whichever process or tool made it, and the path below is not used. Without capture:
 
 - A mutation on Instance A triggers `pg_notify('rebase_entity_changes', ...)`.
 - Instance B receives the notification via its dedicated `LISTEN` connection.
-- Instance B refetches the affected entity and fans out the update to its local subscribers.
-- Each instance has a unique ID (`inst_<uuid>`) to skip its own notifications.
+- Instance B schedules a debounced refetch for its local subscribers of the affected path, under each subscriber's own scope.
+- Each instance has a unique ID (`inst_<8 hex chars>`) to skip its own notifications.
 
-This is **automatic** when `connectionString` is provided to the Postgres bootstrapper. The dedicated `LISTEN` connection auto-reconnects with a **3-second fixed delay** if it drops.
+This is **automatic**: the `LISTEN` client uses the adapter's direct connection (`directConnectionString`, else `connectionString`). The dedicated `LISTEN` connection auto-reconnects with a **3-second fixed delay** if it drops, then refetches every live subscription.
 
 ### `DATABASE_DIRECT_URL` Environment Variable
 
@@ -924,24 +950,27 @@ This ensures that a subscription to `"posts"` receives updates even when a relat
 
 ### SDK Error Types
 
-The client throws `ApiError` for WebSocket errors:
+The client throws `RebaseApiError` (exported from `@rebasepro/client`) for WebSocket errors — the same class HTTP failures use:
 
 ```typescript
-class ApiError extends Error {
-    code?: string;   // Error code (e.g., "UNAUTHORIZED", "RATE_LIMITED")
-    error?: string;  // Error description
+class RebaseApiError extends Error {
+    readonly status?: number;   // HTTP status; undefined for socket errors
+    readonly code?: string;     // Error code (e.g., "UNAUTHORIZED", "RATE_LIMITED")
+    readonly details?: unknown; // Structured payload from the server, when present
 }
 ```
 
 ### Subscription Error Callbacks
 
 ```typescript
+import { RebaseApiError } from "@rebasepro/client";
+
 const unsubscribe = client.data.products.listen(
     undefined,
     (response) => { /* success */ },
     (error) => {
-        // error is an Error or ApiError instance
-        if (error instanceof ApiError) {
+        // error is an Error or RebaseApiError instance
+        if (error instanceof RebaseApiError) {
             console.error("Code:", error.code);
         }
         console.error("Message:", error.message);
@@ -953,17 +982,17 @@ const unsubscribe = client.data.products.listen(
 
 To prevent client requests from hanging indefinitely, all pending WebSocket operations that expect a server response (such as `FETCH_COLLECTION`, `FETCH_ONE`, `SAVE`, `DELETE`, `COUNT`, and `CHECK_UNIQUE_FIELD`) have a default timeout of 30 seconds (`requestTimeoutMs = 30000`).
 
-If the server does not respond within this window, the client automatically deletes the pending request record and rejects the request's promise with an `ApiError`:
-- Message: `"Request timed out"`
-- Code: `undefined`
+The deadline runs from the call, so a request that waited in the queue for a socket does not get a fresh 30s once it is written. If the server does not respond within this window, the client automatically deletes the pending request record and rejects the request's promise with a `RebaseApiError`:
+- Code: `REQUEST_TIMEOUT`
+- Message: `"The server did not answer the realtime request in time. It may or may not have been applied."` when it was written, or `"The realtime request timed out before it could be sent. It was not applied."` when it never reached a socket
 
-One-way messages that do not expect a response (like `subscribe_collection`, `subscribe_one`, `unsubscribe`, `join_channel`, `leave_channel`, `broadcast`, `presence_track`, `presence_untrack`, and `presence_state`) resolve immediately upon transmission and do not trigger timeouts.
+One-way messages that do not expect a response (like `subscribe_collection`, `subscribe_one`, `unsubscribe`, `join_channel`, `leave_channel`, `broadcast`, `presence_track`, `presence_untrack`, and `presence_state`) resolve immediately upon transmission and do not trigger timeouts. A subscription whose first frame has not arrived 30 seconds after its subscribe was sent fails instead, with a `SUBSCRIPTION_TIMEOUT` error on its `onError`.
 
 ### Production Error Sanitization
 
 In production (`NODE_ENV=production`):
 - Debug logs are suppressed on both server and client.
-- Error messages in responses are sanitized to `"An unexpected error occurred"` to prevent PII/data leaks.
+- Unexpected errors (`INTERNAL_ERROR`) have their message sanitized to `"An unexpected error occurred"` to prevent PII/data leaks. Declared refusals — a validation error, a callback veto, `INVALID_LIMIT`, `NOT_FOUND`, … — keep their code and message.
 - The `WebSocket` handler catches all unhandled errors and returns them as generic `ERROR` messages.
 
 ## When to Use Realtime

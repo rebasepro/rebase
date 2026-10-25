@@ -170,7 +170,7 @@ interface WebhookDeliveryResult {
 | `statusCode` | `number` | HTTP status code from the receiver. `0` if the request failed entirely (network error, timeout). |
 | `responseBody` | `string` | Response body from the receiver, **truncated to 1000 characters**. Error message if the request failed. |
 | `success` | `boolean` | `true` if the final attempt returned a 2xx status code. |
-| `attemptNumber` | `number` | The attempt number of the final delivery (1–3). |
+| `attemptNumber` | `number` | The attempt number of the final delivery (1–3). `0` for a delivery refused before any attempt (`"queue full"`). |
 
 ## Webhook Payload Format
 
@@ -217,12 +217,12 @@ Every webhook request includes these headers:
 | `Content-Type` | `application/json` | ✅ |
 | `X-Webhook-Id` | The webhook's `id` (e.g. `wh_orders_new`) | ✅ |
 | `X-Webhook-Event` | The event type (`INSERT`, `UPDATE`, `DELETE`) | ✅ |
-| `X-Webhook-Delivery` | A unique UUID for this specific delivery attempt | ✅ |
+| `X-Webhook-Delivery` | A UUID per delivery, the **same on every attempt** at it — deduplicate retries on it | ✅ |
 | `X-Webhook-Attempt` | The attempt number (`"1"`, `"2"`, or `"3"`) | ✅ |
 | `X-Webhook-Signature` | HMAC-SHA256 signature (e.g. `sha256=abc123...`) | Only when `secret` is set |
 | *(custom headers)* | Values from `headers` config | Only when `headers` is set |
 
-> **IMPORTANT FOR AGENTS**: Custom headers from the `headers` config are **merged after** the standard headers. This means custom headers can **override** built-in headers like `Content-Type` if the same key is used.
+> **IMPORTANT FOR AGENTS**: Custom headers from the `headers` config are **merged after** the standard headers. This means custom headers can **override** built-in headers like `Content-Type` if the same key is used. `X-Webhook-Signature` is set after them, so it cannot be overridden.
 
 ## HMAC Signature Verification
 
@@ -411,60 +411,55 @@ The most common pattern is to wire the dispatcher into Rebase collection callbac
 
 > **IMPORTANT FOR AGENTS**: `afterSave` and `afterDelete` are awaited **inside the write's Postgres transaction**. Awaiting a delivery there holds a pooled connection and the row's locks until the receiver answers — up to ~36 seconds across three attempts for the slowest matching webhook — and a throw from the callback rolls the customer's write back. `enqueueEntityChange()` returns `void` immediately and queues the deliveries once the write commits — never for a write that rolls back — which is why it is the pattern for callbacks.
 
+> **IMPORTANT FOR AGENTS**: keep the dispatcher **out of the collection file**. A collection file is also bundled into the admin, in the browser: the build strips its callbacks, but a dispatcher built at the top of the file — and its `@rebasepro/server` import — would ship to every visitor and fail the admin build. Wire it in server code with `backend.setCollectionCallbacks`.
+
 ```typescript
-// config/collections/orders.ts
-import type { PostgresCollectionConfig, CollectionCallbacks } from "@rebasepro/types";
-import { WebhookDispatcher } from "@rebasepro/server";
+// Server-only: call once with what `initializeRebaseBackend` returned.
+import type { CollectionCallbacks } from "@rebasepro/types";
+import { WebhookDispatcher, type RebaseBackendInstance } from "@rebasepro/server";
 
-const dispatcher = new WebhookDispatcher({
-    onDelivery: (result) => {
-        if (!result.success) console.error(`Webhook ${result.webhookId} failed`, result.responseBody);
-    }
-});
-dispatcher.setWebhooks([
-    {
-        id: "wh_orders",
-        url: process.env.ORDERS_WEBHOOK_URL!,
-        secret: process.env.ORDERS_WEBHOOK_SECRET,
-        events: ["INSERT", "UPDATE", "DELETE"],
-        table: "orders",
-        enabled: true,
-    },
-]);
+export function sendOrderWebhooks(backend: RebaseBackendInstance): void {
+    const dispatcher = new WebhookDispatcher({
+        onDelivery: (result) => {
+            if (!result.success) console.error(`Webhook ${result.webhookId} failed`, result.responseBody);
+        }
+    });
+    dispatcher.setWebhooks([
+        {
+            id: "wh_orders",
+            url: process.env.ORDERS_WEBHOOK_URL!,
+            secret: process.env.ORDERS_WEBHOOK_SECRET,
+            events: ["INSERT", "UPDATE", "DELETE"],
+            table: "orders",
+            enabled: true,
+        },
+    ]);
 
-const callbacks: CollectionCallbacks = {
-    afterSave: async ({ id, values, previousValues, status, collection }) => {
-        const event = status === "new" ? "INSERT" : "UPDATE";
-        dispatcher.enqueueEntityChange(
-            collection.slug,
-            event,
-            String(id),
-            values,
-            status === "new" ? undefined : previousValues
-        );
-    },
-    afterDelete: async ({ id, collection }) => {
-        dispatcher.enqueueEntityChange(
-            collection.slug,
-            "DELETE",
-            String(id),
-            null
-        );
-    },
-};
+    const callbacks: CollectionCallbacks = {
+        afterSave: async ({ id, values, previousValues, status, collection }) => {
+            const event = status === "new" ? "INSERT" : "UPDATE";
+            dispatcher.enqueueEntityChange(
+                collection.slug,
+                event,
+                String(id),
+                values,
+                status === "new" ? undefined : previousValues
+            );
+        },
+        afterDelete: async ({ id, collection }) => {
+            dispatcher.enqueueEntityChange(
+                collection.slug,
+                "DELETE",
+                String(id),
+                null
+            );
+        },
+    };
 
-const ordersCollection: PostgresCollectionConfig = {
-    name: "Orders",
-    slug: "orders",
-    table: "orders",
-    callbacks,
-    properties: {
-        id: { name: "ID", type: "string", isId: "uuid" },
-        // ... the rest of the columns
-    },
-};
-
-export default ordersCollection;
+    // Replaces the callbacks the collection declares — compose them with
+    // `composeCallbacks(declared, callbacks)` if it has some.
+    backend.setCollectionCallbacks("orders", callbacks);
+}
 ```
 
 ### With Custom Functions (Manual Dispatch)
@@ -632,8 +627,10 @@ const { jobQueue } = await initializeRebaseBackend({ jobs: { enabled: true } });
 const dispatcher = new WebhookDispatcher({ jobQueue });
 dispatcher.setWebhooks(myWebhooks);
 
-jobQueue?.register(WEBHOOK_DELIVERY_TASK, ctx => dispatcher.deliverQueuedJob(ctx.payload as never));
+jobQueue?.register(WEBHOOK_DELIVERY_TASK, ctx => dispatcher.deliverQueuedJob(ctx.payload as never, ctx));
 ```
+
+Pass `ctx` as the second argument: without it every attempt sends `X-Webhook-Attempt: 1`. Each job is **one** attempt; the queue does the retrying, and a refused destination or a redirect is dead-lettered after that one attempt.
 
 Only the webhook's **id** goes on the job, never the webhook itself: its signing secret would otherwise sit in `rebase.jobs` in cleartext for as long as retention keeps the row, and a webhook edited between the enqueue and the delivery should go out as it is now.
 
@@ -709,7 +706,7 @@ afterSave: async ({ id, values, collection }) => {
 | **Disabled webhook in `setWebhooks()`** | Silently filtered out. Never dispatched. |
 | **`setWebhooks()` called multiple times** | Replaces the entire list each time. Previous webhooks are discarded. |
 | **`secret` is not set** | No `X-Webhook-Signature` header is sent. Payload is not signed. |
-| **Custom header conflicts with built-in** | Custom headers override built-in headers (they are spread after). |
+| **Custom header conflicts with built-in** | Custom headers override built-in headers (they are spread after), except `X-Webhook-Signature`, which is set last. |
 | **Response body very large** | Truncated to **1000 characters** in the `WebhookDeliveryResult`. |
 | **`entity` is `null` for DELETE** | Sent as `"record": null` in the payload. |
 | **`previousEntity` not passed for UPDATE** | `old_record` is `undefined` (omitted from JSON). |

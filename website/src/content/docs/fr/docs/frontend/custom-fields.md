@@ -1,5 +1,5 @@
 ---
-sourceHash: db02ecc36f64f46c
+sourceHash: af7e2ab87a0b3b4f
 title: Champs personnalisés
 sidebar_label: Champs personnalisés
 description: Créez des champs de formulaire personnalisés pour l'édition d'entités avec un accès complet au contexte du formulaire, aux valeurs de l'entité et aux hooks Rebase.
@@ -47,7 +47,7 @@ function ColorPickerField({ value, setValue, error, showError }: FieldProps<Stri
 | `property` | `Property` | La configuration de la propriété |
 | `context` | `FormContext` | Contexte complet du formulaire avec toutes les valeurs de l'entité |
 | `disabled` | `boolean` | Le champ est en lecture seule |
-| `tableMode` | `boolean` | Rendu à l'intérieur de la feuille de calcul (mode compact) |
+| `minimalistView` | `boolean` | Rendu dans l'éditeur de cellule en popup du tableau (mode compact) |
 
 ## Enregistrer un champ personnalisé
 
@@ -80,8 +80,8 @@ properties: {
         type: "string",
         name: "Brand Color",
         admin: {
-            Field: () => import("../../../frontend/src/ColorPickerField"),
-            Preview: () => import("../../../frontend/src/ColorPreview")
+            Field: () => import("../../frontend/src/ColorPickerField"),
+            Preview: () => import("../../frontend/src/ColorPreview")
         }
     }
 }
@@ -137,7 +137,7 @@ function PriceWithTaxField({ value, setValue, context }: FieldProps<NumberProper
                 value={value ?? 0}
                 onChange={(e) => setValue(Number(e.target.value))}
             />
-            <p>Avec taxe : ${priceWithTax.toFixed(2)}</p>
+            <p>With tax: ${priceWithTax.toFixed(2)}</p>
         </div>
     );
 }
@@ -145,17 +145,17 @@ function PriceWithTaxField({ value, setValue, context }: FieldProps<NumberProper
 
 ## Mode Tableau
 
-Lors du rendu dans la vue feuille de calcul, les champs doivent être compacts. Vérifiez `tableMode` :
+Un champ personnalisé n'est pas dessiné à l'intérieur d'une cellule de tableau : la cellule affiche la valeur (ou votre `Preview`), et la modifier ouvre le champ dans un popup avec `minimalistView` activé. Gardez-le compact à cet endroit :
 
 ```tsx
 function MyField({ value, setValue, minimalistView }: FieldProps<StringProperty>) {
     if (minimalistView) {
-        return <span onClick={() => { /* open editor */ }}>{value}</span>;
+        return <input value={value ?? ""} onChange={(e) => setValue(e.target.value)}/>;
     }
 
     return (
         <div>
-            <label>Éditeur complet</label>
+            <label>Full Editor</label>
             <textarea value={value ?? ""} onChange={(e) => setValue(e.target.value)} />
         </div>
     );
@@ -180,7 +180,7 @@ function ColorPreview({ value }: { value: string }) {
     );
 }
 
-// Enregistrer le composant
+// Register it
 properties: {
     color: {
         type: "string",

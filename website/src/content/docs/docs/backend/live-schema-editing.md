@@ -463,8 +463,8 @@ working in:
 - No migration file is written. A project provisioned by boot-ensure needs none;
   a project provisioned by migrations should run `rebase db generate`, which
   mints one through Atlas with the integrity hash Atlas requires.
-- Postgres only. The capability is detected on the driver, and other engines
-  answer `SCHEMA_EDITING_UNSUPPORTED`.
+- Postgres and MongoDB (see [MongoDB](#mongodb)). The capability is detected on
+  the driver, and other engines answer `SCHEMA_EDITING_UNSUPPORTED`.
 
 ## Related
 

@@ -1,5 +1,5 @@
 ---
-sourceHash: bf198f4f8752c00d
+sourceHash: 0a89002005014cb6
 title: Regole di sicurezza (RLS)
 sidebar_label: Regole di sicurezza
 description: Definisci criteri di Row Level Security per le tue collection utilizzando scorciatoie pratiche o espressioni SQL raw.
@@ -86,7 +86,7 @@ Questo genera: `USING ((user_id)::text = (SELECT rebase.uid()))` — vedi
 
 ### Accesso pubblico
 
-Consenti a chiunque (inclusi gli utenti non autenticati) la lettura:
+Non mettere alcun filtro di riga sulle letture, così ogni chiamante che l'API lascia entrare legge ogni riga:
 
 ```typescript
 securityRules: [
@@ -95,6 +95,10 @@ securityRules: [
 ```
 
 Questo genera: `USING (true)`
+
+Allarga quali righe vede un chiamante, non chi può chiamare. Per impostazione predefinita l'API risponde comunque 401 a una richiesta senza token. Imposta `AUTH_REQUIRE=false`
+(`auth.requireAuth: false`) per rimuovere quel gate e lasciare decidere alle sole policy;
+allora anche un chiamante non autenticato legge queste righe.
 
 ### Accesso autenticato
 
@@ -171,7 +175,8 @@ Importato da `@rebasepro/types`. Le espressioni si compongono; gli operandi sono
 | `policy.outerField(name)` | all'interno di `existsIn`, una colonna della riga esterna |
 | `policy.literal(value)` | una stringa, un numero, un booleano o `null` |
 | `policy.authUid()` | `rebase.uid()` |
-| `policy.authRoles()` | `rebase.roles()` |
+| `policy.authRoles()` | i ruoli del chiamante come array, `string_to_array(rebase.roles(), ',')` |
+| `policy.authClaim(name)` | un claim personalizzato sul token di sessione, `NULLIF(rebase.jwt() ->> '<name>', '')`, convertito al tipo della colonna con cui viene confrontato |
 
 #### Valutata una volta per istruzione
 
@@ -341,7 +346,7 @@ securityRules: [
 
 ## Accesso anonimo (inserimenti pubblici)
 
-Un'esigenza comune è consentire agli **utenti non autenticati** di inviare dati: moduli di contatto, iscrizioni alla newsletter, candidature pubbliche. Rebase fornisce un pattern pulito a questo scopo.
+Un'esigenza comune è consentire agli **utenti non autenticati** di inviare dati: moduli di contatto, iscrizioni alla newsletter, candidature pubbliche. Rebase fornisce un pattern pulito a questo scopo. Una richiesta senza token raggiunge queste policy solo quando `AUTH_REQUIRE=false` (`auth.requireAuth: false`); altrimenti l'API risponde prima con un 401.
 
 ### Consigliato: una regola `withCheck` raw
 
@@ -370,7 +375,7 @@ const contactMessagesCollection = defineCollection({
 });
 ```
 
-La scorciatoia `access: "public"` genera una policy che consente l'operazione senza richiedere l'autenticazione.
+La scorciatoia `access: "public"` genera una policy senza alcun filtro di riga. Se un chiamante senza token la raggiunga dipende da `AUTH_REQUIRE`, non dalla policy.
 
 ### Per acquisizione lead / registrazioni
 
@@ -395,11 +400,11 @@ const leadSignupsCollection = defineCollection({
 
 ### Come funzionano le richieste anonime
 
-Quando arriva una richiesta senza un token JWT, il backend di Rebase imposta le variabili di sessione di PostgreSQL su:
+Quando arriva una richiesta senza un token JWT (e `AUTH_REQUIRE=false` la lascia passare), il backend di Rebase imposta le variabili di sessione di PostgreSQL su:
 
 | Variabile | Valore |
 |-----------|--------|
-| `app.user_id` | `'anonymous'` |
+| `app.uid` (e il suo alias legacy `app.user_id`) | `'anonymous'` |
 | `app.user_roles` | `''` (vuoto) |
 
 Ciò significa che:

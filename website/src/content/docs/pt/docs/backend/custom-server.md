@@ -1,5 +1,5 @@
 ---
-sourceHash: e6c4f1132a6e61eb
+sourceHash: 6f3e503eb493c0cf
 title: Integração com Servidor Customizado
 sidebar_label: Servidor Customizado
 description: Construa o backend do Rebase a partir de peças públicas no seu próprio servidor — createRebaseBackend, seus grupos de rotas, mount, attachRealtime e start — ou incorpore o driver do Postgres no Express.
@@ -52,20 +52,25 @@ export const env = loadEnv({
 
 Importar `z` de `@rebasepro/server` é uma novidade. Na versão 0.17 e anteriores, o pacote não exportava o `z`: importe-o de `zod`, compatível com a versão major utilizada pelo runtime, e deixe seu bundler desduplicar as duas cópias.
 
-:::caution[O `z` com o qual você estende deve ser o zod do runtime]
-Ter duas cópias do zod carregadas ao mesmo tempo é a única maneira de essa chamada falhar, e costumava falhar silenciosamente. O `.merge()` aceita um esquema da outra cópia — os formatos são idênticos — e então o `.parse()` rejeita todos os campos que possuem um `.default()`, porque um padrão é reconhecido por identidade de classe. O servidor iniciava, informava sucesso e não executava nenhum dos seus crons; nada na falha mencionava o zod.
+:::caution[Duas cópias do zod]
+Ter duas cópias do zod carregadas ao mesmo tempo costumava quebrar essa chamada
+silenciosamente. O `loadEnv` combinava os esquemas com `.merge()`, que aceita um
+esquema da outra cópia e então rejeita todos os campos que possuem um `.default()`.
+O servidor iniciava, informava sucesso e não executava nenhum dos seus crons; nada
+na falha mencionava o zod.
 
-O runtime fornece o `zod`. O `backend/package.json` do scaffold o lista na faixa
-que o `@rebasepro/server` usa, de modo que uma única cópia é instalada: mantenha as duas
-iguais. O `loadEnv` agora recusa um esquema externo na inicialização com uma mensagem
-indicando a correção, em vez de aceitá-lo e validar apenas metade dele.
+O `loadEnv` agora valida o esquema base e o seu esquema `extend` cada um com o
+próprio `.parse()`, de modo que um esquema construído por outra cópia do zod
+funciona. O runtime fornece o `zod`, e o `backend/package.json` do scaffold o lista
+na faixa que o `@rebasepro/server` usa, de modo que uma única cópia é instalada:
+mantenha as duas iguais.
 :::
 
 **Comportamentos principais:**
 - Gera `JWT_SECRET` e `REBASE_SERVICE_KEY` em desenvolvimento quando não estão definidos, para que você possa começar sem configuração manual, e os guarda em cache em `.rebase-dev-secrets.json` para que uma reinicialização não desconecte ninguém.
 - Bloqueia segredos gerados automaticamente em produção — você deve defini-los explicitamente.
 - Valida se `CORS_ORIGINS` ou `FRONTEND_URL` está definido em produção.
-- Recusa um esquema `extend` construído por uma cópia diferente do zod.
+- Recusa um valor `extend` que não seja um esquema zod.
 - Lança um `Error` que nomeia cada variável ausente ou incorreta, como `DATABASE_URL: is required`, com os problemas apontados pelo zod na sua propriedade `issues`. Na 0.24 ele lança o próprio `ZodError` do zod, que não nomeia nenhuma variável quando nada o captura.
 
 Consulte `.env.example` na aplicação gerada para obter a lista completa de variáveis suportadas.
@@ -225,7 +230,8 @@ fora:
 | `backend.shutdown(timeoutMs, { server })` | Para o que o `start()` e o `attachRealtime()` iniciaram, aguardando as execuções de cron e os jobs em andamento. Fecha o `server` apenas quando você o passa. | |
 
 O `path` padrão do socket é o caminho base passado ao `mount()` sem o `/api`
-final, então `/api` dá `/` e `/x/api` dá `/x`. É ali que o SDK se conecta,
+final, então `/api` dá `/` e `/x/api` dá `/x`; um caminho base que
+não termina em `/api` dá `/`. É ali que o SDK se conecta,
 porque ele conecta ao seu `baseUrl` enquanto suas requisições HTTP vão para
 `${baseUrl}/api`. Um upgrade para qualquer outro caminho fica para os outros
 listeners de `upgrade` do servidor, então seu app pode rodar o próprio servidor
@@ -594,7 +600,8 @@ cabeçalho que o SDK passe a ler em uma versão posterior chega ao seu frontend 
 nenhuma mudança aqui. São `ETag`, `Retry-After`, `X-Request-ID`, os três
 cabeçalhos `X-RateLimit-*` e `Preference-Applied`, mais `Location`,
 `Upload-Offset` e `Rebase-Upload-Result`, nos quais um upload retomável (arquivos acima de
-8 MiB) responde. Sem esses três, o SDK não consegue acompanhar um upload a partir de outra
+8 MiB) responde, e `X-Rebase-Simulated-Context`, que informa com qual identidade a requisição
+simulada de um administrador foi executada. Sem os três cabeçalhos de upload, o SDK não consegue acompanhar um upload a partir de outra
 origem, e envia cada arquivo como uma única requisição multipart. Na 0.24,
 escreva a lista à mão.
 

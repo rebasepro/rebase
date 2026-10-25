@@ -1,5 +1,5 @@
 ---
-sourceHash: 9eaa953076c5923b
+sourceHash: 22d7c8bbab763065
 title: Funciones personalizadas
 sidebar_label: Funciones personalizadas
 description: Añade endpoints de API de Hono personalizados junto a tus rutas CRUD de Rebase. Detección automática desde un directorio, con acceso total a la instancia del backend.
@@ -87,7 +87,7 @@ Consulta [Portabilidad en diferentes runtimes](#portabilidad-en-diferentes-runti
 ## Configuración
 
 :::note[Dónde va esto]
-**Runtime administrado:** nada que configurar; el runtime detecta `backend/functions/` automáticamente (`functions` en la entrada `rebase.json` de la app de backend si lo has movido). `REBASE_FUNCTIONS_ONLY` / `REBASE_FUNCTIONS_EXCLUDE` delimitan cuáles sirve un proceso.
+**Runtime administrado:** nada que configurar; el runtime detecta `backend/functions/` automáticamente (`functions` en la entrada `rebase.json` de la app de backend si lo has movido). `REBASE_FUNCTIONS_ONLY` / `REBASE_FUNCTIONS_EXCLUDE` delimitan cuáles sirve un proceso `REBASE_ROLE=functions`; cualquier otro rol se niega a arrancar si están definidas.
 **Ejected:** `initializeRebaseBackend({ functionsDir })`, o `functions` (a continuación), en `backend/src/index.ts`.
 :::
 
@@ -416,7 +416,7 @@ export default defineFunction((app, { rebase }) => {
 });
 ```
 
-Una promesa sin `await` parece equivalente pero no lo es. `waitUntil` aporta dos ventajas:
+Una promesa sin await parece equivalente pero no lo es. `waitUntil` aporta dos ventajas:
 
 - **En Node**, se rastrea la promesa, por lo que un apagado controlado (graceful shutdown) la espera en lugar de que el proceso termine interrumpiendo un webhook enviado a medias. Una promesa flotante durante un `SIGTERM` simplemente se pierde.
 - **En un host basado en isolates**, se indica al host que mantenga vivo el isolate hasta que la promesa se resuelva. Sin esto, el trabajo se descarta en el instante en que la respuesta se resuelve —silenciosamente, con un 200 limpio en los registros.
@@ -552,7 +552,7 @@ declare function notifyFulfilment(url: string, session: Record<string, string>):
 
 ## Depuración
 
-Cuando una función se carga con éxito, verás:
+Cuando se cargan las funciones, el arranque registra `Loaded custom functions` con su número. La línea de cada función se registra en el nivel `debug` (`LOG_LEVEL=debug`):
 
 ```
 ⚡ Loaded function route: hello
@@ -565,6 +565,8 @@ Si la carga falla, el cargador proporciona información de diagnóstico:
   export type: object (SomeClass)
   prototype methods: constructor, someMethod
   Hint: ensure the function exports a Hono app created with the same hono version as the server.
+  Author with `defineFunction(...)` from @rebasepro/server/functions for a typed, checked contract.
+  The loader checks for .fetch() and .routes — any Hono-compatible app will work.
 ```
 
 El enrutador se monta para el **directorio**, no para las funciones individuales que contiene. Si falla la importación de cada uno de los archivos —una sola variable de entorno faltante en el ámbito del módulo es suficiente para derribarlos a todos—, `GET /api/functions` responderá igualmente con un `200` y una lista vacía más un contador `skipped`, de modo que "no se cargó nada" se distingue de "esta compilación no incluyó funciones". El listado en sí requiere un llamador autenticado, una clave de API con el scope básico `functions:invoke` o la clave de servicio; las funciones siguen siendo invocables por quien admita cada una, pero el inventario de las mismas no es público. Los motivos permanecen en el registro de arranque.

@@ -191,6 +191,15 @@
 
 #### Runtime
 
+- **The Helm chart's migration Job starts.** It ran as `REBASE_ROLE=worker`
+  with `REBASE_MIGRATE_ON_BOOT=ensure`, and the runtime refuses that pair, so
+  every default `helm install` and `helm upgrade` stopped at its pre-install
+  hook. Even admitted, a `worker` would have created no collection tables. The
+  Job now runs as `all`, with cron and the job workers off, and exits once the
+  schema is in place, so it also creates the tables each surface owns.
+  `check:chart` now runs every rendered unit's env through the runtime's own
+  role rules, and fails on a refusal, or on a schema that no unit or two units
+  would create.
 - **The request role no longer gets write access to `rebase.schema_meta` on
   first boot.** On a backend without auth, the collection schema stamp created
   that table after boot's last sweep of the request role's grants. So

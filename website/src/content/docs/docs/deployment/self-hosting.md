@@ -95,10 +95,11 @@ Three secrets, one fact, and the account you sign in with:
   it once, while the user table is empty, and does nothing on every boot after
   that.
 
-Each of the three secrets must be at least 32 characters, and the admin password
-at least 12. Use an address with a dot in its domain: `POST /auth/login` parses
-its body with `z.string().email()`, so `admin@localhost` would seed an account
-and then refuse every attempt to use it. The compose file declares all six with
+`JWT_SECRET` and `REBASE_SERVICE_KEY` must each be at least 32 characters, and
+the admin password at least 12. Use an address with a dot in its domain:
+`POST /auth/login` parses its body with `z.string().email()`, so the runtime
+refuses to seed `admin@localhost` — an account nobody could sign in to — and logs
+why instead. The compose file declares all six with
 `${VAR:?…}`, so a missing one stops the stack with a message naming it rather
 than starting something half-configured — and self-registration ships off
 (`DISABLE_SELF_REGISTRATION`, default `true`), so nothing is left to be claimed.
@@ -247,7 +248,10 @@ uploaded file on the next restart. Uploads are refused with
 `501 STORAGE_NOT_CONFIGURED` until you set one up.
 
 For a bucket, set `STORAGE_TYPE=s3` (or `gcs`) plus its bucket and credentials —
-the compose file lists the variables, commented out.
+the compose file lists the variables, commented out. `gcs` loads
+`@google-cloud/storage`, which the official image does not ship, so on that image
+reach Google Cloud Storage through its S3-compatible endpoint instead
+(`STORAGE_TYPE=s3`, `S3_ENDPOINT=https://storage.googleapis.com`, HMAC keys).
 
 For local disk, which is only appropriate when the path is a real volume that
 outlives the container:
@@ -320,7 +324,7 @@ containers works. Two things to get right everywhere:
 
 ```toml
 [build]
-  image = "rebasepro/server:0.25.1"
+  dockerfile = "Dockerfile"   # FROM rebasepro/server:0.25.1 + COPY dist-bundle /bundle
 
 [http_service]
   internal_port = 8080
@@ -345,7 +349,7 @@ rebase-server /srv/myapp/dist-bundle
 ```
 
 `rebase-server --help` lists the variables it reads. Under systemd — the
-three admin lines are new, and on 0.17.3 the first account to
+two `REBASE_ADMIN_*` lines need 0.18 or later, and on 0.17.3 the first account to
 register becomes the administrator instead:
 
 ```ini title="/etc/systemd/system/rebase.service"

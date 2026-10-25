@@ -1,5 +1,5 @@
 ---
-sourceHash: fef2eb56c7043526
+sourceHash: a6f7e70d9dfb90ae
 title: Diseño de formulario
 sidebar_label: Diseño de formulario
 description: Controla cómo se organiza el formulario de entidad — anchos de columna, secciones y el riel de metadatos.
@@ -172,7 +172,7 @@ la columna principal.
 | `admin.form.sections` | `FormSection[]` | Grupos con título para la columna principal |
 | `admin.form.showRecordMeta` | `boolean` | Mostrar id/creado/actualizado al pie del riel |
 
-`FormSection` es `{ key, title?, properties, collapsed?, collapsible? }`.
+`FormSection` es `{ key, title?, properties, collapsed?, collapsible?, readVariant? }`. `readVariant: "summary"` apila los campos de la sección como filas etiqueta/valor en la vista de solo lectura del registro; el valor por defecto, `"grid"`, usa la cuadrícula del formulario.
 
 ## Relacionado
 

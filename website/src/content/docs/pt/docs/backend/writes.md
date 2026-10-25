@@ -108,10 +108,6 @@ A tag é comparada dentro da própria transação da escrita, depois que a linha
 Duas escritas com a mesma tag não podem passar ambas: a segunda espera a primeira
 ser confirmada, lê o que ela escreveu e é recusada com `412`.
 
-A tag é comparada dentro da própria transação da gravação, depois de a linha ser
-bloqueada. Duas gravações com a mesma tag não podem passar ambas: a segunda espera
-que a primeira faça commit, lê o que ela gravou e é recusada com `412`.
-
 ### Operações de campo
 
 O valor de uma propriedade no corpo de um `PATCH` pode ser uma operação sobre o valor

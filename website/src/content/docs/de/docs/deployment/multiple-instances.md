@@ -1,5 +1,5 @@
 ---
-sourceHash: de9051fe769a602b
+sourceHash: 88050e5f44c6457a
 title: Mehrere Instanzen ausführen
 sidebar_label: Mehrere Instanzen
 description: Jeder Zustand, den ein Rebase-Prozess für sich behält, und die Einstellung, die ihn teilt – was konfiguriert werden muss, bevor ein zweites Replikat, ein Rolling Deploy oder ein Split-Deployment Traffic übernimmt.
@@ -35,7 +35,7 @@ Die folgenden Abschnitte beschreiben, was die einzelnen Punkte bewirken, wenn si
 
 ## Signaturschlüssel
 
-`JWT_SECRET` signiert jede Sitzung und `REBASE_SERVICE_KEY` authentifiziert Server-zu-Server-Aufrufe. In der Entwicklung generiert jeder Prozess seine eigenen, wenn sie nicht gesetzt sind, sodass ein von einem Prozess ausgestelltes Token vom nächsten abgelehnt wird. In der Produktion verweigert das System den Start bereits ohne diese Werte; bei mehreren Prozessen kommt es darauf an, dass jeder die **gleichen** Werte erhält – aus einem Secret, nicht einem pro Replikat.
+`JWT_SECRET` signiert jede Sitzung und `REBASE_SERVICE_KEY` authentifiziert Server-zu-Server-Aufrufe. In der Entwicklung generiert jeder Prozess seine eigenen, wenn sie nicht gesetzt sind, sodass ein von einem Prozess ausgestelltes Token vom nächsten abgelehnt wird. In der Produktion verweigert das System den Start bereits ohne `JWT_SECRET` (ohne `REBASE_SERVICE_KEY` startet es ganz ohne Service-Key); bei mehreren Prozessen kommt es darauf an, dass jeder die **gleichen** Werte erhält – aus einem Secret, nicht einem pro Replikat.
 
 ## Rate-Limits und die Client-Adresse
 

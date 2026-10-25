@@ -1,5 +1,5 @@
 ---
-sourceHash: 172ed813d51ccec3
+sourceHash: 607e40e364a1e6b0
 title: Suscripciones en tiempo real
 sidebar_label: Tiempo real
 description: Suscríbete a cambios de datos en vivo con el SDK tipado de Rebase utilizando listeners en tiempo real basados en WebSocket.
@@ -215,7 +215,7 @@ useEffect(() => {
 
 El cliente WebSocket gestiona la autenticación automáticamente:
 
-- Al **iniciar sesión** o **renovar el token**, el nuevo token se envía a un socket ya abierto a través de un mensaje `authenticate`. Si no hay ninguno abierto, no ocurre nada: iniciar sesión no es una solicitud de tiempo real, y un socket abierto más tarde se autentica por sí mismo.
+- Al **iniciar sesión** o **renovar el token**, un socket ya abierto toma la nueva credencial. Una renovación, o un inicio de sesión como la cuenta que ya tiene, envía el token en un mensaje `authenticate`; un inicio de sesión como una cuenta distinta —incluido un visitante que inicia sesión— reconstruye el socket, que se autentica como esa cuenta y vuelve a enviar cada suscripción y canal activos. Si no hay ninguno abierto, no ocurre nada: iniciar sesión no es una solicitud de tiempo real, y un socket abierto más tarde se autentica por sí mismo.
 - Al **cerrar sesión**, la conexión WebSocket se desconecta. El cliente sigue siendo utilizable; una suscripción posterior se reconecta de forma anónima.
 - Si la conexión se cae, el cliente **se reconecta automáticamente** y restablece todas las suscripciones activas. Nunca deja de intentarlo mientras exista una suscripción o un canal al que se haya unido; el retraso entre intentos crece hasta un máximo de 30 segundos.
 - Si el servidor termina la sesión del socket — el usuario cerró sesión en todas partes, esta sesión fue revocada, la cuenta se eliminó o el token expiró antes de que una renovación llegara al socket — cierra el socket con el código `4001`. El cliente se reconecta como tras cualquier caída, autenticándose con la sesión que tenga en ese momento (renovada si es posible), o de forma anónima cuando no hay ninguna. Quitar un rol no cierra el socket: se aplica desde el siguiente frame. Consulta [Autenticación y RLS](/docs/backend/realtime/#authentication--rls).

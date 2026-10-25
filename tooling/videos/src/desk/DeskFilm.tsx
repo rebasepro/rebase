@@ -4,7 +4,7 @@ import { DeskPlane } from "./DeskPlane";
 import { Desk } from "./Desk";
 import { Mark } from "../components/Mark";
 import { ramp, SHIFT } from "../components/motion";
-import { FONT, FRAME, INK } from "../theme";
+import { FONT, FRAME, GROUND, INK } from "../theme";
 import { Narration } from "../Narration";
 import { DESK_FRAMES_PER_WORD, DESK_NARRATION } from "./script";
 import { CLOSE, Presenter, type LiveFeed, type Take } from "./Presenter";
@@ -52,7 +52,7 @@ export const RebaseDesk: React.FC<DeskProps> = ({ timing, take, live }) => (
 );
 
 const DeskFilm: React.FC<{ take?: Take | null; live?: LiveFeed | null }> = ({ take, live }) => (
-    <AbsoluteFill style={{ background: "#000" }}>
+    <AbsoluteFill style={{ background: GROUND.base }}>
         <DeskPlane />
         <Desk />
         <Close />
@@ -109,7 +109,7 @@ const Close: React.FC = () => {
     const left = CLOSE.x + CLOSE.w + 60;
     return (
         <AbsoluteFill>
-            <AbsoluteFill style={{ background: "#000", opacity: 0.86 * scrim + 0.14 * dark }} />
+            <AbsoluteFill style={{ background: GROUND.base, opacity: 0.86 * scrim + 0.14 * dark }} />
             <AbsoluteFill style={{ left, width: 1920 - left - 120, alignItems: "center", justifyContent: "center" }}>
                 <Mark size={116} delay={at} spread={18} />
                 <div style={{ overflow: "hidden", marginTop: 38, paddingBottom: "0.1em" }}>

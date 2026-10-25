@@ -1,5 +1,5 @@
 ---
-sourceHash: c35ed2ce1194af56
+sourceHash: 6ac0abb490b5801e
 title: Autenticação e Login
 sidebar_label: Autenticação e Login
 description: Configure o controlador de autenticação, a tela de login e a simulação de papéis no seu frontend React do Rebase.
@@ -35,7 +35,7 @@ authController.signOut()      // Log out
 authController.getAuthToken() // Get current JWT for API calls
 ```
 
-Passe o `authController` para o controlador de navegação do Rebase para proteger todo o painel de administração com autenticação.
+Passe o `authController` para `<Rebase authController>`. O `<RebaseShell>` (ou o `<RebaseAuthGate>` em um layout manual) o lê dali e protege todo o painel de administração com autenticação.
 
 ## Seu próprio provedor de autenticação
 

@@ -1,5 +1,5 @@
 ---
-sourceHash: f66784a0d8158afb
+sourceHash: 5e1a0bbb522c32d0
 title: Entorno y configuración
 sidebar_label: Configuración
 description: Todas las variables de entorno y opciones de configuración para proyectos Rebase.
@@ -69,7 +69,7 @@ Toda la configuración se realiza mediante variables de entorno en el archivo `.
 | `LOG_LEVEL` | Nivel de detalle de los registros: `error`, `warn`, `info`, `debug` | `info` |
 | `REBASE_LOG_RAW_QUERIES` | Muestra el SQL detrás de una línea `Failed query: [redacted]`. Cada sentencia con error se oculta de forma predeterminada, porque una consulta fallida incluye sus parámetros enlazados (un correo electrónico, un hash de contraseña). Establézcalo en `true` mientras diagnostica un fallo de DDL, RLS o de captura de cambios. Se ignora cuando `NODE_ENV=production`. | `false` |
 | `NODE_ENV` | Entorno: `development`, `production` o `test` | `development` |
-| `CORS_ORIGINS` | Lista separada por comas de orígenes permitidos. **Obligatoria en producción** si difiere del dominio del backend. En desarrollo se *añade a* localhost — consulte más abajo. | — |
+| `CORS_ORIGINS` | Lista separada por comas de orígenes permitidos. **Obligatoria en producción** a menos que `FRONTEND_URL` esté definida: un arranque en producción sin ninguna de las dos se niega a iniciar. En desarrollo se *añade a* localhost — consulte más abajo. | — |
 | `FRONTEND_URL` | URL de la aplicación frontend. Se utiliza como alternativa a CORS_ORIGINS en ambos entornos. | — |
 | `ADMIN_CONNECTION_STRING` | Cadena de conexión a la base de datos a nivel de administrador (utilizada para la introspección de esquemas y operaciones administrativas). La base de datos que indica no es la que la consola SQL considera actual, ni lo que copia una nueva rama por defecto: ambas corresponden a la base de datos en la que se encuentra la conexión propia de la aplicación (consulte `REBASE_BRANCH_PARENT_DATABASE` para un servidor en una rama). | `DATABASE_URL` |
 | `DISABLE_DB_ROLE_SWITCHING` | Desactiva el cambio de roles de PostgreSQL en el Editor SQL (útil para autenticación personalizada donde los roles de la base de datos no están mapeados). La consola SQL de Studio indicará entonces que las filas se leyeron como el propietario de la conexión, mostrará su nombre y deshabilitará el selector de roles. | `false` |
@@ -389,7 +389,7 @@ Leído por `rebase`, no por el servidor. Nada de lo que está aquí afecta a un 
 
 ## Secretos en desarrollo
 
-`JWT_SECRET` y `REBASE_SERVICE_KEY` son obligatorios en producción y se generan
+`JWT_SECRET` es obligatorio en producción. Este y `REBASE_SERVICE_KEY` se generan
 automáticamente fuera de ella, para que pueda empezar sin tener que configurar nada.
 
 Esos valores generados se almacenan en caché en `.rebase-dev-secrets.json`, junto a
@@ -404,13 +404,13 @@ la sesión en su propia aplicación e invalidaba cualquier clave de API recién 
 - Si no se puede escribir el archivo —por ejemplo, en un contenedor de solo lectura—, el servidor
   arranca de todos modos con un secreto efímero, exactamente como solía hacerlo.
 
-Nada se almacena en caché en producción, ni bajo un ejecutor de pruebas. En producción, un
-arranque que deba generar cualquiera de los secretos seguirá fallando, nombrando la
-variable correspondiente, y eso no cambia:
+Nada se almacena en caché en producción, ni bajo un ejecutor de pruebas. En producción tampoco se
+genera nada: un arranque sin `JWT_SECRET` falla, nombrando la variable, y eso no
+cambia:
 
 ```
-JWT_SECRET must be explicitly set in production.
-Do not rely on auto-generated secrets outside development.
+The environment is not valid:
+  JWT_SECRET: is required
 ```
 
 ## Objeto de configuración del backend

@@ -1,5 +1,5 @@
 ---
-sourceHash: ed69210a7093e29f
+sourceHash: a5bdb4bcc6886af4
 title: Bereitstellung von Rebase auf Fly.io
 description: Erfahren Sie, wie Sie Rebase global bereitstellen oder mithilfe von Fly.io auf europäische Rechenzentren beschränken können.
 sidebar_label: Fly.io
@@ -67,8 +67,6 @@ primary_region = "fra"
 ```
 
 Verwenden Sie `/livez` anstelle von `/health`: Letzteres führt einen Datenbank-Roundtrip durch, sodass ein Liveness-Check bei einem kurzen Schluckauf der Datenbank eine ansonsten gesunde Machine neu starten würde.
-
-`DISABLE_SELF_REGISTRATION` ist neu: Unter 0.17.3 gibt es keinen solchen Schalter, und das erste registrierte Konto wird zum Administrator.
 
 Ein späteres Upgrade von Rebase erfordert lediglich eine Änderung dieser `FROM`-Zeile. Ihr Bundle bleibt unberührt.
 

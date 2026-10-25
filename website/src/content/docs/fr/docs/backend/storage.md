@@ -1,5 +1,5 @@
 ---
-sourceHash: cc1736a186791d89
+sourceHash: afd1a90c05fb48c3
 title: Configuration du stockage
 sidebar_label: Configuration du stockage
 description: Configurez les backends de stockage sur système de fichiers local, compatible S3 ou GCS/Firebase Storage pour les téléversements de fichiers, les images et les médias.
@@ -16,7 +16,7 @@ Rebase prend en charge trois backends de stockage :
 ## Configuration
 
 :::note[Où cela se place]
-**Runtime managé** — les variables `STORAGE_*` dans `.env` (`STORAGE_TYPE`, `STORAGE_BUCKET` ou `S3_BUCKET` / `GCS_BUCKET`, `STORAGE_PATH`, `STORAGE_PUBLIC_READ`, … — suffixez n'importe laquelle d'entre elles avec `__<KEY>` pour une source nommée), plus une déclaration `bucket("<key>")` dans `config/resources.ts` pour chaque bucket au-delà de celui par défaut, et `export const storageAuthorize` depuis `config/index.ts`. `storageAuthorize` n'a volontairement aucune forme sous forme de variable d'environnement : aucune variable ne peut exprimer « cet utilisateur peut lire cette clé ».
+**Runtime managé** — les variables `STORAGE_*` dans `.env` (`STORAGE_TYPE`, `S3_BUCKET` / `GCS_BUCKET`, `STORAGE_PATH`, `STORAGE_PUBLIC_READ`, … — suffixez n'importe laquelle d'entre elles avec `__<KEY>` pour une source nommée), plus une déclaration `bucket("<key>")` dans `config/resources.ts` pour chaque bucket au-delà de celui par défaut, et `export const storageAuthorize` depuis `config/index.ts`. `storageAuthorize` n'a volontairement aucune forme sous forme de variable d'environnement : aucune variable ne peut exprimer « cet utilisateur peut lire cette clé ».
 
 **Éjecté (Ejected)** — le bloc `storage` sur `initializeRebaseBackend({ … })`. `storagePolicies` et `storageTriggers` sont réservés au mode éjecté.
 
@@ -99,7 +99,7 @@ image: {
 
 | Méthode | Chemin | Description |
 |--------|------|-------------|
-| `POST` | `/api/storage/upload` | Téléversement direct de fichier, un seul corps `multipart/form-data` : `file` (obligatoire) ; `key`, la clé d'objet, dossiers compris (`author_pictures/ada.jpg`), sinon le nom du fichier à la racine ; `bucket`, sinon le bucket par défaut ; `storageId` ; et `metadata_<name>` pour des métadonnées personnalisées. Tout autre champ est ignoré : il n'existe pas de champ `path` |
+| `POST` | `/api/storage/upload` | Téléversement direct de fichier, un seul corps `multipart/form-data` : `file` (obligatoire) ; `key`, la clé d'objet, dossiers compris (`author_pictures/ada.jpg`), sinon le nom du fichier à la racine ; `bucket`, sinon le bucket par défaut ; `storageId` ; `collection` et `property`, qui limitent le fichier au `maxSize` et aux `acceptedFiles` de cette propriété ; et `metadata_<name>` pour des métadonnées personnalisées. Tout autre champ est ignoré : il n'existe pas de champ `path` |
 | `POST` | `/api/storage/upload?storageId=<key>` | Téléversement vers un backend nommé spécifique |
 | `GET` | `/api/storage/file/*` | Récupérer un fichier — tout ce qui suit `/file/` est la clé de l'objet |
 | `GET` | `/api/storage/file/*?storageId=<key>` | Récupérer un fichier depuis un backend spécifique |
@@ -364,8 +364,8 @@ Associez une propriété à une source à l'aide de `storageSource` :
 ```ts
 {
     name: "Cover",
-    dataType: "string",
-    storage: { storageSource: "media", acceptedFiles: ["image/*"] }
+    type: "string",
+    storage: { storagePath: "covers", storageSource: "media", acceptedFiles: ["image/*"] }
 }
 ```
 
@@ -403,7 +403,7 @@ permettant ainsi à une source de changer de fournisseur sans impacter les autre
 
 ## Sources de stockage côté frontend
 
-Lors de l'utilisation de multiples backends de stockage, transmettez `storageSources` au fournisseur `<Rebase>` afin que le frontend sache comment router directement les téléversements :
+Le frontend apprend les sources du serveur via `GET /api/storage/sources`, une source `server` n'a donc besoin d'aucune entrée. Transmettez `storageSources` au fournisseur `<Rebase>` pour une source `direct`, qui téléverse directement vers son fournisseur, ou pour définir vous-même un libellé ou un transport :
 
 ```tsx
 import { Rebase } from "@rebasepro/app";
@@ -422,7 +422,7 @@ import { Rebase } from "@rebasepro/app";
 </Rebase>
 ```
 
-La `key` de chaque source doit correspondre à une clé de backend enregistrée dans la configuration `storage` du serveur. Le contexte React `StorageSourcesContext` détermine la source active pour chaque champ de téléversement.
+La `key` d'une source `server` doit correspondre à une clé de backend enregistrée dans la configuration `storage` du serveur. Le contexte React `StorageSourcesContext` détermine la source active pour chaque champ de téléversement.
 
 ## Mise en cache et CDNs
 
@@ -460,8 +460,7 @@ storagePolicies: [
 ]
 ```
 
-**Une clé ne correspondant à aucune politique est refusée.** Chaque ouverture de droit est une ligne explicite,
-et une erreur entraîne un refus plutôt qu'un accès accordé.
+**Une clé ne correspondant à aucune politique est refusée**, sauf si un hook `storageAuthorize` l'autorise : le hook n'est interrogé que lorsqu'aucune politique ne correspond, et ni l'un ni l'autre ne peut restreindre l'autre. Chaque ouverture de droit est une ligne explicite, et une erreur entraîne un refus plutôt qu'un accès accordé.
 
 Les modèles effectuent la correspondance **par segment, jamais par sous-chaîne** — `public/**` ne correspond pas à
 `publicity/secret.png` :
@@ -535,7 +534,7 @@ Bon à savoir :
 - **Un chemin est public lorsque la clé qu'il désigne l'est.** Le préfixe `public/` est évalué sur la clé canonique servie par la route — après suppression du segment initial de bucket `default/` et résolution de `//`, `./` et du `/` initial — jamais sur l'URL telle qu'elle est écrite. `/api/storage/file/notes://public/x.txt` désigne la clé privée `notes:/public/x.txt`, et la clé `default/public/x.txt` (atteinte via `/api/storage/file/default/default/public/x.txt`) se trouve dans un dossier nommé `default` ; aucune des deux n'est publique. Dans un hook, testez la `key` qui vous est fournie avec `isPublicStorageKey` issu de `@rebasepro/types` — `isPublicStoragePath` lit un chemin ou une URL côté client, et les évalue tous deux comme publics.
 - **`list` est contrôlé sur le préfixe.** Le listing est le moyen de découvrir des clés dont personne ne vous a parlé.
 - **Les téléversements avec reprise (TUS) sont contrôlés au moment de la création**, évitant ainsi qu'un téléversement refusé ne laisse un fichier temporaire derrière lui.
-- Omettre le hook préserve le comportement précédent, les applications mono-locataires ne sont donc pas affectées.
+- Omettre le hook (et `storagePolicies`) ne laisse aucun contrôle par objet : la production refuse donc de démarrer, sauf si `storagePublicRead` ou `storageInsecureAllowAnyAuthenticated` est défini.
 
 ### Clés d'API et jetons
 

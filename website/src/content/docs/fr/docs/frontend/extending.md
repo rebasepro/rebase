@@ -1,5 +1,5 @@
 ---
-sourceHash: a874bc209f13c746
+sourceHash: 2888be015d5ef43f
 title: Étendre Rebase
 sidebar_label: Étendre Rebase
 description: Un guide de décision pour choisir le bon mécanisme d'extension — plugins, slots, substitutions de composants, vues d'entités, actions, et plus encore.
@@ -28,7 +28,7 @@ pour le backend.
 | Remplacer la page de connexion | `components` (`Auth.LoginView`) | app | [Substitutions de composants](/docs/frontend/component-overrides) |
 | Remplacer la page d'accueil | `components` (`HomePage`) | app | [Substitutions de composants](/docs/frontend/component-overrides) |
 | Modifier entièrement l'apparence du formulaire d'une collection | `formView` | collection | [ci-dessous](#formview) |
-| Échanger un composant au sein d'une collection | `collection.components` | collection | [Substitutions de composants](/docs/frontend/component-overrides) |
+| Échanger un composant au sein d'une collection | `admin.components` | collection | [Substitutions de composants](/docs/frontend/component-overrides) |
 | Définir des substitutions de composants par défaut pour toutes les collections | `components` (noms à portée de collection) | app | [Substitutions de composants](/docs/frontend/component-overrides) |
 | Ajouter un bouton à la barre d'outils d'une collection | `Actions` de collection | collection | [Actions d'entités](/docs/frontend/entity-actions#collection-actions) |
 | Injecter de l'interface utilisateur dans un slot de barre d'outils de collection | slot `collection.actions` | app/plugin | [Slots](/docs/frontend/slots) |
@@ -56,7 +56,7 @@ codée en dur sera invisible dans l'un des deux thèmes. Consultez
 
 **Portée :** app.
 
-Un plugin regroupe des collections, des vues, des substitutions de composants, des contributions aux slots, l'authentification, des sources de données, des providers, des hooks et des rappels de cycle de vie au sein d'une seule unité installable. Tous les autres mécanismes répertoriés ici peuvent être injectés via l'interface d'un plugin.
+Un plugin regroupe des collections injectées ou modifiées, des vues, des contributions aux slots, des wrappers de champs, des providers, des hooks et des rappels de cycle de vie au sein d'une seule unité installable. Les substitutions de composants, les vues d'entités, les actions d'entités et `propertyConfigs` ne sont pas des champs de plugin : ils se placent sur `<Rebase>` ou sur la collection.
 
 → [Référence des plugins](/docs/plugins)
 
@@ -99,7 +99,7 @@ Deux modes : **Eject** (remplacement complet) ou **Wrap** (enrichissement de l'o
 - `EntityPreview`
 - `Entity.MissingReference`
 
-**Ordre de priorité :** Les `components` au niveau de la collection prévalent sur les valeurs par défaut au niveau de l'application pour le même nom de composant (décomposition d'objet simple — les valeurs de la collection écrasent les valeurs globales). Les noms de composants réservés à l'application (`Shell.*`, `HomePage`, `Auth.*`) ne peuvent être substitués qu'au niveau `<Rebase>`.
+**Ordre de priorité :** Les `components` au niveau de la collection s'appliquent par-dessus les valeurs par défaut au niveau de l'application pour le même nom de composant : un remplacement au niveau collection remplace les deux, et une substitution `wrap: true` au niveau collection enveloppe celle de l'application. Les noms de composants réservés à l'application (`Shell.*`, `HomePage`, `Auth.*`) ne peuvent être substitués qu'au niveau `<Rebase>`.
 
 → [Substitutions de composants](/docs/frontend/component-overrides)
 
@@ -107,7 +107,7 @@ Deux modes : **Eject** (remplacement complet) ou **Wrap** (enrichissement de l'o
 
 **Portée :** entité (ajoute des onglets).
 
-Vues personnalisées qui apparaissent sous forme d'onglets sur la page de détail de l'entité. Peuvent être définies globalement sur `<Rebase>` ou par collection.
+Vues personnalisées qui apparaissent sous forme d'onglets sur la page de détail de l'entité. Définies par collection, ou enregistrées une fois sur `<Rebase entityViews>` (ou `<RebaseCMS entityViews>`) et nommées par `key` dans les `admin.entityViews` d'une collection.
 
 → [Vues d'entités](/docs/frontend/entity-views)
 
@@ -115,7 +115,7 @@ Vues personnalisées qui apparaissent sous forme d'onglets sur la page de détai
 
 **Portée :** entité.
 
-Boutons d'action personnalisés sur des entités individuelles (publier, archiver, cloner, etc.). Peuvent être définis globalement ou par collection.
+Boutons d'action personnalisés sur des entités individuelles (publier, archiver, cloner, etc.). Définis par collection, ou enregistrés une fois sur `<Rebase entityActions>` (ou `<RebaseCMS entityActions>`) et nommés par `key` dans les `admin.entityActions` d'une collection.
 
 → [Actions d'entités](/docs/frontend/entity-actions)
 
@@ -195,14 +195,14 @@ const collection = {
     admin: {
         formView: {
             Builder: MyCustomProductForm,
-            includeActions: true  // Enregistrer et Ignorer dans la barre (par défaut : true)
+            includeActions: true  // Save and Discard in the bar (default: true)
         }
     }
 };
 
 ```
 
-À utiliser lorsque vous avez besoin d'une disposition entièrement personnalisée pour l'expérience d'édition d'entités d'une collection. Pour des ajustements plus modestes, préférez `collection.components` avec une substitution de `Entity.Form`.
+À utiliser lorsque vous avez besoin d'une disposition entièrement personnalisée pour l'expérience d'édition d'entités d'une collection. Pour des ajustements plus modestes, préférez `admin.components` avec une substitution de `Entity.Form`.
 
 Le Builder est rendu à l'intérieur du formulaire de l'enregistrement et reçoit son `formContext` dynamique : écrivez avec `formContext.setFieldValue`, et le bouton Enregistrer de la barre stocke l'enregistrement. Lorsque l'enregistrement ne peut pas être modifié — la vue détaillée en lecture seule, ou un utilisateur sans permission de modification — `formContext.disabled` vaut `true` et les écritures lèvent une erreur. Définissez `includeActions: false` si votre Builder enregistre lui-même via `formContext.submit()`.
 
@@ -239,7 +239,7 @@ panneau affiche, vous n'êtes pas sur la bonne page. Le serveur possède sa prop
 
 ## Résumé de la précédence
 
-- **`collection.components` prévaut sur les `components` globaux** au sein de cette collection. Un remplacement au niveau collection remplace les deux ; une substitution avec `wrap: true` au niveau collection enveloppe la substitution globale lorsqu'elle existe (en 0.24, elle enveloppe le composant intégré et la substitution globale est ignorée). Consultez [Substitutions de composants](/docs/frontend/component-overrides#when-both-scopes-override-a-component).
+- **Les `admin.components` d'une collection prévalent sur les `components` globaux** au sein de cette collection. Un remplacement au niveau collection remplace les deux ; une substitution avec `wrap: true` au niveau collection enveloppe la substitution globale lorsqu'elle existe (en 0.24, elle enveloppe le composant intégré et la substitution globale est ignorée). Consultez [Substitutions de composants](/docs/frontend/component-overrides#when-both-scopes-override-a-component).
 - **Les `Actions` de collection et le slot `collection.actions` sont cumulatifs** — les `Actions` sont rendues en premier, puis les contributions du slot.
-- **Les `entityActions` et `entityViews` au niveau de la collection étendent (ne remplacent pas) les éléments globaux.**
+- **Les `entityActions` et `entityViews` au niveau de l'application sont un registre, pas des valeurs par défaut :** une collection n'en affiche un que si ses propres `admin.entityActions` / `admin.entityViews` nomment sa `key`.
 - **Les plugins s'appliquent dans l'ordre du tableau `plugins`**, et non par `key`. Les contributions aux slots sont rendues selon leur propriété `order` (les valeurs les plus basses en premier, 50 par défaut), et les égalités conservent cet ordre. Les wrappers de champs provenant de plusieurs plugins se composent dans cet ordre, celui du premier plugin étant le plus interne ; en 0.24, seul le dernier wrapper était rendu. Consultez [Plugins](/docs/plugins#field-wrappers-from-several-plugins).

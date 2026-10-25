@@ -1,5 +1,5 @@
 ---
-sourceHash: f66784a0d8158afb
+sourceHash: 5e1a0bbb522c32d0
 title: Ambiente e configurazione
 sidebar_label: Configurazione
 description: Tutte le variabili d'ambiente e le opzioni di configurazione per i progetti Rebase.
@@ -70,7 +70,7 @@ Tutta la configurazione viene eseguita tramite variabili d'ambiente nel file `.e
 | `LOG_LEVEL` | Livello di dettaglio dei log: `error`, `warn`, `info`, `debug` | `info` |
 | `REBASE_LOG_RAW_QUERIES` | Mostra la query SQL sottostante a una riga `Failed query: [redacted]`. Ogni istruzione fallita viene oscurata per impostazione predefinita, poiché una query non riuscita include i parametri associati (ad es. email, hash della password). Impostare su `true` durante la diagnosi di problemi DDL, RLS o di change-capture. Ignorata quando `NODE_ENV=production`. | `false` |
 | `NODE_ENV` | Ambiente: `development`, `production` o `test` | `development` |
-| `CORS_ORIGINS` | Elenco di origini consentite separate da virgola. **Obbligatoria in produzione** se diversa dal dominio di backend. In fase di sviluppo viene *aggiunta a* localhost — vedere di seguito. | — |
+| `CORS_ORIGINS` | Elenco di origini consentite separate da virgola. **Obbligatoria in produzione** a meno che sia impostata `FRONTEND_URL`: un avvio in produzione senza nessuna delle due si rifiuta di partire. In fase di sviluppo viene *aggiunta a* localhost — vedere di seguito. | — |
 | `FRONTEND_URL` | URL dell'applicazione frontend. Utilizzata come alternativa a CORS_ORIGINS, in entrambi gli ambienti. | — |
 | `ADMIN_CONNECTION_STRING` | Stringa di connessione al database a livello di amministratore (utilizzata per l'introspezione dello schema e le operazioni amministrative). Il database specificato non è quello considerato corrente dalla console SQL, né quello copiato per impostazione predefinita da un nuovo branch: entrambi corrispondono al database su cui si trova la connessione dell'applicazione stessa (vedere `REBASE_BRANCH_PARENT_DATABASE` per un server su un branch). | `DATABASE_URL` |
 | `DISABLE_DB_ROLE_SWITCHING` | Disabilita il cambio di ruolo PostgreSQL nell'editor SQL (utile per l'autenticazione personalizzata in cui i ruoli del database non sono mappati). In questo caso la console SQL di Studio indicherà che le righe sono state lette come proprietario della connessione, specificandone il nome, e disabiliterà il selettore dei ruoli. | `false` |
@@ -377,8 +377,8 @@ variabili produce impatti sull'ambiente di distribuzione remota.
 
 ## Gestione dei segreti in sviluppo
 
-Le variabili `JWT_SECRET` e `REBASE_SERVICE_KEY` sono vincolanti in produzione, mentre vengono
-create automaticamente in fase di sviluppo, permettendo di iniziare senza configurazioni manuali.
+`JWT_SECRET` è obbligatoria in produzione. Essa e `REBASE_SERVICE_KEY` vengono
+create automaticamente al di fuori della produzione, permettendo di iniziare senza configurazioni manuali.
 
 Tali valori generati sono memorizzati localmente nel file `.rebase-dev-secrets.json`, affiancato a
 `.rebase-dev-port` e `.rebase-dev-url` e analogamente escluso dal controllo di versione tramite gitignore. Nelle versioni precedenti
@@ -392,12 +392,12 @@ e la perdita di validità di eventuali chiavi API appena generate.
 - Se il file non può essere creato o aggiornato (ad esempio in container con filesystem di sola lettura), il sistema completerà
   comunque l'inizializzazione adottando chiavi volatili in memoria, conformemente al comportamento storico.
 
-La cache locale dei segreti è del tutto inattiva in produzione o in presenza di test runner. In produzione, un avvio
-che richieda la generazione automatica di un segreto viene interrotto, restituendo il nome del parametro mancante:
+La cache locale dei segreti è del tutto inattiva in produzione o in presenza di test runner. In produzione non viene generato nulla: un avvio
+senza `JWT_SECRET` viene interrotto, restituendo il nome della variabile mancante, e questo comportamento resta invariato:
 
 ```
-JWT_SECRET must be explicitly set in production.
-Do not rely on auto-generated secrets outside development.
+The environment is not valid:
+  JWT_SECRET: is required
 ```
 
 ## Oggetto di configurazione del backend

@@ -21,6 +21,19 @@ Usalo per attività che non devono essere perse e che non devono essere eseguite
 
 ## Abilitazione
 
+:::note[Dove va configurato]
+**Runtime gestito** — da nessuna parte. `jobs` accetta *funzioni* handler, che nessuna
+variabile d'ambiente e nessun export di `config/index.ts` può trasportare, quindi un
+progetto creato con lo scaffold non può abilitare la coda. Esegui `rebase eject` (oppure scrivi un
+[server personalizzato](/docs/backend/custom-server/)) per raggiungerla. `REBASE_JOB_WORKERS`
+in `.env` decide solo se i worker di una coda già abilitata girano in *questo*
+processo.
+
+**Ejected** — il blocco `jobs` su `initializeRebaseBackend({ … })`, come qui sotto.
+
+La mappa completa è in [Panoramica del backend](/docs/backend/#where-each-option-lives).
+:::
+
 ```typescript no-verify
 await initializeRebaseBackend({
     jobs: {

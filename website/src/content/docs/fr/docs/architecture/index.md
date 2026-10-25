@@ -1,5 +1,5 @@
 ---
-sourceHash: 840da8865bd3eab7
+sourceHash: 7f14a487f380e2c9
 title: Aperçu de l'architecture
 sidebar_label: Architecture
 description: Comprenez comment le backend, le frontend, le SDK typé et la base de données de Rebase s'intègrent pour former un Backend-as-a-Service complet.
@@ -58,17 +58,17 @@ Le `BackendCollectionRegistry` est l'index d'exécution de toutes les collection
 
 La synchronisation en temps réel utilise le mécanisme natif `LISTEN/NOTIFY` de PostgreSQL :
 
-1. Une mutation de données se produit (insertion, mise à jour, suppression)
-2. Le backend émet un `NOTIFY` sur un canal
+1. Une mutation de données se produit (insertion, mise à jour, suppression) — via l'API, ou par tout autre moyen qui écrit dans la table : `psql`, un cron, l'éditeur SQL
+2. Un trigger sur la table émet un `NOTIFY` sur un canal (là où le trigger ne peut pas être installé, le backend l'émet, uniquement pour les écritures passant par l'API)
 3. Le `RealtimeService` reçoit la notification
 4. Il diffuse le changement à tous les clients WebSocket connectés
 5. Les composants React effectuent un nouveau rendu avec les nouvelles données
 
-Pour les **déploiements multi-instances** (par exemple, Cloud Run avec plusieurs réplicas), fournissez une `connectionString` dans votre PostgresBootstrapper afin que tous les réplicas partagent la même connexion `LISTEN`.
+Pour les **déploiements multi-instances** (par exemple, Cloud Run avec plusieurs réplicas), chaque réplica détient sa propre connexion `LISTEN` vers la même base de données, de sorte qu'un changement atteint les abonnés de tous les réplicas. Derrière un pooler en mode transaction tel que PgBouncer, qui ne conserve pas de `LISTEN`, définissez `DATABASE_DIRECT_URL` sur la base de données elle-même.
 
 ### Registre de stockage
 
-Tout comme les pilotes, les backends de stockage sont enregistrés dans un registre. Vous pouvez avoir plusieurs fournisseurs de stockage (local, S3) et router différents champs de fichiers vers différents backends à l'aide de `storageId`.
+Tout comme les pilotes, les backends de stockage sont enregistrés dans un registre. Vous pouvez avoir plusieurs fournisseurs de stockage (local, S3) et router différents champs de fichiers vers différents backends à l'aide de `storage.storageSource`.
 
 ## Carte des packages
 
@@ -77,14 +77,13 @@ Tout comme les pilotes, les backends de stockage sont enregistrés dans un regis
 | `@rebasepro/types` | Interfaces TypeScript pour les collections, propriétés, entités, plugins | Tout |
 | `@rebasepro/server` | Initialisation du serveur backend, API REST, authentification, stockage, WebSocket | Backend |
 | `@rebasepro/client` | SDK typé — Transport HTTP, WebSocket, authentification | Frontend |
-| `@rebasepro/app` | Framework React — Scaffold, contrôleurs, formulaires, routes, hooks | Frontend |
+| `@rebasepro/app` | Framework React — Scaffold, contrôleurs, formulaires, routes, hooks, vues de connexion, hooks de contrôleur d'authentification | Frontend |
 | `@rebasepro/ui` | Bibliothèque de composants d'interface utilisateur autonome (Tailwind v4 + Radix) | Frontend |
-| `@rebasepro/app` | Vues de connexion, hooks de contrôleur d'authentification, gestion des utilisateurs | Frontend |
 | `@rebasepro/studio` | Éditeur de collection, console SQL, console JS, éditeur RLS, explorateur de stockage | Frontend |
 | `@rebasepro/cli` | CLI pour la génération de schéma, les migrations de base de données, la génération de SDK | Outils de dév |
 | `@rebasepro/forms` | Gestion d'état de formulaire React légère | Frontend |
 | `@rebasepro/plugin-ai` | Plugin d'autocomplétion de champs alimenté par l'IA | Frontend |
-| `@rebasepro/plugin-data-import-export` | Importation et exportation CSV/JSON/Excel | Frontend |
+| `@rebasepro/cms` | Vues, formulaires et routage de gestion de contenu, y compris l'importation et l'exportation CSV/JSON/Excel | Frontend |
 | `@rebasepro/inference` | Déduit les propriétés d'une collection à partir de lignes d'exemple (l'import « créer une collection à partir d'un fichier » de l'admin) | Frontend |
 
 ## Flux de données

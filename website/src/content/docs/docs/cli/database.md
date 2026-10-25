@@ -49,7 +49,7 @@ Generate SQL migration files from schema changes:
 rebase db generate
 ```
 
-Creates timestamped migration files in `drizzle/migrations/` that can be reviewed and committed.
+Creates timestamped migration files in `backend/drizzle/migrations/` that can be reviewed and committed.
 
 ### `rebase db migrate`
 

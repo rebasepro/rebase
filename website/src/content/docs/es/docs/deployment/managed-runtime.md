@@ -1,5 +1,5 @@
 ---
-sourceHash: f02c2b6d0bb6de5f
+sourceHash: 819343e76e0e61e9
 title: Runtime de backend administrado
 sidebar_label: Runtime administrado
 description: Lo que un backend con runtime "managed" puede y no puede hacer en Rebase Cloud — paquetes y binarios, memoria y CPU, tiempos de espera y tamaños de cuerpo, el sistema de archivos, el estado en memoria, secretos, almacenamiento para archivos generados y red de salida.
@@ -46,7 +46,7 @@ Los números aquí provienen del runtime y de la plataforma tal como son hoy. Al
 
 - **Los scripts de instalación nunca se ejecutan.** La instalación utiliza `--ignore-scripts`. Un paquete que descarga un binario o compila algo en `postinstall` se instala sin ello.
 - **Solo se instalan versiones del registro.** Una dependencia `file:`, `link:`, `git+…` o `github:` hace que la compilación falle, porque el runtime no tiene contra qué resolverla.
-- **Algunos paquetes provienen de la imagen, no de ti.** `@rebasepro/*`, `hono`, `@hono/node-server` y `zod` se eliminan de las dependencias del bundle y se vinculan las copias propias de la imagen, por lo que tu versión de ellos no aplica. `typescript` y `tsx` también se eliminan; son herramientas de compilación.
+- **Algunos paquetes provienen de la imagen, no de ti.** `@rebasepro/server`, `@rebasepro/types`, `@rebasepro/client`, `@rebasepro/common`, `@rebasepro/utils`, `hono`, `@hono/node-server` y `zod` se eliminan de las dependencias del bundle y se vinculan las copias propias de la imagen, por lo que tu versión de ellos no aplica. Los demás paquetes `@rebasepro/*`, como el driver de base de datos, se instalan desde tu `package.json` como cualquier dependencia. `typescript` y `tsx` también se eliminan; son herramientas de compilación.
 - **Los paquetes privados necesitan un `.npmrc`.** `rebase build` copia el `.npmrc` del proyecto (y `backend/.npmrc`) en el bundle, para que la instalación use la misma configuración de registro que tu máquina. Cada credencial dentro de él debe ser una referencia a una variable de entorno, nunca el token en sí; un token literal hace que la compilación falle, ya que el bundle se sube con tu código:
 
   ```ini title=".npmrc"
@@ -127,7 +127,7 @@ El sistema de archivos del contenedor es de lectura y escritura, y `/tmp` funcio
 |---|---|---|
 | Tiempo de espera de funciones | 30 s, luego `504` con código `FUNCTION_TIMEOUT` | `REBASE_FUNCTIONS_TIMEOUT_MS` (`0` lo desactiva) |
 | Espera en tu instancia, en el edge | 10 minutos entre lecturas o escrituras | Fijo |
-| Cuerpo de la solicitud, todas las rutas `/api/*` | 10 MiB, luego `413 PAYLOAD_TOO_LARGE` | `REBASE_MAX_BODY_SIZE`, en bytes |
+| Cuerpo de la solicitud, rutas `/api/*` sin un límite propio | 10 MiB, luego `413 PAYLOAD_TOO_LARGE` | `REBASE_MAX_BODY_SIZE`, en bytes |
 | Cuerpo de la solicitud en el edge | 64 MiB | Fijo |
 | Un archivo mediante `POST /api/storage/upload` | 50 MB | `STORAGE_MAX_FILE_SIZE` |
 | Llamadas anónimas a `/api/functions/*` | 3000 por IP cada 15 minutos | `rateLimit.anonymousFunctions` |

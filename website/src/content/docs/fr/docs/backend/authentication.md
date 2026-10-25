@@ -1,5 +1,5 @@
 ---
-sourceHash: d9b66c9d404a5085
+sourceHash: bd2df1ee8d59330b
 title: Authentification
 sidebar_label: Authentification
 description: Configurez l'authentification JWT, les fournisseurs OAuth, les e-mails SMTP, la protection contre les bots et la collection d'utilisateurs sur le backend Rebase.
@@ -95,6 +95,7 @@ const backend = await initializeRebaseBackend({
 | `disableSelfRegistration` | `boolean` | `false` | Coupe-circuit : ferme également la fenêtre de bootstrap du premier utilisateur laissée ouverte par `allowRegistration: false` |
 | `allowAnonymous` | `boolean` | `false` | Activer `POST /api/auth/anonymous`. Délibérément non conditionné par `allowRegistration` — une application publique principalement en lecture peut nécessiter des sessions sans comptes. Transformer un invité en compte (`POST /api/auth/anonymous/link`) est une inscription, et nécessite aussi `allowRegistration` — et `allowAnonymous` toujours activé : désactivé, il refuse aussi les invités déjà connectés, si bien qu'aucun ne peut devenir un compte (`403 ANONYMOUS_AUTH_DISABLED`) |
 | `allowUserLookup` | `boolean` | `false` | Monter `POST /api/auth/find-user` pour les flux d'invitation par e-mail |
+| `captcha` | `CaptchaConfig` | — | Protection contre les bots sur les routes qui envoient des e-mails — voir [Protection contre les bots](#protection-contre-les-bots) |
 | `defaultRole` | `string` | — | Rôle attribué à un utilisateur nouvellement inscrit lorsqu'aucun n'est spécifié. Il ne peut pas être `admin`, ni un rôle déclaré qui détient une portée du plan d'administration : le démarrage refuse les deux |
 | `serviceKey` | `string` | — | Clé statique pour les appels de serveur à serveur — voir [Authentification par clé de service](/docs/backend/auth-endpoints/#service-key-authentication) |
 | `email` | `EmailConfig` | — | SMTP, pour la réinitialisation de mot de passe, la vérification, les invitations et les liens magiques |
@@ -312,9 +313,11 @@ DISCORD_CLIENT_SECRET=…
 
 `GET /api/auth/config` liste ensuite `discord` dans `enabledProviders`, ce qui permet de vérifier que la paire a bien été prise en compte.
 
+Google se configure avec `GOOGLE_CLIENT_ID` seul : son flux par jeton d'ID n'a besoin d'aucun secret, `GOOGLE_CLIENT_SECRET` est donc facultatif.
+
 Apple est l'exception : il ne possède pas de secret client statique, car Rebase signe un JWT ES256 à courte durée de vie pour chaque échange de jetons. Il nécessite les quatre variables `APPLE_CLIENT_ID`, `APPLE_TEAM_ID`, `APPLE_KEY_ID` et `APPLE_PRIVATE_KEY` — le contenu du fichier `.p8`, sauts de ligne inclus.
 
-Deux options n'ont pas d'équivalent dans les variables d'environnement et requièrent le bloc `auth` (donc un backend éjecté ou configuré par le code) : `microsoft.tenantId`, qui vaut par défaut `common` et signale chaque adresse comme non vérifiée, et `gitlab.baseUrl`, pour une instance auto-hébergée.
+Deux options n'ont pas d'équivalent dans les variables d'environnement et requièrent le bloc `auth` (donc un backend éjecté ou configuré par le code) : `microsoft.tenantId`, qui vaut par défaut `common` et accepte chaque tenant Entra (avec n'importe quel tenant, une adresse n'est considérée comme vérifiée que si l'enregistrement de l'application émet la revendication `xms_edov`), et `gitlab.baseUrl`, pour une instance auto-hébergée.
 
 Chaque champ nommé est résolu au démarrage dans `auth.providers`, qui est le tableau canonique et le point d'extension pour tout ce que les champs nommés ne couvrent pas. Les entrées sont créées avec les factories `create*Provider`, et les deux formes fusionnent — les champs nommés sont ajoutés après les entrées explicites :
 
@@ -368,11 +371,13 @@ prouve aussi. `requireEmailVerification` rend l'inscription à confirmation pré
 
 ## Tables créées automatiquement
 
-Lors du premier démarrage, Rebase provisionne automatiquement le schéma `auth` et les tables suivantes dans la base de données (liées au schéma défini dans votre collection, par ex. `rebase`) :
+Lors du premier démarrage, Rebase provisionne automatiquement le schéma `rebase` et les tables suivantes dans la base de données (liées au schéma défini dans votre collection, par ex. `rebase`) :
 
 - **`rebase.users`** — Comptes utilisateurs avec e-mail, hash de mot de passe, métadonnées et une colonne `roles` en text[] (les rôles sont stockés sous forme de tableaux de texte inline pour optimiser les requêtes et éviter les jointures).
+- **`rebase.user_identities`** — Les identités OAuth liées à chaque compte, une ligne par identité de fournisseur.
 - **`rebase.refresh_tokens`** — Sessions longue durée contenant les jetons de rafraîchissement hachés, les user-agents et les adresses IP. Comprend un index unique sur `token_hash`. Une connexion correspond à un seul `session_id`, partagé par chaque jeton issu de sa rotation ; il n'y a pas de contrainte par appareil, donc deux navigateurs derrière une même adresse comptent pour deux sessions. Chaque jeton d'une session porte aussi son niveau d'assurance (`aal`) et la façon dont la connexion s'est faite (`method`, que rapporte `providerId`).
 - **`rebase.password_reset_tokens`** — Jetons à usage unique avec expiration pour les flux de réinitialisation de mot de passe.
+- **`rebase.magic_link_tokens`** — Jetons à usage unique avec expiration pour la connexion par lien magique.
 - **`rebase.mfa_factors`** — Méthodes d'authentification multifacteur enregistrées (par ex. secrets TOTP chiffrés avec AES-256).
 - **`rebase.mfa_challenges`** — Journaux de vérification suivant les tentatives actives de validation MFA.
 - **`rebase.recovery_codes`** — Codes de secours/récupération multifacteur hachés.
@@ -380,8 +385,8 @@ Lors du premier démarrage, Rebase provisionne automatiquement le schéma `auth`
 
 Les jetons qui expirent — liens de réinitialisation, liens magiques et codes par e-mail,
 jetons de rafraîchissement, challenges MFA — sont supprimés une heure après leur expiration.
-Le balayage s'exécute sur le processus qui détient les minuteurs (le rôle `worker` dans un
-déploiement scindé) et sur une seule instance de la flotte : chaque heure est revendiquée dans
+Le balayage s'exécute sur les processus qui détiennent les minuteurs (tous les rôles sauf `functions`
+dans un déploiement scindé, à moins que `REBASE_CRON_SCHEDULER=false` ne les retire de l'`api`) et sur une seule instance de la flotte : chaque heure est revendiquée dans
 `rebase.cron_claims` sous l'id de job `rebase:auth:expired-tokens`, comme l'est un créneau cron.
 Avec `cronPersistence: false` il n'y a pas de table de revendications, et chaque instance de ce
 type balaie. Un jeton expiré est refusé quand il est présenté, que le balayage ait eu lieu ou non ;

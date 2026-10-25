@@ -45,7 +45,7 @@ environment, the row says so.
 |----------|------|---------|-------------|
 | `server` | `Server` (Node `http.Server`) | — | **Required by `initializeRebaseBackend`.** The HTTP server — the realtime socket attaches to it, and its `shutdown()` closes it. With `createRebaseBackend` you pass it to `attachRealtime(server)` and `shutdown(t, { server })` instead |
 | `app` | `Hono<HonoEnv>` | — | **Required by `initializeRebaseBackend`**, which mounts onto it. With `createRebaseBackend`: `backend.mount(app)`, or `app.route(path, backend.routes.data())` per group |
-| `provision` | `boolean \| { collections?: boolean; realtime?: boolean }` | — | **Required by `createRebaseBackend`** (new in 0.25); `initializeRebaseBackend` passes `true`. What building the backend may change in the database. `true`: the collection tables and their RLS policies, change capture for realtime, the role requests run as, and the framework's own tables (API keys, cron runs, jobs, metrics). `false`: nothing — the schema must already be there (a migration, or another process built with `true`), and a missing table fails on use, not at boot; what a script, a test or a second process wants. `{ collections: false, realtime: false }`: the framework's tables and the role only — a process that is not the schema's owner. `REBASE_MIGRATE_ON_BOOT=none` still turns the collection schema off |
+| `provision` | `boolean \| { collections?: boolean; realtime?: boolean }` | — | **Required by `createRebaseBackend`** (new in 0.25); `initializeRebaseBackend` passes `true` (`false` under `REBASE_PROVISION=false`). What building the backend may change in the database. `true`: the collection tables and their RLS policies, change capture for realtime, the role requests run as, and the framework's own tables (API keys, cron runs, jobs, metrics). `false`: nothing, at boot or later (not even the tables other backends make on first use) — the schema must already be there (a migration, or another process built with `true`); missing auth tables refuse at boot, and a missing optional table turns its feature off and is named in the log; what a script, a test or a second process wants. `{ collections: false, realtime: false }`: the framework's tables and the role only — a process that is not the schema's owner. `REBASE_MIGRATE_ON_BOOT=none` still turns the collection schema off |
 | `collections` | `AnyCollectionConfig[]` | `[]` | Inline collection definitions. Declaring **none** (and no `collectionsDir`) is what makes the server derive them from the live database instead, so every RLS-protected table is served with nothing to define. There is no `mode` flag — it was removed, because it could only ever agree with this or contradict it |
 | `collectionsDir` | `string` | — | Directory to auto-discover collection files (used if `collections` is empty). Also what the schema editor rewrites, so passing it beside `collections` is not ambiguous: the values are served, the directory is edited |
 | `basePath` | `string` | `"/api"` | `initializeRebaseBackend` only: base path for all API routes. With `createRebaseBackend`: `backend.mount(app, { basePath })` |
@@ -93,8 +93,8 @@ environment, the row says so.
 > **IMPORTANT FOR AGENTS: storage refuses to boot in production without an access
 > model.** When storage is configured and `NODE_ENV=production`,
 > `initializeRebaseBackend` **throws at startup** unless one of `storageAuthorize`,
-> `storagePublicRead: true`, or `storageInsecureAllowAnyAuthenticated: true` is
-> set. In development it logs a warning instead — so a project can be wrong about
+> `storagePolicies`, `storagePublicRead: true`, or
+> `storageInsecureAllowAnyAuthenticated: true` is set. In development it logs a warning instead — so a project can be wrong about
 > this and work fine locally right up until it is deployed. A scaffolded project
 > ships a hook in `config/storage.ts`; read it before replacing it.
 
@@ -224,8 +224,8 @@ await initializeRebaseBackend({
     database: createPostgresAdapter({ connection: db, connectionString }),
     collections: [...collections, defaultUsersCollection],
     collectionsDir: "../config/collections",
-    functionsDir: "./src/functions",
-    cronsDir: "./src/crons",
+    functionsDir: "./functions",   // backend/functions, as `rebase eject` lays it out
+    cronsDir: "./crons",
     auth: {
         collection: defaultUsersCollection,
         jwtSecret: env.JWT_SECRET,
@@ -279,7 +279,7 @@ const backend = await createRebaseBackend({
     database: createPostgresAdapter({ connection: db, connectionString }),
     collections,
     auth: { jwtSecret: env.JWT_SECRET },
-    functions: await loadFunctions("./src/functions"),   // { name: app }
+    functions: await loadFunctions("./functions"),       // { name: app }
     provision: true                                     // required: may it run DDL?
 });
 
@@ -360,9 +360,9 @@ Any collection in that directory that declares no `securityRules` inherits these
 one that declares its own keeps them; one with neither is **locked by default**
 (admin-only).
 
-It belongs there because `db push` generates the Postgres policies — the only
-thing that actually enforces access — from the collection *files*, and never sees
-the running server. A default on the backend config could never reach the
+It belongs there because `db push` and the boot generate the Postgres policies —
+the only thing that actually enforces access — from the collections themselves,
+and `db push` never sees the running server. A default on the backend config could never reach the
 database while reading exactly like an authorization setting. In `baas` mode there
 are no collection files and no `db push`, so the database's own RLS is the whole
 model and there is nothing to default.

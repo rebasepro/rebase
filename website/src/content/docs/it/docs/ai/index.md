@@ -1,5 +1,5 @@
 ---
-sourceHash: 289adf93a568aac7
+sourceHash: 9d4730f8239c48ed
 title: AI e agenti
 sidebar_label: Panoramica
 description: Cosa offre Rebase per gli assistenti di programmazione IA e gli agenti autonomi — un server MCP, skill per agenti locali al progetto, file di istruzioni generati e il modello di credenziali che determina a cosa un agente può effettivamente accedere.
@@ -9,8 +9,8 @@ Rebase fornisce quattro elementi distinti per gli assistenti IA, e ciascuno riso
 
 | | Cos'è | Chi lo utilizza |
 |---|---|---|
-| [**Server MCP**](/docs/ai/mcp) | Un server stdio Model Context Protocol con 42 strumenti per schema, dati, utenti, storage, cron e dev server | Un assistente, a runtime |
-| [**Skill per agenti**](/docs/ai/skills) | 21 file di skill in Markdown inseriti nella tua repo da `rebase skills install` | Un assistente, come materiale di riferimento |
+| [**Server MCP**](/docs/ai/mcp) | Un server stdio Model Context Protocol con 44 strumenti per schema, dati, utenti, storage, cron e dev server | Un assistente, a runtime |
+| [**Skill per agenti**](/docs/ai/skills) | 23 file di skill in Markdown inseriti nella tua repo da `rebase skills install` | Un assistente, come materiale di riferimento |
 | [**File di istruzioni**](/docs/ai/instruction-files) | `ai-instructions.md` più file puntatore specifici per assistente, creati da `rebase init` | Un assistente, come regole sempre attive |
 | [**Chiavi API**](/docs/backend/api-keys) | Credenziali macchina che possiedono [scope](/docs/backend/roles-and-scopes), per collezione e per operazione | Qualsiasi client che chiami l'API HTTP |
 
@@ -51,5 +51,5 @@ Per la ricerca lessicale — ricerca full-text con ranking sui campi specificati
 ## Passaggi successivi
 
 - [Server MCP](/docs/ai/mcp) — connetti Claude Code, Cursor o qualsiasi client MCP
-- [Skill per agenti](/docs/ai/skills) — `rebase skills install` e le 21 skill
+- [Skill per agenti](/docs/ai/skills) — `rebase skills install` e le 23 skill
 - [File di istruzioni IA](/docs/ai/instruction-files) — il pattern delle regole generate

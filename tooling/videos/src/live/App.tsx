@@ -1,7 +1,6 @@
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Player, type PlayerRef } from "@remotion/player";
-import { RebaseDesk, type DeskProps } from "../desk/DeskFilm";
-import { DESK_NARRATION } from "../desk/script";
+import { filmById, FILMS, type FilmProps } from "./films";
 import { buildDeskTimeline, LIVE_HORIZON, type Timing } from "../desk/timeline";
 import { Follower } from "./follow";
 import { canRecognize, Recognizer, TakeRecorder, VoiceDetector } from "./listen";
@@ -28,6 +27,9 @@ const FPS = 30;
 const params = new URLSearchParams(location.search);
 const SIMULATE = params.has("simulate") ? Number(params.get("simulate")) || 155 : null;
 const LANG = params.get("lang") ?? "en-US";
+/** Which film is being recorded: ?film=<id>, the desk film by default. */
+const FILM = filmById(params.get("film"));
+const SCRIPT = FILM.script;
 
 type Phase = "setup" | "ready" | "recording" | "saving" | "saved" | "error";
 
@@ -37,7 +39,7 @@ interface Saved {
     render: string;
 }
 
-const EMPTY: Timing = { live: true, lines: DESK_NARRATION.map(() => null) };
+const EMPTY: Timing = { live: true, lines: SCRIPT.map(() => null) };
 
 /** One take in progress. */
 interface Session {
@@ -183,7 +185,7 @@ export const App: React.FC = () => {
         setSaved(null);
         setError(null);
         const id = takeId();
-        const follower = new Follower(FPS);
+        const follower = new Follower(FPS, 15, SCRIPT);
         const s: Session = {
             id,
             follower,
@@ -259,12 +261,14 @@ export const App: React.FC = () => {
                 fps: FPS,
                 lang: LANG,
                 simulated: SIMULATE !== null,
+                film: FILM.id,
+                compositions: FILM.compositions,
                 recordedAt: new Date().toISOString(),
                 durationFrames: Math.round(((performance.now() - s.t0) * FPS) / 1000),
                 container: s.recorder?.extension ?? null,
                 latency: f.latency,
                 perWord: f.perWord,
-                lines: DESK_NARRATION.map((l, k) => ({
+                lines: SCRIPT.map((l, k) => ({
                     id: l.id,
                     words: l.words,
                     said: f.said[k],
@@ -327,7 +331,7 @@ export const App: React.FC = () => {
 
     /* ── the page ────────────────────────────────────────────────────── */
 
-    const inputProps = useMemo<DeskProps>(() => ({ timing, live: { stream } }), [timing, stream]);
+    const inputProps = useMemo<FilmProps>(() => ({ timing, live: { stream } }), [timing, stream]);
 
     /* ?simulate is a demonstration: it starts reading by itself. (Armed in
        the timeout, not before it: StrictMode runs this effect twice in
@@ -357,7 +361,7 @@ export const App: React.FC = () => {
                 <div style={{ height: "100%", aspectRatio: "16 / 9", maxWidth: "100%", borderRadius: 13, overflow: "hidden", border: "1px solid rgba(255,255,255,0.08)" }}>
                     <Player
                         ref={player}
-                        component={RebaseDesk}
+                        component={FILM.component}
                         inputProps={inputProps}
                         durationInFrames={LIVE_HORIZON}
                         fps={FPS}
@@ -381,7 +385,7 @@ export const App: React.FC = () => {
                     {recording ? `● REC ${clock(elapsed)}` : phase === "saving" ? "saving…" : SIMULATE ? `simulated read, ${SIMULATE} wpm` : "ready"}
                 </span>
                 <span>
-                    line {Math.min(position.line + 1, DESK_NARRATION.length)}/{DESK_NARRATION.length}
+                    line {Math.min(position.line + 1, SCRIPT.length)}/{SCRIPT.length}
                 </span>
                 <Meter level={status.level} threshold={status.threshold} speaking={status.speaking} />
                 <span style={{ color: "rgba(255,255,255,0.45)" }}>{canRecognize() || SIMULATE ? status.recognition : "no speech recognition — use Chrome"}</span>
@@ -396,6 +400,24 @@ export const App: React.FC = () => {
                         <button style={button} onClick={() => void start()}>
                             Start — Space
                         </button>
+                        <label style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                            Film
+                            <select
+                                value={FILM.id}
+                                style={select}
+                                onChange={(e) => {
+                                    const next = new URLSearchParams(location.search);
+                                    next.set("film", e.target.value);
+                                    location.search = next.toString();
+                                }}
+                            >
+                                {FILMS.map((f) => (
+                                    <option key={f.id} value={f.id}>
+                                        {f.title}
+                                    </option>
+                                ))}
+                            </select>
+                        </label>
                         {!SIMULATE && (
                             <>
                                 <Select label="Camera" value={camera} options={cameras} onChange={(v) => { setCamera(v); remember("live.camera", v); }} />
@@ -451,9 +473,9 @@ const Prompter: React.FC<{ position: { line: number; word: number }; timing: Tim
     const words = useRef(new Map<string, HTMLSpanElement>());
     const [offset, setOffset] = useState(0);
     const idle = phase !== "recording";
-    const current = Math.min(position.line, DESK_NARRATION.length - 1);
+    const current = Math.min(position.line, SCRIPT.length - 1);
     const spoken = Math.max(timing.lines[current]?.words.length ?? 0, position.word);
-    const focus = Math.min(spoken, DESK_NARRATION[current].words.length - 1);
+    const focus = Math.min(spoken, SCRIPT[current].words.length - 1);
 
     useLayoutEffect(() => {
         const span = words.current.get(`${current}:${idle ? 0 : focus}`);
@@ -486,7 +508,7 @@ const Prompter: React.FC<{ position: { line: number; word: number }; timing: Tim
                     textAlign: "left",
                 }}
             >
-                {DESK_NARRATION.map((line, k) => (
+                {SCRIPT.map((line, k) => (
                     <p key={line.id} style={{ margin: "0 0 0.45em" }}>
                         {line.words.map((w, i) => {
                             const said = !idle && (k < current || (k === current && i < spoken));
@@ -548,7 +570,7 @@ const Select: React.FC<{ label: string; value: string | undefined; options: Medi
 
 /** Feeds the follower a simulated read, on the real clock. */
 function runSimulation(follower: Follower, t0: number, wpm: number, onText: (text: string) => void): () => void {
-    const read = simulateRead({ wpm, startMs: 1500 });
+    const read = simulateRead({ wpm, startMs: 1500, script: SCRIPT });
     let i = 0;
     let stopped = false;
     const frame = (ms: number) => (ms * FPS) / 1000;
@@ -574,7 +596,7 @@ function runSimulation(follower: Follower, t0: number, wpm: number, onText: (tex
 
 function summarize(t: Timing): string {
     const tl = buildDeskTimeline(t);
-    return DESK_NARRATION.map((l, k) => {
+    return SCRIPT.map((l, k) => {
         const s = t.lines[k];
         if (!s) return `${l.id.padEnd(9)} —`;
         const start = s.words[0] / FPS;

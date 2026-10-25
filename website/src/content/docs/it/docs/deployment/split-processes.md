@@ -1,5 +1,5 @@
 ---
-sourceHash: 8dc5279c89b40f48
+sourceHash: 8c0fc8ebbe0f0b10
 title: Suddivisione in più processi
 sidebar_label: Processi separati
 description: Esegui un unico bundle suddiviso in vari processi cooperanti — un'API, un livello per le funzioni, un worker — a partire dalla stessa immagine di runtime pubblicata, evitando che una funzione custom pesante competa con l'API dati.
@@ -293,9 +293,10 @@ piuttosto che un vincolo imposto dal runtime.
 ## Aggiornamento
 
 Invariato: ogni processo esegue la stessa immagine pubblicata, quindi un aggiornamento corrisponde alla
-modifica dello stesso tag su ciascuno di essi. Esegui il rollout dell'`api` per ultimo se desideri che il
-provisioning dello schema avvenga per primo rispetto alla nuova versione — anche se in pratica
-l'ordine è irrilevante, poiché la procedura di schema è additiva e idempotente.
+modifica dello stesso tag su ciascuno di essi. Esegui per primo il rollout del processo che gestisce lo schema — l'`api`,
+oppure il Job di migrazione — in modo che lo schema della nuova versione sia già al suo posto
+prima che gli altri processi vi operino contro: un'unità può rimanere indietro, mai essere più avanti (vedi
+[La regola](#la-regola)).
 
 ## Risorse correlate
 

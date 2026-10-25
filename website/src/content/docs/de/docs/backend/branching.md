@@ -1,5 +1,5 @@
 ---
-sourceHash: 6c8e1509d678993c
+sourceHash: 90e9eafee6523006
 title: Datenbank-Branching
 sidebar_label: Branching
 description: Erstellen Sie isolierte Datenbank-Branches für Entwicklung, Staging und Tests mit PostgreSQLs CREATE DATABASE ... TEMPLATE – sofortige, originalgetreue Kopien ohne Ausfallzeiten.
@@ -96,7 +96,7 @@ Branch-Konfigurationen werden in der Standarddatenbank in der Tabelle `rebase.br
 CREATE SCHEMA IF NOT EXISTS rebase;
 
 CREATE TABLE IF NOT EXISTS rebase.branches (
-    name         TEXT PRIMARY KEY,              -- Sanitize user branch name (alphanumeric & underscores)
+    name         TEXT PRIMARY KEY,              -- Branch name as given (letters, digits, underscores, hyphens)
     db_name      TEXT NOT NULL UNIQUE,          -- Actual PostgreSQL database name (prefixed with 'rb_')
     parent_db    TEXT NOT NULL,                 -- Source database cloned from
     created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -213,7 +213,7 @@ rebase db branch switch --off
 # Show one branch's parent, age and size
 rebase db branch info dev_sandbox
 
-# Was der Branch geändert hat: Schema, RLS-Richtlinien und Zeilen (--json für alles)
+# What the branch changed: schema, RLS policies and rows (--json for all of it)
 rebase db branch diff dev_sandbox
 
 # Delete a branch
@@ -265,7 +265,11 @@ Das Erstellen eines Branches ändert **nicht**, mit welcher Datenbank Ihr Projek
 postgresql://user:pass@localhost:5432/rb_dev_sandbox
 ```
 
+---
+
 ## Einen Branch prüfen und zusammenführen
+
+<span class="since-badge" data-since="0.26">Seit 0.26</span>
 
 Ein Branch ist der Ort, an dem ein Agent – oder eine Migration, bei der Sie sich nicht sicher sind – eine Datenbank ändern kann, ohne die echte anzufassen. Bevor davon etwas die Datenbank erreicht, aus der der Branch erstellt wurde, können Sie in [Studio](/docs/studio/) sehen, was sich geändert hat, und es zusammenführen: Öffnen Sie **Branches** und wählen Sie einen aus.
 
@@ -305,16 +309,14 @@ Jeder Schreibvorgang geschieht in einer einzigen Anweisung auf dem Elternteil �
 
 ```typescript
 const diff = await admin.diffBranch("agent_run_17");
-// …diff.schema und diff.data prüfen…
+// …review diff.schema and diff.data…
 const result = await admin.mergeBranch("agent_run_17", {
     expectedFingerprint: diff.fingerprint,
-    onConflict: "abort" // oder "branch", oder "target"
+    onConflict: "abort" // or "branch", or "target"
 });
 ```
 
 Zusammenführen ist bewusst kein MCP-Tool: Ein Agent schlägt auf seinem Branch vor, und ein Mensch führt zusammen.
-
----
 
 ---
 

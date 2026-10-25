@@ -642,3 +642,93 @@ describe("a deployment that sets no role at all", () => {
         expect(single.output()).not.toMatch(/Partial runtime surface/);
     });
 });
+
+describe("the chart's migration Job", () => {
+    /**
+     * The env `infra/charts/rebase/templates/job-migrate.yaml` gives its one
+     * container, against a database nothing has touched — then the pod that
+     * follows it, with `REBASE_MIGRATE_ON_BOOT=none` as the chart writes on
+     * every unit when the Job owns the schema.
+     *
+     * The Job used to run as `REBASE_ROLE=worker`, which the runtime refuses
+     * beside `REBASE_MIGRATE_ON_BOOT=ensure`, so every default install stopped
+     * at its pre-install hook. `check:chart` now resolves each rendered unit's
+     * env with the runtime's role rules; this is the other half — that a run in
+     * this shape really provisions and exits on a real database.
+     */
+    const JOB_ENV = {
+        REBASE_ROLE: "all",
+        REBASE_MIGRATE_ON_BOOT: "ensure",
+        REBASE_CRON_SCHEDULER: "false",
+        REBASE_JOB_WORKERS: "false",
+        REBASE_PROVISION_ONLY: "true"
+    };
+    let databaseUrl: string;
+
+    /** Run a process to its end — what a Job is — and return what it said. */
+    function runToExit(env: Record<string, string>): Promise<{ code: number | null; output: string }> {
+        const child = spawn(process.execPath, [SERVER_BIN, PROJECT_ROOT], {
+            env: { ...baseEnv(), ...env },
+            stdio: ["ignore", "pipe", "pipe"]
+        });
+        let output = "";
+        child.stdout?.on("data", (chunk: Buffer) => { output += chunk.toString(); });
+        child.stderr?.on("data", (chunk: Buffer) => { output += chunk.toString(); });
+        return new Promise((resolve, reject) => {
+            const timer = setTimeout(() => {
+                child.kill("SIGKILL");
+                reject(new Error(`Timed out waiting for the run to exit.\n${output}`));
+            }, 90_000);
+            child.once("exit", (code) => {
+                clearTimeout(timer);
+                resolve({ code, output });
+            });
+        });
+    }
+
+    /** Whether `public.split_notes` exists in the Job's own database. */
+    async function notesTableExists(): Promise<boolean> {
+        const { default: pg } = await import("pg");
+        const client = new pg.Client({ connectionString: databaseUrl });
+        await client.connect();
+        try {
+            const { rows } = await client.query("SELECT to_regclass('public.split_notes') IS NOT NULL AS present");
+            return Boolean(rows[0]?.present);
+        } finally {
+            await client.end();
+        }
+    }
+
+    beforeAll(async () => {
+        await query("CREATE DATABASE chart_migration_job");
+        const url = new URL(container.connectionString);
+        url.pathname = "/chart_migration_job";
+        databaseUrl = url.toString();
+    }, 60_000);
+
+    it("would have been refused as a worker — the shape it had before", async () => {
+        const run = await runToExit({ ...JOB_ENV, REBASE_ROLE: "worker", DATABASE_URL: databaseUrl });
+
+        expect(run.code).not.toBe(0);
+        expect(run.output).toMatch(/REBASE_ROLE="worker" cannot also provision the database schema/);
+        expect(await notesTableExists()).toBe(false);
+    }, 120_000);
+
+    it("provisions the collection schema on an empty database and exits", async () => {
+        const run = await runToExit({ ...JOB_ENV, DATABASE_URL: databaseUrl });
+
+        expect(run.code, run.output).toBe(0);
+        expect(run.output).toMatch(/Schema provisioning complete/);
+        expect(await notesTableExists()).toBe(true);
+    }, 120_000);
+
+    it("leaves a schema the pod after it serves, without that pod provisioning", async () => {
+        const pod = await start({ REBASE_MIGRATE_ON_BOOT: "none", DATABASE_URL: databaseUrl });
+        try {
+            expect(pod.output()).toMatch(/Collection schema: skipped — REBASE_MIGRATE_ON_BOOT=none/);
+            expect((await fetch(`${pod.origin}/api/data/notes`)).status).toBe(200);
+        } finally {
+            await stop(pod);
+        }
+    }, 120_000);
+});

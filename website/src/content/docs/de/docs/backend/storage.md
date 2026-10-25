@@ -1,5 +1,5 @@
 ---
-sourceHash: cc1736a186791d89
+sourceHash: afd1a90c05fb48c3
 title: Speicher-Konfiguration
 sidebar_label: Speicher-Konfiguration
 description: Konfigurieren Sie lokales Dateisystem, S3-kompatible Backends oder GCS/Firebase Storage für Datei-Uploads, Bilder und Medien.
@@ -16,7 +16,7 @@ Rebase unterstützt drei Speicher-Backends:
 ## Konfiguration
 
 :::note[Wo dies hingehört]
-**Managed Runtime** — die `STORAGE_*`-Variablen in `.env` (`STORAGE_TYPE`, `STORAGE_BUCKET` oder `S3_BUCKET` / `GCS_BUCKET`, `STORAGE_PATH`, `STORAGE_PUBLIC_READ`, … — fügen Sie an jede davon das Suffix `__<KEY>` für eine benannte Quelle an), plus eine `bucket("<key>")`-Deklaration in `config/resources.ts` für jedes Bucket über das Standard-Bucket hinaus, und `export const storageAuthorize` aus `config/index.ts`. `storageAuthorize` existiert bewusst nicht als Umgebungsvariable: Keine Variable kann ausdrücken: „Dieser Benutzer darf diesen Schlüssel lesen“.
+**Managed Runtime** — die `STORAGE_*`-Variablen in `.env` (`STORAGE_TYPE`, `S3_BUCKET` / `GCS_BUCKET`, `STORAGE_PATH`, `STORAGE_PUBLIC_READ`, … — fügen Sie an jede davon das Suffix `__<KEY>` für eine benannte Quelle an), plus eine `bucket("<key>")`-Deklaration in `config/resources.ts` für jedes Bucket über das Standard-Bucket hinaus, und `export const storageAuthorize` aus `config/index.ts`. `storageAuthorize` existiert bewusst nicht als Umgebungsvariable: Keine Variable kann ausdrücken: „Dieser Benutzer darf diesen Schlüssel lesen“.
 
 **Ejected** — der `storage`-Block in `initializeRebaseBackend({ … })`. `storagePolicies` und `storageTriggers` sind nur im Ejected-Modus verfügbar.
 
@@ -99,7 +99,7 @@ image: {
 
 | Methode | Pfad | Beschreibung |
 |--------|------|-------------|
-| `POST` | `/api/storage/upload` | Direkter Datei-Upload, ein einziger `multipart/form-data`-Body: `file` (Pflichtfeld); `key`, der Objektschlüssel samt Ordnern (`author_pictures/ada.jpg`), sonst der Dateiname im Wurzelverzeichnis; `bucket`, sonst der Standard-Bucket; `storageId`; und `metadata_<name>` für eigene Metadaten. Jedes andere Feld wird ignoriert: Ein Feld `path` gibt es nicht |
+| `POST` | `/api/storage/upload` | Direkter Datei-Upload, ein einziger `multipart/form-data`-Body: `file` (Pflichtfeld); `key`, der Objektschlüssel samt Ordnern (`author_pictures/ada.jpg`), sonst der Dateiname im Wurzelverzeichnis; `bucket`, sonst der Standard-Bucket; `storageId`; `collection` und `property`, die die Datei an `maxSize` und `acceptedFiles` dieser Property binden; und `metadata_<name>` für eigene Metadaten. Jedes andere Feld wird ignoriert: Ein Feld `path` gibt es nicht |
 | `POST` | `/api/storage/upload?storageId=<key>` | Upload in ein bestimmtes benanntes Backend |
 | `GET` | `/api/storage/file/*` | Eine Datei abrufen — alles nach `/file/` ist der Objektschlüssel |
 | `GET` | `/api/storage/file/*?storageId=<key>` | Eine Datei von einem bestimmten Backend abrufen |
@@ -362,8 +362,8 @@ Leiten Sie eine Eigenschaft über `storageSource` an eine Quelle weiter:
 ```ts
 {
     name: "Cover",
-    dataType: "string",
-    storage: { storageSource: "media", acceptedFiles: ["image/*"] }
+    type: "string",
+    storage: { storagePath: "covers", storageSource: "media", acceptedFiles: ["image/*"] }
 }
 ```
 
@@ -401,7 +401,7 @@ sodass eine Quelle den Provider wechseln kann, ohne die anderen zu beeinträchti
 
 ## Frontend-Speicherquellen
 
-Wenn Sie mehrere Speicher-Backends verwenden, übergeben Sie `storageSources` an den `<Rebase>`-Provider, damit das Frontend weiß, wie Uploads direkt weitergeleitet werden:
+Das Frontend erfährt die Quellen des Servers über `GET /api/storage/sources`, eine `server`-Quelle braucht also keinen Eintrag. Übergeben Sie `storageSources` an den `<Rebase>`-Provider für eine `direct`-Quelle, die direkt zu ihrem Provider hochlädt, oder um ein Label oder den Transport selbst festzulegen:
 
 ```tsx
 import { Rebase } from "@rebasepro/app";
@@ -420,7 +420,7 @@ import { Rebase } from "@rebasepro/app";
 </Rebase>
 ```
 
-Der `key` jeder Quelle muss mit einem Backend-Schlüssel übereinstimmen, der in der `storage`-Map des Servers registriert ist. Der React-Kontext `StorageSourcesContext` löst die aktive Quelle für jedes Upload-Feld auf.
+Der `key` einer `server`-Quelle muss mit einem Backend-Schlüssel übereinstimmen, der in der `storage`-Map des Servers registriert ist. Der React-Kontext `StorageSourcesContext` löst die aktive Quelle für jedes Upload-Feld auf.
 
 ## Caching und CDNs
 
@@ -458,8 +458,7 @@ storagePolicies: [
 ]
 ```
 
-**Ein Schlüssel, auf den keine Richtlinie zutrifft, wird abgelehnt.** Jede Lockerung erfordert eine explizite Zeile,
-und ein Konfigurationsfehler verweigert den Zugriff, anstatt ihn versehentlich zu gewähren.
+**Ein Schlüssel, auf den keine Richtlinie zutrifft, wird abgelehnt**, es sei denn, ein `storageAuthorize`-Hook erlaubt ihn: Der Hook wird nur gefragt, wenn keine Richtlinie zutraf, und keiner von beiden kann den anderen einschränken. Jede Lockerung erfordert eine explizite Zeile, und ein Konfigurationsfehler verweigert den Zugriff, anstatt ihn versehentlich zu gewähren.
 
 Muster matchen **nach Segmenten, niemals nach Teilzeichenfolgen** — `public/**` matcht nicht
 auf `publicity/secret.png`:
@@ -533,7 +532,7 @@ Wissenswertes:
 - **Ein Pfad ist öffentlich, wenn der referenzierte Schlüssel öffentlich ist.** Das `public/`-Präfix wird am kanonischen Schlüssel geprüft, den die Route ausliefert — nachdem ein führendes `default/`-Bucket-Segment entfernt und `//`, `./` sowie ein führendes `/` bereinigt wurden — niemals an der URL im Rohzustand. `/api/storage/file/notes://public/x.txt` referenziert den privaten Schlüssel `notes:/public/x.txt`, und der Schlüssel `default/public/x.txt` (aufgerufen als `/api/storage/file/default/default/public/x.txt`) liegt in einem Ordner namens `default`; beide sind nicht öffentlich. Prüfen Sie in einem Hook den übergebenen `key` mit `isPublicStorageKey` aus `@rebasepro/types` — `isPublicStoragePath` wertet clientseitige Pfade oder URLs aus und würde beide fälschlicherweise als öffentlich einstufen.
 - **`list` wird am Präfix autorisiert.** Über Listenoperationen lassen sich Schlüssel finden, die einem sonst nicht bekannt wären.
 - **Fortsetzbare (TUS) Uploads werden beim Erstellen autorisiert**, sodass ein abgelehnter Upload keine temporäre Datei hinterlässt.
-- Das Weglassen des Hooks behält das bisherige Verhalten bei, sodass Single-Tenant-Anwendungen nicht beeinträchtigt werden.
+- Wenn Sie den Hook (und `storagePolicies`) weglassen, gibt es keine Prüfung pro Objekt, sodass die Produktion den Start verweigert, solange `storagePublicRead` oder `storageInsecureAllowAnyAuthenticated` nicht gesetzt ist.
 
 ### API-Schlüssel und Tokens
 

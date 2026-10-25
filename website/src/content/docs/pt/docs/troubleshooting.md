@@ -1,5 +1,5 @@
 ---
-sourceHash: 648de86871ab3d3d
+sourceHash: fdbf8e3627811576
 slug: pt/docs/troubleshooting
 title: Solução de problemas
 description: As falhas que impedem um backend Rebase de iniciar ou responder requisições — um banco de dados inacessível, credenciais incorretas, uma extensão ausente, uma recusa de RLS, desvio de esquema (schema drift), uma porta ocupada, uma função que não carrega — e como cada uma se parece.
@@ -189,10 +189,10 @@ tentativa: a porta configurada é a porta utilizada, e `EADDRINUSE` é fatal.
 ## O backend travou e o `rebase dev` continuou em execução
 
 Um backend que lança exceção na inicialização não para o monitorador (*watcher*) — ele imprime o rastreamento de pilha e
-aguarda uma alteração de arquivo. O `rebase dev` relata isso:
+aguarda uma alteração de arquivo. Quando o backend não se anunciou dentro de `REBASE_DEV_READY_TIMEOUT_MS` (30 segundos por padrão), o `rebase dev` relata isso:
 
 ```
-  ✗ The backend crashed on startup.
+  ✗ The backend has not started after 30s.
     Fix the error above; the watcher restarts it on the next change.
 ```
 

@@ -78,7 +78,8 @@ one row or many come back, and what a write through it may touch.
 | `manyToMany` | in a **junction table** | many | rows are shared; you own the link |
 | `via` | an explicit `joinPath` | either | writable when single-hop, read-only otherwise; state `cardinality` yourself |
 
-Every field is optional except `kind` and `target` — the rest is derived.
+Every field is optional except `kind` and `target` (and, on `via`, `cardinality`
+and `joinPath`) — the rest is derived.
 
 ### belongsTo — the key is on this table
 
@@ -427,7 +428,7 @@ for (const article of data) {
 }
 ```
 
-> The relation names passed to `include()` must match the `relationName` defined in the collection's `relations` array.
+> The relation names passed to `include()` must match the relation's name: the `relationName` of an entry in the collection's `relations` array, or the key of the property that declares it inline.
 
 For the full query builder reference (filtering, sorting, pagination, real-time), see the [typed SDK documentation](/docs/sdk).
 
@@ -552,7 +553,12 @@ interface HasManyRelation extends RelationBase {
 
 interface ManyToManyRelation extends RelationBase {
     kind: "manyToMany";
-    through?: { table?: string; sourceColumn?: string; targetColumn?: string };
+    through?: {
+        table?: string;
+        sourceColumn?: string;
+        targetColumn?: string;
+        properties?: Properties;    // extra columns on the junction row, served under `_pivot`
+    };
 }
 
 interface ViaRelation extends RelationBase {

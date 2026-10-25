@@ -355,7 +355,8 @@ From a terminal,
 `rebase db push` and `rebase db migrate` do run on that database; only the MCP
 tools are refused. On 0.24 the CLI refuses them there too.
 
-Only loopback counts as local: `localhost`, `*.localhost`, `127.0.0.0/8`, `::1`.
+Only loopback counts as local: `localhost`, `*.localhost`, `127.0.0.0/8`, `::1`
+(and `0.0.0.0`).
 Private ranges like `10.x` and `192.168.x` do **not** — those are as likely to be
 a shared staging cluster as a laptop, and treating them as local would wave
 through exactly the accident the gate exists to stop.

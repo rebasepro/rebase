@@ -39,7 +39,7 @@ rebase cloud open         # open the dashboard in a browser
 ## Projekte
 
 ```bash
-rebase cloud init --claim [--name <name>]   # ein Live-Backend ohne Konto und ein Link, um es innerhalb von 72 Stunden zu übernehmen
+rebase cloud init --claim [--name <name>]   # a live backend with no account, and a link to claim it within 72 hours
 rebase cloud projects list
 rebase cloud projects create [--link]
 rebase cloud projects info [id]
@@ -50,6 +50,8 @@ rebase cloud projects delete [id]
 
 ```bash
 rebase cloud deploy [app] [--source .]   # deploy an app and stream build logs
+rebase cloud deploy [app] --preview [--preview-name <name>]  # its own address; production untouched
+rebase cloud previews [list|delete <name>]
 rebase cloud logs [--runtime] [-f]       # build logs, or the running process's
 rebase cloud deployments list [--limit N|--all]
 rebase cloud rollback [id] [-y]          # back to a successful deploy
@@ -70,6 +72,8 @@ Ein verfolgtes `deploy` endet mit einer Zusammenfassung: jede ausgelieferte App 
 
 Vor dem Upload parst `deploy` das JavaScript jeder statischen App, die es ausliefert: die `.js`/`.mjs`/`.cjs`-Dateien in ihrem `output` und die Inline-`<script>`-Blöcke in ihrem HTML. Ein Syntaxfehler stoppt das Deployment mit `file:line:column` (Code `syntax_error` unter `--json`), und `--no-verify` überspringt die Prüfung. Ein erfolgreiches Deployment endet mit dem Weg zurück, `rebase cloud rollback`. Eine allein deployte statische App lässt sich noch nicht zurückrollen; siehe [Rollback](/docs/deployment/cloud#roll-back).
 
+`--preview` liefert den Build unter `https://<project>--<name>.rebase.website` aus und lässt die Produktion unangetastet. Die Vorschau einer statischen App ruft das Produktions-Backend auf. Die Vorschau des Backends führt ein eigenes Backend auf einer eigenen, leeren Datenbank aus. Siehe [Eine Änderung in der Vorschau ansehen](/docs/deployment/cloud/#preview-a-change).
+
 ## Konfiguration
 
 ```bash
@@ -78,6 +82,8 @@ rebase cloud domains list | add <domain> | verify [domain] | remove <domain>
 rebase cloud extensions list | enable | disable
 rebase cloud settings show | set        # name, branch, repo, subdomain, rebuilds
 ```
+
+Eine Backend-Vorschau startet mit den Variablen der Produktion, einschließlich der Live-Schlüssel. `env set KEY=VALUE --preview` gibt Vorschauen einen eigenen Wert, `env unset KEY --preview` lässt die Variable in ihnen weg, `env reset KEY --preview` stellt den Wert der Produktion wieder her, und `env list --preview` zeigt die Unterschiede. Die Produktion wird von keinem dieser Befehle geändert.
 
 ## Organisationen
 

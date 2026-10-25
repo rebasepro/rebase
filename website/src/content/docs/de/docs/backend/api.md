@@ -1,5 +1,5 @@
 ---
-sourceHash: 6d6edea2e91b0bbc
+sourceHash: e61d261c8dae7e37
 title: REST API
 sidebar_label: REST API
 description: Automatisch generierte REST-API-Endpunkte für jede Collection, mit Filterung, Sortierung, Paginierung und Einbindung von Relationen.
@@ -303,9 +303,9 @@ Antwort, nicht im Body.
 
 | Status | Typischer Code | Bedeutung |
 |--------|----------------|-----------|
-| 400 | `BAD_REQUEST`, `VALIDATION_ERROR`, `INVALID_LIMIT`, `INVALID_OFFSET`, `INVALID_PAGE` | Die Anfrage ist fehlerhaft oder fordert etwas Unmögliches an |
+| 400 | `BAD_REQUEST`, `INVALID_INPUT`, `INVALID_LIMIT`, `INVALID_OFFSET`, `INVALID_PAGE` | Die Anfrage ist fehlerhaft oder fordert etwas Unmögliches an |
 | 401 | `UNAUTHORIZED` | Keine Anmeldedaten oder solche, die niemanden identifizieren |
-| 403 | `FORBIDDEN`, `DB_PERMISSION_DENIED` | Anmeldedaten, die jemanden ohne die erforderlichen Rechte identifizieren |
+| 403 | `FORBIDDEN`, `SCOPE_MISSING`, `WRITE_DENIED` | Anmeldedaten, die jemanden ohne die erforderlichen Rechte identifizieren |
 | 404 | `NOT_FOUND` | Das adressierte Objekt existiert nicht |
 | 409 | `CONFLICT` | Der Zustand steht in Konflikt — ein doppelter Schlüssel, ein veränderter Baum (Dirty Tree) |
 | 501 | variiert | Die Schnittstelle existiert, ist aber auf diesem Deployment **nicht konfiguriert** |
@@ -433,15 +433,15 @@ Jeder Hook wird abgewartet, und ein Fehler in einem davon macht den gesamten Sch
 | Methode | Pfad | Auth | Beschreibung |
 |---------|------|------|--------------|
 | `GET` | `/health` und `/api/health` | keine | Liveness-/Readiness-Prüfung |
-| `GET` | `/api/docs` | keine | Die OpenAPI 3.0-JSON-Spezifikation |
-| `GET` | `/api/swagger` | keine | Swagger UI. In der Entwicklung aktiviert, in der Produktion deaktiviert; `REBASE_ENABLE_SWAGGER` überschreibt dies in beiden Richtungen |
-| `GET` | `/api/meta/schema-version` | keine | Der Schema-Hash, aus dem dieses Backend erstellt wurde — bewusst unauthentifiziert, und es wird nur dieser Hash zurückgegeben |
+| `GET` | `/api/docs` | keine; `schema:read`, wenn `enableSwagger` `false` ist (der Standard der Runtime in der Produktion) | Die OpenAPI 3.0-JSON-Spezifikation |
+| `GET` | `/api/swagger` | keine | Swagger UI. Wird nur außerhalb der Produktion bereitgestellt; `REBASE_ENABLE_SWAGGER` kann es in der Produktion nicht einschalten |
+| `GET` | `/api/meta/schema-version` | keine | Der Schema-Hash, aus dem dieses Backend erstellt wurde, und die Runtime-Version — bewusst unauthentifiziert, und nichts, was das Schema beschreibt |
 | `GET` | `/api/meta/contract` | `schema:read`: ein Admin, der Service-Key oder ein API-Key, der ihn hält | Der vollständige Collection-Vertrag für `rebase generate-sdk --from`. Fail-closed: `404`, wenn keine Authentifizierung konfiguriert ist |
 | `GET` | `/metrics` | `REBASE_METRICS_TOKEN`, falls gesetzt | Prometheus-Metriken, wenn `REBASE_METRICS=true` |
 
 ## OpenAPI / Swagger
 
-Die OpenAPI-Spezifikation wird automatisch aus Ihren Collection-Definitionen generiert: Sie beschreibt die Listen-, Lese-, Erstellungs-, Aktualisierungs-, Lösch- und Bulk-Endpunkte jeder vom Backend bereitgestellten Collection mitsamt deren Query-Parametern und Response-Schemas. Sie ist kein vollständiges Abbild der gesamten HTTP-Oberfläche — die Routen für Auth, Storage, Functions und Cron sind ausschließlich auf dieser Website dokumentiert — und als `excludeFromApi` markierte Spalten werden ausgelassen.
+Die OpenAPI-Spezifikation wird automatisch aus Ihren Collection-Definitionen generiert: Sie beschreibt die Listen-, Query-, Count-, Aggregate-, Lese-, Erstellungs-, Aktualisierungs-, Lösch- und Bulk-Endpunkte jeder vom Backend bereitgestellten Collection, deren verschachtelte Routen und `_batch`, mitsamt deren Query-Parametern und Response-Schemas. Sie ist kein vollständiges Abbild der gesamten HTTP-Oberfläche — die Routen für Auth, Storage, Functions und Cron sind ausschließlich auf dieser Website dokumentiert — und als `excludeFromApi` markierte Spalten werden ausgelassen.
 
 Für eine [`softDelete`](/docs/collections/soft-delete/)-Collection gibt die Spezifikation an,
 dass ein Löschen, einzeln oder als Bulk, die Zeile in den Papierkorb verschiebt, und dokumentiert
@@ -472,8 +472,8 @@ GET /api/meta/schema-version
 ```
 
 Für die Struktur der Endpunkte statt des dahinterliegenden Schemas befindet sich das
-OpenAPI-Dokument unter `GET /api/docs`, mit der Swagger UI unter `/api/swagger`,
-wenn `enableSwagger` aktiviert ist.
+OpenAPI-Dokument unter `GET /api/docs`, mit der Swagger UI unter `/api/swagger` außerhalb
+der Produktion.
 
 ## Nächste Schritte
 

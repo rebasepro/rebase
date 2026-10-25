@@ -32,14 +32,15 @@ The entry point re-exports four modules whole, and utilities and hooks by name:
 ```ts
 export * from "./components";  // All UI components
 export * from "./views";       // ListView, CardView, KanbanView, the headless CollectionView family
-export * from "./icons";       // Icon, iconSize, LucideIconByName, iconKeys, coolIconKeys, lucide icons
+export * from "./icons";       // iconSize, IconProps, colorClassesMapping, LucideIconByName, iconKeys, coolIconKeys, a curated set of lucide icons
 export * from "./styles";      // Tailwind style mixin strings
 
 // By name only:
-//   cls, debounce, lazyChunk, loadChunk, isChunkLoadError,
+//   cls, debounce, isKeyHandled, lazyChunk, loadChunk, isChunkLoadError,
 //   CHIP_COLORS, CHIP_HUES, CHIP_SEED_KEYS, getColorSchemeForKey, getColorSchemeForSeed,
 //   useOutsideAlerter, useDebouncedCallback, useDebounceCallback, useDebounceValue,
-//   useIsDarkMode, useInjectStyles, PortalContainerProvider, usePortalContainer
+//   useIsDarkMode, useInjectStyles, PortalContainerProvider, usePortalContainer,
+//   UiLabelsProvider, useUiLabels, defaultUiLabels
 // Not exported: keyToIconComponent. (hashString comes from @rebasepro/utils.)
 ```
 
@@ -72,7 +73,7 @@ import { PlusIcon } from "@rebasepro/ui";
 </Button>
 
 <Button variant="outlined" color="error" size="small">Delete</Button>
-<Button variant="text" color="secondary">Cancel</Button>
+<Button variant="text">Cancel</Button>
 
 {/* As an anchor */}
 <Button component="a" href="/docs" variant="text" color="primary">
@@ -86,7 +87,7 @@ Icon-only button with ghost or filled background.
 
 | Prop | Type | Default | Description |
 |------|------|---------|-------------|
-| `size` | `"smallest" \| "small" \| "medium" \| "large"` | `"medium"` | Size (6/8/10/12 = 24/32/40/48 px) |
+| `size` | `"smallest" \| "small" \| "medium" \| "large"` | `"medium"` | Size (7/8/10/12 = 28/32/40/48 px) |
 | `variant` | `"ghost" \| "filled"` | `"ghost"` | Background style |
 | `shape` | `"circular" \| "square"` | `"circular"` | Border radius |
 | `disabled` | `boolean` | — | Disabled state |
@@ -147,9 +148,9 @@ Renders text with semantic HTML elements and consistent styling.
 | `caption` | `<p>` | `typography-caption` |
 | `button` | `<span>` | `typography-button` |
 | `lead` | `<p>` | `typography-lead` — the sentence under a page title |
-| `micro` | `<p>` | `typography-micro` — uppercase field label; the only sanctioned tier below `text-xs` |
-| `mono` | `<p>` | `typography-mono` — carries `tabular-nums` |
-| `stat` | `<p>` | `typography-stat` — a dashboard figure |
+| `micro` | `<span>` | `typography-micro` — uppercase field label; the only sanctioned tier below `text-xs` |
+| `mono` | `<span>` | `typography-mono` — carries `tabular-nums` |
+| `stat` | `<span>` | `typography-stat` — a dashboard figure |
 
 ```tsx
 import { Typography } from "@rebasepro/ui";
@@ -175,7 +176,7 @@ Centered max-width container with responsive padding.
 import { Container } from "@rebasepro/ui";
 
 <Container maxWidth="4xl">
-    {/* Content limited to max-w-4xl with mx-auto px-3 md:px-4 */}
+    {/* Content limited to max-w-4xl with mx-auto px-3 md:px-4 lg:px-6 */}
     …
 </Container>
 ```
@@ -209,7 +210,7 @@ import { Card, Typography } from "@rebasepro/ui";
 
 ### Paper
 
-Minimal bordered container. Uses `paperMixin` styling: white/`surface-900` bg, `rounded-lg`, solid border. A floating surface sits *over* unknown content and keeps a definite edge — a `Card` in the document flow gets a hairline instead.
+Minimal bordered container. Uses `paperMixin` styling: `bg-surface-card`, `rounded-lg`, `border-hairline-strong`. A floating surface sits *over* unknown content and keeps a definite edge — a `Card` in the document flow gets a hairline instead.
 
 ```tsx
 import { Paper } from "@rebasepro/ui";
@@ -229,7 +230,7 @@ import { CenteredView } from "@rebasepro/ui";
 
 ### Alert
 
-Contextual alert banner with color-coded left border.
+Contextual alert banner: a leading icon, a low-alpha tint of the alert's hue and a 1px border in that hue (`base` is a neutral field fill).
 
 | Prop | Type | Default | Description |
 |------|------|---------|-------------|
@@ -263,15 +264,16 @@ Colored label/tag with optional icon.
 
 | Prop | Type | Default | Description |
 |------|------|---------|-------------|
-| `colorScheme` | `ChipColorScheme \| ChipColorKey` | — | Color. Can be a key string (`"blue"`, `"teal"`, etc.) or a `ChipColorScheme` object |
-| `size` | `"smallest" \| "small" \| "medium" \| "large"` | `"large"` | Size preset |
+| `colorScheme` | `ChipColorScheme \| ChipColorKey` | — | Color. Can be a key string (`"blue"`, `"tealDark"`, etc.) or a `ChipColorScheme` object |
+| `variant` | `"tinted" \| "filled"` | `"tinted"` | `tinted` paints the hue at low alpha behind hue-coloured ink; `filled` is the solid stop, for swatches (a colour picker, a legend) |
+| `size` | `"smallest" \| "small" \| "medium" \| "large"` | `"medium"` | Size preset |
 | `outlined` | `boolean` | — | Outlined variant with translucent bg |
 | `error` | `boolean` | — | Red error styling |
 | `onClick` | `() => void` | — | Makes chip clickable |
-| `icon` | `ReactNode` | — | Icon rendered after text |
+| `icon` | `ReactNode` | — | Icon rendered before the label |
 | `className` | `string` | — | Extra classes |
 
-**ChipColorKey values:** `"blue"`, `"teal"`, `"yellow"`, `"pink"`, `"purple"`, `"cyan"`, `"orange"`, `"green"`, `"red"`, `"gray"`, `"indigo"`, `"violet"`, `"fuchsia"`, `"rose"`, `"emerald"`
+**ChipColorKey values:** a hue — `"blue"`, `"teal"`, `"yellow"`, `"pink"`, `"purple"`, `"cyan"`, `"orange"`, `"green"`, `"red"`, `"gray"`, `"indigo"`, `"violet"`, `"fuchsia"`, `"rose"`, `"emerald"` (`CHIP_HUES`) — optionally followed by a tone: `Lighter`, `Light`, `Dark` or `Darker` (`"blueDark"`, `"redDarker"`). A bare hue is the `Lighter` tone.
 
 ```tsx
 import { Chip } from "@rebasepro/ui";
@@ -284,7 +286,7 @@ import { Chip } from "@rebasepro/ui";
 
 ### FilterChip
 
-Toggle chip for filter presets. Uses inset box-shadow for stable sizing.
+Toggle chip for view and filter presets. It takes the row grammar, not the chip grammar: text at rest, an alpha highlight (`bg-surface-active`) when active, no hue.
 
 | Prop | Type | Default | Description |
 |------|------|---------|-------------|
@@ -732,7 +734,7 @@ Date/datetime picker using native `<input type="date|datetime-local">`.
 |------|------|---------|-------------|
 | `value` | `Date \| null` | — | Date value |
 | `onChange` | `(date: Date \| null) => void` | — | Change callback |
-| `mode` | `"date" \| "date_time"` | `"date"` | Date only or datetime |
+| `mode` | `"date" \| "date_time" \| "time"` | `"date"` | Date only, datetime, or time only |
 | `disabled` | `boolean` | — | Disabled |
 | `clearable` | `boolean` | — | Show clear button |
 | `error` | `boolean` | — | Error state |
@@ -807,7 +809,7 @@ Debounced search input with clear button and loading state.
 |------|------|---------|-------------|
 | `onTextSearch` | `(searchString?: string) => void` | — | Debounced search callback |
 | `placeholder` | `string` | `"Search"` | Placeholder text |
-| `size` | `"smallest" \| "small" \| "medium"` | `"medium"` | Height preset |
+| `size` | `"smallest" \| "small" \| "medium" \| "large"` | `"medium"` | Height preset |
 | `expandable` | `boolean` | `false` | Expand on focus |
 | `loading` | `boolean` | — | Show spinner instead of icon |
 | `disabled` | `boolean` | — | Disabled |
@@ -1019,7 +1021,7 @@ Animated loading spinner.
 
 | Prop | Type | Default | Description |
 |------|------|---------|-------------|
-| `size` | `"smallest" \| "small" \| "medium" \| "large"` | — | Size preset |
+| `size` | `"smallest" \| "small" \| "medium" \| "large"` | `"medium"` | Size preset |
 
 ### CircularProgressCenter
 
@@ -1085,7 +1087,6 @@ import { SettingsIcon } from "@rebasepro/ui";
 | `Badge` | Small count badge |
 | `Collapse` | Animated show/hide wrapper |
 | `InputLabel` | Floating label used internally by `TextField`. Props: `shrink` |
-| `SelectInputLabel` | Small label above Select/MultiSelect. Props: `error` |
 | `InfoLabel` | Small info label |
 | `Label` | Form label |
 | `Markdown` | Markdown renderer |
@@ -1117,7 +1118,7 @@ import { Portal, PopoverPrimitive, Slot } from "@rebasepro/ui";
 
 ### Using Icons
 
-Icons are re-exported from `lucide-react`. Use the `iconSize` map for consistent sizing:
+A curated set of `lucide-react` icons is re-exported by name, with an `Icon` suffix (the list is `packages/ui/src/icons/index.ts`). An icon outside that set is not importable by name — render it with `LucideIconByName` (below). Use the `iconSize` map for consistent sizing:
 
 ```tsx
 import { PlusIcon, SettingsIcon, Trash2Icon, iconSize } from "@rebasepro/ui";
@@ -1260,17 +1261,17 @@ import {
 
 | Mixin | Purpose |
 |-------|---------|
-| `focusedClasses` | Focus ring: `ring-2 ring-primary ring-opacity-75` |
+| `focusedClasses` | Outset focus ring: `z-30 outline-none ring-2 ring-primary/60 ring-offset-0 ring-offset-transparent` |
 | `focusedDisabled` | Remove focus ring: `focus-visible:ring-0` |
 | `focusedInvisibleMixin` | Focus bg for invisible fields |
 | `fieldBackgroundMixin` | Default field background (light/dark) |
 | `fieldBackgroundInvisibleMixin` | Transparent field background |
 | `fieldBackgroundDisabledMixin` | Disabled field background |
 | `fieldBackgroundHoverMixin` | Field hover background |
-| `defaultBorderMixin` | Standard border: `border-surface-200 dark:border-surface-700/60` |
-| `paperMixin` | Floating surface (menu, dialog, popover): white/`surface-900` bg, `rounded-lg`, solid border |
-| `cardMixin` | Card in the document flow: white/`surface-900` bg, `rounded-xl`, hairline border |
-| `codeSurfaceMixin` | Inset code well: `bg-surface-100 dark:bg-surface-950 rounded-md` |
+| `defaultBorderMixin` | Standard border colour: `border-hairline` (pair it with `border`) |
+| `paperMixin` | Floating surface (menu, dialog, popover): `bg-surface-card rounded-lg border border-hairline-strong` |
+| `cardMixin` | Card in the document flow: `bg-surface-card rounded-xl border border-hairline` |
+| `codeSurfaceMixin` | Inset code well: `bg-surface-well rounded-md` |
 | `cardClickableMixin` | Hover/click effects for interactive cards |
 | `cardSelectedMixin` | Selected card highlight: `bg-primary-bg/30 ring-1 ring-primary/75` |
 
@@ -1331,8 +1332,8 @@ hashString("my-entity-id"); // e.g. 1234567
 
 ```tsx
 import {
-    CHIP_COLORS,              // Record<string, ChipColorScheme>
-    getColorSchemeForKey,      // (key: ChipColorKey) => ChipColorScheme
+    CHIP_COLORS,              // Record<ChipColorKey, ChipColorScheme>
+    getColorSchemeForKey,      // (key: ChipColorKey | string) => ChipColorScheme (unknown keys are seeded)
     getColorSchemeForSeed      // (seed: string) => ChipColorScheme (deterministic)
 } from "@rebasepro/ui";
 ```
@@ -1340,14 +1341,20 @@ import {
 **`ChipColorScheme`** type:
 ```ts no-verify
 {
-    color: string;      // Light mode background hex
-    text: string;       // Light mode text hex
-    darkColor?: string; // Dark mode background hex
-    darkText?: string;  // Dark mode text hex
+    color: string;            // Light mode background hex (the `filled` stop)
+    text: string;             // Light mode text hex
+    darkColor?: string;       // Dark mode background hex
+    darkText?: string;        // Dark mode text hex
+    outlineText?: string;     // Ink for `outlined` (sits on the page, not the fill)
+    darkOutlineText?: string;
+    tintColor?: string;       // `tinted` background, an rgba() at low alpha
+    tintText?: string;        // Ink measured on that tint
+    darkTintColor?: string;
+    darkTintText?: string;
 }
 ```
 
-**Available CHIP_COLORS keys:** `blue`, `teal`, `yellow`, `pink`, `purple`, `cyan`, `orange`, `green`, `red`, `gray`, `indigo`, `violet`, `fuchsia`, `rose`, `emerald`
+**Available CHIP_COLORS keys:** each hue — `blue`, `teal`, `yellow`, `pink`, `purple`, `cyan`, `orange`, `green`, `red`, `gray`, `indigo`, `violet`, `fuchsia`, `rose`, `emerald` — bare and with each tone suffix (`blueLighter`, `blueLight`, `blueDark`, `blueDarker`, …)
 
 ```tsx
 // Deterministic color from any string
@@ -1451,6 +1458,7 @@ import {
     Typography,
     Card,
     Button,
+    IconButton,
     TextField,
     Tabs,
     Tab,
@@ -1490,7 +1498,7 @@ export function DashboardView() {
                 </Button>
             </div>
 
-            <Alert color="info" size="small" className="mb-4">
+            <Alert color="info" size="small" outerClassName="mb-4">
                 Welcome back! You have 3 items needing review.
             </Alert>
 

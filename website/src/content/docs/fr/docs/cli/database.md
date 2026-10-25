@@ -1,5 +1,5 @@
 ---
-sourceHash: 8b0cf8dec1186f45
+sourceHash: 4527233b1773b5c2
 title: Commandes de base de données
 sidebar_label: Commandes de base de données
 description: Les commandes rebase db — push, generate et migrate, sauvegardes et restaurations, copie d'une base distante, chaîne de connexion, base de développement gérée et branches.
@@ -48,7 +48,7 @@ Générer des fichiers de migration SQL à partir des modifications de schéma :
 rebase db generate
 ```
 
-Crée des fichiers de migration horodatés dans `drizzle/migrations/` qui peuvent être vérifiés et commités.
+Crée des fichiers de migration horodatés dans `backend/drizzle/migrations/` qui peuvent être vérifiés et commités.
 
 ### `rebase db migrate`
 

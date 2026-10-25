@@ -1,5 +1,5 @@
 ---
-sourceHash: 867178ccdf409a3f
+sourceHash: 3dd5a537f812658a
 title: Visión general del frontend
 sidebar_label: Frontend
 description: "Construye y personaliza el panel — Rebase CMS y Rebase Studio — con React: controladores, scaffold, enrutamiento y vistas."
@@ -11,7 +11,7 @@ El frontend de Rebase es un **framework de React** que renderiza tu panel de adm
 
 En el scaffold predeterminado, el panel de administración **es** el frontend: se sirve en la raíz de tu URL desplegada. Si en su lugar construyes tu propia aplicación de producto, puedes montar el panel de administración bajo un prefijo como `/admin` en el mismo despliegue — consulta [Cambiar la URL base](/docs/getting-started/deployment#changing-the-base-url).
 
-Este es `frontend/src/App.tsx` tal como lo genera `rebase init` — todo el panel de administración, cuatro declaraciones dentro de un único proveedor:
+Este es `frontend/src/App.tsx` tal como lo genera `rebase init`, sin sus importaciones de fuentes, su error boundary ni el client id de Google — todo el panel de administración, cuatro declaraciones dentro de un único proveedor:
 
 ```tsx
 import React from "react";
@@ -77,9 +77,9 @@ Los veintitrés en su totalidad — la tabla solía listar diez, y dos de ellos 
 | `plugins` | Instancias de plugins — consulta [Plugins](/docs/plugins) |
 | `slots` | Contribuciones de slots declaradas directamente, sin un plugin |
 | `propertyConfigs` | Widgets de campos personalizados, indexados por el nombre que una propiedad define en `propertyConfig` |
-| `entityViews` | Pestañas globales de vistas de entidades personalizadas |
+| `entityViews` | Pestañas de vistas de entidad personalizadas, disponibles para cualquier colección que indique su `key` en `admin.entityViews` |
 | `collectionViews` | Modos de vista de colección personalizados, disponibles para cualquier colección mediante `key` |
-| `entityActions` | Acciones globales de entidad |
+| `entityActions` | Acciones de entidad, disponibles para cualquier colección que indique su `key` en `admin.entityActions` |
 | `effectiveRoleController` | Simula un rol diferente mientras el modo de desarrollo está activo |
 | `modeController` | Entrega a Rebase el modo claro/oscuro de la aplicación anfitriona; Rebase entonces nunca toca `<html>`, `prefers-color-scheme` ni localStorage — consulta [Estilos](#estilos) |
 | `translations` | Anula o extiende cualquier cadena de texto de la interfaz de usuario, indexada por locale — consulta [Traducciones](/docs/frontend/i18n) |

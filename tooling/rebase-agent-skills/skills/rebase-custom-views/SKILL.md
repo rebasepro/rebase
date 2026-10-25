@@ -184,8 +184,8 @@ export default defineCollection({
 Entry fields: `key` (unique on the record), `name` (tab label), `Builder`,
 `icon`, and `position` — `"end"` (default, after the form) or `"start"` (before
 it: a read-only cover of the record, with the form one tab to the right).
-Never import the component into the collection file: that pulls React into the
-backend and `pnpm check:headless` fails.
+Never import the component into the collection file: the backend loads that
+file too, and the import pulls React into it.
 
 The component receives `EntityCustomViewParams`:
 
@@ -270,8 +270,10 @@ export default defineCollection({
 });
 ```
 
-The field owns the input; the label, the validation and the error line stay
-with the form. `FieldProps` carries `value`, `setValue(value)`, `property`,
+The component replaces the whole field: it draws the input, the label and the
+error line (`error`, when `showError`) itself, as the built-in fields do;
+validation stays with the form, which computes `error` from the property's
+rules. `FieldProps` carries `value`, `setValue(value)`, `property`,
 `propertyKey`, `disabled`, `error`, `showError`, `customProps`, and `context`
 (the whole form: `values`, `setFieldValue`, `entityId`, …).
 

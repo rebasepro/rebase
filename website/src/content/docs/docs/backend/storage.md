@@ -15,7 +15,7 @@ Rebase supports three storage backends:
 ## Configuration
 
 :::note[Where this goes]
-**Managed runtime** — the `STORAGE_*` variables in `.env` (`STORAGE_TYPE`, `STORAGE_BUCKET` or `S3_BUCKET` / `GCS_BUCKET`, `STORAGE_PATH`, `STORAGE_PUBLIC_READ`, … — suffix any of them `__<KEY>` for a named source), plus a `bucket("<key>")` declaration in `config/resources.ts` for every bucket beyond the default, and `export const storageAuthorize` from `config/index.ts`. `storageAuthorize` has no environment form on purpose: no variable can express "this user may read this key".
+**Managed runtime** — the `STORAGE_*` variables in `.env` (`STORAGE_TYPE`, `S3_BUCKET` / `GCS_BUCKET`, `STORAGE_PATH`, `STORAGE_PUBLIC_READ`, … — suffix any of them `__<KEY>` for a named source), plus a `bucket("<key>")` declaration in `config/resources.ts` for every bucket beyond the default, and `export const storageAuthorize` from `config/index.ts`. `storageAuthorize` has no environment form on purpose: no variable can express "this user may read this key".
 
 **Ejected** — the `storage` block on `initializeRebaseBackend({ … })`. `storagePolicies` and `storageTriggers` are ejected-only.
 
@@ -98,7 +98,7 @@ image: {
 
 | Method | Path | Description |
 |--------|------|-------------|
-| `POST` | `/api/storage/upload` | Direct file upload, one `multipart/form-data` body: `file` (required); `key`, the object key, folders included (`author_pictures/ada.jpg`), else the file's name at the root; `bucket`, else the default one; `storageId`; and `metadata_<name>` for custom metadata. Any other field is ignored: there is no `path` field |
+| `POST` | `/api/storage/upload` | Direct file upload, one `multipart/form-data` body: `file` (required); `key`, the object key, folders included (`author_pictures/ada.jpg`), else the file's name at the root; `bucket`, else the default one; `storageId`; `collection` and `property`, which hold the file to that property's `maxSize` and `acceptedFiles`; and `metadata_<name>` for custom metadata. Any other field is ignored: there is no `path` field |
 | `POST` | `/api/storage/upload?storageId=<key>` | Upload to a specific named backend |
 | `GET` | `/api/storage/file/*` | Retrieve a file — everything after `/file/` is the object key |
 | `GET` | `/api/storage/file/*?storageId=<key>` | Retrieve a file from a specific backend |
@@ -363,8 +363,8 @@ Route a property to a source with `storageSource`:
 ```ts
 {
     name: "Cover",
-    dataType: "string",
-    storage: { storageSource: "media", acceptedFiles: ["image/*"] }
+    type: "string",
+    storage: { storagePath: "covers", storageSource: "media", acceptedFiles: ["image/*"] }
 }
 ```
 
@@ -402,7 +402,7 @@ so one source can move providers without breaking the rest.
 
 ## Frontend Storage Sources
 
-When using multiple storage backends, pass `storageSources` to the `<Rebase>` provider so the frontend knows how to route uploads directly:
+The frontend learns the server's sources from `GET /api/storage/sources`, so a `server` source needs no entry. Pass `storageSources` to the `<Rebase>` provider for a `direct` source, which uploads straight to its provider, or to set a label or transport yourself:
 
 ```tsx
 import { Rebase } from "@rebasepro/app";
@@ -421,7 +421,7 @@ import { Rebase } from "@rebasepro/app";
 </Rebase>
 ```
 
-Each source's `key` must match a backend key registered in the server's `storage` map. The `StorageSourcesContext` React context resolves the active source for each upload field.
+A `server` source's `key` must match a backend key registered in the server's `storage` map. The `StorageSourcesContext` React context resolves the active source for each upload field.
 
 ## Caching and CDNs
 
@@ -459,8 +459,7 @@ storagePolicies: [
 ]
 ```
 
-**A key matched by no policy is refused.** Every widening is an explicit line,
-and a mistake denies rather than grants.
+**A key matched by no policy is refused**, unless a `storageAuthorize` hook allows it: the hook is asked only when no policy matched, and neither can narrow the other. Every widening is an explicit line, and a mistake denies rather than grants.
 
 Patterns match **by segment, never by substring** — `public/**` does not match
 `publicity/secret.png`:
@@ -534,7 +533,7 @@ Worth knowing:
 - **A path is public when the key it names is.** The `public/` prefix is tested on the canonical key the route serves — after a leading `default/` bucket segment is read off and `//`, `./` and a leading `/` are folded away — never on the URL as written. `/api/storage/file/notes://public/x.txt` names the private key `notes:/public/x.txt`, and the key `default/public/x.txt` (reached as `/api/storage/file/default/default/public/x.txt`) lies in a folder called `default`; neither is public. In a hook, test the `key` you are handed with `isPublicStorageKey` from `@rebasepro/types` — `isPublicStoragePath` reads a client-side path or URL, and reads both of those as public.
 - **`list` is gated on the prefix.** Listing is how you discover keys nobody told you about.
 - **Resumable (TUS) uploads are gated at create time**, so a denied upload leaves no temp file behind.
-- Omitting the hook preserves the previous behaviour, so single-tenant apps are unaffected.
+- Omitting the hook (and `storagePolicies`) leaves no per-object check, so production refuses to boot unless `storagePublicRead` or `storageInsecureAllowAnyAuthenticated` is set.
 
 ### API keys and tokens
 

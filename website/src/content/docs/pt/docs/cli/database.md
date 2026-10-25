@@ -1,5 +1,5 @@
 ---
-sourceHash: 8b0cf8dec1186f45
+sourceHash: 4527233b1773b5c2
 title: Comandos de Banco de Dados
 sidebar_label: Comandos de Banco de Dados
 description: Os comandos rebase db — push, generate e migrate, backups e restaurações, importar uma cópia, a string de conexão, o banco de dados de desenvolvimento gerenciado e os branches.
@@ -49,7 +49,7 @@ Gera arquivos de migração SQL a partir de alterações de schema:
 rebase db generate
 ```
 
-Cria arquivos de migração com carimbo de data/hora em `drizzle/migrations/` que podem ser revisados e comitados.
+Cria arquivos de migração com carimbo de data/hora em `backend/drizzle/migrations/` que podem ser revisados e comitados.
 
 ### `rebase db migrate`
 

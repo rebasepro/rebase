@@ -1,5 +1,5 @@
 ---
-sourceHash: e6d2447955c86775
+sourceHash: 96a224ca982e3d25
 title: Papéis e escopos
 sidebar_label: Papéis e escopos
 description: "O que um chamador pode fazer: o plano de dados que toda pessoa tem, o plano administrativo que os papéis concedem, os escopos que um app declara para si mesmo e como cada credencial os carrega."
@@ -252,10 +252,11 @@ Para chaves:
 
 Para contas, quem tem `users:write`:
 
-- não pode editar, redefinir ou excluir uma conta que tenha um papel ou escopo que ele não tem:
+- não pode editar, redefinir ou excluir uma conta cujos papéis tenham um escopo que ele não tem,
+  ou `admin` quando ele não é um admin:
   `403 ACCOUNT_OUTRANKS_CALLER`. Sem isso, um papel de suporte poderia redefinir a senha
   de um administrador e entrar como ele.
-- não pode conceder papéis que tenham mais do que ele tem: `403 ROLE_EXCEEDS_CALLER`.
+- não pode conceder papéis que tenham mais do que ele tem, `admin` incluído: `403 ROLE_EXCEEDS_CALLER`.
 
 ## Como cada credencial tem escopos
 

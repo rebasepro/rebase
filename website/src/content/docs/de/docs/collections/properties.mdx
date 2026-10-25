@@ -1,5 +1,5 @@
 ---
-sourceHash: 9426e0b3511c31f5
+sourceHash: 01c8a1a724587153
 title: Properties
 sidebar_label: Properties
 description: Property-Typen definieren den Datentyp, die Validierung und das UI-Rendering für jedes Feld in einer Collection. Rebase unterstützt string-, number-, boolean-, date-, array-, map-, reference-, relation- und geopoint-Typen.
@@ -20,10 +20,10 @@ Properties definieren die Spalten in Ihrer Datenbanktabelle und wie sie in der A
 
 | Typ | Beschreibung | PostgreSQL-Spalte |
 |------|-------------|-------------------|
-| `string` | Text, Select, Markdown, Datei-Upload, URL, E-Mail | standardmäßig `text`; `varchar`, `char` oder `uuid` mit `columnType` |
+| `string` | Text, Select, Markdown, Datei-Upload, URL, E-Mail | standardmäßig `text`; `varchar`, `char` oder `uuid` mit `columnType`; ein Postgres-Enum-Typ (`<table>_<column>`) mit `enum` |
 | `number` | Ganzzahl, Dezimalzahl, Währung | `integer`, `numeric`, `bigint`, `serial` |
 | `boolean` | True/False-Umschalter | `boolean` |
-| `date` | Datum, Datum/Uhrzeit, Timestamp | `timestamp`, `date` |
+| `date` | Datum, Datum/Uhrzeit, Timestamp | standardmäßig `timestamptz`; `date` oder `time` mit `columnType` |
 | `array` | Geordnete Liste von Werten | Ein natives Array (`text[]`, `integer[]`, `numeric[]`, `boolean[]`), wenn `of` eine einzelne String-, Number- oder Boolean-Property ist; andernfalls `jsonb` |
 | `map` | Schlüssel-Wert-Objekt | `jsonb` |
 | `geopoint` | Breitengrad-/Längengrad-Paar | `jsonb` |
@@ -41,7 +41,7 @@ Alle Property-Typen teilen sich diese Optionen:
 | `type` | `string` | **Erforderlich.** Datentyp (siehe oben) |
 | `name` | `string` | Anzeigename (Label). Standardmäßig der Property-Schlüssel, formatiert – `publishDate` → "Publish Date". Setzen Sie ihn, wenn diese Ableitung nicht passt: `"URL"` statt "Url". |
 | `description` | `string` | Hilfetext, der unter dem Feld angezeigt wird |
-| `defaultValue` | `any` | Standardwert für neue Entitäten. Ein literaler Wert – ein String, eine Zahl, ein Boolean, ein Datum, eine Enum-ID oder ein `map`/`array`-Dokument – wird auch zum `DEFAULT` der Spalte, sodass eine Zeile, die von etwas anderem als dem Admin-Panel eingefügt wird (die REST-API, ein Seed, `psql`), diesen ebenfalls erhält |
+| `defaultValue` | `any` | Standardwert für neue Entitäten. Ein literaler Wert – ein String, eine Zahl, ein Boolean, ein Datum, eine Enum-ID oder ein als JSON gespeichertes `map`/`array`-Dokument – wird auch zum `DEFAULT` der Spalte, sodass eine Zeile, die von etwas anderem als dem Admin-Panel eingefügt wird (die REST-API, ein Seed, `psql`), diesen ebenfalls erhält |
 | `databaseDefault` | `boolean \| SqlExpression` | Die Datenbank füllt die Spalte, wenn sie bei der Erstellung leer gelassen wird: eine `NOT NULL DEFAULT <Ausdruck>`-Spalte wie `gen_random_uuid()` oder `nextval(…)`. Ein `required`-Feld damit kann bei der Erstellung im Admin-Formular und über die API weggelassen werden, und ein beim Erstellen übergebenes `null` wird der Datenbank überlassen; beim Bearbeiten bleibt es erforderlich, und der generierte `Insert`-Typ macht es optional. Geben Sie den Ausdruck in der Template-Form an, die auch `isId` verwendet: ``databaseDefault: "sql`gen_random_uuid()`"``, und der Schema-Planer schreibt ihn als `DEFAULT` der Spalte, sodass `rebase db push` ihn beibehält. `true` deklariert ein an anderer Stelle geschriebenes `DEFAULT` und schreibt keines, sodass ein Push das Löschen plant. "Import from table" und `rebase schema introspect` setzen den Ausdruck, den sie auslesen |
 | `validation` | `object` | Validierungsregeln |
 | `propertyConfig` | `string` | Registrierter Property-Config-Schlüssel |
@@ -83,9 +83,9 @@ price: {
 | `admin.hideFromCollection` | `boolean` | In der Tabellenansicht ausblenden. Reine Anzeige: Die verknüpften Zeilen einer ausgeblendeten Relation-Property sind beim Listenabruf weiterhin eingebettet (siehe [Relations](/docs/collections/relations)) |
 | `admin.columnWidth` | `number` | Spaltenbreite in Pixeln (Tabellenansicht) |
 | `admin.span` | `1 \| 2 \| 3 \| 4` | Feldbreite über das vierspaltige Formularraster |
-| `admin.Field` | `React.ComponentType` | Benutzerdefinierte Feldkomponente |
-| `admin.Preview` | `React.ComponentType` | Benutzerdefinierte Tabellenzellenkomponente |
-| `admin.Filter` | `React.ComponentType` | Benutzerdefiniertes Filterfeld für diese Property. Überschreibt das Override auf Collection-Ebene `Collection.FilterField` und das integrierte typspezifische Feld |
+| `admin.Field` | `ComponentRef` | Benutzerdefinierte Feldkomponente |
+| `admin.Preview` | `ComponentRef` | Benutzerdefinierte Tabellenzellenkomponente |
+| `admin.Filter` | `ComponentRef` | Benutzerdefiniertes Filterfeld für diese Property. Überschreibt das Override auf Collection-Ebene `Collection.FilterField` und das integrierte typspezifische Feld |
 | `admin.filterOperators` | `WhereFilterOp[]` | Schränkt die Operatoren ein, die beim Filtern nach dieser Property angeboten werden. Die angebotene Menge ist die **Schnittmenge** aus den Fähigkeiten der Engine, den Standardwerten des Typs und dieser Liste – Sie können nur einschränken, niemals einen Operator hinzufügen, den die Engine nicht ausführen kann. `[]` deaktiviert das Filtern nach dieser Property |
 | `admin.customProps` | `unknown` | Alles, was Ihr eigenes `Field` oder `Preview` benötigt. Rebase reicht es unverändert durch |
 
@@ -246,7 +246,7 @@ locales: {
 | `userSelect` | `boolean` | Als Benutzerauswahl (User Picker) rendern. Der Wert ist eine einfache String-Spalte, die die Benutzer-ID enthält – nichts löst sie beim Eingang auf oder prüft sie. **Nur Admin-Formular – wird nicht von der API oder der Datenbank erzwungen.** Die Auswahl listet Namen, E-Mails und Avatare von Benutzern für jeden auf, der die Collection schreiben darf, über [`GET /api/admin/users/pick`](/docs/backend/auth-endpoints/), ohne den Scope `users:read`. Eine Collection, deren Schreibregeln aus direktem SQL bestehen, zählt nicht dazu, da diese nicht vorab ausgewertet werden können: Dort können nur Inhaber von `users:read` Benutzer auswählen. |
 | `admin.previewAsTag` | `boolean` | Diesen String in der Vorschau als Tag rendern |
 | `admin.clearable` | `boolean` | Ein Icon zum Leeren des Werts hinzufügen (auf null setzen) |
-| `admin.urlPreview` | `PreviewType` | Wie ein String gerendert werden soll, der eine URL enthält: als Link oder als Inline-Bild-, Audio- oder Video-Vorschau. Reine Darstellung – ob der Wert eine URL *ist*, entscheidet das Flag `url` an der Property, aus dem der OpenAPI-Vertrag generiert wird |
+| `admin.urlPreview` | `PreviewType \| boolean` | Wie ein String gerendert werden soll, der eine URL enthält: `true` für einen Link oder `"image"`, `"video"`, `"audio"` bzw. `"file"` für eine Inline-Vorschau. Reine Darstellung – ob der Wert eine URL *ist*, entscheidet das Flag `url` an der Property, aus dem der OpenAPI-Vertrag generiert wird |
 
 ### Audit-Spalten
 

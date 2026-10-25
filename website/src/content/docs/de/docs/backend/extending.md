@@ -1,5 +1,5 @@
 ---
-sourceHash: b2aa1062d257415a
+sourceHash: 791588f79f48d44f
 title: Rebase unterstützt X nicht
 sidebar_label: Server erweitern
 description: Die serverseitige Erweiterungsleiter – Deklaration, Collection-Callback, benutzerdefinierte Funktion, eigene Routen, eigener Server, Eject – und was die einzelnen Stufen erreichen können und was nicht.
@@ -55,7 +55,7 @@ rendert sie und `rebase doctor` vergleicht sie mit der Live-Datenbank.
 | Bestimmen, wer eine Zeile lesen oder schreiben darf | `securityRules` | [Authentifizierung](/docs/backend/authentication) |
 | Text richtig durchsuchen – Akzente, JSONB, Ranking, Teilstrings | einen `search`-Block | [Suche](/docs/backend/search) |
 | Zeilen nach Bedeutung finden | eine `vector`-Eigenschaft | [Suche](/docs/backend/search) |
-| Gelöschte Zeilen aufbewahren | `softDelete` | [Schreibvorgänge](/docs/backend/writes) |
+| Gelöschte Zeilen aufbewahren | `softDelete` | [Soft Delete](/docs/collections/soft-delete) |
 | Protokollieren, wer was geändert hat | `history` | [Verlauf](/docs/backend/history) |
 | Etwas nach Zeitplan ausführen | eine Cron-Job-Datei | [Cron-Jobs](/docs/backend/cron-jobs) |
 | Etwas nach einem Schreibvorgang asynchron ausführen | einen Job | [Jobs](/docs/backend/jobs) |
@@ -102,7 +102,7 @@ callbacks: {
 }
 ```
 
-Drei Eigenschaften sollten Sie kennen, bevor Sie sich darauf verlassen:
+Vier Eigenschaften sollten Sie kennen, bevor Sie sich darauf verlassen:
 
 - **Es kann nur eingrenzen.** Der Rückgabewert ist ein Filter, der per AND verknüpft wird, und es
   gibt keine Rückgabeform, die den Lesevorgang erweitern kann. Das ist beabsichtigt: Ein Hook,

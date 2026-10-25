@@ -57,17 +57,17 @@ The `BackendCollectionRegistry` is the runtime index of all collections, their P
 
 Real-time sync uses PostgreSQL's native `LISTEN/NOTIFY` mechanism:
 
-1. A data mutation happens (insert, update, delete)
-2. The backend emits a `NOTIFY` on a channel
+1. A data mutation happens (insert, update, delete) — through the API, or anything else that writes the table: `psql`, a cron, the SQL editor
+2. A trigger on the table emits a `NOTIFY` on a channel (where the trigger cannot be installed, the backend emits it, for writes made through the API only)
 3. The `RealtimeService` receives the notification
 4. It broadcasts the change to all connected WebSocket clients
 5. React components re-render with the new data
 
-For **multi-instance deployments** (e.g., Cloud Run with multiple replicas), provide a `connectionString` in your PostgresBootstrapper so all replicas share the same `LISTEN` connection.
+For **multi-instance deployments** (e.g., Cloud Run with multiple replicas), every replica holds its own `LISTEN` connection to the same database, so a change reaches the subscribers of every replica. Behind a transaction-mode pooler such as PgBouncer, which does not keep a `LISTEN`, set `DATABASE_DIRECT_URL` to the database itself.
 
 ### Storage Registry
 
-Like drivers, storage backends are registered in a registry. You can have multiple storage providers (local, S3) and route different file fields to different backends using `storageId`.
+Like drivers, storage backends are registered in a registry. You can have multiple storage providers (local, S3) and route different file fields to different backends using `storage.storageSource`.
 
 ## Package Map
 
@@ -76,14 +76,13 @@ Like drivers, storage backends are registered in a registry. You can have multip
 | `@rebasepro/types` | TypeScript interfaces for collections, properties, entities, plugins | Everything |
 | `@rebasepro/server` | Backend server initialization, REST API, auth, storage, WebSocket | Backend |
 | `@rebasepro/client` | Typed SDK — HTTP transport, WebSocket, auth | Frontend |
-| `@rebasepro/app` | React framework — Scaffold, controllers, forms, routes, hooks | Frontend |
+| `@rebasepro/app` | React framework — Scaffold, controllers, forms, routes, hooks, login views, auth controller hooks | Frontend |
 | `@rebasepro/ui` | Standalone UI component library (Tailwind v4 + Radix) | Frontend |
-| `@rebasepro/app` | Login views, auth controller hooks, user management | Frontend |
 | `@rebasepro/studio` | Collection editor, SQL console, JS console, RLS editor, storage browser | Frontend |
 | `@rebasepro/cli` | CLI for schema generation, DB migrations, SDK generation | Dev tooling |
 | `@rebasepro/forms` | Lightweight React form state management | Frontend |
 | `@rebasepro/plugin-ai` | AI-powered field autocompletion plugin | Frontend |
-| `@rebasepro/plugin-data-import-export` | CSV/JSON/Excel import and export | Frontend |
+| `@rebasepro/cms` | Content management views, forms and routing, including CSV/JSON/Excel import and export | Frontend |
 | `@rebasepro/inference` | Infer collection properties from sample rows (the admin's "create a collection from a file" import) | Frontend |
 
 ## Data Flow

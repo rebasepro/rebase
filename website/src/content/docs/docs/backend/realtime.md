@@ -64,8 +64,8 @@ const unsubscribe = client.data.products.listen(
 );
 ```
 
-The callback receives a `FindResponse<M>` containing:
-- `data` — Array of `Entity<M>` objects.
+The callback receives a `FindResult<M>` containing:
+- `data` — The rows, flat, as `find()` returns them (`row.name`, not `row.values.name`).
 - `meta` — Pagination info (`total`, `limit`, `offset`, `hasMore`).
 
 ### Subscribing to a Collection with Filters
@@ -148,7 +148,7 @@ const unsubscribe = client.data.orders
 ```
 
 :::note
-The `.listen()` method on the query builder is only available when the `RebaseClient` is configured with a `websocketUrl`. If the WebSocket connection is not configured, calling `.listen()` will throw an error.
+`.listen()` — on the query builder and on the collection accessor alike — needs the client's WebSocket. The client derives its URL from `baseUrl` unless `websocketUrl` is given. On a client created with `realtime: false`, or one that could derive no URL, calling `.listen()` throws an error.
 :::
 
 ## Update Delivery: Instant Patch + Correctness Refetch
@@ -413,7 +413,7 @@ Presence tracks which users are currently online in a channel and lets each user
 | `presence_track`  | Client → Server | Start tracking presence with custom state            |
 | `presence_untrack`| Client → Server | Stop tracking presence                               |
 | `presence_state`  | Client → Server | Request the full presence state for a channel        |
-| `presence_state`  | Server → Client | Full entity of all presences in a channel          |
+| `presence_state`  | Server → Client | Every presence in the channel, in full               |
 | `presence_diff`   | Server → Client | Incremental update (joins and leaves)                |
 
 When a client sends `presence_track`, the server automatically joins them to the channel (no separate `join_channel` needed) and broadcasts a `presence_diff` to all channel members. The SDK re-sends its state every ~20 seconds as a heartbeat; a heartbeat whose state is unchanged only refreshes the client's timeout and sends no `presence_diff`.
@@ -469,7 +469,7 @@ messages sent while disconnected are queued and sent after reconnecting:
 | `connecting` | Dialling, with no outage in progress. |
 | `connected` | The socket is open. |
 | `reconnecting` | The socket dropped and the client is redialling. Nothing has been reported yet. |
-| `disconnected` | The outage has lasted about 15 seconds or more. `CONNECTION_LOST` has been reported, and the client keeps redialling. |
+| `disconnected` | The outage has lasted 14 seconds or more. `CONNECTION_LOST` has been reported, and the client keeps redialling. |
 | `closed` | `client.close()` was called. Final. |
 
 ```typescript
@@ -521,9 +521,9 @@ SDK, Studio, `psql`, a cron job in another service. How the capture works, the
 
 To prevent client requests from hanging indefinitely, all pending WebSocket operations that expect a server response (such as one-shot collection fetches `FETCH_COLLECTION`, single entity fetches `FETCH_ONE`, creating/updating `SAVE`, deletes `DELETE`, counts `COUNT`, and uniqueness checks `CHECK_UNIQUE_FIELD`) have a default timeout of 30 seconds.
 
-If the server does not respond within this 30-second window, the client automatically deletes the pending request and rejects the promise with an `ApiError` with the message `"Request timed out"`.
+If the server does not respond within this 30-second window, the client automatically deletes the pending request and rejects the promise with a `RebaseApiError` whose code is `REQUEST_TIMEOUT`.
 
-One-way messages that do not expect a response (like `subscribe_collection`, `subscribe_one`, `unsubscribe`, `join_channel`, `leave_channel`, `broadcast`, `presence_track`, `presence_untrack`, and `presence_state`) resolve immediately upon transmission and do not trigger timeouts.
+One-way messages that do not expect a response (like `subscribe_collection`, `subscribe_one`, `unsubscribe`, `join_channel`, `leave_channel`, `broadcast`, `presence_track`, `presence_untrack`, `presence_state` and `channel_history`) resolve immediately upon transmission and do not trigger this timeout. A subscription whose first frame has not arrived 30 seconds after its subscribe was sent fails instead, with `SUBSCRIPTION_TIMEOUT` on its `onError`.
 
 ### When a channel frame is refused
 
@@ -547,7 +547,7 @@ channel.onError((error) => {
 | Code | Means |
 |------|-------|
 | `CHANNEL_FORBIDDEN` | You are not a member of the channel — join it before broadcasting or reading its history |
-| `RATE_LIMITED` | Past the channel frame budget above, or, for a history request, past the [data rate limit](#what-a-write-costs-and-the-limits) |
+| `RATE_LIMITED` | Past the channel frame budget (7,200 channel frames a minute per socket), or, for a history request, past the [data rate limit](#what-a-write-costs-and-the-limits) |
 | `CHANNEL_HISTORY_WRITE_FAILED` | A retained broadcast could not be persisted, so it was dropped |
 | `CHANNEL_HISTORY_READ_FAILED` | A catch-up request could not be served |
 | `CHANNEL_HISTORY_GAP` | Raised by the client: a catch-up found that the server no longer retains messages this client never received. `details` is `{ from, to }`, the sequence numbers missed. Resync the channel's state from its source of truth |

@@ -34,7 +34,7 @@ authController.signOut()      // Log out
 authController.getAuthToken() // Get current JWT for API calls
 ```
 
-Pass the `authController` to the Rebase navigation controller to gate the entire admin panel behind authentication.
+Pass the `authController` to `<Rebase authController>`. `<RebaseShell>` (or `<RebaseAuthGate>` in a manual layout) reads it from there and gates the entire admin panel behind authentication.
 
 ## Your Own Auth Provider
 

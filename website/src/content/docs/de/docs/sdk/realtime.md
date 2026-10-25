@@ -1,5 +1,5 @@
 ---
-sourceHash: 172ed813d51ccec3
+sourceHash: 607e40e364a1e6b0
 title: Realtime-Abonnements
 sidebar_label: Realtime
 description: Abonnieren Sie Live-Datenänderungen mit dem typisierten SDK von Rebase über WebSocket-basierte Realtime-Listener.
@@ -215,7 +215,7 @@ useEffect(() => {
 
 Der WebSocket-Client übernimmt die Authentifizierung automatisch:
 
-- Bei der **Anmeldung** oder beim **Token-Refresh** wird das neue Token über eine `authenticate`-Nachricht an einen bereits geöffneten Socket gesendet. Ist keiner geöffnet, geschieht nichts – das Anmelden ist keine Anforderung für Realtime, und ein später geöffneter Socket authentifiziert sich selbst.
+- Bei der **Anmeldung** oder beim **Token-Refresh** übernimmt ein bereits geöffneter Socket die neue Anmeldeinformation. Ein Refresh oder eine Anmeldung als das Konto, das er bereits hält, sendet das Token in einer `authenticate`-Nachricht; eine Anmeldung als ein anderes Konto — auch die eines Besuchers — baut den Socket neu auf, der sich als dieses Konto authentifiziert und jedes aktive Abonnement und jeden Channel erneut sendet. Ist keiner geöffnet, geschieht nichts – das Anmelden ist keine Anforderung für Realtime, und ein später geöffneter Socket authentifiziert sich selbst.
 - Bei der **Abmeldung** wird die WebSocket-Verbindung getrennt. Der Client bleibt nutzbar; ein späteres Abonnement stellt die Verbindung anonym wieder her.
 - Wenn die Verbindung abbricht, **verbindet sich der Client automatisch wieder** und richtet alle aktiven Abonnements neu ein. Er hört nie auf, es zu versuchen, solange ein Abonnement oder ein beigetretener Channel existiert; die Verzögerung zwischen den Versuchen wächst auf höchstens 30 Sekunden.
 - Beendet der Server die Sitzung des Sockets — die Person hat sich überall abgemeldet, diese Sitzung wurde widerrufen, das Konto wurde gelöscht, oder das Token ist abgelaufen, bevor ein Refresh den Socket erreichte —, schließt er den Socket mit dem Code `4001`. Der Client verbindet sich wieder wie nach jedem anderen Abbruch und authentifiziert sich mit der Sitzung, die er dann hält (aktualisiert, falls möglich), oder anonym, wenn keine vorhanden ist. Eine entzogene Rolle schließt den Socket nicht: Sie gilt ab dem nächsten Frame. Siehe [Authentifizierung & RLS](/docs/backend/realtime/#authentication--rls).

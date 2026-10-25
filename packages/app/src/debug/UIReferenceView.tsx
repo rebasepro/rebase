@@ -729,7 +729,7 @@ selected: true }, { name: "Tags" }].map(c => (
                 <SectionBlock id="empty-states" title="Empty States — Canonical Pattern">
                     <Typography variant="body2" color="secondary" className="mb-4">
                         All empty / placeholder states share the same layout: a centered <code className="font-mono text-xs">flex-col</code> container
-                        with <code className="font-mono text-xs">Typography variant=&quot;label&quot;</code> for the message and a <code className="font-mono text-xs">Button</code> with <code className="font-mono text-xs">AddIcon</code> for the primary action.
+                        with <code className="font-mono text-xs">Typography variant=&quot;label&quot;</code> for the message and a <code className="font-mono text-xs">Button</code> with <code className="font-mono text-xs">PlusIcon</code> for the primary action.
                         Sources: <code className="font-mono text-xs">CollectionPropertiesEditorForm</code>, <code className="font-mono text-xs">CollectionsStudioView</code>, <code className="font-mono text-xs">CollectionStudioView</code>.
                     </Typography>
 

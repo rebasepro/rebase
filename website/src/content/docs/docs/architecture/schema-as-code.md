@@ -165,10 +165,10 @@ none of the four.
 
 When Rebase updates the database schema, it maps TypeScript collection definitions to database tables. To ensure that **unmapped database objects (e.g., tables, views, enums) are never dropped or modified**, Rebase implements several layers of safety:
 
-1. **Strict Table Filtering (`tablesFilter`)**: The generated Drizzle configuration dynamically restricts synchronization to only the tables exported in the generated schema. Any unrecognized tables or legacy systems' tables existing in the database are ignored by the sync engine.
-2. **Schema Restrictions (`schemaFilter`)**: The DB sync is restricted exclusively to the `public` schema. Internal database tables, custom schemas, and extension-specific tables are left untouched.
-3. **Roles and Extension Protection**: Drizzle is configured not to manage database roles (`entities.roles: false`) or helper tables from extensions like PostGIS.
-4. **Interactive Dev Mode Confirmation**: When running `rebase db push` in development, the CLI executes with `--strict` and `--verbose` flags, which ensures that developers must explicitly review and approve any destructive SQL actions before they are executed.
+1. **Unmapped Table Exclusion**: Before every push, the CLI lists every table and view in the database and hands Atlas an `--exclude` for each one that backs no collection (or a collection's junction table), so Atlas never plans a change to it. If the database cannot be read, the push aborts rather than run with a partial list.
+2. **Schemas Rebase Owns**: The `rebase` schema (auth tables, RLS helper functions, Atlas's revision table) and any `auth` schema are excluded whole, so a push can never plan a `DROP SCHEMA … CASCADE`.
+3. **Objects Atlas Cannot Model**: Search columns, vector indexes and triggers are excluded from Atlas too, and applied from their own generated files.
+4. **Destructive-Change Gate**: `rebase db push` dry-runs the plan first. A statement that destroys data — a dropped column or table, a lossy type change — stops the push: in a terminal it asks you to type `yes`, and without one (CI, scripts, agents) it refuses unless you pass `--allow-destructive`.
 5. **Index Ownership by Name**: Indexes are the one object that lives *on* a mapped table, so table filtering cannot protect them — and a push used to plan `DROP INDEX` for any index missing from the desired state, which meant every hand-written one. Rebase now names the indexes it generates `<table>_<columns>_ix_<7 hex>` (`_ux_` when unique), a shape no other namer here produces, and excludes everything else from the diff by name. An index you wrote by hand, or that came in through introspection, is never touched; a declaration you delete still drops, which is the intent. See **[Indexes](/docs/backend/indexes)**.
 
 ## Next Steps

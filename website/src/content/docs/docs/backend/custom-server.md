@@ -52,25 +52,24 @@ Importing `z` from `@rebasepro/server` is new. On 0.17 and
 earlier the package exported no `z`: import it from `zod`, matching the major the
 runtime uses, and let your bundler dedupe the two copies.
 
-:::caution[The `z` you extend with must be the runtime's zod]
-Two copies of zod loaded at once is the one way this call goes wrong, and it
-used to go wrong silently. `.merge()` accepts a schema from the other copy —
-the shapes are identical — and then `.parse()` rejects every field carrying a
-`.default()`, because a default is recognised by class identity. The server came
-up, reported success, and ran none of its crons; nothing in the failure
-mentioned zod.
+:::caution[Two copies of zod]
+Two copies of zod loaded at once used to break this call silently. `loadEnv`
+combined the schemas with `.merge()`, which accepts a schema from the other copy
+and then rejects every field carrying a `.default()`. The server came up,
+reported success, and ran none of its crons; nothing in the failure mentioned
+zod.
 
-The runtime provides `zod`. The scaffold's `backend/package.json` lists it at
-the range `@rebasepro/server` uses, so one copy is installed: keep the two equal.
-`loadEnv` now refuses a foreign schema at boot with a message naming the fix,
-rather than accepting it and validating half of it.
+`loadEnv` now validates the base schema and your `extend` schema each with its
+own `.parse()`, so a schema built by another copy of zod works. The runtime
+provides `zod`, and the scaffold's `backend/package.json` lists it at the range
+`@rebasepro/server` uses, so one copy is installed: keep the two equal.
 :::
 
 **Key behaviors:**
 - Generates `JWT_SECRET` and `REBASE_SERVICE_KEY` in development when they are unset, so you can start without manual setup, and caches them in `.rebase-dev-secrets.json` so a restart does not sign anyone out.
 - Blocks auto-generated secrets in production — you must set them explicitly.
 - Validates that `CORS_ORIGINS` or `FRONTEND_URL` is set in production.
-- Refuses an `extend` schema built by a different copy of zod.
+- Refuses an `extend` value that is not a zod schema.
 - Throws an `Error` naming each variable that is missing or wrong, such as `DATABASE_URL: is required`, with zod's issues on its `issues` property. On 0.24 it throws zod's own `ZodError`, which names no variable when nothing catches it.
 
 See `.env.example` in the scaffolded app for the full list of supported variables.
@@ -234,7 +233,8 @@ of the rest is a call you make, or leave out:
 | `backend.shutdown(timeoutMs, { server })` | Stops what `start()` and `attachRealtime()` started, waiting for cron runs and jobs in flight. Closes `server` only when you pass it. | |
 
 The socket's default `path` is the base path given to `mount()` with a trailing
-`/api` removed, so `/api` gives `/` and `/x/api` gives `/x`. That is where the
+`/api` removed, so `/api` gives `/` and `/x/api` gives `/x`; a base path that
+does not end in `/api` gives `/`. That is where the
 SDK dials, because it connects to its `baseUrl` while its HTTP requests go to
 `${baseUrl}/api`. An upgrade to any other path is left to the server's other
 `upgrade` listeners, so your app can run its own WebSocket server on the same
@@ -470,8 +470,10 @@ header the SDK starts reading in a later version reaches your frontend without
 a change here. It is `ETag`, `Retry-After`, `X-Request-ID`, the three
 `X-RateLimit-*` headers and `Preference-Applied`, plus `Location`,
 `Upload-Offset` and `Rebase-Upload-Result`, which a resumable upload (files over
-8 MiB) answers in. Without those three the SDK cannot follow an upload from
-another origin, and sends every file as one multipart request instead. On 0.24,
+8 MiB) answers in, and `X-Rebase-Simulated-Context`, which names what an
+administrator's simulated request ran as. Without the three upload headers the
+SDK cannot follow an upload from another origin, and sends every file as one
+multipart request instead. On 0.24,
 write the list out by hand.
 
 The Rebase runtime and the ejected backend send this list already. On 0.23

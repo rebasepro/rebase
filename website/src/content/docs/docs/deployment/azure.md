@@ -97,7 +97,7 @@ The runtime image ships without the CLI, so this never runs inside the container
 
 ## File storage
 
-Container Apps replicas have no durable disk, so local file storage is silent data loss and the runtime refuses it in production. Create an Azure Storage account and use its S3-compatible surface, or an S3-compatible bucket in the same region, with `STORAGE_TYPE=s3` — see [Storage](/docs/backend/storage).
+Container Apps replicas have no durable disk, so local file storage is silent data loss and the runtime refuses it in production. Azure Blob Storage does not speak the S3 API, so use an S3-compatible bucket in the same region with `STORAGE_TYPE=s3` and its `S3_ENDPOINT` — see [Storage](/docs/backend/storage).
 
 ## Next steps
 

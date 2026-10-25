@@ -1,8 +1,8 @@
 ---
-sourceHash: ee28e46d5e82c6f9
+sourceHash: 78d733a060f9bbd1
 title: Serveur MCP
 sidebar_label: Serveur MCP
-description: Connectez Claude Code, Cursor, Gemini CLI ou n'importe quel client MCP à un projet Rebase — les 42 outils exposés, l'identifiant avec lequel il s'authentifie et le verrou loopback qui s'interpose entre un agent et la production.
+description: Connectez Claude Code, Cursor, Gemini CLI ou n'importe quel client MCP à un projet Rebase — les 44 outils exposés, l'identifiant avec lequel il s'authentifie et le verrou loopback qui s'interpose entre un agent et la production.
 ---
 
 `@rebasepro/mcp` est un serveur [Model Context Protocol](https://modelcontextprotocol.io)
@@ -175,7 +175,7 @@ Un jeton enregistré pour un projet **l'emporte sur l'auto-découverte**. La dé
 que combler un manque.
 
 :::danger[La méthode sans configuration utilise un identifiant administrateur]
-Les options 2 et 3 correspondent à la **clé de service** (`service key`) — un secret administrateur
+Les options 2 et 3 correspondent à la **clé de service** — un secret administrateur
 sans restriction de portée. Le backend la résout en `uid: "service"`, `roles: ["admin"]`, `isAdmin: true`.
 Cette identité détient toutes les [portées](/docs/backend/roles-and-scopes/), et elle satisfait les
 politiques `_default_admin_read` / `_default_admin_write` que Rebase injecte dans chaque collection
@@ -295,12 +295,12 @@ l'interface loopback.** Le verrou est conçu comme une liste de ce qui n'*est pa
 verrouillé, de sorte qu'un outil ajouté ultérieurement est protégé par défaut.
 
 - **Non verrouillés — lectures :** `rebase_schema_plan`, `rebase_doctor`,
-  `rebase_db_branch_list`, `rebase_db_branch_info`, `list_documents`,
+  `rebase_db_branch_list`, `rebase_db_branch_info`, `rebase_db_branch_diff`, `list_documents`,
   `get_document`, `list_users`, `list_roles`, `storage_list_objects`,
   `storage_get_download_url`, `cron_list_jobs`, `cron_get_job`, `cron_get_job_logs`,
   `rebase_dev_logs`.
 - **Non verrouillés — locaux uniquement :** `rebase_schema_introspect`, `rebase_schema_generate`, `rebase_db_generate`,
-  `rebase_generate_sdk`, les outils du serveur de dev et les outils du registre de projets.
+  `rebase_generate_sdk`, `rebase_db_branch_switch`, les outils du serveur de dev et les outils du registre de projets.
   Ceux-ci écrivent des fichiers locaux ou un état local et n'ont aucune cible distante à vérifier.
 - **Verrouillés selon `DATABASE_URL` :** les outils CLI restants — `rebase_db_push`,
   `rebase_db_migrate`, `rebase_db_branch_create`, `rebase_db_branch_delete`.
@@ -308,7 +308,8 @@ verrouillé, de sorte qu'un outil ajouté ultérieurement est protégé par déf
   `create_document`, `update_document`, `delete_document`, `create_user`,
   `update_user`, `delete_user`, `rebase_auth_reset_password`,
   `storage_delete_object`, `cron_trigger_job`, `cron_toggle_job`,
-  `invoke_function`.
+  `invoke_function` — et `rebase_cloud_provision`, qui lance `rebase cloud`
+  mais est lui aussi contrôlé par rapport à `baseUrl`.
 
 Les deux cibles ne sont pas interchangeables. Les outils CLI ne voient jamais `baseUrl`, ainsi un backend
 localhost associé à une `DATABASE_URL` de production est contrôlé par rapport à la base de données,
@@ -339,7 +340,8 @@ Depuis un terminal,
 `rebase db push` et `rebase db migrate` s'exécutent bel et bien sur cette base de
 données ; seuls les outils MCP sont refusés. En 0.24, la CLI les y refuse aussi.
 
-Seule l'interface loopback est considérée comme locale : `localhost`, `*.localhost`, `127.0.0.0/8`, `::1`.
+Seule l'interface loopback est considérée comme locale : `localhost`, `*.localhost`, `127.0.0.0/8`, `::1`
+(et `0.0.0.0`).
 Les plages privées telles que `10.x` et `192.168.x` ne le sont **pas** — celles-ci ont autant de chances
 d'être un cluster de staging partagé qu'un ordinateur portable, et les traiter comme locales laisserait
 passer précisément l'accident que ce verrou a pour rôle d'empêcher.
@@ -408,9 +410,10 @@ traitez-le en conséquence.
 
 ## Référence des outils
 
-42 outils, répartis en neuf groupes : schéma et base de données, planification de schéma,
-documents, utilisateurs et rôles, stockage, cron, fonctions, le serveur de dev et le registre de
-projets. Chacun, avec ce dont il a besoin et si le verrou le refuse sur une cible non locale, se
+44 outils, répartis en dix groupes : schéma et base de données, planification de schéma,
+documents, utilisateurs et rôles, stockage, cron, fonctions, le serveur de dev, le registre de
+projets et Rebase Cloud.
+Chacun, avec ce dont il a besoin et si le verrou le refuse sur une cible non locale, se
 trouve dans la [référence des outils MCP](/docs/ai/mcp-tool-reference).
 
 ## Ressources

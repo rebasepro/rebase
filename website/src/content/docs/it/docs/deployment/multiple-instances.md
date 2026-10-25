@@ -1,5 +1,5 @@
 ---
-sourceHash: de9051fe769a602b
+sourceHash: 88050e5f44c6457a
 title: Esecuzione di più istanze
 sidebar_label: Più istanze
 description: "Ogni elemento di stato che un processo Rebase mantiene per sé e l'impostazione per condividerlo: cosa configurare prima che una seconda replica, un rolling deploy o un deployment suddiviso ricevano traffico."
@@ -48,7 +48,8 @@ Le sezioni seguenti spiegano il comportamento di ogni elemento se lasciato limit
 `JWT_SECRET` firma ciascuna sessione e `REBASE_SERVICE_KEY` autentica
 le chiamate server-to-server. In fase di sviluppo, ogni processo genera i propri se
 non sono impostati, quindi un token emesso da un processo viene rifiutato dal successivo.
-In produzione l'avvio viene già rifiutato se sono assenti; ciò che conta con più processi
+In produzione l'avvio viene già rifiutato in assenza di `JWT_SECRET` (senza `REBASE_SERVICE_KEY` si avvia
+senza alcuna service key); ciò che conta con più processi
 è che ognuno riceva gli **stessi** valori — da un unico segreto, non uno per replica.
 
 ## Rate limit e indirizzo del client

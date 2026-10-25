@@ -1,5 +1,5 @@
 ---
-sourceHash: f3af5fc4d4e8aac0
+sourceHash: c8644465af03e13a
 title: Referência de Hooks
 sidebar_label: Hooks
 description: Hooks React fornecidos pelo Rebase para acessar autenticação, dados, navegação, painéis laterais, armazenamento e estado da UI.
@@ -93,7 +93,7 @@ function ProductList() {
 | Parâmetro | Tipo | Descrição |
 |-----------|------|-------------|
 | `path` | `string` | Caminho absoluto da coleção (por ex., `"products"`). |
-| `collection` | `CollectionConfig` | O objeto de definição da coleção. |
+| `collection` | `AdminCollection` | O objeto de definição da coleção. |
 | `itemCount` | `number` | Opcional. Número de entidades a carregar (limite SQL). |
 | `offset` | `number` | Opcional. Número de itens a pular. |
 | `page` | `number` | Opcional. Número da página (começando em 1), alternativa ao `offset`. |
@@ -145,7 +145,7 @@ function ProductDetail({ productId }) {
 |-----------|------|-------------|
 | `path` | `string` | Caminho absoluto da coleção. |
 | `entityId` | `string \| number` | O ID da entidade a carregar. |
-| `collection` | `CollectionConfig` | O objeto de definição da coleção. |
+| `collection` | `AdminCollection` | O objeto de definição da coleção. |
 | `useCache` | `boolean` | Opcional. Se `true` e a entidade estiver em cache, pula a atualização em segundo plano. (Padrão: `false`). |
 
 ### Utilitários de cache
@@ -416,7 +416,7 @@ function CategorySelector({ onSelect }) {
 | Opção | Tipo | Descrição |
 |--------|------|-------------|
 | `path` | `string` | Caminho absoluto da coleção. |
-| `collection` | `CollectionConfig` | Definição da coleção de destino. |
+| `collection` | `AdminCollection` | Definição da coleção de destino. |
 | `fixedFilter` | `FilterValues` | Opcional. Filtros estáticos para restringir os resultados da busca. |
 | `pageSize` | `number` | Opcional. Número de itens por página. (Padrão: `10`). |
 | `getLabelFromEntity` | `(entity) => string` | Opcional. Personaliza o texto do rótulo exibido. |

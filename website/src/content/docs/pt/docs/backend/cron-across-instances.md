@@ -69,11 +69,11 @@ pausado.
 `rebase dev` exibiu; veja a [REST API](/docs/backend/cron-jobs-api/).
 
 ```bash
-# Pausar, para todos os processos, até alguém retomá-lo
+# Pause, for every process, until someone resumes it
 curl -X PUT -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
     -d '{ "enabled": false }' "$API_URL/api/admin/cron/health-check"
 
-# Parar de sobrescrever: voltar a seguir o `enabled` declarado no arquivo do job
+# Stop overriding: follow the `enabled` the job's file declares again
 curl -X PUT -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
     -d '{ "enabled": null }' "$API_URL/api/admin/cron/health-check"
 ```

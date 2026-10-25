@@ -55,9 +55,11 @@ The four pattern operators match text. An enum column is matched by its value
 (`?status=like.draft%25`); on a number, a date or any other column that is not
 text they are a 400 `INVALID_FILTER_OPERATOR`.
 
-`isnull` and `notnull` ignore their value — the operator is the whole condition,
-and anything after the dot is discarded. The SDK writes `.null`, so that is the
-spelling you will see on the wire.
+`isnull` and `notnull` take no operand — the operator is the whole condition, and
+`.null`, `.true`, `.false` or nothing after the dot all mean the same. The SDK
+writes `.null`, so that is the spelling you will see on the wire. Anything else
+after the dot is not an operand they have, so the whole string is read as a
+value: `?reason=notnull.reason` matches the text `notnull.reason`.
 
 :::caution[`eq.null` is the four-character string, not `IS NULL`]
 `?deleted_at=eq.null` searches for the literal text `null`. SQL `= NULL` is
@@ -140,7 +142,7 @@ security happens to allow.
 
 ## How the filters combine
 
-`?field=op.value`, `?where=`, `?or=`/`?and=` and `?searchString=` are
+`?field=op.value`, `?where=`, `?or=`/`?and=`/`?not=` and `?searchString=` are
 independent, and every one of them that is present must match:
 
 ```text
@@ -148,6 +150,10 @@ independent, and every one of them that is present must match:
   AND (the logical group)
   AND (the search string)
 ```
+
+The one exception is a field named in both `?field=op.value` and `where`: there
+the query parameter **replaces** the `where` condition on that field, being the
+more specific request, rather than being AND-ed with it.
 
 There is no way to OR one against another. Anything that is not a plain AND of
 those groups belongs inside a single `or=`/`and=` tree.

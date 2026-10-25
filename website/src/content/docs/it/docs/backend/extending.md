@@ -1,5 +1,5 @@
 ---
-sourceHash: b2aa1062d257415a
+sourceHash: 791588f79f48d44f
 title: Rebase non fa X
 sidebar_label: Estendere il server
 description: La scala di estensione lato server — dichiarazione, callback di collezione, funzione personalizzata, rotte personalizzate, server personalizzato, eject — con ciò che ciascuno può e non può raggiungere.
@@ -51,7 +51,7 @@ la renderizza e `rebase doctor` la confronta con il database attivo.
 | Decidere chi può leggere o scrivere una riga | `securityRules` | [Authentication](/docs/backend/authentication) |
 | Cercare testo correttamente — accenti, JSONB, ranking, sottostringhe | un blocco `search` | [Search](/docs/backend/search) |
 | Trovare righe per significato semantico | una proprietà `vector` | [Search](/docs/backend/search) |
-| Mantenere le righe cancellate | `softDelete` | [Writes](/docs/backend/writes) |
+| Mantenere le righe cancellate | `softDelete` | [Soft delete](/docs/collections/soft-delete) |
 | Registrare chi ha modificato cosa | `history` | [History](/docs/backend/history) |
 | Eseguire un'attività pianificata | un file cron job | [Cron Jobs](/docs/backend/cron-jobs) |
 | Eseguire qualcosa dopo una scrittura, fuori banda | un job | [Jobs](/docs/backend/jobs) |
@@ -98,7 +98,7 @@ callbacks: {
 }
 ```
 
-Vale la pena conoscere tre proprietà prima di farvi affidamento:
+Vale la pena conoscere quattro proprietà prima di farvi affidamento:
 
 - **Può solo restringere.** Il valore restituito è un filtro da aggiungere in AND, e non
   c'è forma possibile che possa ampliare la lettura. Questa è una scelta deliberata: se a un hook venisse

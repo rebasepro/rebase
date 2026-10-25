@@ -1,5 +1,5 @@
 ---
-sourceHash: e68d814b6b83ef41
+sourceHash: a5511fd6dc8fd73e
 title: MCP-Tool-Referenz
 sidebar_label: MCP-Tool-Referenz
 description: Jedes Tool, das der Rebase-MCP-Server registriert, nach Gruppe – was jedes einzelne benötigt und tut, und welche das Loopback-Gate bei einem nicht lokalen Projekt abweist.
@@ -10,10 +10,10 @@ Wie er sich verbindet, welches Credential er hält und wie das
 [Loopback-Gate](/docs/ai/mcp#the-loopback-gate) entscheidet, was ⚠ bedeutet,
 steht auf der Seite [MCP-Server](/docs/ai/mcp).
 
-42 Tools in neun Gruppen. Mit ⚠ markierte Tools werden bei Zielen außerhalb von
+44 Tools in zehn Gruppen. Mit ⚠ markierte Tools werden bei Zielen außerhalb von
 localhost abgewiesen, sofern Sie dies nicht explizit erlauben.
 
-## Schema & Datenbank (12)
+## Schema & Datenbank (13)
 
 Startet die Rebase-CLI im aktiven Projektverzeichnis.
 
@@ -30,6 +30,7 @@ Startet die Rebase-CLI im aktiven Projektverzeichnis.
 | `rebase_db_branch_list` | — | Datenbank-Branches auflisten (nur Admins) |
 | `rebase_db_branch_delete` ⚠ | `name` | Datenbank-Branch löschen (nur Admins) |
 | `rebase_db_branch_info` | `name` | Branch-Informationen und -Status (nur Admins) |
+| `rebase_db_branch_diff` | `name` | Was ein Branch gegenüber der Datenbank geändert hat, aus der er erstellt wurde – Schema, Richtlinien und Zeilen, mit Konflikten; ändert keines von beiden (nur Admins) |
 | `rebase_db_branch_switch` | — | Dieses Checkout auf einen Branch oder zurück auf die Hauptdatenbank verweisen lassen (nur Admins) |
 
 ## Schema-Planung (1)
@@ -116,7 +117,7 @@ dem, was Ihre Funktionen tun.
 |---|---|---|
 | `rebase_project_list` | — | Registrierte Projekte auflisten und das aktive anzeigen |
 | `rebase_project_switch` | `name` | Aktives Projekt wechseln |
-| `rebase_project_add` | `name` | Projekt registrieren (`baseUrl`, optional `projectDir`, `token`) |
+| `rebase_project_add` | `name` | Projekt registrieren (optional `projectDir`, `baseUrl`, `token`) |
 | `rebase_project_remove` | `name` | Projekt entfernen (das Standardprojekt kann nicht entfernt werden) |
 | `rebase_project_current` | — | Aktives Projekt und dessen Authentifizierungsstatus anzeigen |
 | `rebase_project_status` | — | Health-Check für das aktive Backend durchführen |
@@ -125,3 +126,11 @@ dem, was Ihre Funktionen tun.
 Ziel für alles Weitere ändert, anstatt selbst Aktionen auf einem Ziel auszuführen.
 Ein Assistent kann daher zu einem Remote-Projekt wechseln, ohne das Gate auszulösen –
 er kann dort anschließend lediglich keine destruktiven Tools ausführen.
+
+## Rebase Cloud (1)
+
+Startet `rebase cloud` im aktiven Projektverzeichnis.
+
+| Tool | Erforderlich | Beschreibung |
+|---|---|---|
+| `rebase_cloud_provision` ⚠ | — | Ein nicht beanspruchtes Rebase-Cloud-Projekt ohne Konto bereitstellen (`rebase cloud init --claim`), `REBASE_BASE_URL` und `REBASE_API_TOKEN` in `.env` schreiben und die Collections deployen; optional `name`, `deploy` |

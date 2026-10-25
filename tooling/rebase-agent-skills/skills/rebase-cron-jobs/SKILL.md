@@ -89,10 +89,10 @@ they still work (and still declare, as before), warn once per process, and
 
 Rebase will:
 1. Scan the directory for `.ts` / `.js` files (or take the `crons` values as given)
-2. **Validate** each job's cron schedule — invalid schedules are rejected with an error and the job is NOT registered
+2. **Validate** each job's cron schedule, `timezone` and `timeoutSeconds` — a job that fails is rejected with an error log, NOT registered, and listed under `rejected` on `GET /api/admin/cron`
 3. Register each default export as a cron job
 4. Use the filename as the job id — so two files with one name and different extensions (`x.ts`, `x.js`) are one job, not two; keep one
-5. Auto-create the `rebase.cron_logs` table in PostgreSQL (unless `cronPersistence: false`, or the backend was built with `provision: false`)
+5. Auto-create the `rebase.cron_logs`, `rebase.cron_claims` and `rebase.cron_job_state` tables in PostgreSQL (unless `cronPersistence: false`, or the backend was built with `provision: false`)
 6. Mount admin REST routes at `/api/admin/cron` (reads need the `cron:read` scope, trigger/pause need `cron:write`)
 7. Seed in-memory counters (`totalRuns`, `totalFailures`, `lastRunAt`) from the database
 8. Start the scheduler — `backend.start()`, which `initializeRebaseBackend` calls for you
@@ -233,10 +233,12 @@ export default job;
 ```typescript
 interface CronJobDefinition {
     schedule: string;           // Cron expression (5-field)
-    name: string;               // Human-readable name for Studio
+    timezone?: string;          // IANA zone the schedule is read in (default: the process's own zone)
+    name?: string;              // Human-readable name for Studio (default: the job id)
     description?: string;       // Optional description
     enabled?: boolean;          // Start enabled? (default: true)
-    timeoutSeconds?: number;    // Max execution time (default: 300)
+    timeoutSeconds?: number;    // Max execution time (default: 300; Infinity for none)
+    catchUpWindowSeconds?: number; // Run a slot missed while no instance was ticking (default: off)
     handler: (ctx: CronJobContext) => Promise<unknown> | unknown;
 }
 ```
@@ -244,10 +246,12 @@ interface CronJobDefinition {
 | Property | Type | Default | Description |
 |----------|------|---------|-------------|
 | `schedule` | `string` | — | Standard 5-field cron expression. **Validated on registration** — invalid expressions are rejected. |
-| `name` | `string` | — | Human-readable name shown in Studio UI and API responses. |
+| `timezone` | `string?` | process zone | IANA zone, e.g. `"Europe/Madrid"`. Without it the schedule is read in the host's zone — UTC in nearly every container. An unknown zone is rejected when the job loads. |
+| `name` | `string?` | the job id | Human-readable name shown in Studio UI and API responses. |
 | `description` | `string?` | `undefined` | Optional description shown in Studio. |
-| `enabled` | `boolean?` | `true` | Whether the job starts enabled. Can be toggled at runtime via the Admin API. |
-| `timeoutSeconds` | `number?` | `300` | Maximum seconds the handler may run before being timed out. |
+| `enabled` | `boolean?` | `true` | Whether the job starts enabled. A pause or resume from Studio or the Admin API overrides it, for every process, until reset with `{ "enabled": null }`. |
+| `timeoutSeconds` | `number?` | `300` | Maximum seconds the handler may run before being timed out. `Infinity` means no timeout; `0`, a negative number or `NaN` is rejected when the job loads. |
+| `catchUpWindowSeconds` | `number?` | off | On startup, run the most recent slot inside this window that no instance claimed. Needs a claims-capable store (PostgreSQL with `cronPersistence` on). |
 | `handler` | `(ctx) => Promise<unknown> \| unknown` | — | The function executed on each tick. May return JSON-serialisable data stored in the log. |
 
 ## CronJobContext (Handler Argument)
@@ -340,7 +344,7 @@ Standard 5-field cron format: `minute hour day-of-month month day-of-week`
 
 ### Schedule Validation
 
-Schedules are **validated on registration**. Invalid expressions are rejected with a warning log and the job is **not** registered. Validation checks:
+Schedules are **validated on registration**. Invalid expressions are rejected with an error log and the job is **not** registered; it is listed under `rejected` on `GET /api/admin/cron`, with the reason (most often `Expected 5 fields, got 6`). Validation checks:
 
 - Exactly 5 fields (minute, hour, day-of-month, month, day-of-week)
 - All values within valid ranges: minute `0–59`, hour `0–23`, dom `1–31`, month `1–12`, dow `0–6`
@@ -352,34 +356,40 @@ A **5-second minimum delay** is enforced between scheduled executions. Even if a
 
 ## Concurrency Guard
 
-> **WARNING FOR AGENTS**: A cron job **never** runs two instances concurrently. If a scheduled tick fires while the previous run is still executing, it is **skipped** (not queued). The scheduler re-schedules for the next tick.
+> **WARNING FOR AGENTS**: A cron job **never** runs two instances concurrently — on this process or, through the run lease on `rebase.cron_job_state`, on any other. If a scheduled tick fires while the previous run is still executing, it is **skipped** (not queued) and the skip is recorded in the run history. The scheduler re-schedules for the next tick.
 
-This also applies to **manual triggers** via `POST /api/admin/cron/:id/trigger`. If the job is currently executing, the API returns immediately with a log entry containing:
+This also applies to **manual triggers** via `POST /api/admin/cron/:id/trigger`. If the job is currently executing, the API answers `409` with the code `CRON_JOB_ALREADY_EXECUTING`; `error.details.log` carries the recorded skip:
 
 ```json
 {
-  "log": {
-    "jobId": "my-job",
-    "durationMs": 0,
-    "success": true,
-    "result": { "skipped": true, "reason": "already_executing" },
-    "logs": ["Skipped: job is already running"],
-    "manual": true
+  "error": {
+    "message": "Cron job \"my-job\" is already executing — try again when that run has finished",
+    "code": "CRON_JOB_ALREADY_EXECUTING",
+    "details": {
+      "log": {
+        "jobId": "my-job",
+        "durationMs": 0,
+        "success": true,
+        "result": { "skipped": true, "reason": "already_executing" },
+        "logs": ["Skipped: the previous run has not finished"],
+        "manual": true
+      }
+    }
   }
 }
 ```
 
 ## Timeout Behavior
 
-Each handler invocation is **raced** against a timeout:
+Each handler invocation is **raced** against a timeout: when it fires, `ctx.signal` is aborted and the race rejects.
 
 ```typescript
 const timeout = (job.timeoutSeconds ?? 300) * 1000;
-const result = await Promise.race([handlerPromise, timeoutPromise]);
+const result = await Promise.race([handlerPromise, abortedPromise]);
 ```
 
-- Default timeout: **300 seconds** (5 minutes)
-- If the timeout fires first, the job is marked as **failed** with error `Cron job "<id>" timed out after <N>ms`
+- Default timeout: **300 seconds** (5 minutes); `timeoutSeconds: Infinity` means none
+- If the timeout fires first, the job is marked as **failed** with error `Cron job "<id>" timed out after <N>ms`. The handler itself keeps running unless it honours `ctx.signal`
 - The timeout timer is always cleaned up via `clearTimeout`, even on success or error
 - The `executing` flag is always cleared in a `finally` block, so the concurrency guard recovers correctly
 
@@ -407,13 +417,15 @@ CREATE TABLE rebase.cron_logs (
 CREATE INDEX idx_cron_logs_job ON rebase.cron_logs(job_id, started_at DESC);
 ```
 
+Two more tables are created beside it: `rebase.cron_claims` (one row per job and slot, so one instance runs each slot) and `rebase.cron_job_state` (the pause override, the run lease and the counters). The end-user role `rebase_user` has no privilege on any of them.
+
 Log persistence is **non-blocking** — if the database insert fails, the error is logged but the scheduler continues normally.
 
 The history keeps **30 days**: an hourly sweep deletes older rows in batches. The run and failure counts are all-time — they live on `rebase.cron_job_state` (`total_runs`, `total_failures`, `last_run_at`, …), written in the same statement as each run's row, and a listing reads one row per job.
 
 ### In-Memory Ring Buffer
 
-Regardless of database persistence, the scheduler keeps an **in-memory ring buffer** of the last **50 log entries per job**. The REST API falls back to this buffer when database persistence is unavailable.
+Regardless of database persistence, the scheduler keeps an **in-memory ring buffer** of the last **50 log entries per job**. The REST API reads it when no store is attached (no SQL, or `cronPersistence: false`). With a store, a history read that fails answers `503` rather than this process's buffer.
 
 ### Fallback Behavior
 
@@ -461,6 +473,8 @@ GET /api/admin/cron
   ]
 }
 ```
+
+A job the scheduler refused (bad schedule, unknown `timezone`, invalid `timeoutSeconds`) is not in `jobs`. When there are any, or cron files failed to load, the listing adds `skipped` (the count), `rejected` (`[{ id, name, schedule, reason }]`) and a `note`.
 
 ### Get Single Job
 
@@ -520,7 +534,9 @@ POST /api/admin/cron/:id/trigger
 }
 ```
 
-> If the job is already executing, the response returns immediately with `result: { skipped: true, reason: "already_executing" }`.
+> If the job is already executing — here or on any other process — the answer is `409` with the code `CRON_JOB_ALREADY_EXECUTING`.
+
+The call waits for the run to finish. For a job longer than a proxy in front of the server holds a request, add `?async=1`: the answer is `202` with `{ "accepted": true, "startedAt": "…", "job": { … } }` once the run has started, and the outcome lands in the logs as the entry with `"manual": true` and that `startedAt`. `?async` takes `1`, `true`, `0` or `false`; any other value is a `400`.
 
 ### Get Job Logs
 
@@ -530,7 +546,7 @@ GET /api/admin/cron/:id/logs?limit=10
 
 | Query Param | Type | Default | Description |
 |-------------|------|---------|-------------|
-| `limit` | `number?` | `50` | Maximum number of log entries to return |
+| `limit` | `number?` | `50` | Maximum number of log entries to return. A non-numeric value is a `400` |
 
 **Response:** `200 OK`
 
@@ -551,7 +567,7 @@ GET /api/admin/cron/:id/logs?limit=10
 }
 ```
 
-Logs are returned **newest first**. When a database store is available, logs are fetched from the database; otherwise, the in-memory ring buffer is used as fallback.
+Logs are returned **newest first**, the last 30 days of them. When a database store is available, logs are fetched from the database — and a read that fails answers `503`, not an empty list; otherwise, the in-memory ring buffer is used as fallback.
 
 ### Enable/Disable a Job
 
@@ -575,23 +591,27 @@ Content-Type: application/json
 }
 ```
 
-**Error:** `400 Bad Request` (missing `enabled` field)
+The pause applies to every process and survives restarts and redeploys (it is stored on `rebase.cron_job_state`). `{ "enabled": null }` hands the job back to the `enabled` its file declares.
+
+**Error:** `400 Bad Request` (`enabled` missing, or not `true`, `false` or `null`)
 
 ```json
 {
-  "error": { "message": "Missing 'enabled' boolean in body", "code": "BAD_REQUEST" }
+  "error": { "message": "Missing 'enabled' in body: true or false to override the job's code, or null to follow it again", "code": "BAD_REQUEST" }
 }
 ```
+
+A change the store could not save answers `503` and changes no process.
 
 ### API Summary Table
 
 | Method | Path | Request Body | Response Shape |
 |--------|------|-------------|----------------|
-| `GET` | `/api/admin/cron` | — | `{ jobs: CronJobStatus[] }` |
+| `GET` | `/api/admin/cron` | — | `CronJobListing` (`{ jobs: CronJobStatus[], skipped?, rejected?, note? }`) |
 | `GET` | `/api/admin/cron/:id` | — | `{ job: CronJobStatus }` |
-| `POST` | `/api/admin/cron/:id/trigger` | — | `{ log: CronJobLogEntry, job: CronJobStatus }` |
+| `POST` | `/api/admin/cron/:id/trigger` | — | `{ log: CronJobLogEntry, job: CronJobStatus }`; `?async=1` → `202` `CronJobStarted`; `409` while running |
 | `GET` | `/api/admin/cron/:id/logs` | — | `{ logs: CronJobLogEntry[] }` |
-| `PUT` | `/api/admin/cron/:id` | `{ enabled: boolean }` | `{ job: CronJobStatus }` |
+| `PUT` | `/api/admin/cron/:id` | `{ enabled: boolean \| null }` | `{ job: CronJobStatus }` |
 
 ## Type Reference
 
@@ -613,8 +633,8 @@ interface CronJobStatus {
     nextRunAt?: string;       // ISO timestamp of next scheduled execution
     lastDurationMs?: number;  // Duration of last run in ms
     lastError?: string;       // Error message from last failed run
-    totalRuns: number;        // Total executions since server start (seeded from DB)
-    totalFailures: number;    // Total failures since server start (seeded from DB)
+    totalRuns: number;        // All-time executions, every process's (read from the DB)
+    totalFailures: number;    // How many of totalRuns failed
 }
 ```
 
@@ -630,8 +650,8 @@ interface CronJobStatus {
 | `nextRunAt` | `string?` | ISO timestamp of the next scheduled execution. |
 | `lastDurationMs` | `number?` | Duration of the last run in milliseconds. |
 | `lastError` | `string?` | Error message from the last failed run. |
-| `totalRuns` | `number` | Total number of executions (seeded from DB on startup). |
-| `totalFailures` | `number` | Total number of failed executions (seeded from DB on startup). |
+| `totalRuns` | `number` | All-time executions, skips included — every process's, read from `rebase.cron_job_state` where runs are persisted, this process's own otherwise. |
+| `totalFailures` | `number` | How many of `totalRuns` failed. |
 
 ### `CronJobRunState`
 
@@ -642,8 +662,8 @@ type CronJobRunState = "idle" | "running" | "success" | "error" | "disabled";
 | State | Meaning |
 |-------|---------|
 | `idle` | Enabled and waiting for next scheduled tick |
-| `running` | Handler is currently executing |
-| `success` | Last run completed successfully (transitional — becomes `idle`) |
+| `running` | Handler is currently executing — on this process or another |
+| `success` | In the type, but the scheduler never reports it: a successful run returns the job to `idle` |
 | `error` | Last run failed (stays until next successful run) |
 | `disabled` | Job is disabled via API or `enabled: false` in definition |
 
@@ -679,7 +699,7 @@ interface CronJobLogEntry {
 
 ## Client SDK
 
-The Rebase client SDK provides typed methods for all cron operations. All methods require admin authentication.
+The Rebase client SDK provides typed methods for all cron operations. Reads need the `cron:read` scope; `triggerJob` and `toggleJob` need `cron:write`.
 
 ```typescript
 import { createRebaseClient } from "@rebasepro/client";
@@ -694,15 +714,17 @@ const client = createRebaseClient({
 
 | Method | Return Type | Description |
 |--------|------------|-------------|
-| `client.cron.listJobs()` | `Promise<{ jobs: CronJobStatus[] }>` | List all registered cron jobs |
+| `client.cron.listJobs()` | `Promise<CronJobListing>` | List all registered cron jobs, plus `skipped` / `rejected` / `note` |
 | `client.cron.getJob(jobId)` | `Promise<{ job: CronJobStatus }>` | Get a single job's status |
-| `client.cron.triggerJob(jobId)` | `Promise<{ log: CronJobLogEntry, job: CronJobStatus }>` | Manually trigger a job |
+| `client.cron.triggerJob(jobId)` | `Promise<{ log: CronJobLogEntry, job: CronJobStatus }>` | Manually trigger a job and wait for it. `{ async: true }` → `Promise<CronJobStarted>`. Throws a `RebaseApiError` (`409`) while it is running |
 | `client.cron.getJobLogs(jobId, options?)` | `Promise<{ logs: CronJobLogEntry[] }>` | Get execution history |
 | `client.cron.toggleJob(jobId, enabled)` | `Promise<{ job: CronJobStatus }>` | Enable or disable a job |
 
 ### Usage Examples
 
 ```typescript
+import { RebaseApiError } from "@rebasepro/client";
+
 // List all jobs
 const { jobs } = await client.cron.listJobs();
 console.log(jobs.map(j => `${j.id}: ${j.state}`));
@@ -711,14 +733,20 @@ console.log(jobs.map(j => `${j.id}: ${j.state}`));
 const { job } = await client.cron.getJob("cleanup-sessions");
 console.log(`Next run: ${job.nextRunAt}`);
 
-// Trigger a job manually
-const { log, job: updatedJob } = await client.cron.triggerJob("cleanup-sessions");
-// `result` is whatever the handler returned, so it arrives as `unknown` — narrow it.
-if ((log.result as { skipped?: boolean } | undefined)?.skipped) {
-    console.log("Job was already running — skipped");
-} else {
+// Trigger a job manually — a run already in progress is a 409, thrown
+try {
+    const { log, job: updatedJob } = await client.cron.triggerJob("cleanup-sessions");
     console.log(`Completed in ${log.durationMs}ms`, log.result);
+} catch (err) {
+    if (err instanceof RebaseApiError && err.code === "CRON_JOB_ALREADY_EXECUTING") {
+        console.log("Job was already running — skipped");
+    } else {
+        throw err;
+    }
 }
+
+// Trigger a long job and answer once it has started
+const { startedAt } = await client.cron.triggerJob("cleanup-sessions", { async: true });
 
 // Get execution history (last 10 entries)
 const { logs } = await client.cron.getJobLogs("cleanup-sessions", { limit: 10 });
@@ -734,13 +762,13 @@ await client.cron.toggleJob("cleanup-sessions", true);
 
 | Scenario | Behavior |
 |----------|----------|
-| **Invalid cron expression** | Job is rejected at registration with a warning log. Not registered. |
+| **Invalid cron expression, unknown `timezone`, or bad `timeoutSeconds`** | Job is rejected at registration with an error log. Not registered; listed under `rejected` on `GET /api/admin/cron`. |
 | **Duplicate job ID** (`x.ts` and `x.js` in the crons dir) | One job: the directory is read into one record keyed by id, so the file read last wins. Keep one file per id. |
 | **Job still running when next tick fires** | Scheduled tick is skipped; scheduler re-schedules for the next tick. |
-| **Manual trigger while running** | Returns immediately with `{ skipped: true, reason: "already_executing" }`. |
+| **Manual trigger while running** | Answers `409` `CRON_JOB_ALREADY_EXECUTING` immediately; the skip (`{ skipped: true, reason: "already_executing" }`) is in `error.details.log` and the run history. |
 | **Handler throws an exception** | Marked as failed; `error` field populated; `totalFailures` incremented; `executing` flag cleared. |
-| **Handler exceeds timeout** | `Promise.race` rejects with timeout error; marked as failed. Timeout timer is always cleaned up. |
-| **Scheduler stopped while handler runs** | Handler runs to completion (it's async), but no further scheduling occurs. |
+| **Handler exceeds timeout** | `ctx.signal` is aborted and the race rejects with the timeout error; marked as failed. Timeout timer is always cleaned up. |
+| **Scheduler stopped while handler runs** | No further scheduling occurs. `backend.shutdown()` waits for the run within its budget; a run still going then has `ctx.signal` aborted and is recorded as failed. |
 | **Non-SQL driver (e.g. MongoDB)** | Warning logged; cron jobs run normally but logs are not persisted to DB (in-memory only). |
 | **DB persistence insert fails** | Error logged; scheduler continues normally (non-blocking). |
 | **`cronPersistence: false`** | No `rebase.cron_logs` table created; logs kept in-memory ring buffer (50 per job). |

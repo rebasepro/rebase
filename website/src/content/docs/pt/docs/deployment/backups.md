@@ -1,5 +1,5 @@
 ---
-sourceHash: 0ad3c09f2832ec0a
+sourceHash: edbdf58fb055d26f
 title: Backups e restauração
 sidebar_label: Backups
 description: Crie, agende, liste e restaure backups do banco de dados com pg_dump — o que um backup contém, o arquivo de roles que viaja com ele, e a única coisa que ele não cobre, seus arquivos enviados.
@@ -89,8 +89,8 @@ row-level security do dump nomeiam uma — `rebase_user`. Restaurado em um
 Postgres novo sem ela, o primeiro `GRANT` para essa role falha e a
 restauração para.
 
-Mantenha os dois arquivos juntos. A CLI faz upload, lista, descarta e restaura
-ambos como um par, e o `rebase db restore` procura o `.globals.sql` no mesmo
+Mantenha os dois arquivos juntos. A CLI faz upload e restaura
+ambos como um par, um backup agendado os descarta como um só, e o `rebase db restore` procura o `.globals.sql` no mesmo
 diretório ou prefixo do `.dump`. As roles são recriadas **sem senhas**;
 defina-as novamente após uma restauração em um cluster novo. `PG_DUMPALL_PATH`
 aponta para um binário específico do `pg_dumpall`.
@@ -126,7 +126,7 @@ antigos. Coloque um arquivo em `backend/crons/` que exporte um por padrão:
 
 ```ts
 // backend/crons/backup.ts
-import { GCSStorageController, S3StorageController, type StorageController } from "@rebasepro/server";
+import { backupStorageFromEnv, type StorageController } from "@rebasepro/server";
 import { createBackupCron, backupCronConfigFromEnv } from "@rebasepro/server-postgres";
 
 const resolved = backupCronConfigFromEnv(process.env);
@@ -134,19 +134,9 @@ if (resolved.error) throw new Error(resolved.error);
 
 function backupStorage(): StorageController | undefined {
     const destination = resolved.config?.destination;
-    if (destination?.kind === "gcs") {
-        return new GCSStorageController({ type: "gcs", bucket: destination.bucket });
-    }
-    if (destination?.kind !== "s3") return undefined; // local: written to disk directly
-    return new S3StorageController({
-        type: "s3",
-        bucket: destination.bucket,
-        region: process.env.S3_REGION || "auto",
-        accessKeyId: process.env.S3_ACCESS_KEY_ID ?? "",
-        secretAccessKey: process.env.S3_SECRET_ACCESS_KEY ?? "",
-        endpoint: process.env.S3_ENDPOINT,
-        forcePathStyle: process.env.S3_FORCE_PATH_STYLE === "true"
-    });
+    if (!destination || destination.kind === "local") return undefined; // local: written to disk directly
+    // The same S3_* (or application-default GCS) client the CLI and the Backups panel build.
+    return backupStorageFromEnv(destination, process.env);
 }
 
 // With BACKUP_SCHEDULE unset, export a disabled job so discovery still works.
@@ -193,9 +183,9 @@ próxima seção).
 ## Compatibilidade de versões
 
 O `pg_dump` e o `pg_restore` precisam ser da **mesma versão principal do
-servidor, ou mais recentes**. Todo comando verifica primeiro a versão
-principal do cliente contra o `server_version_num` do servidor em execução e
-para com a solução caso não combinem, ou se o binário estiver ausente:
+servidor, ou mais recentes**. `rebase db backup` e `rebase db restore` verificam a versão
+principal do cliente contra o `server_version_num` do servidor em execução antes de
+fazer o dump ou a restauração, e param com a solução caso não combinem, ou se o binário estiver ausente:
 
 ```
 ✗ Client tool is Postgres 15 but the server is Postgres 16. pg_dump/pg_restore
@@ -277,7 +267,8 @@ O `--continue-on-error` ainda executa o `--clean` do próprio pg_restore.
 Antes de restaurar, ele recria as roles do cluster a partir do
 `.globals.sql` do backup — uma role já existente é ignorada, não é um erro —
 para que os grants e as políticas do dump se apliquem. Em seguida, ele
-executa com `--exit-on-error`: uma restauração que registrasse um `GRANT`
+para no primeiro erro (`--exit-on-error`,
+ou `ON_ERROR_STOP` com `--clean`): uma restauração que registrasse um `GRANT`
 falho e continuasse reportaria sucesso com o row-level security não aplicado.
 Sem um `.globals.sql` ao lado do backup, ele avisa que roles podem estar
 faltando.
@@ -305,8 +296,8 @@ verificá-lo, e só então mover a aplicação:
 ## O painel Backups
 
 O painel **Backups** do Studio, no grupo *Database*, lista os backups em
-`BACKUP_DESTINATION`, do mais recente para o mais antigo, com seu tamanho e
-horário. **Download** busca o dump; **Roles file** busca seu `.globals.sql`.
+`BACKUP_DESTINATION`, do mais recente para o mais antigo, com seu horário (e seu
+tamanho, para um destino local). **Download** busca o dump; **Roles file** busca seu `.globals.sql`.
 Baixe os dois e mantenha-os no mesmo diretório. Um backup marcado como **No
 roles file** não tem o complemento: recrie suas roles manualmente antes de
 restaurá-lo em um Postgres novo.
@@ -381,9 +372,9 @@ const { stream, name } = await client.backups.stream(key);
 await pipeline(Readable.fromWeb(stream), createWriteStream(name));
 ```
 
-Antes da 0.24, `backups.download(key)` respondia um `Blob` com o dump inteiro.
+Na 0.24 e anteriores, `backups.download(key)` respondia um `Blob` com o dump inteiro.
 Agora ele salva o arquivo em um navegador e lança um erro em outros lugares; use `stream(key)`
-no Node. Contra um servidor sem links de download (um anterior à 0.24, ou um
+no Node. Contra um servidor sem links de download (um anterior à 0.25, ou um
 sem segredo JWT para assiná-los), `download()` recorre a ler os bytes
 por conta própria.
 
