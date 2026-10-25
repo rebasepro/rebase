@@ -57,6 +57,14 @@ const VIEW_FLAGS = {
 /** A slug is a URL segment and an entity view key: kebab-case, starting with a letter. */
 const SLUG_PATTERN = /^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/;
 
+/**
+ * Top-level paths the admin's own routes answer (`RebaseRouteDefs` in
+ * `@rebasepro/cms`): `/c/*` the collections, `/s` Studio, `/settings`. They are
+ * declared before custom views, so a screen at one of them was listed in the
+ * sidebar and opened the built-in page instead.
+ */
+const RESERVED_SCREEN_SLUGS: readonly string[] = ["c", "s", "settings"];
+
 export interface GenerateViewOptions {
     projectRoot: string;
     slug: string;
@@ -464,6 +472,12 @@ export function planGenerateView(options: GenerateViewOptions): GenerateViewPlan
     if (!SLUG_PATTERN.test(slug)) {
         throw new UsageError(
             `"${slug}" is not a view slug: use lowercase letters, digits and dashes, starting with a letter (e.g. orders-board).`
+        );
+    }
+    if (!options.collection && RESERVED_SCREEN_SLUGS.includes(slug)) {
+        throw new UsageError(
+            `"${slug}" is reserved: the admin's own routes answer /${slug}, so a screen there would never show. ` +
+            `Pick another slug (e.g. ${slug === "settings" ? "app-settings" : `${slug}-view`}).`
         );
     }
     const frontendDir = resolveFrontendDir(projectRoot);

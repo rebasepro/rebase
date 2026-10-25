@@ -87,6 +87,17 @@ describe("names", () => {
 });
 
 describe("a screen", () => {
+    it("refuses a slug the admin's own routes already answer", () => {
+        // `/settings`, `/s` (Studio) and `/c/*` (collections) are declared
+        // before custom views, so a view at one of them was listed in the
+        // sidebar and opened the built-in page instead.
+        for (const slug of ["settings", "s", "c"]) {
+            expect(() => planGenerateView({ projectRoot: project, slug })).toThrow(/admin.*own|reserved/i);
+        }
+        // A record tab is not a route of its own, so it may use the name.
+        expect(() => planGenerateView({ projectRoot: project, slug: "settings", collection: "posts" })).not.toThrow(/reserved/i);
+    });
+
     it("writes the view and the screens list, and wires App.tsx", () => {
         const plan = planGenerateView({ projectRoot: project, slug: "orders-board" });
         const written = plan.files.map(f => [path.relative(project, f.path), f.action]);
