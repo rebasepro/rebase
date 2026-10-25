@@ -26,7 +26,7 @@ rebase cloud whoami     # the current session, or what REBASE_TOKEN may do
 rebase cloud tokens create --can deploy,logs   # a token for CI, shown once
 ```
 
-At a terminal with no password given, `login` asks whether to use your password
+At a terminal with no password given, <span class="since-badge" data-since="0.26">Since 0.26</span> `login` asks whether to use your password
 or a code the control plane emails you. With two-factor authentication on, it
 then asks for your authenticator code (or a recovery code). Without a terminal
 neither can be typed: set `REBASE_TOKEN` to an access token made in the console
@@ -53,7 +53,7 @@ rebase cloud projects info [id]
 rebase cloud projects delete [id]
 ```
 
-`claim` prints the claim link of the project `init --claim` provisioned in this
+<span class="since-badge" data-since="0.26">Since 0.26</span> `claim` prints the claim link of the project `init --claim` provisioned in this
 directory, and the time left before it is deleted unclaimed (`Unclaimed: deleted
 in 41h`). `--open` also opens it in a browser. The link is kept only on the
 machine that ran `init --claim`, in `~/.rebase/credentials.json`; the control
@@ -132,7 +132,7 @@ rebase cloud logs --runtime --previous            # a restarted container's last
   the structured `severity` a Rebase backend logs, a level word at the start of a
   plain line, or an error shape such as `TypeError:`. Lines with none are left out.
 
-A follow polls every two seconds and prints each line once. It announces pods
+<span class="since-badge" data-since="0.26">Since 0.26</span> A follow polls every two seconds and prints each line once. It announces pods
 that start, stop or restart. When a container restarts it also prints the last
 lines of the instance that died, where the reason usually is. It waits while no
 pod is running, and after a dropped connection it retries with backoff and
@@ -160,7 +160,7 @@ A backend preview starts from production's variables, live keys included.
 back production's value, and `env list --preview` shows the differences.
 Production is never changed by any of them.
 
-`env set KEY --stdin` reads the value from standard input instead of the
+<span class="since-badge" data-since="0.26">Since 0.26</span> `env set KEY --stdin` reads the value from standard input instead of the
 command line, where `ps` and your shell history would show it:
 
 ```bash
@@ -180,7 +180,7 @@ rebase cloud orgs invites [list] | revoke <id|email> | resend <id|email>
 rebase cloud activity [--project <id|slug>] [--action <area|action>] [--actor <email>] [--limit N] [--before <cursor>]
 ```
 
-`members invite` adds someone whose Rebase account has the address verified,
+<span class="since-badge" data-since="0.26">Since 0.26</span> `members invite` adds someone whose Rebase account has the address verified,
 and otherwise opens an invitation and prints its link: single use, valid 7 days,
 accepted only by an account that has verified that address. The output (and
 `emailDelivery` in `--json`) says whether it was emailed; when it was not, a
@@ -194,7 +194,7 @@ takes any member.
 takes an owner, and the last owner stays. `--org <id>` picks an organization
 other than the selected one.
 
-`activity` is the selected organization's audit log, newest first: who
+<span class="since-badge" data-since="0.26">Since 0.26</span> `activity` is the selected organization's audit log, newest first: who
 deployed, rolled back, set, deleted or revealed an environment variable (by
 name, never by value), changed a domain, created, restored or downloaded a
 backup, changed a project's compute, stopped or deleted a project, changed a
@@ -266,7 +266,7 @@ rebase cloud usage [--month YYYY-MM]   # requests used this month against the al
 rebase cloud usage org           # every project of the selected organization, with the total
 ```
 
-`notifications add <url>` sends the linked project's events to a URL. `--events`
+<span class="since-badge" data-since="0.26">Since 0.26</span> `notifications add <url>` sends the linked project's events to a URL. `--events`
 takes a comma-separated list of `deploy.failed` (the default),
 `deploy.succeeded`, `deploy.rolled_back`, `backup.unhealthy`,
 `billing.payment_failed` and `usage.threshold`. `--format slack` sends
@@ -279,13 +279,13 @@ and `remove` need the owner or admin role. These routes take your
 `rebase cloud login`: no access-token capability includes them. See
 [Cloud notifications](/docs/deployment/cloud-notifications/).
 
-`billing invoices` and `billing upcoming` read the same Stripe data as the
+<span class="since-badge" data-since="0.26">Since 0.26</span> `billing invoices` and `billing upcoming` read the same Stripe data as the
 console's Billing page, and are open to the organization's owners and admins
 only. Amounts in `--json` are in the currency's minor unit (cents), exactly as
 Stripe sends them. Draft invoices are not listed; the preview is computed by
 Stripe and its metered lines keep growing until the period closes.
 
-`usage` reads what the linked project (or `--project`) has used in a calendar
+<span class="since-badge" data-since="0.26">Since 0.26</span> `usage` reads what the linked project (or `--project`) has used in a calendar
 month, in UTC: requests against the included allowance, 5xx errors, the overage
 so far in euros and, for the month in progress, where it is heading at this
 pace (an estimate). The overage is the overage report's own calculation, the

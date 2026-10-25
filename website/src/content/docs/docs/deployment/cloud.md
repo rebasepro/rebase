@@ -61,7 +61,7 @@ before sending your email and password there. Without a terminal, or with
 `--json`, it refuses with `unknown_control_plane`; pass `--url <host>` (or set
 `REBASE_CLOUD_URL`) to sign in there on purpose.
 
-**Signed up with Google, GitHub or LinkedIn?** Your account has no password, so
+**Signed up with Google, GitHub or LinkedIn?** <span class="since-badge" data-since="0.26">Since 0.26</span> Your account has no password, so
 sign in with a code instead:
 
 ```bash
@@ -168,6 +168,8 @@ file"; it is an unknown option now rather than an alias, so a script carrying it
 stops instead.
 
 ### The syntax check before the upload
+
+<span class="since-badge" data-since="0.26">Since 0.26</span>
 
 A static app's files are served exactly as they are. When its `build` only
 copies hand-written scripts into `output`, nothing has parsed them, and a file
@@ -373,11 +375,11 @@ trust under **Settings → Access tokens**.
 verified; anyone else gets a link to copy (emailed when this control plane sends
 email) that works once, for 7 days, only for an account that verifies that
 address. Owners and admins resend or revoke it under **Pending invitations**;
-from a terminal, [`rebase cloud orgs members invite`](/docs/cli/cloud/#organizations).
+from a terminal, <span class="since-badge" data-since="0.26">Since 0.26</span> [`rebase cloud orgs members invite`](/docs/cli/cloud/#organizations).
 
 ## See who did what
 
-The console's **Activity** page and `rebase cloud activity` show the
+The console's **Activity** page and <span class="since-badge" data-since="0.26">Since 0.26</span> `rebase cloud activity` show the
 organization's owners and admins who deployed, set or revealed an environment
 variable (by name, never by value), changed a domain, restored a backup,
 resized, stopped or deleted a project, changed a member's role, or created a
@@ -395,6 +397,8 @@ a signed-in person are in
 [CI and agents](/docs/deployment/cloud-agents/#ci-and-agents).
 
 ## A backend with no account
+
+<span class="since-badge" data-since="0.26">Since 0.26</span>
 
 `rebase cloud init --claim` gives an app a live backend before anyone has signed
 up, and prints a claim URL for the person to keep it; a project nobody claims

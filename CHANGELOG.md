@@ -7,18 +7,30 @@
 #### Studio
 
 - **Review a database branch like a pull request, and merge it.** Picking a
-  branch in Studio's Branches pane shows what it changed against the database
-  it was made from: its tables, columns and RLS policies as SQL, side by side,
-  and per table the rows it inserted, updated and deleted, with samples. Rows
-  the parent changed on its own meanwhile are counted apart, and rows both
-  sides changed are conflicts — each row's transaction id says which side
-  wrote it. **Merge** writes the branch's rows to the parent in one statement,
-  all or none: the parent's own changes are kept, a conflict writes nothing
-  unless you choose which side wins, and a diff that went stale writes nothing.
-  Schema and policies are never merged. The same diff is `rebase db branch
-  diff`, `GET /api/admin/branches/:name/diff`, the read-only MCP tool
+  branch in Studio's Branches pane shows what it changed against the database it
+  was made from: its tables, columns, constraints, indexes, triggers, enum
+  labels, views, functions and RLS policies as SQL, side by side, and per table
+  the rows it inserted, updated and deleted, with samples. Rows the parent
+  changed on its own meanwhile are counted apart, and rows both sides changed
+  are conflicts — each row's transaction id says which side wrote it. **Merge**
+  writes the branch's rows to the parent in one statement, all or none: the
+  parent's own changes are kept, a conflict writes nothing unless you choose
+  which side wins, and a diff that went stale writes nothing. A row the branch
+  deleted that newer parent rows still reference is a conflict as well
+  (`referencedBy` on the diff), so a merge never removes them through a foreign
+  key unless you choose the branch's side, and then its `warnings` list what
+  `ON DELETE` reached. A table that cannot be matched row by row, or was
+  rewritten since the fork (`TABLE_REWRITTEN`), blocks the merge. A merge the
+  parent refuses answers `409 BRANCH_MERGE_FAILED` naming the table and
+  constraint. Schema and policies are never merged. Reading the diff needs
+  `database:write`, like the merge, because its samples are rows of both
+  databases read outside row-level security; samples are capped at 1,000 rows a
+  table, and a column named like a credential (`password_hash`, `*_token`,
+  `*secret*`) shows `[redacted]`. The same diff is `rebase db branch diff`,
+  `GET /api/admin/branches/:name/diff`, the read-only MCP tool
   `rebase_db_branch_diff`, and `diffBranch` on the driver's admin; see
-  [Reviewing and merging a branch](/docs/backend/branching/#reviewing-and-merging-a-branch).
+  [Reviewing and merging a
+  branch](/docs/backend/branching/#reviewing-and-merging-a-branch).
 
 #### Admin (CMS & app)
 
@@ -33,8 +45,9 @@
 - **`EntityFormPanel` creates a record under the id it is given when no record
   has it yet.** A record kept at a known key — a settings singleton, a profile
   keyed by its user's uid — said "not found" until something seeded it; now the
-  first save creates it there. Where the collection marks a key property
-  `isId`, the id is that property's value, set and locked.
+  first save creates it there. Where the collection marks a key property `isId`,
+  the id is that property's value, set and locked. The form is disabled where
+  creating is not allowed, including while access is simulated.
 - **The leaf parts of two overridable components are exported**, so a copy of
   the component compiles with package imports: `NavigationCard` and
   `SmallNavigationCard` (`HomePage.CollectionCard`), and
@@ -75,42 +88,65 @@
   `Collection.View`, `DetailView` and `HomePage`'s drag-and-drop stay
   uncopyable on purpose; the recipes README says why and what to customize
   instead. A test fails when a part that copies stops copying.
-- **"Simulate access" in the app bar: see every collection as a role, a user
-  or a service key.** Pick one and every data view reloads showing only the
-  rows and fields it can read, under a banner that counts the collections it
-  cannot see and the columns masked from it. `client.simulate()` is the client
-  behind it.
+- **"Simulate access" in the app bar: see every collection as a role, a user or
+  a service key.** Pick one and every data view reloads showing only the rows
+  and fields it can read, under a banner that counts the collections it cannot
+  see and the columns masked from it. Simulation is read-only: the form, Revert
+  and every other edit are off while it is on, and a record's History tab and
+  its "last edited by" are read as the simulated identity too.
+  `client.simulate()` is the client behind it, typed by your `Database` and
+  closable.
+- **`escapeCsvFormula` and `unescapeCsvFormula` are exported from
+  `@rebasepro/utils`,** so code outside the admin writes CSV with the same
+  formula escaping. `@rebasepro/cms` still exports both.
 
 #### Server
 
-- **The RLS simulator: an administrator's data request can run as a role, a
-  user or a service key.** `x-rebase-simulate-role`, `x-rebase-simulate-user-id`
-  and `x-rebase-simulate-api-key-id` on the data API and custom functions run
-  the request through the real policies as that identity (`customer` holding
-  uid `u_1` need not be an account), and a key's scopes apply as they would to
-  the key. The response's `x-rebase-simulated-context` names the role, the uid
-  and the fields that identity's roles cannot read. Anyone but an
+- **The RLS simulator: an administrator's data request can run as a role, a user
+  or a service key.** `x-rebase-simulate-role`, `x-rebase-simulate-user-id` and
+  `x-rebase-simulate-api-key-id` on the data API and custom functions run the
+  request through the real policies as that identity (`customer` holding uid
+  `u_1` need not be an account), and a key's scopes apply as they would to the
+  key. Simulation is read-only: a write, delete, batch, history revert or
+  non-GET function call carrying the headers gets `403 SIMULATION_READ_ONLY`.
+  Simulating `anon` simulates no session, so a function's `requireAuth` refuses
+  it, and a simulated request spends the administrator's rate limit, not the
+  simulated key's. The response's `x-rebase-simulated-context` names the role,
+  the uid and the fields that identity's roles cannot read. Anyone but an
   administrator's own session gets `403 SIMULATION_FORBIDDEN`, and every other
   route refuses the headers. `/api/admin/rls-simulator` lists what can be
   simulated and previews each collection's visible rows and masked fields.
 - **`REBASE_PROVISION`: set it to `false` and Rebase changes nothing in your
-  database.** For a
-  database whose schema changes only through your own change process. No
-  table, column, index, function, trigger, policy, role or grant is created or
-  altered, at boot or later. That includes the framework's own tables, which
-  `REBASE_MIGRATE_ON_BOOT=none` still keeps current, and the tables the runtime
-  used to create on first use: idempotency keys, cron claims and the shared
-  rate-limit counters. The runtime reads what is there and names what is
-  missing. Missing auth tables, or a request role that can reach
-  `rebase.refresh_tokens` or `rebase.api_keys`, stop the boot, with the
-  `REVOKE` to run. A missing optional table turns its feature off and says so.
-  The schema comes from a provisioning run your process controls:
+  database.** For a database whose schema changes only through your own change
+  process. No table, column, index, function, trigger, policy, role or grant is
+  created or altered, at boot or later. That includes the framework's own
+  tables, which `REBASE_MIGRATE_ON_BOOT=none` still keeps current, and the
+  tables the runtime used to create on first use: idempotency keys, cron claims
+  and the shared rate-limit counters. The runtime reads what is there and names
+  what is missing. Missing auth tables, or a request role that can reach
+  `rebase.refresh_tokens` or `rebase.api_keys`, stop the boot, with the `REVOKE`
+  to run. A missing optional table turns its feature off and says so. The schema
+  comes from a provisioning run your process controls:
   `REBASE_PROVISION_ONLY=true` with `REBASE_PROVISION_SQL_OUT=<file>` writes
   every schema change the run made as a SQL script to review and apply with
   `psql`. That run no longer starts cron or the job queue, and now creates the
   first-use tables too. `initializeRebaseBackend` reads the variable as well; a
-  server built with `createRebaseBackend` passes `provision: false`. See
-  [When only your change process may change the database](/docs/deployment/self-hosting/#when-only-your-change-process-may-change-the-database).
+  server built with `createRebaseBackend` passes `provision: false`. Studio's
+  schema change dialog then commits a change as source only, for your process to
+  apply. See [When only your change process may change the
+  database](/docs/deployment/self-hosting/#when-only-your-change-process-may-change-the-database).
+- **`openRebase({ callbacks })` runs the project's global callbacks on a
+  script's writes,** as the server does for an API write.
+- **Optional driver hooks for whole-store sweeps: `DataDriver.scanStoredRows`,
+  `StorageController.storageLocation` and the history service's
+  `scanStoredValues`.** `rebase storage orphans` reads rows through them as
+  stored, past any read hook.
+- **For realtime adapter authors: `RealtimeSocketOptions.runInScope` and
+  `RealtimeProvider.setScopeRunner`,** so a hook reached over your transport
+  sees its own backend as `rebase`. `devEmailSinkFor(sendEmail)` in
+  `@rebasepro/server`'s email exports gives a backend its own development
+  mailbox.
+
 #### CLI
 
 - **`rebase cloud deploy` checks a static app's JavaScript before uploading
@@ -128,12 +164,17 @@
   deployed on its own records no bundle, so it cannot be rolled back yet; its
   deploy says so and suggests deploying the last good version again.
 
-- **`rebase cloud deploy --preview` serves a build at its own address and
-  leaves production alone.** Before, the only way to see a change on the
-  platform was to ship it to production. The new flag prints an address like
-  `https://<project>--<name>.rebase.website`, and `--preview-name` keeps the same
-  address across deploys. A static app's preview calls the production backend.
-  A backend preview runs its own backend, on an empty database of its own.
+- **`rebase cloud deploy --preview` serves a build at its own address and leaves
+  production alone.** Before, the only way to see a change on the platform was
+  to ship it to production. The new flag prints an address like
+  `https://<project>--<name>.rebase.website`, and `--preview-name` keeps the
+  same address across deploys. A preview runs its own backend, on an empty
+  database of its own. Rebase Cloud does not serve a static app's own preview
+  yet, so `rebase cloud deploy <app> --preview` for a static app is refused with
+  `PREVIEW_STATIC_UNSERVED` and publishes nothing. The deploy checks that the
+  preview's address answers before calling it live, as a production deploy does.
+  `--can deploy`, `--can env` and `--can logs` tokens cover previews; a token
+  created before this release must be created again to use them.
   `rebase cloud previews` lists and deletes previews. A preview is started
   through its own control-plane function, never through `deploy`, so a control
   plane without previews refuses it with `previews_unavailable` and nothing
@@ -157,21 +198,100 @@
   `${NPM_TOKEN}`, set with `rebase cloud env set NPM_TOKEN=… --secret`; a
   literal token fails the build, because the bundle is uploaded with the code.
 
+- **`rebase cloud login --code` signs in with a 6-digit code emailed to you,**
+  for accounts made with Google, GitHub or LinkedIn, which have no password. At
+  a terminal, `rebase cloud login` offers "Password" or "Email me a code" when
+  the control plane sends codes. With two-factor authentication on, either path
+  asks for the authenticator or recovery code; without a terminal it exits
+  `mfa_required` and names access tokens. A refused password now names `--code`
+  and access tokens (`REBASE_TOKEN`).
+
+- **`rebase cloud activity` prints the organization's audit log:** deploys,
+  rollbacks, env var changes (names only), domains, backups, point-in-time
+  restores, database password reveals, project and member changes and access
+  tokens, each with who and when. `--project`, `--action`, `--actor`, `--limit`,
+  `--before` and `--org` filter it, and `--json` works. Owners and admins can
+  read it, here and on the console's Activity page.
+
+- **`rebase cloud orgs members invite` invites anyone to an organization by
+  email** (`--role admin|member`). Someone with a verified Rebase account is
+  added at once; anyone else gets a single-use link, valid 7 days, that only an
+  account which verified the invited address can accept. `orgs members remove`,
+  `orgs members role` and `rebase cloud orgs invites` (list, revoke, resend)
+  manage the rest, and `orgs members` shows emails.
+
+- **`rebase cloud billing invoices` and `rebase cloud billing upcoming`** list
+  the organization's issued invoices with Stripe's hosted page, and preview each
+  subscription's next invoice. Owner or admin only; `--json` works.
+
+- **`rebase cloud usage` prints this month's requests against the included
+  allowance,** the overage so far and the projected month-end figure, for the
+  linked project or, with `org`, every project in the organization.
+  `--month YYYY-MM` picks another month, `--json` works, and the figures carry
+  their known accuracy limits as `caveats`.
+
+- **`rebase cloud logs --runtime -f` follows the running app's log from every
+  pod until Ctrl-C.** Each line shows once, pods that start, stop or restart are
+  announced, a restarted container's last lines are printed and dropped
+  connections are retried. `--runtime` also takes `--since 5m|<RFC3339>`,
+  `--tail <n>`, `--grep <text|/re/>`, `--level` and `--previous`. With `--json`
+  a follow prints NDJSON, and a snapshot adds `pods`, `state`, `message`,
+  `truncated`, `preview` and `nextSinceTime` beside `logs`.
+  `rebase cloud logs --preview [name]` prints or follows a preview's build log,
+  and with `--runtime` its backend's log.
+
+- **`rebase cloud notifications` sends a project's deploy, backup, billing and
+  usage events to Slack, Discord or any https URL,** signed with
+  `X-Webhook-Signature`:
+  `add <url> [--events …] [--format json|slack] [--name …]`, `list`, `test <id>`
+  and `remove <id>`.
+
+- **`rebase cloud claim` prints the claim link of the project
+  `rebase cloud init --claim` provisioned here,** with the time left (`--open`
+  opens it), and refuses with `already_claimed` once someone has claimed it.
+
+- **`rebase cloud env set KEY --stdin` reads the value from standard input,**
+  keeping it out of `ps` and shell history.
+
+#### Client SDK
+
+- **`client.admin.listUsers({ role, ids })` filters by role and resolves a known
+  set of users** in one round trip, sent as `?role=` and `?ids=a,b`.
+
+#### MCP
+
+- **Cloud tools past provisioning: `rebase_cloud_status`, `rebase_cloud_deploy`,
+  `rebase_cloud_logs`, `rebase_cloud_env_list`, `rebase_cloud_env_set`,
+  `rebase_cloud_deployments_list` and `rebase_cloud_rollback`.** An agent can
+  check, deploy, read logs, configure and roll back the project its directory is
+  linked to without shelling out. They use the CLI's credential and the control
+  plane's own permissions, env values travel through stdin and are never
+  returned, and logs are one snapshot. Every cloud tool,
+  `rebase_cloud_provision` included, refuses arguments its schema does not
+  declare.
+
+#### Helm chart
+
+- **`networkPolicy.ingressNamespace` lets the chart's NetworkPolicy admit an
+  ingress controller other than ingress-nginx,** such as k3s's Traefik in
+  `kube-system`.
+
 ### Changed
 
 #### Admin (CMS & app)
 
-- **Form fields are full width unless they are a pair of like compact
-  fields, or the collection sets `admin.span`.** The form used to guess widths
-  from property types — strings, dates and relations at half, numbers and
-  booleans at a quarter, the title property full — and paired fields that had
-  nothing to do with each other: Namespace beside Custom Domain, Git Branch
-  beside Git Repository URL. Now a field takes the whole row unless it and its
-  neighbour have the same small editor (two numbers, two switches, two dates of
-  the same mode, two selects with short options) and neither has a long label,
-  long help text, `conditions` or a custom `Field`. Free-text strings are never
-  paired, nothing reads the title property, and rows are no longer stretched to
-  close a gap. A span written on a property is used as written.
+- **Form fields are full width unless they are a pair of like compact fields, or
+  the collection sets `admin.span`.** The form used to guess widths from
+  property types — strings, dates and relations at half, numbers and booleans at
+  a quarter, the title property full — and paired fields that had nothing to do
+  with each other: Namespace beside Custom Domain, Git Branch beside Git
+  Repository URL. Now a field takes the whole row unless it and its neighbour
+  have the same small editor (two numbers, two switches, two dates of the same
+  mode, two selects with short options) and neither has a long label, long help
+  text, `conditions`, a custom `Field`, a field-level `access` rule or
+  `excludeFromApi`. Free-text strings are never paired, nothing reads the title
+  property, and rows are no longer stretched to close a gap. A span written on a
+  property is used as written.
 
 #### CLI
 
@@ -186,6 +306,41 @@
   `project`, `apps`, `durationMs`, `live` and `liveChecks`. A piped run without
   either says on stderr how to get JSON back. Every other `rebase cloud`
   command still switches to JSON when piped.
+- **A destructive db push approved by its --yes flag now warns.**
+  `rebase db push --yes` warns, once per process, when it approves a destructive
+  change. From the next release `--yes` approves only non-destructive pushes;
+  pass `--allow-destructive` for the rest.
+- **The cloud webhooks command is retired.** `rebase cloud webhooks` never
+  delivered anything. Every action now exits 1 with code `command_retired` and
+  names `rebase cloud notifications`, and a `WebhookDispatcher` in app code for
+  row changes.
+- **Local commands warn when .env points them at the linked cloud project.**
+  `rebase api-keys`, `rebase storage` and `rebase auth reset-password` say so on
+  stderr when `.env`'s `REBASE_BASE_URL` is the address of the cloud project
+  `init --claim` linked; which address wins is unchanged.
+
+#### Server
+
+- **A create or update naming a multi-hop via relation is refused with a 400.**
+  A `via` chain longer than one link (a to-many chain with no single junction
+  table, or a to-one chain of two or more steps) failed inside the transaction
+  as `500 RELATION_MISCONFIGURED`, telling you to run `rebase schema generate`;
+  a two-step to-one chain was written by re-pointing the target's key at the
+  first step's column. Both are now refused up front with
+  `400 RELATION_NOT_WRITABLE`, naming the field. Single-hop `via` writes (to-one
+  in one step, to-many through one junction table) work as before, the generated
+  SDK now types them, and the admin form disables the picker of a multi-hop
+  `via`.
+- **Role names with a comma, a brace, a double quote, a backslash or a control
+  character are refused.** Users, the users collection and service keys answer
+  `400 INVALID_ROLE` for one, and for an empty name. Roles are now stored as
+  bound parameters (see Security).
+- **Local storage listing page tokens have a new format** (`n.…`). A token
+  issued before the upgrade is refused with `400 INVALID_LIST_OPTIONS`; start
+  the listing over.
+- **The realtime per-user socket ceiling counts each API key's sockets against
+  that key,** not against the account that made it
+  (`REALTIME_MAX_SOCKETS_PER_USER`).
 
 ### Fixed
 
@@ -213,6 +368,60 @@
   the bundle, so `import { Hono } from "hono"` failed with "Cannot find
   package" and the function's route answered 404. Both are now linked in at
   boot, like `@rebasepro/server` and `zod`.
+- **A raw SQL call naming a data source runs on that source's own connection.**
+  `rebase.sql(query, { database: analytics })` treated the key as a database
+  name on the default source's server: "database does not exist", or the wrong
+  database, silently. A key that is no configured source is refused by name, and
+  `openRebase(...).sql` refuses a source it did not open.
+- **Hooks reached over the realtime socket, a live query's refetch or MCP see
+  their own backend as `rebase`,** as they do over REST. With several backends
+  in one process they reached the process default, or threw "server not
+  initialized yet".
+- **In a split deployment, the api forwards every Set-Cookie a function sets,**
+  not only the last one, so a sign-in that sets a session and a CSRF cookie
+  works through the api. An unreachable functions upstream answers the standard
+  error envelope, with a `requestId`.
+- **A graceful shutdown waits for the work a request handed to `waitUntil`**
+  while it was still in flight at SIGTERM.
+- **On a process whose role turns a surface off, the in-process client says
+  so.** On a `worker` or `functions` process, `rebase.functions`, `.auth`,
+  `.admin` and `.cron` name the surface that is off and what to do, instead of
+  "No route for …".
+- **`createRebaseBackend` no longer writes the users collection it discovers
+  back into the caller's `auth` object,** and each backend's development mailbox
+  (`/api/admin/dev/emails`) serves its own captured mail, not that of whichever
+  backend registered last.
+- **Impersonating a user or key spends the administrator's rate limit, not the
+  target's,** so a production key's `rate_limit` is no longer consumed by an
+  admin acting as it.
+- **Live schema editing from a built bundle refuses a second change while one is
+  committed and not deployed,** also after a restart, on another replica, and
+  when a developer pushed the change. The guard was a flag in process memory; it
+  now compares the repository's `schema.generated.ts` with what the running
+  collections generate, and the refusal names the file and the command that
+  brings it back in step.
+- **Storage orphan deletion no longer deletes files that rows still name.**
+  `rebase storage orphans --delete` read rows through `beforeQuery` and
+  `afterRead` hooks, so a file a hook hid was called an orphan. The scan now
+  reads rows as stored, a collection with read hooks on a driver that cannot
+  read past them blocks the delete (`409 STORAGE_SCAN_INCOMPLETE`), and a file
+  only a row's history names is no longer an orphan, so a revert cannot restore
+  a row pointing at a deleted file.
+- **Moving storage with --delete-source moves every file, and never deletes them
+  all.** `rebase storage move --delete-source` moved half of a local source per
+  run, because its page token was an index into a folder the move was shrinking.
+  Between two sources that store in the same bucket or directory it deleted
+  every file; that move is now refused with `400 STORAGE_SAME_LOCATION`.
+- **The OpenAPI create body names every relation the server writes:** a
+  `hasOne`, the to-many memberships (with a `manyToMany`'s `_pivot`) and a
+  single-hop `via`, not only `belongsTo`, matching the generated SDK's `Insert`.
+- **Remote MCP can find a trashed row to restore.** `delete_document` no longer
+  tells the model that every delete is permanent, and `query_collection` and
+  `count_documents` take `deleted: "include" | "only"`.
+- **The MCP consent screen shows the server's sign-in error instead of "[object
+  Object]",** and accounts with a second factor can consent: the screen asks for
+  an authenticator or recovery code. An account that only signs in with a social
+  provider or a magic link is told to set a password first.
 
 #### CLI
 
@@ -261,6 +470,63 @@
   project's storage and its port and none of the code it runs. Both wordings are
   shown now.
 
+- **Every command reads the collections where `rebase.json` puts the backend's
+  config,** not only `config/collections`: verify, doctor, generate-sdk,
+  console, `db push` and `db generate`, `schema generate`, dev's regeneration
+  and the Claude Code hook.
+
+- **A database push leaves alone the DEFAULT of a column declared
+  `databaseDefault: true`.** `rebase db push` planned `DROP DEFAULT`, and
+  creates that left the field to the database then failed on NOT NULL. A DEFAULT
+  on an undeclared column is still removed.
+
+- **The live RLS audit no longer leaves the managed dev database read-only.**
+  After `rebase verify --live` or `npx @rebasepro/rls-check "$(rebase db url)"`,
+  every write failed with 25006 until `rebase db stop`.
+
+- **Project verification fails when it has nothing to check.** `rebase verify`
+  refuses a `--collections` path that does not exist (it reported 0 errors), and
+  `rebase verify --live` fails when the database is missing or does not answer
+  (it skipped and exited 0). The live audit reads the database the `db` commands
+  resolve, the managed one included, takes `--database-url` and `--docker`, and
+  counts a baselined database's earlier migrations as applied. A fresh blog
+  scaffold passes it: a compiled `access: "public"` read is a warning while the
+  API requires a token, and an error with `AUTH_REQUIRE=false`, read as every
+  boolean env var is read.
+
+- **The dev server no longer prints "Schema and SDK types regenerated" after a
+  failed regeneration.**
+
+- **The Claude Code collection guardrail runs on Windows, and stops blocking
+  edits it cannot check:** in a project whose dependencies are not installed
+  yet, or whose CLI predates `rebase verify`, it skips with a note.
+
+- **Rewriting `rebase.json` keeps the app fields this CLI does not model,** so
+  `generate-sdk --register`, `apps init --force` and `eject` no longer delete
+  them.
+
+- **A mistyped flag under --json puts the error envelope on stdout,** as the CLI
+  promises for every exit.
+
+- **A view label with braces, angle brackets, an ampersand or a comment end
+  still compiles.** `rebase generate view --name` now quotes the label.
+
+- **The skills installer updates a hook an earlier CLI wrote,** instead of
+  reporting it as edited by you (`rebase skills --hooks`).
+
+- **Commands in a directory `init --claim` provisioned keep its token and claim
+  link.** `rebase cloud whoami` and `projects create` deleted both; `whoami` and
+  `status` now show the project, its claim URL and the expiry, `unlink` warns
+  that an unclaimed project keeps running, a second `init --claim` points at the
+  existing claim, and every command that knows says when the project's
+  `REBASE_API_TOKEN` expires and how to replace it. `init --claim` deploys with
+  the new project's own token even when `REBASE_TOKEN` is set, and commands warn
+  when `REBASE_TOKEN` displaces it. After a claim, a signed-in claimer is told
+  to run the command again instead of to sign in.
+
+- **A bundle deploy blocked by another deploy names it and how to cancel it,**
+  and a `402` points at `rebase cloud billing setup`.
+
 #### Client SDK
 
 - **A public page no longer prints the client's connection messages to every
@@ -272,6 +538,36 @@
   the site, with `localStorage.setItem("rebase_debug", "1")`;
   `globalThis.__REBASE_DEBUG__` and `__REBASE_DEBUG_REALTIME__` work too.
   Warnings and errors are printed as before.
+- **A required belongsTo is satisfied by either spelling on a typed create.**
+  With `author` declared `validation: { required: true }`, the generated
+  `Insert` required both `authorId` and `author`, so only a body naming the row
+  twice compiled, on `client.data`, `batch()` and `context.data` alike. Either
+  spelling now compiles; neither (or `null`) is still an error. Regenerate with
+  `rebase generate-sdk`.
+- **A closed to-one relation's foreign key leaves the generated types, as it
+  leaves the API.** An `excludeFromApi` `belongsTo` no longer puts its key on
+  `Row`, `Insert` or `Update`, a `write: []` one no longer offers its key on
+  writes, and `IncludeFor` no longer offers an `excludeFromApi` relation the
+  server answers `UNKNOWN_RELATION`.
+- **A hasOne relation is writable on a typed create and update.**
+  `client.data.users.update(1, { profile: 9 })` (and `null` to unlink) compiles,
+  as the server already performed it.
+- **A collection callback's client takes SQL bind parameters.**
+  `context.client.sql(q, { params })` was a type error while `rebase.sql`
+  accepted it.
+- **An offline edit or delete made after a queued create lost its answer is no
+  longer lost,** with `replayBatchSize` too. A caller's own `ifMatch` on
+  `update()` and `delete()` survives the queue, with or without `onConflict`;
+  without it, a 412 is reported to `onSyncError`. `findById()` on an
+  offline-enabled client keeps the row's version (`etagOf`).
+- **A socket refused for too many connections backs off and says so.** Over
+  `REALTIME_MAX_SOCKETS_PER_USER`, the client redialled every second unseen; it
+  now backs off up to 30 s and reports `CONNECTION_LOST`
+  (`details.reason: "TOO_MANY_SOCKETS"`) to its subscriptions and
+  `onConnectionLost`.
+- **With a recount interval set, a list's total is counted again when the
+  interval is up,** not left stale until the next write
+  (`REALTIME_RECOUNT_INTERVAL_MS`, and `listenCount()`).
 
 #### Admin (CMS & app)
 
@@ -311,6 +607,64 @@
   the URL on `#new_side`. A dirty record still asks before the panel leaves it.
   `useUnsavedChangesDialog` now also takes a function for `when`, read at the
   moment of navigation.
+
+- **`EntityFormPanel` saves the record it shows after its `entityId` changes.**
+  It saved into the previous record, or answered 412 on every save; changing
+  `entityId` now remounts the form. `EntityFormPanel` and `CollectionPanel` also
+  open a subcollection by its full path (`posts/p1/comments`) inside a scope
+  that holds its parent.
+
+#### MCP
+
+- **`rebase_cloud_provision` says what to do when the control plane refuses**
+  (provisioning not enabled, rate limited, already linked), takes names up to
+  200 characters, and is no longer refused when the active project already
+  points at a remote app.
+
+### Security
+
+- **A role holding users:write can no longer grant itself, or anyone, admin.** A
+  role name like `"support,admin"`, a nested array or a quoted name was written
+  into the roles array literal as more than one role. Roles are now stored as
+  bound parameters, and such names are refused (see Changed).
+- **A route group mounted on its own refuses impersonation and simulation it
+  cannot honour.** `backend.routes.storage()`, `routes.admin()` and the others
+  answered a request carrying `x-rebase-impersonate` or `x-rebase-simulate-*` as
+  the administrator. `refuseUnhonouredImpersonation` and
+  `reportSimulatedContext` are exported for your own groups.
+- **A role with keys:write can no longer change or revoke a service key that
+  outranks it.** A key holding a role or scope the caller does not answers
+  `403 KEY_OUTRANKS_CALLER`.
+- **The remote MCP consent screen shows the host the authorization code is sent
+  to,** and says that host is not verified. A client registered as "Claude" with
+  any https redirect looked identical to the real one.
+- **AI Autofill sends only the values of declared, unlocked properties.**
+  Read-only or hidden properties that also had `dynamicProps`, and columns the
+  collection does not declare, were sent to the AI service
+  (`@rebasepro/plugin-ai`).
+- **The MCP server sends the project's local service key only to a loopback
+  backend.** After `rebase cloud init --claim` without a deploy,
+  `@rebasepro/mcp` sent it to the cloud project; it now says on stderr to set
+  `REBASE_API_TOKEN`.
+- **The MCP server no longer sends the CLI's control-plane token to the app.**
+  `REBASE_TOKEN` was accepted as the app's API key, so the token that can deploy
+  and read secrets reached every backend the MCP server called. Set
+  `REBASE_API_TOKEN` for the app; the server says so once on stderr when only
+  `REBASE_TOKEN` is set. Setups that relied on the alias stop authenticating
+  with the app.
+- **Every CSV the product writes escapes spreadsheet formulas,** as the admin's
+  export already did: the SQL console's Export CSV, Copy as CSV and Download
+  full result as CSV prefix `'` to a cell starting with `=`, `+`, `-`, `@`, a
+  tab or a carriage return, while signed numbers stay numbers. Such cells are no
+  longer byte-identical to `COPY … CSV`.
+- **A cloud claim's .env is private and keeps your token.**
+  `rebase cloud init --claim` creates `.env` with mode 0600 and no longer
+  overwrites a `REBASE_API_TOKEN` already in it.
+
+### Documentation
+
+- **Embedding the Postgres Driver and The Remote MCP Endpoint are pages of their
+  own.**
 
 ## [0.25.1] - 2026-10-14
 

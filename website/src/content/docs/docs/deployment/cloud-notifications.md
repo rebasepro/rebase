@@ -12,6 +12,8 @@ is in the [CLI's cloud reference](/docs/cli/cloud/).
 
 ## Webhooks
 
+<span class="since-badge" data-since="0.26">Since 0.26</span>
+
 A project can send these events to a Slack or Discord incoming
 webhook, or to any https URL, from **Settings → Notifications** in the console
 or with the CLI:

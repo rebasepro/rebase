@@ -125,6 +125,8 @@ tool there.
 
 ## Rebase Cloud (8)
 
+<span class="since-badge" data-since="0.26">Since 0.26</span>
+
 Spawn `rebase cloud … --json` in the active project directory, against the
 project it is linked to, with the CLI's own credential. See
 [Rebase Cloud](/docs/ai/mcp#rebase-cloud) for what they act on and why none of

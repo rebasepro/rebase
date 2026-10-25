@@ -79,6 +79,8 @@ project. `rebase cloud tokens revoke <id> --yes` stops it at once.
 
 ## A backend with no account
 
+<span class="since-badge" data-since="0.26">Since 0.26</span>
+
 An agent that has built an app can give it a live backend before anyone has
 signed up, and hand the person it works for a link to keep it:
 
