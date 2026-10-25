@@ -442,10 +442,8 @@ On `POST /api/auth/<provider>` the resolution order is:
 1. **Known provider identity**: if this exact provider identity has signed in
    before, that user is returned. The email is not consulted.
 2. **Existing account with the same email, provider verified the email**: the
-   identity is attached to the existing account and the user is signed in to
-   it. One account, two ways in. If the account's own address was not
-   verified yet, this sign-in verifies it, and first removes what nobody
-   proved (see below).
+   identity is attached and the user is signed in to it. One account, two ways
+   in. An unverified account is verified first (see below).
 3. **Existing account with the same email, provider did not verify it**:
    rejected with `403 EMAIL_NOT_VERIFIED` and `details.reason`
    `provider-email-unverified`. Nothing is created or modified.
@@ -470,9 +468,8 @@ email code or a password reset all prove the address and verify the account.
 On an account that was not verified yet, the first such proof removes the
 password (a reset sets the new one) and every linked identity whose provider
 did not verify that address, and ends every session, before it marks the
-account verified. So someone who registered with a password and never verified
-the address, then signs in with Google, loses that password and signs in with
-Google (or a reset) from then on.
+account verified: a password nobody verified is gone after the first Google
+sign-in.
 
 A verification link keeps what the person following it also proves: a live
 session of the account, or its password. See [Email verification](/docs/backend/email-verification/). Accounts created by an
