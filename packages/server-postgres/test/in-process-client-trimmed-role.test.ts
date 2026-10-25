@@ -23,7 +23,7 @@
 import { afterAll, describe, expect, it } from "@jest/globals";
 import { PGlite } from "@electric-sql/pglite";
 import { REBASE_USER_ROLE } from "@rebasepro/common";
-import type { BackendBootstrapper, CollectionConfig, DataDriver, InitializedDriver } from "@rebasepro/types";
+import type { AuthClient, BackendBootstrapper, CollectionConfig, DataDriver, InitializedDriver } from "@rebasepro/types";
 import { createRebaseBackend, defineCron, defineFunction, type RebaseBackend } from "@rebasepro/server";
 
 const ping = defineFunction((app) => {
@@ -101,6 +101,20 @@ function present<T>(accessor: T | undefined, name: string): T {
     return accessor;
 }
 
+/**
+ * The client's own auth carries the email reset flow, which the shared
+ * `AuthClient` interface does not declare. A guard rather than a cast, so a
+ * client without it fails the test by name.
+ */
+function hasEmailReset(auth: AuthClient): auth is AuthClient & { resetPasswordForEmail(email: string): Promise<unknown> } {
+    return "resetPasswordForEmail" in auth && typeof auth.resetPasswordForEmail === "function";
+}
+
+function askEmailReset(auth: AuthClient, email: string): Promise<unknown> {
+    if (!hasEmailReset(auth)) throw new Error("backend.rebase.auth has no resetPasswordForEmail");
+    return auth.resetPasswordForEmail(email);
+}
+
 /** The error a call rejects with, as `status code message`. */
 async function refusal(call: Promise<unknown>): Promise<string> {
     try {
@@ -151,7 +165,7 @@ describe("the in-process client on a trimmed role", () => {
 
     it("names the auth surface, and points at rebase.admin, where it is off", async () => {
         const backend = await make(WORKER);
-        const said = await refusal(present(backend.rebase.auth, "auth").resetPasswordForEmail("ada@example.com"));
+        const said = await refusal(askEmailReset(present(backend.rebase.auth, "auth"), "ada@example.com"));
         expect(said).toMatch(/^404 NOT_FOUND /);
         expect(said).toContain("auth surface is off");
         expect(said).toContain("use rebase.admin");
@@ -163,7 +177,7 @@ describe("the in-process client on a trimmed role", () => {
         const backend = await make(FUNCTIONS);
         expect(await present(backend.rebase.functions, "functions").invoke("ping", {})).toEqual({ pong: true });
         expect(await present(backend.rebase.admin, "admin").listUsers()).toMatchObject({ users: [], total: 0 });
-        const said = await refusal(present(backend.rebase.auth, "auth").resetPasswordForEmail("ada@example.com"));
+        const said = await refusal(askEmailReset(present(backend.rebase.auth, "auth"), "ada@example.com"));
         expect(said).toContain("auth surface is off");
     });
 

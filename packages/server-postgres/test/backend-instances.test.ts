@@ -514,7 +514,10 @@ describe("two backends built from one options object", () => {
  */
 describe("two backends built from one auth adapter", () => {
     const who = defineFunction((app) => {
-        app.get("/", (c) => c.json({ uid: c.get("user")?.uid ?? null }));
+        app.get("/", (c) => {
+            const user = c.get("user");
+            return c.json({ uid: typeof user === "object" && user !== null ? user.uid ?? null : null });
+        });
     });
 
     async function twoBackends(auth: Parameters<typeof createRebaseBackend>[0]["auth"]): Promise<RebaseBackend[]> {

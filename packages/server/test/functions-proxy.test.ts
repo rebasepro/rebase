@@ -264,7 +264,7 @@ describe("the api role forwarding /api/functions", () => {
         // A hook's or a cron job's `rebase.functions.invoke(...)` on the api
         // (or worker) process goes through the forwarder carrying the
         // deployment's service key, which the functions process admits.
-        const seen = await apiBackend.rebase.functions.invoke("echo", undefined, { method: "GET", path: "whoami" });
+        const seen = await apiBackend.rebase.functions?.invoke("echo", undefined, { method: "GET", path: "whoami" });
         expect(seen).toEqual({ uid: "service", roles: ["admin"] });
     });
 
