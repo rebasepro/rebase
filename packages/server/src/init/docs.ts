@@ -42,7 +42,7 @@ export interface OpenApiDocsOptions {
 }
 
 /**
- * Serve the OpenAPI document, and Swagger UI outside production.
+ * Serve the OpenAPI document, and Swagger UI outside production when swagger is on.
  */
 export function mountOpenApiDocs(app: Hono<HonoEnv>, basePath: string, options: OpenApiDocsOptions): void {
     const { enableSwagger, serverCollections, requireAuth, adminGate, generate, unprotectedTables = [] } = options;
@@ -123,7 +123,10 @@ export function mountOpenApiDocs(app: Hono<HonoEnv>, basePath: string, options: 
         app.get(`${basePath}/docs`, (c) => spec(c));
     }
 
-    if (process.env.NODE_ENV !== "production") {
+    // The UI only where the spec is public, and never in production: it
+    // loads scripts from a CDN. Off, the explorer is off everywhere — a UI
+    // left up in development fetched a spec only an admin could read.
+    if (isPublic && process.env.NODE_ENV !== "production") {
         app.get(`${basePath}/swagger`, (c) => {
             return c.html(`<!DOCTYPE html>
 <html>

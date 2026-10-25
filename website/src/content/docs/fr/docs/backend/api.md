@@ -1,5 +1,5 @@
 ---
-sourceHash: e61d261c8dae7e37
+sourceHash: 1aa81dc2f00c934e
 title: API REST
 sidebar_label: API REST
 description: Points de terminaison d'API REST générés automatiquement pour chaque collection, avec filtrage, tri, pagination et inclusion de relations.
@@ -363,7 +363,7 @@ Chaque hook est attendu, et une exception levée par l'un d'eux annule toute l'�
 |--------|------|------|-------------|
 | `GET` | `/health` et `/api/health` | aucune | Vérification de liveness/readiness |
 | `GET` | `/api/docs` | aucune ; `schema:read` lorsque `enableSwagger` vaut `false` (valeur par défaut du runtime en production) | La spécification JSON OpenAPI 3.0 |
-| `GET` | `/api/swagger` | aucune | Swagger UI. Servi uniquement hors production ; `REBASE_ENABLE_SWAGGER` ne peut pas l'activer en production |
+| `GET` | `/api/swagger` | aucune | Swagger UI. Servi uniquement hors production ; `REBASE_ENABLE_SWAGGER` ne peut pas l'activer en production. Non servi lorsque `enableSwagger` vaut `false`, en développement non plus |
 | `GET` | `/api/meta/schema-version` | aucune | Le hash du schéma à partir duquel ce backend a été construit, et la version du runtime — délibérément sans authentification, et rien qui décrive le schéma |
 | `GET` | `/api/meta/contract` | `schema:read` : un administrateur, la clé de service, ou une clé API qui la détient | Le contrat complet des collections, pour `rebase generate-sdk --from`. Sécurisé par défaut : `404` lorsqu'aucune authentification n'est configurée |
 | `GET` | `/metrics` | `REBASE_METRICS_TOKEN` si défini | Métriques Prometheus, lorsque `REBASE_METRICS=true` |

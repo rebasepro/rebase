@@ -421,7 +421,7 @@ Every hook is awaited, and a throw from any of them undoes the whole write:
 |--------|------|------|-------------|
 | `GET` | `/health` and `/api/health` | none | Liveness/readiness check |
 | `GET` | `/api/docs` | none; `schema:read` when `enableSwagger` is `false` (the runtime's default in production) | The OpenAPI 3.0 JSON specification |
-| `GET` | `/api/swagger` | none | Swagger UI. Served only outside production; `REBASE_ENABLE_SWAGGER` cannot turn it on in production |
+| `GET` | `/api/swagger` | none | Swagger UI. Served only outside production; `REBASE_ENABLE_SWAGGER` cannot turn it on in production. Not served when `enableSwagger` is `false`, in development either |
 | `GET` | `/api/meta/schema-version` | none | The schema hash this backend was built from, and the runtime version — deliberately unauthenticated, and nothing that describes the schema |
 | `GET` | `/api/meta/contract` | `schema:read`: an admin, the service key, or an API key holding it | The full collection contract, for `rebase generate-sdk --from`. Fail-closed: `404` when no auth is configured |
 | `GET` | `/metrics` | `REBASE_METRICS_TOKEN` when set | Prometheus metrics, when `REBASE_METRICS=true` |
