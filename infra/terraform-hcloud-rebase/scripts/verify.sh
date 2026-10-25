@@ -29,6 +29,17 @@ for example in examples/*/; do
   (cd "$example" && terraform init -backend=false -input=false >/dev/null && terraform validate)
 done
 
+# `validate` cannot see a precondition: those are checked at plan. The README
+# and examples/bundle-url were refused at plan for months while validate passed.
+# These run against mock providers, so they need no Hetzner account either.
+echo "==> terraform test (module)"
+terraform test
+for example in examples/*/; do
+  [ -d "$example/tests" ] || continue
+  echo "==> terraform test ($example)"
+  (cd "$example" && terraform test)
+done
+
 echo "==> rendering cloud-init and compose with stub values"
 mkdir -p "$WORK"
 python3 - "$WORK" <<'PY'
@@ -41,6 +52,7 @@ for ref, stub in [
     ('random_password.jwt.result', '"JWTSTUB0123456789abcdefghijklmnopqrstuvwxyz"'),
     ('random_password.service_key.result', '"SVCSTUB0123456789abcdefghijklmnopqrstuvwxyz"'),
     ('random_password.postgres.result', '"PGSTUB0123456789abcdefghijklmn"'),
+    ('random_password.admin.result', '"ADMINSTUB0123456789abcd"'),
     ('hcloud_volume.data.id', '"12345678"'),
 ]:
     locals_only = locals_only.replace(ref, stub)

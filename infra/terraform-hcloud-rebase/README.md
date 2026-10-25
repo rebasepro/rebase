@@ -13,7 +13,8 @@ module "rebase" {
   ssh_public_keys = [file(pathexpand("~/.ssh/id_ed25519.pub"))]
   admin_email     = "you@example.com"
 
-  bundle_url = "https://storage.example.com/bundles/app-1.4.0.tar.gz"
+  bundle_url      = "https://storage.example.com/bundles/app-1.4.0.tar.gz"
+  runtime_version = "0.25.1"
 
   s3_bucket            = "example-uploads"
   s3_access_key_id     = var.s3_access_key_id
@@ -108,7 +109,10 @@ filesystem is destroyed on every restart and a `local` backend there is silent
 data loss: the API serves, and every upload answers 501. This module makes you
 choose at plan time rather than discovering that after `apply` reported
 success: set `s3_bucket` (with endpoint and credentials), or set
-`force_local_storage = true` if the project stores no uploads at all.
+`force_local_storage = true` to keep uploads on the attached data volume
+(`/mnt/rebase-data/storage`, mounted at `/storage` in the runtime). They then
+outlive restarts and host rebuilds exactly as the database does, and like it
+they live on one volume: back it up.
 
 Hetzner Object Storage is S3-compatible and lives in the same datacenters —
 `https://fsn1.your-objectstorage.com` and friends, which is the default endpoint
@@ -191,7 +195,7 @@ Validated against hcloud provider 1.68.0 — `hcloud_primary_ip` only accepts
 | `delete_protection` | `bool` | `false` | Hetzner-side delete protection on the server and volume. `terraform destroy` fails while this is on — which is the point. |
 | `enable_backups` | `bool` | `true` | Hetzner's automatic server snapshots (+20% of server cost). Independent of, and no substitute for, `rebase db backup`. |
 | `extra_env` | `map(string)` | `{}` | Additional environment variables for the runtime container, merged last. The escape hatch for anything this module does not model. |
-| `force_local_storage` | `bool` | `false` | Set true only when the project stores no uploads at all. Acknowledges that any file written to the container is lost on restart. |
+| `force_local_storage` | `bool` | `false` | Keep uploads on the attached data volume (mounted at `/storage`) instead of object storage. Required when `s3_bucket` is not set. |
 | `image` | `string` | `null` | A container image with the bundle already baked in: |
 | `image_os` | `string` | `ubuntu-24.04` | Base OS image for the server. |
 | `jwt_secret` | `string` | `null` | JWT_SECRET, min 32 chars. Generated if unset. Changing it invalidates every issued token. |

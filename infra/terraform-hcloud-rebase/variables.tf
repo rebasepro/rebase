@@ -275,7 +275,7 @@ variable "s3_secret_access_key" {
 }
 
 variable "force_local_storage" {
-  description = "Set true only when the project stores no uploads at all. Acknowledges that any file written to the container is lost on restart."
+  description = "Keep uploads on the attached data volume (mounted at `/storage`) instead of object storage. Required when `s3_bucket` is not set."
   type        = bool
   default     = false
 }
