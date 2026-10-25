@@ -102,7 +102,7 @@ Each callback receives a single props object. Common fields:
 
 `context.user` contains the authenticated user (`uid`, `roles`, etc.). A request with no token, where the API lets one in, carries the anonymous identity `{ uid: "anonymous", roles: ["anon"] }` rather than `undefined`.
 
-`context.credential` names the API key a write was made with: `{ kind, id, name }`, where `kind` is `"personal"` or `"service"`. A personal key acts as its owner, so `context.user` is the owner whether they saved by hand or a CI job wrote with their key; `context.credential` tells the two apart. It is set on the data API, the realtime socket and `/mcp`, and absent for a session, the service key, server-context work (`rebase.dataAsAdmin`, crons) and in the browser. It never carries the secret.
+<span class="since-badge" data-since="0.26">Since 0.26</span> `context.credential` names the API key a write was made with: `{ kind, id, name }`, where `kind` is `"personal"` or `"service"`. A personal key acts as its owner, so `context.user` is the owner whether they saved by hand or a CI job wrote with their key; `context.credential` tells the two apart. It is set on the data API, the realtime socket and `/mcp`, and absent for a session, the service key, server-context work (`rebase.dataAsAdmin`, crons) and in the browser. It never carries the secret.
 
 `collection` is always there. A global callback fires for every collection, so
 it is the one tier that is registered independently of any of them — but it is
@@ -302,6 +302,9 @@ const instance = await initializeRebaseBackend({
 Note what this buys and what it costs: if the audit row cannot be written, the
 delete does not happen either. For an audit trail that is usually what you want.
 If it is not, catch the error in the callback and say so in a comment.
+
+The `via_key` column reads `context.credential`, which is new: <span class="since-badge" data-since="0.26">Since 0.26</span> On an
+earlier version, leave it out.
 
 ### Collection-Specific Logic
 
