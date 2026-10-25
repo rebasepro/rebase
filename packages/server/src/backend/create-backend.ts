@@ -1683,9 +1683,14 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
         const { store, publicUrl } = mcpReady;
         const mcpPath = "/mcp";
         const oauthBasePath = `${basePath}/oauth`;
+        // The repository the admin gate re-reads from, so a grant answers to
+        // the same revocation, roles and account a session does — at consent,
+        // every refresh, and every `/mcp` request.
+        const identity = grantIdentityFromRepository(adminIdentityRepo);
         const mcpConfig = {
             // Tokens this backend's OAuth server minted, with its own key.
             jwt,
+            identity,
             publicUrl,
             mcpPath,
             oauthBasePath,
@@ -1733,10 +1738,7 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
             // issue IDs itself — with any spelling of no; `!== "false"` left it
             // open on `=0`.
             allowDynamicRegistration: parseEnvBoolean(process.env.REBASE_MCP_OPEN_REGISTRATION) !== false,
-            // The repository the admin gate re-reads from, so a grant answers
-            // to the same revocation, roles and account a session does — at
-            // consent and every refresh.
-            identity: grantIdentityFromRepository(adminIdentityRepo)
+            identity
         })));
 
         if (announce) logger.info(`MCP endpoint mounted at ${publicUrl}${mcpPath} (OAuth at ${oauthBasePath})`);

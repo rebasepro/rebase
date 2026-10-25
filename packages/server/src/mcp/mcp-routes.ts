@@ -45,6 +45,8 @@ import {
 } from "./oauth-metadata.js";
 import { findTool, toolsForScopes, McpToolError, MCP_TOOLS, type McpCaller } from "./mcp-tools.js";
 import type { ApiKeyIdentity, ApiKeyRefusal } from "../auth/api-keys/api-key-middleware.js";
+import { isAccessTokenRevoked } from "../auth/token-revocation.js";
+import type { McpGrantIdentity } from "./oauth-routes.js";
 
 /**
  * The protocol revisions this server implements.
@@ -114,6 +116,14 @@ export interface McpRoutesConfig {
      * rate limiting off. See {@link createMcpRoutes}.
      */
     rateLimit?: DataRateLimitConfig;
+    /**
+     * Who an access token's account is now — the identity the OAuth routes
+     * re-read at consent and refresh. Asked on every request, so a deleted,
+     * disabled or signed-out-everywhere account stops at once and a demotion
+     * takes effect on the next call. Absent when the auth adapter exposes no
+     * user repository, and then a token carries the roles it was minted with.
+     */
+    identity?: McpGrantIdentity;
 }
 
 /**
@@ -234,9 +244,42 @@ export function createMcpRoutes(config: McpRoutesConfig): Hono<HonoEnv> {
             );
         }
 
+        // A verified token says who it was minted for, an hour ago at most.
+        // The account is asked what has happened since — deleted, disabled,
+        // signed out everywhere, demoted — as every other door asks it of a
+        // session token. Without this, all four reached `/mcp` only at the
+        // client's next refresh.
+        let roles = payload.roles;
+        if (config.identity) {
+            const refused = () => c.json(
+                { error: "invalid_token", error_description: "The account behind this access token is no longer active, or signed out." },
+                401,
+                { "WWW-Authenticate": bearerChallenge(config.publicUrl, config.mcpPath, DEFAULT_MCP_SCOPE) }
+            );
+            const revocation = config.identity.revocation;
+            if (revocation && await isAccessTokenRevoked(revocation, { uid: payload.uid, iat: payload.iat })) {
+                return refused();
+            }
+            let current: string[] | null;
+            try {
+                current = await config.identity.currentRoles(payload.uid);
+            } catch (error) {
+                // Not the token's own roles: they may be the very ones a
+                // demotion took away. The client retries.
+                logger.error("[mcp] Could not read the account behind an access token", { uid: payload.uid, error });
+                return c.json(
+                    { error: "temporarily_unavailable", error_description: "The account could not be checked. Try again." },
+                    503,
+                    { "Retry-After": "1" }
+                );
+            }
+            if (!current) return refused();
+            roles = current;
+        }
+
         return {
             uid: payload.uid,
-            roles: payload.roles,
+            roles,
             // A token issued before the shared vocabulary is read as what it granted.
             scopes: scopeList(upgradeStoredMcpScope(payload.scope)),
             clientId: payload.clientId

@@ -171,10 +171,10 @@ export interface OAuthStore {
      * there was nothing to revoke, which lets the route answer 404 rather than
      * reporting success for a client the user never connected.
      *
-     * Access tokens already issued are NOT invalidated — they are self-contained
-     * JWTs with no per-request database lookup, which is what makes `/mcp` cheap.
-     * The window is therefore one access-token lifetime (an hour), and the
-     * route's response says so rather than implying an instant cut-off.
+     * Access tokens already issued are NOT invalidated — `/mcp` re-checks the
+     * account on each request, not the grant. The window is therefore one
+     * access-token lifetime (an hour), and the route's response says so rather
+     * than implying an instant cut-off.
      */
     revokeGrant(uid: string, clientId: string): Promise<boolean>;
 }

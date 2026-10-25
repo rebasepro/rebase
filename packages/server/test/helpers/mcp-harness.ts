@@ -218,7 +218,8 @@ export function buildApp(options: HarnessOptions = {}) {
         serverInfo: { name: "rebase", version: "test" },
         maxBodySize: options.maxBodySize,
         rateLimit: options.rateLimit,
-        resolveApiKey: options.resolveApiKey
+        resolveApiKey: options.resolveApiKey,
+        identity: options.identity
     };
     app.route("/", createMcpWellKnownRoutes(mcpConfig));
     app.route("/mcp", createMcpRoutes(mcpConfig));

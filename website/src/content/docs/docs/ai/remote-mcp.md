@@ -74,13 +74,15 @@ to one user, the endpoint declines to mount and says why in the boot log. No
   `/api/data`, `/api/admin` and the WebSocket, so connecting an assistant does not
   hand it a session.
 
+Every request to `/mcp` re-reads the person's account. A deleted or disabled
+account, or a "sign out everywhere" or password change after the token was
+issued, stops a connected client at once with a 401. A demotion applies to its
+next tool call. Every refresh makes the same checks and refuses such a grant
+for good. A guest session cannot consent at all.
+
 One limit. Disconnecting a client (`DELETE /api/oauth/grants/:clientId`, with the
 person's own session) revokes its refresh tokens at once, but an access token
-already issued keeps working until it expires, within the hour. The same hour
-bounds everything else: every refresh re-reads the person's roles, and refuses
-an account that was deleted or a grant older than its last "sign out everywhere"
-or password change. So a demotion or a sign-out reaches a connected client
-within one access-token lifetime. A guest session cannot consent at all.
+already issued keeps working until it expires, within the hour.
 
 The routes are in [Endpoints](/docs/backend/endpoints/#mcp-surface) and the
 variables in [Configuration](/docs/getting-started/configuration/#mcp-surface).
