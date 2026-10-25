@@ -39,23 +39,18 @@ export function RelationFieldBinding(props: FieldProps<RelationProperty>) {
     const resolvedProperty = resolveRelationProperty(property, collection, propertyKey);
     const relation = resolvedProperty;
 
-    // A `via` is read-only (`writable: false`): the server refuses a write
-    // naming one (RELATION_NOT_WRITABLE), so its picker could only lead to a
-    // failed save. Shown, not offered.
-    const fieldProps = relation && !relation.writable ? { ...props, disabled: true } : props;
-
     const manyRelation = relation?.cardinality === "many";
     const widget = property.admin?.widget ?? "select";
 
     if (widget === "select" && relation) {
-        return <RelationSelectorBinding {...fieldProps} relation={relation} manyRelation={manyRelation} />;
+        return <RelationSelectorBinding {...props} relation={relation} manyRelation={manyRelation} />;
     }
 
     if (manyRelation) {
-        return <MultipleRelationFieldBinding {...fieldProps} />;
+        return <MultipleRelationFieldBinding {...props} />;
     }
 
-    return <SingleRelationFieldBinding {...fieldProps} relation={relation} />;
+    return <SingleRelationFieldBinding {...props} relation={relation} />;
 }
 
 function RelationSelectorBinding({

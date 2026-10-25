@@ -170,9 +170,7 @@ view** — `sourceColumn` always names *this* collection:
 
 For links the four shapes above cannot express: multi-hop paths, composite keys,
 or a join whose condition is not a plain foreign key. Read-only — Rebase will
-not infer how to write through an arbitrary chain. A create or update that names
-a `via` key is refused with `400 RELATION_NOT_WRITABLE`, as a nested write
-through one is, and the admin form shows the field without a picker.
+not infer how to write through an arbitrary chain.
 
 ```typescript
 {

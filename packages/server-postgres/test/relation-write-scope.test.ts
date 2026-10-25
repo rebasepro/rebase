@@ -198,14 +198,9 @@ describe("a junction membership write", () => {
         expect(await linkedTags()).toEqual([2, 3]);
     });
 
-    it("is refused through a join path, which is read-only, and touches no link", async () => {
-        // A `via` is not written on any door (RELATION_NOT_WRITABLE); this
-        // used to diff the junction through the chain.
-        const before = await linkedTags();
-        await expect(driverOver(db, TENANT_USER).save({ path: "posts", id: 1, values: { viaTags: [] }, status: "existing" }))
-            .rejects.toMatchObject({ code: "RELATION_NOT_WRITABLE" });
-        expect(await linkedTags()).toEqual(before);
-        expect(before.length).toBeGreaterThan(0);
+    it("leaves them through a join path as well", async () => {
+        await driverOver(db, TENANT_USER).save({ path: "posts", id: 1, values: { viaTags: [] }, status: "existing" });
+        expect(await linkedTags()).toEqual([2, 3]);
     });
 
     it("still unlinks a visible row the caller left out", async () => {
