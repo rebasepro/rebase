@@ -413,6 +413,7 @@ deployed database.
 rebase verify
 rebase verify --json
 rebase verify --live
+rebase verify --live --database-url postgresql://…
 ```
 
 Whether the collections are safe to ship, in one fast command for CI and for an
@@ -423,7 +424,7 @@ AI agent's hooks. Offline by default, and it never changes anything.
 | Collection config | A file under `config/collections/` that does not load, or that the boot validator rejects — with unknown keys as errors, so a misspelt option or a UI option written outside `admin: { … }` (a top-level `widget`) is caught here rather than silently ignored. |
 | RLS coverage | A collection with no `securityRules` that inherits none, or one with a `user_id`, `owner_id`, `organization_id` or `tenant_id` column that relies on directory defaults instead. A rule that lets a role read every row of such a table is a warning. |
 | Migration freshness | A table or column the collections declare that no file in `backend/drizzle/migrations` creates, or one they dropped that a migration still creates. Skipped for a project with no migrations yet. |
-| Live RLS audit | With `--live`: the [`rls-check`](/docs/rls-check) catalogue against `DATABASE_URL`, and whether every migration has been applied. A database that is not configured or does not answer is an error, not a skip: the audit was asked for. |
+| Live RLS audit | With `--live`: the [`rls-check`](/docs/rls-check) catalogue against the project's database, and whether every migration has been applied. The database is resolved as the `db` commands resolve it — `--database-url`, `DATABASE_URL`, `--docker`, otherwise the managed development database. A database that is not configured or does not answer is an error, not a skip: the audit was asked for. |
 
 `--json` prints one object — every step, and every finding with its `file`, the
 dotted `path` into the collection config, and the `fix` — so an agent can repair

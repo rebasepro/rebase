@@ -22,8 +22,9 @@
  * 3. **Migration freshness** — whether `drizzle/migrations` still builds the
  *    tables and columns the collections declare (offline), and with `--live`
  *    whether the database has applied every migration.
- * 4. **Live RLS audit** — with `--live` and a reachable `DATABASE_URL`, the
- *    `@rebasepro/rls-check` catalogue against the database itself.
+ * 4. **Live RLS audit** — with `--live`, the `@rebasepro/rls-check` catalogue
+ *    against the project's database, resolved as `db *` resolves it (the
+ *    managed one unless something names another).
  *
  * `--json` prints one object an agent can act on: every finding carries the
  * file, the dotted path into the config and the fix.
@@ -50,14 +51,18 @@ export const VERIFY_FLAGS = {
     "--json": Boolean,
     "--quiet": Boolean,
     "-q": "--quiet",
-    "--live": Boolean
+    "--live": Boolean,
+    "--database-url": String,
+    "--docker": Boolean
 } as const;
 
 const VERIFY_FLAG_HELP: Record<string, string> = {
     "--collections, -c": COLLECTIONS_FLAG_HELP,
     "--json": "Print one JSON object: every step, and every finding with its file, path and fix",
     "--quiet, -q": "Print nothing when everything passes; only the problems when something fails",
-    "--live": "Also connect to DATABASE_URL: check migrations are applied and run the rls-check audit"
+    "--live": "Also connect to the project's database: check migrations are applied and run the rls-check audit",
+    "--database-url": "With --live: audit this database instead of the project's",
+    "--docker": "With --live: use the database from docker compose, starting it if needed"
 };
 
 export type VerifyStepId = "config" | "rls" | "migrations" | "live";
@@ -756,12 +761,43 @@ ${chalk.green.bold("Steps")}
   1. Collection config     every file loads and passes the boot validator, unknown keys as errors
   2. RLS coverage          securityRules are declared, and owner/tenant columns are filtered on
   3. Migration freshness   drizzle/migrations builds every declared table and column
-  4. Live RLS audit        with --live: the rls-check catalogue against DATABASE_URL
+  4. Live RLS audit        with --live: the rls-check catalogue against the project's database
 
 Exits 1 when any step reports an error; warnings do not fail. Under --live, a
 database that is missing or does not answer is an error. Fast and offline
 without --live: for CI, and for the Claude Code hook that ${chalk.cyan("rebase skills --hooks")} installs.
 `);
+}
+
+/**
+ * The database `--live` audits, resolved as every other database door resolves
+ * it (`db *`, `console`, `doctor`): `--database-url`, `DATABASE_URL`, `.env`,
+ * `--docker` or the last `rebase dev --docker`, and otherwise the managed
+ * development database — started if it is not running. Reading only
+ * `DATABASE_URL` meant the audit never ran on a fresh scaffold, whose database
+ * is the managed one.
+ *
+ * Progress goes to stderr, so `--json` keeps stdout to the report.
+ */
+async function resolveLiveDatabase(
+    projectRoot: string,
+    rawArgs: readonly string[],
+    options: { flagUrl: string | null; flagDocker: boolean; quiet: boolean }
+): Promise<Pick<VerifyOptions, "databaseUrl" | "databaseUnavailable">> {
+    try {
+        const { ensureDockerDatabase, databaseUrlOf } = await import("./db");
+        await ensureDockerDatabase(projectRoot, rawArgs);
+        const { prepareDatabaseEnv } = await import("../dev-db/prepare");
+        const prepared = await prepareDatabaseEnv(projectRoot, {
+            flagUrl: options.flagUrl,
+            flagDocker: options.flagDocker,
+            quiet: options.quiet,
+            onProgress: options.quiet ? undefined : (line) => console.error(chalk.gray(`  ${line}`))
+        });
+        return { databaseUrl: databaseUrlOf(prepared, readEnvFile(projectRoot)) };
+    } catch (error) {
+        return { databaseUnavailable: error instanceof Error ? error.message : String(error) };
+    }
 }
 
 export async function verifyCommand(rawArgs: string[]): Promise<void> {
@@ -803,16 +839,20 @@ export async function verifyCommand(rawArgs: string[]): Promise<void> {
         ? path.resolve(process.cwd(), flags["--collections"])
         : path.join(projectRoot, "config", "collections");
     const live = flags["--live"] === true;
-    const databaseUrl = live
-        ? (process.env.DATABASE_URL || readEnvFile(projectRoot).DATABASE_URL || undefined)
-        : undefined;
+    const database = live
+        ? await resolveLiveDatabase(projectRoot, rawArgs, {
+            flagUrl: flags["--database-url"] ?? null,
+            flagDocker: flags["--docker"] === true,
+            quiet: flags["--quiet"] === true
+        })
+        : {};
 
     const report = await runVerify({
         projectRoot,
         collectionsDir,
         backendDir,
         live,
-        databaseUrl
+        ...database
     });
 
     if (flags["--json"]) {
