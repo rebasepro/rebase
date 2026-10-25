@@ -9,16 +9,28 @@
  * "No route for POST /api/functions/send-digest on this backend.": a sentence
  * that names no surface, no role and nothing to do. It now says which surface
  * is off and what to do instead.
+ *
+ * Per role, what the in-process client reaches:
+ * - `functions` — forwarded through `REBASE_FUNCTIONS_UPSTREAM` where one is
+ *   set (`functions-proxy.test.ts` in @rebasepro/server), the named refusal
+ *   where none is.
+ * - `admin` and `cron` — the account administration and the cron controls
+ *   are carried in-process whatever the role serves; the rest of the admin
+ *   group (backups, logs, …) answers the named refusal.
+ * - `auth` — a person's sign-in flows, refused by name, pointing at
+ *   `rebase.admin`.
  */
 import { afterAll, describe, expect, it } from "@jest/globals";
 import { PGlite } from "@electric-sql/pglite";
 import { REBASE_USER_ROLE } from "@rebasepro/common";
 import type { BackendBootstrapper, CollectionConfig, DataDriver, InitializedDriver } from "@rebasepro/types";
-import { createRebaseBackend, defineFunction, type RebaseBackend } from "@rebasepro/server";
+import { createRebaseBackend, defineCron, defineFunction, type RebaseBackend } from "@rebasepro/server";
 
 const ping = defineFunction((app) => {
     app.post("/", (c) => c.json({ pong: true }));
 });
+
+const nightly = defineCron({ schedule: "0 3 * * *", handler: async () => undefined });
 
 function bootstrapper(db: PGlite): BackendBootstrapper {
     const executeSql = async (text: string) => (await db.query<Record<string, unknown>>(text)).rows;
@@ -35,7 +47,8 @@ function bootstrapper(db: PGlite): BackendBootstrapper {
         getUserRoleIds: async () => [],
         getUserById: async () => null,
         getAccountAccessState: async () => null,
-        getUserByEmail: async () => null
+        getUserByEmail: async () => null,
+        listUsersPaginated: async () => ({ users: [], total: 0, limit: 25, offset: 0 })
     };
     return {
         type: "postgres",
@@ -53,9 +66,12 @@ function bootstrapper(db: PGlite): BackendBootstrapper {
 /** What `REBASE_ROLE=worker` turns off. */
 const WORKER = { auth: false, data: false, storage: false, admin: false, functions: false, cron: false, meta: false, realtime: false };
 
+/** What `REBASE_ROLE=functions` turns off. */
+const FUNCTIONS = { auth: false, data: false, storage: false, admin: false, cron: false, meta: false, realtime: false };
+
 const built: Array<{ backend: RebaseBackend; db: PGlite }> = [];
 
-async function make(surfaces?: typeof WORKER): Promise<RebaseBackend> {
+async function make(surfaces?: typeof WORKER | typeof FUNCTIONS): Promise<RebaseBackend> {
     const db = new PGlite();
     await db.exec(`CREATE ROLE ${REBASE_USER_ROLE} NOLOGIN`);
     const backend = await createRebaseBackend({
@@ -63,6 +79,7 @@ async function make(surfaces?: typeof WORKER): Promise<RebaseBackend> {
         bootstrappers: [bootstrapper(db)],
         auth: { jwtSecret: "in-process-client-trimmed-role-secret-0123456789" },
         functions: { ping },
+        crons: { nightly },
         cronPersistence: false,
         provision: true,
         ...(surfaces ? { surfaces } : {})
@@ -110,10 +127,59 @@ describe("the in-process client on a trimmed role", () => {
         expect(said).toContain("over HTTP");
     });
 
-    it("names the admin surface where it is off", async () => {
+    it("reaches the account administration where the admin surface is off", async () => {
+        // A cron job on a worker that deactivates stale accounts, or lists
+        // them for a digest: the adapter's admin routes load no user code, so
+        // the worker carries them in-process.
         const backend = await make(WORKER);
-        const said = await refusal(present(backend.rebase.admin, "admin").listUsers());
+        expect(await present(backend.rebase.admin, "admin").listUsers()).toMatchObject({ users: [], total: 0 });
+    });
+
+    it("reaches the cron controls where the cron surface is off", async () => {
+        const backend = await make(WORKER);
+        const listing = await present(backend.rebase.cron, "cron").listJobs();
+        expect(JSON.stringify(listing)).toContain("nightly");
+    });
+
+    it("names the admin surface for the admin routes a worker does not carry", async () => {
+        const backend = await make(WORKER);
+        const said = await refusal(present(backend.rebase.backups, "backups").list());
         expect(said).toMatch(/^404 NOT_FOUND /);
         expect(said).toContain("admin surface is off");
+        expect(said).toContain("only the user and role administration");
+    });
+
+    it("names the auth surface, and points at rebase.admin, where it is off", async () => {
+        const backend = await make(WORKER);
+        const said = await refusal(present(backend.rebase.auth, "auth").resetPasswordForEmail("ada@example.com"));
+        expect(said).toMatch(/^404 NOT_FOUND /);
+        expect(said).toContain("auth surface is off");
+        expect(said).toContain("use rebase.admin");
+    });
+
+    it("on the functions role, serves its functions and the account administration in-process", async () => {
+        // A function calling `rebase.admin.*` from a handler: the functions
+        // role serves no admin surface either.
+        const backend = await make(FUNCTIONS);
+        expect(await present(backend.rebase.functions, "functions").invoke("ping", {})).toEqual({ pong: true });
+        expect(await present(backend.rebase.admin, "admin").listUsers()).toMatchObject({ users: [], total: 0 });
+        const said = await refusal(present(backend.rebase.auth, "auth").resetPasswordForEmail("ada@example.com"));
+        expect(said).toContain("auth surface is off");
+    });
+
+    it("serves none of it on the worker's own port", async () => {
+        // Carried for the in-process client only: mounted on an app, the
+        // worker still answers nothing under /api/admin.
+        const { Hono } = await import("hono");
+        const backend = await make(WORKER);
+        const app = new Hono();
+        backend.mount(app as never);
+        for (const path of ["/api/admin/users", "/api/admin/cron"]) {
+            const res = await app.request(path);
+            expect(res.status).toBe(404);
+            // The generic envelope for a path nothing serves — not the
+            // in-process refusal, and not a 401 from a route that exists.
+            expect(await res.json()).toMatchObject({ error: { code: "NOT_FOUND", message: `No route for GET ${path} on this backend.` } });
+        }
     });
 });

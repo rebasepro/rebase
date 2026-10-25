@@ -226,6 +226,39 @@ describe("resolveRole — refusals", () => {
         }))).not.toThrow();
     });
 
+    it("accepts the upstream on a worker, which forwards its own in-process calls", () => {
+        // A cron job moved to a worker calls `rebase.functions.invoke(...)`;
+        // the worker serves no functions, so this is the only way it reaches one.
+        const resolved = resolveRole(env({
+            REBASE_ROLE: "worker",
+            REBASE_MIGRATE_ON_BOOT: "none",
+            REBASE_FUNCTIONS_UPSTREAM: " http://functions:8080 "
+        }));
+        expect(resolved.functionsUpstream).toBe("http://functions:8080");
+        // Still a worker: forwarding is not serving.
+        expect(resolved.surfaces.functions).toBe(false);
+    });
+
+    it("refuses the upstream on `all`, which serves the functions itself", () => {
+        expect(() => resolveRole(env({
+            REBASE_ROLE: "all",
+            REBASE_FUNCTIONS_UPSTREAM: "http://functions:8080"
+        }))).toThrow(/only read by REBASE_ROLE=api and REBASE_ROLE=worker/);
+    });
+
+    it.each(["api", "worker"] as const)("refuses an upstream on %s that is not an http(s) URL", (role) => {
+        for (const upstream of ["functions:8080", "ftp://functions", "not a url"]) {
+            try {
+                resolveRole(env({ REBASE_ROLE: role, REBASE_MIGRATE_ON_BOOT: "none", REBASE_FUNCTIONS_UPSTREAM: upstream }));
+                throw new Error(`accepted ${upstream}`);
+            } catch (err) {
+                expect(err).toBeInstanceOf(RoleConfigurationError);
+                expect((err as Error).message).toContain("is not an http(s) URL");
+                expect((err as RoleConfigurationError).hint).toContain("http://functions:8080");
+            }
+        }
+    });
+
     it("refuses a role it does not know", () => {
         expect(() => resolveRole(env({ REBASE_ROLE: "frontend" as never })))
             .toThrow(/is not a role/);

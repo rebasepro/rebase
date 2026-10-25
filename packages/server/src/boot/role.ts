@@ -165,14 +165,24 @@ export function resolveRole(env: RoleEnv): ResolvedRole {
     // Set on the wrong process these do nothing at all, which is the worst
     // outcome available: the deployment looks configured and behaves as if it
     // were not. Naming the role that reads each one is the whole message.
-    if (env.REBASE_FUNCTIONS_UPSTREAM && role !== "api") {
+    //
+    // The upstream is read by the two roles that serve no functions: `api`,
+    // which forwards `/api/functions/*` for its clients, and `worker`, which
+    // forwards only its own in-process calls — a cron job's
+    // `rebase.functions.invoke(...)` — and still answers nothing on its port.
+    // `all` and `functions` serve those routes themselves.
+    const functionsUpstream = env.REBASE_FUNCTIONS_UPSTREAM?.trim() || undefined;
+    if (functionsUpstream && role !== "api" && role !== "worker") {
         throw new RoleConfigurationError(
-            `REBASE_FUNCTIONS_UPSTREAM is only read by REBASE_ROLE=api, and this process is "${role}".`,
+            `REBASE_FUNCTIONS_UPSTREAM is only read by REBASE_ROLE=api and REBASE_ROLE=worker, and this process is "${role}".`,
             role === "functions"
-                ? "A functions process serves those routes; it does not forward them. Set the upstream on the api process instead."
-                : "Remove it, or set REBASE_ROLE=api on this process."
+                ? "A functions process serves those routes; it does not forward them. Set the upstream on the api (or worker) process instead."
+                : "This process serves the functions itself. Remove it, or set REBASE_ROLE=api on this process."
         );
     }
+    // A value `fetch` can never reach would boot, and then fail every
+    // forwarded call with a 502 that blames the functions process.
+    if (functionsUpstream) assertUpstreamUrl(functionsUpstream);
     const hasSelection = Boolean(env.REBASE_FUNCTIONS_ONLY || env.REBASE_FUNCTIONS_EXCLUDE);
     if (hasSelection && role !== "functions") {
         throw new RoleConfigurationError(
@@ -216,8 +226,24 @@ export function resolveRole(env: RoleEnv): ResolvedRole {
             only: parseNameList(env.REBASE_FUNCTIONS_ONLY),
             exclude: parseNameList(env.REBASE_FUNCTIONS_EXCLUDE)
         },
-        functionsUpstream: env.REBASE_FUNCTIONS_UPSTREAM?.trim() || undefined
+        functionsUpstream
     };
+}
+
+/** Refuse a `REBASE_FUNCTIONS_UPSTREAM` that is not an absolute http(s) URL. */
+function assertUpstreamUrl(value: string): void {
+    let url: URL | undefined;
+    try {
+        url = new URL(value);
+    } catch {
+        url = undefined;
+    }
+    if (!url || (url.protocol !== "http:" && url.protocol !== "https:")) {
+        throw new RoleConfigurationError(
+            `REBASE_FUNCTIONS_UPSTREAM="${value}" is not an http(s) URL.`,
+            "Set it to the functions process's base URL, e.g. http://functions:8080."
+        );
+    }
 }
 
 /**

@@ -6,6 +6,7 @@ import path from "node:path";
 import type { BackendBootstrapper, CollectionConfig, InitializedDriver } from "@rebasepro/types";
 
 import { initializeRebaseBackend } from "../src/init";
+import { createRebaseBackend, type RebaseBackend } from "../src/backend/create-backend";
 import { generateAccessToken } from "../src/auth/jwt";
 
 /**
@@ -290,5 +291,72 @@ describe("the api role forwarding /api/functions", () => {
 
         // Reaches the local function rather than the unreachable upstream.
         expect((await both.request("/api/functions/echo/hello")).status).toBe(200);
+    });
+});
+
+/**
+ * The `worker` role forwarding its own function calls.
+ *
+ * A cron job that calls `rebase.functions.invoke(...)` works under
+ * `REBASE_ROLE=all` and, after the documented move of cron to a worker, found
+ * no route: a worker serves no functions. With `REBASE_FUNCTIONS_UPSTREAM` set
+ * on it, the in-process client forwards the call to the functions process —
+ * and the worker's own port still answers nothing under `/api/functions`.
+ */
+describe("the worker role forwarding its own function calls", () => {
+    const WORKER_SURFACES = {
+        auth: false, data: false, storage: false, admin: false,
+        functions: false, cron: false, meta: false, realtime: false
+    };
+    const backends: RebaseBackend[] = [];
+
+    afterAll(async () => {
+        for (const backend of backends) await backend.shutdown(0);
+    });
+
+    /** A worker, as `bootFromBundle` builds one for `REBASE_ROLE=worker`, with the deployment's service key. */
+    async function worker(functionsUpstream?: string): Promise<RebaseBackend> {
+        const backend = await createRebaseBackend({
+            collections: [collection("jobs")],
+            bootstrappers: [bootstrapper],
+            auth: { jwtSecret: JWT_SECRET, serviceKey: SERVICE_KEY },
+            surfaces: WORKER_SURFACES,
+            cronPersistence: false,
+            provision: false,
+            ...(functionsUpstream ? { functionsUpstream } : {})
+        } as never);
+        backends.push(backend);
+        return backend;
+    }
+
+    it("reaches the function on the functions process, as the service", async () => {
+        const backend = await worker(upstream.url);
+        const functions = backend.rebase.functions;
+        if (!functions) throw new Error("backend.rebase.functions is missing");
+
+        expect(await functions.invoke("echo", undefined, { method: "GET", path: "hello" })).toEqual({ ok: true });
+        // The in-process client's credential arrives intact: the function sees
+        // the service identity, not an anonymous caller.
+        expect(await functions.invoke("echo", undefined, { method: "GET", path: "whoami" }))
+            .toEqual({ uid: "service", roles: ["admin"] });
+    });
+
+    it("does not answer /api/functions on its own port", async () => {
+        const backend = await worker(upstream.url);
+        const app = new Hono();
+        backend.mount(app as never);
+
+        const res = await app.request("/api/functions/echo/hello");
+        expect(res.status).toBe(404);
+        expect(await res.json()).toMatchObject({ error: { code: "NOT_FOUND" } });
+    });
+
+    it("without an upstream, names the variable that would forward the call", async () => {
+        const backend = await worker();
+        const functions = backend.rebase.functions;
+        if (!functions) throw new Error("backend.rebase.functions is missing");
+
+        await expect(functions.invoke("echo", undefined, { method: "GET", path: "hello" }))
+            .rejects.toThrow(/functions surface is off.*REBASE_FUNCTIONS_UPSTREAM/s);
     });
 });

@@ -355,9 +355,12 @@ export const bootEnvExtension = z.object({
     /**
      * Base URL of the process serving `/api/functions/*`.
      *
-     * `api` role only. Set it and this process forwards those requests there
-     * instead of mounting them, so a split deployment presents the identical URL
-     * surface and nobody has to run a reverse proxy to try one.
+     * `api` and `worker` roles only. Set on the api, this process forwards
+     * those requests there instead of mounting them, so a split deployment
+     * presents the identical URL surface and nobody has to run a reverse proxy
+     * to try one. Set on a worker, only the worker's own in-process
+     * `rebase.functions` calls are forwarded; its port serves none. An http(s)
+     * URL, or the boot stops.
      */
     REBASE_FUNCTIONS_UPSTREAM: z.string().optional(),
 

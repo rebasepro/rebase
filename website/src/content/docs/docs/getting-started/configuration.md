@@ -275,7 +275,7 @@ combinations refuse to boot — is on
 | `REBASE_JOB_WORKERS` | Override whether this process runs job-queue workers. Unset follows the role. | — |
 | `REBASE_FUNCTIONS_ONLY` | Serve only the named custom functions in this process. | — |
 | `REBASE_FUNCTIONS_EXCLUDE` | Serve every custom function except the named ones. | — |
-| `REBASE_FUNCTIONS_UPSTREAM` | Where the API process forwards a function request it does not serve itself. | — |
+| `REBASE_FUNCTIONS_UPSTREAM` | Where the API process forwards a function request it does not serve itself. On a `worker`, where its own `rebase.functions` calls go. An `http(s)` URL. | — |
 
 ### MCP surface
 
