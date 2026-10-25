@@ -120,8 +120,15 @@ Kept in step with `TOPOLOGY_ENV_VARS` in
 `packages/server/src/deploy/pod-contract.ts` by `scripts/check-chart.mjs`,
 which cannot import TypeScript and so compares the two lists as text.
 */}}
-{{- $topologyEnv := list "REBASE_ROLE" "REBASE_FUNCTIONS_ONLY" "REBASE_FUNCTIONS_EXCLUDE" "REBASE_FUNCTIONS_UPSTREAM" "REBASE_CRON_SCHEDULER" "REBASE_JOB_WORKERS" "REBASE_RLS_AUDIT" "REBASE_MCP_ENABLED" "REBASE_MIGRATE_ON_BOOT" "REBASE_PROVISION" "TRUSTED_PROXY_HOPS" "REBASE_RATE_LIMIT_STORE" "REBASE_REQUIRE_SCHEMA_MATCH" -}}
+{{- $topologyEnv := list "REBASE_ROLE" "REBASE_FUNCTIONS_ONLY" "REBASE_FUNCTIONS_EXCLUDE" "REBASE_FUNCTIONS_UPSTREAM" "REBASE_CRON_SCHEDULER" "REBASE_JOB_WORKERS" "REBASE_RLS_AUDIT" "REBASE_MCP_ENABLED" "REBASE_MIGRATE_ON_BOOT" "REBASE_PROVISION" "REBASE_PROVISION_ONLY" "TRUSTED_PROXY_HOPS" "REBASE_RATE_LIMIT_STORE" "REBASE_REQUIRE_SCHEMA_MATCH" -}}
 {{- range $name, $value := .Values.config.env }}
+  {{/* `config.env` reaches every unit, so this one turns each Deployment into
+       a run that provisions and exits 0. The migration Job sets it in its own
+       env, which is the chart deciding. Its own message, because the one below
+       points at `split`, and the step this asks for is the Job's. */}}
+  {{- if eq $name "REBASE_PROVISION_ONLY" }}
+    {{- fail "config.env sets REBASE_PROVISION_ONLY, which reaches every unit in this release: each pod would provision, exit 0 and be restarted, and the rollout would never become ready. The chart already runs that step as its migration Job (migrationJob.enabled). With provision=false, run the image with REBASE_PROVISION_ONLY=true under your own change process, outside this release." }}
+  {{- end }}
   {{- if has $name $topologyEnv }}
     {{- fail (printf "config.env sets %s, which decides this release's topology and is the chart's to own. Set here it either does nothing (under split, the chart's value is written last and wins) or takes effect unsupervised (unsplit, where nothing overrides it) — and a wrong topology passes every probe, because /livez and /health answer on every role. Use `split` and the api/functions/worker blocks instead." $name) }}
   {{- end }}

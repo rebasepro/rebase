@@ -784,6 +784,8 @@ const REFUSAL_CASES = [
     ["no admin and no self-registration", ["--set", "config.adminEmail="]],
     ["an admin password too short to be created", ["--set", "config.adminPassword=short"]],
     ["topology variable in config.env", ["--set", "config.env.REBASE_ROLE=worker"]],
+    // Every pod a Deployment runs would provision, exit 0 and be restarted.
+    ["provision-only in config.env", ["--set-string", "config.env.REBASE_PROVISION_ONLY=true"]],
     ["static app with no name", ["--set-json", 'staticApps=[{"path":"/x","image":{"repository":"e/x"}}]']],
     ["static app with no path", ["--set-json", 'staticApps=[{"name":"x","image":{"repository":"e/x"}}]']],
     ["static app path without a slash", ["--set-json", 'staticApps=[{"name":"x","path":"x","image":{"repository":"e/x"}}]']],
