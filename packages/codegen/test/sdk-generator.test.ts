@@ -528,8 +528,9 @@ isId: "increment" },
         // target is a string uuid and the relation is required
         expect(ts).toContain("authorId: string;");
         expect(ts).not.toContain("authorId?: string | null;");
-        // …and the write side agrees: no `?`.
-        expect(ts).toContain("author: string;");
+        // …and the write side agrees: a create must name the author, under
+        // either spelling — the server's required check reads both.
+        expect(ts).toContain("} & ({ authorId: string } | { author: string });");
     });
 
     // Same fact, declared the other way: the relation lives in `relations` and

@@ -268,6 +268,35 @@ describe("schemas that cannot be generated are rejected, not emitted", () => {
     });
 });
 
+/** Compile the generated file together with a snippet that uses it. */
+function compileWithConsumer(source: string, consumer: string): string[] {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "rebase-codegen-include-"));
+    const dbFile = path.join(dir, "database.types.ts");
+    const useFile = path.join(dir, "use.ts");
+    try {
+        fs.writeFileSync(dbFile, source, "utf-8");
+        fs.writeFileSync(useFile, consumer, "utf-8");
+        const program = ts.createProgram([dbFile, useFile], {
+            noEmit: true,
+            strict: true,
+            target: ts.ScriptTarget.ESNext,
+            module: ts.ModuleKind.ESNext,
+            moduleResolution: ts.ModuleResolutionKind.Bundler,
+            skipLibCheck: true,
+            lib: ["lib.esnext.d.ts"]
+        });
+        return [dbFile, useFile].flatMap(f => {
+            const sf = program.getSourceFile(f)!;
+            return [
+                ...program.getSyntacticDiagnostics(sf),
+                ...program.getSemanticDiagnostics(sf)
+            ].map(d => `${path.basename(f)} TS${d.code}: ${ts.flattenDiagnosticMessageText(d.messageText, " ")}`);
+        });
+    } finally {
+        fs.rmSync(dir, { recursive: true, force: true });
+    }
+}
+
 /**
  * `include`, typed against the relations a project actually declares.
  *
@@ -286,35 +315,6 @@ describe("schemas that cannot be generated are rejected, not emitted", () => {
  * beside them still compiles.
  */
 describe("the generated include types", () => {
-    /** Compile the generated file together with a snippet that uses it. */
-    function compileWithConsumer(source: string, consumer: string): string[] {
-        const dir = fs.mkdtempSync(path.join(os.tmpdir(), "rebase-codegen-include-"));
-        const dbFile = path.join(dir, "database.types.ts");
-        const useFile = path.join(dir, "use.ts");
-        try {
-            fs.writeFileSync(dbFile, source, "utf-8");
-            fs.writeFileSync(useFile, consumer, "utf-8");
-            const program = ts.createProgram([dbFile, useFile], {
-                noEmit: true,
-                strict: true,
-                target: ts.ScriptTarget.ESNext,
-                module: ts.ModuleKind.ESNext,
-                moduleResolution: ts.ModuleResolutionKind.Bundler,
-                skipLibCheck: true,
-                lib: ["lib.esnext.d.ts"]
-            });
-            return [dbFile, useFile].flatMap(f => {
-                const sf = program.getSourceFile(f)!;
-                return [
-                    ...program.getSyntacticDiagnostics(sf),
-                    ...program.getSemanticDiagnostics(sf)
-                ].map(d => `${path.basename(f)} TS${d.code}: ${ts.flattenDiagnosticMessageText(d.messageText, " ")}`);
-            });
-        } finally {
-            fs.rmSync(dir, { recursive: true, force: true });
-        }
-    }
-
     const authors: Record<string, unknown> = {
         slug: "authors",
         properties: {
@@ -398,6 +398,75 @@ describe("the generated include types", () => {
             // Columns are untouched either way.
             const title: string = withAuthor.title;
             export { name, body, bodies, title };
+        `)).toEqual([]);
+    });
+});
+
+/**
+ * What a write may name, for each relation kind — asserted by compiling a
+ * consumer, as the include types are, because whether a create compiles is the
+ * whole question and a substring cannot answer it.
+ *
+ * The same seams are crossed against the real client in
+ * `tests/e2e/baas-typecheck/src/typed-sdk/probes.ts`.
+ */
+describe("the generated write types, per relation kind", () => {
+    const authors: Record<string, unknown> = {
+        slug: "authors",
+        properties: {
+            id: { type: "number", isId: "increment" },
+            name: { type: "string", validation: { required: true } }
+        }
+    };
+    const comments: Record<string, unknown> = {
+        slug: "comments",
+        properties: {
+            id: { type: "number", isId: "increment" },
+            body: { type: "string", validation: { required: true } },
+            post: {
+                type: "relation",
+                validation: { required: true },
+                relation: { kind: "belongsTo", target: () => posts, localKey: "post_id" }
+            },
+            author: {
+                type: "relation",
+                validation: { required: true },
+                relation: { kind: "belongsTo", target: () => authors, localKey: "author_id" }
+            }
+        }
+    };
+    const posts: Record<string, unknown> = {
+        slug: "posts",
+        properties: {
+            id: { type: "string", isId: "uuid" },
+            title: { type: "string", validation: { required: true } }
+        }
+    };
+
+    const schema = () => generateTypedefs([authors, comments, posts] as unknown as CollectionConfig[]);
+
+    it("satisfies a required belongsTo with either spelling, and with neither refuses", () => {
+        // The server's required check reads both the foreign key and the
+        // relation. Both used to be required keys, so only a create that named
+        // the same row twice compiled.
+        expect(compileWithConsumer(schema(), `
+            import type { Database } from "./database.types";
+            type Insert = Database["comments"]["Insert"];
+            const byKey: Insert = { body: "b", postId: "p", authorId: 1 };
+            const byRelation: Insert = { body: "b", post: "p", author: 1 };
+            const mixed: Insert = { body: "b", postId: "p", author: 1 };
+            const both: Insert = { body: "b", postId: "p", post: "p", authorId: 1 };
+            // @ts-expect-error neither spelling of the post
+            const noPost: Insert = { body: "b", authorId: 1 };
+            // @ts-expect-error a required link cannot be null
+            const nullPost: Insert = { body: "b", postId: null, authorId: 1 };
+            // @ts-expect-error a post's id is a string
+            const wrongType: Insert = { body: "b", post: 1, authorId: 1 };
+            // Both names stay keys of the type.
+            const keys: Array<keyof Insert> = ["postId", "post", "authorId", "author"];
+            // An update may name neither.
+            const update: Database["comments"]["Update"] = { body: "c" };
+            export { byKey, byRelation, mixed, both, noPost, nullPost, wrongType, keys, update };
         `)).toEqual([]);
     });
 });

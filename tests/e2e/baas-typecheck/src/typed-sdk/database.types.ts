@@ -12,6 +12,7 @@ export interface Database {
       computed?: string | null;
       createdAt?: string | null;
       posts?: Array<Database["posts"]["Row"]>;
+      profile?: Database["profiles"]["Row"];
     };
     Insert: {
       id?: number;
@@ -28,8 +29,43 @@ export interface Database {
     };
     Relations: {
       posts: "posts";
+      profile: "profiles";
     };
     Slug: "authors";
+  };
+  comments: {
+    Row: {
+      id: number;
+      body: string;
+      postId: string;
+      moderatorId?: number | null;
+      reviewerId?: number | null;
+      post?: Database["posts"]["Row"];
+      reviewer?: Database["authors"]["Row"];
+      postTags?: Array<Database["tags"]["Row"]>;
+    };
+    Insert: {
+      id?: number;
+      body: string;
+      postId?: string;
+      moderatorId?: number | null;
+      reviewerId?: number | null;
+      post?: string;
+    } & ({ postId: string } | { post: string });
+    Update: {
+      body?: string;
+      postId?: string;
+      moderatorId?: number | null;
+      reviewerId?: number | null;
+      post?: string;
+    };
+    Relations: {
+      post: "posts";
+      moderator: "authors";
+      reviewer: "authors";
+      postTags: "tags";
+    };
+    Slug: "comments";
   };
   myNotes: {
     Row: {
@@ -109,6 +145,21 @@ export interface Database {
     };
     Slug: "posts";
   };
+  profiles: {
+    Row: {
+      id: number;
+      bio?: string | null;
+    };
+    Insert: {
+      id?: number;
+      bio?: string | null;
+    };
+    Update: {
+      bio?: string | null;
+    };
+    Relations: Record<never, never>;
+    Slug: "profiles";
+  };
   tags: {
     Row: {
       id: string;
@@ -130,9 +181,11 @@ export type CollectionName = keyof Database;
 
 export const collectionsDictionary = {
   authors: "authors",
+  comments: "comments",
   myNotes: "my-notes",
   orderItems: "order_items",
   posts: "posts",
+  profiles: "profiles",
   tags: "tags",
 } as const;
 

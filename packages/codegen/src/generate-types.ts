@@ -551,8 +551,11 @@ export function generateTypedefs(input: CollectionConfig[]): string {
             emittedKeys.add(key);
         }
 
-        emitWritableRelations(lines, collection, properties, resolvedRelations, emittedKeys, false);
-        lines.push("    };");
+        const eitherSpelling = emitWritableRelations(lines, collection, properties, resolvedRelations, emittedKeys, false);
+        // A required `belongsTo` written under either of its names: see
+        // `emitWritableRelations`. One `& (A | B)` per such relation, so each is
+        // satisfied on its own.
+        lines.push(eitherSpelling.length === 0 ? "    };" : `    } & ${eitherSpelling.join(" & ")};`);
 
         // ── Update Type ──
         //
@@ -745,6 +748,13 @@ function includeHelperLines(): string[] {
  * finds there is one. A relation whose `relationName` differs from its property
  * key is reachable as the property and not as the name, so emitting the name
  * would have offered a key that writes to a column that does not exist.
+ *
+ * A **required** `belongsTo` is satisfied by either spelling — the server's
+ * required check reads both (`write-validation.ts`). Emitting each name as a
+ * required key made a create name the same row twice to compile. So on an
+ * `Insert` both names go in optional, and the requirement comes back as one
+ * returned `({ authorId: T } | { author: T })` for the caller to intersect
+ * with the object. Both stay in the object so `keyof Insert` still names them.
  */
 function emitWritableRelations(
     lines: string[],
@@ -753,7 +763,28 @@ function emitWritableRelations(
     resolvedRelations: Record<string, ResolvedRelation>,
     emittedKeys: Set<string>,
     allOptional: boolean
-): void {
+): string[] {
+    // Every name each `belongsTo` can still be written under, so `emit` knows
+    // whether a required one has a second spelling to fall back on.
+    const spellings = new Map<ResolvedRelation, string[]>();
+    const addSpelling = (relation: ResolvedRelation, key: string): void => {
+        if (emittedKeys.has(key)) return;
+        const keys = spellings.get(relation) ?? [];
+        if (!keys.includes(key)) keys.push(key);
+        spellings.set(relation, keys);
+    };
+    for (const relation of Object.values(resolvedRelations)) {
+        if (relation.kind === "belongsTo" && relation.localKey) {
+            addSpelling(relation, fieldKeyForColumn(collection, relation.localKey));
+        }
+    }
+    for (const [key, rawProp] of Object.entries(properties)) {
+        if ((rawProp as Property).type !== "relation") continue;
+        const relation = findRelation(resolvedRelations, key);
+        if (relation?.kind === "belongsTo" && relation.localKey) addSpelling(relation, key);
+    }
+
+    const eitherSpelling: string[] = [];
     // The target's primary key type is the same one `Row` uses. A hardcoded
     // `string | number` here accepted a string for a numeric-keyed target.
     const emit = (key: string, relation: ResolvedRelation): void => {
@@ -762,8 +793,13 @@ function emitWritableRelations(
         // A foreign key that is not required can be unassigned, which is a
         // write of `null` — see `writableType`.
         const type = required ? foreignKeyType(relation) : `${foreignKeyType(relation)} | null`;
-        lines.push(line(key, type, allOptional || !required));
+        const names = spellings.get(relation) ?? [key];
+        const oneOfSeveral = required && !allOptional && names.length > 1;
+        lines.push(line(key, type, allOptional || !required || oneOfSeveral));
         emittedKeys.add(key);
+        if (oneOfSeveral && names[0] === key) {
+            eitherSpelling.push(`(${names.map(name => `{ ${emitKey(name)}: ${type} }`).join(" | ")})`);
+        }
     };
 
     for (const relation of Object.values(resolvedRelations)) {
@@ -793,6 +829,8 @@ function emitWritableRelations(
         lines.push(line(key, `Array<${element}>`, true));
         emittedKeys.add(key);
     }
+
+    return eitherSpelling;
 }
 
 /**

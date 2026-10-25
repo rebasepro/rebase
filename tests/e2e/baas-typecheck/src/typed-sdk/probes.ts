@@ -170,3 +170,40 @@ export async function dateWriteProbes(): Promise<string | null | undefined> {
     await posts.update("p1", { publishedAt: 1 });
     return created.publishedAt;
 }
+
+/**
+ * A required `belongsTo` is satisfied by either spelling the server accepts:
+ * the foreign key (`postId`) or the relation (`post`). Both used to be
+ * required, so only a create that sent the same id twice compiled.
+ */
+export async function requiredBelongsToProbes(): Promise<string> {
+    const comments = client.data.comments;
+    await comments.create({ body: "b", postId: "p1" });
+    await comments.create({ body: "b", post: "p1" });
+    await comments.create({ body: "b", postId: "p1", post: "p1" });
+    await client.batch([{ op: "create", collection: "comments", values: { body: "b", post: "p1" } }]);
+    await client.batch([
+        { op: "create", collection: "posts", values: { title: "t" }, ref: "post" },
+        { op: "create", collection: "comments", values: { body: "b", postId: { $ref: "post.id" } } }
+    ]);
+    await comments.update(1, { post: "p2" });
+    await comments.update(1, { body: "c" });
+    // @ts-expect-error — neither spelling: the post is required (VALIDATION_REQUIRED)
+    await comments.create({ body: "b" });
+    // @ts-expect-error — and a required link cannot be null
+    await comments.create({ body: "b", postId: null });
+    await client.batch([
+        // @ts-expect-error — nor in a batch
+        { op: "create", collection: "comments", values: { body: "b" } }
+    ]);
+    const { data } = await comments.find();
+    return data[0].postId;
+}
+
+/** A `via` is read-only on every door (RELATION_NOT_WRITABLE). */
+export async function viaWriteProbes(): Promise<void> {
+    // @ts-expect-error — not writable through the flat door
+    await client.data.comments.update(1, { postTags: ["t"] });
+    // @ts-expect-error — nor on a create
+    await client.data.comments.create({ body: "b", post: "p1", postTags: ["t"] });
+}
