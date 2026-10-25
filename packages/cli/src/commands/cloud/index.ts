@@ -27,6 +27,7 @@ import { debugCommand, printDebugHelp } from "./debug";
 import { cronCommand } from "./cron";
 import { previewsCommand } from "./previews";
 import { usageCommand } from "./usage";
+import { appKeyCommand } from "./app-key";
 import { activityCommand } from "./activity";
 import { notificationsCommand } from "./notifications";
 import {
@@ -432,6 +433,9 @@ export async function cloudCommand(subcommand: string | undefined, rawArgs: stri
         case "usage":
             await usageCommand(rawArgs);
             break;
+        case "app-key":
+            await appKeyCommand(rawArgs);
+            break;
         case "activity":
             await activityCommand(rawArgs);
             break;
@@ -544,6 +548,7 @@ export const CLOUD_GROUPS: HelpAction[] = [
     { action: "domains", section: "Config", description: "Custom domains, their DNS records, and verification" },
     { action: "extensions", section: "Config", description: "The Postgres extension allowlist" },
     { action: "settings", section: "Config", description: "Name, subdomain, repository, branch" },
+    { action: "app-key", section: "Config", args: "[rotate]", description: "The app key `init --claim` wrote into .env, and replacing it. Owners and admins" },
 
     { action: "orgs", section: "Organizations", description: "Organizations you belong to, and their members" },
     { action: "activity", section: "Organizations", description: "Who did what in the organization: deploys, env vars, domains, backups, members. Owners and admins" },

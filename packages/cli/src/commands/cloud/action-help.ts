@@ -715,6 +715,26 @@ export const ACTION_HELP: Record<string, ActionHelp> = {
         ]
     },
 
+    "app-key": {
+        command: "cloud app-key",
+        usage: "cloud app-key [rotate]",
+        summary:
+            "The key `rebase cloud init --claim` minted on the project's app and wrote into .env as REBASE_API_TOKEN. "
+            + "Claiming the project hands it over: it stops expiring. Without an action, lists the app's agent keys "
+            + "(never their value). `rotate` mints a new key, revokes every earlier agent key at once, and writes the "
+            + "new one into a .env that already sets REBASE_API_TOKEN, or prints it once. Owners and admins, signed in.",
+        flags: [],
+        examples: [
+            "rebase cloud app-key",
+            "rebase cloud app-key rotate",
+            "rebase cloud app-key rotate --yes --json"
+        ],
+        notes: [
+            "Anything still using the old key (a hosted frontend, CI) is refused until it is given the new one.",
+            "Keys made in the app's own admin panel are not touched.",
+            "It runs with your login: no access-token capability grants it, so REBASE_TOKEN is refused."
+        ]
+    },
     usage: {
         command: "cloud usage",
         usage: "cloud usage [org] [--month YYYY-MM]",

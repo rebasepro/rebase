@@ -484,11 +484,16 @@ describe("reading the claim URL back", () => {
 });
 
 describe("when the app's key stops working", () => {
-    it("init says the key expires even once the project is claimed, and how to replace it", async () => {
+    // r3-cloud-access item 1: a claim hands the key over (no expiry), so the
+    // note no longer says it dies at 72h once claimed. Was pinned as "even once
+    // the project is claimed".
+    it("init says the key expires unless the project is claimed, that a claim hands it over, and how to replace it", async () => {
         await init(["--claim"]);
         const note = (printedJson() as { appKey: { note: string } }).appKey.note;
-        expect(note).toContain("even once the project is claimed");
-        expect(note).toContain("admin panel");
+        expect(note).toContain("unless the project is claimed first");
+        expect(note).toContain("stops expiring");
+        expect(note).toContain("rebase cloud app-key rotate");
+        expect(note).not.toContain("even once the project is claimed");
     });
 
     it("`whoami` says it while the project is unclaimed", async () => {
@@ -498,7 +503,7 @@ describe("when the app's key stops working", () => {
             : json(404, { error: { code: "NOT_FOUND", message: "no route" } });
         said = [];
         await cloudCommand("whoami", line("whoami"));
-        expect((printedJson() as { appKeyNote: string | null }).appKeyNote).toContain("even once the project is claimed");
+        expect((printedJson() as { appKeyNote: string | null }).appKeyNote).toContain("unless the project is claimed first");
     });
 
     it("the refusal that follows a claim says it, with the date", async () => {

@@ -241,13 +241,16 @@ export function projectDotenvSetsAppKey(): boolean {
 
 /**
  * When the app key `init --claim` minted stops working, and what to do about
- * it. It is minted to expire with the claim window and a claim does not extend
- * it, so a person who claims at hour 1 sees their local MCP server and SDK
- * start failing at hour 72 — every command that knows the date says so.
+ * it. It is minted to expire with the claim window; a claim hands it over to
+ * the person who claims (the control plane lifts its expiry), so an unclaimed
+ * project's key stops at the window's end and a claimed one's does not. The
+ * claimer replaces it — the agent holds a copy — with `rebase cloud app-key
+ * rotate`. Every command that knows the date says so.
  */
 export function appKeyExpiryNote(expiresAt: string): string {
-    return `${APP_KEY_ENV} in .env stops working at ${new Date(expiresAt).toLocaleString()}, even once the project is claimed. `
-        + `Once it is yours, create a permanent key in the project's admin panel and put it in .env as ${APP_KEY_ENV} instead.`;
+    return `${APP_KEY_ENV} in .env stops working at ${new Date(expiresAt).toLocaleString()} unless the project is claimed first: `
+        + "claiming hands the key to the person who claims it, and it stops expiring. "
+        + `They can replace it with \`rebase cloud app-key rotate\`.`;
 }
 
 /** Host that a bare `rebase cloud` command should target, if any. */

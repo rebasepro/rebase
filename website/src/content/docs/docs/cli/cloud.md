@@ -154,7 +154,17 @@ rebase cloud env list | set | unset | reveal | pull
 rebase cloud domains list | add <domain> | verify [domain] | remove <domain>
 rebase cloud extensions list | enable | disable
 rebase cloud settings show | set        # name, branch, repo, subdomain, rebuilds
+rebase cloud app-key [rotate]           # the app key init --claim wrote; owners and admins
 ```
+
+<span class="since-badge" data-since="0.26">Since 0.26</span> `app-key` lists the
+key `rebase cloud init --claim` minted on the app and wrote into `.env` as
+`REBASE_API_TOKEN`, by its prefix and never its value. Claiming the project
+hands that key over and it stops expiring. `app-key rotate` mints a new one and
+revokes every earlier agent key at once. It writes the new key into a `.env`
+that already sets `REBASE_API_TOKEN`, and keeps it out of `--json` there. In
+any other directory it prints the key once. Keys made in the app's admin panel
+are not touched. It runs with your login: no token capability grants it.
 
 A backend preview starts from production's variables, live keys included.
 `env set KEY=VALUE --preview` gives previews their own value, `env unset KEY

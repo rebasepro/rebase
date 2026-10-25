@@ -16,7 +16,8 @@
  *   has built the app, `REBASE_API_TOKEN`: a key the APP accepts, minted on it
  *   by the control plane (`POST /api/functions/ephemeral/app-key`). It reads and
  *   writes data through the app's row-level security, holds nothing of the
- *   admin plane, and expires with the claim window; see {@link requestAppKey}.
+ *   admin plane, and expires with the claim window unless the project is
+ *   claimed: a claim hands it over and it stops expiring; see {@link requestAppKey}.
  *   With `--no-deploy`, or a deploy that failed, the next `rebase cloud deploy`
  *   that succeeds asks for it instead; see {@link mintMissingAppKey}.
  * - `.rebase/cloud.json`: the link, so every `rebase cloud` command in this
@@ -275,7 +276,7 @@ export function appKeyPayload(outcome: AppKeyOutcome): Record<string, unknown> {
             env: API_TOKEN_ENV,
             scopes: outcome.key.scopes,
             expiresAt: outcome.key.expiresAt,
-            // A claim does not extend it: say so where an agent reads it.
+            // When it expires, and that a claim hands it over: said where an agent reads it.
             note: appKeyExpiryNote(outcome.key.expiresAt)
         }
         : { ok: false, error: { code: outcome.code, message: outcome.message } };
