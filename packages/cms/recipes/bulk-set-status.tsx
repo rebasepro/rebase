@@ -7,7 +7,8 @@
  * "every row matching the filter", not just the ticked ones — `resolveSelection`
  * handles both), updates each row through the data layer, and clears the
  * selection. Saves go through the server, so its callbacks and security rules
- * apply to every row.
+ * apply to every row. When one is refused, the rows before it are already
+ * archived: it says how many, and leaves the rest selected for another try.
  *
  * To use it: `admin: { Actions: [ArchiveSelectedAction] }` on the collection,
  * or copy it and change `FIELD` / `VALUE` / the label.
@@ -30,16 +31,24 @@ export function ArchiveSelectedAction({ path, selectionController }: CollectionA
 
     const archive = async () => {
         setRunning(true);
+        let rows: Awaited<ReturnType<typeof resolveSelection>> = [];
+        let done = 0;
         try {
             const accessor = data.collection(path);
-            const rows = await resolveSelection({ selection: selectionController.selection, accessor });
+            rows = await resolveSelection({ selection: selectionController.selection, accessor });
             for (const row of rows) {
                 await accessor.update(row.id, { [FIELD]: VALUE });
+                done++;
             }
             selectionController.clearSelection();
             snackbar.open({ type: "success", message: `Archived ${rows.length} row${rows.length === 1 ? "" : "s"}` });
         } catch (error) {
-            snackbar.open({ type: "error", message: error instanceof Error ? error.message : String(error) });
+            const reason = error instanceof Error ? error.message : String(error);
+            if (done > 0) selectionController.setSelectedEntities(rows.slice(done));
+            snackbar.open({
+                type: "error",
+                message: rows.length > 0 ? `Archived ${done} of ${rows.length} rows. ${reason}` : reason
+            });
         } finally {
             setRunning(false);
         }

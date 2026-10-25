@@ -22,15 +22,20 @@ if (typeof globalThis.ResizeObserver === "undefined") {
 
 export type Row = Record<string, unknown>;
 
-/** Tables keyed by collection path; every row keyed on `id`. */
-export const db: { rows: Record<string, Row[]> } = { rows: {} };
+/**
+ * Tables keyed by collection path; every row keyed on `id`. `failSaveOf` names
+ * a row whose save the driver refuses, as a security rule or a callback would.
+ */
+export const db: { rows: Record<string, Row[]>; failSaveOf?: string } = { rows: {} };
 
 export const memoryDriver: DataDriver = {
     key: "memory",
-    fetchCollection: async ({ path }) => db.rows[path] ?? [],
+    // A page is at most `limit` rows, as a real data source serves it.
+    fetchCollection: async ({ path, limit }) => (db.rows[path] ?? []).slice(0, limit ?? undefined),
     fetchOne: async ({ path, id }) => (db.rows[path] ?? []).find(r => String(r.id) === String(id)),
     save: async ({ path, values, id: savedId }) => {
         const id = savedId ?? values.id ?? `${path}-${(db.rows[path] ?? []).length + 1}`;
+        if (db.failSaveOf !== undefined && String(id) === db.failSaveOf) throw new Error(`Saving ${String(id)} was refused`);
         const saved = { ...(db.rows[path] ?? []).find(r => String(r.id) === String(id)), ...values, id };
         db.rows[path] = [...(db.rows[path] ?? []).filter(r => String(r.id) !== String(id)), saved];
         return saved;

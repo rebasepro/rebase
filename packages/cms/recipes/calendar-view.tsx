@@ -87,24 +87,26 @@ export function CalendarView({ collection, tableController, onEntityClick }: Col
                 </Typography>
                 <Button size={"small"} variant={"text"} onClick={() => shift(1)} aria-label={"Next month"}>›</Button>
             </div>
-            <div className={"grid grid-cols-7 gap-px rounded-lg overflow-hidden border border-surface-200 dark:border-surface-700 bg-surface-200 dark:bg-surface-700"}>
+            <div className={"grid grid-cols-7 gap-px rounded-lg overflow-hidden border border-hairline bg-hairline"}>
                 {WEEKDAYS.map(day => (
                     <Typography key={day} variant={"caption"} color={"secondary"}
-                        className={"bg-surface-50 dark:bg-surface-900 px-2 py-1"}>{day}</Typography>
+                        className={"bg-surface-raised px-2 py-1"}>{day}</Typography>
                 ))}
                 {monthGrid(month).map(day => (
                     <div key={dayKey(day)}
                         data-day={dayKey(day)}
-                        className={"min-h-24 bg-white dark:bg-surface-950 p-1 flex flex-col gap-1"
+                        className={"min-h-24 bg-surface-card p-1 flex flex-col gap-1"
                             + (day.getMonth() === month.getMonth() ? "" : " opacity-40")}>
                         <Typography variant={"caption"} color={"secondary"}>{day.getDate()}</Typography>
                         {(byDay.get(dayKey(day)) ?? []).map(entity => (
-                            <button key={String(entity.id)}
-                                type={"button"}
+                            <Button key={String(entity.id)}
+                                variant={"text"}
+                                size={"smallest"}
+                                fullWidth
                                 onClick={() => onEntityClick?.(entity)}
-                                className={"truncate text-left text-xs rounded px-1 py-0.5 bg-primary/10 text-primary hover:bg-primary/20"}>
-                                {String(entity.values[TITLE_FIELD] ?? entity.id)}
-                            </button>
+                                className={"justify-start min-w-0"}>
+                                <span className={"truncate"}>{String(entity.values[TITLE_FIELD] ?? entity.id)}</span>
+                            </Button>
                         ))}
                     </div>
                 ))}
