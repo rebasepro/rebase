@@ -525,7 +525,12 @@ describe("every command the dispatch answers parses its flags strictly", () => {
             "cron.ts:connect": "a helper of `cron list` and `cron logs`, which declare --host and parse first",
             "link.ts:linkDirect": "the self-hosted branch of `linkCommand`, which parsed before choosing it",
             "projects.ts:projectInfo": "its line is parsed by `resolveProjectArg` at the dispatch site",
-            "resources.ts:buildDialPatch": "reads the dials' VALUES; `computeCommand` is what accepts the line"
+            "resources.ts:buildDialPatch": "reads the dials' VALUES; `computeCommand` is what accepts the line",
+            "resources.ts:webhooksCommand": "retired: refuses every line with `command_retired` before reading any of it",
+            "orgs.ts:listMembers": "an action of `orgs members`, whose `membersCommand` parses the line before dispatching",
+            "orgs.ts:inviteMember": "an action of `orgs members`, whose `membersCommand` parses the line before dispatching",
+            "orgs.ts:removeMember": "an action of `orgs members`, whose `membersCommand` parses the line before dispatching",
+            "orgs.ts:changeRole": "an action of `orgs members`, whose `membersCommand` parses the line before dispatching"
         };
 
         /** `function name(params)` and its body, by brace matching. */
