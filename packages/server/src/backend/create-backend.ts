@@ -1177,6 +1177,18 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
     // Resolved BEFORE route mounting so every admin surface — including the
     // adapter-created admin routes, whose middleware captures the key at
     // creation time — gates on the same key.
+    //
+    // Not for a process that forwards its functions to another one: its own
+    // `rebase.functions.invoke(...)` crosses to that process carrying this
+    // key, and a per-boot key is one the other process never heard of — every
+    // call from a hook or a cron job answered 401 "Invalid or expired token".
+    if (config.functionsUpstream && !surfaces.functions && !serviceKey) {
+        throw new Error(
+            "REBASE_FUNCTIONS_UPSTREAM is set but REBASE_SERVICE_KEY is not. This process's own " +
+            "rebase.functions calls reach the functions process with the service key, so set REBASE_SERVICE_KEY " +
+            "to the same value on this process and on the functions process."
+        );
+    }
     const internalServiceKey = serviceKey || randomBytes(48).toString("base64");
     if (!serviceKey) {
         logger.info("No REBASE_SERVICE_KEY configured. Generated internal per-boot key for singleton control-plane APIs.");
@@ -1543,7 +1555,11 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
             if (authRoutes) adapterAuthRouter = adapterRouter(authRoutes, "Auth");
         }
 
-        if (authAdapter && authAdapter.createAdminRoutes && surfaces.admin) {
+        // Built whether or not the admin surface is served: on a role that
+        // turns it off (a `worker`), the in-process client's `rebase.admin`
+        // still reaches them — see `inProcessAdmin` below. Building a router
+        // loads no user code and opens nothing.
+        if (authAdapter && authAdapter.createAdminRoutes) {
             const adminRoutes = authAdapter.createAdminRoutes();
             if (adminRoutes) adapterAdminRouter = adapterRouter(adminRoutes, "Admin");
         }
@@ -2993,6 +3009,13 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
 
     // 5a. Or forward them, when another process serves them.
     //
+    // A process that serves no HTTP surface of its own — the `worker` shape —
+    // forwards only its own in-process calls: the upstream is how a cron job's
+    // `rebase.functions.invoke(...)` reaches the functions process, and it
+    // does not turn the worker's port into another door to `/api/functions`.
+    const forwardsFunctionsOnlyInProcess = !surfaces.functions
+        && !surfaces.auth && !surfaces.data && !surfaces.storage && !surfaces.admin && !surfaces.meta;
+    //
     // Mutually exclusive with mounting: a process either serves these routes or
     // hands them on, and a deployment that configured both would have the local
     // copy silently win. The `surfaces.functions` check is what makes that
@@ -3002,7 +3025,9 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
         // No `basePath`: the forwarder asks the upstream for the path it was
         // asked for, wherever the group is mounted.
         functionsSurface = createFunctionsProxy({ upstream: config.functionsUpstream });
-        logger.info("Forwarding custom functions to another process", {
+        logger.info(forwardsFunctionsOnlyInProcess
+            ? "Forwarding this process's own function calls (rebase.functions) to another process"
+            : "Forwarding custom functions to another process", {
             upstream: config.functionsUpstream
         });
     }
@@ -3738,6 +3763,7 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
         // groups themselves (see `group`), so it holds wherever they are mounted.
 
         if (surfaces.admin) app.route(`${basePath}/admin`, groups.admin());
+        else if (!announce) mountInProcessAdmin(app, basePath);
         if (surfaces.auth) app.route(`${basePath}/auth`, groups.auth());
 
         // ── JWKS ─────────────────────────────────────────────────────────
@@ -3798,7 +3824,9 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
             });
         }
 
-        if (functionsSurface) {
+        // `announce` is off for the in-process app alone, which carries the
+        // forwarder whatever the process serves on its port.
+        if (functionsSurface && (!announce || !forwardsFunctionsOnlyInProcess)) {
             app.route(`${basePath}/functions`, groups.functions());
             if (announce) logger.debug("Function routes mounted", { path: `${basePath}/functions` });
         }
@@ -3815,6 +3843,24 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
         if (surfaces.meta && metaSurface) app.route(`${basePath}/meta`, groups.meta());
 
         if (announce) logger.debug("Rebase backend mounted", { basePath });
+    };
+
+    // What `rebase.admin` and `rebase.cron` reach in-process on a role that
+    // serves no admin surface — a `worker`, where a cron job runs. The account
+    // administration the auth adapter answers (users, roles, password resets)
+    // and the cron controls, nothing else: those are built from this backend's
+    // own configuration and load no user code, where the rest of the admin
+    // group (backups, the schema editor, logs, SQL export, …) is built only
+    // where it is served. A path outside them answers the named refusal below.
+    // Only the service key this backend minted reaches them: nothing mounts
+    // this on a port.
+    const mountInProcessAdmin = (app: Hono<HonoEnv>, basePath: string): void => {
+        if (adapterAdminRouter) {
+            const adminGroup = group();
+            adminGroup.route("/", adapterAdminRouter);
+            app.route(`${basePath}/admin`, adminGroup);
+        }
+        if (cronSurface && !surfaces.cron) app.route(`${basePath}/admin/cron`, group(cronSurface));
     };
 
     // The app the in-process client and `fetch` dispatch into: everything,
@@ -3838,19 +3884,41 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
     // docs/deployment/split-processes.md suggests, failed with it every night.
     // Same status and code; the message says which surface and what instead.
     const refuseSurfacesOffByName = (app: Hono<HonoEnv>): void => {
-        const off: Array<{ path: string; surface: RuntimeSurface; accessor: string; roles: string }> = [];
+        const elsewhere = "Call it over HTTP on a process that serves it, or run this code on one.";
+        const off: Array<{ path: string; surface: RuntimeSurface; consequence: string; roles: string; remedy: string }> = [];
         if (!functionsSurface) {
-            off.push({ path: "functions", surface: "functions", accessor: "rebase.functions", roles: "REBASE_ROLE=worker, and REBASE_ROLE=api without REBASE_FUNCTIONS_UPSTREAM" });
+            off.push({
+                path: "functions", surface: "functions", roles: "REBASE_ROLE=worker and REBASE_ROLE=api",
+                consequence: "rebase.functions has nothing to call in this process",
+                remedy: "Set REBASE_FUNCTIONS_UPSTREAM to the functions process's URL on this process to forward " +
+                    "these calls there, or call the function over HTTP on a process that serves it."
+            });
         }
-        if (!surfaces.auth) off.push({ path: "auth", surface: "auth", accessor: "rebase.auth", roles: "REBASE_ROLE=worker and REBASE_ROLE=functions" });
-        if (!surfaces.admin) off.push({ path: "admin", surface: "admin", accessor: "rebase.admin and rebase.cron", roles: "REBASE_ROLE=worker and REBASE_ROLE=functions" });
-        for (const { path, surface, accessor, roles } of off) {
+        if (!surfaces.auth) {
+            off.push({
+                path: "auth", surface: "auth", roles: "REBASE_ROLE=worker and REBASE_ROLE=functions",
+                // Every `rebase.auth` call is a person's sign-in flow, behind the
+                // rate limits and bot protection meant for public traffic; the
+                // server's own account work is `rebase.admin`, which answers here.
+                consequence: "rebase.auth has nothing to call in this process",
+                remedy: `For account administration from server code use rebase.admin, which works here. ${elsewhere}`
+            });
+        }
+        if (!surfaces.admin) {
+            off.push({
+                path: "admin", surface: "admin", roles: "REBASE_ROLE=worker and REBASE_ROLE=functions",
+                consequence: adapterAdminRouter || cronSurface
+                    ? "this process carries only the user and role administration (rebase.admin) and the cron controls (rebase.cron) in-process, and this is neither"
+                    : "rebase.admin and rebase.cron have nothing to call in this process",
+                remedy: elsewhere
+            });
+        }
+        for (const { path, surface, consequence, roles, remedy } of off) {
             app.all(`${IN_PROCESS_BASE_PATH}/${path}/*`, (c) => errorHandler(new ApiError(
                 404,
                 "NOT_FOUND",
                 `No route for ${c.req.method} ${c.req.path} on this backend: its ${surface} surface is off ` +
-                `(${roles} turn it off), so ${accessor} has nothing to call in this process. ` +
-                "Call it over HTTP on a process that serves it, or run this code on one.",
+                `(${roles} turn it off), so ${consequence}. ${remedy}`,
                 undefined,
                 true
             ), c));

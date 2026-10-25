@@ -103,7 +103,9 @@ docker compose up --scale functions=3
 
 Both processes need the same `DATABASE_URL`, the same `JWT_SECRET` and the same
 `REBASE_SERVICE_KEY` — they are one deployment, and a token minted by one has to
-be accepted by the other.
+be accepted by the other. A process with `REBASE_FUNCTIONS_UPSTREAM` and no
+`REBASE_SERVICE_KEY` refuses to boot: its own `rebase.functions.invoke(...)`
+calls, from a hook or a cron job, reach the functions process with that key.
 
 ## Keeping the URLs the same
 

@@ -41,6 +41,8 @@ jest.mock("../src/utils/dynamic-import", () => ({
 
 const FUNCTIONS_DIR = path.join(__dirname, "fixtures", "functions-proxy");
 const JWT_SECRET = "functions-proxy-test-secret-1234567890";
+/** One deployment, one key: what the api process presents for its own calls, and what the functions process admits. */
+const SERVICE_KEY = "functions-proxy-service-key-0123456789abcdef";
 
 function collection(slug: string): CollectionConfig {
     return {
@@ -77,17 +79,21 @@ const bootstrapper: BackendBootstrapper = {
     }
 } as unknown as BackendBootstrapper;
 
-async function buildBackend(over: Record<string, unknown>): Promise<Hono> {
+async function buildBackendInstance(over: Record<string, unknown>): Promise<{ app: Hono; backend: Awaited<ReturnType<typeof initializeRebaseBackend>> }> {
     const app = new Hono();
-    await initializeRebaseBackend({
+    const backend = await initializeRebaseBackend({
         app: app as never,
         server: {} as never,
         collections: [collection("jobs")],
         bootstrappers: [bootstrapper],
-        auth: { jwtSecret: JWT_SECRET },
+        auth: { jwtSecret: JWT_SECRET, serviceKey: SERVICE_KEY },
         ...over
     } as never);
-    return app;
+    return { app, backend };
+}
+
+async function buildBackend(over: Record<string, unknown>): Promise<Hono> {
+    return (await buildBackendInstance(over)).app;
 }
 
 /**
@@ -107,6 +113,7 @@ function listen(app: Hono): Promise<{ url: string; server: ReturnType<typeof ser
 
 let upstream: Awaited<ReturnType<typeof listen>>;
 let apiServer: Awaited<ReturnType<typeof listen>>;
+let apiBackend: Awaited<ReturnType<typeof initializeRebaseBackend>>;
 /** Call the api process over a real socket, so the proxy has an address to see. */
 const callApi = (pathname: string, init?: RequestInit) => fetch(`${apiServer.url}${pathname}`, init);
 
@@ -121,10 +128,12 @@ beforeAll(async () => {
     // The api process: everything but functions, which it forwards. On a real
     // port too — `app.request()` has no socket, so `getConnInfo` cannot report a
     // client address and the X-Forwarded-For behaviour would go untested.
-    apiServer = await listen(await buildBackend({
+    const api = await buildBackendInstance({
         surfaces: { functions: false },
         functionsUpstream: upstream.url
-    }));
+    });
+    apiBackend = api.backend;
+    apiServer = await listen(api.app);
 });
 
 afterAll(async () => {
@@ -248,6 +257,27 @@ describe("the api role forwarding /api/functions", () => {
         expect(body.error.code).toBe("FUNCTIONS_UPSTREAM_UNREACHABLE");
         expect(body.error.requestId).toBe(res.headers.get("x-request-id"));
         expect(body.error.requestId).toBeTruthy();
+    });
+
+    it("reaches the function as the service with this process's own rebase.functions", async () => {
+        // A hook's or a cron job's `rebase.functions.invoke(...)` on the api
+        // (or worker) process goes through the forwarder carrying the
+        // deployment's service key, which the functions process admits.
+        const seen = await apiBackend.rebase.functions.invoke("echo", undefined, { method: "GET", path: "whoami" });
+        expect(seen).toEqual({ uid: "service", roles: ["admin"] });
+    });
+
+    it("refuses to boot a forwarder without REBASE_SERVICE_KEY", async () => {
+        // Without one, each process mints its own per-boot key. The forwarder
+        // carried the api's to a functions process that had never heard of
+        // it, so every `rebase.functions.invoke(...)` from a hook or a cron
+        // job answered 401 "Invalid or expired token" — a deployment that
+        // booted green and could not call its own functions.
+        await expect(buildBackend({
+            auth: { jwtSecret: JWT_SECRET },
+            surfaces: { functions: false },
+            functionsUpstream: upstream.url
+        })).rejects.toThrow(/REBASE_SERVICE_KEY/);
     });
 
     it("serves the functions itself, and does not forward, when the surface is on", async () => {
