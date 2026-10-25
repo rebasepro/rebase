@@ -512,7 +512,7 @@ function MergeDialog({ open, diff, onClose, merge }: {
     return (
         <Dialog open={open} onOpenChange={(next) => { if (!next && !merging) onClose(); }}>
             <DialogTitle>{t("studio_branch_diff_merge_title", { branch: diff.branch, target })}</DialogTitle>
-            <DialogContent className="space-y-4 min-w-[420px] max-w-[560px]">
+            <DialogContent className="space-y-4 sm:min-w-[420px] max-w-[560px]">
                 <Typography variant="body2">
                     {t("studio_branch_diff_merge_writes", { inserted: sum("inserted"), updated: sum("updated"), deleted: sum("deleted"), target })}
                 </Typography>
