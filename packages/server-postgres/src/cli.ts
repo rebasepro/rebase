@@ -53,7 +53,7 @@ import {
 } from "./cli-errors";
 import { forAtlas, redactConnectionPasswords } from "./utils/connection-string";
 import { dropLegacyAuthSchema, RLS_BOOTSTRAP_SQL } from "./schema/rls-bootstrap-sql";
-import { detectDestructiveStatements, decidePushSafety, destructiveOptInFlag, extractPlanStatements, type DestructiveStatement, type ExistingColumnType } from "./schema/destructive-sql";
+import { detectDestructiveStatements, decidePushSafety, destructiveOptInFlag, extractPlanStatements, warnIfYesApprovedDestructive, type DestructiveStatement, type ExistingColumnType } from "./schema/destructive-sql";
 import type { LegacyRename } from "./schema/push-legacy-renames";
 import {
     parseColumnMutations,
@@ -851,6 +851,7 @@ async function dbCommand(subcommand: string, rawArgs: string[]): Promise<void> {
                     for (const line of destructiveLines(destructive)) outWarn(line);
                     outWarn("");
                     outWarn(chalk.yellow("  Applying them needs `rebase db push --allow-destructive`. Back up first: rebase db backup"));
+                    outWarn(chalk.gray("  (`--yes` still approves them in this release, with a deprecation warning; from the next it will not.)"));
                     outWarn("");
                 }
                 out(chalk.gray("  The auth schema step was skipped, because it writes. A real push runs it first."));
@@ -898,6 +899,7 @@ async function dbCommand(subcommand: string, rawArgs: string[]): Promise<void> {
                 } else {
                     // decision === "apply" via --allow-destructive or --yes
                     outWarn(chalk.yellow(`  Proceeding because ${optIn ?? "--allow-destructive"} was passed.`));
+                    warnIfYesApprovedDestructive(optIn, destructive.length);
                 }
             }
 

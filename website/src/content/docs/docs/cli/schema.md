@@ -176,7 +176,9 @@ rebase db push
   before the drop of a CHECK or EXCLUDE constraint the database holds: no row
   is lost, but from then on the database accepts the rows it refused.
   It asks on a terminal, where Ctrl-C or Ctrl-D answers no, and refuses
-  otherwise; `--allow-destructive` (or `--yes`) applies it anyway. A push that
+  otherwise; `--allow-destructive` applies it anyway. `--yes` still does too in
+  this release, with a deprecation warning; from the next release it approves
+  only pushes that destroy nothing. A push that
   stops there drops its scratch `<db>_dev_diff` database on the way out
 - Switches row-level security on for every collection table, junctions included, right after the
   schema change and before any step that can fail, so a push that stops part-way leaves a new table

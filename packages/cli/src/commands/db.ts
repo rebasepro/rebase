@@ -1709,6 +1709,8 @@ const DB_ACTION_HELP: Record<string, { usage: string; summary: string; notes?: s
         notes: [
             "--dry-run prints the SQL and applies nothing. Read it before you approve it.",
             "A change that drops data, or re-keys a table (every row gets a new id), needs --allow-destructive.",
+            "--yes approves non-destructive pushes. It still approves destructive ones too in this release, with a "
+                + "deprecation warning; from the next release it will not — pass --allow-destructive for those.",
             `--collections <dir>: ${COLLECTIONS_FLAG_HELP}.`,
             DATABASE_FLAGS_HELP
         ]
