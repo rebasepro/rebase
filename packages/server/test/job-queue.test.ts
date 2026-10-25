@@ -1,5 +1,8 @@
 import { afterEach, describe, expect, it, jest } from "@jest/globals";
-import { createJobQueue, defaultBackoff, PermanentJobError } from "../src/jobs";
+import { createJobQueue, defaultBackoff } from "../src/jobs";
+// From the package root, the way a job handler reaches it: a handler that
+// cannot name the class cannot dead-letter a job on the spot.
+import { PermanentJobError } from "../src/index";
 import type { JobRecord } from "../src/jobs";
 import type { JobStore } from "../src/jobs";
 import { logger } from "../src/utils/logger";
