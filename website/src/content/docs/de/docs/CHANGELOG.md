@@ -364,6 +364,13 @@ Die Übersetzung steht noch aus. Der Inhalt unten ist auf Englisch.
   `check:chart` now runs every rendered unit's env through the runtime's own
   role rules, and fails on a refusal, or on a schema that no unit or two units
   would create.
+- **The Helm chart refuses `REBASE_PROVISION_ONLY` in `config.env`.** The
+  variable makes a process provision and exit 0 instead of serving, and
+  `config.env` reaches every unit. Each Deployment's pods would provision,
+  exit and be restarted, and the rollout would never become ready. It is now
+  one of `@rebasepro/server`'s `TOPOLOGY_ENV_VARS`, the variables the deployer
+  decides and the project's own environment may not. The chart's migration Job
+  still sets it in its own `env`.
 - **The request role no longer gets write access to `rebase.schema_meta` on
   first boot.** On a backend without auth, the collection schema stamp created
   that table after boot's last sweep of the request role's grants. So
