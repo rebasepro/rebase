@@ -63,12 +63,6 @@ function walk(dir, opts = {}, out = []) {
         if (statSync(f).isDirectory()) {
             if (["node_modules", "dist", "__mocks__"].includes(e)) continue;
             if (!opts.includeTests && e === "__tests__") continue;
-            // `packages/types/__tests__/bivariance/` holds probes that are meant
-            // to fail to compile — they are excluded from `tsconfig.tests.json`
-            // for the same reason. They are assertions about the type system,
-            // not code anything installs, so their imports are not declarations
-            // this package owes anyone.
-            if (e === "bivariance") continue;
             walk(f, opts, out);
         } else if (/\.(ts|tsx|mts|cts|js|mjs|jsx)$/.test(e)
             && !/\.d\./.test(e)

@@ -3,7 +3,8 @@ import {
     resolveAdminCollection,
     toAdminCollectionConfig,
     type AdditionalFieldKey,
-    type AdminCollection
+    type AdminCollection,
+    type AdminCollectionOptions
 } from "../src/admin_collection";
 // The builder is its own module: a collection file is loaded by the backend
 // too, so it must be reachable without React. See `define_collection.ts`.
@@ -687,5 +688,32 @@ describe("a relation is checked against the member its `kind` selects", () => {
                 }
             }
         });
+    });
+});
+
+/**
+ * A typed collection's admin block has to stay usable as a generic one: every
+ * consumer that takes a collection it did not author depends on
+ * `AdminCollectionOptions<M>` being assignable to `AdminCollectionOptions`, and
+ * so do `defineCollection`'s overloads. A callback written as an arrow property
+ * (`resolve: (params: …<M>) => …`) takes `M` in parameter position and makes the
+ * whole block invariant in `M`; method syntax is bivariant under
+ * `strictFunctionTypes`. See `EntityDisplayResolver` in `types/entity_display.ts`.
+ *
+ * The assignment below is the assertion, and tsc is what runs it: this file is
+ * in `tsconfig.tests.json`, so it fails `pnpm typecheck` the day a resolver is
+ * written the other way.
+ */
+describe("a typed collection's admin block is usable as a generic one", () => {
+    it("assigns AdminCollectionOptions<M>, display resolvers included, to AdminCollectionOptions", () => {
+        type Post = { id: string; title: string; published: boolean };
+        const typed: AdminCollectionOptions<Post> = {
+            display: {
+                title: ({ entity }) => entity.values.title,
+                subtitle: "title"
+            }
+        };
+        const generic: AdminCollectionOptions = typed;
+        expect(generic).toBe(typed);
     });
 });

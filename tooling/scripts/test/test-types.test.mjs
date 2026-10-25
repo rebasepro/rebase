@@ -33,11 +33,10 @@ test("a grown count is grown, a shrunk one shrunk, a package that reached zero i
     assert.deepEqual(shrunk, [{ pkg: "client", was: 4, now: 0 }]);
 });
 
-test("the program reads every package's tests and leaves the bivariance probes out", () => {
+test("the program reads every package's tests", () => {
     const config = programConfig(ROOT);
     assert.equal(config.extends, path.join(ROOT, "tsconfig.tests.json"));
     for (const glob of ["packages/*/test", "packages/*/src/**/*.test.ts", "packages/*/src/**/*.test.tsx"]) {
         assert.ok(config.include.includes(path.join(ROOT, glob)), glob);
     }
-    assert.ok(config.exclude.includes(path.join(ROOT, "packages/types/__tests__")));
 });
