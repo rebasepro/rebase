@@ -572,6 +572,70 @@ find: async () => ({ data: rows }) }));
     });
 
     /**
+     * Without an id, the newest rollbackable deploy is skipped only when the
+     * newest deploy is it. A static app deployed on its own succeeds without
+     * recording a bundle, so it was not "it": the auto-target became the
+     * backend deploy that is live right now, and the CLI announced a rollback
+     * that changed nothing. Likewise the fallback when nothing older qualifies
+     * named the live deploy itself, and a previous deploy of the same image
+     * re-deploys what is running.
+     */
+    describe("never auto-targets what is already live", () => {
+        /** Run `rollback` with no id against the client in use, and return its refusal. */
+        async function refusal(): Promise<{ code: string; message: string }> {
+            const cap = captureStdout();
+            const exit = vi.spyOn(process, "exit").mockImplementation(((): never => {
+                throw new Error("__exit__");
+            }) as never);
+            await expect(rollbackCommand(["node", "rebase", "cloud", "rollback", "--yes", "--json"])).rejects.toThrow("__exit__");
+            cap.restore();
+            exit.mockRestore();
+            return JSON.parse(cap.output().trim()).error;
+        }
+
+        it("refuses after a static app deployed on its own, rather than re-deploying the live backend", async () => {
+            const invoke = vi.fn(async () => ({}));
+            useClient(fakeClient({ invoke, find: async () => ({ data: [
+                { id: "d3", status: "success", app: "web", createdAt: "2026-01-03T00:00:00Z" },
+                { id: "d2", status: "success", imageUrl: "img:2", createdAt: "2026-01-02T00:00:00Z" },
+                { id: "d1", status: "success", imageUrl: "img:1", createdAt: "2026-01-01T00:00:00Z" }
+            ] }) }));
+            const error = await refusal();
+            expect(invoke).not.toHaveBeenCalled();
+            expect(error.code).toBe("deploy_not_rollbackable");
+            expect(error.message).toMatch(/d3/);
+            expect(error.message).toMatch(/static/i);
+        });
+
+        it("refuses when the live deploy is the only one that qualifies", async () => {
+            const invoke = vi.fn(async () => ({}));
+            useClient(fakeClient({ invoke, find: async () => ({ data: [
+                { id: "d2", status: "success", imageUrl: "img:2", createdAt: "2026-01-02T00:00:00Z" },
+                { id: "d1", status: "failed", imageUrl: "img:1", createdAt: "2026-01-01T00:00:00Z" }
+            ] }) }));
+            const error = await refusal();
+            expect(invoke).not.toHaveBeenCalled();
+            expect(error.code).toBe("deploy_not_rollbackable");
+            expect(error.message).toMatch(/d2/);
+        });
+
+        it("skips an earlier deploy of the image that is live", async () => {
+            const invoke = vi.fn(async (_n: string, body: unknown) => ({
+                success: true, deployment: { id: "d5" }, rolledBackTo: (body as { deploymentId?: string }).deploymentId, imageUrl: "img:1"
+            }));
+            useClient(fakeClient({ invoke, find: async () => ({ data: [
+                { id: "d3", status: "success", imageUrl: "img:2", createdAt: "2026-01-03T00:00:00Z" },
+                { id: "d2", status: "success", imageUrl: "img:2", createdAt: "2026-01-02T00:00:00Z" },
+                { id: "d1", status: "success", imageUrl: "img:1", createdAt: "2026-01-01T00:00:00Z" }
+            ] }) }));
+            const cap = captureStdout();
+            await rollbackCommand(["node", "rebase", "cloud", "rollback", "--yes", "--json"]);
+            cap.restore();
+            expect((invoke.mock.calls[0][1] as { deploymentId: string }).deploymentId).toBe("d1");
+        });
+    });
+
+    /**
      * The history page is the newest 100 deploys, and an id named outright was
      * looked up only there: on a project with more, `rollback <older id>` said
      * "not found" for a deployment the control plane would have rolled back to.

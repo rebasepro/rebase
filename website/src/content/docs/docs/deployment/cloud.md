@@ -307,7 +307,8 @@ A static app deployed on its own (`rebase cloud deploy <app>`) cannot be rolled
 back yet. Its deployment records which app it published, but no bundle, so the
 control plane has nothing to restore it from. The fix is to deploy the last good
 version again, for example from the commit before the bad one. After such a
-deploy, `deploy` says this instead of pointing at `rollback`.
+deploy, `deploy` says this instead of pointing at `rollback`, and `rollback`
+without an id refuses rather than re-deploying the backend that is serving.
 
 So a rollback needs a deployment that recorded one of the two, which means a
 project that has deployed successfully at least twice. `rebase cloud deployments`

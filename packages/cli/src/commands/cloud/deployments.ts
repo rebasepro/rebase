@@ -92,6 +92,12 @@ export function isRollbackable(dep: DeploymentRow): boolean {
     return dep.status === "success" && (deploymentImage(dep) !== null || deploymentBundle(dep) !== null);
 }
 
+/** The image or bundle a deploy shipped, as one comparable value. */
+function artefactOf(dep: DeploymentRow): string {
+    const image = deploymentImage(dep);
+    return image !== null ? `image:${image}` : `bundle:${deploymentBundle(dep) ?? ""}`;
+}
+
 /** What a rollback needs, said the way a refusal should say it. */
 const ROLLBACKABLE_RULE = "needs a successful deploy that recorded an image or a bundle";
 
@@ -427,10 +433,35 @@ export async function rollbackCommand(rawArgs: string[]): Promise<void> {
                 "deploy_not_rollbackable"
             );
         }
-        // Prefer the previous good image when the newest deploy is itself good
-        // (rolling back to the live image is a no-op); otherwise the most recent
-        // good one.
-        target = rollbackable.find((d) => String(d.id) !== String(rows![0].id)) ?? rollbackable[0];
+        const newest = rows![0];
+        // A static app deployed on its own succeeded and recorded no bundle:
+        // the backend serving now is the newest rollbackable deploy, and
+        // re-deploying it changes nothing. What changed cannot be rolled back.
+        if (newest.status === "success" && !isRollbackable(newest)) {
+            fail(
+                `The newest deployment, ${newest.id}, published a static app on its own, which cannot be rolled back yet; ` +
+                `the backend deployment ${rollbackable[0].id} is the one serving now.`,
+                "Deploy the last good version of the app again, or name the deployment to roll back to: `rebase cloud rollback <id>`.",
+                "deploy_not_rollbackable"
+            );
+        }
+        // Prefer the previous good artefact when the newest deploy is itself
+        // good — rolling back to what is live, or to an earlier deploy of the
+        // same image or bundle, is a no-op; otherwise (the newest failed) the
+        // most recent good one.
+        if (String(rollbackable[0].id) === String(newest.id)) {
+            const live = artefactOf(newest);
+            target = rollbackable.find((d) => artefactOf(d) !== live);
+            if (!target) {
+                fail(
+                    `Deployment ${newest.id} is live, and no earlier deployment shipped something else to roll back to.`,
+                    "A rollback needs a project that has deployed successfully at least twice. List history with `rebase cloud deployments list`.",
+                    "deploy_not_rollbackable"
+                );
+            }
+        } else {
+            target = rollbackable[0];
+        }
     }
 
     await confirmDestructive({
