@@ -24,6 +24,7 @@ const PG_DUPLICATE_DATABASE = "42P04";
 
 /** `object_in_use` — the database still has connections attached. */
 const PG_OBJECT_IN_USE = "55006";
+const PG_UNDEFINED_TABLE = "42P01";
 
 /** How many times `--force` disconnects the other sessions before it reports one still there. */
 const FORCE_ATTEMPTS = 3;
@@ -194,6 +195,19 @@ function describeBranchDdlError(err: unknown, fallbackContext: string): Error {
     const detail = pgError?.message ?? extractCauseMessage(err);
     if (detail) return new Error(detail);
     return err instanceof Error ? err : new Error(String(err));
+}
+
+/**
+ * The registry is not there: a server with `REBASE_PROVISION=false` never
+ * creates it. Said by name rather than as Postgres's "relation does not exist".
+ */
+function missingRegistryError(err: unknown): Error | undefined {
+    if (extractPgError(err)?.code !== PG_UNDEFINED_TABLE) return undefined;
+    return new Error(
+        "Branching needs the rebase.branches registry, and this database has none. A server with " +
+        "REBASE_PROVISION=false does not create it: boot once with provisioning on, or create it with " +
+        "`rebase db branch create` from the CLI, which makes it."
+    );
 }
 
 /** Fully-qualified metadata table in the rebase schema. */
@@ -396,7 +410,9 @@ export class BranchService {
         // Check if branch already exists
         const existing = await (await this.home.registry()).execute(
             sql`SELECT name FROM rebase.branches WHERE name = ${name} OR db_name = ${dbName}`
-        );
+        ).catch((err: unknown) => {
+            throw missingRegistryError(err) ?? err;
+        });
         if ((existing.rows as unknown[]).length > 0) {
             throw new Error(`Branch "${name}" already exists.`);
         }

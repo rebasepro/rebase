@@ -228,6 +228,16 @@ describe("BranchService", () => {
             ]);
         });
 
+        it("names the missing registry instead of a raw 'relation does not exist'", async () => {
+            // With REBASE_PROVISION=false the server never creates
+            // rebase.branches, and the first statement that reads it failed
+            // with Postgres's own words.
+            db.execute.mockRejectedValueOnce(
+                Object.assign(new Error('relation "rebase.branches" does not exist'), { code: "42P01" }) as never
+            );
+            await expect(service.createBranch("staging")).rejects.toThrow(/rebase\.branches.*REBASE_PROVISION/s);
+        });
+
         it("refuses a name it cannot represent rather than quietly changing it", async () => {
             await expect(service.createBranch("my-feature/branch!@#")).rejects.toThrow(
                 /only letters, digits, underscores, and hyphens/
