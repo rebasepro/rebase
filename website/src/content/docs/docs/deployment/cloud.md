@@ -468,6 +468,7 @@ except one that restarts the database, which waits for a maintenance window.
 | `cron` | The deployed app's cron jobs and their recorded runs, read with your `rebase cloud` login. Read-only |
 | `env` | Environment variables. `list` never prints values; `--secret` is write-only |
 | `app-key` | The key `init --claim` wrote into `.env` as `REBASE_API_TOKEN`, handed over at the claim; `rotate` replaces it and revokes the old one. Owners and admins |
+| `service-key` | `REBASE_SERVICE_KEY`, admin on the app's own API: when it was last rotated; `rotate` gives the app a new one. Owners and admins |
 | `domains` | Custom domains, the DNS records to add, and verification. A project can answer on several, each verified on its own; `verify` and `remove` take the domain to act on, which may be left out only when there is one (for `verify`, one still pending). `list --json` returns `{ projectId, tenantHost, domains: [...] }` |
 | `db` | Attach or create a database, connect to it from your machine, backups, restore, and point-in-time recovery |
 | `extensions` | The Postgres extension allowlist |
@@ -523,6 +524,16 @@ Stated plainly, because finding out later is worse:
   `rebase cloud db info --reveal`, both need the organization's owner or admin
   role: the same one Studio's SQL editor asks for, because all three end at a
   session on your production data.
+- **Deploying is running code with the production secrets.** The app's
+  environment holds `REBASE_SERVICE_KEY` (admin on its own API),
+  `DATABASE_URL` and `JWT_SECRET`, so code a member deploys can read them,
+  even though only owners and admins can reveal them in the console. Invite
+  as a member only someone you would trust with those values.
+- **The service key can be replaced.** <span class="since-badge" data-since="0.26">Since 0.26</span> The project's **Settings**
+  (or `rebase cloud service-key rotate`) issue a new `REBASE_SERVICE_KEY`
+  and restart the app onto it. The old key works until the restart has
+  finished, and nothing after, so anything that copied it is refused from
+  then on. Claiming a project does the same.
 
 ## Self-hosting instead
 

@@ -170,6 +170,7 @@ rebase cloud domains list | add <domain> | verify [domain] | remove <domain>
 rebase cloud extensions list | enable | disable
 rebase cloud settings show | set        # name, branch, repo, subdomain, rebuilds
 rebase cloud app-key [rotate]           # the app key init --claim wrote; owners and admins
+rebase cloud service-key [rotate]       # REBASE_SERVICE_KEY; owners and admins
 ```
 
 <span class="since-badge" data-since="0.26">Since 0.26</span> `app-key` lists the
@@ -180,6 +181,15 @@ revokes every earlier agent key at once. It writes the new key into a `.env`
 that already sets `REBASE_API_TOKEN`, and keeps it out of `--json` there. In
 any other directory it prints the key once. Keys made in the app's admin panel
 are not touched. It runs with your login: no token capability grants it.
+
+<span class="since-badge" data-since="0.26">Since 0.26</span> `service-key`
+prints the generation of the project's `REBASE_SERVICE_KEY`, when it was last
+rotated, and whether the app is still restarting onto the newest one. It never
+prints the key: that is `env reveal REBASE_SERVICE_KEY`. `service-key rotate`
+issues a new key and restarts the app onto it. The old key works until the
+restart has finished, and nothing after. It is refused while a deploy is
+running, and it runs with your login. Claiming a project rotates its service
+key too.
 
 A backend preview starts from production's variables, live keys included.
 `env set KEY=VALUE --preview` gives previews their own value, `env unset KEY

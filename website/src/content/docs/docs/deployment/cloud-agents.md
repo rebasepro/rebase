@@ -174,6 +174,12 @@ or shows it once. Owners and admins rotate it, signed in. A key that could not
 be handed over keeps its expiry, which happens when the app was not deployed or
 not answering at the claim. Rotating replaces it with one that does not expire.
 
+Claiming also replaces the project's `REBASE_SERVICE_KEY`, which is admin on
+the app's own API and which the agent's deployed code could read. The app
+restarts once onto a new key, and whatever the agent kept stops working when
+that restart has finished. If a deploy is running at the moment of the claim,
+the next deploy carries the new key.
+
 Claiming takes a signed-in browser session, not a token, and a payment method on
 the organization the project moves into. From the claim onwards the project is
 billed like any other. Claiming also revokes the agent's token: sign in with

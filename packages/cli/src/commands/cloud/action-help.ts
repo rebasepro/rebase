@@ -762,6 +762,27 @@ export const ACTION_HELP: Record<string, ActionHelp> = {
             "It runs with your login: no access-token capability grants it, so REBASE_TOKEN is refused."
         ]
     },
+    "service-key": {
+        command: "cloud service-key",
+        usage: "cloud service-key [rotate]",
+        summary:
+            "The project's REBASE_SERVICE_KEY, admin on the app's own API. Without an action, prints its generation, "
+            + "when it was last rotated and whether the app is still restarting onto the newest one (never the key: "
+            + "that is `rebase cloud env reveal REBASE_SERVICE_KEY`). `rotate` issues a new key and restarts the app "
+            + "onto it; the old key works until the restart has finished and nothing after. Refused while a deploy is "
+            + "running. Owners and admins, signed in.",
+        flags: [],
+        examples: [
+            "rebase cloud service-key",
+            "rebase cloud service-key rotate",
+            "rebase cloud service-key rotate --yes --json"
+        ],
+        notes: [
+            "Anything that copied the old key (a script, a CI job) is refused once the restart has finished.",
+            "Claiming a project rotates its service key too.",
+            "It runs with your login: no access-token capability grants it, so REBASE_TOKEN is refused."
+        ]
+    },
     usage: {
         command: "cloud usage",
         usage: "cloud usage [org] [--month YYYY-MM]",
