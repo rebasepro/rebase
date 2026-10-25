@@ -89,6 +89,13 @@ async function authed(user: User) {
     return base.withAuth(user);
 }
 
+/** The id a save answered with, as the delete takes it. */
+function rowId(row: Record<string, unknown>): string | number {
+    const id = row.id;
+    if (typeof id !== "string" && typeof id !== "number") throw new Error("the save answered without an id");
+    return id;
+}
+
 beforeEach(async () => {
     seen = {};
     db = new PGlite();
@@ -105,7 +112,7 @@ describe("context.credential in collection callbacks", () => {
         const driver = await authed(person(CI_KEY));
 
         const saved = await driver.save({ path: "notes", values: { title: "from CI" }, status: "new" });
-        await driver.delete({ row: { path: "notes", id: saved.id } });
+        await driver.delete({ row: { path: "notes", id: rowId(saved) } });
 
         expect(seen).toEqual({
             beforeSave: CI_KEY,
@@ -119,7 +126,7 @@ describe("context.credential in collection callbacks", () => {
         const driver = await authed(person());
 
         const saved = await driver.save({ path: "notes", values: { title: "by hand" }, status: "new" });
-        await driver.delete({ row: { path: "notes", id: saved.id } });
+        await driver.delete({ row: { path: "notes", id: rowId(saved) } });
 
         expect(seen).toEqual({
             beforeSave: "absent",

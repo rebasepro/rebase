@@ -325,14 +325,25 @@ describe("POST /auth/<provider> — auto-linking onto an existing account", () =
         // on it, and it has to go before the victim's is linked.
         const app = createApp();
         repo.getUserByEmail.mockResolvedValue(mockUser({ id: "oauth-user", passwordHash: null, emailVerified: false }));
-        repo.getUserIdentities.mockResolvedValue([{ provider: "spotify", providerId: "attacker", profileData: { email: "user@example.com", emailVerified: false } }]);
+        const planted = new Date("2026-01-01T00:00:00Z");
+        repo.getUserIdentities.mockResolvedValue([{
+            id: "identity-1",
+            uid: "oauth-user",
+            provider: "spotify",
+            providerId: "attacker",
+            profileData: { email: "user@example.com", emailVerified: false },
+            createdAt: planted,
+            updatedAt: planted
+        }]);
 
         const res = await signIn(app);
 
         expect(res.status).toBe(200);
         expect(repo.unlinkUserIdentity).toHaveBeenCalledWith("oauth-user", "spotify", "attacker");
         expect(repo.setEmailVerified).toHaveBeenCalledWith("oauth-user", true);
-        expect(repo.unlinkUserIdentity.mock.invocationCallOrder[0]).toBeLessThan(repo.linkUserIdentity.mock.invocationCallOrder[0]);
+        const unlink = repo.unlinkUserIdentity;
+        if (!unlink) throw new Error("the repository under test implements unlinkUserIdentity");
+        expect(jest.mocked(unlink).mock.invocationCallOrder[0]).toBeLessThan(repo.linkUserIdentity.mock.invocationCallOrder[0]);
     });
 
     it("leaves an already verified account's password and sessions alone", async () => {

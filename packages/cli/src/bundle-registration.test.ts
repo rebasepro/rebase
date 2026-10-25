@@ -61,7 +61,7 @@ const TYPED_PROBE =
     "export const body: Body = \"typed\";\n";
 
 const build = (app: { type: "backend"; registerDatabase?: boolean }) =>
-    buildBundle({ projectRoot: scratch, appName: "backend", app, runtimeRange: "^1" });
+    buildBundle({ projectRoot: scratch, appName: "backend", app: { runtime: "managed", ...app }, runtimeRange: "^1" });
 
 describe("the bundle builder and the Database registration", () => {
     it("writes it from the collections before compiling, when registerDatabase is set", async () => {
