@@ -62,6 +62,18 @@ const authors: AdminCollection = {
     }
 } as AdminCollection;
 
+const comments: AdminCollection = {
+    slug: "comments",
+    name: "Comments",
+    table: "comments",
+    properties: {
+        id: { type: "string", name: "Id", isId: true },
+        body: { type: "string", name: "Body" }
+    }
+} as AdminCollection;
+
+const postsWithComments: AdminCollection = { ...posts, childCollections: () => [comments] } as AdminCollection;
+
 type Row = Record<string, unknown>;
 let rows: Record<string, Row[]>;
 const saves: { path: string, id?: unknown, values: Row }[] = [];
@@ -221,6 +233,21 @@ describe("one record's form in a page of the host app", () => {
         expect(saves[0]).toEqual(expect.objectContaining({ path: "posts", id: "p2" }));
         expect(rows.posts.find(r => r.id === "p1")).toEqual(expect.objectContaining({ title: "Hello world" }));
         expect(rows.posts.find(r => r.id === "p2")).toEqual(expect.objectContaining({ title: "Second post, edited" }));
+    });
+
+    it("loads a subcollection's record by its full path, under a scope that holds its parent", async () => {
+        // The documented `path` of a subcollection record. The panel compared
+        // the scope's top-level slugs to the whole path, mounted a scope of
+        // its own holding only `comments`, and said "Entity not found".
+        rows["posts/p1/comments"] = [{ id: "c1", body: "Nice post" }];
+        render(
+            <Page>
+                <CollectionsProvider collections={[postsWithComments]}>
+                    <EntityFormPanel collection={comments} path={"posts/p1/comments"} entityId={"c1"}/>
+                </CollectionsProvider>
+            </Page>
+        );
+        expect(await screen.findByDisplayValue("Nice post")).toBeTruthy();
     });
 
     it("creates a record when given no id", async () => {
