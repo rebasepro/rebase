@@ -107,7 +107,11 @@ function oracleMatches(expression: string, instantMs: number, zone?: string): bo
         expandedFields.set(expression, fields);
     }
     const checked = fields;
-    return oracleWall(instantMs, zone).every((value, i) => checked[i].has(value));
+    const [minute, hour, dom, month, dow] = oracleWall(instantMs, zone).map((value, i) => checked[i].has(value));
+    // Standard cron: with both day fields restricted, either day will do.
+    const [, , domField, , dowField] = expression.split(" ");
+    const day = !domField.startsWith("*") && !dowField.startsWith("*") ? dom || dow : dom && dow;
+    return minute && hour && month && day;
 }
 
 function oracleNext(expression: string, after: Date, zone?: string): string {

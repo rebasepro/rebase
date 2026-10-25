@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, jest } from "@jest/globals";
-import { CronScheduler, validateCronExpression, findMostRecentSlot } from "./cron-scheduler";
+import { CronScheduler, validateCronExpression, findMostRecentSlot, parseCronExpression } from "./cron-scheduler";
 import { createCronStore } from "./cron-store";
 import type { CronJobPersistedState, CronJobRunSummary, CronRunLease, CronStore } from "./cron-store";
 import type { CronJobDefinition, CronJobLogEntry, DataDriver } from "@rebasepro/types";
@@ -155,6 +155,39 @@ describe("CronScheduler", () => {
 
         it("rejects non-numeric garbage", () => {
             expect(validateCronExpression("abc * * * *").valid).toBe(false);
+        });
+
+        it.each([
+            "5abc * * * *", "1-5x * * * *", "*/5x * * * *", "1.5 * * * *",
+            "0 9 1-5x * *", "1- * * * *", "-1 * * * *", "0-30/ * * * *", "5-1 * * * *"
+        ])("rejects a malformed token: %s", (expr) => {
+            // `parseInt` reads a leading number and drops the rest, so these
+            // used to pass as the number they start with.
+            expect(validateCronExpression(expr).valid).toBe(false);
+        });
+    });
+
+    // ── Day of month and day of week ─────────────────────────────────
+
+    describe("day of month and day of week together", () => {
+        // 2026-10-25 is a Sunday.
+        const SUNDAY = new Date("2026-10-25T12:00:00Z");
+        const next = (expr: string, after: Date = SUNDAY) => parseCronExpression(expr, after, "UTC").toISOString();
+
+        it("fires on either when both are restricted, as standard cron does", () => {
+            // Every 1st of the month and every Monday — not only a Monday the 1st.
+            expect(next("0 9 1 * 1")).toBe("2026-10-26T09:00:00.000Z");
+            expect(next("0 9 1 * 1", new Date("2026-10-27T00:00:00Z"))).toBe("2026-11-01T09:00:00.000Z");
+            expect(findMostRecentSlot("0 9 1 * 1", new Date("2026-10-19T00:00:00Z"), SUNDAY, "UTC")?.toISOString())
+                .toBe("2026-10-19T09:00:00.000Z");
+        });
+
+        it("needs both when either field starts with *", () => {
+            expect(next("0 9 * * 1")).toBe("2026-10-26T09:00:00.000Z");
+            expect(next("0 9 1 * *")).toBe("2026-11-01T09:00:00.000Z");
+            expect(next("0 9 1 * */7")).toBe("2026-11-01T09:00:00.000Z");
+            // `*/2` starts with `*`, so the days must be odd Mondays.
+            expect(next("0 9 */2 * 1")).toBe("2026-11-09T09:00:00.000Z");
         });
     });
 

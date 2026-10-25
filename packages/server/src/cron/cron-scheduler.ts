@@ -23,38 +23,55 @@ import { buildScaleToZeroWarning } from "./scale-to-zero.js";
  * Supports: `*`, `N`, `N-M`, `N/S`, `N-M/S`, `*\/S`, and comma-separated combinations.
  */
 function expandCronField(field: string, min: number, max: number): number[] {
+    // Whole tokens only. `parseInt` reads a leading number and drops the
+    // rest, so `5abc` used to pass as 5 and `*/5x` as every fifth.
+    const number = (token: string): number => {
+        if (!/^\d+$/.test(token)) {
+            throw new Error(`Invalid value "${token}" in cron field "${field}"`);
+        }
+        return Number(token);
+    };
+    const range = (token: string): [number, number] => {
+        const bounds = token.split("-");
+        if (bounds.length !== 2) {
+            throw new Error(`Invalid range "${token}" in cron field "${field}"`);
+        }
+        const [a, b] = bounds.map(number);
+        if (a > b) {
+            throw new Error(`Range "${token}" in cron field "${field}" runs backwards`);
+        }
+        return [a, b];
+    };
     const results = new Set<number>();
     for (const segment of field.split(",")) {
         const trimmed = segment.trim();
         if (trimmed === "*") {
             for (let i = min; i <= max; i++) results.add(i);
         } else if (trimmed.includes("/")) {
-            const [rangeStr, stepStr] = trimmed.split("/");
-            const step = parseInt(stepStr, 10);
-            if (isNaN(step) || step <= 0) {
+            const parts = trimmed.split("/");
+            if (parts.length !== 2) {
+                throw new Error(`Invalid step expression "${trimmed}" in cron field "${field}"`);
+            }
+            const [rangeStr, stepStr] = parts;
+            if (!/^\d+$/.test(stepStr) || Number(stepStr) <= 0) {
                 throw new Error(`Invalid step value "${stepStr}" in cron field "${field}"`);
             }
+            const step = Number(stepStr);
             let start = min;
             let end = max;
             if (rangeStr !== "*") {
                 if (rangeStr.includes("-")) {
-                    const [a, b] = rangeStr.split("-").map(Number);
-                    start = a;
-                    end = b;
+                    [start, end] = range(rangeStr);
                 } else {
-                    start = parseInt(rangeStr, 10);
+                    start = number(rangeStr);
                 }
             }
             for (let i = start; i <= end; i += step) results.add(i);
         } else if (trimmed.includes("-")) {
-            const [a, b] = trimmed.split("-").map(Number);
+            const [a, b] = range(trimmed);
             for (let i = a; i <= b; i++) results.add(i);
         } else {
-            const val = parseInt(trimmed, 10);
-            if (isNaN(val)) {
-                throw new Error(`Invalid value "${trimmed}" in cron field "${field}"`);
-            }
-            results.add(val);
+            results.add(number(trimmed));
         }
     }
     return [...results].sort((a, b) => a - b);
@@ -110,6 +127,14 @@ interface CronFields {
     doms: number[];
     months: number[];
     dows: number[];
+    /**
+     * Whether a day need only match one of day of month and day of week.
+     * Standard cron's rule: when both fields are restricted — neither starts
+     * with `*` — a day matching either one matches, so `0 9 1 * 1` fires on
+     * every 1st and every Monday. When either starts with `*` (`*\/2`
+     * included, as in Vixie cron), a day must match both.
+     */
+    eitherDay: boolean;
 }
 
 /** Expand all five fields of an expression. Throws on invalid expressions. */
@@ -124,7 +149,8 @@ function parseCronFields(expression: string): CronFields {
         hours: expandCronField(hourField, 0, 23),
         doms: expandCronField(domField, 1, 31),
         months: expandCronField(monField, 1, 12),
-        dows: expandCronField(dowField, 0, 6) // 0=Sunday
+        dows: expandCronField(dowField, 0, 6), // 0=Sunday
+        eitherDay: !domField.startsWith("*") && !dowField.startsWith("*")
     };
 }
 
@@ -215,9 +241,10 @@ function offsetAt(instantMs: number, wall: WallClock): number {
 
 /** Whether a wall-clock day — month, day of month, weekday — can hold a slot. */
 function dayMatches(wall: WallClock, fields: CronFields): boolean {
-    return fields.months.includes(wall.month)
-        && fields.doms.includes(wall.dom)
-        && fields.dows.includes(wall.dow);
+    if (!fields.months.includes(wall.month)) return false;
+    const dom = fields.doms.includes(wall.dom);
+    const dow = fields.dows.includes(wall.dow);
+    return fields.eitherDay ? dom || dow : dom && dow;
 }
 
 /** Whether a wall-clock minute matches every field of the expression. */
