@@ -8,7 +8,7 @@ import { useNavigationStateController } from "../hooks/navigation/contexts/Navig
 
 
 import { Link, useNavigate } from "react-router";
-import { AnalyticsEvent } from "@rebasepro/cms-types";
+import { AnalyticsEvent, studioSchemaToolEnabled } from "@rebasepro/cms-types";
 import {
     Avatar,
     ChevronsLeftIcon,
@@ -181,9 +181,9 @@ function AdminNavigationContent() {
         const slugs = new Set<string>();
         (registry.studioConfig?.devViews ?? []).forEach(v => slugs.add(v.slug));
         // The schema view is also a Studio dev view (auto-injected when collectionEditor is enabled)
-        if (registry.studioConfig && registry.cmsConfig?.collectionEditor) slugs.add("schema");
+        if (studioSchemaToolEnabled(registry)) slugs.add("schema");
         return slugs;
-    }, [registry.studioConfig, registry.cmsConfig?.collectionEditor]);
+    }, [registry]);
 
     // Studio mode shows Studio dev views + admin entries (Users/Roles).
     // Content mode shows collections, admin custom views, and admin entries — but not Studio dev views.

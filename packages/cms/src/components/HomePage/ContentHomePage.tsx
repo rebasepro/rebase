@@ -2,7 +2,7 @@ import type { HomePageSection, NavigationEntry, NavigationGroupMapping, PluginGe
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Fuse from "fuse.js";
 import { Container, SearchBar } from "@rebasepro/ui";
-import { AnalyticsEvent } from "@rebasepro/cms-types";
+import { AnalyticsEvent, studioSchemaToolEnabled } from "@rebasepro/cms-types";
 import { FavouritesView } from "./FavouritesView";
 import { ErrorBoundary } from "@rebasepro/ui";
 import { NavigationGroup } from "./NavigationGroup";
@@ -71,9 +71,9 @@ export function ContentHomePage({
     const studioViewSlugs = useMemo(() => {
         const slugs = new Set<string>();
         (registry.studioConfig?.devViews ?? []).forEach(v => slugs.add(v.slug));
-        if (registry.studioConfig && registry.cmsConfig?.collectionEditor) slugs.add("schema");
+        if (studioSchemaToolEnabled(registry)) slugs.add("schema");
         return slugs;
-    }, [registry.studioConfig, registry.cmsConfig?.collectionEditor]);
+    }, [registry]);
 
     // Studio mode shows Studio dev views + admin entries (Users/Roles).
     // Content mode shows collections, admin custom views, and admin entries — but not Studio dev views.
