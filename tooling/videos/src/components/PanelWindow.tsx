@@ -1,7 +1,7 @@
 import React from "react";
 import { AbsoluteFill, OffthreadVideo, Sequence, interpolate, staticFile, useCurrentFrame } from "remotion";
 import { ramp, ENTER } from "./motion";
-import { FRAME } from "../theme";
+import { FRAME, SURFACE } from "../theme";
 
 /**
  * The admin panel, as a window running a short montage of real captures.
@@ -91,7 +91,7 @@ export const PanelWindow: React.FC<{
                 aspectRatio: "1280 / 800",
                 borderRadius: FRAME.radius,
                 border: FRAME.border,
-                background: "#000",
+                background: SURFACE.frame,
                 boxShadow: FRAME.boxShadow,
                 overflow: "hidden",
                 position: "relative",

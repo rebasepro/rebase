@@ -94,7 +94,7 @@ const RuleBody: React.FC = () => {
                                     right: 0,
                                     bottom: 0,
                                     height: 90,
-                                    background: `linear-gradient(rgba(10,10,10,0), ${SURFACE.well})`,
+                                    background: `linear-gradient(rgba(9,10,12,0), ${SURFACE.well})`,
                                 }}
                             />
                         </div>

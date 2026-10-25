@@ -424,16 +424,21 @@ const CLIPS = {
            take is the customer — the related record. Found by role and
            position, not by icon; a pass that took "the first button under
            the results header" hit an export tool instead. */
-        const triggers = page.locator("button[aria-haspopup=menu]");
+        /* Since the Graphite-era Studio, a result that matches ONE
+           collection (this one: Customers) gives each row a pencil that
+           opens the record straight away; only a result matching two or
+           more has the menu. Take whichever the first row has. */
+        const triggers = page.locator("button");
         const count = await triggers.count();
         let first = null;
         for (let i = 0; i < count; i++) {
             const b = await triggers.nth(i).boundingBox();
-            if (b && b.x > 300 && b.x < 340 && b.y > 440 && (!first || b.y < first.y)) first = { i, y: b.y };
+            if (b && b.x > 300 && b.x < 360 && b.y > 440 && b.width < 48 && (!first || b.y < first.y)) first = { i, y: b.y };
         }
         if (!first) throw new Error("no row action in the results");
-        await clickOn(() => triggers.nth(first.i), 0.7, 0.7);
-        await clickOn(() => page.getByRole("menuitem", { name: /open customers/i }).first(), 3.2, 0.4);
+        const menu = (await triggers.nth(first.i).getAttribute("aria-haspopup")) === "menu";
+        await clickOn(() => triggers.nth(first.i), menu ? 0.7 : 3.2, menu ? 0.7 : 0.4);
+        if (menu) await clickOn(() => page.getByRole("menuitem", { name: /open customers/i }).first(), 3.2, 0.4);
         await hold(0.8);
     },
 
@@ -664,7 +669,9 @@ Object.assign(CLIPS, {
                            collapses and the pencil sits at x 17. */
                         .filter((r) => r.width > 0 && r.x < cell.x && Math.abs(r.y + r.height / 2 - (cell.y + cell.height / 2)) < 24)
                         .sort((a, c) => a.x - c.x)[0];
-                    return hit ? { x: Math.round(hit.x + hit.width / 2), y: Math.round(hit.y + hit.height / 2) } : null;
+                    /* At 600px the pencil sits half off the left edge (x -17..15):
+                       click its visible half, never its off-screen centre. */
+                    return hit ? { x: Math.max(6, Math.round(hit.x + hit.width / 2)), y: Math.round(hit.y + hit.height / 2) } : null;
                 }, b);
                 if (!pt) throw new Error("no pencil on the hovered row");
                 return pt;
