@@ -17,7 +17,7 @@ import { fileURLToPath } from "url";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { createRebaseApp, type TemplatePreset } from "./init";
-import { pendingMigrations, runVerify, verifyCommand, type VerifyReport } from "./verify";
+import { authRequiredFrom, pendingMigrations, runVerify, verifyCommand, type VerifyReport } from "./verify";
 import { compareMigrationVersions, migrationVersionOf } from "@rebasepro/server-postgres";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -294,6 +294,21 @@ describe("rebase verify --live: which migrations are applied", () => {
             { version: "20261025000126", type: 4 },
             { version: "20261026090000", type: 2 }
         ])).toEqual([]);
+    });
+});
+
+describe("rebase verify --live: whether the API requires a token", () => {
+    it("reads AUTH_REQUIRE the way every boolean env var is read", () => {
+        for (const off of ["false", "0", "no", "off", "FALSE", " false "]) {
+            expect(authRequiredFrom({ AUTH_REQUIRE: off }, {}), off).toBe(false);
+        }
+        for (const on of ["true", "1", "yes"]) expect(authRequiredFrom({ AUTH_REQUIRE: on }, {}), on).toBe(true);
+    });
+
+    it("is on by default, and takes .env when the environment says nothing", () => {
+        expect(authRequiredFrom({}, {})).toBe(true);
+        expect(authRequiredFrom({}, { AUTH_REQUIRE: "0" })).toBe(false);
+        expect(authRequiredFrom({ AUTH_REQUIRE: "true" }, { AUTH_REQUIRE: "0" })).toBe(true);
     });
 });
 

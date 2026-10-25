@@ -33,6 +33,7 @@ import chalk from "chalk";
 import fs from "fs";
 import path from "path";
 import {
+    parseEnvBoolean,
     isFirebaseCollectionConfig,
     isRelationalCollectionConfig,
     type CollectionConfig,
@@ -846,6 +847,21 @@ without --live: for CI, and for the Claude Code hook that ${chalk.cyan("rebase s
 }
 
 /**
+ * Whether the backend refuses a request with no token: `AUTH_REQUIRE` from the
+ * environment, else `.env`, read as every boolean env var is read
+ * (`parseEnvBoolean`: `false`/`0`/`no`/`off` turn it off). On unless one of
+ * those says otherwise — the runtime's default. Compared raw, `AUTH_REQUIRE=0`
+ * read as "on", and a compiled public read was reported as token-gated on a
+ * backend that serves it to anyone.
+ */
+export function authRequiredFrom(
+    environment: Record<string, string | undefined>,
+    envFile: Record<string, string | undefined>
+): boolean {
+    return parseEnvBoolean(environment.AUTH_REQUIRE ?? envFile.AUTH_REQUIRE) !== false;
+}
+
+/**
  * The database `--live` audits, resolved as every other database door resolves
  * it (`db *`, `console`, `doctor`): `--database-url`, `DATABASE_URL`, `.env`,
  * `--docker` or the last `rebase dev --docker`, and otherwise the managed
@@ -923,14 +939,13 @@ export async function verifyCommand(rawArgs: string[]): Promise<void> {
         })
         : {};
 
-    const authSetting = process.env.AUTH_REQUIRE ?? readEnvFile(projectRoot).AUTH_REQUIRE;
     const report = await runVerify({
         projectRoot,
         collectionsDir,
         backendDir,
         live,
         ...database,
-        authRequired: authSetting?.trim() !== "false"
+        authRequired: authRequiredFrom(process.env, readEnvFile(projectRoot))
     });
 
     if (flags["--json"]) {
