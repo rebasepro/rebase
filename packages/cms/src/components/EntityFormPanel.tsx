@@ -118,7 +118,7 @@ function EntityFormPanelInScope<M extends Record<string, unknown>>({
     const path = pathProp ?? collectionProp.slug;
     const collectionRegistry = useCollectionRegistryController<Record<string, unknown>, AdminCollection<M>>();
     const navigationState = useNavigationStateController();
-    const { canEdit } = usePermissions();
+    const { canCreate, canEdit } = usePermissions();
 
     // The registry's copy: it carries the plugins' changes and the user's
     // saved overrides.
@@ -165,7 +165,9 @@ function EntityFormPanelInScope<M extends Record<string, unknown>>({
     // keeps the status it opened with, so once it creates the record it edits
     // it from then on.
     const creating = shownEntity === undefined;
-    const editable = creating || canEdit(collection, path, shownEntity);
+    // As the CMS's own New button and save actions: a record to create needs
+    // canCreate (false while access is simulated), an existing one canEdit.
+    const editable = creating ? canCreate(collection, path) : canEdit(collection, path, shownEntity);
 
     return (
         <CollectionScopeProvider collection={collection}>

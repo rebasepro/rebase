@@ -18,7 +18,8 @@ import { act, fireEvent, render, screen, waitFor, within } from "@testing-librar
 import { BrowserRouter } from "react-router";
 import type { DataDriver } from "@rebasepro/types";
 import type { AdminCollection } from "@rebasepro/cms-types";
-import { Rebase } from "@rebasepro/app";
+import { Rebase, RlsSimulationContext } from "@rebasepro/app";
+import type { RlsSimulationController } from "@rebasepro/app";
 import { CollectionPanel, CollectionsProvider, EntityFormPanel } from "@rebasepro/cms";
 
 if (typeof globalThis.ResizeObserver === "undefined") {
@@ -248,6 +249,31 @@ describe("one record's form in a page of the host app", () => {
             </Page>
         );
         expect(await screen.findByDisplayValue("Nice post")).toBeTruthy();
+    });
+
+    it("offers no record to create where creating is not allowed", async () => {
+        // The create-under-id form checked only canEdit, and only for an
+        // existing record: while access was simulated (or insert was denied)
+        // the record-to-create was editable and failed on the server.
+        const simulating: RlsSimulationController = {
+            available: true,
+            simulation: { role: "customer" },
+            label: null,
+            setSimulation: () => undefined
+        };
+        render(
+            <Page>
+                <RlsSimulationContext.Provider value={simulating}>
+                    <EntityFormPanel collection={posts} entityId={"p1"}/>
+                    <EntityFormPanel collection={posts} entityId={"site"} defaultValues={{ title: "Untitled site" }}/>
+                </RlsSimulationContext.Provider>
+            </Page>
+        );
+        const existing = await screen.findByDisplayValue("Hello world");
+        expect((existing as HTMLInputElement).disabled).toBe(true);
+        const toCreate = await screen.findByDisplayValue("Untitled site");
+        expect((toCreate as HTMLInputElement).disabled).toBe(true);
+        expect((screen.getByRole("button", { name: /create/i }) as HTMLButtonElement).disabled).toBe(true);
     });
 
     it("creates a record when given no id", async () => {
