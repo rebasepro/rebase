@@ -271,12 +271,19 @@ export const TOO_MANY_SOCKETS_CLOSE_CODE = 4002;
 
 /**
  * What a socket counts against under `REALTIME_MAX_SOCKETS_PER_USER`: the
- * user it signed in as, or — for an API key — that key. A key acts as the
- * account that made it, and a fleet of workers holding sockets under its keys
- * counted against that account's ceiling, locking out its people and each
- * other; each key is a credential of its own, with its own ceiling.
+ * credential that opened it. That is the user it signed in as; for an API key,
+ * that key; and for an administrator impersonating someone, the administrator.
+ *
+ * A key acts as the account that made it, and a fleet of workers holding
+ * sockets under its keys counted against that account's ceiling, locking out
+ * its people and each other; each key is a credential of its own, with its own
+ * ceiling. An impersonating socket counted against the user it acts as: an
+ * administrator checking on someone spent that person's places, and could
+ * hold any number of sockets by spreading them over users. It is the
+ * administrator's traffic, as its rate-limit bucket already says.
  */
-function socketCeilingBucket(user: Pick<WsUserIdentity, "uid" | "apiKey">): string {
+function socketCeilingBucket(user: Pick<WsUserIdentity, "uid" | "apiKey" | "impersonator">): string {
+    if (user.impersonator) return `user:${user.impersonator}`;
     return user.apiKey ? `key:${user.apiKey.id}` : `user:${user.uid}`;
 }
 
@@ -1207,7 +1214,7 @@ fetchAllowanceAt: Date.now() });
                                 if (other !== session && other.user && socketCeilingBucket(other.user) === bucket) held++;
                             }
                             if (held >= maxSocketsPerUser) {
-                                logger.warn(`[WebSocket Server] Refused a socket for ${verifiedUser.uid}: ${held} already open, ceiling ${maxSocketsPerUser}`);
+                                logger.warn(`[WebSocket Server] Refused a socket for ${verifiedUser.uid} (counted as ${bucket}): ${held} already open, ceiling ${maxSocketsPerUser}`);
                                 sendError(
                                     "ERROR",
                                     "TOO_MANY_SOCKETS",
