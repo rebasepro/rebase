@@ -105,6 +105,12 @@ export const TOPOLOGY_ENV_VARS = [
     // the line above, asked more widely — and a tenant who could answer it
     // would have a database the platform can never provision.
     "REBASE_PROVISION",
+    // Whether this process serves at all, or provisions and exits 0: the
+    // difference between a Job and a Deployment, which only the deployer knows.
+    // Set on a serving unit, every pod provisions, exits, is restarted, and the
+    // rollout never becomes ready. The chart's migration Job sets it in its own
+    // `env`, which is the deployer deciding.
+    "REBASE_PROVISION_ONLY",
     "TRUSTED_PROXY_HOPS",
     "REBASE_RATE_LIMIT_STORE",
     "REBASE_REQUIRE_SCHEMA_MATCH"
