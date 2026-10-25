@@ -147,6 +147,17 @@ A backend preview starts from production's variables, live keys included.
 back production's value, and `env list --preview` shows the differences.
 Production is never changed by any of them.
 
+`env set KEY --stdin` reads the value from standard input instead of the
+command line, where `ps` and your shell history would show it:
+
+```bash
+read -rs STRIPE_KEY   # paste the value; nothing is echoed
+printf %s "$STRIPE_KEY" | rebase cloud env set STRIPE_KEY --stdin --secret
+```
+
+One trailing newline is dropped. The MCP server's `rebase_cloud_env_set` sets
+values this way.
+
 ## Organizations
 
 ```bash

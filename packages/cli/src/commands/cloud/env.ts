@@ -284,8 +284,42 @@ export function buildTimeEnvPrefix(key: string): string | undefined {
 export const ENV_SET_FLAGS = {
     "--secret": Boolean,
     "--force": Boolean,
+    /* Read the value from standard input instead of the command line, where
+       every process on the machine can read it (`ps`) and the shell keeps it
+       in its history. The MCP server's `rebase_cloud_env_set` sets values this
+       way. */
+    "--stdin": Boolean,
     ...ENV_PREVIEW_FLAGS
 } as const;
+
+/**
+ * The value `env set KEY --stdin` was piped: everything on standard input,
+ * less the one line ending `echo` and a here-string add. Refuses a terminal
+ * (it would wait for a value nobody knows to type) and a line that also gives
+ * the value, which would leave two candidates.
+ */
+export function envValueFromStdin(
+    operands: string[],
+    read: () => string = () => fs.readFileSync(0, "utf-8"),
+    isTTY: boolean = process.stdin.isTTY === true
+): { key: string; value: string } {
+    const first = operands[0] ?? "";
+    if (operands.length !== 1 || first.includes("=")) {
+        fail(
+            "With --stdin, name only the variable: `rebase cloud env set KEY --stdin`.",
+            "The value is read from standard input, so it cannot also be on the command line.",
+            "usage"
+        );
+    }
+    if (isTTY) {
+        fail(
+            "--stdin reads the value from a pipe, and standard input is a terminal.",
+            "Pipe it in: `printf %s \"$VALUE\" | rebase cloud env set KEY --stdin`.",
+            "usage"
+        );
+    }
+    return { key: first.trim(), value: read().replace(/\r?\n$/, "") };
+}
 
 /**
  * What `env set` was asked to store.
@@ -310,11 +344,15 @@ export function resolveEnvSetArgs(rawArgs: string[]) {
         maxPositionals: 2 // KEY=VALUE, or KEY VALUE
     });
     return { flags,
+positionals,
 assignment: parseEnvAssignment(positionals) };
 }
 
 async function setEnv(rawArgs: string[]): Promise<void> {
-    const { flags: args, assignment: parsed } = resolveEnvSetArgs(rawArgs);
+    const resolved = resolveEnvSetArgs(rawArgs);
+    const args = resolved.flags;
+    // Read before any request, so a refusal costs nothing.
+    const parsed = args["--stdin"] ? envValueFromStdin(resolved.positionals) : resolved.assignment;
     const { client } = await requireClient(rawArgs);
     const projectId = await requireProject(rawArgs, client);
     const projectRef = displayProjectRef(rawArgs);
@@ -684,6 +722,7 @@ flags: [["--preview", "What previews run with instead of production's values"]] 
                 flags: [
                     ["--secret", "Mark it write-only: it can be set and used, never read back"],
                     ["--force", "Set a build-time key anyway"],
+                    ["--stdin", "Read the value from standard input (give only KEY), so it is not on the command line"],
                     ["--preview", "Only for previews: production keeps its value"]
                 ]
             },

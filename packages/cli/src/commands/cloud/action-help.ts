@@ -510,13 +510,14 @@ export const ACTION_HELP: Record<string, ActionHelp> = {
 
     "env set": {
         command: "cloud env set",
-        usage: "cloud env set KEY=VALUE | KEY VALUE [--secret] [--force] [--preview]",
+        usage: "cloud env set KEY=VALUE | KEY VALUE | KEY --stdin [--secret] [--force] [--preview]",
         summary:
             "Set one environment variable on the project. Takes effect on the next deploy — "
             + "a running instance does not pick it up.",
         flags: [
             ["--secret", "Store it encrypted and never return it in a listing"],
             ["--force", "Set a build-time key (VITE_*, NEXT_PUBLIC_*, …) anyway, for a build that reads it at run time"],
+            ["--stdin", "Read the value from standard input, so it never appears in `ps` or your shell history. Give only KEY"],
             ["--preview", "Set it for the project's previews only; production keeps its value"]
         ],
         examples: [
@@ -527,6 +528,7 @@ export const ACTION_HELP: Record<string, ActionHelp> = {
         ],
         notes: [
             "A value starting with `-` must use the KEY=VALUE form; the KEY VALUE form refuses it.",
+            "`printf %s \"$STRIPE_KEY\" | rebase cloud env set STRIPE_KEY --stdin --secret` sets a value without putting it on the command line.",
             "Variables the platform sets for every project cannot be overridden — `env reveal` reads them."
         ]
     },
