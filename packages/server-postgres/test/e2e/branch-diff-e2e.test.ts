@@ -345,6 +345,27 @@ describe("database branch diff and merge", () => {
         expect(changed.data.find((entry) => entry.table === "ev")).toMatchObject({ updated: 1, conflicts: 0 });
     });
 
+    it("keeps the target's rows when the branch database's catalog row is rewritten after they were written", async () => {
+        await freshBranch("forkmove", `
+            CREATE TABLE t (id int PRIMARY KEY, v text);
+            INSERT INTO t VALUES (1, 'before the fork');
+        `);
+        await on("forkmove", "INSERT INTO t VALUES (2, 'written on the target after the fork')");
+        // Each of these rewrites rb_forkmove's pg_database row, so its xmin is
+        // younger than the target's insert. Read as the fork point, the insert
+        // would be older than the branch, absent from it, and so "the branch
+        // deleted it".
+        await maintenance.query(`GRANT CONNECT ON DATABASE "rb_forkmove" TO PUBLIC`);
+        await maintenance.query(`ALTER DATABASE "rb_forkmove" CONNECTION LIMIT 50`);
+
+        const diff = await diffDatabaseBranch(admin, "forkmove");
+        expect(diff.forkPointKnown).toBe(true);
+        expect(diff.data.find((entry) => entry.table === "t")).toMatchObject({ deleted: 0, targetChanges: 1 });
+
+        await mergeDatabaseBranch(admin, "forkmove", { expectedFingerprint: diff.fingerprint });
+        expect(await on("forkmove", "SELECT id FROM t ORDER BY id")).toEqual([{ id: 1 }, { id: 2 }]);
+    });
+
     describe("a table rewritten since the branch was made", () => {
         const SETUP = `
             CREATE TABLE items (id int PRIMARY KEY, qty int, label text);

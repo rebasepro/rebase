@@ -840,6 +840,13 @@ export interface BranchInfo {
     createdAt: Date;
     /** Size in bytes, if available from the server. */
     sizeBytes?: number;
+    /**
+     * The transaction that created the branch database, recorded when it was
+     * made: the fork point a branch diff tells the two sides' writes apart by.
+     * Absent for a branch made before it was recorded, or by a server that
+     * does not record it.
+     */
+    forkXid?: string;
 }
 
 /**

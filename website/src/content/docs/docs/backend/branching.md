@@ -312,7 +312,9 @@ inserted after the branch was made looks exactly like a row the branch deleted.
 Rebase tells them apart by when each row was written. Transaction ids belong to
 the server, not to one database, and the template copy keeps them, so a row
 written after the branch was made — on either side — is younger than the
-transaction that created the branch database.
+transaction that created the branch database. That transaction is read when
+the branch is made and kept in its record, so a later `GRANT` or
+`ALTER DATABASE` on the branch database does not move it.
 
 | The branch's row | The parent's row | Counted as |
 | --- | --- | --- |
@@ -327,9 +329,11 @@ deleted and the parent then changed is kept, and a row the parent deleted and
 the branch then changed is the branch's insert. An `UPDATE` that writes the
 values a row already had still counts as a write.
 
-When the fork point cannot be read — a long-lived branch whose `pg_database`
-row a vacuum froze, or one renamed with `ALTER DATABASE` — the diff says so,
-and counts every difference as the branch's.
+A branch made before Rebase kept that transaction reads it from the branch
+database's `pg_database` row as it is now; anything that rewrote the row since
+moves it. When the fork point cannot be read at all — a long-lived branch
+whose row a vacuum froze — the diff says so, and counts every difference as
+the branch's.
 
 ### What a merge does
 

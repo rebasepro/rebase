@@ -17,8 +17,11 @@
  * Transaction ids are the server's, not a database's, and the template copy
  * keeps every row's `xmin`. So a row written after the branch was made — on
  * either side — has an `xmin` younger than the transaction that created the
- * branch database, which is the `xmin` of its `pg_database` row. That is the
- * fork point, and with it each difference has an author:
+ * branch database. That is the fork point: the `xmin` of the new database's
+ * `pg_database` row, read when the branch is made and kept in its record
+ * (`BranchInfo.forkXid`), because a `GRANT`, an `ALTER DATABASE` or a forced
+ * copy from the branch rewrites that row later. With it each difference has an
+ * author:
  *
  * | branch row          | target row          | the change                     |
  * |---------------------|---------------------|--------------------------------|
@@ -41,9 +44,10 @@
  * a delete: `onConflict: "target"` keeps the row, `"branch"` deletes it and
  * says what the foreign key reached (`referencedBy` on the diff).
  *
- * When the fork point cannot be read — the `pg_database` row was frozen by a
- * vacuum, or rewritten by an `ALTER DATABASE` — every difference is counted as
- * the branch's and the diff says so (`forkPointKnown: false`).
+ * A branch recorded before the fork point was kept falls back to the
+ * `pg_database` row as it is now. When the fork point cannot be read — that
+ * row was frozen by a vacuum — every difference is counted as the branch's and
+ * the diff says so (`forkPointKnown: false`).
  *
  * ## What a merge does
  *
@@ -785,15 +789,15 @@ async function referencingKeys(sql: SQLAdmin, database: string, facts: TableFact
 /**
  * The rows of `key`'s table, written after the fork, that reference a row of
  * `facts` among the keys in `keysParam` — joined from the referenced table, so
- * the result is per referenced key. `forkParam` names the branch database,
- * whose creation is the fork point.
+ * the result is per referenced key. `forkParam` is the fork point's
+ * transaction id.
  */
 function referencingRowsFrom(facts: TableFacts, keyExpr: string, key: ReferencingKey, keysParam: string, forkParam: string): string {
     const join = key.columns.map((column, index) => `c.${ident(column)} = t.${ident(key.referenced[index] ?? column)}`).join(" AND ");
     return `FROM ${qualified(facts.schema, facts.table)} t
               JOIN ${qualified(key.schema, key.table)} c ON ${join}
              WHERE ${keyExpr} = ANY(${keysParam}::text[])
-               AND age(c.xmin) < (SELECT age(d.xmin) FROM pg_database d WHERE d.datname = ${forkParam})`;
+               AND age(c.xmin) < age(${forkParam}::text::xid)`;
 }
 
 /** What {@link deleteConflicts} found: the keys in conflict, and through which keys. */
@@ -810,7 +814,7 @@ interface DeleteConflicts {
 async function deleteConflicts(
     sql: SQLAdmin,
     targetDb: string,
-    branchDb: string,
+    forkXid: string,
     facts: TableFacts,
     keyExpr: string,
     deleted: readonly string[]
@@ -822,7 +826,7 @@ async function deleteConflicts(
     for (const key of keys) {
         const rows = await sql.executeSql(
             `SELECT ${keyExpr} AS k, count(*)::text AS n ${referencingRowsFrom(facts, keyExpr, key, "$1", "$2")} GROUP BY 1`,
-            { database: targetDb, params: [[...deleted], branchDb] }
+            { database: targetDb, params: [[...deleted], forkXid] }
         );
         if (rows.length === 0) continue;
         let count = 0;
@@ -853,6 +857,8 @@ interface MatchedTable {
 interface ComputedDiff {
     diff: BranchDiff;
     matched: Map<string, MatchedTable>;
+    /** The fork point's transaction id, or `null` when it is not known. */
+    forkXid: string | null;
 }
 
 async function rowStates(
@@ -861,16 +867,16 @@ async function rowStates(
     facts: TableFacts,
     keyExpr: string,
     hashExpr: string,
-    forkDatabase: string | null
+    forkXid: string | null
 ): Promise<RowState[]> {
-    const young = forkDatabase === null
+    const young = forkXid === null
         ? "false"
-        : "(age(t.xmin) < (SELECT age(d.xmin) FROM pg_database d WHERE d.datname = $1))";
+        : "(age(t.xmin) < age($1::text::xid))";
     const rows = await sql.executeSql(
         `SELECT ${keyExpr} AS k, ${hashExpr} AS h, ${young} AS young
            FROM ${qualified(facts.schema, facts.table)} t
           ORDER BY (${keyExpr}) COLLATE "C"`,
-        { database, params: forkDatabase === null ? undefined : [forkDatabase] }
+        { database, params: forkXid === null ? undefined : [forkXid] }
     );
     return rows.map((row) => ({ key: text(row, "k"), hash: text(row, "h"), young: flag(row, "young") }));
 }
@@ -905,14 +911,14 @@ async function forkSplit(
     facts: TableFacts,
     keyExpr: string,
     hashExpr: string,
-    forkDatabase: string
+    forkXid: string
 ): Promise<{ young: number; oldSum: string }> {
-    const young = "(age(t.xmin) < (SELECT age(d.xmin) FROM pg_database d WHERE d.datname = $1))";
+    const young = "(age(t.xmin) < age($1::text::xid))";
     const [row] = await sql.executeSql(
         `SELECT count(*) FILTER (WHERE ${young})::text AS young,
                 coalesce(sum(('x' || left(md5(${keyExpr} || ':' || ${hashExpr}), 15))::bit(60)::bigint) FILTER (WHERE NOT ${young}), 0)::text AS s
            FROM ${qualified(facts.schema, facts.table)} t`,
-        { database, params: [forkDatabase] }
+        { database, params: [forkXid] }
     );
     return row ? { young: Number(text(row, "young")), oldSum: text(row, "s") } : { young: 0, oldSum: "0" };
 }
@@ -1000,11 +1006,13 @@ async function computeDiff(admin: DatabaseAdmin | undefined, branchName: string,
         readCatalog(sql, branchDb, schemas),
         readSchemaObjects(sql, targetDb, schemas),
         readSchemaObjects(sql, branchDb, schemas),
-        sql.executeSql("SELECT age(xmin)::text AS age FROM pg_database WHERE datname = $1", { database: targetDb, params: [branchDb] })
+        branch.forkXid !== undefined
+            ? sql.executeSql("SELECT $1::text AS xid, age($1::text::xid)::text AS age", { database: targetDb, params: [branch.forkXid] })
+            : sql.executeSql("SELECT xmin::text AS xid, age(xmin)::text AS age FROM pg_database WHERE datname = $1", { database: targetDb, params: [branchDb] })
     ]);
     const forkAge = fork[0] ? Number(text(fork[0], "age")) : NaN;
-    const forkPointKnown = Number.isFinite(forkAge) && forkAge < FROZEN_AGE;
-    const forkDatabase = forkPointKnown ? branchDb : null;
+    const forkPointKnown = Number.isFinite(forkAge) && forkAge >= 0 && forkAge < FROZEN_AGE;
+    const forkXid = forkPointKnown && fork[0] ? text(fork[0], "xid") : null;
 
     const schemaChanges = [...diffCatalogs(targetCatalog, branchCatalog), ...diffSchemaObjects(targetObjects, branchObjects)];
     const data: BranchTableDataDiff[] = [];
@@ -1080,10 +1088,10 @@ async function computeDiff(admin: DatabaseAdmin | undefined, branchName: string,
             // branch: it wrote none since the fork, and the rows from before
             // it are the same on both sides. Then every difference is the
             // target's, and there is nothing to merge or to block.
-            if (forkDatabase !== null) {
+            if (forkXid !== null) {
                 const [targetSplit, branchSplit] = await Promise.all([
-                    forkSplit(sql, targetDb, target, keyExpr, hashExpr, forkDatabase),
-                    forkSplit(sql, branchDb, branchFacts, keyExpr, hashExpr, forkDatabase)
+                    forkSplit(sql, targetDb, target, keyExpr, hashExpr, forkXid),
+                    forkSplit(sql, branchDb, branchFacts, keyExpr, hashExpr, forkXid)
                 ]);
                 if (branchSplit.young === 0 && targetSplit.oldSum === branchSplit.oldSum) {
                     entry.targetChanges = targetSplit.young;
@@ -1105,8 +1113,8 @@ async function computeDiff(admin: DatabaseAdmin | undefined, branchName: string,
         }
 
         const [targetRows, branchRows] = await Promise.all([
-            rowStates(sql, targetDb, target, keyExpr, hashExpr, forkDatabase),
-            rowStates(sql, branchDb, branchFacts, keyExpr, hashExpr, forkDatabase)
+            rowStates(sql, targetDb, target, keyExpr, hashExpr, forkXid),
+            rowStates(sql, branchDb, branchFacts, keyExpr, hashExpr, forkXid)
         ]);
         const rows = classifyRows(targetRows, branchRows, forkPointKnown);
 
@@ -1130,8 +1138,8 @@ async function computeDiff(admin: DatabaseAdmin | undefined, branchName: string,
         }
         // Without a fork point every target-only row is already the branch's
         // delete, and nothing can be told the target's.
-        const referenced = forkPointKnown
-            ? await deleteConflicts(sql, targetDb, branchDb, target, keyExpr, rows.deleted)
+        const referenced = forkXid !== null
+            ? await deleteConflicts(sql, targetDb, forkXid, target, keyExpr, rows.deleted)
             : { keys: [], referencedBy: [] };
         if (referenced.keys.length > 0) {
             const inConflict = new Set(referenced.keys);
@@ -1215,7 +1223,8 @@ async function computeDiff(admin: DatabaseAdmin | undefined, branchName: string,
             sampleLimit,
             computedAt: new Date().toISOString()
         },
-        matched
+        matched,
+        forkXid
     };
 }
 
@@ -1297,7 +1306,7 @@ export async function mergeDatabaseBranch(
         throw new ApiError(400, "INVALID_INPUT", "`onConflict` must be \"abort\", \"branch\" or \"target\".", undefined, EXPECTED);
     }
 
-    const { diff, matched } = await computeDiff(admin, branchName, {
+    const { diff, matched, forkXid } = await computeDiff(admin, branchName, {
         sampleLimit: 0,
         schemas: options.schemas,
         maxRowsPerTable: options.maxRowsPerTable
@@ -1439,11 +1448,11 @@ export async function mergeDatabaseBranch(
         // diff counted: none for a plain delete, the ones it named for a
         // conflict the branch won. A row written since would be reached by a
         // delete nobody reviewed.
-        if (deletes.length > 0 && diff.forkPointKnown) {
+        if (deletes.length > 0 && forkXid !== null) {
             const counted = new Map(table.deleteConflicts.referencedBy.map((found) => [found.constraint + "\u0000" + found.schema + "." + found.table, found.rows]));
             const keys = await referencingKeys(sql, diff.targetDatabase, table.facts);
             const keysParam = keys.length > 0 ? param([...deletes]) : "";
-            const forkParam = keys.length > 0 ? param(diff.branchDatabase) : "";
+            const forkParam = keys.length > 0 ? param(forkXid) : "";
             for (const key of keys) {
                 const expected = onConflict === "branch" ? counted.get(key.constraint + "\u0000" + key.schema + "." + key.table) ?? 0 : 0;
                 guards.push(`(SELECT count(*) ${referencingRowsFrom(table.facts, table.keyExpression, key, keysParam, forkParam)}) = ${expected}`);

@@ -437,19 +437,32 @@ export class BranchService {
             throw describeBranchDdlError(err, dbName);
         }
 
+        // The fork point, read now and kept: the `xmin` of the new database's
+        // `pg_database` row is the transaction that created it — until
+        // anything rewrites that row. A `GRANT CONNECT`, an `ALTER DATABASE`,
+        // or `--force` closing this branch as the source of another all do,
+        // and a diff that read the fork point from the catalog afterwards
+        // would take every target write before it for a branch delete.
+        const forkResult = await this.db.execute(
+            sql`SELECT xmin::text AS xid FROM pg_database WHERE datname = ${dbName}`
+        );
+        const forkXid = (forkResult.rows as Record<string, unknown>[])[0]?.xid;
+
         // Record metadata in the registry — asked for again, as copying the
         // main database closed any pool on it.
         const now = new Date();
+        const metadata = typeof forkXid === "string" ? { forkXid } : {};
         await (await this.home.registry()).execute(
-            sql`INSERT INTO rebase.branches (name, db_name, parent_db, created_at)
-                VALUES (${name}, ${dbName}, ${sourceDb}, ${now.toISOString()})`
+            sql`INSERT INTO rebase.branches (name, db_name, parent_db, created_at, metadata)
+                VALUES (${name}, ${dbName}, ${sourceDb}, ${now.toISOString()}, ${JSON.stringify(metadata)}::jsonb)`
         );
 
         return {
             name,
             database: dbName,
             parentDatabase: sourceDb,
-            createdAt: now
+            createdAt: now,
+            ...(typeof forkXid === "string" ? { forkXid } : {})
         };
     }
 
@@ -861,7 +874,8 @@ export class BranchService {
                 b.name,
                 b.db_name,
                 b.parent_db,
-                b.created_at
+                b.created_at,
+                b.metadata->>'forkXid' AS fork_xid
             FROM rebase.branches b
             WHERE b.name = ${name}
         `);
@@ -893,7 +907,8 @@ export class BranchService {
             database: row.db_name as string,
             parentDatabase: row.parent_db as string,
             createdAt: new Date(row.created_at as string),
-            sizeBytes
+            sizeBytes,
+            ...(typeof row.fork_xid === "string" ? { forkXid: row.fork_xid } : {})
         };
     }
 }
