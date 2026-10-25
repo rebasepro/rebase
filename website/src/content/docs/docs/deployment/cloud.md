@@ -238,6 +238,9 @@ rebase cloud previews delete new-checkout  # stops serving it and drops its data
 
 `rebase cloud logs` without `--preview` is always production's.
 
+The console's **Deployments** page lists the same previews, and opens, shows the
+build log of, or deletes each one. Creating one stays a CLI step.
+
 A preview expires a week after it was last deployed to.
 
 When it finishes, the deploy checks that the preview's address answers, as a
@@ -308,6 +311,21 @@ so it is in view at the moment a bad release is noticed.
 A rollback appends a new deployment rather than rewinding history, and waits for
 the restored version to serve before reporting success. Follow it with
 `rebase cloud logs -f`.
+
+## Restore the database to a point in time
+
+A managed database can be recovered to any minute inside its recovery window,
+from **Database → Backups** in the console or with the CLI:
+`rebase cloud db pitr status | restore --target <ISO> | cutover | discard`.
+It takes two steps. First a recovered copy is staged beside the live database;
+your app keeps running on the live one, and the copy's storage is billed until
+you cut over or discard it.
+Then, once the copy is ready, cutting over repoints the app at it and restarts
+it. Anything written after the target time is not in the copy. The original
+database is kept as the way back, and keeps billing storage; switching back,
+removing it, or a second restore goes through support. Only an owner or admin
+can stage, cut over or discard, and the console asks for the project's name
+before it cuts over.
 
 ## Secure your account
 
@@ -560,8 +578,6 @@ Stated plainly, because finding out later is worse:
   `.rebase/cloud.json` names a control plane other than the platform's own, pass
   it as `--url` too: without a terminal, `login` refuses to send a password to a
   host that only the checked-out file named.
-- **Point-in-time recovery is CLI-only.** The console shows backups; the staged
-  PITR workflow is `rebase cloud db pitr`.
 - **No public database endpoint.** A managed database is not exposed to the
   internet, so the host the console shows is your backend's address for it and
   resolves to nothing on your machine. `rebase cloud db connect` opens a local
