@@ -390,6 +390,9 @@ export function createOAuthRoutes(config: OAuthRoutesConfig): Hono<HonoEnv> {
             scopeDescriptions: describeScopes(scope),
             requestToken,
             loginUrl: `${config.authBasePath}/login`,
+            mfaChallengeUrl: `${config.authBasePath}/mfa/challenge`,
+            mfaVerifyUrl: `${config.authBasePath}/mfa/challenge/verify`,
+            redirectUri,
             decisionUrl: `${c.req.path}/decision`,
             resource: canonicalResource,
             nonce

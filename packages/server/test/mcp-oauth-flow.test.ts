@@ -182,6 +182,28 @@ describe("authorization refusals", () => {
         expect(new URL(res.headers.get("location")!).searchParams.get("error")).toBe("invalid_target");
     });
 
+    it("names the redirect host on the consent screen, and wires the MFA step to the auth routes", async () => {
+        // The client name is the registrant's free text; the host is the one
+        // fact they cannot borrow. A page that omits it lets a client called
+        // "Claude" collect codes at any https address.
+        const { driver } = stubDriver();
+        const { app } = buildApp({ driver });
+        const registered = await app.request("/api/oauth/register", {
+            method: "POST", headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ client_name: "Claude", redirect_uris: ["https://claude-connect.example/cb"] })
+        });
+        const { client_id } = await registered.json() as { client_id: string };
+        const { challenge } = await pkcePair();
+        const page = await app.request(`/api/oauth/authorize?${new URLSearchParams({
+            response_type: "code", client_id, redirect_uri: "https://claude-connect.example/cb",
+            code_challenge: challenge, code_challenge_method: "S256", resource: RESOURCE
+        })}`);
+        const html = await page.text();
+        expect(html).toContain("<strong>claude-connect.example</strong>");
+        expect(html).toContain("\"/api/auth/mfa/challenge\"");
+        expect(html).toContain("\"/api/auth/mfa/challenge/verify\"");
+    });
+
     it("refuses registration of a non-loopback http redirect", async () => {
         const { driver } = stubDriver();
         const { app } = buildApp({ driver });

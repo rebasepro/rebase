@@ -548,7 +548,14 @@ to one user, the endpoint declines to mount and says why in the boot log. No
   through `/.well-known/oauth-protected-resource`, registers itself (dynamic
   registration is on by default; `REBASE_MCP_OPEN_REGISTRATION=false` limits it
   to clients you register), and sends the person to a consent screen that signs
-  them in through your existing `/auth/login`.
+  them in through your existing `/auth/login`. An account with a second factor
+  is then asked for its authenticator code or a recovery code, through the
+  existing `/auth/mfa/challenge` routes. The screen signs in with a password
+  only: someone who has only ever used Google, GitHub or an email link sets one
+  first with `/auth/forgot-password` (your app's "Forgot password"), and the
+  screen tells them so. It also names the host the authorization code is sent
+  to, and says that host is not verified: anyone may register a client under
+  any name, so the host is the part a person can check.
 - **Eight tools, three scopes.** The same [scopes](/docs/backend/roles-and-scopes/)
   every credential uses. `data:read` offers `list_collections`, `describe_collection`,
   `query_collection`, `count_documents` and `get_document`; `data:write` adds `create_document` and
