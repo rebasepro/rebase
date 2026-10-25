@@ -1,6 +1,10 @@
 import { TYPED } from "./films/01-typed";
 import { SECURITY } from "./films/02-security";
 import { AGENTS } from "./films/03-agents";
+import { OWN } from "./films/04-own";
+import { ONE_DEFINITION } from "./films/05-one-definition";
+import { ZERO } from "./films/06-zero";
+import { REALTIME } from "./films/07-realtime";
 import { seriesDuration, seriesFilm, type FilmSpec, type SeriesProps } from "./kit";
 
 /**
@@ -9,7 +13,7 @@ import { seriesDuration, seriesFilm, type FilmSpec, type SeriesProps } from "./k
  * 1080x1920 — from the same take, and the recording page reads it with
  * `?film=<id>`.
  */
-export const SERIES: FilmSpec[] = [TYPED, SECURITY, AGENTS];
+export const SERIES: FilmSpec[] = [TYPED, SECURITY, AGENTS, OWN, ONE_DEFINITION, ZERO, REALTIME];
 
 export interface SeriesEntry {
     spec: FilmSpec;
