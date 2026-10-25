@@ -864,6 +864,42 @@ function readManifestObject(filePath: string): Record<string, unknown> {
 }
 
 /**
+ * Each app as the caller wrote it, plus the fields the file has on that app
+ * that this CLI does not model.
+ *
+ * Apps are validated by construction (`validateApp` names every field it
+ * returns), so a manifest loaded and written back had lost every app field
+ * this CLI does not know: a typo it had only warned about (`"pathh"`), or a
+ * field from a newer CLI or the cloud running ahead — the case
+ * `warnUnknownFields` exists not to break. `rebase generate-sdk --register`
+ * said "Remembered in rebase.json" and deleted them.
+ *
+ * Only unmodelled fields, only onto an app of the same name and type: a
+ * modelled field the caller left out was removed on purpose, and an app the
+ * caller dropped or retyped is not this one any more.
+ */
+function carryUnmodelledAppFields(
+    apps: RebaseProjectManifest["apps"],
+    existingApps: unknown
+): Record<string, unknown> {
+    const result: Record<string, unknown> = {};
+    for (const [name, app] of Object.entries(apps)) {
+        const raw = isRecord(existingApps) ? existingApps[name] : undefined;
+        const known = KNOWN_APP_FIELDS[app.type];
+        if (!isRecord(raw) || raw.type !== app.type || !known) {
+            result[name] = app;
+            continue;
+        }
+        const carried: Record<string, unknown> = {};
+        for (const [field, value] of Object.entries(raw)) {
+            if (!known.includes(field)) carried[field] = value;
+        }
+        result[name] = { ...app, ...carried };
+    }
+    return result;
+}
+
+/**
  * Write a manifest, with a trailing newline so it plays well with other tools.
  *
  * **Every key on disk survives.** This used to emit exactly `$schema`, `rebase`
@@ -896,7 +932,7 @@ export function writeManifest(projectRoot: string, manifest: RebaseProjectManife
     const ordered = {
         $schema: schema,
         rebase: manifest.rebase,
-        apps: manifest.apps,
+        apps: carryUnmodelledAppFields(manifest.apps, existing.apps),
         ...(telemetry !== undefined ? { telemetry } : {}),
         ...carried
     };
