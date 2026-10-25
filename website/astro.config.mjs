@@ -311,6 +311,7 @@ export default defineConfig({
                         { label: "Overview", slug: "docs/deployment" },
                         { label: "Deployment Guide", slug: "docs/getting-started/deployment" },
                         { label: "Rebase Cloud", slug: "docs/deployment/cloud" },
+                        { label: "Cloud CI and Agents", slug: "docs/deployment/cloud-agents" },
                         { label: "Cloud Notifications", slug: "docs/deployment/cloud-notifications" },
                         { label: "Managed Runtime", slug: "docs/deployment/managed-runtime" },
                         { label: "Self-Hosting", slug: "docs/deployment/self-hosting" },

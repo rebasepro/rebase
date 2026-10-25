@@ -77,7 +77,7 @@ If you turned on two-factor authentication, `login` then asks for the code from
 your authenticator app, or one of your recovery codes, whichever way you signed
 in. Neither a sign-in code nor a second factor can be typed without a terminal.
 For a script, create an access token in the console (**Settings → Access
-tokens**) and set `REBASE_TOKEN`; see [CI and agents](#ci-and-agents).
+tokens**) and set `REBASE_TOKEN`; see [CI and agents](/docs/deployment/cloud-agents/#ci-and-agents).
 
 A wrong password answers `invalid_credentials` with the same two ways in, since
 the usual cause is an account that never had one.
@@ -363,7 +363,7 @@ organization's: what you set there applies in every organization you belong to.
   with its address and when it signed in. Sign out any device you do not
   recognise, or all of them at once.
 
-[Access tokens](#ci-and-agents) are not sessions and do not ask for a second
+[Access tokens](/docs/deployment/cloud-agents/#ci-and-agents) are not sessions and do not ask for a second
 factor, so CI keeps deploying after you turn it on. Revoke a token you no longer
 trust under **Settings → Access tokens**.
 
@@ -387,140 +387,20 @@ about a deleted project stays. The filters are in
 
 ## CI and agents
 
-A CI job or an agent should not carry your password. Give it a token
-instead: a key that acts as your account, narrowed to a few actions on one
-project. Create it from a signed-in terminal:
-
-```bash
-rebase cloud tokens create --project shop --can deploy,logs --expires-in 90
-```
-
-The token is printed once, as an `export REBASE_TOKEN=rk_live_…` line. With
-`REBASE_TOKEN` set, every `rebase cloud` command authenticates with it instead of
-your login, and never reads or writes the stored session. In GitHub Actions,
-store it as a repository secret and expose it under that name:
-
-```yaml title=".github/workflows/deploy.yml"
-name: Deploy
-on:
-  push:
-    branches: [main]
-jobs:
-  deploy:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
-        with:
-          version: 11
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22.x
-          cache: pnpm
-      - run: pnpm install --frozen-lockfile
-      - run: pnpm exec rebase cloud deploy --project shop
-        env:
-          REBASE_TOKEN: ${{ secrets.REBASE_TOKEN }}
-```
-
-`--can` takes one or more capabilities, comma-separated or repeated:
-
-| Capability | What the token may do |
-|---|---|
-| `deploy` | Deploy the project and follow its builds: `deploy` (`--preview` included), `deployments`, `previews` |
-| `logs` | Read build and runtime logs, cron history, and live metrics: `logs`, `cron`, `metrics` |
-| `env` | Read and change environment variables, secrets included, and previews' own (`--preview`) |
-| `database` | `db list`, `db info` and `db connect`, which includes the database password |
-| `backups` | List, create, inspect and download backups, and read the point-in-time window |
-
-Under the hood a token is a [personal API key](/docs/backend/api-keys/#personal-keys)
-on the control plane. Each capability becomes a few
-[scopes](/docs/backend/roles-and-scopes/): `deploy` on `shop` holds
-`project:deploy:<id>`, with the project's id, plus the data and function scopes
-the deploy commands call. The token never holds more than your account does at the moment
-it is used, so it loses whatever your account loses.
-
-Two things stay with a signed-in person:
-
-- **Managing tokens.** `rebase cloud tokens list`, `create` and `revoke <id>` take
-  your `rebase cloud login` session. A token cannot list, create or revoke
-  tokens, because a token that could mint tokens could mint its own successor.
-- **Restoring.** No capability grants a backup restore or a point-in-time
-  `restore` and `cutover`. Putting old data over a live database stays with a
-  signed-in owner or admin.
-
-`rebase cloud whoami` with a token set shows what it may do, and on which
-project. `rebase cloud tokens revoke <id> --yes` stops it at once.
+A CI job or an agent should not carry your password. Give it a token narrowed to
+a few actions on one project, created from a signed-in terminal with
+`rebase cloud tokens create --project shop --can deploy,logs`, and set it as
+`REBASE_TOKEN`. The capabilities, a GitHub Actions workflow and what stays with
+a signed-in person are in
+[CI and agents](/docs/deployment/cloud-agents/#ci-and-agents).
 
 ## A backend with no account
 
-An agent that has built an app can give it a live backend before anyone has
-signed up, and hand the person it works for a link to keep it:
-
-```bash
-rebase cloud init --claim
-```
-
-That provisions a project on Rebase Cloud, sets `REBASE_BASE_URL` in `.env` to
-its live address, links the directory, and deploys the local collections with
-`rebase cloud deploy --bundle`. It prints the live URL, the admin panel URL and a
-**claim URL**. Whoever opens the claim URL and signs in can move the project into
-one of their organizations. The link works once. A project nobody claims within
-72 hours is deleted, database included. `rebase cloud claim` prints the claim
-URL again with the time left, and `--open` opens it. The MCP server's
-`rebase_cloud_provision` tool runs the same command and returns the same URLs;
-its other cloud tools then check, deploy, read logs, set variables and roll back
-the project without a login (see [MCP server](/docs/ai/mcp#rebase-cloud)).
-
-`REBASE_BASE_URL` in `.env` is also where `rebase api-keys`, `rebase storage`
-and `rebase auth reset-password` send the local service key, so after `init
---claim` they go to the cloud project, which does not take that key. They say so
-when they do; set `REBASE_BASE_URL` in the shell to reach a local backend
-instead.
-
-Until the project is claimed it belongs to no account. Its token is narrowed to
-that one project: it deploys, reads logs and metrics, sets environment variables
-and runs `db info`. It reads nothing secret back: not a variable's value (the
-service key included), not the database password, and it cannot open
-`db connect` or a preview. It is kept in
-`~/.rebase/credentials.json`, never in the repository, and `rebase cloud`
-commands in the linked directory use it on their own (`REBASE_TOKEN`, when set,
-still wins, and those commands warn that it did; the deploy `init --claim` runs
-always uses the project's own token). It expires with the project. `rebase cloud whoami` in that directory shows the project, what the
-token may do, the claim URL and when the project expires. A command that needs a
-person's session refuses with `session_required` and keeps the token; it is
-forgotten only once the control plane refuses it everywhere, after a claim or at
-expiry, and the claim URL is printed as it goes. `rebase cloud status` shows the
-claim URL and the expiry too (`unclaimed` in `--json`). `rebase cloud unlink`
-does not delete an unclaimed project: it warns that the project keeps running
-until it expires and prints the claim URL, and `init --claim` in a directory
-that is already linked to one points at its claim URL instead of provisioning a
-second. Until the claim, the app reaches the internet on ports 80 and 443 only;
-the mail ports every other project has (465, 587 and 993) open when the project
-is claimed.
-
-Once the deploy has built the app, the command also sets `REBASE_API_TOKEN` in
-`.env`: a key minted on the app itself, which is what the MCP server and the SDK
-send to it. A `REBASE_API_TOKEN` already in `.env` is kept and none is minted,
-and a `.env` the command creates is readable by you alone. It reads and writes data (`data:read`, `data:write`) through the
-app's row-level security, as a caller who is neither a person nor an admin. It
-holds nothing of the admin plane, and it expires with the claim window. With
-`--no-deploy`, or when that first deploy fails, there is no key yet: the next
-`rebase cloud deploy` that succeeds in the directory asks for one, as long as the
-project is unclaimed and `.env` sets no `REBASE_API_TOKEN` already. The key
-expires at the end of the claim window even when the project is claimed sooner,
-so the MCP server and the SDK start getting 401 from the app then; `init`,
-`deploy`, `status` and `whoami` print the date, and so does the refusal that
-follows a claim. Once the project is yours, create a permanent key in its admin
-panel and put it in `.env` as `REBASE_API_TOKEN` in place of the agent's.
-
-Claiming takes a signed-in browser session, not a token, and a payment method on
-the organization the project moves into. From the claim onwards the project is
-billed like any other. Claiming also revokes the agent's token: sign in with
-`rebase cloud login`, or mint a new token with `rebase cloud tokens create`.
-
-Provisioning without an account is bounded per address and in total, and a
-control plane that has not switched it on refuses with a message saying so.
+`rebase cloud init --claim` gives an app a live backend before anyone has signed
+up, and prints a claim URL for the person to keep it; a project nobody claims
+within 72 hours is deleted. What the unclaimed project's token may do, the
+`REBASE_API_TOKEN` it writes and what claiming changes are in
+[A backend with no account](/docs/deployment/cloud-agents/#a-backend-with-no-account).
 
 ## Compute, and what it costs
 
@@ -558,9 +438,9 @@ except one that restarts the database, which waits for a maintenance window.
 | Command group | What it covers |
 |---|---|
 | `login`, `logout`, `whoami` | Your session |
-| `tokens` | Tokens for CI and agents, each narrowed to one project. See [CI and agents](#ci-and-agents) |
+| `tokens` | Tokens for CI and agents, each narrowed to one project. See [CI and agents](/docs/deployment/cloud-agents/#ci-and-agents) |
 | `link`, `unlink`, `use`, `open` | Binding this directory to a project, selecting an organization, opening the console |
-| `init`, `claim` | With `--claim`: a live backend with no account, and a link to claim it; `claim` prints that link again. See [A backend with no account](#a-backend-with-no-account) |
+| `init`, `claim` | With `--claim`: a live backend with no account, and a link to claim it; `claim` prints that link again. See [A backend with no account](/docs/deployment/cloud-agents/#a-backend-with-no-account) |
 | `projects` | Create, list, inspect, delete |
 | `deploy`, `logs`, `deployments`, `rollback`, `cancel` | Shipping and watching |
 | `previews` | Builds served on their own address by `deploy --preview`, and deleting them. See [Preview a change](#preview-a-change) |
@@ -606,7 +486,7 @@ Stated plainly, because finding out later is worse:
 - **No branch deploys**, and no first-party GitHub App. Deploy hooks — secret URLs
   you point a repository webhook at — are the supported automation. [Preview
   deploys](#preview-a-change) are rolling out and are started from the CLI.
-- **Tokens act as a person.** A [token](#ci-and-agents) is minted by an account
+- **Tokens act as a person.** A [token](/docs/deployment/cloud-agents/#ci-and-agents) is minted by an account
   and acts as it; there is no organization-owned machine identity yet. If you
   sign in from CI instead, pass `REBASE_CLOUD_EMAIL` and `REBASE_CLOUD_PASSWORD`
   from a secret store — `--password` puts the password in your shell history and
