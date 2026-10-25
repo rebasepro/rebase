@@ -150,9 +150,11 @@ asCustomer.close();
 The derived client is typed by the same `Database` as the one it came from, and
 is a client of its own: `close()` it when you are done.
 
-The effective-role switch (`useBuildEffectiveRoleController`) is not an RLS
-tester: it only changes which Studio views the navigation lists, sends nothing
-to the server, and evaluates no policy.
+The effective-role switch is not an RLS tester: it only changes which Studio
+views the navigation lists, sends nothing to the server, and evaluates no
+policy. `useBuildEffectiveRoleController`, which built one, is deprecated and
+warns once when called: `<Rebase>` builds its own controller when none is
+passed, and Simulate access is the way to test what a role can do.
 
 ## Next Steps
 
