@@ -31,6 +31,7 @@ import { CLAIM_FLAGS } from "./claim";
 import { CRON_LIST_FLAGS, CRON_LOGS_FLAGS } from "./cron";
 import { PREVIEWS_LIST_FLAGS, PREVIEWS_DELETE_FLAGS } from "./previews";
 import { USAGE_FLAGS, USAGE_ACTIONS } from "./usage";
+import { NOTIFICATIONS_ADD_FLAGS } from "./notifications";
 
 /**
  * Which spec backs which page.
@@ -70,8 +71,10 @@ const SPECS: Record<string, Record<string, unknown> | null> = {
         "--source": String
     },
     webhooks: null,
-    "webhooks create": { "--name": String, "--table": String, "--endpoint": String, "--events": String },
-    "webhooks delete": {},
+    notifications: null,
+    "notifications add": NOTIFICATIONS_ADD_FLAGS,
+    "notifications test": {},
+    "notifications remove": {},
     billing: { "--limit": Number },
     usage: USAGE_FLAGS,
     logs: LOGS_FLAGS,

@@ -557,7 +557,8 @@ except one that restarts the database, which waits for a maintenance window.
 | `compute` | What this project reserves, what it costs, and how to change it |
 | `usage` | Requests used this month against the included allowance, and the overage so far, as the invoice counts it. `usage org` lists every project of the organization |
 | `clusters` | The clusters tenants run on. Platform-admin only |
-| `settings`, `orgs`, `webhooks`, `billing` | Project settings, organizations, deploy hooks, payment |
+| `settings`, `orgs`, `billing` | Project settings, organizations, payment |
+| `notifications`, `webhooks` | Where the project's events are POSTed: Slack, Discord or any https URL ([Cloud notifications](/docs/deployment/cloud-notifications/)). `webhooks` is retired and exits 1 with code `command_retired` |
 
 Every group in that table answers `--help` with a page of its own — a usage line,
 its flags, and examples — and `--help` never runs the command. A test holds the

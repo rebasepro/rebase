@@ -609,34 +609,6 @@ export const ACTION_HELP: Record<string, ActionHelp> = {
         ]
     },
 
-    "webhooks create": {
-        command: "cloud webhooks create",
-        usage:
-            "cloud webhooks create --name <name> --table <table> --endpoint <url> [--events <list>]",
-        summary: "Register an outbound webhook on a table's row changes.",
-        flags: [
-            ["--name <name>", "Required. What it is called in listings"],
-            ["--table <table>", "Required. The table whose changes fire it"],
-            ["--endpoint <url>", "Required. Where the POST goes"],
-            ["--events <list>", "Comma-separated: insert, update, delete. Default: all three"]
-        ],
-        examples: [
-            "rebase cloud webhooks create --name notify --table orders --endpoint https://example.com/hook",
-            "rebase cloud webhooks create --name audit --table users --endpoint https://example.com/hook --events insert,delete"
-        ],
-        notes: [
-            "`--endpoint`, not `--url`: every cloud command's `--url` names the control plane, and one written here would be authenticated against instead of called."
-        ]
-    },
-
-    "webhooks delete": {
-        command: "cloud webhooks delete",
-        usage: "cloud webhooks delete <id>",
-        summary: "Remove one webhook by the id `webhooks list` prints.",
-        flags: [],
-        examples: ["rebase cloud webhooks delete 42"]
-    },
-
     deployments: {
         command: "cloud deployments",
         usage: "cloud deployments [list] [options]",
@@ -647,14 +619,74 @@ export const ACTION_HELP: Record<string, ActionHelp> = {
 
     webhooks: {
         command: "cloud webhooks",
-        usage: "cloud webhooks <list|create|delete> [options]",
-        summary: "Outbound webhooks on a table's row changes.",
+        usage: "cloud webhooks",
+        summary:
+            "Retired: it never delivered anything, and every action now exits 1 with code `command_retired`. "
+            + "A project's events (deploy failed, backups, billing, usage) go to Slack, Discord or any URL with "
+            + "`rebase cloud notifications`; a POST when rows of your app's own tables change is a WebhookDispatcher "
+            + "in your app's code.",
+        flags: [],
+        examples: ["rebase cloud notifications add https://hooks.slack.com/services/…"]
+    },
+
+    notifications: {
+        command: "cloud notifications",
+        usage: "cloud notifications [list|add|test|remove] [options]",
+        summary:
+            "Where the linked project's events are POSTed: a Slack or Discord incoming webhook, or any https URL. "
+            + "`list` (the default) shows each destination, masked, with the outcome of its last delivery; any "
+            + "member of the organization may read it. `add`, `test` and `remove` take the owner or admin role. "
+            + "Which emails you get is set in the console, under Account → Notifications.",
         flags: [],
         examples: [
-            "rebase cloud webhooks list",
-            "rebase cloud webhooks create --help",
-            "rebase cloud webhooks delete 42"
+            "rebase cloud notifications",
+            "rebase cloud notifications add https://hooks.slack.com/services/T000/B000/XXXX",
+            "rebase cloud notifications test 6f1c…",
+            "rebase cloud notifications remove 6f1c… --yes"
         ]
+    },
+
+    "notifications add": {
+        command: "cloud notifications add",
+        usage: "cloud notifications add <url> [--events <list>] [--format json|slack] [--name <name>]",
+        summary:
+            "Send the project's events to a URL. The control plane refuses a URL that is not https, or that "
+            + "resolves to a private, loopback, link-local or metadata address, now and at every delivery. "
+            + "Prints the signing secret once.",
+        flags: [
+            ["--events <list>", "Comma-separated: deploy.failed, deploy.succeeded, deploy.rolled_back, backup.unhealthy, billing.payment_failed, usage.threshold. Default: deploy.failed"],
+            ["--format <json|slack>", "json (default): the event's facts plus a `text` line Slack reads as-is. slack: `{ text }` only"],
+            ["--name <name>", "What it is called in listings"]
+        ],
+        examples: [
+            "rebase cloud notifications add https://hooks.slack.com/services/T000/B000/XXXX",
+            "rebase cloud notifications add https://discord.com/api/webhooks/1/abc/slack --events deploy.failed,backup.unhealthy",
+            "rebase cloud notifications add https://ops.example.com/rebase --events deploy.failed,deploy.succeeded --name pager"
+        ],
+        notes: [
+            "The URL is a positional argument: `--url` names the control plane in every cloud command.",
+            "Each POST carries `X-Webhook-Signature: sha256=<hex HMAC-SHA256 of the raw body>` with the secret, "
+                + "`X-Webhook-Event`, and an `X-Webhook-Delivery` id that is the same on every retry of one delivery.",
+            "Discord takes Slack's format at its webhook URL with `/slack` appended."
+        ]
+    },
+
+    "notifications test": {
+        command: "cloud notifications test",
+        usage: "cloud notifications test <id>",
+        summary:
+            "POST a `notification.test` event now and report what the receiver answered. Exits 1, code "
+            + "`delivery_failed`, when it was not delivered.",
+        flags: [],
+        examples: ["rebase cloud notifications test 6f1c…"]
+    },
+
+    "notifications remove": {
+        command: "cloud notifications remove",
+        usage: "cloud notifications remove <id> [--yes]",
+        summary: "Stop sending events to a destination. Adding it again mints a new signing secret.",
+        flags: [],
+        examples: ["rebase cloud notifications remove 6f1c… --yes"]
     },
 
     billing: {

@@ -27,6 +27,7 @@ import { debugCommand, printDebugHelp } from "./debug";
 import { cronCommand } from "./cron";
 import { previewsCommand } from "./previews";
 import { usageCommand } from "./usage";
+import { notificationsCommand } from "./notifications";
 import {
     statusCommand,
     metricsCommand,
@@ -91,6 +92,7 @@ export const CLOUD_VALUE_FLAGS = {
     "--endpoint": String,
     "--events": String,
     "--expires-in": String,
+    "--format": String,
     "--function": String,
     "--grep": String,
     "--host": String,
@@ -121,7 +123,6 @@ export const CLOUD_VALUE_FLAGS = {
     "--spot": String,
     "--storage": String,
     "--subdomain": String,
-    "--table": String,
     "--tail": String,
     "--target": String,
     "--timeout": String,
@@ -397,6 +398,9 @@ export async function cloudCommand(subcommand: string | undefined, rawArgs: stri
         case "webhooks":
             await webhooksCommand(action, rawArgs);
             break;
+        case "notifications":
+            await notificationsCommand(action, rawArgs);
+            break;
         case "storage":
             await storageCommand(action, rawArgs);
             break;
@@ -538,7 +542,8 @@ export const CLOUD_GROUPS: HelpAction[] = [
     { action: "db", section: "Data", description: "Attach a database, back it up, restore, point-in-time recovery" },
     { action: "storage", section: "Data", description: "The project's object storage" },
 
-    { action: "webhooks", section: "Other resources", description: "Outbound webhooks on a table's row changes" },
+    { action: "notifications", section: "Deploy & observe", description: "Send deploy, backup, billing and usage events to Slack, Discord or any URL" },
+    { action: "webhooks", section: "Other resources", description: "Retired: use `notifications`, or a WebhookDispatcher in your app's code" },
     // Both of these dispatch and have a page, and both were absent from this
     // list — so the command that names what a project costs, and the one that
     // names what it declares, were undiscoverable from `rebase cloud --help`,

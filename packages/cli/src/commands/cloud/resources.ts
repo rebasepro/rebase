@@ -26,7 +26,6 @@ import {
     reportError,
     note,
     noteBlank,
-    requireCloudRow,
     billingAccountIdOf,
     grantForLink,
     appKeyExpiryNote,
@@ -542,161 +541,37 @@ maxPositionals: 0 });
     }
 }
 
-/* ─── webhooks ─────────────────────────────────────────────────── */
+/* ─── webhooks (retired) ───────────────────────────────────────── */
 
 /**
- * The webhook `webhooks delete` names.
+ * `rebase cloud webhooks` is retired, and says where to go instead.
  *
- * The worst instance of the operand-filter bug in this family, because the
- * argument is consumed by a DELETE and the wrong value looks entirely
- * plausible: `rebase cloud webhooks delete --project acme 42` filtered out
- * `--project` and kept "acme", so the id it deleted was the project slug rather
- * than the 42 the caller wrote. Strict parsing consumes the flag with its
- * value, leaving `["42"]`.
+ * It never worked. It wrote rows to a data collection named `webhooks` on the
+ * control plane, whose real slug is `database-webhooks` — and nothing on the
+ * control plane ever delivered those rows anyway. What people reached for it
+ * to do is now two other things:
  *
- * Exported so its tests drive the real parser.
+ *  - a project's own events (a deploy failed, backups stopped, a payment was
+ *    declined, usage passed 80%) to Slack, Discord or any URL:
+ *    `rebase cloud notifications`;
+ *  - a POST when rows of your app's own tables change: a `WebhookDispatcher`
+ *    in your app's code, which your backend delivers itself.
+ *
+ * Every action answers the same refusal, exit 1, code `command_retired`, with
+ * both routes — a retired command that still exits 0 would tell a script its
+ * webhook exists.
  */
-export function resolveWebhookIdArg(rawArgs: string[]): string | undefined {
-    return parseCloudArgs({
-        spec: {},
-        rawArgs,
-        commandWords: 3, // cloud webhooks delete
-        command: "cloud webhooks delete",
-        maxPositionals: 1
-    }).positionals[0];
-}
+export const WEBHOOKS_RETIRED_HINT =
+    "For a project's events (deploy failed, backups, billing, usage) to Slack, Discord or any URL: "
+    + "`rebase cloud notifications add <url>`. For row changes in your app's own tables: a WebhookDispatcher "
+    + "in your app's code — https://rebase.pro/docs/recipes/webhooks/";
 
-/** The action words `rebase cloud webhooks` dispatches. No word means `list`. */
-export const WEBHOOKS_ACTIONS = ["list", "create", "delete"] as const;
-
-export async function webhooksCommand(subcommand: string | undefined, rawArgs: string[]): Promise<void> {
-    // Before the parse and before the client: `webhooks creat` used to fall past
-    // both `if`s and LIST the webhooks, exit 0, and leave the caller believing
-    // one had been created.
-    requireKnownAction("webhooks", subcommand, WEBHOOKS_ACTIONS);
-
-    // Both lines are parsed BEFORE the client is built. A line the parser will
-    // refuse is refused without first spending a login round-trip on it — and
-    // for `delete`, without the ambiguity of a refusal that arrives after the
-    // command has already started talking to the control plane.
-    const create = subcommand === "create"
-        ? parseCloudArgs({
-            // `--endpoint`, not `--url`.
-            //
-            // Every command in this family inherits a global `--url`, which
-            // names the CONTROL PLANE — `resolveCloudUrl` reads it straight off
-            // the raw line, before any per-command spec exists. A second
-            // `--url` here did not shadow it, because the two parses are
-            // independent: `webhooks create --url https://example.com/hook`
-            // sent the customer's webhook endpoint to `requireClient` as the
-            // control plane to authenticate against, so the documented example
-            // could not create a webhook. Renaming is the fix; a per-command
-            // flag cannot be a global's spelling, and `action-help.test.ts`
-            // now sweeps for the class.
-            spec: { "--name": String,
-"--table": String,
-"--endpoint": String,
-"--events": String },
-            rawArgs,
-            commandWords: 3, // cloud webhooks create
-            command: "cloud webhooks create",
-            maxPositionals: 0
-        }).flags
-        : undefined;
-    const deleteId = subcommand === "delete" ? resolveWebhookIdArg(rawArgs) : undefined;
-    if (subcommand === "delete" && !deleteId) {
-        fail("Usage: rebase cloud webhooks delete <id>", undefined, "usage");
-    }
-    // The listing takes only the globals, and took them permissively: `webhooks
-    // list --tabel orders` listed every webhook and exited 0.
-    if (!create && !deleteId) {
-        parseCloudArgs({ spec: {},
-rawArgs,
-commandWords: 3,
-command: "cloud webhooks",
-maxPositionals: 0 });
-    }
-
-    const { client } = await requireClient(rawArgs);
-    const projectId = await requireProject(rawArgs, client);
-
-    try {
-        if (subcommand === "create") {
-            const args = create!;
-            const name = args["--name"] || fail("--name is required.", undefined, "usage");
-            const table = args["--table"] || fail("--table is required.", undefined, "usage");
-            const url = args["--endpoint"] || fail("--endpoint is required.", "Where the POST goes.", "usage");
-            const events = (args["--events"] || "insert,update,delete").split(",").map((s) => s.trim());
-
-            const created = requireCloudRow(await client.data.collection("webhooks").create({
-                project: projectId,
-                name,
-                table,
-                url,
-                events,
-                enabled: true
-            }), "webhook");
-            success(`Created webhook ${chalk.bold(name)} [${created.id}]`);
-            emit(() => {}, {
-                success: true,
-                id: String(created.id),
-                projectId,
-                name,
-                table,
-                url,
-                events,
-                enabled: true
-            });
-            return;
-        }
-
-        if (subcommand === "delete") {
-            await client.data.collection("webhooks").delete(deleteId!);
-            success(`Deleted webhook ${deleteId}`);
-            emit(() => {}, { success: true,
-id: deleteId!,
-projectId });
-            return;
-        }
-
-        // list
-        const hooks = (await client.data.collection("webhooks").find({
-            where: { project: ["==", projectId] },
-            limit: 100
-        })).data as Array<{ id: string | number; name?: string; table?: string; url?: string; enabled?: boolean; events?: string[] }>;
-
-        emit(
-            () => {
-                console.log("");
-                console.log(chalk.bold(`  🔗 Webhooks — project ${displayProjectRef(rawArgs)}`));
-                console.log("");
-                if (hooks.length === 0) {
-                    console.log(chalk.gray("  No webhooks. Add one with `rebase cloud webhooks create`."));
-                    console.log("");
-                    return;
-                }
-                for (const h of hooks) {
-                    const state = h.enabled ? chalk.green("enabled") : chalk.gray("disabled");
-                    console.log(`  ${chalk.bold(h.name ?? "(unnamed)")} ${chalk.gray(`[${h.id}]`)} ${state}`);
-                    console.log(`    ${chalk.gray(`${h.table ?? "?"} → ${h.url ?? "?"}  (${(h.events ?? []).join(", ")})`)}`);
-                }
-                console.log("");
-            },
-            {
-                projectId,
-                webhooks: hooks.map((h) => ({
-                    id: String(h.id),
-                    name: h.name ?? null,
-                    table: h.table ?? null,
-                    url: h.url ?? null,
-                    events: h.events ?? [],
-                    enabled: h.enabled ?? null
-                }))
-            }
-        );
-    } catch (e) {
-        reportError(e, "Webhook operation failed");
-    }
+export async function webhooksCommand(_subcommand: string | undefined, _rawArgs: string[]): Promise<void> {
+    fail(
+        "`rebase cloud webhooks` is retired: it never delivered anything.",
+        WEBHOOKS_RETIRED_HINT,
+        "command_retired"
+    );
 }
 
 /* ─── storage ──────────────────────────────────────────────────── */

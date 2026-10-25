@@ -1,7 +1,7 @@
 ---
 title: rebase cloud
 sidebar_label: rebase cloud
-description: The command groups for Rebase Cloud in the CLI — auth, project link, deploys, config, organizations, databases, resources, compute, storage, webhooks, clusters, billing and usage.
+description: The command groups for Rebase Cloud in the CLI — auth, project link, deploys, notifications, config, organizations, databases, resources, compute, storage, clusters, billing and usage.
 ---
 
 Everything to do with Rebase Cloud, which is in private beta. See the
@@ -218,13 +218,14 @@ rebase cloud compute set        # change it
 tiers: everything is priced per resource. See
 [Rebase Cloud](/docs/deployment/cloud/).
 
-## Storage, webhooks, clusters, billing and usage
+## Storage, notifications, clusters, billing and usage
 
 ```bash
 rebase cloud storage             # list storage buckets
 rebase cloud storage create      # provision platform-managed storage
 rebase cloud storage attach      # attach your own S3-compatible bucket
-rebase cloud webhooks list | create | delete
+rebase cloud notifications [list] | add <url> | test <id> | remove <id>   # deploy, backup, billing and usage events to Slack, Discord or any URL
+rebase cloud webhooks            # retired: exits 1 (`command_retired`) and names `notifications`
 rebase cloud clusters list | add | verify   # the clusters tenants run on; `add` registers one from a kubeconfig
 rebase cloud billing             # the billing account and card on file
 rebase cloud billing setup       # attach a card, one-time, opens a browser
@@ -234,6 +235,19 @@ rebase cloud billing upcoming    # a preview of each subscription's next invoice
 rebase cloud usage [--month YYYY-MM]   # requests used this month against the allowance, and the overage so far
 rebase cloud usage org           # every project of the selected organization, with the total
 ```
+
+`notifications add <url>` sends the linked project's events to a URL. `--events`
+takes a comma-separated list of `deploy.failed` (the default),
+`deploy.succeeded`, `deploy.rolled_back`, `backup.unhealthy`,
+`billing.payment_failed` and `usage.threshold`. `--format slack` sends
+`{ "text" }` alone instead of the event JSON, which also carries a `text`. The URL
+is a positional argument because `--url` names the control plane. `add` prints
+the signing secret once; `--json` returns `{ projectId, webhook, secret }`.
+`test <id>` exits 1 with code `delivery_failed` when the receiver did not accept
+the test event. Listing is open to any member of the organization; `add`, `test`
+and `remove` need the owner or admin role. These routes take your
+`rebase cloud login`: no access-token capability includes them. See
+[Cloud notifications](/docs/deployment/cloud-notifications/).
 
 `billing invoices` and `billing upcoming` read the same Stripe data as the
 console's Billing page, and are open to the organization's owners and admins
