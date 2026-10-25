@@ -70,7 +70,7 @@ const Thrice: React.FC = () => {
                         const o = ramp(frame, ats[i], 12, ENTER);
                         return (
                             <div key={t.file} style={{ flex: 1, opacity: o, transform: `translateY(${(1 - o) * 14}px) rotate(${(i - 1) * (tall ? 0 : 1.2)}deg)` }}>
-                                <Editor file={t.file} code={t.code} size={tall ? 20 : 22} at={0} step={0} accent={CHROMA.coral} />
+                                <Editor file={t.file} code={t.code} size={tall ? 18 : 22} at={0} step={0} accent={CHROMA.coral} />
                             </div>
                         );
                     })}

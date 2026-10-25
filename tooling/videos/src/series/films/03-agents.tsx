@@ -83,20 +83,20 @@ const Mcp: React.FC = () => {
                 <Label at={6} color={ACCENT} size={tall ? 20 : 18}>.mcp.json · written by rebase init</Label>
                 <div style={{ height: 14 }} />
                 <Frame surface="well" delay={4} bodyStyle={{ padding: "22px 26px" }}>
-                    <Code code={MCP_JSON} size={tall ? 28 : 28} delay={10} step={2} />
+                    <Code code={MCP_JSON} size={tall ? 22 : 28} delay={10} step={2} />
                 </Frame>
             </At>
-            <At x={tall ? x : x + 720} y={tall ? y + 460 : y} w={tall ? w : 680}>
-                <Label at={tools} size={tall ? 20 : 18}>44 tools · nineteen of them</Label>
+            <At x={tall ? x : x + 720} y={tall ? y + 400 : y} w={tall ? w : 680}>
+                <Label at={tools} size={tall ? 20 : 18}>{tall ? "44 tools · nine of them" : "44 tools · nineteen of them"}</Label>
                 <div style={{ display: "flex", flexWrap: "wrap", gap: 10, marginTop: 14 }}>
-                    {TOOLS.slice(0, tall ? 12 : 19).map((t, i) => {
+                    {TOOLS.slice(0, tall ? 9 : 19).map((t, i) => {
                         const o = ramp(frame, tools + i * 2, 10, ENTER);
                         return (
                             <span
                                 key={t}
                                 style={{
                                     fontFamily: FONT.mono,
-                                    fontSize: tall ? 26 : 25,
+                                    fontSize: tall ? 22 : 25,
                                     padding: "8px 14px",
                                     borderRadius: 6,
                                     background: "rgba(255,255,255,0.08)",
