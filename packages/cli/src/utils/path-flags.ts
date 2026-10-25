@@ -58,6 +58,10 @@ const MISSING_COLLECTIONS_CONSEQUENCE = {
     doctor: [
         "Nothing was checked — a directory that is not there has no collections, so",
         "every collection check would pass over it."
+    ],
+    verify: [
+        "Nothing was verified — a directory that is not there has no collections, so",
+        "every step would pass over it and report 0 errors."
     ]
 } as const;
 

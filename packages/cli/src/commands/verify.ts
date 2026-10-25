@@ -39,8 +39,8 @@ import {
     type SecurityRule
 } from "@rebasepro/types";
 import { parseCommandArgs, wantsHelp } from "../utils/args";
-import { findBackendDir, getActiveBackendPlugin, readEnvFile, requireProjectRoot } from "../utils/project";
-import { COLLECTIONS_FLAG_HELP } from "../utils/path-flags";
+import { failAsJson, findBackendDir, getActiveBackendPlugin, readEnvFile, requireProjectRoot } from "../utils/project";
+import { COLLECTIONS_FLAG_HELP, missingCollectionsPath } from "../utils/path-flags";
 import { isLoadedCollectionFile } from "../utils/collection-drift";
 
 /** The flags `rebase verify` takes. */
@@ -721,6 +721,27 @@ export async function verifyCommand(rawArgs: string[]): Promise<void> {
     });
 
     const projectRoot = requireProjectRoot();
+    const backendDir = findBackendDir(projectRoot);
+    if (flags["--collections"]) {
+        // A mistyped `-c` used to skip every step and print "0 errors" with
+        // exit 0 — a green CI run over nothing. Refused as `doctor` and
+        // `schema` refuse it. Without the flag, a project with no collections
+        // directory (a headless one) is still a skip, not a failure.
+        const refusal = missingCollectionsPath(rawArgs, process.cwd(), backendDir ?? projectRoot, "verify");
+        if (refusal) {
+            if (flags["--json"]) {
+                failAsJson(
+                    `Collections path not found: "${flags["--collections"]}" (resolved to ${path.resolve(process.cwd(), flags["--collections"])}).`,
+                    "collections_not_found",
+                    "Leave --collections out (config/collections is the default), or pass a directory that exists; relative paths are resolved from where you run the command."
+                );
+            }
+            console.error("");
+            for (const line of refusal) console.error(line);
+            console.error("");
+            process.exit(1);
+        }
+    }
     const collectionsDir = flags["--collections"]
         ? path.resolve(process.cwd(), flags["--collections"])
         : path.join(projectRoot, "config", "collections");
@@ -732,7 +753,7 @@ export async function verifyCommand(rawArgs: string[]): Promise<void> {
     const report = await runVerify({
         projectRoot,
         collectionsDir,
-        backendDir: findBackendDir(projectRoot),
+        backendDir,
         live,
         databaseUrl
     });

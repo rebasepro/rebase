@@ -318,6 +318,43 @@ describe("rebase verify --json", () => {
     });
 });
 
+describe("rebase verify --collections", () => {
+    let cwd: string;
+    let stdout: string[];
+    let stderr: string[];
+
+    beforeEach(() => {
+        cwd = process.cwd();
+        stdout = [];
+        stderr = [];
+        vi.spyOn(console, "log").mockImplementation((...args: unknown[]) => { stdout.push(args.map(String).join(" ")); });
+        vi.spyOn(console, "error").mockImplementation((...args: unknown[]) => { stderr.push(args.map(String).join(" ")); });
+        vi.spyOn(process, "exit").mockImplementation(((code?: number) => {
+            throw new Error(`exit ${code}`);
+        }) as typeof process.exit);
+    });
+
+    afterEach(() => {
+        process.chdir(cwd);
+        process.exitCode = undefined;
+    });
+
+    it("refuses a mistyped path instead of passing every step over nothing", async () => {
+        process.chdir(root);
+        await expect(verifyCommand(["node", "rebase", "verify", "-c", "config/colections"])).rejects.toThrow("exit 1");
+        expect(stderr.join("\n")).toContain('Collections path not found: "config/colections"');
+        expect(stdout.join("\n")).not.toContain("0 errors");
+    });
+
+    it("refuses it with a JSON envelope under --json", async () => {
+        process.chdir(root);
+        await expect(verifyCommand(["node", "rebase", "verify", "--json", "--collections", "nope"])).rejects.toThrow("exit 1");
+        const envelope = JSON.parse(stdout.join("\n")) as { error: { code: string; message: string } };
+        expect(envelope.error.code).toBe("collections_not_found");
+        expect(envelope.error.message).toContain("nope");
+    });
+});
+
 describe("a fresh scaffold", () => {
     /**
      * Every preset `rebase init` writes must pass its own verifier — otherwise
