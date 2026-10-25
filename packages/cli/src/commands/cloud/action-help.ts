@@ -681,7 +681,7 @@ export const ACTION_HELP: Record<string, ActionHelp> = {
             + "resolves to a private, loopback, link-local or metadata address, now and at every delivery. "
             + "Prints the signing secret once.",
         flags: [
-            ["--events <list>", "Comma-separated: deploy.failed, deploy.succeeded, deploy.rolled_back, backup.unhealthy, billing.payment_failed, usage.threshold. Default: deploy.failed"],
+            ["--events <list>", "Comma-separated: deploy.failed, deploy.succeeded, deploy.rolled_back, backup.unhealthy, billing.payment_failed, usage.threshold, preview.paused. Default: deploy.failed"],
             ["--format <json|slack>", "json (default): the event's facts plus a `text` line Slack reads as-is. slack: `{ text }` only"],
             ["--name <name>", "What it is called in listings"]
         ],

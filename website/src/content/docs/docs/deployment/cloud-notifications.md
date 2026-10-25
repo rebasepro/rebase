@@ -27,8 +27,9 @@ rebase cloud notifications remove <id>
 ```
 
 The events are `deploy.failed` (the default), `deploy.succeeded`,
-`deploy.rolled_back`, `backup.unhealthy`, `billing.payment_failed` and
-`usage.threshold`. Each POST is JSON with a `type`, the `project`, the facts of
+`deploy.rolled_back`, `backup.unhealthy`, `billing.payment_failed`,
+`usage.threshold` and `preview.paused` (a backend preview whose database grew
+past the preview limit was stopped). Each POST is JSON with a `type`, the `project`, the facts of
 the event, a console `url` and a one-line `text`. Slack shows the `text` as the
 message, so a Slack incoming-webhook URL works without any setup. For Discord,
 add `/slack` to the end of its webhook URL. `--format slack` sends `{ "text" }`

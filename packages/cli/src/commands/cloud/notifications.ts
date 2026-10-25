@@ -39,7 +39,8 @@ export const NOTIFICATION_EVENTS = [
     "deploy.rolled_back",
     "backup.unhealthy",
     "billing.payment_failed",
-    "usage.threshold"
+    "usage.threshold",
+    "preview.paused"
 ] as const;
 
 export const NOTIFICATIONS_ACTIONS = ["list", "add", "test", "remove"] as const;

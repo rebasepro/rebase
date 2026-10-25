@@ -271,11 +271,21 @@ does. A first deploy that
 fails before anything runs is removed rather than billed. A project may run
 three backend previews at once.
 
+Each new preview address gets a TLS certificate of its own from Let's Encrypt,
+which allows a domain 50 new certificates a week, shared with every production
+site on it. Previews may take 20 of them in any 7 days, across the platform. Past
+that, a new preview is refused (`429`, `preview_cert_budget`) with the time it can
+be deployed; redeploying a preview that already exists never counts.
+
 A backend preview's database is a second database on **production's** Postgres:
 its own data, but the same instance and the same disk. It is limited to 10
-connections, so previews cannot use up production's, but its size is not
-limited: a preview that loads a large fixture fills production's disk too.
-Delete previews you no longer need. Extensions installed on production are not
+connections, so previews cannot use up production's, and to 2 GB: a preview
+whose database grows past that is paused. Its backend stops, its address stops
+answering, `rebase cloud previews` and the console show it as `paused` with the
+reason, and the project's owners and admins are notified (`preview.paused`). Its
+data is kept until it expires. Deploy it again to start it (it is paused again
+while the database is still too large), or delete it. A paused preview is still
+billed until it is deleted or expires. Delete previews you no longer need. Extensions installed on production are not
 installed in a preview's database.
 
 Previews are rolling out. A control plane that does not serve them yet refuses

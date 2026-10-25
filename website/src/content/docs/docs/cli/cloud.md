@@ -121,7 +121,11 @@ is refused with `PREVIEW_STATIC_UNSERVED` and publishes nothing. A backend
 preview is billed as one more app unit at the default size while it exists, and
 the deploy says what that comes to per month, from the control plane's own quote
 (`cost` under `--json`; only the rule and this link when the control plane cannot
-price it); `rebase cloud previews delete <name>` stops it.
+price it); `rebase cloud previews delete <name>` stops it. `rebase cloud previews`
+shows a preview the platform paused (its database grew past the preview limit) as
+`paused`, with the reason (`statusMessage` under `--json`). A new preview address
+can be refused with `preview_cert_budget` when the platform's weekly budget of
+preview certificates is spent; the message says until when.
 See [Preview a change](/docs/deployment/cloud/#preview-a-change).
 
 ### Logs
@@ -294,7 +298,7 @@ rebase cloud usage org           # every project of the selected organization, w
 <span class="since-badge" data-since="0.26">Since 0.26</span> `notifications add <url>` sends the linked project's events to a URL. `--events`
 takes a comma-separated list of `deploy.failed` (the default),
 `deploy.succeeded`, `deploy.rolled_back`, `backup.unhealthy`,
-`billing.payment_failed` and `usage.threshold`. `--format slack` sends
+`billing.payment_failed`, `usage.threshold` and `preview.paused`. `--format slack` sends
 `{ "text" }` alone instead of the event JSON, which also carries a `text`. The URL
 is a positional argument because `--url` names the control plane. `add` prints
 the signing secret once; `--json` returns `{ projectId, webhook, secret }`.

@@ -95,6 +95,8 @@ export interface Preview {
      */
     backend: PreviewBackend | null;
     status: string | null;
+    /** Why it is in its status, as the control plane wrote it — set for `paused` (its database outgrew the preview limit). */
+    statusMessage: string | null;
     /** The deployment that built it, in {@link PREVIEW_DEPLOYMENTS_COLLECTION}. */
     deploymentId: string | null;
     createdAt: string | null;
@@ -132,6 +134,7 @@ export function previewFrom(value: unknown): Preview | null {
         app: text(value, "app"),
         backend: backend === "preview" || backend === "production" ? backend : null,
         status: text(value, "status"),
+        statusMessage: text(value, "statusMessage", "status_message"),
         deploymentId: text(value, "deploymentId", "deployment_id"),
         createdAt: text(value, "createdAt", "created_at"),
         updatedAt: text(value, "updatedAt", "updated_at"),
@@ -414,6 +417,7 @@ async function listCommand(rawArgs: string[]): Promise<void> {
                     .join("  ·  ");
                 console.log(`  ${chalk.bold(p.name.padEnd(nameWidth))}  ${chalk.cyan(p.url)}`);
                 if (tags) console.log(`  ${" ".repeat(nameWidth)}  ${chalk.gray(tags)}`);
+                if (p.statusMessage) console.log(`  ${" ".repeat(nameWidth)}  ${chalk.yellow(p.statusMessage)}`);
             }
             console.log("");
         },
