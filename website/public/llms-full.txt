@@ -4231,6 +4231,14 @@ yet, listed so that nobody reads a promise into them:
   and handlers. Before, they answered
   404. `rebase.auth` still answers a 404 that names the surface and points at
   `rebase.admin`.
+- **Collection callbacks name the API key a write was made with, as
+  `context.credential`:** `{ kind: "personal" | "service", id, name }` for a
+  write through the data API, the realtime socket or `/mcp` with an `rk_` key,
+  so a personal key's write can be told apart from its owner's own. It is
+  absent for a session, the service key, server-side work and the browser. New
+  type `CallerCredential`; `User.credential` and `RebaseCallContext.credential`
+  carry it, and the socket's `resolveApiKey` may return the key's `name` and
+  `kind`.
 ##### CLI
 
 - **`rebase cloud deploy` checks a static app's JavaScript before uploading
@@ -4266,7 +4274,10 @@ yet, listed so that nobody reads a promise into them:
   `docs/preview-deployments.md`. A backend preview's deploy says what it costs
   per month, from the control plane's own quote (`cost` under `--json`), or
   gives the billing rule and a docs link when the control plane cannot price
-  it.
+  it. Rebase Cloud pauses a backend preview whose database grows past the
+  preview limit (2 GB by default); `rebase cloud previews` prints why under a
+  paused preview (`statusMessage` in `--json`), and
+  `rebase cloud notifications add --events preview.paused` subscribes to it.
 
 - **Previews can run with their own environment variables.** A backend preview
   starts from production's variables, and that copy carries production's live
@@ -4301,10 +4312,13 @@ yet, listed so that nobody reads a promise into them:
   read it, here and on the console's Activity page.
 
 - **`rebase cloud orgs members invite` invites anyone to an organization by
-  email** (`--role admin|member`). Someone with a verified Rebase account is
-  added at once; anyone else gets a single-use link, valid 7 days, that only an
-  account which verified the invited address can accept. `orgs members remove`,
-  `orgs members role` and `rebase cloud orgs invites` (list, revoke, resend)
+  email** (`--role admin|member`). Everyone, an existing account included, gets
+  a single-use link, valid 7 days, that only an account which verified the
+  invited address can accept; nobody joins an organization without accepting.
+  `--role owner` is refused with `invite_role_not_allowed`: invite as admin,
+  then promote with `orgs members role`. `orgs members remove`,
+  `orgs members role` and `rebase cloud orgs invites` (list, revoke, resend;
+  owners and admins only)
   manage the rest, and `orgs members` shows emails.
 
 - **`rebase cloud billing invoices` and `rebase cloud billing upcoming`** list
@@ -4350,6 +4364,45 @@ yet, listed so that nobody reads a promise into them:
 - **`rebase storage move` lists the source again after the move and names
   every file it did not move** (exit 1; `--json` `notMoved`). New
   `POST /api/admin/storage/move/verify`.
+
+- **`rebase cloud app-key` shows the app key a claim hands over, and
+  `rebase cloud app-key rotate` replaces it.** Claiming a project
+  `init --claim` provisioned now removes the expiry of the `REBASE_API_TOKEN`
+  it wrote into `.env`, which used to end with the claim window, and the notes that said the key stops
+  working even once the project is claimed now say a claim hands it over.
+  `app-key` lists the app's agent keys by prefix, never the value. `rotate`
+  (confirm or `--yes`) mints a key that does not expire, revokes the earlier
+  agent keys, and writes the new one into a `.env` that already sets
+  `REBASE_API_TOKEN` (keeping it out of `--json` there) or prints it once.
+  Signed in only.
+
+- **`rebase cloud service-key` shows a project's service key generation, and
+  `rebase cloud service-key rotate` replaces `REBASE_SERVICE_KEY`.** The app
+  restarts onto the new key, and the old one stops working once the restart has
+  finished; `service-key` says whether the restart is still under way and never
+  prints the key (`rebase cloud env reveal REBASE_SERVICE_KEY` does). Claiming a
+  project rotates it as well, so nothing an agent's code read before the claim
+  stays valid. Signed in only.
+
+- **`rebase cloud tokens create --can` takes organization capabilities:**
+  `billing`, `audit` and `notifications` give a token one organization's
+  billing, audit log or notifications (`org:<capability>:<organizationId>`; the
+  organization is `--org`, else the project's own, else the one
+  `rebase cloud use` selected). A token may hold only organization
+  capabilities. `tokens list`, `whoami` and `tokens create --json` read them
+  back. Reading the audit log with a token now needs `audit`; a token from
+  before `billing` existed keeps billing access for one release, and the CLI
+  prints the control plane's deprecation notice once, on stderr. `logs` now
+  also covers `rebase cloud usage`.
+
+- **`rebase cloud clusters registry` gives a customer-owned cluster an image
+  registry of its own** (platform admins): `--repository`,
+  `--push-service-account` and `--pull-key-file`, all three or `--clear`. That
+  cluster's builds push only to its own repository, and its image pull secret
+  holds only the reader key. A pull key that belongs to the push account is
+  refused before it leaves the machine, and the key is never printed. A deploy
+  to a cluster Rebase does not operate that still uses the shared registry says
+  so in its deploy log.
 ##### Client SDK
 
 - **`client.admin.listUsers({ role, ids })` filters by role and resolves a known
@@ -4456,11 +4509,26 @@ yet, listed so that nobody reads a promise into them:
   API base path too.** Only Hono's default `404 Not Found` is turned into the
   JSON envelope.
 
+##### Client SDK
+
+- **A typed client created without its collections dictionary says which
+  accessor was used, where the request went and how to fix it.** The one-time
+  warning now names the accessor and the `/data/<slug>` path it was sent to,
+  and gives both fixes: pass `collections: collectionsDictionary` from
+  `generated/sdk/database.types`, or use `client.data.collection("<slug>")`.
+  `collections` is documented as required for a typed client.
+
 #### Deprecated
 
 - **`GET /api/admin/storage/orphans`, and `DELETE` without `?scan=`,** the
   scan inside one request. They answer with `Deprecation: true` and a `Link` to
   the scan routes, and will be removed in a later release.
+- **The hook that builds an effective-role controller is deprecated.**
+  `useBuildEffectiveRoleController` only changes which Studio views are listed,
+  never what a role can read. It still works and warns once, naming Simulate
+  access: test permissions with `useRlsSimulation` or `client.simulate()`.
+  `<Rebase>` no longer calls it for its fallback, so an app that never calls it
+  sees no warning.
 #### Fixed
 
 ##### Runtime
@@ -4679,6 +4747,13 @@ yet, listed so that nobody reads a promise into them:
 - **Project verification reads a belongsTo owner column from its
   relation name.** In `rebase verify`, a `workspace` relation with
   `relationName: "tenant"` (column `tenant_id`) passed as public.
+
+- **A CI build of a fresh clone compiles typed callbacks.** `rebase build` and
+  `rebase cloud deploy` now write the server-side `Database` registration
+  (`config/generated/register.ts` and `database.types.ts`, as
+  `rebase generate-sdk` writes them) before the type check, when the backend
+  sets `registerDatabase` or an earlier `--register` left one. They keep that
+  one current and refuse to overwrite a `register.ts` they did not write.
 ##### Client SDK
 
 - **A public page no longer prints the client's connection messages to every
@@ -4773,6 +4848,20 @@ yet, listed so that nobody reads a promise into them:
   open a subcollection by its full path (`posts/p1/comments`) inside a scope
   that holds its parent.
 
+- **A record panel whose record is deleted elsewhere keeps what was typed.**
+  With a live read, `EntityFormPanel` threw "Form has not been initialised
+  with the correct parameters" mid-edit. It now does what the edit view does:
+  it keeps the last record and the typed values, says the record was deleted
+  elsewhere, and offers "Save as new", which turns the panel into a create
+  form with those values; `onSaved` reports the new record.
+
+- **A dialog never runs wider than a phone's screen.** The kit's `Dialog`
+  ignored `fullWidth` whenever `maxWidth` was set, so every default dialog was
+  a fixed 512px. `fullWidth` (the default) now gives 11/12 of the viewport
+  capped by `maxWidth`, and `fullWidth={false}` gives `maxWidth` capped at
+  11/12. Desktop sizes are unchanged. The AI collection generator's panel fits
+  a phone too.
+
 ##### MCP
 
 - **`rebase_cloud_provision` says what to do when the control plane refuses**
@@ -4829,6 +4918,17 @@ yet, listed so that nobody reads a promise into them:
   is reserved.** Reading, writing or listing it answers `400
   INVALID_STORAGE_KEY`, so a caller cannot forge what an administrator's
   orphan delete removes.
+- **An OAuth sign-in whose provider verified the email verifies the matching
+  unverified account, after removing what nobody proved on it.** Before linking,
+  the password, every identity whose provider did not vouch for the address
+  and every session are removed, as a magic link or email code already does, so
+  someone who pre-registered the victim's address keeps no way in. The refusal
+  reasons `local-account-unverified` and `local-account-unverified-passwordless`
+  are no longer returned. A provider that does not assert `email_verified`
+  still gets `403 EMAIL_NOT_VERIFIED` (`provider-email-unverified`), and a user
+  store without `unlinkUserIdentity` answers `409 UNVERIFIED_IDENTITIES` and
+  changes nothing. A user who never verified their password loses it on their
+  first provider sign-in.
 #### Documentation
 
 - **Embedding the Postgres Driver and The Remote MCP Endpoint are pages of their
@@ -19565,7 +19665,7 @@ const { data } = await client.data.products.find();
 
 When `Database` is supplied, `createRebaseClient` returns a `CreateRebaseClientResult<DB>` instance. This maps camelCase collection accessors directly on `client.data` to their corresponding types, giving you full autocomplete on collection operations and types (e.g. `client.data.products.find()`).
 
-`collectionsDictionary` maps each accessor back to the slug the wire uses. Pass it whenever a slug is not already a valid property name — `my-notes` is reachable as `client.data.myNotes` only because the dictionary says so.
+`collectionsDictionary` maps each accessor back to the slug the wire uses. **`collections` is required for a typed client.** The types offer every accessor whether you pass it or not, but without it `client.data.myNotes` is sent to `/data/my_notes`, the accessor in snake_case, so a slug like `my-notes` or a renamed accessor answers 404. The client warns once, naming the accessor and the fix. A later version will make `collections` required in the types when `Database` is supplied.
 
 A few names on `client.data` are taken: `collection` is the dynamic `collection(slug)` function, and `then`, `toJSON` and `$$typeof` are left alone for promise and serialisation checks. A collection whose accessor would be one of them is generated as `<name>Collection` — the `collection` slug is `client.data.collectionCollection` — and `generate-sdk` prints a warning naming both. `client.data.collection("collection")` reaches it too.
 
@@ -26287,7 +26387,7 @@ the ID you got. Read the response header.
 | `CHALLENGE_EXHAUSTED` | 401 | Too many wrong codes against one MFA challenge. | Start a new challenge. |
 | `EMAIL_EXISTS` | 409 | An account with that address already exists — on registration, on an address change, and on following an address-change link when another account took the address while it waited. | Sign in, or start a password reset; for an address change, pick another address. |
 | `EMAIL_NOT_CONFIGURED` | 503 | Magic links or OTP were requested and the server has no mail transport. | Configure SMTP, or use another sign-in method. |
-| `EMAIL_NOT_VERIFIED` | 403 | The account exists and its address is unverified. | Verify the address. |
+| `EMAIL_NOT_VERIFIED` | 403 | An OAuth sign-in found an account with the same address, and the provider did not verify that address, so it is not linked. | Sign in with the existing method, then `POST /auth/link/<provider>`. |
 | `FACTOR_NOT_VERIFIED` | 400 | The MFA factor was enrolled but never confirmed. | Confirm the factor. |
 | `IDENTITY_ALREADY_LINKED` | 409 | That OAuth identity belongs to another account. | Sign in with it, or unlink it there first. |
 | `IMPERSONATION_FORBIDDEN` | 403 | A request sent `x-rebase-impersonate` and its caller may not run a request as another user. Only a signed-in administrator's own session may, never an API key or the service key. | Send it with an administrator's session, or leave the header out. |
@@ -27743,24 +27843,21 @@ a trailing slash are ignored.
 
 What happens when someone registers with email/password as `ada@example.com`,
 then later clicks "Sign in with Google" on a Google account with that same
-address? Rebase **links the two into one account** — but only when the provider
-asserts the email as verified *and* the account's own address has been verified.
-It never silently creates a second account for the same address.
+address? Rebase **links the two into one account**, but only when the provider
+asserts the email as verified. It never silently creates a second account for
+the same address.
 
 On `POST /api/auth/<provider>` the resolution order is:
 
-1. **Known provider identity** — if this exact provider identity has signed in
+1. **Known provider identity**: if this exact provider identity has signed in
    before, that user is returned. The email is not consulted.
-2. **Existing account with the same email, both sides verified** — the
-   provider verified the email, and so has the account. The identity is
-   attached to the existing account and the user is signed in to it. One
-   account, two ways in.
-3. **Existing account with the same email, either side unverified** —
-   rejected with `403 EMAIL_NOT_VERIFIED`. Nothing is created or modified.
-   `details.reason` says which side: `provider-email-unverified`, or
-   `local-account-unverified` (the account has a password) /
-   `local-account-unverified-passwordless` (it does not).
-4. **No account with that email** — a new account is created, verified if the
+2. **Existing account with the same email, provider verified the email**: the
+   identity is attached and the user is signed in to it. One account, two ways
+   in. An unverified account is verified first (see below).
+3. **Existing account with the same email, provider did not verify it**:
+   rejected with `403 EMAIL_NOT_VERIFIED` and `details.reason`
+   `provider-email-unverified`. Nothing is created or modified.
+4. **No account with that email**: a new account is created, verified if the
    provider verified the email.
 
 Step 3 is the security-critical case. If an unverified provider email were
@@ -27770,17 +27867,19 @@ own could take over the matching Rebase account. Google always asserts
 Google sign-in; step 3 mostly catches providers that let users supply an
 arbitrary unconfirmed address.
 
-The account's side matters for the same reason. Nothing verifies the address
+The account's side matters too. Nothing verifies the address
 `POST /auth/register` is given, so anyone can register someone else's address
 with a password, or sign in as it through a provider that does not vouch for
-it, and wait. Linking the owner's Google sign-in onto that account would leave
-the other person's way in on it.
+it, and wait. Linking the owner's Google sign-in onto that account must not
+leave the other person's way in on it.
 
-A verification link, a magic link, an email code or a password reset proves
-the address and verifies the account. On an account that was not verified yet,
-the first such proof removes the password (a reset sets the new one) and every
-linked identity whose provider did not verify that address, and ends every
-session, before it marks the account verified. After that, step 2 applies.
+A provider that verified the address, a verification link, a magic link, an
+email code or a password reset all prove the address and verify the account.
+On an account that was not verified yet, the first such proof removes the
+password (a reset sets the new one) and every linked identity whose provider
+did not verify that address, and ends every session, before it marks the
+account verified: a password nobody verified is gone after the first Google
+sign-in.
 
 A verification link keeps what the person following it also proves: a live
 session of the account, or its password. See [Email verification](/docs/backend/email-verification/). Accounts created by an
@@ -28251,9 +28350,12 @@ The registrant follows the link and enters their password
 and signs them in. With it off, which is the default, an address that already
 has an account is answered `409 EMAIL_EXISTS`, as before.
 
-To recover from a step-3 rejection (`403 EMAIL_NOT_VERIFIED`, see
-[Account linking](/docs/backend/authentication/#account-linking-across-sign-in-methods)),
-the user signs in with their existing method and calls the explicit link endpoint:
+A sign-in through a provider that verified the address also verifies the
+account (see
+[Account linking](/docs/backend/authentication/#account-linking-across-sign-in-methods)).
+To recover from a step-3 rejection (`403 EMAIL_NOT_VERIFIED`: the provider did
+not verify the address), the user signs in with their existing method and calls
+the explicit link endpoint:
 
 ```http
 POST /api/auth/link/google
@@ -33531,11 +33633,14 @@ exactly what it did before.
 The flag is remembered in `rebase.json`, as `"registerDatabase": true` on the
 backend app, so every later `rebase generate-sdk`, and `rebase dev` on each
 collection change, keeps both files current. The scaffold's `.gitignore`
-ignores `generated/` directories, so a fresh clone has neither file until the
-first `rebase generate-sdk` or `rebase dev` writes them again. `rebase build`
-does not write them: in CI, run `rebase generate-sdk` before anything compiles
-the backend or the `config` package, or callbacks that read typed rows compile
-against the untyped `context.data` and fail. A project with
+ignores `generated/` directories, so a fresh clone has neither file until
+something writes them again. `rebase build` (and `rebase cloud deploy`, which
+builds the same bundle) writes them from the collections before it compiles,
+so a CI job that runs `rebase build` on a fresh clone compiles typed callbacks.
+A CI step that compiles the backend or the `config` package some other way
+(`tsc`, `pnpm build`) still needs `rebase generate-sdk` first, or callbacks
+that read typed rows compile against the untyped `context.data` and fail. A
+project with
 no `rebase.json` keeps registering for as long as `config/generated/register.ts`
 is there. To go back to untyped server-side data, remove `registerDatabase` and
 delete `config/generated/`.
@@ -33734,6 +33839,8 @@ Each callback receives a single props object. Common fields:
 
 `context.user` contains the authenticated user (`uid`, `roles`, etc.). A request with no token, where the API lets one in, carries the anonymous identity `{ uid: "anonymous", roles: ["anon"] }` rather than `undefined`.
 
+<span class="since-badge" data-since="0.26">Since 0.26</span> `context.credential` names the API key a write was made with: `{ kind, id, name }`, where `kind` is `"personal"` or `"service"`. A personal key acts as its owner, so `context.user` is the owner whether they saved by hand or a CI job wrote with their key; `context.credential` tells the two apart. It is set on the data API, the realtime socket and `/mcp`, and absent for a session, the service key, server-context work (`rebase.dataAsAdmin`, crons) and in the browser. It never carries the secret.
+
 `collection` is always there. A global callback fires for every collection, so
 it is the one tier that is registered independently of any of them — but it is
 still never handed a missing collection. A request naming a path the collection
@@ -33920,6 +34027,8 @@ const instance = await initializeRebaseBackend({
                 collection: collection.slug,
                 entity_id: String(id),
                 actor: context.user?.uid ?? "anonymous",
+                // The API key, when the delete was made with one.
+                via_key: context.credential?.name ?? null,
                 snapshot: row
             });
         }
@@ -33930,6 +34039,9 @@ const instance = await initializeRebaseBackend({
 Note what this buys and what it costs: if the audit row cannot be written, the
 delete does not happen either. For an audit trail that is usually what you want.
 If it is not, catch the error in the callback and say so in a comment.
+
+The `via_key` column reads `context.credential`, which is new: <span class="since-badge" data-since="0.26">Since 0.26</span> On an
+earlier version, leave it out.
 
 #### Collection-Specific Logic
 
@@ -35711,6 +35823,11 @@ its record is deleted:
     onClose={() => navigate("/posts")}/>
 ```
 
+If someone else deletes the record while the form is open, the form keeps
+what was typed and says the record was deleted elsewhere. Its "Save as new"
+action turns it into a form that creates a new record with those values;
+`onSaved` then reports the new record.
+
 Both bring their own `CollectionsProvider` when none is above them. That is
 the step underneath, and you can mount it yourself to share one scope between
 several panels, or to use the lower-level pieces (`CollectionViewBinding`,
@@ -36980,9 +37097,11 @@ asCustomer.close();
 The derived client is typed by the same `Database` as the one it came from, and
 is a client of its own: `close()` it when you are done.
 
-The effective-role switch (`useBuildEffectiveRoleController`) is not an RLS
-tester: it only changes which Studio views the navigation lists, sends nothing
-to the server, and evaluates no policy.
+The effective-role switch is not an RLS tester: it only changes which Studio
+views the navigation lists, sends nothing to the server, and evaluates no
+policy. `useBuildEffectiveRoleController`, which built one, is deprecated and
+warns once when called: `<Rebase>` builds its own controller when none is
+passed, and Simulate access is the way to test what a role can do.
 
 ### Next Steps
 
@@ -39175,6 +39294,10 @@ row-level security policy, so a data view still shows what you can read. To
 test RLS, use **Simulate access** (above your avatar in the drawer), or `client.simulate()` from
 code; see [Testing access](/docs/frontend/authentication/#testing-access-simulate-access).
 
+`<Rebase>` provides the controller. `useBuildEffectiveRoleController`, the hook
+that built one to pass as `effectiveRoleController`, is deprecated in favour of
+Simulate access and warns once when called.
+
 ```typescript
 import { useEffectiveRoleController } from "@rebasepro/app";
 
@@ -40298,11 +40421,11 @@ import { Dialog } from "@rebasepro/ui";
 | `children` | `React.ReactNode` | yes |  |
 | `className` | `string` | — |  |
 | `containerClassName` | `string` | — |  |
-| `fullWidth` | `boolean` | — |  |
+| `fullWidth` | `boolean` | — | Size the paper to most of the viewport's width (`w-11/12`), capped at `maxWidth`. On by default. Off, the paper takes `maxWidth`'s width, still capped at that share of the viewport, so it never runs off a phone. |
 | `fullHeight` | `boolean` | — |  |
 | `fullScreen` | `boolean` | — |  |
 | `scrollable` | `boolean` | — |  |
-| `maxWidth` | `"xl" \| "2xl" \| "xs" \| "sm" \| "md" \| "lg" \| "3xl" \| "4xl" \| "5xl" \| "6xl" \| "7xl" \| "full"` | — |  |
+| `maxWidth` | `"xl" \| "2xl" \| "xs" \| "sm" \| "md" \| "lg" \| "3xl" \| "4xl" \| "5xl" \| "6xl" \| "7xl" \| "full"` | — | The widest the paper gets (default `"lg"`). Ignored when `fullScreen`. |
 | `modal` | `boolean` | — |  |
 | `onOpenAutoFocus` | `(e: Event) => void` | — |  |
 | `onCloseAutoFocus` | `(e: Event) => void` | — | Called when focus is about to return after the dialog closes. By default it goes back to the element that had it when the dialog opened; call `preventDefault()` to put it somewhere else. |
@@ -44943,7 +45066,7 @@ const { data } = await client.data.products.find();
 
 When `Database` is supplied, `createRebaseClient` returns a `CreateRebaseClientResult<DB>` instance. This maps camelCase collection accessors directly on `client.data` to their corresponding types, giving you full autocomplete on collection operations and types (e.g. `client.data.products.find()`).
 
-`collectionsDictionary` maps each accessor back to the slug the wire uses. Pass it whenever a slug is not already a valid property name — `my-notes` is reachable as `client.data.myNotes` only because the dictionary says so.
+`collectionsDictionary` maps each accessor back to the slug the wire uses. **`collections` is required for a typed client.** The types offer every accessor whether you pass it or not, but without it `client.data.myNotes` is sent to `/data/my_notes`, the accessor in snake_case, so a slug like `my-notes` or a renamed accessor answers 404. The client warns once, naming the accessor and the fix. A later version will make `collections` required in the types when `Database` is supplied.
 
 A few names on `client.data` are taken: `collection` is the dynamic `collection(slug)` function, and `then`, `toJSON` and `$$typeof` are left alone for promise and serialisation checks. A collection whose accessor would be one of them is generated as `<name>Collection` — the `collection` slug is `client.data.collectionCollection` — and `generate-sdk` prints a warning naming both. `client.data.collection("collection")` reaches it too.
 
@@ -50605,7 +50728,18 @@ rebase cloud login --code   # with an emailed 6-digit code: accounts made with G
 rebase cloud logout     # sign out
 rebase cloud whoami     # the current session, or what REBASE_TOKEN may do
 rebase cloud tokens create --can deploy,logs   # a token for CI, shown once
+rebase cloud tokens create --can billing --org <id>   # a token for an organization's billing
 ```
+
+`--can` takes `deploy`, `logs`, `env`, `database` and `backups` on one project
+(`--project`, or the linked one), and <span class="since-badge" data-since="0.26">Since 0.26</span> `billing`, `audit` and
+`notifications` on one organization: `--org`, else the project's organization,
+else the selected one. A token may hold only organization capabilities.
+`logs` also covers `usage`. What each one reaches is in
+[CI and agents](/docs/deployment/cloud-agents/#ci-and-agents). When the control
+plane marks an answer to a token as deprecated (a token from before `billing`
+reading billing), the CLI prints the notice once on stderr, never in the
+`--json` value.
 
 At a terminal with no password given, <span class="since-badge" data-since="0.26">Since 0.26</span> `login` asks whether to use your password
 or a code the control plane emails you. With two-factor authentication on, it
@@ -50691,7 +50825,11 @@ is refused with `PREVIEW_STATIC_UNSERVED` and publishes nothing. A backend
 preview is billed as one more app unit at the default size while it exists, and
 the deploy says what that comes to per month, from the control plane's own quote
 (`cost` under `--json`; only the rule and this link when the control plane cannot
-price it); `rebase cloud previews delete <name>` stops it.
+price it); `rebase cloud previews delete <name>` stops it. `rebase cloud previews`
+shows a preview the platform paused (its database grew past the preview limit) as
+`paused`, with the reason (`statusMessage` under `--json`). A new preview address
+can be refused with `preview_cert_budget` when the platform's weekly budget of
+preview certificates is spent; the message says until when.
 See [Preview a change](/docs/deployment/cloud/#preview-a-change).
 
 #### Logs
@@ -50735,7 +50873,27 @@ rebase cloud env list | set | unset | reveal | pull
 rebase cloud domains list | add <domain> | verify [domain] | remove <domain>
 rebase cloud extensions list | enable | disable
 rebase cloud settings show | set        # name, branch, repo, subdomain, rebuilds
+rebase cloud app-key [rotate]           # the app key init --claim wrote; owners and admins
+rebase cloud service-key [rotate]       # REBASE_SERVICE_KEY; owners and admins
 ```
+
+<span class="since-badge" data-since="0.26">Since 0.26</span> `app-key` lists the
+key `rebase cloud init --claim` minted on the app and wrote into `.env` as
+`REBASE_API_TOKEN`, by its prefix and never its value. Claiming the project
+hands that key over and it stops expiring. `app-key rotate` mints a new one and
+revokes every earlier agent key at once. It writes the new key into a `.env`
+that already sets `REBASE_API_TOKEN`, and keeps it out of `--json` there. In
+any other directory it prints the key once. Keys made in the app's admin panel
+are not touched. It runs with your login: no token capability grants it.
+
+<span class="since-badge" data-since="0.26">Since 0.26</span> `service-key`
+prints the generation of the project's `REBASE_SERVICE_KEY`, when it was last
+rotated, and whether the app is still restarting onto the newest one. It never
+prints the key: that is `env reveal REBASE_SERVICE_KEY`. `service-key rotate`
+issues a new key and restarts the app onto it. The old key works until the
+restart has finished, and nothing after. It is refused while a deploy is
+running, and it runs with your login. Claiming a project rotates its service
+key too.
 
 A backend preview starts from production's variables, live keys included.
 `env set KEY=VALUE --preview` gives previews their own value, `env unset KEY
@@ -50763,16 +50921,17 @@ rebase cloud orgs invites [list] | revoke <id|email> | resend <id|email>
 rebase cloud activity [--project <id|slug>] [--action <area|action>] [--actor <email>] [--limit N] [--before <cursor>]
 ```
 
-<span class="since-badge" data-since="0.26">Since 0.26</span> `members invite` adds someone whose Rebase account has the address verified,
-and otherwise opens an invitation and prints its link: single use, valid 7 days,
-accepted only by an account that has verified that address. The output (and
-`emailDelivery` in `--json`) says whether it was emailed; when it was not, a
-warning says to send the link yourself. `--role` is `admin` or `member`
-(default); `owner` only adds an existing verified account, and only an owner
-may grant it. `invites resend` gives a new link and the old one stops working.
+<span class="since-badge" data-since="0.26">Since 0.26</span> `members invite` opens an invitation and prints its link: single use,
+valid 7 days, accepted only by an account that has verified that address.
+Nobody joins until they accept, even someone who already has a Rebase account.
+The output (and `emailDelivery` in `--json`) says whether it was emailed; when
+it was not, a warning says to send the link yourself. `--role` is `admin` or
+`member` (default). Nobody is invited as `owner`: invite them as an admin, and
+an owner promotes them with `members role <email> owner` once they have joined.
+`invites resend` gives a new link and the old one stops working.
 Inviting and `invites` need a `rebase cloud login` session; `REBASE_TOKEN` is
-refused. Inviting, resending and revoking take the owner or admin role; listing
-takes any member.
+refused. Inviting, listing, resending and revoking take the owner or admin
+role; a member is told so.
 `members remove` asks first (`--yes` skips it); removing or demoting an owner
 takes an owner, and the last owner stays. `--org <id>` picks an organization
 other than the selected one.
@@ -50786,9 +50945,10 @@ member's role, or created or revoked an access token. `--action` takes an area
 `extension`, `storage`, `project`, `org`, `member`, `invite`, `token`) or a full action
 such as `env.set`. A page holds up to 100 entries (`--limit`, default 50); the
 output prints the `--before` cursor for the next one. `--json` is one value,
-`{ org, events, nextCursor }`. It needs the organization's owner or admin role
-and reads with your login: no access-token capability includes it. The
-console's **Activity** page shows the same log.
+`{ org, events, nextCursor }`. It needs the organization's owner or admin role.
+A token reads it only with the `audit` capability on the organization
+(`rebase cloud tokens create --can audit`). The console's **Activity** page
+shows the same log.
 
 ### Databases
 
@@ -50839,7 +50999,7 @@ rebase cloud storage create      # provision platform-managed storage
 rebase cloud storage attach      # attach your own S3-compatible bucket
 rebase cloud notifications [list] | add <url> | test <id> | remove <id>   # deploy, backup, billing and usage events to Slack, Discord or any URL
 rebase cloud webhooks            # retired: exits 1 (`command_retired`) and names `notifications`
-rebase cloud clusters list | add | verify   # the clusters tenants run on; `add` registers one from a kubeconfig
+rebase cloud clusters list | add | verify | registry   # the clusters tenants run on; `add` registers one from a kubeconfig
 rebase cloud billing             # the billing account and card on file
 rebase cloud billing setup       # attach a card, one-time, opens a browser
 rebase cloud billing checkout    # a Stripe session for one project
@@ -50852,19 +51012,34 @@ rebase cloud usage org           # every project of the selected organization, w
 <span class="since-badge" data-since="0.26">Since 0.26</span> `notifications add <url>` sends the linked project's events to a URL. `--events`
 takes a comma-separated list of `deploy.failed` (the default),
 `deploy.succeeded`, `deploy.rolled_back`, `backup.unhealthy`,
-`billing.payment_failed` and `usage.threshold`. `--format slack` sends
+`billing.payment_failed`, `usage.threshold` and `preview.paused`. `--format slack` sends
 `{ "text" }` alone instead of the event JSON, which also carries a `text`. The URL
 is a positional argument because `--url` names the control plane. `add` prints
 the signing secret once; `--json` returns `{ projectId, webhook, secret }`.
 `test <id>` exits 1 with code `delivery_failed` when the receiver did not accept
 the test event. Listing is open to any member of the organization; `add`, `test`
-and `remove` need the owner or admin role. These routes take your
-`rebase cloud login`: no access-token capability includes them. See
+and `remove` need the owner or admin role. A token manages them with the
+`notifications` capability on the organization, within the same role rule. See
 [Cloud notifications](/docs/deployment/cloud-notifications/).
+
+<span class="since-badge" data-since="0.26">Since 0.26</span> `clusters registry <cluster-id> --repository <host/project/repo>
+--push-service-account <email> --pull-key-file <key.json>` gives a customer's
+own cluster an image registry of its own, used for that cluster alone. Without
+one, such a cluster uses the platform's shared registry, and every deploy to it
+says so in its log. With one, builds push to that repository with a token for
+that account, pods pull with that key alone, and a rollback accepts the
+project's images there. Images
+the project built in the shared repository before stay pullable and stay
+rollback targets. The three values go together; `--clear` forgets them. The key
+is sealed when it is written and never read back. Like the rest of `clusters`,
+it needs the platform-admin role. The operator creates the repository and both
+accounts with Terraform (`saas/infra/gcp/registry-linked-clusters.tf`).
 
 <span class="since-badge" data-since="0.26">Since 0.26</span> `billing invoices` and `billing upcoming` read the same Stripe data as the
 console's Billing page, and are open to the organization's owners and admins
-only. Amounts in `--json` are in the currency's minor unit (cents), exactly as
+only. A token reaches them, and the rest of `billing`, with the `billing`
+capability on the organization; a token made before that capability keeps
+working for one release, with a warning on each answer. Amounts in `--json` are in the currency's minor unit (cents), exactly as
 Stripe sends them. Draft invoices are not listed; the preview is computed by
 Stripe and its metered lines keep growing until the period closes.
 
@@ -50874,12 +51049,17 @@ so far in euros and, for the month in progress, where it is heading at this
 pace (an estimate). The overage is the overage report's own calculation, the
 one that tells Stripe what to bill, and lands on the following month's invoice.
 `usage org` lists every project of the organization selected with `rebase cloud
-use`, and the total. Any member of the organization can read it, with their
-login: no access-token capability includes it yet, so `REBASE_TOKEN` is refused.
+use`, and the total. Any member of the organization can read it. A token reads
+it with the `logs` capability on the project; `usage org` lists the projects the
+token holds that on.
 `--month` takes a past month. The answer carries `caveats`, each with a `code`: `storage_not_measured`
 (object storage reads 0), `multi_pod_undercount` (requests served while two or
 more app pods run are not counted), `partial_days`, `metering_off`,
-`overage_billing_off`, `not_billed` and `billed_next_month`.
+`overage_billing_off`, `not_billed`, `billed_next_month`, `pre_claim_days` (a
+project claimed from an agent counts only the days from the claim on) and
+`autoscale_not_charged` (pods ran above `--replicas` and this platform does not
+charge them yet). An autoscaled project's answer also carries `autoscale`:
+`extraPodSeconds` above the floor, `amountEur` at its rates, and `charged`.
 
 ## Schema Generation
 
@@ -53361,7 +53541,15 @@ finding that out after a bundle has finished uploading is the worse order.
 After that, the console's **Billing** page lists the organization's invoices,
 each with Stripe's hosted page and PDF, and previews the next invoice of every
 project. `rebase cloud billing invoices` and `rebase cloud billing upcoming`
-print the same. Both are for the organization's owners and admins.
+print the same. Both are for the organization's owners and admins. Where the
+platform offers it, **Manage billing** opens Stripe's customer portal for the
+card, the billing details and past invoices.
+
+With a card already on file, creating another project in the console asks for
+no second payment: the project is billed on that card and deploys. If the card
+is declined, or the bank wants the payment confirmed, the console takes you to
+**Billing**, where **Fix your card** saves another card and **Complete the
+payment** opens Stripe's invoice.
 
 What a project has used shows on its overview, under **Usage this month**, and
 for every project at once on the **Billing** page: requests against the
@@ -53372,7 +53560,11 @@ appears on the invoice of the month after. `rebase cloud usage` prints the
 same, and `rebase cloud usage org` the whole organization. Any member can read
 it. The figures say what they cannot see yet: object storage is not measured,
 so no storage overage is billed; while a project runs two or more app pods,
-its requests are not counted; and a day with missed samples undercounts.
+its requests are not counted; and a day with missed samples undercounts. An
+autoscaled project also shows the pods it ran above `--replicas`, in pod-hours,
+what they cost at its own rates and whether this platform charges them yet. A
+project claimed from an agent counts only the days from the claim on: before
+it, the project was the platform's.
 
 An existing project links without creating one:
 
@@ -53543,11 +53735,21 @@ does. A first deploy that
 fails before anything runs is removed rather than billed. A project may run
 three backend previews at once.
 
+Each new preview address gets a TLS certificate of its own from Let's Encrypt,
+which allows a domain 50 new certificates a week, shared with every production
+site on it. Previews may take 20 of them in any 7 days, across the platform. Past
+that, a new preview is refused (`429`, `preview_cert_budget`) with the time it can
+be deployed; redeploying a preview that already exists never counts.
+
 A backend preview's database is a second database on **production's** Postgres:
 its own data, but the same instance and the same disk. It is limited to 10
-connections, so previews cannot use up production's, but its size is not
-limited: a preview that loads a large fixture fills production's disk too.
-Delete previews you no longer need. Extensions installed on production are not
+connections, so previews cannot use up production's, and to 2 GB: a preview
+whose database grows past that is paused. Its backend stops, its address stops
+answering, `rebase cloud previews` and the console show it as `paused` with the
+reason, and the project's owners and admins are notified (`preview.paused`). Its
+data is kept until it expires. Deploy it again to start it (it is paused again
+while the database is still too large), or delete it. A paused preview is still
+billed until it is deleted or expires. Delete previews you no longer need. Extensions installed on production are not
 installed in a preview's database.
 
 Previews are rolling out. A control plane that does not serve them yet refuses
@@ -53645,11 +53847,11 @@ trust under **Settings → Access tokens**.
 
 ### Invite your team
 
-**Members → Invite member** adds someone whose Rebase account has the address
-verified; anyone else gets a link to copy (emailed when this control plane sends
-email) that works once, for 7 days, only for an account that verifies that
-address. Owners and admins resend or revoke it under **Pending invitations**;
-from a terminal, <span class="since-badge" data-since="0.26">Since 0.26</span> [`rebase cloud orgs members invite`](/docs/cli/cloud/#organizations).
+**Members → Invite member** gives a link to copy (emailed when this control plane
+sends email) that works once, for 7 days, for an account that has verified that
+address; nobody joins until they accept. Invite an admin or a member, and make
+them an owner once they have joined. Owners and admins see, resend or revoke it in
+**Pending invitations**; from a terminal, <span class="since-badge" data-since="0.26">Since 0.26</span> [`rebase cloud orgs members invite`](/docs/cli/cloud/#organizations).
 
 ### See who did what
 
@@ -53658,7 +53860,8 @@ organization's owners and admins who deployed, set or revealed an environment
 variable (by name, never by value), changed a domain, restored a backup,
 resized, stopped or deleted a project, changed a member's role, or created a
 token, and when. A project's **Settings** links to its own entries; an entry
-about a deleted project stays. The filters are in
+about a deleted project stays. A script reads it with a token made with
+`--can audit` on the organization. Entries are kept for a year. The filters are in
 [`rebase cloud`](/docs/cli/cloud/#organizations).
 
 ### CI and agents
@@ -53666,8 +53869,10 @@ about a deleted project stays. The filters are in
 A CI job or an agent should not carry your password. Give it a token narrowed to
 a few actions on one project, created from a signed-in terminal with
 `rebase cloud tokens create --project shop --can deploy,logs`, and set it as
-`REBASE_TOKEN`. The capabilities, a GitHub Actions workflow and what stays with
-a signed-in person are in
+`REBASE_TOKEN`. An organization's billing, activity log and notification
+settings are capabilities of their own (`--can billing`, `audit`,
+`notifications`) that a token holds only when asked for. The capabilities, a
+GitHub Actions workflow and what stays with a signed-in person are in
 [CI and agents](/docs/deployment/cloud-agents/#ci-and-agents).
 
 ### A backend with no account
@@ -53695,8 +53900,8 @@ rebase cloud compute set --cpu 500m --memory 2Gi
 | Dial | Unit, and what it means |
 |---|---|
 | `--cpu`, `--memory` | App request per instance, e.g. `500m` and `2Gi`. Empty means the platform default — `100m` and `384Mi`, bursting to 2 CPU and `2Gi` |
-| `--replicas` | Instances that always exist: the autoscaler's floor, and what the project is billed for |
-| `--autoscale-max` | 1–16. The ceiling it may reach. Instances the autoscaler adds above `--replicas` are not billed today. `--no-autoscale` turns it off |
+| `--replicas` | Instances that always exist: the autoscaler's floor, and what the project's subscription bills monthly |
+| `--autoscale-max` | 1–16. The ceiling it may reach. Instances the autoscaler adds above `--replicas` are metered per pod-second at the same rates, and charged only where the platform has switched that on; **Usage this month** says which. `--no-autoscale` turns it off |
 | `--autoscale-cpu-target` | 10–95. The CPU utilisation the autoscaler holds, against the request rather than the limit. Empty means 70 |
 | `--spot` | `true` or `false`. Preemptible capacity: cheaper, and restarted without notice |
 | `--db-instances` | 1–3. `1` is a single instance with no failover; `2` adds an automatic standby |
@@ -53722,10 +53927,12 @@ except one that restarts the database, which waits for a maintenance window.
 | `projects` | Create, list, inspect, delete |
 | `deploy`, `logs`, `deployments`, `rollback`, `cancel` | Shipping and watching |
 | `previews` | Builds served on their own address by `deploy --preview`, and deleting them. See [Preview a change](#preview-a-change) |
-| `start`, `stop`, `restart` | Pausing a project and bringing it back |
+| `start`, `stop`, `restart` | Pausing a project and bringing it back. A stopped project keeps its subscription, unless the platform bills stopped projects for storage and the platform fee only; the console's **Billing** row says so when it does |
 | `status`, `metrics`, `debug` | What it is doing, and why it is not |
 | `cron` | The deployed app's cron jobs and their recorded runs, read with your `rebase cloud` login. Read-only |
 | `env` | Environment variables. `list` never prints values; `--secret` is write-only |
+| `app-key` | The key `init --claim` wrote into `.env` as `REBASE_API_TOKEN`, handed over at the claim; `rotate` replaces it and revokes the old one. Owners and admins |
+| `service-key` | `REBASE_SERVICE_KEY`, admin on the app's own API: when it was last rotated; `rotate` gives the app a new one. Owners and admins |
 | `domains` | Custom domains, the DNS records to add, and verification. A project can answer on several, each verified on its own; `verify` and `remove` take the domain to act on, which may be left out only when there is one (for `verify`, one still pending). `list --json` returns `{ projectId, tenantHost, domains: [...] }` |
 | `db` | Attach or create a database, connect to it from your machine, backups, restore, and point-in-time recovery |
 | `extensions` | The Postgres extension allowlist |
@@ -53781,6 +53988,16 @@ Stated plainly, because finding out later is worse:
   `rebase cloud db info --reveal`, both need the organization's owner or admin
   role: the same one Studio's SQL editor asks for, because all three end at a
   session on your production data.
+- **Deploying is running code with the production secrets.** The app's
+  environment holds `REBASE_SERVICE_KEY` (admin on its own API),
+  `DATABASE_URL` and `JWT_SECRET`, so code a member deploys can read them,
+  even though only owners and admins can reveal them in the console. Invite
+  as a member only someone you would trust with those values.
+- **The service key can be replaced.** <span class="since-badge" data-since="0.26">Since 0.26</span> The project's **Settings**
+  (or `rebase cloud service-key rotate`) issue a new `REBASE_SERVICE_KEY`
+  and restart the app onto it. The old key works until the restart has
+  finished, and nothing after, so anything that copied it is refused from
+  then on. Claiming a project does the same.
 
 ### Self-hosting instead
 
@@ -53839,16 +54056,39 @@ jobs:
 | Capability | What the token may do |
 |---|---|
 | `deploy` | Deploy the project and follow its builds: `deploy` (`--preview` included), `deployments`, `previews` |
-| `logs` | Read build and runtime logs, cron history, and live metrics: `logs`, `cron`, `metrics` |
+| `logs` | Read build and runtime logs, cron history, live metrics and usage: `logs`, `cron`, `metrics`, `usage` |
 | `env` | Read and change environment variables, secrets included, and previews' own (`--preview`) |
 | `database` | `db list`, `db info` and `db connect`, which includes the database password |
 | `backups` | List, create, inspect and download backups, and read the point-in-time window |
+
+<span class="since-badge" data-since="0.26">Since 0.26</span> Three more capabilities act on an organization rather than a project. A token
+holds one only when `--can` names it, on the organization `--org` names (or,
+without `--org`, the project's organization, then the one selected with
+`rebase cloud use`). A token may hold them and no project capability:
+
+```bash
+rebase cloud tokens create --can billing --org <organization-id> --name invoices
+```
+
+| Capability | What the token may do |
+|---|---|
+| `billing` | Read the card on file, the invoices and the next invoice, and change the billing email: `billing`, `billing invoices`, `billing upcoming`. Owners and admins only |
+| `audit` | Read the organization's activity log: `activity`. Owners and admins only |
+| `notifications` | Change its owner's own email choices, and the organization's projects' notification webhooks: `notifications`. Adding, changing and removing a webhook still takes the owner or admin role |
+
+A token made before
+`billing` existed still reads billing for one release. Each of those answers
+carries a `Deprecation: true` header and a sentence naming the scope the token
+lacks, and the CLI prints it once, on stderr, as a warning. Replace such a token
+with one made with `--can billing` before the next release, when billing starts
+refusing it.
 
 Under the hood a token is a [personal API key](/docs/backend/api-keys/#personal-keys)
 on the control plane. Each capability becomes a few
 [scopes](/docs/backend/roles-and-scopes/): `deploy` on `shop` holds
 `project:deploy:<id>`, with the project's id, plus the data and function scopes
-the deploy commands call. The token never holds more than your account does at the moment
+the deploy commands call. An organization capability holds `org:billing:<id>`,
+`org:audit:<id>` or `org:notifications:<id>`, with the organization's id. The token never holds more than your account does at the moment
 it is used, so it loses whatever your account loses.
 
 Two things stay with a signed-in person:
@@ -53861,7 +54101,8 @@ Two things stay with a signed-in person:
   signed-in owner or admin.
 
 `rebase cloud whoami` with a token set shows what it may do, and on which
-project. `rebase cloud tokens revoke <id> --yes` stops it at once.
+project or organization. The console's **Access tokens** screen offers the same
+capabilities, the organization ones under **Organization access**. `rebase cloud tokens revoke <id> --yes` stops it at once.
 
 ### A backend with no account
 
@@ -53920,23 +54161,37 @@ Once the deploy has built the app, the command also sets `REBASE_API_TOKEN` in
 send to it. A `REBASE_API_TOKEN` already in `.env` is kept and none is minted,
 and a `.env` the command creates is readable by you alone. It reads and writes data (`data:read`, `data:write`) through the
 app's row-level security, as a caller who is neither a person nor an admin. It
-holds nothing of the admin plane, and it expires with the claim window. With
-`--no-deploy`, or when that first deploy fails, there is no key yet: the next
-`rebase cloud deploy` that succeeds in the directory asks for one, as long as the
-project is unclaimed and `.env` sets no `REBASE_API_TOKEN` already. The key
-expires at the end of the claim window even when the project is claimed sooner,
-so the MCP server and the SDK start getting 401 from the app then; `init`,
-`deploy`, `status` and `whoami` print the date, and so does the refusal that
-follows a claim. Once the project is yours, create a permanent key in its admin
-panel and put it in `.env` as `REBASE_API_TOKEN` in place of the agent's.
+holds nothing of the admin plane, and it expires with the claim window unless the
+project is claimed first. With `--no-deploy`, or when that first deploy fails,
+there is no key yet: the next `rebase cloud deploy` that succeeds in the
+directory asks for one, as long as the project is unclaimed and `.env` sets no
+`REBASE_API_TOKEN` already. `init`, `deploy`, `status` and `whoami` print the
+date it expires.
+
+Claiming hands the key over: the claim removes its expiry, so the app's `.env`
+keeps working. The agent still holds a copy, so the person who claimed the
+project can replace it. `rebase cloud app-key rotate`, or **Rotate app key** in
+the project's Settings, mints a new key and revokes every earlier agent key at
+once. It writes the new key into a `.env` that already sets `REBASE_API_TOKEN`,
+or shows it once. Owners and admins rotate it, signed in. A key that could not
+be handed over keeps its expiry, which happens when the app was not deployed or
+not answering at the claim. Rotating replaces it with one that does not expire.
+
+Claiming also replaces the project's `REBASE_SERVICE_KEY`, which is admin on
+the app's own API and which the agent's deployed code could read. The app
+restarts once onto a new key, and whatever the agent kept stops working when
+that restart has finished. If a deploy is running at the moment of the claim,
+the next deploy carries the new key.
 
 Claiming takes a signed-in browser session, not a token, and a payment method on
 the organization the project moves into. From the claim onwards the project is
 billed like any other. Claiming also revokes the agent's token: sign in with
 `rebase cloud login`, or mint a new token with `rebase cloud tokens create`.
 
-Provisioning without an account is bounded per address and in total, and a
-control plane that has not switched it on refuses with a message saying so.
+Provisioning without an account is bounded per address, per network (an IPv4
+/24) and in total, and a control plane that has not switched it on refuses with
+a message saying so. Usage from before the claim is not billed to whoever
+claims the project.
 
 ## Cloud Notifications
 
@@ -53963,8 +54218,9 @@ rebase cloud notifications remove <id>
 ```
 
 The events are `deploy.failed` (the default), `deploy.succeeded`,
-`deploy.rolled_back`, `backup.unhealthy`, `billing.payment_failed` and
-`usage.threshold`. Each POST is JSON with a `type`, the `project`, the facts of
+`deploy.rolled_back`, `backup.unhealthy`, `billing.payment_failed`,
+`usage.threshold` and `preview.paused` (a backend preview whose database grew
+past the preview limit was stopped). Each POST is JSON with a `type`, the `project`, the facts of
 the event, a console `url` and a one-line `text`. Slack shows the `text` as the
 message, so a Slack incoming-webhook URL works without any setup. For Discord,
 add `/slack` to the end of its webhook URL. `--format slack` sends `{ "text" }`

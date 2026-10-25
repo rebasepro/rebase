@@ -174,6 +174,14 @@ Die Übersetzung steht noch aus. Der Inhalt unten ist auf Englisch.
   and handlers. Before, they answered
   404. `rebase.auth` still answers a 404 that names the surface and points at
   `rebase.admin`.
+- **Collection callbacks name the API key a write was made with, as
+  `context.credential`:** `{ kind: "personal" | "service", id, name }` for a
+  write through the data API, the realtime socket or `/mcp` with an `rk_` key,
+  so a personal key's write can be told apart from its owner's own. It is
+  absent for a session, the service key, server-side work and the browser. New
+  type `CallerCredential`; `User.credential` and `RebaseCallContext.credential`
+  carry it, and the socket's `resolveApiKey` may return the key's `name` and
+  `kind`.
 #### CLI
 
 - **`rebase cloud deploy` checks a static app's JavaScript before uploading
@@ -209,7 +217,10 @@ Die Übersetzung steht noch aus. Der Inhalt unten ist auf Englisch.
   `docs/preview-deployments.md`. A backend preview's deploy says what it costs
   per month, from the control plane's own quote (`cost` under `--json`), or
   gives the billing rule and a docs link when the control plane cannot price
-  it.
+  it. Rebase Cloud pauses a backend preview whose database grows past the
+  preview limit (2 GB by default); `rebase cloud previews` prints why under a
+  paused preview (`statusMessage` in `--json`), and
+  `rebase cloud notifications add --events preview.paused` subscribes to it.
 
 - **Previews can run with their own environment variables.** A backend preview
   starts from production's variables, and that copy carries production's live
@@ -244,10 +255,13 @@ Die Übersetzung steht noch aus. Der Inhalt unten ist auf Englisch.
   read it, here and on the console's Activity page.
 
 - **`rebase cloud orgs members invite` invites anyone to an organization by
-  email** (`--role admin|member`). Someone with a verified Rebase account is
-  added at once; anyone else gets a single-use link, valid 7 days, that only an
-  account which verified the invited address can accept. `orgs members remove`,
-  `orgs members role` and `rebase cloud orgs invites` (list, revoke, resend)
+  email** (`--role admin|member`). Everyone, an existing account included, gets
+  a single-use link, valid 7 days, that only an account which verified the
+  invited address can accept; nobody joins an organization without accepting.
+  `--role owner` is refused with `invite_role_not_allowed`: invite as admin,
+  then promote with `orgs members role`. `orgs members remove`,
+  `orgs members role` and `rebase cloud orgs invites` (list, revoke, resend;
+  owners and admins only)
   manage the rest, and `orgs members` shows emails.
 
 - **`rebase cloud billing invoices` and `rebase cloud billing upcoming`** list
@@ -293,6 +307,45 @@ Die Übersetzung steht noch aus. Der Inhalt unten ist auf Englisch.
 - **`rebase storage move` lists the source again after the move and names
   every file it did not move** (exit 1; `--json` `notMoved`). New
   `POST /api/admin/storage/move/verify`.
+
+- **`rebase cloud app-key` shows the app key a claim hands over, and
+  `rebase cloud app-key rotate` replaces it.** Claiming a project
+  `init --claim` provisioned now removes the expiry of the `REBASE_API_TOKEN`
+  it wrote into `.env`, which used to end with the claim window, and the notes that said the key stops
+  working even once the project is claimed now say a claim hands it over.
+  `app-key` lists the app's agent keys by prefix, never the value. `rotate`
+  (confirm or `--yes`) mints a key that does not expire, revokes the earlier
+  agent keys, and writes the new one into a `.env` that already sets
+  `REBASE_API_TOKEN` (keeping it out of `--json` there) or prints it once.
+  Signed in only.
+
+- **`rebase cloud service-key` shows a project's service key generation, and
+  `rebase cloud service-key rotate` replaces `REBASE_SERVICE_KEY`.** The app
+  restarts onto the new key, and the old one stops working once the restart has
+  finished; `service-key` says whether the restart is still under way and never
+  prints the key (`rebase cloud env reveal REBASE_SERVICE_KEY` does). Claiming a
+  project rotates it as well, so nothing an agent's code read before the claim
+  stays valid. Signed in only.
+
+- **`rebase cloud tokens create --can` takes organization capabilities:**
+  `billing`, `audit` and `notifications` give a token one organization's
+  billing, audit log or notifications (`org:<capability>:<organizationId>`; the
+  organization is `--org`, else the project's own, else the one
+  `rebase cloud use` selected). A token may hold only organization
+  capabilities. `tokens list`, `whoami` and `tokens create --json` read them
+  back. Reading the audit log with a token now needs `audit`; a token from
+  before `billing` existed keeps billing access for one release, and the CLI
+  prints the control plane's deprecation notice once, on stderr. `logs` now
+  also covers `rebase cloud usage`.
+
+- **`rebase cloud clusters registry` gives a customer-owned cluster an image
+  registry of its own** (platform admins): `--repository`,
+  `--push-service-account` and `--pull-key-file`, all three or `--clear`. That
+  cluster's builds push only to its own repository, and its image pull secret
+  holds only the reader key. A pull key that belongs to the push account is
+  refused before it leaves the machine, and the key is never printed. A deploy
+  to a cluster Rebase does not operate that still uses the shared registry says
+  so in its deploy log.
 #### Client SDK
 
 - **`client.admin.listUsers({ role, ids })` filters by role and resolves a known
@@ -399,11 +452,26 @@ Die Übersetzung steht noch aus. Der Inhalt unten ist auf Englisch.
   API base path too.** Only Hono's default `404 Not Found` is turned into the
   JSON envelope.
 
+#### Client SDK
+
+- **A typed client created without its collections dictionary says which
+  accessor was used, where the request went and how to fix it.** The one-time
+  warning now names the accessor and the `/data/<slug>` path it was sent to,
+  and gives both fixes: pass `collections: collectionsDictionary` from
+  `generated/sdk/database.types`, or use `client.data.collection("<slug>")`.
+  `collections` is documented as required for a typed client.
+
 ### Deprecated
 
 - **`GET /api/admin/storage/orphans`, and `DELETE` without `?scan=`,** the
   scan inside one request. They answer with `Deprecation: true` and a `Link` to
   the scan routes, and will be removed in a later release.
+- **The hook that builds an effective-role controller is deprecated.**
+  `useBuildEffectiveRoleController` only changes which Studio views are listed,
+  never what a role can read. It still works and warns once, naming Simulate
+  access: test permissions with `useRlsSimulation` or `client.simulate()`.
+  `<Rebase>` no longer calls it for its fallback, so an app that never calls it
+  sees no warning.
 ### Fixed
 
 #### Runtime
@@ -622,6 +690,13 @@ Die Übersetzung steht noch aus. Der Inhalt unten ist auf Englisch.
 - **Project verification reads a belongsTo owner column from its
   relation name.** In `rebase verify`, a `workspace` relation with
   `relationName: "tenant"` (column `tenant_id`) passed as public.
+
+- **A CI build of a fresh clone compiles typed callbacks.** `rebase build` and
+  `rebase cloud deploy` now write the server-side `Database` registration
+  (`config/generated/register.ts` and `database.types.ts`, as
+  `rebase generate-sdk` writes them) before the type check, when the backend
+  sets `registerDatabase` or an earlier `--register` left one. They keep that
+  one current and refuse to overwrite a `register.ts` they did not write.
 #### Client SDK
 
 - **A public page no longer prints the client's connection messages to every
@@ -716,6 +791,20 @@ Die Übersetzung steht noch aus. Der Inhalt unten ist auf Englisch.
   open a subcollection by its full path (`posts/p1/comments`) inside a scope
   that holds its parent.
 
+- **A record panel whose record is deleted elsewhere keeps what was typed.**
+  With a live read, `EntityFormPanel` threw "Form has not been initialised
+  with the correct parameters" mid-edit. It now does what the edit view does:
+  it keeps the last record and the typed values, says the record was deleted
+  elsewhere, and offers "Save as new", which turns the panel into a create
+  form with those values; `onSaved` reports the new record.
+
+- **A dialog never runs wider than a phone's screen.** The kit's `Dialog`
+  ignored `fullWidth` whenever `maxWidth` was set, so every default dialog was
+  a fixed 512px. `fullWidth` (the default) now gives 11/12 of the viewport
+  capped by `maxWidth`, and `fullWidth={false}` gives `maxWidth` capped at
+  11/12. Desktop sizes are unchanged. The AI collection generator's panel fits
+  a phone too.
+
 #### MCP
 
 - **`rebase_cloud_provision` says what to do when the control plane refuses**
@@ -772,6 +861,17 @@ Die Übersetzung steht noch aus. Der Inhalt unten ist auf Englisch.
   is reserved.** Reading, writing or listing it answers `400
   INVALID_STORAGE_KEY`, so a caller cannot forge what an administrator's
   orphan delete removes.
+- **An OAuth sign-in whose provider verified the email verifies the matching
+  unverified account, after removing what nobody proved on it.** Before linking,
+  the password, every identity whose provider did not vouch for the address
+  and every session are removed, as a magic link or email code already does, so
+  someone who pre-registered the victim's address keeps no way in. The refusal
+  reasons `local-account-unverified` and `local-account-unverified-passwordless`
+  are no longer returned. A provider that does not assert `email_verified`
+  still gets `403 EMAIL_NOT_VERIFIED` (`provider-email-unverified`), and a user
+  store without `unlinkUserIdentity` answers `409 UNVERIFIED_IDENTITIES` and
+  changes nothing. A user who never verified their password loses it on their
+  first provider sign-in.
 ### Documentation
 
 - **Embedding the Postgres Driver and The Remote MCP Endpoint are pages of their
