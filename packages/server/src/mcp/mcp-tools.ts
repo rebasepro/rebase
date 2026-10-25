@@ -284,6 +284,14 @@ function readOptions(args: Record<string, unknown>, collection: CollectionConfig
     }
     if (args.limit !== undefined && args.limit !== null) query.limit = String(args.limit);
     if (args.offset !== undefined && args.offset !== null) query.offset = String(args.offset);
+    if (args.deleted !== undefined && args.deleted !== null) {
+        // REST's `?deleted=`, refused here in the tool's own words: REST's
+        // message names a query parameter the model never sent.
+        if (args.deleted !== "include" && args.deleted !== "only") {
+            throw new McpToolError("`deleted` takes \"include\" (live rows and trashed ones) or \"only\" (trashed rows alone). Omit it for the live rows.");
+        }
+        query.deleted = args.deleted;
+    }
     return parseQueryOptions(query, {}, { collection, viewer: viewerOf(ctx) });
 }
 
@@ -335,6 +343,18 @@ const WHERE_ARG = {
         + "{\"status\": [\"==\", \"paid\"], \"total\": [\">\", 100]}. Several conditions on one field: "
         + "{\"total\": [[\">=\", 10], [\"<\", 100]]}. A belongsTo relation is filtered by its foreign key, "
         + "as the rows carry it (e.g. \"authorId\"). Operators: " + ALL_WHERE_FILTER_OPS.join(", ") + "."
+};
+
+/**
+ * REST's `?deleted=`. Without it every read hides the trash, so a row
+ * delete_document sent there could never be found again to restore — while
+ * describe_collection told the model that update_document restores it.
+ */
+const DELETED_ARG = {
+    type: "string",
+    enum: ["include", "only"],
+    description: "On a collection with a `softDeleteField` (see describe_collection): \"only\" reads the trashed "
+        + "rows alone, \"include\" reads them with the live ones. Omit it for the live rows."
 };
 
 const SEARCH_ARG = {
@@ -435,7 +455,8 @@ const TOOLS: McpToolDefinition[] = [
                     type: "number",
                     description: `Rows to return, 1 to ${MAX_LIST_LIMIT} (default ${DEFAULT_LIST_LIMIT}). A larger limit is refused.`
                 },
-                offset: { type: "number", description: "Rows to skip." }
+                offset: { type: "number", description: "Rows to skip." },
+                deleted: DELETED_ARG
             },
             required: ["collection"],
             additionalProperties: false
@@ -463,7 +484,8 @@ const TOOLS: McpToolDefinition[] = [
             properties: {
                 collection: COLLECTION_ARG,
                 where: WHERE_ARG,
-                searchString: SEARCH_ARG
+                searchString: SEARCH_ARG,
+                deleted: DELETED_ARG
             },
             required: ["collection"],
             additionalProperties: false
@@ -587,7 +609,10 @@ const TOOLS: McpToolDefinition[] = [
 
     {
         name: "delete_document",
-        description: "Delete a row by id. This cannot be undone.",
+        description:
+            "Delete a row by id. On a collection with a `softDeleteField` (see describe_collection) the row goes "
+            + "to the trash: query_collection with `deleted: \"only\"` finds it, and update_document setting that "
+            + "field to null restores it. On any other collection the delete is permanent.",
         requiredScope: "data:delete",
         inputSchema: {
             type: "object",

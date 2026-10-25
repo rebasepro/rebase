@@ -584,7 +584,11 @@ to one user, the endpoint declines to mount and says why in the boot log. No
   answers `{ data, meta }` with `meta.total` and `meta.hasMore`, and `count_documents`
   `{ count }`. As on REST, a `limit` above 1000, an undeclared argument and an
   edit or delete of a trashed row (404) are refused; setting the soft-delete
-  field to `null` restores it.
+  field to `null` restores it. `deleted: "only"` (or `"include"`) on
+  `query_collection` and `count_documents` reads the trash, as REST's
+  `?deleted=` does, so a row `delete_document` trashed can be found again to
+  restore. Its description tells the model the delete is permanent only where
+  the collection has no soft-delete field.
 - **The listing names the collections; `describe_collection` gives one's schema.**
   `list_collections` answers each collection's `name`, `title` and `description`,
   and `describe_collection { collection }` that collection's OpenAPI `row` and
