@@ -740,6 +740,7 @@ interface BroadcastMessage { channel, error, event, payload, requestId, row, row
 interface BtreeIndex { include, on, reason, unique, using, where }
 interface BucketOptions { account, default, engine, label, prefix, publicRead, transport }
 interface ByIdReadOptions { include }
+interface CallerCredential { id, kind, name }
 interface ChannelBus { kind, maxFrameBytes, publish, start, stop }
 interface ChannelErrorMessage { channel, error, payload, requestId, row, rows, subscriptionId, type }
 interface ChannelHistoryEntry { at, event, payload, senderId, seq }
@@ -1100,7 +1101,7 @@ type ReadOperation
 type RealtimeConnectionState
 type RebaseAppConfig
 type RebaseAppType
-type RebaseCallContext { client, data, driver, storageSource, user }
+type RebaseCallContext { client, credential, data, driver, storageSource, user }
 type RebaseCallbackClient
 type RebaseData
 type RebaseErrorCode
@@ -1136,7 +1137,7 @@ type TopicDelivery
 type TopicHandler
 type UpdateOf
 type UpdateValues
-type User { claims, createdAt, displayName, email, emailVerified, getIdToken, isAnonymous, metadata, pendingEmail, photoURL, providerId, roles, uid }
+type User { claims, createdAt, credential, displayName, email, emailVerified, getIdToken, isAnonymous, metadata, pendingEmail, photoURL, providerId, roles, uid }
 type VectorDistance
 type WhereConditionFor
 type WhereElementOf
@@ -1261,7 +1262,7 @@ type SessionRestoreOutcome
 type StorageReferenceResolver
 type UpdateOf
 type UpdateValues
-type User { claims, createdAt, displayName, email, emailVerified, getIdToken, isAnonymous, metadata, pendingEmail, photoURL, providerId, roles, uid }
+type User { claims, createdAt, credential, displayName, email, emailVerified, getIdToken, isAnonymous, metadata, pendingEmail, photoURL, providerId, roles, uid }
 type WhereConditionFor
 type WhereFilterOp
 type WhereFor
