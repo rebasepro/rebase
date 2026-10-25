@@ -504,12 +504,12 @@ if (only === "both" || only === "names") {
 if (only === "both" || only === "names") {
     console.log(`\n${YELLOW}━━━ MCP tool tables ━━━${NC}`);
     const { findings: bad } = checkMcpToolTables(ROOT);
-    console.log(`${DIM}Compared packages/mcp/README.md and the agent skill's MCP reference against ALL_TOOLS.${NC}`);
+    console.log(`${DIM}Compared packages/mcp/README.md, the agent skill's MCP reference, the website's MCP tool reference and the tool counts on the English MCP pages against ALL_TOOLS (and the remote /mcp tools).${NC}`);
     if (!bad.length) {
-        console.log(`${GREEN}✓ The npm README's and the skill's tool tables are the ones the server registers.${NC}`);
+        console.log(`${GREEN}✓ The README's, the skill's and the website's tool tables, and every tool count, are what the server registers.${NC}`);
     } else {
         findings += bad.length;
-        console.log(`${RED}✗ ${bad.length} generated block(s) out of date:${NC}`);
+        console.log(`${RED}✗ ${bad.length} MCP tool table(s) or count(s) out of date:${NC}`);
         for (const b of bad) {
             console.log(`  ${RED}${b.file}${NC}`);
             console.log(`      ${DIM}${b.message}${NC}`);

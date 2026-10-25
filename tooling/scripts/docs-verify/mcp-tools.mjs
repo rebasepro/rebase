@@ -98,11 +98,21 @@ function objectsIn(body) {
     return out;
 }
 
-/** The value of a double-quoted `key: "…"` at the top level of an object literal. */
+/**
+ * The value of a double-quoted `key: "…"` at the top level of an object
+ * literal, with any `"…" + "…"` continuation joined on.
+ *
+ * Reading only the first literal cut a long description at its first line
+ * break in the source: `rebase_db_branch_diff` went into the README as "Show
+ * what a database branch changed … (Admins only): added, dropped".
+ */
 function stringField(objectSource, key) {
-    const re = new RegExp(`(?:^|[,{\\s])${key}\\s*:\\s*"((?:[^"\\\\]|\\\\.)*)"`);
+    const re = new RegExp(`(?:^|[,{\\s])${key}\\s*:\\s*((?:"(?:[^"\\\\]|\\\\.)*"\\s*\\+\\s*)*"(?:[^"\\\\]|\\\\.)*")`);
     const m = re.exec(objectSource);
-    return m ? m[1].replace(/\\"/g, '"').replace(/\\\\/g, "\\") : null;
+    if (!m) return null;
+    return [...m[1].matchAll(/"((?:[^"\\]|\\.)*)"/g)]
+        .map((part) => part[1].replace(/\\"/g, '"').replace(/\\\\/g, "\\"))
+        .join("");
 }
 
 /** A `required: ["a", "b"]` list, in source order. */

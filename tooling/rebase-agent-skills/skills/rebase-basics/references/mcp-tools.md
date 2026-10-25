@@ -44,7 +44,7 @@ Spawn the Rebase CLI in the active project directory.
 | `rebase_db_branch_list` | — | List all database branches (Admins only) |
 | `rebase_db_branch_delete` ⚠ | `name` | Delete an existing database branch (Admins only) |
 | `rebase_db_branch_info` | `name` | Show information and status for a database branch (Admins only) |
-| `rebase_db_branch_diff` | `name` | Show what a database branch changed against the database it was made from (Admins only): added, dropped  |
+| `rebase_db_branch_diff` | `name` | Show what a database branch changed against the database it was made from (Admins only): added, dropped and altered tables, columns, constraints, indexes, triggers, RLS policies, enum types, views and functions as SQL, and per table the rows the branch inserted, updated and deleted, matched by primary key, with sample rows |
 | `rebase_db_branch_switch` | — | Point this checkout at a database branch, or back at the main database (Admins only) |
 
 ### Schema planning (1)
@@ -127,7 +127,7 @@ Spawn `rebase cloud … --json` in the active project directory, against the pro
 
 | Tool | Required | Description |
 |---|---|---|
-| `rebase_cloud_provision` | — | Give the active project a live backend on Rebase Cloud with no account or signup: provisions a project,  |
+| `rebase_cloud_provision` | — | Give the active project a live backend on Rebase Cloud with no account or signup: provisions a project, sets REBASE_BASE_URL in .env, links the directory and deploys the local collections to it (`rebase cloud init --claim`), then sets REBASE_API_TOKEN in .env: a key the deployed app accepts, for reading and writing data through its row-level security, expiring with the claim window |
 | `rebase_cloud_status` | — | Show the Rebase Cloud project this directory is linked to (`rebase cloud status`) |
 | `rebase_cloud_deploy` | — | Deploy this directory to its linked Rebase Cloud project (`rebase cloud deploy`) |
 | `rebase_cloud_logs` | — | Read the linked Rebase Cloud project's log once, the running app's or the latest build's (`rebase cloud logs`) |

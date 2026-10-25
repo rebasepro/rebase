@@ -66,7 +66,7 @@ The server attempts to load `.env` from `$REBASE_PROJECT_DIR/.env` or `$REBASE_P
 
 **Every tool that changes the target environment is refused unless that target is on the loopback interface.** The gate is a list of what is *not* gated, so a newly added tool is protected by default:
 
-- **Not gated — reads:** `rebase_schema_plan`, `rebase_doctor`, `rebase_db_branch_list`, `rebase_db_branch_info`, `list_documents`, `get_document`, `list_users`, `list_roles`, `storage_list_objects`, `storage_get_download_url`, `cron_list_jobs`, `cron_get_job`, `cron_get_job_logs`, `rebase_dev_logs`, and the Rebase Cloud reads `rebase_cloud_status`, `rebase_cloud_logs`, `rebase_cloud_env_list`, `rebase_cloud_deployments_list`.
+- **Not gated — reads:** `rebase_schema_plan`, `rebase_doctor`, `rebase_db_branch_list`, `rebase_db_branch_info`, `rebase_db_branch_diff`, `list_documents`, `get_document`, `list_users`, `list_roles`, `storage_list_objects`, `storage_get_download_url`, `cron_list_jobs`, `cron_get_job`, `cron_get_job_logs`, `rebase_dev_logs`, and the Rebase Cloud reads `rebase_cloud_status`, `rebase_cloud_logs`, `rebase_cloud_env_list`, `rebase_cloud_deployments_list`.
 - **Not gated — Rebase Cloud writes:** `rebase_cloud_provision`, `rebase_cloud_deploy`, `rebase_cloud_env_set`, `rebase_cloud_rollback`. Provisioning creates a project and links this directory; the others change the linked cloud project, but they spawn `rebase cloud`, which acts on the project `.rebase/cloud.json` links with the CLI's own credential and the control plane's own permission checks; they never use `baseUrl` or `DATABASE_URL`, which is all the gate can check.
 - **Not gated — local only:** `rebase_schema_introspect`, `rebase_db_branch_switch`, `rebase_schema_generate`, `rebase_db_generate`, `rebase_generate_sdk`, the dev-server tools, and the project-registry tools. These write local files or local state and have no remote target to check.
 - **Gated against `DATABASE_URL`:** every other CLI tool — `rebase_db_push`, `rebase_db_migrate`, `rebase_db_branch_create`, `rebase_db_branch_delete`.
@@ -112,7 +112,7 @@ Spawn the Rebase CLI in the active project directory.
 | `rebase_db_branch_list` | — | List all database branches (Admins only) |
 | `rebase_db_branch_delete` ⚠ | `name` | Delete an existing database branch (Admins only) |
 | `rebase_db_branch_info` | `name` | Show information and status for a database branch (Admins only) |
-| `rebase_db_branch_diff` | `name` | Show what a database branch changed against the database it was made from (Admins only): added, dropped  |
+| `rebase_db_branch_diff` | `name` | Show what a database branch changed against the database it was made from (Admins only): added, dropped and altered tables, columns, constraints, indexes, triggers, RLS policies, enum types, views and functions as SQL, and per table the rows the branch inserted, updated and deleted, matched by primary key, with sample rows |
 | `rebase_db_branch_switch` | — | Point this checkout at a database branch, or back at the main database (Admins only) |
 
 ### Schema planning (1)
@@ -195,7 +195,7 @@ Spawn `rebase cloud … --json` in the active project directory, against the pro
 
 | Tool | Required | Description |
 |---|---|---|
-| `rebase_cloud_provision` | — | Give the active project a live backend on Rebase Cloud with no account or signup: provisions a project,  |
+| `rebase_cloud_provision` | — | Give the active project a live backend on Rebase Cloud with no account or signup: provisions a project, sets REBASE_BASE_URL in .env, links the directory and deploys the local collections to it (`rebase cloud init --claim`), then sets REBASE_API_TOKEN in .env: a key the deployed app accepts, for reading and writing data through its row-level security, expiring with the claim window |
 | `rebase_cloud_status` | — | Show the Rebase Cloud project this directory is linked to (`rebase cloud status`) |
 | `rebase_cloud_deploy` | — | Deploy this directory to its linked Rebase Cloud project (`rebase cloud deploy`) |
 | `rebase_cloud_logs` | — | Read the linked Rebase Cloud project's log once, the running app's or the latest build's (`rebase cloud logs`) |

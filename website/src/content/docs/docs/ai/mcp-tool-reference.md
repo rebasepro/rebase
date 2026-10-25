@@ -11,7 +11,7 @@ decides what ⚠ means are on the [MCP server](/docs/ai/mcp) page.
 51 tools, in ten groups. Tools marked ⚠ are refused against non-local targets
 unless you opt out.
 
-## Schema & database (12)
+## Schema & database (13)
 
 Spawn the Rebase CLI in the active project directory.
 
@@ -28,6 +28,7 @@ Spawn the Rebase CLI in the active project directory.
 | `rebase_db_branch_list` | — | List database branches (admins only) |
 | `rebase_db_branch_delete` ⚠ | `name` | Delete a database branch (admins only) |
 | `rebase_db_branch_info` | `name` | Branch information and status (admins only) |
+| `rebase_db_branch_diff` | `name` | What a branch changed against the database it was made from: the schema as SQL, and per table the rows it inserted, updated and deleted (admins only) |
 | `rebase_db_branch_switch` | — | Point this checkout at a branch, or back at the main database (admins only) |
 
 ## Schema planning (1)
