@@ -1,4 +1,4 @@
-import { CollectionConfig, ResolvedRelation } from "@rebasepro/types";
+import { CollectionConfig, Property, ResolvedRelation } from "@rebasepro/types";
 import { apiHiddenFieldNames, findRelation, resolveCollectionRelations } from "@rebasepro/common";
 import { namesHiddenFromCaller } from "./field-viewer";
 import { ApiError } from "@rebasepro/server";
@@ -122,6 +122,43 @@ export function resolveNestedPath(
  */
 export function isJunctionBackedRelation(relation: ResolvedRelation): boolean {
     return relation.shared;
+}
+
+/**
+ * Reject a write whose body names a relation Rebase does not write through —
+ * a `via` (`writable: false`), on the flat create/update door.
+ *
+ * The nested door refuses one in {@link assertWritableThrough}, the type says
+ * `writable: false`, the docs say read-only and the generated SDK leaves it off
+ * `Insert`/`Update`. The flat door wrote it anyway — a to-one `via` through the
+ * join-path writer, a to-many one as junction membership — so the same link was
+ * writable or not depending on which URL named it, and a multi-hop chain with
+ * no junction to bind failed as a 500 asking for a schema regeneration.
+ *
+ * Matched the way the write path matches: a key that is a relation's own name
+ * (the to-many split), or a `relation` property that resolves to one (the
+ * to-one transformer). An `undefined` value is no value — the transformer skips
+ * it — so it is not a write either; `null` is, since it would unlink.
+ */
+export function assertNoReadOnlyRelationValues(values: Record<string, unknown>, collection: CollectionConfig): void {
+    const properties: Record<string, Property | undefined> = collection.properties ?? {};
+    let relations: Record<string, ResolvedRelation> | undefined;
+    const named: string[] = [];
+    for (const [key, value] of Object.entries(values)) {
+        if (value === undefined) continue;
+        relations ??= resolveCollectionRelations(collection);
+        const relation = relations[key] ?? (properties[key]?.type === "relation" ? findRelation(relations, key) : undefined);
+        if (relation && !relation.writable) named.push(key);
+    }
+    if (named.length === 0) return;
+    const list = named.map(key => `'${key}'`).join(", ");
+    throw ApiError.badRequest(
+        `${list} on '${collection.slug}' ${named.length > 1 ? "are `via` relations" : "is a `via` relation"}, ` +
+        "which is read-only: Rebase will not infer how to write through an arbitrary join chain. " +
+        "Write the rows the chain joins directly.",
+        "RELATION_NOT_WRITABLE",
+        { collection: collection.slug, fields: named }
+    );
 }
 
 /**

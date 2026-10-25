@@ -23,6 +23,7 @@ import { FetchService } from "./FetchService";
 import { DrizzleClient } from "../interfaces";
 import { PostgresCollectionRegistry } from "../collections/PostgresCollectionRegistry";
 import {
+    assertNoReadOnlyRelationValues,
     assertWritableThrough,
     isJunctionBackedRelation,
     isNestedPath,
@@ -419,6 +420,8 @@ export class PersistService {
         }
 
         const collection = getCollectionByPath(effectiveCollectionPath, this.registry);
+        // Before anything is written or even planned: see the function.
+        assertNoReadOnlyRelationValues(effectiveValues as Record<string, unknown>, collection);
         const table = getTableForCollection(collection, this.registry);
         const idInfoArray = getPrimaryKeys(collection, this.registry);
         const primaryKeyFields = idInfoArray.map(info => info.fieldName);

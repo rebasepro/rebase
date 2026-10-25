@@ -654,106 +654,26 @@ to: "user_profiles.user_id" } }
                 idField: "id"
             };
 
-            it("should handle one-to-one owning relation via joinPath on write", async () => {
+            // A `via` is read-only on every door: this flat write used to go
+            // through the join-path writer. It is refused before anything is
+            // read or written — the nested door's answer, RELATION_NOT_WRITABLE.
+            it("refuses a one-to-one owning via on a create", async () => {
                 jest.spyOn(collectionRegistry, "getCollectionByPath").mockReturnValue(postsWithAuthorViaJoinPath);
-                jest.spyOn(collectionRegistry, "getTable").mockImplementation(tableName => {
-                    if (tableName === "posts") return mockPostsTable as any;
-                    if (tableName === "authors") return mockAuthorsTable as any;
-                    if (tableName === "user_profiles") return mockUserProfilesTable as any;
-                    return undefined;
-                });
-
-                const newPost = {
-                    title: "Test Post",
-                    authorProfile: { id: "1",
-path: "user_profiles",
-__type: "relation" }
-                };
-
-                // The link is written through the parent's own foreign key, so
-                // the source reads that column back before it writes anything.
-                // The mock answers every select the same way, so this one is
-                // picked out by the projection the source asks for — which is
-                // also what makes the projection assertable below.
-                let parentKeyRead: Record<string, unknown> | undefined;
-                db.select.mockImplementation(((selection?: Record<string, unknown>) => {
-                    if (selection && "val" in selection) {
-                        parentKeyRead = selection;
-                        const chain: Record<string, unknown> = {};
-                        chain.from = () => chain;
-                        chain.where = () => chain;
-                        chain.limit = () => Promise.resolve([{ val: 7 }]);
-                        return chain;
-                    }
-                    return db;
-                }) as never);
-
-                db.returning.mockResolvedValue([{ id: 1 }]);
-                db.limit.mockResolvedValue([{ id: 1,
-title: "Test Post",
-authorId: 7 }]);
-
-                await dataService.save("posts_jp", newPost);
-
-                // Asserting a transaction ran says nothing — every save is
-                // wrapped in one. These are the writes the joinPath produced.
-                //
-                // The chain is posts.author_id → authors.id → user_profiles.
-                // The value written into the profile is the *parent's*
-                // author_id, not the post's id: reading the wrong end of the
-                // first hop links the profile to a row it has no relation to.
-                expect(parentKeyRead?.val).toBe(mockPostsTable.authorId);
-                expect(tableNames(db.update as jest.Mock)).toEqual(["user_profiles", "user_profiles"]);
-                // To-one: whoever currently holds the parent's key is cleared
-                // before the named target takes it, or the pair ends up with
-                // two profiles claiming the same author.
-                expect(setPayloads(db.set as jest.Mock)).toEqual([{ userId: null }, { userId: 7 }]);
+                await expect(dataService.save("posts_jp", { title: "Test Post", authorProfile: { id: "1", path: "user_profiles", __type: "relation" } }))
+                    .rejects.toMatchObject({ code: "RELATION_NOT_WRITABLE", details: { fields: ["authorProfile"] } });
+                expect(db.insert).not.toHaveBeenCalled();
+                expect(db.update).not.toHaveBeenCalled();
             });
 
-            it("applies joinPath updates BEFORE main UPDATE on existing entities to prevent stale data corruption", async () => {
+            // A `via` is read-only on every door: this flat write used to go
+            // through the join-path writer. It is refused before anything is
+            // read or written — the nested door's answer, RELATION_NOT_WRITABLE.
+            it("refuses a one-to-one owning via on an update", async () => {
                 jest.spyOn(collectionRegistry, "getCollectionByPath").mockReturnValue(postsWithAuthorViaJoinPath);
-                jest.spyOn(collectionRegistry, "getTable").mockImplementation(tableName => {
-                    if (tableName === "posts") return mockPostsTable as any;
-                    if (tableName === "authors") return mockAuthorsTable as any;
-                    if (tableName === "user_profiles") return mockUserProfilesTable as any;
-                    return undefined;
-                });
-
-                const postUpdate = {
-                    title: "Test Post Updated",
-                    authorProfile: { id: "1",
-path: "user_profiles",
-__type: "relation" }
-                };
-
-                const expectedOps: string[] = [];
-
-                // Track updateJoinPathOneToOneRelations
-                const relationService = dataService.getPersistService().getRelationWriteService();
-                const spyJoinPath = jest.spyOn(relationService, "updateJoinPathOneToOneRelations").mockImplementation(async () => {
-                    expectedOps.push("joinPathUpdate");
-                });
-
-                // Track main entity update
-                const originalUpdate = db.update;
-                db.update = jest.fn(function(this: any, table) {
-                    if (table && (table as any)._def?.tableName === "posts") {
-                        expectedOps.push("mainUpdate");
-                    }
-                    return originalUpdate.call(this, table);
-                }) as any;
-
-                db.limit.mockResolvedValue([{ id: 1,
-title: "Test Post Updated",
-authorId: 1 }]);
-
-                try {
-                    await dataService.save("posts_jp", postUpdate, 1);
-                    expect(expectedOps).toEqual(["joinPathUpdate", "mainUpdate"]);
-                } finally {
-                    db.update = originalUpdate;
-                    spyJoinPath.mockRestore();
-                }
+                await expect(dataService.save("posts_jp", { title: "Test Post Updated", authorProfile: { id: "1", path: "user_profiles", __type: "relation" } }, 1))
+                    .rejects.toMatchObject({ code: "RELATION_NOT_WRITABLE", details: { fields: ["authorProfile"] } });
+                expect(db.insert).not.toHaveBeenCalled();
+                expect(db.update).not.toHaveBeenCalled();
             });
         });
 
@@ -815,52 +735,15 @@ to: "user_profiles.user_id" } }
                 idField: "id"
             };
 
-            it("should handle one-to-one inverse relation via joinPath on write", async () => {
+            // A `via` is read-only on every door: this flat write used to go
+            // through the join-path writer. It is refused before anything is
+            // read or written — the nested door's answer, RELATION_NOT_WRITABLE.
+            it("refuses a one-to-one inverse via on a create", async () => {
                 jest.spyOn(collectionRegistry, "getCollectionByPath").mockReturnValue(authorsWithProfileViaJoinPath);
-                jest.spyOn(collectionRegistry, "getTable").mockImplementation(tableName => {
-                    if (tableName === "authors") return mockAuthorsTable as any;
-                    if (tableName === "customers") return mockCustomersTable as any;
-                    if (tableName === "user_profiles") return mockUserProfilesTable as any;
-                    return undefined;
-                });
-
-                const newAuthor = {
-                    name: "Jane Author",
-                    profile: { id: "2",
-path: "user_profiles",
-__type: "relation" }
-                };
-
-                // See the owning joinPath test above: the parent's key is read
-                // back before the link is written, and the mock picks that read
-                // out by its projection.
-                let parentKeyRead: Record<string, unknown> | undefined;
-                db.select.mockImplementation(((selection?: Record<string, unknown>) => {
-                    if (selection && "val" in selection) {
-                        parentKeyRead = selection;
-                        const chain: Record<string, unknown> = {};
-                        chain.from = () => chain;
-                        chain.where = () => chain;
-                        chain.limit = () => Promise.resolve([{ val: 3 }]);
-                        return chain;
-                    }
-                    return db;
-                }) as never);
-
-                db.returning.mockResolvedValue([{ id: 1 }]);
-                db.limit.mockResolvedValue([{ id: 1,
-name: "Jane Author" }]);
-
-                await dataService.save("authors_jp", newAuthor);
-
-                // This chain starts authors.id → customers.id, so the value
-                // carried to the profile is the author's own id — the contrast
-                // with the owning case above, where it was an intermediate FK.
-                // Resolving the same column for both would write one of them
-                // against a value from the wrong table.
-                expect(parentKeyRead?.val).toBe(mockAuthorsTable.id);
-                expect(tableNames(db.update as jest.Mock)).toEqual(["user_profiles", "user_profiles"]);
-                expect(setPayloads(db.set as jest.Mock)).toEqual([{ userId: null }, { userId: 3 }]);
+                await expect(dataService.save("authors_jp", { name: "Jane Author", profile: { id: "2", path: "user_profiles", __type: "relation" } }))
+                    .rejects.toMatchObject({ code: "RELATION_NOT_WRITABLE", details: { fields: ["profile"] } });
+                expect(db.insert).not.toHaveBeenCalled();
+                expect(db.update).not.toHaveBeenCalled();
             });
         });
 
@@ -941,44 +824,16 @@ to: "tags.id" } }
                 idField: "id"
             };
 
-            it("should handle many-to-many owning relation via joinPath on write", async () => {
-                jest.spyOn(collectionRegistry, "getCollectionByPath").mockImplementation(path => {
-                    if (path === "posts_tags_jp" || path === "posts") return postsWithTagsViaJoinPath;
-                    if (path.startsWith("tags")) return postsWithTagsViaJoinPath.relations![0].target();
-                    return undefined;
-                });
-                jest.spyOn(collectionRegistry, "getTable").mockImplementation(tableName => {
-                    if (tableName === "posts") return mockPostsTable as any;
-                    if (tableName === "post_tags") return mockPostTagsTable as any;
-                    if (tableName === "tags") return mockTagsTable as any;
-                    return undefined;
-                });
-
-                const postWithTags = {
-                    title: "Tagged Post",
-                    tags: [
-                        { id: "1",
-path: "tags",
-__type: "relation" },
-                        { id: "2",
-path: "tags",
-__type: "relation" }
-                    ]
-                };
-
-                db.returning.mockResolvedValue([{ id: 1 }]);
-                db.limit.mockResolvedValue([{ id: 1,
-title: "Tagged Post" }]);
-                // Mock the fetch for tags relation - return empty array since we're testing write
-                db.orderBy.mockResolvedValue([]);
-
-                const _entity = await dataService.save("posts_tags_jp", postWithTags);
-
-                // Should manage junction table via joinPath
-                expect(db.transaction).toHaveBeenCalled();
-                // The links this save asks for are all new, so the junction is
-                // written and nothing is removed — see junction-diff-write.
-                expect(db.insert).toHaveBeenCalled();
+            // A `via` is read-only on every door: this flat write used to go
+            // through the join-path writer. It is refused before anything is
+            // read or written — the nested door's answer, RELATION_NOT_WRITABLE.
+            it("refuses a many-to-many owning via on a create", async () => {
+                jest.spyOn(collectionRegistry, "getCollectionByPath").mockImplementation(path =>
+                    path === "posts_tags_jp" || path === "posts" ? postsWithTagsViaJoinPath : undefined);
+                await expect(dataService.save("posts_tags_jp", { title: "Tagged Post", tags: [{ id: "1", path: "tags", __type: "relation" }] }))
+                    .rejects.toMatchObject({ code: "RELATION_NOT_WRITABLE", details: { fields: ["tags"] } });
+                expect(db.insert).not.toHaveBeenCalled();
+                expect(db.update).not.toHaveBeenCalled();
             });
         });
 
@@ -1048,42 +903,16 @@ to: "orders.id" } }
                 idField: "id"
             };
 
-            it("should handle many-to-many inverse relation with through", async () => {
-                jest.spyOn(collectionRegistry, "getCollectionByPath").mockImplementation(path => {
-                    if (path === "products_orders" || path === "products") return productsWithOrdersInverse;
-                    if (path.startsWith("orders")) return ordersCollection;
-                    return undefined;
-                });
-                jest.spyOn(collectionRegistry, "getTable").mockImplementation(tableName => {
-                    if (tableName === "products") return mockProductsTable as any;
-                    if (tableName === "orders") return mockOrdersTable as any;
-                    if (tableName === "order_items") return mockOrderItemsTable as any;
-                    return undefined;
-                });
-
-                const productWithOrders = {
-                    name: "Popular Product",
-                    orders: [
-                        { id: "1",
-path: "orders",
-__type: "relation" },
-                        { id: "2",
-path: "orders",
-__type: "relation" }
-                    ]
-                };
-
-                db.returning.mockResolvedValue([{ id: 1 }]);
-                db.limit.mockResolvedValue([{ id: 1,
-name: "Popular Product" }]);
-                // Mock the fetch for orders relation - return empty array
-                db.orderBy.mockResolvedValue([]);
-
-                const _entity = await dataService.save("products_orders", productWithOrders);
-
-                // Should manage junction table from inverse side
-                expect(db.transaction).toHaveBeenCalled();
-                expect(db.insert).toHaveBeenCalled();
+            // A `via` is read-only on every door: this flat write used to go
+            // through the join-path writer. It is refused before anything is
+            // read or written — the nested door's answer, RELATION_NOT_WRITABLE.
+            it("refuses a many-to-many inverse via on a create", async () => {
+                jest.spyOn(collectionRegistry, "getCollectionByPath").mockImplementation(path =>
+                    path === "products_orders" || path === "products" ? productsWithOrdersInverse : undefined);
+                await expect(dataService.save("products_orders", { name: "Popular Product", orders: [{ id: "1", path: "orders", __type: "relation" }] }))
+                    .rejects.toMatchObject({ code: "RELATION_NOT_WRITABLE", details: { fields: ["orders"] } });
+                expect(db.insert).not.toHaveBeenCalled();
+                expect(db.update).not.toHaveBeenCalled();
             });
         });
 
@@ -1124,42 +953,16 @@ to: "posts.id" } }
                 idField: "id"
             };
 
-            it("should handle many-to-many inverse relation via joinPath on write", async () => {
-                jest.spyOn(collectionRegistry, "getCollectionByPath").mockImplementation(path => {
-                    if (path === "tags_posts_jp" || path === "tags") return tagsWithPostsViaJoinPath;
-                    if (path.startsWith("posts")) return tagsWithPostsViaJoinPath.relations![0].target();
-                    return undefined;
-                });
-                jest.spyOn(collectionRegistry, "getTable").mockImplementation(tableName => {
-                    if (tableName === "tags") return mockTagsTable as any;
-                    if (tableName === "post_tags") return mockPostTagsTable as any;
-                    if (tableName === "posts") return mockPostsTable as any;
-                    return undefined;
-                });
-
-                const tagWithPosts = {
-                    name: "Popular Tag",
-                    posts: [
-                        { id: "1",
-path: "posts",
-__type: "relation" },
-                        { id: "2",
-path: "posts",
-__type: "relation" }
-                    ]
-                };
-
-                db.returning.mockResolvedValue([{ id: 1 }]);
-                db.limit.mockResolvedValue([{ id: 1,
-name: "Popular Tag" }]);
-                // Mock the fetch for posts relation - return empty array since we're testing write
-                db.orderBy.mockResolvedValue([]);
-
-                const _entity = await dataService.save("tags_posts_jp", tagWithPosts);
-
-                // Should manage junction table via inverse joinPath
-                expect(db.transaction).toHaveBeenCalled();
-                expect(db.insert).toHaveBeenCalled();
+            // A `via` is read-only on every door: this flat write used to go
+            // through the join-path writer. It is refused before anything is
+            // read or written — the nested door's answer, RELATION_NOT_WRITABLE.
+            it("refuses a many-to-many inverse via on a create, and names it", async () => {
+                jest.spyOn(collectionRegistry, "getCollectionByPath").mockImplementation(path =>
+                    path === "tags_posts_jp" || path === "tags" ? tagsWithPostsViaJoinPath : undefined);
+                await expect(dataService.save("tags_posts_jp", { name: "Popular Tag", posts: [{ id: "1", path: "posts", __type: "relation" }] }))
+                    .rejects.toMatchObject({ code: "RELATION_NOT_WRITABLE", details: { fields: ["posts"] } });
+                expect(db.insert).not.toHaveBeenCalled();
+                expect(db.update).not.toHaveBeenCalled();
             });
         });
     });
