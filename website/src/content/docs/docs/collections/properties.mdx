@@ -496,7 +496,7 @@ client: {
 
 <FieldWidgetPreview client:only="react" variant="reference" />
 
-On Postgres a `reference` is a foreign key like any other, so it follows the same `ON DELETE` rule as a `belongsTo` relation: optional is `SET NULL`, required is `RESTRICT`. See [Relations](/docs/collections/relations).
+`reference` is the link of the document databases (Firestore, MongoDB). On Postgres, link with a [`relation`](/docs/collections/relations) instead: a `PostgresCollectionConfig`'s property types refuse `reference`, the way a Firestore collection's refuse `relation`. A `reference` that reaches the schema generator anyway — a config written without those types — becomes a foreign key with the `belongsTo` `ON DELETE` rule: optional is `SET NULL`, required is `RESTRICT`.
 
 
 ### Reference & Relation Options
