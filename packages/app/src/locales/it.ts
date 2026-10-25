@@ -238,7 +238,7 @@ export const it: RebaseTranslations = {
     rls_simulation_masked_columns: "{{count}} colonne mascherate dalla RLS",
     rls_simulation_masked_columns_one: "1 colonna mascherata dalla RLS",
     rls_simulation_counting: "Calcolo di ciò che questa identità può leggere…",
-    rls_simulation_note: "Le viste dei dati mostrano solo le righe e i campi che questa identità può leggere. Gli aggiornamenti in tempo reale sono in pausa durante la simulazione.",
+    rls_simulation_note: "Le viste dei dati mostrano solo le righe e i campi che questa identità può leggere. La modifica è disattivata durante la simulazione: interrompi la simulazione per apportare modifiche. Gli aggiornamenti in tempo reale sono in pausa.",
     create_index: "Crea indice",
     value_is_not_reference: "Il valore non è un riferimento.",
     click_to_edit: "Fai clic per modificare",
