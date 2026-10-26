@@ -10,7 +10,10 @@ import { RealtimeMiniDemo } from "../demos/RealtimeMiniDemo";
 import { AdminDemoCarousel } from "../demos/AdminDemoCarousel";
 import { AgentConsoleDemo } from "../demos/AgentConsoleDemo";
 import { getLangFromUrl, useTranslations, useTranslatedPath } from "../../i18n/ui";
-import { ArrowRight, Database, LayoutDashboard, TerminalSquare } from "lucide-react";
+import {
+    ArrowRight, Database, LayoutDashboard, TerminalSquare,
+    KeyRound, HardDrive, Code2, Clock, Sparkles, GitBranch, History, ArchiveRestore,
+} from "lucide-react";
 import { DEMO_URL } from "../../utils/links";
 
 // Rendered by the home route, which supplies both; falls back for the dev route.
@@ -28,6 +31,21 @@ const RLS_CHECK_COMMAND = "npx @rebasepro/rls-check";
 // One source for the command the hero shows and the copy button writes, so
 // the two can never drift apart.
 const INSTALL_COMMAND = "pnpm dlx @rebasepro/cli init";
+
+// Chapter 02's capability grid. Only what ships in the published release goes
+// here — preview deploys and branch merging are 0.26 and wait for it. Each
+// handle is the real name a reader would type or search the docs for.
+const ENGINE_CAPABILITIES = [
+    { title: "engine.cap.auth.title", desc: "engine.cap.auth.desc", Icon: KeyRound, handle: "/api/auth" },
+    { title: "engine.cap.storage.title", desc: "engine.cap.storage.desc", Icon: HardDrive, handle: "/api/storage" },
+    { title: "engine.cap.functions.title", desc: "engine.cap.functions.desc", Icon: Code2, handle: "defineFunction()" },
+    { title: "engine.cap.jobs.title", desc: "engine.cap.jobs.desc", Icon: Clock, handle: "defineCron() · jobQueue.enqueue()" },
+    { title: "engine.cap.vector.title", desc: "engine.cap.vector.desc", Icon: Sparkles, handle: "?vector_search=embedding" },
+    { title: "engine.cap.branches.title", desc: "engine.cap.branches.desc", Icon: GitBranch, handle: "rebase db branch create" },
+    { title: "engine.cap.history.title", desc: "engine.cap.history.desc", Icon: History, handle: "history: true" },
+    { title: "engine.cap.backups.title", desc: "engine.cap.backups.desc", Icon: ArchiveRestore, handle: "rebase db backup" },
+] as const;
+
 // The hero colours the command by role: the runner, the package, the verb.
 const [INSTALL_RUNNER, INSTALL_PACKAGE, INSTALL_VERB] =
     INSTALL_COMMAND.match(/^(\S+ \S+) (\S+) (\S+)$/)!.slice(1);
@@ -249,9 +267,12 @@ const SELFHOST_COMMAND = "docker compose up -d";
                         </div>
                     </div>
 
-                    <!-- What is left over is a line of text, not a fourth panel. -->
-                    <div class="mt-12 flex flex-wrap items-baseline gap-x-8 gap-y-3 border-t border-white/8 pt-8">
-                        <p class="text-sm text-page-copy max-w-2xl">
+                    {/* The rest of the backend, as a list someone can scan. It was one
+                        sentence, and an evaluator came away believing Rebase had no
+                        functions, branching or backups. Text cells, not a fourth
+                        panel: each names the feature and the handle that turns it on. */}
+                    <div class="mt-16 flex flex-wrap items-baseline gap-x-8 gap-y-3">
+                        <p class="text-page-copy max-w-2xl">
                             {t("engine.plus")}
                         </p>
                         <a href={translatePath("/backend")} class="accent-link ml-auto">
@@ -259,6 +280,18 @@ const SELFHOST_COMMAND = "docker compose up -d";
                             <ArrowRight size={15} />
                         </a>
                     </div>
+                    <ul class="mt-8 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 border-t border-l border-white/8">
+                        {ENGINE_CAPABILITIES.map(({ title, desc, Icon, handle }) => (
+                            <li class="border-r border-b border-white/8 p-6">
+                                <p class="flex items-center gap-2.5 font-headers text-base text-surface-100">
+                                    <Icon size={16} class="shrink-0 text-surface-400" />
+                                    {t(title)}
+                                </p>
+                                <p class="mt-2 text-sm text-page-copy leading-relaxed">{t(desc)}</p>
+                                <p class="mt-4 font-mono text-2xs text-surface-400">{handle}</p>
+                            </li>
+                        ))}
+                    </ul>
                 </div>
             </section>
         </div>

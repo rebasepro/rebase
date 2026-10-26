@@ -88,7 +88,31 @@ export const es = {
   "cta.button.demo": "Probar la demo",
   "cta.button.docs": "Leer la documentación",
   "engine.plus":
-    "Además: auth y roles, almacenamiento compatible con S3, tareas programadas, funciones serverless y backups. Nada de esto es un servicio aparte en el que tengas que registrarte y conectar.",
+    "Y el resto del backend, en el mismo servidor. Nada de esto es un servicio aparte en el que tengas que registrarte y conectar.",
+  "engine.cap.auth.title": "Auth",
+  "engine.cap.auth.desc":
+    "Email y contraseña, magic links, doce proveedores OAuth y API keys con scopes.",
+  "engine.cap.storage.title": "Almacenamiento",
+  "engine.cap.storage.desc":
+    "Compatible con S3, GCS o disco local, con subidas reanudables y reglas de acceso por archivo.",
+  "engine.cap.functions.title": "Funciones",
+  "engine.cap.functions.desc":
+    "Tus propios endpoints junto a los generados. Deja un archivo en functions/ y queda montado.",
+  "engine.cap.jobs.title": "Cron y jobs",
+  "engine.cap.jobs.desc":
+    "Tareas programadas y una cola en Postgres que reintenta con backoff y sobrevive a un reinicio.",
+  "engine.cap.vector.title": "Búsqueda vectorial",
+  "engine.cap.vector.desc":
+    "Consultas de vecinos más cercanos sobre columnas pgvector, con la misma API REST.",
+  "engine.cap.branches.title": "Ramas de base de datos",
+  "engine.cap.branches.desc":
+    "Una copia completa de tu base de datos para probar una migración sin tocar la real.",
+  "engine.cap.history.title": "Historial",
+  "engine.cap.history.desc":
+    "Quién cambió qué fila y cuándo, con el antes y el después completos.",
+  "engine.cap.backups.title": "Backups",
+  "engine.cap.backups.desc":
+    "pg_dump a disco o S3 de forma programada, restaurado en una base nueva. Recuperación a un punto en el tiempo en Rebase Cloud.",
   "personas.badge": "Quién lo toca",
   "personas.title": "Tres personas tocan esto. Ninguna de la misma manera.",
   "personas.dev.title": "La persona que desarrolla y es dueña de la base de datos",

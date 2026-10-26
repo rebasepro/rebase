@@ -87,7 +87,31 @@ export const de = {
   "cta.button.demo": "Demo testen",
   "cta.button.docs": "Docs lesen",
   "engine.plus":
-    "Dazu Auth und Rollen, S3-kompatibler Storage, geplante Jobs, Serverless Functions und Backups. Nichts davon ist ein separater Dienst, für den du dich registrieren und den du zusammenstecken musst.",
+    "Und der Rest des Backends, im selben Server. Nichts davon ist ein separater Dienst, für den du dich registrieren und den du zusammenstecken musst.",
+  "engine.cap.auth.title": "Auth",
+  "engine.cap.auth.desc":
+    "E-Mail und Passwort, Magic Links, zwölf OAuth-Anbieter und API-Keys mit Scopes.",
+  "engine.cap.storage.title": "Dateispeicher",
+  "engine.cap.storage.desc":
+    "S3-kompatibel, GCS oder lokale Platte, mit fortsetzbaren Uploads und Zugriffsregeln pro Datei.",
+  "engine.cap.functions.title": "Functions",
+  "engine.cap.functions.desc":
+    "Eigene Endpunkte neben den generierten. Leg eine Datei in functions/ ab, und sie ist eingebunden.",
+  "engine.cap.jobs.title": "Cron und Jobs",
+  "engine.cap.jobs.desc":
+    "Geplante Aufgaben und eine Queue in Postgres, die mit Backoff wiederholt und einen Neustart übersteht.",
+  "engine.cap.vector.title": "Vektorsuche",
+  "engine.cap.vector.desc":
+    "Nearest-Neighbour-Abfragen über pgvector-Spalten, über dieselbe REST-API.",
+  "engine.cap.branches.title": "Datenbank-Branches",
+  "engine.cap.branches.desc":
+    "Eine vollständige Kopie deiner Datenbank, um eine Migration zu testen, ohne die echte anzufassen.",
+  "engine.cap.history.title": "Verlauf",
+  "engine.cap.history.desc":
+    "Wer welche Zeile wann geändert hat, mit dem vollständigen Vorher und Nachher.",
+  "engine.cap.backups.title": "Backups",
+  "engine.cap.backups.desc":
+    "pg_dump auf Platte oder S3 nach Zeitplan, wiederhergestellt in eine frische Datenbank. Point-in-Time-Recovery auf Rebase Cloud.",
   "personas.badge": "Wer es anfasst",
   "personas.title": "Drei Menschen fassen das an. Keiner auf dieselbe Weise.",
   "personas.dev.title": "Die Entwicklerin, der die Datenbank gehört",

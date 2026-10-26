@@ -88,7 +88,31 @@ export const fr = {
   "cta.button.demo": "Tester la démo",
   "cta.button.docs": "Lire la doc",
   "engine.plus":
-    "Plus l'auth et les rôles, le stockage compatible S3, les tâches planifiées, les fonctions serverless et les sauvegardes. Aucun service séparé auquel souscrire ou à interconnecter.",
+    "Et le reste du backend, dans le même serveur. Aucun service séparé auquel souscrire ou à interconnecter.",
+  "engine.cap.auth.title": "Auth",
+  "engine.cap.auth.desc":
+    "E-mail et mot de passe, magic links, douze fournisseurs OAuth et clés d'API à portée limitée.",
+  "engine.cap.storage.title": "Stockage de fichiers",
+  "engine.cap.storage.desc":
+    "Compatible S3, GCS ou disque local, avec reprise des envois et règles d'accès par fichier.",
+  "engine.cap.functions.title": "Fonctions",
+  "engine.cap.functions.desc":
+    "Vos propres endpoints à côté des endpoints générés. Déposez un fichier dans functions/ et il est monté.",
+  "engine.cap.jobs.title": "Cron et jobs",
+  "engine.cap.jobs.desc":
+    "Des tâches planifiées, et une file d'attente dans Postgres qui réessaie avec backoff et survit à un redémarrage.",
+  "engine.cap.vector.title": "Recherche vectorielle",
+  "engine.cap.vector.desc":
+    "Requêtes du plus proche voisin sur des colonnes pgvector, via la même API REST.",
+  "engine.cap.branches.title": "Branches de base de données",
+  "engine.cap.branches.desc":
+    "Une copie complète de votre base pour tester une migration, sans toucher à la vraie.",
+  "engine.cap.history.title": "Historique",
+  "engine.cap.history.desc":
+    "Qui a modifié quelle ligne et quand, avec l'avant et l'après complets.",
+  "engine.cap.backups.title": "Sauvegardes",
+  "engine.cap.backups.desc":
+    "pg_dump vers le disque ou S3 selon un planning, restauré dans une base neuve. Restauration à un instant précis sur Rebase Cloud.",
   "personas.badge": "Qui y touche",
   "personas.title": "Trois personnes y touchent. Aucune de la même façon.",
   "personas.dev.title": "La développeuse ou le développeur qui possède la base de données",
