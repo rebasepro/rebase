@@ -77,7 +77,7 @@ function stubDriver(canDiff: boolean) {
 
 const started: Array<() => void> = [];
 
-async function boot(options: { canDiff?: boolean } = {}): Promise<Hono> {
+async function boot(options: { canDiff?: boolean; roles?: Record<string, { scopes: string[] }> } = {}): Promise<Hono> {
     const bootstrapper = {
         type: "fake",
         isDefault: true,
@@ -86,7 +86,8 @@ async function boot(options: { canDiff?: boolean } = {}): Promise<Hono> {
         },
         async initializeAuth() {
             const authRepository = {
-                getUserRoleIds: async (uid: string) => (uid.startsWith("admin") ? ["admin"] : ["editor"]),
+                getUserRoleIds: async (uid: string) => (uid.startsWith("admin") ? ["admin"]
+                    : uid.startsWith("dev-") ? ["developer"] : uid.startsWith("dba-") ? ["dba"] : ["editor"]),
                 getTokensValidAfter: async () => null
             };
             return { userService: authRepository, authRepository };
@@ -96,7 +97,13 @@ async function boot(options: { canDiff?: boolean } = {}): Promise<Hono> {
     const backend = await initializeRebaseBackend({
         app: app as never,
         server: {} as never,
-        collections: [{ name: "jobs", slug: "jobs", table: "jobs", properties: { id: { name: "ID", type: "string", isId: "uuid" } } } as unknown as CollectionConfig],
+        collections: [
+            { name: "jobs", slug: "jobs", table: "jobs", properties: { id: { name: "ID", type: "string", isId: "uuid" } } } as unknown as CollectionConfig,
+            ...(options.roles ? [{
+                name: "Users", slug: "users", table: "users", auth: { enabled: true, roles: options.roles },
+                properties: { id: { name: "ID", type: "string", isId: "uuid" }, email: { name: "Email", type: "string" } }
+            } as unknown as CollectionConfig] : [])
+        ],
         cronsDir: CRONS_DIR,
         cronPersistence: false,
         bootstrappers: [bootstrapper],
@@ -139,6 +146,32 @@ describe("who may review a branch", () => {
         expect(res.status).toBe(403);
         expect((await merge(app, { expectedFingerprint: "f1" }, token)).status).toBe(403);
         expect(calls).toEqual({ diff: [], merge: [] });
+    });
+});
+
+describe("who may read a branch's rows", () => {
+    // The diff's samples are whole rows from both databases, read as the
+    // database owner, outside row-level security: what `database:write`
+    // means. `database:read` lists databases and branches, and no rows.
+    const roles = {
+        developer: { scopes: ["schema:read", "database:read", "logs:read"] },
+        dba: { scopes: ["database:read", "database:write"] }
+    };
+
+    it("refuses the diff to a role holding database:read alone", async () => {
+        const app = await boot({ roles });
+        const token = await generateAccessToken("dev-1", ["developer"]);
+        const res = await app.request("/api/admin/branches/agent/diff", { headers: { authorization: `Bearer ${token}` } });
+        expect(res.status).toBe(403);
+        expect(calls.diff).toEqual([]);
+    });
+
+    it("answers it to a role holding database:write", async () => {
+        const app = await boot({ roles });
+        const token = await generateAccessToken("dba-1", ["dba"]);
+        const res = await app.request("/api/admin/branches/agent/diff", { headers: { authorization: `Bearer ${token}` } });
+        expect(res.status).toBe(200);
+        expect(calls.diff).toHaveLength(1);
     });
 });
 

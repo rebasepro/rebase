@@ -42,7 +42,9 @@ description: Rules for creating UI components in the Rebase codebase
 
    - **Lines.** A hairline marks an object, never a region. Do not put a `border-b` under a toolbar, an identity bar or a header band that sits on the sheet, nor a `border-l`/`border-r` between two regions that already differ by a surface step (the form rail, the split list). The lines that stay hold something up: the sheet edge, the tab strip a folder tab sits on, a table or list header's rule.
 
-   - **Form density.** Record-form fields are `size="small"` (32px) with 14px text, and every field carries its hairline through `fieldBackgroundMixin`; never pass `size="large"` to a field binding (48px with 16px text is the hero-form scale, and eight of them in a row read as a wall). Field labels are 13px medium in the primary ink with a 14px muted type icon; helper text is `caption` (11px).
+   - **Fields.** A field is a filled box with no visible edge (the FireCMS field): `fieldBackgroundMixin` is `bg-surface-field` plus a *transparent* 1px border, which keeps every measured height and lets an error recolour the border without shifting the layout. Never add `border-hairline` to a field, and never override the fill.
+
+   - **Form density.** Record-form fields are `size="large"` — the entity form passes it and the bindings default to it. The one-line controls (text, number, date, switch, single select, a one-line read-only value) carry their label INSIDE the box: 64px plus the 1px border, a 16px value. A multi-select, uploads, markdown, relations and custom editors keep a label above (`FieldBlock`: 13px medium, primary ink, 14px muted type icon) over a 48px box. `labelsInsideControl` in `packages/cms/src/form/label_placement.ts` decides; keep it in step with the bindings. Helper text is `caption` (11px), under the box.
 
 3. **No gradients on icons or fallback placeholders** unless the design explicitly calls for it.
 
@@ -97,7 +99,7 @@ Each collection view mode has a standard icon from Lucide. When building view sw
 |-----------|-------------|-------|
 | `table` | `Table` | Default tabular view |
 | `cards` | `LayoutGrid` | Grid of cards |
-| `kanban` | `Columns` | Board with columns |
+| `kanban` | `Kanban` | Board with columns |
 | `list` | `List` | Compact list view |
 
 ---
@@ -119,5 +121,5 @@ Each collection view mode has a standard icon from Lucide. When building view sw
    | Hand-rolled alert/banner div | `Alert` |
    | Hand-rolled badge/pill span | `Badge` / `Chip` |
    | Hardcoded `border-gray-*` | `defaultBorderMixin` |
-   | Hardcoded `text-gray-*` / `text-slate-*` | `text-surface-*` design tokens |
+   | Hardcoded `text-gray-*` / `text-slate-*` | `Typography`'s `color`, or the text tokens `text-text-primary dark:text-text-primary-dark` / `text-text-secondary dark:text-text-secondary-dark` |
 

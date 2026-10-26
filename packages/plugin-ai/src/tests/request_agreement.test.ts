@@ -243,11 +243,13 @@ type: "string" }
 
 describe("omitDisabledValues", () => {
 
-    it("leaves a record alone when nothing is disabled", () => {
+    it("keeps a declared, unlocked value and drops a key the map does not declare", () => {
+        // This pinned the old deny-list: `b`, declared nowhere, went out with
+        // the record. Values now travel only for properties the map declares.
         const values = { a: 1,
 b: 2 };
         expect(omitDisabledValues(values, { a: { type: "number",
-fieldConfigId: "number_field" } })).toBe(values);
+fieldConfigId: "number_field" } })).toEqual({ a: 1 });
     });
 
     it("survives a property map carrying a non-object at a path", () => {

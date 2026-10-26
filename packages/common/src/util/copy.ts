@@ -12,8 +12,9 @@ import { resolveRelationProperty } from "./resolutions";
  * lives on the other row. Writing a `hasMany` or a `hasOne` points the
  * children's foreign key at the copy, which takes them away from the record
  * that was copied: duplicating an author moved every one of their posts to the
- * duplicate and left the original with none. A `via` is declared read-only,
- * and its one-to-one writer re-points the target's key the same way.
+ * duplicate and left the original with none. A `via` is left out too: a
+ * single-hop one's one-to-one writer re-points the target's key the same way,
+ * and a multi-hop one is read-only.
  *
  * Exhaustive over the kinds, so a new one is a compile error here rather than
  * a copy that quietly carries it.

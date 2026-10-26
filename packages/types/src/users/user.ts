@@ -1,3 +1,5 @@
+import type { CallerCredential } from "../types/api_keys";
+
 
 /**
  * The canonical representation of an authenticated user in the Rebase ecosystem.
@@ -93,6 +95,14 @@ export type User = {
      * anonymous request.
      */
     readonly claims?: Record<string, unknown>;
+
+    /**
+     * The API key this request authenticated with, when it was one. Set
+     * server-side on the identity a request's driver is scoped to, and read by
+     * collection callbacks as `context.credential`. Absent for a session, a
+     * service-key request and in the browser.
+     */
+    readonly credential?: CallerCredential;
 
     getIdToken?: (forceRefresh?: boolean) => Promise<string>;
 

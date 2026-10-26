@@ -159,17 +159,52 @@ describe("an unmatched route answers the envelope", () => {
         expect(missing.headers.get("content-type")).toContain("application/json");
     });
 
-    it("leaves paths outside basePath to the application's own 404", async () => {
+    it("leaves the text 404 of a handler registered with app.all", async () => {
+        // A webhook receiver or a proxy in a function is `app.all(...)`, which
+        // Hono registers as method `ALL` — the same as middleware. The route
+        // exists; answering "No route for …" said it did not.
+        const a = new Hono<HonoEnv>();
+        installRootErrorHandler(a);
+        installUnmatchedApiEnvelope(a, "/api");
+        a.use("/api/*", requestId());
+        a.all("/api/functions/x/feed", (c) => c.text("no such feed", 404));
+
+        for (const method of ["GET", "POST"]) {
+            const res = await a.request("/api/functions/x/feed", { method });
+            expect(res.status).toBe(404);
+            expect(res.headers.get("content-type")).toContain("text/plain");
+            expect(await res.text()).toBe("no such feed");
+        }
+        // Hono's own default beside it is still converted.
+        const missing = await a.request("/api/functions/x/nope");
+        expect(missing.headers.get("content-type")).toContain("application/json");
+        expect((await missing.json() as { error: { code: string } }).error.code).toBe("NOT_FOUND");
+    });
+
+    it("converts only Hono's default body, not a handler's text that merely starts like it", async () => {
+        const a = new Hono<HonoEnv>();
+        installUnmatchedApiEnvelope(a, "/api");
+        a.all("/api/functions/x/*", (c) => c.text("404 Not Found: feed 7", 404));
+
+        expect(await (await a.request("/api/functions/x/seven")).text()).toBe("404 Not Found: feed 7");
+    });
+
+    it("leaves an application's own notFound to answer, inside basePath as outside", async () => {
         // An app that mounts a backend at `/api` and serves its own pages at
         // `/` keeps answering its own way for the pages — which is also why
         // this is not `app.notFound`, whose handler Hono keeps private and
         // which we would therefore have replaced without being able to see it.
+        //
+        // Under `/api` too, now: only Hono's default body is "nothing handled
+        // this", and an app's own handler is its answer, as its own `onError`
+        // is. (It used to be replaced there, which is the same rule that
+        // replaced an `app.all` handler's deliberate 404.)
         const a = new Hono<HonoEnv>();
         a.notFound((c) => c.text("the project's own 404", 404));
         installRootErrorHandler(a);
         installUnmatchedApiEnvelope(a, "/api");
 
         expect(await (await a.request("/about")).text()).toBe("the project's own 404");
-        expect((await a.request("/api/nope")).headers.get("content-type")).toContain("application/json");
+        expect(await (await a.request("/api/nope")).text()).toBe("the project's own 404");
     });
 });

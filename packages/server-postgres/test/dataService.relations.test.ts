@@ -641,12 +641,11 @@ relationName: "authorProfile" }
                         relationName: "authorProfile",
                         target: () => userProfilesCollection,
                         cardinality: "one",
+                        // One step: a multi-hop to-one chain is read-only
+                        // (see "refuses a multi-hop to-one via" below).
                         joinPath: [
-                            { table: "authors",
-on: { from: "posts.author_id",
-to: "authors.id" } },
                             { table: "user_profiles",
-on: { from: "authors.id",
+on: { from: "posts.author_id",
 to: "user_profiles.user_id" } }
                         ]
                     }
@@ -698,10 +697,10 @@ authorId: 7 }]);
                 // Asserting a transaction ran says nothing — every save is
                 // wrapped in one. These are the writes the joinPath produced.
                 //
-                // The chain is posts.author_id → authors.id → user_profiles.
-                // The value written into the profile is the *parent's*
-                // author_id, not the post's id: reading the wrong end of the
-                // first hop links the profile to a row it has no relation to.
+                // The step is posts.author_id → user_profiles.user_id. The
+                // value written into the profile is the *parent's* author_id,
+                // not the post's id: reading the wrong end of the step links
+                // the profile to a row it has no relation to.
                 expect(parentKeyRead?.val).toBe(mockPostsTable.authorId);
                 expect(tableNames(db.update as jest.Mock)).toEqual(["user_profiles", "user_profiles"]);
                 // To-one: whoever currently holds the parent's key is cleared
@@ -803,11 +802,8 @@ relationName: "profile" }
                         target: () => userProfilesCollection,
                         cardinality: "one",
                         joinPath: [
-                            { table: "customers",
-on: { from: "authors.id",
-to: "customers.id" } },
                             { table: "user_profiles",
-on: { from: "customers.id",
+on: { from: "authors.id",
 to: "user_profiles.user_id" } }
                         ]
                     }
@@ -853,14 +849,50 @@ name: "Jane Author" }]);
 
                 await dataService.save("authors_jp", newAuthor);
 
-                // This chain starts authors.id → customers.id, so the value
-                // carried to the profile is the author's own id — the contrast
-                // with the owning case above, where it was an intermediate FK.
+                // This step starts at authors.id, so the value carried to the
+                // profile is the author's own id — the contrast with the owning
+                // case above, where it was the parent's foreign key.
                 // Resolving the same column for both would write one of them
                 // against a value from the wrong table.
                 expect(parentKeyRead?.val).toBe(mockAuthorsTable.id);
                 expect(tableNames(db.update as jest.Mock)).toEqual(["user_profiles", "user_profiles"]);
                 expect(setPayloads(db.set as jest.Mock)).toEqual([{ userId: null }, { userId: 3 }]);
+            });
+        });
+
+        describe("ONE + multi-hop joinPath", () => {
+            // A to-one chain of more than one step has no single key to set:
+            // the writer re-pointed the target at the first step's column. It
+            // is read-only, refused before anything is read or written.
+            const postsWithTwoHopProfile: CollectionConfig = {
+                slug: "posts_two_hop",
+                name: "Posts with a two-hop profile",
+                table: "posts",
+                properties: {
+                    id: { type: "number", isId: true },
+                    title: { type: "string" },
+                    authorProfile: {
+                        type: "relation",
+                        relation: {
+                            kind: "via",
+                            relationName: "authorProfile",
+                            target: () => userProfilesCollection,
+                            cardinality: "one",
+                            joinPath: [
+                                { table: "authors", on: { from: "posts.author_id", to: "authors.id" } },
+                                { table: "user_profiles", on: { from: "authors.id", to: "user_profiles.user_id" } }
+                            ]
+                        }
+                    }
+                }
+            };
+
+            it("refuses a multi-hop to-one via with 400 RELATION_NOT_WRITABLE", async () => {
+                jest.spyOn(collectionRegistry, "getCollectionByPath").mockReturnValue(postsWithTwoHopProfile);
+                await expect(dataService.save("posts_two_hop", { title: "t", authorProfile: "1" }, 1))
+                    .rejects.toMatchObject({ code: "RELATION_NOT_WRITABLE", details: { fields: ["authorProfile"] } });
+                expect(db.update).not.toHaveBeenCalled();
+                expect(db.insert).not.toHaveBeenCalled();
             });
         });
 

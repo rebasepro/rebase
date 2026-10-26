@@ -207,8 +207,8 @@ fields };
                     // date is one value under one key here because it is one
                     // property under one key there. Where they disagreed, the
                     // service read a filled field as empty and offered to
-                    // rewrite it. Values of properties nobody may edit do not
-                    // travel at all.
+                    // rewrite it. Values of properties nobody may edit, and of
+                    // keys no property declares, do not travel at all.
                     values: flatValues,
                     properties: currentProperties,
                     propertyKey: params.propertyKey,

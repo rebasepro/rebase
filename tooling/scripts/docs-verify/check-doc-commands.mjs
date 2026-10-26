@@ -512,6 +512,11 @@ function shellVariables(text) {
         }
         if (!isShell) continue;
         for (const m of lines[i].matchAll(/(?:^|[\s(;&|])(?:export\s+)?([A-Z][A-Z0-9_]*)=/g)) assigned.add(m[1]);
+        // `read -rs SECRET` fills SECRET from the terminal, which is how a page
+        // keeps a value off the command line.
+        for (const m of lines[i].matchAll(/(?:^|[\s(;&|])read((?:\s+-[A-Za-z]+)*)((?:\s+[A-Z][A-Z0-9_]*)+)/g)) {
+            for (const name of m[2].trim().split(/\s+/)) assigned.add(name);
+        }
         for (const m of lines[i].matchAll(/\$\{?([A-Z][A-Z0-9_]*)\}?/g)) {
             out.push({ line: i + 1, name: m[1], assigned: new Set(assigned) });
         }

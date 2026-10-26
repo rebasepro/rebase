@@ -1,5 +1,5 @@
 ---
-sourceHash: a0bd19745c59b12b
+sourceHash: e6db89a6b0b8b60d
 title: Sistema de plugins
 sidebar_label: Plugins
 description: Extiende Rebase con plugins — inyecta componentes de UI, modifica colecciones, añade acciones a la barra de herramientas y crea constructores de campos personalizados.
@@ -18,7 +18,7 @@ Los plugins son el mecanismo principal de extensión en el panel. Pueden:
 
 - Envolver toda la aplicación con un **provider** (contexto, gestión de estado)
 - Añadir **acciones de la página de inicio** y widgets
-- Inyectar componentes de **vista de colección** (barra de herramientas, constructores de columnas)
+- Inyectar componentes de **vista de colección** (barra de herramientas, encabezados de columna)
 - Añadir componentes de **formulario** (constructores de campos, paneles adicionales)
 - **Inyectar o modificar colecciones** dinámicamente
 
@@ -31,7 +31,7 @@ interface RebasePlugin {
 
     // UI contributions — a flat array, each entry naming its slot.
     // This replaced the old per-area objects (homePage, collectionView, form).
-    slots?: SlotContribution[];
+    slots?: AnySlotContribution[];
 
     // HOC providers. `scope: "root"` wraps the whole admin below
     // RebaseContext; `scope: "form"` wraps each entity form / edit view.
@@ -236,7 +236,9 @@ Otro plugin puede dar a los campos markdown un controlador de la misma forma, co
 
 :::caution[Este plugin envía datos fuera de tu equipo]
 El autocompletado envía los valores de los campos de la entidad a un servicio
-alojado para generar una sugerencia. Por defecto, ese servicio es
+alojado para generar una sugerencia: solo los valores de las propiedades declaradas,
+nunca los de una de solo lectura, deshabilitada u oculta, una con `dynamicProps`, ni
+los de una columna que la colección no declara. Por defecto, ese servicio es
 **`https://app.rebase.pro/api/functions/ai`**, operado por Rebase — de uso
 gratuito, sin configuración y sin credenciales adjuntas: las peticiones son
 anónimas, limitadas por tasa de solicitudes en lugar de por identidad. Tu JWT no

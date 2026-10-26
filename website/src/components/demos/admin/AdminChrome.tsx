@@ -177,13 +177,14 @@ export function ViewModeButton({
   );
 }
 
-/** SearchBar, `size="small"`: a 32px rounded-full field, not a rounded-lg box. */
+/** SearchBar, `size="small"`: a 32px rounded-full field, not a rounded-lg box —
+ *  filled, with no visible edge, like every field in the kit. */
 export function ToolbarSearch({ width = 180 }: { width?: number }) {
   return (
     <div
       role="search"
       aria-label="Search"
-      className="relative h-[32px] bg-surface-field border border-hairline rounded-full overflow-hidden flex items-center"
+      className="relative h-[32px] bg-surface-field border border-transparent rounded-full overflow-hidden flex items-center"
       style={{ width }}
     >
       <div className="absolute p-0 h-full pointer-events-none flex items-center justify-center top-0 px-2">

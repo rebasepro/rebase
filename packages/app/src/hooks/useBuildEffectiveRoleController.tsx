@@ -1,30 +1,25 @@
 import type { EffectiveRoleController } from "@rebasepro/types";
-import { useCallback, useState, useMemo } from "react";
-import { readStoredString, removeStoredString, writeStoredString } from "../util/local_storage";
-;
+import { warnDeprecated } from "@rebasepro/common";
+import { useEffectiveRoleState } from "../core/effective_role_state";
 
 /**
- * Use this hook to build an effective role controller that determines
- * what role is simulated in Editor mode when Dev mode is active.
+ * Build an effective role controller: which role Studio's navigation is
+ * listed for when Dev mode is active, kept in localStorage across reloads.
  *
- * It uses localStorage to persist the simulated role across reloads.
+ * Navigation only: it changes which Studio views are listed, sends nothing to
+ * the server and evaluates no row-level security policy.
+ *
+ * @deprecated To see what a role, a user or an API key can read and do, use
+ * "Simulate access" (`useRlsSimulation`, `client.simulate()`), which asks the
+ * server. `<Rebase>` builds its own effective role controller when none is
+ * passed, so there is no need to build one.
  */
 export function useBuildEffectiveRoleController(): EffectiveRoleController {
-
-    const savedRole = readStoredString("rebase-effective-role");
-    const [effectiveRole, setEffectiveRole] = useState<string | null>(savedRole ?? null);
-
-    const setRoleInternal = useCallback((newRole: string | null) => {
-        if (newRole) {
-            writeStoredString("rebase-effective-role", newRole);
-        } else {
-            removeStoredString("rebase-effective-role");
-        }
-        setEffectiveRole(newRole);
-    }, []);
-
-    return useMemo(() => ({
-        effectiveRole,
-        setEffectiveRole: setRoleInternal
-    }), [effectiveRole, setRoleInternal]);
+    warnDeprecated(
+        "useBuildEffectiveRoleController",
+        "`useBuildEffectiveRoleController` is deprecated. It only changes which Studio views are listed and " +
+        "tests no permission. To see what a role, user or API key can read, use Simulate access " +
+        "(`useRlsSimulation`, `client.simulate()`). `<Rebase>` builds its own controller when none is passed."
+    );
+    return useEffectiveRoleState();
 }

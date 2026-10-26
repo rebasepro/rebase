@@ -1,5 +1,5 @@
 ---
-sourceHash: fcc8e36632d57207
+sourceHash: 210827aa1afa92f7
 title: Édition de schéma en direct
 description: Créez et modifiez des collections sur un backend en cours d'exécution — d'abord validé dans votre dépôt, puis appliqué.
 ---
@@ -133,6 +133,8 @@ y compris lorsqu'une colonne laissée derrière est `NOT NULL` sans valeur par d
 échouer toute insertion ultérieure jusqu'à ce qu'elle soit supprimée ou rendue nullable. Un
 changement sans cela (déplacer une clé primaire, une relation dont rien ne crée la colonne de
 lien) ne peut pas être écrit dans la seule source.
+
+Sur un déploiement qui ne change rien dans sa base de données (`REBASE_PROVISION=false`), aucune modification n'est appliquée depuis le panneau : toutes passent donc par ce chemin. Le bouton principal de la boîte de dialogue affiche **Commit** et envoie `"sourceOnly": true`, et le processus qui modifie cette base de données applique le schéma.
 
 Supprimer une collection depuis le panneau d'administration suit le même chemin : `/apply` avec
 `"remove": true` et `"sourceOnly": true` supprime le fichier de la collection et son entrée dans
@@ -280,7 +282,9 @@ Ce qui reste identique lorsqu'il est activé :
 
 Une chose diffère. Le déploiement en cours continue de servir les collections avec lesquelles il a été construit, jusqu'à ce que votre pipeline construise et déploie le commit. La base de données a la modification tout de suite ; le panneau d'administration et l'API voient la nouvelle définition de collection après ce déploiement.
 
-Un déploiement ne fait donc **qu'une modification par déploiement**. Une fois un commit arrivé, l'application suivante est refusée avec `SCHEMA_CHANGE_FAILED`, qui nomme le commit, jusqu'à ce qu'un processus exécutant ce commit remplace celui-ci. Une seconde modification planifiée contre les collections que ce déploiement exécute encore validerait des fichiers de schéma générés qui omettent la première. La planification reste disponible entre-temps.
+Un déploiement ne fait donc **qu'une modification par déploiement**. Une seconde modification planifiée contre les collections que ce déploiement exécute encore validerait des fichiers de schéma générés qui omettent la première. Chaque application génère donc `schema.generated.ts` à partir des collections que ce déploiement exécute et le compare à la copie du dépôt. Lorsqu'ils diffèrent, l'application est refusée avec `SCHEMA_CHANGE_FAILED`, qui nomme le fichier, jusqu'à ce qu'un processus exécutant ce commit remplace celui-ci. La vérification lit le dépôt, pas la mémoire de ce processus : elle tient donc après un redémarrage, d'un réplica à l'autre, et pour une modification qu'un développeur a poussée sans qu'elle soit encore déployée. La planification reste disponible entre-temps.
+
+Les copies diffèrent aussi lorsque le fichier a été généré par une autre version de Rebase, reformaté ou modifié à la main. Si rien n'attend d'être déployé, lancez `rebase schema generate` avec la version qu'exécute le déploiement, committez le résultat et déployez-le. Les fins de ligne et les espaces en fin de ligne ne comptent pas comme une différence.
 
 ### Valider dans un dépôt distant
 
@@ -332,7 +336,7 @@ Deux éléments garantissent la sécurité de l'exécution sur un dépôt dans l
 
 - Modifications additives uniquement. Tout le reste est refusé avec un motif, car le chemin d'assurance est la seule chose qui modifie un schéma et il ne peut qu'ajouter.
 - Aucun fichier de migration n'est écrit. Un projet provisionné par boot-ensure n'en a pas besoin ; un projet provisionné par migrations doit exécuter `rebase db generate`, qui en produit un via Atlas avec le hachage d'intégrité requis par Atlas.
-- Postgres uniquement. La fonctionnalité est détectée sur le pilote, et les autres moteurs répondent `SCHEMA_EDITING_UNSUPPORTED`.
+- Postgres et MongoDB (voir [MongoDB](#mongodb)). La fonctionnalité est détectée sur le pilote, et les autres moteurs répondent `SCHEMA_EDITING_UNSUPPORTED`.
 
 ## Liens connexes
 

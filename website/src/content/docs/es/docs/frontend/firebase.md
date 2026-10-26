@@ -2,7 +2,7 @@
 sourceHash: 3e18de6e2b935fc7
 title: Firebase
 sidebar_label: Firebase
-description:"\"@rebasepro/firebase ejecuta Rebase CMS contra Firestore, Firebase Auth y Firebase Storage: un adaptador del lado del cliente, sin ningún servidor de Rebase involucrado.\""
+description: "@rebasepro/firebase ejecuta Rebase CMS contra Firestore, Firebase Auth y Firebase Storage: un adaptador del lado del cliente, sin ningún servidor de Rebase involucrado."
 ---
 
 `@rebasepro/firebase` apunta Rebase CMS hacia Firebase. Tus

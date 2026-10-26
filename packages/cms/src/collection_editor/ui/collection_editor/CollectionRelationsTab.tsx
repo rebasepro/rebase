@@ -240,7 +240,7 @@ kind: "hasMany" });
                                             </IconButton>
                                         </TableCell>
                                         <TableCell className="font-medium">{relation.relationName}</TableCell>
-                                        <TableCell>{getTargetSlug(relation.target) || "Function"}</TableCell>
+                                        <TableCell>{getTargetSlug(relation.target) || t("studio_branch_diff_object_function")}</TableCell>
                                         <TableCell>{relation.kind}</TableCell>
                                     </TableRow>
                                 ))}

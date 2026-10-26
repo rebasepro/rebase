@@ -1,5 +1,5 @@
 ---
-sourceHash: 9210bf054bc3c431
+sourceHash: 2df00511c02fed53
 title: Referência da CLI
 sidebar_label: CLI
 description: Comandos da CLI do Rebase para inicialização de projetos, geração de schemas, migrações de banco de dados e geração de SDK.
@@ -86,7 +86,7 @@ O bundle é o artefato que você implanta — a imagem de runtime o carrega, por
 |------|--------|
 | `--output <dir>` (ou `--out`) | Grava o bundle em outro local que não seja `dist-bundle/` (um app por vez) |
 | `--vendor` | Sempre instala e empacota as dependências do bundle |
-| `--no-vendor` | Nunca faz o vendoring; o pod instala na primeira inicialização |
+| `--no-vendor` | Nunca faz o vendoring; o pod as instala a cada inicialização |
 | `--skip-type-check` | Pula a verificação de tipos (mais rápido, menos seguro) |
 | `--no-static` | Não embute o frontend no bundle do backend (cada app estático ainda recebe seu próprio bundle) |
 | `--skip-static-build` | Embute o frontend como já compilado, sem executar seu comando de build |
@@ -351,7 +351,9 @@ O comando para executar quando algo estiver errado e você ainda não souber o q
 | Strings de conexão | Um caractere `=` não codificado em um parâmetro de URL, o qual as próprias ferramentas do PostgreSQL se recusam a interpretar — fazendo com que backups e o `psql` quebrem enquanto a aplicação continua funcionando. |
 | Funções customizadas | O que cada função requer de seu host e quais delas não executariam em um runtime de edge. |
 
-**Contra o banco de dados**, quando `DATABASE_URL` estiver definido:
+**Contra o banco de dados** — o do próprio projeto, resolvido da mesma forma que
+`rebase db url` o resolve, de modo que num scaffold novo é o banco gerenciado, que o
+`doctor` inicia:
 
 | Verificação | Motivo |
 | --- | --- |
@@ -364,7 +366,7 @@ O comando para executar quando algo estiver errado e você ainda não souber o q
 
 Se o banco de dados estiver inacessível, suas etapas são reportadas como ignoradas informando o motivo, e o restante continua sendo executado — consulte [Solução de Problemas](/docs/troubleshooting/).
 
-Encerra com código diferente de zero quando uma verificação encontra um erro, ou quando uma etapa não pôde ser executada porque o banco de dados fornecido recusa conexões. Uma etapa ignorada por você não ter definido `DATABASE_URL` não é considerada uma falha.
+Encerra com código diferente de zero quando uma verificação encontra um erro, ou quando uma etapa não pôde ser executada porque o banco de dados fornecido recusa conexões. Uma etapa ignorada porque nenhum banco de dados pôde ser resolvido não é considerada uma falha.
 
 `rebase doctor --policies` executa apenas as verificações de RLS — sem diff de schema, sem tipos do SDK — e falha de forma estrita (fails closed), tornando-se o formato ideal para ser utilizado como validação de CI contra um banco de dados implantado.
 
@@ -374,6 +376,7 @@ Encerra com código diferente de zero quando uma verificação encontra um erro,
 rebase verify
 rebase verify --json
 rebase verify --live
+rebase verify --live --database-url postgresql://…
 ```
 
 Se as coleções estão prontas para publicar, em um único comando rápido para CI e para os hooks de um agente de IA. Offline por padrão, e nunca altera nada.
@@ -383,7 +386,7 @@ Se as coleções estão prontas para publicar, em um único comando rápido para
 | Configuração das coleções | Um arquivo em `config/collections/` que não carrega, ou que o validador de inicialização rejeita — com chaves desconhecidas como erros, de modo que uma opção escrita errada ou uma opção de interface escrita fora de `admin: { … }` (um `widget` no nível superior) é detectada aqui em vez de ser ignorada em silêncio. |
 | Cobertura de RLS | Uma coleção sem `securityRules` que também não herda nenhuma, ou uma com uma coluna `user_id`, `owner_id`, `organization_id` ou `tenant_id` que depende, em vez disso, dos padrões do diretório. Uma regra que deixa um papel ler todas as linhas de uma tabela assim é um aviso. |
 | Migrações em dia | Uma tabela ou coluna que as coleções declaram e que nenhum arquivo em `backend/drizzle/migrations` cria, ou uma removida que uma migração ainda cria. Ignorada em um projeto que ainda não tem migrações. |
-| Auditoria de RLS ao vivo | Com `--live`: o catálogo do [`rls-check`](/docs/rls-check) contra `DATABASE_URL`, e se cada migração foi aplicada. |
+| Auditoria de RLS ao vivo | Com `--live`: o catálogo do [`rls-check`](/docs/rls-check) contra o banco de dados do projeto, e se cada migração foi aplicada. O banco de dados é resolvido como os comandos `db` o resolvem — `--database-url`, `DATABASE_URL`, `--docker`, ou senão o banco de dados de desenvolvimento gerenciado. Um banco de dados que não está configurado ou não responde é um erro, não um item ignorado: a auditoria foi solicitada. Uma política de leitura `USING (true)` compilada a partir de uma regra `access: "public"` é um aviso enquanto a API exige um token (`AUTH_REQUIRE`, ativado por padrão) — todo usuário autenticado lê todas as linhas — e um erro com `AUTH_REQUIRE=false`, em que as linhas são anônimas. |
 
 `--json` imprime um único objeto — cada etapa, e cada achado com seu `file`, o `path` pontuado dentro da configuração da coleção e o `fix` — para que um agente possa consertar o que quebrou. `--quiet` não imprime nada quando tudo passa. Sai com código diferente de zero em caso de erro; avisos não o fazem falhar.
 
@@ -429,20 +432,45 @@ rebase storage move --from "(default)" --to media --prefix avatars
 rebase storage move --from "(default)" --to media --prefix avatars --delete-source
 ```
 
-`orphans` lê cada linha de cada collection, inclusive as com soft delete, e
-lista os arquivos de uma fonte (`--source`, a fonte padrão quando omitido)
-que nenhuma string em nenhuma linha nomeia: uma chave, uma URL, uma referência `rebase-storage:` em
-um texto. Arquivos mais novos que `--older-than` horas (24 por padrão) ficam de fora,
+`orphans` lê cada linha de cada collection como armazenada (inclusive as com soft delete,
+passando por todo hook `beforeQuery` e `afterRead`) e cada entrada de
+[histórico](/docs/backend/history/), já que uma reversão restaura o que ela guarda.
+Ele lista os arquivos de uma fonte (`--source`, a fonte padrão quando omitido)
+que nenhuma string em nenhuma delas nomeia: uma chave, uma URL, uma referência `rebase-storage:`
+em um texto. Arquivos mais novos que `--older-than` horas (24 por padrão) ficam de fora,
 porque o painel de administração envia um arquivo antes de a linha que o nomeia ser salva.
+A varredura roda no backend em segundo plano, então um projeto grande demais para ser varrido
+dentro de uma única requisição (atrás de um ingress que a expira) ainda termina. A
+CLI a inicia e mostra o progresso (arquivos listados, linhas lidas, collections
+concluídas, e as que não puderam ser lidas) até ela terminar. Com a
+[fila de jobs](/docs/backend/jobs/) ativada, a varredura é um job `storage.orphans` que
+os workers de jobs executam. Sem ela, a varredura roda dentro do processo do servidor que
+foi consultado, e a CLI informa isso: reiniciar esse processo interrompe a varredura. Uma varredura
+é uma tentativa de job, limitada por `jobs.timeoutMs` (15 minutos por padrão). Aumente-o,
+ou defina-o como 0, para uma fonte que leva mais tempo. `--json` imprime o mesmo
+relatório de antes, mais o seu `scanId`.
+
 `--delete` pergunta antes de excluir (`--yes` dispensa a pergunta, e é obrigatório
-sem um terminal), o servidor encontra os arquivos de novo antes, e nada é
-excluído enquanto uma collection não puder ser lida. Arquivos que apenas as suas próprias tabelas
-fora das collections nomeiam parecem sem uso: confira antes de excluir.
+sem um terminal). Ele exclui apenas a partir da varredura que acabou de ser impressa, e somente dentro de
+15 minutos depois de essa varredura ser concluída. Nada é excluído enquanto uma collection
+não puder ser lida: uma collection com hooks de leitura em uma fonte de dados cujo driver
+não consegue ler além deles conta como não lida. Antes de excluir qualquer coisa, o servidor
+lê de novo cada linha e cada entrada de histórico em relação aos arquivos listados. Depois, ele pergunta
+por cada arquivo de novo logo antes de excluí-lo. Um arquivo que uma linha nomeia agora,
+que foi enviado de novo desde a varredura, ou que sumiu é mantido, e a CLI
+o lista como mantido. Arquivos que apenas as suas próprias tabelas fora das collections nomeiam parecem
+sem uso: confira antes de excluir. Contra um backend da 0.25.1 ou anterior, a
+CLI varre do jeito antigo, dentro de uma única requisição.
 
 `move` copia os arquivos sob `--prefix` para outra fonte sob as mesmas chaves,
 uma página por vez. Um arquivo que o destino já guarda com o mesmo tamanho é ignorado,
 de modo que uma movimentação interrompida é retomada executando-a de novo; `--delete-source` exclui cada
-arquivo da origem assim que o destino o guarda. Ambos exigem `database:read`, e
+arquivo da origem assim que o destino o guarda, e é recusado quando as duas
+fontes armazenam no mesmo bucket ou diretório. Quando a movimentação termina, a CLI
+lista a fonte de novo com uma varredura nova e nomeia cada arquivo que a movimentação não
+moveu: com `--delete-source`, qualquer arquivo ainda na origem; sem ele, qualquer arquivo
+de que o destino não guarda uma cópia do mesmo tamanho. Ela sai com 1 quando há algum, e
+executar a mesma movimentação de novo o retoma. `--json` os imprime como `notMoved`. Ambos exigem `database:read`, e
 excluir ou mover exige `database:write`, que a chave de serviço possui.
 
 ### `rebase skills install`

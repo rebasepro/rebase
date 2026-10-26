@@ -1,5 +1,5 @@
 ---
-sourceHash: 0b96e438f37a5cac
+sourceHash: 70ff1f5bc92ce503
 title: Importação e Exportação de Dados
 sidebar_label: Importação e Exportação de Dados
 description: Importe dados de arquivos CSV, JSON e Excel para suas coleções e exporte dados de coleções para CSV ou JSON com campos computados opcionais.
@@ -9,7 +9,7 @@ description: Importe dados de arquivos CSV, JSON e Excel para suas coleções e 
 
 O Rebase inclui ferramentas integradas de importação e exportação de dados acessíveis diretamente do painel de administração. A importação suporta arquivos CSV, JSON e Excel com um assistente de mapeamento de colunas. A exportação suporta CSV e JSON com campos computados opcionais.
 
-Ambos estão disponíveis em todas as coleções. A exportação pode ser configurada por coleção com campos computados; nenhum dos dois recursos pode ser desativado por coleção.
+Ambos estão disponíveis em todas as coleções. A exportação pode ser configurada por coleção com campos computados, ou desativada com `exportable: false`; a importação não pode ser desativada por coleção.
 
 ## Importando Dados
 
@@ -103,7 +103,7 @@ Quaisquer filtros ativos na visualização da coleção são aplicados à export
 
 ### Configuração de Exportação
 
-A exportação está disponível em todas as coleções. O `admin.exportable` a configura: forneça a ele um `ExportConfig` para adicionar colunas computadas, como mostrado abaixo. O tipo também aceita um booleano, mas nada o lê — `exportable: false` não remove o botão **Exportar**.
+A exportação está disponível em todas as coleções, a menos que você a desative. O `admin.exportable` a configura: `exportable: false` remove o botão **Exportar**, e um `ExportConfig` o mantém e adiciona colunas computadas, como mostrado abaixo.
 
 ### Adicionando Campos Computados
 

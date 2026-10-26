@@ -16,7 +16,8 @@
  *   has built the app, `REBASE_API_TOKEN`: a key the APP accepts, minted on it
  *   by the control plane (`POST /api/functions/ephemeral/app-key`). It reads and
  *   writes data through the app's row-level security, holds nothing of the
- *   admin plane, and expires with the claim window; see {@link requestAppKey}.
+ *   admin plane, and expires with the claim window unless the project is
+ *   claimed: a claim hands it over and it stops expiring; see {@link requestAppKey}.
  *   With `--no-deploy`, or a deploy that failed, the next `rebase cloud deploy`
  *   that succeeds asks for it instead; see {@link mintMissingAppKey}.
  * - `.rebase/cloud.json`: the link, so every `rebase cloud` command in this
@@ -33,9 +34,12 @@ import path from "path";
 import { spawn } from "child_process";
 import chalk from "chalk";
 import {
+    appKeyExpiryNote,
+    dotenvSets,
     emit,
     ephemeralGrantFor,
     fail,
+    grantForLink,
     isJsonMode,
     keyValues,
     note,
@@ -45,6 +49,7 @@ import {
     resolveCloudUrl,
     saveEphemeralGrant,
     success,
+    TOKEN_ENV,
     warn,
     writeLink
 } from "./context";
@@ -189,8 +194,10 @@ const APP_KEY_RETRY_DELAY_MS = 5_000;
  * an admin, expiring with the claim window. Never fatal: the project and its
  * claim link stand without it, so a refusal comes back as an outcome to report.
  *
- * Asks again only while the app is not answering yet (503), the state a
- * rollout that has just finished can still be in.
+ * Asks again only while the app is not answering yet, the state a rollout
+ * that has just finished can still be in: a 503 from the control plane (the
+ * app did not answer), or a 502/504 (the app's gateway answered for it — the
+ * control plane passes any non-2xx from the app on as 502).
  */
 export async function requestAppKey(
     url: string,
@@ -230,7 +237,7 @@ export async function requestAppKey(
         if (res.status === 404 && !refusal) {
             return { ok: false, code: "not_supported", message: `${url} does not mint keys for an unclaimed project's app.` };
         }
-        if (res.status !== 503) return last;
+        if (res.status !== 502 && res.status !== 503 && res.status !== 504) return last;
     }
     return last;
 }
@@ -247,18 +254,12 @@ export function upsertDotenv(file: string, key: string, value: string): void {
     const at = lines.findIndex((l) => new RegExp(`^\\s*(export\\s+)?${key}\\s*=`).test(l));
     if (at >= 0) lines[at] = line;
     else lines.push(line);
-    fs.writeFileSync(file, `${lines.join("\n")}\n`);
+    // A `.env` this writes holds keys: created private, as `env pull` creates
+    // one. An existing file keeps the mode its owner gave it.
+    fs.writeFileSync(file, `${lines.join("\n")}\n`, { mode: 0o600 });
 }
 
-/** Whether a `.env` sets a variable to something: an empty `KEY=` or `KEY=""` does not. */
-export function dotenvSets(file: string, key: string): boolean {
-    if (!fs.existsSync(file)) return false;
-    const pattern = new RegExp(`^\\s*(export\\s+)?${key}\\s*=(.*)$`);
-    return fs.readFileSync(file, "utf-8").split("\n").some((l) => {
-        const value = pattern.exec(l)?.[2]?.trim();
-        return value !== undefined && value !== "" && value !== "\"\"" && value !== "''";
-    });
-}
+export { dotenvSets };
 
 /**
  * Set on the deploy `init` runs as a child. `init` asks for the app's key
@@ -270,7 +271,14 @@ export const INIT_CHILD_DEPLOY_ENV = "REBASE_CLOUD_INIT_DEPLOY";
 /** The key's outcome as a result reports it. Never the key: this output reaches an agent's transcript. */
 export function appKeyPayload(outcome: AppKeyOutcome): Record<string, unknown> {
     return outcome.ok
-        ? { ok: true, env: API_TOKEN_ENV, scopes: outcome.key.scopes, expiresAt: outcome.key.expiresAt }
+        ? {
+            ok: true,
+            env: API_TOKEN_ENV,
+            scopes: outcome.key.scopes,
+            expiresAt: outcome.key.expiresAt,
+            // When it expires, and that a claim hands it over: said where an agent reads it.
+            note: appKeyExpiryNote(outcome.key.expiresAt)
+        }
         : { ok: false, error: { code: outcome.code, message: outcome.message } };
 }
 
@@ -329,7 +337,8 @@ export function reportMintedAppKey(outcome: AppKeyOutcome | undefined): void {
     }
     if (isJsonMode()) return;
     console.log(chalk.gray(`  ${API_TOKEN_ENV} set in .env (${outcome.key.scopes.join(", ")}): the app's own key, for this unclaimed project.`));
-    console.log(chalk.gray("  It reads and writes data as the app's rules allow, and expires with the claim window."));
+    console.log(chalk.gray("  It reads and writes data as the app's rules allow."));
+    console.log(chalk.gray(`  ${appKeyExpiryNote(outcome.key.expiresAt)}`));
     console.log("");
 }
 
@@ -357,6 +366,22 @@ export interface DeployOutcome {
 }
 
 /**
+ * The environment of {@link runBundleDeploy}'s child: this one, marked as
+ * init's own deploy, and without `REBASE_TOKEN`.
+ *
+ * `REBASE_TOKEN` outranks the stored grant (see `requireClient`), and a shell
+ * or an MCP server that has one holds it for the person's other projects — it
+ * has no scope on the project just provisioned, so the deploy was refused and
+ * the project never got its collections. The project is deployed with its own
+ * token.
+ */
+export function bundleDeployEnv(env: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
+    const child: NodeJS.ProcessEnv = { ...env, [INIT_CHILD_DEPLOY_ENV]: "1" };
+    delete child[TOKEN_ENV];
+    return child;
+}
+
+/**
  * Push the local collections: `rebase cloud deploy --bundle`, as a child.
  *
  * A child rather than a call, so this command still prints exactly one
@@ -372,7 +397,7 @@ export function runBundleDeploy(cwd: string, json: boolean): Promise<DeployOutco
         const child = spawn(process.execPath, args, {
             cwd,
             stdio: json ? ["ignore", "pipe", "inherit"] : "inherit",
-            env: { ...process.env, [INIT_CHILD_DEPLOY_ENV]: "1" }
+            env: bundleDeployEnv(process.env)
         });
         let stdout = "";
         child.stdout?.on("data", (chunk: Buffer) => { stdout += chunk.toString("utf-8"); });
@@ -421,9 +446,15 @@ export async function cloudInitCommand(rawArgs: string[], deps: InitDeps = DEFAU
 
     const existing = readLink();
     if (existing?.projectId) {
+        // An unclaimed project here is the one to hand over, not to replace:
+        // unlinking it leaves it running, and orphaned, until it expires.
+        const grant = grantForLink(existing);
         fail(
             `This directory is already linked to project ${existing.slug ?? existing.projectId}.`,
-            "Run `rebase cloud unlink` first to provision a new one here.",
+            grant
+                ? `It is unclaimed: open ${grant.claimUrl} and sign in to keep it (it is deleted ${new Date(grant.expiresAt).toLocaleString()} otherwise). `
+                    + "Deploy to it with `rebase cloud deploy`."
+                : "Run `rebase cloud unlink` first to provision a new one here.",
             "already_linked"
         );
     }
@@ -465,7 +496,18 @@ export async function cloudInitCommand(rawArgs: string[], deps: InitDeps = DEFAU
     // Only once the deploy has built the app: before that there is nothing to
     // mint the key on. A missing key is reported, never fatal.
     let appKey: AppKeyOutcome | undefined;
-    if (deployed?.ok) {
+    if (deployed?.ok && dotenvSets(path.join(root, ".env"), API_TOKEN_ENV)) {
+        // The rule `mintMissingAppKey` follows: a key already in `.env` may be
+        // one someone made by hand, and is not replaced. Not asked for either,
+        // since a key minted and never written is a key nobody can use.
+        appKey = {
+            ok: false,
+            code: "env_has_key",
+            message: `.env already sets ${API_TOKEN_ENV}, which may be a key someone made by hand, so it was kept. `
+                + "Remove it and run `rebase cloud deploy` to get the project's app key."
+        };
+        warn(`${API_TOKEN_ENV} was not written: ${appKey.message}`);
+    } else if (deployed?.ok) {
         appKey = await deps.appKey(url, project.apiKey, project.projectId);
         if (appKey.ok) {
             upsertDotenv(path.join(root, ".env"), API_TOKEN_ENV, appKey.key.apiKey);
@@ -495,8 +537,11 @@ export async function cloudInitCommand(rawArgs: string[], deps: InitDeps = DEFAU
             const written = appKey?.ok ? `${BASE_URL_ENV} and ${API_TOKEN_ENV} are` : `${BASE_URL_ENV} is`;
             console.log(chalk.gray(`  ${written} set in .env. Open the claim URL, sign in, and the project is yours;`));
             console.log(chalk.gray("  until then `rebase cloud` commands here use the project's own token."));
+            console.log(chalk.gray(`  Local commands that read ${BASE_URL_ENV} (\`rebase api-keys\`, \`rebase storage\`, \`rebase auth reset-password\`)`));
+            console.log(chalk.gray("  now go to this project too, and say so; set it in the shell to reach a local backend instead."));
             if (appKey?.ok) {
-                console.log(chalk.gray(`  ${API_TOKEN_ENV} reads and writes data as the app's rules allow, and expires with the claim window.`));
+                console.log(chalk.gray(`  ${API_TOKEN_ENV} reads and writes data as the app's rules allow.`));
+                console.log(chalk.gray(`  ${appKeyExpiryNote(appKey.key.expiresAt)}`));
             }
             console.log("");
         },

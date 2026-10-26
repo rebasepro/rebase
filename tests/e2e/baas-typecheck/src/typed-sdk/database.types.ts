@@ -12,24 +12,60 @@ export interface Database {
       computed?: string | null;
       createdAt?: string | null;
       posts?: Array<Database["posts"]["Row"]>;
+      profile?: Database["profiles"]["Row"];
+      profileVia?: Database["profiles"]["Row"];
     };
     Insert: {
       id?: number;
       name: string;
       salary?: number | null;
       createdAt?: string | Date | null;
+      profile?: number | null;
+      profileVia?: number | null;
       posts?: Array<string | { id: string }>;
     };
     Update: {
       name?: string;
       salary?: number | null;
       createdAt?: string | Date | null;
+      profile?: number | null;
+      profileVia?: number | null;
       posts?: Array<string | { id: string }>;
     };
     Relations: {
       posts: "posts";
+      profile: "profiles";
+      profileVia: "profiles";
     };
     Slug: "authors";
+  };
+  comments: {
+    Row: {
+      id: number;
+      body: string;
+      postId: string;
+      reviewerId?: number | null;
+      post?: Database["posts"]["Row"];
+      reviewer?: Database["authors"]["Row"];
+      postTags?: Array<Database["tags"]["Row"]>;
+    };
+    Insert: {
+      id?: number;
+      body: string;
+      postId?: string;
+      post?: string;
+    } & ({ postId: string } | { post: string });
+    Update: {
+      body?: string;
+      postId?: string;
+      post?: string;
+    };
+    Relations: {
+      post: "posts";
+      reviewer: "authors";
+      postTags: "tags";
+    };
+    Slug: "comments";
   };
   myNotes: {
     Row: {
@@ -77,6 +113,7 @@ export interface Database {
       authorId?: number | null;
       author?: Database["authors"]["Row"];
       tags?: Array<Database["tags"]["Row"] & { _pivot?: { position?: number | null; } }>;
+      tagsVia?: Array<Database["tags"]["Row"]>;
     };
     Insert: {
       id?: string;
@@ -90,6 +127,7 @@ export interface Database {
       authorId?: number | null;
       author?: number | null;
       tags?: Array<string | { id: string; _pivot?: { position?: number | null; } }>;
+      tagsVia?: Array<string | { id: string }>;
     };
     Update: {
       title?: string;
@@ -102,12 +140,29 @@ export interface Database {
       authorId?: number | null;
       author?: number | null;
       tags?: Array<string | { id: string; _pivot?: { position?: number | null; } }>;
+      tagsVia?: Array<string | { id: string }>;
     };
     Relations: {
       author: "authors";
       tags: "tags";
+      tagsVia: "tags";
     };
     Slug: "posts";
+  };
+  profiles: {
+    Row: {
+      id: number;
+      bio?: string | null;
+    };
+    Insert: {
+      id?: number;
+      bio?: string | null;
+    };
+    Update: {
+      bio?: string | null;
+    };
+    Relations: Record<never, never>;
+    Slug: "profiles";
   };
   tags: {
     Row: {
@@ -130,9 +185,11 @@ export type CollectionName = keyof Database;
 
 export const collectionsDictionary = {
   authors: "authors",
+  comments: "comments",
   myNotes: "my-notes",
   orderItems: "order_items",
   posts: "posts",
+  profiles: "profiles",
   tags: "tags",
 } as const;
 

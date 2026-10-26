@@ -1,5 +1,5 @@
 ---
-sourceHash: ce1b04dc7278a010
+sourceHash: 80956abbae707a91
 title: Kubernetes
 sidebar_label: Kubernetes
 description: Faça o deploy do Rebase em um cluster Kubernetes com o Helm chart oficial — um Deployment ou vários, um Job de migração responsável pelo schema, e aplicações estáticas no mesmo host.
@@ -16,15 +16,41 @@ helm install rebase oci://registry-1.docker.io/rebasepro/rebase \
   --set config.databaseUrl='postgres://user:pass@host:5432/db' \
   --set config.jwtSecret="$(openssl rand -hex 32)" \
   --set config.serviceKey="$(openssl rand -hex 32)" \
+  --set config.adminEmail=you@example.com \
+  --set config.adminPassword="$(openssl rand -hex 16)" \
   --set ingress.host=api.example.com \
   --set image.repository=my-registry/my-app
 ```
 
+O chart sai com o autorregistro desligado, então uma release precisa nomear a conta
+com a qual seu operador entra — caso contrário ela sobe com a tabela de usuários vazia e
+sem como produzir o primeiro chamador autenticado. `config.adminPassword` deve ter
+pelo menos 12 caracteres, e `config.adminEmail` precisa de um ponto no domínio: a
+rota de login valida o corpo com `z.string().email()`, então `admin@localhost`
+é uma conta na qual ninguém conseguiria entrar e o runtime se recusa a criá-la. Ambas
+são recusas em tempo de renderização, e não
+surpresas em tempo de execução — veja [o que o chart se recusa a
+renderizar](#o-que-o-chart-se-recusa-a-renderizar). Entre e troque a senha;
+esses valores vão para um Secret.
+
+Gerencie-os por fora, apontando `existingSecret` para um Secret
+que contenha `REBASE_ADMIN_EMAIL` e `REBASE_ADMIN_PASSWORD` junto com
+`DATABASE_URL` e o restante.
+
 O chart faz o deploy **apenas do runtime**. Ele não faz o deploy do Postgres — use CloudNativePG, um banco de dados gerenciado ou seu próprio StatefulSet, e aponte `config.databaseUrl` para ele. Um chart que também gerenciasse seu banco de dados teria que assumir seus backups e failover, o que é uma promessa muito maior do que apenas "executar a aplicação".
 
-> **Maturidade.** O chart passa por lint e renderização em CI contra o Helm v4.2.4 — cobrindo todas as topologias documentadas e um caso para cada recusa listada abaixo. Ele **ainda não foi testado em um cluster ativo**. Trate-o como um ponto de partida bem testado em vez de um padrão comprovado em produção, e leia [Auto-hospedagem](/docs/deployment/self-hosting) para o caminho comprovado.
+> **Maturidade.** Duas coisas separadas são verificadas em CI, e uma terceira não.
+> O chart passa por lint e renderização contra o Helm v4.2.4 — todas as topologias
+> documentadas nesta página, incluindo o comando de instalação acima, e um caso
+> que atinge cada recusa listada abaixo. A imagem de runtime que o chart implanta é
+> compilada e inicializada contra um Postgres real, das duas formas pelas quais um bundle pode chegar. O que
+> **nunca rodou foi o chart contra um cluster ativo**: nada agendou
+> esses manifestos, então os probes, a ordem do Job de migração de pré-instalação e
+> o ingress estão corretos como YAML e não comprovados como um deploy. Trate-o como um
+> ponto de partida bem testado em vez de um padrão comprovado em produção, e leia
+> [Auto-hospedagem](/docs/deployment/self-hosting) para o caminho comprovado.
 
-Para trabalhar a partir de um clone local — um chart modificado ou uma instalação air-gapped — `helm install rebase ./charts/rebase` aceita os mesmos valores.
+Para trabalhar a partir de um clone local — um chart modificado ou uma instalação air-gapped — `helm install rebase ./infra/charts/rebase` aceita os mesmos valores.
 
 ## Levando seu projeto para o pod
 
@@ -34,6 +60,8 @@ Para trabalhar a partir de um clone local — um chart modificado ou uma instala
 | `url` | Imagem padrão; o runtime baixa um tarball a cada inicialização do pod | Um painel de controle (control plane) que entrega bundles fora de banda |
 
 ## Um processo ou vários
+
+<span class="since-badge" data-since="0.26">A partir da versão 0.26</span>
 
 O padrão é um único Deployment servindo tudo — o mesmo formato executado pelo arquivo Compose. A divisão requer apenas um valor:
 
@@ -88,9 +116,9 @@ O deploy do admin passa a ser apenas o incremento da tag da imagem em um Deploym
 
 ## Schema
 
-`migrationJob.enabled` (o padrão) executa um Job de `pre-install,pre-upgrade` que provisiona e finaliza, e cada pod inicializa com `REBASE_MIGRATE_ON_BOOT=none`. Nada no caminho das requisições gerencia DDL, o que é a resposta mais limpa para "exatamente um processo provisiona o schema" — isso deixa de ser uma regra que alguém precisa lembrar.
+`migrationJob.enabled` (o padrão) executa um Job de `pre-install,pre-upgrade` que provisiona e finaliza, e cada pod inicializa com `REBASE_MIGRATE_ON_BOOT=none`. Nada no caminho das requisições gerencia o schema das coleções, o que é a resposta mais limpa para "exatamente um processo provisiona o schema" — isso deixa de ser uma regra que alguém precisa lembrar. Os pods ainda mantêm atualizadas, na inicialização, as tabelas do próprio framework (autenticação, chaves de API, jobs, cron); `provision: false` interrompe isso também, não renderiza nenhum Job e deixa o schema para uma [execução de provisionamento](/docs/deployment/self-hosting/#when-only-your-change-process-may-change-the-database) sob o seu próprio processo de mudanças.
 
-`mode: ensure` cria o que estiver faltando. `mode: push` também aplica alterações de schema das coleções e **é destrutivo**; não é o padrão.
+`mode: ensure` cria o que estiver faltando, de forma aditiva, e é o único modo que a imagem de runtime aceita. `push` é recusado na inicialização: aplicar alterações de schema das coleções é destrutivo, e o `rebase db push`, a partir de um checkout ou do CI, faz um dry-run da mudança, recusa as destrutivas sem confirmação e pode fazer um backup antes — nada disso um pod iniciando sem supervisão consegue fazer.
 
 ## O que o chart se recusa a renderizar
 
@@ -102,6 +130,13 @@ Cada um destes itens é uma configuração que não gera erros em tempo de execu
 - `bundle.mode=image` enquanto `image.repository` ainda for a imagem padrão de runtime
 - `ingress.enabled` sem host, ou `bundle.mode=url` sem URL
 - um `migrationJob.mode` ou `sharedState.rateLimitStore` não reconhecido
+- nenhum `config.adminEmail` com o autorregistro desligado — uma release na qual ninguém
+  consegue entrar. Defina os dois valores de admin, ou `config.allowSelfRegistration=true`
+  entendendo que a primeira pessoa a chegar ao formulário de cadastro se torna
+  administradora
+- um `config.adminPassword` com menos de 12 caracteres, ou um `config.adminEmail` cujo
+  domínio não tem ponto. O runtime se recusa a criar qualquer um dos dois, na inicialização, e deixa a
+  mesma release trancada para fora
 
 ## O que o chart não pode fazer por você
 

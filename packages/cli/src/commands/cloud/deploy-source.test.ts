@@ -346,6 +346,34 @@ describe("a bundle refused as a downgrade", () => {
     });
 });
 
+describe("a bundle deploy blocked by another deploy", () => {
+    it("names the blocking deployment and how to stop it, as a source deploy does", async () => {
+        bundle("backend");
+        controlPlane();
+        invoke.mockRejectedValueOnce(Object.assign(new Error("A deployment is already in progress"), {
+            status: 409,
+            code: "deploy_in_progress",
+            details: { deployment: { id: 77, mine: true, triggerSource: "cli" } }
+        }));
+
+        await expect(deploy("--no-source")).rejects.toMatchObject({ code: 1 });
+
+        const text = said.join("\n");
+        expect(text).toContain("Deployment 77 is already in progress");
+        expect(text).toContain("rebase cloud cancel 77");
+    });
+
+    it("sends a payment refusal to billing setup", async () => {
+        bundle("backend");
+        controlPlane();
+        invoke.mockRejectedValueOnce(Object.assign(new Error("Add a payment method to deploy."), { status: 402 }));
+
+        await expect(deploy("--no-source")).rejects.toMatchObject({ code: 1 });
+
+        expect(said.join("\n")).toContain("rebase cloud billing setup");
+    });
+});
+
 /** The entries of an uploaded archive, without directories or the `./` prefix. */
 function archiveEntries(archive: Buffer | undefined): string[] {
     expect(archive).toBeDefined();
@@ -1249,8 +1277,23 @@ describe("a successful deploy to an unclaimed project", () => {
             error: { code: "upstream_error", message: "The project's app refused the platform's credential." }
         }), { status: 502 });
 
-        await followed();
+        // A 502 is asked again (the app's gateway may be answering for an app
+        // still rolling out), 5 s apart: the clock is faked so the four asks
+        // do not take 15 s of real time.
+        vi.useFakeTimers({ toFake: ["setTimeout"] });
+        try {
+            let settled = false;
+            const run = followed().finally(() => { settled = true; });
+            while (!settled) {
+                await vi.advanceTimersByTimeAsync(1_000);
+                await new Promise((resolve) => setImmediate(resolve));
+            }
+            await run;
+        } finally {
+            vi.useRealTimers();
+        }
 
+        expect(appKeyAsks).toHaveLength(4);
         expect(process.exitCode ?? 0).toBe(0);
         expect(JSON.parse(stdout.join(""))).toMatchObject({
             success: true,

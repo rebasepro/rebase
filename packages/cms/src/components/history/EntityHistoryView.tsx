@@ -4,7 +4,7 @@ import { useRef, useEffect } from "react";
 import { cls, IconButton, Label, Tooltip, Typography } from "@rebasepro/ui";
 import { ErrorBoundary, HistoryIcon } from "@rebasepro/ui";
 import { EntityHistoryEntry } from "./EntityHistoryEntry";
-import { useSnackbarController, useAuthController, useTranslation } from "@rebasepro/app";
+import { usePermissions, useSnackbarController, useTranslation } from "@rebasepro/app";
 import { ConfirmationDialog } from "@rebasepro/app";
 import { useState } from "react";
 import { useHistory } from "../../hooks/useHistory";
@@ -25,7 +25,7 @@ export function EntityHistoryView<M extends Record<string, unknown>>({
 
     const { t } = useTranslation();
     const snackbarController = useSnackbarController();
-    const authController = useAuthController();
+    const { canEdit } = usePermissions();
     const dirty = formContext?.formex.dirty;
 
     const slug = collection.slug;
@@ -82,6 +82,10 @@ export function EntityHistoryView<M extends Record<string, unknown>>({
         </div>;
     }
 
+    // A revert writes the record: offered only to someone who may edit it,
+    // which no one may while access is simulated.
+    const editable = canEdit(collection, entity.path ?? slug, entity);
+
     async function doRevert(historyId: string) {
         setIsReverting(true);
         try {
@@ -104,8 +108,9 @@ export function EntityHistoryView<M extends Record<string, unknown>>({
             });
         } catch (error) {
             console.error("Error reverting entity:", error);
+            const reason = error instanceof Error ? error.message : undefined;
             snackbarController.open({
-                message: t("history_revert_error") ?? "Error reverting entity",
+                message: [t("history_revert_error") ?? "Error reverting entity", reason].filter(Boolean).join(": "),
                 type: "error"
             });
         } finally {
@@ -151,7 +156,7 @@ export function EntityHistoryView<M extends Record<string, unknown>>({
                         entry={entry}
                         collection={collection}
                         size={"medium"}
-                        actions={
+                        actions={editable &&
                             <Tooltip title={t("history_revert") ?? "Revert to this version"}
                                 className={"m-2 grow-0 self-start"}>
                                 <IconButton aria-label={t("history_revert") ?? "Revert to this version"}

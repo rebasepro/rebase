@@ -107,7 +107,7 @@ WebSocket auth follows a message-based flow:
 3. Session is marked as authenticated; a key's scopes are stored on the session.
 4. Each subsequent data operation calls `getScopedDelegate()` to create a user-scoped driver. A key-authenticated session needs `data:read` / `data:write` / `data:delete` on the frame's collection, and cannot use channels.
 5. Admin-plane operations need their scope, for keys and people alike: `database:write` for `EXECUTE_SQL` and creating/deleting branches, `database:read` for the catalogue and listing branches.
-6. Rate limiting: 2000 messages per 60 seconds.
+6. Rate limiting: 2000 messages per 60 seconds; channel frames (join, leave, broadcast, presence, history) count against a separate 7200.
 
 ---
 
@@ -124,8 +124,10 @@ The scoped driver is placed into `c.set("driver", scopedDriver)`. The raw, unsco
 
 ```typescript
 // From packages/server/src/auth/rls-scope.ts
+type ScopedUser = { uid: string; roles?: string[]; isAnonymous?: boolean; claims?: Record<string, unknown> };
+
 type RLSScopedDriver = DataDriver & {
-    withAuth(user: { uid: string; roles?: string[] }): Promise<DataDriver>;
+    withAuth(user: ScopedUser): Promise<DataDriver>;
 };
 
 function isRLSScopedDriver(driver: DataDriver): driver is RLSScopedDriver {
@@ -134,7 +136,7 @@ function isRLSScopedDriver(driver: DataDriver): driver is RLSScopedDriver {
 
 export async function scopeDataDriver(
     driver: DataDriver,
-    user: { uid: string; roles?: string[] }
+    user: ScopedUser
 ): Promise<DataDriver> {
     if (isRLSScopedDriver(driver)) {
         // Fail closed — if withAuth() throws, the request is DENIED
@@ -180,7 +182,7 @@ export async function scopeDataDriver(
 > - `uid: "api-key:{id}"` + `roles: ["service", ...key.roles]` — service API key requests. A personal key carries its owner's uid and roles instead.
 > - Real user IDs and roles for JWT-authenticated requests.
 >
-> **Key insight:** `rebase.dataAsAdmin` is not a raw admin driver either. It is the native DataDriver scoped as `{ uid: "service", roles: ["admin"] }`, so RLS is still evaluated and callbacks still fire — they live in the driver, not at the route boundary. Callbacks can therefore distinguish server-internal reads from end-user ones by checking `context.user?.roles?.includes("admin")`.
+> **Key insight:** `rebase.dataAsAdmin` is not a raw admin driver either. It is the native DataDriver scoped as `{ uid: "service", roles: ["admin"] }`, so RLS is still evaluated and callbacks still fire — they live in the driver, not at the route boundary. Callbacks can therefore distinguish server-internal reads from end-user ones by checking `context.user?.uid === "service"` — not `roles.includes("admin")`, which a signed-in admin (and an admin-roled API key) also passes.
 
 ---
 
@@ -253,6 +255,10 @@ type CollectionCallbacks<M extends Record<string, unknown>, USER extends User> =
     afterRead?(props: AfterReadProps<M, USER>):
         Promise<Record<string, unknown>> | Record<string, unknown>;
 
+    // ANDs a filter / logical group into a read before it runs. It can only narrow.
+    beforeQuery?(props: BeforeQueryProps<M, USER>):
+        Promise<QueryNarrowing<M> | void> | QueryNarrowing<M> | void;
+
     beforeSave?(props: BeforeSaveProps<M, USER>):
         Promise<Partial<EntityValues<M>>> | Partial<EntityValues<M>>;
 
@@ -314,7 +320,8 @@ SELECT
     set_config('app.user_id', :uid, true),          -- pre-rename alias, still written for legacy policies
     set_config('app.user_roles', :rolesString, true),
     set_config('app.is_anonymous', :isAnonymous, true),
-    set_config('app.jwt', :jwtClaims, true)
+    set_config('app.jwt', :jwtClaims, true),        -- custom claims, then sub / roles / is_anonymous
+    set_config('role', 'rebase_user', true)          -- = SET LOCAL ROLE, in the same statement
 ```
 
 PostgreSQL RLS policies use `rebase.uid()`, `rebase.roles()`, `rebase.is_anonymous()` and `rebase.jwt()` to read these session variables and enforce row-level access control. `app.uid` is the canonical variable; write new policies against the functions, never against `app.user_id`. (The pre-1.0 `auth.*` spellings are rewritten on compile and still work, but the backend names the collections still carrying them at boot — write `rebase.*`.)

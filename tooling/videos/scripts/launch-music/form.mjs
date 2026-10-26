@@ -30,6 +30,9 @@ export function bar(n) {
          *  A (define, secure), B (build, agents), C (manage, shape). */
         groove: verb < 0 ? null : ["A", "A", "B", "B", "C", "C"][verb],
         next: ORDER.find((s) => s.bar === n + 1) ?? null,
+        /** The bar that rises into the first verb: the riser lives here,
+         *  whatever kind of section it is. */
+        intoFirstVerb: n === VERBS[0].bar - 1,
     };
 }
 

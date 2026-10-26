@@ -17,6 +17,7 @@ import React, { useMemo, useState } from "react";
 import type { CollectionCustomView, CollectionCustomViewParams } from "@rebasepro/cms-types";
 import type { Entity } from "@rebasepro/types";
 import { Button, Typography } from "@rebasepro/ui";
+import { getDatePropertyTimezone } from "@rebasepro/cms";
 
 const DATE_FIELD = "dueDate";
 const TITLE_FIELD = "title";
@@ -25,6 +26,20 @@ const WEEKDAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
 function dayKey(date: Date): string {
     return `${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`;
+}
+
+/**
+ * The day a stored date falls on, in the zone the admin shows it in: UTC for a
+ * `columnType: "date"` column (a calendar day, delivered as that day's UTC
+ * midnight — in local time it is the day before west of Greenwich), the
+ * property's `timezone` when it declares one, else the browser's.
+ */
+function storedDayKey(date: Date, timeZone: string | undefined): string {
+    if (!timeZone) return dayKey(date);
+    const parts = new Intl.DateTimeFormat("en-US", { timeZone, year: "numeric", month: "numeric", day: "numeric" })
+        .formatToParts(date);
+    const part = (type: string) => Number(parts.find(p => p.type === type)?.value);
+    return `${part("year")}-${part("month") - 1}-${part("day")}`;
 }
 
 /** The days shown for a month: whole weeks, Monday first. */
@@ -39,11 +54,14 @@ function monthGrid(month: Date): Date[] {
     return days;
 }
 
-export function CalendarView({ tableController, onEntityClick }: CollectionCustomViewParams) {
+export function CalendarView({ collection, tableController, onEntityClick }: CollectionCustomViewParams) {
     const [month, setMonth] = useState(() => {
         const now = new Date();
         return new Date(now.getFullYear(), now.getMonth(), 1);
     });
+
+    const dateProperty = collection.properties[DATE_FIELD];
+    const timeZone = dateProperty?.type === "date" ? getDatePropertyTimezone(dateProperty) : undefined;
 
     const byDay = useMemo(() => {
         const map = new Map<string, Entity[]>();
@@ -52,11 +70,11 @@ export function CalendarView({ tableController, onEntityClick }: CollectionCusto
             if (raw === null || raw === undefined) continue;
             const date = raw instanceof Date ? raw : new Date(String(raw));
             if (Number.isNaN(date.getTime())) continue;
-            const key = dayKey(date);
+            const key = storedDayKey(date, timeZone);
             map.set(key, [...(map.get(key) ?? []), entity]);
         }
         return map;
-    }, [tableController.data]);
+    }, [tableController.data, timeZone]);
 
     const shift = (months: number) => setMonth(m => new Date(m.getFullYear(), m.getMonth() + months, 1));
 
@@ -69,24 +87,26 @@ export function CalendarView({ tableController, onEntityClick }: CollectionCusto
                 </Typography>
                 <Button size={"small"} variant={"text"} onClick={() => shift(1)} aria-label={"Next month"}>›</Button>
             </div>
-            <div className={"grid grid-cols-7 gap-px rounded-lg overflow-hidden border border-surface-200 dark:border-surface-700 bg-surface-200 dark:bg-surface-700"}>
+            <div className={"grid grid-cols-7 gap-px rounded-lg overflow-hidden border border-hairline bg-hairline"}>
                 {WEEKDAYS.map(day => (
                     <Typography key={day} variant={"caption"} color={"secondary"}
-                        className={"bg-surface-50 dark:bg-surface-900 px-2 py-1"}>{day}</Typography>
+                        className={"bg-surface-raised px-2 py-1"}>{day}</Typography>
                 ))}
                 {monthGrid(month).map(day => (
                     <div key={dayKey(day)}
                         data-day={dayKey(day)}
-                        className={"min-h-24 bg-white dark:bg-surface-950 p-1 flex flex-col gap-1"
+                        className={"min-h-24 bg-surface-card p-1 flex flex-col gap-1"
                             + (day.getMonth() === month.getMonth() ? "" : " opacity-40")}>
                         <Typography variant={"caption"} color={"secondary"}>{day.getDate()}</Typography>
                         {(byDay.get(dayKey(day)) ?? []).map(entity => (
-                            <button key={String(entity.id)}
-                                type={"button"}
+                            <Button key={String(entity.id)}
+                                variant={"text"}
+                                size={"smallest"}
+                                fullWidth
                                 onClick={() => onEntityClick?.(entity)}
-                                className={"truncate text-left text-xs rounded px-1 py-0.5 bg-primary/10 text-primary hover:bg-primary/20"}>
-                                {String(entity.values[TITLE_FIELD] ?? entity.id)}
-                            </button>
+                                className={"justify-start min-w-0"}>
+                                <span className={"truncate"}>{String(entity.values[TITLE_FIELD] ?? entity.id)}</span>
+                            </Button>
                         ))}
                     </div>
                 ))}

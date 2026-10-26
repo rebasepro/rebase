@@ -443,6 +443,14 @@ keys yet" and a reset-password dialog in English apart from "Cancelar".
 41 keys were missing outright, which i18next renders as the key.`
     },
     {
+        run: "check:locale-staleness",
+        why: `The half neither of the others can see: a key whose English was
+rewritten while the six translations kept saying what the old English said.
+Every bundle has the key and every value is translated, so parity is green.
+tooling/scripts/locale-sources.json records each value's hash as of when the
+bundles last agreed, so an English change without its translations fails.`
+    },
+    {
         run: "check:theme-tokens",
         why: `Tailwind v4 builds colour utilities from the \`--color-*\` entries in @theme.
 Ask for one that is not there and it does not warn, does not fall back and

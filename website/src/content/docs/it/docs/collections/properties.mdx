@@ -1,5 +1,5 @@
 ---
-sourceHash: 9426e0b3511c31f5
+sourceHash: bd42729686fb869a
 title: Proprietà
 sidebar_label: Proprietà
 description: I tipi di proprietà definiscono il tipo di dato, la convalida e il rendering dell'interfaccia utente per ciascun campo in una collezione. Rebase supporta i tipi string, number, boolean, date, array, map, reference, relation e geopoint.
@@ -20,10 +20,10 @@ Le proprietà definiscono le colonne nella tabella del database e il modo in cui
 
 | Tipo | Descrizione | Colonna PostgreSQL |
 |------|-------------|-------------------|
-| `string` | Testo, select, markdown, upload di file, URL, email | `text` come impostazione predefinita; `varchar`, `char` o `uuid` con `columnType` |
+| `string` | Testo, select, markdown, upload di file, URL, email | `text` come impostazione predefinita; `varchar`, `char` o `uuid` con `columnType`; un tipo enum Postgres (`<table>_<column>`) con `enum` |
 | `number` | Intero, decimale, valuta | `integer`, `numeric`, `bigint`, `serial` |
 | `boolean` | Toggle vero/falso | `boolean` |
-| `date` | Data, data e ora, timestamp | `timestamp`, `date` |
+| `date` | Data, data e ora, timestamp | `timestamptz` come impostazione predefinita; `date` o `time` con `columnType` |
 | `array` | Elenco ordinato di valori | Un array nativo (`text[]`, `integer[]`, `numeric[]`, `boolean[]`) quando `of` è una singola proprietà string, number o boolean; `jsonb` altrimenti |
 | `map` | Oggetto chiave-valore | `jsonb` |
 | `geopoint` | Coppia latitudine/longitudine | `jsonb` |
@@ -41,8 +41,8 @@ Tutti i tipi di proprietà condividono queste opzioni:
 | `type` | `string` | **Obbligatorio.** Tipo di dato (vedi sopra) |
 | `name` | `string` | Etichetta visualizzata. Il valore predefinito è la chiave della proprietà formattata in modo leggibile — `publishDate` → "Publish Date". Impostalo quando tale derivazione è errata: `"URL"` invece di "Url". |
 | `description` | `string` | Testo di aiuto mostrato sotto il campo |
-| `defaultValue` | `any` | Valore predefinito per le nuove entità. Un valore letterale — una stringa, un numero, un booleano, una data, un id di enum o un documento `map`/`array` — diventa anche il `DEFAULT` della colonna, quindi anche una riga inserita da qualsiasi elemento diverso dal pannello di amministrazione (l'API REST, un seed, `psql`) lo riceve |
-| `databaseDefault` | `boolean \| SqlExpression` | Il database compila la colonna quando un'operazione di creazione la lascia vuota: una colonna `NOT NULL DEFAULT <expression>` come `gen_random_uuid()` o `nextval(…)`. Un campo `required` con questa opzione può essere omesso durante la creazione, sia dal form di amministrazione che dall'API, e un valore `null` inviato in creazione viene demandato al database; rimane obbligatorio in fase di modifica, e il tipo generato `Insert` lo rende opzionale. Fornisci l'espressione nel formato template accettato da `isId`, ``databaseDefault: "sql`gen_random_uuid()`"``, e il pianificatore dello schema la scriverà come `DEFAULT` della colonna, garantendo che `rebase db push` la mantenga. `true` dichiara un `DEFAULT` scritto altrove e non ne scrive alcuno, pertanto un push pianificherà la sua rimozione. "Import from table" e `rebase schema introspect` impostano l'espressione che leggono |
+| `defaultValue` | `any` | Valore predefinito per le nuove entità. Un valore letterale — una stringa, un numero, un booleano, una data, un id di enum o un documento `map`/`array` memorizzato come JSON — diventa anche il `DEFAULT` della colonna, quindi anche una riga inserita da qualsiasi elemento diverso dal pannello di amministrazione (l'API REST, un seed, `psql`) lo riceve |
+| `databaseDefault` | `boolean \| SqlExpression` | Il database compila la colonna quando un'operazione di creazione la lascia vuota: una colonna `NOT NULL DEFAULT <expression>` come `gen_random_uuid()` o `nextval(…)`. Un campo `required` con questa opzione può essere omesso durante la creazione, sia dal form di amministrazione che dall'API, e un valore `null` inviato in creazione viene demandato al database; rimane obbligatorio in fase di modifica, e il tipo generato `Insert` lo rende opzionale. Fornisci l'espressione nel formato template accettato da `isId`, ``databaseDefault: "sql`gen_random_uuid()`"``, e il pianificatore dello schema la scriverà come `DEFAULT` della colonna, garantendo che `rebase db push` la mantenga. `true` dichiara un `DEFAULT` scritto altrove: il planner non ne scrive alcuno, e `rebase db push` lascia così com'è quello che il database possiede. "Import from table" e `rebase schema introspect` impostano l'espressione che leggono |
 | `validation` | `object` | Regole di convalida |
 | `propertyConfig` | `string` | Chiave di configurazione della proprietà registrata |
 | `columnName` | `string` | Nome esplicito della colonna del database (ignora la conversione in snake_case) |
@@ -89,9 +89,9 @@ price: {
 | `admin.hideFromCollection` | `boolean` | Nasconde dalla vista a tabella. Solo visualizzazione: le righe correlate di una proprietà di relazione nascosta rimangono comunque incorporate nella lettura dell'elenco (vedi [Relazioni](/docs/collections/relations)) |
 | `admin.columnWidth` | `number` | Larghezza della colonna in pixel (vista a tabella) |
 | `admin.span` | `1 \| 2 \| 3 \| 4` | Larghezza del campo sulla griglia del form a quattro colonne |
-| `admin.Field` | `React.ComponentType` | Componente personalizzato per il campo |
-| `admin.Preview` | `React.ComponentType` | Componente personalizzato per la cella della tabella |
-| `admin.Filter` | `React.ComponentType` | Campo di filtro personalizzato per questa proprietà. Ha la precedenza sull'override a livello di collezione `Collection.FilterField` e sul campo predefinito integrato per tipo |
+| `admin.Field` | `ComponentRef` | Componente personalizzato per il campo |
+| `admin.Preview` | `ComponentRef` | Componente personalizzato per la cella della tabella |
+| `admin.Filter` | `ComponentRef` | Campo di filtro personalizzato per questa proprietà. Ha la precedenza sull'override a livello di collezione `Collection.FilterField` e sul campo predefinito integrato per tipo |
 | `admin.filterOperators` | `WhereFilterOp[]` | Limita gli operatori offerti durante il filtraggio su questa proprietà. Il set offerto è l'**intersezione** tra le funzionalità del motore, i valori predefiniti del tipo e questo elenco — puoi solo restringere, mai aggiungere un operatore che il motore non è in grado di eseguire. `[]` disabilita il filtraggio sulla proprietà |
 | `admin.customProps` | `unknown` | Qualsiasi elemento necessario ai tuoi componenti `Field` o `Preview`. Rebase lo passa senza modifiche |
 
@@ -257,7 +257,7 @@ locales: {
 | `userSelect` | `boolean` | Renderizza come selettore utente. Il valore è una semplice colonna di stringhe che memorizza l'id utente — nulla lo risolve o lo controlla in ingresso. **Solo form di amministrazione — non applicato dall'API o dal database.** Il selettore elenca nomi, email e avatar degli utenti a chiunque abbia i permessi di scrittura sulla collezione, tramite [`GET /api/admin/users/pick`](/docs/backend/auth-endpoints/), senza lo scope `users:read`. Una collezione le cui regole di scrittura sono espresse in puro SQL non viene inclusa, poiché tali regole non possono essere valutate preventivamente: in tal caso, solo i possessori di `users:read` possono effettuare la selezione. |
 | `admin.previewAsTag` | `boolean` | Renderizza questa stringa come tag nelle anteprime |
 | `admin.clearable` | `boolean` | Aggiunge un'icona per azzerare il valore (impostandolo su null) |
-| `admin.urlPreview` | `PreviewType` | Come renderizzare una stringa che contiene un URL: un link, oppure un'anteprima in linea di immagini, audio o video. Si tratta solo di presentazione — la natura di URL del valore è determinata dal flag `url` sulla proprietà, da cui viene generato il contratto OpenAPI |
+| `admin.urlPreview` | `PreviewType \| boolean` | Come renderizzare una stringa che contiene un URL: `true` per un link, oppure `"image"`, `"video"`, `"audio"` o `"file"` per un'anteprima in linea. Si tratta solo di presentazione — la natura di URL del valore è determinata dal flag `url` sulla proprietà, da cui viene generato il contratto OpenAPI |
 
 ### Colonne di audit
 

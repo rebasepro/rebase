@@ -178,7 +178,7 @@ keeps its key. An upsert whose key belonged to such a row wrote its values into
 the hidden row and answered `201 Created`, so the row stayed deleted and the
 caller saw a success. It is now refused with `409 ROW_IN_TRASH` and nothing is
 written, on every upsert door: `?on_conflict=`, `/bulk`, `/_batch`, the SDK, the
-socket, and `rebase.data` or `context.data` on the server.
+socket, and `rebase.dataAsAdmin` or `context.data` on the server.
 
 **What to change:** nothing, unless something upserts into a soft-deleted
 collection and expects to bring a row back. Restore the row first, with an
@@ -194,7 +194,7 @@ update setting its soft-delete field to `null`, then upsert. Or purge it with
 ## 49. An update that changes a row's key is refused with `400 KEY_IMMUTABLE`
 
 An update whose body named the row's key with another value, or a `beforeSave`
-that changed it, answered `500`. In-process, through `rebase.data`, the row had
+that changed it, answered `500`. In-process, through `rebase.dataAsAdmin`, the row had
 already moved to the new key when the write threw. Every door now refuses it
 with `400 KEY_IMMUTABLE` before any hook runs, naming the field, and nothing is
 written. Sending the key the row already has is still accepted.
@@ -372,7 +372,7 @@ See [The remote endpoint](/docs/ai/mcp/#the-remote-endpoint).
 
 ## 57. In-process writes refuse `ifMatch` and `idempotencyKey`
 
-A write through `context.data` in a callback, or `rebase.data` in a function,
+A write through `context.data` in a callback, or `rebase.dataAsAdmin` in a function,
 cron job or seed, never leaves the process: there is no `If-Match` to check and
 no idempotency store. Both options were silently ignored, so a conditional write
 there was unconditional. They now throw `UNSUPPORTED_OPTION` before anything is
@@ -388,7 +388,7 @@ client, which honours both.
 ```
 
 ```bash
-grep -rnE "(context|rebase)\.data\..*(ifMatch|idempotencyKey)" --exclude-dir=node_modules .
+grep -rnE "(context\.data|rebase\.dataAsAdmin)\..*(ifMatch|idempotencyKey)" --exclude-dir=node_modules .
 ```
 
 ## 58. `Button` and `IconButton` are typed against the element they render

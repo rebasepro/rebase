@@ -1,5 +1,5 @@
 ---
-sourceHash: 5df9a53a2ea5bdf9
+sourceHash: 64d01f9888fd5011
 title: Despliegue de Rebase en Google Cloud Platform
 description: Despliega tu instancia de Rebase de forma segura en GCP usando Cloud SQL y Cloud Run, enfocándote en regiones de centros de datos de la UE.
 sidebar_label: Google Cloud
@@ -95,7 +95,7 @@ Desde tu equipo, conéctate mediante el [Cloud SQL Auth Proxy](https://cloud.goo
 Las instancias de Cloud Run son sin estado (stateless) y efímeras, por lo que el almacenamiento de archivos local supone una pérdida de datos silenciosa y el runtime lo rechaza en producción.
 
 1. Crea un bucket privado de Google Cloud Storage en tu región de la UE elegida.
-2. Configura `STORAGE_TYPE=gcs` y su bucket; consulta [Almacenamiento](/docs/backend/storage). En Cloud Run, la cuenta de servicio del entorno suministra las credenciales, por lo que no hay nada más que configurar.
+2. Crea una clave HMAC para una cuenta de servicio que pueda usar el bucket (**Cloud Storage → Settings → Interoperability**) y accede al bucket a través de su endpoint compatible con S3: `STORAGE_TYPE=s3`, `S3_BUCKET`, `S3_ENDPOINT=https://storage.googleapis.com`, `S3_REGION=auto`, y la clave como `S3_ACCESS_KEY_ID` / `S3_SECRET_ACCESS_KEY`; consulta [Almacenamiento](/docs/backend/storage). `STORAGE_TYPE=gcs` carga `@google-cloud/storage`, que la imagen del runtime no incluye, y una copia en tu bundle no está en su ruta de resolución.
 
 :::caution
 Cloud Run escala a cero. Si tu proyecto utiliza suscripciones en tiempo real, define `--min-instances 1`; las conexiones WebSocket se terminan cuando una instancia se reduce a cero.

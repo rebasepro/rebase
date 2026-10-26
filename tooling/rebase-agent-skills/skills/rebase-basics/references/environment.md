@@ -48,12 +48,15 @@ Everything `rebaseEnvSchema` declares — what an **ejected** project's own
 > **IMPORTANT FOR AGENTS:** this is not the whole environment a project reads. A
 > project booted by the **runtime** (`rebase dev`, `rebase start`, the published
 > image — the default, and what `rebase init` scaffolds) uses `loadBootEnv`,
-> which extends this schema with the variables the runtime itself owns: `SMTP_*`
-> and `APP_NAME`; `REBASE_SERVE_STATIC`, `REBASE_MIGRATE_ON_BOOT`,
+> which extends this schema with the variables the runtime itself owns, among
+> them: `SMTP_*`, `APP_NAME` and `EMAIL_LOGO_URL`; `REBASE_SERVE_STATIC`,
+> `REBASE_MIGRATE_ON_BOOT`, `REBASE_PROVISION`,
 > `REBASE_METRICS`, `REBASE_METRICS_TOKEN`, `LOG_LEVEL`; `STORAGE_PUBLIC_READ`
 > and `STORAGE_ALLOW_ANY_AUTHENTICATED`; `AUTH_REQUIRE`,
-> `AUTH_ALLOW_USER_LOOKUP`, `AUTH_COOKIE_SAME_SITE`, `AUTH_DEFAULT_ROLE`,
-> `GITHUB_CLIENT_*`, `MICROSOFT_CLIENT_*`; `REBASE_BASE_PATH`,
+> `AUTH_ALLOW_USER_LOOKUP`, `AUTH_MAGIC_LINK`, `AUTH_EMAIL_OTP`,
+> `AUTH_COOKIE_SAME_SITE`, `AUTH_DEFAULT_ROLE`, `CAPTCHA_*`, and the
+> `<PROVIDER>_CLIENT_*` pairs of every OAuth provider past Google
+> (`GITHUB`, `MICROSOFT`, `APPLE_*`, …); `REBASE_MCP_ENABLED`, `REBASE_BASE_PATH`,
 > `REBASE_ENABLE_SWAGGER`, `REBASE_MAX_BODY_SIZE`, `REBASE_COMPRESSION`,
 > `REBASE_HISTORY`; and the split-deployment set `REBASE_ROLE`,
 > `REBASE_CRON_SCHEDULER`, `REBASE_JOB_WORKERS`, `REBASE_FUNCTIONS_ONLY`,
@@ -109,9 +112,9 @@ Everything `rebaseEnvSchema` declares — what an **ejected** project's own
 
 ### Auto-Generated Dev Secrets
 
-In non-production mode, `loadEnv()` automatically generates cryptographically secure random values for `JWT_SECRET` and `REBASE_SERVICE_KEY` using `crypto.randomBytes(48).toString("hex")` when they are not set. This means:
+In non-production mode, `loadEnv()` automatically generates cryptographically secure random values for `JWT_SECRET` and `REBASE_SERVICE_KEY` using `crypto.randomBytes(48).toString("hex")` when they are not set, and caches them in `.rebase-dev-secrets.json`. This means:
 
 - **Developers can start immediately** without creating a `.env` file
-- **Existing JWT tokens are invalidated on every server restart** because the secret changes
-- A console warning is emitted: `⚠️ Auto-generated secrets for: JWT_SECRET, REBASE_SERVICE_KEY...`
-- To persist sessions across restarts, set these values explicitly in `.env`
+- **Sessions survive a restart**: the next boot reads the same secrets back out of the cache (an info line names the file the first time)
+- Only when the cache cannot be written (a read-only or containerised working directory) are the secrets ephemeral; then a warning is emitted: `⚠️ Auto-generated secrets for: JWT_SECRET, REBASE_SERVICE_KEY. These are ephemeral — existing tokens will be invalidated on restart.`
+- Set these values explicitly in `.env` for anything that is not a development machine

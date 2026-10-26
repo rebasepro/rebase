@@ -94,7 +94,7 @@ From your machine, connect through the [Cloud SQL Auth Proxy](https://cloud.goog
 Cloud Run instances are stateless and ephemeral, so local file storage is silent data loss and the runtime refuses it in production.
 
 1. Create a private Google Cloud Storage bucket in your chosen EU region.
-2. Set `STORAGE_TYPE=gcs` and its bucket — see [Storage](/docs/backend/storage). On Cloud Run the ambient service account supplies the credentials, so there is nothing else to set.
+2. Create an HMAC key for a service account that can use the bucket (**Cloud Storage → Settings → Interoperability**), and reach the bucket through its S3-compatible endpoint: `STORAGE_TYPE=s3`, `S3_BUCKET`, `S3_ENDPOINT=https://storage.googleapis.com`, `S3_REGION=auto`, and the key as `S3_ACCESS_KEY_ID` / `S3_SECRET_ACCESS_KEY` — see [Storage](/docs/backend/storage). `STORAGE_TYPE=gcs` loads `@google-cloud/storage`, which the runtime image does not ship, and a copy in your bundle is not on its resolution path.
 
 :::caution
 Cloud Run scales to zero. If your project uses realtime subscriptions, set `--min-instances 1` — WebSocket connections are terminated when an instance is scaled down.

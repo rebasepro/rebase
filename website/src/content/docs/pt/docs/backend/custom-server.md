@@ -1,5 +1,5 @@
 ---
-sourceHash: e3a81a3528add4c5
+sourceHash: 8935b1e530b1bfb3
 title: Integração com Servidor Customizado
 sidebar_label: Servidor Customizado
 description: Construa o backend do Rebase a partir de peças públicas no seu próprio servidor — createRebaseBackend, seus grupos de rotas, mount, attachRealtime e start — ou incorpore o driver do Postgres no Express.
@@ -15,8 +15,8 @@ quer, use-o.
 Quando não for, desça um passo. Cada parte dessa chamada é uma peça pública que
 você mesmo pode chamar: construa o backend, depois monte tudo ou apenas os grupos
 de rotas que quiser, nos caminhos que quiser, e decida qual processo inicia os
-timers. A última seção vai um passo além e incorpora apenas o driver do Postgres
-em um app Express.
+timers. [Incorporando o Driver do Postgres](/docs/backend/embedding-postgres-driver/)
+vai um passo além e abre apenas o driver do Postgres em um app Express.
 
 ## Configuração de Ambiente
 
@@ -52,20 +52,25 @@ export const env = loadEnv({
 
 Importar `z` de `@rebasepro/server` é uma novidade. Na versão 0.17 e anteriores, o pacote não exportava o `z`: importe-o de `zod`, compatível com a versão major utilizada pelo runtime, e deixe seu bundler desduplicar as duas cópias.
 
-:::caution[O `z` com o qual você estende deve ser o zod do runtime]
-Ter duas cópias do zod carregadas ao mesmo tempo é a única maneira de essa chamada falhar, e costumava falhar silenciosamente. O `.merge()` aceita um esquema da outra cópia — os formatos são idênticos — e então o `.parse()` rejeita todos os campos que possuem um `.default()`, porque um padrão é reconhecido por identidade de classe. O servidor iniciava, informava sucesso e não executava nenhum dos seus crons; nada na falha mencionava o zod.
+:::caution[Duas cópias do zod]
+Ter duas cópias do zod carregadas ao mesmo tempo costumava quebrar essa chamada
+silenciosamente. O `loadEnv` combinava os esquemas com `.merge()`, que aceita um
+esquema da outra cópia e então rejeita todos os campos que possuem um `.default()`.
+O servidor iniciava, informava sucesso e não executava nenhum dos seus crons; nada
+na falha mencionava o zod.
 
-O runtime fornece o `zod`. O `backend/package.json` do scaffold o lista na faixa
-que o `@rebasepro/server` usa, de modo que uma única cópia é instalada: mantenha as duas
-iguais. O `loadEnv` agora recusa um esquema externo na inicialização com uma mensagem
-indicando a correção, em vez de aceitá-lo e validar apenas metade dele.
+O `loadEnv` agora valida o esquema base e o seu esquema `extend` cada um com o
+próprio `.parse()`, de modo que um esquema construído por outra cópia do zod
+funciona. O runtime fornece o `zod`, e o `backend/package.json` do scaffold o lista
+na faixa que o `@rebasepro/server` usa, de modo que uma única cópia é instalada:
+mantenha as duas iguais.
 :::
 
 **Comportamentos principais:**
 - Gera `JWT_SECRET` e `REBASE_SERVICE_KEY` em desenvolvimento quando não estão definidos, para que você possa começar sem configuração manual, e os guarda em cache em `.rebase-dev-secrets.json` para que uma reinicialização não desconecte ninguém.
 - Bloqueia segredos gerados automaticamente em produção — você deve defini-los explicitamente.
 - Valida se `CORS_ORIGINS` ou `FRONTEND_URL` está definido em produção.
-- Recusa um esquema `extend` construído por uma cópia diferente do zod.
+- Recusa um valor `extend` que não seja um esquema zod.
 - Lança um `Error` que nomeia cada variável ausente ou incorreta, como `DATABASE_URL: is required`, com os problemas apontados pelo zod na sua propriedade `issues`. Na 0.24 ele lança o próprio `ZodError` do zod, que não nomeia nenhuma variável quando nada o captura.
 
 Consulte `.env.example` na aplicação gerada para obter a lista completa de variáveis suportadas.
@@ -82,7 +87,12 @@ O `initializeRebaseBackend` é estas chamadas, e nada mais:
 import { createRebaseBackend, installUnhandledRejectionHandler, setDefaultBackend } from "@rebasepro/server";
 
 installUnhandledRejectionHandler();
-const backend = await createRebaseBackend({ ...options, provision: true });
+const backend = await createRebaseBackend({
+    ...options,
+    // `false` or `{ collections: false, realtime: false }` in the cases
+    // the `provision` section below lists.
+    provision: true
+});
 setDefaultBackend(backend);
 backend.mount(app, { basePath: "/api" });
 await backend.attachRealtime(server);
@@ -225,7 +235,8 @@ fora:
 | `backend.shutdown(timeoutMs, { server })` | Para o que o `start()` e o `attachRealtime()` iniciaram, aguardando as execuções de cron e os jobs em andamento. Fecha o `server` apenas quando você o passa. | |
 
 O `path` padrão do socket é o caminho base passado ao `mount()` sem o `/api`
-final, então `/api` dá `/` e `/x/api` dá `/x`. É ali que o SDK se conecta,
+final, então `/api` dá `/` e `/x/api` dá `/x`; um caminho base que
+não termina em `/api` dá `/`. É ali que o SDK se conecta,
 porque ele conecta ao seu `baseUrl` enquanto suas requisições HTTP vão para
 `${baseUrl}/api`. Um upgrade para qualquer outro caminho fica para os outros
 listeners de `upgrade` do servidor, então seu app pode rodar o próprio servidor
@@ -239,14 +250,14 @@ decida:
 | `provision` | Cria | Para |
 |---|---|---|
 | `true` | Tudo o que o backend serve: as tabelas das coleções e suas políticas de RLS, a captura de mudanças para o tempo real, a role com que as requisições rodam e as tabelas do próprio framework (chaves de API, execuções de cron, jobs, métricas). | um deploy de processo único; o que o `initializeRebaseBackend` passa |
-| `false` | Nada. O schema já deve estar lá, aplicado pelo `rebase db push`, por uma migração ou por outro processo. Uma tabela ausente falha quando é usada. | um script, um teste, um REPL, um processo que só lê |
+| `false` | Nada, nem no boot nem depois: as tabelas que outros backends criam no primeiro uso (chaves de idempotência, claims do cron) também não são criadas. O schema já deve estar lá, aplicado pelo `rebase db push`, por uma migração ou por outro processo. Tabelas de auth ausentes fazem o boot ser recusado; uma tabela opcional ausente desliga sua funcionalidade e é nomeada no log. | um script, um teste, um REPL, um processo que só lê, um banco de dados que só o seu processo de mudanças pode alterar |
 | `{ collections: false, realtime: false }` | As tabelas do framework e a role, mas não o schema das coleções nem a captura de mudanças. | um processo que não é dono do schema em um deploy dividido |
 
 É uma opção, e não um passo posterior, de propósito. O driver lê as tabelas ao
 abrir e anexa a captura de mudanças às que existem naquele momento. Um
 `provision()` chamado depois rodaria depois de o driver já ter decidido o que
 existe. O `REBASE_MIGRATE_ON_BOOT=none` ainda desliga o schema das coleções para
-qualquer backend do processo.
+qualquer backend do processo. <span class="since-badge" data-since="0.26">A partir da versão 0.26</span> `initializeRebaseBackend` passa `false` quando `REBASE_PROVISION=false`.
 
 ## Montando apenas os grupos que você quer
 
@@ -285,6 +296,12 @@ quer que seja montado, inclusive sob um caminho parametrizado como
 `/:tenant/data`. Um grupo também lê onde foi montado, então a API de dados ainda
 encaminha cada coleção à sua fonte de dados e a listagem de funções nomeia os
 caminhos em que ela realmente é servida.
+
+Um grupo também recusa por conta própria `x-rebase-impersonate` e `x-rebase-simulate-*`
+(`400 IMPERSONATION_UNSUPPORTED` / `SIMULATION_UNSUPPORTED`), a menos que seja o grupo de
+dados ou o de funções, que os honram; na 0.25, um grupo montado sozinho
+respondia como o administrador. `refuseUnhonouredImpersonation(honouredMounts)`
+de `@rebasepro/server` faz o mesmo para rotas suas.
 
 O que um grupo não carrega é o middleware de todo o processo que o `mount()`
 coloca na frente de tudo. Ao montar os grupos um a um, adicione você mesmo o que
@@ -359,6 +376,14 @@ app.route("/b/data", b.routes.data());   // a session from `a` is a 401 here
 Um backend sem `auth.jwtSecret`, como um cujo `auth` é um adaptador, não assina
 nada por conta própria, então o seu `services.jwt` acompanha o padrão do processo.
 
+**Os recursos são do processo.** As declarações `database()`, `bucket()`, `topic()` e
+`queue()` em `config/resources.ts` são valores de nível de módulo, e
+todo backend do processo lê todas elas: um backend cujo próprio projeto
+não declara nenhum tópico ainda liga a sua fila de jobs para o tópico de outro projeto,
+e se recusa a inicializar se o seu driver não puder carregar um. Execute os
+recursos de um projeto por processo. Vários backends desse mesmo projeto, cada um em seu próprio
+banco de dados, não há problema.
+
 **Para onde vai o `rebase`.** Dentro de uma requisição, de uma execução de cron
 ou de um job que um backend atende, o `rebase`, seja importado de
 `@rebasepro/server` ou recebido como `ctx.rebase`, é esse backend, e o mesmo vale
@@ -430,150 +455,14 @@ backend já fecha o servidor que recebeu, e um segundo fechamento causa deadlock
 Um backend de `createRebaseBackend` fecha um servidor apenas quando você o passa,
 `backend.shutdown(timeoutMs, { server })`, como no exemplo do início desta página.
 
-## Incorporando o driver do Postgres no Express
+## Incorporando o driver do Postgres
 
-Um passo mais abaixo, o `@rebasepro/server-postgres` funciona sem o servidor do
-Rebase. Ele depende do Drizzle e do `http.Server` do Node, então você pode abrir
-o driver de dados e o socket de tempo real dentro do Express, do Fastify ou do
-Node puro. Nesse nível você monta o backend por conta própria: não há rotas de
-autenticação, nem armazenamento, nem API de administração, a menos que você as
-construa.
+Um passo mais abaixo, o `@rebasepro/server-postgres` funciona sem o servidor do Rebase
+de forma alguma: abra seu driver de dados e o socket de tempo real dentro do Express, do Fastify
+ou do Node puro, e monte o resto você mesmo. Veja
+[Incorporando o Driver do Postgres](/docs/backend/embedding-postgres-driver/).
 
-### 1. Instalação
-
-```bash
-npm install @rebasepro/server-postgres @rebasepro/types express pg drizzle-orm
-```
-
-### 2. Abrindo o driver e o socket
-
-`openPostgresDriver`
-e `postgresDriverConfigFromEnv` são exportados. Na 0.24, abra o driver com
-`createPostgresBootstrapper(pgConfig).initializeDriver(…)`, cujo `internals` não
-é tipado.
-
-```typescript
-import express from "express";
-import { createServer } from "node:http";
-import { sql } from "drizzle-orm";
-import {
-    createPostgresDatabaseConnection,
-    createPostgresWebSocket,
-    openPostgresDriver,
-    postgresDriverConfigFromEnv
-} from "@rebasepro/server-postgres";
-import { collections } from "./collections";
-
-async function startServer() {
-    const app = express();
-
-    // The socket needs the raw http.Server, so listen on it, not on app.listen.
-    // 64 KB of headers, as the Rebase runtime takes: a vector search in the URL
-    // outgrows Node's 16 KB.
-    const server = createServer({ maxHeaderSize: 64 * 1024 }, app);
-
-    const { db, pool, connectionString } = createPostgresDatabaseConnection(process.env.DATABASE_URL!);
-
-    // The environment, read the way the Rebase server's boot reads it:
-    // DATABASE_READ_URL, DATABASE_DIRECT_URL and the REALTIME_* variables.
-    // Leave this call out and the driver reads no environment variable at all.
-    const pgConfig = postgresDriverConfigFromEnv({ connection: db, connectionString });
-
-    // The collections' tables must already exist: the driver serves them and never creates them.
-    // `provision` (default true) is the rest of its DDL: the role requests run as, branch metadata,
-    // channel history and change capture. `provision: false` when none of that may run here.
-    const { driver, internals } = await openPostgresDriver(pgConfig, { collections });
-
-    // The realtime socket. It answers upgrades on `path` only, so a WebSocket
-    // server of your own can share the same http.Server.
-    createPostgresWebSocket(
-        server,
-        internals.realtimeService,
-        internals.driver,
-        { requireAuth: true, jwtSecret: process.env.JWT_SECRET },
-        undefined,
-        { path: "/" }
-    );
-
-    app.use(express.json());
-
-    app.get("/api/health", (req, res) => {
-        res.json({ status: "healthy" });
-    });
-
-    // A write through the driver
-    app.post("/api/products", async (req, res) => {
-        try {
-            const result = await driver.save({
-                path: "products",
-                values: req.body,
-                status: "new"   // required: "new" | "existing" | "copy"
-            });
-            res.status(201).json({ success: true, data: result });
-        } catch (error) {
-            res.status(500).json({ error: error instanceof Error ? error.message : "Internal Server Error" });
-        }
-    });
-
-    // Drizzle directly, typed: `internals.db`, and `internals.readDb` when a
-    // read replica is configured.
-    app.get("/api/stats", async (req, res) => {
-        const result = await internals.db.execute(sql`select count(*) from products`);
-        res.json(result.rows);
-    });
-
-    const port = process.env.PORT || 3000;
-    server.listen(port);
-
-    // Graceful shutdown: stop listening, stop the LISTEN client, evict branch
-    // pools, then end the main pool.
-    const handleShutdown = (signal: string) => {
-        console.log(`Shutdown triggered via ${signal}.`);
-        server.close(async () => {
-            try {
-                await internals.realtimeService.stopListening();
-                await internals.poolManager?.shutdown();
-                await pool.end();
-                process.exit(0);
-            } catch (err) {
-                console.error("Error during graceful shutdown:", err);
-                process.exit(1);
-            }
-        });
-    };
-
-    process.on("SIGTERM", () => handleShutdown("SIGTERM"));
-    process.on("SIGINT", () => handleShutdown("SIGINT"));
-}
-
-startServer();
-```
-
-O `openPostgresDriver` é o que o `createPostgresAdapter` executa quando o servidor
-do Rebase inicializa, depois de o `postgresDriverConfigFromEnv` ter lido o
-ambiente para dentro da config. Seu segundo argumento diz o que abrir: as
-`collections`, se a abertura pode executar o seu próprio DDL (`provision`, padrão
-`true`) e que papel este processo assume no tempo real (`realtime: false` para
-nenhum).
-
-Ele não cria nenhuma tabela de coleção, então contra um banco de dados sem a tabela o `POST /api/products` responde `500` "Table not found for collection 'products'". Crie as tabelas primeiro. O `rebase db push` faz isso a partir de um projeto Rebase cujo `config/collections` as declara. Neste servidor, `await createPostgresAdapter(pgConfig).ensureCollectionSchema?.(collections)` antes do `openPostgresDriver` adiciona as tabelas e colunas que faltam no banco de dados, como faz a inicialização do servidor do Rebase, e não altera nada que já existe.
-
----
-
-## Conceitos-Chave do Backend
-
-### Conexões com Réplicas de Leitura
-Defina `readConnectionString` na config do driver, ou a variável de ambiente `DATABASE_READ_URL`, que a inicialização do servidor e o `postgresDriverConfigFromEnv` leem para dentro dela, e o driver abre um segundo pool de conexões contra a sua réplica de leitura, em `internals.readDb`. As leituras vão para a réplica; as escritas ficam no primário.
-
-A opção `readConnectionString` é respeitada. Na 0.24 ela era declarada e ignorada, e só o `DATABASE_READ_URL` funcionava.
-
-### Integração com o Drizzle
-Você não precisa escolher entre Rebase e Drizzle. O driver compila seus esquemas dinamicamente, e `internals.db` é o cliente `NodePgDatabase` do Drizzle, tipado, para SQL puro ou builders type-safe do Drizzle juntamente com os serviços REST do Rebase.
-
-### Drenagem Graciosa de Conexões
-Em ambientes serverless ou orquestradores (como Kubernetes), a finalização de pods pode resultar em conexões quebradas. Sempre implemente manipuladores de sinal que invoquem `internals.realtimeService.stopListening()` (que encerra o cliente pg LISTEN dedicado) e `pool.end()`, para não vazar slots de conexão no seu servidor de banco de dados.
-
-### CORS para um frontend no navegador
+## CORS para um frontend no navegador
 Um servidor customizado é dono da sua própria configuração de CORS, e um frontend em outra origem só consegue ler os cabeçalhos de resposta que ela expõe. Exponha os que o SDK lê, ou `etagOf(row)` será sempre `undefined` ali — uma escrita com `ifMatch` então sai sem nenhum `If-Match` — e um 429 perde seu `Retry-After`:
 
 ```typescript
@@ -594,7 +483,8 @@ cabeçalho que o SDK passe a ler em uma versão posterior chega ao seu frontend 
 nenhuma mudança aqui. São `ETag`, `Retry-After`, `X-Request-ID`, os três
 cabeçalhos `X-RateLimit-*` e `Preference-Applied`, mais `Location`,
 `Upload-Offset` e `Rebase-Upload-Result`, nos quais um upload retomável (arquivos acima de
-8 MiB) responde. Sem esses três, o SDK não consegue acompanhar um upload a partir de outra
+8 MiB) responde, e `X-Rebase-Simulated-Context`, que informa com qual identidade a requisição
+simulada de um administrador foi executada. Sem os três cabeçalhos de upload, o SDK não consegue acompanhar um upload a partir de outra
 origem, e envia cada arquivo como uma única requisição multipart. Na 0.24,
 escreva a lista à mão.
 
@@ -603,6 +493,7 @@ eles não expõem nenhum desses cabeçalhos, então um frontend em outra origem 
 
 ## Relacionados
 
+- [Incorporando o Driver do Postgres](/docs/backend/embedding-postgres-driver/) — o driver de dados e o socket de tempo real sozinhos, no Express
 - [Scripts e o Console](/docs/backend/scripts/) — os dados do projeto a partir de um script, de um teste ou de um REPL, sem servidor
 - [Visão Geral do Backend](/docs/backend/) — onde cada opção fica quando o runtime inicializa em vez disso
 - [Divisão em vários processos](/docs/deployment/split-processes/) — as roles que um servidor customizado precisa reproduzir

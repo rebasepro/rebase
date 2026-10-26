@@ -1,5 +1,5 @@
 ---
-sourceHash: e68d814b6b83ef41
+sourceHash: 441bdd62f0e1b3f7
 title: Referência de ferramentas do MCP
 sidebar_label: Referência de ferramentas do MCP
 description: Toda ferramenta que o servidor MCP do Rebase registra, por grupo — o que cada uma precisa e faz, e quais o gate de loopback recusa contra um projeto não local.
@@ -9,10 +9,10 @@ As ferramentas que o [`@rebasepro/mcp`](/docs/ai/mcp) oferece a um assistente. C
 qual credencial ele possui e como o [gate de loopback](/docs/ai/mcp#the-loopback-gate)
 decide o que ⚠ significa estão na página do [servidor MCP](/docs/ai/mcp).
 
-42 ferramentas, divididas em nove grupos. As ferramentas marcadas com ⚠ são recusadas contra destinos não locais,
+51 ferramentas, divididas em dez grupos. As ferramentas marcadas com ⚠ são recusadas contra destinos não locais,
 a menos que você desative essa proteção.
 
-## Schema e banco de dados (12)
+## Schema e banco de dados (13)
 
 Executam a CLI do Rebase no diretório do projeto ativo.
 
@@ -29,6 +29,7 @@ Executam a CLI do Rebase no diretório do projeto ativo.
 | `rebase_db_branch_list` | — | Lista as branches de banco de dados (somente admins) |
 | `rebase_db_branch_delete` ⚠ | `name` | Exclui uma branch de banco de dados (somente admins) |
 | `rebase_db_branch_info` | `name` | Informações e status da branch (somente admins) |
+| `rebase_db_branch_diff` | `name` | O que uma branch alterou em relação ao banco de dados a partir do qual foi criada — schema, políticas e linhas, com conflitos; não altera nenhum dos dois (somente admins) |
 | `rebase_db_branch_switch` | — | Aponta este checkout para uma branch ou de volta ao banco principal (somente admins) |
 
 ## Planejamento de schema (1)
@@ -113,7 +114,7 @@ pelo modelo. Seu raio de impacto é tudo aquilo que suas funções puderem fazer
 |---|---|---|
 | `rebase_project_list` | — | Lista projetos registrados e mostra o ativo |
 | `rebase_project_switch` | `name` | Altera o projeto ativo |
-| `rebase_project_add` | `name` | Registra um projeto (`baseUrl`, `projectDir` e `token` opcionais) |
+| `rebase_project_add` | `name` | Registra um projeto (`projectDir`, `baseUrl` e `token` opcionais) |
 | `rebase_project_remove` | `name` | Remove um projeto (o projeto default não pode ser removido) |
 | `rebase_project_current` | — | Mostra o projeto ativo e seu status de autenticação |
 | `rebase_project_status` | — | Verifica a integridade (health-check) do backend ativo |
@@ -122,3 +123,27 @@ pelo modelo. Seu raio de impacto é tudo aquilo que suas funções puderem fazer
 em vez de agir diretamente em um alvo. Um assistente pode, portanto, alternar para um
 projeto remoto sem disparar o gate — ele apenas não poderá executar uma ferramenta
 destrutiva lá.
+
+## Rebase Cloud (8)
+
+<span class="since-badge" data-since="0.26">A partir da versão 0.26</span>
+
+Executam `rebase cloud … --json` no diretório do projeto ativo, contra o
+projeto ao qual ele está vinculado, com a credencial da própria CLI. Veja
+[Rebase Cloud](/docs/ai/mcp#rebase-cloud) para saber sobre o que elas atuam e por que nenhuma
+delas é bloqueada pelo gate.
+
+| Ferramenta | Obrigatório | Descrição |
+|---|---|---|
+| `rebase_cloud_provision` | — | Um backend no ar sem conta (`rebase cloud init --claim`): a URL no ar, a URL de administração e uma URL de reivindicação (`name`, `deploy`) |
+| `rebase_cloud_status` | — | A URL, o status, o último deploy, o runtime, o banco de dados e o armazenamento do projeto vinculado, e sua URL de reivindicação enquanto não é reivindicado |
+| `rebase_cloud_deploy` | — | Faz o deploy e o acompanha até o fim (`app`, `bundle`, `message`, `wait`, `timeoutSeconds`, `preview`, `previewName`) |
+| `rebase_cloud_logs` | — | Um instantâneo do log de runtime, ou o log de build mais recente (`source`, `since`, `tail`, `grep`, `level`, `previous`, `preview`). Nunca acompanha |
+| `rebase_cloud_env_list` | — | Chaves das variáveis, nunca valores (`preview`) |
+| `rebase_cloud_env_set` | `key`, `value` | Define uma variável; o valor passa pela stdin e nunca é retornado (`secret`, `preview`) |
+| `rebase_cloud_deployments_list` | — | Deploys recentes, e para quais é possível fazer rollback (`limit`) |
+| `rebase_cloud_rollback` | — | Coloca de volta em serviço um deploy anterior bem-sucedido (`deploymentId`) |
+
+`rebase_cloud_provision` cria um projeto e vincula este diretório. Ele nunca
+lê a `baseUrl` do projeto ativo, então o gate não o verifica; a CLI
+o recusa em um diretório que já está vinculado.

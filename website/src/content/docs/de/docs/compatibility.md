@@ -1,5 +1,5 @@
 ---
-sourceHash: 36e5e343075cc0f8
+sourceHash: a8656ede47530810
 slug: de/docs/compatibility
 title: Kompatibilität
 description: Was Rebase über Versionen hinweg verspricht und was nicht – die sechs versionierten Verträge, wie jeder einzelne fehlschlägt und was sich in einem Minor-Release noch ändern kann.
@@ -76,7 +76,7 @@ Die drei Bewertungen bedeuten:
 | Offline sync | Beta | Mutationen enthalten Idempotenzschlüssel, die der Server berücksichtigt, und die im Juli-Audit festgestellten Datenverlustfehler sind behoben. Das Konfliktmodell ist Last-Write-Wins ohne feldweises Zusammenführen |
 | Entity history | Stable | Snapshot-basiert, abgesichert durch eine eigene Testsuite |
 | Functions and crons | Stable | Der portable Einstiegspunkt (`@rebasepro/server/functions`) ist ein versionierter Vertrag mit einem eigenen API-Surface-Abschnitt |
-| MCP server + agent skills | Beta | `@rebasepro/mcp` läuft über stdio: zweiundvierzig Tools, Bearer-Auth pro Projekt, destruktive Tools verweigern nicht-lokale Ziele ohne Opt-in. Seit 0.21 kann der Server auch einen Remote-Endpunkt `/mcp` mounten – OAuth 2.1, sechs Daten-Tools, jeder Aufruf unter dem eigenen RLS des angemeldeten Benutzers – standardmäßig deaktiviert, es sei denn `REBASE_MCP_ENABLED=true`, und nur für Postgres |
+| MCP server + agent skills | Beta | `@rebasepro/mcp` läuft über stdio: einundfünfzig Tools, Bearer-Auth pro Projekt, destruktive Tools verweigern nicht-lokale Ziele ohne Opt-in. Seit 0.21 kann der Server auch einen Remote-Endpunkt `/mcp` mounten – OAuth 2.1, acht Daten-Tools, jeder Aufruf unter dem eigenen RLS des angemeldeten Benutzers – standardmäßig deaktiviert, es sei denn `REBASE_MCP_ENABLED=true`, und nur für Postgres |
 | Studio (SQL, schema, RLS, API explorer) | Beta | Täglich in echten Projekten im Einsatz. Branching ist im OSS-Paket vorhanden und wird in Rebase Cloud bewusst nicht angeboten, da das Verschieben eines laufenden Deployments auf einen Branch noch nicht gelöst ist |
 | CMS + admin panel | Beta | Vollständig für CRUD, Relationen, Storage-Felder und Rollen. **Die Datentabelle hat keine Grid-Semantik** – keine `role`, kein `aria-rowindex`, `tabIndex` entfernt – daher können Benutzer von Tastatur und Screenreadern die Hauptansicht nicht bedienen. Keine Entwürfe, keine länderspezifischen Inhalte (Locales), kein Block-Rich-Text |
 | PGlite managed dev database | Beta | Zero-Setup `rebase dev` ohne Docker. Jeweils nur eine Session, sodass Anfragen serialisiert werden und Nebenläufigkeit damit nicht reproduziert werden kann; Atlas-basierte Befehle (`db push`, `generate`, `migrate`) planen gegen eine für den Befehl gestartete, wegwerfbare zweite PGlite-Instanz (unter 0.24 verweigern sie die verwaltete Datenbank); `db branch` funktioniert dort nicht und weist darauf hin |
@@ -379,7 +379,8 @@ wurde:
   die Exportliste genau deshalb kuratiert ist, damit ein interner Export nicht
   versehentlich öffentlich wird.
 - Das Datenbankschema *Ihrer* Collections. Das gehört Ihnen; Rebase besitzt nur
-  die Schemas `rebase` und `auth`.
+  das Schema `rebase` (und, in einer vor 0.13 bereitgestellten Datenbank, das alte
+  Schema `auth`, bis der Boot es abschafft).
 
 ## Die Gates, die dies absichern
 
@@ -396,7 +397,7 @@ fehlschlägt, wenn er verletzt wird:
 | `pnpm check:derived-names` | jeder Spalten-, Constraint-, Junction-, Enum- und Policy-Name, den das Framework ableitet – und dass Boot und `db push` diese identisch ableiten |
 | `pnpm rls:check` | die Policies des generierten Schemas |
 | `pnpm check:api-surface` | jeder Export und dessen Member der fünf Pakete, die das Image bereitstellt – `@rebasepro/server`, `types`, `client`, `common`, `utils` – plus der Einstiegspunkt `@rebasepro/server/functions`, abgeglichen mit den sechs Abschnitten von `contracts/server.api.txt`. Dies sind die Pakete, die `infra/docker/entrypoint.mjs` über die eigenen Kopien eines deployten Bundles verlinkt (symlink). Das Entfernen eines Exports aus einem dieser Pakete ist daher für niemanden ein Compile-Fehler – es ist ein flottenweiter Boot-Fehler während eines Rollouts, um den niemand gebeten hat |
-| `pnpm test:gates` | die eigenen Tests der Gates über Fixtures – elf Dateien, darunter `check:api-surface` und der Release-Bump-Check weiter unten –, damit ein Gate, das nicht mehr erkennt, was es schützen soll, hier fehlschlägt. `check:api-surface` konnte während seiner gesamten Existenz nicht erkennen, wenn ein Member aus `const rebase` verschwand |
+| `pnpm test:gates` | die eigenen Tests der Gates über Fixtures – siebenundvierzig Dateien, darunter `check:api-surface` und der Release-Bump-Check weiter unten –, damit ein Gate, das nicht mehr erkennt, was es schützen soll, hier fehlschlägt. `check:api-surface` konnte während seiner gesamten Existenz nicht erkennen, wenn ein Member aus `const rebase` verschwand |
 | `node tooling/scripts/check-release-bump.mjs` | dass das Bump-Level, unter dem ein Release veröffentlicht wird, dem entspricht, was das Release an den obigen Baselines geändert hat – ausgeführt von `publish.yml`, bevor das Changelog gestempelt wird |
 | saas CI | die Control Plane, gebaut gegen den `main`-Branch dieses Repositories, bei eigenen Pushes und nächtlich (nightly) |
 

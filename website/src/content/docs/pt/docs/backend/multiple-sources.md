@@ -1,5 +1,5 @@
 ---
-sourceHash: 7f10dbaa07451bc9
+sourceHash: 19a82f97d9b01fc0
 title: Múltiplos Bancos de Dados e Buckets
 sidebar_label: Múltiplas Fontes
 description: Direcione coleções para diferentes bancos de dados e propriedades para diferentes buckets de armazenamento, e configure cada um a partir do ambiente.
@@ -42,9 +42,8 @@ signups.subscription("send-welcome", async (event) => {
 });
 ```
 
-`queue()` é novo. `database()`, `bucket()` e `topic()`
-podem ser declarados desde a versão 0.17, portanto, um projeto na versão lançada declara
-esses três e acessa trabalhos em segundo plano por meio de `jobs.tasks`.
+`database()`, `bucket()` e `topic()` podem ser declarados desde a versão 0.17, e
+`queue()` desde a 0.18.
 
 Em seguida, aponte uma coleção para um deles, por meio do handle — o mesmo nome, digitado uma única vez:
 
@@ -69,7 +68,7 @@ import { media } from "../resources";
 coverImage: {
     name: "Cover image",
     type: "string",
-    storage: { storageSource: media, acceptedFiles: ["image/*"] }
+    storage: { storagePath: "covers", storageSource: media, acceptedFiles: ["image/*"] }
 }
 ```
 
@@ -93,6 +92,12 @@ export default defineFunction((app, { rebase }) => {
     });
 });
 ```
+
+`{ database: analytics }` executa a consulta na conexão própria dessa fonte —
+seja o que for para onde `DATABASE_URL__ANALYTICS` aponte, em qualquer servidor — e nenhuma
+opção a executa na fonte padrão. Uma chave que não nomeia nenhuma fonte configurada é
+recusada com um erro que lista as que existem. Até a 0.25.1 a chave era
+lida como o nome de um banco de dados no servidor da fonte padrão.
 
 ### Visualizando o que você declarou
 
@@ -230,7 +235,7 @@ O engine provém da declaração, portanto não há `STORAGE_TYPE` a ser configu
 Uma propriedade de armazenamento que não especifica nenhum `storageSource` grava no bucket **padrão**.
 Declarar buckets nomeados nunca o move. O padrão mantém a sua própria
 configuração, seja qual for o conteúdo de `config/resources.ts`: `STORAGE_TYPE`,
-`STORAGE_PATH` (`./uploads` quando não definido) e as variáveis `S3_*` / `GCS_*` sem
+`STORAGE_PATH` (`<project>/uploads` quando não definido) e as variáveis `S3_*` / `GCS_*` sem
 sufixo. Adicionar `bucket("media", { engine: "s3" })` a um projeto que já tem
 arquivos em `./uploads` os deixa onde estão e ainda servidos. O `media` lê as suas
 próprias variáveis `__MEDIA` e, em desenvolvimento, vira um diretório próprio,
@@ -297,8 +302,8 @@ await signups.publish({ userId });
 ```
 
 Uma fila é a outra forma de trabalho em segundo plano: uma lista de trabalho com **um
-único handler**, onde o chamador retém o id do job. Filas são novas
- — tópicos foram lançados na versão 0.17.
+único handler**, onde o chamador retém o id do job. Filas foram lançadas na versão 0.18,
+tópicos na versão 0.17.
 
 ```ts
 export const thumbnails = queue<{ key: string }>("thumbnails");
@@ -379,8 +384,8 @@ export const storageAuthorize: StorageAuthorize = async ({ key, user, operation 
 
 Existem duas opções de escape via variáveis de ambiente para os casos em que esse é realmente o modelo desejado:
 
-- `STORAGE_PUBLIC_READ=true` — o bucket funciona como uma CDN pública, somente leitura. Operações de escrita,
-  exclusão e listagem continuam exigindo autenticação.
+- `STORAGE_PUBLIC_READ=true` — o bucket funciona como uma CDN pública, somente leitura. Sem um hook `storageAuthorize`,
+  escrita, exclusão e listagem são apenas para admins.
 - `STORAGE_ALLOW_ANY_AUTHENTICATED=true` — todo usuário autenticado tem permissão sobre
   qualquer arquivo. Aceitável para uma aplicação single-tenant, nunca para uma aplicação multi-tenant.
 

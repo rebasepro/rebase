@@ -87,20 +87,25 @@ test.describe("entity dialog", () => {
         await expect(page.locator("[data-radix-popper-content-wrapper]")).toHaveCount(0);
     });
 
-    test("hovering a label reveals its key in the label row, clear of the field", async ({ page }) => {
+    test("hovering a field reveals its key under the box, clear of the field", async ({ page }) => {
         const dialog = await openNewUser(page);
         const block = dialog.locator("#form_field_displayName");
         const hint = block.getByRole("button", { name: "Copy displayName" });
 
+        // The label is inside the text field's box now, so there is no label
+        // row to put the key in: it goes under the box, on the description's
+        // line or in the row gap below it, and never over the field.
+        // Hovered through the input: the label inside the box lets the pointer
+        // through to it, so the label itself is not a hover target.
         await expect(hint).toHaveCSS("opacity", "0");
-        await block.getByText("Name", { exact: true }).hover();
+        await block.locator("input").hover();
         await expect(hint).toHaveCSS("opacity", "1");
 
         const hintBox = await hint.boundingBox();
-        const inputBox = await block.locator("input").boundingBox();
-        expect(hintBox && inputBox, "hint or input not laid out").toBeTruthy();
-        expect(hintBox!.y + hintBox!.height, "the key overlaps the field below its label")
-            .toBeLessThanOrEqual(inputBox!.y);
+        const controlBox = await block.locator(":scope > [data-field-control]").boundingBox();
+        expect(hintBox && controlBox, "hint or field not laid out").toBeTruthy();
+        expect(hintBox!.y, "the key overlaps the field it names")
+            .toBeGreaterThanOrEqual(controlBox!.y + controlBox!.height);
         await expect(page.locator("[data-radix-popper-content-wrapper]")).toHaveCount(0);
     });
 

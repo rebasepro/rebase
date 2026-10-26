@@ -1,5 +1,5 @@
 ---
-sourceHash: cd33d688b582283c
+sourceHash: 155fe61b0635a331
 title: Acceso a campos
 sidebar_label: Acceso a campos
 description: Permisos de lectura y escritura por propiedad según el rol. Un emisor al que las reglas de seguridad de la fila permiten el paso aún así no recibe un campo que sus roles no pueden leer.
@@ -140,11 +140,11 @@ Una operación de campo también necesita `read` sobre su campo. Una operación 
 
 La búsqueda por defecto — una colección sin bloque `search` — coincide mediante `ILIKE` en tus propiedades de cadena, y omite aquellas que el emisor no puede leer. Nada se filtra a través de ella.
 
-Una colección que **sí** declara un [bloque `search`](/docs/backend/api/) se compila en una única columna `tsvector` generada compartida por todos los emisores. No existe una variante por rol de la misma, por lo que un campo restringido incluido en `search.fields` seguiría siendo *coincidente* para emisores que nunca pueden ver su valor — recuperable término a término. Rebase rechaza esa combinación al arrancar: elimina el campo de `search.fields` o retira la restricción de lectura.
+Una colección que **sí** declara un [bloque `search`](/docs/backend/search) se compila en una única columna `tsvector` generada compartida por todos los emisores. No existe una variante por rol de la misma, por lo que un campo restringido incluido en `search.fields` seguiría siendo *coincidente* para emisores que nunca pueden ver su valor — recuperable término a término. Rebase rechaza esa combinación al arrancar: elimina el campo de `search.fields` o retira la restricción de lectura.
 
 ## Historial
 
-El [historial de entidades](/docs/backend/api/) almacena la fila completa y se entrega a cualquiera que pueda leer la fila — la condición de acceso es "¿puedes consultar esta entidad?", no "¿eres administrador?". Por lo tanto, la regla de lectura también se aplica a cada instantánea almacenada: la entrada sigue listándose, indicando quién la modificó y cuándo, pero las columnas retenidas desaparecen de sus `values`.
+El [historial de entidades](/docs/backend/history) almacena la fila completa y se entrega a cualquiera que pueda leer la fila — la condición de acceso es "¿puedes consultar esta entidad?", no "¿eres administrador?". Por lo tanto, la regla de lectura también se aplica a cada instantánea almacenada: la entrada sigue listándose, indicando quién la modificó y cuándo, pero las columnas retenidas desaparecen de sus `values`.
 
 La reversión no se ve afectada. La ruta de reversión lee la entrada almacenada en el lado del servidor, por lo que un emisor puede restaurar una versión cuyos campos no pueda ver en su totalidad — exactamente igual a como ya puede sobrescribir una fila sin leerla por completo.
 
@@ -172,7 +172,7 @@ Un campo que nadie puede leer está ausente del esquema de lectura y de los par�
 
 Las escrituras en proceso — `context.data` en un callback, `rebase.dataAsAdmin` en un callback, una función o un trabajo programado (cron job) — no pasan por la comprobación de escritura. Esa es la misma exención que `excludeFromApi` siempre ha tenido, y es lo que permite que la regla sea aplicable: algo tiene que ser capaz de almacenar el hash de la contraseña.
 
-Las lecturas a través de `rebase.dataAsAdmin` poseen el rol `admin`, por lo que una regla de roles no les oculta nada. `[]` todavía sí lo hace — incluso para `dataAsAdmin`. Usa [`rebase.sql()`](/docs/backend/api/) si necesitas la columna sin procesar.
+Las lecturas a través de `rebase.dataAsAdmin` poseen el rol `admin`, por lo que una regla de roles no les oculta nada. `[]` todavía sí lo hace — incluso para `dataAsAdmin`. Usa [`rebase.sql()`](/docs/backend/custom-functions) si necesitas la columna sin procesar.
 
 ## Validación
 

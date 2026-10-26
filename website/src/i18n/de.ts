@@ -3,7 +3,7 @@ export const de = {
   "hero.title.part1": "Das Backend für dein Postgres.",
   "hero.title.part2": "Gebaut für dein Team. Sicher für deine Agenten.",
   "hero.subtitle":
-    "REST, ein typisiertes SDK, Realtime, Auth und Storage für deine App; ein Admin-Panel mit Tabellen, Medien, Relationen und Freigabe-Queues für dein Team; gescopte MCP-Tools und Postgres-RLS für deine Agenten. Unser eigenes CRM besteht aus 23 Collections und keinem einzigen handgeschriebenen Screen.",
+    "Hör auf, bei jedem Projekt dasselbe Backend und Admin-Panel neu zu bauen — oder zu prompten. Starte ab Minute eins mit einem produktionserprobten System, abgesichert durch Postgres.",
   "hero.cta.demo": "Demo testen",
   "rlscheck.title": "Glaub uns das nicht einfach.",
   "rlscheck.subtitle": "<code class=\"font-mono text-surface-300\">rls-check</code> liest den Katalog deiner eigenen Datenbank und meldet, was tatsächlich offen liegt — Tabellen, die mit abgeschalteter Row-Level Security ausgeliefert werden, Policies, die für jeden wahr sind, Views, die an der RLS ihrer Basistabellen vorbeilesen. Fünfzehn Checks. Jedes Postgres: Supabase, Neon, RDS, dein eigener Server. Es liest nur, braucht keinen Account, und es ist ihm egal, ob du Rebase benutzt.",
@@ -19,8 +19,8 @@ export const de = {
   "recognition.one": "Eine Regel",
   "recognition.oneNote": "eine Regel, in Postgres, auf jedem Weg",
   // Beat 04 — the panel that ships with the backend (carousel + the three products).
-  "panel.badge": "Das Panel, das mitkommt",
-  "panel.title": "Und das Admin-Panel, das dein Team jeden Morgen öffnet.",
+  "panel.badge": "Wo dein Team arbeitet",
+  "panel.title": "Agenten brauchen keine Oberfläche. Dein Team schon.",
   "engine.badge": "Was du bekommst",
   "engine.title": "Einsatzbereite APIs für deine Datenbank, ab Minute eins.",
   "engine.subtitle":
@@ -47,7 +47,7 @@ export const de = {
   "showcase.title.part1": "Dutzende Produkte.",
   "showcase.title.part2": "Alle in Production.",
   "showcase.subtitle":
-    "Ein <b>zertifiziertes Medizinprodukt</b>, ein <b>Retail-Loyalty-Programm</b>, ein <b>zweiseitiger Marktplatz</b>, <b>offene Daten</b>, ein Outbound-Sales-Agent, ein Design-Tool und ein CRM — teils von uns, teils von unseren Kunden.",
+    "Ein <b>zertifiziertes Medizinprodukt</b>, ein <b>Retail-Loyalty-Programm</b>, ein <b>zweiseitiger Marktplatz</b>, ein <b>Musikquiz fürs Wohnzimmer</b>, ein Outbound-Sales-Agent, ein Design-Tool und ein CRM — teils von uns, teils von unseren Kunden.",
   "showcase.nolink": "Internes Tool — keine öffentliche Website",
   "showcase.case0.badge": "Vektor-Design-Tool · Vom Rebase-Team gebaut",
   "showcase.case0.title": "Dadaki",
@@ -58,9 +58,10 @@ export const de = {
   "showcase.case2.badge": "Digitale Schmerztherapie",
   "showcase.case2.title": "MedicalMotion",
   "showcase.case2.desc": "Ein zertifiziertes digitales Medizinprodukt für KI-personalisierte Schmerztherapie. Rebase betreibt das komplette Backend — Patientendaten, Therapiepläne, die Übungsbibliothek und die klinischen Dashboards darüber.",
-  "showcase.case3.badge": "Offene Daten · Vom Rebase-Team gebaut",
-  "showcase.case3.title": "A dónde va el dinero de España",
-  "showcase.case3.desc": "Eine öffentliche Aufschlüsselung der spanischen Staatsausgaben, von 725 Mrd. € bis zur einzelnen Haushaltszeile. Im Lesepfad liegt keine Datenbank: Ein Cron kompiliert die offiziellen Zahlen monatlich neu, Storage liefert sie als JSON aus, und die Seite macht keinen einzigen API-Aufruf.",
+  "showcase.case7.badge": "Partyspiel · Vom Rebase-Team gebaut",
+  "showcase.case7.title": "SongBuzz",
+  "showcase.case7.desc":
+    "Ein Musikquiz fürs Wohnzimmer: Der Fernseher spielt die Songs, jedes Handy ist ein Buzzer, und niemand installiert eine App. Jeder Raum ist eine Zeile und ein Realtime-Kanal; Functions liefern die Musik und die Stimme des KI-Moderators, Crons halten den Katalog abspielbar.",
   "showcase.case4.badge": "KI-Vertriebsagent · Vom Rebase-Team gebaut",
   "showcase.case4.title": "Prospector",
   "showcase.case4.desc": "Ein Agent, der deine Website liest, Zielgruppen plant und echte Unternehmen samt den Menschen dahinter findet — jedes gegen die eigene Website verifiziert. Crons, Functions und das Review-Board sind Rebase von der Stange. Er entwirft; das Schema kennt keinen Zustand, in dem er versendet.",
@@ -87,7 +88,31 @@ export const de = {
   "cta.button.demo": "Demo testen",
   "cta.button.docs": "Docs lesen",
   "engine.plus":
-    "Dazu Auth und Rollen, S3-kompatibler Storage, geplante Jobs, Serverless Functions und Backups. Nichts davon ist ein separater Dienst, für den du dich registrieren und den du zusammenstecken musst.",
+    "Und der Rest des Backends, im selben Server. Nichts davon ist ein separater Dienst, für den du dich registrieren und den du zusammenstecken musst.",
+  "engine.cap.auth.title": "Auth",
+  "engine.cap.auth.desc":
+    "E-Mail und Passwort, Magic Links, zwölf OAuth-Anbieter und API-Keys mit Scopes.",
+  "engine.cap.storage.title": "Dateispeicher",
+  "engine.cap.storage.desc":
+    "S3-kompatibel, GCS oder lokale Platte, mit fortsetzbaren Uploads und Zugriffsregeln pro Datei.",
+  "engine.cap.functions.title": "Functions",
+  "engine.cap.functions.desc":
+    "Eigene Endpunkte neben den generierten. Leg eine Datei in functions/ ab, und sie ist eingebunden.",
+  "engine.cap.jobs.title": "Cron und Jobs",
+  "engine.cap.jobs.desc":
+    "Geplante Aufgaben und eine Queue in Postgres, die mit Backoff wiederholt und einen Neustart übersteht.",
+  "engine.cap.vector.title": "Vektorsuche",
+  "engine.cap.vector.desc":
+    "Nearest-Neighbour-Abfragen über pgvector-Spalten, über dieselbe REST-API.",
+  "engine.cap.branches.title": "Datenbank-Branches",
+  "engine.cap.branches.desc":
+    "Eine vollständige Kopie deiner Datenbank, um eine Migration zu testen, ohne die echte anzufassen.",
+  "engine.cap.history.title": "Verlauf",
+  "engine.cap.history.desc":
+    "Wer welche Zeile wann geändert hat, mit dem vollständigen Vorher und Nachher.",
+  "engine.cap.backups.title": "Backups",
+  "engine.cap.backups.desc":
+    "pg_dump auf Platte oder S3 nach Zeitplan, wiederhergestellt in eine frische Datenbank. Point-in-Time-Recovery auf Rebase Cloud.",
   "personas.badge": "Wer es anfasst",
   "personas.title": "Drei Menschen fassen das an. Keiner auf dieselbe Weise.",
   "personas.dev.title": "Die Entwicklerin, der die Datenbank gehört",

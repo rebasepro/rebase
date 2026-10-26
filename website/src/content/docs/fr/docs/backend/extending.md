@@ -1,5 +1,5 @@
 ---
-sourceHash: b2aa1062d257415a
+sourceHash: 858a87d510ba1de5
 title: Rebase ne fait pas X
 sidebar_label: Étendre le serveur
 description: L'échelle d'extension côté serveur — déclaration, callback de collection, fonction personnalisée, vos propres routes, votre propre serveur, eject — avec ce que chacun peut et ne peut pas atteindre.
@@ -44,7 +44,7 @@ La plupart des besoins d'un backend se résument à une déclaration sur la coll
 | Définir qui peut lire ou écrire une ligne | `securityRules` | [Authentication](/docs/backend/authentication) |
 | Rechercher du texte correctement — accents, JSONB, classement, sous-chaînes | un bloc `search` | [Search](/docs/backend/search) |
 | Trouver des lignes par similarité sémantique | une propriété `vector` | [Search](/docs/backend/search) |
-| Conserver les lignes supprimées | `softDelete` | [Writes](/docs/backend/writes) |
+| Conserver les lignes supprimées | `softDelete` | [Soft delete](/docs/collections/soft-delete) |
 | Enregistrer qui a modifié quoi | `history` | [History](/docs/backend/history) |
 | Exécuter une tâche de façon planifiée | un fichier de cron job | [Cron Jobs](/docs/backend/cron-jobs) |
 | Exécuter quelque chose après une écriture, en tâche de fond | un job | [Jobs](/docs/backend/jobs) |
@@ -84,7 +84,7 @@ callbacks: {
 }
 ```
 
-Trois propriétés méritent d'être connues avant de s'appuyer dessus :
+Quatre propriétés méritent d'être connues avant de s'appuyer dessus :
 
 - **Il ne peut que restreindre.** La valeur de retour est un filtre combiné par un AND, et aucune structure renvoyée ne peut élargir la lecture. C'est délibéré : un hook recevant la requête et devant en retourner une pourrait omettre une condition, et sur un plan de données appliquant la sécurité au niveau des lignes (RLS), une condition omise renvoie toutes les lignes que les politiques autorisent.
 - **Il se déclenche sur tous les chemins de lecture.** La liste, la récupération unitaire, le décompte (count), l'agrégation, la recherche, la lecture vectorielle, une liste par chemin imbriqué, le rafraîchissement temps réel générant les trames d'abonnement, et les lignes chargées pour une relation ou un `?include=` — où c'est le hook de la collection **cible** qui s'applique. Un hook pris en compte par la liste mais pas par le décompte donnerait une page affichant « 1 sur 4 résultats ».
@@ -158,7 +158,8 @@ await backend.attachRealtime(server);
 backend.start();                                // cron, job workers, sweeps
 ```
 
-Un groupe porte son propre contexte d'authentification, ses limites de débit et sa barrière d'administration, de sorte que
+Un groupe porte son propre contexte d'authentification, ses limites de débit et sa barrière d'administration, et refuse
+les en-têtes d'usurpation et de simulation à moins d'être le groupe des données ou des fonctions, de sorte que
 `getDriver(c)` fonctionne dans un groupe monté n'importe où. Ce qu'il ne porte pas, c'est le middleware
 global que `mount()` ajoute : la limite de taille du corps, la compression, la protection CSRF et
 l'enveloppe d'erreur sont à ajouter vous-même lorsque vous montez les groupes un par un.

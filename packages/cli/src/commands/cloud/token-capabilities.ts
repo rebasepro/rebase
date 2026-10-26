@@ -15,17 +15,32 @@
  * hold:
  *
  * - `deploy`   — `rebase cloud deploy` (bundle and source paths, uploads, the
- *                build follow) and `rebase cloud deployments`.
- * - `logs`     — `rebase cloud logs` (build, `--follow`, `--runtime`),
- *                `rebase cloud metrics` and `rebase cloud cron` — whose
- *                `runtime-token` call is how a token reads the app's own
- *                cron history.
- * - `env`      — `rebase cloud env list|set|unset|reveal|pull`.
+ *                build follow, `--preview`), `rebase cloud deployments` and
+ *                `rebase cloud previews`.
+ * - `logs`     — `rebase cloud logs` (build, `--follow`, `--runtime`,
+ *                `--preview`),
+ *                `rebase cloud metrics`, `rebase cloud usage` and
+ *                `rebase cloud cron` — whose `runtime-token` call is how a
+ *                token reads the app's own cron history.
+ * - `env`      — `rebase cloud env list|set|unset|reveal|pull`, and the
+ *                same with `--preview` (and `env reset --preview`).
  * - `database` — `rebase cloud db list|info|connect`.
  * - `backups`  — `rebase cloud db backup list|create|status|download` and
  *                `db pitr status`. Restoring takes `project:restore`, which no
  *                capability grants: putting old data over a live database is
  *                for a signed-in person.
+ *
+ * Three more capabilities act on one ORGANIZATION rather than a project, and a
+ * token holds one only when it is asked for ({@link ORG_CAPABILITIES}):
+ *
+ * - `billing`       — `rebase cloud billing`, `billing invoices|upcoming`.
+ * - `audit`         — `rebase cloud activity`.
+ * - `notifications` — `rebase cloud notifications` on the organization's
+ *                     projects (adding and removing one still takes the
+ *                     owner or admin role).
+ *
+ * Each holds its `org:*` scope narrowed to the organization
+ * (`org:billing:<organizationId>`).
  *
  * Every project-level scope is narrowed to the one project the token is for
  * (`project:deploy:<projectId>`). The data and function scopes cannot be: they
@@ -46,12 +61,14 @@ export const TOKEN_CAPABILITY_NAMES: readonly TokenCapability[] = ["deploy", "lo
 
 /**
  * Scopes every token holds, whatever it was created for: resolving a project
- * by its slug, reading the deployment a command follows, the organization a
- * project belongs to, and the control plane's public description of itself.
+ * by its slug, reading the deployment a command follows (a production one, or
+ * a preview's), the organization a project belongs to, and the control plane's
+ * public description of itself.
  */
 export const ALWAYS_SCOPES: string[] = [
     "data:read:projects",
     "data:read:deployments",
+    "data:read:preview-deployments",
     "data:read:organizations",
     "functions:invoke:platform-config"
 ];
@@ -63,24 +80,33 @@ export const TOKEN_CAPABILITIES: Record<TokenCapability, { label: string; scopes
         scopes: (projectId) => [
             `project:read:${projectId}`,
             `project:deploy:${projectId}`,
-            "functions:invoke:deploy"
+            "functions:invoke:deploy",
+            // `deploy --preview` triggers, and `cloud previews` lists and
+            // deletes, through the `previews` function.
+            "functions:invoke:previews"
         ]
     },
     logs: {
-        label: "Read build and runtime logs, cron history, and live metrics",
+        label: "Read build and runtime logs, cron history, live metrics and usage",
         scopes: (projectId) => [
             `project:read:${projectId}`,
             `project:logs:${projectId}`,
             "functions:invoke:runtime-logs",
             "functions:invoke:metrics",
-            "functions:invoke:runtime-token"
+            "functions:invoke:runtime-token",
+            // `logs --preview <name>` finds the preview through `previews`.
+            "functions:invoke:previews",
+            // `rebase cloud usage`: the route asks `project:read` per project.
+            "functions:invoke:usage"
         ]
     },
     env: {
         label: "Read and change environment variables, secrets included",
         scopes: (projectId) => [
             `project:env:${projectId}`,
-            "functions:invoke:env-vars"
+            "functions:invoke:env-vars",
+            // `env … --preview`: previews' own overrides live in `previews`.
+            "functions:invoke:previews"
         ]
     },
     database: {
@@ -147,5 +173,100 @@ export function capabilitiesInScopes(scopes: readonly string[]): Array<{ project
         projectId,
         capabilities: TOKEN_CAPABILITY_NAMES.filter(capability =>
             TOKEN_CAPABILITIES[capability].scopes(projectId).every(scope => held.has(scope)))
+    }));
+}
+
+/**
+ * Whether a token's scopes reach one project: a project scope narrowed to it,
+ * or an unnarrowed one, which reaches every project.
+ *
+ * What decides, in a directory `rebase cloud init --claim` linked, whether
+ * `REBASE_TOKEN` or the token stored for that project acts on it: a
+ * `REBASE_TOKEN` made for other projects would be refused on this one.
+ */
+export function scopesReachProject(scopes: readonly string[], projectId: string): boolean {
+    return scopes.some(scope => {
+        const match = /^project:[a-z][a-z0-9-]*(?::(.+))?$/.exec(scope);
+        return match !== null && (match[1] === undefined || match[1] === projectId);
+    });
+}
+
+/* ─── organization capabilities ──────────────────────────────────── */
+
+/** A capability on one organization. A token holds one only when asked for. */
+export type OrgCapability = "billing" | "audit" | "notifications";
+
+/** Every organization capability, in the order they are offered. */
+export const ORG_CAPABILITY_NAMES: readonly OrgCapability[] = ["billing", "audit", "notifications"];
+
+/** Each organization capability: what it lets a token do, and the scopes that does on one organization. */
+export const ORG_CAPABILITIES: Record<OrgCapability, { label: string; scopes: (organizationId: string) => string[] }> = {
+    billing: {
+        label: "Read the organization's billing: card on file, invoices and the next invoice (owners and admins)",
+        scopes: (organizationId) => [
+            `org:billing:${organizationId}`,
+            "functions:invoke:stripe-billing",
+            // `rebase cloud billing` shows the billing account row.
+            "data:read:billing-accounts"
+        ]
+    },
+    audit: {
+        label: "Read the organization's activity log (owners and admins)",
+        scopes: (organizationId) => [
+            `org:audit:${organizationId}`,
+            "functions:invoke:audit"
+        ]
+    },
+    notifications: {
+        label: "Manage notifications: your own email choices, and its projects' webhooks",
+        scopes: (organizationId) => [
+            `org:notifications:${organizationId}`,
+            "functions:invoke:notifications"
+        ]
+    }
+};
+
+/** Whether a word names an organization capability. */
+export function isOrgCapability(value: string): value is OrgCapability {
+    return (ORG_CAPABILITY_NAMES as readonly string[]).includes(value);
+}
+
+/**
+ * The scopes `capabilities` hold on one organization, each once — added to a
+ * token's project scopes, so not {@link ALWAYS_SCOPES}.
+ *
+ * Throws on an organization id a scope cannot carry, and on an unknown
+ * capability.
+ */
+export function scopesForOrgCapabilities(organizationId: string, capabilities: readonly OrgCapability[]): string[] {
+    if (organizationId.length === 0 || /\s/.test(organizationId)) {
+        throw new Error(`"${organizationId}" is not an organization id a scope can be narrowed to.`);
+    }
+    const scopes = new Set<string>();
+    for (const capability of capabilities) {
+        if (!isOrgCapability(capability)) {
+            throw new Error(`"${String(capability)}" is not an organization capability. Capabilities: ${ORG_CAPABILITY_NAMES.join(", ")}.`);
+        }
+        for (const scope of ORG_CAPABILITIES[capability].scopes(organizationId)) scopes.add(scope);
+    }
+    return [...scopes];
+}
+
+/**
+ * Read a token's `org:*` scopes back as organization capabilities: the
+ * organizations they name, and, for each, the capabilities it holds every
+ * scope of.
+ */
+export function orgCapabilitiesInScopes(scopes: readonly string[]): Array<{ organizationId: string; capabilities: OrgCapability[] }> {
+    const held = new Set(scopes);
+    const organizationIds: string[] = [];
+    for (const scope of scopes) {
+        const match = /^org:[a-z][a-z0-9-]*:(.+)$/.exec(scope);
+        if (match && !organizationIds.includes(match[1])) organizationIds.push(match[1]);
+    }
+    return organizationIds.map(organizationId => ({
+        organizationId,
+        capabilities: ORG_CAPABILITY_NAMES.filter(capability =>
+            ORG_CAPABILITIES[capability].scopes(organizationId).every(scope => held.has(scope)))
     }));
 }

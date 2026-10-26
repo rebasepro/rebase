@@ -1,5 +1,5 @@
 ---
-sourceHash: add7e5205bcbe73a
+sourceHash: 2e525d1d6efa4692
 title: Mise en cache du stockage et CDN
 sidebar_label: Mise en cache du stockage et CDN
 description: Comment Rebase distribue les fichiers stockés pour que les navigateurs et les CDN puissent les mettre en cache — ETags et 304, Cache-Control selon qui peut lire un objet, plages d'octets pour le déplacement dans l'audio et la vidéo, et ce qu'il faut configurer sur un CDN en amont.
@@ -76,5 +76,5 @@ Deux éléments à configurer sur le CDN lui-même :
 ## Liens associés
 
 - [Configuration du stockage](/docs/backend/storage/) — les backends depuis lesquels ces en-têtes sont servis, et le préfixe `public/` ainsi que `publicRead` qui rendent un objet `public`.
-- [Autorisation par objet](/docs/backend/storage/#per-object-authorization) — qui peut lire un objet, ce qui détermine le choix entre `public` et `private`.
+- [Autorisation par objet](/docs/backend/storage-authorization/) — qui peut lire un objet, ce qui détermine le choix entre `public` et `private`.
 - [Champs de téléversement de fichiers](/docs/collections/file-uploads/) — les propriétés de collection qui stockent des fichiers.

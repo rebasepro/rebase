@@ -63,6 +63,9 @@ export function DateTimeFieldBinding({
                 // labels on its behalf, and FieldBlock's label is a <span> that
                 // points at nothing — so without this the control is nameless.
                 aria-label={hideLabel ? (property.name ?? propertyKey) : undefined}
+                // 16px under the label, as the text field beside it: the 64px
+                // labelled box is sized for a 24px line.
+                inputClassName={!hideLabel && size === "large" ? "text-base" : undefined}
             />
 
             <FieldHelperText includeDescription={includeDescription}

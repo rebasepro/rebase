@@ -50,10 +50,11 @@ import { resolveExtensionArgs } from "./extensions";
 import { resolveDeploymentIdArg } from "./deployments";
 import { resolveBackupArgs } from "./databases";
 import {
-    resolveWebhookIdArg,
     webhooksCommand,
     resolveClusterVerifyArgs,
     resolveClusterAddArgs,
+    resolveClusterRegistryArgs,
+    readPullKey,
     storageCommand,
     clustersCommand,
     computeCommand,
@@ -61,6 +62,7 @@ import {
 } from "./resources";
 import { resolveProjectArg } from "./projects";
 import { resolveDeployArgs } from "./deploy";
+import { notificationsCommand } from "./notifications";
 
 /** `rebase <words…>` as `process.argv` — what every command is handed. */
 function argv(...words: string[]): string[] {
@@ -73,7 +75,7 @@ function argv(...words: string[]): string[] {
  * A refusal in this family is `fail`: exactly one JSON value on stdout and a
  * non-zero exit, never a thrown error — see `expectsJsonNotAThrow` below.
  */
-async function refusalOf(run: () => unknown): Promise<{ message: string; code: string | null }> {
+async function refusalOf(run: () => unknown): Promise<{ message: string; code: string | null; hint?: string }> {
     const chunks: string[] = [];
     const origWrite = process.stdout.write.bind(process.stdout);
     process.stdout.write = (s: string) => {
@@ -127,7 +129,6 @@ describe("--project's value is not an argument", () => {
         ["cancel", () => resolveDeploymentIdArg(argv("cancel", "--project", "acme"), "cloud cancel").id], // "acme"
         ["extensions enable", () => resolveExtensionArgs(argv("extensions", "enable", "-p", "acme"), "enable").name], // "acme"
         ["extensions disable", () => resolveExtensionArgs(argv("extensions", "disable", "-p", "acme"), "disable").name], // "acme"
-        ["webhooks delete", () => resolveWebhookIdArg(argv("webhooks", "delete", "-p", "acme"))], // "acme"
         ["db backup restore", () => resolveBackupArgs(argv("db", "backup", "restore", "-p", "acme")).filename] // "acme"
     ])("%s reads no argument from `-p acme`", (_label, resolve) => {
         expect(resolve()).toBeUndefined();
@@ -148,7 +149,6 @@ describe("--project's value is not an argument", () => {
      */
     it("keeps the real argument when the flag comes first", () => {
         expect(resolveEnvKeyArg(argv("env", "unset", "--project", "acme", "API_KEY"), "unset")).toBe("API_KEY");
-        expect(resolveWebhookIdArg(argv("webhooks", "delete", "--project", "acme", "42"))).toBe("42");
         expect(resolveBackupArgs(argv("db", "backup", "restore", "-p", "acme", "db.sql")).filename).toBe("db.sql");
     });
 
@@ -157,7 +157,6 @@ describe("--project's value is not an argument", () => {
         expect(resolveDomainArg(argv("domains", "add", "app.example.com"))).toBe("app.example.com");
         expect(resolveDeploymentIdArg(argv("rollback", "d2", "--yes", "--json"), "cloud rollback").id).toBe("d2");
         expect(resolveExtensionArgs(argv("extensions", "enable", "vector", "-y"), "enable").name).toBe("vector");
-        expect(resolveWebhookIdArg(argv("webhooks", "delete", "42"))).toBe("42");
     });
 
     /**
@@ -215,7 +214,6 @@ describe("an undeclared flag", () => {
         ["domains add", () => resolveDomainArg(argv("domains", "add", "--dry-run"))],
         ["env unset", () => resolveEnvKeyArg(argv("env", "unset", "--dry-run"), "unset")],
         ["extensions enable", () => resolveExtensionArgs(argv("extensions", "enable", "--dry-run"), "enable")],
-        ["webhooks delete", () => resolveWebhookIdArg(argv("webhooks", "delete", "--dry-run"))],
         ["rollback", () => resolveDeploymentIdArg(argv("rollback", "--dry-run"), "cloud rollback")],
         ["projects delete", () => resolveProjectArg(argv("projects", "delete", "--dry-run"), "delete")]
     ])("is refused by %s, never taken as the argument", async (_label, resolve) => {
@@ -240,7 +238,6 @@ describe("an undeclared flag", () => {
      */
     it("does not include --debug, the flag the CLI tells you to add", () => {
         expect(resolveDomainArg(argv("domains", "add", "app.example.com", "--debug"))).toBe("app.example.com");
-        expect(resolveWebhookIdArg(argv("webhooks", "delete", "--debug"))).toBeUndefined();
     });
 });
 
@@ -400,74 +397,22 @@ pendingRedeploy: true }));
         expect(err.code).toBe("usage");
     });
 
-    it("`webhooks delete --project acme 42` never deletes the project slug", async () => {
-        // The parameter is what the assertion below reads: a bare `vi.fn()`
-        // types `mock.calls` as `[][]`, so `calls[0][0]` is a tuple index error
-        // and the "never deletes the project slug" claim compiles to nothing.
-        const del = vi.fn(async (_id: string) => ({}));
-        (context.requireClient as unknown as ReturnType<typeof vi.fn>).mockResolvedValue({
-            client: fakeClient({ del }),
-            url: "https://cp.example"
-        });
-
-        const log = vi.spyOn(console, "log").mockImplementation(() => {});
-        await webhooksCommand("delete", argv("webhooks", "delete", "--project", "acme", "42"));
-        log.mockRestore();
-
-        expect(del).toHaveBeenCalledTimes(1);
-        expect(del.mock.calls[0][0]).toBe("42");
-    });
-
     /**
-     * `webhooks create` names its destination `--endpoint`, and the reason is
-     * not taste.
-     *
-     * `--url` is a GLOBAL in this family: `resolveCloudUrl` reads it off the raw
-     * line, ahead of the env var and ahead of the link file, for every command.
-     * So the documented `webhooks create … --url https://example.com/hook` sent
-     * the customer's webhook endpoint to `requireClient` as the control plane to
-     * authenticate against — the one command whose whole argument is somebody
-     * else's URL. Both halves are asserted: the row gets the endpoint, and the
-     * control plane is still the control plane.
+     * `webhooks` never worked (it wrote to a collection slug the control plane
+     * does not have, and nothing delivered those rows). Retired, it must say
+     * so and where to go — and never exit 0, which would tell a script its
+     * webhook exists — whatever line it is given, the documented ones included.
      */
-    it("`webhooks create --endpoint <url>` does not retarget the control plane", async () => {
-        const created: Array<Record<string, unknown>> = [];
-        const client = {
-            functions: { invoke: vi.fn(async () => ({})) },
-            data: {
-                collection: () => ({
-                    find: async () => ({ data: [] }),
-                    findById: async () => undefined,
-                    update: async () => ({}),
-                    create: async (row: Record<string, unknown>) => {
-                        created.push(row);
-                        return { id: 7 };
-                    },
-                    delete: async () => ({})
-                })
-            }
-        };
-        (context.requireClient as unknown as ReturnType<typeof vi.fn>).mockResolvedValue({
-            client,
-            url: "https://cp.example"
-        });
-
-        const line = argv(
-            "webhooks", "create",
-            "--name", "notify", "--table", "orders",
-            "--endpoint", "https://example.com/hook"
-        );
-
-        const log = vi.spyOn(console, "log").mockImplementation(() => {});
-        await webhooksCommand("create", line);
-        log.mockRestore();
-
-        expect(created).toHaveLength(1);
-        expect(created[0].url).toBe("https://example.com/hook");
-        // The half that was the bug. `resolveCloudUrl` is the real one — the
-        // module mock above leaves it alone — so this is the same read the
-        // client factory makes.
-        expect(context.resolveCloudUrl(line)).not.toBe("https://example.com/hook");
+    it.each([
+        ["list"],
+        ["create", "--name", "notify", "--table", "orders", "--endpoint", "https://example.com/hook"],
+        ["delete", "--project", "acme", "42"]
+    ])("`webhooks %s` is refused as retired, pointing at notifications", async (action, ...rest) => {
+        const err = await refusalOf(() => webhooksCommand(action, argv("webhooks", action, ...rest)));
+        expect(err.code).toBe("command_retired");
+        expect(err.hint).toContain("rebase cloud notifications add");
+        expect(err.hint).toContain("WebhookDispatcher");
+        expect(context.requireClient).not.toHaveBeenCalled();
     });
 });
 
@@ -538,7 +483,7 @@ describe("a mistyped action word refuses instead of running the default", () => 
         ["storage", (line: string[]) => storageCommand("creat", line)],
         ["clusters", (line: string[]) => clustersCommand("verifyy", line)],
         ["compute", (line: string[]) => computeCommand("et", line)],
-        ["webhooks", (line: string[]) => webhooksCommand("creat", line)]
+        ["notifications", (line: string[]) => notificationsCommand("ad", line)]
     ])("%s", async (group, run) => {
         const err = await refusalOf(() => run(argv(group, "typo")));
         expect(err.code).toBe("unknown_command");
@@ -625,5 +570,62 @@ describe("cloud clusters add", () => {
             "clusters", "add", "--name", "x", "--provider", "azure", "--region", "r", "--kubeconfig", "k"
         )));
         expect(refusal.message).toMatch(/gcp, aws or hetzner/);
+    });
+});
+
+/**
+ * `rebase cloud clusters registry` — a customer cluster's own image registry.
+ *
+ * The control plane ignores a partial set (and keeps handing the cluster the
+ * shared credentials), so the command takes all three values or `--clear` —
+ * and a pull key that could push is refused before it leaves the machine,
+ * because the pull secret sits where the cluster's admin can read it.
+ */
+describe("cloud clusters registry", () => {
+    const REPO = "europe-west1-docker.pkg.dev/rebase-578f2/rlc-acme";
+    const PUSHER = "rlc-acme-push@rebase-578f2.iam.gserviceaccount.com";
+
+    it("reads the cluster id and all three values", () => {
+        expect(resolveClusterRegistryArgs(argv(
+            "clusters", "registry", "c_1", "--repository", `${REPO}/`, "--push-service-account", PUSHER, "--pull-key-file", "./pull.json"
+        ))).toEqual({ id: "c_1", clear: false, repository: REPO, pushServiceAccount: PUSHER, pullKeyFile: "./pull.json" });
+    });
+
+    it("clears with --clear alone", () => {
+        expect(resolveClusterRegistryArgs(argv("clusters", "registry", "c_1", "--clear"))).toEqual({ id: "c_1", clear: true });
+    });
+
+    it("refuses a partial set: the control plane would ignore it", async () => {
+        const refusal = await refusalOf(() => resolveClusterRegistryArgs(argv(
+            "clusters", "registry", "c_1", "--repository", REPO, "--push-service-account", PUSHER
+        )));
+        expect(refusal.message).toMatch(/All three go together/);
+    });
+
+    it("refuses a repository that is not <host>/<project>/<repository>", async () => {
+        const refusal = await refusalOf(() => resolveClusterRegistryArgs(argv(
+            "clusters", "registry", "c_1", "--repository", "europe-west1-docker.pkg.dev", "--push-service-account", PUSHER, "--pull-key-file", "k"
+        )));
+        expect(refusal.message).toMatch(/<host>\/<project>\/<repository>/);
+    });
+
+    it("refuses a missing cluster id", async () => {
+        const refusal = await refusalOf(() => resolveClusterRegistryArgs(argv("clusters", "registry", "--clear")));
+        expect(refusal.message).toMatch(/Usage: rebase cloud clusters registry/);
+    });
+
+    it("accepts the reader's key and names its account", () => {
+        const key = JSON.stringify({ client_email: "rlc-acme-pull@rebase-578f2.iam.gserviceaccount.com", private_key: "k" });
+        expect(readPullKey(`${key}\n`, PUSHER)).toEqual({ key, account: "rlc-acme-pull@rebase-578f2.iam.gserviceaccount.com" });
+    });
+
+    it("refuses the pusher's key as the pull key: the pull secret must not be able to write", async () => {
+        const refusal = await refusalOf(() => readPullKey(JSON.stringify({ client_email: PUSHER, private_key: "k" }), PUSHER));
+        expect(refusal.message).toMatch(/read-only account/);
+    });
+
+    it("refuses a file that is not a service-account key", async () => {
+        expect((await refusalOf(() => readPullKey("not json", PUSHER))).message).toMatch(/not JSON/);
+        expect((await refusalOf(() => readPullKey("{}", PUSHER))).message).toMatch(/client_email\/private_key/);
     });
 });

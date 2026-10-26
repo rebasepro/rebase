@@ -34,7 +34,6 @@ list. `:slug` is a collection's `slug`.
 
 | Method | Path | Gate | More |
 |---|---|---|---|
-| `GET` | `/api/data/collections` | session | [REST API](/docs/backend/api/) |
 | `GET` | `/api/data/:slug` | RLS | [Querying](/docs/backend/filtering/) |
 | `POST` | `/api/data/:slug` | RLS | [REST API](/docs/backend/api/) |
 | `POST` | `/api/data/:slug/query` | RLS | The listing, query parameters in the body — [Queries too long for a URL](/docs/backend/vector-search/#queries-too-long-for-a-url) |
@@ -57,7 +56,7 @@ that `aggregate` is not read as an entity id. `?select=` and `?groupBy=` are
 their parameters, and `select` is required on `/aggregate`.
 
 Text search, vector search, relation inclusion and field selection *are* query
-parameters on `GET /api/data/:slug` rather than routes — `search`,
+parameters on `GET /api/data/:slug` rather than routes — `searchString`,
 `vector_search`, `include`, `fields`. See [REST API](/docs/backend/api/).
 
 A project that declares no collections and introspects none serves this prefix
@@ -80,6 +79,8 @@ as a single `404 NO_COLLECTIONS`. See [Backend only](/docs/getting-started/headl
 | `POST` | `/api/auth/forgot-password` | none | [Authentication](/docs/backend/authentication/) |
 | `POST` | `/api/auth/reset-password` | none (a reset token) | [Authentication](/docs/backend/authentication/) |
 | `POST` | `/api/auth/change-password` | session | [Authentication](/docs/backend/authentication/) |
+| `POST` | `/api/auth/change-email` | session | Mails a confirmation link to the new address — [Changing an email address](/docs/backend/auth-endpoints/#changing-an-email-address) |
+| `POST` | `/api/auth/confirm-email-change` | none (a link token) | Moves the account onto the new address — [Changing an email address](/docs/backend/auth-endpoints/#changing-an-email-address) |
 | `POST` | `/api/auth/send-verification` | session | [Authentication](/docs/backend/authentication/) |
 | `GET` | `/api/auth/verify-email` | none (a verification token) | [Authentication](/docs/backend/authentication/) |
 | `POST` | `/api/auth/verify-email` | none (a verification token, and a session or the password to keep it) | [Email verification](/docs/backend/email-verification/) |
@@ -138,9 +139,13 @@ a collection reaches none of this. See [Roles and scopes](/docs/backend/roles-an
 | `GET` | `/api/admin/backups` | `backups:read` | Backup inventory |
 | `GET` | `/api/admin/backups/download` | `backups:read` | Streams one backup. With `?token=` from a download link, no header is needed, for that backup only |
 | `POST` | `/api/admin/backups/download-url` | `backups:read` | A link to one backup, `{ key }` → `{ url, token, expiresIn }`, good for 60 seconds — [Backups](/docs/deployment/backups/#download-a-backup) |
-| `GET` | `/api/admin/storage/orphans` | `database:read` | Stored files no row names, `?storageId=&olderThanHours=` — what `rebase storage orphans` prints |
-| `DELETE` | `/api/admin/storage/orphans` | `database:write` | Finds them again and deletes them; `409 STORAGE_SCAN_INCOMPLETE` when a collection could not be read |
-| `POST` | `/api/admin/storage/move` | `database:write` | Copies a folder to another source under the same keys, a page per call — what `rebase storage move` sends |
+| `POST` | `/api/admin/storage/orphans/scans` | `database:write` | Starts a scan for the stored files no row names, `?storageId=&olderThanHours=`, in the background. Answers `202` with the scan's record: `id`, `status` (`queued`), and `runner` (`worker` when it is a `storage.orphans` job on the job queue, `in-process` when the server runs it itself). Its record is written into the source, under the reserved `_rebase/maintenance/` |
+| `GET` | `/api/admin/storage/orphans/scans/:id` | `database:read` | The scan's record, `?storageId=`. While it runs: `progress` (`filesScanned`, `rowsScanned`, `collectionsScanned` of `collectionsTotal`, `unscanned`). Once `completed`: `result`, the report the old `GET /orphans` answered. A run that stopped reporting for 10 minutes is answered as `failed`. `404 STORAGE_SCAN_NOT_FOUND` when the source holds no such scan |
+| `DELETE` | `/api/admin/storage/orphans?scan=:id` | `database:write` | Deletes a completed scan's orphans in the background, `202`. Each one is checked against every row and history entry again, and asked for again right before it is deleted. The outcome is the scan record's `deletion`. `409` with `STORAGE_SCAN_NOT_COMPLETE`, `STORAGE_SCAN_INCOMPLETE`, `STORAGE_SCAN_EXPIRED` or `STORAGE_SCAN_DELETION_STARTED` |
+| `GET` | `/api/admin/storage/orphans` | `database:read` | Deprecated: the scan inside the request, `?storageId=&olderThanHours=`. Answers with `Deprecation: true`. Use `POST /orphans/scans` |
+| `DELETE` | `/api/admin/storage/orphans` | `database:write` | Deprecated, without `?scan=`: scans again and deletes inside the request. `409 STORAGE_SCAN_INCOMPLETE` when a collection could not be read |
+| `POST` | `/api/admin/storage/move` | `database:write` | Copies a folder to another source under the same keys, a page per call — what `rebase storage move` sends; `400 STORAGE_SAME_LOCATION` for `deleteSource` between two sources that store in the same place |
+| `POST` | `/api/admin/storage/move/verify` | `database:write` | Lists the source again after a move, with the same body, a page per call: `{ checked, notMoved: [{ key, reason }], cursor? }` — every file still in the source with `deleteSource`, every file the target has no copy of without it. `rebase storage move` asks it when the move is done |
 | `GET` | `/api/admin/logs` | `logs:read` | The recent log buffer |
 | `GET` | `/api/admin/logs/latest` | `logs:read` | The most recent entries |
 | `GET` | `/api/admin/logs/stream` | `logs:read` | Server-sent events |
@@ -148,7 +153,7 @@ a collection reaches none of this. See [Roles and scopes](/docs/backend/roles-an
 | `GET` | `/api/admin/rls-simulator/options` | `schema:read` | Roles, users' rule roles and live service keys an administrator can simulate |
 | `POST` | `/api/admin/rls-simulator/preview` | `schema:read` | Each collection as `{ role?, userId?, apiKeyId? }` reaches it: visible rows against the caller's, hidden by scope or RLS, masked fields. Administrator's session only |
 | `POST` | `/api/admin/sql/csv` | `database:write` | Streams one read-only query's whole result as CSV — [Studio](/docs/studio/)'s "Download full result as CSV" |
-| `GET` | `/api/admin/branches/:name/diff` | `database:read` | What a [branch](/docs/backend/branching/#reviewing-and-merging-a-branch) changed: schema, policies and rows, `?sampleLimit=&schemas=&maxRowsPerTable=` |
+| `GET` | `/api/admin/branches/:name/diff` | `database:write` | What a [branch](/docs/backend/branching/#reviewing-and-merging-a-branch) changed: schema, policies and rows, `?sampleLimit=&schemas=&maxRowsPerTable=` |
 | `POST` | `/api/admin/branches/:name/merge` | `database:write` | Writes the branch's rows to its parent, `{ expectedFingerprint, onConflict?, skipBlocked? }`; `409` when either side changed since the diff, or rows conflict |
 | `GET` | `/api/admin/schema/status` | `schema:read` | [Live schema editing](/docs/backend/live-schema-editing/) |
 | `POST` | `/api/admin/schema/plan` | `schema:read` | Plans a change; never applies one |
@@ -184,17 +189,20 @@ for projects that have not moved; write new code against the canonical path.
 | `DELETE` | `/api/storage/tus/:id` | the upload's owner | Resumable uploads: cancel |
 
 A deployment with no storage configured serves this prefix as a `501` naming the
-variable it needs, rather than 404ing as if the feature did not exist.
+variable it needs, rather than 404ing as if the feature did not exist —
+except `GET /api/storage/sources`, which answers `200` with an empty list.
 
 ## Functions
 
 | Method | Path | Gate | More |
 |---|---|---|---|
+| `GET` | `/api/functions` | session | The names of the functions served, and how many files failed to load |
 | any | `/api/functions/<name>` | whatever the function declares. An API key also needs `functions:invoke` | [Custom Functions](/docs/backend/custom-functions/) |
 
 One route per file under `backend/functions/`, so the paths come from your
-project. `GET /api/functions` does **not** list them: an inventory of a
-deployment's custom endpoints is not public.
+project. `GET /api/functions` lists them only to a signed-in caller — a
+session, an API key or the service key — and answers anyone else `401`: an
+inventory of a deployment's custom endpoints is not public.
 
 ## Meta and operations
 
@@ -202,9 +210,9 @@ deployment's custom endpoints is not public.
 |---|---|---|---|
 | `GET` | `/livez` | none | Liveness alone: is this process running. Does not touch the database, which is why it is the probe path a container should use — `RUNTIME_LIVENESS_PATH` |
 | `GET` | `/health`, `/api/health` | none | Liveness and readiness. Reports every configured data source, not only the default |
-| `GET` | `/api/docs` | none (`schema:read` in production) | The OpenAPI 3.0 document |
-| `GET` | `/api/swagger` | none | Swagger UI. Development only unless `REBASE_ENABLE_SWAGGER` |
-| `GET` | `/api/meta/schema-version` | none | The schema hash this backend was built from, and nothing else |
+| `GET` | `/api/docs` | none (`schema:read` when `enableSwagger` is `false`, the runtime's default in production) | The OpenAPI 3.0 document |
+| `GET` | `/api/swagger` | none | Swagger UI. Outside production only; `REBASE_ENABLE_SWAGGER` cannot turn it on in production |
+| `GET` | `/api/meta/schema-version` | none | The schema hash this backend was built from and the runtime version, and nothing else |
 | `GET` | `/api/meta/contract` | `schema:read` | The full collection contract, for `rebase generate-sdk --from`. `404` when no auth is configured |
 | `GET` | `/metrics` | `REBASE_METRICS_TOKEN` when set | Prometheus metrics, when `REBASE_METRICS=true` |
 | `GET` | `/metrics/history` | `REBASE_METRICS_TOKEN` when set | The recorded series behind the Studio charts. `501` on a runtime with no backend |

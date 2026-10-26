@@ -1,5 +1,5 @@
 ---
-sourceHash: acd1967fc17b4924
+sourceHash: b95e3733ef1e2cda
 slug: es/docs/upgrading/0-23-to-0-24
 title: Actualización de 0.23 a 0.24
 sidebar_label: 0.23 → 0.24
@@ -137,7 +137,7 @@ fijados juntos. Consulte [Conectar un cliente](/docs/ai/mcp/#connecting-a-client
 
 `--scopes` nombra lo que la clave puede hacer, separado por comas o repetido:
 `--scopes data:read:posts,logs:read`. `--roles` indica los roles RLS con los que
-se ejecuta, además de `service`, y `--expires-in <días>` o `--expires-at <fecha>`
+se ejecuta, además de `service`, y `--expires-in <days>` o `--expires-at <date>`
 indica cuándo deja de valer. `--full-access` son todos los scopes que tiene la
 clave de servicio, excepto `keys:read` y `keys:write`, que ninguna clave puede
 tener. `rebase api-keys scopes` lista todos los scopes que conoce el backend.
@@ -186,7 +186,7 @@ eliminada conserva su clave. Un upsert cuya clave pertenecía a una fila así
 escribía sus valores en la fila oculta y respondía `201 Created`, por lo que la
 fila seguía eliminada y quien llamaba veía un éxito. Ahora se rechaza con
 `409 ROW_IN_TRASH` y no se escribe nada, en todas las vías de upsert:
-`?on_conflict=`, `/bulk`, `/_batch`, el SDK, el socket, y `rebase.data` o
+`?on_conflict=`, `/bulk`, `/_batch`, el SDK, el socket, y `rebase.dataAsAdmin` o
 `context.data` en el servidor.
 
 **Qué cambiar:** nada, a menos que algo haga upsert en una colección con borrado
@@ -204,7 +204,7 @@ upsert. O elimínela definitivamente con `?hard=true` y haga upsert de una nueva
 
 Una actualización cuyo cuerpo nombraba la clave de la fila con otro valor, o un
 `beforeSave` que la cambiaba, respondía `500`. En proceso, a través de
-`rebase.data`, la fila ya se había movido a la nueva clave cuando la escritura
+`rebase.dataAsAdmin`, la fila ya se había movido a la nueva clave cuando la escritura
 lanzaba el error. Ahora todas las vías la rechazan con `400 KEY_IMMUTABLE` antes
 de que se ejecute ningún hook, nombrando el campo, y no se escribe nada. Enviar la
 clave que la fila ya tiene se sigue aceptando.
@@ -234,7 +234,7 @@ Consulte [Cabeceras de seguridad](/docs/deployment/self-hosting/#security-header
 ## 51. Los permisos son scopes
 
 Toda pregunta del tipo "¿puede quien llama hacer esto?" ahora pide un scope, con
-nombre `recurso:acción`: `data:read`, `users:write`, `cron:write`. Un scope puede
+nombre `resource:action`: `data:read`, `users:write`, `cron:write`. Un scope puede
 nombrar un único destino: `data:read:posts` es `data:read` solo sobre `posts`. La
 sesión de una persona, una clave de API, un rol y un token MCP tienen scopes, y
 todos usan las mismas cadenas.
@@ -389,7 +389,7 @@ Consulte [El endpoint remoto](/docs/ai/mcp/#the-remote-endpoint).
 
 ## 57. Las escrituras en proceso rechazan `ifMatch` e `idempotencyKey`
 
-Una escritura a través de `context.data` en un callback, o de `rebase.data` en una
+Una escritura a través de `context.data` en un callback, o de `rebase.dataAsAdmin` en una
 función, un trabajo cron o un seed, nunca sale del proceso: no hay `If-Match` que
 comprobar ni almacén de idempotencia. Ambas opciones se ignoraban en silencio, por
 lo que una escritura condicional allí era incondicional. Ahora lanzan
@@ -405,7 +405,7 @@ cliente HTTP, que respeta ambas.
 ```
 
 ```bash
-grep -rnE "(context|rebase)\.data\..*(ifMatch|idempotencyKey)" --exclude-dir=node_modules .
+grep -rnE "(context\.data|rebase\.dataAsAdmin)\..*(ifMatch|idempotencyKey)" --exclude-dir=node_modules .
 ```
 
 ## 58. `Button` e `IconButton` se tipan según el elemento que renderizan

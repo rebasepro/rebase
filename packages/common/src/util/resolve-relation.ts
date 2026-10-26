@@ -131,7 +131,7 @@ export function resolveRelation(
                 ...shared,
                 kind: "via",
                 cardinality: relation.cardinality,
-                writable: false,
+                writable: isSingleHopVia(relation.cardinality, relation.joinPath),
                 // A join chain reaches rows that other parents reach too, and
                 // Rebase does not know which hop, if any, is a link it owns.
                 shared: true,
@@ -145,6 +145,31 @@ export function resolveRelation(
             throw new Error(`Unknown relation kind: ${JSON.stringify(exhaustive)}`);
         }
     }
+}
+
+/**
+ * Whether a `via` chain has a single link for a write to set — the chains
+ * Rebase writes through a create or update:
+ *
+ * - **to-one, one step** (`{ table: target, on: { from, to } }`): the target
+ *   row holds the key, and the write points it at this row, as a `hasOne`
+ *   write does;
+ * - **to-many, two steps through one table between the ends**: that table
+ *   holds the links, and the write sets them as junction rows, as a
+ *   `manyToMany` write does.
+ *
+ * Both shipped writable (0.24.0 fixed the one-to-one writer). A longer chain
+ * has no single link to maintain: a to-many one found no junction connecting
+ * both ends and failed as a 500, and a to-one one re-pointed the target at
+ * whatever column the first step read. So those are read-only, and every door
+ * reads this answer through `writable` rather than re-deriving it.
+ */
+function isSingleHopVia(cardinality: "one" | "many", joinPath: readonly { table: string }[] | undefined): boolean {
+    // A chain declared without its steps resolves — resolution cannot fail;
+    // the relation validator names the missing `joinPath` — and is not written.
+    if (!Array.isArray(joinPath)) return false;
+    if (cardinality === "one") return joinPath.length === 1;
+    return joinPath.length === 2 && joinPath[0].table !== joinPath[1].table;
 }
 
 /** How this relation is addressed in an error message, before it has a resolved name. */

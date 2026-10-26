@@ -387,7 +387,7 @@ export interface JwtService {
      * it ever needs to verify one, and an asymmetric key here would be a
      * second key surface bought for nobody.
      */
-    generateMcpAccessToken(payload: Omit<McpAccessTokenPayload, "purpose">, expiresInSeconds: number): Promise<string>;
+    generateMcpAccessToken(payload: Omit<McpAccessTokenPayload, "purpose" | "iat">, expiresInSeconds: number): Promise<string>;
 
     /**
      * Verify an MCP access token **for a specific resource**.
@@ -856,7 +856,8 @@ function jwtServiceFrom(state: JwtState): JwtService {
                     scope: typeof decoded.scope === "string" ? decoded.scope : "",
                     clientId: typeof decoded.clientId === "string" ? decoded.clientId : "",
                     aud: decoded.aud,
-                    iss: typeof decoded.iss === "string" ? decoded.iss : ""
+                    iss: typeof decoded.iss === "string" ? decoded.iss : "",
+                    ...(typeof decoded.iat === "number" ? { iat: decoded.iat } : {})
                 };
             } catch (error) {
                 logger.error("[JWT] MCP token verification failed", { error: error });
@@ -1127,11 +1128,17 @@ export interface McpAccessTokenPayload {
     /** The resource this token is bound to (RFC 8707). */
     aud: string;
     iss: string;
+    /**
+     * When it was signed, in whole seconds. Set on a verified token only; the
+     * signer stamps it itself. `/mcp` places it against the account's
+     * revocation watermark, as every other door does a session token.
+     */
+    iat?: number;
 }
 
 /** See {@link JwtService.generateMcpAccessToken}. Answers for the process default. */
 export async function generateMcpAccessToken(
-    payload: Omit<McpAccessTokenPayload, "purpose">,
+    payload: Omit<McpAccessTokenPayload, "purpose" | "iat">,
     expiresInSeconds: number
 ): Promise<string> {
     return processJwt.generateMcpAccessToken(payload, expiresInSeconds);

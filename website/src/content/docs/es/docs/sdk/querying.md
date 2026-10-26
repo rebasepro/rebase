@@ -1,5 +1,5 @@
 ---
-sourceHash: dc64725d910c68e0
+sourceHash: aecc5f68b6d9adc0
 title: Consulta de datos
 sidebar_label: Consulta de datos
 description: Operaciones CRUD, constructor de consultas fluido, operadores de filtro, ordenación, selección de columnas y agregaciones con el SDK tipado de Rebase.
@@ -414,7 +414,7 @@ const byCustomer = await client.data.orders.aggregate({
     groupBy: ["customerId"],
     limit: 200
 });
-byCustomer.meta; // { limit: 200, offset: 0, hasMore: true } — pagine con offset: 200
+byCustomer.meta; // { limit: 200, offset: 0, hasMore: true } — page on with offset: 200
 ```
 
 El resultado sigue siendo un array de filas; `meta` es una propiedad no
@@ -426,8 +426,8 @@ hace nada y `offset` se rechaza. En una función de servidor (`rebase.data`,
 grupos. En 0.23 no hay `meta` ni `offset`, así que una lista de grupos
 recortada por el límite parece completa.
 `include` no se envía con una agregación: no tiene relaciones que
-cargar. El SDK todavía no ordena grupos; por HTTP también se pueden ordenar —
-consulte [Agregaciones y búsqueda](/docs/sdk/aggregates-and-search/).
+cargar. Los grupos se pueden ordenar con `orderBy`, por una columna de `groupBy` o por
+la clave de un agregado — consulte [Agregaciones y búsqueda](/docs/sdk/aggregates-and-search/).
 
 El propósito principal es evitar la descarga de filas para procesarlas en memoria. Calcular los "ingresos por estado" sobre un millón de órdenes requiere aquí una sola consulta y una fila por estado, frente a un `findAll()` con un bucle en otros entornos (lo cual falla con un `limit` y resulta inasumible sin él). Se ejecuta a través del mismo contexto de solicitud que el resto de lecturas, por lo que la seguridad a nivel de fila se aplica a los registros agregados.
 

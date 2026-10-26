@@ -95,10 +95,11 @@ Three secrets, one fact, and the account you sign in with:
   it once, while the user table is empty, and does nothing on every boot after
   that.
 
-Each of the three secrets must be at least 32 characters, and the admin password
-at least 12. Use an address with a dot in its domain: `POST /auth/login` parses
-its body with `z.string().email()`, so `admin@localhost` would seed an account
-and then refuse every attempt to use it. The compose file declares all six with
+`JWT_SECRET` and `REBASE_SERVICE_KEY` must each be at least 32 characters, and
+the admin password at least 12. Use an address with a dot in its domain:
+`POST /auth/login` parses its body with `z.string().email()`, so the runtime
+refuses to seed `admin@localhost` — an account nobody could sign in to — and logs
+why instead. The compose file declares all six with
 `${VAR:?…}`, so a missing one stops the stack with a message naming it rather
 than starting something half-configured — and self-registration ships off
 (`DISABLE_SELF_REGISTRATION`, default `true`), so nothing is left to be claimed.
@@ -164,6 +165,81 @@ outside.
 `REBASE_MIGRATE_ON_BOOT` accepts `ensure` and `none`, and nothing else — the
 image **refuses to boot** on `push`, for the reason above.
 
+## When only your change process may change the database
+
+<span class="since-badge" data-since="0.26">Since 0.26</span>
+
+`REBASE_MIGRATE_ON_BOOT=none` leaves your collections alone. It does not leave
+the database alone: the framework's own tables (auth, API keys, jobs, cron) are
+still created and kept current at every boot. When the database may only change
+through a reviewed change process, set `REBASE_PROVISION=false` on every process
+that serves:
+
+| Setting | Collection tables and policies | Framework tables |
+|---|---|---|
+| default (`REBASE_MIGRATE_ON_BOOT=ensure`) | created and kept current at boot | created and kept current |
+| `REBASE_MIGRATE_ON_BOOT=none` | left alone | created and kept current |
+| `REBASE_PROVISION=false` | left alone | left alone; whatever is missing is named in the log |
+
+With provisioning off the runtime creates and alters nothing: no table, column,
+index, function, trigger, policy, role or grant. That holds at boot and later,
+including the tables a serving process otherwise makes on first use
+(idempotency keys, cron claims, the shared rate-limit counters). It reads what
+is there instead:
+
+- **Auth tables, or a column auth reads, missing:** the boot refuses and lists
+  each one.
+- **The request role can reach a framework table** such as
+  `rebase.refresh_tokens` or `rebase.api_keys`: the boot refuses and prints the
+  `REVOKE` to run. A provisioning boot takes those privileges away on its own.
+  With provisioning off, nothing does.
+- **An optional table missing** (API keys, idempotency keys, cron claims,
+  rate-limit counters, presence, metrics history): that feature is off, and the
+  log says which table it needs.
+
+Rows still change, as they would on any database: sign-ins, sessions, API key
+usage, idempotency keys, cron claims. The first admin account
+(`REBASE_ADMIN_EMAIL`) is seeded by the provisioning run, not by the serving
+processes. [Live schema editing](/docs/backend/live-schema-editing) can still
+commit a change as source, but refuses to apply it to the database.
+
+### The provisioning run
+
+<span class="since-badge" data-since="0.26">Since 0.26</span>
+
+The schema comes from a run your change process controls. Use the same image and
+bundle as the server, with `REBASE_PROVISION_ONLY=true`, connected as a role that
+may create in the database. `REBASE_PROVISION_SQL_OUT` keeps every schema change
+the run made, as a SQL script:
+
+```bash
+docker run --rm \
+  -e DATABASE_URL="postgres://admin:…@scratch-db:5432/app" \
+  -e JWT_SECRET="…" \
+  -e REBASE_PROVISION_ONLY=true \
+  -e REBASE_PROVISION_SQL_OUT=/out/rebase.sql \
+  -v "$PWD/out:/out" \
+  -v "$PWD/dist-bundle:/bundle" \
+  "rebasepro/server:$REBASE_VERSION"
+```
+
+The script is a record, not a plan: every statement in it ran, in order, and
+succeeded. Recorded against an empty database, it is the whole schema the release
+needs. Recorded against a restored copy of production, it is exactly the upgrade.
+Rows the run wrote are not in it. Review it, then apply it to the real database:
+
+```bash
+psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f out/rebase.sql
+```
+
+Do it again for every Rebase upgrade, before the serving processes roll. A
+release can add a table or a column, and a process that may not create one
+reports it missing rather than making it.
+
+A server you build yourself follows the same rule: `initializeRebaseBackend` reads
+`REBASE_PROVISION`, and `createRebaseBackend` takes
+[`provision: false`](/docs/backend/custom-server#what-creating-a-backend-may-change-provision).
+
 ## File storage
 
 Storage is **off** unless a bucket is configured, and that is deliberate: the
@@ -172,7 +248,10 @@ uploaded file on the next restart. Uploads are refused with
 `501 STORAGE_NOT_CONFIGURED` until you set one up.
 
 For a bucket, set `STORAGE_TYPE=s3` (or `gcs`) plus its bucket and credentials —
-the compose file lists the variables, commented out.
+the compose file lists the variables, commented out. `gcs` loads
+`@google-cloud/storage`, which the official image does not ship, so on that image
+reach Google Cloud Storage through its S3-compatible endpoint instead
+(`STORAGE_TYPE=s3`, `S3_ENDPOINT=https://storage.googleapis.com`, HMAC keys).
 
 For local disk, which is only appropriate when the path is a real volume that
 outlives the container:
@@ -245,7 +324,7 @@ containers works. Two things to get right everywhere:
 
 ```toml
 [build]
-  image = "rebasepro/server:0.25.1"
+  dockerfile = "Dockerfile"   # FROM rebasepro/server:0.25.1 + COPY dist-bundle /bundle
 
 [http_service]
   internal_port = 8080
@@ -270,7 +349,7 @@ rebase-server /srv/myapp/dist-bundle
 ```
 
 `rebase-server --help` lists the variables it reads. Under systemd — the
-three admin lines are new, and on 0.17.3 the first account to
+two `REBASE_ADMIN_*` lines need 0.18 or later, and on 0.17.3 the first account to
 register becomes the administrator instead:
 
 ```ini title="/etc/systemd/system/rebase.service"

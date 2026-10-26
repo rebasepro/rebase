@@ -247,6 +247,15 @@ describe("what a service key may hold", () => {
         expect(res.status).toBe(201);
     });
 
+    // A key's roles reach RLS joined by "," in `app.user_roles`, which the
+    // policies split again: a role "editor,admin" is two roles there.
+    it.each([[["editor,admin"]], [["{admin}"]], [["\"admin\""]], [["a\\b"]]])("refuses the role name %j", async (roles) => {
+        const { res, body, store } = await mint({ name: "k", scopes: ["data:read"], roles }, ["admin"]);
+        expect(res.status).toBe(400);
+        expect(body.error?.code).toBe("INVALID_ROLE");
+        expect(store.createApiKey).not.toHaveBeenCalled();
+    });
+
     it.each([
         [["data:read:nope"], "UNKNOWN_SCOPE_TARGET"],
         [["storage:write:archive"], "UNKNOWN_SCOPE_TARGET"],
@@ -285,6 +294,65 @@ describe("what a service key may hold", () => {
         });
         expect(res.status).toBe(403);
         expect(store.updateApiKey).not.toHaveBeenCalled();
+    });
+});
+
+describe("changing or revoking a service key", () => {
+    // Minting checked the minter against the key; changing and revoking did
+    // not. A `keys:write` role widened an admin-role key it could never have
+    // minted to every data scope, and could revoke it.
+    const ADMIN_KEY = makeKey("rk_admin_role_key_dddd", { id: "admin-key", roles: ["admin"], scopes: ["data:read:posts"] });
+    const OWN_KEY = makeKey("rk_own_level_key_eeee", { id: "own-key", roles: [], scopes: ["logs:read"] });
+
+    function storeWith(...keys: ApiKey[]) {
+        const store = makeStore();
+        Object.assign(store, {
+            getApiKeyById: jest.fn(async (id: string) => keys.find(k => k.id === id) ?? null),
+            updateApiKey: jest.fn(async (id: string) => keys.find(k => k.id === id) ?? null)
+        });
+        return store;
+    }
+    const as = async (roles: string[], init: RequestInit) => ({
+        ...init,
+        headers: { "content-type": "application/json", Authorization: `Bearer ${await generateAccessToken("manager", roles)}` }
+    });
+
+    it("refuses a keys:write holder widening a key that runs as more than they hold", async () => {
+        configureAccess({ model: MODEL });
+        const store = storeWith(ADMIN_KEY);
+        const res = await buildApp(store).request("/api/admin/api-keys/admin-key",
+            await as(["keymaster"], { method: "PUT", body: JSON.stringify({ name: "renamed" }) }));
+        expect(res.status).toBe(403);
+        expect((await res.json() as { error: { code: string } }).error.code).toBe("KEY_OUTRANKS_CALLER");
+        expect(store.updateApiKey).not.toHaveBeenCalled();
+    });
+
+    it("refuses them revoking it", async () => {
+        configureAccess({ model: MODEL });
+        const store = storeWith(ADMIN_KEY);
+        const res = await buildApp(store).request("/api/admin/api-keys/admin-key", await as(["keymaster"], { method: "DELETE" }));
+        expect(res.status).toBe(403);
+        expect((await res.json() as { error: { code: string } }).error.code).toBe("KEY_OUTRANKS_CALLER");
+        expect(store.revokeApiKey).not.toHaveBeenCalled();
+    });
+
+    it("lets them change and revoke a key within what they hold, and an admin any key", async () => {
+        configureAccess({ model: MODEL });
+        const store = storeWith(ADMIN_KEY, OWN_KEY);
+        const app = buildApp(store);
+        expect((await app.request("/api/admin/api-keys/own-key",
+            await as(["keymaster"], { method: "PUT", body: JSON.stringify({ name: "renamed" }) }))).status).toBe(200);
+        expect((await app.request("/api/admin/api-keys/own-key", await as(["keymaster"], { method: "DELETE" }))).status).toBe(200);
+        expect((await app.request("/api/admin/api-keys/admin-key",
+            await as(["admin"], { method: "PUT", body: JSON.stringify({ name: "renamed" }) }))).status).toBe(200);
+        expect((await app.request("/api/admin/api-keys/admin-key", await as(["admin"], { method: "DELETE" }))).status).toBe(200);
+    });
+
+    it("answers 404 for a key that does not exist", async () => {
+        configureAccess({ model: MODEL });
+        const store = storeWith();
+        expect((await buildApp(store).request("/api/admin/api-keys/nope", await as(["admin"], { method: "DELETE" }))).status).toBe(404);
+        expect(store.revokeApiKey).not.toHaveBeenCalled();
     });
 });
 

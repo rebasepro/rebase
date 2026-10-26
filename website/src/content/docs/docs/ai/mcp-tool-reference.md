@@ -8,10 +8,10 @@ The tools [`@rebasepro/mcp`](/docs/ai/mcp) offers an assistant. How it connects,
 which credential it holds and how the [loopback gate](/docs/ai/mcp#the-loopback-gate)
 decides what ⚠ means are on the [MCP server](/docs/ai/mcp) page.
 
-42 tools, in nine groups. Tools marked ⚠ are refused against non-local targets
+51 tools, in ten groups. Tools marked ⚠ are refused against non-local targets
 unless you opt out.
 
-## Schema & database (12)
+## Schema & database (13)
 
 Spawn the Rebase CLI in the active project directory.
 
@@ -28,6 +28,7 @@ Spawn the Rebase CLI in the active project directory.
 | `rebase_db_branch_list` | — | List database branches (admins only) |
 | `rebase_db_branch_delete` ⚠ | `name` | Delete a database branch (admins only) |
 | `rebase_db_branch_info` | `name` | Branch information and status (admins only) |
+| `rebase_db_branch_diff` | `name` | What a branch changed against the database it was made from — schema, policies and rows, with conflicts; changes neither (admins only) |
 | `rebase_db_branch_switch` | — | Point this checkout at a branch, or back at the main database (admins only) |
 
 ## Schema planning (1)
@@ -112,7 +113,7 @@ chose. Its blast radius is whatever your functions do.
 |---|---|---|
 | `rebase_project_list` | — | List registered projects and show the active one |
 | `rebase_project_switch` | `name` | Change the active project |
-| `rebase_project_add` | `name` | Register a project (`baseUrl`, optional `projectDir`, `token`) |
+| `rebase_project_add` | `name` | Register a project (optional `projectDir`, `baseUrl`, `token`) |
 | `rebase_project_remove` | `name` | Remove a project (the default project cannot be removed) |
 | `rebase_project_current` | — | Show the active project and its auth status |
 | `rebase_project_status` | — | Health-check the active backend |
@@ -121,3 +122,27 @@ chose. Its blast radius is whatever your functions do.
 rather than acting on a target itself. An assistant can therefore switch to a
 remote project without tripping the gate — it just cannot then run a destructive
 tool there.
+
+## Rebase Cloud (8)
+
+<span class="since-badge" data-since="0.26">Since 0.26</span>
+
+Spawn `rebase cloud … --json` in the active project directory, against the
+project it is linked to, with the CLI's own credential. See
+[Rebase Cloud](/docs/ai/mcp#rebase-cloud) for what they act on and why none of
+them is gated.
+
+| Tool | Required | Description |
+|---|---|---|
+| `rebase_cloud_provision` | — | A live backend with no account (`rebase cloud init --claim`): the live URL, the admin URL and a claim URL (`name`, `deploy`) |
+| `rebase_cloud_status` | — | The linked project's URL, status, last deploy, runtime, database, storage, and its claim URL while unclaimed |
+| `rebase_cloud_deploy` | — | Deploy and follow it to the end (`app`, `bundle`, `message`, `wait`, `timeoutSeconds`, `preview`, `previewName`) |
+| `rebase_cloud_logs` | — | One snapshot of the runtime log, or the latest build log (`source`, `since`, `tail`, `grep`, `level`, `previous`, `preview`). Never follows |
+| `rebase_cloud_env_list` | — | Variable keys, never values (`preview`) |
+| `rebase_cloud_env_set` | `key`, `value` | Set one variable; the value goes through stdin and is never returned (`secret`, `preview`) |
+| `rebase_cloud_deployments_list` | — | Recent deployments, and which ones can be rolled back to (`limit`) |
+| `rebase_cloud_rollback` | — | Put a previous successful deployment back into service (`deploymentId`) |
+
+`rebase_cloud_provision` creates a project and links this directory. It never
+reads the active project's `baseUrl`, so the gate does not check it; the CLI
+refuses it in a directory that is already linked.

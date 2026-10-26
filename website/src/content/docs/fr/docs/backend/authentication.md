@@ -1,5 +1,5 @@
 ---
-sourceHash: d9b66c9d404a5085
+sourceHash: bb2bf60cbaed04eb
 title: Authentification
 sidebar_label: Authentification
 description: Configurez l'authentification JWT, les fournisseurs OAuth, les e-mails SMTP, la protection contre les bots et la collection d'utilisateurs sur le backend Rebase.
@@ -95,6 +95,7 @@ const backend = await initializeRebaseBackend({
 | `disableSelfRegistration` | `boolean` | `false` | Coupe-circuit : ferme également la fenêtre de bootstrap du premier utilisateur laissée ouverte par `allowRegistration: false` |
 | `allowAnonymous` | `boolean` | `false` | Activer `POST /api/auth/anonymous`. Délibérément non conditionné par `allowRegistration` — une application publique principalement en lecture peut nécessiter des sessions sans comptes. Transformer un invité en compte (`POST /api/auth/anonymous/link`) est une inscription, et nécessite aussi `allowRegistration` — et `allowAnonymous` toujours activé : désactivé, il refuse aussi les invités déjà connectés, si bien qu'aucun ne peut devenir un compte (`403 ANONYMOUS_AUTH_DISABLED`) |
 | `allowUserLookup` | `boolean` | `false` | Monter `POST /api/auth/find-user` pour les flux d'invitation par e-mail |
+| `captcha` | `CaptchaConfig` | — | Protection contre les bots sur les routes qui envoient des e-mails — voir [Protection contre les bots](#protection-contre-les-bots) |
 | `defaultRole` | `string` | — | Rôle attribué à un utilisateur nouvellement inscrit lorsqu'aucun n'est spécifié. Il ne peut pas être `admin`, ni un rôle déclaré qui détient une portée du plan d'administration : le démarrage refuse les deux |
 | `serviceKey` | `string` | — | Clé statique pour les appels de serveur à serveur — voir [Authentification par clé de service](/docs/backend/auth-endpoints/#service-key-authentication) |
 | `email` | `EmailConfig` | — | SMTP, pour la réinitialisation de mot de passe, la vérification, les invitations et les liens magiques |
@@ -312,9 +313,11 @@ DISCORD_CLIENT_SECRET=…
 
 `GET /api/auth/config` liste ensuite `discord` dans `enabledProviders`, ce qui permet de vérifier que la paire a bien été prise en compte.
 
+Google se configure avec `GOOGLE_CLIENT_ID` seul : son flux par jeton d'ID n'a besoin d'aucun secret, `GOOGLE_CLIENT_SECRET` est donc facultatif.
+
 Apple est l'exception : il ne possède pas de secret client statique, car Rebase signe un JWT ES256 à courte durée de vie pour chaque échange de jetons. Il nécessite les quatre variables `APPLE_CLIENT_ID`, `APPLE_TEAM_ID`, `APPLE_KEY_ID` et `APPLE_PRIVATE_KEY` — le contenu du fichier `.p8`, sauts de ligne inclus.
 
-Deux options n'ont pas d'équivalent dans les variables d'environnement et requièrent le bloc `auth` (donc un backend éjecté ou configuré par le code) : `microsoft.tenantId`, qui vaut par défaut `common` et signale chaque adresse comme non vérifiée, et `gitlab.baseUrl`, pour une instance auto-hébergée.
+Deux options n'ont pas d'équivalent dans les variables d'environnement et requièrent le bloc `auth` (donc un backend éjecté ou configuré par le code) : `microsoft.tenantId`, qui vaut par défaut `common` et accepte chaque tenant Entra (avec n'importe quel tenant, une adresse n'est considérée comme vérifiée que si l'enregistrement de l'application émet la revendication `xms_edov`), et `gitlab.baseUrl`, pour une instance auto-hébergée.
 
 Chaque champ nommé est résolu au démarrage dans `auth.providers`, qui est le tableau canonique et le point d'extension pour tout ce que les champs nommés ne couvrent pas. Les entrées sont créées avec les factories `create*Provider`, et les deux formes fusionnent — les champs nommés sont ajoutés après les entrées explicites :
 
@@ -339,20 +342,20 @@ Si cette option n'est pas définie, la seule vérification lors d'une redirectio
 
 ### Liaison de comptes entre méthodes de connexion
 
-Que se passe-t-il lorsque quelqu'un s'inscrit avec e-mail/mot de passe en tant que `ada@example.com`, puis clique plus tard sur « Se connecter avec Google » sur un compte Google associé à cette même adresse ? Rebase **lie les deux en un seul compte** — mais uniquement si le fournisseur certifie que l'e-mail est vérifié *et* que l'adresse du compte lui-même a été vérifiée. Il ne crée jamais silencieusement un deuxième compte pour la même adresse.
+Que se passe-t-il lorsque quelqu'un s'inscrit avec e-mail/mot de passe en tant que `ada@example.com`, puis clique plus tard sur « Se connecter avec Google » sur un compte Google associé à cette même adresse ? Rebase **lie les deux en un seul compte**, mais uniquement si le fournisseur certifie que l'e-mail est vérifié. Il ne crée jamais silencieusement un deuxième compte pour la même adresse.
 
 Sur `POST /api/auth/<provider>`, l'ordre de résolution est :
 
-1. **Identité de fournisseur connue** — si cette identité exacte de fournisseur s'est déjà connectée auparavant, cet utilisateur est renvoyé. L'e-mail n'est pas consulté.
-2. **Compte existant avec le même e-mail, vérifié des deux côtés** — le fournisseur a vérifié l'e-mail, et le compte aussi. L'identité est rattachée au compte existant et l'utilisateur y est connecté. Un seul compte, deux moyens d'accès.
-3. **Compte existant avec le même e-mail, un côté non vérifié** — rejeté avec `403 EMAIL_NOT_VERIFIED`. Rien n'est créé ni modifié. `details.reason` indique quel côté : `provider-email-unverified`, ou `local-account-unverified` (le compte a un mot de passe) / `local-account-unverified-passwordless` (il n'en a pas).
-4. **Aucun compte avec cet e-mail** — un nouveau compte est créé, vérifié si le fournisseur a vérifié l'e-mail.
+1. **Identité de fournisseur connue** : si cette identité exacte de fournisseur s'est déjà connectée auparavant, cet utilisateur est renvoyé. L'e-mail n'est pas consulté.
+2. **Compte existant avec le même e-mail, le fournisseur a vérifié l'e-mail** : l'identité est rattachée et l'utilisateur est connecté à ce compte. Un seul compte, deux moyens d'accès. Un compte non vérifié est d'abord vérifié (voir ci-dessous).
+3. **Compte existant avec le même e-mail, le fournisseur ne l'a pas vérifié** : rejeté avec `403 EMAIL_NOT_VERIFIED` et `details.reason` valant `provider-email-unverified`. Rien n'est créé ni modifié.
+4. **Aucun compte avec cet e-mail** : un nouveau compte est créé, vérifié si le fournisseur a vérifié l'e-mail.
 
 L'étape 3 est le cas critique pour la sécurité. Si un e-mail de fournisseur non vérifié suffisait pour lier le compte, quiconque parviendrait à faire émettre par un fournisseur une adresse qui ne lui appartient pas pourrait prendre le contrôle du compte Rebase correspondant. Google affirme toujours `email_verified` pour les vrais comptes Google, l'étape 2 est donc le parcours normal pour la connexion Google ; l'étape 3 intercepte principalement les fournisseurs qui permettent aux utilisateurs de renseigner une adresse non confirmée arbitraire.
 
-Le côté du compte compte pour la même raison. Rien ne vérifie l'adresse que reçoit `POST /auth/register` : n'importe qui peut donc inscrire l'adresse de quelqu'un d'autre avec un mot de passe, ou se connecter avec elle via un fournisseur qui ne la garantit pas, et attendre. Lier la connexion Google du propriétaire à ce compte y laisserait le moyen d'accès de l'autre personne.
+Le côté du compte compte aussi. Rien ne vérifie l'adresse que reçoit `POST /auth/register` : n'importe qui peut donc inscrire l'adresse de quelqu'un d'autre avec un mot de passe, ou se connecter avec elle via un fournisseur qui ne la garantit pas, et attendre. Lier la connexion Google du propriétaire à ce compte ne doit pas y laisser le moyen d'accès de l'autre personne.
 
-Un lien de vérification, un lien magique, un code par e-mail ou une réinitialisation du mot de passe prouvent l'adresse et vérifient le compte. Sur un compte qui n'était pas encore vérifié, la première de ces preuves supprime le mot de passe (une réinitialisation définit le nouveau) et chaque identité liée dont le fournisseur n'a pas vérifié cette adresse, et met fin à toutes les sessions, avant de marquer le compte comme vérifié. Ensuite, l'étape 2 s'applique.
+Un fournisseur qui a vérifié l'adresse, un lien de vérification, un lien magique, un code par e-mail ou une réinitialisation du mot de passe prouvent tous l'adresse et vérifient le compte. Sur un compte qui n'était pas encore vérifié, la première de ces preuves supprime le mot de passe (une réinitialisation définit le nouveau) et chaque identité liée dont le fournisseur n'a pas vérifié cette adresse, et met fin à toutes les sessions, avant de marquer le compte comme vérifié : un mot de passe que personne n'a vérifié disparaît dès la première connexion Google.
 
 Un lien de vérification conserve ce que la personne qui le suit prouve aussi : une session
 active du compte, ou son mot de passe. Voir [Vérification de l'e-mail](/docs/backend/email-verification/). Les comptes créés par un administrateur avec `POST /api/admin/users` sont enregistrés comme vérifiés, de sorte qu'une personne invitée peut utiliser « Se connecter avec Google » immédiatement. Un dépôt d'authentification personnalisé sans `unlinkUserIdentity` refuse une telle preuve avec `409 UNVERIFIED_IDENTITIES` lorsqu'il y a une identité à supprimer.
@@ -368,11 +371,13 @@ prouve aussi. `requireEmailVerification` rend l'inscription à confirmation pré
 
 ## Tables créées automatiquement
 
-Lors du premier démarrage, Rebase provisionne automatiquement le schéma `auth` et les tables suivantes dans la base de données (liées au schéma défini dans votre collection, par ex. `rebase`) :
+Lors du premier démarrage, Rebase provisionne automatiquement le schéma `rebase` et les tables suivantes dans la base de données (liées au schéma défini dans votre collection, par ex. `rebase`) :
 
 - **`rebase.users`** — Comptes utilisateurs avec e-mail, hash de mot de passe, métadonnées et une colonne `roles` en text[] (les rôles sont stockés sous forme de tableaux de texte inline pour optimiser les requêtes et éviter les jointures).
+- **`rebase.user_identities`** — Les identités OAuth liées à chaque compte, une ligne par identité de fournisseur.
 - **`rebase.refresh_tokens`** — Sessions longue durée contenant les jetons de rafraîchissement hachés, les user-agents et les adresses IP. Comprend un index unique sur `token_hash`. Une connexion correspond à un seul `session_id`, partagé par chaque jeton issu de sa rotation ; il n'y a pas de contrainte par appareil, donc deux navigateurs derrière une même adresse comptent pour deux sessions. Chaque jeton d'une session porte aussi son niveau d'assurance (`aal`) et la façon dont la connexion s'est faite (`method`, que rapporte `providerId`).
 - **`rebase.password_reset_tokens`** — Jetons à usage unique avec expiration pour les flux de réinitialisation de mot de passe.
+- **`rebase.magic_link_tokens`** — Jetons à usage unique avec expiration pour la connexion par lien magique.
 - **`rebase.mfa_factors`** — Méthodes d'authentification multifacteur enregistrées (par ex. secrets TOTP chiffrés avec AES-256).
 - **`rebase.mfa_challenges`** — Journaux de vérification suivant les tentatives actives de validation MFA.
 - **`rebase.recovery_codes`** — Codes de secours/récupération multifacteur hachés.
@@ -380,8 +385,8 @@ Lors du premier démarrage, Rebase provisionne automatiquement le schéma `auth`
 
 Les jetons qui expirent — liens de réinitialisation, liens magiques et codes par e-mail,
 jetons de rafraîchissement, challenges MFA — sont supprimés une heure après leur expiration.
-Le balayage s'exécute sur le processus qui détient les minuteurs (le rôle `worker` dans un
-déploiement scindé) et sur une seule instance de la flotte : chaque heure est revendiquée dans
+Le balayage s'exécute sur les processus qui détiennent les minuteurs (tous les rôles sauf `functions`
+dans un déploiement scindé, à moins que `REBASE_CRON_SCHEDULER=false` ne les retire de l'`api`) et sur une seule instance de la flotte : chaque heure est revendiquée dans
 `rebase.cron_claims` sous l'id de job `rebase:auth:expired-tokens`, comme l'est un créneau cron.
 Avec `cronPersistence: false` il n'y a pas de table de revendications, et chaque instance de ce
 type balaie. Un jeton expiré est refusé quand il est présenté, que le balayage ait eu lieu ou non ;

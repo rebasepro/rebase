@@ -1,5 +1,5 @@
 ---
-sourceHash: 7256a7d26ab9e154
+sourceHash: 53c151ad9bf8af55
 title: "Capture des modifications de la base de données"
 sidebar_label: "Capture des modifications de la base de données"
 description: "Des événements en temps réel pour chaque écriture validée, quelle que soit sa provenance : les déclencheurs de capture, le paramètre REALTIME_CDC et ce qu'ils exigent."
@@ -46,14 +46,14 @@ Si la connexion ne le prend pas en charge, `auto` consigne une ligne d'informati
 2. **Capture** — Un client `LISTEN` dédié et hors pool par instance consomme `rebase_cdc`, associe la table modifiée à sa collection correspondante, et transmet la modification au même pipeline `RealtimeService` que celui utilisé par les mutations d'API. Tout comme le récepteur multi-instances, il privilégie `DATABASE_DIRECT_URL` et se reconnecte automatiquement.
 3. **Livraison sécurisée avec RLS** — La ligne brute provenant du flux de modifications n'est **jamais** transmise aux abonnés. La modification est marquée comme invalidée, et chaque abonnement relit la ligne sous son **propre** contexte d'authentification. Le filtrage s'effectue donc par abonné, jamais par émetteur : un client ne reçoit jamais que les lignes permises par ses politiques RLS.
 4. **Multi-instances** — Étant donné que chaque instance observe chaque commit via le flux de modifications, le CDC *est* également le canal inter-instances ; l'ancienne diffusion par mutation `rebase_entity_changes` n'est pas utilisée tant que le CDC est actif.
-5. **Déduplication** — Une mutation effectuée via l'API Rebase est livrée localement dès sa validation (commit) et est également répercutée en écho via le flux de modifications. L'instance d'origine supprime un écho qui arrive dans la fenêtre de temporisation de la nouvelle requête (via un enregistrement éphémère de ses propres émissions), de sorte qu'une écriture API produit normalement une seule trame. Un écho qui arrive plus tard déclenche une nouvelle requête de plus, qui livre à nouveau les mêmes lignes : sans danger, mais un abonné peut voir deux fois une trame identique.
+5. **Déduplication** — Une mutation effectuée via l'API Rebase planifie une nouvelle lecture pour les abonnés locaux dès sa validation (commit) et est également répercutée en écho via le flux de modifications. L'instance d'origine supprime un écho qui arrive dans la fenêtre de temporisation de la nouvelle requête (via un enregistrement éphémère de ses propres émissions), de sorte qu'une écriture API produit normalement une seule trame. Un écho qui arrive plus tard déclenche une nouvelle requête de plus, qui livre à nouveau les mêmes lignes : sans danger, mais un abonné peut voir deux fois une trame identique.
 
 ## Prérequis & Remarques
 
 `directConnectionString` est l'option de l'adaptateur ; en 0.24, utilisez `DATABASE_DIRECT_URL`.
 
 - Le CDC nécessite une chaîne de connexion directe (`DATABASE_DIRECT_URL`, le `directConnectionString` de l'adaptateur, ou la connexion principale) pour le client `LISTEN` — les gestionnaires de pools de connexions (connection poolers) en mode transaction ne prennent pas en charge les sessions `LISTEN` de longue durée.
-- Les déclencheurs ne sont installés que sur les tables adossées à une collection enregistrée. Les écritures sur des tables non associées sont ignorées.
+- Les déclencheurs ne sont installés que sur les tables adossées à une collection enregistrée, ainsi que sur les tables de jonction de leurs relations plusieurs-à-plusieurs. Les écritures sur des tables non associées sont ignorées.
 - Une collection dont la table n'a pas encore fait l'objet d'une migration est ignorée avec un avertissement au lieu de bloquer le CDC pour le reste.
 - Le streaming natif par réplication logique WAL (`wal2json`/`pgoutput`) est prévu ; aujourd'hui, `REALTIME_CDC=wal` se rabat sur la méthode basée sur les déclencheurs, qui fournit une couverture équivalente au niveau de la base de données.
 

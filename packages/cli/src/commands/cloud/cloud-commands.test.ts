@@ -14,7 +14,8 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { setJsonModeForTest } from "./context";
 import { isRollbackable, deploymentDurationMs, deploymentView, triggerInfo, type DeploymentRow } from "./deployments";
-import { parseEnvAssignment } from "./env";
+import { parseEnvAssignment, envValueFromStdin } from "./env";
+import fs from "fs";
 import { resolveExtensionAlias } from "./extensions";
 import { buildSettingsPatch, parseOnOff } from "./settings";
 import { ACTION_HELP } from "./action-help";
@@ -369,6 +370,68 @@ describe("env set of a build-time variable", () => {
  * production's values. Every one of these must reach the `previews` function
  * and never `env-vars`, which is production's environment.
  */
+/**
+ * `env set KEY --stdin`: the value comes from a pipe, never the command line,
+ * where `ps` and shell history would show it. The MCP server sets values this way.
+ */
+describe("env set --stdin", () => {
+    it("sends the piped value, less its one trailing newline, and never prints it", async () => {
+        const invoke = vi.fn(async () => ({ success: true, var: { key: "STRIPE_KEY", secret: true, valueSet: true }, pendingRedeploy: true }));
+        useClient(fakeClient({ invoke }));
+        const read = vi.spyOn(fs, "readFileSync").mockImplementation(((target: unknown, ...rest: unknown[]) => {
+            if (target === 0) return "sk_live_piped\n";
+            return (fs.readFileSync as unknown as (...a: unknown[]) => unknown)(target, ...rest);
+        }) as typeof fs.readFileSync);
+        const cap = captureStdout();
+        try {
+            await envCommand("set", ["node", "rebase", "cloud", "env", "set", "STRIPE_KEY", "--stdin", "--secret", "--json"]);
+        } finally {
+            cap.restore();
+            read.mockRestore();
+        }
+        expect(invoke.mock.calls[0]).toEqual(["env-vars", { key: "STRIPE_KEY", value: "sk_live_piped", secret: true }, { path: "proj_1" }]);
+        expect(cap.output()).not.toContain("sk_live_piped");
+        expect(JSON.parse(cap.output().trim())).toMatchObject({ success: true, key: "STRIPE_KEY", secret: true });
+    });
+
+    it("keeps inner newlines and strips only the last line ending", () => {
+        expect(envValueFromStdin(["K"], () => "a\nb\r\n", false)).toEqual({ key: "K", value: "a\nb" });
+        expect(envValueFromStdin(["K"], () => "", false)).toEqual({ key: "K", value: "" });
+    });
+
+    it.each([
+        [["K=v"], "a value on the line too"],
+        [["K", "v"], "a second operand"],
+        [[], "no key"]
+    ])("refuses %j (%s) before reading anything", (operands) => {
+        const exit = vi.spyOn(process, "exit").mockImplementation(((): never => { throw new Error("__exit__"); }) as never);
+        const cap = captureStdout();
+        const read = vi.fn(() => "x");
+        try {
+            expect(() => envValueFromStdin(operands, read, false)).toThrow("__exit__");
+        } finally {
+            cap.restore();
+            exit.mockRestore();
+        }
+        expect(read).not.toHaveBeenCalled();
+        expect(JSON.parse(cap.output().trim()).error.code).toBe("usage");
+    });
+
+    it("refuses a terminal, which would wait for a value nobody knows to type", () => {
+        const exit = vi.spyOn(process, "exit").mockImplementation(((): never => { throw new Error("__exit__"); }) as never);
+        const cap = captureStdout();
+        const read = vi.fn(() => "x");
+        try {
+            expect(() => envValueFromStdin(["K"], read, true)).toThrow("__exit__");
+        } finally {
+            cap.restore();
+            exit.mockRestore();
+        }
+        expect(read).not.toHaveBeenCalled();
+        expect(JSON.parse(cap.output().trim()).error.message).toContain("terminal");
+    });
+});
+
 describe("env --preview", () => {
     async function run(action: string, ...args: string[]) {
         const cap = captureStdout();
@@ -506,6 +569,70 @@ find: async () => ({ data: rows }) }));
         expect((invoke.mock.calls[0][1] as { deploymentId: string }).deploymentId).toBe("d2");
         const parsed = JSON.parse(cap.output().trim());
         expect(parsed.rolledBackTo).toBe("d2");
+    });
+
+    /**
+     * Without an id, the newest rollbackable deploy is skipped only when the
+     * newest deploy is it. A static app deployed on its own succeeds without
+     * recording a bundle, so it was not "it": the auto-target became the
+     * backend deploy that is live right now, and the CLI announced a rollback
+     * that changed nothing. Likewise the fallback when nothing older qualifies
+     * named the live deploy itself, and a previous deploy of the same image
+     * re-deploys what is running.
+     */
+    describe("never auto-targets what is already live", () => {
+        /** Run `rollback` with no id against the client in use, and return its refusal. */
+        async function refusal(): Promise<{ code: string; message: string }> {
+            const cap = captureStdout();
+            const exit = vi.spyOn(process, "exit").mockImplementation(((): never => {
+                throw new Error("__exit__");
+            }) as never);
+            await expect(rollbackCommand(["node", "rebase", "cloud", "rollback", "--yes", "--json"])).rejects.toThrow("__exit__");
+            cap.restore();
+            exit.mockRestore();
+            return JSON.parse(cap.output().trim()).error;
+        }
+
+        it("refuses after a static app deployed on its own, rather than re-deploying the live backend", async () => {
+            const invoke = vi.fn(async () => ({}));
+            useClient(fakeClient({ invoke, find: async () => ({ data: [
+                { id: "d3", status: "success", app: "web", createdAt: "2026-01-03T00:00:00Z" },
+                { id: "d2", status: "success", imageUrl: "img:2", createdAt: "2026-01-02T00:00:00Z" },
+                { id: "d1", status: "success", imageUrl: "img:1", createdAt: "2026-01-01T00:00:00Z" }
+            ] }) }));
+            const error = await refusal();
+            expect(invoke).not.toHaveBeenCalled();
+            expect(error.code).toBe("deploy_not_rollbackable");
+            expect(error.message).toMatch(/d3/);
+            expect(error.message).toMatch(/static/i);
+        });
+
+        it("refuses when the live deploy is the only one that qualifies", async () => {
+            const invoke = vi.fn(async () => ({}));
+            useClient(fakeClient({ invoke, find: async () => ({ data: [
+                { id: "d2", status: "success", imageUrl: "img:2", createdAt: "2026-01-02T00:00:00Z" },
+                { id: "d1", status: "failed", imageUrl: "img:1", createdAt: "2026-01-01T00:00:00Z" }
+            ] }) }));
+            const error = await refusal();
+            expect(invoke).not.toHaveBeenCalled();
+            expect(error.code).toBe("deploy_not_rollbackable");
+            expect(error.message).toMatch(/d2/);
+        });
+
+        it("skips an earlier deploy of the image that is live", async () => {
+            const invoke = vi.fn(async (_n: string, body: unknown) => ({
+                success: true, deployment: { id: "d5" }, rolledBackTo: (body as { deploymentId?: string }).deploymentId, imageUrl: "img:1"
+            }));
+            useClient(fakeClient({ invoke, find: async () => ({ data: [
+                { id: "d3", status: "success", imageUrl: "img:2", createdAt: "2026-01-03T00:00:00Z" },
+                { id: "d2", status: "success", imageUrl: "img:2", createdAt: "2026-01-02T00:00:00Z" },
+                { id: "d1", status: "success", imageUrl: "img:1", createdAt: "2026-01-01T00:00:00Z" }
+            ] }) }));
+            const cap = captureStdout();
+            await rollbackCommand(["node", "rebase", "cloud", "rollback", "--yes", "--json"]);
+            cap.restore();
+            expect((invoke.mock.calls[0][1] as { deploymentId: string }).deploymentId).toBe("d1");
+        });
     });
 
     /**

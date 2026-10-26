@@ -1,5 +1,5 @@
 ---
-sourceHash: e6d2447955c86775
+sourceHash: faf5a0ca622c3a50
 title: Rollen und Scopes
 sidebar_label: Rollen und Scopes
 description: "Was ein Aufrufer darf: die Datenebene, die jede Person hält, die Admin-Ebene, die Rollen gewähren, die Scopes, die eine App für sich selbst deklariert, und wie jedes Credential sie trägt."
@@ -18,7 +18,7 @@ Scopes gibt es auf zwei Ebenen, und eine Person hält sie unterschiedlich.
 **Die Datenebene** ist `data:*`, `storage:*` und `functions:invoke`. Jede
 angemeldete Person hält sie vollständig. Was eine Person mit einer Zeile tun darf, entscheiden die
 [Sicherheitsregeln](/docs/collections/security-rules/) der Collection, Zeile für Zeile,
-und was sie mit einer Datei tun darf, die [Storage-Policies](/docs/backend/storage/#per-object-authorization).
+und was sie mit einer Datei tun darf, die [Storage-Policies](/docs/backend/storage-authorization/).
 Ein Scope entscheidet das für eine Person nie. Auf einem Schlüssel oder einem Token schränken Scopes der Datenebene
 ein: Ein Schlüssel, der nur `data:read:posts` hält, liest `posts` und sonst nichts,
 egal was die Regeln erlauben würden.
@@ -250,13 +250,21 @@ Für Schlüssel:
   ist Admin. Sonst `403 ROLE_EXCEEDS_CREATOR`.
 - `keys:read` und `keys:write` kommen nie auf einen Schlüssel. Ein Schlüssel, der Schlüssel verwaltet, könnte
   seinen eigenen Nachfolger erzeugen. `400 KEY_MANAGEMENT_SCOPE`.
+- Wer `keys:write` hält, kann einen Schlüssel nicht ändern oder widerrufen, der eine Rolle oder einen
+  Scope hält, die er nicht hält, es sei denn, er ist Admin: `403 KEY_OUTRANKS_CALLER`.
+  Ohne das könnte er einen Schlüssel mit Admin-Rolle auf jeden Daten-Scope ausweiten.
 
 Für Konten gilt: Wer `users:write` hält,
 
-- kann kein Konto bearbeiten, zurücksetzen oder löschen, das eine Rolle oder einen Scope hält, die er nicht hält:
+- kann kein Konto bearbeiten, zurücksetzen oder löschen, dessen Rollen einen Scope halten, den er nicht hält, oder `admin`, wenn er kein Admin ist:
   `403 ACCOUNT_OUTRANKS_CALLER`. Ohne das könnte eine Support-Rolle das Passwort eines
   Admins zurücksetzen und sich als dieser anmelden.
-- kann keine Rollen gewähren, die mehr halten als er: `403 ROLE_EXCEEDS_CALLER`.
+- kann keine Rollen gewähren, die mehr halten als er, `admin` eingeschlossen: `403 ROLE_EXCEEDS_CALLER`.
+
+Ein Rollenname darf alles sein, außer einem Namen, der als andere Rollen zurückgelesen würde:
+Ein leerer Name oder einer, der `,` `{` `}` `"` `\` oder ein Steuerzeichen enthält, wird überall,
+wo eine Rolle geschrieben wird (Benutzer, die Users-Collection, Service-Schlüssel), mit
+`400 INVALID_ROLE` abgelehnt.
 
 ## Wie jedes Credential Scopes hält
 
@@ -265,7 +273,7 @@ Für Konten gilt: Wer `users:write` hält,
 | Die Sitzung einer Person | die Person | die Datenebene, jeden App-Scope und die Scopes ihrer Rollen. Ein Admin hält alles |
 | [Service-Schlüssel](/docs/backend/api-keys/#service-keys) `rk_live_…` | `api-key:<id>`, mit den RLS-Rollen `service` plus seinen eigenen `roles` | genau seine Scopes |
 | [Persönlicher Schlüssel](/docs/backend/api-keys/#personal-keys) `rk_live_…` | sein Eigentümer, mit dessen Rollen, so wie sie bei jeder Anfrage sind | seine Scopes, beschnitten auf das, was der Eigentümer jetzt hält |
-| [MCP-Token](/docs/ai/mcp/#the-remote-endpoint) | die Person, die es verbunden hat | `data:read`, `data:write`, `data:delete` wie gewährt, optional pro Collection |
+| [MCP-Token](/docs/ai/remote-mcp/) | die Person, die es verbunden hat | `data:read`, `data:write`, `data:delete` wie gewährt, optional pro Collection |
 | `REBASE_SERVICE_KEY` | `service`, mit der Rolle `admin` | alles |
 
 Ein Schlüssel oder ein Token umgeht nie die Row-Level Security. Seine Scopes sind eine Obergrenze,

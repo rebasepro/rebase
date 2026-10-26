@@ -38,6 +38,7 @@ import {
     type CloudClient
 } from "./context";
 import { isMissingRoute } from "./cron";
+import { cliUserAgent } from "../../utils/version";
 
 /** The control-plane function that creates, lists and deletes previews. */
 export const PREVIEWS_FUNCTION = "previews";
@@ -94,6 +95,8 @@ export interface Preview {
      */
     backend: PreviewBackend | null;
     status: string | null;
+    /** Why it is in its status, as the control plane wrote it — set for `paused` (its database outgrew the preview limit). */
+    statusMessage: string | null;
     /** The deployment that built it, in {@link PREVIEW_DEPLOYMENTS_COLLECTION}. */
     deploymentId: string | null;
     createdAt: string | null;
@@ -131,6 +134,7 @@ export function previewFrom(value: unknown): Preview | null {
         app: text(value, "app"),
         backend: backend === "preview" || backend === "production" ? backend : null,
         status: text(value, "status"),
+        statusMessage: text(value, "statusMessage", "status_message"),
         deploymentId: text(value, "deploymentId", "deployment_id"),
         createdAt: text(value, "createdAt", "created_at"),
         updatedAt: text(value, "updatedAt", "updated_at"),
@@ -162,6 +166,34 @@ function previewsUnavailable(e: unknown): void {
     }
 }
 
+/**
+ * The intake code a control plane refuses a static app's own preview with when
+ * nothing on it serves static sites by themselves (no front door). Rebase Cloud
+ * is one, today: every host is served by the project's own pod.
+ */
+export const PREVIEW_STATIC_UNSERVED = "PREVIEW_STATIC_UNSERVED";
+
+function intakeCodeOf(e: unknown): string | undefined {
+    if (!isRecord(e) || !isRecord(e.details)) return undefined;
+    return typeof e.details.intakeCode === "string" ? e.details.intakeCode : undefined;
+}
+
+/**
+ * Turn "this cloud cannot serve a static app on its own" into a refusal that
+ * says what to do instead — which depends on whether the project has a
+ * backend to fold the app into, so both ways are named.
+ */
+function staticPreviewUnserved(e: unknown): void {
+    if (intakeCodeOf(e) !== PREVIEW_STATIC_UNSERVED) return;
+    fail(
+        "Previews of a static app on its own are not available on this cloud yet: nothing here serves a static site by itself. "
+            + "Nothing was published, and production is untouched.",
+        "With a managed backend in rebase.json, `rebase cloud deploy --preview` previews it with its static apps folded in, "
+            + "this one included. Without one, deploy the app to production with `rebase cloud deploy <app>`.",
+        PREVIEW_STATIC_UNSERVED
+    );
+}
+
 /** What the `previews` trigger answers. */
 export interface PreviewTrigger {
     deploymentId: string;
@@ -187,6 +219,7 @@ export async function triggerPreview(
         res = await client.functions.invoke<unknown>(PREVIEWS_FUNCTION, body, { method: "POST", path: projectId });
     } catch (e) {
         previewsUnavailable(e);
+        staticPreviewUnserved(e);
         refusal(e);
         reportError(e, "Preview deploy failed to start");
     }
@@ -213,6 +246,129 @@ export function previewLines(preview: Preview): string[] {
     }
     lines.push(chalk.gray("Production is unchanged."));
     if (preview.expiresAt) lines.push(chalk.gray(`Expires ${preview.expiresAt} unless deployed again.`));
+    return lines;
+}
+
+/** Where the docs state what a backend preview costs. */
+export const PREVIEW_PRICING_DOCS = "https://rebase.pro/docs/deployment/cloud/#preview-a-change";
+
+/** The billing rule in words: what is printed when the control plane cannot put a number on it. */
+export const PREVIEW_PRICING_RULE =
+    "A backend preview is billed like one app unit at the default size, at your app's rate for its region and capacity, "
+    + "prorated for as long as it exists.";
+
+/** What a backend preview costs, as the control plane quotes it. */
+export interface PreviewCost {
+    /** €/month one backend preview adds to the project's quote; null when it could not be priced. */
+    perPreviewMonthlyEur: number | null;
+    /** Backend previews the project runs, this one included; null when unknown. */
+    backendPreviews: number | null;
+    /** €/month all of them add together; null when unknown. */
+    previewsMonthlyEur: number | null;
+    /** The rule the numbers come from, in words. */
+    rule: string;
+    docs: string;
+}
+
+interface QuoteAnswer {
+    totalEur: number;
+    backendPreviews?: number;
+}
+
+function quoteAnswerFrom(value: unknown): QuoteAnswer | null {
+    if (!isRecord(value) || typeof value.totalEur !== "number" || !Number.isFinite(value.totalEur)) return null;
+    return {
+        totalEur: value.totalEur,
+        backendPreviews: typeof value.backendPreviews === "number" ? value.backendPreviews : undefined
+    };
+}
+
+const cents = (eur: number) => Math.round(eur * 100) / 100;
+
+/**
+ * What a backend preview costs, in the control plane's own numbers.
+ *
+ * No price is written down here: the control plane quotes the project's dials
+ * with and without backend previews (`pricing/quote` with `backendPreviews`,
+ * the call the console's quote makes) and the difference is what they add —
+ * which follows the rate card, the app's region and its capacity class as
+ * they change. One batched call, best-effort: a control plane that does not
+ * price previews (its answer does not echo the count it was sent) or cannot be
+ * asked leaves the numbers null, and the rule and the docs carry the answer.
+ *
+ * The quote is asked with no credential. The route is public — it prices a
+ * hypothetical and reads nobody's data — and an access token would be refused
+ * on it, holding no `functions:invoke:pricing`: no token capability names it,
+ * and none needs to.
+ */
+export async function previewCost(client: CloudClient, url: string, projectId: string): Promise<PreviewCost> {
+    const cost: PreviewCost = {
+        perPreviewMonthlyEur: null,
+        backendPreviews: null,
+        previewsMonthlyEur: null,
+        rule: PREVIEW_PRICING_RULE,
+        docs: PREVIEW_PRICING_DOCS
+    };
+    let project: Record<string, unknown> | undefined;
+    try {
+        project = (await client.data.collection("projects").findById(projectId)) as Record<string, unknown> | undefined;
+    } catch {
+        return cost;
+    }
+    if (!isRecord(project)) return cost;
+
+    try {
+        const res = await client.functions.invoke<unknown>(PREVIEWS_FUNCTION, undefined, { method: "GET", path: projectId });
+        const rows = isRecord(res) && Array.isArray(res.previews) ? res.previews : undefined;
+        if (rows) {
+            // At least this one, should the list trail the trigger.
+            cost.backendPreviews = Math.max(1, rows.map(previewFrom).filter(p => p !== null && p.backend !== "production").length);
+        }
+    } catch {
+        // The count is a detail; the price of one preview does not need it.
+    }
+
+    const counts = [0, 1];
+    if (cost.backendPreviews !== null && cost.backendPreviews > 1) counts.push(cost.backendPreviews);
+    let quotes: Array<QuoteAnswer | null>;
+    try {
+        const res = await fetch(`${url}/api/functions/pricing/quote`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json", "User-Agent": cliUserAgent() },
+            body: JSON.stringify(counts.map(backendPreviews => ({ ...project, backendPreviews })))
+        });
+        if (!res.ok) return cost;
+        const body: unknown = await res.json();
+        quotes = isRecord(body) && Array.isArray(body.quotes) ? body.quotes.map(quoteAnswerFrom) : [];
+    } catch {
+        return cost;
+    }
+    const [none, one, all] = quotes;
+    // A control plane that prices no previews answers the same total for both
+    // and echoes no count: a €0.00 from it would be a guess, not a quote.
+    if (!none || !one || one.backendPreviews !== 1) return cost;
+    cost.perPreviewMonthlyEur = cents(one.totalEur - none.totalEur);
+    if (cost.backendPreviews !== null && cost.backendPreviews <= 1) {
+        cost.previewsMonthlyEur = cost.backendPreviews === 1 ? cost.perPreviewMonthlyEur : 0;
+    } else if (all && all.backendPreviews !== undefined) {
+        cost.backendPreviews = all.backendPreviews;
+        cost.previewsMonthlyEur = cents(all.totalEur - none.totalEur);
+    }
+    return cost;
+}
+
+/** The line a preview deploy prints about its cost. */
+export function previewCostLines(cost: PreviewCost, previewName: string): string[] {
+    const stop = `\`rebase cloud previews delete ${previewName}\` stops it.`;
+    if (cost.perPreviewMonthlyEur === null) {
+        return [`${cost.rule} ${stop}`, `See ${cost.docs}`];
+    }
+    const lines = [
+        `Billed while it exists: €${cost.perPreviewMonthlyEur.toFixed(2)}/month, prorated — the control plane's quote for one backend preview of this project. ${stop}`
+    ];
+    if (cost.backendPreviews !== null && cost.backendPreviews > 1 && cost.previewsMonthlyEur !== null) {
+        lines.push(`The project runs ${cost.backendPreviews} backend previews: €${cost.previewsMonthlyEur.toFixed(2)}/month together.`);
+    }
     return lines;
 }
 
@@ -261,6 +417,7 @@ async function listCommand(rawArgs: string[]): Promise<void> {
                     .join("  ·  ");
                 console.log(`  ${chalk.bold(p.name.padEnd(nameWidth))}  ${chalk.cyan(p.url)}`);
                 if (tags) console.log(`  ${" ".repeat(nameWidth)}  ${chalk.gray(tags)}`);
+                if (p.statusMessage) console.log(`  ${" ".repeat(nameWidth)}  ${chalk.yellow(p.statusMessage)}`);
             }
             console.log("");
         },

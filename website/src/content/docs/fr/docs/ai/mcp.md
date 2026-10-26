@@ -1,8 +1,8 @@
 ---
-sourceHash: ee28e46d5e82c6f9
+sourceHash: 781e0136e6dc1271
 title: Serveur MCP
 sidebar_label: Serveur MCP
-description: Connectez Claude Code, Cursor, Gemini CLI ou n'importe quel client MCP à un projet Rebase — les 42 outils exposés, l'identifiant avec lequel il s'authentifie et le verrou loopback qui s'interpose entre un agent et la production.
+description: Connectez Claude Code, Cursor, Gemini CLI ou n'importe quel client MCP à un projet Rebase — les 51 outils exposés, l'identifiant avec lequel il s'authentifie et le verrou loopback qui s'interpose entre un agent et la production.
 ---
 
 `@rebasepro/mcp` est un serveur [Model Context Protocol](https://modelcontextprotocol.io)
@@ -18,7 +18,7 @@ de vous présenter le bloc de configuration.
 
 Un backend déployé peut également servir du MCP lui-même, via HTTP, aux personnes qui utilisent
 votre application. Il s'agit d'une chose différente avec un modèle d'identifiants différent :
-voir [Le point de terminaison distant](#le-point-de-terminaison-distant).
+voir [Le point de terminaison MCP distant](/docs/ai/remote-mcp/).
 
 ## Connecter un client
 
@@ -166,16 +166,24 @@ commutateur du paquet permet d'*étendre* la portée plutôt que de la restreind
 
 De quel identifiant il s'agit, par ordre de priorité :
 
-1. `REBASE_API_TOKEN` / `REBASE_TOKEN` issu de l'environnement
+1. `REBASE_API_TOKEN` issu de l'environnement. `REBASE_TOKEN` n'est pas lu ici :
+   c'est le jeton de plan de contrôle du CLI, et il n'est jamais envoyé à l'app (le
+   serveur l'indique une fois sur stderr lorsque c'est le seul défini). Les outils cloud
+   le transmettent tout de même au CLI qu'ils lancent, qui l'envoie au plan de contrôle.
 2. `REBASE_SERVICE_KEY` lu dans le fichier `.env` du projet
 3. La clé de service découverte automatiquement depuis `.rebase/state.json` pendant
    que `rebase dev` s'exécute
+
+Les options 2 et 3 sont la clé du backend de dev de cette machine, utilisée uniquement lorsque la cible est en
+loopback. Lorsque `REBASE_BASE_URL` pointe ailleurs — <span class="since-badge" data-since="0.26">Depuis 0.26</span> `rebase cloud init --claim`
+écrit l'adresse du projet cloud, et aucun `REBASE_API_TOKEN` tant qu'un déploiement
+n'a pas réussi —, le serveur n'envoie aucun jeton et l'indique une fois sur stderr.
 
 Un jeton enregistré pour un projet **l'emporte sur l'auto-découverte**. La découverte ne fait
 que combler un manque.
 
 :::danger[La méthode sans configuration utilise un identifiant administrateur]
-Les options 2 et 3 correspondent à la **clé de service** (`service key`) — un secret administrateur
+Les options 2 et 3 correspondent à la **clé de service** — un secret administrateur
 sans restriction de portée. Le backend la résout en `uid: "service"`, `roles: ["admin"]`, `isAdmin: true`.
 Cette identité détient toutes les [portées](/docs/backend/roles-and-scopes/), et elle satisfait les
 politiques `_default_admin_read` / `_default_admin_write` que Rebase injecte dans chaque collection
@@ -295,11 +303,17 @@ l'interface loopback.** Le verrou est conçu comme une liste de ce qui n'*est pa
 verrouillé, de sorte qu'un outil ajouté ultérieurement est protégé par défaut.
 
 - **Non verrouillés — lectures :** `rebase_schema_plan`, `rebase_doctor`,
-  `rebase_db_branch_list`, `rebase_db_branch_info`, `list_documents`,
+  `rebase_db_branch_list`, `rebase_db_branch_info`, `rebase_db_branch_diff`, `list_documents`,
   `get_document`, `list_users`, `list_roles`, `storage_list_objects`,
   `storage_get_download_url`, `cron_list_jobs`, `cron_get_job`, `cron_get_job_logs`,
-  `rebase_dev_logs`.
-- **Non verrouillés — locaux uniquement :** `rebase_schema_introspect`, `rebase_schema_generate`, `rebase_db_generate`,
+  `rebase_dev_logs`, et <span class="since-badge" data-since="0.26">Depuis 0.26</span> les lectures Rebase Cloud `rebase_cloud_status`,
+  `rebase_cloud_logs`, `rebase_cloud_env_list`, `rebase_cloud_deployments_list`.
+- **Non verrouillés — écritures Rebase Cloud :** `rebase_cloud_provision`,
+  `rebase_cloud_deploy`, `rebase_cloud_env_set`, `rebase_cloud_rollback`.
+  Le provisionnement crée un projet ; les autres modifient un projet de production. Aucun
+  d'eux ne passe par `baseUrl` ou `DATABASE_URL`, qui sont tout ce que le verrou peut
+  vérifier. Voir [Rebase Cloud](#rebase-cloud) pour ce qui se dresse devant eux.
+- **Non verrouillés — locaux uniquement :** `rebase_schema_introspect`, `rebase_db_branch_switch`, `rebase_schema_generate`, `rebase_db_generate`,
   `rebase_generate_sdk`, les outils du serveur de dev et les outils du registre de projets.
   Ceux-ci écrivent des fichiers locaux ou un état local et n'ont aucune cible distante à vérifier.
 - **Verrouillés selon `DATABASE_URL` :** les outils CLI restants — `rebase_db_push`,
@@ -308,7 +322,7 @@ verrouillé, de sorte qu'un outil ajouté ultérieurement est protégé par déf
   `create_document`, `update_document`, `delete_document`, `create_user`,
   `update_user`, `delete_user`, `rebase_auth_reset_password`,
   `storage_delete_object`, `cron_trigger_job`, `cron_toggle_job`,
-  `invoke_function`.
+  et `invoke_function`.
 
 Les deux cibles ne sont pas interchangeables. Les outils CLI ne voient jamais `baseUrl`, ainsi un backend
 localhost associé à une `DATABASE_URL` de production est contrôlé par rapport à la base de données,
@@ -339,7 +353,8 @@ Depuis un terminal,
 `rebase db push` et `rebase db migrate` s'exécutent bel et bien sur cette base de
 données ; seuls les outils MCP sont refusés. En 0.24, la CLI les y refuse aussi.
 
-Seule l'interface loopback est considérée comme locale : `localhost`, `*.localhost`, `127.0.0.0/8`, `::1`.
+Seule l'interface loopback est considérée comme locale : `localhost`, `*.localhost`, `127.0.0.0/8`, `::1`
+(et `0.0.0.0`).
 Les plages privées telles que `10.x` et `192.168.x` ne le sont **pas** — celles-ci ont autant de chances
 d'être un cluster de staging partagé qu'un ordinateur portable, et les traiter comme locales laisserait
 passer précisément l'accident que ce verrou a pour rôle d'empêcher.
@@ -368,7 +383,7 @@ de fin le portant clôture le bloc. Le texte à l'intérieur des données qui re
 scindé par une espace sans chasse (zero-width space), de sorte qu'une ligne qui contiendrait
 `<<<END_UNTRUSTED_DATA>>>` ne puisse pas fermer prématurément l'enveloppe et exposer ce qui la suit.
 
-Le [point de terminaison distant](#le-point-de-terminaison-distant) clôture ses résultats d'outils
+Le [point de terminaison distant](/docs/ai/remote-mcp/) clôture ses résultats d'outils
 de la même façon et le signale au client ; son `structuredContent` porte le résultat brut.
 `list_collections` et
 `describe_collection` font exception : seul un modèle les lit, elles ne sont donc envoyées qu'une fois,
@@ -406,11 +421,93 @@ Les jetons sont stockés dans ce registre **en clair**. Il s'agit d'un fichier d
 personnel qui contient des identifiants administrateurs pour chaque projet que vous avez enregistré ;
 traitez-le en conséquence.
 
+## Rebase Cloud
+
+<span class="since-badge" data-since="0.26">Depuis 0.26</span>
+
+Huit outils mènent une app de ce répertoire à un backend en ligne sur
+[Rebase Cloud](/docs/deployment/cloud/) et le maintiennent en fonctionnement. Chacun lance
+`rebase cloud <command> --json` dans le répertoire du projet actif : la même
+commande qu'une personne exécute, il n'y a donc pas de seconde implémentation qui puisse diverger.
+
+| Outil | Lance | Modifie le projet |
+|---|---|---|
+| `rebase_cloud_provision` | `rebase cloud init --claim` | En crée un, sans compte |
+| `rebase_cloud_status` | `rebase cloud status` | Non |
+| `rebase_cloud_deploy` | `rebase cloud deploy` | Oui |
+| `rebase_cloud_logs` | `rebase cloud logs [--runtime]` | Non |
+| `rebase_cloud_env_list` | `rebase cloud env list` | Non |
+| `rebase_cloud_env_set` | `rebase cloud env set KEY --stdin` | Oui, à partir du prochain déploiement |
+| `rebase_cloud_deployments_list` | `rebase cloud deployments list` | Non |
+| `rebase_cloud_rollback` | `rebase cloud rollback --yes` | Oui |
+
+Le parcours habituel d'un agent est : `rebase_cloud_provision`, puis remettre à l'utilisateur
+l'URL de réclamation ; `rebase_cloud_status` pour voir le projet (tant qu'il n'est pas réclamé,
+`unclaimed` porte l'URL de réclamation et la date de suppression) ; `rebase_cloud_deploy`
+après une modification ; `rebase_cloud_logs` quand quelque chose se comporte mal ; et
+`rebase_cloud_rollback` quand la production est cassée.
+
+**Sur quoi ils agissent.** Le projet auquel le répertoire actif est lié dans
+`.rebase/cloud.json`. Aucun ne prend d'identifiant de projet ni de répertoire ; un
+assistant ne peut donc pas les diriger vers un autre projet que celui auquel le répertoire est
+lié. Changer de projet actif avec `rebase_project_switch` change
+le répertoire dans lequel ils s'exécutent.
+
+**Sous quelle autorité.** Ce que le CLI résout dans ce répertoire : `REBASE_TOKEN`
+lorsqu'il est défini, puis le jeton que `rebase cloud init --claim` a stocké pour un
+projet non réclamé, puis la session `rebase cloud login`. Dans le répertoire de ce
+projet non réclamé, un `REBASE_TOKEN` qui ne détient aucune portée sur le projet est mis
+de côté au profit du jeton propre au projet. Le plan de contrôle
+vérifie chaque appel comme il vérifie ceux du CLI ; avec un jeton créé par
+`rebase cloud tokens create --can logs`, un assistant peut donc lire les logs, et le
+plan de contrôle refuse ses déploiements, variables et rollbacks. L'absence d'identifiant, ou un identifiant refusé, revient sous la forme d'une erreur qui indique ce que
+l'utilisateur doit faire (`rebase cloud login`, ou réclamer le projet).
+
+**Pourquoi le verrou loopback ne s'applique pas.** Le verrou vérifie la `baseUrl` de l'app et
+la `DATABASE_URL` du CLI ; ces outils n'utilisent ni l'une ni l'autre. Après `rebase_cloud_provision`,
+`REBASE_BASE_URL` pointe vers le nouveau projet cloud ; le verrouiller dessus refuserait
+le déploiement même dont le parcours a besoin. Le provisionnement ne fait lui-même que créer : il ne touche
+aucune app ni base de données existante, et le CLI le refuse toujours dans un répertoire
+déjà lié. Un déploiement, une variable et un rollback modifient chacun
+la production. Ce qui se dresse devant eux, c'est l'identifiant ci-dessus et
+l'approbation d'outil de votre client MCP. Pour empêcher un assistant de modifier un projet
+cloud, définissez `REBASE_TOKEN` dans l'environnement du serveur avec un jeton dépourvu des
+capacités `deploy` et `env`.
+
+Chaque outil est un instantané :
+
+- `rebase_cloud_logs` ne suit jamais. Son résultat porte `nextSinceTime` ; renvoyez-le
+  comme `since` pour lire ce qui a suivi. Il renvoie les 200 dernières lignes sauf si
+  `tail` en décide autrement. `source: "build"` renvoie à la place le dernier log de build.
+- `rebase_cloud_deploy` suit le déploiement jusqu'à la fin et vérifie que la nouvelle
+  version répond. `wait: false` rend la main dès que le déploiement est déclenché.
+  Il ne fait jamais sortir un projet du runtime managé, ne déploie pas une version plus ancienne du
+  framework, ne saute pas les vérifications de build : ce sont des décisions de l'utilisateur, et un
+  refus qui en nécessite une le dit.
+- `rebase_cloud_rollback` passe `--yes`. L'appel d'outil vaut confirmation, puisqu'il
+  n'y a pas de terminal où demander.
+
+`rebase_cloud_env_set` écrit la valeur sur l'entrée standard du CLI, de sorte qu'elle ne
+figure jamais sur une ligne de commande où `ps` l'afficherait, et la valeur est retirée de
+tout ce que l'outil renvoie. Son résultat indique ce qui a été stocké (la clé, si elle
+est secrète, si un redéploiement est en attente), jamais la valeur. `rebase_cloud_env_list`
+ne liste que les clés. Un CLI plus ancien que `env set --stdin` est refusé avec un message l'invitant à
+le mettre à jour ; la valeur n'est pas envoyée autrement.
+
+Les résultats reviennent dans l'[enveloppe de données non fiables](#marquage-des-données-non-fiables),
+derrière une ligne du serveur sur la suite à donner. Un refus est une erreur d'outil
+qui porte le code du CLI, tel que `no_project`, `token_rejected`,
+`managed_project` ou `deploy_failed`. Lorsque le serveur reconnaît le code, il
+ajoute l'étape suivante, puis le message propre au CLI. Chaque outil vérifie ses arguments
+par rapport au schéma qu'il annonce avant qu'un processus ne soit lancé, et refuse
+un argument qu'il ne déclare pas.
+
 ## Référence des outils
 
-42 outils, répartis en neuf groupes : schéma et base de données, planification de schéma,
-documents, utilisateurs et rôles, stockage, cron, fonctions, le serveur de dev et le registre de
-projets. Chacun, avec ce dont il a besoin et si le verrou le refuse sur une cible non locale, se
+51 outils, répartis en dix groupes : schéma et base de données, planification de schéma,
+documents, utilisateurs et rôles, stockage, cron, fonctions, le serveur de dev, le registre de
+projets et Rebase Cloud.
+Chacun, avec ce dont il a besoin et si le verrou le refuse sur une cible non locale, se
 trouve dans la [référence des outils MCP](/docs/ai/mcp-tool-reference).
 
 ## Ressources
@@ -436,77 +533,10 @@ tandis qu'un projet organisé d'une autre manière, ou qui n'a pas encore exécu
 
 ## Le point de terminaison distant
 
-Tout ce qui précède concerne un outil de développement : il s'exécute sur votre machine et détient une clé
-de service ou une clé d'API. Un backend déployé peut également servir du MCP lui-même, sur `/mcp`, pour
-les personnes qui utilisent votre application. Un assistant connecté par l'une d'elles lit et
-écrit dans le projet **en tant que cette personne**, et chaque appel s'exécute sous ses propres
-règles de sécurité au niveau des lignes (RLS).
-
-Il est désactivé par défaut, et les deux variables sont obligatoires :
-
-```bash
-REBASE_MCP_ENABLED=true
-REBASE_PUBLIC_URL=https://app.example.com   # this deployment's real origin
-```
-
-Sans `REBASE_PUBLIC_URL`, un secret JWT ou un pilote de données capable de restreindre une requête
-à un utilisateur, le point de terminaison refuse de se monter et en explique la raison dans le journal de démarrage.
-Aucun `REBASE_ROLE` ne permet de l'activer.
-
-- **OAuth, avec écran de consentement.** Un client découvre le serveur d'autorisation
-  via `/.well-known/oauth-protected-resource`, s'enregistre lui-même (l'enregistrement
-  dynamique est activé par défaut ; `REBASE_MCP_OPEN_REGISTRATION=false` le limite
-  aux clients que vous enregistrez), et redirige la personne vers un écran de consentement qui
-  la connecte via votre `/auth/login` existant.
-- **Huit outils, trois portées (scopes).** Les mêmes [portées](/docs/backend/roles-and-scopes/)
-  que celles de tous les identifiants. `data:read` propose `list_collections`, `describe_collection`,
-  `query_collection`, `count_documents` et `get_document` ; `data:write` ajoute `create_document` et
-  `update_document` ; `data:delete` ajoute `delete_document`. Un client qui ne demande
-  rien obtient `data:read`. Chacune se restreint à une collection : `data:read:posts`
-  liste, décrit et lit `posts` et rien d'autre. Une portée détermine les outils proposés et les
-  collections qu'ils atteignent, pas les lignes accessibles : une liste vide peut simplement
-  être le résultat du RLS, et `data:write` ne peut toujours pas écrire une ligne à laquelle
-  la personne n'a pas accès.
-- **Les autorisations accordées avant 0.24 gardent leur portée.** `mcp:read` est lu comme
-  `data:read`, et `mcp:write` comme `data:write data:delete`, sur les autorisations
-  enregistrées et sur les jetons déjà émis.
-- **Une clé API fonctionne aussi.** `/mcp` accepte aussi `Authorization: Bearer rk_…`, pour
-  un client configuré avec un en-tête plutôt qu'avec un flux OAuth. La clé atteint
-  les outils que couvrent ses portées `data:*`, en tant que l'identité pour laquelle elle agit : une
-  [clé personnelle](/docs/backend/api-keys/#personal-keys) en tant que son propriétaire, une clé de service
-  en tant que `api-key:<id>`.
-- **Le vocabulaire du SDK, les réponses de REST.** Les outils prennent ce que prend le SDK —
-  `where` (`{"status": ["==", "paid"]}`), `orderBy` (`["created_at", "desc"]` ou
-  `"created_at:desc"`), `limit`, `offset`, `searchString`, et `data` pour une
-  écriture — et lisent à travers le chemin de `GET /api/data/<collection>`, si bien qu'une ligne
-  revient comme REST la sert (dates ISO, un `belongsTo` sous forme de clé étrangère, par ex.
-  `authorId`) et peut être renvoyée telle quelle dans une mise à jour. `query_collection`
-  répond `{ data, meta }` avec `meta.total` et `meta.hasMore`, et `count_documents`
-  répond `{ count }`. Comme sur REST, un `limit` au-delà de 1000, un argument non déclaré et une
-  modification ou suppression d'une ligne dans la corbeille (404) sont refusés ; remettre le champ
-  de soft delete à `null` la restaure.
-- **La liste nomme les collections ; `describe_collection` donne le schéma de l'une d'elles.**
-  `list_collections` répond `name`, `title` et `description` de chaque collection, et
-  `describe_collection { collection }` les schémas OpenAPI `row` et `create` de cette collection,
-  plus `softDeleteField` quand les lignes vont dans une corbeille. Les descriptions des outils
-  demandent au modèle de décrire une collection avant d'y écrire. La liste d'un projet de
-  200 collections pèse environ 5k jetons, et chaque description moins de 1k ; avec tous les
-  schémas dans la liste, elle en pesait environ 150k.
-- **Un jeton réservé à ce point de terminaison.** Un jeton d'accès MCP est refusé par
-  `/api/data`, `/api/admin` et le WebSocket, de sorte que connecter un assistant ne lui
-  confère pas une session complète.
-
-Une limite : déconnecter un client (`DELETE /api/oauth/grants/:clientId`, avec la
-propre session de la personne) révoque immédiatement ses jetons de rafraîchissement (refresh tokens),
-mais un jeton d'accès déjà émis reste valide jusqu'à son expiration, dans la limite d'une heure.
-Ce même délai d'une heure encadre tout le reste : chaque rafraîchissement relit les rôles de la
-personne et rejette un compte supprimé ou une autorisation antérieure à sa dernière action « se déconnecter de partout »
-ou à son changement de mot de passe. Ainsi, une rétrogradation de rôle ou une déconnexion prend effet
-pour un client connecté dans la durée de vie d'un jeton d'accès. Une session invité ne peut en aucun cas
-donner son consentement.
-
-Les routes se trouvent dans [Points de terminaison](/docs/backend/endpoints/#mcp-surface) et les
-variables dans [Configuration](/docs/getting-started/configuration/#mcp-surface).
+Un backend déployé peut également servir du MCP lui-même, sur `/mcp`, aux personnes qui utilisent
+votre application, chacune se connectant en son nom propre sous ses propres règles de sécurité au niveau
+des lignes. Cela a sa propre page :
+[Le point de terminaison MCP distant](/docs/ai/remote-mcp/).
 
 ## Configuration recommandée
 

@@ -1,5 +1,5 @@
 ---
-sourceHash: 172ed813d51ccec3
+sourceHash: 189ee23f6992c2e4
 title: Abonnements en temps réel
 sidebar_label: Temps réel
 description: Abonnez-vous aux modifications de données en direct avec le SDK typé de Rebase à l'aide d'écouteurs en temps réel basés sur WebSocket.
@@ -237,7 +237,7 @@ useEffect(() => {
 
 Le client WebSocket gère l'authentification automatiquement :
 
-- Lors de la **connexion** ou du **rafraîchissement de jeton**, le nouveau jeton est envoyé à un socket déjà ouvert via un message `authenticate`. Si aucun socket n'est ouvert, rien ne se passe — se connecter n'est pas une demande d'activation du temps réel, et un socket ouvert ultérieurement s'authentifie de lui-même.
+- Lors de la **connexion** ou du **rafraîchissement de jeton**, un socket déjà ouvert prend le nouvel identifiant. Un rafraîchissement, ou une connexion avec le compte qu'il détient déjà, envoie le jeton dans un message `authenticate` ; une connexion avec un compte différent — y compris celle d'un visiteur — reconstruit le socket, qui s'authentifie avec ce compte et renvoie chaque abonnement et chaque canal actifs. Si aucun socket n'est ouvert, rien ne se passe — se connecter n'est pas une demande d'activation du temps réel, et un socket ouvert ultérieurement s'authentifie de lui-même.
 - Lors de la **déconnexion**, la connexion WebSocket est coupée. Le client reste utilisable ; un abonnement ultérieur se reconnectera de façon anonyme.
 - Si la connexion est perdue, le client **se reconnecte automatiquement** et rétablit tous les abonnements actifs. Il n'arrête jamais d'essayer tant qu'il existe un abonnement ou un canal rejoint ; le délai entre les tentatives croît jusqu'à 30 secondes au maximum.
 - Si le serveur met fin à la session du socket — l'utilisateur s'est déconnecté partout, cette session a été révoquée, le compte a été supprimé, ou le jeton a expiré avant qu'un rafraîchissement n'atteigne le socket — il ferme le socket avec le code `4001`. Le client se reconnecte comme après toute coupure, en s'authentifiant avec la session qu'il détient alors (rafraîchie si possible), ou de façon anonyme s'il n'en détient aucune. Un rôle retiré ne ferme pas le socket : il s'applique dès la trame suivante. Voir [Authentification & RLS](/docs/backend/realtime/#authentication--rls).
@@ -411,7 +411,7 @@ const { messages, retained, latestSeq } = await channel.history({
 :::note[Les rediffusions peuvent se chevaucher, et cela ne pose aucun problème]
 Le serveur ne peut pas savoir précisément quels messages vous sont parvenus avant la coupure du socket ; ainsi, une plage de rattrapage peut inclure des éléments que vous avez déjà appliqués. Le SDK rejette tout message dont la séquence est inférieure ou égale à celle déjà traitée, garantissant que les gestionnaires ne voient jamais un message deux fois.
 
-Vos propres messages ne sont **pas** filtrés d'une rediffusion : une reconnexion attribue un nouvel identifiant client, ce qui correspond précisément au scénario pour lequel le rattrapage existe et où ce filtre échouerait. Rendez vos opérations idempotentes si le fait de réappliquer vos propres messages pose problème.
+Vos propres messages sont filtrés d'une rediffusion, comme en direct, y compris ceux envoyés avant qu'une reconnexion ne donne un nouvel identifiant client au socket : le canal se souvient des identifiants qu'il a diffusés. Un nouvel objet canal — après un rechargement de page, par exemple — n'en retient aucun, de sorte qu'un rattrapage à cet endroit livre vos messages antérieurs comme ceux de n'importe qui, ce dont a besoin la reconstruction d'un état à partir de l'historique.
 :::
 
 ## Suivi de présence

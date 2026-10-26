@@ -32,7 +32,7 @@ npx @rebasepro/cli generate-sdk
 
 ### What Gets Generated
 
-A single `database.types.ts` file containing:
+A `database.types.ts` file (written beside `schema.meta.ts`, which exports the `SCHEMA_VERSION` to pass as the client's `schemaVersion` option, and a `README.md`) containing:
 
 | Export | Description |
 |--------|-------------|
@@ -72,8 +72,8 @@ is the one the backend answers to.
 | `date` | `string` (ISO 8601) |
 | `geopoint` | `{ latitude: number; longitude: number }` |
 | `reference` | `string \| number` |
-| `map` | Nested `{ ... }` or `Record<string, any>` |
-| `array` | `Array<T>` or `Array<any>` |
+| `map` | Nested `{ ... }` or `Record<string, unknown>` |
+| `array` | `Array<T>` or `Array<unknown>` |
 | `vector` | `number[]` |
 | `binary` | `string` |
 
@@ -110,14 +110,14 @@ Passing your generated `Database` type maps camelCase collection names (e.g. `po
 
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
-| `baseUrl` | `string` | — | Backend URL (required) |
+| `baseUrl` | `string` | Same origin (browser only) | Backend origin — scheme, host and port only. Never include `/api`: `apiPath` is appended, so `.../api` builds `/api/api/…` and every request 404s |
 | `token` | `string` | — | Static JWT token (e.g., service key for server-side scripts) |
 | `apiPath` | `string` | `'/api'` | API path prefix |
 | `websocketUrl` | `string` | Auto-derived from `baseUrl` | WebSocket URL for realtime |
 | `fetch` | `typeof fetch` | Global `fetch` | Custom fetch implementation |
-| `onUnauthorized` | `() => void` | — | Handler called on 401 responses |
+| `onUnauthorized` | `() => Promise<boolean>` | The client's own session refresh | Handler called on 401 responses and socket auth errors; resolve `true` to retry with the token resolved again |
 | `realtime` | `boolean` | `true` | Open the WebSocket. Set `false` in one-shot scripts, or the process will not exit |
-| `collections` | `Record<string, string>` | — | Maps accessor names to collection slugs |
+| `collections` | `Record<string, string>` | — | Maps accessor names to collection slugs. **Required for a typed client**: pass the generated `collectionsDictionary` |
 | `offline` | `boolean \| OfflineConfig` | `false` | Local-first sync — see **Offline & Local-First Sync** below |
 
 ### Server-Side Usage
@@ -127,6 +127,7 @@ For server-side scripts or service-to-service calls, pass a service key as the `
 ```typescript
 const rebase = createRebaseClient<Database>({
     baseUrl: 'https://api.myapp.com',
+    collections: collectionsDictionary,
     token: process.env.REBASE_SERVICE_KEY,
 });
 ```
@@ -160,6 +161,8 @@ const { data: posts } = await rebase.data.collection('posts').find();
 | `deleteMany` | `deleteMany(ids)` | `void` | Delete many rows by id |
 | `findAll` | `findAll(params?)` | `Entity[]` | Every matching row, paging internally |
 | `iterate` | `iterate(params?)` | `AsyncIterable<Entity>` | Stream matching rows page by page |
+| `upsert` | `upsert(data, { onConflict? })` | `Entity` | Insert, or update the row matching on the primary key (or `onConflict` columns) |
+| `aggregate` | `aggregate({ select, groupBy?, where?, … })` | rows (+ `meta`) | `count`/`sum`/`avg`/`min`/`max` — see **Aggregates** |
 
 ### Bulk writes
 
@@ -285,6 +288,7 @@ silently produces a malformed query rather than an error.
 | `array-contains` | Array contains | `['array-contains', 'tag1']` |
 | `array-contains-any` | Array contains any | `['array-contains-any', ['tag1', 'tag2']]` |
 | `like` / `ilike` | Pattern match (SQL wildcards) | `['ilike', '%john%']` |
+| `not-like` / `not-ilike` | Negated pattern match | `['not-ilike', '%test%']` |
 | `is-null` / `is-not-null` | Null checks (value ignored) | `['is-null', null]` |
 
 ### Approach 2: Fluent QueryBuilder
@@ -386,15 +390,24 @@ Rules an agent needs before writing one:
 ### Aggregates
 
 `count`, `sum`, `avg`, `min` and `max` over the rows a filter selects, without
-fetching them. **This is a REST endpoint — there is no client method, so do not
-write `rebase.data.orders.aggregate()`.** Reach it with `fetch`:
+fetching them. From the SDK, `aggregate()` on a collection — never a `findAll()`
+and a reduce, which is wrong under a `limit` and unaffordable without one:
 
+```typescript
+const byStatus = await rebase.data.orders.aggregate({
+    select: [{ fn: 'count' }, { fn: 'sum', field: 'total' }],
+    groupBy: ['status'],
+    where: { createdAt: ['>=', '2026-01-01'] },
+});
+// byStatus.meta → { limit, offset, hasMore } for a grouped aggregate
 ```
-GET /api/data/orders/aggregate?select=count(),sum(total)&groupBy=status
-```
+
+Over HTTP it is `GET /api/data/orders/aggregate?select=count(),sum(total)&groupBy=status`.
 
 Results are keyed by function and field: `count()` becomes `count`, `sum(total)`
-becomes `sum_total`. It takes the same filters as the list endpoint.
+becomes `sum_total`. It takes the same filters as the list endpoint. Groups page
+like a listing's rows — a grouped aggregate with no `limit` is cut at the
+listing default (50 groups) — so read `meta.hasMore`.
 
 Row-level security applies to the rows being aggregated — an aggregate is an
 efficient way to learn about rows you cannot read, so someone who can select
@@ -515,7 +528,8 @@ await rebase.auth.signInWithGoogle({ code, redirectUri });
 await rebase.auth.signInWithGitHub(code, redirectUri);
 await rebase.auth.signInWithMicrosoft(code, redirectUri);
 await rebase.auth.signInWithApple(code, redirectUri);
-// ... same pattern for all providers
+// ... same pattern for all providers, except Twitter, which also takes the
+// PKCE verifier: signInWithTwitter(code, redirectUri, codeVerifier)
 
 // Generic OAuth (for custom providers)
 await rebase.auth.signInWithOAuth('custom-provider', payload);
@@ -575,7 +589,7 @@ unsubscribe();
 ```
 
 **Session behavior:**
-- Sessions are persisted to `localStorage` by default (configurable: `localStorage`, `memoryStorage`, `cookieStorage`)
+- Sessions are persisted to `localStorage` by default, in memory where there is none (configurable with `auth: { storage }` — `createMemoryStorage()`, `createCookieStorage()`, or any `{ getItem, setItem, removeItem }`)
 - Tokens auto-refresh 120 seconds before expiry
 - All requests automatically include the auth token
 - On 401 responses, the client auto-refreshes the session and retries the request
@@ -638,10 +652,10 @@ rebase.ws?.disconnect();
 ```
 
 **Realtime features:**
-- Auto-reconnect with exponential backoff (max 5 attempts)
+- Auto-reconnect with jittered exponential backoff (2s step doubling to 30s); it never gives up while a subscription or channel is live, and stops after 5 failed attempts only when nothing is registered
 - Subscription deduplication
 - Client-side entity caching with structural merge
-- Instant entity patches across subscriptions
+- Every update is a debounced refetch under the subscriber's own scope (no instant row patches — they were removed)
 - Auto-authentication and re-authentication on token refresh
 
 ### The socket connects lazily
@@ -685,6 +699,7 @@ Opt in with one option. It is **off by default**, so nothing below applies unles
 ```typescript
 const rebase = createRebaseClient<Database>({
     baseUrl: API_URL,
+    collections: collectionsDictionary,
     offline: true,
 });
 ```
@@ -765,11 +780,13 @@ Full reference: [rebase.pro/docs/sdk/offline](https://rebase.pro/docs/sdk/offlin
 ```typescript
 // Upload file
 const result = await rebase.storage.putObject({
-    file: fileBlob,        // File or Blob
-    key: 'path/to/file',   // Optional custom key
-    bucket: 'my-bucket',   // Optional bucket
-    metadata: { ... },     // Optional metadata
+    file: myFile,              // a File (`UploadFileProps.file` is typed `File`)
+    key: 'path/to/file.png',   // Storage key (required)
+    bucket: 'my-bucket',       // Optional bucket
+    metadata: { ... },         // Optional metadata
+    public: false,             // Optional: true → token-less permanent URL
 });
+// result → { key, bucket, storageUrl }
 
 // Get signed download URL
 const { url, metadata } = await rebase.storage.getSignedUrl('path/to/file', 'bucket');
@@ -858,7 +875,9 @@ const newUser = await rebase.admin.createUser({
 await rebase.admin.updateUser(userId, { displayName: 'Updated Name', roles: ['admin'] });
 await rebase.admin.deleteUser(userId);
 
-// Bootstrap (initial admin setup)
+// Bootstrap (initial admin setup): promotes the signed-in caller, who must be the
+// earliest registered user, while no admin exists — 403 BOOTSTRAP_COMPLETED after
+// that, and 403 SETUP_REQUIRED when NODE_ENV=production
 await rebase.admin.bootstrap();
 ```
 
@@ -899,20 +918,22 @@ A common pattern for using the SDK in a React application:
 ```typescript
 // src/client.ts
 import { createRebaseClient } from '@rebasepro/client';
-import type { Database } from './generated/sdk/database.types';
+import { collectionsDictionary, type Database } from './generated/sdk/database.types';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
-export const rebase = createRebaseClient<Database>({ baseUrl: API_URL });
+export const rebase = createRebaseClient<Database>({ baseUrl: API_URL, collections: collectionsDictionary });
 ```
 
 ```typescript
 // src/hooks/useCollection.ts
 import { useState, useEffect } from 'react';
+import type { FindParams } from '@rebasepro/client';
 import { rebase } from '../client';
 
 export function useCollection<T extends keyof Database>(
     slug: T,
-    options?: { limit?: number; where?: Record<string, string> }
+    // Tuples (`{ status: ['==', 'published'] }`), never bare strings
+    options?: { limit?: number; where?: FindParams['where'] }
 ) {
     const [data, setData] = useState<Database[T]['Row'][]>([]);
     const [loading, setLoading] = useState(true);

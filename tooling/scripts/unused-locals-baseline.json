@@ -51,7 +51,6 @@
   "packages/cms/src/components/DetailViewBinding.tsx::selectedEntityView": 1,
   "packages/cms/src/components/EditViewBinding.tsx::largeLayout": 1,
   "packages/cms/src/components/EditViewBinding.tsx::selectedEntityView": 1,
-  "packages/cms/src/components/history/EntityHistoryView.tsx::authController": 1,
   "packages/cms/src/components/history/EntityHistoryView.tsx::isReverting": 1,
   "packages/cms/src/components/HomePage/HomePageDnD.tsx::overCont": 1,
   "packages/cms/src/components/HomePage/RenameGroupDialog.tsx::handleClose": 1,

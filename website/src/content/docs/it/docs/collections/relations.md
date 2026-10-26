@@ -1,5 +1,5 @@
 ---
-sourceHash: e3130fcc43e901ed
+sourceHash: 5902e196f7801815
 title: Relazioni
 sidebar_label: Relazioni
 description: Definisci relazioni SQL uno-a-uno, uno-a-molti e molti-a-molti tra collezioni con chiavi esterne, tabelle di giunzione e join multi-hop.
@@ -78,9 +78,10 @@ attraverso.
 | `hasOne` | sulla tabella della **destinazione** | una | `foreignKeyOnTarget`, predefinito il singolare di questa collection più `_id` (`users` → `user_id`) |
 | `hasMany` | sulla tabella della **destinazione** | molte | i figli appartengono a questo solo padre |
 | `manyToMany` | in una **tabella di giunzione** | molte | le righe sono condivise; il collegamento è tuo |
-| `via` | un `joinPath` esplicito | l'una o l'altra | in sola lettura; la `cardinality` la dichiari tu |
+| `via` | un `joinPath` esplicito | l'una o l'altra | scrivibile se a singolo hop, altrimenti in sola lettura; la `cardinality` la dichiari tu |
 
-Ogni campo è opzionale tranne `kind` e `target` — il resto è derivato.
+Ogni campo è opzionale tranne `kind` e `target` (e, su `via`, `cardinality`
+e `joinPath`) — il resto è derivato.
 
 ### belongsTo — la chiave è su questa tabella
 
@@ -136,7 +137,7 @@ relations: [
 da cui questo lato legge, questo nomina la colonna a cui punta l'altro lato.
 Senza di esso un collegamento come quello sopra non è affatto esprimibile come
 `hasMany` e deve ripiegare su [`via`](#via--una-catena-di-join-esplicita), che è
-in sola lettura.
+in sola lettura per una catena come questa.
 
 La colonna deve essere univoca. Un collegamento che indirizza più di una riga di
 origine non può dire a quale appartiene una riga correlata, e nemmeno Postgres
@@ -175,8 +176,23 @@ punto di vista** — `sourceColumn` nomina sempre *questa* collezione:
 
 Per collegamenti che le quattro forme precedenti non riescono a esprimere:
 percorsi multi-hop, chiavi composite, o un join la cui condizione non è una
-semplice chiave esterna. In sola lettura — Rebase non dedurrà come scrivere
-attraverso una catena arbitraria.
+semplice chiave esterna.
+
+Una catena a **singolo hop** è scrivibile con una creazione o un aggiornamento, nel modo
+in cui si scrive il kind che sostituisce:
+
+- una catena **to-one** di **un passaggio** — la riga di destinazione contiene la chiave,
+  quindi `{ badge: "b-1" }` punta la colonna di quella riga a questa, e `null` la scollega,
+  come fa una scrittura `hasOne`;
+- una catena **to-many** di **due passaggi attraverso una tabella** tra le estremità — quella
+  tabella contiene i collegamenti, quindi `{ tags: ["t-1", "t-2"] }` li imposta come sue
+  righe, come fa una scrittura `manyToMany` (un `via` non porta alcun `_pivot`).
+
+Qualsiasi catena più lunga è **in sola lettura**: Rebase non dedurrà come scrivere
+attraverso una catena arbitraria. Una creazione o un aggiornamento che ne nomina una viene
+rifiutato con `400 RELATION_NOT_WRITABLE`, e il form di amministrazione mostra il campo senza
+selettore. Anche una scrittura annidata (`PATCH users/1/permissions/3`) attraverso qualsiasi
+`via` viene rifiutata allo stesso modo.
 
 ```typescript
 {
@@ -260,8 +276,9 @@ properties: {
 ## Join Multi-Salto
 
 Per relazioni che attraversano più tabelle, usa `kind: "via"` con un `joinPath`.
-Sono in sola lettura: Rebase non dedurrà come scrivere attraverso una catena
-arbitraria.
+Una catena più lunga di un collegamento è in sola lettura: Rebase non dedurrà come
+scrivere attraverso una catena arbitraria (vedi [via](#via--una-catena-di-join-esplicita)
+per le catene a singolo hop che invece scrive).
 
 ```typescript
 // Users → Permissions through Roles
@@ -361,7 +378,7 @@ esplicitamente:
     kind: "belongsTo",
     relationName: "order",
     target: () => ordersCollection,
-    // Una riga d'ordine non ha senso senza il suo ordine: dillo.
+    // A line item is meaningless without its order — say so.
     onDelete: "cascade"
 }
 ```
@@ -420,7 +437,7 @@ for (const article of data) {
 }
 ```
 
-> I nomi delle relazioni passati a `include()` devono corrispondere al `relationName` definito nell'array `relations` della collezione.
+> I nomi delle relazioni passati a `include()` devono corrispondere al nome della relazione: il `relationName` di una voce dell'array `relations` della collezione, oppure la chiave della proprietà che la dichiara in linea.
 
 Per la documentazione completa del query builder (filtro, ordinamento, paginazione, real-time), consulta la [documentazione dell'SDK tipizzato](/docs/sdk).
 
@@ -549,7 +566,12 @@ interface HasManyRelation extends RelationBase {
 
 interface ManyToManyRelation extends RelationBase {
     kind: "manyToMany";
-    through?: { table?: string; sourceColumn?: string; targetColumn?: string };
+    through?: {
+        table?: string;
+        sourceColumn?: string;
+        targetColumn?: string;
+        properties?: Properties;    // extra columns on the junction row, served under `_pivot`
+    };
 }
 
 interface ViaRelation extends RelationBase {
@@ -564,7 +586,7 @@ interface ViaRelation extends RelationBase {
 Quello che scrivi sopra è la forma di *autore*. Internamente Rebase lavora con
 `ResolvedRelation`: lo stesso collegamento con ogni valore predefinito riempito e
 niente di opzionale, più `cardinality`, `targetSlug` e due flag — `writable`
-(falso solo per `via`) e `shared` (vero quando le righe di destinazione
+(falso solo per un `via` multi-hop) e `shared` (vero quando le righe di destinazione
 appartengono anche ad altri padri, così che una rimozione scolleghi invece di
 eliminare).
 

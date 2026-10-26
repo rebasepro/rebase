@@ -26,7 +26,8 @@ import {
     noteBlank,
     warn,
     requireInteractive,
-    cloudRows
+    cloudRows,
+    grantForLink
 } from "./context";
 
 interface ProjectRow {
@@ -236,11 +237,22 @@ linkPath: projectLinkPath() }
         );
         return;
     }
+    // An unclaimed project outlives its link: it keeps running until it
+    // expires, and this directory was the only place its claim URL was read
+    // back from. Say so, with the URL, before the link goes.
+    const grant = grantForLink(link);
     removeLink();
+    if (grant) {
+        warn(
+            `Project ${link.slug ?? link.projectId} is unclaimed. Unlinking does not delete it: it runs until ${new Date(grant.expiresAt).toLocaleString()}, then it is deleted.`,
+            `To keep it, open ${grant.claimUrl} and sign in.`
+        );
+    }
     success("Unlinked from cloud project");
     emit(() => {}, { success: true,
 unlinked: true,
-linkPath: projectLinkPath() });
+linkPath: projectLinkPath(),
+unclaimed: grant ? { projectId: link.projectId, claimUrl: grant.claimUrl, expiresAt: grant.expiresAt } : null });
 }
 
 export async function selectOrgCommand(rawArgs: string[]): Promise<void> {

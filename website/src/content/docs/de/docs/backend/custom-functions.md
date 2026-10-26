@@ -1,5 +1,5 @@
 ---
-sourceHash: 9eaa953076c5923b
+sourceHash: 22d7c8bbab763065
 title: Eigene Funktionen (Custom Functions)
 sidebar_label: Custom Functions
 description: Fügen Sie eigene Hono-API-Endpunkte neben Ihren Rebase-CRUD-Routen hinzu. Automatische Erkennung aus einem Verzeichnis, mit vollem Zugriff auf die Backend-Instanz.
@@ -50,8 +50,8 @@ import { createRebaseClient } from "@rebasepro/client";
 const client = createRebaseClient({ baseUrl: "http://localhost:3000" });
 
 const { message } = await client.functions.invoke<{ message: string }>(
-    "hello",                 // der Dateiname ohne Erweiterung — ein Pfadsegment
-    { name: "Ada" }          // JSON-Body; bei einem GET weggelassen
+    "hello",                 // the filename, without extension — one path segment
+    { name: "Ada" }          // JSON body; omitted for a GET
 );
 ```
 
@@ -62,19 +62,19 @@ Funktion den Aufrufer erreicht, anstelle einer einfachen `fetch`-Rejection.
 Vier Dinge, die über den Namen hinaus akzeptiert werden:
 
 ```typescript
-// Eine andere Methode. Die Payload wird bei GET verworfen, da GET keinen Body hat.
+// A different method. The payload is dropped for GET, since GET has no body.
 await client.functions.invoke("hello", undefined, { method: "GET" });
 
-// Ein Unterpfad — `/api/functions/hello/stats`. Gehört hierhin, niemals in den Namen:
-// Ein Name, der "/" enthält, wird abgelehnt, anstatt per Percent-Encoding in einen 404 umgewandelt zu werden.
+// A sub-path — `/api/functions/hello/stats`. It goes here, never in the name:
+// a name containing "/" is refused rather than percent-encoded into a 404.
 await client.functions.invoke("hello", undefined, { method: "GET", path: "stats" });
 
-// Ein Query-String. Übergeben als `path`, ohne Trennzeichen vor `?`.
+// A query string. Passed as `path`, with no separator inserted before `?`.
 await client.functions.invoke("reports", undefined, { method: "GET", path: "?days=30" });
 
-// Eine Funktion, die Text oder eine Datei zurückgibt (`c.text(csv)`, `c.body(pdf)`).
-// Die Antwort wird als JSON interpretiert, sofern nicht anders angegeben: "text" liefert einen String,
-// "blob" ein Blob, "response" das unverarbeitete Response-Objekt selbst.
+// A function that answers text or a file (`c.text(csv)`, `c.body(pdf)`).
+// The answer is read as JSON unless you say otherwise: "text" gives a string,
+// "blob" a Blob, "response" the Response itself with its body unread.
 const csv = await client.functions.invoke<string>("export-orders", undefined, { method: "GET", responseType: "text" });
 ```
 
@@ -97,7 +97,7 @@ Den vollständigen Vertrag finden Sie unter [Portabilität der Laufzeitumgebung]
 ## Konfiguration
 
 :::note[Wo dies hingehört]
-**Managed Runtime:** Nichts zu konfigurieren — die Runtime erkennt `backend/functions/` automatisch (`functions` im `rebase.json`-Eintrag der Backend-App, falls verschoben). `REBASE_FUNCTIONS_ONLY` / `REBASE_FUNCTIONS_EXCLUDE` schränken ein, welche Funktionen ein Prozess bereitstellt.
+**Managed Runtime:** Nichts zu konfigurieren — die Runtime erkennt `backend/functions/` automatisch (`functions` im `rebase.json`-Eintrag der Backend-App, falls verschoben). `REBASE_FUNCTIONS_ONLY` / `REBASE_FUNCTIONS_EXCLUDE` schränken ein, welche Funktionen ein Prozess mit `REBASE_ROLE=functions` bereitstellt; jede andere Rolle verweigert den Start, wenn sie gesetzt sind.
 **Ejected:** `initializeRebaseBackend({ functionsDir })`, oder `functions` (unten), in `backend/src/index.ts`.
 :::
 
@@ -107,7 +107,7 @@ Aktivieren Sie Custom Functions, indem Sie `functionsDir` zu Ihrer Backend-Konfi
 import path from "path";
 
 const instance = await initializeRebaseBackend({
-    // ... sonstige Konfiguration
+    // ... other config
     functionsDir: path.resolve(__dirname, "../functions"),
 });
 ```
@@ -116,7 +116,7 @@ Rebase wird:
 
 1. Das Verzeichnis nach `.ts`- / `.js`-Dateien durchsuchen
 2. Prüfen, ob jeder Standardexport eine Hono-App ist (Duck-Typing über `.fetch()` + `.routes`)
-3. Jede App unter `/api/functions/<Dateiname>` einbinden
+3. Jede App unter `/api/functions/<filename>` einbinden
 4. Die Auth-Middleware anwenden (siehe [Authentifizierung](#authentifizierung-und-kontextweitergabe) unten)
 
 ### Funktionen als Werte
@@ -131,7 +131,7 @@ import { initializeRebaseBackend, loadFunctions } from "@rebasepro/server";
 import sendInvoice from "../functions/send-invoice";
 
 await initializeRebaseBackend({ app, server, functions: { "send-invoice": sendInvoice } }); // → /api/functions/send-invoice
-// Entspricht functionsDir:
+// the same as functionsDir:
 await initializeRebaseBackend({ app, server, functions: await loadFunctions(path.resolve(__dirname, "../functions")) });
 ```
 
@@ -230,16 +230,16 @@ export default defineFunction((app) => {
 import { defineFunction, requireAuth, requireAdmin, requireRole, getUserId } from "@rebasepro/server/functions";
 
 export default defineFunction((app) => {
-    // Öffentlicher Endpunkt — kein Guard, jeder kann ihn aufrufen.
+    // Public endpoint — no guard, so anyone can call it.
     app.get("/public", (c) => c.json({ message: "Anyone can access this" }));
 
-    // 401 für anonyme Aufrufer.
+    // 401 for anonymous callers.
     app.post("/protected", requireAuth, (c) => c.json({ message: `Hello, ${getUserId(c)}` }));
 
-    // 401 anonym, 403 ohne Admin-Rolle. Reihenfolge ist wichtig.
+    // 401 anonymous, 403 without the admin role. Order matters.
     app.post("/admin-only", requireAuth, requireAdmin, (c) => c.json({ ok: true }));
 
-    // Jede der genannten Rollen.
+    // Any one of the named roles.
     app.post("/publish", requireAuth, requireRole("editor", "admin"), (c) => c.json({ ok: true }));
 });
 ```
@@ -258,12 +258,12 @@ Das Auslesen von `getUser(c)` ist **kein** Guard. Ein anonymer Aufrufer erhält 
 import { defineFunction, requireAuth, requireScope, hasScope } from "@rebasepro/server/functions";
 
 export default defineFunction((app) => {
-    // 403 SCOPE_MISSING, es sei denn, der Aufrufer besitzt project:deploy oder project:deploy:<dieses Projekt>.
+    // 403 SCOPE_MISSING unless the caller holds project:deploy, or project:deploy:<this project>.
     app.post("/:project", requireAuth, requireScope("project:deploy", c => c.req.param("project")), (c) => {
         return c.json({ deploying: c.req.param("project") });
     });
 
-    // Dieselbe Prüfung innerhalb eines Handlers.
+    // The same question inside a handler.
     app.get("/:project/can-deploy", requireAuth, (c) => c.json({ allowed: hasScope(c, "project:deploy", c.req.param("project")) }));
 });
 ```
@@ -373,7 +373,7 @@ Lesen Sie Konfigurationen **innerhalb** des Handlers aus, niemals auf Modulebene
 ```typescript
 import { defineFunction, requireEnv, lazyResource } from "@rebasepro/server/functions";
 
-// Wird einmalig bei der ersten Anfrage erstellt, die es benötigt — nicht beim Import.
+// Built once, on the first request that needs it — not at import time.
 const apiKey = lazyResource((env) => env.PRICING_API_KEY ?? "");
 
 export default defineFunction((app) => {
@@ -390,9 +390,9 @@ export default defineFunction((app) => {
 Warum dies auf **jeder** Laufzeitumgebung, einschließlich Node, wichtig ist:
 
 ```typescript no-verify
-// Nicht empfohlen: Ist STRIPE_SECRET_KEY nicht gesetzt, schlägt dies bereits beim
-// Importieren der Datei fehl — und der Loader meldet dies als *übersprungene Funktion*.
-// Die Route gibt 404 zurück, und der Grund ist in einem Boot-Log-Eintrag vergraben.
+// Don't. If STRIPE_SECRET_KEY is unset, this throws while the file is being
+// imported — and the loader reports that as a *skipped function*. The route
+// 404s, with the reason buried in a boot log line.
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
 ```
 
@@ -415,7 +415,7 @@ import { defineFunction, requireAuth, waitUntil } from "@rebasepro/server/functi
 export default defineFunction((app, { rebase }) => {
     app.post("/orders", requireAuth, async (c) => {
         const order = await c.req.json();
-        // Der Aufrufer wartet nicht hierauf, das Herunterfahren des Servers jedoch schon.
+        // The caller does not wait for this, but shutdown does.
         waitUntil(c, rebase.email.send({
             to: "warehouse@example.com",
             subject: "New order",
@@ -509,10 +509,10 @@ Das bedeutet, dass Ihre Custom Functions Zugriff auf alle initialisierten Servic
 ```typescript no-verify
 const app = new Hono<HonoEnv>();
 
-// Dies läuft VOR den Rebase-Routen
+// This runs BEFORE Rebase routes
 app.get("/health", (c) => c.json({ status: "ok" }));
 
-// Rebase-Initialisierung — registriert alle /api/*-Routen
+// Rebase initialization — registers all /api/* routes
 const instance = await initializeRebaseBackend({ app, /* ... */ });
 ```
 
@@ -525,12 +525,12 @@ Routen, die Sie Ihrer eigenen App auf diese Weise hinzufügen, liegen **außerha
 ```typescript
 import { defineFunction, requireEnv, waitUntil, lazyResource } from "@rebasepro/server/functions";
 
-/** Wird bei der ersten Anfrage aus der Konfiguration dieser Anfrage erstellt. */
+/** Constructed on the first request, from that request's configuration. */
 const secret = lazyResource((env) => env.STRIPE_WEBHOOK_SECRET ?? "");
 
 export default defineFunction((app, { rebase }) => {
-    // Bewusst öffentlich: Stripe sendet kein Token mit. Die Signatur ist die
-    // Authentifizierung und muss daher vor allem anderen validiert werden.
+    // Deliberately public: Stripe has no token to send. The signature is the
+    // authentication, so verify it before doing anything else.
     app.post("/", async (c) => {
         const signature = c.req.header("stripe-signature");
         const body = await c.req.text();
@@ -548,7 +548,7 @@ export default defineFunction((app, { rebase }) => {
                 stripe_id: session.subscription,
                 status: "active",
             });
-            // Die Abwicklung kann über die Antwort hinausgehen; der 200-Status teilt Stripe mit, keine weiteren Retrys zu senden.
+            // Fulfilment can outlive the response; the 200 tells Stripe to stop retrying.
             waitUntil(c, notifyFulfilment(requireEnv(c, "FULFILMENT_URL"), session));
         }
 
@@ -562,7 +562,7 @@ declare function notifyFulfilment(url: string, session: Record<string, string>):
 
 ## Fehlerbehebung (Debugging)
 
-Wenn eine Funktion erfolgreich geladen wurde, sehen Sie:
+Wenn Funktionen geladen werden, protokolliert der Boot `Loaded custom functions` mit deren Anzahl. Die Zeile jeder einzelnen Funktion wird auf `debug` protokolliert (`LOG_LEVEL=debug`):
 
 ```
 ⚡ Loaded function route: hello
@@ -575,6 +575,8 @@ Wenn das Laden fehlschlägt, gibt der Loader Diagnoseinformationen aus:
   export type: object (SomeClass)
   prototype methods: constructor, someMethod
   Hint: ensure the function exports a Hono app created with the same hono version as the server.
+  Author with `defineFunction(...)` from @rebasepro/server/functions for a typed, checked contract.
+  The loader checks for .fetch() and .routes — any Hono-compatible app will work.
 ```
 
 Der Router wird für das **Verzeichnis** gemountet, nicht für die einzelnen darin enthaltenen Funktionen. Sollte der Import aller Dateien fehlschlagen — eine einzige fehlende Umgebungsvariable auf Modulebene reicht aus, um alle zu blockieren —, antwortet `GET /api/functions` dennoch mit `200` mit einer leeren Liste sowie einem `skipped`-Zähler. So lässt sich unterscheiden, ob "nichts geladen werden konnte" oder "dieser Build keine Funktionen enthielt". Das Listing selbst erfordert einen authentifizierten Aufrufer, einen API-Schlüssel mit dem Scope `functions:invoke` oder den Service-Key — die Funktionen bleiben für jeden aufrufbar, den sie jeweils zulassen, aber die Liste der Funktionen ist nicht öffentlich. Die genauen Ursachen verbleiben im Boot-Log.

@@ -1,4 +1,4 @@
-import { CollectionConfig, ResolvedRelation } from "@rebasepro/types";
+import { CollectionConfig, Property, ResolvedRelation } from "@rebasepro/types";
 import { apiHiddenFieldNames, findRelation, resolveCollectionRelations } from "@rebasepro/common";
 import { namesHiddenFromCaller } from "./field-viewer";
 import { ApiError } from "@rebasepro/server";
@@ -125,6 +125,42 @@ export function isJunctionBackedRelation(relation: ResolvedRelation): boolean {
 }
 
 /**
+ * Reject a create or update whose body names a relation Rebase does not write
+ * — a multi-hop `via` (`writable: false`) — before anything is read or written.
+ *
+ * A single-hop `via` is written through this door as it shipped (to-one: the
+ * target's key; to-many: one junction's rows). A longer chain used to get as
+ * far as the writer: a to-many one failed inside the transaction as a 500
+ * RELATION_MISCONFIGURED telling the caller to regenerate a schema that was
+ * fine, and a to-one one re-pointed the target at the first step's column.
+ *
+ * Matched the way the write path matches: a key that is a relation's own name
+ * (the to-many split), or a `relation` property that resolves to one (the
+ * to-one transformer). An `undefined` value is no value — the transformer skips
+ * it — so it is not a write; `null` is, since it would unlink.
+ */
+export function assertNoReadOnlyRelationValues(values: Record<string, unknown>, collection: CollectionConfig): void {
+    const properties: Record<string, Property | undefined> = collection.properties ?? {};
+    let relations: Record<string, ResolvedRelation> | undefined;
+    const named: string[] = [];
+    for (const [key, value] of Object.entries(values)) {
+        if (value === undefined) continue;
+        relations ??= resolveCollectionRelations(collection);
+        const relation = relations[key] ?? (properties[key]?.type === "relation" ? findRelation(relations, key) : undefined);
+        if (relation && !relation.writable) named.push(key);
+    }
+    if (named.length === 0) return;
+    const list = named.map(key => `'${key}'`).join(", ");
+    throw ApiError.badRequest(
+        `${list} on '${collection.slug}' ${named.length > 1 ? "are multi-hop `via` relations" : "is a multi-hop `via` relation"}, ` +
+        "which is read-only: only single-hop via relations are writable — a to-one chain of one step, or a to-many " +
+        "chain through one junction table. Write the rows the chain joins directly.",
+        "RELATION_NOT_WRITABLE",
+        { collection: collection.slug, fields: named }
+    );
+}
+
+/**
  * Reject a nested write whose final segment is a to-one relation.
  *
  * There is no column on the target row that records a to-one parent — the
@@ -137,17 +173,25 @@ export function isJunctionBackedRelation(relation: ResolvedRelation): boolean {
 export function assertWritableThrough(hop: NestedPathHop, path: string): void {
     const { relation } = hop;
 
-    // Read the flag rather than re-deriving the rule. This guard used to test
-    // `cardinality !== "many"`, which let a to-many `via` through even though
-    // its type declares `writable: false` — a second expression of one rule,
-    // free to disagree with the first, which is the shape of defect this union
-    // exists to remove.
-    if (relation.writable && relation.cardinality === "many") return;
+    // A `via` first, by kind: a single-hop one is `writable` through a create
+    // or update of the parent, but this door creates or updates the *child*
+    // under the parent's path and links it — and there is no link-stamping for
+    // a join chain here, so a create would land unlinked. The nested door has
+    // always refused every `via`; it still does.
+    //
+    // Otherwise read the flag rather than re-deriving the rule. This guard
+    // used to test `cardinality !== "many"` — a second expression of one rule,
+    // free to disagree with the first, which is the shape of defect the
+    // resolved union exists to remove.
+    if (relation.kind !== "via" && relation.writable && relation.cardinality === "many") return;
 
-    if (!relation.writable) {
+    if (relation.kind === "via") {
         throw ApiError.badRequest(
-            `"${path}" ends in '${hop.relationKey}', a \`via\` relation. Rebase will not infer how to write ` +
-            `through an arbitrary join chain — write the row at "${hop.targetCollection.slug}" directly.`,
+            `"${path}" ends in '${hop.relationKey}', a \`via\` relation, which a nested path does not write ` +
+            `through — write the row at "${hop.targetCollection.slug}" directly` +
+            (relation.writable
+                ? `, and link it by setting '${hop.relationKey}' in an update of the '${hop.parentCollection.slug}' row.`
+                : "."),
             "RELATION_NOT_WRITABLE"
         );
     }

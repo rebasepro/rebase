@@ -11,6 +11,7 @@ import { logger } from "../utils/logger.js";
 import { isSQLAdmin, type DataDriver } from "@rebasepro/types";
 import {
     ensureMetricsHistory,
+    adoptExistingMetricsHistory,
     recordSamples,
     readSeries,
     sampleSelf,
@@ -43,7 +44,13 @@ function sqlExecutorOf(driver: DataDriver): Exec | undefined {
  * chart that renders empty is indistinguishable from a quiet period and this is
  * exactly the class of silence the panel it feeds exists to remove.
  */
-export function createMetricsHistory(driver: DataDriver): MetricsHistory | undefined {
+export function createMetricsHistory(
+    driver: DataDriver,
+    options: {
+        /** Default `true`. `false` uses the table if it is there and never creates it. */
+        provision?: boolean;
+    } = {}
+): MetricsHistory | undefined {
     const exec = sqlExecutorOf(driver);
     if (!exec) {
         logger.debug("[metrics] driver has no SQL admin — no metrics history will be kept.");
@@ -51,7 +58,7 @@ export function createMetricsHistory(driver: DataDriver): MetricsHistory | undef
     }
 
     return {
-        ensure: () => ensureMetricsHistory(exec),
+        ensure: () => options.provision === false ? adoptExistingMetricsHistory(exec) : ensureMetricsHistory(exec),
         read: (series, sinceMinutes) => readSeries(exec, series, sinceMinutes),
         start(): () => void {
             // Which process this is. A tenant's replicas share one database and

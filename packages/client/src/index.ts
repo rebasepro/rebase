@@ -187,10 +187,17 @@ export interface CreateRebaseClientOptions extends RebaseClientConfig {
      */
     storageSources?: StorageSourceDefinition[];
     /**
-     * Maps camelCase property names / safe identifiers to the actual
-     * collection slugs on the server (e.g. `{ companyMembers: "company-members" }`).
-     * If provided, the data layer proxy will resolve property accessors to their
-     * correct slugs via this map before falling back to automatic snake_casing.
+     * Maps each `client.data` accessor to the collection slug the server
+     * serves (e.g. `{ companyMembers: "company-members" }`): the generated
+     * `collectionsDictionary`.
+     *
+     * **Required for a typed client** (`createRebaseClient<Database>`). The
+     * types offer every accessor, but without the map the proxy sends
+     * `client.data.companyMembers` to `/data/company_members`, so a kebab-case
+     * slug or a renamed accessor (`collectionCollection`) answers 404; a
+     * one-time warning names the accessor. With the map, an unknown accessor
+     * throws `UNKNOWN_COLLECTION` with a suggestion. A later version will make
+     * it required in the types when `Database` is supplied.
      */
     collections?: Record<string, string>;
     /**
@@ -272,7 +279,19 @@ type TypedDataLayer<DB> = {
  * capabilities populated and the `data` layer narrowed to provide
  * typed collection accessors when a `DB` schema generic is supplied.
  */
-export type CreateRebaseClientResult<DB = Record<string, unknown>> = Omit<RebaseClient<DB>, "data" | "email"> & {
+export type CreateRebaseClientResult<DB = Record<string, unknown>> = Omit<RebaseClient<DB>, "data" | "email" | "simulate"> & {
+    /**
+     * A client whose data requests run with simulated access — as a role, a
+     * uid holding a role, or a service key — for an administrator checking
+     * what row-level security lets that identity read. See
+     * {@link RebaseClient.simulate} for what the server honours and refuses.
+     *
+     * Always present here, typed by the same `Database` (it is built with the
+     * same `collections` dictionary), and closable: it is a client of its own,
+     * so release it with `close()` when done. On `RebaseClient` it is optional
+     * and untyped, because a server-side client has none.
+     */
+    simulate: (simulation: AccessSimulation) => CreateRebaseClientResult<DB>;
     /**
      * Send this token from now on, over HTTP and on the realtime socket. An
      * open socket is rebuilt to authenticate with it. A token getter, when one
@@ -725,8 +744,8 @@ export function createRebaseClient<DB = Record<string, unknown>>(options: Create
             // user (or switches to whoever it really is); a refusal means
             // there is no session, and the device is signed out.
             let confirming = false;
-            offlineManager.api.onStatusChange((status) => {
-                if (!status.online || !status.unverifiedUser || confirming || auth.getSession()) return;
+            const confirm = () => {
+                if (confirming || auth.getSession()) return;
                 confirming = true;
                 auth.refreshSession().catch((error: unknown) => {
                     const refused = error instanceof RebaseApiError
@@ -735,7 +754,13 @@ export function createRebaseClient<DB = Record<string, unknown>>(options: Create
                 }).finally(() => {
                     confirming = false;
                 });
+            };
+            offlineManager.api.onStatusChange((status) => {
+                if (status.online && status.unverifiedUser) confirm();
             });
+            // A read made while unconfirmed reached the server — the
+            // connection is back even when the status never said it was gone.
+            offlineManager.onReachedUnconfirmed(confirm);
         }
     }
 
@@ -808,15 +833,22 @@ export function createRebaseClient<DB = Record<string, unknown>>(options: Create
             }
             // Untyped fallback: convert camelCase property names to snake_case slugs.
             // e.g. `companyMembers` → `company_members`
+            const slug = toSnakeCase(prop);
             if (!untypedWarned) {
                 untypedWarned = true;
+                // Once per client, and it names everything needed to act:
+                // which accessor, where it went, and the two fixes. A typed
+                // client (`createRebaseClient<Database>`) without the
+                // dictionary compiles every accessor and 404s on any slug that
+                // is not the accessor in snake_case.
                 console.warn(
-                    `[Rebase] Untyped data access detected (client.data.${prop}). ` +
-                    `Collection names are resolved via snake_case conversion, which may cause silent 404s at request time. ` +
-                    `Pass a \`collections\` dictionary to createRebaseClient() or use the generated SDK for type-safe access.`
+                    `[Rebase] Untyped data access detected: client.data.${prop} was sent to /data/${slug}, ` +
+                    `its name in snake_case, because this client has no \`collections\` dictionary. ` +
+                    `A collection whose slug is not that (a kebab-case slug, a renamed accessor) answers 404. ` +
+                    `With generated types, pass \`collections: collectionsDictionary\` (from generated/sdk/database.types) ` +
+                    `to createRebaseClient(); a typed client needs it. Otherwise use client.data.collection("<slug>").`
                 );
             }
-            const slug = toSnakeCase(prop);
             return collection(slug);
         },
         // `"posts" in client.data` answers what `get` serves: with a
@@ -919,13 +951,13 @@ export function createRebaseClient<DB = Record<string, unknown>>(options: Create
             onUnauthorized = handler;
         },
         resolveToken: transport.resolveToken,
-        simulate: (simulation: AccessSimulation): RebaseClient<Record<string, unknown>> => {
+        simulate: (simulation: AccessSimulation): CreateRebaseClientResult<DB> => {
             // A data client and nothing more: no socket (the server honours
             // the headers over HTTP only), no offline store (simulated rows
             // must never land in the administrator's cache), no session of its
             // own — the token is this client's, asked for on every request, so
             // this client's session is the one that refreshes.
-            const derived = createRebaseClient({
+            const derived = createRebaseClient<DB>({
                 baseUrl: options.baseUrl,
                 apiPath: options.apiPath,
                 fetch: options.fetch,

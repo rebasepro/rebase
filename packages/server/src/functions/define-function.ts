@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import type { RebaseServerClient, RegisteredDatabase } from "@rebasepro/types";
 import type { HonoEnv } from "../api/types";
 import { rebase } from "../singleton";
+import { isHonoLike } from "./hono-like";
 
 /**
  * Typed context injected into a function authored with {@link defineFunction}.
@@ -99,6 +100,8 @@ export function defineFunction<DB = RegisteredDatabase>(
     definition: (app: Hono<HonoEnv>, ctx: RebaseFunctionContext<DB>) => void | Hono<HonoEnv>
 ): Hono<HonoEnv> {
     const app = new Hono<HonoEnv>();
-    const returned = definition(app, { rebase: typedSingleton<DB>() });
-    return returned instanceof Hono ? returned : app;
+    const returned: unknown = definition(app, { rebase: typedSingleton<DB>() });
+    // Duck-typed, as the loader does: an app from another copy of `hono` is
+    // not `instanceof` this one, and was replaced by the empty `app`.
+    return isHonoLike(returned) ? returned as Hono<HonoEnv> : app;
 }

@@ -1,5 +1,5 @@
 ---
-sourceHash: fa5ea5eeb92e1460
+sourceHash: d672b029e72aca9e
 title: La API context.data
 sidebar_label: API context.data
 description: Lee y escribe otras colecciones desde un callback con context.data — sus métodos, los privilegios con los que se ejecuta, la semántica transaccional y la conexión que ocupa un callback.
@@ -38,10 +38,10 @@ Cada descriptor de acceso a la colección (`context.data.<slug>`) proporciona es
 
 | Método | Firma | Descripción |
 |--------|-----------|-------------|
-| `.find()` | `find(params?: FindParams) → FindResponse` | Consulta entidades con filtros, ordenación y paginación |
-| `.findById()` | `findById(id: string \| number) → Entity \| undefined` | Obtiene una sola entidad por ID |
-| `.create()` | `create(data: Partial<Values>, id?: string) → Entity` | Crea una nueva entidad |
-| `.update()` | `update(id: string \| number, data: Partial<Values>) → Entity` | Actualiza una entidad existente |
+| `.find()` | `find(params?: FindParams) → FindResult` | Consulta entidades con filtros, ordenación y paginación |
+| `.findById()` | `findById(id: string \| number) → Row \| undefined` | Obtiene una sola fila por ID |
+| `.create()` | `create(data: Insert, id?: string \| number) → Row` | Crea una nueva fila y la devuelve tal como quedó almacenada |
+| `.update()` | `update(id: string \| number, data: Update) → Row` | Actualiza una fila existente y la devuelve tal como quedó almacenada |
 | `.delete()` | `delete(id: string \| number) → void` | Elimina un registro |
 | `.count()` | `count(params?: FindParams) → number` | Cuenta las entidades que coinciden |
 | `.listen()` | `listen(params, onUpdate, onError?) → unsubscribe` | Suscripción en tiempo real (donde sea compatible) |

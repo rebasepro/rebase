@@ -89,6 +89,9 @@ export interface PendingMutation {
      *
      * An `update` or `delete` carries only the key: its queued request is the
      * one it sent, since nothing is merged into an op that has `sent`.
+     *
+     * A queued create or update is marked too, before its first replay goes
+     * out, for the same reason: from then on the server may hold it.
      */
     sent?: {
         idempotencyKey: string;
@@ -98,6 +101,13 @@ export interface PendingMutation {
         id?: string | number;
         /** `createMany`: the conflict target the batch was sent with. */
         onConflict?: readonly string[];
+        /**
+         * A `create` replayed folded into a `replayBatchSize` run: that run's
+         * key. While the run is still whole in the queue it is sent again as
+         * that same request; otherwise each member replays alone, under its
+         * own key.
+         */
+        run?: string;
     };
     queuedAt: number;
     /**

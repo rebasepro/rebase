@@ -1,8 +1,7 @@
 
-import React, { useEffect, useState, useCallback } from "react";
-;
-import { useApiBase, useApiConfig } from "@rebasepro/app";
-import { useAuthController } from "@rebasepro/app";
+import React, { useEffect, useState, useCallback, useMemo } from "react";
+import { useApiBase, useApiConfig, useAuthController, useRlsSimulation } from "@rebasepro/app";
+import { simulationHeaders } from "@rebasepro/types";
 import { formatRelativeTime, type RelativeTimeLabels } from "@rebasepro/utils";
 import { useUiLabels } from "@rebasepro/ui";
 import { HistoryEntryData } from "../../hooks";
@@ -19,7 +18,8 @@ function getRelativeTimeString(date: Date, labels: Partial<RelativeTimeLabels>):
 
 /**
  * Fetches the latest history entry from the backend API and displays
- * who last edited the entity and when.
+ * who last edited the entity and when — as the simulated identity while access
+ * is simulated, like the History tab.
  */
 export function LastEditedByIndicator({
     path,
@@ -34,6 +34,8 @@ export function LastEditedByIndicator({
     const apiBase = useApiBase();
     const authController = useAuthController();
     const relativeTimeLabels = useUiLabels().relativeTime;
+    const { simulation } = useRlsSimulation();
+    const simulated = useMemo(() => simulationHeaders(simulation), [simulation]);
     const [latestEntry, setLatestEntry] = useState<HistoryEntryData | undefined>();
 
     const fetchLatest = useCallback(async () => {
@@ -41,7 +43,7 @@ export function LastEditedByIndicator({
 
         try {
             const token = await apiConfig.getAuthToken?.();
-            const headers: Record<string, string> = {};
+            const headers: Record<string, string> = { ...simulated };
             if (token) headers["Authorization"] = `Bearer ${token}`;
 
             const url = `${apiBase}/data/${collection.slug}/${entityId}/history?limit=1&offset=0`;
@@ -49,15 +51,15 @@ export function LastEditedByIndicator({
 
             if (response.ok) {
                 const result = await response.json();
-                if (result.data && result.data.length > 0) {
-                    setLatestEntry(result.data[0]);
-                }
+                setLatestEntry(result.data?.[0]);
+            } else {
+                setLatestEntry(undefined);
             }
         } catch (error) {
             // Silently fail — this is a non-critical UI indicator
             console.debug("Failed to fetch latest history entry:", error);
         }
-    }, [apiConfig, apiBase, entityId, collection.slug]);
+    }, [apiConfig, apiBase, entityId, collection.slug, simulated]);
 
     useEffect(() => {
         fetchLatest();

@@ -97,7 +97,7 @@ Branch configurations are stored in the default database under the `rebase.branc
 CREATE SCHEMA IF NOT EXISTS rebase;
 
 CREATE TABLE IF NOT EXISTS rebase.branches (
-    name         TEXT PRIMARY KEY,              -- Sanitize user branch name (alphanumeric & underscores)
+    name         TEXT PRIMARY KEY,              -- Branch name as given (letters, digits, underscores, hyphens)
     db_name      TEXT NOT NULL UNIQUE,          -- Actual PostgreSQL database name (prefixed with 'rb_')
     parent_db    TEXT NOT NULL,                 -- Source database cloned from
     created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -284,12 +284,20 @@ database without touching the real one. Before any of it reaches the database
 the branch was made from, you can see what changed and merge it from
 [Studio](/docs/studio/): open **Branches** and pick one.
 
-- **Schema & RLS policies** lists every table, column, primary key and policy
-  the branch added, dropped or altered, as SQL, with the parent's definition
-  beside the branch's.
+- **Schema & RLS policies** lists every table, column, primary key,
+  constraint (unique, foreign key, check, exclusion), index, trigger, policy,
+  enum type (with its labels), view and function the branch added, dropped or
+  altered, as SQL, with the parent's definition beside the branch's.
 - **Data changes** counts, per table, the rows the branch inserted, updated and
-  deleted, matched by primary key, and shows up to 100 of them per table with
-  the columns that changed.
+  deleted, matched by primary key, and shows up to 100 of them per table (at
+  most 1,000 when you ask for more) with the columns that changed. A column
+  named like a credential — `password_hash`, a `*_token`, anything with
+  `secret` in it, a `*_hash` — shows `[redacted]` instead of its value.
+
+Reviewing a branch needs the `database:write` scope, the one that runs SQL as
+the database owner: the samples are rows of both databases, read outside
+row-level security. `database:read` lists branches but does not read their
+rows.
 
 The same diff is `rebase db branch diff <name>` in a terminal, `GET
 /api/admin/branches/<name>/diff` over HTTP, the `rebase_db_branch_diff` MCP
@@ -304,7 +312,9 @@ inserted after the branch was made looks exactly like a row the branch deleted.
 Rebase tells them apart by when each row was written. Transaction ids belong to
 the server, not to one database, and the template copy keeps them, so a row
 written after the branch was made — on either side — is younger than the
-transaction that created the branch database.
+transaction that created the branch database. That transaction is read when
+the branch is made and kept in its record, so a later `GRANT` or
+`ALTER DATABASE` on the branch database does not move it.
 
 | The branch's row | The parent's row | Counted as |
 | --- | --- | --- |
@@ -319,9 +329,11 @@ deleted and the parent then changed is kept, and a row the parent deleted and
 the branch then changed is the branch's insert. An `UPDATE` that writes the
 values a row already had still counts as a write.
 
-When the fork point cannot be read — a long-lived branch whose `pg_database`
-row a vacuum froze, or one renamed with `ALTER DATABASE` — the diff says so,
-and counts every difference as the branch's.
+A branch made before Rebase kept that transaction reads it from the branch
+database's `pg_database` row as it is now; anything that rewrote the row since
+moves it. When the fork point cannot be read at all — a long-lived branch
+whose row a vacuum froze — the diff says so, and counts every difference as
+the branch's.
 
 ### What a merge does
 
@@ -331,19 +343,39 @@ parent. What wins:
 - **Rows only the branch changed** are written: inserted, overwritten or
   deleted.
 - **Rows only the parent changed** since the branch was made are left exactly as
-  they are.
+  they are — unless one references a row the branch deleted, which is a
+  conflict (below).
 - **Rows both changed** are conflicts. By default the merge writes nothing at
   all; choose `onConflict: "branch"` to write the branch's row over the
   parent's, or `"target"` to keep the parent's.
+- **A row the branch deleted that the parent's newer rows still reference** is
+  a conflict too. Say the branch deleted an author, and the parent has since
+  written a post by them: deleting the author on the parent would cascade into
+  that post, null its column, or fail on the foreign key. The diff counts the
+  author as a conflict and names the referencing rows (`referencedBy`: the
+  table, the foreign key, its `ON DELETE` and how many rows). By default the
+  merge refuses, naming the table, the rows and the way out; `"target"` keeps
+  the author, and with it the post; `"branch"` deletes the author, lets the
+  foreign key do what it says, and lists what it reached in `warnings`.
 - **Schema and policy changes are never merged.** They belong to your
   collections and their migrations: apply them with `rebase db push` (or
   `migrate`), then merge the rows.
 
 A table whose rows cannot be matched blocks the merge: one the branch added or
 dropped, one whose columns or primary key differ between the two, one with no
-primary key, or one with more than 100,000 rows on a side. Pass `skipBlocked`
-(in Studio, tick **Merge the other tables**) to merge the rest and leave those
-alone.
+primary key, or one with more than 100,000 rows on a side. Its counts read 0,
+because which rows changed is not known; `rowCounts` gives each side's row
+count. A table like that which only the parent changed — the branch wrote none
+of its rows, and the ones from before the fork are the same — is not blocked.
+Pass `skipBlocked` (in Studio, tick **Merge the other tables**) to merge the
+rest and leave those alone.
+
+A table rewritten since the branch was made is blocked too (`TABLE_REWRITTEN`).
+A column type change, an `ADD COLUMN` with a volatile default, `VACUUM FULL` or
+`CLUSTER` writes every row anew, so every row reads as written since and which
+side changed what can no longer be told. When the branch changed a column's
+type, merge its rows before applying that change to the parent, or make the
+branch again after it.
 
 Every write happens in one statement on the parent — all of it, or none of it,
 foreign keys checked at its end. A merge carries the `fingerprint` of the diff

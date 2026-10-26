@@ -1,7 +1,7 @@
 ---
 title: MCP Server
 sidebar_label: MCP Server
-description: Connect Claude Code, Cursor, Gemini CLI or any MCP client to a Rebase project — the 42 tools it exposes, the credential it authenticates with, and the loopback gate that stands between an agent and production.
+description: Connect Claude Code, Cursor, Gemini CLI or any MCP client to a Rebase project — the 51 tools it exposes, the credential it authenticates with, and the loopback gate that stands between an agent and production.
 ---
 
 `@rebasepro/mcp` is a [Model Context Protocol](https://modelcontextprotocol.io)
@@ -17,7 +17,7 @@ shows you the config block.
 
 A deployed backend can also serve MCP itself, over HTTP, to the people who use
 your application. That is a different thing with a different credential model:
-see [The remote endpoint](#the-remote-endpoint).
+see [The Remote MCP Endpoint](/docs/ai/remote-mcp/).
 
 ## Connecting a client
 
@@ -166,10 +166,18 @@ only switch in the package opts *in* to more reach rather than less.
 
 Which credential that is, in priority order:
 
-1. `REBASE_API_TOKEN` / `REBASE_TOKEN` from the environment
+1. `REBASE_API_TOKEN` from the environment. `REBASE_TOKEN` is not read here:
+   it is the CLI's control-plane token, and it is never sent to the app (the
+   server says so once on stderr when it is the only one set). The cloud tools
+   still pass it to the CLI they spawn, which sends it to the control plane.
 2. `REBASE_SERVICE_KEY` read out of the project's `.env`
 3. The service key auto-discovered from `.rebase/state.json` while `rebase dev`
    is running
+
+2 and 3 are this machine's dev backend's key, used only when the target is on
+loopback. When `REBASE_BASE_URL` points elsewhere — <span class="since-badge" data-since="0.26">Since 0.26</span> `rebase cloud init --claim`
+writes the cloud project's address, and no `REBASE_API_TOKEN` until a deploy
+succeeds — the server sends no token and says so once on stderr.
 
 A token you register for a project **wins over auto-discovery**. Discovery only
 fills a gap.
@@ -296,11 +304,17 @@ on the loopback interface.** The gate is written as a list of what is *not*
 gated, so a tool added later arrives protected by default.
 
 - **Not gated — reads:** `rebase_schema_plan`, `rebase_doctor`,
-  `rebase_db_branch_list`, `rebase_db_branch_info`, `list_documents`,
+  `rebase_db_branch_list`, `rebase_db_branch_info`, `rebase_db_branch_diff`, `list_documents`,
   `get_document`, `list_users`, `list_roles`, `storage_list_objects`,
   `storage_get_download_url`, `cron_list_jobs`, `cron_get_job`, `cron_get_job_logs`,
-  `rebase_dev_logs`.
-- **Not gated — local only:** `rebase_schema_introspect`, `rebase_schema_generate`, `rebase_db_generate`,
+  `rebase_dev_logs`, and <span class="since-badge" data-since="0.26">Since 0.26</span> the Rebase Cloud reads `rebase_cloud_status`,
+  `rebase_cloud_logs`, `rebase_cloud_env_list`, `rebase_cloud_deployments_list`.
+- **Not gated — Rebase Cloud writes:** `rebase_cloud_provision`,
+  `rebase_cloud_deploy`, `rebase_cloud_env_set`, `rebase_cloud_rollback`.
+  Provisioning creates a project; the others change a production project. None
+  of them goes through `baseUrl` or `DATABASE_URL`, which are all the gate can
+  check. See [Rebase Cloud](#rebase-cloud) for what stands in front of them.
+- **Not gated — local only:** `rebase_schema_introspect`, `rebase_db_branch_switch`, `rebase_schema_generate`, `rebase_db_generate`,
   `rebase_generate_sdk`, the dev-server tools and the project-registry tools.
   These write local files or local state and have no remote target to check.
 - **Gated against `DATABASE_URL`:** the remaining CLI tools — `rebase_db_push`,
@@ -309,7 +323,7 @@ gated, so a tool added later arrives protected by default.
   `create_document`, `update_document`, `delete_document`, `create_user`,
   `update_user`, `delete_user`, `rebase_auth_reset_password`,
   `storage_delete_object`, `cron_trigger_job`, `cron_toggle_job`,
-  `invoke_function`.
+  and `invoke_function`.
 
 The two targets are not interchangeable. CLI tools never see `baseUrl`, so a
 localhost backend sitting next to a production `DATABASE_URL` is checked against
@@ -341,7 +355,8 @@ From a terminal,
 `rebase db push` and `rebase db migrate` do run on that database; only the MCP
 tools are refused. On 0.24 the CLI refuses them there too.
 
-Only loopback counts as local: `localhost`, `*.localhost`, `127.0.0.0/8`, `::1`.
+Only loopback counts as local: `localhost`, `*.localhost`, `127.0.0.0/8`, `::1`
+(and `0.0.0.0`).
 Private ranges like `10.x` and `192.168.x` do **not** — those are as likely to be
 a shared staging cluster as a laptop, and treating them as local would wave
 through exactly the accident the gate exists to stop.
@@ -371,7 +386,7 @@ shaped like a marker is broken with a zero-width space, so a row that prints
 `<<<END_UNTRUSTED_DATA>>>` cannot end the envelope early and put what follows it
 outside.
 
-The [remote endpoint](#the-remote-endpoint) fences its tool results the same
+The [remote endpoint](/docs/ai/remote-mcp/) fences its tool results the same
 way and says so to the client; its `structuredContent` carries the plain result.
 `list_collections` and
 `describe_collection` are the exceptions: only a model reads them, so they are
@@ -413,10 +428,92 @@ Tokens are stored in that registry **in plaintext**. It is a file in your home
 directory holding admin credentials for every project you have registered; treat
 it accordingly.
 
+## Rebase Cloud
+
+<span class="since-badge" data-since="0.26">Since 0.26</span>
+
+Eight tools take an app from this directory to a live backend on
+[Rebase Cloud](/docs/deployment/cloud/) and keep it running. Each one spawns
+`rebase cloud <command> --json` in the active project directory: the same
+command a person runs, so there is no second implementation to drift from it.
+
+| Tool | Runs | Changes the project |
+|---|---|---|
+| `rebase_cloud_provision` | `rebase cloud init --claim` | Creates one, with no account |
+| `rebase_cloud_status` | `rebase cloud status` | No |
+| `rebase_cloud_deploy` | `rebase cloud deploy` | Yes |
+| `rebase_cloud_logs` | `rebase cloud logs [--runtime]` | No |
+| `rebase_cloud_env_list` | `rebase cloud env list` | No |
+| `rebase_cloud_env_set` | `rebase cloud env set KEY --stdin` | Yes, from the next deploy |
+| `rebase_cloud_deployments_list` | `rebase cloud deployments list` | No |
+| `rebase_cloud_rollback` | `rebase cloud rollback --yes` | Yes |
+
+The usual agent journey is: `rebase_cloud_provision`, then give the user the
+claim URL; `rebase_cloud_status` to see the project (while it is unclaimed,
+`unclaimed` carries the claim URL and when it is deleted); `rebase_cloud_deploy`
+after a change; `rebase_cloud_logs` when something misbehaves; and
+`rebase_cloud_rollback` when production is broken.
+
+**What they act on.** The project the active directory is linked to in
+`.rebase/cloud.json`. None of them takes a project id or a directory, so an
+assistant cannot point them at another project than the one the directory is
+linked to. Switching the active project with `rebase_project_switch` switches
+the directory they run in.
+
+**Whose authority.** Whatever the CLI resolves in that directory: `REBASE_TOKEN`
+when it is set, then the token `rebase cloud init --claim` stored for an
+unclaimed project, then the `rebase cloud login` session. In that unclaimed
+project's directory, a `REBASE_TOKEN` that holds no scope on the project is set
+aside for the project's own token. The control plane
+checks each call as it checks the CLI's, so with a token made by
+`rebase cloud tokens create --can logs` an assistant can read logs, and the
+control plane refuses its deploys, variables and rollbacks. No credential, or a refused one, comes back as an error that says what the
+user has to do (`rebase cloud login`, or claiming the project).
+
+**Why the loopback gate does not apply.** The gate checks the app's `baseUrl` and
+the CLI's `DATABASE_URL`; these tools use neither. After `rebase_cloud_provision`,
+`REBASE_BASE_URL` points at the new cloud project, so gating on it would refuse
+the very deploy the journey needs. Provisioning itself only creates: it touches
+no existing app or database, and the CLI still refuses it in a directory that
+is already linked. A deploy, a variable and a rollback each
+change production. What stands in front of them is the credential above and
+your MCP client's tool approval. To keep an assistant from changing a cloud
+project, set `REBASE_TOKEN` in the server's environment to a token without the
+`deploy` and `env` capabilities.
+
+Each tool is a snapshot:
+
+- `rebase_cloud_logs` never follows. Its result carries `nextSinceTime`; pass it
+  back as `since` to read what came after. It returns the last 200 lines unless
+  `tail` says otherwise. `source: "build"` returns the latest build log instead.
+- `rebase_cloud_deploy` follows the deployment to the end and checks that the new
+  version answers. `wait: false` returns as soon as the deployment is triggered.
+  It never ejects a project from the managed runtime, deploys an older framework
+  release, or skips the build checks: those are the user's decisions, and a
+  refusal that needs one says so.
+- `rebase_cloud_rollback` passes `--yes`. The tool call is the confirmation, since
+  there is no terminal to ask at.
+
+`rebase_cloud_env_set` writes the value to the CLI's standard input, so it is
+never on a command line where `ps` would show it, and the value is cut out of
+anything the tool returns. Its result says what was stored (the key, whether it
+is secret, whether a redeploy is pending), never the value. `rebase_cloud_env_list`
+lists keys only. A CLI older than `env set --stdin` is refused with a message to
+upgrade it; the value is not sent another way.
+
+Results come back in the [untrusted-data envelope](#untrusted-data-marking),
+behind one line from the server on what to do next. A refusal is a tool error
+that carries the CLI's code, such as `no_project`, `token_rejected`,
+`managed_project` or `deploy_failed`. When the server recognises the code, it
+adds the next step, then the CLI's own message. Every tool checks its arguments
+against the schema it advertises before anything is spawned, and refuses an
+argument it does not declare.
+
 ## Tool reference
 
-42 tools, in nine groups: schema and database, schema planning, documents, users
-and roles, storage, cron, functions, the dev server and the project registry.
+51 tools, in ten groups: schema and database, schema planning, documents, users
+and roles, storage, cron, functions, the dev server, the project registry and
+Rebase Cloud.
 Each one, with what it needs and whether the gate refuses it against a non-local
 target, is in the [MCP tool reference](/docs/ai/mcp-tool-reference).
 
@@ -443,75 +540,10 @@ see the resource offered.
 
 ## The remote endpoint
 
-Everything above is a developer tool: it runs on your machine and holds a service
-key or an API key. A deployed backend can also serve MCP itself, at `/mcp`, for
-the people who use your application. An assistant one of them connects reads and
-writes the project **as that person**, and every call runs under their own
-row-level security.
-
-It is off unless you turn it on, and both variables are required:
-
-```bash
-REBASE_MCP_ENABLED=true
-REBASE_PUBLIC_URL=https://app.example.com   # this deployment's real origin
-```
-
-Without `REBASE_PUBLIC_URL`, a JWT secret, or a data driver that can scope a query
-to one user, the endpoint declines to mount and says why in the boot log. No
-`REBASE_ROLE` turns it on.
-
-- **OAuth, with a consent screen.** A client finds the authorization server
-  through `/.well-known/oauth-protected-resource`, registers itself (dynamic
-  registration is on by default; `REBASE_MCP_OPEN_REGISTRATION=false` limits it
-  to clients you register), and sends the person to a consent screen that signs
-  them in through your existing `/auth/login`.
-- **Eight tools, three scopes.** The same [scopes](/docs/backend/roles-and-scopes/)
-  every credential uses. `data:read` offers `list_collections`, `describe_collection`,
-  `query_collection`, `count_documents` and `get_document`; `data:write` adds `create_document` and
-  `update_document`; `data:delete` adds `delete_document`. A client that asks for
-  nothing gets `data:read`. Each one narrows to a collection: `data:read:posts`
-  lists, describes and reads `posts` and nothing else. A scope decides which tools are
-  offered and which collections they reach, not which rows: an empty list can be
-  RLS working, and `data:write` still cannot write a row the person could not.
-- **Grants made before 0.24 keep their reach.** `mcp:read` is read as
-  `data:read`, and `mcp:write` as `data:write data:delete`, on stored grants and
-  on tokens already issued.
-- **An API key works too.** `/mcp` also accepts `Authorization: Bearer rk_…`, for
-  a client configured with a header rather than an OAuth flow. The key reaches
-  the tools its `data:*` scopes cover, as whoever it acts as: a
-  [personal key](/docs/backend/api-keys/#personal-keys) as its owner, a service key
-  as `api-key:<id>`.
-- **The SDK's vocabulary, REST's answers.** The tools take what the SDK takes —
-  `where` (`{"status": ["==", "paid"]}`), `orderBy` (`["created_at", "desc"]` or
-  `"created_at:desc"`), `limit`, `offset`, `searchString`, and `data` for a
-  write — and read through `GET /api/data/<collection>`'s path, so a row comes
-  back as REST serves it (ISO dates, a `belongsTo` as its foreign key, e.g.
-  `authorId`) and can be sent back in an update unchanged. `query_collection`
-  answers `{ data, meta }` with `meta.total` and `meta.hasMore`, and `count_documents`
-  `{ count }`. As on REST, a `limit` above 1000, an undeclared argument and an
-  edit or delete of a trashed row (404) are refused; setting the soft-delete
-  field to `null` restores it.
-- **The listing names the collections; `describe_collection` gives one's schema.**
-  `list_collections` answers each collection's `name`, `title` and `description`,
-  and `describe_collection { collection }` that collection's OpenAPI `row` and
-  `create` schemas, plus `softDeleteField` where rows go to a trash. The tool
-  descriptions tell the model to describe a collection before writing to it. A
-  200-collection project's listing is about 5k tokens, and each description
-  under 1k; with every schema in the listing it was about 150k.
-- **A token for this endpoint only.** An MCP access token is refused by
-  `/api/data`, `/api/admin` and the WebSocket, so connecting an assistant does not
-  hand it a session.
-
-One limit. Disconnecting a client (`DELETE /api/oauth/grants/:clientId`, with the
-person's own session) revokes its refresh tokens at once, but an access token
-already issued keeps working until it expires, within the hour. The same hour
-bounds everything else: every refresh re-reads the person's roles, and refuses
-an account that was deleted or a grant older than its last "sign out everywhere"
-or password change. So a demotion or a sign-out reaches a connected client
-within one access-token lifetime. A guest session cannot consent at all.
-
-The routes are in [Endpoints](/docs/backend/endpoints/#mcp-surface) and the
-variables in [Configuration](/docs/getting-started/configuration/#mcp-surface).
+A deployed backend can also serve MCP itself, at `/mcp`, to the people who use
+your application, each connecting as themselves under their own row-level
+security. That has its own page:
+[The Remote MCP Endpoint](/docs/ai/remote-mcp/).
 
 ## Recommended setup
 

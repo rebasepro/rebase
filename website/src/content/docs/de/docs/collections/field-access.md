@@ -1,5 +1,5 @@
 ---
-sourceHash: cd33d688b582283c
+sourceHash: 155fe61b0635a331
 title: Feldzugriff
 sidebar_label: Feldzugriff
 description: Lese- und Schreibberechtigungen auf Eigenschaftsebene nach Rolle. Ein Aufrufer, den die Sicherheitsregeln der Zeile durchlassen, erhält dennoch kein Feld, das seine Rollen nicht lesen dürfen.
@@ -179,7 +179,7 @@ Die Fallback-Suche – eine Collection ohne `search`-Block – führt ein `ILIKE
 Ihre String-Eigenschaften durch und überspringt diejenigen, die der Aufrufer nicht lesen kann. Hierbei
 leckt nichts nach außen.
 
-Eine Collection, die **tatsächlich** einen [`search`-Block](/docs/backend/api/) deklariert, kompiliert
+Eine Collection, die **tatsächlich** einen [`search`-Block](/docs/backend/search) deklariert, kompiliert
 zu einer einzelnen generierten `tsvector`-Spalte, die von allen Aufrufern geteilt wird. Es gibt keine
 rollenspezifische Variante davon, sodass ein eingeschränktes Feld, das in `search.fields` angegeben ist,
 für Aufrufer, die seinen Wert niemals sehen können, *durchsuchbar* bliebe – rekonstruierbar Begriff für
@@ -188,7 +188,7 @@ Begriff. Rebase verweigert diese Kombination beim Booten: Entfernen Sie das Feld
 
 ## Historie
 
-Die [Entity-Historie](/docs/backend/api/) speichert die gesamte Zeile und wird jedem
+Die [Entity-Historie](/docs/backend/history) speichert die gesamte Zeile und wird jedem
 bereitgestellt, der die Zeile lesen kann – die Zugangsbedingung lautet „Können Sie diese Entity abrufen?“,
 nicht „Sind Sie ein Admin?“. Daher wird die Leseregel auch auf jeden gespeicherten Snapshot angewendet:
 Der Eintrag wird weiterhin aufgeführt (mit der Information, wer ihn wann geändert hat), und die vorenthaltenen
@@ -239,7 +239,7 @@ die Regel überhaupt erst durchsetzbar: Irgendetwas muss in der Lage sein, den P
 
 Lesezugriffe über `rebase.dataAsAdmin` besitzen die Rolle `admin`, sodass eine Rollenregel
 nichts vor ihnen verbirgt. `[]` tut dies weiterhin – auch vor `dataAsAdmin`. Verwenden
-Sie [`rebase.sql()`](/docs/backend/api/), wenn Sie die rohe Spalte benötigen.
+Sie [`rebase.sql()`](/docs/backend/custom-functions), wenn Sie die rohe Spalte benötigen.
 
 ## Validierung
 

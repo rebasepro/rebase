@@ -30,7 +30,33 @@ export const authors = defineCollection({
             name: "Posts",
             type: "relation",
             relation: { kind: "hasMany", target: (): AnyCollectionConfig => posts, foreignKeyOnTarget: "author_id" }
+        },
+        profile: {
+            name: "Profile",
+            type: "relation",
+            relation: { kind: "hasOne", target: (): AnyCollectionConfig => profiles, foreignKeyOnTarget: "author_id" }
+        },
+        // A single-hop to-one `via`: the target holds the key, so it is writable.
+        profileVia: {
+            name: "Profile (via)",
+            type: "relation",
+            relation: {
+                kind: "via",
+                cardinality: "one",
+                target: (): AnyCollectionConfig => profiles,
+                joinPath: [{ table: "profiles", on: { from: "id", to: "author_id" } }]
+            }
         }
+    }
+});
+
+export const profiles = defineCollection({
+    name: "Profiles",
+    slug: "profiles",
+    table: "profiles",
+    properties: {
+        id: { name: "Id", type: "number", isId: "increment" },
+        bio: { name: "Bio", type: "string" }
     }
 });
 
@@ -70,6 +96,20 @@ export const posts = defineCollection({
                 target: () => tags,
                 through: { properties: { position: { name: "Position", type: "number" } } }
             }
+        },
+        // A single-hop to-many `via`: one junction table holds the links.
+        tagsVia: {
+            name: "Tags (via)",
+            type: "relation",
+            relation: {
+                kind: "via",
+                cardinality: "many",
+                target: () => tags,
+                joinPath: [
+                    { table: "posts_tags", on: { from: "id", to: "posts_id" } },
+                    { table: "tags", on: { from: "tags_id", to: "id" } }
+                ]
+            }
         }
     }
 });
@@ -95,4 +135,52 @@ export const myNotes = defineCollection({
     }
 });
 
-export const collections = [authors, tags, posts, orderItems, myNotes];
+/**
+ * Every relation kind's write seam that `posts` does not already cross: a
+ * required `belongsTo` (either spelling satisfies it), one hidden from the API
+ * and one nobody may write (their foreign key goes with them), and a multi-hop
+ * `via`, which is read-only.
+ */
+export const comments = defineCollection({
+    name: "Comments",
+    slug: "comments",
+    table: "comments",
+    properties: {
+        id: { name: "Id", type: "number", isId: "increment" },
+        body: { name: "Body", type: "string", validation: { required: true } },
+        post: {
+            name: "Post",
+            type: "relation",
+            validation: { required: true },
+            relation: { kind: "belongsTo", target: (): AnyCollectionConfig => posts, localKey: "post_id" }
+        },
+        moderator: {
+            name: "Moderator",
+            type: "relation",
+            excludeFromApi: true,
+            relation: { kind: "belongsTo", target: (): AnyCollectionConfig => authors, localKey: "moderator_id" }
+        },
+        reviewer: {
+            name: "Reviewer",
+            type: "relation",
+            access: { write: [] },
+            relation: { kind: "belongsTo", target: (): AnyCollectionConfig => authors, localKey: "reviewer_id" }
+        },
+        postTags: {
+            name: "Post tags",
+            type: "relation",
+            relation: {
+                kind: "via",
+                cardinality: "many",
+                target: (): AnyCollectionConfig => tags,
+                joinPath: [
+                    { table: "posts", on: { from: "post_id", to: "id" } },
+                    { table: "posts_tags", on: { from: "id", to: "posts_id" } },
+                    { table: "tags", on: { from: "tags_id", to: "id" } }
+                ]
+            }
+        }
+    }
+});
+
+export const collections = [authors, tags, posts, orderItems, myNotes, profiles, comments];

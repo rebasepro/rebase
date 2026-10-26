@@ -1,5 +1,5 @@
 ---
-sourceHash: 8dc5279c89b40f48
+sourceHash: a9c35edb64ea5e56
 title: Suddivisione in più processi
 sidebar_label: Processi separati
 description: Esegui un unico bundle suddiviso in vari processi cooperanti — un'API, un livello per le funzioni, un worker — a partire dalla stessa immagine di runtime pubblicata, evitando che una funzione custom pesante competa con l'API dati.
@@ -104,12 +104,16 @@ docker compose up --scale functions=3
 
 Entrambi i processi necessitano dello stesso `DATABASE_URL`, dello stesso `JWT_SECRET` e dello stesso
 `REBASE_SERVICE_KEY` — costituiscono un unico deployment, e un token generato da uno deve essere
-accettato dall'altro.
+accettato dall'altro. Un processo con `REBASE_FUNCTIONS_UPSTREAM` e senza
+`REBASE_SERVICE_KEY` rifiuta di avviarsi: le sue stesse chiamate `rebase.functions.invoke(...)`,
+da un hook o da un cron job, raggiungono il processo delle funzioni con quella chiave.
 
 ## Mantenere invariati gli URL
 
 `REBASE_FUNCTIONS_UPSTREAM` indica al processo `api` di inoltrare `/api/functions/*`
-al processo delle funzioni invece di gestirlo direttamente. I client, gli SDK generati e le chiavi
+al processo delle funzioni invece di gestirlo direttamente. Deve essere un URL `http://` o
+`https://`; qualsiasi altra cosa interrompe l'avvio. Solo `api` e `worker` lo leggono
+(per il worker vedi [Cron e job in background](#cron-e-job-in-background)). I client, gli SDK generati e le chiavi
 API vedono esattamente la stessa superficie visibile prima della separazione, di conseguenza non è
 necessario modificare il codice dell'applicazione né configurare un reverse proxy per provarlo.
 
@@ -198,7 +202,30 @@ e disattivale sull'API:
     environment:
       REBASE_ROLE: worker
       REBASE_MIGRATE_ON_BOOT: none
+      REBASE_SERVICE_KEY: ${REBASE_SERVICE_KEY}
+      # Only if a job calls rebase.functions:
+      REBASE_FUNCTIONS_UPSTREAM: http://functions:8080
 ```
+
+Un job che passa a un worker mantiene `rebase.dataAsAdmin`, `rebase.sql`,
+`rebase.storage` e `rebase.email`, che comunicano direttamente con il database, i bucket e
+il server di posta. Mantiene anche:
+
+- **`rebase.admin`** (utenti, ruoli, reimpostazioni delle password) **e `rebase.cron`.** Un
+  worker non serve alcuna superficie di amministrazione sulla sua porta, ma porta con sé questi due
+  in-process, solo per i propri job.
+- **`rebase.functions`, con `REBASE_FUNCTIONS_UPSTREAM`.** Un worker non serve
+  funzioni. Con l'upstream impostato, le sue stesse chiamate `rebase.functions.invoke(...)`
+  vengono inoltrate al processo delle funzioni, dove la funzione vede la
+  chiamata come il service. Il worker continua a non rispondere a nulla sotto `/api/functions`
+  sulla sua porta. Il worker necessita per questo del `REBASE_SERVICE_KEY` del deployment,
+  come `api`.
+
+Perde `rebase.auth`: sono i flussi di accesso di una persona, e un worker
+non ne serve alcuno. Per il lavoro sugli account da un job, usa `rebase.admin`. Perde anche il
+resto dell'API di amministrazione (backup, log, l'editor dello schema e così via), e
+`rebase.functions` quando non è impostato alcun upstream. Una chiamata a una qualsiasi di queste risponde
+`404 NOT_FOUND` indicando la superficie disattivata e cosa fare al suo posto.
 
 Un processo `functions` non esegue mai nessuno dei due. La sua scalabilità dipende dal
 carico delle richieste e viene sostituito liberamente; assegnargli attività pianificate darebbe
@@ -293,9 +320,10 @@ piuttosto che un vincolo imposto dal runtime.
 ## Aggiornamento
 
 Invariato: ogni processo esegue la stessa immagine pubblicata, quindi un aggiornamento corrisponde alla
-modifica dello stesso tag su ciascuno di essi. Esegui il rollout dell'`api` per ultimo se desideri che il
-provisioning dello schema avvenga per primo rispetto alla nuova versione — anche se in pratica
-l'ordine è irrilevante, poiché la procedura di schema è additiva e idempotente.
+modifica dello stesso tag su ciascuno di essi. Esegui per primo il rollout del processo che gestisce lo schema — l'`api`,
+oppure il Job di migrazione — in modo che lo schema della nuova versione sia già al suo posto
+prima che gli altri processi vi operino contro: un'unità può rimanere indietro, mai essere più avanti (vedi
+[La regola](#la-regola)).
 
 ## Risorse correlate
 

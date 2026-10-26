@@ -1,5 +1,5 @@
 ---
-sourceHash: 352139def44b34e0
+sourceHash: 6713d8b8d0ba9125
 title: Outils du Studio
 sidebar_label: Studio
 description: Rebase Studio fournit des outils de développement pour l'édition visuelle de schémas, les requêtes SQL, le scripting JavaScript, la gestion des politiques RLS et la navigation dans le stockage.
@@ -47,15 +47,15 @@ L'éditeur est actif partout où Studio est monté — le `<RebaseStudio/>` d'un
 import { RebaseCMS } from "@rebasepro/cms";
 import { RebaseStudio } from "@rebasepro/studio";
 
-// Studio est monté, donc l'éditeur de collections est disponible.
-// Rien d'autre n'est nécessaire.
+// Studio is mounted, so the Collection Editor is available. Nothing else
+// is needed for it.
 <Rebase>
     <RebaseCMS collections={collections}/>
     <RebaseStudio/>
 </Rebase>
 
-// `collectionEditor` sert au réglage — un éditeur en lecture seule,
-// un autre jeton — pas à l'activation.
+// `collectionEditor` is for fine-tuning — a read-only editor, a different
+// token — not for opting in.
 <RebaseCMS
     collections={collections}
     collectionEditor={{
@@ -72,7 +72,7 @@ Ils sont fournis avec Studio et **chargés à la demande par `RebaseStudio`** �
 
 | Onglet | Slug | Groupe | Rôle |
 |--------|------|--------|------|
-| Console SQL | `sql` | Base de données | Exécuter du SQL brut sur votre base PostgreSQL et lire les résultats dans un tableau. Le tableau affiche le résultat de la dernière instruction, dans la limite de ses 10 000 premières lignes ou de 32 Mo de valeurs ; un résultat plus long indique combien de lignes il comptait, et la copie comme l'export n'incluent que les lignes affichées. Un tel résultat propose aussi **Download full result as CSV** : le serveur diffuse l'intégralité du résultat à travers un curseur en lecture seule (`POST /api/admin/sql/csv`), une requête à la fois, sur un serveur Postgres de votre choix plutôt que sur la base de développement en processus. Les valeurs sont le texte de la base de données, tel que psql l'affiche, et **Export JSON** les écrit ainsi ; **Export typed JSON** écrit chaque valeur lue selon le type de sa colonne — entiers et numériques sous forme de nombre JSON exact, booléens, `json`/`jsonb` en JSON — et conserve toutes les autres valeurs sous forme de texte. Tant qu'une exécution est en cours, **Cancel run** rend aussitôt la console ; un serveur qui accepte la trame `CANCEL_SQL` du socket (il liste `cancel_sql` dans le `hello` dont il répond sur le socket) arrête aussi l'instruction avec `pg_cancel_backend`. La base de développement en processus ne peut pas être interrompue, et un serveur plus ancien laisse l'instruction se terminer dans la limite de son `statement_timeout` |
+| Console SQL | `sql` | Base de données | Exécuter du SQL brut sur votre base PostgreSQL et lire les résultats dans un tableau. Le tableau affiche le résultat de la dernière instruction, dans la limite de ses 10 000 premières lignes ou de 32 Mo de valeurs ; un résultat plus long indique combien de lignes il comptait, et la copie comme l'export n'incluent que les lignes affichées. Un tel résultat propose aussi **Download full result as CSV** : le serveur diffuse l'intégralité du résultat à travers un curseur en lecture seule (`POST /api/admin/sql/csv`), une requête à la fois, sur un serveur Postgres de votre choix plutôt que sur la base de développement en processus. Les valeurs sont le texte de la base de données, tel que psql l'affiche, et **Export JSON** les écrit ainsi ; **Export typed JSON** écrit chaque valeur lue selon le type de sa colonne — entiers et numériques sous forme de nombre JSON exact, booléens, `json`/`jsonb` en JSON — et conserve toutes les autres valeurs sous forme de texte. Dans tout CSV (export, copie et téléchargement complet), une valeur qu'un tableur exécuterait comme une formule (une valeur commençant par `=`, `+`, `-`, `@`, une tabulation ou un retour chariot, autre qu'un nombre signé) est écrite avec un `'` en tête, comme l'écrit l'export de collection. Tant qu'une exécution est en cours, **Cancel run** rend aussitôt la console ; un serveur qui accepte la trame `CANCEL_SQL` du socket (il liste `cancel_sql` dans le `hello` dont il répond sur le socket) arrête aussi l'instruction avec `pg_cancel_backend`. La base de développement en processus ne peut pas être interrompue, et un serveur plus ancien laisse l'instruction se terminer dans la limite de son `statement_timeout` |
 | Politiques RLS | `rls` | Base de données | Inspecter et gérer les politiques Row Level Security de vos tables. Une politique est listée telle que la base de données la détient, avec le badge **Diffère du code** lorsque ce n'est pas ce que le projet déclare. Une politique que Rebase génère ne peut pas être modifiée directement dans la base de données, et sur une table que Rebase gère, une bannière indique que chaque démarrage du serveur et chaque `rebase db push` réappliquent les politiques déclarées |
 | Visualiseur de schéma | `schema-visualizer` | Base de données | Diagramme d'entités de vos collections et de leurs relations, tracé à partir des définitions de collection : tables, colonnes, types et relations sont tels que les collections les déclarent. Seuls les marqueurs RLS sont lus depuis la base de données. La disposition s'exécute dans un web worker, de sorte que la page reste réactive pendant l'agencement d'un grand diagramme. Un schéma de plus de 300 tables est dessiné un voisinage de table à la fois — les tables situées à une ou deux relations — en partant de la table la plus connectée ; choisissez une autre table dans la liste pour vous déplacer |
 | Branches | `branches` | Base de données | Créer et gérer des [branches de base de données](/docs/backend/branching), et en examiner une comme une pull request : ses modifications de schéma et de politiques RLS côte à côte, les lignes qu'elle a insérées, mises à jour et supprimées, et une fusion dans la base dont elle a été créée qui dit d'abord ce qui l'emporte — voir [Examiner et fusionner une branche](/docs/backend/branching/#reviewing-and-merging-a-branch) |
@@ -197,6 +197,9 @@ propre navigateur de stockage peut par exemple laisser celui-ci de côté :
 ```tsx
 <RebaseStudio tools={["sql", "rls", "schema-visualizer", "api"]} />
 ```
+
+La vue Studio de l'éditeur de collections est l'outil `"schema"`. Sans `tools`, elle est
+présente ; si vous passez une liste sans `"schema"`, comme ci-dessus, elle est omise.
 
 La liste est lue par son *contenu*, non par son identité, si bien que l'écrire en
 ligne est sans risque : un nouveau rendu de l'hôte ne démonte ni ne remonte

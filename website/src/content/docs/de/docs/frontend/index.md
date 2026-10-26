@@ -1,5 +1,5 @@
 ---
-sourceHash: 867178ccdf409a3f
+sourceHash: 12294b1ff06361d9
 title: Frontend-Übersicht
 sidebar_label: Frontend
 description: "Erstellen und Anpassen des Panels — Rebase CMS und Rebase Studio — mit React: Controller, Scaffold, Routing und Views."
@@ -11,7 +11,7 @@ Das Rebase-Frontend ist ein **React-Framework**, das Ihr Admin-Panel rendert. Es
 
 Im Standard-Scaffold **ist** das Admin-Panel das Frontend: Es wird am Root Ihrer bereitgestellten URL ausgeliefert. Wenn Sie stattdessen eine eigene Produkt-App erstellen, können Sie das Admin-Panel unter einem Präfix wie `/admin` im selben Deployment einbinden — siehe [Changing the Base URL](/docs/getting-started/deployment#changing-the-base-url).
 
-So sieht `frontend/src/App.tsx` aus, wie es von `rebase init` generiert wird — das gesamte Admin-Panel, vier Deklarationen innerhalb eines Providers:
+So sieht `frontend/src/App.tsx` aus, wie es von `rebase init` generiert wird, ohne die Schrift-Imports, die Error Boundary und die Google-Client-ID — das gesamte Admin-Panel, vier Deklarationen innerhalb eines Providers:
 
 ```tsx
 import React from "react";
@@ -77,9 +77,9 @@ Alle 23 Props im Detail — die Tabelle führte früher zehn auf, von denen zwei
 | `plugins` | Plugin-Instanzen — siehe [Plugins](/docs/plugins) |
 | `slots` | Direkt deklarierte Slot-Erweiterungen, ohne Plugin |
 | `propertyConfigs` | Benutzerdefinierte Feld-Widgets, zugeordnet über den Namen, den eine Eigenschaft in `propertyConfig` angibt |
-| `entityViews` | Globale benutzerdefinierte Entity-View-Tabs |
+| `entityViews` | Benutzerdefinierte Entity-View-Tabs, verfügbar für jede Collection, die ihren `key` in `admin.entityViews` nennt |
 | `collectionViews` | Benutzerdefinierte Collection-View-Modi, verfügbar für jede Collection über `key` |
-| `entityActions` | Globale Entity-Aktionen |
+| `entityActions` | Entity-Aktionen, verfügbar für jede Collection, die ihren `key` in `admin.entityActions` nennt |
 | `effectiveRoleController` | Simuliert eine andere Rolle, während der Dev-Modus aktiv ist |
 | `modeController` | Übergibt Rebase den Light-/Dark-Modus der Host-App; Rebase berührt dann nie `<html>`, `prefers-color-scheme` oder localStorage — siehe [Styling](#styling) |
 | `translations` | Überschreibt oder erweitert beliebige UI-Strings, zugeordnet nach Locale — siehe [Translations](/docs/frontend/i18n) |
@@ -169,6 +169,11 @@ sein Datensatz gelöscht wurde:
     onSaved={({ entity }) => console.log("saved", entity.id)}
     onClose={() => navigate("/posts")}/>
 ```
+
+Löscht jemand anderes den Datensatz, während das Formular geöffnet ist, behält das Formular,
+was eingegeben wurde, und sagt, dass der Datensatz anderswo gelöscht wurde. Seine Aktion
+„Als neu speichern“ macht daraus ein Formular, das einen neuen Datensatz mit diesen Werten
+anlegt; `onSaved` meldet dann den neuen Datensatz.
 
 Beide bringen ihren eigenen `CollectionsProvider` mit, wenn über ihnen keiner liegt. Das ist
 der Schritt darunter, und Sie können ihn selbst einbinden, um einen Scope zwischen

@@ -1,5 +1,5 @@
 ---
-sourceHash: 9eaa953076c5923b
+sourceHash: 22d7c8bbab763065
 title: Funções Personalizadas
 sidebar_label: Funções Personalizadas
 description: Adicione endpoints de API Hono personalizados junto com suas rotas CRUD do Rebase. Descobertos automaticamente a partir de um diretório, com acesso total à instância do backend.
@@ -50,8 +50,8 @@ import { createRebaseClient } from "@rebasepro/client";
 const client = createRebaseClient({ baseUrl: "http://localhost:3000" });
 
 const { message } = await client.functions.invoke<{ message: string }>(
-    "hello",                 // o nome do arquivo, sem extensão — um segmento de caminho
-    { name: "Ada" }          // corpo JSON; omitido para um GET
+    "hello",                 // the filename, without extension — one path segment
+    { name: "Ada" }          // JSON body; omitted for a GET
 );
 ```
 
@@ -62,19 +62,19 @@ chega ao chamador em vez de uma rejeição pura de `fetch`.
 Quatro opções que ele aceita além do nome:
 
 ```typescript
-// Um método diferente. O payload é descartado para GET, já que GET não tem corpo.
+// A different method. The payload is dropped for GET, since GET has no body.
 await client.functions.invoke("hello", undefined, { method: "GET" });
 
-// Um subcaminho — `/api/functions/hello/stats`. Ele vai aqui, nunca no nome:
-// um nome contendo "/" é recusado em vez de codificado em percentual em um 404.
+// A sub-path — `/api/functions/hello/stats`. It goes here, never in the name:
+// a name containing "/" is refused rather than percent-encoded into a 404.
 await client.functions.invoke("hello", undefined, { method: "GET", path: "stats" });
 
-// Uma query string. Passada como `path`, sem nenhum separador inserido antes de `?`.
+// A query string. Passed as `path`, with no separator inserted before `?`.
 await client.functions.invoke("reports", undefined, { method: "GET", path: "?days=30" });
 
-// Uma função que responde texto ou um arquivo (`c.text(csv)`, `c.body(pdf)`).
-// A resposta é lida como JSON, a menos que você especifique o contrário: "text" retorna uma string,
-// "blob" um Blob, "response" o próprio Response com seu corpo ainda não lido.
+// A function that answers text or a file (`c.text(csv)`, `c.body(pdf)`).
+// The answer is read as JSON unless you say otherwise: "text" gives a string,
+// "blob" a Blob, "response" the Response itself with its body unread.
 const csv = await client.functions.invoke<string>("export-orders", undefined, { method: "GET", responseType: "text" });
 ```
 
@@ -97,7 +97,7 @@ Consulte [Portabilidade de runtime](#portabilidade-de-runtime) para o contrato c
 ## Configuração
 
 :::note[Onde isso se aplica]
-**Runtime gerenciado:** nada a configurar — o runtime descobre `backend/functions/` por conta própria (`functions` na entrada `rebase.json` do aplicativo de backend se você o moveu). `REBASE_FUNCTIONS_ONLY` / `REBASE_FUNCTIONS_EXCLUDE` restringem quais funções um processo atende.
+**Runtime gerenciado:** nada a configurar — o runtime descobre `backend/functions/` por conta própria (`functions` na entrada `rebase.json` do aplicativo de backend se você o moveu). `REBASE_FUNCTIONS_ONLY` / `REBASE_FUNCTIONS_EXCLUDE` restringem quais funções um processo `REBASE_ROLE=functions` atende; qualquer outra role se recusa a inicializar com elas definidas.
 **Ejetado:** `initializeRebaseBackend({ functionsDir })`, ou `functions` (abaixo), em `backend/src/index.ts`.
 :::
 
@@ -131,7 +131,7 @@ import { initializeRebaseBackend, loadFunctions } from "@rebasepro/server";
 import sendInvoice from "../functions/send-invoice";
 
 await initializeRebaseBackend({ app, server, functions: { "send-invoice": sendInvoice } }); // → /api/functions/send-invoice
-// o mesmo que functionsDir:
+// the same as functionsDir:
 await initializeRebaseBackend({ app, server, functions: await loadFunctions(path.resolve(__dirname, "../functions")) });
 ```
 
@@ -230,16 +230,16 @@ export default defineFunction((app) => {
 import { defineFunction, requireAuth, requireAdmin, requireRole, getUserId } from "@rebasepro/server/functions";
 
 export default defineFunction((app) => {
-    // Endpoint público — sem guard, qualquer pessoa pode chamar.
+    // Public endpoint — no guard, so anyone can call it.
     app.get("/public", (c) => c.json({ message: "Anyone can access this" }));
 
-    // 401 para chamadores anônimos.
+    // 401 for anonymous callers.
     app.post("/protected", requireAuth, (c) => c.json({ message: `Hello, ${getUserId(c)}` }));
 
-    // 401 anônimo, 403 sem a role admin. A ordem importa.
+    // 401 anonymous, 403 without the admin role. Order matters.
     app.post("/admin-only", requireAuth, requireAdmin, (c) => c.json({ ok: true }));
 
-    // Qualquer uma das roles especificadas.
+    // Any one of the named roles.
     app.post("/publish", requireAuth, requireRole("editor", "admin"), (c) => c.json({ ok: true }));
 });
 ```
@@ -258,12 +258,12 @@ A leitura de `getUser(c)` **não** atua como um guard. Um chamador anônimo rece
 import { defineFunction, requireAuth, requireScope, hasScope } from "@rebasepro/server/functions";
 
 export default defineFunction((app) => {
-    // 403 SCOPE_MISSING a menos que o chamador possua project:deploy, ou project:deploy:<este projeto>.
+    // 403 SCOPE_MISSING unless the caller holds project:deploy, or project:deploy:<this project>.
     app.post("/:project", requireAuth, requireScope("project:deploy", c => c.req.param("project")), (c) => {
         return c.json({ deploying: c.req.param("project") });
     });
 
-    // A mesma verificação dentro de um manipulador.
+    // The same question inside a handler.
     app.get("/:project/can-deploy", requireAuth, (c) => c.json({ allowed: hasScope(c, "project:deploy", c.req.param("project")) }));
 });
 ```
@@ -373,7 +373,7 @@ Leia a configuração **dentro** do manipulador, nunca no escopo do módulo:
 ```typescript
 import { defineFunction, requireEnv, lazyResource } from "@rebasepro/server/functions";
 
-// Construído uma vez, na primeira requisição que precisar — não no momento da importação.
+// Built once, on the first request that needs it — not at import time.
 const apiKey = lazyResource((env) => env.PRICING_API_KEY ?? "");
 
 export default defineFunction((app) => {
@@ -390,9 +390,9 @@ export default defineFunction((app) => {
 Por que isso importa em **qualquer** runtime, inclusive o Node:
 
 ```typescript no-verify
-// Não faça isso. Se STRIPE_SECRET_KEY não estiver definida, isso lança um erro enquanto o arquivo
-// está sendo importado — e o carregador reporta isso como uma *função ignorada*. A rota
-// retorna 404, com o motivo oculto em uma linha de log de inicialização.
+// Don't. If STRIPE_SECRET_KEY is unset, this throws while the file is being
+// imported — and the loader reports that as a *skipped function*. The route
+// 404s, with the reason buried in a boot log line.
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
 ```
 
@@ -415,7 +415,7 @@ import { defineFunction, requireAuth, waitUntil } from "@rebasepro/server/functi
 export default defineFunction((app, { rebase }) => {
     app.post("/orders", requireAuth, async (c) => {
         const order = await c.req.json();
-        // O chamador não espera por isso, mas o processo de encerramento sim.
+        // The caller does not wait for this, but shutdown does.
         waitUntil(c, rebase.email.send({
             to: "warehouse@example.com",
             subject: "New order",
@@ -509,10 +509,10 @@ Isso significa que suas funções personalizadas têm acesso a todos os serviço
 ```typescript no-verify
 const app = new Hono<HonoEnv>();
 
-// Isso executa ANTES das rotas do Rebase
+// This runs BEFORE Rebase routes
 app.get("/health", (c) => c.json({ status: "ok" }));
 
-// Inicialização do Rebase — registra todas as rotas /api/*
+// Rebase initialization — registers all /api/* routes
 const instance = await initializeRebaseBackend({ app, /* ... */ });
 ```
 
@@ -525,12 +525,12 @@ As rotas adicionadas ao seu próprio aplicativo dessa forma ficam **fora** de qu
 ```typescript
 import { defineFunction, requireEnv, waitUntil, lazyResource } from "@rebasepro/server/functions";
 
-/** Construído na primeira requisição, a partir das configurações dessa requisição. */
+/** Constructed on the first request, from that request's configuration. */
 const secret = lazyResource((env) => env.STRIPE_WEBHOOK_SECRET ?? "");
 
 export default defineFunction((app, { rebase }) => {
-    // Deliberadamente público: o Stripe não envia um token. A assinatura é a
-    // autenticação, portanto valide-a antes de fazer qualquer outra coisa.
+    // Deliberately public: Stripe has no token to send. The signature is the
+    // authentication, so verify it before doing anything else.
     app.post("/", async (c) => {
         const signature = c.req.header("stripe-signature");
         const body = await c.req.text();
@@ -548,7 +548,7 @@ export default defineFunction((app, { rebase }) => {
                 stripe_id: session.subscription,
                 status: "active",
             });
-            // O processamento pode continuar após a resposta; o 200 informa ao Stripe para não tentar novamente.
+            // Fulfilment can outlive the response; the 200 tells Stripe to stop retrying.
             waitUntil(c, notifyFulfilment(requireEnv(c, "FULFILMENT_URL"), session));
         }
 
@@ -562,7 +562,7 @@ declare function notifyFulfilment(url: string, session: Record<string, string>):
 
 ## Depuração
 
-Quando uma função é carregada com sucesso, você verá:
+Quando as funções são carregadas, a inicialização registra `Loaded custom functions` com a contagem. A linha de cada função é registrada em `debug` (`LOG_LEVEL=debug`):
 
 ```
 ⚡ Loaded function route: hello
@@ -575,6 +575,8 @@ Se o carregamento falhar, o carregador fornecerá mensagens de diagnóstico:
   export type: object (SomeClass)
   prototype methods: constructor, someMethod
   Hint: ensure the function exports a Hono app created with the same hono version as the server.
+  Author with `defineFunction(...)` from @rebasepro/server/functions for a typed, checked contract.
+  The loader checks for .fetch() and .routes — any Hono-compatible app will work.
 ```
 
 O roteador é montado para o **diretório**, não individualmente para as funções contidas nele. Se todos os arquivos falharem ao importar — uma única variável de ambiente ausente no escopo do módulo é suficiente para derrubar todos eles — a rota `GET /api/functions` ainda responderá com `200` com uma lista vazia mais a contagem de `skipped`, diferenciando a situação de "nada pôde ser carregado" de "esta versão não enviou nenhuma função". A listagem em si exige um chamador autenticado, uma chave de API que possua o escopo simples `functions:invoke`, ou a chave de serviço — as funções continuam acessíveis por quem cada uma autorizar, mas o inventário delas não é público. Os motivos continuam visíveis nos logs de inicialização.

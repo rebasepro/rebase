@@ -69,7 +69,7 @@ All configuration is done via environment variables in your `.env` file at the p
 | `LOG_LEVEL` | Logging verbosity: `error`, `warn`, `info`, `debug` | `info` |
 | `REBASE_LOG_RAW_QUERIES` | Show the SQL behind a `Failed query: [redacted]` line. Every failing statement is redacted by default, because a failed query carries its bound parameters — an email, a password hash. Set it to `true` while diagnosing a DDL, RLS or change-capture failure. Ignored when `NODE_ENV=production`. | `false` |
 | `NODE_ENV` | Environment: `development`, `production`, or `test` | `development` |
-| `CORS_ORIGINS` | Comma-separated list of allowed origins. **Required in production** if different from backend domain. In development it is *added to* localhost — see below. | — |
+| `CORS_ORIGINS` | Comma-separated list of allowed origins. **Required in production** unless `FRONTEND_URL` is set: a production boot with neither refuses to start. In development it is *added to* localhost — see below. | — |
 | `FRONTEND_URL` | URL of the frontend app. Used as an alternative to CORS_ORIGINS, in both environments. | — |
 | `ADMIN_CONNECTION_STRING` | Admin-level database connection string (used for schema introspection and admin operations). The database it names is not the one the SQL console calls current, nor what a new branch copies by default: both are the database the app's own connection is on (see `REBASE_BRANCH_PARENT_DATABASE` for a server on a branch). | `DATABASE_URL` |
 | `DISABLE_DB_ROLE_SWITCHING` | Disable PostgreSQL role-switching in SQL Editor (useful for custom authentication where DB roles are not mapped). Studio's SQL console then says that the rows were read as the connection owner, names it, and greys out its role picker. | `false` |
@@ -227,18 +227,20 @@ image. A project that has ejected owns these decisions in its own code instead.
 | `REBASE_METRICS` | Expose Prometheus metrics at `/metrics`. | `false` |
 | `REBASE_HSTS_INCLUDE_SUBDOMAINS` | Add `includeSubDomains` to the `Strict-Transport-Security` header, so browsers refuse plain HTTP on every subdomain of the host for six months — hosts this process does not serve included. Turn it on only when every subdomain of the domain is HTTPS-only. Anything but `true`/`false` refuses to boot. See [Security headers](/docs/deployment/self-hosting/#security-headers). | `false` |
 | `REBASE_METRICS_TOKEN` | Bearer token guarding `/metrics`. Unset leaves the endpoint open to anything that can reach the port — fine on a private network, not on a public one, and the boot logs say so. | — |
-| `REBASE_MIGRATE_ON_BOOT` | What the runtime may do to the schema at boot. `ensure` (the default, everywhere — production included) runs the **additive** pass: create missing tables, columns and enum types, never drop or rewrite one. `none` touches nothing. The published image accepts only those two and **refuses to boot on `push`**. In a [split deployment](/docs/deployment/split-processes) exactly one process may provision, so every other role must set `none` or refuse to boot. | `ensure` |
+| `REBASE_MIGRATE_ON_BOOT` | What the runtime may do to the collection schema at boot. `ensure` (the default, everywhere — production included) runs the **additive** pass: create missing tables, columns and enum types, never drop or rewrite one. `none` leaves the collection schema alone, but the framework's own tables (auth, API keys, jobs, cron) are still created and kept current; <span class="since-badge" data-since="0.26">Since 0.26</span> `REBASE_PROVISION=false` turns those off too. The published image accepts only those two and **refuses to boot on `push`**. In a [split deployment](/docs/deployment/split-processes) exactly one process may provision, so every other role must set `none` or refuse to boot. | `ensure` |
+| `REBASE_PROVISION` | <span class="since-badge" data-since="0.26">Since 0.26</span> `false` makes the runtime change nothing in its database: no table, column, index, function, trigger, policy, role or grant, at boot or later, the framework's own included. It reports what is missing by name instead. For a database that only your change process may change. See [When only your change process may change the database](/docs/deployment/self-hosting/#when-only-your-change-process-may-change-the-database). Only `true` and `false` are accepted. | `true` |
 | `REBASE_REQUIRE_SCHEMA_MATCH` | Refuse to boot when the database was last provisioned from a different set of collections than this process was built from. Unset (or anything other than `true`/`1`) warns instead. | warn |
 | `REALTIME_CDC` | Database-level change capture: `auto` (enable where the connection supports it, silently fall back otherwise), `trigger` (force it, warn if impossible), `wal` (degrades to `trigger` today), `off`. See [Realtime](/docs/backend/realtime-cdc/). Wins over `realtime.cdc`. | `auto` |
 | `REALTIME_CHANNEL_BUS` | Cross-instance transport for broadcast channels and presence: `memory` or `postgres`. Ignored when `realtime.bus` was given a constructed transport. | `memory` |
 | `REALTIME_MAX_SUBSCRIPTIONS_PER_SOCKET` | How many subscriptions one realtime socket may hold; the next is refused with `TOO_MANY_SUBSCRIPTIONS`. A positive whole number — anything else stops the server at boot. Wins over `realtime.maxSubscriptionsPerSocket`. See [Realtime](/docs/backend/realtime#what-a-write-costs-and-the-limits). | `1000` |
-| `REALTIME_MAX_SOCKETS_PER_USER` | How many realtime sockets one user may hold open on one server instance. The next one's sign-in is refused with `TOO_MANY_SOCKETS` and the socket closed (4002); the SDK keeps retrying, so it gets in when another closes. A positive whole number — anything else stops the server at boot. Wins over `realtime.maxSocketsPerUser`. | No ceiling |
+| `REALTIME_MAX_SOCKETS_PER_USER` | How many realtime sockets one user, or one API key, may hold open on one server instance. An administrator's impersonating sockets count against the administrator. The next one's sign-in is refused with `TOO_MANY_SOCKETS` and the socket closed (4002); the SDK keeps retrying, so it gets in when another closes. A positive whole number — anything else stops the server at boot. Wins over `realtime.maxSocketsPerUser`. | No ceiling |
 | `REALTIME_REFETCH_MAX_WAIT_MS` | The longest a change waits for the refetch that delivers it to live subscribers, in ms. A refetch waits for 300 ms without a change, and at most this long under a steady stream of writes. A positive whole number — anything else stops the server at boot. Wins over `realtime.refetchMaxWaitMs`. | `1000` |
 | `REALTIME_RECOUNT_INTERVAL_MS` | How long a big list subscription's total may be reused before it is counted again, in ms; frames that reuse it carry `meta.totalAsOf`. Unset, every frame counts. Wins over `realtime.recountIntervalMs`. | Unset |
 | `REALTIME_RECOUNT_MIN_ROWS` | The smallest last total `REALTIME_RECOUNT_INTERVAL_MS` applies to; smaller lists are counted on every frame. Wins over `realtime.recountMinRows`. | `100000` |
 | `ALLOW_LOCALHOST_IN_PRODUCTION` | Permit `localhost`/loopback values under `NODE_ENV=production`. Off, so a production boot fails loudly rather than connecting to a database that is not there. | `false` |
 | `REBASE_STRICT_COLLECTION_CONFIG` | What boot does with a key in your collections that this version does not read: `warn`, `error` (refuse to boot — worth turning on in CI), or `off`. Only governs keys it does not *recognise*, which are usually a typo and occasionally deliberate metadata; a key it knows has moved is always fatal, because the feature it configured is silently absent otherwise. | `warn` |
-| `REBASE_PROVISION_ONLY` | `1`/`true` runs the schema pass and exits without opening a socket — the shape a migration Job wants, from the same image and the same bundle as the server that follows it. An empty value is *unset*, so an unsubstituted `${SOMETHING}` in a compose file cannot turn an ordinary deployment into one that migrates and refuses to serve. | — |
+| `REBASE_PROVISION_ONLY` | `1`/`true` runs the schema pass and exits without opening a socket — the shape a migration Job wants, from the same image and the same bundle as the server that follows it. It also creates the tables a serving process would otherwise make on first use, and starts no cron or job queue. An empty value is *unset*, so an unsubstituted `${SOMETHING}` in a compose file cannot turn an ordinary deployment into one that migrates and refuses to serve. Refused together with <span class="since-badge" data-since="0.26">Since 0.26</span> `REBASE_PROVISION=false`. | — |
+| `REBASE_PROVISION_SQL_OUT` | <span class="since-badge" data-since="0.26">Since 0.26</span> A file path. A provisioning run (`REBASE_PROVISION_ONLY=true`) writes every schema change it made to it, in order, as a SQL script to review and apply with `psql`. Rows it wrote are not included. Refused on a process that serves. | — |
 | `REBASE_LIVE_SCHEMA_ALLOW_MACHINE_APPLY` | `true` lets a machine — an agent, a CI job — *apply* a schema change through `/api/admin/schema`, not only plan one. Off unless asked for: the credential that would make such a change is the one most likely to be sitting in a CI variable. | `false` |
 | `REBASE_FUNCTIONS_TIMEOUT_MS` | How long a custom function may run before its request is aborted. Same knob as the `functionsTimeoutMs` option. `0` turns it off. | `30000` |
 | `REBASE_EXIT_ON_UNHANDLED_REJECTION` | `true` makes an unhandled promise rejection terminate the process instead of logging it. On under an orchestrator that will restart you; off where a restart is worse than a leak. | `false` |
@@ -273,7 +275,7 @@ combinations refuse to boot — is on
 | `REBASE_JOB_WORKERS` | Override whether this process runs job-queue workers. Unset follows the role. | — |
 | `REBASE_FUNCTIONS_ONLY` | Serve only the named custom functions in this process. | — |
 | `REBASE_FUNCTIONS_EXCLUDE` | Serve every custom function except the named ones. | — |
-| `REBASE_FUNCTIONS_UPSTREAM` | Where the API process forwards a function request it does not serve itself. | — |
+| `REBASE_FUNCTIONS_UPSTREAM` | Where the API process forwards a function request it does not serve itself. On a `worker`, where its own `rebase.functions` calls go. An `http(s)` URL. | — |
 
 ### MCP surface
 
@@ -371,7 +373,7 @@ Read by `rebase`, not by the server. Nothing here affects a deployment.
 | `REBASE_CLOUD_URL` | The control plane `rebase cloud` talks to. | — |
 | `REBASE_CLOUD_EMAIL` | The account `rebase cloud login` signs in as, instead of prompting. | — |
 | `REBASE_CLOUD_PASSWORD` | Its password, so a secret store can hand it over without it reaching the shell's history. | — |
-| `REBASE_TOKEN` | A token from `rebase cloud tokens create`. Set, every `rebase cloud` command authenticates with it instead of the `rebase cloud login` session, and never reads or writes the stored session. The way to run `rebase cloud` in CI — see [CI and agents](/docs/deployment/cloud/#ci-and-agents). The [MCP server](/docs/ai/mcp/) reads the same name as an alias of `REBASE_API_TOKEN`. | — |
+| `REBASE_TOKEN` | A token from `rebase cloud tokens create`. Set, every `rebase cloud` command authenticates with it instead of the `rebase cloud login` session, and never reads or writes the stored session. <span class="since-badge" data-since="0.26">Since 0.26</span> In a directory `rebase cloud init --claim` linked, it is set aside for that project's own token when it holds no scope on the project. The way to run `rebase cloud` in CI — see [CI and agents](/docs/deployment/cloud/#ci-and-agents). The [MCP server](/docs/ai/mcp/) passes it to the CLI its cloud tools spawn, and never sends it to the app: set `REBASE_API_TOKEN` for that. | — |
 | `REBASE_DEBUG` | `1` prints the underlying error and request detail instead of the short message. The first thing to set when a `rebase cloud` command fails unhelpfully. | — |
 | `REBASE_ATLAS_DEV_URL` | The empty database `rebase db push`, `db generate` and `db migrate` plan against, instead of the `<db>_dev_diff` they create beside `DATABASE_URL`. Rebase neither creates nor drops a database named here, and refuses one equal to `DATABASE_URL`. On the managed development database the CLI sets it to a throwaway in-memory PGlite of its own. Set it where `CREATE DATABASE` is not granted. | `<db>_dev_diff` |
 | `REBASE_DEV_NO_DB` | `rebase dev` starts no database and provisions nothing — you bring your own. Same as `--no-db`. | — |
@@ -384,8 +386,8 @@ Read by `rebase`, not by the server. Nothing here affects a deployment.
 
 ## Secrets in development
 
-`JWT_SECRET` and `REBASE_SERVICE_KEY` are required in production and generated
-for you outside it, so you can start without setting anything up.
+`JWT_SECRET` is required in production. It and `REBASE_SERVICE_KEY` are
+generated for you outside it, so you can start without setting anything up.
 
 Those generated values are cached in `.rebase-dev-secrets.json`, beside
 `.rebase-dev-port` and `.rebase-dev-url` and gitignored with them. Before, they
@@ -399,13 +401,13 @@ your own app and invalidated any API key you had just created.
 - If the file cannot be written — a read-only container, say — the server starts
   anyway with an ephemeral secret, exactly as it used to.
 
-Nothing is cached in production, or under a test runner. In production a boot
-that had to generate either secret still fails, naming the variable, and that is
-unchanged:
+Nothing is cached in production, or under a test runner. In production nothing
+is generated either: a boot with no `JWT_SECRET` fails, naming the variable, and
+that is unchanged:
 
 ```
-JWT_SECRET must be explicitly set in production.
-Do not rely on auto-generated secrets outside development.
+The environment is not valid:
+  JWT_SECRET: is required
 ```
 
 ## Backend Config Object

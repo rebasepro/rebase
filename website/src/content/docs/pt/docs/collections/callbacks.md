@@ -1,5 +1,5 @@
 ---
-sourceHash: c3af858aa8d11859
+sourceHash: 85df48d51e9e9dd9
 title: Callbacks de Entidade
 sidebar_label: Callbacks
 description: Use callbacks de ciclo de vida para executar lógica personalizada quando entidades forem criadas, atualizadas, lidas ou excluídas. Inclui a API context.data para operações entre coleções.
@@ -229,7 +229,7 @@ conexão](/docs/collections/context-data-api#a-callback-holds-a-connection).
 ```typescript
 beforeSave: async ({
     values,       // Entity values
-    id,           // Entity ID (null for new entities)
+    id,           // Entity ID (undefined for a new entity, unless the caller sent one)
     status,       // "new" | "existing" | "copy"
     previousValues, // Previous values (for updates)
     context       // Full Rebase context

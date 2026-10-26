@@ -1,5 +1,5 @@
 ---
-sourceHash: a0bd19745c59b12b
+sourceHash: e6db89a6b0b8b60d
 title: Système de plugins
 sidebar_label: Plugins
 description: Étendez Rebase avec des plugins — injectez des composants d'interface, modifiez des collections, ajoutez des actions de barre d'outils et créez des constructeurs de champs personnalisés.
@@ -13,7 +13,7 @@ Les plugins constituent le mécanisme d'extension principal du panneau. Ils peuv
 
 - Envelopper l'ensemble de l'application avec un **provider** (contexte, gestion d'état)
 - Ajouter des **actions sur la page d'accueil** et des widgets
-- Injecter des composants de **vue de collection** (barre d'outils, générateurs de colonnes)
+- Injecter des composants de **vue de collection** (barre d'outils, en-têtes de colonnes)
 - Ajouter des composants de **formulaire** (générateurs de champs, panneaux supplémentaires)
 - **Injecter ou modifier des collections** dynamiquement
 
@@ -26,7 +26,7 @@ interface RebasePlugin {
 
     // UI contributions — a flat array, each entry naming its slot.
     // This replaced the old per-area objects (homePage, collectionView, form).
-    slots?: SlotContribution[];
+    slots?: AnySlotContribution[];
 
     // HOC providers. `scope: "root"` wraps the whole admin below
     // RebaseContext; `scope: "form"` wraps each entity form / edit view.
@@ -209,7 +209,7 @@ Il ajoute une action Autofill à chaque formulaire, et une commande slash **Auto
 ![Data enhancement](/img/data_enhancement.png)
 
 :::caution[Ce plugin envoie des données en dehors de votre machine]
-Le remplissage automatique envoie les valeurs des champs de l'entité à un service hébergé afin de générer une suggestion. Par défaut, ce service est **`https://app.rebase.pro/api/functions/ai`**, géré par Rebase — gratuit d'utilisation, sans configuration, et sans identifiant associé : les requêtes sont anonymes, limitées par un quota de débit plutôt que par l'identité. Votre JWT n'est pas envoyé. L'autocomplétion par barre oblique de l'éditeur envoie aussi du texte : jusqu'à 8 000 caractères de chaque côté du curseur, jamais le document entier.
+Le remplissage automatique envoie les valeurs des champs de l'entité à un service hébergé afin de générer une suggestion : uniquement les valeurs des propriétés déclarées, jamais celles d'une propriété en lecture seule, désactivée ou masquée, d'une propriété avec `dynamicProps`, ni d'une colonne que la collection ne déclare pas. Par défaut, ce service est **`https://app.rebase.pro/api/functions/ai`**, géré par Rebase — gratuit d'utilisation, sans configuration, et sans identifiant associé : les requêtes sont anonymes, limitées par un quota de débit plutôt que par l'identité. Votre JWT n'est pas envoyé. L'autocomplétion par barre oblique de l'éditeur envoie aussi du texte : jusqu'à 8 000 caractères de chaque côté du curseur, jamais le document entier.
 
 L'acceptabilité de ce fonctionnement dépend du contenu des champs. Pointez `endpoint` vers votre propre déploiement pour conserver la génération au sein de votre infrastructure :
 

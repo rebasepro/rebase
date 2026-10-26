@@ -1,5 +1,5 @@
 ---
-sourceHash: f3af5fc4d4e8aac0
+sourceHash: 6dfae85520b10436
 title: Referencia de Hooks
 sidebar_label: Hooks
 description: Hooks de React que proporciona Rebase para acceder a autenticación, datos, navegación, paneles laterales, almacenamiento y estado de la UI.
@@ -93,7 +93,7 @@ function ProductList() {
 | Parámetro | Tipo | Descripción |
 |-----------|------|-------------|
 | `path` | `string` | Ruta absoluta de la colección (p. ej., `"products"`). |
-| `collection` | `CollectionConfig` | El objeto de definición de la colección. |
+| `collection` | `AdminCollection` | El objeto de definición de la colección. |
 | `itemCount` | `number` | Opcional. Número de entidades a cargar (límite SQL). |
 | `offset` | `number` | Opcional. Número de elementos a omitir. |
 | `page` | `number` | Opcional. Número de página (empezando en 1), alternativa a `offset`. |
@@ -145,7 +145,7 @@ function ProductDetail({ productId }) {
 |-----------|------|-------------|
 | `path` | `string` | Ruta absoluta de la colección. |
 | `entityId` | `string \| number` | El ID de la entidad a cargar. |
-| `collection` | `CollectionConfig` | El objeto de definición de la colección. |
+| `collection` | `AdminCollection` | El objeto de definición de la colección. |
 | `useCache` | `boolean` | Opcional. Si es `true` y la entidad está en caché, omite el refresco en segundo plano. (Por defecto: `false`). |
 
 ### Utilidades de caché
@@ -416,7 +416,7 @@ function CategorySelector({ onSelect }) {
 | Opción | Tipo | Descripción |
 |--------|------|-------------|
 | `path` | `string` | Ruta absoluta de la colección. |
-| `collection` | `CollectionConfig` | Definición de la colección de destino. |
+| `collection` | `AdminCollection` | Definición de la colección de destino. |
 | `fixedFilter` | `FilterValues` | Opcional. Filtros estáticos para restringir los resultados de búsqueda. |
 | `pageSize` | `number` | Opcional. Número de elementos por página. (Por defecto: `10`). |
 | `getLabelFromEntity` | `(entity) => string` | Opcional. Personaliza el texto de la etiqueta mostrada. |
@@ -477,7 +477,15 @@ function EditForm() {
 
 ## `useEffectiveRoleController`
 
-Cambia de rol en tiempo de ejecución para previsualizar permisos y probar políticas de Row-Level Security (RLS) en local sin cerrar sesión.
+Cambia el rol para el que se construye la navegación del panel de administración, sin cerrar sesión:
+qué vistas de Studio lista. No envía nada al servidor y no evalúa ninguna política de
+seguridad a nivel de fila, así que una vista de datos sigue mostrando lo que puedes leer. Para
+probar RLS, usa **Simulate access** (encima de tu avatar en el menú lateral), o `client.simulate()` desde
+código; consulta [Testing access](/docs/frontend/authentication/#testing-access-simulate-access).
+
+`<Rebase>` proporciona el controlador. `useBuildEffectiveRoleController`, el hook
+que construía uno para pasarlo como `effectiveRoleController`, está obsoleto en favor de
+Simulate access y avisa una vez cuando se llama.
 
 ```typescript
 import { useEffectiveRoleController } from "@rebasepro/app";

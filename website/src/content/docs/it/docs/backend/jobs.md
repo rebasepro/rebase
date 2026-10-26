@@ -1,5 +1,5 @@
 ---
-sourceHash: cf996dc5a52fc912
+sourceHash: cae2434b532cd67f
 title: Job in background
 sidebar_label: Job in background
 description: Una coda di job persistente basata su Postgres — lavoro che sopravvive a un riavvio, ritentato con backoff, con i fallimenti conservati anziché eliminati.
@@ -20,6 +20,19 @@ Usalo per attività che non devono essere perse e che non devono essere eseguite
 | Un `setTimeout` in un callback | Una volta, in questo processo | No |
 
 ## Abilitazione
+
+:::note[Dove va configurato]
+**Runtime gestito** — da nessuna parte. `jobs` accetta *funzioni* handler, che nessuna
+variabile d'ambiente e nessun export di `config/index.ts` può trasportare, quindi un
+progetto creato con lo scaffold non può abilitare la coda. Esegui `rebase eject` (oppure scrivi un
+[server personalizzato](/docs/backend/custom-server/)) per raggiungerla. `REBASE_JOB_WORKERS`
+in `.env` decide solo se i worker di una coda già abilitata girano in *questo*
+processo.
+
+**Ejected** — il blocco `jobs` su `initializeRebaseBackend({ … })`, come qui sotto.
+
+La mappa completa è in [Panoramica del backend](/docs/backend/#where-each-option-lives).
+:::
 
 ```typescript no-verify
 await initializeRebaseBackend({
@@ -139,6 +152,17 @@ Gli handler della coda e le sottoscrizioni ai topic ricevono lo stesso `signal` 
 Sicuro per progettazione. I worker acquisiscono i job con `SELECT … FOR UPDATE SKIP LOCKED`, quindi ogni job viene assegnato a uno solo di essi e gli altri passano alla riga successiva invece di mettersi in coda dietro di essa. Non è necessario eleggere alcun leader.
 
 Un'istanza acquisisce solo i task per cui ha un handler. Durante un rolling deploy, un'istanza che esegue codice precedente lascia stare i job il cui task è implementato solo dal codice più recente: restano `pending`, senza consumare tentativi, finché un'istanza aggiornata non li acquisisce. Anche un task che nessuna istanza implementa resta `pending`, invece di finire in dead-letter.
+
+## Scansioni degli orfani dello storage
+
+`rebase storage orphans` viaggia su questa coda quando è attiva: ogni scansione,
+e ogni eliminazione da una scansione, è un job `storage.orphans`, con un solo
+tentativo. Il backend registra lui stesso l'handler, in ogni processo con lo
+storage configurato, e lo eseguono solo i processi i cui worker dei job sono
+attivi. Una scansione è vincolata da `timeoutMs` come qualsiasi job, quindi una
+sorgente troppo grande per essere scansionata in 15 minuti richiede un
+`timeoutMs` più alto, oppure 0. Senza la coda, il server esegue invece la
+scansione all'interno del proprio processo. Vedi [la CLI](/docs/cli/#rebase-storage).
 
 ## Webhook persistenti
 

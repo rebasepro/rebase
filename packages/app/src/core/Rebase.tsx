@@ -36,7 +36,7 @@ import { CustomizationControllerContext } from "../contexts/CustomizationControl
 import { AnalyticsContext } from "../contexts/AnalyticsContext";
 
 import { EffectiveRoleControllerContext } from "../contexts/EffectiveRoleController";
-import { useBuildEffectiveRoleController } from "../hooks/useBuildEffectiveRoleController";
+import { useEffectiveRoleState } from "./effective_role_state";
 
 /**
  * If you are using independent components of the admin
@@ -488,7 +488,7 @@ export function Rebase<USER extends User, DB = unknown>(props: RebaseProps<USER,
         onAnalyticsEvent
     }), [onAnalyticsEvent]);
 
-    const fallbackEffectiveRoleController = useBuildEffectiveRoleController();
+    const fallbackEffectiveRoleController = useEffectiveRoleState();
     const activeEffectiveRoleController = effectiveRoleController ?? fallbackEffectiveRoleController;
 
     // Built either way (a hook cannot be skipped), but switched off — no class

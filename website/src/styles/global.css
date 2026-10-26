@@ -706,15 +706,16 @@
    field changes, change it HERE too; nothing generates one from the other. */
 
 /* TextField / Select / BooleanSwitchWithLabel container.
-   Updated 2026-09-08 with the surface system: a field is `surface-field` (white
-   4% in dark) inside a 1px `hairline` (white 8%), at the control radius, which
-   theme.css now sets to 9px. The old 5.5% fill with no edge is what the panel
-   drew before it had a border. */
+   Updated 2026-10-26: the FireCMS field again — `surface-field` (white 6.5% in
+   dark) with no visible edge, at the control radius (9px). The border stays,
+   transparent, exactly as `fieldBackgroundMixin` keeps it: every height the
+   demos copied from the panel was measured with that 1px inside the box.
+   (2026-09-08 to 2026-10-26 the field was a 4% fill inside a 1px hairline.) */
 @utility field {
     position: relative;
     border-radius: 9px;                      /* rounded-lg, as theme.css sets it */
     background: var(--surface-field);
-    border: 1px solid var(--hairline);
+    border: 1px solid transparent;
 }
 
 /* Hover state of the same container, for demos where a field is clickable. */

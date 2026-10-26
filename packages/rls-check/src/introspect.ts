@@ -5,11 +5,13 @@
  * on the assumption that it will be pointed at production by someone who has
  * never heard of us. So:
  *
- *   - The session is opened `default_transaction_read_only` and the work runs
- *     inside `BEGIN READ ONLY`. Not as a convention — as a guarantee, so that a
- *     bug here cannot write.
- *   - `statement_timeout` is set before anything else runs, so a scan of a large
- *     catalog cannot pin a connection.
+ *   - The work runs inside `BEGIN READ ONLY`. Not as a convention — as a
+ *     guarantee, so that a bug here cannot write.
+ *   - `statement_timeout` is set (`SET LOCAL`) before anything else runs, so a
+ *     scan of a large catalog cannot pin a connection.
+ *   - Nothing is set for the session. The session may be shared — Rebase's
+ *     managed dev database, a transaction-mode pooler — and must be left as
+ *     it was found.
  *   - Privileges are read from `pg_class.relacl` via `aclexplode`, not from
  *     `information_schema.role_table_grants`. The information_schema views only
  *     show grants involving roles the caller is a member of, so a non-superuser
@@ -212,12 +214,11 @@ export async function introspectWithDiagnostics(opts: ConnectOptions): Promise<I
 
     try {
         const timeout = Math.max(1000, Math.floor(opts.statementTimeoutMs ?? 15000));
-        await client.query(`SET statement_timeout = ${timeout}`);
-        await client.query("SET default_transaction_read_only = on");
-        await client.query("BEGIN READ ONLY");
+        const begin = beginReadOnly(client, timeout);
+        await begin();
 
         try {
-            const snapshot = await readSnapshot(client, opts, diagnostics);
+            const snapshot = await readSnapshot(client, opts, diagnostics, begin);
             await client.query("COMMIT");
             return { snapshot, diagnostics };
         } catch (error) {
@@ -419,7 +420,25 @@ export interface Reader {
     ): Promise<R[]>;
 }
 
-function reader(client: Client, diagnostics: IntrospectDiagnostics): Reader {
+/**
+ * Open the scan's read-only transaction, with its statement timeout.
+ *
+ * Both are set for the transaction only — `BEGIN READ ONLY` and `SET LOCAL` —
+ * never for the session. The session may not be ours: Rebase's managed
+ * development database serves every client on ONE shared PGlite session, and
+ * a session-level `default_transaction_read_only = on` left there made the
+ * running dev backend, `db push` and sign-up fail every write with "cannot
+ * execute … in a read-only transaction" until `rebase db stop`. A pooler in
+ * transaction mode hands a session to the next client the same way.
+ */
+function beginReadOnly(client: Client, timeoutMs: number): () => Promise<void> {
+    return async () => {
+        await client.query("BEGIN READ ONLY");
+        await client.query(`SET LOCAL statement_timeout = ${timeoutMs}`);
+    };
+}
+
+function reader(client: Client, diagnostics: IntrospectDiagnostics, begin: () => Promise<void>): Reader {
     return {
         async query(what, text, values) {
             try {
@@ -434,7 +453,7 @@ function reader(client: Client, diagnostics: IntrospectDiagnostics): Reader {
                     error: error instanceof Error ? error.message : String(error)
                 });
                 await client.query("ROLLBACK").catch(() => undefined);
-                await client.query("BEGIN READ ONLY").catch(() => undefined);
+                await begin().catch(() => undefined);
                 return [];
             }
         }
@@ -444,9 +463,10 @@ function reader(client: Client, diagnostics: IntrospectDiagnostics): Reader {
 async function readSnapshot(
     client: Client,
     opts: ConnectOptions,
-    diagnostics: IntrospectDiagnostics
+    diagnostics: IntrospectDiagnostics,
+    begin: () => Promise<void>
 ): Promise<DbSnapshot> {
-    const db = reader(client, diagnostics);
+    const db = reader(client, diagnostics, begin);
 
     const [server] = await db.query<{
         version_num: string | number;

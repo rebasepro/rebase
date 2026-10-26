@@ -1,4 +1,5 @@
 import { DESK_NARRATION } from "../desk/script";
+import type { Script } from "../spoken/narration";
 
 /**
  * A SIMULATED PRESENTER — the script read aloud as the page would hear it,
@@ -28,6 +29,8 @@ export interface SimOptions {
     mishear: number;
     drop: number;
     seed: number;
+    /** Which script is read: the desk film's by default. */
+    script: Script;
 }
 
 export const SIM_DEFAULTS: SimOptions = {
@@ -38,6 +41,7 @@ export const SIM_DEFAULTS: SimOptions = {
     mishear: 0.08,
     drop: 0.03,
     seed: 7,
+    script: DESK_NARRATION,
 };
 
 export interface SimRead {
@@ -80,7 +84,7 @@ export function simulateRead(options: Partial<SimOptions> = {}): SimRead {
        break, and for a 250 ms break the "off" arrived after the next "on":
        the follower was told the presenter had gone quiet mid-line. */
     let voiceOn = false;
-    DESK_NARRATION.forEach((line) => {
+    o.script.forEach((line) => {
         const said: number[] = [];
         if (!voiceOn) events.push({ atMs: t + 120, kind: "voice", speaking: true, voiceAtMs: t });
         voiceOn = true;
@@ -111,7 +115,7 @@ export function simulateRead(options: Partial<SimOptions> = {}): SimRead {
         ends.push(t);
         const pause = o.pause[0] + (o.pause[1] - o.pause[0]) * rnd();
         /* After the last line the silence never ends, so it always registers. */
-        const last = line === DESK_NARRATION[DESK_NARRATION.length - 1];
+        const last = line === o.script[o.script.length - 1];
         if (pause > 420 || last) {
             events.push({ atMs: t + 400, kind: "voice", speaking: false, voiceAtMs: t });
             voiceOn = false;

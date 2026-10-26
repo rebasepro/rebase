@@ -393,7 +393,7 @@ Import paths only — no behaviour moved with them.
 | `@rebasepro/mcp-server` | `@rebasepro/mcp` |
 | `@rebasepro/plugin-data-enhancement` | `@rebasepro/plugin-ai` |
 
-Unchanged: `types`, `utils`, `common`, `client`, `admin`, `admin`, `studio`,
+Unchanged: `types`, `utils`, `common`, `client`, `ui`, `admin`, `studio`,
 `cli`, `plugin-insights`.
 
 The retired names are deprecated on npm, so installing one tells you rather
@@ -404,7 +404,7 @@ Additionally, **`@rebasepro/auth` is removed**. `useRebaseAuthController`,
 from `@rebasepro/app`, beside the `RebaseAuth` and `LoginView` components they
 are used with.
 
-**`RebaseCMS` is now `RebaseCMS`.** `mode: "cms"` on `RebaseBackendConfig` is
+**`RebaseCMS` is now `RebaseAdmin`** (and becomes `RebaseCMS` again in [0.17](/docs/upgrading/0-14-to-0-17/)). `mode: "cms"` on `RebaseBackendConfig` is
 unchanged — it describes where collections come from, not the UI.
 
 ---

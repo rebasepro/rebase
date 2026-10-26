@@ -1,5 +1,5 @@
 ---
-sourceHash: 8b0cf8dec1186f45
+sourceHash: f7939e13ff2b006a
 title: Comandi del database
 sidebar_label: Comandi del database
 description: I comandi rebase db — push, generate e migrate, backup e ripristini, la copia di un database, la stringa di connessione, il database di sviluppo gestito e i branch.
@@ -48,7 +48,7 @@ Genera file di migrazione SQL a partire dalle modifiche allo schema:
 rebase db generate
 ```
 
-Crea file di migrazione con timestamp in `drizzle/migrations/` che possono essere revisionati e committati.
+Crea file di migrazione con timestamp in `backend/drizzle/migrations/` che possono essere revisionati e committati.
 
 ### `rebase db migrate`
 
@@ -251,7 +251,7 @@ Senza un terminale su cui chiedere, come in CI, non rimuove nulla, dice di passa
 `list` e `info` si limitano a leggere: un database su cui non è stato creato alcun branch non ne ha, e
 non vi creano lo schema `rebase`. Su 0.24 creano il registro.
 
-`diff` mostra cosa ha cambiato un branch rispetto al database da cui è stato creato: tabelle, colonne e policy RLS aggiunte, eliminate o modificate, e per tabella le righe che ha inserito, aggiornato ed eliminato. Le righe che il genitore ha cambiato per conto suo da allora sono contate a parte, e quelle cambiate da entrambi sono conflitti. `--json` stampa l'intero diff, con fino a `--sample-limit` righe per tabella (100 per impostazione predefinita). Legge entrambi i database e non ne modifica nessuno; l'unione si fa in Studio — vedi [Esaminare e unire un branch](/docs/backend/branching/#reviewing-and-merging-a-branch).
+`diff` mostra cosa ha cambiato un branch rispetto al database da cui è stato creato: tabelle, colonne, vincoli, indici, trigger, policy RLS, tipi enum, viste e funzioni aggiunti, eliminati o modificati, e per tabella le righe che ha inserito, aggiornato ed eliminato. Le righe che il genitore ha cambiato per conto suo da allora sono contate a parte, e quelle cambiate da entrambi sono conflitti. `--json` stampa l'intero diff, con fino a `--sample-limit` righe per tabella (100 per impostazione predefinita). Legge entrambi i database e non ne modifica nessuno; l'unione si fa in Studio — vedi [Esaminare e unire un branch](/docs/backend/branching/#reviewing-and-merging-a-branch).
 
 `switch` registra il branch in `.rebase/branch.json` e non modifica mai `.env`. Ha la precedenza su `DATABASE_URL` presente in `.env` ma cede il passo a `--database-url` o a una variabile `DATABASE_URL` definita nella shell; pertanto, un flag passato da riga di comando ha sempre priorità rispetto a uno switch effettuato precedentemente. `delete` rifiuta il branch su cui ti trovi, poiché ogni comando del checkout, `delete` compreso, punta a esso: prima `switch --off`, poi eliminalo. L'intero flusso di lavoro è in [Database Branching](/docs/backend/branching/).
 

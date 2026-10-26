@@ -1,5 +1,5 @@
 ---
-sourceHash: 6d6edea2e91b0bbc
+sourceHash: e61d261c8dae7e37
 title: API REST
 sidebar_label: API REST
 description: Endpoint API REST generati automaticamente per ogni collection, con filtraggio, ordinamento, paginazione e inclusione delle relazioni.
@@ -248,9 +248,9 @@ Ogni errore, proveniente da qualsiasi route, viene restituito in una struttura (
 
 | Stato | Codice tipico | Significato |
 |-------|---------------|-------------|
-| 400 | `BAD_REQUEST`, `VALIDATION_ERROR`, `INVALID_LIMIT`, `INVALID_OFFSET`, `INVALID_PAGE` | La richiesta è malformata o richiede un'operazione impossibile |
+| 400 | `BAD_REQUEST`, `INVALID_INPUT`, `INVALID_LIMIT`, `INVALID_OFFSET`, `INVALID_PAGE` | La richiesta è malformata o richiede un'operazione impossibile |
 | 401 | `UNAUTHORIZED` | Nessuna credenziale, o credenziale che non identifica nessuno |
-| 403 | `FORBIDDEN`, `DB_PERMISSION_DENIED` | Credenziale che identifica un utente privo dei permessi necessari |
+| 403 | `FORBIDDEN`, `SCOPE_MISSING`, `WRITE_DENIED` | Credenziale che identifica un utente privo dei permessi necessari |
 | 404 | `NOT_FOUND` | L'elemento indirizzato non esiste |
 | 409 | `CONFLICT` | Conflitto di stato — una chiave duplicata, un albero dirty |
 | 501 | varia | La funzionalità esiste ma **non è configurata** in questo deployment |
@@ -361,15 +361,15 @@ Ogni hook viene atteso, e un errore lanciato da uno qualsiasi di essi annulla l'
 | Metodo | Percorso | Autenticazione | Descrizione |
 |--------|----------|----------------|-------------|
 | `GET` | `/health` and `/api/health` | nessuna | Verifica di liveness/readiness |
-| `GET` | `/api/docs` | nessuna | La specifica JSON di OpenAPI 3.0 |
-| `GET` | `/api/swagger` | nessuna | Swagger UI. Attivo in fase di sviluppo, disattivato in produzione; `REBASE_ENABLE_SWAGGER` ne sovrascrive lo stato in entrambi i casi |
-| `GET` | `/api/meta/schema-version` | nessuna | L'hash dello schema da cui è stato compilato questo backend — deliberatamente non autenticato, restituisce solo tale hash |
+| `GET` | `/api/docs` | nessuna; `schema:read` quando `enableSwagger` è `false` (il valore predefinito del runtime in produzione) | La specifica JSON di OpenAPI 3.0 |
+| `GET` | `/api/swagger` | nessuna | Swagger UI. Servita solo al di fuori della produzione; `REBASE_ENABLE_SWAGGER` non può attivarla in produzione |
+| `GET` | `/api/meta/schema-version` | nessuna | L'hash dello schema da cui è stato compilato questo backend, e la versione del runtime — deliberatamente non autenticato, e nulla che descriva lo schema |
 | `GET` | `/api/meta/contract` | `schema:read`: un admin, la service key o una API key che lo possiede | Il contratto completo delle collection, per `rebase generate-sdk --from`. Fail-closed: `404` se non è configurata alcuna autenticazione |
 | `GET` | `/metrics` | `REBASE_METRICS_TOKEN` quando impostato | Metriche di Prometheus, se `REBASE_METRICS=true` |
 
 ## OpenAPI / Swagger
 
-La specifica OpenAPI viene generata automaticamente a partire dalle definizioni delle tue collection: descrive gli endpoint di elenco, lettura, creazione, aggiornamento, eliminazione e operazioni di massa (bulk) di ogni collection gestita dal backend, con i rispettivi parametri di query e schemi di risposta. Non costituisce una mappa completa dell'intera superficie HTTP — le route relative ad auth, storage, functions e cron sono documentate esclusivamente su questo sito — e le colonne contrassegnate con `excludeFromApi` ne vengono escluse.
+La specifica OpenAPI viene generata automaticamente a partire dalle definizioni delle tue collection: descrive gli endpoint di elenco, query, conteggio, aggregazione, lettura, creazione, aggiornamento, eliminazione e operazioni di massa (bulk) di ogni collection gestita dal backend, le sue route annidate e `_batch`, con i rispettivi parametri di query e schemi di risposta. Non costituisce una mappa completa dell'intera superficie HTTP — le route relative ad auth, storage, functions e cron sono documentate esclusivamente su questo sito — e le colonne contrassegnate con `excludeFromApi` ne vengono escluse.
 
 Per una collection con [`softDelete`](/docs/collections/soft-delete/) la specifica indica
 che un'eliminazione, singola o di massa, sposta la riga nel cestino, e documenta
@@ -394,7 +394,7 @@ Richiede lo scope **`schema:read`**, che un amministratore possiede, e, su un de
 GET /api/meta/schema-version
 ```
 
-Per verificare la struttura degli endpoint anziché lo schema sottostante, il documento OpenAPI è disponibile su `GET /api/docs`, con la Swagger UI consultabile su `/api/swagger` quando `enableSwagger` è abilitato.
+Per verificare la struttura degli endpoint anziché lo schema sottostante, il documento OpenAPI è disponibile su `GET /api/docs`, con la Swagger UI consultabile su `/api/swagger` al di fuori della produzione.
 
 ## Passaggi successivi
 

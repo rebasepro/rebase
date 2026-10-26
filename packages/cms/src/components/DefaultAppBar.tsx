@@ -223,7 +223,9 @@ export const DefaultAppBar = function DefaultAppBar({
 
             {shellToolbar}
 
-            <RlsSimulatorBar/>
+            {/* On a large layout the drawer is always on screen and carries
+                this control; one per screen. */}
+            {!(hasDrawer && largeLayout) && <RlsSimulatorBar/>}
 
             {includeLanguageToggle && <LanguageToggle/>}
 

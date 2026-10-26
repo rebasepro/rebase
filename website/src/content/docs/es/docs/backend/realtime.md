@@ -1,5 +1,5 @@
 ---
-sourceHash: 0a56c2d3dea31616
+sourceHash: cb80897157f6b539
 title: Tiempo real y WebSocket
 sidebar_label: Tiempo real
 description: Sincronización de datos en tiempo real, canales de difusión y seguimiento de presencia mediante WebSocket.
@@ -65,8 +65,8 @@ const unsubscribe = client.data.products.listen(
 );
 ```
 
-El callback recibe un `FindResponse<M>` que contiene:
-- `data` — Array de objetos `Entity<M>`.
+El callback recibe un `FindResult<M>` que contiene:
+- `data` — Las filas, planas, tal como las devuelve `find()` (`row.name`, no `row.values.name`).
 - `meta` — Información de paginación (`total`, `limit`, `offset`, `hasMore`).
 
 ### Suscribirse a una colección con filtros
@@ -149,7 +149,7 @@ const unsubscribe = client.data.orders
 ```
 
 :::note
-El método `.listen()` en el query builder solo está disponible cuando el `RebaseClient` está configurado con un `websocketUrl`. Si la conexión WebSocket no está configurada, llamar a `.listen()` generará un error.
+`.listen()` —tanto en el query builder como en el accessor de la colección— necesita el WebSocket del cliente. El cliente deriva su URL de `baseUrl` a menos que se indique `websocketUrl`. En un cliente creado con `realtime: false`, o que no pudo derivar ninguna URL, llamar a `.listen()` lanza un error.
 :::
 
 ## Entrega de actualizaciones: Instant Patch + Refetch de corrección
@@ -191,7 +191,7 @@ La trama es `{ rows, pks, meta }`:
 
 `meta` se calcula dentro de la misma transacción sujeta a RLS que leyó las filas, por lo que describe con exactitud las filas que la acompañan. Sin esto, un cliente que necesitara el total tenía que emitir un `GET /count` **por cada push**: un viaje de ida y vuelta adicional por escritura y por suscriptor, además de una ventana en la que el conteo y las filas describían estados distintos de la colección.
 
-Cuando el propio conteo falla, la trama incluye `partial: true` y ningún `total`; esto no constituye un error de suscripción, y el cliente debe conservar el último total real en lugar de sustituirlo por la longitud de la página. En una tabla grande, el conteo es la mayor parte de lo que cuesta una trama. Con `REALTIME_RECOUNT_INTERVAL_MS` definida, una lista cuyo último total fue de al menos `REALTIME_RECOUNT_MIN_ROWS` (100.000 por defecto) reutiliza ese total durante el intervalo en lugar de contar en cada escritura, y esa trama lleva `meta.totalAsOf`, el momento en que se tomó el total. Sin definir, como por defecto, cada trama cuenta.
+Cuando el propio conteo falla, la trama incluye `partial: true` y ningún `total`; esto no constituye un error de suscripción, y el cliente debe conservar el último total real en lugar de sustituirlo por la longitud de la página. En una tabla grande, el conteo es la mayor parte de lo que cuesta una trama. Con `REALTIME_RECOUNT_INTERVAL_MS` definida, una lista cuyo último total fue de al menos `REALTIME_RECOUNT_MIN_ROWS` (100.000 por defecto) reutiliza ese total durante el intervalo en lugar de contar en cada escritura, y esa trama lleva `meta.totalAsOf`, el momento en que se tomó el total. Cuando se cumple el intervalo, una lista cuya última trama reutilizó el total se cuenta de nuevo y recibe el total nuevo, haya habido o no alguna escritura desde entonces. Sin definir, como por defecto, cada trama cuenta.
 
 ### Lo que cuesta una escritura, y los límites
 
@@ -244,7 +244,7 @@ registros distintos que una página tiene abiertos. Cámbialo con
 `REALTIME_MAX_SUBSCRIPTIONS_PER_SOCKET` o `realtime.maxSubscriptionsPerSocket`
 en el adaptador de Postgres (la variable de entorno prevalece); un valor que
 no sea un entero positivo detiene el servidor en el arranque. En 0.23 las
-suscripciones de un socket no tienen límite. **También se pueden limitar los sockets que mantiene un usuario**, por instancia del servidor: define `REALTIME_MAX_SOCKETS_PER_USER` (o `realtime.maxSocketsPerUser`), y un inicio de sesión por encima del límite se rechaza con `TOO_MANY_SOCKETS` y el socket se cierra con 4002. Sin definir, como por defecto, no hay techo.
+suscripciones de un socket no tienen límite. **También se pueden limitar los sockets que mantiene un usuario**, por instancia del servidor: define `REALTIME_MAX_SOCKETS_PER_USER` (o `realtime.maxSocketsPerUser`), y un inicio de sesión por encima del límite se rechaza con `TOO_MANY_SOCKETS` y el socket se cierra con 4002. Los sockets que inician sesión con una clave de API cuentan contra esa clave, cada clave por separado, no contra la cuenta que la creó; la clave de servicio es una sola credencial, así que todos sus sockets cuentan juntos. Los sockets de un administrador que suplantan a un usuario cuentan contra el administrador, junto con sus propios sockets, no contra el usuario cuya identidad adoptan. El SDK avisa a todas las suscripciones activas y a `onConnectionLost` a la vez, con un error `CONNECTION_LOST` cuyo `details.reason` es `TOO_MANY_SOCKETS`, y sigue reintentando, esperando más cada vez hasta 30 s, de modo que la pestaña entra en cuanto se cierra otro socket. Sin definir, como por defecto, no hay techo.
 
 Un id de suscripción es propio del socket: dos clientes que nombran ambos una
 suscripción `"sub-1"` conservan cada uno la suya, y un `unsubscribe` termina
@@ -394,7 +394,7 @@ El seguimiento de presencia registra qué usuarios están conectados actualmente
 | `presence_track`  | Cliente → Servidor | Iniciar el seguimiento de presencia con un estado personalizado |
 | `presence_untrack`| Cliente → Servidor | Detener el seguimiento de presencia                  |
 | `presence_state`  | Cliente → Servidor | Solicitar el estado completo de presencia de un canal |
-| `presence_state`  | Servidor → Cliente | Entidad completa de todas las presencias en un canal  |
+| `presence_state`  | Servidor → Cliente | Todas las presencias del canal, completas             |
 | `presence_diff`   | Servidor → Cliente | Actualización incremental (ingresos y salidas)       |
 
 Cuando un cliente envía `presence_track`, el servidor lo une automáticamente al canal (sin necesidad de un `join_channel` aparte) y difunde un `presence_diff` a todos los miembros del canal. El SDK reenvía su estado cada ~20 segundos como latido (heartbeat); un latido cuyo estado no ha cambiado solo renueva el tiempo de espera del cliente y no envía ningún `presence_diff`.
@@ -450,7 +450,7 @@ los mensajes enviados mientras está desconectado se ponen en cola y se envían 
 | `connecting` | Marcando, sin ninguna interrupción en curso. |
 | `connected` | El socket está abierto. |
 | `reconnecting` | El socket se cayó y el cliente está volviendo a marcar. Aún no se ha informado nada. |
-| `disconnected` | La interrupción ha durado unos 15 segundos o más. Se ha informado `CONNECTION_LOST`, y el cliente sigue volviendo a marcar. |
+| `disconnected` | La interrupción ha durado 14 segundos o más. Se ha informado `CONNECTION_LOST`, y el cliente sigue volviendo a marcar. |
 | `closed` | Se llamó a `client.close()`. Final. |
 
 ```typescript
@@ -493,15 +493,15 @@ Ejecutar más de una instancia —el bus LISTEN/NOTIFY, el comportamiento de la 
 
 ## Captura de cambios a nivel de base de datos (CDC)
 
-→ [Captura de cambios a nivel de base de datos (CDC)](/docs/backend/realtime-cdc/)
+Cada escritura confirmada emite eventos en tiempo real, sin importar cómo se hizo: REST, el SDK, Studio, `psql`, una tarea cron en otro servicio. Cómo funciona la captura, el ajuste `REALTIME_CDC` y lo que necesita: [Captura de cambios de la base de datos](/docs/backend/realtime-cdc/).
 
 ## Tiempo de espera de solicitudes pendientes (Timeout)
 
 Para evitar que las solicitudes de los clientes se queden colgadas indefinidamente, todas las operaciones WebSocket pendientes que esperan una respuesta del servidor (como las consultas únicas de colecciones `FETCH_COLLECTION`, consultas de entidad única `FETCH_ONE`, creación/actualización `SAVE`, eliminaciones `DELETE`, conteos `COUNT` y comprobaciones de unicidad `CHECK_UNIQUE_FIELD`) tienen un tiempo de espera predeterminado de 30 segundos.
 
-Si el servidor no responde dentro de esta ventana de 30 segundos, el cliente elimina automáticamente la solicitud pendiente y rechaza la promesa con un `ApiError` con el mensaje `"Request timed out"`.
+Si el servidor no responde dentro de esta ventana de 30 segundos, el cliente elimina automáticamente la solicitud pendiente y rechaza la promesa con un `RebaseApiError` cuyo código es `REQUEST_TIMEOUT`.
 
-Los mensajes unidireccionales que no esperan respuesta (como `subscribe_collection`, `subscribe_one`, `unsubscribe`, `join_channel`, `leave_channel`, `broadcast`, `presence_track`, `presence_untrack` y `presence_state`) se resuelven inmediatamente tras la transmisión y no activan tiempos de espera.
+Los mensajes unidireccionales que no esperan respuesta (como `subscribe_collection`, `subscribe_one`, `unsubscribe`, `join_channel`, `leave_channel`, `broadcast`, `presence_track`, `presence_untrack`, `presence_state` y `channel_history`) se resuelven inmediatamente tras la transmisión y no activan este tiempo de espera. Una suscripción cuya primera trama no ha llegado 30 segundos después de enviar su subscribe falla en su lugar, con `SUBSCRIPTION_TIMEOUT` en su `onError`.
 
 ### Cuando se rechaza una trama de canal
 
@@ -521,7 +521,7 @@ channel.onError((error) => {
 | Código | Significado |
 |------|-------|
 | `CHANNEL_FORBIDDEN` | No eres miembro del canal; únete a él antes de transmitir o leer su historial |
-| `RATE_LIMITED` | Has superado el límite de tramas por canal mencionado anteriormente o, en una solicitud de historial, el [límite de tasa de datos](#lo-que-cuesta-una-escritura-y-los-límites) |
+| `RATE_LIMITED` | Has superado el presupuesto de tramas por canal (7.200 tramas de canal por minuto por socket) o, en una solicitud de historial, el [límite de tasa de datos](#lo-que-cuesta-una-escritura-y-los-límites) |
 | `CHANNEL_HISTORY_WRITE_FAILED` | No se pudo persistir una difusión retenida, por lo que fue descartada |
 | `CHANNEL_HISTORY_READ_FAILED` | No se pudo atender una solicitud para ponerse al día |
 | `CHANNEL_HISTORY_GAP` | Lo genera el cliente: al ponerse al día se descubrió que el servidor ya no conserva mensajes que este cliente nunca recibió. `details` es `{ from, to }`, los números de secuencia perdidos. Vuelve a sincronizar el estado del canal desde su fuente de verdad |

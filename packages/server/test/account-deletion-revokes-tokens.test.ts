@@ -143,7 +143,8 @@ describe("judgeAccessToken", () => {
  * The guard for the class: a door that honours an access token asks
  * `judgeAccessToken`, which knows a deleted account when it sees one. The
  * watermark read on its own does not — the mark lives on the row — so its only
- * callers are the two MCP paths that pair it with `currentRoles`, which does.
+ * callers are the MCP paths that pair it with `currentRoles`, which does: the
+ * OAuth refresh, and `/mcp` itself on every access token it is handed.
  */
 describe("who reads the revocation watermark on its own", () => {
     it("is only the MCP grant paths, which ask whether the account exists beside it", async () => {
@@ -162,7 +163,7 @@ describe("who reads the revocation watermark on its own", () => {
             }
         };
         walk(root);
-        expect(callers.sort()).toEqual(["mcp/oauth-routes.ts"]);
+        expect(callers.sort()).toEqual(["mcp/mcp-routes.ts", "mcp/oauth-routes.ts"]);
     });
 });
 

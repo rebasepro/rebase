@@ -92,11 +92,27 @@ function requestTimeoutError(written: boolean): RebaseApiError {
  * connection has been down for longer than a blip. The registration is kept and
  * resumes when the socket is back.
  */
-function realtimeLostError(): RebaseApiError {
+function realtimeLostError(refusal?: RebaseApiError): RebaseApiError {
+    if (refusal) {
+        return new RebaseApiError(
+            `The server refused this realtime connection (${refusal.code}: ${refusal.message}), so live data is not ` +
+            "updating. The client keeps retrying, more slowly each time, and refreshes this subscription once it is let in.",
+            { code: "CONNECTION_LOST", details: { reason: refusal.code }, cause: refusal }
+        );
+    }
     return new RebaseApiError(
         "The realtime connection is down, so live data is not updating. The client keeps reconnecting and refreshes this subscription when the connection is back.",
         { code: "CONNECTION_LOST" }
     );
+}
+
+/**
+ * Whether `error` is the server refusing this socket for its per-user ceiling
+ * (`REALTIME_MAX_SOCKETS_PER_USER`): it answers AUTHENTICATE with
+ * `TOO_MANY_SOCKETS` and closes the socket.
+ */
+function isSocketCeilingRefusal(error: unknown): error is RebaseApiError {
+    return error instanceof RebaseApiError && error.code === "TOO_MANY_SOCKETS";
 }
 
 /**
@@ -727,6 +743,26 @@ export class RebaseWebSocketClient {
         return true;
     }
 
+    /** Whether the current run of ceiling refusals has been said in the console. */
+    private socketCeilingWarned = false;
+
+    /**
+     * The server refused this socket for its per-user ceiling. Said once per
+     * run of refusals, as a warning, and reported to every registration at
+     * once as an outage — a refusal is not a blip that the next dial fixes.
+     */
+    private noteSocketCeiling(error: RebaseApiError): void {
+        if (!this.socketCeilingWarned) {
+            this.socketCeilingWarned = true;
+            console.warn(
+                `[Rebase] Realtime: the server refused this connection (${error.code}: ${error.message}). ` +
+                "Live data is not updating; the client retries, more slowly each time, until another connection closes."
+            );
+        }
+        this.clearOutageTimer();
+        this.reportConnectionLost(error);
+    }
+
     /**
      * Authenticate the WebSocket connection
      */
@@ -885,14 +921,10 @@ export class RebaseWebSocketClient {
                 const wasReconnect = this.hadConnection;
                 this.hadConnection = true;
                 this.isConnected = true;
-                this.reconnectAttempts = 0;
-                // The outage, if there was one, is over. The registrations
-                // hear about it through the re-subscribe below: each one's
-                // next `onUpdate` carries what was written meanwhile.
-                this.clearOutageTimer();
-                this.outageReported = false;
                 this.gaveUp = false;
-                this.setState("connected");
+                // Connected, unless an outage is being reported: then only once
+                // the socket is let in, below.
+                if (!this.outageReported) this.setState("connected");
                 // A new socket asks the server afresh.
                 this.refusedSession = null;
 
@@ -906,6 +938,14 @@ export class RebaseWebSocketClient {
                             this.connectionDebug("WebSocket auto-authenticated");
                         }
                     } catch (error) {
+                        // Refused for the per-user socket ceiling: the server
+                        // closes this socket, and the redial waits on the
+                        // growing schedule — nothing below runs, since this
+                        // open was not a connection.
+                        if (isSocketCeilingRefusal(error)) {
+                            this.noteSocketCeiling(error);
+                            return;
+                        }
                         // A refused session is said as that — once, as a
                         // warning — and not as a connect that went without
                         // signing in. Anything else (not logged in, auth still
@@ -916,6 +956,20 @@ export class RebaseWebSocketClient {
                         }
                     }
                 }
+                // Closed while signing in: the next socket starts over.
+                if (this.ws !== socket) return;
+
+                // Only now is the outage over and the backoff reset: on `open`
+                // they were reset before a refusal could arrive, so a refused
+                // socket redialled at the first step forever and its outage
+                // was never reported. The registrations hear the outage ended
+                // through the re-subscribe below: each one's next `onUpdate`
+                // carries what was written meanwhile.
+                this.reconnectAttempts = 0;
+                this.clearOutageTimer();
+                this.outageReported = false;
+                this.socketCeilingWarned = false;
+                this.setState("connected");
 
                 this.emit(wasReconnect ? "reconnect" : "connect");
                 this.processMessageQueue(wasReconnect);
@@ -1178,11 +1232,11 @@ export class RebaseWebSocketClient {
         this.outageTimer = null;
     }
 
-    private reportConnectionLost(): void {
+    private reportConnectionLost(refusal?: RebaseApiError): void {
         if (this.outageReported) return;
         this.outageReported = true;
         this.setState("disconnected");
-        const error = realtimeLostError();
+        const error = realtimeLostError(refusal);
         for (const subscription of this.collectionSubscriptions.values()) {
             this.notifyError(subscription.callbacks, error);
         }

@@ -19,6 +19,7 @@ import { installUnhandledRejectionHandler } from "./init/process-safety";
 import { createRebaseBackend, type RebaseBackend } from "./backend/create-backend";
 import { setDefaultBackend } from "./backend/default-backend";
 import type { RebaseBackendOptions } from "./backend/options";
+import { resolveProvisionEnv } from "./boot/provision";
 
 /** What {@link initializeRebaseBackend} takes: a backend's options, and where to serve it. */
 export interface RebaseBackendConfig extends Omit<RebaseBackendOptions, "provision"> {
@@ -62,7 +63,12 @@ export type RebaseBackendInstance = RebaseBackend;
  *
  * ```ts
  * installUnhandledRejectionHandler();
- * const backend = await createRebaseBackend({ ...options, provision: true });
+ * const backend = await createRebaseBackend({
+ *     ...options,
+ *     provision: !resolveProvisionEnv(process.env)
+ *         ? false
+ *         : provisionSchema === false ? { collections: false, realtime: false } : true
+ * });
  * setDefaultBackend(backend);
  * backend.mount(app, { basePath });
  * await backend.attachRealtime(server);
@@ -82,9 +88,10 @@ export async function initializeRebaseBackend(config: RebaseBackendConfig): Prom
     const { app, server, basePath, provisionSchema, ...options } = config;
 
     // One floating promise in application code — a fire-and-forget call in a
-    // custom function is the usual one — otherwise ends the process, and on the
-    // managed runtime that process is shared with other tenants. Log it and
-    // keep serving. Process-wide, so it belongs to the one call that owns the
+    // custom function is the usual one — otherwise ends the process, and with
+    // it every request in flight: on Rebase Cloud's managed runtime the
+    // project's own pod (each project runs in a process of its own, never
+    // shared between tenants). Log it and keep serving. Process-wide, so it belongs to the one call that owns the
     // process: a backend built with `createRebaseBackend` leaves the decision
     // to whoever does. Idempotent, and opt-out via
     // REBASE_EXIT_ON_UNHANDLED_REJECTION.
@@ -96,8 +103,12 @@ export async function initializeRebaseBackend(config: RebaseBackendConfig): Prom
         // several booting the same project and not the one that owns the
         // schema, which still keeps the framework's own tables current.
         // `REBASE_MIGRATE_ON_BOOT=none` turns the collection schema off on top
-        // of either, where the DDL runs.
-        provision: provisionSchema === false ? { collections: false, realtime: false } : true
+        // of either, where the DDL runs. `REBASE_PROVISION=false` turns off
+        // everything, the framework's own tables included: the database is
+        // changed by something else, and only read here.
+        provision: !resolveProvisionEnv(process.env)
+            ? false
+            : provisionSchema === false ? { collections: false, realtime: false } : true
     });
 
     // The process serves this one backend, so the module-level API answers

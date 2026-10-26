@@ -1,5 +1,5 @@
 ---
-sourceHash: d9b66c9d404a5085
+sourceHash: bb2bf60cbaed04eb
 title: Autenticação
 sidebar_label: Autenticação
 description: Configure a autenticação JWT, provedores OAuth, e-mail SMTP, proteção contra bots e a coleção de usuários no backend do Rebase.
@@ -95,6 +95,7 @@ const backend = await initializeRebaseBackend({
 | `disableSelfRegistration` | `boolean` | `false` | Kill switch: também fecha a janela de bootstrap do primeiro usuário que `allowRegistration: false` deixa aberta |
 | `allowAnonymous` | `boolean` | `false` | Habilita `POST /api/auth/anonymous`. Deliberadamente não restrito por `allowRegistration` — um aplicativo público predominantemente de leitura pode querer sessões sem contas. Transformar um convidado em uma conta (`POST /api/auth/anonymous/link`) é um registro, e também requer `allowRegistration` — e `allowAnonymous` ainda ligado: se for desligado, ele também recusa os convidados que já entraram, de modo que nenhum pode virar uma conta (`403 ANONYMOUS_AUTH_DISABLED`) |
 | `allowUserLookup` | `boolean` | `false` | Disponibiliza `POST /api/auth/find-user` para fluxos de convite por e-mail |
+| `captcha` | `CaptchaConfig` | — | Proteção contra bots nas rotas que enviam e-mail — consulte [Proteção contra bots](#proteção-contra-bots) |
 | `defaultRole` | `string` | — | Role atribuída a um usuário recém-registrado quando nenhuma for especificada. Não pode ser `admin`, nem uma role declarada que tenha um escopo do plano administrativo: a inicialização recusa as duas |
 | `serviceKey` | `string` | — | Chave estática para chamadas servidor para servidor — consulte [Autenticação por Chave de Serviço](/docs/backend/auth-endpoints/#service-key-authentication) |
 | `email` | `EmailConfig` | — | SMTP, para redefinição de senha, verificação, convites e magic links |
@@ -405,6 +406,8 @@ DISCORD_CLIENT_SECRET=…
 O endpoint `GET /api/auth/config` lista então `discord` em `enabledProviders`, que
 é a forma de verificar se o par foi reconhecido.
 
+O Google é configurado apenas por `GOOGLE_CLIENT_ID`: seu fluxo de ID token não precisa de segredo, então `GOOGLE_CLIENT_SECRET` é opcional.
+
 A Apple é a exceção: ela não possui um client secret estático, porque o Rebase
 assina um JWT ES256 de curta duração para cada troca de token. Ela requer todas as
 quatro variáveis: `APPLE_CLIENT_ID`, `APPLE_TEAM_ID`, `APPLE_KEY_ID` e
@@ -413,8 +416,8 @@ tudo mais.
 
 Duas opções não possuem correspondência em variáveis de ambiente e exigem o bloco
 `auth` (ou seja, um backend ejetado ou configurado via código):
-`microsoft.tenantId`, cujo padrão é `common` e relata todos os endereços como
-não verificados, e `gitlab.baseUrl`, para uma instância auto-hospedada.
+`microsoft.tenantId`, cujo padrão é `common` e aceita todos os tenants do Entra (com qualquer tenant, um endereço só conta como verificado quando o registro do aplicativo emite a claim `xms_edov`), e
+`gitlab.baseUrl`, para uma instância auto-hospedada.
 
 Cada campo nomeado é resolvido na inicialização dentro de `auth.providers`, que é
 o array canônico e o ponto de extensão para qualquer coisa não coberta pelos
@@ -451,23 +454,21 @@ final são ignorados.
 
 O que acontece quando alguém se registra com e-mail/senha como `ada@example.com` e,
 mais tarde, clica em "Entrar com o Google" em uma conta do Google com esse mesmo
-endereço? O Rebase **vincula as duas em uma única conta** — mas somente quando o
-provedor confirmar que o e-mail está verificado *e* o endereço da própria conta
-tiver sido verificado. Ele nunca cria silenciosamente uma segunda conta para o mesmo
-endereço.
+endereço? O Rebase **vincula as duas em uma única conta**, mas somente quando o
+provedor confirmar que o e-mail está verificado. Ele nunca cria silenciosamente
+uma segunda conta para o mesmo endereço.
 
 Em `POST /api/auth/<provider>`, a ordem de resolução é:
 
-1. **Identidade do provedor conhecida** — se essa identidade exata do provedor já
+1. **Identidade do provedor conhecida**: se essa identidade exata do provedor já
    tiver feito login antes, esse usuário é retornado. O e-mail não é consultado.
-2. **Conta existente com o mesmo e-mail, verificada dos dois lados** — o provedor
-   verificou o e-mail, e a conta também. A identidade é vinculada à conta existente
-   e a sessão do usuário é iniciada nela. Uma conta, duas formas de acesso.
-3. **Conta existente com o mesmo e-mail, algum lado não verificado** — rejeitada com
-   `403 EMAIL_NOT_VERIFIED`. Nada é criado ou modificado. `details.reason` diz qual
-   lado: `provider-email-unverified`, ou `local-account-unverified` (a conta tem
-   senha) / `local-account-unverified-passwordless` (não tem).
-4. **Nenhuma conta com esse e-mail** — uma nova conta é criada, verificada se o
+2. **Conta existente com o mesmo e-mail, o provedor verificou o e-mail**: a
+   identidade é vinculada e a sessão do usuário é iniciada nela. Uma conta, duas
+   formas de acesso. Uma conta não verificada é verificada primeiro (veja abaixo).
+3. **Conta existente com o mesmo e-mail, o provedor não o verificou**: rejeitada
+   com `403 EMAIL_NOT_VERIFIED` e `details.reason`
+   `provider-email-unverified`. Nada é criado ou modificado.
+4. **Nenhuma conta com esse e-mail**: uma nova conta é criada, verificada se o
    provedor verificou o e-mail.
 
 O passo 3 é o caso crítico para a segurança. Se um e-mail de provedor não
@@ -478,18 +479,19 @@ contas reais do Google, portanto o passo 2 é o caminho normal para o login do
 Google; o passo 3 captura principalmente provedores que permitem aos usuários
 fornecer um endereço arbitrário não confirmado.
 
-O lado da conta importa pelo mesmo motivo. Nada verifica o endereço que
+O lado da conta também importa. Nada verifica o endereço que
 `POST /auth/register` recebe, então qualquer um pode cadastrar o endereço de outra
 pessoa com uma senha, ou entrar com ele por um provedor que não o garante, e
-esperar. Vincular o login com o Google do titular a essa conta deixaria nela a forma
-de acesso da outra pessoa.
+esperar. Vincular o login com o Google do titular a essa conta não pode deixar
+nela a forma de acesso da outra pessoa.
 
-Um link de verificação, um magic link, um código por e-mail ou uma redefinição de
-senha comprovam o endereço e verificam a conta. Em uma conta que ainda não estava
-verificada, a primeira dessas provas remove a senha (uma redefinição define a nova)
-e cada identidade vinculada cujo provedor não verificou esse endereço, e encerra
-todas as sessões, antes de marcar a conta como verificada. A partir daí vale o
-passo 2.
+Um provedor que verificou o endereço, um link de verificação, um magic link, um
+código por e-mail ou uma redefinição de senha comprovam o endereço e verificam a
+conta. Em uma conta que ainda não estava verificada, a primeira dessas provas
+remove a senha (uma redefinição define a nova) e cada identidade vinculada cujo
+provedor não verificou esse endereço, e encerra todas as sessões, antes de marcar
+a conta como verificada: uma senha que ninguém verificou desaparece depois do
+primeiro login com o Google.
 
 Um link de verificação mantém o que a pessoa que o segue também comprova: uma
 sessão ativa da conta, ou sua senha. Veja [Verificação de e-mail](/docs/backend/email-verification/). Contas criadas por um
@@ -510,13 +512,14 @@ comprova. `requireEmailVerification` torna o registro confirm-first. Veja
 
 ## Tabelas Criadas Automaticamente
 
-Na primeira inicialização, o Rebase provisiona automaticamente o schema `auth` e
+Na primeira inicialização, o Rebase provisiona automaticamente o schema `rebase` e
 as seguintes tabelas no banco de dados (vinculadas ao schema definido na sua
 coleção, por exemplo, `rebase`):
 
 - **`rebase.users`** — Contas de usuário com e-mail, hash de senha, metadados e
   uma coluna `roles` do tipo text[] (as roles são armazenadas como arrays de texto
   inline para otimizar consultas e evitar joins).
+- **`rebase.user_identities`** — As identidades OAuth vinculadas a cada conta, uma linha por identidade de provedor.
 - **`rebase.refresh_tokens`** — Sessões de longa duração contendo refresh tokens
   hasheados, user agents e endereços IP. Inclui um índice único em `token_hash`.
   Um login é um único `session_id`, compartilhado por todo token rotacionado a
@@ -525,6 +528,7 @@ coleção, por exemplo, `rebase`):
   nível de garantia (`aal`) e como ele foi autenticado (`method`, que `providerId` reporta).
 - **`rebase.password_reset_tokens`** — Tokens de uso único com expiração para
   fluxos de recuperação de senha.
+- **`rebase.magic_link_tokens`** — Tokens de uso único com expiração para o login por magic link.
 - **`rebase.mfa_factors`** — Métodos de autenticação multifator cadastrados (por
   exemplo, segredos TOTP criptografados com AES-256).
 - **`rebase.mfa_challenges`** — Logs de verificação rastreando tentativas ativas
@@ -536,8 +540,8 @@ coleção, por exemplo, `rebase`):
 
 Tokens que expiram — links de redefinição, magic links e códigos por e-mail,
 refresh tokens, desafios de MFA — são excluídos uma hora depois de expirarem. A
-limpeza é executada no processo que possui os timers (a role `worker` em uma
-implantação dividida) e em uma única instância da frota: cada hora é reivindicada
+limpeza é executada nos processos que possuem os timers (toda role, exceto `functions`, em uma
+implantação dividida, a menos que `REBASE_CRON_SCHEDULER=false` os tire da `api`) e em uma única instância da frota: cada hora é reivindicada
 em `rebase.cron_claims` sob o id de job `rebase:auth:expired-tokens`, como um slot
 de cron é. Com `cronPersistence: false` não há tabela de claims, e toda instância
 assim faz a limpeza. Um token expirado é recusado quando apresentado, tenha a

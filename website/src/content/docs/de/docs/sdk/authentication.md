@@ -1,5 +1,5 @@
 ---
-sourceHash: 65085708df65a92e
+sourceHash: aba79f55ccca539b
 title: Authentifizierung
 sidebar_label: Authentifizierung
 description: Clientseitige Authentifizierung mit dem Rebase SDK — E-Mail/Passwort-Anmeldung, OAuth-Anbieter, Sitzungsverwaltung und Auth-Status-Listener.
@@ -130,7 +130,7 @@ const { user } = await client.auth.verifyMagicLink(token);
 
 `sendMagicLink` liefert die gleiche Antwort, unabhängig davon, ob für die Adresse ein Konto existiert oder nicht. Das ist Absicht: Ein Endpunkt, der „Benutzer existiert nicht“ meldet, wäre ein Orakel für die Konto-Enumeration (Account Enumeration). Nutzen Sie das Ergebnis daher nicht, um einer Person mitzuteilen, ob sie registriert ist — der Endpunkt weiß es nicht.
 
-Beide erfordern einen im Backend konfigurierten E-Mail-Dienst, andernfalls antworten sie mit 503 `EMAIL_NOT_CONFIGURED`.
+Das Senden eines Links erfordert einen im Backend konfigurierten E-Mail-Dienst, andernfalls antwortet `sendMagicLink` mit 503 `EMAIL_NOT_CONFIGURED`.
 
 ## Einmalcodes
 
@@ -334,8 +334,8 @@ unsubscribe();
 |-------|------|
 | `SIGNED_IN` | Eine Anmeldung oder Registrierung wurde abgeschlossen |
 | `TOKEN_REFRESHED` | Das Access-Token wurde erneuert — einschließlich der stillen Erneuerung, die eine Sitzung beim Laden der Seite wiederherstellt |
-| `USER_UPDATED` | `updateUser()` hat das Profil geändert, oder `confirmEmailChange()` hat dieses Konto auf seine neue Adresse verschoben |
-| `SIGNED_OUT` | Eine Abmeldung oder eine Aktualisierung, die endgültig fehlgeschlagen ist |
+| `USER_UPDATED` | `updateUser()` hat das Profil geändert, `linkAnonymous()` hat einen Gast zu einem Konto gemacht, `changeEmail()` hat eine Adressänderung gestartet, oder `confirmEmailChange()` hat dieses Konto auf seine neue Adresse verschoben |
+| `SIGNED_OUT` | Eine Abmeldung, `revokeAllSessions()` oder eine Aktualisierung, die endgültig fehlgeschlagen ist |
 
 ## Passwortverwaltung
 

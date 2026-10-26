@@ -1,5 +1,5 @@
 ---
-sourceHash: d74cc2ea4835551d
+sourceHash: 0c021da7af2a852e
 title: Indizes
 sidebar_label: Indizes
 description: Deklarieren Sie gewöhnliche Postgres-Indizes für eine Collection – btree, GIN und BRIN, partiell, zusammengesetzt, abdeckend und eindeutig – und warum ein handgeschriebener früher verschwand.
@@ -214,6 +214,8 @@ author: {
 Rebase liest zu dieser Entscheidung nur Ihre Collections, nie die Datenbank: `db push` und der Boot müssen dieselbe Menge an Indizes mit denselben Namen erreichen, sonst würde der nächste Push entfernen, was der Boot gebaut hat. Ein Index, den Sie von Hand auf derselben Spalte außerhalb von `indexes:` angelegt haben, wird daher nicht gesehen — deklarieren Sie ihn in `indexes:` oder setzen Sie `index: false`, um einen Index statt zwei zu behalten.
 
 ### Was ein Upgrade mit einer bestehenden Datenbank macht
+
+<span class="since-badge" data-since="0.26">Seit 0.26</span>
 
 Die Indizes sind neue Objekte auf Tabellen, die bereits Daten enthalten, und die beiden Wege bauen sie unterschiedlich:
 

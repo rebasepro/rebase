@@ -19,6 +19,7 @@ import { Alert, Button, CircularProgressCenter, cls, defaultBorderMixin, Dialog,
 import { Formex, FormexController, useCreateFormex } from "@rebasepro/forms";
 
 import { FieldBlock, isSelfLabellingProperty, LABEL_ICON_SIZE, spanClass } from "./components/FieldBlock";
+import { labelsInsideControl } from "./label_placement";
 import { AdditionalFieldValue } from "../components/AdditionalFieldValue";
 import { FormRail, RecordMeta } from "./components/FormRail";
 import { FormSections } from "./components/FormSections";
@@ -752,9 +753,13 @@ export function EntityForm<M extends Record<string, unknown>>({
             !equal(formex.values[field.key], underlyingChanges[field.key]);
 
         const disabled = isFieldDisabled(field.key, property);
-        // The panel-style editors carry their own header; everything else is
-        // labelled by FieldBlock, which is what puts every label in one place.
+        // Three places a label can be. The panel-style editors carry their own
+        // header. The one-line controls draw it inside their box, FireCMS-style,
+        // so they all stand the same height. Everything else — multi-selects,
+        // uploads, markdown, relations — is labelled above by FieldBlock.
         const selfLabelling = isSelfLabellingProperty(property);
+        const labelInside = !selfLabelling
+            && labelsInsideControl(property, customizationController.propertyConfigs);
 
         const cmsFormFieldProps: PropertyFieldBindingProps<M> = {
             propertyKey: field.key,
@@ -764,14 +769,15 @@ export function EntityForm<M extends Record<string, unknown>>({
             // repeat it — it still renders validation errors, which belong
             // against the control rather than under the label.
             includeDescription: false,
-            hideLabel: !selfLabelling,
+            hideLabel: !selfLabelling && !labelInside,
             underlyingValueHasChanged: underlyingValueHasChanged && !autoSave,
             context: fieldContext,
             partOfArray: false,
             minimalistView: false,
             // One height for every control in the form. Left to their own
             // defaults, a text field came out 48px, a select 44 and a switch 64.
-            // `large` (48px, 14px text): the record-form density. 0.20.0 took
+            // `large`: the record-form density — a 64px box with the label
+            // inside and a 16px value, or a 48px box under a label. 0.20.0 took
             // the form to `small` (32px) to match the reference, and the fields
             // read as cramped next to what they had been; see DESIGN.md "Form
             // density".
@@ -783,7 +789,8 @@ export function EntityForm<M extends Record<string, unknown>>({
             <div key={`field_${field.key}`} className={spanClass(field.span)}>
                 <FieldBlock propertyKey={field.key}
                     property={property}
-                    showLabel={!selfLabelling}>
+                    showLabel={!selfLabelling && !labelInside}
+                    labelInside={labelInside}>
                     <PropertyFieldBinding {...cmsFormFieldProps}/>
                 </FieldBlock>
             </div>

@@ -1,5 +1,5 @@
 ---
-sourceHash: 2d930362e74e2a12
+sourceHash: 8f3cdbfa7f75e54b
 title: Coleções
 sidebar_label: Coleções
 description: As coleções são o bloco de construção fundamental do Rebase — cada coleção é mapeada para uma tabela de banco de dados e define seu esquema, relações, segurança e comportamento de interface.
@@ -46,13 +46,15 @@ const products = defineCollection({
     }
 ```
 
-Os campos verificados são `display`, `sort`, `propertiesOrder` e `listProperties`. Três formatos são aceitos além de uma chave de propriedade comum:
+Os campos verificados são `display`, `sort`, `propertiesOrder`, `listProperties`,
+`previewProperties`, `orderProperty` e os filtros `defaultFilter`, `fixedFilter`
+e `filterPresets`. Três formatos são aceitos além de uma chave de propriedade comum:
 
 | Formato | Exemplo | Notas |
 | --- | --- | --- |
-| Caminho pontilhado em um `map` | `"profile.displayName"` | A **raiz** deve ser uma propriedade real; o caminho abaixo dela não é verificado. |
+| Caminho pontilhado em um `map` | `"profile.displayName"` | A **raiz** deve ser uma propriedade real; o caminho abaixo dela não é verificado. Não em `previewProperties` / `orderProperty`, que recebem uma chave de nível superior. |
 | Coluna de coleção filha | `"subcollection:orders"` | Apenas `propertiesOrder` / `listProperties`. |
-| Uma chave de `additionalFields` | `"score" as AdditionalFieldKey` | Precisa da coerção de tipo (cast) — veja abaixo. |
+| Uma chave de `additionalFields` | `"score" as AdditionalFieldKey` | Apenas `propertiesOrder` / `listProperties`. Precisa da coerção de tipo (cast) — veja abaixo. |
 
 `AdditionalFieldDelegate.key` é uma `string` simples, portanto o sistema de tipos não tem como saber quais chaves adicionais uma coleção declara. Em vez de reabrir esses campos para qualquer string, o cast torna a exceção explícita:
 
@@ -144,7 +146,7 @@ const posts = defineCollection({
 Uma extensão (augmentation) se aplica a todo o *programa* TypeScript, e `config/` e `frontend/` são programas separados — por isso a referência pertence ao pacote de configuração. Não existe um tipo wrapper `AdminCollectionConfig`: com o campo mesclado, `CollectionConfig` é o tipo usado na criação.
 
 :::note[Por que um projeto BaaS não tem custo adicional]
-O tipo de uma propriedade em uma instalação BaaS não tem `Field`, não tem `columnWidth`, nem `hideFromCollection` — esses residem em `AdminPropertyOptions` no pacote admin. Essa garantia é verificada em código, não apenas alegada: `e2e/baas-typecheck/src/admin_absent.ts` usa `@ts-expect-error` em `admin`, portanto o build falhará se o campo voltar a ser aceito no core.
+O tipo de uma propriedade em uma instalação BaaS não tem `Field`, não tem `columnWidth`, nem `hideFromCollection` — esses residem em `AdminPropertyOptions` no pacote admin. Essa garantia é verificada em código, não apenas alegada: `tests/e2e/baas-typecheck/src/admin_absent.ts` usa `@ts-expect-error` em `admin`, portanto o build falhará se o campo voltar a ser aceito no core.
 :::
 
 ### Migrando a partir de uma coleção plana (flat)
@@ -152,7 +154,7 @@ O tipo de uma propriedade em uma instalação BaaS não tem `Field`, não tem `c
 Antes da versão 0.11, esses campos ficavam no nível superior. Para movê-los:
 
 ```bash
-node scripts/codemod/collections-admin-block.mjs config/collections
+node tooling/scripts/codemod/collections-admin-block.mjs config/collections
 ```
 
 O comando relata qualquer coisa que não possa mover com segurança — principalmente apresentação dentro de `relations[].overrides`, que necessita de `overrides: { admin: { … } }` manualmente.
@@ -301,7 +303,7 @@ E dentro de `admin`, porque apenas o painel os renderiza:
 | Propriedade | Tipo | Descrição |
 |----------|------|-------------|
 | `admin.entityActions` | `EntityAction[]` | Ações personalizadas em entidades (arquivar, publicar, etc.) |
-| `admin.Actions` | `React.ComponentType` | Componente personalizado de ações na barra de ferramentas |
+| `admin.Actions` | `ComponentRef<CollectionActionsProps>[]` | Componentes personalizados de ações na barra de ferramentas |
 | `admin.entityViews` | `EntityCustomView[]` | Abas personalizadas na visualização de detalhes da entidade |
 | `admin.additionalFields` | `AdditionalFieldDelegate[]` | Colunas virtuais/computadas |
 | `admin.exportable` | `boolean \| ExportConfig` | Habilitar exportação de dados |
@@ -364,14 +366,14 @@ Prefira um caminho sempre que o valor já estiver no registro: um caminho preser
 
 ### Seleção da Propriedade de Título
 Quando `display.title` não está definido, a propriedade usada como o título de exibição da entidade (pré-visualizações, cabeçalhos) é resolvida automaticamente:
-1. Se `propertiesOrder` estiver explicitamente definido, a primeira propriedade que não seja de ID e que seja do tipo `relation` ou `string` é escolhida como o título.
-2. Se nenhum `propertiesOrder` estiver definido, o framework busca as propriedades em ordem e escolhe a primeira propriedade do tipo string.
+1. Se `propertiesOrder` estiver explicitamente definido, a primeira propriedade dessa ordem que possa ser um título é escolhida: uma `string`, uma `relation` de cardinalidade única ou uma `reference`. Identificadores (chaves primárias e estrangeiras, colunas `uuid`, `isId`), campos de upload de arquivo e propriedades ocultas nunca se qualificam.
+2. Se nenhum `propertiesOrder` estiver definido, os mesmos candidatos são ranqueados: primeiro uma string cuja chave nomeia um rótulo (`name`, `title`, `label`, …), depois texto curto simples, um e-mail, um enum, texto longo, uma relação ou seletor de usuário, e por último uma reference. Empates seguem a ordem de declaração.
 
 ### Pré-visualizações de Relações em Tabelas
 Quando `propertiesOrder` é definido explicitamente, as propriedades de relação **não** são filtradas automaticamente das colunas de pré-visualização padrão (ao passo que são excluídas dos padrões não ordenados para evitar operações lentas de join).
 
 ### Como o valor de um título é renderizado
-Independentemente do que a propriedade de título contenha, o painel renderiza uma string. Uma data é formatada, um array é concatenado, e uma relação — que chega como `{ id, data: { values } }` em vez de texto — é examinada em busca do primeiro valor entre `name`, `title`, `label` ou `displayName` na linha relacionada, usando o seu id como fallback. Assim, um título pode apontar para uma propriedade `relation` e ainda assim ser exibido como um nome, e não como um UUID.
+Independentemente do que a propriedade de título contenha, o painel renderiza uma string. Uma data é formatada, um array é concatenado, e uma relação — que chega como `{ id, data: { values } }` em vez de texto — é examinada em busca do primeiro valor entre `name`, `title`, `label` ou `displayName` na linha relacionada, depois pelo seu primeiro valor de string curto, usando o seu id como fallback. Assim, um título pode apontar para uma propriedade `relation` e ainda assim ser exibido como um nome, e não como um UUID.
 
 Isso não é um helper exportado: é o que cada superfície que desenha um registro já faz. Não há nada a chamar nem nada a importar.
 

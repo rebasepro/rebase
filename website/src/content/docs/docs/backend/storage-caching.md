@@ -76,5 +76,5 @@ Two things to configure on the CDN itself:
 ## Related
 
 - [Storage Configuration](/docs/backend/storage/) — the backends these headers are served from, and the `public/` prefix and `publicRead` that make an object `public`.
-- [Per-object authorization](/docs/backend/storage/#per-object-authorization) — who may read an object, which is what decides between `public` and `private`.
+- [Per-object authorization](/docs/backend/storage-authorization/) — who may read an object, which is what decides between `public` and `private`.
 - [File uploads](/docs/collections/file-uploads/) — the collection properties that store files.

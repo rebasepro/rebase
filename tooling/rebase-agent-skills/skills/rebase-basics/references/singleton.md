@@ -47,7 +47,8 @@ privileged plane has exactly one name. It is not there at runtime either:
 |----------|------|-------------|
 | `rebase.dataAsAdmin` | `RebaseData` | Admin-level data access — scoped as `{ uid: "service", roles: ["admin"] }`, so RLS is **evaluated against that identity, not bypassed**. Use `rebase.dataAsAdmin.<slug>.find()`, `.findOne()`, `.create()`, `.update()`, `.delete()` |
 | `rebase.auth` | `AuthClient` | Authentication operations |
-| `rebase.storage` | `StorageSource \| undefined` | File storage operations |
+| `rebase.storage` | `StorageSource \| undefined` | File storage operations (the default source) |
+| `rebase.bucket(source)` | `StorageSource` | The storage source a bucket handle (or key) names. **Always present** — with no storage configured it refuses with a message naming what to set |
 | `rebase.email` | `EmailService` | Send emails. **Always present** — without SMTP, `send()` throws a message naming what to set, so ask `rebase.email.isConfigured()` rather than testing for the property |
 | `rebase.admin` | `AdminAPI \| undefined` | User management API |
 | `rebase.sql` | `(query, options?) => Promise<Record[]>` | Raw SQL. Always present server-side on SQL engines. Pass values via `options.params` and reference them as `$1`, `$2`, … Runs on the owner connection — this, not `dataAsAdmin`, is the unconditional RLS bypass |

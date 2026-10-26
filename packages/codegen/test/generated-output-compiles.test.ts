@@ -268,6 +268,35 @@ describe("schemas that cannot be generated are rejected, not emitted", () => {
     });
 });
 
+/** Compile the generated file together with a snippet that uses it. */
+function compileWithConsumer(source: string, consumer: string): string[] {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "rebase-codegen-include-"));
+    const dbFile = path.join(dir, "database.types.ts");
+    const useFile = path.join(dir, "use.ts");
+    try {
+        fs.writeFileSync(dbFile, source, "utf-8");
+        fs.writeFileSync(useFile, consumer, "utf-8");
+        const program = ts.createProgram([dbFile, useFile], {
+            noEmit: true,
+            strict: true,
+            target: ts.ScriptTarget.ESNext,
+            module: ts.ModuleKind.ESNext,
+            moduleResolution: ts.ModuleResolutionKind.Bundler,
+            skipLibCheck: true,
+            lib: ["lib.esnext.d.ts"]
+        });
+        return [dbFile, useFile].flatMap(f => {
+            const sf = program.getSourceFile(f)!;
+            return [
+                ...program.getSyntacticDiagnostics(sf),
+                ...program.getSemanticDiagnostics(sf)
+            ].map(d => `${path.basename(f)} TS${d.code}: ${ts.flattenDiagnosticMessageText(d.messageText, " ")}`);
+        });
+    } finally {
+        fs.rmSync(dir, { recursive: true, force: true });
+    }
+}
+
 /**
  * `include`, typed against the relations a project actually declares.
  *
@@ -286,35 +315,6 @@ describe("schemas that cannot be generated are rejected, not emitted", () => {
  * beside them still compiles.
  */
 describe("the generated include types", () => {
-    /** Compile the generated file together with a snippet that uses it. */
-    function compileWithConsumer(source: string, consumer: string): string[] {
-        const dir = fs.mkdtempSync(path.join(os.tmpdir(), "rebase-codegen-include-"));
-        const dbFile = path.join(dir, "database.types.ts");
-        const useFile = path.join(dir, "use.ts");
-        try {
-            fs.writeFileSync(dbFile, source, "utf-8");
-            fs.writeFileSync(useFile, consumer, "utf-8");
-            const program = ts.createProgram([dbFile, useFile], {
-                noEmit: true,
-                strict: true,
-                target: ts.ScriptTarget.ESNext,
-                module: ts.ModuleKind.ESNext,
-                moduleResolution: ts.ModuleResolutionKind.Bundler,
-                skipLibCheck: true,
-                lib: ["lib.esnext.d.ts"]
-            });
-            return [dbFile, useFile].flatMap(f => {
-                const sf = program.getSourceFile(f)!;
-                return [
-                    ...program.getSyntacticDiagnostics(sf),
-                    ...program.getSemanticDiagnostics(sf)
-                ].map(d => `${path.basename(f)} TS${d.code}: ${ts.flattenDiagnosticMessageText(d.messageText, " ")}`);
-            });
-        } finally {
-            fs.rmSync(dir, { recursive: true, force: true });
-        }
-    }
-
     const authors: Record<string, unknown> = {
         slug: "authors",
         properties: {
@@ -398,6 +398,193 @@ describe("the generated include types", () => {
             // Columns are untouched either way.
             const title: string = withAuthor.title;
             export { name, body, bodies, title };
+        `)).toEqual([]);
+    });
+});
+
+/**
+ * What a write may name, for each relation kind — asserted by compiling a
+ * consumer, as the include types are, because whether a create compiles is the
+ * whole question and a substring cannot answer it.
+ *
+ * The same seams are crossed against the real client in
+ * `tests/e2e/baas-typecheck/src/typed-sdk/probes.ts`.
+ */
+describe("the generated write types, per relation kind", () => {
+    const authors: Record<string, unknown> = {
+        slug: "authors",
+        properties: {
+            id: { type: "number", isId: "increment" },
+            name: { type: "string", validation: { required: true } },
+            profile: {
+                type: "relation",
+                relation: { kind: "hasOne", target: () => profiles, foreignKeyOnTarget: "author_id" }
+            },
+            profileVia: {
+                type: "relation",
+                relation: {
+                    kind: "via", cardinality: "one", target: () => profiles,
+                    joinPath: [{ table: "profiles", on: { from: "id", to: "author_id" } }]
+                }
+            },
+            teamProfile: {
+                type: "relation",
+                relation: {
+                    kind: "via", cardinality: "one", target: () => profiles,
+                    joinPath: [
+                        { table: "teams", on: { from: "team_id", to: "id" } },
+                        { table: "profiles", on: { from: "id", to: "team_id" } }
+                    ]
+                }
+            },
+            commentsVia: {
+                type: "relation",
+                relation: {
+                    kind: "via", cardinality: "many", target: () => comments,
+                    joinPath: [
+                        { table: "authors_comments", on: { from: "id", to: "author_id" } },
+                        { table: "comments", on: { from: "comment_id", to: "id" } }
+                    ]
+                }
+            },
+            roleComments: {
+                type: "relation",
+                relation: {
+                    kind: "via", cardinality: "many", target: () => comments,
+                    joinPath: [
+                        { table: "author_roles", on: { from: "id", to: "author_id" } },
+                        { table: "roles_comments", on: { from: "role_id", to: "role_id" } },
+                        { table: "comments", on: { from: "comment_id", to: "id" } }
+                    ]
+                }
+            }
+        }
+    };
+    const profiles: Record<string, unknown> = {
+        slug: "profiles",
+        properties: { id: { type: "number", isId: "increment" } }
+    };
+    const comments: Record<string, unknown> = {
+        slug: "comments",
+        properties: {
+            id: { type: "number", isId: "increment" },
+            body: { type: "string", validation: { required: true } },
+            post: {
+                type: "relation",
+                validation: { required: true },
+                relation: { kind: "belongsTo", target: () => posts, localKey: "post_id" }
+            },
+            author: {
+                type: "relation",
+                validation: { required: true },
+                relation: { kind: "belongsTo", target: () => authors, localKey: "author_id" }
+            }
+        }
+    };
+    const posts: Record<string, unknown> = {
+        slug: "posts",
+        properties: {
+            id: { type: "string", isId: "uuid" },
+            title: { type: "string", validation: { required: true } },
+            moderator: {
+                type: "relation",
+                excludeFromApi: true,
+                relation: { kind: "belongsTo", target: () => authors, localKey: "moderator_id" }
+            },
+            reviewer: {
+                type: "relation",
+                access: { write: [] },
+                relation: { kind: "belongsTo", target: () => authors, localKey: "reviewer_id" }
+            }
+        }
+    };
+
+    const schema = () => generateTypedefs([authors, comments, posts, profiles] as unknown as CollectionConfig[]);
+
+    it("satisfies a required belongsTo with either spelling, and with neither refuses", () => {
+        // The server's required check reads both the foreign key and the
+        // relation. Both used to be required keys, so only a create that named
+        // the same row twice compiled.
+        expect(compileWithConsumer(schema(), `
+            import type { Database } from "./database.types";
+            type Insert = Database["comments"]["Insert"];
+            const byKey: Insert = { body: "b", postId: "p", authorId: 1 };
+            const byRelation: Insert = { body: "b", post: "p", author: 1 };
+            const mixed: Insert = { body: "b", postId: "p", author: 1 };
+            const both: Insert = { body: "b", postId: "p", post: "p", authorId: 1 };
+            // @ts-expect-error neither spelling of the post
+            const noPost: Insert = { body: "b", authorId: 1 };
+            // @ts-expect-error a required link cannot be null
+            const nullPost: Insert = { body: "b", postId: null, authorId: 1 };
+            // @ts-expect-error a post's id is a string
+            const wrongType: Insert = { body: "b", post: 1, authorId: 1 };
+            // Both names stay keys of the type.
+            const keys: Array<keyof Insert> = ["postId", "post", "authorId", "author"];
+            // An update may name neither.
+            const update: Database["comments"]["Update"] = { body: "c" };
+            export { byKey, byRelation, mixed, both, noPost, nullPost, wrongType, keys, update };
+        `)).toEqual([]);
+    });
+
+    it("takes a closed to-one relation's foreign key with it, as the server does", () => {
+        // The server's read strip and write refusal (`restrictedFieldNames`,
+        // `apiHiddenFieldNames`) restrict the foreign key of a closed
+        // belongsTo alongside the relation: `moderatorId` is stripped from
+        // every read and refused on every write, `reviewerId` is readable and
+        // refused on every write. The generator used to key on the property
+        // name and column only, and kept both foreign keys everywhere.
+        expect(compileWithConsumer(schema(), `
+            import type { Database, IncludeFor } from "./database.types";
+            declare const row: Database["posts"]["Row"];
+            const reviewer: number | null | undefined = row.reviewerId;
+            // @ts-expect-error stripped from every read
+            void row.moderatorId;
+            // @ts-expect-error refused on a create
+            const hidden: Database["posts"]["Insert"] = { title: "t", moderatorId: 1 };
+            // @ts-expect-error refused on an update
+            const closed: Database["posts"]["Update"] = { reviewerId: 1 };
+            // @ts-expect-error nor under the relation's name
+            const closedByName: Database["posts"]["Update"] = { reviewer: 1 };
+            // @ts-expect-error a hidden relation cannot be included (UNKNOWN_RELATION)
+            const include: IncludeFor<"posts"> = ["moderator"];
+            const readable: IncludeFor<"posts"> = ["reviewer"];
+            export { reviewer, hidden, closed, closedByName, include, readable };
+        `)).toEqual([]);
+    });
+
+    it("writes a hasOne by naming the target row, and unlinks it with null", () => {
+        // The server points the target's foreign key at this row
+        // (`inverseRelationUpdates`); the resolved relation says
+        // `writable: true`. Only belongsTo and the to-many kinds were emitted.
+        expect(compileWithConsumer(schema(), `
+            import type { Database } from "./database.types";
+            const link: Database["authors"]["Update"] = { profile: 9 };
+            const unlink: Database["authors"]["Update"] = { profile: null };
+            const onCreate: Database["authors"]["Insert"] = { name: "a", profile: 9 };
+            const optional: Database["authors"]["Insert"] = { name: "a" };
+            // @ts-expect-error a profile's id is a number
+            const wrongType: Database["authors"]["Update"] = { profile: "9" };
+            export { link, unlink, onCreate, optional, wrongType };
+        `)).toEqual([]);
+    });
+
+    it("writes a single-hop via as the server does, and leaves a multi-hop one read-only", () => {
+        // To-one in one step: the target holds the key, written as a hasOne.
+        // To-many through one junction: written as its rows. Anything longer
+        // is refused with RELATION_NOT_WRITABLE, so it is on neither type.
+        expect(compileWithConsumer(schema(), `
+            import type { Database } from "./database.types";
+            type Update = Database["authors"]["Update"];
+            const toOne: Update = { profileVia: 9 };
+            const unlink: Update = { profileVia: null };
+            const toMany: Update = { commentsVia: [1, { id: 2 }] };
+            // @ts-expect-error a multi-hop to-one via is read-only
+            const multiOne: Update = { teamProfile: 9 };
+            // @ts-expect-error a multi-hop to-many via is read-only
+            const multiMany: Update = { roleComments: [1] };
+            // @ts-expect-error a via declares no junction payload
+            const pivot: Update = { commentsVia: [{ id: 1, _pivot: { position: 1 } }] };
+            export { toOne, unlink, toMany, multiOne, multiMany, pivot };
         `)).toEqual([]);
     });
 });

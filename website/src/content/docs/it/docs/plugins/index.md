@@ -1,5 +1,5 @@
 ---
-sourceHash: a0bd19745c59b12b
+sourceHash: e6db89a6b0b8b60d
 title: Sistema dei plugin
 sidebar_label: Plugin
 description: Estendi Rebase con i plugin — inserisci componenti UI, modifica collection, aggiungi azioni alla barra degli strumenti e crea field builder personalizzati.
@@ -13,7 +13,7 @@ I plugin costituiscono il meccanismo primario di estensione nel pannello. Posson
 
 - Avvolgere l'intera app con un **provider** (contesto, gestione dello stato)
 - Aggiungere **azioni per la home page** e widget
-- Inserire componenti per la **vista delle collection** (barra degli strumenti, column builder)
+- Inserire componenti per la **vista delle collection** (barra degli strumenti, intestazioni di colonna)
 - Aggiungere componenti per i **form** (field builder, pannelli aggiuntivi)
 - **Iniettare o modificare collection** in modo dinamico
 
@@ -26,7 +26,7 @@ interface RebasePlugin {
 
     // UI contributions — a flat array, each entry naming its slot.
     // This replaced the old per-area objects (homePage, collectionView, form).
-    slots?: SlotContribution[];
+    slots?: AnySlotContribution[];
 
     // HOC providers. `scope: "root"` wraps the whole admin below
     // RebaseContext; `scope: "form"` wraps each entity form / edit view.
@@ -215,7 +215,7 @@ quello. Un altro plugin può dare ai campi markdown un controller allo stesso mo
 ![Data enhancement](/img/data_enhancement.png)
 
 :::caution[Questo plugin invia dati all'esterno della tua macchina]
-L'autocompletamento invia tramite richiesta POST i valori dei campi dell'entità a un servizio ospitato per generare un suggerimento. Per impostazione predefinita, tale servizio è **`https://app.rebase.pro/api/functions/ai`**, gestito da Rebase — gratuito, senza necessità di configurazione e senza credenziali associate: le richieste sono anonime e limitate da un rate limit anziché dall'identità. Il tuo JWT non viene inviato. Anche l'autocompletamento con slash dell'editor invia testo: fino a 8.000 caratteri per ciascun lato del cursore, mai l'intero documento.
+L'autocompletamento invia tramite richiesta POST i valori dei campi dell'entità a un servizio ospitato per generare un suggerimento: solo i valori delle proprietà dichiarate, mai quelli di una proprietà di sola lettura, disabilitata o nascosta, di una con `dynamicProps`, o di una colonna che la collection non dichiara. Per impostazione predefinita, tale servizio è **`https://app.rebase.pro/api/functions/ai`**, gestito da Rebase — gratuito, senza necessità di configurazione e senza credenziali associate: le richieste sono anonime e limitate da un rate limit anziché dall'identità. Il tuo JWT non viene inviato. Anche l'autocompletamento con slash dell'editor invia testo: fino a 8.000 caratteri per ciascun lato del cursore, mai l'intero documento.
 
 Se questo sia accettabile dipende dal contenuto dei campi. Punta `endpoint` verso la tua distribuzione per mantenere la generazione all'interno della tua infrastruttura:
 

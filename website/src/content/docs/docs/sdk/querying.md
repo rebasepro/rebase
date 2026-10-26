@@ -504,8 +504,8 @@ does nothing and `offset` is refused. In a server function (`rebase.data`,
 `context.data`) a grouped aggregate with no `limit` returns every group. On 0.23
 there is no `meta` and no `offset`, so a list of groups cut at the limit looks
 complete.
-`include` is not sent with an aggregate: it has no relations to load. The SDK
-does not yet sort groups; over HTTP they can be sorted too — see
+`include` is not sent with an aggregate: it has no relations to load. Groups
+can be sorted with `orderBy`, by a `groupBy` column or an aggregate's key — see
 [Aggregates and search](/docs/sdk/aggregates-and-search/).
 
 The whole point is not to fetch rows in order to reduce them. "Revenue by

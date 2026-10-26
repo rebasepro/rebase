@@ -61,9 +61,12 @@ lockfile). Four things follow from that:
 - **Only registry versions install.** A `file:`, `link:`, `git+…` or `github:`
   dependency fails the build, because the runtime has nothing to resolve it
   against.
-- **Some packages come from the image, not from you.** `@rebasepro/*`, `hono`,
-  `@hono/node-server` and `zod` are removed from the bundle's dependencies and
-  the image's own copies are linked in, so your version of them does not apply.
+- **Some packages come from the image, not from you.** `@rebasepro/server`,
+  `@rebasepro/types`, `@rebasepro/client`, `@rebasepro/common`,
+  `@rebasepro/utils`, `hono`, `@hono/node-server` and `zod` are removed from the
+  bundle's dependencies and the image's own copies are linked in, so your
+  version of them does not apply. Other `@rebasepro/*` packages, such as the
+  database driver, install from your `package.json` like any dependency.
   `typescript` and `tsx` are removed too; they are build tools.
 - **Private packages need an `.npmrc`.** `rebase build` copies the project's
   `.npmrc` (and `backend/.npmrc`) into the bundle, so the install uses the same
@@ -193,7 +196,7 @@ deploys or as storage for uploads. That is also why
 |---|---|---|
 | Function timeout | 30 s, then `504` with code `FUNCTION_TIMEOUT` | `REBASE_FUNCTIONS_TIMEOUT_MS` (`0` turns it off) |
 | Waiting on your instance, at the edge | 10 minutes between reads or writes | Fixed |
-| Request body, all `/api/*` routes | 10 MiB, then `413 PAYLOAD_TOO_LARGE` | `REBASE_MAX_BODY_SIZE`, in bytes |
+| Request body, `/api/*` routes without a limit of their own | 10 MiB, then `413 PAYLOAD_TOO_LARGE` | `REBASE_MAX_BODY_SIZE`, in bytes |
 | Request body at the edge | 64 MiB | Fixed |
 | One file through `POST /api/storage/upload` | 50 MB | `STORAGE_MAX_FILE_SIZE` |
 | Anonymous calls to `/api/functions/*` | 3000 per IP per 15 minutes | `rateLimit.anonymousFunctions` |
@@ -283,7 +286,7 @@ declared in `config/resources.ts`; see
 
 A deploy with storage is refused until the project says who may read and write
 files. The scaffold's `config/storage.ts` exports a `storageAuthorize` hook for
-this. See [Per-Object Authorization](/docs/backend/storage/#per-object-authorization).
+this. See [Per-Object Authorization](/docs/backend/storage-authorization/).
 
 **How files are served.** Your backend serves every file at
 `GET /api/storage/file/<key>`. It reads the object from the bucket and streams
@@ -369,9 +372,18 @@ are allowed to any internet address on these TCP ports only:
 | 993 | IMAP over TLS |
 
 Everything else is blocked. That includes port 25, plain IMAP, and databases or
-caches on their own ports: a PostgreSQL on 5432, Redis on 6379 or MongoDB on
-27017 outside Rebase Cloud cannot be reached. The cloud metadata address
-(`169.254.169.254`) is blocked too.
+caches on their own ports: Redis on 6379 or MongoDB on 27017 outside Rebase
+Cloud cannot be reached. The cloud metadata address (`169.254.169.254`) is
+blocked too.
+
+The one exception is your own database. If the project brings its own
+PostgreSQL (BYODB), each deploy also allows connections to that database's
+host on the port in its connection string, and to nothing else on that port.
+The host is resolved to its IP addresses when you deploy, so if your provider
+moves the database to another address, deploy again. The database must accept
+connections from the internet: the app connects to the connection string
+directly. The SSH bastion settings are used only by the connection test, not
+by the deployed app.
 
 The platform adds no proxy and no outbound rate limit; the services you call
 have their own. Pass `getSignal(c)` to `fetch` so a call stops when its request

@@ -1,5 +1,5 @@
 ---
-sourceHash: 6cb1ed423c284379
+sourceHash: 7a29cf6ca21d35be
 title: Apps e Repositórios
 sidebar_label: Apps & Repositórios
 description: Um projeto é um backend mais os apps que se comunicam com ele, os quais podem viver cada um em seu próprio repositório.
@@ -208,7 +208,7 @@ não é mais válido do que `/api`.
 
 Todo o resto sobre `path` se aplica à parte depois do hostname. O app continua
 sendo compilado para ela: `https://admin.example.com` é compilado com
-`REBASE_APP_BASE` definido como `/`, `https://admin.example.com/cms` com `/cms`,
+`REBASE_APP_BASE` definido como `/`, `https://admin.example.com/cms` com `/cms/`,
 e um bundler que o ignora continua gerando uma página em branco. `cms` é um
 caminho no hostname do app, dentro dessa parte do caminho. A URL precisa ser
 `https://` e conter um hostname e um caminho e nada mais — sem porta, query ou
@@ -262,7 +262,9 @@ Depois de publicar os registros:
 rebase cloud domains verify admin.example.com
 ```
 
-O `rebase cloud domains list` exibe os registros de novo se você os perder.
+O `rebase cloud domains list` exibe os registros de novo se você os perder. Um
+hostname que não for verificado em até 7 dias depois de registrado é liberado, e
+o próximo deploy o registra de novo.
 Quando a verificação passa, a plataforma emite o certificado HTTPS para o
 hostname; não há nada para enviar. Até lá, o `admin` não responde em lugar
 nenhum, porque o único hostname em que ele responde ainda não chega ao projeto —
@@ -272,8 +274,15 @@ O console acompanha o app até o hostname dele: o link *Open CMS* e o endereço
 do CMS na visão geral do projeto são `https://admin.example.com/`, e não o host
 do projeto.
 
-Um hostname que outro projeto já detém faz o deploy falhar antes de qualquer
-rollout, assim como um hostname sob o domínio da própria plataforma. Tirar o app
+Um hostname que outro projeto já verificou faz o deploy falhar antes de qualquer
+rollout, assim como um hostname sob o domínio da própria plataforma. Um que outro
+projeto registrou e nunca verificou não atrapalha: a recusa entrega um registro
+TXT para o seu projeto e, depois que ele existir, o próximo deploy (ou
+`rebase cloud domains add`) assume o hostname. Adicionar um hostname que o projeto
+ainda não tem altera os domínios do projeto, o que um token de acesso criado com
+`--can deploy` não pode fazer: a partir do CI, adicione o hostname uma vez com
+`rebase cloud domains add` enquanto estiver autenticado, e o token passa a fazer
+deploy dele como de qualquer hostname que o projeto já tenha. Tirar o app
 do `rebase.json` deixa o hostname registrado no projeto; remova-o com
 `rebase cloud domains remove admin.example.com`.
 
@@ -357,7 +366,7 @@ alteração que deixe desamparado um cliente compilado com o formato antigo.
 Cada SDK gerado registra o schema do qual se originou:
 
 ```ts
-// src/rebase/schema.meta.ts — generated
+// generated/sdk/schema.meta.ts — generated
 export const SCHEMA_VERSION = "v1:c5d97d0f96b7f87a";
 ```
 
@@ -366,7 +375,7 @@ identificador de versão não revela nada sobre o schema que ele representa:
 
 ```bash
 curl -s https://api.example.com/api/meta/schema-version
-# {"schemaVersion":"v1:c5d97d0f96b7f87a"}
+# {"schemaVersion":"v1:c5d97d0f96b7f87a","runtime":{"version":"0.25.1","contract":1}}
 ```
 
 Comparar os dois no CI transforma uma incompatibilidade silenciosa em uma verificação com falha. O

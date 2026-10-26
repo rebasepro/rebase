@@ -1,5 +1,5 @@
 ---
-sourceHash: fcc8e36632d57207
+sourceHash: 210827aa1afa92f7
 title: Edición de esquemas en vivo
 description: "Crea y modifica colecciones en un backend en ejecución: primero se confirman en tu repositorio y luego se aplican."
 ---
@@ -110,7 +110,7 @@ colección o una propiedad, cambiar el tipo de una columna (alternar un entero,
 que una cadena se convierta en un enum, el tipo de elemento de un array, el
 ancho de un varchar), renombrar una columna, cambiar una clave primaria,
 eliminar un valor de un enum, hacer única una columna existente, y cambiar una
-relación — su `kind`, su destino, su `localKey`, su `onDelete`. Un `hasMany` o
+relación — su tipo, su destino, su `localKey`, su `onDelete`. Un `hasMany` o
 `hasOne` cuya columna de enlace nada crea también se rechaza. Cada rechazo
 especifica el cambio y qué hacer en su lugar.
 
@@ -141,6 +141,11 @@ defecto, lo que hace fallar toda inserción posterior hasta que se elimine o se
 haga anulable. Un cambio sin esa frase (mover una clave primaria, una relación
 cuya columna de enlace nada crea) no puede escribirse solo en el código
 fuente.
+
+En un despliegue que no cambia nada en su base de datos (`REBASE_PROVISION=false`)
+no se aplica ningún cambio desde el panel, así que todos los cambios siguen esta
+vía: el botón principal del diálogo dice **Commit** y envía `"sourceOnly": true`,
+y el proceso que cambia esa base de datos aplica el esquema.
 
 Eliminar una colección desde el panel de administración sigue la misma vía:
 `/apply` con `"remove": true` y `"sourceOnly": true` elimina el archivo de la
@@ -307,11 +312,22 @@ construyó hasta que tu pipeline construye y despliega el commit. La base de dat
 tiene el cambio al instante; el panel de administración y la API ven la nueva definición de la colección
 después de ese despliegue.
 
-Así que un despliegue admite **un cambio por despliegue**. Cuando aterriza un commit, el siguiente
-apply se rechaza con `SCHEMA_CHANGE_FAILED`, nombrando el commit, hasta que un proceso
-que ejecute ese commit reemplace a este. Un segundo cambio planificado contra las
-colecciones que este despliegue aún ejecuta confirmaría archivos de esquema generados que
-omiten el primer cambio. La planificación sigue disponible mientras tanto.
+Así que un despliegue admite **un cambio por despliegue**. Un segundo cambio
+planificado contra las colecciones que este despliegue aún ejecuta confirmaría
+archivos de esquema generados que omiten el primer cambio. Por eso cada apply
+genera `schema.generated.ts` a partir de las colecciones que ejecuta este
+despliegue y lo compara con la copia del repositorio. Cuando difieren, el apply se
+rechaza con `SCHEMA_CHANGE_FAILED`, nombrando el archivo, hasta que un proceso que
+ejecute ese commit reemplace a este. La comprobación lee el repositorio, no la
+memoria de este proceso, así que se mantiene tras un reinicio, entre réplicas y
+para un cambio que un desarrollador subió y que aún no está desplegado. La
+planificación sigue disponible mientras tanto.
+
+Las copias también difieren cuando el archivo lo generó otra versión de Rebase,
+se reformateó o se editó a mano. Si no hay nada pendiente de desplegar, ejecuta
+`rebase schema generate` con la versión que ejecuta el despliegue, confirma el
+resultado y despliégalo. Los finales de línea y los espacios al final de línea no
+cuentan como diferencia.
 
 ### Confirmar en un repositorio remoto
 
@@ -374,7 +390,7 @@ Dos cosas que hacen que sea seguro ejecutarlo contra un repositorio en el que ot
 
 - Solo cambios aditivos. Cualquier otra cosa se rechaza con un motivo, porque la ruta ensure es lo único que modifica un esquema y solo puede agregar.
 - No se escribe ningún archivo de migración. Un proyecto aprovisionado mediante boot-ensure no necesita ninguno; un proyecto aprovisionado mediante migraciones debe ejecutar `rebase db generate`, que genera uno a través de Atlas con el hash de integridad que Atlas requiere.
-- Solo para Postgres. La capacidad se detecta en el controlador (driver), y otros motores responden `SCHEMA_EDITING_UNSUPPORTED`.
+- Postgres y MongoDB (consulta [MongoDB](#mongodb)). La capacidad se detecta en el controlador (driver), y otros motores responden `SCHEMA_EDITING_UNSUPPORTED`.
 
 ## Relacionado
 

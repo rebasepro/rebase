@@ -97,12 +97,15 @@ const PRINCIPLES: { title: string; body: string; specimen: React.ReactNode }[] =
     },
     {
         title: "Dense controls, generous containers.",
-        body: "Fields are 32px with 14px text and a 13px label; buttons in a toolbar are 32px. The card around them keeps 16–20px of padding and the form grid keeps 20px between rows. Density lives inside the container; air lives between containers.",
+        body: "Buttons in a toolbar are 32px; a record-form field is a filled 64px box with its label inside and a 16px value. The card around them keeps 16–20px of padding and the form grid keeps 24px between rows. Density lives inside the container; air lives between containers.",
         specimen: (
             <Card className="p-4 w-64">
-                <Typography variant="caption" className="block text-[13px] font-medium mb-1.5">Product name</Typography>
-                <TextField size="small" value="Italian coffee maker" onChange={() => {}}/>
-                <Typography variant="caption" color="disabled" className="block mt-1.5">Shown on the storefront and in receipts.</Typography>
+                <TextField size="large"
+                    value="Italian coffee maker"
+                    onChange={() => {}}
+                    inputClassName="text-base"
+                    label="Product name"/>
+                <Typography variant="caption" color="disabled" className="block mt-1.5 ml-3.5">Shown on the storefront and in receipts.</Typography>
             </Card>
         )
     },
@@ -274,7 +277,7 @@ const CONTROL_SIZES = [
     {
         size: "small" as const,
         px: 32,
-        use: "record forms, toolbars, the reference density"
+        use: "toolbars, dense chrome, the reference density"
     },
     {
         size: "medium" as const,
@@ -284,7 +287,7 @@ const CONTROL_SIZES = [
     {
         size: "large" as const,
         px: 48,
-        use: "the login screen and other one-field moments"
+        use: "record forms (64px with the label inside), the login screen"
     }
 ];
 
@@ -344,19 +347,22 @@ export function ShapeSpaceSection() {
                 <div>
                     <SpecimenLabel>a record-form field, assembled</SpecimenLabel>
                     <div className="max-w-xs">
-                        <div className="flex items-center gap-1.5 font-medium leading-tight mb-1.5 text-[13px]">
-                            <span className="shrink-0 text-text-disabled dark:text-text-disabled-dark"><FileTextIcon size={14}/></span>
-                            <span>SKU</span>
-                            <span className="text-red-500 -ml-1">*</span>
-                        </div>
-                        <TextField size="small" value="SKU-57032" onChange={() => {}}/>
-                        <Typography variant="caption" color="disabled" className="block mt-1.5 ml-0.5 leading-snug">
+                        <TextField size="large"
+                            value="SKU-57032"
+                            onChange={() => {}}
+                            inputClassName="text-base"
+                            label={<span className="inline-flex items-center gap-2">
+                                <FileTextIcon size={20}/>
+                                <span>SKU<span aria-hidden={true}> *</span></span>
+                            </span>}/>
+                        <Typography variant="caption" color="disabled" className="block mt-1.5 ml-3.5 leading-snug">
                             Stock keeping unit — unique product identifier
                         </Typography>
                     </div>
                     <Typography variant="caption" color="secondary" className="block mt-3">
-                        13px label in the primary ink with a muted 14px type icon, a 32px field with its hairline, an 11px note.
-                        Mirrors <code className="font-mono">FieldBlock</code> in the panel.
+                        A filled 64px box with no edge, the label and its type icon shrunk into the top edge, a 16px value,
+                        an 11px note indented to the value. Mirrors the panel&rsquo;s text field binding inside{" "}
+                        <code className="font-mono">FieldBlock</code>.
                     </Typography>
                 </div>
             </div>

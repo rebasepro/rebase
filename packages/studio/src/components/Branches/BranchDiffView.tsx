@@ -29,7 +29,7 @@ import {
 } from "@rebasepro/ui";
 import type { ChipColorKey } from "@rebasepro/ui";
 import { useApiBase, useApiConfig, useSnackbarController, useTranslation } from "@rebasepro/app";
-import type { BranchDiff, BranchInfo, BranchMergeResult, BranchRowChange, BranchSchemaChange, BranchTableDataDiff } from "@rebasepro/types";
+import type { BranchDiff, BranchInfo, BranchMergeResult, BranchReferencingRows, BranchRowChange, BranchSchemaChange, BranchTableDataDiff } from "@rebasepro/types";
 
 import { classifyLoadFailure, type LoadFailure } from "../load-failure";
 import { LoadFailureView } from "../load-failure-view";
@@ -40,10 +40,12 @@ import { splitLineDiff } from "./split-line-diff";
  * merge, behind a dialog that says what wins before anything is written.
  *
  * The diff is the server's (`GET /api/admin/branches/:name/diff`), computed
- * against the database the branch was made from: schema and RLS policies as
+ * against the database the branch was made from: schema (tables, columns,
+ * constraints, indexes, triggers, enums, views, functions) and RLS policies as
  * SQL, side by side, and the rows the branch inserted, updated and deleted.
  * Rows that database changed on its own since are counted apart and never
- * offered as the branch's.
+ * offered as the branch's — and a row the branch deleted that they still
+ * reference is a conflict, since deleting it would reach them.
  *
  * The merge (`POST …/merge`) sends back the fingerprint of the diff on screen,
  * so a merge after either side moved writes nothing, and the pane reloads the
@@ -262,7 +264,13 @@ function SchemaChanges({ diff }: { diff: BranchDiff }) {
         table: t("studio_branch_diff_object_table"),
         column: t("studio_branch_diff_object_column"),
         policy: t("studio_branch_diff_object_policy"),
-        rls: t("studio_branch_diff_object_rls")
+        rls: t("studio_branch_diff_object_rls"),
+        constraint: t("studio_branch_diff_object_constraint"),
+        index: t("studio_branch_diff_object_index"),
+        trigger: t("studio_branch_diff_object_trigger"),
+        enum: t("studio_branch_diff_object_enum"),
+        view: t("studio_branch_diff_object_view"),
+        function: t("studio_branch_diff_object_function")
     };
     const changeLabel: Record<BranchSchemaChange["change"], string> = {
         added: t("studio_branch_diff_change_added"),
@@ -313,19 +321,42 @@ function SplitDiff({ before, after, targetLabel, branchLabel }: { before?: strin
 
 // ── Data ─────────────────────────────────────────────────────────────────────
 
+/** `public.posts (ON DELETE CASCADE, 1)`, for each foreign key into a row the branch deleted. */
+function referencingText(found: readonly BranchReferencingRows[]): string {
+    return found.map((entry) => `${entry.schema}.${entry.table} (ON DELETE ${entry.onDelete.toUpperCase()}, ${entry.rows})`).join(", ");
+}
+
+/** Every foreign key, across the diff, through which the target's newer rows reference a row the branch deleted. */
+function referencingRows(entries: readonly BranchTableDataDiff[]): BranchReferencingRows[] {
+    return entries.flatMap((entry) => entry.referencedBy ?? []);
+}
+
 function DataChanges({ diff }: { diff: BranchDiff }) {
     const { t } = useTranslation();
     if (diff.data.length === 0) {
         return <EmptyState text={t("studio_branch_diff_data_empty", { target: diff.targetDatabase })}/>;
     }
+    // The target's rows in each table that reference a row the branch deleted.
+    const reached = new Map<string, number>();
+    for (const found of referencingRows(diff.data)) {
+        const key = `${found.schema}.${found.table}`;
+        reached.set(key, (reached.get(key) ?? 0) + found.rows);
+    }
     return (
         <div className="space-y-5">
-            {diff.data.map((entry) => <TableChanges key={`${entry.schema}.${entry.table}`} entry={entry} target={diff.targetDatabase}/>)}
+            {diff.data.map((entry) => (
+                <TableChanges
+                    key={`${entry.schema}.${entry.table}`}
+                    entry={entry}
+                    target={diff.targetDatabase}
+                    reached={reached.get(`${entry.schema}.${entry.table}`) ?? 0}
+                />
+            ))}
         </div>
     );
 }
 
-function TableChanges({ entry, target }: { entry: BranchTableDataDiff; target: string }) {
+function TableChanges({ entry, target, reached }: { entry: BranchTableDataDiff; target: string; reached: number }) {
     const { t } = useTranslation();
     const rowLabel: Record<BranchRowChange["change"], string> = {
         inserted: t("studio_branch_diff_row_inserted"),
@@ -346,7 +377,14 @@ function TableChanges({ entry, target }: { entry: BranchTableDataDiff; target: s
             </div>
             {entry.targetChanges > 0 && (
                 <Typography variant="caption" color="secondary" className="block">
-                    {t("studio_branch_diff_target_changes", { count: entry.targetChanges, target })}
+                    {reached > 0
+                        ? t("studio_branch_diff_target_changes_referencing", { count: entry.targetChanges, reached: Math.min(reached, entry.targetChanges), target })
+                        : t("studio_branch_diff_target_changes", { count: entry.targetChanges, target })}
+                </Typography>
+            )}
+            {entry.referencedBy && entry.referencedBy.length > 0 && (
+                <Typography variant="caption" color="secondary" className="block">
+                    {t("studio_branch_diff_referenced_by", { target, tables: referencingText(entry.referencedBy) })}
                 </Typography>
             )}
             {entry.blocked && (
@@ -397,7 +435,9 @@ const VALUES_SHOWN = 8;
 
 function RowValues({ sample }: { sample: BranchRowChange }) {
     const mono = "font-mono text-[12px] break-all";
-    if (sample.change === "updated" || sample.change === "conflict") {
+    // A conflict with no branch side is a row the branch deleted that the
+    // target's newer rows reference: shown as the row it would delete.
+    if (sample.change === "updated" || (sample.change === "conflict" && sample.after)) {
         return (
             <div className="space-y-0.5">
                 {(sample.changedColumns ?? []).map((column) => (
@@ -455,32 +495,51 @@ function MergeDialog({ open, diff, onClose, merge }: {
     }, [open, diff.fingerprint]);
 
     const mergeable = diff.data.filter((entry) => !entry.blocked);
-    const blocked = diff.data.filter((entry) => entry.blocked && entry.inserted + entry.updated + entry.deleted + entry.conflicts > 0);
+    // Every blocked table: a zero count on one is "not matched", not "unchanged".
+    const blocked = diff.data.filter((entry) => entry.blocked);
     const sum = (key: "inserted" | "updated" | "deleted" | "conflicts" | "targetChanges") =>
         mergeable.reduce((total, entry) => total + entry[key], 0);
     const conflicts = sum("conflicts");
     const targetChanges = sum("targetChanges");
     const target = diff.targetDatabase;
+    // The target's rows that reference rows the branch deleted: kept unless
+    // the branch wins, when the foreign keys reach them.
+    const referencing = referencingRows(mergeable);
+    const reached = referencing.reduce((total, found) => total + found.rows, 0);
+    const referencingTables = referencingText(referencing);
     const ready = (conflicts === 0 || rule !== "abort") && (blocked.length === 0 || skipBlocked);
 
     return (
         <Dialog open={open} onOpenChange={(next) => { if (!next && !merging) onClose(); }}>
             <DialogTitle>{t("studio_branch_diff_merge_title", { branch: diff.branch, target })}</DialogTitle>
-            <DialogContent className="space-y-4 min-w-[420px] max-w-[560px]">
+            <DialogContent className="space-y-4 sm:min-w-[420px] max-w-[560px]">
                 <Typography variant="body2">
                     {t("studio_branch_diff_merge_writes", { inserted: sum("inserted"), updated: sum("updated"), deleted: sum("deleted"), target })}
                 </Typography>
-                <Typography variant="body2" color="secondary">
-                    {targetChanges > 0
-                        ? t("studio_branch_diff_merge_target_kept_count", { count: targetChanges, target })
-                        : t("studio_branch_diff_merge_target_kept", { target })}
-                </Typography>
+                {rule === "branch" && reached > 0 ? (
+                    <Alert color="warning">
+                        <Typography variant="body2">
+                            {t("studio_branch_diff_merge_referenced_reached", { count: reached, target, tables: referencingTables })}
+                        </Typography>
+                    </Alert>
+                ) : (
+                    <Typography variant="body2" color="secondary">
+                        {targetChanges > 0
+                            ? t("studio_branch_diff_merge_target_kept_count", { count: targetChanges, target })
+                            : t("studio_branch_diff_merge_target_kept", { target })}
+                    </Typography>
+                )}
                 {diff.schema.length > 0 && (
                     <Typography variant="body2" color="secondary">{t("studio_branch_diff_merge_schema_skipped", { count: diff.schema.length })}</Typography>
                 )}
                 {conflicts > 0 && (
                     <div className="space-y-2">
                         <Typography variant="body2" className="font-medium">{t("studio_branch_diff_merge_conflicts", { count: conflicts })}</Typography>
+                        {reached > 0 && (
+                            <Typography variant="body2" color="secondary">
+                                {t("studio_branch_diff_merge_referenced_conflicts", { count: reached, target, tables: referencingTables })}
+                            </Typography>
+                        )}
                         <RadioGroup value={rule} onValueChange={(value) => setRule(value === "branch" || value === "target" ? value : "abort")}>
                             {([
                                 ["abort", t("studio_branch_diff_conflict_abort")],

@@ -271,7 +271,7 @@ export function MoreControlsSection() {
                         maxRows={6}
                         value={notes}
                         onChange={(e) => setNotes(e.target.value)}
-                        className="w-full rounded-lg border border-hairline bg-surface-field px-3 py-2 text-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
+                        className="w-full rounded-lg border border-transparent bg-surface-field px-3 py-2 text-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
                     />
                 </div>
                 <div className="col-span-12 sm:col-span-6 flex flex-col gap-3">
@@ -279,7 +279,7 @@ export function MoreControlsSection() {
                     <Label htmlFor="ref-label-field">Label, tied to its field</Label>
                     <TextField id="ref-label-field" size="small" placeholder="Focus me through the label"/>
                     <Label border>Label with a border</Label>
-                    <div className="relative h-10 border border-hairline rounded-lg">
+                    <div className="relative h-10 bg-surface-field rounded-lg">
                         <InputLabel shrink>InputLabel (shrunk)</InputLabel>
                     </div>
                 </div>

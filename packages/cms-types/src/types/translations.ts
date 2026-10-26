@@ -225,6 +225,8 @@ export interface RebaseTranslations {
     rls_simulate_no_api_keys: string;
     /** The simulator could not load its options; {{message}} is why */
     rls_simulate_options_error: string;
+    /** The simulator's user search failed; {{message}} is why */
+    rls_simulate_users_error: string;
     /** Banner: simulating a role, {{role}} */
     rls_simulation_viewing_as_role: string;
     /** Banner: simulating uid {{user}} holding {{role}} */
@@ -243,6 +245,8 @@ export interface RebaseTranslations {
     rls_simulation_masked_columns_one: string;
     /** Banner while the per-collection preview loads */
     rls_simulation_counting: string;
+    /** Banner when the per-collection preview failed; {{message}} is why */
+    rls_simulation_count_failed: string;
     /** Banner body: what the data views show while simulating */
     rls_simulation_note: string;
     create_index: string;
@@ -1694,6 +1698,12 @@ export interface RebaseTranslations {
     studio_branch_diff_object_column?: string;
     studio_branch_diff_object_policy?: string;
     studio_branch_diff_object_rls?: string;
+    studio_branch_diff_object_constraint?: string;
+    studio_branch_diff_object_index?: string;
+    studio_branch_diff_object_trigger?: string;
+    studio_branch_diff_object_enum?: string;
+    studio_branch_diff_object_view?: string;
+    studio_branch_diff_object_function?: string;
     studio_branch_diff_change_added?: string;
     studio_branch_diff_change_dropped?: string;
     studio_branch_diff_change_altered?: string;
@@ -1704,6 +1714,8 @@ export interface RebaseTranslations {
     studio_branch_diff_row_conflict?: string;
     studio_branch_diff_conflicts?: string;
     studio_branch_diff_target_changes?: string;
+    studio_branch_diff_target_changes_referencing?: string;
+    studio_branch_diff_referenced_by?: string;
     studio_branch_diff_row_counts?: string;
     studio_branch_diff_column_change?: string;
     studio_branch_diff_column_key?: string;
@@ -1715,6 +1727,8 @@ export interface RebaseTranslations {
     studio_branch_diff_merge_target_kept_count?: string;
     studio_branch_diff_merge_schema_skipped?: string;
     studio_branch_diff_merge_conflicts?: string;
+    studio_branch_diff_merge_referenced_conflicts?: string;
+    studio_branch_diff_merge_referenced_reached?: string;
     studio_branch_diff_conflict_abort?: string;
     studio_branch_diff_conflict_branch?: string;
     studio_branch_diff_conflict_target?: string;

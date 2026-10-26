@@ -1,5 +1,5 @@
 ---
-sourceHash: d9b66c9d404a5085
+sourceHash: bb2bf60cbaed04eb
 title: Autenticación
 sidebar_label: Autenticación
 description: Configura la autenticación JWT, proveedores OAuth, correo SMTP, protección contra bots y la colección de usuarios en el backend de Rebase.
@@ -95,6 +95,7 @@ const backend = await initializeRebaseBackend({
 | `disableSelfRegistration` | `boolean` | `false` | Mecanismo de corte: también cierra la ventana de inicialización del primer usuario que `allowRegistration: false` deja abierta |
 | `allowAnonymous` | `boolean` | `false` | Habilita `POST /api/auth/anonymous`. Deliberadamente no condicionado por `allowRegistration` — una aplicación pública principalmente de lectura puede requerir sesiones sin cuentas. Convertir a un invitado en una cuenta (`POST /api/auth/anonymous/link`) es un registro, y también necesita `allowRegistration` — y que `allowAnonymous` siga activado: si se desactiva, también rechaza a los invitados que ya habían iniciado sesión, de modo que ninguno puede convertirse en cuenta (`403 ANONYMOUS_AUTH_DISABLED`) |
 | `allowUserLookup` | `boolean` | `false` | Monta `POST /api/auth/find-user` para flujos de invitación por correo electrónico |
+| `captcha` | `CaptchaConfig` | — | Protección contra bots en las rutas que envían correo — consulte [Protección contra bots](#protección-contra-bots) |
 | `defaultRole` | `string` | — | Rol asignado a un usuario recién registrado cuando no se especifica ninguno. No puede ser `admin` ni un rol declarado que tenga un alcance del plano de administración: el arranque rechaza ambos |
 | `serviceKey` | `string` | — | Clave estática para llamadas servidor a servidor — consulte [Autenticación mediante clave de servicio](/docs/backend/auth-endpoints/#service-key-authentication) |
 | `email` | `EmailConfig` | — | SMTP, para restablecimiento de contraseña, verificación, invitaciones y enlaces mágicos |
@@ -310,9 +311,11 @@ DISCORD_CLIENT_SECRET=…
 
 `GET /api/auth/config` listará entonces `discord` en `enabledProviders`, lo cual sirve para comprobar que el par de variables se cargó correctamente.
 
+Google se configura solo con `GOOGLE_CLIENT_ID`: su flujo de ID token no necesita ningún secreto, así que `GOOGLE_CLIENT_SECRET` es opcional.
+
 Apple es la excepción: no tiene un client secret estático, ya que Rebase firma un JWT ES256 de corta duración para cada intercambio de tokens. Requiere los cuatro valores: `APPLE_CLIENT_ID`, `APPLE_TEAM_ID`, `APPLE_KEY_ID` y `APPLE_PRIVATE_KEY` — el contenido del archivo `.p8`, con saltos de línea incluidos.
 
-Dos opciones no tienen equivalente en variables de entorno y requieren el bloque `auth` (es decir, un backend ejected o configurado por código): `microsoft.tenantId`, que de lo contrario utiliza por defecto `common` y reporta cada dirección como no verificada, y `gitlab.baseUrl`, para una instancia autoalojada.
+Dos opciones no tienen equivalente en variables de entorno y requieren el bloque `auth` (es decir, un backend ejected o configurado por código): `microsoft.tenantId`, que de lo contrario utiliza por defecto `common` y acepta todos los tenants de Entra (con cualquier tenant, una dirección cuenta como verificada solo cuando el registro de la aplicación emite el claim `xms_edov`), y `gitlab.baseUrl`, para una instancia autoalojada.
 
 Cada campo nombrado se resuelve al inicio dentro de `auth.providers`, que es el array canónico y el punto de extensión para cualquier cosa que los campos nombrados no cubran. Las entradas se construyen con las funciones factoría `create*Provider`, y ambas formas se combinan — los campos nombrados se agregan después de las entradas explícitas:
 
@@ -337,20 +340,20 @@ Si no se configura, la única comprobación sobre una redirección de OAuth es l
 
 ### Vinculación de cuentas entre métodos de inicio de sesión
 
-¿Qué ocurre cuando alguien se registra con correo/contraseña como `ada@example.com`, y más tarde hace clic en "Iniciar sesión con Google" con una cuenta de Google que tiene esa misma dirección? Rebase **vincula ambas en una sola cuenta** — pero únicamente cuando el proveedor certifica que el correo está verificado *y* la dirección de la propia cuenta ha sido verificada. Nunca crea de forma silenciosa una segunda cuenta para la misma dirección.
+¿Qué ocurre cuando alguien se registra con correo/contraseña como `ada@example.com`, y más tarde hace clic en "Iniciar sesión con Google" con una cuenta de Google que tiene esa misma dirección? Rebase **vincula ambas en una sola cuenta**, pero únicamente cuando el proveedor certifica que el correo está verificado. Nunca crea de forma silenciosa una segunda cuenta para la misma dirección.
 
 En `POST /api/auth/<provider>`, el orden de resolución es:
 
-1. **Identidad de proveedor conocida** — si esta identidad exacta del proveedor ha iniciado sesión antes, se devuelve ese usuario. No se consulta el correo electrónico.
-2. **Cuenta existente con el mismo correo electrónico, ambos lados verificados** — el proveedor verificó el correo, y la cuenta también. La identidad se asocia a la cuenta existente y se inicia sesión con el usuario en ella. Una cuenta, dos vías de acceso.
-3. **Cuenta existente con el mismo correo electrónico, algún lado sin verificar** — rechazada con `403 EMAIL_NOT_VERIFIED`. No se crea ni se modifica nada. `details.reason` indica qué lado: `provider-email-unverified`, o `local-account-unverified` (la cuenta tiene contraseña) / `local-account-unverified-passwordless` (no la tiene).
-4. **Sin cuenta con ese correo electrónico** — se crea una nueva cuenta, verificada si el proveedor verificó el correo.
+1. **Identidad de proveedor conocida**: si esta identidad exacta del proveedor ha iniciado sesión antes, se devuelve ese usuario. No se consulta el correo electrónico.
+2. **Cuenta existente con el mismo correo electrónico, el proveedor verificó el correo**: la identidad se asocia y se inicia sesión con el usuario en la cuenta. Una cuenta, dos vías de acceso. Una cuenta sin verificar se verifica primero (véase más abajo).
+3. **Cuenta existente con el mismo correo electrónico, el proveedor no lo verificó**: rechazada con `403 EMAIL_NOT_VERIFIED` y `details.reason` `provider-email-unverified`. No se crea ni se modifica nada.
+4. **Sin cuenta con ese correo electrónico**: se crea una nueva cuenta, verificada si el proveedor verificó el correo.
 
 El paso 3 es el caso crítico a nivel de seguridad. Si un correo electrónico de proveedor no verificado bastara para vincular cuentas, cualquiera que lograse que un proveedor emitiera una dirección que no le pertenece podría apoderarse de la cuenta de Rebase correspondiente. Google siempre declara `email_verified` para cuentas reales de Google, por lo que el paso 2 es la ruta habitual para el inicio de sesión con Google; el paso 3 detecta principalmente proveedores que permiten a los usuarios proporcionar una dirección arbitraria sin confirmar.
 
-El lado de la cuenta importa por la misma razón. Nada verifica la dirección que recibe `POST /auth/register`, así que cualquiera puede registrar la dirección de otra persona con una contraseña, o iniciar sesión con ella a través de un proveedor que no la avala, y esperar. Vincular el inicio de sesión con Google del titular a esa cuenta dejaría en ella la vía de acceso de la otra persona.
+El lado de la cuenta también importa. Nada verifica la dirección que recibe `POST /auth/register`, así que cualquiera puede registrar la dirección de otra persona con una contraseña, o iniciar sesión con ella a través de un proveedor que no la avala, y esperar. Vincular el inicio de sesión con Google del titular a esa cuenta no debe dejar en ella la vía de acceso de la otra persona.
 
-Un enlace de verificación, un enlace mágico, un código por correo o un restablecimiento de contraseña demuestran la dirección y verifican la cuenta. En una cuenta que aún no estaba verificada, la primera de esas pruebas elimina la contraseña (un restablecimiento establece la nueva) y cada identidad vinculada cuyo proveedor no verificó esa dirección, y cierra todas las sesiones, antes de marcar la cuenta como verificada. A partir de ahí se aplica el paso 2.
+Un proveedor que verificó la dirección, un enlace de verificación, un enlace mágico, un código por correo o un restablecimiento de contraseña demuestran la dirección y verifican la cuenta. En una cuenta que aún no estaba verificada, la primera de esas pruebas elimina la contraseña (un restablecimiento establece la nueva) y cada identidad vinculada cuyo proveedor no verificó esa dirección, y cierra todas las sesiones, antes de marcar la cuenta como verificada: una contraseña que nadie verificó desaparece tras el primer inicio de sesión con Google.
 
 Un enlace de verificación conserva lo que también demuestra la persona que lo sigue: una sesión activa de la cuenta, o su contraseña. Consulte [Verificación de correo electrónico](/docs/backend/email-verification/). Las cuentas que crea un administrador con `POST /api/admin/users` se guardan verificadas, por lo que un invitado puede usar "Iniciar sesión con Google" de inmediato. Un repositorio de autenticación propio sin `unlinkUserIdentity` rechaza esa prueba con `409 UNVERIFIED_IDENTITIES` cuando hay una identidad que eliminar.
 
@@ -366,11 +369,13 @@ registro confirme primero. Consulte
 
 ## Tablas creadas automáticamente
 
-En el primer arranque, Rebase aprovisiona automáticamente el esquema `auth` y las siguientes tablas en la base de datos (vinculadas al esquema definido en su colección, p. ej., `rebase`):
+En el primer arranque, Rebase aprovisiona automáticamente el esquema `rebase` y las siguientes tablas en la base de datos (vinculadas al esquema definido en su colección, p. ej., `rebase`):
 
 - **`rebase.users`** — Cuentas de usuario con correo electrónico, hash de contraseña, metadatos y una columna text[] `roles` (los roles se almacenan como arrays de texto en línea para optimizar consultas y evitar joins).
+- **`rebase.user_identities`** — Las identidades OAuth vinculadas a cada cuenta, una fila por cada identidad de proveedor.
 - **`rebase.refresh_tokens`** — Sesiones de larga duración que contienen tokens de actualización hasheados, user agents y direcciones IP. Incluye un índice único en `token_hash`. Un inicio de sesión es un `session_id`, compartido por cada token que se rota a partir de él; no hay ninguna restricción por dispositivo, así que dos navegadores detrás de una misma dirección son dos sesiones. Cada token de una sesión también lleva su nivel de confianza (`aal`) y cómo se inició sesión (`method`, que `providerId` reporta).
 - **`rebase.password_reset_tokens`** — Tokens de un solo uso con expiración para los flujos de recuperación de contraseña.
+- **`rebase.magic_link_tokens`** — Tokens de un solo uso con expiración para el inicio de sesión con enlace mágico.
 - **`rebase.mfa_factors`** — Métodos de autenticación multifactor registrados (p. ej., secretos TOTP cifrados con AES-256).
 - **`rebase.mfa_challenges`** — Registros de verificación que rastrean los intentos activos de verificación MFA.
 - **`rebase.recovery_codes`** — Códigos de respaldo/recuperación multifactor hasheados.
@@ -378,8 +383,9 @@ En el primer arranque, Rebase aprovisiona automáticamente el esquema `auth` y l
 
 Los tokens que expiran — enlaces de restablecimiento, enlaces mágicos y códigos
 por correo, refresh tokens, desafíos MFA — se eliminan una hora después de
-expirar. La limpieza se ejecuta en el proceso que posee los temporizadores (el
-rol `worker` en un despliegue dividido) y en una sola instancia de la flota:
+expirar. La limpieza se ejecuta en los procesos que poseen los temporizadores (todos los
+roles excepto `functions` en un despliegue dividido, a menos que
+`REBASE_CRON_SCHEDULER=false` los saque de `api`) y en una sola instancia de la flota:
 cada hora se reclama en `rebase.cron_claims` bajo el id de tarea
 `rebase:auth:expired-tokens`, igual que un slot de cron. Con
 `cronPersistence: false` no hay tabla de reclamaciones, y todas esas

@@ -69,11 +69,11 @@ bleibt pausiert.
 `rebase dev` ausgegeben hat — siehe [REST-API](/docs/backend/cron-jobs-api/).
 
 ```bash
-# Pausieren, für jeden Prozess, bis jemand ihn fortsetzt
+# Pause, for every process, until someone resumes it
 curl -X PUT -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
     -d '{ "enabled": false }' "$API_URL/api/admin/cron/health-check"
 
-# Nicht mehr überschreiben: wieder dem `enabled` aus der Datei des Jobs folgen
+# Stop overriding: follow the `enabled` the job's file declares again
 curl -X PUT -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
     -d '{ "enabled": null }' "$API_URL/api/admin/cron/health-check"
 ```

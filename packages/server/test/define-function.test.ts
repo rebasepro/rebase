@@ -47,6 +47,23 @@ describe("defineFunction", () => {
         expect(res.status).toBe(200);
         expect(await res.text()).toBe("custom");
     });
+
+    it("uses a returned app from another copy of hono, which instanceof does not recognise", async () => {
+        // A project whose own `hono` is not the copy this package resolves:
+        // `returned instanceof Hono` was false, and the empty app replaced the
+        // author's — every route silently gone. The loader duck-types for
+        // exactly this reason.
+        const custom = new Hono();
+        custom.get("/custom", (c) => c.text("custom"));
+        const foreign = new Proxy(custom, { getPrototypeOf: () => Object.prototype });
+        expect(foreign instanceof Hono).toBe(false);
+
+        const app = defineFunction(() => foreign as unknown as Hono<HonoEnv>);
+
+        const res = await app.request("/custom");
+        expect(res.status).toBe(200);
+        expect(await res.text()).toBe("custom");
+    });
 });
 
 /**

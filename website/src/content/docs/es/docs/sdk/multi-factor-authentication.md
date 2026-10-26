@@ -81,3 +81,8 @@ await client.auth.mfa.unenroll(factorId);
 ```
 
 Una vez que hay un factor verificado, esto requiere una sesión `aal2`, de modo que un token `aal1` robado no pueda desactivar MFA; una primera inscripción sin terminar se elimina desde cualquier sesión. Eliminar el último factor verificado también descarta los códigos de recuperación.
+
+## Próximos pasos
+
+- **[Autenticación](/docs/sdk/authentication/)** — Inicio de sesión, sesiones y el resto de `client.auth`
+- **[Endpoints de autenticación](/docs/backend/auth-endpoints/#multi-factor-authentication-totp)** — Las rutas HTTP detrás del registro y el desafío

@@ -29,8 +29,8 @@ no `app/` directory:
 <project-root>/
 ├── frontend/             # React admin panel (Vite)
 ├── backend/
-│   ├── functions/        # Custom backend functions, one file per function
-│   └── crons/            # Scheduled jobs, one file per job
+│   └── functions/        # Custom backend functions, one file per function
+│                         # (add crons/ for scheduled jobs, one file per job)
 ├── config/               # Collections and storageAuthorize, shared by both
 │   └── collections/
 ├── scripts/              # Standalone SDK scripts
@@ -38,7 +38,7 @@ no `app/` directory:
 ├── rebase.json           # Which apps this project deploys, and how
 ├── .env                  # Written by `rebase init`; DATABASE_URL commented out
 ├── .env.example          # Every variable, documented inline
-├── docker-compose.yml    # Optional PostgreSQL container — not needed by default
+├── docker-compose.yml    # Self-hosting (PostgreSQL + the runtime) — not needed to develop
 ├── pnpm-workspace.yaml
 └── package.json
 ```
@@ -91,11 +91,12 @@ for this project, with its data under `.rebase/`. It then generates the Drizzle
 schema from the project's collections and creates the missing tables at boot.
 The first run needs no schema command.
 
-**Do not run `rebase db push` on it.** `db push` plans changes with
-[Atlas](https://atlasgo.io/), which needs a second empty database to compare
-against, and the managed one serves exactly one — the command refuses, by
-design. Boot's additive apply is the development loop; see `rebase-basics` for
-what it deliberately leaves alone.
+**There is no `rebase db push` step for a first run.** Boot's additive apply is
+the development loop; see `rebase-basics` for what it deliberately leaves alone.
+For those changes `db push` works on the managed database too (0.25+): it plans
+with [Atlas](https://atlasgo.io/), which needs a second empty database to
+compare against, and the CLI starts a throwaway in-memory one for the command.
+On 0.24 and earlier it refuses the managed database.
 
 `rebase db url` prints whichever database is in use, managed or not.
 
@@ -138,7 +139,7 @@ ports have working development defaults.
 |---|---|
 | `DATABASE_URL` | **Leave it unset** for the managed database. Set it and yours wins, always. |
 | `JWT_SECRET` | Must be ≥ 32 characters. `rebase init` writes one. Left empty, dev mode generates one and caches it in `.rebase-dev-secrets.json`, so sessions survive a restart; only where that file cannot be written is it ephemeral (boot warns), and every restart then signs everyone out. |
-| `PORT` / `VITE_API_URL` | Configure `rebase start`, the production server. `rebase dev` derives its ports from the project path and ignores them. |
+| `PORT` / `VITE_API_URL` | `PORT` is what `rebase start` binds; `rebase dev` derives its ports from the project path and ignores the `.env` value (a `PORT` in the shell still counts). Leave `VITE_API_URL` empty unless the API is on another origin: it is baked in at build time, and `rebase dev` injects its own. |
 | `FRONTEND_URL` | Used in password-reset and verification emails. |
 
 > **WARNING FOR AGENTS:** `rebase dev` binds ports **derived from the project's
@@ -168,9 +169,10 @@ unset), applies the schema, and runs both halves with hot reload:
 - **Frontend** — the Rebase admin panel
 
 The project's other scripts are `pnpm run build`, `pnpm run start`,
-`pnpm run schema:generate`, `pnpm run db:push`, `pnpm run db:generate`,
-`pnpm run db:migrate`, `pnpm run generate:sdk`, `pnpm run skills:install` and
-`pnpm run example`.
+`pnpm run schema:generate`, `pnpm run schema:introspect`, `pnpm run db:push`,
+`pnpm run db:generate`, `pnpm run db:migrate`, `pnpm run generate:sdk`,
+`pnpm run skills:install`, `pnpm run example` and `pnpm run deploy`
+(`rebase cloud deploy` — never run it unasked).
 
 ## References
 

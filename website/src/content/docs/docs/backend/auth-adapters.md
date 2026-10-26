@@ -12,7 +12,7 @@ Rebase allows complete replacement of the built-in authentication system via a p
 
 ### The AuthAdapter Contract
 
-You can implement the `AuthAdapter` interface directly for complete control. The interface definition is as follows:
+You can implement the `AuthAdapter` interface directly for complete control. The interface, abridged (the full definition, with the optional user-administration and `transformAuthResponse` hooks, is `AuthAdapter` in `@rebasepro/types`):
 
 ```typescript
 import { Hono } from "hono";
@@ -34,6 +34,12 @@ export interface AuthAdapter {
    * If omitted, a synthetic request is automatically constructed.
    */
   verifyToken?(token: string): Promise<AuthenticatedUser | null>;
+
+  /**
+   * The identity an account would carry right now, with no credential.
+   * Without it, a request that impersonates another user is refused.
+   */
+  resolveUser?(uid: string): Promise<AuthenticatedUser | null>;
 
   /** Optional user management operations (CRUD) for the panel */
   userManagement?: UserManagementAdapter;
@@ -73,14 +79,16 @@ Regardless of the external authentication provider chosen, your adapter must res
 
 ```typescript
 export interface AuthenticatedUser {
-  uid: string;                    // Maps to pg local 'app.user_id' -> rebase.uid()
+  uid: string;                    // Maps to pg local 'app.uid' -> rebase.uid()
   email: string;                  // User email address
   displayName?: string | null;    // Optional display name
   photoUrl?: string | null;        // Optional avatar URL
   roles: string[];                // Maps to pg local 'app.user_roles' -> rebase.roles()
-  isAdmin: boolean;               // Grants global superuser privileges if true
+  isAdmin: boolean;               // Informational: authorization reads `roles` (give the `admin` role)
+  isAnonymous?: boolean;          // A guest session. Maps to 'app.is_anonymous' -> rebase.is_anonymous()
   rawToken?: string;              // The original token string (for downstream forwarding)
   claims?: Record<string, any>;   // Custom claims/metadata (available in rebase.jwt())
+  scopes?: string[];              // Narrower than the user's roles (set for an API key)
 }
 ```
 
@@ -198,8 +206,8 @@ const backend = await initializeRebaseBackend({
 
 #### The client half
 
-On 0.24 the getter
-authenticates HTTP requests only, and the realtime socket stays anonymous.
+Before 0.25 the getter
+authenticated HTTP requests only, and the realtime socket stayed anonymous.
 
 The adapter verifies the provider's token; the client has to send it. Give the
 Rebase client a getter for it, once:
@@ -259,7 +267,7 @@ const myOauthAdapter: AuthAdapter = {
 };
 ```
 
-If you wish to allow user CRUD operations directly inside the panel, implement the `userManagement` helper within the adapter options, which provides hooks for `listUsers`, `createUser`, `updateUser`, and `deleteUser`.
+If you wish to allow user CRUD operations directly inside the panel, implement the `userManagement` helper within the adapter options, which provides hooks for `listUsers`, `getUserById`, `createUser`, `updateUser`, `deleteUser`, `getUserRoles` and `setUserRoles`.
 
 ## Next Steps
 

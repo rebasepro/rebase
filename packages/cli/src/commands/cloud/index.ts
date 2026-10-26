@@ -13,6 +13,7 @@ import { tokensCommand } from "./tokens";
 import { linkCommand, unlinkCommand, selectOrgCommand, openCommand } from "./link";
 import { listProjects, createProject, projectInfo, deleteProject, resolveProjectArg } from "./projects";
 import { cloudInitCommand } from "./init";
+import { claimCommand } from "./claim";
 import { deployCommand, logsCommand } from "./deploy";
 import { orgsCommand, printOrgsHelp } from "./orgs";
 import { dbCommand, printDbHelp } from "./databases";
@@ -25,6 +26,11 @@ import { powerCommand } from "./power";
 import { debugCommand, printDebugHelp } from "./debug";
 import { cronCommand } from "./cron";
 import { previewsCommand } from "./previews";
+import { usageCommand } from "./usage";
+import { appKeyCommand } from "./app-key";
+import { serviceKeyCommand } from "./service-key";
+import { activityCommand } from "./activity";
+import { notificationsCommand } from "./notifications";
 import {
     statusCommand,
     metricsCommand,
@@ -67,6 +73,8 @@ import { ACTION_HELP, printActionHelp } from "./action-help";
  */
 export const CLOUD_VALUE_FLAGS = {
     "--access-key-id": String,
+    "--action": String,
+    "--actor": String,
     "--autoscale-cpu-target": String,
     "--autoscale-max": String,
     "--backup-access-key-id": String,
@@ -74,6 +82,7 @@ export const CLOUD_VALUE_FLAGS = {
     "--backup-endpoint": String,
     "--backup-secret-access-key": String,
     "--base-domain": String,
+    "--before": String,
     "--branch": String,
     "--bucket": String,
     "--bundle-dir": String,
@@ -89,14 +98,18 @@ export const CLOUD_VALUE_FLAGS = {
     "--endpoint": String,
     "--events": String,
     "--expires-in": String,
+    "--format": String,
     "--function": String,
+    "--grep": String,
     "--host": String,
     "--ingress-address": String,
     "--kubeconfig": String,
+    "--level": String,
     "--limit": String,
     "--live-timeout": String,
     "--memory": String,
     "--message": String,
+    "--month": String,
     "--name": String,
     "--org": String,
     "--output": String,
@@ -105,9 +118,15 @@ export const CLOUD_VALUE_FLAGS = {
     "--port": String,
     "--preview-name": String,
     "--provider": String,
+    // `clusters registry` (b403f036d5): its three values, so a flag's value is
+    // never read as the action.
+    "--pull-key-file": String,
+    "--push-service-account": String,
     "--region": String,
     "--replicas": String,
     "--repo": String,
+    "--repository": String,
+    "--role": String,
     "--scale-to-zero": String,
     "--secret-access-key": String,
     "--since": String,
@@ -116,7 +135,6 @@ export const CLOUD_VALUE_FLAGS = {
     "--spot": String,
     "--storage": String,
     "--subdomain": String,
-    "--table": String,
     "--tail": String,
     "--target": String,
     "--timeout": String,
@@ -313,6 +331,9 @@ export async function cloudCommand(subcommand: string | undefined, rawArgs: stri
         case "init":
             await cloudInitCommand(rawArgs);
             break;
+        case "claim":
+            await claimCommand(rawArgs);
+            break;
         case "projects":
         case "project":
             await projectsGroup(action, rawArgs);
@@ -389,6 +410,9 @@ export async function cloudCommand(subcommand: string | undefined, rawArgs: stri
         case "webhooks":
             await webhooksCommand(action, rawArgs);
             break;
+        case "notifications":
+            await notificationsCommand(action, rawArgs);
+            break;
         case "storage":
             await storageCommand(action, rawArgs);
             break;
@@ -411,6 +435,18 @@ export async function cloudCommand(subcommand: string | undefined, rawArgs: stri
             break;
         case "clusters":
             await clustersCommand(action, rawArgs);
+            break;
+        case "usage":
+            await usageCommand(rawArgs);
+            break;
+        case "app-key":
+            await appKeyCommand(rawArgs);
+            break;
+        case "service-key":
+            await serviceKeyCommand(rawArgs);
+            break;
+        case "activity":
+            await activityCommand(rawArgs);
             break;
         case "billing":
             await billingCommand(rawArgs);
@@ -500,6 +536,7 @@ export const CLOUD_GROUPS: HelpAction[] = [
     { action: "open", section: "Project link", description: "Open the console in a browser" },
 
     { action: "init", section: "Projects", description: "With --claim: a live backend with no account, and a link to claim it within 72 hours" },
+    { action: "claim", section: "Projects", description: "The claim link of the project `init --claim` made here, and the time left; --open opens it" },
     { action: "projects", section: "Projects", description: "Create, list, inspect and delete projects" },
 
     { action: "deploy", section: "Deploy & observe", args: "[app]", description: "Build, upload and ship an app, following it to a terminal state" },
@@ -520,13 +557,17 @@ export const CLOUD_GROUPS: HelpAction[] = [
     { action: "domains", section: "Config", description: "Custom domains, their DNS records, and verification" },
     { action: "extensions", section: "Config", description: "The Postgres extension allowlist" },
     { action: "settings", section: "Config", description: "Name, subdomain, repository, branch" },
+    { action: "app-key", section: "Config", args: "[rotate]", description: "The app key `init --claim` wrote into .env, and replacing it. Owners and admins" },
+    { action: "service-key", section: "Config", args: "[rotate]", description: "REBASE_SERVICE_KEY, admin on the app's API: its state, and replacing it. Owners and admins" },
 
     { action: "orgs", section: "Organizations", description: "Organizations you belong to, and their members" },
+    { action: "activity", section: "Organizations", description: "Who did what in the organization: deploys, env vars, domains, backups, members. Owners and admins" },
 
     { action: "db", section: "Data", description: "Attach a database, back it up, restore, point-in-time recovery" },
     { action: "storage", section: "Data", description: "The project's object storage" },
 
-    { action: "webhooks", section: "Other resources", description: "Outbound webhooks on a table's row changes" },
+    { action: "notifications", section: "Deploy & observe", description: "Send deploy, backup, billing and usage events to Slack, Discord or any URL" },
+    { action: "webhooks", section: "Other resources", description: "Retired: use `notifications`, or a WebhookDispatcher in your app's code" },
     // Both of these dispatch and have a page, and both were absent from this
     // list — so the command that names what a project costs, and the one that
     // names what it declares, were undiscoverable from `rebase cloud --help`,
@@ -534,7 +575,8 @@ export const CLOUD_GROUPS: HelpAction[] = [
     { action: "resources", section: "Other resources", description: "What the code declares against what the platform provisioned" },
     { action: "compute", section: "Other resources", description: "What this project reserves, what it costs, and how to change it" },
     { action: "clusters", section: "Other resources", description: "The clusters tenants run on. Platform-admin only" },
-    { action: "billing", section: "Other resources", description: "The organization's billing account and card on file" }
+    { action: "billing", section: "Other resources", description: "The organization's billing account and card on file" },
+    { action: "usage", section: "Other resources", args: "[org]", description: "Requests used this month against the allowance, and the overage so far" }
 ];
 
 /** The dispatch words alone — what `--help` routing and the tests iterate. */

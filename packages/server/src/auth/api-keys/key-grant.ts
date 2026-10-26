@@ -14,6 +14,7 @@ import {
     KEY_MANAGEMENT_SCOPES,
     knownScopes,
     parseScope,
+    roleNameProblem,
     scopesBeyond,
     SCOPE_TARGETS,
     isBuiltInScope,
@@ -51,13 +52,27 @@ export function readScopesField(value: unknown): string[] {
     return [...new Set(value.map(entry => entry.trim()))];
 }
 
-/** Read a `roles` body field: an array of non-empty strings, deduplicated, without `service`. */
+/**
+ * Read a `roles` body field: an array of role names, trimmed, deduplicated,
+ * without `service`. A key's roles reach RLS joined by `,` in `app.user_roles`,
+ * so a name `roleNameProblem` refuses — `"editor,admin"` — is refused here too.
+ */
 export function readRolesField(value: unknown): string[] {
     if (!Array.isArray(value) || value.some(entry => typeof entry !== "string" || entry.trim() === "")) {
         throw ApiError.badRequest("roles must be an array of role names", "INVALID_INPUT");
     }
+    const trimmed = value.map(entry => String(entry).trim());
+    const problems = trimmed.flatMap(name => {
+        const problem = roleNameProblem(name);
+        return problem ? [`${JSON.stringify(name)} ${problem}`] : [];
+    });
+    if (problems.length > 0) {
+        throw new ApiError(400, "INVALID_ROLE",
+            `Not valid role names: ${problems.join("; ")}. A role name is a non-empty string without , { } " \\ or control characters.`,
+            { problems });
+    }
     // `service` is every service key's identity already; listing it adds nothing.
-    return [...new Set(value.map(entry => entry.trim()))].filter(role => role !== "service");
+    return [...new Set(trimmed)].filter(role => role !== "service");
 }
 
 /**
@@ -133,6 +148,31 @@ export function assertRolesGrantable(requested: readonly string[], minterRoles: 
         throw new ApiError(403, "ROLE_EXCEEDS_CREATOR",
             `A key cannot run as a role the account creating it does not hold: ${beyond.join(", ")}.`,
             { roles: beyond });
+    }
+}
+
+/**
+ * Refuse changing or revoking a key that holds more than the caller — a role
+ * they do not hold, or a scope beyond theirs. An admin manages any key.
+ *
+ * The same ceiling as minting, applied to the key as it already is: a
+ * `keys:write` role could otherwise widen an admin-role key it could never
+ * have minted to every data scope, or revoke the key an admin's integration
+ * runs on. `assertMayManageAccount` is the same rule for accounts.
+ */
+export function assertMayManageKey(
+    existing: { roles: readonly string[]; scopes: readonly string[] },
+    managerRoles: readonly string[],
+    managerScopes: readonly string[]
+): void {
+    if (hasAdminRole(managerRoles)) return;
+    const roles = existing.roles.filter(role => !managerRoles.includes(role));
+    const scopes = scopesBeyond(existing.scopes, managerScopes);
+    if (roles.length > 0 || scopes.length > 0) {
+        throw new ApiError(403, "KEY_OUTRANKS_CALLER",
+            `This key holds ${[...roles.map(role => `the role ${role}`), ...scopes].join(", ")}, which you do not, ` +
+            "so you cannot change or revoke it.",
+            { roles, scopes });
     }
 }
 

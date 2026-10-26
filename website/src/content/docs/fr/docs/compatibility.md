@@ -1,5 +1,5 @@
 ---
-sourceHash: 36e5e343075cc0f8
+sourceHash: a8656ede47530810
 slug: fr/docs/compatibility
 title: Compatibilité
 description: Ce que Rebase garantit d'une version à l'autre et ce qu'il ne garantit pas — les six contrats versionnés, la manière dont chacun échoue et ce qui peut encore changer dans une version mineure.
@@ -75,7 +75,7 @@ Les trois évaluations signifient :
 | Synchronisation hors ligne | Bêta | Les mutations portent des clés d'idempotence respectées par le serveur, et les défauts de perte de données identifiés lors de l'audit de juillet sont corrigés. Le modèle de conflit applique le principe de « dernière écriture gagnante » sans fusion par champ |
 | Historique des entités | Stable | Basé sur des instantanés (snapshots), validé par sa propre suite de tests |
 | Fonctions et tâches cron | Stable | Le point d'entrée portable (`@rebasepro/server/functions`) est un contrat versionné avec sa propre section de surface d'API |
-| Serveur MCP + compétences agent (agent skills) | Bêta | `@rebasepro/mcp` s'exécute sur stdio : quarante-deux outils, authentification bearer par projet, les outils destructifs refusent les cibles non locales sauf consentement explicite. Depuis la 0.21, le serveur peut également monter un endpoint distant `/mcp` — OAuth 2.1, six outils de données, chaque appel sous le RLS de la personne connectée — désactivé sauf si `REBASE_MCP_ENABLED=true`, et Postgres uniquement |
+| Serveur MCP + compétences agent (agent skills) | Bêta | `@rebasepro/mcp` s'exécute sur stdio : cinquante et un outils, authentification bearer par projet, les outils destructifs refusent les cibles non locales sauf consentement explicite. Depuis la 0.21, le serveur peut également monter un endpoint distant `/mcp` — OAuth 2.1, huit outils de données, chaque appel sous le RLS de la personne connectée — désactivé sauf si `REBASE_MCP_ENABLED=true`, et Postgres uniquement |
 | Studio (SQL, schéma, RLS, explorateur d'API) | Bêta | Utilisé quotidiennement sur des projets réels. Le système de branches est présent dans le paquet open-source et délibérément non exposé dans Rebase Cloud, car le basculement d'un déploiement actif sur une branche n'est pas encore pris en charge |
 | CMS + panneau d'administration | Bêta | Complet pour le CRUD, les relations, les champs de stockage et les rôles. **Le tableau de données n'a pas de sémantique de grille** — pas de `role`, pas d'`aria-rowindex`, `tabIndex` supprimé — si bien que les utilisateurs du clavier et des lecteurs d'écran ne peuvent pas utiliser la vue principale. Pas de brouillons, pas de contenu par langue, pas de texte enrichi par blocs |
 | Base de données de dev gérée PGlite | Bêta | `rebase dev` sans configuration et sans Docker. Une seule session à la fois, les requêtes sont donc sérialisées et la concurrence ne peut pas être reproduite dessus ; les commandes basées sur Atlas (`db push`, `generate`, `migrate`) planifient contre un second PGlite jetable, démarré pour la commande (en 0.24, elles refusent la base gérée) ; `db branch` ne fonctionne pas dans cet environnement et le signale |
@@ -373,7 +373,8 @@ Exprimé clairement, afin que personne n'en déduise une promesse qui n'a jamais
   expliquant que sa liste d'exports est restreinte précisément pour qu'un export
   interne ne puisse pas devenir public par accident.
 - Le schéma de base de données de *vos* collections. Il vous appartient ; Rebase
-  ne possède que les schémas `rebase` et `auth`.
+  ne possède que le schéma `rebase` (et, sur une base de données provisionnée avant la 0.13,
+  l'ancien schéma `auth` jusqu'à ce que le démarrage le retire).
 
 ## Les barrières de validation qui garantissent ces règles
 
@@ -390,7 +391,7 @@ test qui échoue en cas de rupture :
 | `pnpm check:derived-names` | chaque nom de colonne, contrainte, jonction, enum et politique que le framework dérive — et le fait que le démarrage et `db push` les dérivent de manière identique |
 | `pnpm rls:check` | les politiques du schéma généré |
 | `pnpm check:api-surface` | chaque export, et ses membres, des cinq paquets fournis par l'image — `@rebasepro/server`, `types`, `client`, `common`, `utils` — ainsi que le point d'entrée `@rebasepro/server/functions`, par rapport aux six sections de `contracts/server.api.txt`. Ce sont les paquets que `infra/docker/entrypoint.mjs` lie par lien symbolique par-dessus les propres copies d'un bundle déployé ; supprimer un export de l'un d'eux n'est donc pas une erreur de compilation pour quiconque — c'est un échec au démarrage sur tout le parc, lors d'un déploiement que personne n'a sollicité |
-| `pnpm test:gates` | les propres tests des barrières de validation, appliqués à des fixtures — onze fichiers, dont `check:api-surface` et la vérification de montée de version ci-dessous — afin qu'une barrière qui cesserait de surveiller ce qu'elle protège échoue ici. `check:api-surface` a passé toute son existence sans pouvoir détecter la disparition d'un membre de `const rebase` |
+| `pnpm test:gates` | les propres tests des barrières de validation, appliqués à des fixtures — quarante-sept fichiers, dont `check:api-surface` et la vérification de montée de version ci-dessous — afin qu'une barrière qui cesserait de surveiller ce qu'elle protège échoue ici. `check:api-surface` a passé toute son existence sans pouvoir détecter la disparition d'un membre de `const rebase` |
 | `node tooling/scripts/check-release-bump.mjs` | le fait que le type d'incrément de version sous lequel une release est publiée corresponde à ce qu'elle a modifié dans les références ci-dessus — exécuté par `publish.yml` avant que le changelog ne soit validé |
 | CI saas | le plan de contrôle compilé par rapport à la branche `main` de ce dépôt, sur ses propres pushes et chaque nuit |
 

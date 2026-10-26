@@ -1,5 +1,5 @@
 ---
-sourceHash: 2d930362e74e2a12
+sourceHash: 8f3cdbfa7f75e54b
 title: Colecciones
 sidebar_label: Colecciones
 description: Las colecciones son el bloque de construcción fundamental de Rebase — cada colección se asigna a una tabla de base de datos y define su esquema, relaciones, seguridad y comportamiento en la interfaz de usuario.
@@ -50,14 +50,15 @@ const products = defineCollection({
     }
 ```
 
-Los campos verificados son `display`, `sort`, `propertiesOrder` y `listProperties`.
-Se aceptan tres formatos además de una clave de propiedad simple:
+Los campos verificados son `display`, `sort`, `propertiesOrder`, `listProperties`,
+`previewProperties`, `orderProperty` y los filtros `defaultFilter`, `fixedFilter`
+y `filterPresets`. Se aceptan tres formatos además de una clave de propiedad simple:
 
 | Formato | Ejemplo | Notas |
 | --- | --- | --- |
-| Ruta con puntos dentro de un `map` | `"profile.displayName"` | La **raíz** debe ser una propiedad real; la ruta anidada debajo de ella no se comprueba. |
+| Ruta con puntos dentro de un `map` | `"profile.displayName"` | La **raíz** debe ser una propiedad real; la ruta anidada debajo de ella no se comprueba. No en `previewProperties` / `orderProperty`, que toman una clave de primer nivel. |
 | Columna de colección secundaria | `"subcollection:orders"` | Solo para `propertiesOrder` / `listProperties`. |
-| Una clave de `additionalFields` | `"score" as AdditionalFieldKey` | Requiere el casteo (cast) — ver más abajo. |
+| Una clave de `additionalFields` | `"score" as AdditionalFieldKey` | Solo para `propertiesOrder` / `listProperties`. Requiere el casteo (cast) — ver más abajo. |
 
 `AdditionalFieldDelegate.key` es un `string` simple, por lo que el sistema de tipos no tiene forma de saber
 qué claves adicionales declara una colección. En lugar de reabrir estos campos a cualquier cadena de texto,
@@ -172,7 +173,7 @@ pasa a ser el tipo de autoría.
 :::note[Por qué un proyecto BaaS no paga ningún coste]
 Un tipo de propiedad en una instalación BaaS no contiene `Field`, `columnWidth` ni
 `hideFromCollection` —estos residen en `AdminPropertyOptions` dentro del paquete admin. Esta
-garantía se afirma en pruebas, no solo conceptualmente: `e2e/baas-typecheck/src/admin_absent.ts` utiliza
+garantía se afirma en pruebas, no solo conceptualmente: `tests/e2e/baas-typecheck/src/admin_absent.ts` utiliza
 `@ts-expect-error` sobre `admin`, de modo que la compilación falla si el campo vuelve a ser modificable en
 el núcleo (core).
 :::
@@ -182,7 +183,7 @@ el núcleo (core).
 Antes de la versión 0.11, estos campos se encontraban en el nivel superior. Para moverlos:
 
 ```bash
-node scripts/codemod/collections-admin-block.mjs config/collections
+node tooling/scripts/codemod/collections-admin-block.mjs config/collections
 ```
 
 La herramienta reportará cualquier elemento que no pueda mover de forma segura —especialmente aspectos de presentación dentro de
@@ -333,7 +334,7 @@ Y dentro de `admin`, ya que únicamente el panel las dibuja:
 | Propiedad | Tipo | Descripción |
 |----------|------|-------------|
 | `admin.entityActions` | `EntityAction[]` | Acciones personalizadas sobre entidades (archivar, publicar, etc.) |
-| `admin.Actions` | `React.ComponentType` | Componente personalizado para acciones en la barra de herramientas |
+| `admin.Actions` | `ComponentRef<CollectionActionsProps>[]` | Componentes personalizados para acciones en la barra de herramientas |
 | `admin.entityViews` | `EntityCustomView[]` | Pestañas personalizadas en la vista de detalle de la entidad |
 | `admin.additionalFields` | `AdditionalFieldDelegate[]` | Columnas computadas/virtuales |
 | `admin.exportable` | `boolean \| ExportConfig` | Habilita la exportación de datos |
@@ -416,14 +417,14 @@ de clave desconocida.
 
 ### Selección de la Propiedad de Título
 Cuando `display.title` no está definido, la propiedad que se utiliza como título visible de la entidad (vistas previas, encabezados) se resuelve automáticamente:
-1. Si `propertiesOrder` está definido explícitamente, se selecciona como título la primera propiedad que no sea un ID y que sea de tipo `relation` o `string`.
-2. Si no se define `propertiesOrder`, el framework busca en las propiedades en orden y toma la primera propiedad de tipo string.
+1. Si `propertiesOrder` está definido explícitamente, se selecciona como título la primera propiedad de ese orden que pueda serlo: un `string`, una `relation` de cardinalidad única o una `reference`. Los identificadores (claves primarias y foráneas, columnas `uuid`, `isId`), los campos de subida de archivos y las propiedades ocultas nunca cumplen.
+2. Si no se define `propertiesOrder`, se ordenan los mismos candidatos: primero un string cuya clave nombra una etiqueta (`name`, `title`, `label`, …), luego un texto corto simple, un correo electrónico, un enum, un texto largo, una relación o selector de usuario, y una referencia en último lugar. Los empates se resuelven por orden de declaración.
 
 ### Vistas previas de Relaciones en Tablas
 Cuando `propertiesOrder` se define explícitamente, las propiedades de relación **no** se filtran automáticamente de las columnas de vista previa por defecto (a diferencia de lo que ocurre en los valores por defecto sin ordenar, donde se excluyen para evitar operaciones de join lentas).
 
 ### Cómo se renderiza el valor de un título
-Independientemente de lo que contenga la propiedad de título, el panel renderiza una cadena de texto. Una fecha se formatea, un array se une mediante comas, y una relación —que llega como `{ id, data: { values } }` en lugar de como texto simple— se inspecciona buscando el primer valor existente entre `name`, `title`, `label` o `displayName` en la fila relacionada, recurriendo a su ID como alternativa. Por lo tanto, un título puede hacer referencia a una propiedad de tipo `relation` y seguir mostrándose como un nombre en lugar de un UUID.
+Independientemente de lo que contenga la propiedad de título, el panel renderiza una cadena de texto. Una fecha se formatea, un array se une mediante comas, y una relación —que llega como `{ id, data: { values } }` en lugar de como texto simple— se inspecciona buscando el primer valor existente entre `name`, `title`, `label` o `displayName` en la fila relacionada, luego su primer valor de cadena corto, recurriendo a su ID como alternativa. Por lo tanto, un título puede hacer referencia a una propiedad de tipo `relation` y seguir mostrándose como un nombre en lugar de un UUID.
 
 Esto no es un helper exportado: es el comportamiento predeterminado que ya ejecuta cualquier superficie que dibuje un registro. No requiere invocar ni importar nada.
 
@@ -447,7 +448,7 @@ const collectionsBuilder: CollectionConfigsBuilder = ({ user, authController }) 
 
 ## Filtrado y Ordenación
 
-Puedes definir filtros por defecto o forzados. Ambos corresponden a la presentación —con qué estado
+Puedes definir filtros por defecto o forzados. Los tres corresponden a la presentación —con qué estado
 se abre el panel—, por lo que residen en `admin`:
 
 ```typescript

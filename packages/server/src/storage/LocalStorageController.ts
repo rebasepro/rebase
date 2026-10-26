@@ -88,6 +88,34 @@ function customMetadataOfSidecar(sidecar: unknown): Record<string, unknown> {
 /** What the metadata kept beside an object is named: `<key>.metadata.json`. */
 const METADATA_SUFFIX = ".metadata.json";
 
+/** A listing page token: `n.` and the last entry name a page read, base64url. */
+const LISTING_TOKEN_PREFIX = "n.";
+
+function encodeListingToken(name: string): string {
+    return LISTING_TOKEN_PREFIX + Buffer.from(name, "utf-8").toString("base64url");
+}
+
+/** The entry name a token this listing issued names, or `undefined` for any other string. */
+function decodeListingToken(token: string): string | undefined {
+    if (!token.startsWith(LISTING_TOKEN_PREFIX)) return undefined;
+    const encoded = token.slice(LISTING_TOKEN_PREFIX.length);
+    if (!/^[A-Za-z0-9_-]+$/.test(encoded)) return undefined;
+    const name = Buffer.from(encoded, "base64url").toString("utf-8");
+    return name && encodeListingToken(name) === token ? name : undefined;
+}
+
+/** The index of the first of `entries` (in name order) named after `name`. */
+function firstEntryAfter(entries: readonly fs.Dirent[], name: string): number {
+    let low = 0;
+    let high = entries.length;
+    while (low < high) {
+        const mid = (low + high) >>> 1;
+        if (entries[mid].name <= name) low = mid + 1;
+        else high = mid;
+    }
+    return low;
+}
+
 /**
  * Refuse a key that names one of local storage's own files rather than an
  * object: the metadata beside an object, or a write in progress.
@@ -253,6 +281,20 @@ export class LocalStorageController implements StorageController {
             // still the bucket a read would use.
             return [DEFAULT_BUCKET];
         }
+    }
+
+    /**
+     * See {@link StorageController.storageLocation}: the default bucket's
+     * directory, with the storage root's links resolved.
+     */
+    storageLocation(): string {
+        let root = this.basePath;
+        try {
+            root = fs.realpathSync(this.basePath);
+        } catch {
+            // No storage root yet: nothing to resolve.
+        }
+        return `local:${path.join(root, DEFAULT_BUCKET)}`;
     }
 
     /**
@@ -605,17 +647,17 @@ export class LocalStorageController implements StorageController {
     }): Promise<StorageListResult> {
         // Checked before the directory is read, so a bad page is refused the
         // same way whether or not there is anything to list. The token is this
-        // controller's own — the decimal index it hands back as
-        // `nextPageToken` — so anything else was not issued by it.
+        // controller's own — the name of the last entry a page read, which it
+        // hands back as `nextPageToken` — so anything else was not issued by it.
         const maxResults = options?.maxResults ?? 1000;
         if (!Number.isInteger(maxResults) || maxResults < 1) {
             throw new InvalidListOptionsError(`maxResults must be a whole number of at least 1, got ${maxResults}.`);
         }
         const pageToken = options?.pageToken;
-        if (pageToken && !/^\d+$/.test(pageToken)) {
+        const after = pageToken ? decodeListingToken(pageToken) : undefined;
+        if (pageToken && after === undefined) {
             throw new InvalidListOptionsError(`"${pageToken}" is not a page token this listing issued.`);
         }
-        const startIndex = pageToken ? parseInt(pageToken, 10) : 0;
 
         // Normalize path to handle leading/trailing slashes
         const normalizedPath = normalizeStoragePath(prefix);
@@ -624,7 +666,12 @@ export class LocalStorageController implements StorageController {
         const prefixes: StorageReference[] = [];
 
         try {
-            const entries = await this.listingEntries(fullPath, startIndex > 0);
+            const entries = await this.listingEntries(fullPath, after !== undefined);
+            // Where the page starts: the first entry after the last one read.
+            // A name, not an index — a page that deletes what it read (a
+            // `storage move --delete-source`) shrinks the folder, and an index
+            // into it then skipped as many entries as were deleted.
+            const startIndex = after === undefined ? 0 : firstEntryAfter(entries, after);
 
             let count = 0;
             // Cursor over `entries`, not over emitted results. Every stored
@@ -674,7 +721,9 @@ export class LocalStorageController implements StorageController {
             // same `stat` and sidecar read, behind an HTTP round trip each.
             await describeListed(items, ref => path.join(fullPath, ref.name));
 
-            const nextPageToken = scanned < entries.length ? String(scanned) : undefined;
+            const nextPageToken = scanned < entries.length && scanned > 0
+                ? encodeListingToken(entries[scanned - 1].name)
+                : undefined;
             // The last page of a walk frees the folder's read.
             if (!nextPageToken) this.listingSnapshots.delete(fullPath);
 
@@ -696,11 +745,11 @@ prefixes: [] };
     /**
      * A folder's entries for a listing page.
      *
-     * A page token is an index into these entries, and every continuation
-     * page used to read the whole folder again to find its place: a folder of
+     * A page token names the last of these entries a page read, and every
+     * continuation page used to read the whole folder again to find its place: a folder of
      * n entries listed in pages of p cost n/p full reads. A first page reads
      * the folder and, when there is a next page, keeps the read; a
-     * continuation page indexes into it while all of these hold:
+     * continuation page finds its place in it while all of these hold:
      *
      *  - the folder's mtime is the one read with it. Adding, removing or
      *    renaming an entry changes it, which is the invalidation;
@@ -722,7 +771,9 @@ prefixes: [] };
         }
         this.listingSnapshots.delete(fullPath);
 
-        const entries = await fs.promises.readdir(fullPath, { withFileTypes: true });
+        // In name order, which a page token's place is found by.
+        const entries = (await fs.promises.readdir(fullPath, { withFileTypes: true }))
+            .sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0));
         if (readAt - mtimeMs > LISTING_SNAPSHOT_RACY_MS && entries.length <= LISTING_SNAPSHOT_MAX_ENTRIES) {
             this.listingSnapshots.set(fullPath, { entries, mtimeMs, readAt });
             let total = 0;

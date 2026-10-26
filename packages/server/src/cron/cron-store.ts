@@ -3,7 +3,7 @@ import type { DataDriver } from "@rebasepro/types";
 import { isSQLAdmin } from "@rebasepro/types";
 import { REBASE_USER_ROLE, revokeInternalTableSql } from "@rebasepro/common";
 import { logger } from "../utils/logger.js";
-import { createDdlBootstrapper, hasInCauseChain } from "../boot/ddl-bootstrap.js";
+import { createDdlBootstrapper, hasInCauseChain, provisioningExec } from "../boot/ddl-bootstrap.js";
 
 /**
  * Persistence layer for cron: the run history (`rebase.cron_logs`), the slot
@@ -308,15 +308,28 @@ function ensureSharedInFlight(driver: DataDriver, setUp: () => Promise<boolean>)
     return attempt;
 }
 
-export function createCronStore(driver: DataDriver): Required<CronStore> | undefined {
+export function createCronStore(
+    driver: DataDriver,
+    options: {
+        /**
+         * Default `true`. `false` is a backend that changes nothing in its
+         * database: `ensureTable` reads what is there, creates and revokes
+         * nothing, and says which capability a missing table costs.
+         */
+        provision?: boolean;
+    } = {}
+): Required<CronStore> | undefined {
     const admin = driver.admin;
     if (!isSQLAdmin(admin)) {
         logger.warn("⚠️ [cron-store] DataDriver does not support SQL admin — cron logs will not be persisted.");
         return undefined;
     }
 
-    const exec = (sqlText: string, options?: { params?: unknown[] }) =>
-        admin.executeSql(sqlText, options?.params ? { params: options.params } : undefined);
+    const exec = provisioningExec(
+        (sqlText, execOptions) =>
+            admin.executeSql(sqlText, execOptions?.params ? { params: execOptions.params } : undefined),
+        options.provision
+    );
 
     const ddl = createDdlBootstrapper(exec, "cron-store");
 
@@ -583,20 +596,26 @@ export function createCronStore(driver: DataDriver): Required<CronStore> | undef
         // Say which capability is gone, and what it costs. "Continuing
         // without cron log persistence" undersold this: the claims table is
         // the only thing stopping every instance from running every job.
+        // On a backend that may not create it, also say where it comes from.
+        const provisioningOff = options.provision === false
+            ? " This backend changes nothing in its database; a provisioning run creates it."
+            : "";
         if (!claimsReady) {
             logger.error(
                 `❌ [cron-store] ${CLAIMS_TABLE} is unavailable — scheduled runs cannot be coordinated. ` +
-                "With more than one app instance, every instance will now run every job on every tick."
+                "With more than one app instance, every instance will now run every job on every tick." +
+                provisioningOff
             );
         }
         if (!logsReady) {
-            logger.warn(`⚠️ [cron-store] ${TABLE} is unavailable — cron run history will not be persisted.`);
+            logger.warn(`⚠️ [cron-store] ${TABLE} is unavailable — cron run history will not be persisted.${provisioningOff}`);
         }
         if (!stateReady) {
             logger.warn(
                 `⚠️ [cron-store] ${STATE_TABLE} is unavailable — pausing a job reaches only the process ` +
                 "that served the request, and jobs run as their code declares on every other one. " +
-                "A manual trigger is not kept off a run another process is making."
+                "A manual trigger is not kept off a run another process is making." +
+                provisioningOff
             );
         }
         return false;

@@ -138,10 +138,14 @@ export function RlsSimulatorBarPanel({ className, compact, side, align = "end", 
     const [userSearch, setUserSearch] = useState("");
     const [users, setUsers] = useState<Array<{ uid: string; label: string; detail?: string }>>([]);
     const [usersLoading, setUsersLoading] = useState(false);
+    // A failed search is not a search that found no one.
+    const [usersError, setUsersError] = useState<string | null>(null);
 
     useEffect(() => {
         if (!open || options) return;
         let cancelled = false;
+        // An error from an earlier open is about that request, not this one.
+        setOptionsError(null);
         request<SimulatorOptions>("/options")
             .then((loaded) => {
                 if (!cancelled) setOptions(loaded);
@@ -163,14 +167,17 @@ export function RlsSimulatorBarPanel({ className, compact, side, align = "end", 
             adminApi.listUsersPaginated({ search: userSearch || undefined, limit: USER_PAGE_SIZE })
                 .then(({ users: found }) => {
                     if (cancelled) return;
+                    setUsersError(null);
                     setUsers(found.filter(user => !user.disabled).map(user => ({
                         uid: user.uid,
                         label: user.email ?? user.displayName ?? user.uid,
                         detail: user.roles?.length ? user.roles.join(", ") : undefined
                     })));
                 })
-                .catch(() => {
-                    if (!cancelled) setUsers([]);
+                .catch((error: unknown) => {
+                    if (cancelled) return;
+                    setUsers([]);
+                    setUsersError(error instanceof Error ? error.message : String(error));
                 })
                 .finally(() => {
                     if (!cancelled) setUsersLoading(false);
@@ -279,7 +286,12 @@ export function RlsSimulatorBarPanel({ className, compact, side, align = "end", 
                             {usersLoading && users.length === 0 && (
                                 <div className="flex justify-center p-2"><CircularProgress size="small"/></div>
                             )}
-                            {!usersLoading && users.length === 0 && (
+                            {!usersLoading && usersError && (
+                                <Alert color="error" size="small" role={null}>
+                                    {t("rls_simulate_users_error", { message: usersError })}
+                                </Alert>
+                            )}
+                            {!usersLoading && !usersError && users.length === 0 && (
                                 <Typography variant="caption" color="secondary" className="p-2">{t("rls_simulate_no_users")}</Typography>
                             )}
                             {users.map(user => (
@@ -340,9 +352,13 @@ export function RlsSimulationBannerPanel({ className }: { className?: string }) 
     const { simulation, label, setSimulation } = useRlsSimulation();
     const request = useSimulatorRequest();
     const [summary, setSummary] = useState<SimulationSummary | null>(null);
+    // Why the count failed: without it the banner said "Counting…" for as long
+    // as the simulation ran.
+    const [summaryError, setSummaryError] = useState<string | null>(null);
 
     useEffect(() => {
         setSummary(null);
+        setSummaryError(null);
         if (!simulation) return;
         let cancelled = false;
         request<{ summary: SimulationSummary }>("/preview", { method: "POST", body: simulation })
@@ -351,6 +367,7 @@ export function RlsSimulationBannerPanel({ className }: { className?: string }) 
             })
             .catch((error: unknown) => {
                 console.warn("Could not preview the simulated access", error);
+                if (!cancelled) setSummaryError(error instanceof Error ? error.message : String(error));
             });
         return () => {
             cancelled = true;
@@ -378,7 +395,9 @@ export function RlsSimulationBannerPanel({ className }: { className?: string }) 
                 ? t("rls_simulation_masked_columns_one")
                 : t("rls_simulation_masked_columns", { count: String(summary.maskedColumns) })
         ].join(", ")
-        : t("rls_simulation_counting");
+        : summaryError !== null
+            ? t("rls_simulation_count_failed", { message: summaryError })
+            : t("rls_simulation_counting");
 
     return (
         <div role="status" aria-live="polite" className={className}>

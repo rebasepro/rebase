@@ -209,7 +209,9 @@ export type {
 export { resolveApiKey, getAccessModel } from "./auth";
 // The realtime socket runs a session as another user by the same decision the
 // data API takes for `x-rebase-impersonate`.
-export { decideImpersonation } from "./auth/impersonation";
+export { decideImpersonation, refuseUnhonouredImpersonation } from "./auth/impersonation";
+// For a server that composes its own routes: the guard every group carries.
+export { reportSimulatedContext } from "./auth/simulation";
 export type { ImpersonationCredential, ImpersonationDecision, ImpersonationRequest, ImpersonationUserResolver } from "./auth/impersonation";
 // For an app's own socket or tunnel: a session token or an API key, as one
 // identity with scopes.

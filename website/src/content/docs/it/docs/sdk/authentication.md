@@ -1,5 +1,5 @@
 ---
-sourceHash: 65085708df65a92e
+sourceHash: aba79f55ccca539b
 title: Autenticazione
 sidebar_label: Autenticazione
 description: Autenticazione lato client con l'SDK di Rebase — accesso con email/password, provider OAuth, gestione delle sessioni e listener dello stato di autenticazione.
@@ -133,7 +133,7 @@ const { user } = await client.auth.verifyMagicLink(token);
 
 `sendMagicLink` risponde allo stesso modo indipendentemente dal fatto che l'indirizzo abbia o meno un account. Questo è intenzionale: un endpoint che rispondesse "nessun utente trovato" costituirebbe un oracolo per l'enumerazione degli account, quindi non usare il risultato per comunicare a una persona se è registrata o meno — non è possibile saperlo.
 
-Entrambi richiedono un servizio email configurato sul backend, altrimenti restituiscono 503 `EMAIL_NOT_CONFIGURED`.
+Per inviarne uno serve un servizio email configurato sul backend, altrimenti `sendMagicLink` risponde 503 `EMAIL_NOT_CONFIGURED`.
 
 ## Codici monouso
 
@@ -337,8 +337,8 @@ unsubscribe();
 |--------|--------|
 | `SIGNED_IN` | Un accesso o una registrazione sono stati completati |
 | `TOKEN_REFRESHED` | L'access token è stato rinnovato — compreso il rinnovo silenzioso che ripristina una sessione al caricamento della pagina |
-| `USER_UPDATED` | `updateUser()` ha modificato il profilo, oppure `confirmEmailChange()` ha spostato questo account sul suo nuovo indirizzo |
-| `SIGNED_OUT` | Una disconnessione, o un aggiornamento del token fallito definitivamente |
+| `USER_UPDATED` | `updateUser()` ha modificato il profilo, `linkAnonymous()` ha trasformato un ospite in un account, `changeEmail()` ha avviato un cambio di indirizzo, oppure `confirmEmailChange()` ha spostato questo account sul suo nuovo indirizzo |
+| `SIGNED_OUT` | Una disconnessione, `revokeAllSessions()`, o un aggiornamento del token fallito definitivamente |
 
 ## Gestione delle password
 

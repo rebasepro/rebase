@@ -41,6 +41,11 @@ export const callbacks: CollectionCallbacks = {
         // `context.client.dataAsAdmin` is the same `Database`.
         await context.client.dataAsAdmin?.posts.find({ include: ["author"] });
 
+        // Raw SQL from a hook takes bind parameters, as `rebase.sql` does —
+        // the only typed spelling used to forbid them, which left string
+        // interpolation of row values as the way to write the query.
+        await context.client.sql?.("select 1 from authors where id = $1", { params: [values.id] });
+
         // A literal slug is typed through `collection()` as through its
         // accessor: the `my-notes` collection's rows, and its columns only.
         const note = await context.data.collection("my-notes").findById("n1");

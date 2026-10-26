@@ -385,7 +385,7 @@ export function BranchesView() {
                 if (!open) setCreateError(null);
             }}>
                 <DialogTitle>{t("studio_branches_create_title")}</DialogTitle>
-                <DialogContent className="space-y-4 min-w-[400px]">
+                <DialogContent className="space-y-4 sm:min-w-[400px]">
                     <Typography variant="body2" color="secondary" className="text-[13px]">
                         {t("studio_branches_create_body")}
                     </Typography>

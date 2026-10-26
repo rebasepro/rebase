@@ -41,9 +41,54 @@ describe("the presence roster table", () => {
 
     it("is created again without complaint by a second instance", async () => {
         const second = new ChannelPresenceStore(drizzle(pglite) as unknown as NodePgDatabase<Record<string, unknown>>, "inst_b");
-        await expect(second.ensureTables()).resolves.toBeUndefined();
+        await expect(second.ensureTables()).resolves.toBe(true);
         await store.track("doc:1", "c1", { name: "Ada" });
         await store.removeClient("c1");
         expect(await store.roster("doc:1")).toEqual({});
+    });
+});
+
+describe("the presence roster table, on a backend that changes nothing in its database", () => {
+    let pglite: PGlite;
+
+    beforeEach(async () => {
+        pglite = new PGlite();
+        await pglite.waitReady;
+    }, 60_000);
+
+    afterEach(async () => {
+        await pglite.close();
+    });
+
+    const storeOn = (db: PGlite, sent: string[]) => {
+        const handle = drizzle(db);
+        const execute = handle.execute.bind(handle);
+        // Every statement the store sends, for the assertion below.
+        handle.execute = ((query: Parameters<typeof execute>[0]) => {
+            const chunks = (query as unknown as { queryChunks?: Array<{ value?: string[] }> }).queryChunks ?? [];
+            sent.push(chunks.flatMap(chunk => chunk.value ?? []).join(""));
+            return execute(query);
+        }) as typeof handle.execute;
+        return new ChannelPresenceStore(handle as unknown as NodePgDatabase<Record<string, unknown>>, "inst_a");
+    };
+
+    it("uses a roster table a provisioning run made, and creates and revokes nothing", async () => {
+        await new ChannelPresenceStore(drizzle(pglite) as unknown as NodePgDatabase<Record<string, unknown>>, "setup").ensureTables();
+        const sent: string[] = [];
+
+        await expect(storeOn(pglite, sent).ensureTables({ provision: false })).resolves.toBe(true);
+
+        // The capture sees the probe, so an empty list below means something.
+        expect(sent.some(statement => statement.includes("rebase.channel_presence"))).toBe(true);
+        expect(sent.filter(statement => /^\s*(CREATE|ALTER|DO|REVOKE|GRANT)\b/i.test(statement))).toEqual([]);
+    });
+
+    it("reports a missing one as not ready rather than making it", async () => {
+        const sent: string[] = [];
+
+        await expect(storeOn(pglite, sent).ensureTables({ provision: false })).resolves.toBe(false);
+
+        const { rows } = await pglite.query<{ present: boolean }>("SELECT to_regclass('rebase.channel_presence') IS NOT NULL AS present");
+        expect(rows[0].present).toBe(false);
     });
 });

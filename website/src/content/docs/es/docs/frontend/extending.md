@@ -1,5 +1,5 @@
 ---
-sourceHash: a874bc209f13c746
+sourceHash: 2888be015d5ef43f
 title: Extender Rebase
 sidebar_label: Extender Rebase
 description: Una guía de decisión para elegir el mecanismo de extensión adecuado — plugins, slots, reemplazos de componentes, vistas de entidad, acciones y más.
@@ -28,7 +28,7 @@ para el backend.
 | Reemplazar la página de inicio de sesión | `components` (`Auth.LoginView`) | app | [Reemplazos de Componentes](/docs/frontend/component-overrides) |
 | Reemplazar la página de inicio | `components` (`HomePage`) | app | [Reemplazos de Componentes](/docs/frontend/component-overrides) |
 | Cambiar por completo la apariencia del formulario de una colección | `formView` | collection | [más abajo](#formview) |
-| Cambiar un componente dentro de una colección | `collection.components` | collection | [Reemplazos de Componentes](/docs/frontend/component-overrides) |
+| Cambiar un componente dentro de una colección | `admin.components` | collection | [Reemplazos de Componentes](/docs/frontend/component-overrides) |
 | Establecer reemplazos de componentes predeterminados para todas las colecciones | `components` (nombres con alcance de colección) | app | [Reemplazos de Componentes](/docs/frontend/component-overrides) |
 | Añadir un botón a la barra de herramientas de la colección | `Actions` de colección | collection | [Acciones de Entidad](/docs/frontend/entity-actions#collection-actions) |
 | Inyectar UI en un slot de la barra de herramientas de la colección | slot `collection.actions` | app/plugin | [Slots](/docs/frontend/slots) |
@@ -56,7 +56,7 @@ definido a fuego (hardcoded) es invisible en uno de los dos temas. Consulta
 
 **Alcance:** app.
 
-Un plugin agrupa colecciones, vistas, reemplazos de componentes, contribuciones a slots, autenticación, fuentes de datos, proveedores, hooks y callbacks del ciclo de vida en una sola unidad instalable. Todos los demás mecanismos enumerados aquí pueden aportarse a través de la interfaz de un plugin.
+Un plugin agrupa colecciones inyectadas o modificadas, vistas, contribuciones a slots, wrappers de campos, proveedores, hooks y callbacks del ciclo de vida en una sola unidad instalable. Los reemplazos de componentes, las vistas de entidad, las acciones de entidad y `propertyConfigs` no son campos de un plugin: van en `<Rebase>` o en la colección.
 
 → [Referencia de Plugins](/docs/plugins)
 
@@ -99,7 +99,7 @@ Dos modos: **Eject** (reemplazo completo) o **Wrap** (ampliar el original).
 - `EntityPreview`
 - `Entity.MissingReference`
 
-**Precedencia:** Los `components` a nivel de colección reemplazan los valores predeterminados a nivel de aplicación para el mismo nombre de componente (propagación de objetos simple — los valores de la colección sobrescriben los valores globales). Los nombres de componentes exclusivos para App (`Shell.*`, `HomePage`, `Auth.*`) solo se pueden reemplazar a nivel de `<Rebase>`.
+**Precedencia:** Los `components` a nivel de colección se aplican sobre los valores predeterminados a nivel de aplicación para el mismo nombre de componente: un reemplazo de la colección sustituye a ambos, y un reemplazo de la colección con `wrap: true` envuelve al de nivel de aplicación. Los nombres de componentes exclusivos para App (`Shell.*`, `HomePage`, `Auth.*`) solo se pueden reemplazar a nivel de `<Rebase>`.
 
 → [Reemplazos de Componentes](/docs/frontend/component-overrides)
 
@@ -107,7 +107,7 @@ Dos modos: **Eject** (reemplazo completo) o **Wrap** (ampliar el original).
 
 **Alcance:** entity (añade pestañas).
 
-Vistas personalizadas que aparecen como pestañas en la página de detalle de la entidad. Se pueden definir globalmente en `<Rebase>` o por colección.
+Vistas personalizadas que aparecen como pestañas en la página de detalle de la entidad. Se definen por colección, o se registran una vez en `<Rebase entityViews>` (o `<RebaseCMS entityViews>`) y se nombran por su `key` en el `admin.entityViews` de una colección.
 
 → [Vistas de Entidad](/docs/frontend/entity-views)
 
@@ -115,7 +115,7 @@ Vistas personalizadas que aparecen como pestañas en la página de detalle de la
 
 **Alcance:** entity.
 
-Botones de acción personalizados en entidades individuales (publicar, archivar, clonar, etc.). Se pueden definir globalmente o por colección.
+Botones de acción personalizados en entidades individuales (publicar, archivar, clonar, etc.). Se definen por colección, o se registran una vez en `<Rebase entityActions>` (o `<RebaseCMS entityActions>`) y se nombran por su `key` en el `admin.entityActions` de una colección.
 
 → [Acciones de Entidad](/docs/frontend/entity-actions)
 
@@ -202,7 +202,7 @@ const collection = {
 
 ```
 
-Úsalo cuando necesites un diseño completamente personalizado para la experiencia de edición de entidades de una colección. Para ajustes más pequeños, es preferible usar `collection.components` con el reemplazo de `Entity.Form`.
+Úsalo cuando necesites un diseño completamente personalizado para la experiencia de edición de entidades de una colección. Para ajustes más pequeños, es preferible usar `admin.components` con el reemplazo de `Entity.Form`.
 
 El Builder se renderiza dentro del formulario del registro y recibe su `formContext` en vivo: escribe con `formContext.setFieldValue`, y el botón Guardar de la barra almacenará el registro. Donde el registro no se pueda editar —la vista de detalle de solo lectura o un usuario sin permisos de edición— `formContext.disabled` es `true` y las escrituras lanzarán un error. Establece `includeActions: false` si tu Builder guarda por su cuenta mediante `formContext.submit()`.
 
@@ -239,7 +239,7 @@ el panel, esta es la página equivocada. El servidor tiene su propia escala:
 
 ## Resumen de Precedencia
 
-- **`collection.components` se aplica sobre los `components` globales** dentro de esa colección. Un reemplazo a nivel de colección sustituye a ambos; un reemplazo con `wrap: true` en la colección envuelve al reemplazo global cuando existe uno (en 0.24 envuelve al componente integrado y se omite el reemplazo global). Consulta [Reemplazos de Componentes](/docs/frontend/component-overrides#when-both-scopes-override-a-component).
+- **Los `admin.components` de una colección se aplican sobre los `components` globales** dentro de esa colección. Un reemplazo a nivel de colección sustituye a ambos; un reemplazo con `wrap: true` en la colección envuelve al reemplazo global cuando existe uno (en 0.24 envuelve al componente integrado y se omite el reemplazo global). Consulta [Reemplazos de Componentes](/docs/frontend/component-overrides#when-both-scopes-override-a-component).
 - **Las `Actions` de colección y el slot `collection.actions` son aditivos** — `Actions` se renderizan primero, seguidas de las contribuciones a los slots.
-- **Las `entityActions` y `entityViews` a nivel de colección extienden (no reemplazan) las globales.**
+- **Las `entityActions` y `entityViews` a nivel de aplicación son un registro, no valores predeterminados:** una colección solo muestra una cuando su propio `admin.entityActions` / `admin.entityViews` nombra su `key`.
 - **Los plugins se aplican en el orden del array `plugins`**, no por `key`. Las contribuciones a slots se renderizan según su `order` (menor valor primero, 50 por defecto), y los empates mantienen ese orden. Los envoltorios de campo (field wrappers) de varios plugins se componen en ese orden, siendo el del primer plugin el más interno; en 0.24 solo se renderizaba el último envoltorio. Consulta [Plugins](/docs/plugins#field-wrappers-from-several-plugins).

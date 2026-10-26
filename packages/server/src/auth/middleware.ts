@@ -515,7 +515,9 @@ code: "INTERNAL_ERROR" } }, 500);
         // deployment without it, which reads as the two behaving differently for
         // the same config. Naming the switch is what makes that one fact instead
         // of two mysteries.
-        if (enforceAuth && !c.get("user")) {
+        // A simulated anonymous caller has no `user` but is let past: see
+        // `auth/simulation.ts`.
+        if (enforceAuth && !c.get("user") && !c.get("simulation")) {
             return refuse(c, ApiError.unauthenticated(
                 "Unauthorized: Authentication required. This is the API-level gate, not a row " +
                 "rule — a collection granting public reads still needs a caller. Set " +

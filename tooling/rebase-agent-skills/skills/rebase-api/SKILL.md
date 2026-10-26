@@ -28,8 +28,8 @@ All data routes are mounted under `/api/data/`. Other route categories:
 | `/api/auth/scopes` | Every scope the backend knows, and the ones the caller holds |
 | `/api/storage/*` | File uploads and downloads |
 | `/api/functions/{name}` | Custom backend functions |
-| `/api/schema-editor/*` | Visual schema editor (dev only) |
-| `/api/docs` | OpenAPI 3.0.3 JSON spec |
+| `/api/admin/schema-editor/*` | Visual schema editor (dev only; `/api/schema-editor/*` is a deprecated alias) |
+| `/api/docs` | OpenAPI 3.0.3 JSON spec (needs `schema:read` when `enableSwagger` is false — the bundle runtime's production default) |
 | `/api/swagger` | Swagger UI (dev only) |
 | `/api/health` | Health check |
 | `/api/meta/contract` | Collection contract, for remote SDK generation (needs `schema:read`) |
@@ -48,6 +48,12 @@ All data routes are mounted under `/api/data/`. Other route categories:
 | `POST` | `/api/data/{slug}` | Create a new entity | `201` |
 | `PATCH` | `/api/data/{slug}/:id` | Update a record — partial, only what you send | `200` |
 | `DELETE` | `/api/data/{slug}/:id` | Delete a record | `204` |
+| `POST` | `/api/data/{slug}/query` | The list, its query parameters in a JSON body (a read) | `200` |
+| `POST` | `/api/data/{slug}/count` | The count, its query parameters in a JSON body (a read) | `200` |
+| `POST` | `/api/data/{slug}/bulk` | Create many in one transaction | `200` |
+| `PATCH` | `/api/data/{slug}/bulk` | Update many in one transaction | `200` |
+| `POST` | `/api/data/{slug}/bulk/delete` | Delete many in one transaction | `200` |
+| `POST` | `/api/data/_batch` | Write across collections in one transaction | `200` |
 
 ### Subcollection Routes
 
@@ -146,12 +152,16 @@ Every field in the collection can be used as a query parameter with an operator 
 | `nin` | `not-in` | Value not in list | `?status=nin.(archived,deleted)` |
 | `cs` | `array-contains` | Array contains value | `?tags=cs.javascript` |
 | `csa` | `array-contains-any` | Array contains any of values | `?tags=csa.(javascript,typescript)` |
+| `like` / `ilike` | `like` / `ilike` | SQL `LIKE` / `ILIKE` | `?name=ilike.%25widget%25` |
+| `nlike` / `nilike` | `not-like` / `not-ilike` | Negated `LIKE` / `ILIKE` | `?name=nilike.test%25` |
+| `isnull` | `is-null` | Is null | `?deletedAt=isnull.null` |
+| `notnull` | `is-not-null` | Is not null | `?deletedAt=notnull.null` |
 
 > **IMPORTANT FOR AGENTS:** `like`, `ilike`, `nlike` and `nilike` are real operators — SQL `LIKE`/`ILIKE` with `%` and `_` wildcards. They are the wrong tool for prose: they cannot use a text index, so a leading `%` scans the table. For searching text, use `searchString`, and read the Text Search section below before telling a user what it will match, because by default it does not see inside JSONB.
 
 **Array values** for `in`, `nin`, and `csa` use parenthesized comma-separated lists: `(val1,val2,val3)`.
 
-**Automatic type coercion:** The values `true`, `false`, `null`, and numeric strings are automatically parsed to their corresponding types.
+**Type coercion:** Querystring values are not parsed on the way in — they reach the driver as strings and are compared against the column's type. `?field=eq.null` is the four-character string `"null"`; test for null with `isnull` / `notnull`. The JSON `?where=` dialect carries real types.
 
 ### Logical Operators (or / and)
 
@@ -179,7 +189,8 @@ Nested logical conditions are also supported:
 ```
 
 By default this is `ILIKE '%widget%'` OR-ed across the collection's top-level
-string properties — it does **not** reach inside `map`/JSONB or array
+string properties (not enum or uuid ones); with several words, each word must
+match some property. It does **not** reach inside `map`/JSONB or array
 properties, and does not rank. A collection that declares a `search` block gets
 ranked full-text matching over the fields it names, and rows carry a `_score`
 that `orderBy` accepts:
@@ -208,7 +219,8 @@ below work together; `vector_search` and `vector` are both required.
 ```
 
 Rows come back closest-first, each with a `_distance`. Other filters apply
-before the ordering.
+before the ordering. Without `?limit`, a vector search returns 10 rows
+(`DEFAULT_VECTOR_LIST_LIMIT`), not 50.
 
 ### Relation Includes (Eager Loading)
 
@@ -227,25 +239,11 @@ Use `*` to include all relations:
 |-----------|------|-------------|---------|
 | `fields` | string | Comma-separated list of fields to return | `?fields=id,name,price` |
 
-### Vector Similarity Search
-
-| Parameter | Type | Description | Example |
-|-----------|------|-------------|---------|
-| `vector_search` | string | Name of the vector property to search | `?vector_search=embedding` |
-| `vector` | string | JSON array of numbers (query vector) | `?vector=[0.1,0.2,0.3]` |
-| `vector_distance` | string | Distance function: `cosine`, `l2`, or `inner_product` (default: `cosine`) | `?vector_distance=cosine` |
-| `vector_threshold` | number | Optional similarity threshold | `?vector_threshold=0.8` |
-
-**Example — vector similarity search:**
-```
-?vector_search=embedding&vector=[0.1,0.2,0.3,0.4]&vector_distance=cosine&vector_threshold=0.5
-```
-
 ### Reserved Query Keys
 
 These parameter names are reserved and will NOT be interpreted as filter fields:
 
-`limit`, `offset`, `page`, `orderBy`, `include`, `fields`, `searchString`, `vector_search`, `vector`, `vector_distance`, `vector_threshold`, `or`, `and`
+`limit`, `offset`, `page`, `after`, `orderBy`, `include`, `fields`, `distinct`, `count`, `searchString`, `searchExplain`, `vector_search`, `vector`, `vector_distance`, `vector_threshold`, `or`, `and`, `not`, `where`, `select`, `groupBy`, `deleted`, `hard`
 
 ## Response Format
 
@@ -333,7 +331,7 @@ The `details` field is optional and only present when additional context is avai
 | `400` | `INVALID_INPUT` | Validation failure |
 | `401` | `UNAUTHORIZED` | Missing or invalid authentication token |
 | `401` | `INVALID_CREDENTIALS` | Wrong email/password |
-| `401` | `INVALID_TOKEN` | Expired or malformed JWT |
+| `401` | `INVALID_TOKEN` | Unknown refresh token, or provider credentials an OAuth sign-in could not verify (an invalid or expired access token is `401 UNAUTHORIZED`; a bad reset, verification or magic-link token is `400 INVALID_TOKEN`) |
 | `403` | `FORBIDDEN` | Insufficient permissions |
 | `403` | `SCOPE_MISSING` | The credential lacks the scope this route needs; `details.requiredScope` names it (e.g. `data:write:orders`) |
 | `404` | `NOT_FOUND` | Entity not found |
@@ -383,13 +381,13 @@ export async function countOrders() {
 Authorization: Bearer <jwt-token>
 ```
 
-### Query Parameter Token
+### No query-parameter token
 
-As an alternative to the Authorization header, pass the token as a query parameter:
-
-```
-?token=<jwt-token>
-```
+Data, auth, functions and admin routes read the credential from the
+`Authorization` header only — a `?token=` on `/api/data/...` is not a
+credential (it is parsed as a filter on a field named `token`). The one
+exception is storage file serving (`/api/storage/file/*`, `/api/storage/metadata/*`),
+which accepts a scoped download `?token=` for `<img src>`-style links.
 
 ### Service Key
 
@@ -407,7 +405,7 @@ API keys start with the `rk_` prefix and are validated against the database. Wha
 Authorization: Bearer rk_live_abc123...
 ```
 
-- `data:read`, `data:write`, `data:delete` — plain for every collection, or narrowed: `data:read:orders`. The operation comes from the HTTP method (`GET` → read, `POST`/`PUT`/`PATCH` → write, `DELETE` → delete; `POST /bulk/delete` is a delete). On a nested path the target collection needs the operation and each parent `data:read`.
+- `data:read`, `data:write`, `data:delete` — plain for every collection, or narrowed: `data:read:orders`. The operation comes from the HTTP method (`GET` → read, `POST`/`PUT`/`PATCH` → write, `DELETE` → delete; `POST /bulk/delete` is a delete, `POST /query` and `POST /count` are reads). On a nested path the target collection needs the operation and each parent `data:read`.
 - `storage:read`, `storage:write`, `storage:delete` — target is a storage source id; the default source is `(default)`.
 - `functions:invoke` — or `functions:invoke:<name>` for one function.
 - Admin-plane scopes (`users:read`, `cron:write`, `logs:read`, `schema:read`, …) reach that admin surface. `keys:read`/`keys:write` can never go on a key.
@@ -461,16 +459,17 @@ await initializeRebaseBackend({
 | Callback | Trigger | Can modify? | Can abort? |
 |----------|---------|-------------|------------|
 | `afterRead({ row, context, … })` | Every read | Return the transformed row | No |
-| `beforeSave({ values, status, context, … })` | Before every write | Return modified values | Throw → 400 |
-| `afterSave({ id, values, context, … })` | After a successful write | No | No |
+| `beforeSave({ values, status, context, … })` | Before every write | Return modified values | Throw → `400 CALLBACK_REJECTED` |
+| `afterSave({ id, values, context, … })` | After the write, before the commit | No | Throw → write rolled back, `400 CALLBACK_REJECTED` |
 | `afterSaveError({ values, context, … })` | After a failed write | No | No |
 | `beforeDelete({ row, id, context, … })` | Before every delete | No | Return `false` or throw |
-| `afterDelete({ row, id, context, … })` | After a delete | No | No |
+| `afterDelete({ row, id, context, … })` | After the delete, before the commit | No | Throw → delete rolled back, `400 CALLBACK_REJECTED` |
 
 Every callback takes **one props object**, not positional arguments. Common
 fields: `collection`, `path`, `row`, `id`, `values`, `previousValues`, `status`
-(`"new" | "existing"`) and `context`. `context.user` carries `uid` and `roles`,
-or is `undefined` for a public request.
+(`"new" | "existing"`) and `context`. `context.user` carries `uid` and `roles`;
+an unauthenticated request arrives as `{ uid: "anonymous", roles: ["anon"] }`,
+not as `undefined` — test it with `isAnonymousUid` from `@rebasepro/types`.
 
 > **IMPORTANT FOR AGENTS:** these are not an API-boundary interceptor. They live
 > in the driver, so they fire on *every* data path — REST, WebSocket/realtime and
@@ -575,20 +574,20 @@ curl -H "Authorization: Bearer $TOKEN" \
 
 ### OpenAPI 3.0.3 Spec
 
-Available at `GET /api/docs`. Returns a JSON OpenAPI specification that mirrors the REST API exactly.
+Available at `GET /api/docs`. Returns a JSON OpenAPI specification of the data API. It does not cover the auth, storage, functions or admin routes. With `enableSwagger: false` — which the bundle runtime sets in production unless `REBASE_ENABLE_SWAGGER=true` — it is served only to a caller holding `schema:read`.
 
 The spec includes:
-- All collection CRUD routes with parameters and schemas
+- All collection CRUD, bulk and `_batch` routes with parameters and schemas
 - PostgREST-style filter parameters per field
 - Subcollection routes for relations
 - Component schemas for each collection (output and input)
 - `PaginationMeta` and `ErrorResponse` component schemas
-- Security schemes (`bearerAuth` and `queryToken`) when auth is enabled
+- The `bearerAuth` security scheme when auth is enabled (no query-token scheme)
 - Proper `201` for POST and `204` for DELETE
 
 ### Swagger UI
 
-Available at `GET /api/swagger` in non-production environments. Renders an interactive Swagger UI that loads the spec from `/api/docs`.
+Available at `GET /api/swagger` when `NODE_ENV` is not `production` (`REBASE_ENABLE_SWAGGER` does not change this). Renders an interactive Swagger UI that loads the spec from `/api/docs`.
 
 ## Metadata Endpoints
 
@@ -606,7 +605,7 @@ GET /api/health    # the same answer, under basePath
 }
 ```
 
-`status` is `"ok"` with HTTP 200, or `"degraded"` with HTTP **503**. A `details` object is included when the driver supplies one, and a `dataSources` array lists any secondary source that failed its probe.
+`status` is `"ok"` with HTTP 200, or `"degraded"` with HTTP **503**. Outside production a `details` object is included when the driver supplies one; a `dataSources` array lists any secondary source that failed its probe (in production, only its `key`).
 
 Both paths are registered by the bundle boot path (`packages/server/src/boot/boot.ts`), not by `initializeRebaseBackend` — an orchestrator probes `/health`, so it cannot live under `basePath` alone.
 
@@ -620,7 +619,7 @@ There is no `GET /api/collections`. The equivalent is the contract endpoint, whi
 GET /api/meta/contract
 ```
 
-Gated — needs `schema:read`: an admin, the service key, or an API key holding it.
+Gated — needs `schema:read`: an admin, the service key, or an API key holding it. With no auth configured it is not served at all (`404 CONTRACT_UNAVAILABLE`).
 
 ```json
 {
@@ -636,7 +635,7 @@ Gated — needs `schema:read`: an admin, the service key, or an API key holding 
 GET /api/meta/schema-version
 ```
 
-Unauthenticated and deliberately tiny — `{ "schemaVersion": "a1b2c3…" }`. Use it in CI to tell whether a generated SDK is stale without holding admin credentials. Both responses also carry the value in an `x-rebase-schema` header.
+Unauthenticated and deliberately tiny — `{ "schemaVersion": "a1b2c3…", "runtime": { "version": "0.25.1", "contract": 1 } }`. Use it in CI to tell whether a generated SDK is stale without holding admin credentials. Both responses also carry the value in an `x-rebase-schema` header.
 
 
 ## Server Configuration (RebaseBackendConfig)
@@ -651,7 +650,7 @@ Every option, with its default and what the runtime fills it from, is in the **`
 
 - **`requireAuth`, `jwtSecret`, `serviceKey`, `allowRegistration`, OAuth providers and `email` live inside `auth`**, not at the top level.
 - **Storage refuses to boot in production** unless `storageAuthorize`, `storagePolicies`, `storagePublicRead` or `storageInsecureAllowAnyAuthenticated` is set.
-- **`rateLimit` is on by default**, with loose per-caller limits (API key by id, user by uid, everyone else by IP), counted in-process unless you supply a `store`.
+- **`rateLimit` is on by default**, with loose per-caller limits (API key by id, user by uid, everyone else by IP), counted in-process unless you supply a `store` or set `REBASE_RATE_LIMIT_STORE=sql`.
 - **CORS itself is not a config key.** It is set from the `CORS_ORIGINS` and `FRONTEND_URL` environment variables, and a production boot fails if neither is set.
 
 ### Pagination is not configurable

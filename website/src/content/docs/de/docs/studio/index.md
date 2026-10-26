@@ -1,5 +1,5 @@
 ---
-sourceHash: 352139def44b34e0
+sourceHash: 6713d8b8d0ba9125
 title: Studio-Tools
 sidebar_label: Studio
 description: Rebase Studio bietet Entwickler-Tools für die visuelle Schema-Bearbeitung, SQL-Abfragen, JavaScript-Skripte, RLS-Richtlinienverwaltung und das Durchsuchen von Speichern.
@@ -48,15 +48,15 @@ Der Editor ist überall dort aktiv, wo Studio eingebunden ist — das `<RebaseSt
 import { RebaseCMS } from "@rebasepro/cms";
 import { RebaseStudio } from "@rebasepro/studio";
 
-// Studio ist eingebunden, also steht der Sammlungs-Editor zur Verfügung.
-// Mehr ist dafür nicht nötig.
+// Studio is mounted, so the Collection Editor is available. Nothing else
+// is needed for it.
 <Rebase>
     <RebaseCMS collections={collections}/>
     <RebaseStudio/>
 </Rebase>
 
-// `collectionEditor` dient der Feinabstimmung — ein schreibgeschützter
-// Editor, ein anderes Token — nicht dem Einschalten.
+// `collectionEditor` is for fine-tuning — a read-only editor, a different
+// token — not for opting in.
 <RebaseCMS
     collections={collections}
     collectionEditor={{
@@ -73,7 +73,7 @@ Sie gehören zu Studio und werden **von `RebaseStudio` lazy geladen** — jedes 
 
 | Tab | Slug | Gruppe | Funktion |
 |-----|------|--------|----------|
-| SQL-Konsole | `sql` | Datenbank | Rohes SQL gegen Ihre PostgreSQL-Datenbank ausführen und Ergebnisse als Tabelle lesen. Die Tabelle zeigt das Ergebnis der letzten Anweisung, bis zu den ersten 10.000 Zeilen oder 32 MB an Werten; ein längeres Ergebnis nennt die Anzahl der Zeilen, und Kopieren und Export enthalten nur die angezeigten Zeilen. Ein solches Ergebnis bietet außerdem **Download full result as CSV**: Der Server streamt es vollständig über einen schreibgeschützten Cursor (`POST /api/admin/sql/csv`), eine Abfrage nach der anderen, auf einem eigenen Postgres-Server statt der In-Process-Entwicklungsdatenbank. Werte sind der Datenbanktext, wie psql ihn zeigt, und **Export JSON** schreibt sie so; **Export typed JSON** schreibt jeden Wert gemäß dem Typ seiner Spalte — Ganzzahlen und Numerics, die eine JSON-Zahl exakt fasst, Booleans, `json`/`jsonb` als JSON — und lässt jeden anderen Wert als Text. Während ein Lauf aktiv ist, gibt **Cancel run** die Konsole sofort zurück; ein Server, der den `CANCEL_SQL`-Frame des Sockets annimmt (er führt `cancel_sql` im `hello` auf, mit dem er auf den Socket antwortet), stoppt zudem die Anweisung mit `pg_cancel_backend`. Die In-Process-Entwicklungsdatenbank lässt sich nicht unterbrechen, und ein älterer Server beendet die Anweisung innerhalb seines `statement_timeout` |
+| SQL-Konsole | `sql` | Datenbank | Rohes SQL gegen Ihre PostgreSQL-Datenbank ausführen und Ergebnisse als Tabelle lesen. Die Tabelle zeigt das Ergebnis der letzten Anweisung, bis zu den ersten 10.000 Zeilen oder 32 MB an Werten; ein längeres Ergebnis nennt die Anzahl der Zeilen, und Kopieren und Export enthalten nur die angezeigten Zeilen. Ein solches Ergebnis bietet außerdem **Download full result as CSV**: Der Server streamt es vollständig über einen schreibgeschützten Cursor (`POST /api/admin/sql/csv`), eine Abfrage nach der anderen, auf einem eigenen Postgres-Server statt der In-Process-Entwicklungsdatenbank. Werte sind der Datenbanktext, wie psql ihn zeigt, und **Export JSON** schreibt sie so; **Export typed JSON** schreibt jeden Wert gemäß dem Typ seiner Spalte — Ganzzahlen und Numerics, die eine JSON-Zahl exakt fasst, Booleans, `json`/`jsonb` als JSON — und lässt jeden anderen Wert als Text. In jedem CSV (Export, Kopieren und der vollständige Download) wird ein Wert, den eine Tabellenkalkulation als Formel ausführen würde (einer, der mit `=`, `+`, `-`, `@`, einem Tabulator oder einem Wagenrücklauf beginnt, außer einer vorzeichenbehafteten Zahl), mit einem vorangestellten `'` geschrieben, wie es der Collection-Export tut. Während ein Lauf aktiv ist, gibt **Cancel run** die Konsole sofort zurück; ein Server, der den `CANCEL_SQL`-Frame des Sockets annimmt (er führt `cancel_sql` im `hello` auf, mit dem er auf den Socket antwortet), stoppt zudem die Anweisung mit `pg_cancel_backend`. Die In-Process-Entwicklungsdatenbank lässt sich nicht unterbrechen, und ein älterer Server beendet die Anweisung innerhalb seines `statement_timeout` |
 | RLS-Richtlinien | `rls` | Datenbank | Row-Level-Security-Richtlinien Ihrer Tabellen prüfen und verwalten. Eine Richtlinie wird so aufgeführt, wie die Datenbank sie hält, und mit **Differs from code** markiert, wo das nicht dem entspricht, was das Projekt deklariert. Eine Richtlinie, die Rebase generiert, lässt sich nicht direkt in der Datenbank bearbeiten, und auf einer Tabelle, die Rebase verwaltet, weist ein Banner darauf hin, dass jeder Serverstart und `rebase db push` die deklarierten Richtlinien erneut anwenden |
 | Schema-Visualizer | `schema-visualizer` | Datenbank | Entity-Diagramm Ihrer Sammlungen und ihrer Beziehungen, gezeichnet aus den Sammlungsdefinitionen: Tabellen, Spalten, Typen und Beziehungen sind so, wie die Sammlungen sie deklarieren. Nur die RLS-Markierungen werden aus der Datenbank gelesen. Das Layout läuft in einem Web Worker, sodass die Seite reaktionsfähig bleibt, während ein großes Diagramm angeordnet wird. Ein Schema mit mehr als 300 Tabellen wird jeweils für die Umgebung einer Tabelle gezeichnet — die Tabellen, die eine oder zwei Relationen entfernt sind —, beginnend bei der am stärksten verbundenen Tabelle; wählen Sie in der Liste eine andere Tabelle, um zu wechseln |
 | Branches | `branches` | Datenbank | [Datenbank-Branches](/docs/backend/branching) anlegen und verwalten, und einen wie einen Pull Request prüfen: seine Schema- und RLS-Richtlinienänderungen nebeneinander, die Zeilen, die er eingefügt, aktualisiert und gelöscht hat, und ein Zusammenführen in die Datenbank, aus der er erstellt wurde, das vorher sagt, was gewinnt – siehe [Einen Branch prüfen und zusammenführen](/docs/backend/branching/#reviewing-and-merging-a-branch) |
@@ -199,6 +199,9 @@ Storage-Browser kann diesen etwa weglassen:
 ```tsx
 <RebaseStudio tools={["sql", "rls", "schema-visualizer", "api"]} />
 ```
+
+Die Studio-Ansicht des Sammlungs-Editors ist das Tool `"schema"`. Lassen Sie `tools` weg,
+ist sie vorhanden; übergeben Sie eine Liste ohne `"schema"`, wie oben, wird sie weggelassen.
 
 Die Liste wird über ihren *Inhalt* gelesen, nicht über ihre Identität; sie inline
 zu schreiben ist also unbedenklich: Ein Re-Render des Hosts reißt das gerade

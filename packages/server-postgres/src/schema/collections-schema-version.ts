@@ -29,6 +29,7 @@
  */
 import { sql } from "drizzle-orm";
 import type { NodePgDatabase } from "drizzle-orm/node-postgres";
+import { revokeInternalTableSql } from "@rebasepro/common";
 
 /** Key under which the version is stored in the meta table. */
 const VERSION_KEY = "collections_schema_version";
@@ -87,14 +88,26 @@ export async function stampCollectionsSchemaVersion(
     version: string
 ): Promise<void> {
     const qualified = `"${metaSchema}"."schema_meta"`;
-    await (db as SchemaMetaQueryable).execute(sql`CREATE SCHEMA IF NOT EXISTS ${sql.identifier(metaSchema)}`);
-    await (db as SchemaMetaQueryable).execute(sql`
-        CREATE TABLE IF NOT EXISTS ${sql.raw(qualified)} (
-            key TEXT PRIMARY KEY,
-            value TEXT NOT NULL,
-            updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL
-        )
-    `);
+    const exists = await (db as SchemaMetaQueryable).execute(
+        sql`SELECT to_regclass(${qualified}) IS NOT NULL AS present`
+    );
+    if (!(exists.rows[0] as { present: boolean } | undefined)?.present) {
+        await (db as SchemaMetaQueryable).execute(sql`CREATE SCHEMA IF NOT EXISTS ${sql.identifier(metaSchema)}`);
+        await (db as SchemaMetaQueryable).execute(sql`
+            CREATE TABLE IF NOT EXISTS ${sql.raw(qualified)} (
+                key TEXT PRIMARY KEY,
+                value TEXT NOT NULL,
+                updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL
+            )
+        `);
+        // On a backend without auth this stamp is what creates the table, and
+        // it runs after the boot's last sweep of the request role's grants —
+        // so the table inherited the schema-wide DML grant until the next
+        // boot's sweep took it back. A request role that can rewrite the auth
+        // version stamp can make that boot refuse. Taken back here, by its
+        // creator, as every other internal table is.
+        await (db as SchemaMetaQueryable).execute(sql.raw(revokeInternalTableSql(metaSchema, "schema_meta")));
+    }
     await (db as SchemaMetaQueryable).execute(sql`
         INSERT INTO ${sql.raw(qualified)} (key, value)
         VALUES (${VERSION_KEY}, ${version})

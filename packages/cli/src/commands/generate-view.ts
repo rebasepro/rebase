@@ -36,7 +36,8 @@ import path from "path";
 import { fileURLToPath } from "url";
 import chalk from "chalk";
 
-import { cmsMountOf, findBackendApp, loadManifest, resolveBackendPaths, DEFAULT_CONFIG_DIR } from "../manifest";
+import { cmsMountOf, loadManifest } from "../manifest";
+import { resolveCollectionsDir } from "../utils/collections-dir";
 import { requireProjectRoot } from "../utils/project";
 import { parseCommandArgs, UsageError, wantsHelp } from "../utils/args";
 
@@ -55,6 +56,14 @@ const VIEW_FLAGS = {
 
 /** A slug is a URL segment and an entity view key: kebab-case, starting with a letter. */
 const SLUG_PATTERN = /^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/;
+
+/**
+ * Top-level paths the admin's own routes answer (`RebaseRouteDefs` in
+ * `@rebasepro/cms`): `/c/*` the collections, `/s` Studio, `/settings`. They are
+ * declared before custom views, so a screen at one of them was listed in the
+ * sidebar and opened the built-in page instead.
+ */
+const RESERVED_SCREEN_SLUGS: readonly string[] = ["c", "s", "settings"];
 
 export interface GenerateViewOptions {
     projectRoot: string;
@@ -292,16 +301,8 @@ export function resolveFrontendDir(projectRoot: string): string | undefined {
     return fs.existsSync(path.join(fallback, "src")) ? fallback : undefined;
 }
 
-/** `<config>/collections`, as the backend app declares it. */
-export function resolveCollectionsDir(projectRoot: string): string {
-    try {
-        const backend = findBackendApp(loadManifest(projectRoot).manifest);
-        if (backend) return path.join(projectRoot, resolveBackendPaths(backend.app, projectRoot).config, "collections");
-    } catch {
-        // fall through to the default
-    }
-    return path.join(projectRoot, DEFAULT_CONFIG_DIR, "collections");
-}
+/** `<config>/collections`, as the backend app declares it — one resolver for every command. */
+export { resolveCollectionsDir };
 
 function collectionFiles(dir: string): string[] {
     if (!fs.existsSync(dir)) return [];
@@ -363,14 +364,31 @@ function findCliRoot(from: string): string | null {
 
 type ViewTemplateOptions = { slug: string; componentName: string; label: string; collection: string };
 
+/**
+ * A label as JSX text: written as is when it is plain, as a string expression
+ * when it holds a character JSX reads — `{`, `}`, `<`, `>`, `&`. Pasted raw,
+ * `--name "KPIs {beta}"` wrote `<Typography>KPIs {beta}</Typography>`, and the
+ * view did not compile ("Cannot find name 'beta'").
+ */
+function jsxText(text: string): string {
+    return /[{}<>&]/.test(text) ? `{${JSON.stringify(text)}}` : text;
+}
+
+/** A label inside the leading `/** … *\/` comment: one line, and no `*\/` to close it early. */
+function commentText(text: string): string {
+    return text.replace(/[\r\n]+/g, " ").replaceAll("*/", "*\\/");
+}
+
 function fillViewTemplate(template: string, options: ViewTemplateOptions): string {
     const { slug, componentName, label, collection } = options;
     return template
         .replaceAll("\"__COLLECTION__\"", JSON.stringify(collection))
         .replaceAll("__COLLECTION__", collection)
         .replaceAll("__COMPONENT__", componentName)
-        .replaceAll("__label__", label.toLowerCase())
-        .replaceAll("__LABEL__", label)
+        .replaceAll("__label_jsx__", jsxText(label.toLowerCase()))
+        .replaceAll("__LABEL_JSX__", jsxText(label))
+        .replaceAll("__label__", commentText(label.toLowerCase()))
+        .replaceAll("__LABEL__", commentText(label))
         .replaceAll("__SLUG__", slug);
 }
 
@@ -454,6 +472,12 @@ export function planGenerateView(options: GenerateViewOptions): GenerateViewPlan
     if (!SLUG_PATTERN.test(slug)) {
         throw new UsageError(
             `"${slug}" is not a view slug: use lowercase letters, digits and dashes, starting with a letter (e.g. orders-board).`
+        );
+    }
+    if (!options.collection && RESERVED_SCREEN_SLUGS.includes(slug)) {
+        throw new UsageError(
+            `"${slug}" is reserved: the admin's own routes answer /${slug}, so a screen there would never show. ` +
+            `Pick another slug (e.g. ${slug === "settings" ? "app-settings" : `${slug}-view`}).`
         );
     }
     const frontendDir = resolveFrontendDir(projectRoot);

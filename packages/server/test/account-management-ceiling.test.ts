@@ -137,6 +137,46 @@ describe("a users:write role managing accounts", () => {
     });
 });
 
+describe("a role name that would be read back as other roles", () => {
+    // The ceiling judged a filtered copy of the list and the write stored the
+    // raw one, which Postgres then parsed as an array literal: a support user
+    // sent `["support,admin"]` or `["support", ["admin"]]`, passed the check,
+    // and was stored as `{support,admin}` — an administrator.
+    it.each([
+        [["support,admin"]],
+        [["support", ["admin"]]],
+        [["\"admin\""]],
+        [["support", "{admin}"]],
+        [["back\\slash"]],
+        [["   "]],
+        [[""]],
+        [["line\nbreak"]],
+        ["admin"]
+    ])("refuses %j on PUT and POST with nothing written", async (roles) => {
+        configureAccess({ model: MODEL });
+        const { authRepo, writes } = repo({ sup: ["support"] });
+        const a = app(authRepo);
+        const headers = await as("sup", ["support"]);
+
+        const put = await a.request("/users/sup", { method: "PUT", headers, body: JSON.stringify({ roles }) });
+        expect(put.status).toBe(400);
+        expect((await put.json() as { error: { code: string } }).error.code).toBe("INVALID_ROLE");
+        const post = await a.request("/users", { method: "POST", headers, body: JSON.stringify({ email: "n@test.com", roles }) });
+        expect(post.status).toBe(400);
+        expect(writes).toEqual([]);
+    });
+
+    it("writes exactly the list it judged, for any name that is not array syntax", async () => {
+        configureAccess({ model: { roles: { ...MODEL.roles, "Editor in chief": { scopes: [] }, "NULL": { scopes: [] } }, scopes: {} } });
+        const { authRepo, roles } = repo({ sup: ["support"], plain: [] });
+        const res = await app(authRepo).request("/users/plain", {
+            method: "PUT", headers: await as("sup", ["support"]), body: JSON.stringify({ roles: ["Editor in chief", "NULL", "support"] })
+        });
+        expect(res.status).toBe(200);
+        expect(roles.get("plain")).toEqual(["Editor in chief", "NULL", "support"]);
+    });
+});
+
 describe("an administrator", () => {
     it("manages any account and grants any role", async () => {
         configureAccess({ model: MODEL });

@@ -110,6 +110,37 @@ describe("the OpenAPI document and the generated SDK", () => {
     });
 });
 
+/**
+ * The keys of one block (`Insert`, `Update`) of a collection in the generated
+ * `Database`. A block ends at the first line that closes it — `    };`, or
+ * `    } & (...)` for an `Insert` carrying a required belongsTo's alternatives.
+ */
+function sdkBlockKeys(typedefs: string, accessor: string, block: "Insert" | "Update"): string[] {
+    const start = typedefs.indexOf(`  ${accessor}: {`);
+    const blockStart = typedefs.indexOf(`    ${block}: {`, start);
+    if (start < 0 || blockStart < 0) throw new Error(`no ${block} block for "${accessor}"`);
+    const lines = typedefs.slice(blockStart + `    ${block}: {`.length).split("\n");
+    const end = lines.findIndex(line => line.startsWith("    }"));
+    return lines.slice(0, end)
+        .map(line => line.trim())
+        .filter(Boolean)
+        .map(line => line.replace(/^"?([^"?:]+)"?\??:.*$/, "$1"));
+}
+
+describe("the OpenAPI create and update bodies and the generated SDK", () => {
+    // The write half drifted on its own: the document offered `belongsTo`
+    // only, while the SDK's Insert typed the `manyToMany` membership the
+    // server writes. The bodies and the SDK now name the same keys.
+    it("name the same writable fields", () => {
+        const typedefs = generateTypedefs(collections);
+        for (const [accessor, schemaName] of [["posts", "Post"], ["authors", "Author"], ["tags", "Tag"]] as const) {
+            const input = Object.keys(spec.components.schemas[`${schemaName}Input`].properties as Record<string, unknown>);
+            expect(new Set(input)).toEqual(new Set(sdkBlockKeys(typedefs, accessor, "Insert")));
+        }
+        expect(Object.keys(spec.components.schemas.PostInput.properties)).toEqual(expect.arrayContaining(["tags", "author", "authorId"]));
+    });
+});
+
 describe("the primary key", () => {
     it("has one type across the read, Input and Update schemas", () => {
         for (const name of ["Post", "Author", "Tag"]) {

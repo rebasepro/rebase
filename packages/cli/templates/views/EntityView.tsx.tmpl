@@ -23,7 +23,7 @@ export function __COMPONENT__({ collection, entity, modifiedValues, formContext 
         return (
             <div className="p-6">
                 <Typography variant="body2" color="secondary">
-                    Save this {collection.singularName ?? collection.name} to see __label__.
+                    Save this {collection.singularName ?? collection.name} to see __label_jsx__.
                 </Typography>
             </div>
         );
@@ -35,7 +35,7 @@ export function __COMPONENT__({ collection, entity, modifiedValues, formContext 
     return (
         <div className="p-6 flex flex-col gap-4">
             <div className="flex items-center justify-between gap-2">
-                <Typography variant="h6">__LABEL__</Typography>
+                <Typography variant="h6">__LABEL_JSX__</Typography>
                 {formContext.readOnly && <Chip size="small">Read only</Chip>}
             </div>
             <Card className="p-4 flex flex-col gap-3">

@@ -515,6 +515,10 @@ export interface RebaseClient<DB = unknown> {
      * else. The derived client opens no realtime socket (live queries fetch
      * once), keeps no offline cache, and holds no session: a refusal of its
      * token is answered by this client. Close it with `close()` when done.
+     *
+     * Read-only: a write, delete, batch, history revert or non-GET function
+     * call through it is refused with `403 SIMULATION_READ_ONLY`, since it
+     * would run as the simulated identity rather than the administrator.
      */
     simulate?(simulation: AccessSimulation): RebaseClient<Record<string, unknown>>;
 
@@ -539,8 +543,14 @@ export interface RebaseClient<DB = unknown> {
     /**
      * Execute raw SQL against the database.
      * Only available server-side with a SQL database.
+     *
+     * The same options as {@link RebaseServerClient.sql}: pass values through
+     * `params` as `$1`, `$2`, … rather than into the query text. This is what
+     * a collection callback's `context.client.sql` is typed by, and it used to
+     * have no `params`, so the one typed way to run SQL from a hook left
+     * interpolating row values into the string as the way to write it.
      */
-    sql?(query: string, options?: { database?: string; role?: string }): Promise<Record<string, unknown>[]>;
+    sql?(query: string, options?: { database?: ResourceRef; role?: string; params?: unknown[] }): Promise<Record<string, unknown>[]>;
 }
 
 // ─── RebaseServerClient ──────────────────────────────────────────────────────
@@ -586,6 +596,11 @@ export interface RebaseServerClient<DB = RegisteredDatabase> extends Omit<Rebase
      * Execute raw SQL against the database. Always present server-side for SQL
      * engines. Values interpolated into the query should be passed via
      * `params`, referenced as `$1`, `$2`, … placeholders in the query text.
+     *
+     * `database` names a declared data source — the handle `database("analytics")`
+     * returned, or its key — and the query runs on that source's own
+     * connection. Omitted, it runs on the default source. A key no configured
+     * source has is refused by name.
      *
      * **Runtime note.** This is the one accessor on this object that is not
      * portable. It runs on the database owner connection over a TCP socket, so

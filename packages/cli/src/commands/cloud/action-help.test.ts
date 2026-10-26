@@ -21,25 +21,32 @@ import { GLOBAL_SPEC_KEYS } from "./context";
 import { CREATE_PROJECT_FLAGS } from "./projects";
 import { CREATE_DATABASE_FLAGS } from "./databases";
 import { DB_CONNECT_FLAGS } from "./db-connect";
-import { DEPLOY_FLAGS } from "./deploy";
+import { DEPLOY_FLAGS, LOGS_FLAGS } from "./deploy";
 import { ENV_SET_FLAGS } from "./env";
-import { COMPUTE_SET_FLAGS, BILLING_ACTIONS } from "./resources";
+import { COMPUTE_SET_FLAGS, BILLING_ACTIONS, CLUSTER_REGISTRY_FLAGS, CLUSTERS_ACTIONS } from "./resources";
 import { LOGIN_FLAGS } from "./auth";
 import { CREATE_TOKEN_FLAGS } from "./tokens";
 import { INIT_FLAGS } from "./init";
+import { CLAIM_FLAGS } from "./claim";
 import { CRON_LIST_FLAGS, CRON_LOGS_FLAGS } from "./cron";
 import { PREVIEWS_LIST_FLAGS, PREVIEWS_DELETE_FLAGS } from "./previews";
+import { USAGE_FLAGS, USAGE_ACTIONS } from "./usage";
+import { APP_KEY_FLAGS, APP_KEY_ACTIONS } from "./app-key";
+import { SERVICE_KEY_FLAGS, SERVICE_KEY_ACTIONS } from "./service-key";
+import { ACTIVITY_FLAGS } from "./activity";
+import { NOTIFICATIONS_ADD_FLAGS } from "./notifications";
 
 /**
  * Which spec backs which page.
  *
  * `null` means "this command declares no spec of its own" — `status` takes only
- * the global flags, and `logs` parses permissively inside its handler. Spelled
+ * the global flags. Spelled
  * out rather than omitted so that the completeness check below can tell a
  * command with nothing to declare from one somebody forgot.
  */
 const SPECS: Record<string, Record<string, unknown> | null> = {
     init: INIT_FLAGS,
+    claim: CLAIM_FLAGS,
     projects: null,
     clusters: null,
     "projects create": CREATE_PROJECT_FLAGS,
@@ -67,12 +74,19 @@ const SPECS: Record<string, Record<string, unknown> | null> = {
         "--source": String
     },
     webhooks: null,
-    "webhooks create": { "--name": String, "--table": String, "--endpoint": String, "--events": String },
-    "webhooks delete": {},
-    billing: {},
-    logs: null,
+    notifications: null,
+    "notifications add": NOTIFICATIONS_ADD_FLAGS,
+    "notifications test": {},
+    "notifications remove": {},
+    billing: { "--limit": Number },
+    usage: USAGE_FLAGS,
+    "app-key": APP_KEY_FLAGS,
+    "service-key": SERVICE_KEY_FLAGS,
+    activity: ACTIVITY_FLAGS,
+    logs: LOGS_FLAGS,
     status: null,
     "clusters verify": null,
+    "clusters registry": CLUSTER_REGISTRY_FLAGS,
     // The graph. Neither listing nor pruning declares a flag of its own —
     // `prune`'s `--yes` is the global one.
     resources: null,
@@ -238,6 +252,7 @@ flag: flag[1] });
         ["env.ts", ENV_SET_FLAGS],
         ["tokens.ts", CREATE_TOKEN_FLAGS],
         ["init.ts", INIT_FLAGS],
+        ["claim.ts", CLAIM_FLAGS],
         ["cron.ts", CRON_LIST_FLAGS],
         ["cron.ts", CRON_LOGS_FLAGS],
         ["previews.ts", PREVIEWS_LIST_FLAGS],
@@ -510,7 +525,11 @@ describe("ACTION_HELP", () => {
      * commands that do not exist, answering as if they did.
      */
     it.each([
-        ["billing", BILLING_ACTIONS]
+        ["billing", BILLING_ACTIONS],
+        ["usage", USAGE_ACTIONS],
+        ["app-key", APP_KEY_ACTIONS],
+        ["service-key", SERVICE_KEY_ACTIONS],
+        ["clusters", CLUSTERS_ACTIONS]
     ])("%s's usage line names the actions it dispatches", (key, dispatched) => {
         expect(actionWordsIn(ACTION_HELP[key].usage).sort()).toEqual([...dispatched].sort());
     });

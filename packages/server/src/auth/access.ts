@@ -27,6 +27,7 @@ import {
     hasAdminRole,
     isDataPlaneScope,
     parseScope,
+    roleNameProblem,
     scopeGrants,
     scopesBeyond,
     scopesForRoles,
@@ -390,6 +391,31 @@ export function assertMayManageAccount(c: Context<HonoEnv>, targetRoles: readonl
             `This account holds ${beyond.join(", ")}, which you do not, so you cannot change it.`,
             { beyond });
     }
+}
+
+/**
+ * Read a `roles` body field as the exact list that is then judged and written.
+ *
+ * Every entry must be a string `roleNameProblem` accepts. Filtering out the bad
+ * entries instead is how the ceiling once judged one list and the write stored
+ * another: `["support", ["admin"]]` was judged as `["support"]` and written as
+ * `{support,admin}`, and `"support,admin"` was one undeclared role to the check
+ * and two roles to Postgres.
+ */
+export function readRoleNames(value: unknown): string[] {
+    if (!Array.isArray(value)) {
+        throw new ApiError(400, "INVALID_ROLE", "roles must be an array of role names, e.g. [\"editor\"]");
+    }
+    const problems = value.flatMap(entry => {
+        const problem = roleNameProblem(entry);
+        return problem ? [`${JSON.stringify(entry)} ${problem}`] : [];
+    });
+    if (problems.length > 0) {
+        throw new ApiError(400, "INVALID_ROLE",
+            `Not valid role names: ${problems.join("; ")}. A role name is a non-empty string without , { } " \\ or control characters.`,
+            { problems });
+    }
+    return [...new Set<string>(value)];
 }
 
 /** Refuse to let the caller grant roles that hold anything the caller does not. */

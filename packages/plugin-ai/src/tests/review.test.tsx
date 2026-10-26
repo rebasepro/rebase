@@ -333,12 +333,22 @@ describe("autofill review", () => {
         // of `seo.title` — not of `seo`. Sending the nested object instead makes
         // every existing value invisible to the model, which shows up as
         // autofill cheerfully overwriting things the operator already wrote.
+        //
+        // `seo` is declared here: a key the collection does not declare is not
+        // sent at all (see "values sent to the service" in properties.test.ts).
         mockService(() => streamingResponse([AUTOFILL_BODY]));
-        const { result } = await mountController();
+        const collection = {
+            ...COLLECTION,
+            properties: {
+                ...COLLECTION.properties,
+                seo: { type: "map", name: "SEO", properties: { title: { type: "string", name: "SEO title" } } }
+            }
+        };
+        const { result } = await mountController({}, { collection });
         await waitFor(() => expect(result.current.enabled).toBe(true));
 
         await act(async () => {
-            await result.current.generate({ values: { seo: { title: "Nested" } } });
+            await result.current.generate({ values: { seo: { title: "Nested" }, undeclared: "stays home" } });
         });
 
         const call = ((global as any).fetch as jest.Mock).mock.calls

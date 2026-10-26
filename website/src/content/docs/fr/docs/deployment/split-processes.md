@@ -1,5 +1,5 @@
 ---
-sourceHash: 8dc5279c89b40f48
+sourceHash: a9c35edb64ea5e56
 title: Séparation en plusieurs processus
 sidebar_label: Processus séparés
 description: Exécutez un seul bundle sous forme de plusieurs processus coopérants — une API, un niveau de fonctions, un worker — à partir de la même image d'exécution publiée, afin qu'une fonction personnalisée lourde ne vienne plus concurrencer l'API de données.
@@ -103,12 +103,16 @@ docker compose up --scale functions=3
 
 Les deux processus ont besoin du même `DATABASE_URL`, du même `JWT_SECRET` et de la même
 clé `REBASE_SERVICE_KEY` — ils constituent un seul déploiement, et un jeton généré par l'un doit
-être accepté par l'autre.
+être accepté par l'autre. Un processus avec `REBASE_FUNCTIONS_UPSTREAM` et sans
+`REBASE_SERVICE_KEY` refuse de démarrer : ses propres appels `rebase.functions.invoke(...)`,
+depuis un hook ou un job cron, atteignent le processus de fonctions avec cette clé.
 
 ## Conserver des URL identiques
 
 `REBASE_FUNCTIONS_UPSTREAM` indique au processus `api` de transférer `/api/functions/*`
-au processus de fonctions plutôt que de le traiter lui-même. Les clients, les SDK générés et les clés
+au processus de fonctions plutôt que de le traiter lui-même. Ce doit être une URL `http://` ou
+`https://` ; toute autre valeur interrompt le démarrage. Seuls `api` et `worker` le lisent
+(voir [Cron et tâches d'arrière-plan](#cron-et-tâches-darrière-plan) pour le worker). Les clients, les SDK générés et les clés
 d'API voient exactement la même interface qu'avant la séparation ; aucun code applicatif ne
 change donc et vous n'avez pas besoin de mettre en place un reverse proxy pour l'essayer.
 
@@ -198,7 +202,29 @@ désactivez-le sur l'API :
     environment:
       REBASE_ROLE: worker
       REBASE_MIGRATE_ON_BOOT: none
+      REBASE_SERVICE_KEY: ${REBASE_SERVICE_KEY}
+      # Only if a job calls rebase.functions:
+      REBASE_FUNCTIONS_UPSTREAM: http://functions:8080
 ```
+
+Un job qui passe sur un worker conserve `rebase.dataAsAdmin`, `rebase.sql`,
+`rebase.storage` et `rebase.email`, qui parlent directement à la base de données, aux buckets et
+au serveur de messagerie. Il conserve aussi :
+
+- **`rebase.admin`** (utilisateurs, rôles, réinitialisations de mot de passe) **et `rebase.cron`.** Un
+  worker ne sert aucune surface d'administration sur son port, mais porte ces deux éléments en processus,
+  pour ses propres jobs uniquement.
+- **`rebase.functions`, avec `REBASE_FUNCTIONS_UPSTREAM`.** Un worker ne sert aucune
+  fonction. Avec l'upstream défini, ses propres appels `rebase.functions.invoke(...)`
+  sont transmis au processus de fonctions, où la fonction voit l'appel comme émanant du service. Le worker ne répond toujours à rien sous `/api/functions`
+  sur son port. Le worker a besoin pour cela de la `REBASE_SERVICE_KEY` du déploiement,
+  comme l'`api`.
+
+Il perd `rebase.auth` : ce sont les flux de connexion d'une personne, et un worker
+n'en sert aucun. Pour du travail sur les comptes depuis un job, utilisez `rebase.admin`. Il perd aussi
+le reste de l'API d'administration (sauvegardes, logs, éditeur de schéma, etc.), et
+`rebase.functions` lorsqu'aucun upstream n'est défini. Un appel à l'un de ces éléments répond
+`404 NOT_FOUND` en nommant la surface désactivée et ce qu'il faut faire à la place.
 
 Un processus `functions` n'exécute jamais aucun des deux. Il est mis à l'échelle en fonction de la charge des requêtes et
 remplacé à volonté ; lui attribuer du travail planifié fausserait la signification
@@ -294,9 +320,10 @@ règle que vous devez respecter plutôt qu'une contrainte imposée par le runtim
 ## Mise à niveau
 
 Ce point est inchangé : chaque processus exécute la même image publiée, une mise à niveau correspond donc au même
-changement de tag sur chacun d'eux. Déployez l'`api` en dernier si vous souhaitez que le
-provisionnement du schéma s'effectue d'abord avec la nouvelle version — bien qu'en pratique
-l'ordre n'ait pas d'importance, car l'étape de mise à jour du schéma est cumulative et idempotente.
+changement de tag sur chacun d'eux. Déployez en premier le processus qui possède le schéma — l'`api`,
+ou le Job de migration — afin que le schéma de la nouvelle version soit en place avant que
+les autres processus ne s'exécutent contre lui : une unité peut être en retard, jamais en avance (voir
+[La règle](#la-règle)).
 
 ## Liens associés
 

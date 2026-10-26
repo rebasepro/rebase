@@ -178,7 +178,7 @@ The fallback search — a collection with no `search` block — matches `ILIKE` 
 your string properties, and it skips the ones the caller cannot read. Nothing
 leaks through it.
 
-A collection that **does** declare a [`search` block](/docs/backend/api/) compiles
+A collection that **does** declare a [`search` block](/docs/backend/search) compiles
 to a single generated `tsvector` column shared by every caller. There is no
 per-role variant of it, so a restricted field named in `search.fields` would stay
 *matchable* to callers who can never see its value — recoverable a term at a
@@ -187,7 +187,7 @@ time. Rebase refuses that combination at boot: remove the field from
 
 ## History
 
-[Entity history](/docs/backend/api/) stores the whole row, and it is served to
+[Entity history](/docs/backend/history) stores the whole row, and it is served to
 anyone who can read the row — the gate is "can you fetch this entity", not "are
 you an admin". So the read rule is applied to each stored snapshot too: the entry
 is still listed, with who changed it and when, and the withheld columns are gone
@@ -237,7 +237,7 @@ rule enforceable at all: something has to be able to store the password hash.
 
 Reads through `rebase.dataAsAdmin` hold the `admin` role, so a role rule does not
 hide anything from them. `[]` still does — including from `dataAsAdmin`. Use
-[`rebase.sql()`](/docs/backend/api/) if you need the raw column.
+[`rebase.sql()`](/docs/backend/custom-functions) if you need the raw column.
 
 ## Validation
 

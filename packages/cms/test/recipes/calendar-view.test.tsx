@@ -26,13 +26,21 @@ const tasks = {
     properties: {
         id: { type: "string", name: "Id", isId: "uuid" },
         title: { type: "string", name: "Title" },
-        dueDate: { type: "date", name: "Due date" }
+        dueDate: { type: "date", name: "Due date", columnType: "date" }
     },
     admin: { customViews: ["calendar"], defaultViewMode: "calendar" }
 } as unknown as AdminCollection;
 
 const now = new Date();
-const thisMonth = (day: number) => new Date(now.getFullYear(), now.getMonth(), day, 12);
+// A `date` column's "YYYY-MM-DD" reaches the admin as that day's UTC midnight,
+// which west of Greenwich is the day before in local time. Jest cannot change
+// the zone it runs in, so east of Greenwich the day is pinned at its last UTC
+// hour, already the next day in local time: either way the local day is wrong
+// and only the UTC day is right. (In a UTC runner the two agree.)
+const utcHour = now.getTimezoneOffset() > 0 ? 0 : 23;
+const thisMonth = (day: number) => new Date(Date.UTC(now.getFullYear(), now.getMonth(), day, utcHour, 30));
+const dayCell = (day: number) =>
+    document.querySelector(`[data-day="${now.getFullYear()}-${now.getMonth()}-${day}"]`) as HTMLElement;
 
 describe("recipe: calendar view", () => {
     beforeEach(() => {
@@ -51,15 +59,35 @@ describe("recipe: calendar view", () => {
     }
 
     it("puts each row on the day of its date, and skips rows without one", async () => {
+        // A due date of the 10th showed on the 9th for anyone west of UTC.
         renderCalendar();
         await screen.findByText("Ship 0.26");
 
-        const tenth = document.querySelector(`[data-day="${now.getFullYear()}-${now.getMonth()}-10"]`) as HTMLElement;
-        expect(within(tenth).getByText("Ship 0.26")).toBeTruthy();
-        expect(within(tenth).getByText("Write the changelog")).toBeTruthy();
-        const twentieth = document.querySelector(`[data-day="${now.getFullYear()}-${now.getMonth()}-20"]`) as HTMLElement;
-        expect(within(twentieth).getByText("Retro")).toBeTruthy();
+        expect(within(dayCell(10)).getByText("Ship 0.26")).toBeTruthy();
+        expect(within(dayCell(10)).getByText("Write the changelog")).toBeTruthy();
+        expect(within(dayCell(20)).getByText("Retro")).toBeTruthy();
         expect(screen.queryByText("Someday")).toBeNull();
+    });
+
+    it("puts a timestamp on its day in the property's declared timezone", async () => {
+        // 03:00 UTC on the 11th is still the 10th in Los Angeles, which is
+        // where the admin shows this property's dates.
+        const zoned = { ...tasks, properties: { ...tasks.properties, dueDate: { type: "date", name: "Due date", timezone: "America/Los_Angeles" } } } as unknown as AdminCollection;
+        db.rows = { tasks: [{ id: "f", title: "West coast launch", dueDate: new Date(Date.UTC(now.getFullYear(), now.getMonth(), 11, 3)) }] };
+        render(<InRebase collectionViews={[calendarView]}><CollectionPanel collection={zoned}/></InRebase>);
+        await screen.findByText("West coast launch");
+
+        expect(within(dayCell(10)).getByText("West coast launch")).toBeTruthy();
+    });
+
+    it("puts a timestamp on its local day", async () => {
+        // 23:30 on the 10th in New York is already the 11th in UTC.
+        const timestamps = { ...tasks, properties: { ...tasks.properties, dueDate: { type: "date", name: "Due date" } } } as unknown as AdminCollection;
+        db.rows = { tasks: [{ id: "e", title: "Late call", dueDate: new Date(now.getFullYear(), now.getMonth(), 10, 23, 30) }] };
+        render(<InRebase collectionViews={[calendarView]}><CollectionPanel collection={timestamps}/></InRebase>);
+        await screen.findByText("Late call");
+
+        expect(within(dayCell(10)).getByText("Late call")).toBeTruthy();
     });
 
     it("opens a row's record when it is clicked", async () => {

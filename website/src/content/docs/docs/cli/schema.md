@@ -22,7 +22,7 @@ Your collection definitions in `config/collections/` describe tables, columns, t
 
 ### 2. Drizzle Schema → Migrations
 
-From the generated Drizzle schema, `db generate` diffs against the migrations already in `drizzle/migrations/`, replayed on a scratch database, and produces timestamped SQL migration files. It never reads your database: a column boot or `db push` already added still comes out as `ADD COLUMN`.
+From the generated Drizzle schema, `db generate` diffs against the migrations already in `backend/drizzle/migrations/`, replayed on a scratch database, and produces timestamped SQL migration files. It never reads your database: a column boot or `db push` already added still comes out as `ADD COLUMN`.
 
 ### 3. Migrations → PostgreSQL
 
@@ -83,7 +83,7 @@ rebase schema introspect
 ```
 
 **What it does:**
-- Connects to your database (using the connection string from your `.env`)
+- Connects to this project's database, the one `rebase db url` prints (the managed one is started if that is it); `--database-url` names another, and `--docker` uses the compose one
 - Inspects all tables, columns, types, and foreign keys
 - Generates collection definition files
 - Reads each
@@ -139,6 +139,9 @@ rebase schema introspect
 | `--output, -o` | Output directory for generated collection files |
 | `--schema` | The Postgres schema to read (default: `public`) |
 | `--force, -f` | Overwrite collection files that already exist; without it, an existing file is skipped |
+| `--database-url` | Read this database instead of the project's own |
+| `--docker` | Read the compose database, starting it if needed |
+| `--data-inference` / `--no-data-inference` | Sample up to 100 rows per table to detect formats, constraints and UI settings, or read the structure only. Without either it asks, and without a terminal it reads the structure only |
 
 This is useful when adopting Rebase on an existing database — introspect first, then customize the generated collections.
 
@@ -176,7 +179,9 @@ rebase db push
   before the drop of a CHECK or EXCLUDE constraint the database holds: no row
   is lost, but from then on the database accepts the rows it refused.
   It asks on a terminal, where Ctrl-C or Ctrl-D answers no, and refuses
-  otherwise; `--allow-destructive` (or `--yes`) applies it anyway. A push that
+  otherwise; `--allow-destructive` applies it anyway. `--yes` still does too in
+  this release, with a deprecation warning; from the next release it approves
+  only pushes that destroy nothing. A push that
   stops there drops its scratch `<db>_dev_diff` database on the way out
 - Switches row-level security on for every collection table, junctions included, right after the
   schema change and before any step that can fail, so a push that stops part-way leaves a new table
@@ -288,7 +293,7 @@ rebase db generate
 
 **What it does:**
 - Compares the Drizzle schema against the state the migrations in `drizzle/migrations/` build, not against your database
-- Produces timestamped SQL migration files in `drizzle/migrations/`
+- Produces timestamped SQL migration files in `backend/drizzle/migrations/`
 - Files can be reviewed, edited, and committed to version control
 - Names every
   statement in the new migration that destroys data, using the check `db push`
@@ -403,7 +408,7 @@ Run `doctor` whenever something feels out of sync. It pinpoints exactly where th
 
 The database comparison includes the one boot makes before it warns that `schema.generated.ts` and the database disagree, run through the same code. So every difference boot warns about is in the report too, in the same words: a column that is NOT NULL on one side and nullable on the other, and a column the database still has that the file does not (boot never drops one, so a renamed property leaves its old column behind). Each is a warning, and the fix names `rebase db push`.
 
-The database comparison needs `DATABASE_URL` (or `ADMIN_CONNECTION_STRING`). Without one, that phase is reported as **skipped** rather than passing, and the run never closes with "All schemas are in sync" — a check that did not happen is not a clean bill of health.
+The database comparison reads the project's database, resolved the way `rebase db url` resolves it — on a fresh scaffold the managed one, which `doctor` starts. When none can be resolved, that phase is reported as **skipped** rather than passing, and the run never closes with "All schemas are in sync" — a check that did not happen is not a clean bill of health.
 
 It also names every collection with no [`search` block](/docs/backend/search) whose table holds more than about 10,000 rows. A search there — the admin's search box, `.search()`, `?searchString=` — is `ILIKE '%term%'` over the text columns, which no index can serve, so each one reads the whole table, and its count reads it again (about a third of a second at 100,000 rows, growing with the table). The row count is Postgres's own estimate, so the check scans nothing. It is a hint: it does not change the exit code, and nothing is indexed for you.
 
@@ -498,9 +503,9 @@ rebase schema generate
 # 3. Generate SQL migration files
 rebase db generate
 
-# 4. Review the generated SQL in drizzle/migrations/
+# 4. Review the generated SQL in backend/drizzle/migrations/
 # 5. Commit the migration to version control
-git add drizzle/migrations/
+git add backend/drizzle/migrations/
 
 # 6. Apply in production
 #    A database Rebase has already booted needs a baseline the first time —

@@ -14,6 +14,7 @@ import { assertNestedWriteAllowed, type NestedWriteKind } from "./nested-write-a
 import { ETAG_HEADER, IF_MATCH_HEADER, assertIfMatch, rowETag } from "./etag";
 import { assertRefsResolvable, parseBatchBody, type ParsedBatchOperation } from "./batch";
 import { httpMethodToOperation, type DataOperation } from "../../auth/api-keys/http-operation";
+import { refuseSimulatedWrite } from "../../auth/simulation-read-only";
 import {
     assertNoUserUpsert,
     assertUserCreationBodyValid,
@@ -215,12 +216,18 @@ export class RestApiGenerator {
         driver: DataDriver,
         authAdapter?: AuthAdapter,
         maxBulkRows: number = DEFAULT_MAX_BULK_ROWS,
-        listLimits: ListLimitOptions = {}
+        listLimits: ListLimitOptions = {},
+        /**
+         * `provision: false` is a backend that changes nothing in its database:
+         * the idempotency-key table is used if it is there, never created.
+         */
+        storeOptions: { provision?: boolean } = {}
     ) {
         this.collections = collections;
         this.driver = driver;
         this.authAdapter = authAdapter;
         this.maxBulkRows = maxBulkRows;
+        this.provision = storeOptions.provision;
         this.listLimits = {
             defaultLimit: listLimits.defaultLimit ?? DEFAULT_LIST_LIMIT,
             maxLimit: listLimits.maxLimit ?? MAX_LIST_LIMIT
@@ -233,8 +240,9 @@ export class RestApiGenerator {
      * for SQL support and creates a table, and most requests never send a key.
      */
     private idempotencyStore?: IdempotencyStore | null;
+    private readonly provision: boolean | undefined;
     private idempotency(): IdempotencyStore | undefined {
-        this.idempotencyStore ??= createIdempotencyStore(this.driver) ?? null;
+        this.idempotencyStore ??= createIdempotencyStore(this.driver, { provision: this.provision }) ?? null;
         return this.idempotencyStore ?? undefined;
     }
 
@@ -588,11 +596,17 @@ export class RestApiGenerator {
          */
         operationOverride?: DataOperation
     ): void {
+        const operation = operationOverride ?? httpMethodToOperation(c.req.method);
+        // Every route states its operation here, so this is also where
+        // "Simulate access" stays read-only — each operation of a `_batch`
+        // included, and `POST …/query` / `…/count` still allowed as the reads
+        // they are.
+        refuseSimulatedWrite(c, operation);
+
         const narrowed = c.get("scopes");
         if (!Array.isArray(narrowed)) return;
         const held = narrowed.filter((entry): entry is string => typeof entry === "string");
 
-        const operation = operationOverride ?? httpMethodToOperation(c.req.method);
         const scope = `data:${operation}`;
         if (!scopeGrants(held, scope, collectionSlug)) {
             throw new ApiError(403, "SCOPE_MISSING",

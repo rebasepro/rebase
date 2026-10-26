@@ -51,6 +51,11 @@ export const SwitchFieldBinding = function SwitchFieldBinding({
                 disabled={disabled}
                 autoFocus={autoFocus}
                 size={size}
+                // With its label inside, a switch stands as tall as a text
+                // field whose label is inside: 64px plus the field's 1px
+                // (transparent) border top and bottom. Pairing puts switches
+                // side by side, and the rail stacks them under selects.
+                className={!hideLabel && size === "large" ? "min-h-[66px]" : undefined}
             />
 
             <FieldHelperText includeDescription={includeDescription}

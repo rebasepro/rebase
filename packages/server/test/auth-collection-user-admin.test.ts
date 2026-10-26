@@ -17,6 +17,7 @@ import { describe, it, expect, jest } from "@jest/globals";
 import { Hono } from "hono";
 import { RestApiGenerator } from "../src/api/rest/api-generator";
 import { errorHandler } from "../src/api/errors";
+import type { HonoEnv } from "../src/api/types";
 import { createBuiltinAuthAdapter } from "../src/auth/builtin-auth-adapter";
 import type { AuthHooks } from "../src/auth/auth-hooks";
 import type { AuthRepository, UserData } from "../src/auth/interfaces";
@@ -85,7 +86,7 @@ function harness(options: {
                     return { messageId: "m" };
                 }
             } as unknown as EmailService,
-            emailConfig: { resetPasswordUrl: "https://app.example.com" }
+            emailConfig: { from: "noreply@example.com", resetPasswordUrl: "https://app.example.com" }
         } : {})
     });
 
@@ -115,7 +116,7 @@ function harness(options: {
         })
     } as unknown as DataDriver;
 
-    const app = new Hono();
+    const app = new Hono<HonoEnv>();
     app.onError(errorHandler);
     app.use("/*", async (c, next) => {
         c.set("driver" as never, driver as never);
@@ -128,7 +129,7 @@ function harness(options: {
     return { app, calls, writes, sent, deleteAllRefreshTokensForUser };
 }
 
-const send = (app: Hono, method: string, path: string, body?: unknown) =>
+const send = (app: Hono<HonoEnv>, method: string, path: string, body?: unknown) =>
     app.request(path, {
         method,
         headers: { "Content-Type": "application/json" },
@@ -221,6 +222,16 @@ describe("updating a user through the data API", () => {
 
         expect(res.status).toBe(200);
         expect(writes()).toHaveLength(1);
+    });
+
+    it("refuses a role name that would be read back as other roles, as /admin/users does", async () => {
+        const { app, writes } = harness({ admins: ["admin-1", "admin-2"] });
+
+        const res = await send(app, "PATCH", "/users/admin-2", { roles: ["viewer,admin"] });
+
+        expect(res.status).toBe(400);
+        expect((await errorOf(res)).code).toBe("INVALID_ROLE");
+        expect(writes()).toHaveLength(0);
     });
 
     it("refuses a bulk update that demotes every administrator at once", async () => {
@@ -318,6 +329,15 @@ describe("creating users through the data API's bulk doors", () => {
         expect(data[0]).toMatchObject({ invitationSent: false });
         expect(data[0]?.temporaryPassword).toBeUndefined();
         expect(typeof data[1]?.temporaryPassword).toBe("string");
+    });
+
+    it("POST /bulk refuses a role name that would be read back as other roles", async () => {
+        const { app, writes } = harness({ admins: ["admin-1"] });
+
+        const res = await send(app, "POST", "/users/bulk", { rows: [{ email: "n@example.com", roles: ["viewer,admin"] }] });
+
+        expect(res.status).toBe(400);
+        expect(writes()).toHaveLength(0);
     });
 
     it("POST /bulk answers in full even when asked for a minimal answer, as POST /users does", async () => {

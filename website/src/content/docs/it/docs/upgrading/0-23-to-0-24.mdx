@@ -1,5 +1,5 @@
 ---
-sourceHash: acd1967fc17b4924
+sourceHash: b95e3733ef1e2cda
 slug: it/docs/upgrading/0-23-to-0-24
 title: Aggiornamento da 0.23 a 0.24
 sidebar_label: 0.23 → 0.24
@@ -179,7 +179,7 @@ mantiene la sua chiave. Un upsert la cui chiave apparteneva a una tale riga scri
 riga nascosta e rispondeva `201 Created`, quindi la riga restava eliminata e il
 chiamante vedeva un successo. Ora viene rifiutato con `409 ROW_IN_TRASH` e nulla viene
 scritto, su ogni porta di upsert: `?on_conflict=`, `/bulk`, `/_batch`, l'SDK, il
-socket, e `rebase.data` o `context.data` sul server.
+socket, e `rebase.dataAsAdmin` o `context.data` sul server.
 
 **Cosa modificare:** nulla, a meno che qualcosa non faccia upsert in una collection con soft delete
 e si aspetti di riportare in vita una riga. Ripristina prima la riga, con un
@@ -195,7 +195,7 @@ update che imposta il suo campo di soft delete a `null`, poi fai l'upsert. Oppur
 ## 49. Un update che cambia la chiave di una riga viene rifiutato con `400 KEY_IMMUTABLE`
 
 Un update il cui body nominava la chiave della riga con un altro valore, o un `beforeSave`
-che la cambiava, rispondeva `500`. In-process, tramite `rebase.data`, la riga si era
+che la cambiava, rispondeva `500`. In-process, tramite `rebase.dataAsAdmin`, la riga si era
 già spostata sulla nuova chiave quando la scrittura generava l'errore. Ora ogni porta lo rifiuta
 con `400 KEY_IMMUTABLE` prima che venga eseguito qualsiasi hook, nominando il campo, e nulla viene
 scritto. Inviare la chiave che la riga ha già è ancora accettato.
@@ -373,7 +373,7 @@ Vedi [L'endpoint remoto](/docs/ai/mcp/#the-remote-endpoint).
 
 ## 57. Le scritture in-process rifiutano `ifMatch` e `idempotencyKey`
 
-Una scrittura tramite `context.data` in una callback, o `rebase.data` in una function,
+Una scrittura tramite `context.data` in una callback, o `rebase.dataAsAdmin` in una function,
 cron job o seed, non lascia mai il processo: non c'è alcun `If-Match` da controllare e
 nessuno store di idempotenza. Entrambe le opzioni venivano ignorate in silenzio, quindi una scrittura
 condizionale lì era incondizionata. Ora lanciano `UNSUPPORTED_OPTION` prima che
@@ -389,7 +389,7 @@ HTTP, che rispetta entrambe.
 ```
 
 ```bash
-grep -rnE "(context|rebase)\.data\..*(ifMatch|idempotencyKey)" --exclude-dir=node_modules .
+grep -rnE "(context\.data|rebase\.dataAsAdmin)\..*(ifMatch|idempotencyKey)" --exclude-dir=node_modules .
 ```
 
 ## 58. `Button` e `IconButton` sono tipizzati rispetto all'elemento che renderizzano

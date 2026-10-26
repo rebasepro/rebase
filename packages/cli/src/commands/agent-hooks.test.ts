@@ -17,7 +17,7 @@ import path from "path";
 import { fileURLToPath } from "url";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
-import { AGENT_HOOK_SCRIPT, AGENT_HOOK_SETTINGS, installAgentHooks } from "./agent-setup";
+import { AGENT_HOOK_SCRIPT, AGENT_HOOK_SETTINGS, hookScriptSha256, installAgentHooks, SHIPPED_HOOK_SCRIPT_SHA256S } from "./agent-setup";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const PACKAGE_ROOT = path.resolve(HERE, "..", "..");
@@ -85,6 +85,28 @@ describe("installAgentHooks", () => {
         expect(installAgentHooks(project, { force: true })[0].status).toBe("replaced");
     });
 
+    it("replaces a copy this CLI shipped earlier instead of calling it edited", () => {
+        // The hook exactly as `rebase init` wrote it on 2026-10-20 (4451138e43),
+        // before the Windows, predates-verify and not-installed fixes.
+        installAgentHooks(project);
+        fs.writeFileSync(
+            path.join(project, AGENT_HOOK_SCRIPT),
+            fs.readFileSync(path.join(HERE, "__test_support__", "post-edit-collection.4451138e43.sh"), "utf-8")
+        );
+        expect(installAgentHooks(project)[0].status).toBe("replaced");
+        expect(fs.readFileSync(path.join(project, AGENT_HOOK_SCRIPT), "utf-8"))
+            .toBe(fs.readFileSync(path.join(TEMPLATE, AGENT_HOOK_SCRIPT), "utf-8"));
+    });
+
+    it("knows every version it shipped, the current one included", () => {
+        // Changing the hook means appending its new hash: the old one must stay,
+        // or projects scaffolded with it would read as edited and never update.
+        const shipped = fs.readFileSync(path.join(TEMPLATE, AGENT_HOOK_SCRIPT), "utf-8");
+        expect(SHIPPED_HOOK_SCRIPT_SHA256S.at(-1)).toBe(hookScriptSha256(shipped));
+        expect(new Set(SHIPPED_HOOK_SCRIPT_SHA256S).size).toBe(SHIPPED_HOOK_SCRIPT_SHA256S.length);
+        expect(hookScriptSha256(shipped.replace(/\n/g, "\r\n"))).toBe(hookScriptSha256(shipped));
+    });
+
     it("leaves a settings file that is not plain JSON alone", () => {
         fs.mkdirSync(path.join(project, ".claude"));
         fs.writeFileSync(path.join(project, AGENT_HOOK_SETTINGS), "{ // a comment\n}\n");
@@ -138,5 +160,57 @@ describe("post-edit-collection.sh", () => {
         expect(result.stderr).toContain("rebase verify failed after editing config/collections/posts.ts");
         expect(result.stderr).toContain(finding);
         expect(result.stderr).toContain("Fix them in config/collections/");
+    });
+
+    it("does not block the edit when the project's CLI predates `rebase verify`", () => {
+        fakeRebase(1, "✗ Unknown command \"verify\" — did you mean `version`? Run `rebase --help` for the rest.");
+        const result = runHook(path.join(project, "config", "collections", "posts.ts"));
+        expect(result.status).toBe(0);
+        expect(result.stderr).toContain("predates `rebase verify`");
+        expect(result.stderr).not.toContain("Fix them in config/collections/");
+    });
+
+    it("checks the collections where rebase.json moved the backend's config", () => {
+        fs.writeFileSync(path.join(project, "rebase.json"), JSON.stringify({
+            rebase: "^1", apps: { backend: { type: "backend", runtime: "managed", config: "shared" } }
+        }));
+        fakeRebase(1, "✗ shared/collections/posts.ts → posts.securityRules  missing.");
+        const result = runHook(path.join(project, "shared", "collections", "posts.ts"));
+        expect(result.status).toBe(2);
+        expect(fs.readFileSync(path.join(project, "ran"), "utf-8").trim()).toBe("verify --quiet");
+        expect(result.stderr).toContain("Fix them in shared/collections/");
+
+        fs.rmSync(path.join(project, "ran"));
+        expect(runHook(path.join(project, "config", "collections", "posts.ts")).status).toBe(0);
+        expect(fs.existsSync(path.join(project, "ran"))).toBe(false);
+    });
+
+    it("does not block the edit in a project whose dependencies are not installed yet", () => {
+        // What `rebase init --yes` leaves: no node_modules at all. A stand-in
+        // `npx` on PATH that fails the way npm does proves nothing reaches it.
+        const bin = path.join(project, "fake-bin");
+        fs.mkdirSync(bin);
+        fs.writeFileSync(path.join(bin, "npx"), [
+            "#!/usr/bin/env bash",
+            `echo ran > "${path.join(project, "ran")}"`,
+            "echo 'npm error could not determine executable to run' >&2",
+            "exit 1"
+        ].join("\n"), { mode: 0o755 });
+        const result = spawnSync("bash", [path.join(TEMPLATE, AGENT_HOOK_SCRIPT)], {
+            input: JSON.stringify({ tool_name: "Edit", tool_input: { file_path: path.join(project, "config", "collections", "posts.ts") } }),
+            env: { ...process.env, CLAUDE_PROJECT_DIR: project, PATH: `${bin}${path.delimiter}${process.env.PATH ?? ""}` },
+            encoding: "utf-8"
+        });
+        expect(result.status).toBe(0);
+        expect(result.stderr).toContain("dependencies are not installed");
+        expect(result.stderr).not.toContain("Fix them in");
+        expect(fs.existsSync(path.join(project, "ran"))).toBe(false);
+    });
+
+    it("checks an edit Claude Code reports with a Windows path", () => {
+        fakeRebase(1, "✗ config/collections/posts.ts → posts.securityRules  missing.");
+        const result = runHook("C:\\Users\\me\\shop\\config\\collections\\posts.ts");
+        expect(result.status).toBe(2);
+        expect(fs.readFileSync(path.join(project, "ran"), "utf-8").trim()).toBe("verify --quiet");
     });
 });

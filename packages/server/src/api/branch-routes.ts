@@ -7,9 +7,9 @@ import { logger } from "../utils/logger";
 /**
  * Studio's review of a database branch: what it changed, and merging it.
  *
- * Mounted under `/api/admin/branches` behind the admin gate — `database:read`
- * for the diff, `database:write` for the merge, the scopes the socket's
- * `LIST_BRANCHES` and `CREATE_BRANCH` ask of the same pane.
+ * Mounted under `/api/admin/branches` behind the admin gate — `database:write`
+ * for both: the diff's sample rows are read as the database owner, outside
+ * row-level security, from both databases.
  *
  * Engine-agnostic: the comparison is the driver's (`BranchAdmin.diffBranch`,
  * `mergeBranch`), and a driver without it answers 501. The driver's refusals

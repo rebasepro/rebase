@@ -1,7 +1,11 @@
 import { createDataSourceRegistry, resolveDataSource } from "@rebasepro/common";
 import { DEFAULT_DATA_SOURCE_KEY } from "@rebasepro/types";
-import type { BackendBootstrapper, CollectionConfig, InitializedDriver } from "@rebasepro/types";
+import type { BackendBootstrapper, CollectionConfig, DataDriver, InitializedDriver } from "@rebasepro/types";
 
+import { createIdempotencyStore } from "../api/rest/idempotency";
+import { resolveRateLimitStoreKind } from "../auth/resolve-rate-limit-store";
+import { createSqlRateLimitStore } from "../auth/sql-rate-limit-store";
+import { createCronStore } from "../cron/cron-store";
 import { loadCollectionsFromDirectory } from "../collections/loader";
 import { logger } from "../utils/logger";
 import { schemaRecoveryGuidance } from "./version-skew";
@@ -102,7 +106,6 @@ function describeAdapter(target: ProvisionTarget): string {
         : `this project's "${target.engine}" adapter`;
 }
 
-/** `REBASE_MIGRATE_ON_BOOT=none` opts a deployment out of both phases. */
 /**
  * How one call to a provisioning function is run.
  *
@@ -117,11 +120,93 @@ export interface ProvisionRunOptions {
     env?: { REBASE_MIGRATE_ON_BOOT?: string };
     /** Default `true`. `false` leaves every DDL statement to another process. */
     provision?: boolean;
+    /**
+     * Why `provision` is `false`, when it is — phrased to follow "skipped —".
+     * Defaults to the split-deployment reason, which is the only one that
+     * existed before a backend could be told to provision nothing at all.
+     */
+    skipReason?: string;
 }
 
+/** `REBASE_MIGRATE_ON_BOOT=none` opts a deployment out of both phases. */
 export function provisioningDisabled(env: { REBASE_MIGRATE_ON_BOOT?: string } = process.env): boolean {
     return (env.REBASE_MIGRATE_ON_BOOT || "ensure") === "none";
 }
+
+/**
+ * `REBASE_PROVISION`: whether this deployment may change its own database.
+ *
+ * `false` is the answer for a database whose schema changes only through a
+ * change process somebody else runs. The backend is then built with
+ * `provision: false`: no table, column, index, type, function, trigger,
+ * policy, role or grant is created or altered — at boot, or later by a request
+ * that would have created a table on first use — and none of the bookkeeping
+ * writes a provisioning boot makes (the first admin account, version stamps)
+ * happens either. What the database lacks is reported, by name, instead.
+ *
+ * Wider than `REBASE_MIGRATE_ON_BOOT=none`, and deliberately a second
+ * variable rather than a new meaning for that one. `none` has only ever turned
+ * off the *collection* schema; the framework's own tables stayed current on
+ * every boot, and deployments rely on that — the chart's migration-Job
+ * topology runs every api pod with `none`. Widening `none` would stop those
+ * pods keeping `rebase.*` current on the next upgrade, silently.
+ *
+ * A blank value is unset, for the same reason as `REBASE_PROVISION_ONLY`: a
+ * compose file writes `${REBASE_PROVISION}` with nothing behind it all the
+ * time. Anything else that is not a yes or a no is refused rather than
+ * guessed at — read as `true`, a typo would leave a change-managed database
+ * being changed.
+ */
+export function resolveProvisionEnv(env: { REBASE_PROVISION?: string } = process.env): boolean {
+    // The same two spellings the boot environment's schema accepts, so a value
+    // means one thing whichever entry point reads it.
+    const raw = (env.REBASE_PROVISION ?? "").trim();
+    if (raw === "" || raw === "true") return true;
+    if (raw === "false") return false;
+    throw new Error(
+        `REBASE_PROVISION must be "true" or "false" (got "${env.REBASE_PROVISION}"). ` +
+        "`false` keeps every schema change out of this backend's boot."
+    );
+}
+
+/**
+ * Create, now, the tables a serving process would otherwise create on first
+ * use: the idempotency keys every keyed write needs, the cron tables the
+ * hourly sweeps claim their slots in, and the shared rate-limit counters when
+ * `REBASE_RATE_LIMIT_STORE=sql` asks for them.
+ *
+ * What a provisioning run calls. A deployment whose serving processes run with
+ * `REBASE_PROVISION=false` never creates anything, so this run is the only
+ * place those tables can come from — and its recorded SQL is only the whole
+ * schema those processes need if it made them.
+ */
+export async function provisionFirstUseTables(
+    driver: DataDriver,
+    env: { REBASE_RATE_LIMIT_STORE?: string } = process.env
+): Promise<void> {
+    // The token and history sweeps claim an hourly slot here on any backend
+    // with auth, crons or not.
+    await createCronStore(driver)?.ensureTable();
+    const idempotency = createIdempotencyStore(driver);
+    if (idempotency && !(await idempotency.ensureTable())) {
+        logger.warn("Provisioning: the idempotency-key table could not be created; see the error above.");
+    }
+    if (resolveRateLimitStoreKind(env) === "sql") {
+        const rateLimits = createSqlRateLimitStore(driver);
+        if (rateLimits && !(await rateLimits.ensureTable())) {
+            logger.warn("Provisioning: the shared rate-limit table could not be created; see the error above.");
+        }
+    }
+}
+
+/** The one line a backend that provisions nothing says about it, at boot. */
+export const PROVISIONING_OFF_NOTICE =
+    "Provisioning is off: this backend changes nothing in its database — no tables, columns, indexes, " +
+    "functions, triggers, policies, roles or grants. What the database lacks is reported below, by name.";
+
+/** Why each provisioning step skips on such a backend, phrased to follow "skipped —". */
+export const PROVISIONING_OFF_SKIP_REASON =
+    "this backend changes nothing in its database (provisioning is off), so the schema is left to whatever manages it.";
 
 /**
  * Ask the database whether it is there, before boot's first real query.
@@ -181,7 +266,8 @@ reason };
     // says this deployment provisions nothing, while this says this process is
     // not the one that does it.
     if (options.provision === false) {
-        return skip("this process does not provision the schema — another process in this deployment owns it.");
+        return skip(options.skipReason
+            ?? "this process does not provision the schema — another process in this deployment owns it.");
     }
     if (provisioningDisabled(options.env ?? process.env)) {
         return skip("REBASE_MIGRATE_ON_BOOT=none, leaving the database schema untouched.");
@@ -254,10 +340,10 @@ export async function provisionCollectionPolicies(
         // Said out loud, unlike this function's other early returns. A missing
         // policy is not a missing table: routes answer 200 with zero rows rather
         // than 500, so nothing else in the logs will point here.
-        logger.info(
-            "Collection RLS policies: not applied by this process — another process in this deployment owns them."
-        );
-        return { status: "skipped", reason: "another process provisions" };
+        logger.info(options.skipReason
+            ? `Collection RLS policies: not applied — ${options.skipReason}`
+            : "Collection RLS policies: not applied by this process — another process in this deployment owns them.");
+        return { status: "skipped", reason: options.skipReason ?? "another process provisions" };
     }
     if (provisioningDisabled(options.env ?? process.env)) {
         return { status: "skipped", reason: "REBASE_MIGRATE_ON_BOOT=none" };

@@ -85,8 +85,8 @@ cannot include cluster-wide roles, and the dump's grants and row-level-security
 policies name one — `rebase_user`. Restored into a new Postgres without it, the
 first `GRANT` to that role fails and the restore stops.
 
-Keep the two files together. The CLI uploads, lists, prunes and restores them
-as a pair, and `rebase db restore` looks for the `.globals.sql` in the same
+Keep the two files together. The CLI uploads and restores them as a pair, a
+scheduled backup prunes them as one, and `rebase db restore` looks for the `.globals.sql` in the same
 directory or prefix as the `.dump`. Roles are recreated **without passwords**;
 set them again after a restore into a new cluster. `PG_DUMPALL_PATH` points at a
 specific `pg_dumpall` binary.
@@ -122,7 +122,7 @@ Drop a file into `backend/crons/` that default-exports one:
 
 ```ts
 // backend/crons/backup.ts
-import { GCSStorageController, S3StorageController, type StorageController } from "@rebasepro/server";
+import { backupStorageFromEnv, type StorageController } from "@rebasepro/server";
 import { createBackupCron, backupCronConfigFromEnv } from "@rebasepro/server-postgres";
 
 const resolved = backupCronConfigFromEnv(process.env);
@@ -130,19 +130,9 @@ if (resolved.error) throw new Error(resolved.error);
 
 function backupStorage(): StorageController | undefined {
     const destination = resolved.config?.destination;
-    if (destination?.kind === "gcs") {
-        return new GCSStorageController({ type: "gcs", bucket: destination.bucket });
-    }
-    if (destination?.kind !== "s3") return undefined; // local: written to disk directly
-    return new S3StorageController({
-        type: "s3",
-        bucket: destination.bucket,
-        region: process.env.S3_REGION || "auto",
-        accessKeyId: process.env.S3_ACCESS_KEY_ID ?? "",
-        secretAccessKey: process.env.S3_SECRET_ACCESS_KEY ?? "",
-        endpoint: process.env.S3_ENDPOINT,
-        forcePathStyle: process.env.S3_FORCE_PATH_STYLE === "true"
-    });
+    if (!destination || destination.kind === "local") return undefined; // local: written to disk directly
+    // The same S3_* (or application-default GCS) client the CLI and the Backups panel build.
+    return backupStorageFromEnv(destination, process.env);
 }
 
 // With BACKUP_SCHEDULE unset, export a disabled job so discovery still works.
@@ -187,8 +177,9 @@ install the client tools yourself (see the next section).
 ## Version compatibility
 
 `pg_dump` and `pg_restore` must be the **same major version as the server, or
-newer**. Every command checks the client's major against the live server's
-`server_version_num` first and stops with the remedy if they do not fit, or if
+newer**. `rebase db backup` and `rebase db restore` check the client's major
+against the live server's `server_version_num` before they dump or restore, and
+stop with the remedy if they do not fit, or if
 the binary is missing:
 
 ```
@@ -267,7 +258,8 @@ was pg_restore's own, one statement at a time: a table the backup lacked in
 
 Before restoring, it recreates the cluster roles from the backup's
 `.globals.sql` — an existing role is skipped, not an error — so the dump's
-grants and policies apply. It then runs with `--exit-on-error`: a restore that
+grants and policies apply. It then stops at the first error (`--exit-on-error`,
+or `ON_ERROR_STOP` under `--clean`): a restore that
 logged a failed `GRANT` and carried on would report success with row-level
 security not enforced. Without a `.globals.sql` beside the backup it warns that
 roles may be missing.
@@ -295,7 +287,8 @@ then move the app:
 ## The Backups panel
 
 Studio's **Backups** panel, in the *Database* group, lists the backups at
-`BACKUP_DESTINATION`, newest first, with their size and time. **Download**
+`BACKUP_DESTINATION`, newest first, with their time (and their size, for a local
+destination). **Download**
 fetches the dump; **Roles file** fetches its `.globals.sql`. Download both and
 keep them in one directory. A backup marked **No roles file** has no sidecar:
 recreate its roles by hand before restoring it into a new Postgres.
@@ -369,9 +362,9 @@ const { stream, name } = await client.backups.stream(key);
 await pipeline(Readable.fromWeb(stream), createWriteStream(name));
 ```
 
-Before 0.24, `backups.download(key)` answered a `Blob` holding the whole dump.
+On 0.24 and earlier, `backups.download(key)` answered a `Blob` holding the whole dump.
 It now saves the file in a browser and throws elsewhere; use `stream(key)`
-in Node. Against a server without download links (one older than 0.24, or one
+in Node. Against a server without download links (one older than 0.25, or one
 with no JWT secret to sign them), `download()` falls back to reading the bytes
 itself.
 

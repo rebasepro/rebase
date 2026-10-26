@@ -20,12 +20,30 @@ export function branchDiffReport(diff: BranchDiff): string[] {
     }
     lines.push("");
     lines.push(diff.data.length === 0 ? "Data: no changes" : `Data: ${diff.data.length} table(s) with changed rows`);
+    // The target's rows, per table, that reference a row the branch deleted:
+    // not "kept" — a merge the branch wins reaches them.
+    const reached = new Map<string, number>();
+    for (const found of diff.data.flatMap((table) => table.referencedBy ?? [])) {
+        reached.set(`${found.schema}.${found.table}`, (reached.get(`${found.schema}.${found.table}`) ?? 0) + found.rows);
+    }
     for (const table of diff.data) {
         const name = table.collection ? `${table.schema}.${table.table} (${table.collection})` : `${table.schema}.${table.table}`;
-        const counts = [`+${table.inserted}`, `~${table.updated}`, `-${table.deleted}`];
+        // A table whose rows were not matched has counts nobody knows.
+        const counts = table.rowCounts
+            ? [`rows: ${table.rowCounts.target} on ${diff.targetDatabase}, ${table.rowCounts.branch} on the branch, not matched one by one`]
+            : [`+${table.inserted}`, `~${table.updated}`, `-${table.deleted}`];
         if (table.conflicts > 0) counts.push(`${table.conflicts} conflict(s)`);
-        if (table.targetChanges > 0) counts.push(`${table.targetChanges} changed on ${diff.targetDatabase} only, kept`);
+        const referencing = Math.min(reached.get(`${table.schema}.${table.table}`) ?? 0, table.targetChanges);
+        if (table.targetChanges > 0) {
+            counts.push(referencing > 0
+                ? `${table.targetChanges} changed on ${diff.targetDatabase} only (${referencing} reference a row the branch deleted)`
+                : `${table.targetChanges} changed on ${diff.targetDatabase} only, kept`);
+        }
         lines.push(`  ${name}: ${counts.join("  ")}`);
+        if (table.referencedBy && table.referencedBy.length > 0) {
+            const tables = table.referencedBy.map((found) => `${found.schema}.${found.table} (${found.rows} row(s), ON DELETE ${found.onDelete.toUpperCase()})`);
+            lines.push(`    deleted on the branch, but referenced by rows ${diff.targetDatabase} wrote since: ${tables.join(", ")}`);
+        }
         if (table.blocked) lines.push(`    cannot be merged: ${table.blocked.message}`);
     }
     lines.push("");

@@ -31,7 +31,8 @@ its operator signs in with — otherwise it comes up with an empty user table an
 no way to produce the first authenticated caller. `config.adminPassword` must be
 at least 12 characters, and `config.adminEmail` needs a dot in its domain: the
 login route parses its body with `z.string().email()`, so `admin@localhost`
-seeds an account and then refuses every sign-in. Both are refusals rather than
+is an account nobody could sign in to and the runtime refuses to seed it. Both
+are render-time refusals rather than
 runtime surprises — see [what the chart refuses to
 render](#what-the-chart-refuses-to-render). Sign in and change the password;
 these values land in a Secret.
@@ -57,7 +58,7 @@ backups and your failover, which is a much larger promise than "run the app".
 > [Self-Hosting](/docs/deployment/self-hosting) for the path that is.
 
 To work from a checkout instead — a modified chart, or an air-gapped install —
-`helm install rebase ./charts/rebase` takes the same values.
+`helm install rebase ./infra/charts/rebase` takes the same values.
 
 ## Getting your project into the pod
 
@@ -67,6 +68,8 @@ To work from a checkout instead — a modified chart, or an air-gapped install �
 | `url` | Stock image; the runtime downloads a tarball at every pod start | A control plane that ships bundles out of band |
 
 ## One process, or several
+
+<span class="since-badge" data-since="0.26">Since 0.26</span>
 
 The default is a single Deployment serving everything — the same shape the
 Compose file runs. Splitting is one value:
@@ -137,9 +140,13 @@ not restart.
 
 `migrationJob.enabled` (the default) runs a `pre-install,pre-upgrade` Job that
 provisions and exits, and every pod boots with `REBASE_MIGRATE_ON_BOOT=none`.
-Nothing on the request path owns DDL, which is the cleanest available answer to
-"exactly one process provisions the schema" — it stops being a rule anyone has to
-remember.
+Nothing on the request path owns the collection schema, which is the cleanest
+available answer to "exactly one process provisions the schema" — it stops being
+a rule anyone has to remember. The pods still keep the framework's own tables
+(auth, API keys, jobs, cron) current at boot; `provision: false` stops that too,
+renders no Job, and leaves the schema to a
+[provisioning run](/docs/deployment/self-hosting/#when-only-your-change-process-may-change-the-database)
+under your own change process.
 
 `mode: ensure` creates what is missing, additively, and is the only mode the
 runtime image accepts. `push` is refused at boot: applying collection schema
@@ -164,8 +171,8 @@ instead, naming the value to change:
   understanding that the first person to reach the sign-up form becomes its
   administrator
 - a `config.adminPassword` under 12 characters, or a `config.adminEmail` whose
-  domain has no dot. Both seed nothing and leave the same locked-out release,
-  one at boot and one at the sign-in form
+  domain has no dot. The runtime refuses to seed either, at boot, and leaves the
+  same locked-out release
 
 ## What the chart cannot do for you
 

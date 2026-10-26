@@ -103,12 +103,16 @@ docker compose up --scale functions=3
 
 Both processes need the same `DATABASE_URL`, the same `JWT_SECRET` and the same
 `REBASE_SERVICE_KEY` — they are one deployment, and a token minted by one has to
-be accepted by the other.
+be accepted by the other. A process with `REBASE_FUNCTIONS_UPSTREAM` and no
+`REBASE_SERVICE_KEY` refuses to boot: its own `rebase.functions.invoke(...)`
+calls, from a hook or a cron job, reach the functions process with that key.
 
 ## Keeping the URLs the same
 
 `REBASE_FUNCTIONS_UPSTREAM` tells the `api` process to forward `/api/functions/*`
-to the functions process rather than serve it. Clients, generated SDKs and API
+to the functions process rather than serve it. It must be an `http://` or
+`https://` URL; anything else stops the boot. Only `api` and `worker` read it
+(see [Cron and background jobs](#cron-and-background-jobs) for the worker). Clients, generated SDKs and API
 keys see exactly the surface they saw before the split, so no application code
 changes and you do not have to stand up a reverse proxy to try one.
 
@@ -198,7 +202,30 @@ turn it off on the API:
     environment:
       REBASE_ROLE: worker
       REBASE_MIGRATE_ON_BOOT: none
+      REBASE_SERVICE_KEY: ${REBASE_SERVICE_KEY}
+      # Only if a job calls rebase.functions:
+      REBASE_FUNCTIONS_UPSTREAM: http://functions:8080
 ```
+
+A job that moves to a worker keeps `rebase.dataAsAdmin`, `rebase.sql`,
+`rebase.storage` and `rebase.email`, which talk to the database, the buckets and
+the mail server directly. It also keeps:
+
+- **`rebase.admin`** (users, roles, password resets) **and `rebase.cron`.** A
+  worker serves no admin surface on its port, but carries these two in-process,
+  for its own jobs only.
+- **`rebase.functions`, with `REBASE_FUNCTIONS_UPSTREAM`.** A worker serves no
+  functions. With the upstream set, its own `rebase.functions.invoke(...)`
+  calls are forwarded to the functions process, where the function sees the
+  call as the service. The worker still answers nothing under `/api/functions`
+  on its port. The worker needs the deployment's `REBASE_SERVICE_KEY` for this,
+  like the `api`.
+
+It loses `rebase.auth`: those are a person's sign-in flows, and a worker
+serves none. For account work from a job, use `rebase.admin`. It also loses the
+rest of the admin API (backups, logs, the schema editor and so on), and
+`rebase.functions` when no upstream is set. A call to any of these answers
+`404 NOT_FOUND` naming the surface that is off and what to do instead.
 
 A `functions` process never runs either. It is scaled by request load and
 replaced at will, and giving it scheduled work would make its replica count mean
@@ -294,9 +321,10 @@ rule you follow rather than one the runtime can enforce.
 ## Upgrading
 
 Unchanged: every process runs the same published image, so an upgrade is the same
-tag change on each of them. Roll the `api` last if you want the schema
-provisioning to happen against the new version first — though in practice the
-order does not matter, because the schema step is additive and idempotent.
+tag change on each of them. Roll the process that owns the schema — the `api`,
+or the migration Job — first, so the new version's schema is in place before
+the other processes run against it: a unit may lag, never lead (see
+[The rule](#the-rule)).
 
 ## Related
 

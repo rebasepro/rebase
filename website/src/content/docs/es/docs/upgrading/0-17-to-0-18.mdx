@@ -1,5 +1,5 @@
 ---
-sourceHash: 056364d861650668
+sourceHash: 8361698c6e191ecf
 slug: es/docs/upgrading/0-17-to-0-18
 title: Actualizar de 0.17 a 0.18
 sidebar_label: 0.17 → 0.18
@@ -9,34 +9,51 @@ description: Cada cambio incompatible de 0.18 y qué hacer con cada uno.
 # Actualizar 0.17 → 0.18
 
 **0.18.0 ya está publicada.** Son las entradas `### Breaking` de su
-[sección del changelog](/es/docs/changelog/), una a una, con lo que cada una te
+[sección del changelog](/docs/changelog/), una a una, con lo que cada una te
 pide cambiar. En 0.x la versión menor es la que rompe, así que este es el muro
 entre 0.17.3 y 0.18.0: léelo antes de actualizar, no después.
 
+Todos son un error de compilación o un arranque rechazado, y no un cambio
+silencioso de comportamiento, salvo el último, que reescribe una restricción que
+el próximo `db push` planificará por ti.
+
+---
+
 ## 20. `defineCollection` tiene una sola firma
 
-Eran tres sobrecargas —Postgres, Firestore, MongoDB— y ahora es una, discriminada
-por `engine` (Postgres cuando falta).
+Eran tres sobrecargas —Postgres, Firestore, MongoDB— y una llamada que fallaba
+producía un único diagnóstico sobre `defineCollection(`, con el primer fallo de
+cada sobrecarga. Ahora hay una sola firma, discriminada por `engine` (Postgres
+cuando falta), y los errores se reportan sobre la clave equivocada, todos a la vez.
 
-**Qué cambiar:** nada en una llamada que ya compilaba; lo que cambia es dónde cae
-el error, ahora sobre la clave equivocada y no sobre `defineCollection(`.
-`UnknownPropertyKey` ahora se llama `NoSuchKey`: solo el código que importaba el
-nombre antiguo tiene algo que tocar.
+**Qué cambiar:** nada, en una llamada que ya compilaba. Lo que cambia es dónde
+cae el subrayado rojo. Dos exports de tipos se movieron con ello: `UnknownPropertyKey`
+ahora es `NoSuchKey` (y lleva un miembro `didYouMean`), y `PropertyTypeNotOnThisEngine`
+es nuevo. Ambos son maquinaria interna del constructor, así que solo el código que
+importaba el nombre antiguo tiene algo que editar.
 
 ## 21. `defineCollection` sigue comprobando tras la primera propiedad errónea
 
-Una sola propiedad mal escrita colapsaba la entidad inferida a
-`Record<string, unknown>` y apagaba todas las demás comprobaciones.
+El constructor restringía su mapa de propiedades, y una restricción que TypeScript
+no puede satisfacer es una de la que retrocede en silencio: así, un solo
+`defaultValue` incorrecto ensanchaba la entidad inferida a `Record<string, unknown>`
+y desactivaba todas las comprobaciones sobre `display.title`, `listProperties`,
+`propertiesOrder` y `previewProperties`.
 
 **Qué cambiar:** nada que escribir, pero espera errores *nuevos* en archivos de
 colección que antes compilaban. Ya estaban mal entonces; el compilador había
-dejado de mirar.
+dejado de mirar. Corrige la propiedad que nombra el primer error y vuelve a
+compilar: el resto de ese archivo se está comprobando por primera vez.
 
 ## 22. El campo de enlace de una relación debe pertenecer a su `kind`
 
-`{ kind: "belongsTo", foreignKeyOnTarget: … }` ya no compila.
+`Relation` es una unión cerrada desde 0.11 —`belongsTo` es dueño de `localKey`,
+`hasOne`/`hasMany` de `foreignKeyOnTarget`, `manyToMany` de `through`, `via` de
+`joinPath`—, pero la comprobación de propiedades sobrantes se ejecutaba contra la
+unión entera, así que `{ kind: "belongsTo", foreignKeyOnTarget: "author_id" }`
+compilaba y luego se resolvía a un enlace distinto del que se había escrito.
 
-**Qué cambiar:** escribe el campo que corresponde a esa clase de relación.
+**Qué cambiar:** escribe el campo de enlace que corresponde a esa clase de relación.
 
 ```diff lang="ts"
   author: {
@@ -46,11 +63,17 @@ dejado de mirar.
   }
 ```
 
-El validador de arranque ya lo rechazaba: si tu proyecto arranca hoy, compila hoy.
+El validador de arranque ya rechazaba esto, así que el aviso pasa de un despliegue
+fallido a un error de compilación. Si tu proyecto arranca hoy, compila hoy.
 
 ## 23. La `validation` de una relación sube a la propiedad
 
 `RelationBase.validation` y `ResolvedRelationBase.validation` se han eliminado.
+Había dos sitios donde escribir `required` y dos generadores que leían uno
+distinto: el DDL consultaba la propiedad (así que la columna salía `NOT NULL`)
+mientras que el generador de tipos del SDK consultaba la relación (así que el tipo
+`Insert` generado hacía opcional el campo), y un `create()` que omitía la relación
+pasaba la comprobación de tipos y luego fallaba en la base de datos.
 
 **Qué cambiar:** súbela un nivel, junto a la de cualquier otro campo.
 
@@ -63,16 +86,24 @@ El validador de arranque ya lo rechazaba: si tu proyecto arranca hoy, compila ho
   }
 ```
 
-El arranque rechaza la clave antigua por su nombre. El código que preguntaba a una
-relación si era obligatoria ahora usa
+El arranque rechaza la clave antigua por su nombre en lugar de ignorarla. El código
+que preguntaba a una relación si era obligatoria ahora usa
 `import { isRelationRequired, relationDeclaringProperty } from "@rebasepro/common"`.
 
 ## 24. Un `belongsTo` obligatorio borra con `RESTRICT`, no con `CASCADE`
 
-**Esto es un cambio de DDL.** El próximo `rebase db push` planifica una
-reconstrucción de la restricción para cada relación obligatoria que nunca declaró
-un `onDelete`, y después los borrados del padre empiezan a fallar donde antes
-cascadeaban.
+`validation: { required: true }` dice que el hijo no puede existir sin un padre. No
+dice que borrar al padre deba borrar al hijo, pero eso es lo que inferaba el
+generador, de modo que cada `DELETE FROM authors` cascadeaba por los posts, sus
+comentarios y todo lo que colgaba de ellos. Ahora el valor por defecto es
+`RESTRICT`: el borrado falla y nombra la restricción. Las relaciones opcionales no
+cambian (`SET NULL`), ni tampoco una tabla de unión `manyToMany` (`CASCADE`: la
+fila que borra es el enlace).
+
+**Esto es un cambio de DDL.** El próximo `rebase db push` planifica un
+`DROP CONSTRAINT` / `ADD CONSTRAINT` para cada relación obligatoria que nunca
+declaró un `onDelete`, y después los borrados del padre empiezan a fallar donde
+antes cascadeaban.
 
 **Qué cambiar:** si quieres conservar el comportamiento anterior, escríbelo.
 
@@ -94,7 +125,6 @@ responde a un desajuste de engines con `[WARN] Unsupported engine` e instala
 igualmente, así que el fallo no llega al instalar: llega más tarde, en un sitio
 donde no se menciona Node.
 
-
 ## 26. `rebase.data` ya no existe en tiempo de ejecución
 
 `RebaseServerClient` quitó `data` de su tipo para que el código de servidor tenga
@@ -106,10 +136,10 @@ objeto como alias en tiempo de ejecución. Ahora se borra en el arranque:
 `rebase.dataAsAdmin` donde quieras el plano de administración y `context.data`
 donde quieras el del llamante. El código tipado ya recibía el error desde que
 cambió el tipo; lo que se rompe ahora es el código sin tipos, y el
-`ai-instructions.md` del andamiaje, que todavía le dice a un asistente que use
-`rebase.data.<slug>`. Ese archivo lo escribe `rebase init`: regenéralo o corrige
-la regla a mano. El código de navegador no cambia: `rebase.data` en el SDK
-tipado es el plano del usuario y se queda.
+`ai-instructions.md` de un scaffold que todavía le dice a un asistente que use
+`rebase.data.<slug>` —`rebase init` reescribe ese archivo, así que regéneralo o
+corrige la regla a mano—. El código de navegador no cambia: `rebase.data` en el
+SDK tipado es el plano del usuario y se queda.
 
 ## 27. `@rebasepro/cli` publica tres exports
 
@@ -153,12 +183,13 @@ construido la condición a mano. `serializeFilter({ a: ["gt", 5] })` lanza en ve
 de devolver `gte`.
 
 **Qué cambiar:** solo si llamas directamente a los serializadores de
-`@rebasepro/common`. Usa los nombres de operador que declaran los tipos (`gt`,
-`gte`, `lt`, `lte`, …) en lugar de los códigos cortos de REST. Los constructores
-de consultas y el SDK ya los escribían así; lo nuevo es que la grafía equivocada
-ahora lo dice.
+`@rebasepro/common`. Usa los nombres de operador que declaran los tipos (`>`,
+`>=`, `<`, `<=`, …) en lugar de los códigos cortos de REST (`gt`, `gte`, …). Los
+constructores de consultas y el SDK ya los escribían así; lo nuevo es que la
+grafía equivocada ahora lo dice.
 
 ---
 
-**Siguiente:** [Qué salto te toca](/es/docs/upgrading/) ·
-[Changelog](/es/docs/changelog/).
+**Siguiente:** [la lista de verificación de actualización](/docs/upgrading/#upgrade-checklist) ·
+[0.14 → 0.17](/docs/upgrading/0-14-to-0-17/), el salto previo a este ·
+[Changelog](/docs/changelog/), las notas de la versión que estas secciones resumen.

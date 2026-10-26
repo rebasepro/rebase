@@ -1,5 +1,5 @@
 ---
-sourceHash: b2a395fe87b59669
+sourceHash: d26aa741e787a03f
 title: Einführung
 sidebar_label: Einführung
 description: Rebase ist das Open-Source-Backend für Postgres, mit einem Admin-Panel für dein Team, entwickelt mit React und TypeScript. Definiere dein Schema in TypeScript und Rebase generiert eine vollständige CRUD-UI, REST-API, Authentifizierung, Storage und Echtzeit-Synchronisierung – betrieben mit PostgreSQL.
@@ -15,7 +15,7 @@ Rebase ist das **Open-Source-Backend für PostgreSQL**, mit einem **Admin-Panel*
 
 - **Schema as Code** — Definiere deine Datenmodelle als TypeScript-Collections. Rebase generiert PostgreSQL-Tabellen, eine vollständige CRUD-UI, REST-API-Endpunkte und ein typisiertes SDK aus einer einzigen Quelle der Wahrheit (Single Source of Truth).
 - **Sofortiges Admin-Panel** — Ein ansprechendes, schnelles React-basiertes Panel mit Tabellenkalkulationen, Listen, Formularen, Kanban-Boards, Inline-Bearbeitung und Echtzeit-Synchronisierung.
-- **Integriertes Backend** — Authentifizierung (Passwörter, Magic Links, Einmalcodes, MFA, API-Schlüssel und zwölf OAuth/OIDC-Anbieter), Dateispeicher (lokal oder S3), Row Level Security, Entity-Historie und WebSocket-Echtzeit — alles direkt integriert.
+- **Integriertes Backend** — Authentifizierung (Passwörter, Magic Links, Einmalcodes, MFA, API-Schlüssel und zwölf OAuth/OIDC-Anbieter), Dateispeicher (lokal, S3 oder GCS), Row Level Security, Entity-Historie und WebSocket-Echtzeit — alles direkt integriert.
 - **Radikal erweiterbar** — Wenn du es in React bauen kannst, kannst du es zu Rebase hinzufügen. Eigene Felder, benutzerdefinierte Ansichten, Plugins und voller Zugriff auf interne Hooks.
 
 :::tip
@@ -90,7 +90,7 @@ Um stattdessen deine eigene Postgres-Datenbank zu verwenden, entferne den Kommen
 | **Relationen** | One-to-One, One-to-Many, Many-to-Many mit Junction-Tables und Multi-Hop-Joins |
 | **Row Level Security** | Supabase-ähnliche RLS-Policies, definiert in deiner Collection-Konfiguration |
 | **Authentifizierung** | JWT + Refresh-Token, zwölf OAuth/OIDC-Anbieter, Magic Links, Einmalcodes, TOTP MFA, berechtigungseingeschränkte API-Schlüssel, rollenbasierte Zugriffskontrolle |
-| **Dateispeicher** | Lokales Dateisystem oder S3-kompatibel mit Upload-Feldern und Dateibrowser |
+| **Dateispeicher** | Lokales Dateisystem, S3-kompatibel oder Google Cloud Storage, mit Upload-Feldern und Dateibrowser |
 | **Echtzeit-Synchronisierung** | WebSocket-gestützte Live-Updates für alle verbundenen Clients |
 | **Entity-Historie** | Vollständiges Audit-Protokoll für jede Erstellung, Aktualisierung und Löschung |
 | **REST-API** | Automatisch generierte CRUD-Endpunkte für jede Collection |

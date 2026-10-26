@@ -34,7 +34,7 @@ authController.signOut()      // Log out
 authController.getAuthToken() // Get current JWT for API calls
 ```
 
-Pass the `authController` to the Rebase navigation controller to gate the entire admin panel behind authentication.
+Pass the `authController` to `<Rebase authController>`. `<RebaseShell>` (or `<RebaseAuthGate>` in a manual layout) reads it from there and gates the entire admin panel behind authentication.
 
 ## Your Own Auth Provider
 
@@ -112,18 +112,49 @@ To add or remove role options, update the `enum` map in your users collection an
 
 A role in this list is a name your [security rules](/docs/collections/security-rules) can match. What it may do beyond its rows (manage users, read logs, change the schema) is declared separately, under `auth.roles` on the same collection. `admin` is built in and holds everything. See [Roles and scopes](/docs/backend/roles-and-scopes).
 
-## Role Simulation (Dev Mode)
+## Testing access: Simulate access
 
-In developer mode, you can simulate different roles without logging out. This is useful for testing RLS policies:
+To check what a role, a user or a service key can read, an administrator uses
+**Simulate access**, the pill above your avatar in the admin panel's drawer (in
+the app bar on a small screen, or when the shell has no drawer). Pick a role
+(with an optional user id, which need not be an account), a user, or a live
+service key.
+Every data view, and a record's History tab, then reads through the server as
+that identity, against the real row-level security policies: a grid shows
+exactly the rows it can read,
+fields its roles cannot read are masked, and the banner counts the collections
+it sees nothing in. The server checks on every request that you are an
+administrator.
+
+Simulated access is read-only. While it is on, the views offer no create, edit,
+delete or history revert, and the server refuses any write that carries a simulation with
+`403 SIMULATION_READ_ONLY`, so nothing is saved as someone else. Stop simulating
+to make changes.
+
+What it does not simulate: the data API's `requireAuth` gate, which lets a
+simulated anonymous caller past so you see what the rows' policies give it
+(a custom function sees it as no session, as a real anonymous caller is);
+storage, whose files are read as you, with uploads off while simulating; and
+live updates, which pause until you stop.
+
+The same thing from code, on the SDK, is `client.simulate()`. It derives a
+client whose requests carry the simulation, and only an administrator's own
+session may use it:
 
 ```typescript
-import { useBuildEffectiveRoleController } from "@rebasepro/app";
-
-const effectiveRoleController = useBuildEffectiveRoleController();
-
-// When active, the UI behaves as if the current user has this role
-effectiveRoleController.setEffectiveRole("editor");
+const asCustomer = client.simulate({ role: "customer", userId: "u_1" });
+const { data } = await asCustomer.data.collection("tickets").find();
+asCustomer.close();
 ```
+
+The derived client is typed by the same `Database` as the one it came from, and
+is a client of its own: `close()` it when you are done.
+
+The effective-role switch is not an RLS tester: it only changes which Studio
+views the navigation lists, sends nothing to the server, and evaluates no
+policy. `useBuildEffectiveRoleController`, which built one, is deprecated and
+warns once when called: `<Rebase>` builds its own controller when none is
+passed, and Simulate access is the way to test what a role can do.
 
 ## Next Steps
 

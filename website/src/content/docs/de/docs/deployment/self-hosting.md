@@ -1,5 +1,5 @@
 ---
-sourceHash: 4cfbb890ccd44b8b
+sourceHash: c6f65640f646f804
 title: Self-Hosting
 sidebar_label: Self-Hosting
 description: Führen Sie Rebase überall mit dem offiziellen Runtime-Image und Ihrem Projekt-Bundle aus – Docker Compose, Fly, Railway oder auf einem einfachen VPS.
@@ -61,7 +61,7 @@ Drei Secrets, ein Parameter und das Konto, mit dem Sie sich anmelden:
 - **`CORS_ORIGINS`** — die Origins, von denen Ihr Frontend bereitgestellt wird, kommagetrennt. Kein Secret und nicht optional: Die Runtime verweigert den Start in der Produktion ohne diesen Wert, anstatt Vermutungen anzustellen – denn eine API, die ihre erlaubten Origins errät, erlaubt früher oder später die falsche.
 - **`REBASE_ADMIN_EMAIL`** / **`REBASE_ADMIN_PASSWORD`** — der erste Administrator. Eine neue Datenbank enthält keine Benutzer, und außerhalb der Produktion erlaubt die Registrierungsrichtlinie die erste Registrierung und ernennt diese zum Admin – andernfalls wäre eine leere Datenbank eine Sackgasse, da das Bootstrapping eines Admins einen bereits angemeldeten Aufrufer erfordert. Sobald dieser Stack jedoch unter einem Hostnamen erreichbar ist, wird diese Bequemlichkeit zu einer Race Condition, die der Operator verlieren kann. Daher ist das Zeitfenster in der Produktion geschlossen und das Konto wird stattdessen hier angegeben. Die Runtime erstellt es einmalig, solange die Benutzertabelle leer ist, und unternimmt bei jedem nachfolgenden Start nichts mehr.
 
-Jedes der drei Secrets muss mindestens 32 Zeichen lang sein, das Admin-Passwort mindestens 12. Verwenden Sie eine E-Mail-Adresse mit einem Punkt in der Domain: `POST /auth/login` parst den Body mit `z.string().email()`, sodass `admin@localhost` zwar ein Konto anlegen, danach aber jeden Versuch verweigern würde, sich damit anzumelden. Die Compose-Datei deklariert alle sechs mit `${VAR:?…}`, sodass eine fehlende Variable den Stack mit einer Fehlermeldung stoppt, die den Namen nennt, anstatt etwas halb Konfiguriertes zu starten – und die Selbstregistrierung ist standardmäßig deaktiviert (`DISABLE_SELF_REGISTRATION`, Standard `true`), sodass nichts herrenlos bleibt.
+`JWT_SECRET` und `REBASE_SERVICE_KEY` müssen jeweils mindestens 32 Zeichen lang sein, das Admin-Passwort mindestens 12. Verwenden Sie eine E-Mail-Adresse mit einem Punkt in der Domain: `POST /auth/login` parst den Body mit `z.string().email()`, sodass die Runtime `admin@localhost` – ein Konto, bei dem sich niemand anmelden könnte – nicht anlegt und stattdessen protokolliert, warum. Die Compose-Datei deklariert alle sechs mit `${VAR:?…}`, sodass eine fehlende Variable den Stack mit einer Fehlermeldung stoppt, die den Namen nennt, anstatt etwas halb Konfiguriertes zu starten – und die Selbstregistrierung ist standardmäßig deaktiviert (`DISABLE_SELF_REGISTRATION`, Standard `true`), sodass nichts herrenlos bleibt.
 
 Melden Sie sich mit diesen Anmeldedaten an und ändern Sie das Passwort: Sie liegen im Klartext in einer Datei auf dem Host.
 
@@ -101,11 +101,58 @@ Führen Sie den Befehl aus einem Checkout oder einem CI-Job aus, der auf die Dat
 
 `REBASE_MIGRATE_ON_BOOT` akzeptiert nur `ensure` und `none` – das Image **verweigert den Start** bei `push` aus dem oben genannten Grund.
 
+## Wenn nur Ihr Änderungsprozess die Datenbank ändern darf
+
+<span class="since-badge" data-since="0.26">Seit 0.26</span>
+
+`REBASE_MIGRATE_ON_BOOT=none` lässt Ihre Collections in Ruhe. Die Datenbank lässt es nicht in Ruhe: Die eigenen Tabellen des Frameworks (Auth, API-Schlüssel, Jobs, Cron) werden bei jedem Start weiterhin angelegt und aktuell gehalten. Darf die Datenbank nur über einen geprüften Änderungsprozess geändert werden, setzen Sie `REBASE_PROVISION=false` auf jedem Prozess, der Anfragen bedient:
+
+| Einstellung | Collection-Tabellen und Policies | Framework-Tabellen |
+|---|---|---|
+| Standard (`REBASE_MIGRATE_ON_BOOT=ensure`) | beim Start angelegt und aktuell gehalten | angelegt und aktuell gehalten |
+| `REBASE_MIGRATE_ON_BOOT=none` | unangetastet | angelegt und aktuell gehalten |
+| `REBASE_PROVISION=false` | unangetastet | unangetastet; was fehlt, wird im Log genannt |
+
+Mit abgeschaltetem Provisioning legt die Runtime nichts an und ändert nichts: keine Tabelle, Spalte, keinen Index, keine Funktion, keinen Trigger, keine Policy, Rolle oder Berechtigung. Das gilt beim Start und danach, auch für die Tabellen, die ein bedienender Prozess sonst bei der ersten Nutzung erstellt (Idempotenzschlüssel, Cron-Claims, die gemeinsamen Rate-Limit-Zähler). Stattdessen liest sie, was vorhanden ist:
+
+- **Auth-Tabellen oder eine von Auth gelesene Spalte fehlen:** Der Start wird verweigert, und jede einzelne wird aufgeführt.
+- **Die Request-Rolle erreicht eine Framework-Tabelle** wie `rebase.refresh_tokens` oder `rebase.api_keys`: Der Start wird verweigert und das auszuführende `REVOKE` ausgegeben. Ein Provisioning-Start entzieht diese Rechte von selbst. Mit abgeschaltetem Provisioning tut das niemand.
+- **Eine optionale Tabelle fehlt** (API-Schlüssel, Idempotenzschlüssel, Cron-Claims, Rate-Limit-Zähler, Presence, Metrik-Verlauf): Diese Funktion ist aus, und das Log nennt die Tabelle, die sie braucht.
+
+Zeilen ändern sich weiterhin, wie in jeder Datenbank: Anmeldungen, Sitzungen, Nutzung von API-Schlüsseln, Idempotenzschlüssel, Cron-Claims. Das erste Admin-Konto (`REBASE_ADMIN_EMAIL`) wird vom Provisioning-Lauf angelegt, nicht von den bedienenden Prozessen. [Live-Schemabearbeitung](/docs/backend/live-schema-editing) kann eine Änderung weiterhin als Quellcode committen, verweigert aber, sie auf die Datenbank anzuwenden.
+
+### Der Provisioning-Lauf
+
+<span class="since-badge" data-since="0.26">Seit 0.26</span>
+
+Das Schema stammt aus einem Lauf, den Ihr Änderungsprozess steuert. Verwenden Sie dasselbe Image und Bundle wie der Server, mit `REBASE_PROVISION_ONLY=true`, verbunden als eine Rolle, die in der Datenbank anlegen darf. `REBASE_PROVISION_SQL_OUT` hält jede Schemaänderung des Laufs als SQL-Skript fest:
+
+```bash
+docker run --rm \
+  -e DATABASE_URL="postgres://admin:…@scratch-db:5432/app" \
+  -e JWT_SECRET="…" \
+  -e REBASE_PROVISION_ONLY=true \
+  -e REBASE_PROVISION_SQL_OUT=/out/rebase.sql \
+  -v "$PWD/out:/out" \
+  -v "$PWD/dist-bundle:/bundle" \
+  "rebasepro/server:$REBASE_VERSION"
+```
+
+Das Skript ist ein Protokoll, kein Plan: Jede Anweisung darin wurde der Reihe nach ausgeführt und war erfolgreich. Gegen eine leere Datenbank aufgezeichnet, ist es das gesamte Schema, das das Release braucht. Gegen eine wiederhergestellte Kopie der Produktion aufgezeichnet, ist es genau das Upgrade. Vom Lauf geschriebene Zeilen sind nicht enthalten. Prüfen Sie es und wenden Sie es dann auf die echte Datenbank an:
+
+```bash
+psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f out/rebase.sql
+```
+
+Wiederholen Sie das bei jedem Rebase-Upgrade, bevor die bedienenden Prozesse ausgerollt werden. Ein Release kann eine Tabelle oder Spalte hinzufügen, und ein Prozess, der nichts anlegen darf, meldet sie als fehlend, statt sie zu erstellen.
+
+Ein selbst gebauter Server folgt derselben Regel: `initializeRebaseBackend` liest `REBASE_PROVISION`, und `createRebaseBackend` nimmt [`provision: false`](/docs/backend/custom-server#what-creating-a-backend-may-change-provision).
+
 ## Dateispeicher
 
 Der Speicher ist standardmäßig **deaktiviert**, sofern kein Bucket konfiguriert ist, und das ist beabsichtigt: Der alternative Standard wäre das Dateisystem des Containers, wodurch jede hochgeladene Datei beim nächsten Neustart stillschweigend verloren ginge. Uploads werden mit `501 STORAGE_NOT_CONFIGURED` abgewiesen, bis Sie einen Speicher einrichten.
 
-Für einen Bucket setzen Sie `STORAGE_TYPE=s3` (oder `gcs`) zusammen mit dem Bucket-Namen und den Zugangsdaten – die Compose-Datei listet die Variablen auskommentiert auf.
+Für einen Bucket setzen Sie `STORAGE_TYPE=s3` (oder `gcs`) zusammen mit dem Bucket-Namen und den Zugangsdaten – die Compose-Datei listet die Variablen auskommentiert auf. `gcs` lädt `@google-cloud/storage`, das das offizielle Image nicht mitliefert; greifen Sie mit diesem Image daher stattdessen über den S3-kompatiblen Endpunkt auf Google Cloud Storage zu (`STORAGE_TYPE=s3`, `S3_ENDPOINT=https://storage.googleapis.com`, HMAC-Schlüssel).
 
 Für lokalen Festplattenspeicher, der nur dann geeignet ist, wenn der Pfad ein echtes Volume ist, das über den Container hinaus fortbesteht:
 
@@ -148,7 +195,7 @@ Die Runtime ist ein gewöhnlicher Container, der auf `$PORT` lauscht, sodass all
 
 ```toml
 [build]
-  image = "rebasepro/server:0.25.1"
+  dockerfile = "Dockerfile"   # FROM rebasepro/server:0.25.1 + COPY dist-bundle /bundle
 
 [http_service]
   internal_port = 8080
@@ -170,7 +217,7 @@ npm install -g @rebasepro/server @rebasepro/server-postgres
 rebase-server /srv/myapp/dist-bundle
 ```
 
-`rebase-server --help` listet die Variablen auf, die gelesen werden. Unter systemd – die drei Admin-Zeilen sind neu; unter 0.17.3 wurde stattdessen das erste registrierte Konto zum Administrator:
+`rebase-server --help` listet die Variablen auf, die gelesen werden. Unter systemd – die beiden `REBASE_ADMIN_*`-Zeilen erfordern 0.18 oder neuer; unter 0.17.3 wurde stattdessen das erste registrierte Konto zum Administrator:
 
 ```ini title="/etc/systemd/system/rebase.service"
 [Service]

@@ -1,5 +1,5 @@
 ---
-sourceHash: 056364d861650668
+sourceHash: 8361698c6e191ecf
 slug: de/docs/upgrading/0-17-to-0-18
 title: Upgrade von 0.17 auf 0.18
 sidebar_label: 0.17 → 0.18
@@ -9,36 +9,56 @@ description: Jeder Breaking Change in 0.18 und was jeweils zu tun ist.
 # Upgrade 0.17 → 0.18
 
 **0.18.0 ist veröffentlicht.** Dies sind die `### Breaking`-Einträge aus seinem
-[Abschnitt im Changelog](/de/docs/changelog/), einer nach dem anderen, jeweils mit
+[Abschnitt im Changelog](/docs/changelog/), einer nach dem anderen, jeweils mit
 dem, was Sie ändern müssen. Unter 0.x ist die Minor-Version die Stelle für
 Breaking Changes, dies ist also die Grenze zwischen 0.17.3 und 0.18.0 — lesen Sie
 es, bevor Sie wechseln, nicht danach.
 
+Jeder davon ist ein Kompilierfehler oder ein verweigerter Start und keine
+stillschweigende Verhaltensänderung, mit Ausnahme des letzten, der einen
+Constraint umschreibt, den der nächste `db push` für Sie plant.
+
+---
+
 ## 20. `defineCollection` hat eine einzige Signatur
 
-Aus drei Überladungen (Postgres, Firestore, MongoDB) wurde eine, unterschieden
-über `engine` (Postgres, wenn nicht angegeben).
+Es waren drei Überladungen — Postgres, Firestore, MongoDB —, und ein fehlschlagender
+Aufruf erzeugte eine einzige Diagnose auf `defineCollection(`, die den ersten
+Fehler jeder Überladung auflistete. Jetzt gibt es eine Signatur, unterschieden
+über `engine` (Postgres, wenn nicht angegeben), und Fehler werden auf dem
+Schlüssel gemeldet, der falsch ist, alle auf einmal.
 
-**Zu ändern:** nichts an einem Aufruf, der bereits kompilierte — nur die
-Fehlermeldungen landen jetzt auf dem falschen Schlüssel statt auf
-`defineCollection(`. `UnknownPropertyKey` heißt jetzt `NoSuchKey`; nur Code, der
-den alten Namen importiert hat, muss angepasst werden.
+**Zu ändern:** nichts, bei einem Aufruf, der bereits kompilierte. Was sich ändert,
+ist die Stelle, an der die rote Wellenlinie landet. Zwei Typ-Exporte sind mit
+umgezogen: `UnknownPropertyKey` heißt jetzt `NoSuchKey` (und trägt ein
+`didYouMean`-Mitglied), und `PropertyTypeNotOnThisEngine` ist neu. Beides ist
+interne Mechanik des Builders, sodass nur Code, der den alten Namen importiert
+hat, etwas anpassen muss.
 
 ## 21. `defineCollection` prüft nach der ersten fehlerhaften Property weiter
 
-Eine einzige fehlerhafte Property ließ den abgeleiteten Entity-Typ auf
-`Record<string, unknown>` zusammenfallen und schaltete jede weitere Prüfung ab.
+Der Builder schränkte seine Property-Map ein, und eine Einschränkung, die
+TypeScript nicht erfüllen kann, ist eine, von der es stillschweigend abrückt —
+sodass ein einziger fehlerhafter `defaultValue` die abgeleitete Entity auf
+`Record<string, unknown>` aufweitete und jede Prüfung von `display.title`,
+`listProperties`, `propertiesOrder` und `previewProperties` abschaltete.
 
 **Zu ändern:** nichts zu schreiben, aber rechnen Sie mit *neuen* Fehlern in
 Collection-Dateien, die vorher kompilierten. Sie waren schon damals falsch — der
-Compiler hatte nur aufgehört hinzusehen.
+Compiler hatte nur aufgehört hinzusehen. Beheben Sie die Property, die der erste
+Fehler nennt, und bauen Sie neu — der Rest dieser Datei wird zum ersten Mal
+geprüft.
 
 ## 22. Das Verknüpfungsfeld einer Relation muss zu ihrer `kind` gehören
 
-`{ kind: "belongsTo", foreignKeyOnTarget: … }` kompiliert nicht mehr.
+`Relation` ist seit 0.11 eine geschlossene Union — `belongsTo` besitzt `localKey`,
+`hasOne`/`hasMany` besitzen `foreignKeyOnTarget`, `manyToMany` besitzt `through`,
+`via` besitzt `joinPath` —, aber die Prüfung auf überzählige Properties lief
+gegen die Union als Ganzes, sodass
+`{ kind: "belongsTo", foreignKeyOnTarget: "author_id" }` kompilierte und dann zu
+einer anderen Verknüpfung auflöste als der geschriebenen.
 
-**Zu ändern:** Schreiben Sie das Feld, das die Art besitzt.
-
+**Zu ändern:** Schreiben Sie das Verknüpfungsfeld, das die Art besitzt.
 ```diff lang="ts"
   author: {
       type: "relation",
@@ -47,15 +67,22 @@ Compiler hatte nur aufgehört hinzusehen.
   }
 ```
 
-Der Boot-Validator hat das ohnehin schon abgelehnt: Wenn Ihr Projekt heute
-startet, kompiliert es auch heute.
+Der Boot-Validator hat das ohnehin schon abgelehnt, sodass sich die Meldung von
+einem fehlgeschlagenen Deploy zu einem Kompilierfehler verschiebt. Wenn Ihr
+Projekt heute startet, kompiliert es auch heute.
 
 ## 23. Die `validation` einer Relation wandert auf die Property
 
-`RelationBase.validation` und `ResolvedRelationBase.validation` sind entfernt.
+`RelationBase.validation` und `ResolvedRelationBase.validation` sind gelöscht.
+Es gab zwei Stellen, an denen man `required` schreiben konnte, und zwei
+Generatoren, die unterschiedliche davon lasen: Das DDL fragte die Property (also
+wurde die Spalte `NOT NULL`), während der SDK-Typgenerator die Relation fragte
+(also machte der generierte `Insert`-Typ das Feld optional), und ein `create()`,
+das die Relation wegließ, bestand die Typprüfung und scheiterte dann an der
+Datenbank.
 
-**Zu ändern:** Verschieben Sie den Eintrag eine Ebene nach oben.
-
+**Zu ändern:** Verschieben Sie es eine Ebene nach oben, neben die Einträge jedes
+anderen Felds.
 ```diff lang="ts"
   author: {
       type: "relation",
@@ -65,77 +92,87 @@ startet, kompiliert es auch heute.
   }
 ```
 
-Der Boot-Vorgang lehnt den alten Schlüssel namentlich ab. Code, der eine Relation
-gefragt hat, ob sie erforderlich ist, fragt nun
+Der Boot-Vorgang lehnt den alten Schlüssel namentlich ab, statt ihn zu ignorieren.
+Code, der eine Relation gefragt hat, ob sie erforderlich ist, fragt nun
 `import { isRelationRequired, relationDeclaringProperty } from "@rebasepro/common"`.
 
 ## 24. Ein erforderliches `belongsTo` löscht mit `RESTRICT`, nicht `CASCADE`
 
+`validation: { required: true }` besagt, dass das Kind nicht ohne Eltern
+existieren kann. Es besagt nicht, dass das Löschen der Eltern das Kind löschen
+soll — aber genau das leitete der Generator ab, sodass jedes
+`DELETE FROM authors` durch Posts, deren Kommentare und alles, was daran hing,
+kaskadierte. Der Standard ist jetzt `RESTRICT`: Das Löschen schlägt fehl und nennt
+den Constraint. Optionale Relationen bleiben unverändert (`SET NULL`), ebenso eine
+`manyToMany`-Verknüpfungstabelle (`CASCADE` — die Zeile, die sie löscht, ist die
+Verknüpfung).
+
 **Das ist eine DDL-Änderung.** Der nächste `rebase db push` plant für jede
-erforderliche Relation ohne ausdrückliches `onDelete` einen Constraint-Umbau, und
-danach schlagen Löschvorgänge am Elternobjekt fehl, wo sie vorher kaskadierten.
+erforderliche Relation, die nie ein `onDelete` benannt hat, ein `DROP CONSTRAINT` /
+`ADD CONSTRAINT`, und danach schlagen diese Löschvorgänge an den Eltern fehl, wo
+sie vorher kaskadierten.
 
 **Zu ändern:** Wenn Sie das alte Verhalten behalten wollen, schreiben Sie es hin.
-
 ```diff lang="ts"
 - relation: { kind: "belongsTo", target: () => authors }
 + relation: { kind: "belongsTo", onDelete: "cascade", target: () => authors }
 ```
 
-Prüfen Sie danach den Plan, bevor Sie ihn anwenden — `rebase db push` gibt die
+Lesen Sie danach den Plan, bevor Sie ihn anwenden — `rebase db push` gibt die
 Anweisungen aus.
 
 ## 25. Die Node-Untergrenze ist `>=22.22.0`
 
-In 0.17.3 deklarierte jedes veröffentlichte Paket `>=20` — `@rebasepro/cli` gar
-kein `engines` —, auf `main` deklarieren alle `>=22.22.0`. Die einzige Quelle ist
-die `.nvmrc` des Repositorys.
+In 0.17.3 deklarierte jedes veröffentlichte Paket `>=20` — `@rebasepro/cli`
+deklarierte gar kein `engines` —, und auf `main` deklarieren alle `>=22.22.0`. Die
+einzige Quelle ist die `.nvmrc` des Repositorys.
 
 **Zu ändern:** Wechseln Sie vor dem Upgrade auf Node 22.22.0. `pnpm install`
 antwortet auf eine nicht passende Engine mit `[WARN] Unsupported engine` und
 installiert trotzdem — der Fehler kommt also nicht bei der Installation, sondern
 später, an einer Stelle, an der von Node keine Rede ist.
 
-
 ## 26. `rebase.data` ist zur Laufzeit verschwunden
 
 `RebaseServerClient` hat `data` aus seinem Typ entfernt, damit serverseitiger
-Code sagen muss, unter wessen Identität ein Lesevorgang läuft — als
-Laufzeit-Alias blieb die Eigenschaft danach am Objekt. Sie wird beim Boot
-gelöscht: `rebase.data` ist `undefined`.
+Code sagen muss, unter wessen Identität ein Lesevorgang läuft — und die Property
+blieb danach als Laufzeit-Alias am Objekt. Sie wird beim Boot gelöscht:
+`rebase.data` ist `undefined`.
 
-**Zu ändern:** In Servercode — Functions, Crons, Callbacks — `rebase.dataAsAdmin`
-schreiben, wo die Admin-Ebene gemeint ist, und `context.data`, wo die des
-Aufrufers gemeint ist. Typisierter Code bekam den Fehler schon mit der
+**Zu ändern:** In Servercode — Functions, Crons, Callbacks — schreiben Sie
+`rebase.dataAsAdmin`, wo die Admin-Ebene gemeint ist, und `context.data`, wo die
+des Aufrufers gemeint ist. Typisierter Code bekommt den Fehler schon seit der
 Typänderung; was jetzt bricht, ist untypisierter Code — und die
 `ai-instructions.md` eines Scaffolds, die einem Assistenten weiterhin
-`rebase.data.<slug>` nahelegt. `rebase init` schreibt diese Datei, also neu
-erzeugen oder die Regel von Hand korrigieren. Browsercode bleibt unberührt:
-`rebase.data` im typisierten SDK ist die nutzergebundene Ebene und bleibt.
+`rebase.data.<slug>` nahelegt: `rebase init` schreibt diese Datei, also erzeugen
+Sie sie neu oder korrigieren Sie die Regel von Hand. Browsercode bleibt
+unberührt: `rebase.data` im typisierten SDK ist die nutzergebundene Ebene und
+bleibt.
 
 ## 27. `@rebasepro/cli` veröffentlicht drei Exporte
 
 `src/index.ts` reexportierte sechzehn Module und stellte 95 Namen auf npm. Jetzt
-sind es `entry`, `manifest` und `bundle`.
+exportiert es `entry`, `manifest` und `bundle`.
 
-**Zu ändern:** nichts, außer Sie importieren aus `@rebasepro/cli` — was
+**Zu ändern:** nichts, außer Sie führen ein `import` aus `@rebasepro/cli` aus — was
 unwahrscheinlich ist, da weder dieses Repository noch die Control Plane das taten.
 Falls doch: Die CLI ist eine Binärdatei. Rufen Sie `rebase <command>` als Prozess
-auf, statt ihre Kommandofunktionen zu importieren, deren Signaturen nie ein
-Vertrag waren.
+auf, statt ihre Kommandofunktionen aufzurufen, deren Signaturen nie ein Vertrag
+waren.
 
 ## 28. Peer-Bereiche sind Carets
 
 `ui`, `forms`, `firebase`, `plugin-insights` und `cms-types` deklarierten
 `react >=19.0.0` — ein Bereich, dessen untere Hälfte `app` und `cms` bei 19.2.7
-nicht erfüllen kann. Ein Installer, der 19.0.0 wählte, erzeugte einen Baum, der
-sauber auflöste und beim Rendern brach. Alle fünf sagen jetzt `^19.2.7`. Der
-`typescript`-Peer von `@rebasepro/app` geht von `>=5.0.0` auf `^6.0.0`.
+nicht erfüllen kann —, sodass ein Installer, der 19.0.0 wählte, einen Baum
+erzeugte, der sauber auflöste und beim Rendern brach. Alle fünf sagen jetzt
+`^19.2.7`. Der `typescript`-Peer von `@rebasepro/app` geht von `>=5.0.0` auf
+`^6.0.0`.
 
-**Zu ändern:** Auf React 19.2.7 oder neuer sein, und auf TypeScript 6, wenn Sie
-das Vite-Plugin von `@rebasepro/app` nutzen. Löste Ihre Installation vorher React
-19.0.x auf, sehen Sie jetzt eine Peer-Warnung, bis Sie anheben — diese Warnung
-ist der Baum, den Sie ohnehin schon ausgeführt haben, laut ausgesprochen.
+**Zu ändern:** Seien Sie auf React 19.2.7 oder neuer, und auf TypeScript 6, wenn
+Sie das Vite-Plugin von `@rebasepro/app` nutzen. Löste Ihre Installation vorher
+React 19.0.x auf, sehen Sie jetzt eine Peer-Warnung, bis Sie anheben; diese
+Warnung ist der Baum, den Sie ohnehin schon ausgeführt haben, laut ausgesprochen.
 
 ## 29. `rebase cloud webhooks create` nimmt `--endpoint`
 
@@ -156,11 +193,13 @@ kommt, und schreibt strikt, weil ein Aufrufer, der ihn dem Serialisierer
 wirft, statt `gte` zurückzuliefern.
 
 **Zu ändern:** nur, wenn Sie die Serialisierer von `@rebasepro/common` direkt
-aufrufen. Verwenden Sie die Operatornamen, die die Typen deklarieren (`gt`,
-`gte`, `lt`, `lte`, …), statt REST-Kurzcodes. Query Builder und SDK schrieben sie
-ohnehin schon so; neu ist, dass die falsche Schreibweise das jetzt sagt.
+aufrufen. Verwenden Sie die Operatornamen, die die Typen deklarieren (`>`, `>=`,
+`<`, `<=`, …), statt REST-Kurzcodes (`gt`, `gte`, …). Query Builder und SDK
+schrieben sie ohnehin schon so; neu ist, dass die falsche Schreibweise das jetzt
+sagt.
 
 ---
 
-**Weiter:** [Welcher Sprung](/de/docs/upgrading/) ·
-[Changelog](/de/docs/changelog/).
+**Weiter:** [die Upgrade-Checkliste](/docs/upgrading/#upgrade-checklist) ·
+[0.14 → 0.17](/docs/upgrading/0-14-to-0-17/), der Schritt vor diesem ·
+[Changelog](/docs/changelog/), die Release Notes, die diese Abschnitte zusammenfassen.

@@ -1,5 +1,5 @@
 ---
-sourceHash: 58e2c845978a7611
+sourceHash: d836d40bf88060b2
 title: Entorno y configuración
 sidebar_label: Configuración
 description: Todas las variables de entorno y opciones de configuración para proyectos Rebase.
@@ -69,7 +69,7 @@ Toda la configuración se realiza mediante variables de entorno en el archivo `.
 | `LOG_LEVEL` | Nivel de detalle de los registros: `error`, `warn`, `info`, `debug` | `info` |
 | `REBASE_LOG_RAW_QUERIES` | Muestra el SQL detrás de una línea `Failed query: [redacted]`. Cada sentencia con error se oculta de forma predeterminada, porque una consulta fallida incluye sus parámetros enlazados (un correo electrónico, un hash de contraseña). Establézcalo en `true` mientras diagnostica un fallo de DDL, RLS o de captura de cambios. Se ignora cuando `NODE_ENV=production`. | `false` |
 | `NODE_ENV` | Entorno: `development`, `production` o `test` | `development` |
-| `CORS_ORIGINS` | Lista separada por comas de orígenes permitidos. **Obligatoria en producción** si difiere del dominio del backend. En desarrollo se *añade a* localhost — consulte más abajo. | — |
+| `CORS_ORIGINS` | Lista separada por comas de orígenes permitidos. **Obligatoria en producción** a menos que `FRONTEND_URL` esté definida: un arranque en producción sin ninguna de las dos se niega a iniciar. En desarrollo se *añade a* localhost — consulte más abajo. | — |
 | `FRONTEND_URL` | URL de la aplicación frontend. Se utiliza como alternativa a CORS_ORIGINS en ambos entornos. | — |
 | `ADMIN_CONNECTION_STRING` | Cadena de conexión a la base de datos a nivel de administrador (utilizada para la introspección de esquemas y operaciones administrativas). La base de datos que indica no es la que la consola SQL considera actual, ni lo que copia una nueva rama por defecto: ambas corresponden a la base de datos en la que se encuentra la conexión propia de la aplicación (consulte `REBASE_BRANCH_PARENT_DATABASE` para un servidor en una rama). | `DATABASE_URL` |
 | `DISABLE_DB_ROLE_SWITCHING` | Desactiva el cambio de roles de PostgreSQL en el Editor SQL (útil para autenticación personalizada donde los roles de la base de datos no están mapeados). La consola SQL de Studio indicará entonces que las filas se leyeron como el propietario de la conexión, mostrará su nombre y deshabilitará el selector de roles. | `false` |
@@ -228,18 +228,20 @@ código en su lugar.
 | `REBASE_METRICS` | Expone métricas de Prometheus en `/metrics`. | `false` |
 | `REBASE_HSTS_INCLUDE_SUBDOMAINS` | Añade `includeSubDomains` al encabezado `Strict-Transport-Security`, de modo que los navegadores rechacen HTTP simple en cada subdominio del host durante seis meses — incluidos los hosts que este proceso no sirve. Actívelo solo cuando cada subdominio del dominio sea exclusivamente HTTPS. Cualquier valor que no sea `true`/`false` rechaza el arranque. Consulte [Encabezados de seguridad](/docs/deployment/self-hosting/#security-headers). | `false` |
 | `REBASE_METRICS_TOKEN` | Token Bearer que protege `/metrics`. Si no se define, deja el endpoint abierto a cualquiera que pueda alcanzar el puerto — aceptable en una red privada, no en una pública, y los registros de arranque lo advertirán. | — |
-| `REBASE_MIGRATE_ON_BOOT` | Lo que el runtime puede hacer con el esquema en el arranque. `ensure` (el predeterminado en todas partes, incluida la producción) ejecuta la pasada **aditiva**: crea tablas, columnas y tipos enum faltantes, y nunca elimina ni reescribe uno existente. `none` no modifica nada. La imagen publicada solo acepta esos dos y **se niega a arrancar con `push`**. En un [despliegue dividido](/docs/deployment/split-processes), exactamente un proceso puede aprovisionar, por lo que cada uno de los otros roles debe establecer `none` o se negará a arrancar. | `ensure` |
+| `REBASE_MIGRATE_ON_BOOT` | Lo que el runtime puede hacer con el esquema en el arranque. `ensure` (el predeterminado en todas partes, incluida la producción) ejecuta la pasada **aditiva**: crea tablas, columnas y tipos enum faltantes, y nunca elimina ni reescribe uno existente. `none` deja intacto el esquema de las colecciones, pero las tablas propias del framework (auth, claves de API, jobs, cron) se siguen creando y manteniendo al día; <span class="since-badge" data-since="0.26">Desde 0.26</span> `REBASE_PROVISION=false` desactiva también esas. La imagen publicada solo acepta esos dos y **se niega a arrancar con `push`**. En un [despliegue dividido](/docs/deployment/split-processes), exactamente un proceso puede aprovisionar, por lo que cada uno de los otros roles debe establecer `none` o se negará a arrancar. | `ensure` |
+| `REBASE_PROVISION` | <span class="since-badge" data-since="0.26">Desde 0.26</span> `false` hace que el runtime no cambie nada en su base de datos: ninguna tabla, columna, índice, función, trigger, política, rol ni permiso, ni en el arranque ni después, incluidas las tablas propias del framework. En su lugar, informa por nombre de lo que falta. Para una base de datos que solo su proceso de cambios puede modificar. Consulte [Cuando solo su proceso de cambios puede modificar la base de datos](/docs/deployment/self-hosting/#when-only-your-change-process-may-change-the-database). Solo se aceptan `true` y `false`. | `true` |
 | `REBASE_REQUIRE_SCHEMA_MATCH` | Se niega a arrancar cuando la base de datos se aprovisionó por última vez a partir de un conjunto de colecciones diferente de aquel a partir del cual se construyó este proceso. Si no se define (o cualquier valor distinto de `true`/`1`), emite una advertencia en su lugar. | warn |
 | `REALTIME_CDC` | Captura de cambios a nivel de base de datos: `auto` (habilitar donde la conexión lo soporte, recurrir silenciosamente a la alternativa si no), `trigger` (forzarlo, advertir si es imposible), `wal` (actualmente se degrada a `trigger`), `off`. Consulte [Realtime](/docs/backend/realtime-cdc/). Tiene prioridad sobre `realtime.cdc`. | `auto` |
 | `REALTIME_CHANNEL_BUS` | Transporte entre instancias para canales de difusión (broadcast) y presencia: `memory` o `postgres`. Se ignora cuando se proporcionó un transporte construido a `realtime.bus`. | `memory` |
 | `REALTIME_MAX_SUBSCRIPTIONS_PER_SOCKET` | Cuántas suscripciones puede mantener un socket de tiempo real; la siguiente se rechaza con `TOO_MANY_SUBSCRIPTIONS`. Un número entero positivo; cualquier otro valor detiene el servidor en el arranque. Tiene prioridad sobre `realtime.maxSubscriptionsPerSocket`. Consulte [Realtime](/docs/backend/realtime#what-a-write-costs-and-the-limits). | `1000` |
-| `REALTIME_MAX_SOCKETS_PER_USER` | Cuántos sockets de tiempo real puede mantener abiertos un usuario en una instancia de servidor. El inicio de sesión del siguiente se rechaza con `TOO_MANY_SOCKETS` y el socket se cierra (4002); el SDK continúa reintentando, por lo que entra cuando se cierra otro. Un número entero positivo; cualquier otro valor detiene el servidor en el arranque. Tiene prioridad sobre `realtime.maxSocketsPerUser`. | Sin límite |
+| `REALTIME_MAX_SOCKETS_PER_USER` | Cuántos sockets de tiempo real puede mantener abiertos un usuario, o una clave de API, en una instancia de servidor. Los sockets de suplantación de un administrador cuentan contra el administrador. El inicio de sesión del siguiente se rechaza con `TOO_MANY_SOCKETS` y el socket se cierra (4002); el SDK continúa reintentando, por lo que entra cuando se cierra otro. Un número entero positivo; cualquier otro valor detiene el servidor en el arranque. Tiene prioridad sobre `realtime.maxSocketsPerUser`. | Sin límite |
 | `REALTIME_REFETCH_MAX_WAIT_MS` | El tiempo máximo que espera un cambio antes de la recarga (refetch) que lo entrega a los suscriptores activos, en ms. Una recarga espera 300 ms sin cambios, y como máximo este tiempo bajo un flujo constante de escrituras. Un número entero positivo; cualquier otro valor detiene el servidor en el arranque. Tiene prioridad sobre `realtime.refetchMaxWaitMs`. | `1000` |
 | `REALTIME_RECOUNT_INTERVAL_MS` | Cuánto tiempo se puede reutilizar el total de una suscripción de lista grande antes de que se vuelva a contar, en ms; los fotogramas que lo reutilizan llevan `meta.totalAsOf`. Si no se define, cada fotograma cuenta. Tiene prioridad sobre `realtime.recountIntervalMs`. | Sin definir |
 | `REALTIME_RECOUNT_MIN_ROWS` | El total anterior más pequeño al que se aplica `REALTIME_RECOUNT_INTERVAL_MS`; las listas más pequeñas se cuentan en cada fotograma. Tiene prioridad sobre `realtime.recountMinRows`. | `100000` |
 | `ALLOW_LOCALHOST_IN_PRODUCTION` | Permite valores `localhost`/loopback bajo `NODE_ENV=production`. Desactivado, de modo que un arranque en producción falle de forma visible y ruidosa en lugar de conectarse a una base de datos inexistente. | `false` |
 | `REBASE_STRICT_COLLECTION_CONFIG` | Qué hace el arranque con una clave en sus colecciones que esta versión no lee: `warn`, `error` (se niega a arrancar — vale la pena activarlo en CI), o `off`. Solo regula las claves que no *reconoce*, que suelen ser un error tipográfico y ocasionalmente metadatos deliberados; una clave que sabe que se ha movido siempre es fatal, ya que de lo contrario la característica que configuraba quedaría silenciosamente ausente. | `warn` |
-| `REBASE_PROVISION_ONLY` | `1`/`true` ejecuta la pasada de esquema y finaliza sin abrir un socket — la estructura requerida por un Job de migración, a partir de la misma imagen y el mismo bundle que el servidor que le sigue. Un valor vacío equivale a *sin definir*, por lo que un `${SOMETHING}` sin sustituir en un archivo compose no puede convertir un despliegue ordinario en uno que migra y se niega a servir. | — |
+| `REBASE_PROVISION_ONLY` | `1`/`true` ejecuta la pasada de esquema y finaliza sin abrir un socket — la estructura requerida por un Job de migración, a partir de la misma imagen y el mismo bundle que el servidor que le sigue. Un valor vacío equivale a *sin definir*, por lo que un `${SOMETHING}` sin sustituir en un archivo compose no puede convertir un despliegue ordinario en uno que migra y se niega a servir. También crea las tablas que un proceso que sirve crearía en su primer uso, y no arranca cron ni la cola de jobs. Se rechaza junto con <span class="since-badge" data-since="0.26">Desde 0.26</span> `REBASE_PROVISION=false`. | — |
+| `REBASE_PROVISION_SQL_OUT` | <span class="since-badge" data-since="0.26">Desde 0.26</span> Una ruta de archivo. Una ejecución de aprovisionamiento (`REBASE_PROVISION_ONLY=true`) escribe en ella cada cambio de esquema que hizo, en orden, como un script SQL para revisar y aplicar con `psql`. Las filas que escribió no se incluyen. Se rechaza en un proceso que sirve. | — |
 | `REBASE_LIVE_SCHEMA_ALLOW_MACHINE_APPLY` | `true` permite que una máquina —un agente, un job de CI— *aplique* un cambio de esquema a través de `/api/admin/schema`, y no solo planificarlo. Desactivado a menos que se solicite: la credencial que realizaría dicho cambio es la que más probabilidades tiene de estar en una variable de CI. | `false` |
 | `REBASE_FUNCTIONS_TIMEOUT_MS` | Cuánto tiempo puede ejecutarse una función personalizada antes de que se aborte su solicitud. El mismo control que la opción `functionsTimeoutMs`. `0` lo desactiva. | `30000` |
 | `REBASE_EXIT_ON_UNHANDLED_REJECTION` | `true` hace que un rechazo de promesa no controlado termine el proceso en lugar de registrarlo. Activo bajo un orquestador que lo reiniciará; inactivo donde un reinicio sea peor que una fuga de memoria. | `false` |
@@ -275,7 +277,7 @@ esta página busca listar cada variable; lo que cada combinación *monta y admin
 | `REBASE_JOB_WORKERS` | Sobrescribe si este proceso ejecuta los trabajadores de la cola de tareas (job-queue). Si no se define, sigue al rol. | — |
 | `REBASE_FUNCTIONS_ONLY` | Sirve únicamente las funciones personalizadas nombradas en este proceso. | — |
 | `REBASE_FUNCTIONS_EXCLUDE` | Sirve todas las funciones personalizadas excepto las indicadas. | — |
-| `REBASE_FUNCTIONS_UPSTREAM` | A dónde reenvía el proceso de API una solicitud de función que no sirve él mismo. | — |
+| `REBASE_FUNCTIONS_UPSTREAM` | A dónde reenvía el proceso de API una solicitud de función que no sirve él mismo. En un `worker`, a dónde van sus propias llamadas a `rebase.functions`. Una URL `http(s)`. | — |
 
 ### Superficie MCP
 
@@ -374,7 +376,7 @@ Leído por `rebase`, no por el servidor. Nada de lo que está aquí afecta a un 
 | `REBASE_CLOUD_URL` | El plano de control con el que se comunica `rebase cloud`. | — |
 | `REBASE_CLOUD_EMAIL` | La cuenta con la que inicia sesión `rebase cloud login`, en lugar de solicitarla de forma interactiva. | — |
 | `REBASE_CLOUD_PASSWORD` | Su contraseña, para que un almacén de secretos pueda suministrarla sin que llegue al historial de la shell. | — |
-| `REBASE_TOKEN` | Un token obtenido con `rebase cloud tokens create`. Si se define, cada comando de `rebase cloud` se autentica con él en lugar de la sesión de `rebase cloud login`, y nunca lee ni escribe la sesión guardada. Es la forma de ejecutar `rebase cloud` en CI — consulte [CI y agentes](/docs/deployment/cloud/#ci-and-agents). El [servidor MCP](/docs/ai/mcp/) lee el mismo nombre como un alias de `REBASE_API_TOKEN`. | — |
+| `REBASE_TOKEN` | Un token obtenido con `rebase cloud tokens create`. Si se define, cada comando de `rebase cloud` se autentica con él en lugar de la sesión de `rebase cloud login`, y nunca lee ni escribe la sesión guardada. <span class="since-badge" data-since="0.26">Desde 0.26</span> En un directorio que `rebase cloud init --claim` vinculó, se aparta en favor del token propio de ese proyecto cuando no tiene ningún alcance sobre el proyecto. Es la forma de ejecutar `rebase cloud` en CI — consulte [CI y agentes](/docs/deployment/cloud/#ci-and-agents). El [servidor MCP](/docs/ai/mcp/) se lo pasa a la CLI que lanzan sus herramientas de cloud, y nunca lo envía a la app: defina `REBASE_API_TOKEN` para eso. | — |
 | `REBASE_DEBUG` | `1` imprime el error subyacente y los detalles de la solicitud en lugar del mensaje breve. Es lo primero que debe configurar cuando un comando de `rebase cloud` falle sin suficiente información. | — |
 | `REBASE_ATLAS_DEV_URL` | La base de datos vacía contra la que planifican `rebase db push`, `db generate` y `db migrate`, en lugar de la base `<db>_dev_diff` que crean junto a `DATABASE_URL`. Rebase no crea ni elimina una base de datos nombrada aquí, y rechaza una que sea igual a `DATABASE_URL`. En la base de datos de desarrollo administrada, la CLI la establece en un PGlite desechable en memoria propio. Configúrela donde no se conceda el permiso `CREATE DATABASE`. | `<db>_dev_diff` |
 | `REBASE_DEV_NO_DB` | `rebase dev` no inicia ninguna base de datos ni aprovisiona nada: usted proporciona la suya. Equivale a `--no-db`. | — |
@@ -387,7 +389,7 @@ Leído por `rebase`, no por el servidor. Nada de lo que está aquí afecta a un 
 
 ## Secretos en desarrollo
 
-`JWT_SECRET` y `REBASE_SERVICE_KEY` son obligatorios en producción y se generan
+`JWT_SECRET` es obligatorio en producción. Este y `REBASE_SERVICE_KEY` se generan
 automáticamente fuera de ella, para que pueda empezar sin tener que configurar nada.
 
 Esos valores generados se almacenan en caché en `.rebase-dev-secrets.json`, junto a
@@ -402,13 +404,13 @@ la sesión en su propia aplicación e invalidaba cualquier clave de API recién 
 - Si no se puede escribir el archivo —por ejemplo, en un contenedor de solo lectura—, el servidor
   arranca de todos modos con un secreto efímero, exactamente como solía hacerlo.
 
-Nada se almacena en caché en producción, ni bajo un ejecutor de pruebas. En producción, un
-arranque que deba generar cualquiera de los secretos seguirá fallando, nombrando la
-variable correspondiente, y eso no cambia:
+Nada se almacena en caché en producción, ni bajo un ejecutor de pruebas. En producción tampoco se
+genera nada: un arranque sin `JWT_SECRET` falla, nombrando la variable, y eso no
+cambia:
 
 ```
-JWT_SECRET must be explicitly set in production.
-Do not rely on auto-generated secrets outside development.
+The environment is not valid:
+  JWT_SECRET: is required
 ```
 
 ## Objeto de configuración del backend

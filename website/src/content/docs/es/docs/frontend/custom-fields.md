@@ -1,5 +1,5 @@
 ---
-sourceHash: db02ecc36f64f46c
+sourceHash: af7e2ab87a0b3b4f
 title: Campos Personalizados
 sidebar_label: Campos Personalizados
 description: Cree campos de formulario personalizados para la edición de entidades con acceso completo al contexto del formulario, los valores de la entidad y los hooks de Rebase.
@@ -47,7 +47,7 @@ function ColorPickerField({ value, setValue, error, showError }: FieldProps<Stri
 | `property` | `Property` | La configuración de la propiedad |
 | `context` | `FormContext` | Contexto completo del formulario con todos los valores de la entidad |
 | `disabled` | `boolean` | El campo es de solo lectura |
-| `tableMode` | `boolean` | Renderizado dentro de la hoja de cálculo (modo compacto) |
+| `minimalistView` | `boolean` | Renderizado en el editor de celda emergente de la tabla (modo compacto) |
 
 ## Registro de un Campo Personalizado
 
@@ -80,8 +80,8 @@ properties: {
         type: "string",
         name: "Brand Color",
         admin: {
-            Field: () => import("../../../frontend/src/ColorPickerField"),
-            Preview: () => import("../../../frontend/src/ColorPreview")
+            Field: () => import("../../frontend/src/ColorPickerField"),
+            Preview: () => import("../../frontend/src/ColorPreview")
         }
     }
 }
@@ -145,12 +145,12 @@ function PriceWithTaxField({ value, setValue, context }: FieldProps<NumberProper
 
 ## Modo Tabla
 
-Al renderizarse dentro de la vista de hoja de cálculo, los campos deben ser compactos. Verifique `tableMode`:
+Un campo personalizado no se dibuja dentro de una celda de tabla: la celda muestra el valor (o tu `Preview`), y al editarla se abre el campo en una ventana emergente con `minimalistView` activado. Mantenlo compacto ahí:
 
 ```tsx
 function MyField({ value, setValue, minimalistView }: FieldProps<StringProperty>) {
     if (minimalistView) {
-        return <span onClick={() => { /* open editor */ }}>{value}</span>;
+        return <input value={value ?? ""} onChange={(e) => setValue(e.target.value)}/>;
     }
 
     return (

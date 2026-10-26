@@ -3,6 +3,7 @@
  */
 import chalk from "chalk";
 import inquirer from "inquirer";
+import { NO_PASSWORD_HINT, askSignInMethod, offersSignInCodes, requireTerminalForCode, signInWithCode, withSecondFactor } from "./login-flow";
 import {
     resolveCloudUrl,
     resolveCloudTarget,
@@ -26,10 +27,16 @@ import {
     warn,
     requireInteractive,
     envToken,
+    linkedEphemeralGrant,
+    grantProjectOf,
+    appKeyExpiryNote,
+    projectDotenvSetsAppKey,
     TOKEN_ENV,
-    type CloudClient
+    type CloudClient,
+    type EphemeralGrant
 } from "./context";
-import { capabilitiesInScopes } from "./token-capabilities";
+import { capabilitiesInScopes, orgCapabilitiesInScopes } from "./token-capabilities";
+import { describeGrants } from "./tokens";
 
 /**
  * Every flag `rebase cloud login` accepts.
@@ -42,6 +49,7 @@ import { capabilitiesInScopes } from "./token-capabilities";
 export const LOGIN_FLAGS = {
     "--email": String,
     "--password": String,
+    "--code": Boolean,
     "-e": "--email"
 } as const;
 
@@ -94,6 +102,10 @@ export async function loginCommand(rawArgs: string[]): Promise<void> {
     note(`Signing in to ${chalk.cyan(url)}`);
     noteBlank();
 
+    if (args["--code"] && passwordOnTheCommandLine(args)) {
+        fail("--code and --password are two ways to sign in. Pass one of them.", undefined, "usage");
+    }
+
     // Once, and before the request: by the time this succeeds the password is
     // already in the history file, and a warning after the fact is advice about
     // something that has happened.
@@ -107,48 +119,48 @@ export async function loginCommand(rawArgs: string[]): Promise<void> {
     const envEmail = (process.env[EMAIL_ENV] ?? "").trim();
     const envPassword = process.env[PASSWORD_ENV] ?? "";
 
-    // Collect any missing credentials interactively — but only where a terminal
-    // can supply them. Piped, this used to hang on a password prompt.
-    const needsEmail = !args["--email"] && !envEmail;
-    const needsPassword = !args["--password"] && !envPassword;
-    if (needsEmail || needsPassword) {
+    // Which way in. `--code` asks for an emailed code; a password from the flag
+    // or the environment is a choice already made; otherwise a terminal is
+    // asked, and offered a code only when this control plane mails them.
+    // Accounts made with Google, GitHub or LinkedIn have no password, so for
+    // them the code is the only way in that a terminal can reach.
+    let method: "password" | "code" | undefined = args["--code"]
+        ? "code"
+        : (args["--password"] || envPassword) ? "password" : undefined;
+    if (method === "code") requireTerminalForCode();
+
+    // Collect anything missing interactively — but only where a terminal can
+    // supply it. Piped, this used to hang on a password prompt.
+    let email = (args["--email"] || envEmail).trim();
+    if (!email || method === undefined) {
         requireInteractive("credentials", `--email and --password, or ${EMAIL_ENV} and ${PASSWORD_ENV}`);
     }
-
-    // The questions' real type, not `Record<string, unknown>`. Inquirer infers
-    // the answer shape from the array it is given, so an array of open records
-    // matches no overload — which is what the
-    // `as unknown as Parameters<typeof inquirer.prompt>[0]` here was answering.
-    // Naming the two question kinds this command asks makes the call check.
-    const prompts: Array<
-        | { type: "input"; name: string; message: string }
-        | { type: "password"; name: string; message: string; mask: string }
-    > = [];
-    if (needsEmail) {
-        prompts.push({ type: "input",
-name: "email",
-message: "Email:" });
+    if (!email) {
+        const answers = await inquirer.prompt([{ type: "input", name: "email", message: "Email:" }]);
+        email = String(answers.email ?? "").trim();
     }
-    if (needsPassword) {
-        prompts.push({ type: "password",
-name: "password",
-message: "Password:",
-mask: "•" });
+    if (!email) fail("An email is required.", undefined, "input_required");
+
+    const client = createCloudClient(url);
+    if (method === undefined) {
+        method = await offersSignInCodes(client.auth) ? await askSignInMethod() : "password";
     }
-    const answers = prompts.length
-        ? await inquirer.prompt(prompts)
-        : {};
 
-    const email = (args["--email"] || envEmail || (answers as { email?: string }).email || "").trim();
-    const password = args["--password"] || envPassword || (answers as { password?: string }).password || "";
-
-    if (!email || !password) {
+    let password = args["--password"] || envPassword;
+    if (method === "password" && !password) {
+        const answers = await inquirer.prompt([{ type: "password", name: "password", message: "Password:", mask: "•" }]);
+        password = String(answers.password ?? "");
+    }
+    if (method === "password" && !password) {
         fail("Email and password are required.");
     }
 
-    const client = createCloudClient(url);
     try {
-        const { user } = await client.auth.signInWithEmail(email, password);
+        // An account with 2FA on answers either door with MFA_REQUIRED; the
+        // second factor is asked for here and the sign-in finished with it.
+        const { user } = await withSecondFactor(client.auth, () => method === "code"
+            ? signInWithCode(client.auth, email)
+            : client.auth.signInWithEmail(email, password));
         setCurrentContext(url);
 
         // Convenience: if the account belongs to exactly one org, make it active.
@@ -181,8 +193,10 @@ mask: "•" });
     } catch (e) {
         // Auth failures are the common case — give a clean message, not a stack.
         const err = e as { status?: number; message?: string };
-        if (err?.status === 401) {
-            fail("Invalid email or password.", undefined, "invalid_credentials");
+        if (err?.status === 401 && method === "password") {
+            // Most often an account that never had a password: a console
+            // sign-up through Google, GitHub or LinkedIn.
+            fail("Invalid email or password.", NO_PASSWORD_HINT, "invalid_credentials");
         }
         reportError(e, "Login failed");
     }
@@ -264,8 +278,20 @@ maxPositionals: 0 });
     const { client, url } = await requireClient(rawArgs);
     // A token is not a session: `/auth/me` takes only a person's login, so the
     // question a token can answer is what it holds.
-    if (envToken()) {
+    // Unless `requireClient` set REBASE_TOKEN aside for the linked project's
+    // own token, because it holds nothing on that project.
+    if (envToken() && !grantProjectOf(client)) {
         await whoamiToken(client, url);
+        return;
+    }
+    // Nor is the token `rebase cloud init --claim` stored for this directory's
+    // project, which `requireClient` picked over the login. Asking `/auth/me`
+    // with it used to be refused, and the refusal deleted the token and the
+    // only stored copy of the claim link. What it can answer is what it holds,
+    // and the claim link a person needs.
+    const linked = linkedEphemeralGrant(url);
+    if (linked) {
+        await whoamiGrant(client, url, linked);
         return;
     }
     try {
@@ -312,6 +338,60 @@ slug: link.slug ?? null }
     }
 }
 
+/**
+ * `whoami` in a directory linked to a project `rebase cloud init --claim`
+ * provisioned: the project's own token, what it may do, the claim URL and
+ * when the project expires unless someone claims it.
+ */
+async function whoamiGrant(
+    client: CloudClient,
+    url: string,
+    linked: { projectId: string; grant: EphemeralGrant }
+): Promise<void> {
+    let held: string[];
+    try {
+        ({ held } = await client.personalKeys.listScopes());
+    } catch (e) {
+        reportError(e, "Failed to read the project token's scopes");
+    }
+    const grants = capabilitiesInScopes(held).filter(grant => grant.capabilities.length > 0);
+    const link = readLink();
+    const expires = new Date(linked.grant.expiresAt);
+    const appKeyNote = projectDotenvSetsAppKey() ? appKeyExpiryNote(linked.grant.expiresAt) : undefined;
+    emit(
+        () => {
+            console.log("");
+            console.log(chalk.bold("  🔐 Unclaimed project token"));
+            console.log("");
+            keyValues([
+                ["Host", url],
+                ["Credential", "the token `rebase cloud init --claim` stored (~/.rebase/credentials.json)"],
+                ["Project", link ? `${link.projectName ?? ""} (${linked.projectId})`.trim() : linked.projectId],
+                ["Can", grants.length ? grants.map(g => g.capabilities.join(", ")).join("; ") : undefined],
+                ["Claim URL", chalk.bold(linked.grant.claimUrl)],
+                ["Expires", `${expires.toLocaleString()} unless claimed`]
+            ]);
+            console.log("");
+            console.log(chalk.gray("  Open the claim URL and sign in to keep the project. Unclaimed, it is deleted when it expires."));
+            if (appKeyNote) console.log(chalk.gray(`  ${appKeyNote}`));
+            console.log("");
+        },
+        {
+            host: url,
+            credential: "ephemeral",
+            projectId: linked.projectId,
+            claimUrl: linked.grant.claimUrl,
+            expiresAt: linked.grant.expiresAt,
+            appKeyNote: appKeyNote ?? null,
+            grants,
+            scopes: held,
+            linkedProject: link
+                ? { id: link.projectId, name: link.projectName ?? null, slug: link.slug ?? null }
+                : null
+        }
+    );
+}
+
 /** `whoami` under `REBASE_TOKEN`: the host, the token, and what it may do. */
 async function whoamiToken(client: CloudClient, url: string): Promise<void> {
     let held: string[];
@@ -321,6 +401,7 @@ async function whoamiToken(client: CloudClient, url: string): Promise<void> {
         reportError(e, "Failed to read the token's scopes");
     }
     const grants = capabilitiesInScopes(held).filter(grant => grant.capabilities.length > 0);
+    const orgGrants = orgCapabilitiesInScopes(held).filter(grant => grant.capabilities.length > 0);
     const link = readLink();
     emit(
         () => {
@@ -330,7 +411,7 @@ async function whoamiToken(client: CloudClient, url: string): Promise<void> {
             keyValues([
                 ["Host", url],
                 ["Credential", TOKEN_ENV],
-                ["Can", grants.length ? grants.map(g => `${g.capabilities.join(", ")} on ${g.projectId}`).join("; ") : undefined],
+                ["Can", describeGrants(held)],
                 ["Scopes", held.join(", ")],
                 [
                     "Linked project",
@@ -343,6 +424,7 @@ async function whoamiToken(client: CloudClient, url: string): Promise<void> {
             host: url,
             credential: "token",
             grants,
+            orgGrants,
             scopes: held,
             linkedProject: link
                 ? { id: link.projectId, name: link.projectName ?? null, slug: link.slug ?? null }

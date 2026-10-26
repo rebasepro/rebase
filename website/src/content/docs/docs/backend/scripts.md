@@ -51,7 +51,9 @@ Two names are in scope, and top-level `await` works:
 | `collections` | The project's collections, loaded the way `rebase db push` loads them |
 
 The console opens the project the way `rebase db push` does: the same `.env`,
-the same database, and the same collections. A project on the managed
+the same database, and the same collections. It also loads the global
+`callbacks` from `config/index.ts`, so its writes run the same hooks as a
+server write. A project on the managed
 development database gets it started first. The history of what you typed is
 kept in `.rebase/console_history`, which the scaffold's `.gitignore` already
 leaves out.
@@ -130,7 +132,7 @@ DATABASE_URL="$(pnpm exec rebase db url)" pnpm exec tsx scripts/publish-drafts.t
 | Member | What it does |
 |---|---|
 | `dataAsAdmin` | Every collection, read and written as the server's service identity (`{ uid: "service", roles: ["admin"] }`): admin, and still evaluated by your RLS policies, exactly like `rebase.dataAsAdmin` in a function |
-| `sql(query, { params })` | Raw SQL on the owner connection, with the same calling convention as `rebase.sql` in a function |
+| `sql(query, { params })` | Raw SQL on the owner connection, with the same calling convention as `rebase.sql` in a function. It runs on the one data source opened: `{ database }` naming any other is refused |
 | `withAuth(user)` | Resolves to `{ data }`: the collections as that user sees them. Every read and write runs as them, filtered by row-level security, as an HTTP request from that user would be |
 | `collections` | The collections it was opened with |
 | `close()` | Ends the connection pool `openRebase` created. Safe to call twice |
@@ -144,6 +146,7 @@ Its options:
 | `collections` | The project's collections. An empty array reads them from the database instead, as a server with no collection files does, and serves them read-only |
 | `pool` | Pool settings, with `databaseUrl` |
 | `dataSourceKey` | The data source these collections are served from. Default `(default)` |
+| `callbacks` | The project's global callbacks, the `callbacks` your `config/index.ts` exports. The server runs them ahead of every collection's own hooks; pass them here and a script write runs them too |
 
 `openRebase` reads no environment variable. The `DATABASE_URL` above is read by
 your script, and settings such as `REBASE_DB_POOL_MAX` or `REALTIME_CDC` change
@@ -268,9 +271,21 @@ and in its hourly sweep.
 
 ### What it leaves out
 
-`openRebase` opens the data layer and nothing else. It starts no realtime, so
-its writes are not announced to live queries. Storage, email, auth
+`openRebase` opens the data layer and nothing else. It starts no realtime of its
+own, but its writes still reach live queries: the database's change-capture
+triggers announce every write, whoever made it, so subscribers on a running
+server refetch after a backfill too. Only with `REALTIME_CDC=off` on that server
+are they not announced. See
+[Database change capture](/docs/backend/realtime-cdc/). Storage, email, auth
 administration and your functions are not on it.
+
+Collection callbacks run on every write, as on the server. The project's global
+`callbacks` run only when you pass them as the `callbacks` option.
+`rebase console` passes them for you: it reads the `callbacks` your
+`config/index.ts` exports, so a global `beforeSave` runs on its writes too. If
+that file cannot be imported (for example, it needs an environment variable the
+console was not given), the console prints one line saying global callbacks are
+off for the session and opens without them.
 
 When a script needs those too, build the backend without serving it:
 `createRebaseBackend({ …, provision: false })` gives you `backend.rebase`, the

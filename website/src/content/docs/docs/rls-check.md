@@ -11,8 +11,7 @@ tables served with row-level security switched off, policies that evaluate to tr
 everyone, views that read straight past the RLS on their base tables, and join tables
 that were forgotten while both of their endpoints were locked down.
 
-It works on **any** Postgres — Supabase, Neon, RDS, Cloud SQL, or a server you run
-yourself. It does not require Rebase, and it is useful whether or not you ever adopt it.
+It works on **any** Postgres — Supabase, Neon, RDS, Cloud SQL, or a server you run yourself. It does not require Rebase, and it is useful whether or not you ever adopt it.
 
 ```bash
 npx @rebasepro/rls-check
@@ -174,7 +173,8 @@ scope, and each run logs one line — at `warn` when a finding reaches
 
 ```
 ⚠️  [rls-audit] RLS audit found 3 issue(s) — 1 critical, 2 medium. 1 table(s)
-    without RLS. Read the detail at GET /api/admin/rls-audit.
+    without RLS. Read the detail at GET /api/admin/rls-audit, or run
+    `npx @rebasepro/rls-check` for the full report.
 ```
 
 ### Why you pass `scan` in

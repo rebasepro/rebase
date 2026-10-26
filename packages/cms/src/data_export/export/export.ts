@@ -1,5 +1,5 @@
 import { Entity, EntityReference, EntityRelation, Properties, Property } from "@rebasepro/types";
-import { type ArrayValuesCount, getArrayValuesCount, getValueInPath } from "@rebasepro/utils";
+import { type ArrayValuesCount, escapeCsvFormula, getArrayValuesCount, getValueInPath, unescapeCsvFormula } from "@rebasepro/utils";
 
 interface Header {
     key: string;
@@ -561,41 +561,9 @@ function processValuesForExport<M extends Record<string, unknown>>
     return result;
 }
 
-/**
- * Characters that make a spreadsheet read a cell as a formula rather than text.
- *
- * Quoting is CSV *escaping* and is not enough: Excel, LibreOffice Calc and
- * Sheets strip the CSV quoting at parse time and then evaluate a cell whose
- * first character is one of these — `=HYPERLINK(…)` exfiltrates neighbouring
- * cells on click, `=cmd|'…'!A0` is worse.
- */
-const FORMULA_TRIGGERS = ["=", "+", "-", "@", "\t", "\r"];
-
-/**
- * Neutralise a cell that a spreadsheet would otherwise evaluate, by prefixing a
- * single quote — the standard OWASP mitigation. The apostrophe is consumed by
- * the spreadsheet as "treat the rest as text", so the value reads back intact.
- */
-export function escapeCsvFormula(value: string): string {
-    const first = value.charAt(0);
-    if (!FORMULA_TRIGGERS.includes(first)) return value;
-    // A signed number is not a formula, and prefixing it would turn every
-    // negative amount in the file into text. `-1+1` is still neutralised,
-    // because it is not a number.
-    if ((first === "-" || first === "+") && value.trim() !== "" && Number.isFinite(Number(value))) return value;
-    return "'" + value;
-}
-
-/**
- * The inverse of {@link escapeCsvFormula}, for a file read back in: a cell that
- * is an apostrophe followed by a formula trigger loses the apostrophe, as it
- * does when a spreadsheet reads it. Any other apostrophe is text.
- */
-export function unescapeCsvFormula(value: string): string {
-    return value.charAt(0) === "'" && FORMULA_TRIGGERS.includes(value.charAt(1))
-        ? value.slice(1)
-        : value;
-}
+// One rule for every CSV the product writes — here, the SQL console's export
+// and the server's streamed download: `@rebasepro/utils`' csv helpers.
+export { escapeCsvFormula, unescapeCsvFormula };
 
 function toCSVCell(v: unknown): string {
     if (v === null || v === undefined) return "";

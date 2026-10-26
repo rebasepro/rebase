@@ -1,5 +1,5 @@
 ---
-sourceHash: 285dcbd930d89f91
+sourceHash: 6c5dd4cfdd97df7c
 title: Adaptateurs d'authentification personnalisés
 sidebar_label: Adaptateurs d'authentification personnalisés
 description: Remplacez l'authentification intégrée de Rebase par Clerk, Firebase Auth ou votre propre fournisseur d'identité en implémentant le contrat AuthAdapter.
@@ -13,7 +13,7 @@ Rebase permet le remplacement complet du système d'authentification intégré v
 
 ### Le contrat AuthAdapter
 
-Vous pouvez implémenter directement l'interface `AuthAdapter` pour un contrôle total. La définition de l'interface est la suivante :
+Vous pouvez implémenter directement l'interface `AuthAdapter` pour un contrôle total. L'interface, abrégée (la définition complète, avec les hooks facultatifs d'administration des utilisateurs et `transformAuthResponse`, est `AuthAdapter` dans `@rebasepro/types`) :
 
 ```typescript
 import { Hono } from "hono";
@@ -35,6 +35,12 @@ export interface AuthAdapter {
    * If omitted, a synthetic request is automatically constructed.
    */
   verifyToken?(token: string): Promise<AuthenticatedUser | null>;
+
+  /**
+   * The identity an account would carry right now, with no credential.
+   * Without it, a request that impersonates another user is refused.
+   */
+  resolveUser?(uid: string): Promise<AuthenticatedUser | null>;
 
   /** Optional user management operations (CRUD) for the panel */
   userManagement?: UserManagementAdapter;
@@ -74,14 +80,16 @@ Quel que soit le fournisseur d'authentification externe choisi, votre adaptateur
 
 ```typescript
 export interface AuthenticatedUser {
-  uid: string;                    // Maps to pg local 'app.user_id' -> rebase.uid()
+  uid: string;                    // Maps to pg local 'app.uid' -> rebase.uid()
   email: string;                  // User email address
   displayName?: string | null;    // Optional display name
   photoUrl?: string | null;        // Optional avatar URL
   roles: string[];                // Maps to pg local 'app.user_roles' -> rebase.roles()
-  isAdmin: boolean;               // Grants global superuser privileges if true
+  isAdmin: boolean;               // Informational: authorization reads `roles` (give the `admin` role)
+  isAnonymous?: boolean;          // A guest session. Maps to 'app.is_anonymous' -> rebase.is_anonymous()
   rawToken?: string;              // The original token string (for downstream forwarding)
   claims?: Record<string, any>;   // Custom claims/metadata (available in rebase.jwt())
+  scopes?: string[];              // Narrower than the user's roles (set for an API key)
 }
 ```
 
@@ -199,8 +207,8 @@ const backend = await initializeRebaseBackend({
 
 #### La moitié côté client
 
-En 0.24, le getter
-n'authentifie que les requêtes HTTP, et le socket temps réel reste anonyme.
+Avant la 0.25, le getter
+n'authentifiait que les requêtes HTTP, et le socket temps réel restait anonyme.
 
 L'adaptateur vérifie le jeton du fournisseur ; c'est au client de l'envoyer. Donnez
 une bonne fois au client Rebase un getter pour ce jeton :
@@ -261,7 +269,7 @@ const myOauthAdapter: AuthAdapter = {
 };
 ```
 
-Si vous souhaitez autoriser les opérations CRUD sur les utilisateurs directement depuis le panneau d'administration, implémentez l'assistant `userManagement` au sein des options de l'adaptateur, qui fournit des hooks pour `listUsers`, `createUser`, `updateUser` et `deleteUser`.
+Si vous souhaitez autoriser les opérations CRUD sur les utilisateurs directement depuis le panneau d'administration, implémentez l'assistant `userManagement` au sein des options de l'adaptateur, qui fournit des hooks pour `listUsers`, `getUserById`, `createUser`, `updateUser`, `deleteUser`, `getUserRoles` et `setUserRoles`.
 
 ## Prochaines étapes
 

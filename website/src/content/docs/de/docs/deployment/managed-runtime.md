@@ -1,5 +1,5 @@
 ---
-sourceHash: f02c2b6d0bb6de5f
+sourceHash: ba40edd634e01a84
 title: Managed-Backend-Runtime
 sidebar_label: Managed Runtime
 description: Was ein Backend mit der Runtime „managed“ auf Rebase Cloud kann und was nicht — Pakete und Binärdateien, Arbeitsspeicher und CPU, Timeouts und Body-Größen, das Dateisystem, In-Memory-Status, Secrets, Speicher für generierte Dateien und ausgehender Netzwerkverkehr.
@@ -60,9 +60,12 @@ Lockfile). Daraus ergeben sich vier Konsequenzen:
   diese Schritte installiert.
 - **Nur Registry-Versionen werden installiert.** Eine `file:`, `link:`, `git+…` oder `github:`-Abhängigkeit
   führt zum Abbruch des Builds, da die Runtime über keine Quelle verfügt, um sie aufzulösen.
-- **Manche Pakete stammen aus dem Image, nicht von Ihnen.** `@rebasepro/*`, `hono`,
-  `@hono/node-server` und `zod` werden aus den Abhängigkeiten des Bundles entfernt und
-  die Kopien des Images werden verlinkt, sodass Ihre Version davon nicht greift.
+- **Manche Pakete stammen aus dem Image, nicht von Ihnen.** `@rebasepro/server`,
+  `@rebasepro/types`, `@rebasepro/client`, `@rebasepro/common`,
+  `@rebasepro/utils`, `hono`, `@hono/node-server` und `zod` werden aus den Abhängigkeiten des
+  Bundles entfernt und die Kopien des Images werden verlinkt, sodass Ihre Version davon nicht
+  greift. Andere `@rebasepro/*`-Pakete, etwa der Datenbanktreiber, werden wie jede Abhängigkeit
+  aus Ihrer `package.json` installiert.
   `typescript` und `tsx` werden ebenfalls entfernt; sie sind Build-Tools.
 - **Private Pakete erfordern eine `.npmrc`.** `rebase build` kopiert die `.npmrc` des Projekts
   (und `backend/.npmrc`) in das Bundle, sodass die Installation dieselben
@@ -126,7 +129,7 @@ Jedes Projekt läuft in seinen eigenen Pods. Arbeitsspeicher und CPU gelten pro 
 über die [Compute-Einstellungen](/docs/deployment/cloud/#compute-and-what-it-costs) konfiguriert:
 
 ```bash
-rebase cloud compute                              # was das Projekt aktuell reserviert
+rebase cloud compute                              # what the project reserves now
 rebase cloud compute set --cpu 500m --memory 1Gi
 ```
 
@@ -192,7 +195,7 @@ Deploys hinweg oder als Speicher für Uploads. Das ist auch der Grund, warum
 |---|---|---|
 | Funktions-Timeout | 30 s, danach `504` mit Code `FUNCTION_TIMEOUT` | `REBASE_FUNCTIONS_TIMEOUT_MS` (`0` deaktiviert es) |
 | Warten auf Ihre Instanz am Edge | 10 Minuten zwischen Lese- oder Schreibvorgängen | Fest |
-| Request-Body, alle `/api/*`-Routen | 10 MiB, danach `413 PAYLOAD_TOO_LARGE` | `REBASE_MAX_BODY_SIZE`, in Bytes |
+| Request-Body, `/api/*`-Routen ohne eigenes Limit | 10 MiB, danach `413 PAYLOAD_TOO_LARGE` | `REBASE_MAX_BODY_SIZE`, in Bytes |
 | Request-Body am Edge | 64 MiB | Fest |
 | Einzelne Datei über `POST /api/storage/upload` | 50 MB | `STORAGE_MAX_FILE_SIZE` |
 | Anonyme Aufrufe an `/api/functions/*` | 3000 pro IP pro 15 Minuten | `rateLimit.anonymousFunctions` |
@@ -223,9 +226,9 @@ Setzen Sie diese über das CLI oder in der Konsole. Es gibt dafür kein Feld in
 
 ```bash
 rebase cloud env set TTS_API_URL=https://api.example.com/v1/speech
-rebase cloud env set TTS_API_KEY=sk-… --secret   # write-only: wird nie wieder angezeigt
-rebase cloud env list                            # nur Namen, niemals Werte
-rebase cloud deploy                              # wendet die Änderung an
+rebase cloud env set TTS_API_KEY=sk-… --secret   # write-only: never shown again
+rebase cloud env list                            # names only, never values
+rebase cloud deploy                              # applies the change
 ```
 
 - **Eine Änderung wird beim nächsten Deploy wirksam.** Laufende Instanzen behalten die Werte,
@@ -270,8 +273,8 @@ nicht geladen werden kann und ihre Routen mit `404` antworten. Siehe
 Ein Cloud-Projekt erhält Dateispeicher, sobald Sie ihn anlegen:
 
 ```bash
-rebase cloud storage create   # ein Managed Bucket und seine Zugangsdaten
-rebase cloud deploy           # das laufende Backend erhält die Zugangsdaten beim Deploy
+rebase cloud storage create   # a managed bucket and its credentials
+rebase cloud deploy           # the running backend gets the credentials at deploy
 ```
 
 Oder verknüpfen Sie das Projekt über `rebase cloud storage attach` mit einem Bucket, den Sie bereits besitzen
@@ -282,7 +285,7 @@ in `config/resources.ts` deklariert; siehe
 
 Ein Deploy mit Dateispeicher wird abgewiesen, bis das Projekt festlegt, wer Dateien lesen und schreiben
 darf. Die Gerüstdatei `config/storage.ts` exportiert hierfür einen `storageAuthorize`-Hook.
-Siehe [Autorisierung pro Objekt](/docs/backend/storage/#per-object-authorization).
+Siehe [Autorisierung pro Objekt](/docs/backend/storage-authorization/).
 
 **Wie Dateien ausgeliefert werden.** Ihr Backend liefert jede Datei unter
 `GET /api/storage/file/<key>` aus. Es liest das Objekt aus dem Bucket und streamt
@@ -368,9 +371,18 @@ sind zu jeder Internetadresse ausschließlich auf diesen TCP-Ports erlaubt:
 | 993 | IMAP über TLS |
 
 Alles andere ist blockiert. Das umfasst Port 25, einfaches IMAP sowie Datenbanken oder
-Caches auf ihren Standard-Ports: Ein PostgreSQL auf 5432, Redis auf 6379 oder MongoDB auf
-27017 außerhalb von Rebase Cloud kann nicht erreicht werden. Die Cloud-Metadatenadresse
+Caches auf ihren Standard-Ports: Redis auf 6379 oder MongoDB auf 27017 außerhalb von
+Rebase Cloud kann nicht erreicht werden. Die Cloud-Metadatenadresse
 (`169.254.169.254`) ist ebenfalls blockiert.
+
+Die einzige Ausnahme ist Ihre eigene Datenbank. Bringt das Projekt sein eigenes
+PostgreSQL mit (BYODB), erlaubt jedes Deployment zusätzlich Verbindungen zum Host dieser
+Datenbank auf dem Port in ihrem Connection-String, und zu nichts anderem auf diesem Port.
+Der Host wird beim Deployment in seine IP-Adressen aufgelöst; zieht Ihr Provider die
+Datenbank auf eine andere Adresse um, deployen Sie erneut. Die Datenbank muss Verbindungen
+aus dem Internet annehmen: Die App verbindet sich direkt mit dem Connection-String. Die
+Einstellungen des SSH-Bastion-Hosts werden nur vom Verbindungstest verwendet, nicht von der
+deployten App.
 
 Die Plattform fügt keinen Proxy und kein ausgehendes Rate-Limit hinzu; die von Ihnen aufgerufenen Dienste
 haben ihre eigenen Limits. Übergeben Sie `getSignal(c)` an `fetch`, damit ein Aufruf stoppt,

@@ -71,7 +71,7 @@ Impostate `collapsed: false` sull'azione per cui si apre il record, e otterrà u
 {
     name: "Publish",
     icon: "Upload",
-    collapsed: false, // un pulsante sul record, un'icona sulla riga
+    collapsed: false, // a button on the record, an icon on the row
     onClick: async ({ entity, context }) => { /* … */ }
 }
 ```
@@ -93,7 +93,7 @@ Un'azione disabilitata che non dice perché sembra rotta. `disabledReason` ricev
 {
     name: "Resend to Shopify",
     isEnabled: ({ entity }) => Boolean(entity?.values.shopify_id),
-    disabledReason: () => "Questo cliente non ha un account Shopify",
+    disabledReason: () => "This customer has no Shopify account",
     onClick: async ({ entity, context }) => { /* … */ }
 }
 ```

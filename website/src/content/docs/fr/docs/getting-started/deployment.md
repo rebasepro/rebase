@@ -7,7 +7,7 @@ description: Déployez votre projet Rebase en production à l'aide de Docker, de
 
 ## Ce qu'un déploiement sert
 
-Un projet Rebase se déploie sous la forme d'**un seul serveur** (sur Rebase Cloud : `https://<projet>.rebase.website`). Ce serveur gère :
+Un projet Rebase se déploie sous la forme d'**un seul serveur** (sur Rebase Cloud : `https://<project>.rebase.website`). Ce serveur gère :
 
 - **`/api/*`** — l'API de données, l'authentification, le temps réel et le stockage
 - **tout le reste** — votre dossier `frontend/` compilé sous forme de SPA statique

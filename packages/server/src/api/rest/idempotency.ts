@@ -178,6 +178,21 @@ export interface IdempotencyStore {
      * is the floor, not the mechanism: it only covers the exits no code runs on.
      */
     release(key: string, uid: string | undefined): Promise<void>;
+    /**
+     * Make the table ready now rather than on the first keyed request — what a
+     * provisioning run calls, so the table exists before a backend that may
+     * not create it ever needs it. Resolves to whether it is usable.
+     */
+    ensureTable(): Promise<boolean>;
+}
+
+export interface IdempotencyStoreOptions {
+    /**
+     * Default `true`. `false` is a backend that changes nothing in its
+     * database: the table is used if it is there and never created, and its
+     * absence turns the mechanism off, said once.
+     */
+    provision?: boolean;
 }
 
 /**
@@ -190,7 +205,10 @@ export interface IdempotencyStore {
  * `remember` is the duplicate we already have today, while a thrown error would
  * reject a write the database has already accepted.
  */
-export function createIdempotencyStore(driver: DataDriver): IdempotencyStore | undefined {
+export function createIdempotencyStore(
+    driver: DataDriver,
+    options: IdempotencyStoreOptions = {}
+): IdempotencyStore | undefined {
     const admin = driver.admin;
     if (!isSQLAdmin(admin)) return undefined;
     const exec = (sql: string, params?: unknown[]) => admin.executeSql(sql, params ? { params } : undefined);
@@ -198,6 +216,31 @@ export function createIdempotencyStore(driver: DataDriver): IdempotencyStore | u
     let ready: Promise<boolean> | undefined;
     let retryEnsureAt = 0;
     let warnedAnonymous = false;
+    let warnedMissing = false;
+
+    /**
+     * What a backend that may not create the table does instead: read it, with
+     * every column the statements below name, so a table an older release made
+     * — without `fingerprint` — counts as absent rather than failing each claim.
+     */
+    const probe = async (): Promise<boolean> => {
+        try {
+            await exec(`SELECT key, uid, fingerprint, response, created_at FROM ${TABLE} WHERE false`);
+            return true;
+        } catch (error) {
+            retryEnsureAt = Date.now() + ENSURE_RETRY_COOLDOWN_MS;
+            if (!warnedMissing) {
+                warnedMissing = true;
+                logger.warn(
+                    `Idempotency keys unavailable — ${TABLE} is missing or out of date, and this backend changes ` +
+                    "nothing in its database. Idempotency-Key is ignored, so a replayed offline write may insert a " +
+                    "duplicate row, until the table is created by a provisioning run.",
+                    { detail: error instanceof Error ? error.message : String(error) }
+                );
+            }
+            return false;
+        }
+    };
     /** Said once per process: it is a deployment fact, not a per-request event. */
     const warnAnonymous = (): void => {
         if (warnedAnonymous) return;
@@ -214,7 +257,7 @@ export function createIdempotencyStore(driver: DataDriver): IdempotencyStore | u
         // A failure is retried, but not by every request that arrives in the
         // meantime: the database is the thing that is unwell.
         if (Date.now() < retryEnsureAt) return Promise.resolve(false);
-        const attempt = (async () => {
+        const attempt = options.provision === false ? probe() : (async () => {
             try {
                 await exec("CREATE SCHEMA IF NOT EXISTS rebase");
                 await exec(`
@@ -346,7 +389,9 @@ export function createIdempotencyStore(driver: DataDriver): IdempotencyStore | u
             } catch {
                 /* The row ages out on its own. */
             }
-        }
+        },
+
+        ensureTable: ensure
     };
 }
 

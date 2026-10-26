@@ -1,5 +1,5 @@
 ---
-sourceHash: 172ed813d51ccec3
+sourceHash: 189ee23f6992c2e4
 title: Sottoscrizioni Realtime
 sidebar_label: Realtime
 description: Sottoscrivi le modifiche ai dati in tempo reale con l'SDK tipizzato di Rebase utilizzando listener realtime basati su WebSocket.
@@ -215,7 +215,7 @@ useEffect(() => {
 
 Il client WebSocket gestisce l'autenticazione automaticamente:
 
-- Al **login** o al **refresh del token**, il nuovo token viene inviato a un socket già aperto tramite un messaggio `authenticate`. Se non c'è alcun socket aperto, non accade nulla — l'accesso non è una richiesta per il realtime, e un socket aperto successivamente si autentica da solo.
+- Al **login** o al **refresh del token**, un socket già aperto acquisisce la nuova credenziale. Un refresh, o un login con lo stesso account che il socket già detiene, invia il token in un messaggio `authenticate`; un login con un account diverso — compreso un visitatore che effettua l'accesso — ricostruisce il socket, che si autentica come quell'account e reinvia ogni sottoscrizione e ogni canale attivi. Se non c'è alcun socket aperto, non accade nulla — l'accesso non è una richiesta per il realtime, e un socket aperto successivamente si autentica da solo.
 - Al **logout**, la connessione WebSocket viene disconnessa. Il client rimane utilizzabile; una sottoscrizione successiva si riconnette in modo anonimo.
 - Se la connessione cade, il client **si riconnette automaticamente** e ristabilisce tutte le sottoscrizioni attive. Non smette mai di tentare finché esiste una sottoscrizione o un canale cui si è aderito; il ritardo tra i tentativi cresce fino a un massimo di 30 secondi.
 - Se il server termina la sessione del socket — l'utente si è disconnesso ovunque, questa sessione è stata revocata, l'account è stato eliminato, oppure il token è scaduto prima che un refresh raggiungesse il socket — chiude il socket con il codice `4001`. Il client si riconnette come dopo qualsiasi caduta, autenticandosi con la sessione che possiede in quel momento (aggiornata se possibile), oppure in modo anonimo quando non ce n'è una. Un ruolo revocato non chiude il socket: si applica a partire dal frame successivo. Vedi [Autenticazione e RLS](/docs/backend/realtime/#authentication--rls).
@@ -389,7 +389,7 @@ const { messages, retained, latestSeq } = await channel.history({
 :::note[Le riproduzioni possono sovrapporsi, ed è normale]
 Il server non può sapere con precisione quali messaggi ti abbiano raggiunto prima dell'interruzione del socket, quindi un intervallo di catch-up potrebbe includere messaggi che hai già applicato. L'SDK scarta qualsiasi elemento pari o inferiore alla sequenza già consegnata, così i gestori non vedranno mai un messaggio due volte.
 
-I tuoi messaggi personali **non** vengono esclusi da un replay: una riconnessione assegna un nuovo ID client, quindi il caso esatto per cui esiste il catch-up è proprio quello in cui tale filtro fallirebbe. Rendi le operazioni idempotenti se riapplicare le tue creerebbe problemi.
+I tuoi messaggi vengono esclusi da un replay, come lo sono in diretta, compresi quelli inviati prima che una riconnessione desse al socket un nuovo ID client: il canale ricorda gli id da cui ha trasmesso. Un nuovo oggetto canale — dopo un ricaricamento della pagina, ad esempio — non ne ricorda nessuno, quindi un catch-up lì consegna i tuoi messaggi precedenti come quelli di chiunque altro, ed è ciò di cui ha bisogno la ricostruzione dello stato dalla cronologia.
 :::
 
 ## Tracciamento della presenza

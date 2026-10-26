@@ -87,7 +87,7 @@ application image to build yourself. Useful flags:
 |------|--------|
 | `--output <dir>` (or `--out`) | Write the bundle somewhere other than `dist-bundle/` (one app at a time) |
 | `--vendor` | Always install and ship the bundle's dependencies |
-| `--no-vendor` | Never vendor; the pod installs on first start |
+| `--no-vendor` | Never vendor; the pod installs them on every start |
 | `--skip-type-check` | Skip typechecking (faster, less safe) |
 | `--no-static` | Do not fold the frontend into the backend bundle (each static app still gets its own bundle) |
 | `--skip-static-build` | Fold the frontend as already built, without running its build command |
@@ -385,7 +385,9 @@ from working at all happens before a table can be compared:
 | Connection strings | An unencoded `=` in a URL parameter, which PostgreSQL's own tools refuse to parse — so backups and `psql` break while the app keeps working. |
 | Custom functions | What each function needs from its host, and which of them would not run on an edge runtime. |
 
-**Against the database**, when `DATABASE_URL` is set:
+**Against the database** — the project's own, resolved the way `rebase db url`
+resolves it, so on a fresh scaffold it is the managed database, which `doctor`
+starts:
 
 | Check | Why |
 | --- | --- |
@@ -401,7 +403,7 @@ reason and the rest still runs — see [Troubleshooting](/docs/troubleshooting/)
 
 Exits non-zero when a check finds an error, or when a phase could not run
 because the database it was given refuses connections. A phase skipped because
-you set no `DATABASE_URL` is not a failure.
+no database could be resolved is not a failure.
 
 `rebase doctor --policies` runs only the RLS checks — no schema diff, no SDK
 types — and fails closed, which makes it the form to use as a CI gate against a
@@ -413,6 +415,7 @@ deployed database.
 rebase verify
 rebase verify --json
 rebase verify --live
+rebase verify --live --database-url postgresql://…
 ```
 
 Whether the collections are safe to ship, in one fast command for CI and for an
@@ -423,7 +426,7 @@ AI agent's hooks. Offline by default, and it never changes anything.
 | Collection config | A file under `config/collections/` that does not load, or that the boot validator rejects — with unknown keys as errors, so a misspelt option or a UI option written outside `admin: { … }` (a top-level `widget`) is caught here rather than silently ignored. |
 | RLS coverage | A collection with no `securityRules` that inherits none, or one with a `user_id`, `owner_id`, `organization_id` or `tenant_id` column that relies on directory defaults instead. A rule that lets a role read every row of such a table is a warning. |
 | Migration freshness | A table or column the collections declare that no file in `backend/drizzle/migrations` creates, or one they dropped that a migration still creates. Skipped for a project with no migrations yet. |
-| Live RLS audit | With `--live`: the [`rls-check`](/docs/rls-check) catalogue against `DATABASE_URL`, and whether every migration has been applied. |
+| Live RLS audit | With `--live`: the [`rls-check`](/docs/rls-check) catalogue against the project's database, and whether every migration has been applied. The database is resolved as the `db` commands resolve it — `--database-url`, `DATABASE_URL`, `--docker`, otherwise the managed development database. A database that is not configured or does not answer is an error, not a skip: the audit was asked for. A `USING (true)` read policy compiled from an `access: "public"` rule is a warning while the API requires a token (`AUTH_REQUIRE`, on by default) — every signed-in user reads every row — and an error with `AUTH_REQUIRE=false`, where the rows are anonymous. |
 
 `--json` prints one object — every step, and every finding with its `file`, the
 dotted `path` into the collection config, and the `fix` — so an agent can repair
@@ -474,20 +477,45 @@ rebase storage move --from "(default)" --to media --prefix avatars
 rebase storage move --from "(default)" --to media --prefix avatars --delete-source
 ```
 
-`orphans` reads every row of every collection, soft-deleted rows included, and
-lists the files of one source (`--source`, the default source when left out)
-that no string in any row names: a key, a URL, a `rebase-storage:` reference in
-a text. Files newer than `--older-than` hours (24 by default) are left out,
+`orphans` reads every row of every collection as stored (soft-deleted rows
+included, past every `beforeQuery` and `afterRead` hook) and every
+[history](/docs/backend/history/) entry, since a revert restores what it holds.
+It lists the files of one source (`--source`, the default source when left out)
+that no string in any of them names: a key, a URL, a `rebase-storage:`
+reference in a text. Files newer than `--older-than` hours (24 by default) are left out,
 because the admin panel uploads a file before the row that names it is saved.
+The scan runs on the backend in the background, so a project too big to scan
+inside one request (behind an ingress that times it out) still finishes. The
+CLI starts it, then shows its progress (files listed, rows read, collections
+done, and any that could not be read) until it is done. With the
+[job queue](/docs/backend/jobs/) on, the scan is a `storage.orphans` job that
+the job workers run. Without it, the scan runs inside the server process that
+was asked, and the CLI says so: restarting that process stops the scan. A scan
+is one job attempt, limited by `jobs.timeoutMs` (15 minutes by default). Raise
+it, or set it to 0, for a source that takes longer. `--json` prints the same
+report as before, plus its `scanId`.
+
 `--delete` asks before it deletes (`--yes` skips the question, and is required
-with no terminal), the server finds the files again first, and nothing is
-deleted while a collection cannot be read. Files that only your own tables
-outside collections name look unused: check before deleting.
+with no terminal). It deletes only from the scan just printed, and only within
+15 minutes of that scan completing. Nothing is deleted while a collection
+cannot be read: a collection with read hooks on a data source whose driver
+cannot read past them counts as unread. Before deleting anything, the server
+reads every row and history entry again against the listed files. Then it asks
+for each file again right before deleting it. A file that a row names now,
+that was uploaded again since the scan, or that is gone is kept, and the CLI
+lists it as kept. Files that only your own tables outside collections name look
+unused: check before deleting. Against a backend from 0.25.1 or earlier, the
+CLI scans the old way, inside one request.
 
 `move` copies the files under `--prefix` to another source under the same keys,
 a page at a time. A file the target already holds at the same size is skipped,
 so a stopped move resumes by running it again; `--delete-source` deletes each
-file from the source once the target holds it. Both need `database:read`, and
+file from the source once the target holds it, and is refused when the two
+sources store in the same bucket or directory. Once the move is done, the CLI
+lists the source again with a fresh walk and names every file the move did not
+move: with `--delete-source`, any file still in the source; without it, any file
+the target holds no copy of the same size of. It exits 1 when there is one, and
+running the same move again picks it up. `--json` prints them as `notMoved`. Both need `database:read`, and
 deleting or moving `database:write`, which the service key holds.
 
 ### `rebase skills install`

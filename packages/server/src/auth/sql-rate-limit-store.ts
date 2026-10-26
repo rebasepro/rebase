@@ -45,7 +45,7 @@ import type { DataDriver } from "@rebasepro/types";
 import { isSQLAdmin } from "@rebasepro/types";
 import { revokeInternalTableSql, firstSqlRow } from "@rebasepro/common";
 import { logger } from "../utils/logger.js";
-import { createDdlBootstrapper } from "../boot/ddl-bootstrap.js";
+import { createDdlBootstrapper, provisioningExec } from "../boot/ddl-bootstrap.js";
 import type { RateLimitDecision, RateLimitStore } from "./rate-limit-store.js";
 
 const SCHEMA = "rebase";
@@ -58,6 +58,12 @@ const DEFAULT_SWEEP_MS = 5 * 60 * 1000;
 export interface SqlRateLimitStoreOptions {
     /** How often to delete expired buckets. Defaults to 5 minutes. */
     sweepMs?: number;
+    /**
+     * Default `true`. `false` is a backend that changes nothing in its
+     * database: the table is used if it is there, never created, and counts
+     * stay per-process without it.
+     */
+    provision?: boolean;
     /**
      * Clock, for tests. Driving the window directly beats sleeping through half
      * of one — a real sleep overruns on a loaded machine and takes the hits it
@@ -73,10 +79,19 @@ export interface SqlRateLimitStoreOptions {
  * deployment on a driver with no SQL admin should degrade to per-process counts
  * with a warning, not refuse to serve.
  */
+/** The shared store, plus the one step a provisioning run takes ahead of time. */
+export interface SqlRateLimitStore extends RateLimitStore {
+    /**
+     * Create the table now rather than on the first counted request — what a
+     * provisioning run calls. Resolves to whether it is usable.
+     */
+    ensureTable(): Promise<boolean>;
+}
+
 export function createSqlRateLimitStore(
     driver: DataDriver,
     options: SqlRateLimitStoreOptions = {}
-): RateLimitStore | undefined {
+): SqlRateLimitStore | undefined {
     const admin = driver.admin;
     if (!isSQLAdmin(admin)) {
         logger.warn(
@@ -87,8 +102,11 @@ export function createSqlRateLimitStore(
         return undefined;
     }
 
-    const exec = (sqlText: string, options?: { params?: unknown[] }) =>
-        admin.executeSql(sqlText, options?.params ? { params: options.params } : undefined);
+    const exec = provisioningExec(
+        (sqlText, execOptions) =>
+            admin.executeSql(sqlText, execOptions?.params ? { params: execOptions.params } : undefined),
+        options.provision
+    );
 
     const ddl = createDdlBootstrapper(exec, "rate-limit-store");
     const now = options.now ?? Date.now;
@@ -146,6 +164,12 @@ export function createSqlRateLimitStore(
                     if (readable) {
                         await ddl.step("Revoking end-user access to rate_limit_hits", () =>
                             exec(revokeInternalTableSql(SCHEMA, TABLE_NAME)));
+                    } else if (options.provision === false) {
+                        logger.error(
+                            `[rate-limit] ${TABLE} does not exist, and this backend changes nothing in its ` +
+                            "database, so counts stay per-process. Every replica will enforce the limit " +
+                            "independently until a provisioning run creates the table."
+                        );
                     } else {
                         logger.error(
                             "[rate-limit] The shared rate-limit table could not be created, so counts " +
@@ -182,6 +206,8 @@ export function createSqlRateLimitStore(
     }
 
     return {
+        ensureTable: ensureReady,
+
         async hit(key: string, windowMs: number, limit: number): Promise<RateLimitDecision> {
             if (!(await ensureReady())) {
                 // No table, so no shared count. Allowing is the right failure

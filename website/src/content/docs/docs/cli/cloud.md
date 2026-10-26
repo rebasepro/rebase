@@ -1,7 +1,7 @@
 ---
 title: rebase cloud
 sidebar_label: rebase cloud
-description: The command groups for Rebase Cloud in the CLI — auth, project link, deploys, config, organizations, databases, resources, compute, storage, webhooks, clusters and billing.
+description: The command groups for Rebase Cloud in the CLI — auth, project link, deploys, notifications, config, organizations, databases, resources, compute, storage, clusters, billing and usage.
 ---
 
 Everything to do with Rebase Cloud, which is in private beta. See the
@@ -20,10 +20,28 @@ specific control plane (or `REBASE_CLOUD_URL`), and `--project, -p <id>`.
 
 ```bash
 rebase cloud login      # sign in to the control plane
+rebase cloud login --code   # with an emailed 6-digit code: accounts made with Google, GitHub or LinkedIn
 rebase cloud logout     # sign out
 rebase cloud whoami     # the current session, or what REBASE_TOKEN may do
 rebase cloud tokens create --can deploy,logs   # a token for CI, shown once
+rebase cloud tokens create --can billing --org <id>   # a token for an organization's billing
 ```
+
+`--can` takes `deploy`, `logs`, `env`, `database` and `backups` on one project
+(`--project`, or the linked one), and <span class="since-badge" data-since="0.26">Since 0.26</span> `billing`, `audit` and
+`notifications` on one organization: `--org`, else the project's organization,
+else the selected one. A token may hold only organization capabilities.
+`logs` also covers `usage`. What each one reaches is in
+[CI and agents](/docs/deployment/cloud-agents/#ci-and-agents). When the control
+plane marks an answer to a token as deprecated (a token from before `billing`
+reading billing), the CLI prints the notice once on stderr, never in the
+`--json` value.
+
+At a terminal with no password given, <span class="since-badge" data-since="0.26">Since 0.26</span> `login` asks whether to use your password
+or a code the control plane emails you. With two-factor authentication on, it
+then asks for your authenticator code (or a recovery code). Without a terminal
+neither can be typed: set `REBASE_TOKEN` to an access token made in the console
+under Settings → Access tokens. See [Rebase Cloud](/docs/deployment/cloud#link-a-project).
 
 ## Project link
 
@@ -39,11 +57,24 @@ rebase cloud open         # open the dashboard in a browser
 
 ```bash
 rebase cloud init --claim [--name <name>]   # a live backend with no account, and a link to claim it within 72 hours
+rebase cloud claim [--open]                 # that link again, and how long is left
 rebase cloud projects list
 rebase cloud projects create [--link]
 rebase cloud projects info [id]
 rebase cloud projects delete [id]
 ```
+
+<span class="since-badge" data-since="0.26">Since 0.26</span> `claim` prints the claim link of the project `init --claim` provisioned in this
+directory, and the time left before it is deleted unclaimed (`Unclaimed: deleted
+in 41h`). `--open` also opens it in a browser. The link is kept only on the
+machine that ran `init --claim`, in `~/.rebase/credentials.json`; the control
+plane stores a hash of it and cannot print it again. Before answering, `claim`
+asks the control plane whether the project's own token still works. A claim
+revokes that token, so once someone has claimed the project, `claim` refuses
+with `already_claimed` instead of printing a dead link. It also refuses once the
+window has ended (`claim_expired`), and in a directory with no claim link
+(`no_claim_link`). `rebase cloud status` and `rebase cloud whoami` show the same
+link while the project is unclaimed.
 
 ## Deploy and observe
 
@@ -51,7 +82,7 @@ rebase cloud projects delete [id]
 rebase cloud deploy [app] [--source .]   # deploy an app and stream build logs
 rebase cloud deploy [app] --preview [--preview-name <name>]  # its own address; production untouched
 rebase cloud previews [list|delete <name>]
-rebase cloud logs [--runtime] [-f]       # build logs, or the running process's
+rebase cloud logs [--runtime] [-f] [--preview [name]]  # build log, or what the app prints
 rebase cloud deployments list [--limit N|--all]
 rebase cloud rollback [id] [-y]          # back to a successful deploy
 rebase cloud cancel [-y]                 # cancel the in-flight build
@@ -69,7 +100,7 @@ platform upgrade can rebuild it; `--no-source` skips that once, and `cloud setti
 A followed `deploy` ends on a summary: each app it shipped with its URL, the
 deployment id, how long it took, and whether the new version answers there. It
 waits up to `--live-timeout` seconds (default 60; `0` skips the check) for a
-backend's `/api/health` and each static app's address to answer. A failed deploy
+backend's `/health` and each static app's address to answer. A failed deploy
 ends on one line naming the app and the reason, and exits non-zero. The summary
 prints even when piped; `--json` (or `REBASE_JSON=1`) prints one object instead,
 with `apps`, `hosts`, `live`, `liveChecks` and `durationMs`.
@@ -83,9 +114,53 @@ its own cannot be rolled back yet; see
 [Roll back](/docs/deployment/cloud#roll-back).
 
 `--preview` serves the build at `https://<project>--<name>.rebase.website` and
-leaves production alone. A preview of a static app calls the production backend.
-A preview of the backend runs its own backend, on an empty database of its own.
+leaves production alone. A preview of the backend runs its own backend, on an
+empty database of its own, with its static apps folded in. A static app cannot be
+previewed on its own on Rebase Cloud yet: `rebase cloud deploy <app> --preview`
+is refused with `PREVIEW_STATIC_UNSERVED` and publishes nothing. A backend
+preview is billed as one more app unit at the default size while it exists, and
+the deploy says what that comes to per month, from the control plane's own quote
+(`cost` under `--json`; only the rule and this link when the control plane cannot
+price it); `rebase cloud previews delete <name>` stops it. `rebase cloud previews`
+shows a preview the platform paused (its database grew past the preview limit) as
+`paused`, with the reason (`statusMessage` under `--json`). A new preview address
+can be refused with `preview_cert_budget` when the platform's weekly budget of
+preview certificates is spent; the message says until when.
 See [Preview a change](/docs/deployment/cloud/#preview-a-change).
+
+### Logs
+
+`rebase cloud logs` prints the latest build log, and `-f` tails a build that is
+still running. `--runtime` reads what the app prints instead, from every pod
+behind it, each line tagged with its pod:
+
+```bash
+rebase cloud logs --runtime -f                    # follow until Ctrl-C (exits 0)
+rebase cloud logs --runtime --since 15m --grep timeout
+rebase cloud logs --runtime -f --level error      # errors only
+rebase cloud logs --runtime --previous            # a restarted container's last run
+```
+
+- `--since` takes a duration (`30s`, `5m`, `1h`) or an RFC3339 time.
+- `--tail <n>` is the lines per pod to start from (the control plane caps it at 2000).
+- `--grep` keeps lines containing the text, in any case; write `/re/flags` for a
+  regular expression.
+- `--level error|warn|info|debug` keeps lines at that severity or worse. It reads
+  the structured `severity` a Rebase backend logs, a level word at the start of a
+  plain line, or an error shape such as `TypeError:`. Lines with none are left out.
+
+<span class="since-badge" data-since="0.26">Since 0.26</span> A follow polls every two seconds and prints each line once. It announces pods
+that start, stop or restart. When a container restarts it also prints the last
+lines of the instance that died, where the reason usually is. It waits while no
+pod is running, and after a dropped connection it retries with backoff and
+resumes where it left off. With `--json`, a follow prints one JSON object per
+line (NDJSON): `{"type":"line","ts","pod","text"}` for each log line, and
+`{"type":"event","event":…}` for the rest.
+
+`--preview <name>` reads a preview instead of production. Use the preview's
+name, or the deployment id a preview deploy printed. On its own, `--preview`
+reads the project's only preview. A static preview has a build log but no
+runtime log, because it runs no server.
 
 ## Config
 
@@ -94,7 +169,27 @@ rebase cloud env list | set | unset | reveal | pull
 rebase cloud domains list | add <domain> | verify [domain] | remove <domain>
 rebase cloud extensions list | enable | disable
 rebase cloud settings show | set        # name, branch, repo, subdomain, rebuilds
+rebase cloud app-key [rotate]           # the app key init --claim wrote; owners and admins
+rebase cloud service-key [rotate]       # REBASE_SERVICE_KEY; owners and admins
 ```
+
+<span class="since-badge" data-since="0.26">Since 0.26</span> `app-key` lists the
+key `rebase cloud init --claim` minted on the app and wrote into `.env` as
+`REBASE_API_TOKEN`, by its prefix and never its value. Claiming the project
+hands that key over and it stops expiring. `app-key rotate` mints a new one and
+revokes every earlier agent key at once. It writes the new key into a `.env`
+that already sets `REBASE_API_TOKEN`, and keeps it out of `--json` there. In
+any other directory it prints the key once. Keys made in the app's admin panel
+are not touched. It runs with your login: no token capability grants it.
+
+<span class="since-badge" data-since="0.26">Since 0.26</span> `service-key`
+prints the generation of the project's `REBASE_SERVICE_KEY`, when it was last
+rotated, and whether the app is still restarting onto the newest one. It never
+prints the key: that is `env reveal REBASE_SERVICE_KEY`. `service-key rotate`
+issues a new key and restarts the app onto it. The old key works until the
+restart has finished, and nothing after. It is refused while a deploy is
+running, and it runs with your login. Claiming a project rotates its service
+key too.
 
 A backend preview starts from production's variables, live keys included.
 `env set KEY=VALUE --preview` gives previews their own value, `env unset KEY
@@ -102,11 +197,54 @@ A backend preview starts from production's variables, live keys included.
 back production's value, and `env list --preview` shows the differences.
 Production is never changed by any of them.
 
+<span class="since-badge" data-since="0.26">Since 0.26</span> `env set KEY --stdin` reads the value from standard input instead of the
+command line, where `ps` and your shell history would show it:
+
+```bash
+read -rs STRIPE_KEY   # paste the value; nothing is echoed
+printf %s "$STRIPE_KEY" | rebase cloud env set STRIPE_KEY --stdin --secret
+```
+
+One trailing newline is dropped. The MCP server's `rebase_cloud_env_set` sets
+values this way.
+
 ## Organizations
 
 ```bash
-rebase cloud orgs list | create | members
+rebase cloud orgs list | create
+rebase cloud orgs members [list] | invite <email> [--role admin|member] | remove <email|uid> | role <email|uid> <role>
+rebase cloud orgs invites [list] | revoke <id|email> | resend <id|email>
+rebase cloud activity [--project <id|slug>] [--action <area|action>] [--actor <email>] [--limit N] [--before <cursor>]
 ```
+
+<span class="since-badge" data-since="0.26">Since 0.26</span> `members invite` opens an invitation and prints its link: single use,
+valid 7 days, accepted only by an account that has verified that address.
+Nobody joins until they accept, even someone who already has a Rebase account.
+The output (and `emailDelivery` in `--json`) says whether it was emailed; when
+it was not, a warning says to send the link yourself. `--role` is `admin` or
+`member` (default). Nobody is invited as `owner`: invite them as an admin, and
+an owner promotes them with `members role <email> owner` once they have joined.
+`invites resend` gives a new link and the old one stops working.
+Inviting and `invites` need a `rebase cloud login` session; `REBASE_TOKEN` is
+refused. Inviting, listing, resending and revoking take the owner or admin
+role; a member is told so.
+`members remove` asks first (`--yes` skips it); removing or demoting an owner
+takes an owner, and the last owner stays. `--org <id>` picks an organization
+other than the selected one.
+
+<span class="since-badge" data-since="0.26">Since 0.26</span> `activity` is the selected organization's audit log, newest first: who
+deployed, rolled back, set, deleted or revealed an environment variable (by
+name, never by value), changed a domain, created, restored or downloaded a
+backup, changed a project's compute, stopped or deleted a project, changed a
+member's role, or created or revoked an access token. `--action` takes an area
+(`deploy`, `deploy_hook`, `env`, `domain`, `backup`, `pitr`, `database`,
+`extension`, `storage`, `project`, `org`, `member`, `invite`, `token`) or a full action
+such as `env.set`. A page holds up to 100 entries (`--limit`, default 50); the
+output prints the `--before` cursor for the next one. `--json` is one value,
+`{ org, events, nextCursor }`. It needs the organization's owner or admin role.
+A token reads it only with the `audit` capability on the organization
+(`rebase cloud tokens create --can audit`). The console's **Activity** page
+shows the same log.
 
 ## Databases
 
@@ -149,15 +287,72 @@ rebase cloud compute set        # change it
 tiers: everything is priced per resource. See
 [Rebase Cloud](/docs/deployment/cloud/).
 
-## Storage, webhooks, clusters and billing
+## Storage, notifications, clusters, billing and usage
 
 ```bash
 rebase cloud storage             # list storage buckets
 rebase cloud storage create      # provision platform-managed storage
 rebase cloud storage attach      # attach your own S3-compatible bucket
-rebase cloud webhooks list | create | delete
-rebase cloud clusters list | add | verify   # the clusters tenants run on; `add` registers one from a kubeconfig
+rebase cloud notifications [list] | add <url> | test <id> | remove <id>   # deploy, backup, billing and usage events to Slack, Discord or any URL
+rebase cloud webhooks            # retired: exits 1 (`command_retired`) and names `notifications`
+rebase cloud clusters list | add | verify | registry   # the clusters tenants run on; `add` registers one from a kubeconfig
 rebase cloud billing             # the billing account and card on file
 rebase cloud billing setup       # attach a card, one-time, opens a browser
 rebase cloud billing checkout    # a Stripe session for one project
+rebase cloud billing invoices [--limit N]   # issued invoices, newest first, with Stripe's hosted page
+rebase cloud billing upcoming    # a preview of each subscription's next invoice
+rebase cloud usage [--month YYYY-MM]   # requests used this month against the allowance, and the overage so far
+rebase cloud usage org           # every project of the selected organization, with the total
 ```
+
+<span class="since-badge" data-since="0.26">Since 0.26</span> `notifications add <url>` sends the linked project's events to a URL. `--events`
+takes a comma-separated list of `deploy.failed` (the default),
+`deploy.succeeded`, `deploy.rolled_back`, `backup.unhealthy`,
+`billing.payment_failed`, `usage.threshold` and `preview.paused`. `--format slack` sends
+`{ "text" }` alone instead of the event JSON, which also carries a `text`. The URL
+is a positional argument because `--url` names the control plane. `add` prints
+the signing secret once; `--json` returns `{ projectId, webhook, secret }`.
+`test <id>` exits 1 with code `delivery_failed` when the receiver did not accept
+the test event. Listing is open to any member of the organization; `add`, `test`
+and `remove` need the owner or admin role. A token manages them with the
+`notifications` capability on the organization, within the same role rule. See
+[Cloud notifications](/docs/deployment/cloud-notifications/).
+
+<span class="since-badge" data-since="0.26">Since 0.26</span> `clusters registry <cluster-id> --repository <host/project/repo>
+--push-service-account <email> --pull-key-file <key.json>` gives a customer's
+own cluster an image registry of its own, used for that cluster alone. Without
+one, such a cluster uses the platform's shared registry, and every deploy to it
+says so in its log. With one, builds push to that repository with a token for
+that account, pods pull with that key alone, and a rollback accepts the
+project's images there. Images
+the project built in the shared repository before stay pullable and stay
+rollback targets. The three values go together; `--clear` forgets them. The key
+is sealed when it is written and never read back. Like the rest of `clusters`,
+it needs the platform-admin role. The operator creates the repository and both
+accounts with Terraform (`saas/infra/gcp/registry-linked-clusters.tf`).
+
+<span class="since-badge" data-since="0.26">Since 0.26</span> `billing invoices` and `billing upcoming` read the same Stripe data as the
+console's Billing page, and are open to the organization's owners and admins
+only. A token reaches them, and the rest of `billing`, with the `billing`
+capability on the organization; a token made before that capability keeps
+working for one release, with a warning on each answer. Amounts in `--json` are in the currency's minor unit (cents), exactly as
+Stripe sends them. Draft invoices are not listed; the preview is computed by
+Stripe and its metered lines keep growing until the period closes.
+
+<span class="since-badge" data-since="0.26">Since 0.26</span> `usage` reads what the linked project (or `--project`) has used in a calendar
+month, in UTC: requests against the included allowance, 5xx errors, the overage
+so far in euros and, for the month in progress, where it is heading at this
+pace (an estimate). The overage is the overage report's own calculation, the
+one that tells Stripe what to bill, and lands on the following month's invoice.
+`usage org` lists every project of the organization selected with `rebase cloud
+use`, and the total. Any member of the organization can read it. A token reads
+it with the `logs` capability on the project; `usage org` lists the projects the
+token holds that on.
+`--month` takes a past month. The answer carries `caveats`, each with a `code`: `storage_not_measured`
+(object storage reads 0), `multi_pod_undercount` (requests served while two or
+more app pods run are not counted), `partial_days`, `metering_off`,
+`overage_billing_off`, `not_billed`, `billed_next_month`, `pre_claim_days` (a
+project claimed from an agent counts only the days from the claim on) and
+`autoscale_not_charged` (pods ran above `--replicas` and this platform does not
+charge them yet). An autoscaled project's answer also carries `autoscale`:
+`extraPodSeconds` above the floor, `amountEur` at its rates, and `charged`.

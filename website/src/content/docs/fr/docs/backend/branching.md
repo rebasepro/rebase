@@ -1,5 +1,5 @@
 ---
-sourceHash: 6c8e1509d678993c
+sourceHash: 9b091b775b58ae32
 title: Branches de base de données
 sidebar_label: Branches
 description: Créez des branches de base de données isolées pour le développement, le staging et les tests à l'aide de CREATE DATABASE ... TEMPLATE de PostgreSQL — des copies instantanées et parfaitement fidèles, sans temps d'arrêt.
@@ -96,7 +96,7 @@ Les configurations de branche sont stockées dans la base de données par défau
 CREATE SCHEMA IF NOT EXISTS rebase;
 
 CREATE TABLE IF NOT EXISTS rebase.branches (
-    name         TEXT PRIMARY KEY,              -- Sanitize user branch name (alphanumeric & underscores)
+    name         TEXT PRIMARY KEY,              -- Branch name as given (letters, digits, underscores, hyphens)
     db_name      TEXT NOT NULL UNIQUE,          -- Actual PostgreSQL database name (prefixed with 'rb_')
     parent_db    TEXT NOT NULL,                 -- Source database cloned from
     created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -202,7 +202,7 @@ rebase db branch switch --off
 # Show one branch's parent, age and size
 rebase db branch info dev_sandbox
 
-# Ce que la branche a changé : schéma, politiques RLS et lignes (--json pour tout)
+# What the branch changed: schema, RLS policies and rows (--json for all of it)
 rebase db branch diff dev_sandbox
 
 # Delete a branch
@@ -254,18 +254,35 @@ Créer une branche ne modifie **pas** la base de données avec laquelle votre pr
 postgresql://user:pass@localhost:5432/rb_dev_sandbox
 ```
 
+---
+
 ## Examiner et fusionner une branche
+
+<span class="since-badge" data-since="0.26">Depuis 0.26</span>
 
 Une branche est l'endroit où un agent, ou une migration dont vous n'êtes pas sûr, peut modifier une base de données sans toucher à la vraie. Avant que quoi que ce soit n'atteigne la base dont la branche a été créée, vous pouvez voir ce qui a changé et le fusionner depuis [Studio](/docs/studio/) : ouvrez **Branches** et choisissez-en une.
 
-- **Schéma et politiques RLS** liste chaque table, colonne, clé primaire et politique que la branche a ajoutée, supprimée ou modifiée, en SQL, avec la définition du parent à côté de celle de la branche.
-- **Modifications des données** compte, par table, les lignes que la branche a insérées, mises à jour et supprimées, appariées par clé primaire, et en montre jusqu'à 100 par table avec les colonnes qui ont changé.
+- **Schéma et politiques RLS** liste chaque table, colonne, clé primaire,
+  contrainte (unique, clé étrangère, check, exclusion), index, trigger, politique,
+  type enum (avec ses libellés), vue et fonction que la branche a ajoutés, supprimés ou
+  modifiés, en SQL, avec la définition du parent à côté de celle de la branche.
+- **Modifications des données** compte, par table, les lignes que la branche a insérées, mises à jour et supprimées, appariées par clé primaire, et en montre jusqu'à 100 par table (au
+  plus 1 000 si vous en demandez davantage) avec les colonnes qui ont changé. Une colonne
+  nommée comme un identifiant secret — `password_hash`, un `*_token`, tout ce qui contient
+  `secret`, un `*_hash` — affiche `[redacted]` au lieu de sa valeur.
+
+Examiner une branche exige la portée `database:write`, celle qui exécute du SQL en tant que
+propriétaire de la base de données : les échantillons sont des lignes des deux bases, lues en dehors de la
+sécurité au niveau des lignes. `database:read` liste les branches mais ne lit pas leurs
+lignes.
 
 Le même diff est `rebase db branch diff <name>` dans un terminal, `GET /api/admin/branches/<name>/diff` en HTTP, l'outil MCP `rebase_db_branch_diff` et `admin.diffBranch(name)` dans le code. Les tables propres à Rebase (sessions, historique, le registre des branches) sont laissées de côté.
 
 ### Quel côté a modifié une ligne
 
-Le parent continue de recevoir des écritures pendant qu'on travaille sur la branche, donc « les deux bases diffèrent » ne veut pas dire « la branche l'a modifié » : une ligne que le parent a insérée après la création de la branche ressemble exactement à une ligne que la branche a supprimée. Rebase les distingue par le moment où chaque ligne a été écrite. Les identifiants de transaction appartiennent au serveur, pas à une base, et la copie par template les conserve : une ligne écrite après la création de la branche — d'un côté comme de l'autre — est plus récente que la transaction qui a créé la base de la branche.
+Le parent continue de recevoir des écritures pendant qu'on travaille sur la branche, donc « les deux bases diffèrent » ne veut pas dire « la branche l'a modifié » : une ligne que le parent a insérée après la création de la branche ressemble exactement à une ligne que la branche a supprimée. Rebase les distingue par le moment où chaque ligne a été écrite. Les identifiants de transaction appartiennent au serveur, pas à une base, et la copie par template les conserve : une ligne écrite après la création de la branche — d'un côté comme de l'autre — est plus récente que la transaction qui a créé la base de la branche. Cette transaction est lue lorsque
+la branche est créée et conservée dans son enregistrement : un `GRANT` ou un
+`ALTER DATABASE` ultérieur sur la base de la branche ne la déplace donc pas.
 
 | La ligne de la branche | La ligne du parent | Comptée comme |
 | --- | --- | --- |
@@ -277,33 +294,56 @@ Le parent continue de recevoir des écritures pendant qu'on travaille sur la bra
 
 Deux cas se ressemblent et sont lus de la façon qui ne perd rien : une ligne que la branche a supprimée et que le parent a modifiée ensuite est conservée, et une ligne que le parent a supprimée et que la branche a modifiée ensuite est une insertion de la branche. Un `UPDATE` qui écrit les valeurs qu'une ligne avait déjà compte quand même comme une écriture.
 
-Quand le point de bifurcation ne peut pas être lu — une branche ancienne dont la ligne `pg_database` a été gelée par un vacuum, ou renommée avec `ALTER DATABASE` — le diff le signale et compte chaque différence comme venant de la branche.
+Une branche créée avant que Rebase ne conserve cette transaction la lit dans la ligne `pg_database`
+de la base de la branche telle qu'elle est maintenant ; tout ce qui a réécrit la ligne depuis
+la déplace. Quand le point de bifurcation ne peut pas être lu du tout — une branche ancienne
+dont la ligne a été gelée par un vacuum — le diff le signale et compte chaque différence comme venant de
+la branche.
 
 ### Ce que fait une fusion
 
 **Fusionner** écrit dans le parent les lignes que la branche a insérées, mises à jour et supprimées. Ce qui l'emporte :
 
 - **Les lignes que seule la branche a modifiées** sont écrites : insérées, écrasées ou supprimées.
-- **Les lignes que seul le parent a modifiées** depuis la création de la branche restent exactement telles quelles.
+- **Les lignes que seul le parent a modifiées** depuis la création de la branche restent exactement telles quelles
+  — sauf si l'une référence une ligne que la branche a supprimée, ce qui est un
+  conflit (ci-dessous).
 - **Les lignes modifiées des deux côtés** sont des conflits. Par défaut, la fusion n'écrit alors rien du tout ; choisissez `onConflict: "branch"` pour écrire la ligne de la branche par-dessus celle du parent, ou `"target"` pour garder celle du parent.
+- **Une ligne que la branche a supprimée et que des lignes plus récentes du parent référencent encore** est
+  aussi un conflit. Supposons que la branche ait supprimé un auteur et que le parent ait écrit depuis
+  un article de cet auteur : supprimer l'auteur sur le parent se propagerait en cascade à
+  cet article, mettrait sa colonne à null, ou échouerait sur la clé étrangère. Le diff compte
+  l'auteur comme un conflit et nomme les lignes qui le référencent (`referencedBy` : la
+  table, la clé étrangère, son `ON DELETE` et le nombre de lignes). Par défaut, la
+  fusion refuse, en nommant la table, les lignes et la façon d'en sortir ; `"target"` garde
+  l'auteur, et avec lui l'article ; `"branch"` supprime l'auteur, laisse la clé
+  étrangère faire ce qu'elle dit, et liste ce qu'elle a atteint dans `warnings`.
 - **Les modifications de schéma et de politiques ne sont jamais fusionnées.** Elles relèvent de vos collections et de leurs migrations : appliquez-les avec `rebase db push` (ou `migrate`), puis fusionnez les lignes.
 
-Une table dont les lignes ne peuvent pas être appariées bloque la fusion : une table que la branche a ajoutée ou supprimée, dont les colonnes ou la clé primaire diffèrent entre les deux, sans clé primaire, ou avec plus de 100 000 lignes d'un côté. Passez `skipBlocked` (dans Studio, cochez **Fusionner les autres tables**) pour fusionner le reste et laisser celles-ci tranquilles.
+Une table dont les lignes ne peuvent pas être appariées bloque la fusion : une table que la branche a ajoutée ou supprimée, dont les colonnes ou la clé primaire diffèrent entre les deux, sans clé primaire, ou avec plus de 100 000 lignes d'un côté. Ses compteurs valent 0, car on ne sait pas quelles lignes ont changé ; `rowCounts` donne le nombre
+de lignes de chaque côté. Une telle table que seul le parent a modifiée — la branche n'a écrit aucune
+de ses lignes, et celles d'avant la bifurcation sont identiques — n'est pas bloquée.
+Passez `skipBlocked` (dans Studio, cochez **Fusionner les autres tables**) pour fusionner le
+reste et laisser celles-ci tranquilles.
+
+Une table réécrite depuis la création de la branche est bloquée aussi (`TABLE_REWRITTEN`).
+Un changement de type de colonne, un `ADD COLUMN` avec une valeur par défaut volatile, `VACUUM FULL` ou
+`CLUSTER` réécrit chaque ligne, de sorte que chaque ligne apparaît comme écrite depuis et que l'on ne peut plus
+dire quel côté a changé quoi. Quand la branche a changé le type d'une colonne, fusionnez ses lignes
+avant d'appliquer ce changement au parent, ou recréez la branche après celui-ci.
 
 Toutes les écritures se font en une seule instruction sur le parent — tout ou rien, clés étrangères vérifiées à la fin. Une fusion transmet le `fingerprint` du diff que vous avez examiné et n'écrit rien si l'une des deux bases a changé depuis : rechargez le diff et regardez à nouveau. Les séquences sont avancées au-delà de tout id que la fusion a inséré.
 
 ```typescript
 const diff = await admin.diffBranch("agent_run_17");
-// …examiner diff.schema et diff.data…
+// …review diff.schema and diff.data…
 const result = await admin.mergeBranch("agent_run_17", {
     expectedFingerprint: diff.fingerprint,
-    onConflict: "abort" // ou "branch", ou "target"
+    onConflict: "abort" // or "branch", or "target"
 });
 ```
 
 La fusion n'est volontairement pas un outil MCP : un agent propose sur sa branche, et une personne fusionne.
-
----
 
 ---
 

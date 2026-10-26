@@ -184,6 +184,16 @@ code implements: they stay `pending`, their attempts untouched, until an updated
 peer claims them. A task that no instance implements stays `pending` too, rather
 than being dead-lettered.
 
+## Storage orphan scans
+
+`rebase storage orphans` runs on this queue when it is on: each scan, and each
+delete from a scan, is a `storage.orphans` job, with one attempt. The backend
+registers the handler itself, in every process with storage configured, and
+only processes whose job workers are on run it. A scan is bound by
+`timeoutMs` like any job, so a source too big to scan in 15 minutes needs a
+higher `timeoutMs`, or 0. Without the queue, the server runs the scan inside
+its own process instead. See [the CLI](/docs/cli/#rebase-storage).
+
 ## Durable webhooks
 
 [`WebhookDispatcher`](/docs/recipes/webhooks) queues its deliveries in memory by

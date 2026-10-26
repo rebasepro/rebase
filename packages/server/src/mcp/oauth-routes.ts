@@ -390,6 +390,9 @@ export function createOAuthRoutes(config: OAuthRoutesConfig): Hono<HonoEnv> {
             scopeDescriptions: describeScopes(scope),
             requestToken,
             loginUrl: `${config.authBasePath}/login`,
+            mfaChallengeUrl: `${config.authBasePath}/mfa/challenge`,
+            mfaVerifyUrl: `${config.authBasePath}/mfa/challenge/verify`,
+            redirectUri,
             decisionUrl: `${c.req.path}/decision`,
             resource: canonicalResource,
             nonce
@@ -661,9 +664,9 @@ export function createOAuthRoutes(config: OAuthRoutesConfig): Hono<HonoEnv> {
         // treats the loser as the replay it is.
         if (!await store.consumeRefreshToken(presented)) return invalid();
 
-        // The account's roles as they are now — see `rolesNow`. A demotion
-        // reaches the grant at its next refresh, within one access-token
-        // lifetime.
+        // The account's roles as they are now — see `rolesNow`. `/mcp`
+        // re-reads them on every request too, so a demotion does not wait
+        // for this refresh.
         return issueTokens(c, {
             clientId: record.clientId,
             uid: record.uid,
@@ -803,11 +806,11 @@ export function createOAuthRoutes(config: OAuthRoutesConfig): Hono<HonoEnv> {
 
         return c.json({
             revoked: true,
-            // Said plainly rather than implied. Access tokens are self-contained
-            // JWTs checked without a database round trip — that is what makes
-            // `/mcp` cheap — so an already-issued one keeps working until it
-            // expires. Claiming an instant cut-off would be the same class of
-            // promise as the consent screen's vanished revocation line.
+            // Said plainly rather than implied. `/mcp` checks the ACCOUNT on
+            // every request, not the grant, so an access token this client
+            // already holds keeps working until it expires. Claiming an
+            // instant cut-off would be the same class of promise as the
+            // consent screen's vanished revocation line.
             note: "Refresh tokens are revoked immediately. An access token already issued keeps working until it expires, at most one hour."
         });
     });

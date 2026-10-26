@@ -78,7 +78,12 @@ export function FormSections({
                             : <div id={`form_section_${section.key}`}
                                 className={cls(
                                     "grid min-w-0",
-                                    reading ? "gap-x-8 gap-y-7" : "gap-x-4 gap-y-5",
+                                    // 24px between rows of filled boxes: with no
+                                    // edge on a field, the gap is what keeps two
+                                    // rows from reading as one block. It also
+                                    // holds a field's key hint, which hangs below
+                                    // a box that has no description line.
+                                    reading ? "gap-x-8 gap-y-7" : "gap-x-4 gap-y-6",
                                     "grid-cols-1 @2xl:grid-cols-4"
                                 )}>
                                 {section.fields.map(renderField)}

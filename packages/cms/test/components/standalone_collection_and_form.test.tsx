@@ -18,7 +18,8 @@ import { act, fireEvent, render, screen, waitFor, within } from "@testing-librar
 import { BrowserRouter } from "react-router";
 import type { DataDriver } from "@rebasepro/types";
 import type { AdminCollection } from "@rebasepro/cms-types";
-import { Rebase } from "@rebasepro/app";
+import { Rebase, RlsSimulationContext } from "@rebasepro/app";
+import type { RlsSimulationController } from "@rebasepro/app";
 import { CollectionPanel, CollectionsProvider, EntityFormPanel } from "@rebasepro/cms";
 
 if (typeof globalThis.ResizeObserver === "undefined") {
@@ -62,9 +63,21 @@ const authors: AdminCollection = {
     }
 } as AdminCollection;
 
+const comments: AdminCollection = {
+    slug: "comments",
+    name: "Comments",
+    table: "comments",
+    properties: {
+        id: { type: "string", name: "Id", isId: true },
+        body: { type: "string", name: "Body" }
+    }
+} as AdminCollection;
+
+const postsWithComments: AdminCollection = { ...posts, childCollections: () => [comments] } as AdminCollection;
+
 type Row = Record<string, unknown>;
 let rows: Record<string, Row[]>;
-const saves: { path: string, values: Row }[] = [];
+const saves: { path: string, id?: unknown, values: Row }[] = [];
 
 function keyOf(path: string): string {
     return path === "authors" ? "handle" : "id";
@@ -75,7 +88,7 @@ const driver: DataDriver = {
     fetchCollection: async ({ path }) => rows[path] ?? [],
     fetchOne: async ({ path, id }) => (rows[path] ?? []).find(r => String(r[keyOf(path)]) === String(id)),
     save: async ({ path, values, id: savedId }) => {
-        saves.push({ path, values: { ...values } });
+        saves.push({ path, id: savedId, values: { ...values } });
         const key = keyOf(path);
         const id = savedId ?? values[key];
         const saved = { ...(rows[path] ?? []).find(r => String(r[key]) === String(id)), ...values, [key]: id };
@@ -100,10 +113,10 @@ const authController = {
     setExtra: () => undefined
 } as never;
 
-function Page({ children }: { children: React.ReactNode }) {
+function Page({ children, dataDriver = driver }: { children: React.ReactNode, dataDriver?: DataDriver }) {
     return (
         <Rebase authController={authController} storageSource={{} as never}
-            dataSources={[{ key: "(default)", engine: "postgres", driver }]}>
+            dataSources={[{ key: "(default)", engine: "postgres", driver: dataDriver }]}>
             <BrowserRouter>
                 <main data-testid={"host-page"}>{children}</main>
             </BrowserRouter>
@@ -204,6 +217,65 @@ describe("one record's form in a page of the host app", () => {
         expect(rows.posts).toHaveLength(3);
     });
 
+    it("saves the record it shows after its entityId changes", async () => {
+        // A host route /posts/:id moving from p1 to p2 re-renders the panel
+        // with another id and no remount. The form showed p2 and saved into p1.
+        const { rerender } = render(<Page><EntityFormPanel collection={posts} entityId={"p1"}/></Page>);
+        await screen.findByDisplayValue("Hello world");
+
+        rerender(<Page><EntityFormPanel collection={posts} entityId={"p2"}/></Page>);
+        const title = await screen.findByDisplayValue("Second post");
+        await act(async () => {
+            fireEvent.change(title, { target: { value: "Second post, edited" } });
+        });
+        fireEvent.click(screen.getByRole("button", { name: /save/i }));
+
+        await waitFor(() => expect(saves).toHaveLength(1));
+        expect(saves[0]).toEqual(expect.objectContaining({ path: "posts", id: "p2" }));
+        expect(rows.posts.find(r => r.id === "p1")).toEqual(expect.objectContaining({ title: "Hello world" }));
+        expect(rows.posts.find(r => r.id === "p2")).toEqual(expect.objectContaining({ title: "Second post, edited" }));
+    });
+
+    it("loads a subcollection's record by its full path, under a scope that holds its parent", async () => {
+        // The documented `path` of a subcollection record. The panel compared
+        // the scope's top-level slugs to the whole path, mounted a scope of
+        // its own holding only `comments`, and said "Entity not found".
+        rows["posts/p1/comments"] = [{ id: "c1", body: "Nice post" }];
+        render(
+            <Page>
+                <CollectionsProvider collections={[postsWithComments]}>
+                    <EntityFormPanel collection={comments} path={"posts/p1/comments"} entityId={"c1"}/>
+                </CollectionsProvider>
+            </Page>
+        );
+        expect(await screen.findByDisplayValue("Nice post")).toBeTruthy();
+    });
+
+    it("offers no record to create where creating is not allowed", async () => {
+        // The create-under-id form checked only canEdit, and only for an
+        // existing record: while access was simulated (or insert was denied)
+        // the record-to-create was editable and failed on the server.
+        const simulating: RlsSimulationController = {
+            available: true,
+            simulation: { role: "customer" },
+            label: null,
+            setSimulation: () => undefined
+        };
+        render(
+            <Page>
+                <RlsSimulationContext.Provider value={simulating}>
+                    <EntityFormPanel collection={posts} entityId={"p1"}/>
+                    <EntityFormPanel collection={posts} entityId={"site"} defaultValues={{ title: "Untitled site" }}/>
+                </RlsSimulationContext.Provider>
+            </Page>
+        );
+        const existing = await screen.findByDisplayValue("Hello world");
+        expect((existing as HTMLInputElement).disabled).toBe(true);
+        const toCreate = await screen.findByDisplayValue("Untitled site");
+        expect((toCreate as HTMLInputElement).disabled).toBe(true);
+        expect((screen.getByRole("button", { name: /create/i }) as HTMLButtonElement).disabled).toBe(true);
+    });
+
     it("creates a record when given no id", async () => {
         const onSaved = jest.fn();
         render(<Page><EntityFormPanel collection={posts} onSaved={onSaved}/></Page>);
@@ -217,5 +289,45 @@ describe("one record's form in a page of the host app", () => {
         await waitFor(() => expect(onSaved).toHaveBeenCalled());
         expect(onSaved).toHaveBeenCalledTimes(1);
         expect(saves).toEqual([expect.objectContaining({ path: "posts", values: expect.objectContaining({ title: "A new post" }) })]);
+    });
+
+    it("says when its record was deleted elsewhere, keeps what was typed, and saves it as a new record", async () => {
+        // The live read stopped delivering the record. The form used to carry
+        // on as if nothing happened: Save answered 404 and nothing said why.
+        const listeners = new Map<string, (row: Row | null) => void>();
+        const live: DataDriver = {
+            ...driver,
+            listenOne: ({ path, id, onUpdate }) => {
+                listeners.set(`${path}/${id}`, onUpdate);
+                onUpdate((rows[path] ?? []).find(r => String(r.id) === String(id)) ?? null);
+                return () => listeners.delete(`${path}/${id}`);
+            }
+        };
+        const onSaved = jest.fn();
+        render(<Page dataDriver={live}><EntityFormPanel collection={posts} entityId={"p1"} onSaved={onSaved}/></Page>);
+
+        const title = await screen.findByDisplayValue("Hello world");
+        await act(async () => {
+            fireEvent.change(title, { target: { value: "Hello again" } });
+        });
+        expect(screen.queryByText(/deleted elsewhere/i)).toBeNull();
+
+        await act(async () => {
+            rows.posts = rows.posts.filter(r => r.id !== "p1");
+            listeners.get("posts/p1")?.(null);
+        });
+
+        expect(await screen.findByText(/This record was deleted elsewhere/)).toBeTruthy();
+        expect(screen.getByDisplayValue("Hello again")).toBeTruthy();
+
+        fireEvent.click(screen.getByRole("button", { name: /save as new/i }));
+        await waitFor(() => expect(screen.queryByText(/deleted elsewhere/i)).toBeNull());
+        expect(screen.getByDisplayValue("Hello again")).toBeTruthy();
+        fireEvent.click(screen.getByRole("button", { name: /create/i }));
+
+        await waitFor(() => expect(onSaved).toHaveBeenCalledTimes(1));
+        expect(saves).toHaveLength(1);
+        expect(saves[0].id).not.toBe("p1");
+        expect(saves[0].values).toEqual(expect.objectContaining({ title: "Hello again" }));
     });
 });

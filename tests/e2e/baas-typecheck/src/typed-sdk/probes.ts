@@ -170,3 +170,94 @@ export async function dateWriteProbes(): Promise<string | null | undefined> {
     await posts.update("p1", { publishedAt: 1 });
     return created.publishedAt;
 }
+
+/**
+ * A required `belongsTo` is satisfied by either spelling the server accepts:
+ * the foreign key (`postId`) or the relation (`post`). Both used to be
+ * required, so only a create that sent the same id twice compiled.
+ */
+export async function requiredBelongsToProbes(): Promise<string> {
+    const comments = client.data.comments;
+    await comments.create({ body: "b", postId: "p1" });
+    await comments.create({ body: "b", post: "p1" });
+    await comments.create({ body: "b", postId: "p1", post: "p1" });
+    await client.batch([{ op: "create", collection: "comments", values: { body: "b", post: "p1" } }]);
+    await client.batch([
+        { op: "create", collection: "posts", values: { title: "t" }, ref: "post" },
+        { op: "create", collection: "comments", values: { body: "b", postId: { $ref: "post.id" } } }
+    ]);
+    await comments.update(1, { post: "p2" });
+    await comments.update(1, { body: "c" });
+    // @ts-expect-error — neither spelling: the post is required (VALIDATION_REQUIRED)
+    await comments.create({ body: "b" });
+    // @ts-expect-error — and a required link cannot be null
+    await comments.create({ body: "b", postId: null });
+    await client.batch([
+        // @ts-expect-error — nor in a batch
+        { op: "create", collection: "comments", values: { body: "b" } }
+    ]);
+    const { data } = await comments.find();
+    return data[0].postId;
+}
+
+/**
+ * A to-one relation closed to the API takes its foreign key with it, as the
+ * server's read strip and write refusal do: hidden from every read and refused
+ * on every write (`excludeFromApi`), or readable but refused on every write
+ * (`access: { write: [] }`).
+ */
+export async function closedRelationProbes(): Promise<number | null | undefined> {
+    const comments = client.data.comments;
+    const { data } = await comments.find();
+    // @ts-expect-error — stripped from every read
+    void data[0].moderatorId;
+    // @ts-expect-error — refused on a write (VALIDATION_EXCLUDED_FIELDS)
+    await comments.update(1, { moderatorId: 1 });
+    // @ts-expect-error — nobody may write the reviewer's key
+    await comments.update(1, { reviewerId: 1 });
+    // @ts-expect-error — nor under the relation's name
+    await comments.update(1, { reviewer: 1 });
+    // Readable, so still on the row.
+    return data[0].reviewerId;
+}
+
+/** A `hasOne` is written by naming the target: the server points its foreign key here. */
+export async function hasOneWriteProbes(): Promise<void> {
+    await client.data.authors.update(1, { profile: 9 });
+    await client.data.authors.update(1, { profile: null });
+    await client.data.authors.create({ name: "a", profile: 9 });
+    // @ts-expect-error — a profile's id is a number
+    await client.data.authors.update(1, { profile: "9" });
+}
+
+/**
+ * A single-hop `via` is written as the server writes it — to-one by naming the
+ * target (the target holds the key), to-many as a list of ids through its one
+ * junction — and a multi-hop one is read-only (RELATION_NOT_WRITABLE).
+ */
+export async function viaWriteProbes(): Promise<void> {
+    await client.data.authors.update(1, { profileVia: 9 });
+    await client.data.authors.update(1, { profileVia: null });
+    await posts.update("p1", { tagsVia: ["tag-uuid"] });
+    await posts.create({ title: "t", tagsVia: [{ id: "tag-uuid" }] });
+    // @ts-expect-error — a via declares no junction payload
+    await posts.update("p1", { tagsVia: [{ id: "tag-uuid", _pivot: { position: 1 } }] });
+    // @ts-expect-error — a multi-hop via is not writable
+    await client.data.comments.update(1, { postTags: ["t"] });
+    // @ts-expect-error — nor on a create
+    await client.data.comments.create({ body: "b", post: "p1", postTags: ["t"] });
+}
+
+/**
+ * `simulate()` on a typed client: always there, typed by the same `Database`,
+ * and closable — its docblock says to `close()` it when done.
+ */
+export async function simulateProbes(): Promise<string> {
+    const asEditor = client.simulate({ role: "editor" });
+    const { data } = await asEditor.data.orderItems.find();
+    const sku: string = data[0].sku;
+    // @ts-expect-error — still typed: not a column of order_items
+    await asEditor.data.orderItems.find({ where: { skuu: ["==", "x"] } });
+    asEditor.close();
+    return sku;
+}

@@ -1,5 +1,5 @@
 ---
-sourceHash: b40368f94c74dfb6
+sourceHash: e515564ee1857435
 title: Typisierte serverseitige Daten
 sidebar_label: Typisierte serverseitige Daten
 description: "Registrieren Sie Ihren generierten Database-Typ einmal, und context.data, rebase.dataAsAdmin und das rebase, das eine Funktion oder ein Cron erhält, sind daraus typisiert: Zeilen, Filter, Sortierungen, Includes und Schreib-Eingaben."
@@ -49,9 +49,15 @@ genau das, was sie zuvor tat.
 
 Das Flag wird in `rebase.json` gemerkt, als `"registerDatabase": true` an der
 Backend-App, sodass jedes spätere `rebase generate-sdk` und `rebase dev` bei jeder
-Collection-Änderung beide Dateien aktuell hält. Das gilt auch bei einem frischen Klon und in
-CI: Die `.gitignore` des Scaffolds ignoriert `generated/`-Verzeichnisse, und das
-erste `rebase generate-sdk` oder `rebase dev` schreibt sie erneut. Ein Projekt ohne
+Collection-Änderung beide Dateien aktuell hält. Die `.gitignore` des Scaffolds
+ignoriert `generated/`-Verzeichnisse, sodass ein frischer Klon keine der beiden Dateien hat,
+bis etwas sie erneut schreibt. `rebase build` (und `rebase cloud deploy`, das dasselbe Bundle
+baut) schreibt sie aus den Collections, bevor es kompiliert, sodass ein CI-Job, der
+`rebase build` auf einem frischen Klon ausführt, typisierte Callbacks kompiliert.
+Ein CI-Schritt, der das Backend oder das `config`-Paket auf andere Weise kompiliert
+(`tsc`, `pnpm build`), braucht weiterhin zuerst `rebase generate-sdk`, sonst kompilieren
+Callbacks, die typisierte Zeilen lesen, gegen das untypisierte `context.data` und scheitern. Ein
+Projekt ohne
 `rebase.json` registriert weiter, solange `config/generated/register.ts`
 vorhanden ist. Um zu untypisierten serverseitigen Daten zurückzukehren, entfernen Sie `registerDatabase` und
 löschen Sie `config/generated/`.

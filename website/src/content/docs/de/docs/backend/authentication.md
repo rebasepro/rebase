@@ -1,5 +1,5 @@
 ---
-sourceHash: d9b66c9d404a5085
+sourceHash: bb2bf60cbaed04eb
 title: Authentifizierung
 sidebar_label: Authentifizierung
 description: Konfigurieren Sie JWT-Authentifizierung, OAuth-Provider, SMTP-E-Mail, Bot-Schutz und die Users-Collection im Rebase-Backend.
@@ -95,6 +95,7 @@ const backend = await initializeRebaseBackend({
 | `disableSelfRegistration` | `boolean` | `false` | Kill-Switch: Schließt auch das Bootstrap-Fenster für den ersten Benutzer, das `allowRegistration: false` offen lässt |
 | `allowAnonymous` | `boolean` | `false` | Aktiviert `POST /api/auth/anonymous`. Bewusst nicht an `allowRegistration` gekoppelt — eine öffentlich lesbare App benötigt möglicherweise Sitzungen ohne Benutzerkonten. Einen Gast in ein Konto zu verwandeln (`POST /api/auth/anonymous/link`) ist eine Registrierung und braucht ebenfalls `allowRegistration` — und `allowAnonymous` muss weiterhin aktiv sein: Ist es abgeschaltet, weist es auch die bereits angemeldeten Gäste ab, sodass keiner zu einem Konto werden kann (`403 ANONYMOUS_AUTH_DISABLED`) |
 | `allowUserLookup` | `boolean` | `false` | Stellt `POST /api/auth/find-user` für Einladungs-Flows per E-Mail bereit |
+| `captcha` | `CaptchaConfig` | — | Bot-Schutz auf den Routen, die E-Mails versenden — siehe [Bot-Schutz](#bot-schutz) |
 | `defaultRole` | `string` | — | Rolle, die einem neu registrierten Benutzer zugewiesen wird, wenn keine angegeben ist. Sie darf weder `admin` noch eine deklarierte Rolle sein, die einen Scope der Admin-Ebene hält: Der Boot lehnt beides ab |
 | `serviceKey` | `string` | — | Statischer Schlüssel für Server-zu-Server-Aufrufe — siehe [Service-Key-Authentifizierung](/docs/backend/auth-endpoints/#service-key-authentication) |
 | `email` | `EmailConfig` | — | SMTP für Passwort-Reset, Verifizierung, Einladungen und Magic Links |
@@ -391,6 +392,8 @@ DISCORD_CLIENT_SECRET=…
 `GET /api/auth/config` listet anschließend `discord` unter `enabledProviders` auf. So lässt sich
 überprüfen, ob das Schlüsselpaar übernommen wurde.
 
+Google wird allein durch `GOOGLE_CLIENT_ID` konfiguriert: Sein ID-Token-Flow benötigt kein Secret, daher ist `GOOGLE_CLIENT_SECRET` optional.
+
 Apple ist die Ausnahme: Hier gibt es kein statisches Client Secret, da Rebase für jeden Token-Austausch
 ein kurzlebiges ES256-JWT signiert. Es werden alle vier Variablen benötigt:
 `APPLE_CLIENT_ID`, `APPLE_TEAM_ID`, `APPLE_KEY_ID` und `APPLE_PRIVATE_KEY` — der
@@ -398,7 +401,7 @@ Inhalt der `.p8`-Datei inklusive Zeilenumbrüchen.
 
 Zwei Optionen haben keine Entsprechung in Umgebungsvariablen und erfordern den `auth`-Block (also
 ein Ejected- oder code-konfiguriertes Backend): `microsoft.tenantId` (welches sonst
-standardmäßig auf `common` gesetzt wird und jede Adresse als nicht verifiziert meldet) und
+standardmäßig auf `common` gesetzt wird und jeden Entra-Tenant akzeptiert; bei einem beliebigen Tenant gilt eine Adresse nur dann als verifiziert, wenn die App-Registrierung den Claim `xms_edov` ausgibt) und
 `gitlab.baseUrl` für selbst gehostete Instanzen.
 
 Jedes benannte Feld wird beim Start in `auth.providers` aufgelöst. Dies ist das
@@ -434,26 +437,22 @@ verglichen; Query-Parameter, Fragmente und abschließende Slashes werden ignorie
 
 Was passiert, wenn sich jemand mit E-Mail/Passwort als `ada@example.com` registriert
 und später auf „Mit Google anmelden“ mit einem Google-Konto derselben Adresse
-klickt? Rebase **verknüpft beide zu einem einzigen Konto** — jedoch nur, wenn der
-Provider die E-Mail als verifiziert bestätigt *und* die Adresse des Kontos selbst
-verifiziert ist. Es wird niemals stillschweigend ein zweites Konto für dieselbe
-Adresse erstellt.
+klickt? Rebase **verknüpft beide zu einem einzigen Konto**, jedoch nur, wenn der
+Provider die E-Mail als verifiziert bestätigt. Es wird niemals stillschweigend
+ein zweites Konto für dieselbe Adresse erstellt.
 
 Bei `POST /api/auth/<provider>` gilt folgende Auflösungsreihenfolge:
 
-1. **Bekannte Provider-Identität** — Hat sich genau diese Provider-Identität schon
+1. **Bekannte Provider-Identität**: Hat sich genau diese Provider-Identität schon
    einmal angemeldet, wird dieser Benutzer zurückgegeben. Die E-Mail-Adresse wird
    nicht herangezogen.
-2. **Bestehendes Konto mit gleicher E-Mail, beide Seiten verifiziert** — Der
-   Provider hat die E-Mail verifiziert, und das Konto ebenfalls. Die Identität wird
-   mit dem bestehenden Konto verknüpft und der Benutzer angemeldet. Ein Konto, zwei
-   Zugangswege.
-3. **Bestehendes Konto mit gleicher E-Mail, eine Seite nicht verifiziert** — Wird
-   mit `403 EMAIL_NOT_VERIFIED` abgewiesen. Es wird nichts erstellt oder geändert.
-   `details.reason` nennt die Seite: `provider-email-unverified`, oder
-   `local-account-unverified` (das Konto hat ein Passwort) /
-   `local-account-unverified-passwordless` (es hat keines).
-4. **Kein Konto mit dieser E-Mail** — Ein neues Konto wird erstellt, als
+2. **Bestehendes Konto mit gleicher E-Mail, Provider hat die E-Mail verifiziert**:
+   Die Identität wird verknüpft und der Benutzer damit angemeldet. Ein Konto, zwei
+   Zugangswege. Ein nicht verifiziertes Konto wird zuerst verifiziert (siehe unten).
+3. **Bestehendes Konto mit gleicher E-Mail, Provider hat sie nicht verifiziert**:
+   Wird mit `403 EMAIL_NOT_VERIFIED` und `details.reason`
+   `provider-email-unverified` abgewiesen. Es wird nichts erstellt oder geändert.
+4. **Kein Konto mit dieser E-Mail**: Ein neues Konto wird erstellt, als
    verifiziert, wenn der Provider die E-Mail verifiziert hat.
 
 Schritt 3 ist der sicherheitskritische Fall. Wäre eine unbestätigte Provider-E-Mail
@@ -463,17 +462,19 @@ Adresse auszugeben, das entsprechende Rebase-Konto übernehmen. Google bestätig
 den Google-Login ist. Schritt 3 fängt vor allem Provider ab, bei denen Benutzer eine
 beliebige unbestätigte Adresse angeben können.
 
-Die Seite des Kontos zählt aus demselben Grund. Nichts verifiziert die Adresse, die
+Die Seite des Kontos zählt ebenfalls. Nichts verifiziert die Adresse, die
 `POST /auth/register` erhält. Jeder kann also die Adresse einer anderen Person mit
 einem Passwort registrieren oder sich über einen Provider, der nicht für sie bürgt,
-damit anmelden, und abwarten. Würde die Google-Anmeldung des Eigentümers mit diesem
-Konto verknüpft, bliebe der Zugang der anderen Person darauf bestehen.
+damit anmelden, und abwarten. Die Verknüpfung der Google-Anmeldung des Eigentümers
+mit diesem Konto darf den Zugang der anderen Person darauf nicht bestehen lassen.
 
-Ein Verifizierungslink, ein Magic Link, ein E-Mail-Code oder ein Passwort-Reset
-weist die Adresse nach und verifiziert das Konto. Bei einem noch nicht verifizierten
-Konto entfernt der erste solche Nachweis das Passwort (ein Reset setzt das neue) und
-jede verknüpfte Identität, deren Provider diese Adresse nicht verifiziert hat, und
-beendet jede Sitzung, bevor er das Konto als verifiziert markiert. Danach gilt Schritt 2.
+Ein Provider, der die Adresse verifiziert hat, ein Verifizierungslink, ein Magic
+Link, ein E-Mail-Code oder ein Passwort-Reset weisen alle die Adresse nach und
+verifizieren das Konto. Bei einem noch nicht verifizierten Konto entfernt der erste
+solche Nachweis das Passwort (ein Reset setzt das neue) und jede verknüpfte
+Identität, deren Provider diese Adresse nicht verifiziert hat, und beendet jede
+Sitzung, bevor er das Konto als verifiziert markiert: Ein Passwort, das niemand
+verifiziert hat, ist nach der ersten Google-Anmeldung weg.
 
 Ein Verifizierungslink behält, was die Person, die ihm folgt, zusätzlich beweist:
 eine aktive Sitzung des Kontos oder sein Passwort. Siehe [E-Mail-Verifizierung](/docs/backend/email-verification/). Konten,
@@ -495,11 +496,13 @@ Bestätigung zu ("confirm-first"). Siehe
 
 ## Automatisch erstellte Tabellen
 
-Beim ersten Start richtet Rebase automatisch das `auth`-Schema und die folgenden Tabellen in der Datenbank ein (gebunden an das in Ihrer Collection definierte Schema, z. B. `rebase`):
+Beim ersten Start richtet Rebase automatisch das `rebase`-Schema und die folgenden Tabellen in der Datenbank ein (gebunden an das in Ihrer Collection definierte Schema, z. B. `rebase`):
 
 - **`rebase.users`** — Benutzerkonten mit E-Mail, Passwort-Hash, Metadaten und einer `roles`-Spalte vom Typ `text[]` (Rollen werden als Inline-Text-Arrays gespeichert, um Abfragen zu optimieren und Joins zu vermeiden).
+- **`rebase.user_identities`** — Die mit jedem Konto verknüpften OAuth-Identitäten, eine Zeile pro Provider-Identität.
 - **`rebase.refresh_tokens`** — Langlebige Sitzungen mit gehashten Refresh-Tokens, User-Agents und IP-Adressen. Enthält einen Unique Index auf `token_hash`. Eine Anmeldung ist eine `session_id`, die von jedem Token geteilt wird, das aus ihr herausrotiert wurde; es gibt keinen Constraint pro Gerät, sodass zwei Browser hinter derselben Adresse zwei Sitzungen sind. Jedes Token einer Sitzung trägt außerdem seine Vertrauensstufe (`aal`) und wie es angemeldet wurde (`method`, was `providerId` meldet).
 - **`rebase.password_reset_tokens`** — Ablaufbare Einmal-Tokens für Abläufe zur Passwortwiederherstellung.
+- **`rebase.magic_link_tokens`** — Ablaufbare Einmal-Tokens für die Anmeldung per Magic Link.
 - **`rebase.mfa_factors`** — Eingerichtete Multi-Faktor-Authentifizierungsmethoden (z. B. mit AES-256 verschlüsselte TOTP-Secrets).
 - **`rebase.mfa_challenges`** — Verifizierungsprotokolle zur Nachverfolgung aktiver MFA-Verifizierungsversuche.
 - **`rebase.recovery_codes`** — Gehashte Multi-Faktor-Backup-/Recovery-Codes.
@@ -507,7 +510,7 @@ Beim ersten Start richtet Rebase automatisch das `auth`-Schema und die folgenden
 
 Tokens, die ablaufen — Reset-Links, Magic Links und E-Mail-Codes, Refresh-Tokens,
 MFA-Challenges — werden eine Stunde nach ihrem Ablauf gelöscht. Der Durchlauf läuft auf
-dem Prozess, dem die Timer gehören (die Rolle `worker` bei einem aufgeteilten Deployment)
+den Prozessen, denen die Timer gehören (jede Rolle außer `functions` bei einem aufgeteilten Deployment, es sei denn, `REBASE_CRON_SCHEDULER=false` nimmt sie dem `api` ab)
 und auf einer Instanz der Flotte: Jede Stunde wird in `rebase.cron_claims` unter der
 Job-ID `rebase:auth:expired-tokens` beansprucht, genau wie ein Cron-Slot. Bei
 `cronPersistence: false` gibt es keine Claims-Tabelle, und jede solche Instanz räumt auf.

@@ -50,8 +50,10 @@ Two consequences worth knowing:
   for it. Cost is bounded by rate limits and a daily ceiling instead.
 - **Your collection schema and the record's current values are sent** with each
   autofill request, because the service has no other way to know the shape of what
-  it is filling. Values of properties marked `admin: { readOnly: true }` or
-  `admin: { disabled: true }` are the exception — they are neither filled nor sent.
+  it is filling. Only values of declared properties travel: a property marked
+  `admin: { readOnly: true }`, `admin: { disabled: true }` or hidden is neither
+  filled nor sent, and neither is a property with `dynamicProps` or a column the
+  collection does not declare.
   If the rest is not acceptable for your data, set `endpoint` and run the
   service yourself — [Self-hosting the service](#self-hosting-the-service) lists
   the four routes it has to answer.

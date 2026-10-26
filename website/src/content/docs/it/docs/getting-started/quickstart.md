@@ -1,5 +1,5 @@
 ---
-sourceHash: 44951a600db63629
+sourceHash: 0199b2905455975d
 title: Guida rapida
 sidebar_label: Guida rapida
 description: Crea un nuovo progetto Rebase e avvialo localmente in meno di 2 minuti.
@@ -33,7 +33,7 @@ Nessun database da installare e nessun Docker richiesto. `rebase dev` esegue un'
 `init` genera un file `.env` pronto all'uso nella radice del progetto con un vero `JWT_SECRET`, una password per il database e una porta locale libera per il database. Non è necessario creare o modificare nulla per iniziare.
 
 :::caution
-Non eseguire `cp .env.example .env`. `.env.example` serve come riferimento per le variabili disponibili: sovrascriverlo al tuo `.env` scarterà i secret generati e farà puntare `DATABASE_URL` a un database inesistente. Modifica direttamente `.env` se vuoi cambiare un valore.
+Non eseguire `cp .env.example .env`. `.env.example` serve come riferimento per le variabili disponibili: sovrascriverlo al tuo `.env` scarterà i secret generati — `JWT_SECRET`, la service key, la password del database e le credenziali del primo admin, tutti vuoti o commentati lì. Modifica direttamente `.env` se vuoi cambiare un valore.
 :::
 
 ## Avvia i server di sviluppo

@@ -1,5 +1,5 @@
 ---
-sourceHash: 8b0cf8dec1186f45
+sourceHash: f7939e13ff2b006a
 title: Comandos de base de datos
 sidebar_label: Comandos de base de datos
 description: Los comandos rebase db — push, generate y migrate, copias de seguridad y restauraciones, traer una copia, la cadena de conexión, la base de datos de desarrollo gestionada y las ramas.
@@ -48,7 +48,7 @@ Genera archivos de migración SQL a partir de los cambios en el esquema:
 rebase db generate
 ```
 
-Crea archivos de migración con marca de tiempo en `drizzle/migrations/` que pueden revisarse y confirmarse en git.
+Crea archivos de migración con marca de tiempo en `backend/drizzle/migrations/` que pueden revisarse y confirmarse en git.
 
 ### `rebase db migrate`
 
@@ -247,7 +247,7 @@ Sin un terminal en el que preguntar, como en CI, no elimina nada, indica que hay
 `list` e `info` solo leen: una base de datos en la que no se creó ninguna rama no tiene ninguna, y
 no crean ningún esquema `rebase` allí. En la 0.24 crean el registro.
 
-`diff` muestra qué cambió una rama respecto a la base de datos de la que se creó: tablas, columnas y políticas RLS añadidas, eliminadas o modificadas, y por tabla las filas que insertó, actualizó y borró. Las filas que el padre cambió por su cuenta desde entonces se cuentan aparte, y las que cambiaron ambos son conflictos. `--json` imprime el diff completo, con hasta `--sample-limit` filas por tabla (100 por defecto). Lee las dos bases de datos y no cambia ninguna; la fusión está en Studio — consulta [Revisar y fusionar una rama](/docs/backend/branching/#reviewing-and-merging-a-branch).
+`diff` muestra qué cambió una rama respecto a la base de datos de la que se creó: tablas, columnas, restricciones, índices, triggers, políticas RLS, tipos enum, vistas y funciones añadidos, eliminados o modificados, y por tabla las filas que insertó, actualizó y borró. Las filas que el padre cambió por su cuenta desde entonces se cuentan aparte, y las que cambiaron ambos son conflictos. `--json` imprime el diff completo, con hasta `--sample-limit` filas por tabla (100 por defecto). Lee las dos bases de datos y no cambia ninguna; la fusión está en Studio — consulta [Revisar y fusionar una rama](/docs/backend/branching/#reviewing-and-merging-a-branch).
 
 `switch` registra la rama en `.rebase/branch.json` y nunca edita `.env`. Tiene prioridad sobre `DATABASE_URL` en `.env` y cede ante `--database-url` o un `DATABASE_URL` en el shell, por lo que un flag en la línea de comandos siempre prevalece sobre un cambio realizado anteriormente. `delete` rechaza la rama en la que te encuentras, ya que todos los comandos del checkout, el propio delete incluido, apuntan a ella: primero `switch --off`, y luego elimínala. El flujo de trabajo completo está en [Ramificación de bases de datos](/docs/backend/branching/).
 

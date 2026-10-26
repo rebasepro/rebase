@@ -1,11 +1,11 @@
 ---
 title: Agent Skills
 sidebar_label: Agent Skills
-description: rebase skills install writes 21 Rebase reference skills into your repo, in the layout your AI assistant expects — Cursor, Claude Code, Windsurf, Gemini CLI and Antigravity.
+description: rebase skills install writes 23 Rebase reference skills into your repo, in the layout your AI assistant expects — Cursor, Claude Code, Windsurf, Gemini CLI and Antigravity.
 ---
 
 An AI assistant that has read Rebase's documentation writes better Rebase code
-than one guessing from the shape of the API. `rebase skills install` copies 21
+than one guessing from the shape of the API. `rebase skills install` copies 23
 Markdown skill files into your repository, in whatever layout your assistant
 expects:
 
@@ -147,7 +147,7 @@ skill stops receiving updates until you `--force` it.
 The command also works outside a Rebase project, falling back to the working
 directory — useful for a separate frontend repo that talks to a Rebase backend.
 
-## The 21 skills
+## The 23 skills
 
 | Skill | Covers |
 |---|---|
@@ -166,6 +166,8 @@ directory — useful for a separate frontend repo that talks to a Rebase backend
 | `rebase-email` | SMTP, templates, custom providers, the `rebase.email` singleton |
 | `rebase-entity-history` | Entity versioning, change tracking, audit logs, reverting |
 | `rebase-admin` | Navigating the admin panel, side drawers, URLs, embedding collection panels |
+| `rebase-customize-admin` | Customizing the admin with React components — singletons, settings pages, bulk actions, view modes, custom fields, replacing built-in parts |
+| `rebase-custom-views` | Custom screens inside the admin — `rebase generate view`, top-level views, record tabs, field widgets |
 | `rebase-ui-components` | The `@rebasepro/ui` component library |
 | `rebase-design-language` | The UI design language: tokens, color, typography, spacing, anti-patterns |
 | `rebase-studio` | The Studio developer tools layer — SQL, RLS, storage, cron, schema visualizer, logs |
@@ -182,9 +184,9 @@ codebase.
 ## What a run looks like
 
 ```text
-  Found 21 Rebase skills
+  Found 23 Rebase skills
 
-  ✓ Claude Code — 21 skills installed (+ 8 reference files) to .claude/skills
+  ✓ Claude Code — 23 skills installed (+ 8 reference files) to .claude/skills
 ```
 
 Skills ship from the `@rebasepro/agent-skills` package, which the CLI depends on,

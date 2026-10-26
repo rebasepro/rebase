@@ -1,8 +1,8 @@
 ---
-sourceHash: 22ec003847a742c2
+sourceHash: 2f29788275d0b4db
 title: Realtime su più istanze
 sidebar_label: Realtime su più istanze
-description:"\"Come i canali di broadcast e la presence sopravvivono a più di un processo server: il bus LISTEN/NOTIFY, cosa appartiene a ciascuna istanza e come scrivere un transport personalizzato.\""
+description: "Come i canali di broadcast e la presence sopravvivono a più di un processo server: il bus LISTEN/NOTIFY, cosa appartiene a ciascuna istanza e come scrivere un transport personalizzato."
 ---
 
 ## Broadcasting tra istanze e architettura LISTEN/NOTIFY
@@ -17,7 +17,7 @@ Poiché i connection pooler come **pgBouncer** non supportano il modello di conn
 
 ### Meccanica delle notifiche e struttura del payload
 
-Quando un record viene modificato sull'Istanza A, trasmette una notifica sul canale `rebase_entity_changes`. Per ridurre al minimo l'overhead del database e la larghezza di banda di rete, il payload della notifica è mantenuto estremamente compatto:
+Con la [change capture a livello di database](/docs/backend/realtime-cdc/) attiva — il comportamento predefinito ovunque il ruolo del database possa creare trigger — ogni istanza sente ogni commit sul canale `rebase_cdc`, e nulla di ciò che segue viene inviato. Senza di essa, quando un record viene modificato sull'Istanza A, trasmette una notifica sul canale `rebase_entity_changes`. Per ridurre al minimo l'overhead del database e la larghezza di banda di rete, il payload della notifica è mantenuto estremamente compatto:
 
 ```json
 {

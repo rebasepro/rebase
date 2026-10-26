@@ -170,9 +170,13 @@ export const DEFAULT_GLOBS = [
 /**
  * @param {string} root
  * @param {string[]} [globs]
- * @returns {{ snippets: Snippet[], skipped: number, skippedFences: Array<{ file: string, line: number, lang: string }>, files: number }}
+ * @param {{ includeOptedOut?: boolean }} [opts] `includeOptedOut` also returns
+ *   the `no-verify` fences, flagged `optedOut: true`. They are still counted in
+ *   `skipped`: opting out of compilation is not opting out of every check, and
+ *   a fence that declares a real type's shape is wrong whether it compiles or not.
+ * @returns {{ snippets: Array<Snippet & { optedOut?: boolean }>, skipped: number, skippedFences: Array<{ file: string, line: number, lang: string }>, files: number }}
  */
-export function extractSnippets(root, globs = DEFAULT_GLOBS) {
+export function extractSnippets(root, globs = DEFAULT_GLOBS, { includeOptedOut = false } = {}) {
     const files = [...new Set(globs.flatMap((g) => globSync(g, { cwd: root })))].sort();
     /** @type {Snippet[]} */
     const snippets = [];
@@ -228,7 +232,8 @@ export function extractSnippets(root, globs = DEFAULT_GLOBS) {
                     if (optedOut) {
                         skipped++;
                         skippedFences.push({ file, line: bodyStart, lang });
-                    } else {
+                    }
+                    if (!optedOut || includeOptedOut) {
                         const dedented = body
                             .map((l) => (fenceIndent && l.startsWith(fenceIndent) ? l.slice(fenceIndent.length) : l));
                         const code = (isDiff ? applyDiff(dedented) : dedented).join("\n");
@@ -238,7 +243,8 @@ export function extractSnippets(root, globs = DEFAULT_GLOBS) {
                                 line: bodyStart,
                                 lang,
                                 code,
-                                id: `${file.replace(/[^A-Za-z0-9]+/g, "_")}__${++n}`
+                                id: `${file.replace(/[^A-Za-z0-9]+/g, "_")}__${++n}`,
+                                ...(optedOut ? { optedOut: true } : {})
                             });
                         }
                     }

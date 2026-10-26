@@ -1,8 +1,8 @@
 ---
-sourceHash: 22ec003847a742c2
+sourceHash: 2f29788275d0b4db
 title: Temps réel entre plusieurs instances
 sidebar_label: Temps réel entre plusieurs instances
-description:"\"Comment les canaux de diffusion et la présence fonctionnent sur plusieurs processus serveur : le bus LISTEN/NOTIFY, la gestion par instance et l'écriture de votre propre transport.\""
+description: "Comment les canaux de diffusion et la présence fonctionnent sur plusieurs processus serveur : le bus LISTEN/NOTIFY, la gestion par instance et l'écriture de votre propre transport."
 ---
 
 ## Diffusion inter-instances et architecture LISTEN/NOTIFY
@@ -17,7 +17,7 @@ Pour les environnements de cluster multi-instances (par exemple, s'exécutant da
 
 ### Mécanismes de notification et structure de la charge utile
 
-Lorsqu'un enregistrement est modifié sur l'instance A, celle-ci diffuse une notification sur le canal `rebase_entity_changes`. Pour minimiser la charge sur la base de données et la bande passante réseau, la charge utile (payload) de la notification reste extrêmement compacte :
+Lorsque la [capture des modifications de la base de données](/docs/backend/realtime-cdc/) est active — le cas par défaut partout où le rôle de base de données peut créer des déclencheurs — chaque instance entend chaque commit sur le canal `rebase_cdc`, et rien de ce qui suit n'est envoyé. Sans elle, lorsqu'un enregistrement est modifié sur l'instance A, celle-ci diffuse une notification sur le canal `rebase_entity_changes`. Pour minimiser la charge sur la base de données et la bande passante réseau, la charge utile (payload) de la notification reste extrêmement compacte :
 
 ```json
 {

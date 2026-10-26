@@ -9,6 +9,7 @@
  * assistants installed on the machine.
  */
 import chalk from "chalk";
+import { createHash } from "crypto";
 import fs from "fs";
 import path from "path";
 import inquirer from "inquirer";
@@ -487,11 +488,41 @@ function mergeHookSettings(filePath: string, shippedText: string): HookWriteStat
 }
 
 /**
+ * The SHA-256 of every version of `post-edit-collection.sh` this CLI has ever
+ * written, oldest first, the current one last — hashed with CRLF read as LF,
+ * so a Windows checkout of an untouched copy still matches.
+ *
+ * A copy that differs from today's script was read as "edited" and kept, so a
+ * fix to the hook never reached a project scaffolded before it: `rebase skills
+ * install --hooks` answered "was edited, so it was kept — pass --force" about a
+ * file nobody had touched. A copy whose hash is one of ours is our old
+ * version, and is replaced like any stale file; only a copy we never shipped is
+ * the developer's.
+ *
+ * Append, never replace: `agent-hooks.test.ts` fails when the shipped script's
+ * hash is not here, so changing the hook means adding its new hash — and the
+ * old one stays, which is the whole point.
+ */
+export const SHIPPED_HOOK_SCRIPT_SHA256S: readonly string[] = [
+    "335c56f268876293c93696cb557c0ff3d8e16b60f81f67ebccbab75b0df457ac", // 4451138e43 — first version
+    "d624f805e1eb635d87cf769ad5e6f877d07d6aa8d547052d2d7ce9d6d6b3a27b", // ac7c5059d2 — Windows paths
+    "25c307e0c9a8838703c6e59ab5ea62ff249966823f071d26dd0dd8c2508f83a4", // c694488bfe — CLI predating verify
+    "7a0eeaa301f3cb6b90d5675199ccfcb8fe1c2a80a327e3f7b53bc82c3f4541c2", // af6eac33cb — rebase.json config dir
+    "dbdbfcec9c4c4e1d2643900a615585594869f6ba9fc19b5652013526367363f6" // 08a7cd9ec8 — skip when not installed
+];
+
+/** The hash {@link SHIPPED_HOOK_SCRIPT_SHA256S} records for a script's text. */
+export function hookScriptSha256(text: string): string {
+    return createHash("sha256").update(text.replace(/\r\n/g, "\n")).digest("hex");
+}
+
+/**
  * Install the Claude Code guardrail into a project: the hook script, and its
  * registration in `.claude/settings.json`.
  *
- * A script the developer edited is kept unless `force`; the settings are always
- * merged, never overwritten.
+ * A script the developer edited is kept unless `force`; a version this CLI
+ * shipped earlier is replaced. The settings are always merged, never
+ * overwritten.
  */
 export function installAgentHooks(
     projectDir: string,
@@ -502,10 +533,14 @@ export function installAgentHooks(
     let scriptStatus: HookWriteStatus;
     if (!fs.existsSync(scriptPath)) {
         scriptStatus = "added";
-    } else if (fs.readFileSync(scriptPath, "utf-8") === shippedScript) {
-        scriptStatus = "present";
     } else {
-        scriptStatus = force ? "replaced" : "kept";
+        const current = fs.readFileSync(scriptPath, "utf-8");
+        if (current === shippedScript) {
+            scriptStatus = "present";
+        } else {
+            const ours = SHIPPED_HOOK_SCRIPT_SHA256S.includes(hookScriptSha256(current));
+            scriptStatus = force || ours ? "replaced" : "kept";
+        }
     }
     if (scriptStatus === "added" || scriptStatus === "replaced") {
         fs.mkdirSync(path.dirname(scriptPath), { recursive: true });

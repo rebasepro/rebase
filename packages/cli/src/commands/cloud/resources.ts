@@ -26,13 +26,16 @@ import {
     reportError,
     note,
     noteBlank,
-    requireCloudRow,
     billingAccountIdOf,
+    grantForLink,
+    appKeyExpiryNote,
+    projectDotenvSetsAppKey,
     warn
 } from "./context";
 import { DEFAULT_STORAGE_SOURCE_KEY } from "@rebasepro/types";
 import { firstRow, latestDeployment, fmtDate } from "./projects";
 import { wantsRawError } from "./errors";
+import { billingInvoices, billingUpcoming } from "./billing-invoices";
 import { switchOn } from "../../utils/args";
 
 /* ─── status: quick project dashboard ──────────────────────────── */
@@ -294,6 +297,11 @@ path: projectId })
 
         const storageLine = describeStorageState(storage);
         const databaseLine = describeDatabaseState(db);
+        // An unclaimed project's claim URL, read back from where `init --claim`
+        // kept it: the only other copy was that command's output.
+        const link = readLink();
+        const grant = link?.projectId === projectId ? grantForLink(link) : undefined;
+        const appKeyNote = grant && projectDotenvSetsAppKey() ? appKeyExpiryNote(grant.expiresAt) : undefined;
         const blocked = resolveBlockedState({
             projectStatus: project.status,
             database: db as { connectionStatus?: string | null } | undefined,
@@ -311,11 +319,17 @@ path: projectId })
                     ["Last deploy", deploy ? `${colorStatus(deploy.status)} · ${fmtDate(deploy.createdAt)}` : "never"],
                     ["Runtime", describeRuntime(project)],
                     ["Database", databaseLine],
-                    ["Storage", storageLine]
+                    ["Storage", storageLine],
+                    ["Claim URL", grant ? chalk.bold(grant.claimUrl) : undefined],
+                    ["Expires", grant ? `${new Date(grant.expiresAt).toLocaleString()} unless claimed, then deleted` : undefined]
                 ]);
                 // The same fact the JSON carries, in the place a person reads.
                 // Below the rows rather than inside them: it is not another
                 // property of the project, it is what to do next.
+                if (appKeyNote) {
+                    console.log("");
+                    console.log(chalk.gray(`  ${appKeyNote}`));
+                }
                 if (blocked.blockedOn) {
                     console.log("");
                     console.log(`  ${chalk.yellow("Waiting on you")} ${chalk.gray(`— ${blocked.blockedOn}`)}`);
@@ -356,7 +370,12 @@ createdAt: deploy.createdAt ?? null } : null,
                 },
                 database: db ? { type: db.type ?? null,
 connectionStatus: db.connectionStatus ?? null } : null,
-                storage: storage ?? null
+                storage: storage ?? null,
+                // Present while the project is unclaimed: open `claimUrl` and
+                // sign in to keep it, before `expiresAt`.
+                unclaimed: grant
+                    ? { claimUrl: grant.claimUrl, expiresAt: grant.expiresAt, appKeyNote: appKeyNote ?? null }
+                    : null
             }
         );
     } catch (e) {
@@ -522,161 +541,37 @@ maxPositionals: 0 });
     }
 }
 
-/* ─── webhooks ─────────────────────────────────────────────────── */
+/* ─── webhooks (retired) ───────────────────────────────────────── */
 
 /**
- * The webhook `webhooks delete` names.
+ * `rebase cloud webhooks` is retired, and says where to go instead.
  *
- * The worst instance of the operand-filter bug in this family, because the
- * argument is consumed by a DELETE and the wrong value looks entirely
- * plausible: `rebase cloud webhooks delete --project acme 42` filtered out
- * `--project` and kept "acme", so the id it deleted was the project slug rather
- * than the 42 the caller wrote. Strict parsing consumes the flag with its
- * value, leaving `["42"]`.
+ * It never worked. It wrote rows to a data collection named `webhooks` on the
+ * control plane, whose real slug is `database-webhooks` — and nothing on the
+ * control plane ever delivered those rows anyway. What people reached for it
+ * to do is now two other things:
  *
- * Exported so its tests drive the real parser.
+ *  - a project's own events (a deploy failed, backups stopped, a payment was
+ *    declined, usage passed 80%) to Slack, Discord or any URL:
+ *    `rebase cloud notifications`;
+ *  - a POST when rows of your app's own tables change: a `WebhookDispatcher`
+ *    in your app's code, which your backend delivers itself.
+ *
+ * Every action answers the same refusal, exit 1, code `command_retired`, with
+ * both routes — a retired command that still exits 0 would tell a script its
+ * webhook exists.
  */
-export function resolveWebhookIdArg(rawArgs: string[]): string | undefined {
-    return parseCloudArgs({
-        spec: {},
-        rawArgs,
-        commandWords: 3, // cloud webhooks delete
-        command: "cloud webhooks delete",
-        maxPositionals: 1
-    }).positionals[0];
-}
+export const WEBHOOKS_RETIRED_HINT =
+    "For a project's events (deploy failed, backups, billing, usage) to Slack, Discord or any URL: "
+    + "`rebase cloud notifications add <url>`. For row changes in your app's own tables: a WebhookDispatcher "
+    + "in your app's code — https://rebase.pro/docs/recipes/webhooks/";
 
-/** The action words `rebase cloud webhooks` dispatches. No word means `list`. */
-export const WEBHOOKS_ACTIONS = ["list", "create", "delete"] as const;
-
-export async function webhooksCommand(subcommand: string | undefined, rawArgs: string[]): Promise<void> {
-    // Before the parse and before the client: `webhooks creat` used to fall past
-    // both `if`s and LIST the webhooks, exit 0, and leave the caller believing
-    // one had been created.
-    requireKnownAction("webhooks", subcommand, WEBHOOKS_ACTIONS);
-
-    // Both lines are parsed BEFORE the client is built. A line the parser will
-    // refuse is refused without first spending a login round-trip on it — and
-    // for `delete`, without the ambiguity of a refusal that arrives after the
-    // command has already started talking to the control plane.
-    const create = subcommand === "create"
-        ? parseCloudArgs({
-            // `--endpoint`, not `--url`.
-            //
-            // Every command in this family inherits a global `--url`, which
-            // names the CONTROL PLANE — `resolveCloudUrl` reads it straight off
-            // the raw line, before any per-command spec exists. A second
-            // `--url` here did not shadow it, because the two parses are
-            // independent: `webhooks create --url https://example.com/hook`
-            // sent the customer's webhook endpoint to `requireClient` as the
-            // control plane to authenticate against, so the documented example
-            // could not create a webhook. Renaming is the fix; a per-command
-            // flag cannot be a global's spelling, and `action-help.test.ts`
-            // now sweeps for the class.
-            spec: { "--name": String,
-"--table": String,
-"--endpoint": String,
-"--events": String },
-            rawArgs,
-            commandWords: 3, // cloud webhooks create
-            command: "cloud webhooks create",
-            maxPositionals: 0
-        }).flags
-        : undefined;
-    const deleteId = subcommand === "delete" ? resolveWebhookIdArg(rawArgs) : undefined;
-    if (subcommand === "delete" && !deleteId) {
-        fail("Usage: rebase cloud webhooks delete <id>", undefined, "usage");
-    }
-    // The listing takes only the globals, and took them permissively: `webhooks
-    // list --tabel orders` listed every webhook and exited 0.
-    if (!create && !deleteId) {
-        parseCloudArgs({ spec: {},
-rawArgs,
-commandWords: 3,
-command: "cloud webhooks",
-maxPositionals: 0 });
-    }
-
-    const { client } = await requireClient(rawArgs);
-    const projectId = await requireProject(rawArgs, client);
-
-    try {
-        if (subcommand === "create") {
-            const args = create!;
-            const name = args["--name"] || fail("--name is required.", undefined, "usage");
-            const table = args["--table"] || fail("--table is required.", undefined, "usage");
-            const url = args["--endpoint"] || fail("--endpoint is required.", "Where the POST goes.", "usage");
-            const events = (args["--events"] || "insert,update,delete").split(",").map((s) => s.trim());
-
-            const created = requireCloudRow(await client.data.collection("webhooks").create({
-                project: projectId,
-                name,
-                table,
-                url,
-                events,
-                enabled: true
-            }), "webhook");
-            success(`Created webhook ${chalk.bold(name)} [${created.id}]`);
-            emit(() => {}, {
-                success: true,
-                id: String(created.id),
-                projectId,
-                name,
-                table,
-                url,
-                events,
-                enabled: true
-            });
-            return;
-        }
-
-        if (subcommand === "delete") {
-            await client.data.collection("webhooks").delete(deleteId!);
-            success(`Deleted webhook ${deleteId}`);
-            emit(() => {}, { success: true,
-id: deleteId!,
-projectId });
-            return;
-        }
-
-        // list
-        const hooks = (await client.data.collection("webhooks").find({
-            where: { project: ["==", projectId] },
-            limit: 100
-        })).data as Array<{ id: string | number; name?: string; table?: string; url?: string; enabled?: boolean; events?: string[] }>;
-
-        emit(
-            () => {
-                console.log("");
-                console.log(chalk.bold(`  🔗 Webhooks — project ${displayProjectRef(rawArgs)}`));
-                console.log("");
-                if (hooks.length === 0) {
-                    console.log(chalk.gray("  No webhooks. Add one with `rebase cloud webhooks create`."));
-                    console.log("");
-                    return;
-                }
-                for (const h of hooks) {
-                    const state = h.enabled ? chalk.green("enabled") : chalk.gray("disabled");
-                    console.log(`  ${chalk.bold(h.name ?? "(unnamed)")} ${chalk.gray(`[${h.id}]`)} ${state}`);
-                    console.log(`    ${chalk.gray(`${h.table ?? "?"} → ${h.url ?? "?"}  (${(h.events ?? []).join(", ")})`)}`);
-                }
-                console.log("");
-            },
-            {
-                projectId,
-                webhooks: hooks.map((h) => ({
-                    id: String(h.id),
-                    name: h.name ?? null,
-                    table: h.table ?? null,
-                    url: h.url ?? null,
-                    events: h.events ?? [],
-                    enabled: h.enabled ?? null
-                }))
-            }
-        );
-    } catch (e) {
-        reportError(e, "Webhook operation failed");
-    }
+export async function webhooksCommand(_subcommand: string | undefined, _rawArgs: string[]): Promise<void> {
+    fail(
+        "`rebase cloud webhooks` is retired: it never delivered anything.",
+        WEBHOOKS_RETIRED_HINT,
+        "command_retired"
+    );
 }
 
 /* ─── storage ──────────────────────────────────────────────────── */
@@ -993,7 +888,7 @@ async function storageAttachCommand(rawArgs: string[]): Promise<void> {
 /* ─── clusters ─────────────────────────────────────────────────── */
 
 /** The action words `rebase cloud clusters` dispatches. No word means `list`. */
-export const CLUSTERS_ACTIONS = ["list", "add", "verify"] as const;
+export const CLUSTERS_ACTIONS = ["list", "add", "verify", "registry"] as const;
 
 /**
  * `rebase cloud clusters` — list, register and verify the clusters tenants run on.
@@ -1006,6 +901,7 @@ export const CLUSTERS_ACTIONS = ["list", "add", "verify"] as const;
 export async function clustersCommand(action: string | undefined, rawArgs: string[]): Promise<void> {
     if (action === "verify") return clustersVerifyCommand(rawArgs);
     if (action === "add") return clustersAddCommand(rawArgs);
+    if (action === "registry") return clustersRegistryCommand(rawArgs);
     // `clusters verifyy` used to LIST the clusters and exit 0 — the one command
     // whose whole purpose is to answer a yes/no question about a specific one.
     requireKnownAction("clusters", action, CLUSTERS_ACTIONS);
@@ -1263,6 +1159,135 @@ async function clustersAddCommand(rawArgs: string[]): Promise<void> {
     );
 }
 
+/** The flags `clusters registry` declares; exported for its help page's test. */
+export const CLUSTER_REGISTRY_FLAGS = {
+    "--repository": String,
+    "--push-service-account": String,
+    "--pull-key-file": String,
+    "--clear": Boolean
+};
+
+/**
+ * What `clusters registry` was asked to record: a customer cluster's own image
+ * repository, the account its builds push as, and the file holding the key of
+ * its read-only account — or `--clear`, to go back to the shared registry.
+ */
+export type ClusterRegistryArgs =
+    | { id: string; clear: true }
+    | { id: string; clear: false; repository: string; pushServiceAccount: string; pullKeyFile: string };
+
+/**
+ * Parse `rebase cloud clusters registry <id> …`.
+ *
+ * All three values or `--clear`, never a part: the control plane ignores a
+ * partial set (and keeps handing the cluster the shared credentials), so a
+ * command that wrote one would look done and change nothing.
+ */
+export function resolveClusterRegistryArgs(rawArgs: string[]): ClusterRegistryArgs {
+    const { flags, positionals } = parseCloudArgs({
+        spec: CLUSTER_REGISTRY_FLAGS,
+        rawArgs,
+        commandWords: 2, // cloud clusters — `registry` is the action positional
+        command: "cloud clusters registry",
+        maxPositionals: 2
+    });
+    const usage =
+        "Usage: rebase cloud clusters registry <cluster-id> --repository <host/project/repo> " +
+        "--push-service-account <email> --pull-key-file <key.json>   (or --clear)";
+    const id = positionals[1];
+    if (!id) fail(usage, undefined, "bad_request");
+    const repository = flags["--repository"]?.trim();
+    const pushServiceAccount = flags["--push-service-account"]?.trim();
+    const pullKeyFile = flags["--pull-key-file"];
+    if (flags["--clear"] === true) {
+        if (repository || pushServiceAccount || pullKeyFile) {
+            fail("--clear takes no other registry flag.", undefined, "bad_request");
+        }
+        return { id: id!, clear: true };
+    }
+    if (!repository || !pushServiceAccount || !pullKeyFile) {
+        fail(`${usage}\nAll three go together: the control plane ignores a partial set.`, undefined, "bad_request");
+    }
+    if (!/^[a-z0-9.-]+(:[0-9]+)?(\/[a-z0-9]+([._-][a-z0-9]+)*){2,}$/.test(repository!.replace(/\/+$/, ""))) {
+        fail(`--repository must be <host>/<project>/<repository> (got "${repository}").`, undefined, "bad_request");
+    }
+    return { id: id!, clear: false, repository: repository!.replace(/\/+$/, ""), pushServiceAccount: pushServiceAccount!, pullKeyFile: pullKeyFile! };
+}
+
+/**
+ * The reader's key from `--pull-key-file`, checked before it leaves this
+ * machine: a service-account key, and not the pusher's — the pull secret sits
+ * where the customer's cluster admin can read it, so it must not be able to
+ * write. Returns the key text and the account it belongs to.
+ */
+export function readPullKey(text: string, pushServiceAccount: string): { key: string; account: string } {
+    let parsed: unknown;
+    try {
+        parsed = JSON.parse(text);
+    } catch {
+        fail("--pull-key-file is not JSON; it must be the reader service account's key file.", undefined, "bad_request");
+    }
+    const record = typeof parsed === "object" && parsed !== null ? parsed as Record<string, unknown> : {};
+    const account = record.client_email;
+    if (typeof account !== "string" || typeof record.private_key !== "string") {
+        fail("--pull-key-file has no client_email/private_key; it must be a service-account key file.", undefined, "bad_request");
+    }
+    if ((account as string).toLowerCase() === pushServiceAccount.toLowerCase()) {
+        fail("--pull-key-file is the push account's key. Use the cluster's read-only account (rlc-<key>-pull).", undefined, "bad_request");
+    }
+    return { key: text.trim(), account: account as string };
+}
+
+/**
+ * Record (or clear) a cluster's own image registry. Platform-admin only, like
+ * the rest of `clusters`: the collection is admin-only. The key is sealed by
+ * the control plane at write and never read back.
+ */
+async function clustersRegistryCommand(rawArgs: string[]): Promise<void> {
+    const args = resolveClusterRegistryArgs(rawArgs);
+    let columns: Record<string, string | null>;
+    let pullAccount: string | null = null;
+    if (args.clear) {
+        columns = { tenantRegistry: null, registryPushServiceAccount: null, registryPullKey: null };
+    } else {
+        let text: string;
+        try {
+            text = fs.readFileSync(args.pullKeyFile, "utf8");
+        } catch {
+            fail(`Could not read ${args.pullKeyFile}`, undefined, "bad_request");
+            return;
+        }
+        const pull = readPullKey(text, args.pushServiceAccount);
+        pullAccount = pull.account;
+        columns = { tenantRegistry: args.repository, registryPushServiceAccount: args.pushServiceAccount, registryPullKey: pull.key };
+    }
+
+    const { client } = await requireClient(rawArgs);
+    try {
+        await client.data.collection("clusters").update(args.id, columns);
+    } catch (error: unknown) {
+        reportError(error, "Could not record the cluster's registry");
+        return;
+    }
+
+    emit(
+        () => {
+            if (args.clear) {
+                success(`Cluster ${args.id} uses the shared registry again.`);
+                note("Deploys to it warn again if it is not platform capacity.");
+                return;
+            }
+            success(`Cluster ${args.id} now builds into ${args.repository}.`);
+            noteBlank();
+            note(`Builds push as ${args.pushServiceAccount}; pods pull with ${pullAccount}'s key (sealed, never shown).`);
+            note("Takes effect on each project's next deploy to it.");
+        },
+        args.clear
+            ? { id: args.id, tenantRegistry: null, registryPushServiceAccount: null, pullServiceAccount: null }
+            : { id: args.id, tenantRegistry: args.repository, registryPushServiceAccount: args.pushServiceAccount, pullServiceAccount: pullAccount }
+    );
+}
+
 async function clustersListCommand(rawArgs: string[]): Promise<void> {
     parseCloudArgs({ spec: {},
 rawArgs,
@@ -1322,22 +1347,40 @@ maxPositionals: 0 });
  * the account — a help page describing a command that does not exist, and a typo
  * exiting 0.
  */
-export const BILLING_ACTIONS = ["setup", "checkout"] as const;
+export const BILLING_ACTIONS = ["setup", "checkout", "invoices", "upcoming"] as const;
 
 export async function billingCommand(rawArgs: string[]): Promise<void> {
     // Parsed before the client is built: an unusable line should be refused
     // without first spending a login round-trip on it.
-    const action = parseCloudArgs({
-        spec: {},
+    const parsed = parseCloudArgs({
+        spec: { "--limit": Number },
         rawArgs,
         commandWords: 2, // cloud billing
         command: "cloud billing",
         maxPositionals: 1
-    }).positionals[0];
+    });
+    const action = parsed.positionals[0];
     requireKnownAction("billing", action, BILLING_ACTIONS);
+    const limit = parsed.flags["--limit"];
+    if (limit !== undefined && action !== "invoices") {
+        fail("`--limit` applies to `rebase cloud billing invoices` only.", undefined, "usage");
+    }
 
     const { client, url } = await requireClient(rawArgs);
     const org = getContextOrg(url);
+
+    // `rebase cloud billing invoices|upcoming` — what Stripe has invoiced the
+    // org, and what it will invoice next. Read-only; owner/admin only.
+    if (action === "invoices" || action === "upcoming") {
+        if (!org) fail("No active organization.", "Run `rebase cloud use` first.", "no_org");
+        try {
+            if (action === "invoices") await billingInvoices(client, org, limit);
+            else await billingUpcoming(client, org);
+        } catch (e) {
+            reportError(e, action === "invoices" ? "Failed to load invoices" : "Failed to load the next invoice");
+        }
+        return;
+    }
 
     // `rebase cloud billing setup` — attach a card to the org (one-time, opens a
     // browser). Once done, project create/deploy work headlessly (off_session).

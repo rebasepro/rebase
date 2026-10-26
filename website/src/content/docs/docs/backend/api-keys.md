@@ -30,7 +30,7 @@ curl "$API_URL/api/data/orders" \
 ```
 
 The same key works on the REST API, storage, custom functions, the admin
-surfaces its scopes reach, the realtime WebSocket and the [`/mcp` endpoint](/docs/ai/mcp/#the-remote-endpoint).
+surfaces its scopes reach, the realtime WebSocket and the [`/mcp` endpoint](/docs/ai/remote-mcp/).
 
 ## Service keys
 
@@ -158,7 +158,7 @@ window, and every door counts against it in one bucket, `api-key:<id>`:
 - its data frames on the realtime socket: fetches, counts, saves and deletes,
   and subscriptions and channel-history requests past each socket's
   [allowance](/docs/backend/realtime/#what-a-write-costs-and-the-limits);
-- its requests to [`/mcp`](/docs/ai/mcp/#the-remote-endpoint).
+- its requests to [`/mcp`](/docs/ai/remote-mcp/).
 
 Without a `rate_limit` the bucket holds the server's API-key default, 1000. A
 personal key has no `rate_limit` of its own, and counts in its own bucket at that
@@ -167,6 +167,11 @@ default. Past the limit an HTTP request answers `429` and a socket frame
 
 The admin routes under `/api/admin`, and the socket's admin messages such as the
 SQL editor's, are not rate limited.
+
+An administrator simulating a key ("Simulate access", `x-rebase-simulate-api-key-id`)
+spends their own allowance, not the key's: the integration running on that key
+keeps its whole budget. Simulating or impersonating a user is charged to the
+administrator the same way.
 
 ## Personal keys
 
@@ -250,7 +255,7 @@ and covers every step of a resumable (TUS) upload, including the offset check
 and the cancel. `storage:delete` deletes. The target is a storage source id. The
 default source's id is `(default)`, so `storage:read:(default)` reads the default
 source only, and `storage:write:avatars` writes a source named `avatars`.
-After the scope check, [`storageAuthorize`](/docs/backend/storage/#per-object-authorization)
+After the scope check, [`storageAuthorize`](/docs/backend/storage-authorization/)
 still runs, with the key's identity.
 
 ### Functions
@@ -306,6 +311,8 @@ Every key is checked against whoever creates it, the same way on both routes:
 | `400 KEY_MANAGEMENT_SCOPE` | `keys:read` or `keys:write` was asked for |
 | `403 SCOPE_EXCEEDS_CREATOR` | A scope the creator does not hold. A key never holds more than the account that made it |
 | `403 ROLE_EXCEEDS_CREATOR` | A service-key role the creator does not hold, when the creator is not an admin |
+| `400 INVALID_ROLE` | A role name is empty or contains `,` `{` `}` `"` `\` or a control character, which RLS would read back as other roles |
+| `403 KEY_OUTRANKS_CALLER` | On a change (`PUT`) or a revoke (`DELETE`): the key already holds a role or scope the caller does not, and the caller is not an admin |
 
 A request the key itself lacks a scope for answers `403 SCOPE_MISSING`, with the
 scope in `details.requiredScope`. See [Error codes](/docs/backend/errors/#authentication-and-accounts).

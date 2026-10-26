@@ -1,5 +1,5 @@
 ---
-sourceHash: bf72686388b55887
+sourceHash: be8f292cf1e7986c
 title: Visão Geral do Backend
 sidebar_label: Backend
 description: O backend do Rebase fornece um servidor completo com API REST, autenticação, armazenamento, tempo real com WebSocket e histórico de entidades — tudo inicializado com uma única chamada de função.
@@ -78,6 +78,7 @@ Ambos os caminhos chegam à mesma `RebaseBackendConfig`. Este é o mapa completo
 | `basePath` | `REBASE_BASE_PATH` (padrão `/api`) |
 | `collections`, `collectionsDir` | o diretório `config/collections/`, declarado pelo `rebase.json` |
 | `functions`, `functionsDir` | `backend/functions/` |
+| `functionsTimeoutMs` | `REBASE_FUNCTIONS_TIMEOUT_MS` |
 | `crons`, `cronsDir` | `backend/crons/` |
 | `bootstrappers`, `database` | `DATABASE_URL`, além de uma declaração `database("<key>")` em `config/resources.ts` para cada banco de dados além do padrão |
 | `auth` | `JWT_SECRET`, as variáveis `OAUTH_*` e `config/collections/users` |
@@ -86,12 +87,15 @@ Ambos os caminhos chegam à mesma `RebaseBackendConfig`. Este é o mapa completo
 | `storagePublicRead` | `STORAGE_PUBLIC_READ` |
 | `storageRenditionCache` | `STORAGE_RENDITION_CACHE` |
 | `storageInsecureAllowAnyAuthenticated` | `STORAGE_ALLOW_ANY_AUTHENTICATED` |
+| `storageDownloadTokenTtl` | `STORAGE_DOWNLOAD_TOKEN_TTL` |
 | `callbacks` | `export const callbacks` de `config/index.ts` |
 | `history` | `REBASE_HISTORY` (ativado por padrão) — apenas a forma booleana |
 | `enableSwagger` | `REBASE_ENABLE_SWAGGER`; se não definido, fica ativado fora de produção |
 | `compression` | `REBASE_COMPRESSION` |
 | `maxBodySize` | `REBASE_MAX_BODY_SIZE` |
 | `logging` | `LOG_LEVEL` |
+| `liveSchema` | `REBASE_LIVE_SCHEMA_REPOSITORY` e suas credenciais `REBASE_LIVE_SCHEMA_*` — somente a forma de repositório |
+| `rlsAudit` | `REBASE_RLS_AUDIT` |
 | `provisionSchema`, `surfaces`, `ownership`, `functionsSelection`, `functionsUpstream` | `REBASE_ROLE` — veja [Processos Divididos](/docs/deployment/split-processes/) |
 | `corsHandled` | O CORS é instalado pelo runtime a partir de `CORS_ORIGINS` |
 | `schemaVersion`, `runtimeVersion` | a compilação (build) estampa ambos no bundle |
@@ -103,8 +107,8 @@ Estas não possuem variável de ambiente nem exportação de configuração. Ela
 apenas a partir de uma chamada manual de `initializeRebaseBackend` — `rebase eject` ou um
 [servidor personalizado](/docs/backend/custom-server/):
 
-`rateLimit` · `jobs` · `csrf` · `cronPersistence` · `functionsTimeoutMs` ·
-`storagePolicies` · `storageTriggers` · `baas` · `liveSchema` · `rlsAudit` ·
+`rateLimit` · `jobs` · `csrf` · `cronPersistence` ·
+`storagePolicies` · `storageTriggers` · `baas` ·
 `history` em sua forma de objeto (`{ retention }`)
 
 `schemaEditor` é desativado forçadamente em um bundle compilado: o editor reescreve os arquivos
@@ -121,8 +125,8 @@ Após a inicialização, estas rotas são montadas:
 | `/api/storage/*` | Upload, download e exclusão de arquivos |
 | `/api/data/:slug` | Operações CRUD por coleção (GET, POST, PATCH, DELETE) |
 | `/api/data/:slug/:id/history` | Histórico de alterações da entidade (quando ativado) |
-| `/api/docs` | Especificação OpenAPI (quando `enableSwagger: true`) |
-| `/api/swagger` | Swagger UI (modo dev, quando `enableSwagger: true`) |
+| `/api/docs` | Especificação OpenAPI (pública, a menos que `enableSwagger: false`, que a coloca atrás de `schema:read`) |
+| `/api/swagger` | Swagger UI (somente fora de produção) |
 | `/api/meta/contract` | O esquema de coleções do projeto (requer `schema:read`) |
 | `/api/meta/schema-version` | Uma string de versão para esse esquema (não autenticado) |
 | `/api/functions/*` | Rotas de funções personalizadas (quando `functions` ou `functionsDir` está definido) |
@@ -139,13 +143,13 @@ Quando você invoca `initializeRebaseBackend()`, o framework aciona uma sequênc
 [Start Boot]
      │
      ▼
-1. ENV validation (Zod parsing of jwt, databases, cors)
+1. Configuration (the database adapter, the auth and storage options you passed)
      │
      ▼
-2. Dynamic Collection Loading (Chokidar watches .ts files, AST parsing)
+2. Collection Loading (imports each file in collectionsDir, strict-validates every collection)
      │
      ▼
-3. Database Bootstrapping (Acquires advisory lock, creates schemas/auth/helper SQL functions)
+3. Database Bootstrapping (creates schemas/auth/helper SQL functions, as `provision` allows)
      │
      ▼
 4. Service Initialization (Auth, Storage S3/Local client instances, Cron store seeding)
@@ -192,7 +196,12 @@ saudável, transformando uma breve indisponibilidade em um loop de reinicializa�
 `/health` não é autenticado, portanto publica apenas o veredito e não o motivo —
 fora de desenvolvimento, ele apenas indica qual fonte de dados está degradada e nada mais. O
 texto de erro do driver cita o host, a porta, o nome do banco de dados e a role, e isso
-vai para os logs. Ambos os caminhos também são servidos sob o `basePath` (`/api/health`).
+vai para os logs. `/health` também é servido sob o `basePath` (`/api/health`);
+`/livez` não é.
+
+Ambas as sondas são do runtime gerenciado. Um `backend/src/index.ts` ejetado serve
+`/health` e `/api/health` por conta própria, sondando apenas o banco de dados padrão, e não tem
+`/livez` até que você adicione um.
 
 ---
 

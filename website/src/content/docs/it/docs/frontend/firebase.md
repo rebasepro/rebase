@@ -2,7 +2,7 @@
 sourceHash: 3e18de6e2b935fc7
 title: Firebase
 sidebar_label: Firebase
-description:"\"@rebasepro/firebase esegue Rebase CMS con Firestore, Firebase Auth e Firebase Storage: un adapter lato client, senza alcun server Rebase coinvolto.\""
+description: "@rebasepro/firebase esegue Rebase CMS con Firestore, Firebase Auth e Firebase Storage: un adapter lato client, senza alcun server Rebase coinvolto."
 ---
 
 `@rebasepro/firebase` collega Rebase CMS a Firebase. Le tue

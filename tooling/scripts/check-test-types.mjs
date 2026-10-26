@@ -18,9 +18,6 @@
  * that shrinks also fails until it is banked, so the room a cleanup made is not
  * spent by the next fixture.
  *
- * `packages/types/__tests__` stays out: its `bivariance/` probes assert that
- * generics are NOT assignable, so they are supposed to error.
- *
  *     pnpm check:test-types            # verify
  *     pnpm check:test-types --update   # bank the current counts
  */
@@ -47,9 +44,7 @@ export function programConfig(root) {
         ].map((glob) => path.join(root, glob)),
         exclude: [
             "**/node_modules",
-            "**/dist",
-            // Probes that are meant to fail to compile.
-            "packages/types/__tests__"
+            "**/dist"
         ].map((glob) => (glob.startsWith("**") ? glob : path.join(root, glob)))
     };
 }

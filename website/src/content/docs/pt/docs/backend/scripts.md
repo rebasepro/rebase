@@ -1,5 +1,5 @@
 ---
-sourceHash: d0d64eef975c9c59
+sourceHash: 21c1631250b71da2
 title: Scripts e o Console
 sidebar_label: Scripts e o Console
 description: Abra os dados de um projeto a partir de um script, de um teste ou de um REPL com openRebase, ou a partir do terminal com rebase console. Sem servidor, sem alterações de schema.
@@ -52,7 +52,9 @@ Dois nomes estão no escopo, e o `await` de nível superior funciona:
 | `collections` | As coleções do projeto, carregadas da mesma forma que o `rebase db push` as carrega |
 
 O console abre o projeto da mesma forma que o `rebase db push`: o mesmo `.env`,
-o mesmo banco de dados e as mesmas coleções. Um projeto no banco de dados de
+o mesmo banco de dados e as mesmas coleções. Ele também carrega os `callbacks`
+globais de `config/index.ts`, então suas escritas executam os mesmos hooks que uma
+escrita do servidor. Um projeto no banco de dados de
 desenvolvimento gerenciado o tem iniciado antes. O histórico do que você digitou
 fica em `.rebase/console_history`, que o `.gitignore` do scaffold já deixa de
 fora.
@@ -133,7 +135,7 @@ DATABASE_URL="$(pnpm exec rebase db url)" pnpm exec tsx scripts/publish-drafts.t
 | Membro | O que faz |
 |---|---|
 | `dataAsAdmin` | Toda coleção, lida e escrita como a identidade de serviço do servidor (`{ uid: "service", roles: ["admin"] }`): admin, e ainda avaliada pelas suas políticas de RLS, exatamente como o `rebase.dataAsAdmin` em uma função |
-| `sql(query, { params })` | SQL puro na conexão do owner, com a mesma convenção de chamada do `rebase.sql` em uma função |
+| `sql(query, { params })` | SQL puro na conexão do owner, com a mesma convenção de chamada do `rebase.sql` em uma função. Ele roda na única fonte de dados aberta: um `{ database }` que nomeie qualquer outra é recusado |
 | `withAuth(user)` | Resolve para `{ data }`: as coleções como aquele usuário as vê. Toda leitura e escrita roda como ele, filtrada pela segurança em nível de linha, como seria uma requisição HTTP desse usuário |
 | `collections` | As coleções com que foi aberto |
 | `close()` | Encerra o pool de conexões que o `openRebase` criou. É seguro chamá-lo duas vezes |
@@ -147,6 +149,7 @@ Suas opções:
 | `collections` | As coleções do projeto. Um array vazio as lê do banco de dados, como faz um servidor sem arquivos de coleção, e as serve somente para leitura |
 | `pool` | Configurações do pool, junto com `databaseUrl` |
 | `dataSourceKey` | A fonte de dados de onde essas coleções são servidas. Padrão `(default)` |
+| `callbacks` | Os callbacks globais do projeto, os `callbacks` que o seu `config/index.ts` exporta. O servidor os executa antes dos hooks próprios de cada coleção; passe-os aqui e uma escrita de script também os executa |
 
 O `openRebase` não lê nenhuma variável de ambiente. O `DATABASE_URL` acima é lido
 pelo seu script, e configurações como `REBASE_DB_POOL_MAX` ou `REALTIME_CDC` não
@@ -275,9 +278,21 @@ quando ele escreve a entidade em seguida, e na sua varredura de hora em hora.
 
 ### O que ele deixa de fora
 
-O `openRebase` abre a camada de dados e nada mais. Ele não inicia o tempo real,
-então suas escritas não são anunciadas às consultas ao vivo. Storage, e-mail,
+O `openRebase` abre a camada de dados e nada mais. Ele não inicia um tempo real
+próprio, mas suas escritas ainda chegam às consultas ao vivo: os triggers de captura
+de alterações do banco de dados anunciam toda escrita, seja quem for que a fez,
+então os assinantes de um servidor em execução fazem uma nova busca depois de um
+backfill também. Só com `REALTIME_CDC=off` nesse servidor elas não são anunciadas.
+Veja [Captura de alterações do banco de dados](/docs/backend/realtime-cdc/). Storage, e-mail,
 administração de autenticação e as suas funções não estão nele.
+
+Os callbacks de coleção rodam em toda escrita, como no servidor. Os `callbacks`
+globais do projeto só rodam quando você os passa na opção `callbacks`.
+O `rebase console` os passa para você: ele lê os `callbacks` que o seu
+`config/index.ts` exporta, então um `beforeSave` global também roda nas escritas dele. Se
+esse arquivo não puder ser importado (por exemplo, ele precisa de uma variável de ambiente que o
+console não recebeu), o console imprime uma linha dizendo que os callbacks globais
+estão desligados nesta sessão e abre sem eles.
 
 Quando um script precisa dessas coisas também, construa o backend sem servi-lo:
 `createRebaseBackend({ …, provision: false })` entrega a você o `backend.rebase`,

@@ -1,7 +1,7 @@
-import React, { useCallback, useContext, useMemo, useState } from "react";
+import React, { useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import type { Entity } from "@rebasepro/types";
 import type { AdminCollection } from "@rebasepro/cms-types";
-import { CenteredView, CircularProgressCenter, Typography } from "@rebasepro/ui";
+import { Alert, Button, CenteredView, CircularProgressCenter, Typography } from "@rebasepro/ui";
 import { CollectionScopeProvider, ErrorView, useFetch, usePermissions, useTranslation } from "@rebasepro/app";
 
 import { EntityFormBinding } from "../form/EntityFormBinding";
@@ -89,14 +89,19 @@ export function EntityFormPanel<M extends Record<string, unknown> = Record<strin
     // one above has settled without this collection.
     const needsOwnScope = !inScope
         || (!navigationState.loading && !isRegistered(collectionRegistry.collections, props.path ?? collection.slug));
+    // One form per record: the binding keeps the id and status it mounted
+    // with, so a page that hands over another id (a route `/posts/:id` going
+    // from p1 to p2) gets a fresh form instead of one that shows p2 and saves
+    // into p1. Keyed on the prop, so the id a create assigns keeps the form.
+    const recordKey = `${props.path ?? collection.slug}/${props.entityId ?? "new"}`;
     if (needsOwnScope) {
         return (
             <CollectionsProvider collections={ownCollections}>
-                <EntityFormPanelInScope {...props}/>
+                <EntityFormPanelInScope key={recordKey} {...props}/>
             </CollectionsProvider>
         );
     }
-    return <EntityFormPanelInScope {...props}/>;
+    return <EntityFormPanelInScope key={recordKey} {...props}/>;
 }
 
 function EntityFormPanelInScope<M extends Record<string, unknown>>({
@@ -113,7 +118,7 @@ function EntityFormPanelInScope<M extends Record<string, unknown>>({
     const path = pathProp ?? collectionProp.slug;
     const collectionRegistry = useCollectionRegistryController<Record<string, unknown>, AdminCollection<M>>();
     const navigationState = useNavigationStateController();
-    const { canEdit } = usePermissions();
+    const { canCreate, canEdit } = usePermissions();
 
     // The registry's copy: it carries the plugins' changes and the user's
     // saved overrides.
@@ -136,9 +141,28 @@ function EntityFormPanelInScope<M extends Record<string, unknown>>({
     // to read it back by from the outside, and the form, existing from then
     // on, needs it.
     const [savedEntity, setSavedEntity] = useState<Entity<M> | undefined>(undefined);
-    const shownEntity = entity ?? savedEntity;
+
+    // The record as it was last delivered. A live read that stops delivering
+    // it — someone deleted it — is not a record that was never there: as in
+    // the CMS's own edit view, the form keeps showing it, with what was typed,
+    // and says so. Without this the form lost its record mid-edit and threw.
+    const [lastSeenEntity, setLastSeenEntity] = useState<Entity<M> | undefined>(undefined);
+    useEffect(() => {
+        if (entity) setLastSeenEntity(entity);
+    }, [entity]);
+    // "Save as new": the same values, in a form that creates a record. Counted,
+    // so that each one is a fresh form.
+    const [asNew, setAsNew] = useState<{ values: Partial<M>, n: number, saved?: Entity<M> } | null>(null);
+    const typedValues = useRef<Partial<M> | undefined>(undefined);
+    const deletedElsewhere = !asNew && entityId !== undefined && !dataLoading && !entity
+        && lastSeenEntity !== undefined && String(lastSeenEntity.id) === String(entityId);
+    const shownEntity = deletedElsewhere ? lastSeenEntity : (entity ?? savedEntity);
 
     const navigateBack = useCallback(() => onClose?.(), [onClose]);
+    const saveAsNew = useCallback(() => {
+        const values: Partial<M> = typedValues.current ?? lastSeenEntity?.values ?? {};
+        setAsNew(previous => ({ values, n: (previous?.n ?? 0) + 1 }));
+    }, [lastSeenEntity]);
 
     if (!collection) {
         if (navigationState.loading) return <CircularProgressCenter/>;
@@ -151,6 +175,34 @@ function EntityFormPanelInScope<M extends Record<string, unknown>>({
         );
     }
 
+    if (asNew) {
+        return (
+            <CollectionScopeProvider collection={collection}>
+                <EntityFormBinding<M>
+                    {...formProps}
+                    key={`as-new-${asNew.n}`}
+                    className={className ?? formProps?.className}
+                    path={path}
+                    collection={collection}
+                    entity={asNew.saved}
+                    initialStatus={"new"}
+                    initialDirtyValues={asNew.values}
+                    disabled={!canCreate(collection, path) || formProps?.disabled}
+                    onEntityChange={(changed) => {
+                        // The record it created, which it edits from then on.
+                        setAsNew(current => current && { ...current, saved: changed });
+                        formProps?.onEntityChange?.(changed);
+                    }}
+                    onSaved={(params) => {
+                        formProps?.onSaved?.(params);
+                        onSaved?.(params);
+                    }}
+                    navigateBack={navigateBack}
+                />
+            </CollectionScopeProvider>
+        );
+    }
+
     if (entityId !== undefined && dataLoadingError) {
         return <CenteredView className={className}><ErrorView error={dataLoadingError}/></CenteredView>;
     }
@@ -160,7 +212,9 @@ function EntityFormPanelInScope<M extends Record<string, unknown>>({
     // keeps the status it opened with, so once it creates the record it edits
     // it from then on.
     const creating = shownEntity === undefined;
-    const editable = creating || canEdit(collection, path, shownEntity);
+    // As the CMS's own New button and save actions: a record to create needs
+    // canCreate (false while access is simulated), an existing one canEdit.
+    const editable = creating ? canCreate(collection, path) : canEdit(collection, path, shownEntity);
 
     return (
         <CollectionScopeProvider collection={collection}>
@@ -178,12 +232,23 @@ function EntityFormPanelInScope<M extends Record<string, unknown>>({
                     setSavedEntity(changed);
                     formProps?.onEntityChange?.(changed);
                 }}
+                onValuesModified={(modified, values) => {
+                    typedValues.current = values;
+                    formProps?.onValuesModified?.(modified, values);
+                }}
                 onSaved={(params) => {
                     formProps?.onSaved?.(params);
                     onSaved?.(params);
                 }}
                 navigateBack={navigateBack}
-            />
+            >
+                {deletedElsewhere &&
+                    <Alert color={"warning"} size={"small"} outerClassName={"w-full mb-4"}
+                        action={<Button size={"small"} variant={"text"} onClick={saveAsNew}>{t("save_as_new")}</Button>}>
+                        {t("entity_deleted_elsewhere")}
+                    </Alert>}
+                {formProps?.children}
+            </EntityFormBinding>
         </CollectionScopeProvider>
     );
 }

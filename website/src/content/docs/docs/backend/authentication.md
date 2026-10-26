@@ -94,6 +94,7 @@ const backend = await initializeRebaseBackend({
 | `disableSelfRegistration` | `boolean` | `false` | Kill switch: also closes the first-user bootstrap window that `allowRegistration: false` leaves open |
 | `allowAnonymous` | `boolean` | `false` | Enable `POST /api/auth/anonymous`. Deliberately not gated by `allowRegistration` — a public read-mostly app can want sessions without accounts. Turning a guest into an account (`POST /api/auth/anonymous/link`) is registration, and needs `allowRegistration` too — and `allowAnonymous` still on: switched off, it also refuses the guests already signed in, so none can become an account (`403 ANONYMOUS_AUTH_DISABLED`) |
 | `allowUserLookup` | `boolean` | `false` | Mount `POST /api/auth/find-user` for invite-by-email flows |
+| `captcha` | `CaptchaConfig` | — | Bot protection on the routes that send mail — see [Bot protection](#bot-protection) |
 | `defaultRole` | `string` | — | Role given to a newly registered user when none is specified. It may not be `admin`, or a declared role that holds an admin-plane scope: the boot refuses both |
 | `serviceKey` | `string` | — | Static key for server-to-server calls — see [Service Key Authentication](/docs/backend/auth-endpoints/#service-key-authentication) |
 | `email` | `EmailConfig` | — | SMTP, for password reset, verification, invitations and magic links |
@@ -387,6 +388,8 @@ DISCORD_CLIENT_SECRET=…
 `GET /api/auth/config` then lists `discord` in `enabledProviders`, which is how
 to check that a pair arrived.
 
+Google is configured by `GOOGLE_CLIENT_ID` alone: its ID-token flow needs no secret, so `GOOGLE_CLIENT_SECRET` is optional.
+
 Apple is the exception: it has no static client secret, because Rebase signs a
 short-lived ES256 JWT for each token exchange. It needs all four of
 `APPLE_CLIENT_ID`, `APPLE_TEAM_ID`, `APPLE_KEY_ID` and `APPLE_PRIVATE_KEY` — the
@@ -394,7 +397,7 @@ short-lived ES256 JWT for each token exchange. It needs all four of
 
 Two options have no environment spelling and need the `auth` block (so, an
 ejected or code-configured backend): `microsoft.tenantId`, which otherwise
-defaults to `common` and reports every address as unverified, and
+defaults to `common` and accepts every Entra tenant (with any tenant, an address counts as verified only when the app registration emits the `xms_edov` claim), and
 `gitlab.baseUrl`, for a self-hosted instance.
 
 Each named field is resolved at startup into `auth.providers`, which is the
@@ -430,24 +433,21 @@ a trailing slash are ignored.
 
 What happens when someone registers with email/password as `ada@example.com`,
 then later clicks "Sign in with Google" on a Google account with that same
-address? Rebase **links the two into one account** — but only when the provider
-asserts the email as verified *and* the account's own address has been verified.
-It never silently creates a second account for the same address.
+address? Rebase **links the two into one account**, but only when the provider
+asserts the email as verified. It never silently creates a second account for
+the same address.
 
 On `POST /api/auth/<provider>` the resolution order is:
 
-1. **Known provider identity** — if this exact provider identity has signed in
+1. **Known provider identity**: if this exact provider identity has signed in
    before, that user is returned. The email is not consulted.
-2. **Existing account with the same email, both sides verified** — the
-   provider verified the email, and so has the account. The identity is
-   attached to the existing account and the user is signed in to it. One
-   account, two ways in.
-3. **Existing account with the same email, either side unverified** —
-   rejected with `403 EMAIL_NOT_VERIFIED`. Nothing is created or modified.
-   `details.reason` says which side: `provider-email-unverified`, or
-   `local-account-unverified` (the account has a password) /
-   `local-account-unverified-passwordless` (it does not).
-4. **No account with that email** — a new account is created, verified if the
+2. **Existing account with the same email, provider verified the email**: the
+   identity is attached and the user is signed in to it. One account, two ways
+   in. An unverified account is verified first (see below).
+3. **Existing account with the same email, provider did not verify it**:
+   rejected with `403 EMAIL_NOT_VERIFIED` and `details.reason`
+   `provider-email-unverified`. Nothing is created or modified.
+4. **No account with that email**: a new account is created, verified if the
    provider verified the email.
 
 Step 3 is the security-critical case. If an unverified provider email were
@@ -457,17 +457,19 @@ own could take over the matching Rebase account. Google always asserts
 Google sign-in; step 3 mostly catches providers that let users supply an
 arbitrary unconfirmed address.
 
-The account's side matters for the same reason. Nothing verifies the address
+The account's side matters too. Nothing verifies the address
 `POST /auth/register` is given, so anyone can register someone else's address
 with a password, or sign in as it through a provider that does not vouch for
-it, and wait. Linking the owner's Google sign-in onto that account would leave
-the other person's way in on it.
+it, and wait. Linking the owner's Google sign-in onto that account must not
+leave the other person's way in on it.
 
-A verification link, a magic link, an email code or a password reset proves
-the address and verifies the account. On an account that was not verified yet,
-the first such proof removes the password (a reset sets the new one) and every
-linked identity whose provider did not verify that address, and ends every
-session, before it marks the account verified. After that, step 2 applies.
+A provider that verified the address, a verification link, a magic link, an
+email code or a password reset all prove the address and verify the account.
+On an account that was not verified yet, the first such proof removes the
+password (a reset sets the new one) and every linked identity whose provider
+did not verify that address, and ends every session, before it marks the
+account verified: a password nobody verified is gone after the first Google
+sign-in.
 
 A verification link keeps what the person following it also proves: a live
 session of the account, or its password. See [Email verification](/docs/backend/email-verification/). Accounts created by an
@@ -488,11 +490,13 @@ also proves. `requireEmailVerification` makes registration confirm-first. See
 
 ## Auto-Created Tables
 
-On first startup, Rebase automatically provisions the `auth` schema and the following tables in the database (bound to the schema defined in your collection, e.g., `rebase`):
+On first startup, Rebase automatically provisions the `rebase` schema and the following tables in the database (bound to the schema defined in your collection, e.g., `rebase`):
 
 - **`rebase.users`** — User accounts with email, password hash, metadata, and a `roles` text[] column (roles are stored as inline text arrays to optimize queries and avoid joins).
+- **`rebase.user_identities`** — The OAuth identities linked to each account, one row per provider identity.
 - **`rebase.refresh_tokens`** — Long-lived sessions carrying hashed refresh tokens, user agents, and IP addresses. Includes a unique index on `token_hash`. One sign-in is one `session_id`, shared by every token rotated out of it; there is no per-device constraint, so two browsers behind one address are two sessions. Every token of a session also carries its assurance level (`aal`) and how it was signed in (`method`, which `providerId` reports).
 - **`rebase.password_reset_tokens`** — Expirable single-use tokens for password recovery flows.
+- **`rebase.magic_link_tokens`** — Expirable single-use tokens for magic-link sign-in.
 - **`rebase.mfa_factors`** — Enrolled multi-factor authentication methods (e.g. TOTP secrets encrypted with AES-256).
 - **`rebase.mfa_challenges`** — Verification logs tracking active MFA verification attempts.
 - **`rebase.recovery_codes`** — Hashed multi-factor backup/recovery codes.
@@ -500,7 +504,7 @@ On first startup, Rebase automatically provisions the `auth` schema and the foll
 
 Tokens that expire — reset links, magic links and email codes, refresh tokens,
 MFA challenges — are deleted once an hour after they expire. The sweep runs on
-the process that owns the timers (the `worker` role in a split deployment) and
+the processes that own the timers (every role but `functions` in a split deployment, unless `REBASE_CRON_SCHEDULER=false` takes them off the `api`) and
 on one instance of the fleet: each hour is claimed in `rebase.cron_claims`
 under the job id `rebase:auth:expired-tokens`, as a cron slot is. With
 `cronPersistence: false` there is no claims table, and every such instance

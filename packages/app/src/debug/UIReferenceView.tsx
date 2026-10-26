@@ -249,8 +249,9 @@ export function UIReferenceView() {
                     <Typography variant="body2" color="secondary" className="mb-4">
                         A surface is named by role and the theme decides the value. Frame, sheet and card each sit one step
                         lighter than the one below; above the card, raised and field are grey on both themes. A hairline marks
-                        an object (a card, a field, a floating panel), never a region (a tile, a row, a track), with one
-                        exception: the sheet edge against the frame, where the step alone is too small to read.
+                        an object (a card, a floating panel), never a region (a tile, a row, a track), with one
+                        exception: the sheet edge against the frame, where the step alone is too small to read. A field
+                        has no edge at all: it is a filled box, and its fill is the edge.
                         See <code className="font-mono text-xs">packages/ui/DESIGN.md</code>.
                     </Typography>
                     <div className="bg-surface-frame rounded-xl p-4">
@@ -729,7 +730,7 @@ selected: true }, { name: "Tags" }].map(c => (
                 <SectionBlock id="empty-states" title="Empty States — Canonical Pattern">
                     <Typography variant="body2" color="secondary" className="mb-4">
                         All empty / placeholder states share the same layout: a centered <code className="font-mono text-xs">flex-col</code> container
-                        with <code className="font-mono text-xs">Typography variant=&quot;label&quot;</code> for the message and a <code className="font-mono text-xs">Button</code> with <code className="font-mono text-xs">AddIcon</code> for the primary action.
+                        with <code className="font-mono text-xs">Typography variant=&quot;label&quot;</code> for the message and a <code className="font-mono text-xs">Button</code> with <code className="font-mono text-xs">PlusIcon</code> for the primary action.
                         Sources: <code className="font-mono text-xs">CollectionPropertiesEditorForm</code>, <code className="font-mono text-xs">CollectionsStudioView</code>, <code className="font-mono text-xs">CollectionStudioView</code>.
                     </Typography>
 
@@ -866,31 +867,50 @@ selected: true }, { name: "Tags" }].map(c => (
                 ═══════════════════════════════════════════════ */}
                 <SectionBlock id="inputs" title="Form Inputs">
                     <Typography variant="body2" color="secondary" className="mb-4 max-w-[68ch]">
-                        Two ways to label a field. A record form puts the label <em>above</em> the control
-                        (<code className="font-mono text-xs">FieldBlock</code>: 13px, primary ink, muted type icon) and the control is{" "}
-                        <code className="font-mono text-xs">large</code>, 48px. A dialog or a standalone control carries its label{" "}
-                        <em>inside</em> as the floating <code className="font-mono text-xs">label</code> prop and is{" "}
-                        <code className="font-mono text-xs">medium</code>, 40px. Every field has its hairline.
+                        A field is a filled box with no edge. <code className="font-mono text-xs">TextField</code>,{" "}
+                        <code className="font-mono text-xs">DateTimeField</code> and a labelled switch carry their label{" "}
+                        <em>inside</em> — the floating <code className="font-mono text-xs">label</code> prop, shrunk into the top edge
+                        once there is a value; a standalone <code className="font-mono text-xs">Select</code> labels above. A record
+                        form sets every one-line field at <code className="font-mono text-xs">large</code> with the label inside,
+                        single selects included: 64px and a 16px value. A multi-select, whose chips wrap, keeps its label{" "}
+                        <em>above</em> (<code className="font-mono text-xs">FieldBlock</code>: 13px, primary ink, muted type icon)
+                        over a 48px box. A dialog or a standalone control is <code className="font-mono text-xs">medium</code>, 40px.
                     </Typography>
                     <div className="grid grid-cols-12 gap-4">
                         <div className="col-span-12 sm:col-span-6">
-                            <Typography variant="caption" color="secondary" className="block mb-2 font-mono">record form · size=&quot;large&quot;, label above</Typography>
-                            <div className="flex flex-col gap-5 mb-6">
+                            <Typography variant="caption" color="secondary" className="block mb-2 font-mono">record form · size=&quot;large&quot;, label inside</Typography>
+                            <div className="flex flex-col gap-6 mb-6">
                                 {([
                                     ["Product name", "Italian coffee maker", "Shown on the storefront and in receipts.", false, false],
                                     ["SKU", "SKU-57032", "Stock keeping unit — unique product identifier", true, false],
                                     ["Brand", "Alessi", undefined, false, true]
                                 ] as const).map(([label, value, help, required, disabled]) => (
                                     <div key={label} className="flex flex-col min-w-0">
-                                        <div className="flex items-center gap-1.5 font-medium leading-tight mb-1.5 text-[13px]">
-                                            <span className="shrink-0 text-text-disabled dark:text-text-disabled-dark"><FileTextIcon size={14}/></span>
-                                            <span className="truncate">{label}</span>
-                                            {required && <span className="text-red-500 dark:text-red-500 -ml-1">*</span>}
-                                        </div>
-                                        <TextField size="large" value={value} disabled={disabled} onChange={() => {}}/>
-                                        {help && <Typography variant="caption" color="disabled" className="mt-1.5 ml-0.5 leading-snug">{help}</Typography>}
+                                        <TextField size="large"
+                                            value={value}
+                                            disabled={disabled}
+                                            onChange={() => {}}
+                                            inputClassName="text-base"
+                                            label={<span className="inline-flex items-center gap-2">
+                                                <FileTextIcon size={20}/>
+                                                <span>{label}{required && <span aria-hidden={true}> *</span>}</span>
+                                            </span>}/>
+                                        {help && <Typography variant="caption" color="disabled" className="mt-1.5 ml-3.5 leading-snug">{help}</Typography>}
                                     </div>
                                 ))}
+                                {/* The exception, mirroring FieldBlock: a multi-select's
+                                    chips wrap, so its label goes above the box. */}
+                                <div className="flex flex-col min-w-0">
+                                    <div className="flex items-center gap-1.5 font-medium leading-tight mb-1.5 text-[13px]">
+                                        <span className="shrink-0 text-text-disabled dark:text-text-disabled-dark"><FileTextIcon size={14}/></span>
+                                        <span className="truncate">Available locales</span>
+                                    </div>
+                                    <MultiSelect size="large" value={["es", "fr", "it"]} onValueChange={() => {}} aria-label="Available locales">
+                                        <MultiSelectItem value="es">Spanish</MultiSelectItem>
+                                        <MultiSelectItem value="fr">French</MultiSelectItem>
+                                        <MultiSelectItem value="it">Italian</MultiSelectItem>
+                                    </MultiSelect>
+                                </div>
                             </div>
                             <Typography variant="caption" color="secondary" className="block mb-2 font-mono">TextField · floating label, size=&quot;medium&quot; (dialogs)</Typography>
                             <div className="flex flex-col gap-3">

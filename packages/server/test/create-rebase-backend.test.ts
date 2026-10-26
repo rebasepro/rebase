@@ -209,6 +209,39 @@ describe("one group, mounted alone, at a path of the application's choosing", ()
     });
 });
 
+describe("a group mounted alone answers the impersonation and simulation headers itself", () => {
+    // `mount()` refused the headers on every route but data and functions at
+    // its base path; a group mounted on its own carried no such guard, so a
+    // custom server's storage or admin group answered `x-rebase-impersonate`
+    // as the administrator who sent it, under the other user's label.
+    const HONOURED = new Set(["data", "functions"]);
+    const ATTEMPTS: Array<[Record<string, string>, string]> = [
+        [{ "x-rebase-impersonate": "u-2" }, "IMPERSONATION_UNSUPPORTED"],
+        [{ "x-rebase-simulate-role": "customer" }, "SIMULATION_UNSUPPORTED"]
+    ];
+
+    it("every group but data and functions refuses them, wherever it is mounted", async () => {
+        const backend = await create({ surfaces: { cron: true, meta: true } });
+        const auth = await bearer("admin-1", ["admin"]);
+        let checked = 0;
+        for (const name of Object.keys(backend.routes) as Array<keyof typeof backend.routes>) {
+            const app = new Hono<HonoEnv>();
+            app.route(`/v2/${name}`, backend.routes[name]());
+            for (const [header, code] of ATTEMPTS) {
+                const res = await app.request(`/v2/${name}/anything`, { headers: { ...auth.headers, ...header } });
+                const body = await res.json().catch(() => ({})) as { error?: { code?: string } };
+                if (HONOURED.has(name)) {
+                    expect([name, body.error?.code]).not.toEqual([name, code]);
+                } else {
+                    expect([name, res.status, body.error?.code]).toEqual([name, 400, code]);
+                }
+            }
+            checked++;
+        }
+        expect(checked).toBe(Object.keys(backend.routes).length);
+    });
+});
+
 describe("building a backend does nothing on its own", () => {
     it("mounts nothing, starts no timer, and adds no process listener", async () => {
         const listeners = process.listenerCount("unhandledRejection");
@@ -309,6 +342,60 @@ describe("provision", () => {
         expect(rec.schemaCalls).toBe(0);
         expect(rec.policyCalls).toBe(0);
         expect(rec.initConfigs[0]).toMatchObject({ provision: false, realtime: { provision: false } });
+    });
+
+    /** Every statement the backend sent through its driver's SQL admin, in order. */
+    const sqlSentThrough = (driver: DataDriver): string[] =>
+        (driver.admin as unknown as { executeSql: jest.Mock }).executeSql.mock.calls.map(call => String(call[0]));
+    const SCHEMA_CHANGE = /^\s*(CREATE|ALTER|DROP|GRANT|REVOKE|COMMENT|DO)\b/i;
+
+    /**
+     * The framework's own tables, a write that carries an Idempotency-Key (whose
+     * table is made on first use), the job queue and its function, and the
+     * hourly token sweep, whose claims table is made on its first tick:
+     * everything that used to run DDL whatever `provision` said.
+     */
+    async function bootAndWrite(provision: boolean): Promise<string[]> {
+        const driver = scopingDriver("(default)");
+        const withSweep: BackendBootstrapper = {
+            ...bootstrapper(recorder(), { driver }),
+            async initializeAuth() {
+                const authRepository = { getUserRoleIds: async () => [], deleteExpiredTokens: async () => 0 };
+                return { userService: authRepository, authRepository } as never;
+            }
+        };
+        const backend = await create({
+            provision,
+            bootstrappers: [withSweep],
+            cronPersistence: true,
+            jobs: { enabled: true, tasks: {} }
+        });
+        backend.start();
+        const app = new Hono<HonoEnv>();
+        app.route("/data", backend.routes.data());
+        const headers = { ...(await bearer("u-1")).headers, "content-type": "application/json", "idempotency-key": "k-1" };
+        const res = await app.request("/data/widgets", { method: "POST", headers, body: JSON.stringify({}) });
+        expect(res.status).toBe(201);
+        // The sweep's first tick is started, not awaited, by `start()`.
+        await new Promise(resolve => setTimeout(resolve, 50));
+        return sqlSentThrough(driver);
+    }
+
+    it("`false` sends no schema change anywhere — the framework's own tables and a first-use table included", async () => {
+        const sent = await bootAndWrite(false);
+
+        expect(sent.filter(statement => SCHEMA_CHANGE.test(statement))).toEqual([]);
+        // It still reads: what is missing is found out at boot, not at the first request.
+        expect(sent.some(statement => /rebase\.api_keys|"rebase"\."idempotency_keys"/.test(statement))).toBe(true);
+    });
+
+    it("`true` makes them — the observation point above is not blind", async () => {
+        const sent = await bootAndWrite(true);
+
+        expect(sent.some(statement => /CREATE TABLE IF NOT EXISTS rebase\.api_keys/.test(statement))).toBe(true);
+        expect(sent.some(statement => /CREATE TABLE IF NOT EXISTS "rebase"\."idempotency_keys"/.test(statement))).toBe(true);
+        expect(sent.some(statement => /CREATE TABLE IF NOT EXISTS rebase\.jobs/.test(statement))).toBe(true);
+        expect(sent.some(statement => /CREATE TABLE IF NOT EXISTS rebase\.cron_claims/.test(statement))).toBe(true);
     });
 
     it("a part can be left to another process", async () => {

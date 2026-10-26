@@ -204,7 +204,7 @@ they are on their own: `https://admin.example.com/api` is no more valid than
 
 Everything else about `path` applies to the part after the hostname. The app
 is still built for it: `https://admin.example.com` is built with
-`REBASE_APP_BASE` set to `/`, `https://admin.example.com/cms` with `/cms`, and
+`REBASE_APP_BASE` set to `/`, `https://admin.example.com/cms` with `/cms/`, and
 a bundler that ignores it still gives you a blank page. `cms` is a path on the
 app's hostname, inside that path part. The URL must be `https://` and carry a
 hostname and a path and nothing else — no port, query or fragment. A bare
@@ -257,7 +257,9 @@ Once the records are published:
 rebase cloud domains verify admin.example.com
 ```
 
-`rebase cloud domains list` prints the records again if you lose them. When
+`rebase cloud domains list` prints the records again if you lose them. A
+hostname that is not verified within 7 days of being registered is released,
+and the next deploy registers it again. When
 verification passes, the platform issues the HTTPS certificate for the
 hostname; there is nothing to upload. Until then `admin` answers nowhere, since
 the one hostname it answers on does not reach the project yet — the rest of
@@ -267,8 +269,15 @@ The console follows the app onto its hostname: the *Open CMS* link and the CMS
 address on the project's overview are `https://admin.example.com/`, not the
 project host.
 
-A hostname that another project already holds fails the deploy before anything
-rolls out, and so does one under the platform's own domain. Taking the app out
+A hostname that another project has verified fails the deploy before anything
+rolls out, and so does one under the platform's own domain. One that another
+project registered and never verified does not stand in your way: the refusal
+gives you a TXT record for your project, and once it exists the next deploy (or
+`rebase cloud domains add`) takes the hostname. Adding a hostname
+the project does not have yet changes the project's domains, which an access
+token made with `--can deploy` may not do: from CI, add the hostname once with
+`rebase cloud domains add` while signed in, and the token then deploys it like
+any hostname already on the project. Taking the app out
 of `rebase.json` leaves the hostname registered on the project; remove it with
 `rebase cloud domains remove admin.example.com`.
 
@@ -352,7 +361,7 @@ change that strands a client built against the old shape.
 Every generated SDK records the schema it came from:
 
 ```ts
-// src/rebase/schema.meta.ts — generated
+// generated/sdk/schema.meta.ts — generated
 export const SCHEMA_VERSION = "v1:c5d97d0f96b7f87a";
 ```
 
@@ -361,7 +370,7 @@ version stamp reveals nothing about the schema it stands for:
 
 ```bash
 curl -s https://api.example.com/api/meta/schema-version
-# {"schemaVersion":"v1:c5d97d0f96b7f87a"}
+# {"schemaVersion":"v1:c5d97d0f96b7f87a","runtime":{"version":"0.25.1","contract":1}}
 ```
 
 Comparing the two in CI turns a silent mismatch into a failed check. The stamp

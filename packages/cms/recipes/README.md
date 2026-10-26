@@ -81,7 +81,11 @@ Components you render anywhere under `<Rebase>` and a router.
 - **Rows are `Entity` objects.** `useData().collection("orders").find()` resolves to
   `{ data: Entity[], meta }`; a row's fields are on `row.values`, its id is
   `row.id`. `find({ limit, offset, where: { status: ["==", "paid"] }, orderBy: ["createdAt", "desc"] })`.
-- **Dates in `values` are `Date` objects** in the admin, not strings.
+- **Dates in `values` are `Date` objects** in the admin, not strings. A
+  `columnType: "date"` column (a calendar day) is that day's UTC midnight, so
+  read its day with `getUTCDate()`, not `getDate()`, or it lands on the day
+  before west of Greenwich. `getDatePropertyTimezone(property)` names the zone
+  the admin shows any date property in.
 - **Defaults for a new record:** a property's `defaultValue` applies everywhere a
   record is created; `EntityFormPanel`'s `defaultValues` apply to that form only,
   on top of them.

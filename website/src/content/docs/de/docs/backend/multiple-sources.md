@@ -1,5 +1,5 @@
 ---
-sourceHash: 7f10dbaa07451bc9
+sourceHash: 19a82f97d9b01fc0
 title: Mehrere Datenbanken und Buckets
 sidebar_label: Mehrere Quellen
 description: Leiten Sie Collections an verschiedene Datenbanken und Properties an verschiedene Storage-Buckets weiter und konfigurieren Sie jedes einzelne über die Umgebung.
@@ -42,9 +42,8 @@ signups.subscription("send-welcome", async (event) => {
 });
 ```
 
-`queue()` ist neu. `database()`, `bucket()` und `topic()`
-können seit Version 0.17 deklariert werden; ein Projekt auf der veröffentlichten Version deklariert
-also diese drei und greift stattdessen über `jobs.tasks` auf Hintergrundaufgaben zu.
+`database()`, `bucket()` und `topic()` können seit Version 0.17 deklariert werden,
+`queue()` seit 0.18.
 
 Verweisen Sie dann über das Handle auf eine davon in einer Collection – derselbe Name, einmal geschrieben:
 
@@ -69,7 +68,7 @@ import { media } from "../resources";
 coverImage: {
     name: "Cover image",
     type: "string",
-    storage: { storageSource: media, acceptedFiles: ["image/*"] }
+    storage: { storagePath: "covers", storageSource: media, acceptedFiles: ["image/*"] }
 }
 ```
 
@@ -93,6 +92,12 @@ export default defineFunction((app, { rebase }) => {
     });
 });
 ```
+
+`{ database: analytics }` führt die Abfrage auf der eigenen Verbindung dieser Quelle aus —
+worauf auch immer `DATABASE_URL__ANALYTICS` zeigt, auf welchem Server auch immer —, und
+keine Option führt sie auf der Standardquelle aus. Ein Schlüssel, der keine konfigurierte
+Quelle nennt, wird mit einem Fehler abgelehnt, der die vorhandenen auflistet. Bis 0.25.1
+wurde der Schlüssel stattdessen als Datenbankname auf dem Server der Standardquelle gelesen.
 
 ### Sehen, was Sie deklariert haben
 
@@ -232,7 +237,7 @@ Die Engine stammt aus der Deklaration, daher muss kein `STORAGE_TYPE` festgelegt
 Eine Storage-Property, die keine `storageSource` angibt, schreibt in den **Standard**-Bucket.
 Benannte Buckets zu deklarieren, verschiebt ihn nie. Der Standard behält seine eigene
 Konfiguration, was auch immer `config/resources.ts` deklariert: `STORAGE_TYPE`,
-`STORAGE_PATH` (`./uploads`, wenn nicht gesetzt) und die Variablen `S3_*` / `GCS_*` ohne
+`STORAGE_PATH` (`<project>/uploads`, wenn nicht gesetzt) und die Variablen `S3_*` / `GCS_*` ohne
 Suffix. Wenn Sie `bucket("media", { engine: "s3" })` zu einem Projekt hinzufügen, das bereits
 Dateien in `./uploads` hat, bleiben diese, wo sie sind, und werden weiterhin ausgeliefert.
 `media` liest seine eigenen `__MEDIA`-Variablen und springt in der Entwicklung als eigenes
@@ -302,8 +307,8 @@ await signups.publish({ userId });
 ```
 
 Eine Queue ist die andere Form von Hintergrundarbeit: eine Arbeitsliste mit **einem
-Handler**, bei der der Aufrufer die ID des Jobs hält. Queues sind neu
- – Topics wurden in 0.17 eingeführt.
+Handler**, bei der der Aufrufer die ID des Jobs hält. Queues wurden in 0.18 eingeführt,
+Topics in 0.17.
 
 ```ts
 export const thumbnails = queue<{ key: string }>("thumbnails");
@@ -387,7 +392,7 @@ export const storageAuthorize: StorageAuthorize = async ({ key, user, operation 
 Es gibt zwei Umgebungs-Ausnahmen für Fälle, in denen dies wirklich dem Modell entspricht:
 
 - `STORAGE_PUBLIC_READ=true` – der Bucket ist ein öffentliches, schreibgeschütztes CDN.
-  Schreib-, Lösch- und Auflistvorgänge erfordern weiterhin eine Authentifizierung.
+  Ohne einen `storageAuthorize`-Hook sind Schreib-, Lösch- und Auflistvorgänge nur für Admins.
 - `STORAGE_ALLOW_ANY_AUTHENTICATED=true` – jedem angemeldeten Benutzer wird bezüglich jeder
   Datei vertraut. Vertretbar für eine Single-Tenant-App, niemals für eine Multi-Tenant-App.
 

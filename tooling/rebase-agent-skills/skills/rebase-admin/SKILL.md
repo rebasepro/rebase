@@ -48,17 +48,17 @@ interface SidePanelController {
     close: () => void;
 
     /** Open a new entity side panel */
-    open: <M extends Record<string, unknown>>(props: EntitySidePanelProps<M>) => void;
+    open: <M extends Record<string, unknown>>(props: SidePanelBindingProps<M>) => void;
 
     /** Replace the last open panel with a new one */
-    replace: <M extends Record<string, unknown>>(props: EntitySidePanelProps<M>) => void;
+    replace: <M extends Record<string, unknown>>(props: SidePanelBindingProps<M>) => void;
 }
 ```
 
-### EntitySidePanelProps
+### SidePanelBindingProps
 
 ```typescript
-interface EntitySidePanelProps<M extends Record<string, unknown> = Record<string, unknown>> {
+interface SidePanelBindingProps<M extends Record<string, unknown> = Record<string, unknown>> {
     /** Absolute path of the entity's collection (e.g. "products") */
     path: string;
 
@@ -75,7 +75,7 @@ interface EntitySidePanelProps<M extends Record<string, unknown> = Record<string
     width?: number | string;
 
     /** Explicit collection config (auto-resolved from navigation if omitted) */
-    collection?: CollectionConfig<M>;
+    collection?: AdminCollection<M>;
 
     /** Whether to update the browser URL when opening (default: true) */
     updateUrl?: boolean;
@@ -184,6 +184,9 @@ type UrlController = {
 
     /** Navigate to a route (wraps react-router's navigate) */
     navigate: (to: string, options?: NavigateOptions) => void;
+
+    /** `false` under a `CollectionsProvider` (no CMS routes): records open over the page. Absent = routes mounted */
+    routesMounted?: boolean;
 };
 ```
 
@@ -245,7 +248,7 @@ type CollectionRegistryController<
     EC extends CollectionConfig = CollectionConfig
 > = {
     /** All registered collections */
-    collections?: CollectionConfig[];
+    collections?: EC[];
 
     /** Whether the registry is ready */
     initialised: boolean;
@@ -255,6 +258,12 @@ type CollectionRegistryController<
 
     /** Get the raw (un-normalized) collection config — for the Visual Editor only */
     getRawCollection: (slugOrPath: string) => EC | undefined;
+
+    /** The path a collection's rows are stored under, for the path the admin addresses it by */
+    resolveDataPath: (path: string) => string;
+
+    /** The inverse of resolveDataPath: the admin path for a stored path */
+    resolveCollectionPath: (path: string, preferredDriver?: string) => string;
 
     /** Get all parent entity references for a path */
     getParentReferencesFromPath: (path: string) => EntityReference[];
@@ -331,7 +340,7 @@ type CollectionPanelProps = {
     className?: string;
 
     /** Additional collection-level overrides */
-    collectionOverrides?: Partial<CollectionConfig>;
+    collectionOverrides?: Partial<AdminCollection>;
 };
 ```
 
@@ -441,7 +450,7 @@ function MyComponent() {
 }
 ```
 
-The hook accepts all `SelectionProps` except `path` (which you pass separately), plus an `onClose` callback.
+The hook accepts `SelectionProps` with `path` made optional (`string | false`), plus an `onClose` callback. `open()` throws when no `path` is set, or when no `collection` is passed and none is registered at that path.
 
 ---
 
@@ -581,13 +590,10 @@ type NavigationStateController = {
     loading: boolean;
 
     /** Error during navigation loading */
-    navigationLoadingError?: unknown;
+    navigationLoadingError?: Error;
 
     /** Force a navigation recalculation */
     refreshNavigation: () => void;
-
-    /** Registered plugins */
-    plugins?: RebasePlugin[];
 };
 ```
 
@@ -623,7 +629,7 @@ context.sidePanelController.open({ path: "products", entityId: "abc" });
 context.urlController.navigate(context.urlController.buildUrlCollectionPath("orders"));
 context.collectionRegistryController.getCollection("products");
 context.authController; // from RebaseContext
-context.data;           // DataSource from RebaseContext
+context.data;           // flat-row SDK data from RebaseContext (useData() gives Entity rows)
 ```
 
 > **TIP:** Use `useAdminContext()` instead of `useRebaseContext()` when you need admin controllers (side panels, navigation, URL). Use `useRebaseContext()` from `@rebasepro/app` when you only need core context (auth, data, storage).
@@ -710,9 +716,10 @@ Add custom pages to the main admin navigation using the `views` prop on `<Rebase
 interface AppView {
     slug: string;                    // URL path segment (e.g. "dashboard")
     name: string;                    // Display name in navigation
-    view: React.ReactNode;           // Component to render
+    view: React.ReactNode | React.ComponentType; // Element, or a component (rendered lazily on visit)
     icon?: string | React.ReactNode; // Lucide icon key or custom element
     group?: string;                  // Navigation group (default: "Views")
+    pinToBottom?: boolean;           // Sink this view's group to the bottom of the drawer
     description?: string;            // Optional description (Markdown)
     hideFromNavigation?: boolean;    // Hidden from sidebar but still routable
     nestedRoutes?: boolean;          // Register slug/* wildcard route

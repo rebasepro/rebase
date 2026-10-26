@@ -1,5 +1,5 @@
 ---
-sourceHash: 6cb1ed423c284379
+sourceHash: 7a29cf6ca21d35be
 title: Apps y repositorios
 sidebar_label: Apps y repositorios
 description: Un proyecto es un backend más las apps que se comunican con él, cada una de las cuales puede residir en su propio repositorio.
@@ -209,7 +209,7 @@ que `/api`.
 Todo lo demás sobre `path` se aplica a la parte que va después del nombre de
 host. La app se sigue compilando para ella: `https://admin.example.com` se
 compila con `REBASE_APP_BASE` igual a `/`, `https://admin.example.com/cms` con
-`/cms`, y un empaquetador que lo ignore sigue dando una página en blanco. `cms` es
+`/cms/`, y un empaquetador que lo ignore sigue dando una página en blanco. `cms` es
 una ruta en el nombre de host de la app, dentro de esa parte de la ruta. La URL
 tiene que ser `https://` y llevar un nombre de host y una ruta y nada más: ni
 puerto, ni query, ni fragmento. Un `admin.example.com` suelto se rechaza,
@@ -262,8 +262,10 @@ Una vez publicados los registros:
 rebase cloud domains verify admin.example.com
 ```
 
-`rebase cloud domains list` vuelve a imprimir los registros si los pierdes.
-Cuando la verificación pasa, la plataforma emite el certificado HTTPS para el
+`rebase cloud domains list` vuelve a imprimir los registros si los pierdes. Un
+nombre de host que no se verifica en los 7 días siguientes a su registro se
+libera, y el siguiente despliegue lo registra de nuevo. Cuando la verificación
+pasa, la plataforma emite el certificado HTTPS para el
 nombre de host; no hay nada que subir. Hasta entonces `admin` no responde en
 ningún sitio, porque el único nombre de host en el que responde todavía no llega
 al proyecto; el resto del proyecto está activo de todos modos.
@@ -272,9 +274,16 @@ La consola sigue a la app hasta su nombre de host: el enlace *Open CMS* y la
 dirección del CMS en la vista general del proyecto son `https://admin.example.com/`,
 no el host del proyecto.
 
-Un nombre de host que ya tiene otro proyecto hace fallar el despliegue antes de
-que se publique nada, y lo mismo ocurre con uno bajo el dominio propio de la
-plataforma. Quitar la app de `rebase.json` deja el nombre de host registrado en
+Un nombre de host que otro proyecto ha verificado hace fallar el despliegue
+antes de que se publique nada, y lo mismo ocurre con uno bajo el dominio propio
+de la plataforma. Uno que otro proyecto registró y nunca verificó no te estorba:
+el rechazo te da un registro TXT para tu proyecto y, en cuanto existe, el
+siguiente despliegue (o `rebase cloud domains add`) se queda con el nombre de
+host. Añadir un nombre de host que el proyecto aún no tiene cambia los dominios
+del proyecto, algo que un token de acceso creado con `--can deploy` no puede
+hacer: desde CI, añade el nombre de host una vez con `rebase cloud domains add`
+con la sesión iniciada, y a partir de entonces el token lo despliega como
+cualquier nombre de host que el proyecto ya tiene. Quitar la app de `rebase.json` deja el nombre de host registrado en
 el proyecto; elimínalo con `rebase cloud domains remove admin.example.com`.
 
 ### Un nombre de host pertenece a una app, no a una ruta
@@ -358,7 +367,7 @@ cambio que deje desamparado a un cliente compilado con la estructura anterior.
 Cada SDK generado registra el esquema del que proviene:
 
 ```ts
-// src/rebase/schema.meta.ts — generated
+// generated/sdk/schema.meta.ts — generated
 export const SCHEMA_VERSION = "v1:c5d97d0f96b7f87a";
 ```
 
@@ -367,7 +376,7 @@ marca de versión no revela nada sobre el esquema al que representa:
 
 ```bash
 curl -s https://api.example.com/api/meta/schema-version
-# {"schemaVersion":"v1:c5d97d0f96b7f87a"}
+# {"schemaVersion":"v1:c5d97d0f96b7f87a","runtime":{"version":"0.25.1","contract":1}}
 ```
 
 Comparar ambos en CI convierte un desajuste silencioso en una comprobación fallida. La marca

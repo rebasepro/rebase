@@ -1,5 +1,5 @@
 ---
-sourceHash: f02c2b6d0bb6de5f
+sourceHash: ba40edd634e01a84
 title: Runtime backend managé
 sidebar_label: Runtime managé
 description: Ce qu'un backend avec le runtime "managed" peut et ne peut pas faire sur Rebase Cloud — paquets et binaires, mémoire et CPU, délais d'expiration et tailles de body, système de fichiers, état en mémoire, secrets, stockage pour les fichiers générés et réseau sortant.
@@ -60,9 +60,12 @@ lockfile). Quatre conséquences en découlent :
   celui-ci.
 - **Seules les versions issues de registres s'installent.** Une dépendance `file:`, `link:`, `git+…` ou `github:`
   fait échouer le build, car le runtime ne dispose d'aucun moyen pour la résoudre.
-- **Certains paquets proviennent de l'image, pas de vous.** `@rebasepro/*`, `hono`,
-  `@hono/node-server` et `zod` sont retirés des dépendances du bundle et
-  les copies propres à l'image sont liées, de sorte que votre version de ces paquets ne s'applique pas.
+- **Certains paquets proviennent de l'image, pas de vous.** `@rebasepro/server`,
+  `@rebasepro/types`, `@rebasepro/client`, `@rebasepro/common`,
+  `@rebasepro/utils`, `hono`, `@hono/node-server` et `zod` sont retirés des
+  dépendances du bundle et les copies propres à l'image sont liées, de sorte que votre
+  version de ces paquets ne s'applique pas. Les autres paquets `@rebasepro/*`, comme le
+  pilote de base de données, s'installent depuis votre `package.json` comme n'importe quelle dépendance.
   `typescript` et `tsx` sont également retirés ; ce sont des outils de build.
 - **Les paquets privés nécessitent un `.npmrc`.** `rebase build` copie le fichier `.npmrc` du projet
   (et `backend/.npmrc`) dans le bundle, afin que l'installation utilise les mêmes
@@ -192,7 +195,7 @@ déploiement à l'autre ou comme stockage pour les téléversements. C'est égal
 |---|---|---|
 | Délai d'expiration de fonction | 30 s, puis `504` avec le code `FUNCTION_TIMEOUT` | `REBASE_FUNCTIONS_TIMEOUT_MS` (`0` le désactive) |
 | Attente de votre instance, au niveau de l'edge | 10 minutes entre lectures ou écritures | Fixe |
-| Corps de la requête, toutes les routes `/api/*` | 10 MiB, puis `413 PAYLOAD_TOO_LARGE` | `REBASE_MAX_BODY_SIZE`, en octets |
+| Corps de la requête, routes `/api/*` sans limite propre | 10 MiB, puis `413 PAYLOAD_TOO_LARGE` | `REBASE_MAX_BODY_SIZE`, en octets |
 | Corps de la requête à l'edge | 64 MiB | Fixe |
 | Un fichier via `POST /api/storage/upload` | 50 Mo | `STORAGE_MAX_FILE_SIZE` |
 | Appels anonymes à `/api/functions/*` | 3000 par IP par 15 minutes | `rateLimit.anonymousFunctions` |
@@ -282,7 +285,7 @@ déclarés dans `config/resources.ts` ; voir
 
 Un déploiement avec stockage est refusé tant que le projet n'a pas défini qui peut lire et écrire
 les fichiers. Le fichier `config/storage.ts` du scaffold exporte un hook `storageAuthorize` prévu
-à cet effet. Voir [Autorisation par objet](/docs/backend/storage/#per-object-authorization).
+à cet effet. Voir [Autorisation par objet](/docs/backend/storage-authorization/).
 
 **Comment les fichiers sont servis.** Votre backend sert chaque fichier à l'adresse
 `GET /api/storage/file/<key>`. Il lit l'objet depuis le bucket et le transmet en flux (stream),
@@ -368,9 +371,18 @@ sont autorisées vers n'importe quelle adresse Internet sur ces ports TCP unique
 | 993 | IMAP via TLS |
 
 Tout le reste est bloqué. Cela inclut le port 25, l'IMAP non chiffré, ainsi que les bases de données ou
-caches sur leurs ports habituels : un PostgreSQL sur 5432, Redis sur 6379 ou MongoDB sur
-27017 en dehors de Rebase Cloud ne peuvent pas être atteints. L'adresse des métadonnées cloud
-(`169.254.169.254`) est également bloquée.
+caches sur leurs ports habituels : Redis sur 6379 ou MongoDB sur 27017 en dehors de Rebase
+Cloud ne peuvent pas être atteints. L'adresse des métadonnées cloud (`169.254.169.254`) est
+également bloquée.
+
+La seule exception est votre propre base de données. Si le projet apporte son propre
+PostgreSQL (BYODB), chaque déploiement autorise aussi les connexions vers l'hôte de cette base
+sur le port de sa chaîne de connexion, et vers rien d'autre sur ce port.
+L'hôte est résolu en adresses IP au moment du déploiement : si votre fournisseur
+déplace la base vers une autre adresse, déployez à nouveau. La base doit accepter
+les connexions depuis internet : l'application se connecte directement à la chaîne
+de connexion. Les paramètres du bastion SSH ne servent qu'au test de connexion, pas
+à l'application déployée.
 
 La plateforme n'ajoute aucun proxy ni aucune limite de débit sortant ; les services que vous appelez
 disposent de leurs propres limites. Passez `getSignal(c)` à `fetch` pour qu'un appel s'arrête lorsque sa requête

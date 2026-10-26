@@ -1,5 +1,5 @@
 ---
-sourceHash: cf996dc5a52fc912
+sourceHash: cae2434b532cd67f
 title: Hintergrund-Jobs
 sidebar_label: Hintergrund-Jobs
 description: Eine dauerhafte, Postgres-gestützte Job-Warteschlange – Aufgaben, die einen Neustart überstehen, mit Backoff wiederholt werden und bei denen Fehler aufbewahrt statt verworfen werden.
@@ -20,6 +20,19 @@ Verwenden Sie dies für Aufgaben, die nicht verloren gehen dürfen und nicht inn
 | Ein `setTimeout` in einem Callback | Einmal, in diesem Prozess | Nein |
 
 ## Aktivierung
+
+:::note[Wo dies hingehört]
+**Managed Runtime** — nirgends. `jobs` nimmt Handler-*Funktionen* entgegen, die weder eine
+Umgebungsvariable noch ein Export aus `config/index.ts` tragen kann, daher kann ein per Scaffolding
+erstelltes Projekt die Warteschlange nicht aktivieren. Führen Sie `rebase eject` aus (oder schreiben Sie einen
+[Custom Server](/docs/backend/custom-server/)), um sie zu erreichen. `REBASE_JOB_WORKERS`
+in `.env` entscheidet nur, ob die Worker einer bereits aktivierten Warteschlange in *diesem*
+Prozess laufen.
+
+**Ejected** — der `jobs`-Block in `initializeRebaseBackend({ … })`, wie unten.
+
+Die vollständige Übersicht steht in der [Backend-Übersicht](/docs/backend/#where-each-option-lives).
+:::
 
 ```typescript no-verify
 await initializeRebaseBackend({
@@ -118,6 +131,17 @@ Queue-Handler und Topic-Subscriptions erhalten dasselbe `signal` in ihrem Kontex
 Konstruktionsbedingt sicher. Worker beanspruchen Jobs mit `SELECT … FOR UPDATE SKIP LOCKED`, sodass jeder Job an genau einen von ihnen geht und die anderen zur nächsten Zeile übergehen, anstatt sich dahinter anzustellen. Es muss kein Leader gewählt werden.
 
 Eine Instanz beansprucht nur die Tasks, für die sie einen Handler hat. Während eines Rolling Deployments lässt eine Instanz mit älterem Code die Jobs liegen, deren Task nur der neuere Code implementiert: Sie bleiben `pending`, ohne dass ein Versuch verbraucht wird, bis eine aktualisierte Instanz sie beansprucht. Ein Task, den keine Instanz implementiert, bleibt ebenfalls `pending`, statt in die Dead-Letter-Ablage zu gehen.
+
+## Storage-Orphan-Scans
+
+`rebase storage orphans` läuft auf dieser Queue, wenn sie aktiviert ist: Jeder Scan
+und jedes Löschen aus einem Scan ist ein `storage.orphans`-Job mit einem Versuch.
+Das Backend registriert den Handler selbst, in jedem Prozess mit konfiguriertem
+Storage, und nur Prozesse, deren Job-Worker aktiviert sind, führen ihn aus. Ein
+Scan unterliegt wie jeder Job dem `timeoutMs`; eine Quelle, die zu groß ist, um
+in 15 Minuten gescannt zu werden, braucht also ein höheres `timeoutMs` oder 0.
+Ohne die Queue führt der Server den Scan stattdessen in seinem eigenen Prozess
+aus. Siehe [die CLI](/docs/cli/#rebase-storage).
 
 ## Zuverlässige Webhooks
 

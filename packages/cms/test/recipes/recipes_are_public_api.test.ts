@@ -70,6 +70,15 @@ describe("admin recipes", () => {
     it.each(recipeFiles())("%s is in the README", (file) => {
         expect(fs.readFileSync(path.join(RECIPES, "README.md"), "utf8")).toContain(`(${file})`);
     });
+
+    // The README tells a user to build from the kit so their pages look like
+    // the rest of the admin; a recipe is what they copy. A raw control or a
+    // palette colour outside the theme's tokens is copied with it.
+    it.each(recipeFiles())("%s builds its controls from the kit, on the theme's surfaces", (file) => {
+        const source = fs.readFileSync(path.join(RECIPES, file), "utf8");
+        expect(source.match(/<(button|input|select|textarea)\b/g) ?? []).toEqual([]);
+        expect(source.match(/\b(bg|border|text)-(white|black|surface-\d{2,3})\b/g) ?? []).toEqual([]);
+    });
 });
 
 /**

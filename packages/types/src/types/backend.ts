@@ -7,6 +7,7 @@ import type { HistoryConfig } from "../controllers/client";
 import type { ChannelBusSetting } from "./channel_bus";
 import type { SchemaEditingAdmin } from "./schema_editing";
 import type { AccessModel } from "./scopes";
+import type { ApiKeyKind } from "./api_keys";
 
 // =============================================================================
 // DATABASE CONNECTION INTERFACES
@@ -457,6 +458,15 @@ export interface RealtimeProvider {
      * still look live, so it is reported rather than inferred.
      */
     health?(): RealtimeListenerHealth[];
+
+    /**
+     * Run the provider's own background reads — the refetches a change
+     * schedules, whatever announced it (a write here, change capture, another
+     * instance) — through `run`. The server passes one that enters the backend
+     * owning this provider, so a hook such a read reaches sees that backend as
+     * `rebase`. Without it they run in the context of whatever scheduled them.
+     */
+    setScopeRunner?(run: <T>(fn: () => T) => T): void;
 }
 
 /**
@@ -831,6 +841,13 @@ export interface BranchInfo {
     createdAt: Date;
     /** Size in bytes, if available from the server. */
     sizeBytes?: number;
+    /**
+     * The transaction that created the branch database, recorded when it was
+     * made: the fork point a branch diff tells the two sides' writes apart by.
+     * Absent for a branch made before it was recorded, or by a server that
+     * does not record it.
+     */
+    forkXid?: string;
 }
 
 /**
@@ -854,8 +871,9 @@ export interface BranchAdmin {
 
     /**
      * What the branch changed, against the database it was made from: its
-     * tables, columns and row-level-security policies, and per table the rows
-     * it inserted, updated and deleted. Reads only.
+     * tables, columns, constraints, indexes, triggers, row-level-security
+     * policies, enum types, views and functions, and per table the rows it
+     * inserted, updated and deleted. Reads only.
      */
     diffBranch?(name: string, options?: BranchDiffOptions): Promise<BranchDiff>;
 
@@ -871,7 +889,7 @@ export interface BranchAdmin {
  * @group Admin
  */
 export interface BranchDiffOptions {
-    /** Rows shown per table, across every kind of change. Default 100. */
+    /** Rows shown per table, across every kind of change. Default 100, at most 1,000. */
     sampleLimit?: number;
     /** Schemas to compare. Default: every schema but the system's, without Rebase's own tables. */
     schemas?: string[];
@@ -884,15 +902,21 @@ export interface BranchDiffOptions {
 }
 
 /**
- * One change to a table, a column, a policy or a table's row-level security.
+ * One change to the schema: a table, a column, a policy, a table's row-level
+ * security, a constraint (unique, foreign key, check, exclusion), an index, a
+ * trigger — or, outside any table, an enum type, a view or a function.
  * @group Admin
  */
 export interface BranchSchemaChange {
-    object: "table" | "column" | "policy" | "rls";
+    object: "table" | "column" | "policy" | "rls" | "constraint" | "index" | "trigger" | "enum" | "view" | "function";
     change: "added" | "dropped" | "altered";
     schema: string;
+    /**
+     * The table the change is on — or, for an enum, a view or a function, the
+     * object's own name (a function's with its argument types).
+     */
     table: string;
-    /** The column's or the policy's name. */
+    /** The column's, policy's, constraint's, index's or trigger's name. */
     name?: string;
     /** The definition on the target, as SQL. Absent for an addition. */
     before?: string;
@@ -905,7 +929,12 @@ export interface BranchSchemaChange {
  * @group Admin
  */
 export interface BranchMergeBlock {
-    code: "TABLE_ADDED" | "TABLE_DROPPED" | "COLUMNS_DIFFER" | "PRIMARY_KEY_DIFFERS" | "NO_PRIMARY_KEY" | "TOO_LARGE";
+    /**
+     * `TABLE_REWRITTEN`: one side wrote every row anew since the branch was
+     * made (a column type change, a volatile default, `VACUUM FULL`), so which
+     * side changed which row can no longer be told.
+     */
+    code: "TABLE_ADDED" | "TABLE_DROPPED" | "COLUMNS_DIFFER" | "PRIMARY_KEY_DIFFERS" | "NO_PRIMARY_KEY" | "TOO_LARGE" | "TABLE_REWRITTEN";
     message: string;
 }
 
@@ -913,7 +942,13 @@ export interface BranchMergeBlock {
  * One row the branch changed, or one both sides changed.
  *
  * Values are the text the database writes for them, `null` for SQL NULL, so a
- * `bigint` or a `numeric` reads exactly as it is stored.
+ * `bigint` or a `numeric` reads exactly as it is stored — except a column named
+ * like a credential (`password_hash`, `*_token`, `*secret*`, `*_hash`), whose
+ * value reads `"[redacted]"`. It is still listed in {@link changedColumns}.
+ *
+ * A `"conflict"` with no {@link after} is a row the branch deleted that rows
+ * the target wrote since the branch was made still reference — see
+ * {@link BranchTableDataDiff.referencedBy}.
  * @group Admin
  */
 export interface BranchRowChange {
@@ -944,7 +979,13 @@ export interface BranchTableDataDiff {
     updated: number;
     /** Rows the branch deleted. */
     deleted: number;
-    /** Rows both sides changed since the branch was made, differently. */
+    /**
+     * Rows both sides changed since the branch was made, differently — and
+     * rows the branch deleted that rows the target wrote since still
+     * reference through a foreign key ({@link referencedBy}). Deleting one of
+     * those on the target would cascade into, or rewrite, the target's own
+     * rows, so it is a conflict {@link BranchMergeOptions.onConflict} decides.
+     */
     conflicts: number;
     /**
      * Rows the target changed since the branch was made, and the branch did
@@ -953,10 +994,36 @@ export interface BranchTableDataDiff {
     targetChanges: number;
     /** Up to {@link BranchDiffOptions.sampleLimit} of the rows counted above, but not of {@link targetChanges}. */
     samples: BranchRowChange[];
-    /** Present when this table's rows cannot be merged. Its counts may then be estimates. */
+    /** Present when this table's rows cannot be merged. A merge refuses it unless told to skip it. */
     blocked?: BranchMergeBlock;
-    /** Rows on each side, for a table whose rows were not matched one by one. */
+    /**
+     * Rows on each side, for a table whose rows were not matched one by one.
+     * Its inserted, updated, deleted and conflict counts are then 0 because
+     * they are unknown, not because nothing changed.
+     */
     rowCounts?: { target: number; branch: number };
+    /**
+     * The foreign keys through which rows the target wrote since the branch
+     * was made reference rows of this table the branch deleted. Each such
+     * delete is counted in {@link conflicts}.
+     */
+    referencedBy?: BranchReferencingRows[];
+}
+
+/**
+ * Rows of one table, written on the target since the branch was made, that
+ * reference rows the branch deleted.
+ * @group Admin
+ */
+export interface BranchReferencingRows {
+    schema: string;
+    table: string;
+    /** The foreign key's name. */
+    constraint: string;
+    /** What deleting the referenced row does to them on the target. */
+    onDelete: "cascade" | "set null" | "set default" | "restrict" | "no action";
+    /** How many of them there are. */
+    rows: number;
 }
 
 /**
@@ -1007,6 +1074,12 @@ export interface BranchMergeOptions {
      * A row both sides changed: `"abort"` (the default) writes nothing,
      * `"branch"` writes the branch's row over the target's, `"target"` keeps
      * the target's.
+     *
+     * A row the branch deleted that the target's newer rows reference
+     * ({@link BranchTableDataDiff.referencedBy}) is a conflict too: `"target"`
+     * keeps it, and with it the rows that reference it; `"branch"` deletes it,
+     * and the foreign key's `ON DELETE` reaches those rows — the result's
+     * `warnings` say which.
      */
     onConflict?: "abort" | "branch" | "target";
     /** Merge the other tables when some cannot be merged, instead of writing nothing. */
@@ -1031,7 +1104,11 @@ export interface BranchMergeResult {
     conflictsKept: number;
     /** Schema and policy changes on the branch, none of which a merge applies. */
     schemaChangesNotMerged: number;
-    /** What went wrong after the rows were written: a sequence left behind them. */
+    /**
+     * What the merge did beyond the rows it counts, or what went wrong after
+     * they were written: a delete whose foreign keys reached the target's own
+     * rows (with `onConflict: "branch"`), a sequence left behind them.
+     */
     warnings: string[];
 }
 
@@ -1256,8 +1333,12 @@ export interface RealtimeSocketOptions {
         uid: string;
         roles: string[];
         scopes: string[];
-        /** The key itself: its id and `rate_limit` decide which rate-limit bucket its frames count in. */
-        apiKey?: { id: string; rate_limit: number | null };
+        /**
+         * The key itself: its id and `rate_limit` decide which rate-limit
+         * bucket its frames count in. With `name` and `kind`, collection
+         * callbacks on its write frames read it as `context.credential`.
+         */
+        apiKey?: { id: string; rate_limit: number | null; name?: string; kind?: ApiKeyKind };
     } | { message: string }>;
     /**
      * Verify a session token presented to `AUTHENTICATE` with the backend's own
@@ -1318,6 +1399,14 @@ export interface RealtimeSocketOptions {
      * answered `404` and closed, so the client is not left hanging.
      */
     path?: string;
+    /**
+     * Run `fn` on behalf of the backend that owns this socket: each connection
+     * and each frame is handled inside it, so a hook a frame reaches sees that
+     * backend as `rebase`, as it does over REST. The server passes its own.
+     * Absent, frames run in the context the HTTP connection was accepted in —
+     * the process default's.
+     */
+    runInScope?: <T>(fn: () => T) => T;
 }
 
 /**
