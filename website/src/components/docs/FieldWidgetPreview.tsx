@@ -638,7 +638,7 @@ function ReferencePreview() {
                 </div>
                 {/* Arrow icon */}
                 <div className="flex-shrink-0">
-                    <IconButton color="inherit" size="small" className="self-start">
+                    <IconButton size="small" className="self-start" aria-label="Open reference">
                         <ArrowRightToLineIcon/>
                     </IconButton>
                 </div>
