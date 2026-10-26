@@ -1,5 +1,5 @@
 ---
-sourceHash: 4cfbb890ccd44b8b
+sourceHash: 7368bcbe77416455
 title: Auto-hospedagem
 sidebar_label: Auto-hospedagem
 description: Execute o Rebase em qualquer lugar com a imagem oficial de runtime e o bundle do seu projeto — Docker Compose, Fly, Railway ou uma VPS simples.
@@ -418,6 +418,8 @@ for the given client ID" em todos os apps, independentemente do que o cliente
 permitisse. Uma resposta que define a própria política a mantém (a página de
 consentimento do MCP envia `no-referrer`); uma página que queira uma mais
 restritiva pode indicá-lo com `<meta name="referrer" content="no-referrer">`.
+`X-Frame-Options` funciona da mesma forma: `SAMEORIGIN`, a menos que a
+resposta defina o seu, como a página de consentimento do MCP faz com `DENY`.
 
 As aplicações estáticas — o painel administrativo do CMS e qualquer frontend servido pelo bundle — também trazem
 `Content-Security-Policy: frame-ancestors 'self'; object-src 'none'; base-uri
