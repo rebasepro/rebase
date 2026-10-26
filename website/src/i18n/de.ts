@@ -3,7 +3,7 @@ export const de = {
   "hero.title.part1": "Das Backend für dein Postgres.",
   "hero.title.part2": "Gebaut für dein Team. Sicher für deine Agenten.",
   "hero.subtitle":
-    "REST, ein typisiertes SDK, Realtime, Auth und Storage für deine App; ein Admin-Panel mit Tabellen, Medien, Relationen und Freigabe-Queues für dein Team; gescopte MCP-Tools und Postgres-RLS für deine Agenten. Unser eigenes CRM besteht aus 23 Collections und keinem einzigen handgeschriebenen Screen.",
+    "Hör auf, bei jedem Projekt dasselbe Backend und Admin-Panel neu zu bauen — oder zu prompten. Starte ab Minute eins mit einem produktionserprobten System, abgesichert durch Postgres.",
   "hero.cta.demo": "Demo testen",
   "rlscheck.title": "Glaub uns das nicht einfach.",
   "rlscheck.subtitle": "<code class=\"font-mono text-surface-300\">rls-check</code> liest den Katalog deiner eigenen Datenbank und meldet, was tatsächlich offen liegt — Tabellen, die mit abgeschalteter Row-Level Security ausgeliefert werden, Policies, die für jeden wahr sind, Views, die an der RLS ihrer Basistabellen vorbeilesen. Fünfzehn Checks. Jedes Postgres: Supabase, Neon, RDS, dein eigener Server. Es liest nur, braucht keinen Account, und es ist ihm egal, ob du Rebase benutzt.",
@@ -19,8 +19,8 @@ export const de = {
   "recognition.one": "Eine Regel",
   "recognition.oneNote": "eine Regel, in Postgres, auf jedem Weg",
   // Beat 04 — the panel that ships with the backend (carousel + the three products).
-  "panel.badge": "Das Panel, das mitkommt",
-  "panel.title": "Und das Admin-Panel, das dein Team jeden Morgen öffnet.",
+  "panel.badge": "Wo dein Team arbeitet",
+  "panel.title": "Agenten brauchen keine Oberfläche. Dein Team schon.",
   "engine.badge": "Was du bekommst",
   "engine.title": "Einsatzbereite APIs für deine Datenbank, ab Minute eins.",
   "engine.subtitle":

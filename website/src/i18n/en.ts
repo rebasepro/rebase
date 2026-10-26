@@ -3,7 +3,7 @@ export const en = {
   "hero.title.part1": "The backend for your Postgres.",
   "hero.title.part2": "Built for your team. Safe for your agents.",
   "hero.subtitle":
-    "REST, a typed SDK, realtime, auth and storage for your app; an admin panel with spreadsheets, media, relations and review queues for your team; scoped MCP tools and Postgres RLS for your agents. Twenty-three collections run our own CRM — not one hand-written screen.",
+    "Stop rebuilding — or prompting — the same backend and admin panel on every project. Run a battle-tested, Postgres-enforced one from minute one.",
   "hero.cta.demo": "Try the demo",
 
   // Free-tool section. The copy stays useful to someone who will never adopt
@@ -24,8 +24,8 @@ export const en = {
   // Beat 03 — what you get: the SDK/REST/realtime demos, then the panel as a
   // sub-block of the same chapter (merged 2026-09-09; panel.badge is no longer
   // rendered on the home page).
-  "panel.badge": "The panel that ships with it",
-  "panel.title": "And the admin panel your team opens every morning.",
+  "panel.badge": "Where your team works",
+  "panel.title": "Agents don't need a UI. Your team still does.",
   "engine.badge": "What you get",
   "engine.title": "Working APIs against your database, from minute one.",
   "engine.subtitle":

@@ -11,7 +11,7 @@ import { AdminDemoCarousel } from "../demos/AdminDemoCarousel";
 import { AgentConsoleDemo } from "../demos/AgentConsoleDemo";
 import { getLangFromUrl, useTranslations, useTranslatedPath } from "../../i18n/ui";
 import {
-    ArrowRight, Database, LayoutDashboard, TerminalSquare,
+    ArrowRight, Database, LayoutDashboard, TerminalSquare, ShieldCheck,
     KeyRound, HardDrive, Code2, Clock, Sparkles, GitBranch, History, ArchiveRestore,
 } from "lucide-react";
 import { DEMO_URL } from "../../utils/links";
@@ -58,10 +58,10 @@ const SELFHOST_COMMAND = "docker compose up -d";
 
           hero      the AI-era backend for your Postgres — built for your team,
                     safe for your agents
-          01        WHAT YOU GET — the engine (typed SDK, REST API, realtime
-                    over LISTEN/NOTIFY) on `ground-raised`
-          02        THE PANEL — the admin panel that ships with it, plus the
-                    three ways to run Rebase (Backend, CMS, Studio)
+          01        THE PANEL — the admin panel that ships with it, plus the
+                    three ways to run Rebase (Backend, CMS, Studio) on `ground-raised`
+          02        WHAT YOU GET — the engine (typed SDK, REST API, realtime
+                    over LISTEN/NOTIFY) on the base ground above the gold divider
           03        SECURITY — the structural Postgres RLS claim on the brand
                     blue slab, then the free `rls-check` audit band
           04        AGENT ERA — MCP + CLI on the same security policy
@@ -120,7 +120,7 @@ const SELFHOST_COMMAND = "docker compose up -d";
                 below the fold — big, but not bold. Full width it sets in three,
                 and the product artifact stays where SITE-STORY §5 requires it. */}
             <div class="relative w-full mx-auto max-w-6xl px-6 lg:px-8">
-                <div class="grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-14 items-center">
+                <div class="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-9 items-center">
                     <div class="lg:col-span-12">
                         <!-- The Postgres mark the old hero carried: it says what the
                              product runs on before the headline has to. -->
@@ -153,10 +153,10 @@ const SELFHOST_COMMAND = "docker compose up -d";
                         takes away, so it is now the second button: the whole
                         thing copies. The sub keeps its 34rem measure (§6). */}
                     <div class="lg:col-span-12">
-                        <div class="max-w-[34rem] text-base sm:text-lg leading-relaxed text-page-copy">
+                        <div class="max-w-[38rem] text-base sm:text-lg leading-relaxed text-page-copy">
                             <p>{t("hero.subtitle")}</p>
                         </div>
-                        <div class="mt-8 flex flex-wrap items-center gap-3">
+                        <div class="mt-6 flex flex-wrap items-center gap-3">
                             {/* The click every arm of an experiment counts as a
                                 conversion (analytics.ts reads the attribute). */}
                             <a
@@ -187,6 +187,39 @@ const SELFHOST_COMMAND = "docker compose up -d";
                                 <span data-copy-label class="hidden font-sans font-medium group-data-copied:inline">{t("copy.command")}</span>
                             </button>
                         </div>
+
+                        {/* Three-pillar architecture strip: visually anchors the three consumers
+                            of the same Postgres schema (Your App, Your Team, Your Agents) right
+                            above the fold without adding another window frame. */}
+                        <div class="mt-7 grid grid-cols-1 sm:grid-cols-3 gap-3 max-w-3xl">
+                            <div class="flex items-center gap-3 rounded-xl border border-white/10 bg-surface-frame/55 backdrop-blur-sm px-3.5 py-2.5">
+                                <span class="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-white/10 bg-white/[0.04] text-primary-light">
+                                    <Database size={14} />
+                                </span>
+                                <div>
+                                    <p class="font-mono text-[10px] uppercase tracking-[0.14em] text-surface-400">Your App</p>
+                                    <p class="text-xs font-medium text-surface-100">Typed SDK, REST &amp; Realtime</p>
+                                </div>
+                            </div>
+                            <div class="flex items-center gap-3 rounded-xl border border-white/10 bg-surface-frame/55 backdrop-blur-sm px-3.5 py-2.5">
+                                <span class="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-white/10 bg-white/[0.04] text-emerald-400">
+                                    <LayoutDashboard size={14} />
+                                </span>
+                                <div>
+                                    <p class="font-mono text-[10px] uppercase tracking-[0.14em] text-surface-400">Your Team</p>
+                                    <p class="text-xs font-medium text-surface-100">Admin Panel, CMS &amp; Studio</p>
+                                </div>
+                            </div>
+                            <div class="flex items-center gap-3 rounded-xl border border-white/10 bg-surface-frame/55 backdrop-blur-sm px-3.5 py-2.5">
+                                <span class="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-white/10 bg-white/[0.04] text-amber-300">
+                                    <ShieldCheck size={14} />
+                                </span>
+                                <div>
+                                    <p class="font-mono text-[10px] uppercase tracking-[0.14em] text-surface-400">Your Agents</p>
+                                    <p class="text-xs font-medium text-surface-100">Scoped MCP &amp; Postgres RLS</p>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -212,101 +245,16 @@ const SELFHOST_COMMAND = "docker compose up -d";
              the gradient behind the logos"). The wall sits on bare ground; the
              next divider is chapter 03's. -->
 
-        <!-- CHAPTER 01 — WHAT YOU GET (THE BACKEND).
-             Promoted to 01 so the reader sees the live SDK, REST API, and
-             realtime engine immediately after the hero. Sits on `ground-raised`
-             so `.frame` automatically steps up one rung to `--surface-card`. -->
+        <!-- CHAPTER 01 — THE ADMIN PANEL.
+             Promoted to 01 on `ground-raised` so the 620px interactive
+             AdminDemoCarousel — the richest visual artifact on the site — is
+             the very first thing the reader sees after the hero and logo strip. -->
         <div>
             <section class="chapter ground-raised border-y border-white/8 relative py-chapter">
                 <div class="relative mx-auto max-w-6xl px-6 lg:px-8">
                     <div class="max-w-[42rem] animate-on-scroll fade-in-up">
                         <p class="eyebrow">
                             <span class="font-mono">01</span>
-                            <span class="mx-2 text-surface-700">·</span>{t("engine.badge")}
-                        </p>
-                        <h2 class="mt-label font-headers text-display-2 text-balance">
-                            {t("engine.title")}
-                        </h2>
-                        <p class="mt-lead max-w-[38rem] text-page-copy leading-relaxed">{t("engine.subtitle")}</p>
-                    </div>
-
-                    <!-- The demos were 232px postage stamps inside a hairline grid.
-                         They are the most interesting thing on the page, so they get
-                         the room: one wide frame, then two half-width ones. -->
-                    <div class="mt-content animate-on-scroll fade-in-up">
-                        <div class="frame">
-                            {/* No traffic lights and no "try it": the REST and
-                                realtime frames below carry neither, and this one
-                                is a scripted animation that ignores the pointer. */}
-                            <div class="frame-head">
-                                <span>{t("index.diag.app")}</span>
-                                <span class="ml-auto">live</span>
-                            </div>
-                            <div class="h-[330px] overflow-hidden flex items-center justify-center">
-                                <SdkMiniDemo client:visible />
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="mt-6 grid grid-cols-1 lg:grid-cols-2 gap-6">
-                        <div class="animate-on-scroll fade-in-up delay-100">
-                            <div class="frame">
-                                <div class="frame-head"><span>{t("index.diag.rest")}</span><span class="ml-auto">live · send a request</span></div>
-                                <div class="h-[340px] overflow-hidden flex items-center justify-center">
-                                    <ApiMiniDemo client:visible />
-                                </div>
-                            </div>
-                        </div>
-                        <div class="animate-on-scroll fade-in-up delay-200">
-                            <div class="frame">
-                                <div class="frame-head"><span>{t("index.diag.realtime")}</span><span class="ml-auto">live</span></div>
-                                <div class="h-[340px] overflow-hidden flex items-center justify-center">
-                                    <RealtimeMiniDemo client:visible />
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* The rest of the backend, as a list someone can scan. It was one
-                        sentence, and an evaluator came away believing Rebase had no
-                        functions, branching or backups. Text cells, not a fourth
-                        panel: each names the feature and the handle that turns it on. */}
-                    <div class="mt-16 flex flex-wrap items-baseline gap-x-8 gap-y-3">
-                        <p class="text-page-copy max-w-2xl">
-                            {t("engine.plus")}
-                        </p>
-                        <a href={translatePath("/backend")} class="accent-link ml-auto">
-                            {t("engine.link")}
-                            <ArrowRight size={15} />
-                        </a>
-                    </div>
-                    <ul class="mt-8 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 border-t border-l border-white/8">
-                        {ENGINE_CAPABILITIES.map(({ title, desc, Icon, handle }) => (
-                            <li class="border-r border-b border-white/8 p-6">
-                                <p class="flex items-center gap-2.5 font-headers text-base text-surface-100">
-                                    <Icon size={16} class="shrink-0 text-surface-400" />
-                                    {t(title)}
-                                </p>
-                                <p class="mt-2 text-sm text-page-copy leading-relaxed">{t(desc)}</p>
-                                <p class="mt-4 font-mono text-2xs text-surface-400">{handle}</p>
-                            </li>
-                        ))}
-                    </ul>
-                </div>
-            </section>
-        </div>
-
-        <!-- CHAPTER 02 — THE ADMIN PANEL.
-             Its own full chapter on the base ground so the 620px interactive
-             AdminDemoCarousel and the three mode columns breathe. No
-             `overflow-hidden` and no `z-0` so the gold divider below bleeds
-             through cleanly (§6). -->
-        <div>
-            <section class="chapter relative py-chapter">
-                <div class="relative mx-auto max-w-6xl px-6 lg:px-8">
-                    <div class="max-w-[42rem] animate-on-scroll fade-in-up">
-                        <p class="eyebrow">
-                            <span class="font-mono">02</span>
                             <span class="mx-2 text-surface-700">·</span>{t("panel.badge")}
                         </p>
                         <h2 class="mt-label font-headers text-display-2 text-balance">
@@ -350,6 +298,87 @@ const SELFHOST_COMMAND = "docker compose up -d";
                         {t("showcase.exploreCms")}
                         <ArrowRight size={15} />
                     </a>
+                </div>
+            </section>
+        </div>
+
+        <!-- CHAPTER 02 — WHAT YOU GET (THE BACKEND).
+             Sits on the transparent base ground without `overflow-hidden` or
+             `z-0` so the gold divider below bleeds cleanly through into the
+             Security slab (§6). -->
+        <div>
+            <section class="chapter relative py-chapter">
+                <div class="relative mx-auto max-w-6xl px-6 lg:px-8">
+                    <div class="max-w-[42rem] animate-on-scroll fade-in-up">
+                        <p class="eyebrow">
+                            <span class="font-mono">02</span>
+                            <span class="mx-2 text-surface-700">·</span>{t("engine.badge")}
+                        </p>
+                        <h2 class="mt-label font-headers text-display-2 text-balance">
+                            {t("engine.title")}
+                        </h2>
+                        <p class="mt-lead max-w-[38rem] text-page-copy leading-relaxed">{t("engine.subtitle")}</p>
+                    </div>
+
+                    <!-- The demos were 232px postage stamps inside a hairline grid.
+                         They are the most interesting thing on the page, so they get
+                         the room: one wide frame, then two half-width ones. -->
+                    <div class="mt-content animate-on-scroll fade-in-up">
+                        <div class="frame">
+                            <div class="frame-head">
+                                <span>{t("index.diag.app")}</span>
+                                <span class="ml-auto">live · generated types</span>
+                            </div>
+                            <div class="h-[330px] overflow-hidden flex items-center justify-center">
+                                <SdkMiniDemo client:visible />
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="mt-6 grid grid-cols-1 lg:grid-cols-2 gap-6">
+                        <div class="animate-on-scroll fade-in-up delay-100">
+                            <div class="frame">
+                                <div class="frame-head"><span>{t("index.diag.rest")}</span><span class="ml-auto">live · click an endpoint</span></div>
+                                <div class="h-[340px] overflow-hidden flex items-center justify-center">
+                                    <ApiMiniDemo client:visible />
+                                </div>
+                            </div>
+                        </div>
+                        <div class="animate-on-scroll fade-in-up delay-200">
+                            <div class="frame">
+                                <div class="frame-head"><span>{t("index.diag.realtime")}</span><span class="ml-auto">live</span></div>
+                                <div class="h-[340px] overflow-hidden flex items-center justify-center">
+                                    <RealtimeMiniDemo client:visible />
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* The rest of the backend, as a list someone can scan. It was one
+                        sentence, and an evaluator came away believing Rebase had no
+                        functions, branching or backups. Text cells, not a fourth
+                        panel: each names the feature and the handle that turns it on. */}
+                    <div class="mt-16 flex flex-wrap items-baseline gap-x-8 gap-y-3">
+                        <p class="text-page-copy max-w-2xl">
+                            {t("engine.plus")}
+                        </p>
+                        <a href={translatePath("/backend")} class="accent-link ml-auto">
+                            {t("engine.link")}
+                            <ArrowRight size={15} />
+                        </a>
+                    </div>
+                    <ul class="mt-8 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 border-t border-l border-white/8">
+                        {ENGINE_CAPABILITIES.map(({ title, desc, Icon, handle }) => (
+                            <li class="border-r border-b border-white/8 p-6">
+                                <p class="flex items-center gap-2.5 font-headers text-base text-surface-100">
+                                    <Icon size={16} class="shrink-0 text-surface-400" />
+                                    {t(title)}
+                                </p>
+                                <p class="mt-2 text-sm text-page-copy leading-relaxed">{t(desc)}</p>
+                                <p class="mt-4 font-mono text-2xs text-surface-400">{handle}</p>
+                            </li>
+                        ))}
+                    </ul>
                 </div>
             </section>
         </div>

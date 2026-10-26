@@ -3,7 +3,7 @@ export const es = {
   "hero.title.part1": "El backend para tu Postgres.",
   "hero.title.part2": "Hecho para tu equipo. Seguro para tus agentes.",
   "hero.subtitle":
-    "REST, un SDK tipado, realtime, auth y storage para tu app; un panel de administración con hojas de cálculo, multimedia, relaciones y colas de revisión para tu equipo; herramientas MCP acotadas y RLS en Postgres para tus agentes. Nuestro propio CRM son veintitrés colecciones y ni una sola pantalla escrita a mano.",
+    "Deja de programar — o pedirle a un prompt — el mismo backend y panel de administración en cada proyecto. Ejecuta uno probado en producción y protegido por Postgres desde el minuto uno.",
   "hero.cta.demo": "Probar la demo",
   "rlscheck.title": "No te fíes de nuestra palabra.",
   "rlscheck.subtitle": "<code class=\"font-mono text-surface-300\">rls-check</code> lee el propio catálogo de tu base de datos y reporta lo que está realmente expuesto — tablas servidas con la seguridad a nivel de fila desactivada, políticas que evalúan a verdadero para todo el mundo, vistas que leen esquivando la RLS de sus tablas base. Quince comprobaciones. Cualquier Postgres: Supabase, Neon, RDS, tu propio servidor. Es de solo lectura, no necesita cuenta y le da igual si usas Rebase.",
@@ -19,8 +19,8 @@ export const es = {
   "recognition.one": "Una regla",
   "recognition.oneNote": "una regla, en Postgres, en cada camino",
   // Beat 04 — the panel that ships with the backend (carousel + the three products).
-  "panel.badge": "El panel que viene incluido",
-  "panel.title": "Y el panel de administración que tu equipo abre cada mañana.",
+  "panel.badge": "Donde trabaja tu equipo",
+  "panel.title": "Los agentes no necesitan una interfaz. Tu equipo sí.",
   "engine.badge": "Lo que obtienes",
   "engine.title":
     "APIs funcionales sobre tu base de datos, desde el minuto uno.",
