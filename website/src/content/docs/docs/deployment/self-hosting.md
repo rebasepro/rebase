@@ -480,13 +480,22 @@ held by write callbacks that await something slow; see
 ## Security headers
 
 Every response carries `X-Frame-Options: SAMEORIGIN`, `X-Content-Type-Options:
-nosniff`, a `Referrer-Policy` and `Strict-Transport-Security: max-age=15552000`
+nosniff`, `Referrer-Policy: strict-origin-when-cross-origin` and `Strict-Transport-Security: max-age=15552000`
 (180 days). The HSTS header leaves out `includeSubDomains`: that would tell
 browsers to refuse plain HTTP on every subdomain of your domain, including ones
 this server has nothing to do with, and a browser keeps it for as long as the
 header says.
 Set `REBASE_HSTS_INCLUDE_SUBDOMAINS=true` when every subdomain is HTTPS-only;
 up to and including 0.23 the header always carried `includeSubDomains`.
+
+`strict-origin-when-cross-origin` is the browsers' own default: a request to
+another site carries your origin and never the page's path or query. It is not
+`no-referrer` because origin checks need the origin — the Google sign-in button
+compares it with the OAuth client's authorized JavaScript origins, and under
+`no-referrer` it answered "The given origin is not allowed for the given client
+ID" on every app, whatever the client allowed. A response that sets its own
+policy keeps it (the MCP consent page sends `no-referrer`); a page that wants a
+stricter one can say so with `<meta name="referrer" content="no-referrer">`.
 
 The static apps — the CMS admin and any frontend the bundle serves — also carry
 `Content-Security-Policy: frame-ancestors 'self'; object-src 'none'; base-uri
