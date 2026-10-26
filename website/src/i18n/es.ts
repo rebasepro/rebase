@@ -48,7 +48,7 @@ export const es = {
   "showcase.title.part1": "Docenas de productos.",
   "showcase.title.part2": "Todos en producción.",
   "showcase.subtitle":
-    "Un <b>producto sanitario certificado</b>, un <b>programa de fidelización en retail</b>, un <b>marketplace de dos caras</b>, <b>datos públicos</b>, un agente de ventas outbound, una herramienta de diseño y un CRM — algunos nuestros, otros de nuestros clientes.",
+    "Un <b>producto sanitario certificado</b>, un <b>programa de fidelización en retail</b>, un <b>marketplace de dos caras</b>, un <b>concurso musical para el salón</b>, un agente de ventas outbound, una herramienta de diseño y un CRM — algunos nuestros, otros de nuestros clientes.",
   "showcase.nolink": "Herramienta interna — sin web pública",
   "showcase.case0.badge": "Editor Vectorial · Creado por el equipo de Rebase",
   "showcase.case0.title": "Dadaki",
@@ -59,9 +59,10 @@ export const es = {
   "showcase.case2.badge": "Terapia Digital del Dolor",
   "showcase.case2.title": "MedicalMotion",
   "showcase.case2.desc": "Un dispositivo médico digital certificado que ofrece terapia del dolor personalizada con IA. Rebase ejecuta todo el backend: historiales de pacientes, planes de terapia, la biblioteca de ejercicios y los dashboards clínicos sobre ellos.",
-  "showcase.case3.badge": "Datos públicos · Creado por el equipo de Rebase",
-  "showcase.case3.title": "A dónde va el dinero de España",
-  "showcase.case3.desc": "Una lectura pública del gasto del Estado, desde los 725.000 M€ hasta una sola partida. No hay base de datos en la ruta de lectura: un cron recompila las cifras oficiales cada mes, storage las sirve como JSON y la página no hace ni una llamada a la API.",
+  "showcase.case7.badge": "Juego de fiesta · Creado por el equipo de Rebase",
+  "showcase.case7.title": "SongBuzz",
+  "showcase.case7.desc":
+    "Un concurso musical para el salón: la tele pone las canciones, cada móvil es un pulsador y nadie instala nada. Cada sala es una fila y un canal realtime; las funciones sirven la música y la voz del presentador con IA, y los crons mantienen el catálogo reproducible.",
   "showcase.case4.badge": "Agente de ventas con IA · Creado por el equipo de Rebase",
   "showcase.case4.title": "Prospector",
   "showcase.case4.desc": "Un agente que lee tu web, planifica audiencias y encuentra empresas reales y a las personas que trabajan en ellas — cada una verificada contra su propio sitio. Crons, funciones y el tablero de revisión son Rebase de serie. Redacta; el esquema no tiene ningún estado en el que envíe.",

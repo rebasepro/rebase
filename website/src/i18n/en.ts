@@ -59,7 +59,7 @@ export const en = {
   "showcase.title.part1": "Dozens of products.",
   "showcase.title.part2": "All of them in production.",
   "showcase.subtitle":
-    "A <b>certified medical device</b>, a <b>retail loyalty programme</b>, a <b>two-sided marketplace</b>, <b>public data</b>, an outbound sales agent, a design tool and a CRM \u2014 some of them ours, some of them our customers'.",
+    "A <b>certified medical device</b>, a <b>retail loyalty programme</b>, a <b>two-sided marketplace</b>, a <b>living-room music quiz</b>, an outbound sales agent, a design tool and a CRM \u2014 some of them ours, some of them our customers'.",
   "showcase.nolink": "Internal tool — no public site",
   "showcase.case0.badge": "Vector Design Tool · Built by the Rebase team",
   "showcase.case0.title": "Dadaki",
@@ -73,10 +73,10 @@ export const en = {
   "showcase.case2.title": "MedicalMotion",
   "showcase.case2.desc":
     "A certified digital medical device delivering AI-personalized pain therapy. Rebase runs the entire backend — patient records, therapy plans, the exercise content library, and the clinical dashboards on top of them.",
-  "showcase.case3.badge": "Public data · Built by the Rebase team",
-  "showcase.case3.title": "A dónde va el dinero de España",
-  "showcase.case3.desc":
-    "A public reading of Spanish government spending, from €725bn down to a single budget line. There is no database in the read path: a cron recompiles the official figures each month, storage serves them as JSON, and the page itself makes zero API calls.",
+  "showcase.case7.badge": "Party game · Built by the Rebase team",
+  "showcase.case7.title": "SongBuzz",
+  "showcase.case7.desc":
+    "A music quiz for the living room: the TV plays the songs, every phone is a buzzer, and nobody installs an app. Each room is a row and a realtime channel; functions serve the music and the AI host's voice, and crons keep the catalogue playable.",
   "showcase.case4.badge": "AI sales agent · Built by the Rebase team",
   "showcase.case4.title": "Prospector",
   "showcase.case4.desc":

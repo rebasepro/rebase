@@ -47,7 +47,7 @@ export const de = {
   "showcase.title.part1": "Dutzende Produkte.",
   "showcase.title.part2": "Alle in Production.",
   "showcase.subtitle":
-    "Ein <b>zertifiziertes Medizinprodukt</b>, ein <b>Retail-Loyalty-Programm</b>, ein <b>zweiseitiger Marktplatz</b>, <b>offene Daten</b>, ein Outbound-Sales-Agent, ein Design-Tool und ein CRM — teils von uns, teils von unseren Kunden.",
+    "Ein <b>zertifiziertes Medizinprodukt</b>, ein <b>Retail-Loyalty-Programm</b>, ein <b>zweiseitiger Marktplatz</b>, ein <b>Musikquiz fürs Wohnzimmer</b>, ein Outbound-Sales-Agent, ein Design-Tool und ein CRM — teils von uns, teils von unseren Kunden.",
   "showcase.nolink": "Internes Tool — keine öffentliche Website",
   "showcase.case0.badge": "Vektor-Design-Tool · Vom Rebase-Team gebaut",
   "showcase.case0.title": "Dadaki",
@@ -58,9 +58,10 @@ export const de = {
   "showcase.case2.badge": "Digitale Schmerztherapie",
   "showcase.case2.title": "MedicalMotion",
   "showcase.case2.desc": "Ein zertifiziertes digitales Medizinprodukt für KI-personalisierte Schmerztherapie. Rebase betreibt das komplette Backend — Patientendaten, Therapiepläne, die Übungsbibliothek und die klinischen Dashboards darüber.",
-  "showcase.case3.badge": "Offene Daten · Vom Rebase-Team gebaut",
-  "showcase.case3.title": "A dónde va el dinero de España",
-  "showcase.case3.desc": "Eine öffentliche Aufschlüsselung der spanischen Staatsausgaben, von 725 Mrd. € bis zur einzelnen Haushaltszeile. Im Lesepfad liegt keine Datenbank: Ein Cron kompiliert die offiziellen Zahlen monatlich neu, Storage liefert sie als JSON aus, und die Seite macht keinen einzigen API-Aufruf.",
+  "showcase.case7.badge": "Partyspiel · Vom Rebase-Team gebaut",
+  "showcase.case7.title": "SongBuzz",
+  "showcase.case7.desc":
+    "Ein Musikquiz fürs Wohnzimmer: Der Fernseher spielt die Songs, jedes Handy ist ein Buzzer, und niemand installiert eine App. Jeder Raum ist eine Zeile und ein Realtime-Kanal; Functions liefern die Musik und die Stimme des KI-Moderators, Crons halten den Katalog abspielbar.",
   "showcase.case4.badge": "KI-Vertriebsagent · Vom Rebase-Team gebaut",
   "showcase.case4.title": "Prospector",
   "showcase.case4.desc": "Ein Agent, der deine Website liest, Zielgruppen plant und echte Unternehmen samt den Menschen dahinter findet — jedes gegen die eigene Website verifiziert. Crons, Functions und das Review-Board sind Rebase von der Stange. Er entwirft; das Schema kennt keinen Zustand, in dem er versendet.",

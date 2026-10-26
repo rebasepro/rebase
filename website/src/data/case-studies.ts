@@ -72,14 +72,14 @@ export const CASE_STUDIES: CaseStudy[] = [
         glow: "from-violet-500/25 via-primary/15 to-transparent"
     },
     {
-        id: "presupuestos",
-        image: "/img/showcase/presupuestos.webp",
-        key: "case3",
-        href: "https://presupuestos.rebase.website",
-        host: "presupuestos.rebase.website",
-        // The app's own favicon: a square mark, so it is sized to sit level
-        // with the wordmarks the way dadaki's does.
-        logo: "/img/logos/presupuestos.svg",
+        id: "songbuzz",
+        image: "/img/showcase/songbuzz.webp",
+        key: "case7",
+        href: "https://songbuzz.tv",
+        host: "songbuzz.tv",
+        // The app's own favicon (the record): a square mark, so it is sized
+        // to sit level with the wordmarks the way dadaki's does.
+        logo: "/img/logos/songbuzz.svg",
         logoClass: "h-9 sm:h-10",
         logoIsMark: true,
         glow: "from-amber-500/25 via-primary/15 to-transparent"
