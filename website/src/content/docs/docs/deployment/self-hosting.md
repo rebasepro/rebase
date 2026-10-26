@@ -496,6 +496,8 @@ compares it with the OAuth client's authorized JavaScript origins, and under
 ID" on every app, whatever the client allowed. A response that sets its own
 policy keeps it (the MCP consent page sends `no-referrer`); a page that wants a
 stricter one can say so with `<meta name="referrer" content="no-referrer">`.
+`X-Frame-Options` works the same way: `SAMEORIGIN` unless the response sets its
+own, as the MCP consent page does with `DENY`.
 
 The static apps — the CMS admin and any frontend the bundle serves — also carry
 `Content-Security-Policy: frame-ancestors 'self'; object-src 'none'; base-uri

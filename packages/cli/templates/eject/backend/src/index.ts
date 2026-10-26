@@ -15,7 +15,7 @@ import {
     HonoEnv,
     listenWithPortRetry,
     cleanupDevPortFile,
-    defaultReferrerPolicy,
+    overridableSecurityHeaders,
     initializeDataSources,
     resolveDataSources,
     resolveStorageSources,
@@ -118,10 +118,14 @@ app.use("/*", cors({
     ]
 }));
 
-// Its `no-referrer` would hide the origin Google sign-in checks; the runtime's
-// default leaves a route's own policy, like the MCP consent page's, alone.
-app.use("/*", secureHeaders({ referrerPolicy: false }));
-app.use("/*", defaultReferrerPolicy());
+// Its `no-referrer` would hide the origin Google sign-in checks, and it would
+// overwrite the MCP consent page's own `no-referrer` and `X-Frame-Options: DENY`.
+// The runtime's defaults for those two leave a route's own alone.
+app.use("/*", secureHeaders({
+    referrerPolicy: false,
+    xFrameOptions: false
+}));
+app.use("/*", overridableSecurityHeaders());
 
 // ─── Databases ───────────────────────────────────────────────────────
 // One connection per declared database, resolved from `DATABASE_URL` for the
