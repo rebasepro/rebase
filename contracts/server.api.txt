@@ -30,6 +30,7 @@ const CORS_EXPOSED_HEADERS
 const DATABASE_UNAVAILABLE_MESSAGE
 const DEFAULT_DRIVER_ID
 const DEFAULT_MAX_FILE_SIZE
+const DEFAULT_REFERRER_POLICY
 const DEFAULT_STORAGE_ID
 const DOCUMENT_MIME_TYPES
 const ETAG_HEADER
@@ -136,6 +137,7 @@ function declareCrons
 function declaredErrorAnswer
 function declaredUniqueTargets
 function defaultBackoff
+function defaultReferrerPolicy
 function defineCron
 function defineFunction
 function drainBackgroundWork

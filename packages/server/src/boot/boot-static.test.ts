@@ -183,6 +183,13 @@ describe("security headers on a static app", () => {
         await expect(bootWithHsts("yes")).rejects.toThrow(/REBASE_HSTS_INCLUDE_SUBDOMAINS: expected "true" or "false"/);
     });
 
+    it("sends a Referrer-Policy that still names the origin, on pages and the API", async () => {
+        // `no-referrer` hid the origin, and Google sign-in refused every app for it.
+        for (const url of ["/", "/admin", "/admin/collections/posts", "/assets/app.js", "/health", "/api/health"]) {
+            expect((await headers(url)).get("referrer-policy")).toBe("strict-origin-when-cross-origin");
+        }
+    });
+
     it("sends a conservative CSP on the page and its deep links", async () => {
         for (const url of ["/", "/admin", "/admin/collections/posts", "/assets/app.js"]) {
             const csp = (await headers(url)).get("content-security-policy");

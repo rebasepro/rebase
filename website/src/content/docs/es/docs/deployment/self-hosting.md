@@ -1,5 +1,5 @@
 ---
-sourceHash: ea0a6a3bfe925373
+sourceHash: 4cfbb890ccd44b8b
 title: Autoalojamiento (Self-Hosting)
 sidebar_label: Autoalojamiento
 description: Ejecuta Rebase en cualquier lugar con la imagen oficial de runtime y el bundle de tu proyecto — Docker Compose, Fly, Railway o un VPS convencional.
@@ -401,13 +401,24 @@ retenidas por callbacks de escritura que esperan operaciones lentas; consulta
 ## Cabeceras de seguridad
 
 Cada respuesta incluye `X-Frame-Options: SAMEORIGIN`, `X-Content-Type-Options:
-nosniff`, una `Referrer-Policy` y `Strict-Transport-Security: max-age=15552000`
+nosniff`, `Referrer-Policy: strict-origin-when-cross-origin` y `Strict-Transport-Security: max-age=15552000`
 (180 días). La cabecera HSTS omite `includeSubDomains`: incluirlo indicaría a los
 navegadores que rechacen HTTP plano en todos los subdominios de tu dominio, incluidos aquellos con
 los que este servidor no tiene relación alguna, y los navegadores conservan esa directiva durante todo el tiempo que
 indique la cabecera.
 Establece `REBASE_HSTS_INCLUDE_SUBDOMAINS=true` cuando todos los subdominios sean exclusivamente HTTPS;
 hasta la versión 0.23 inclusive, la cabecera siempre contenía `includeSubDomains`.
+
+`strict-origin-when-cross-origin` es el valor por defecto de los propios
+navegadores: una petición a otro sitio lleva tu origen y nunca la ruta ni la
+query de la página. No es `no-referrer` porque las comprobaciones de origen
+necesitan el origen: el botón de inicio de sesión de Google lo compara con los
+orígenes de JavaScript autorizados del cliente OAuth, y con `no-referrer`
+respondía "The given origin is not allowed for the given client ID" en todas las
+apps, permitiera lo que permitiera el cliente. Una respuesta que fija su propia
+política la conserva (la página de consentimiento de MCP envía `no-referrer`);
+una página que quiera una más estricta puede indicarlo con
+`<meta name="referrer" content="no-referrer">`.
 
 Las aplicaciones estáticas — el panel de administración del CMS y cualquier frontend que sirva el bundle — también incluyen
 `Content-Security-Policy: frame-ancestors 'self'; object-src 'none'; base-uri
