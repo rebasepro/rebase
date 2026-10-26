@@ -1,5 +1,5 @@
 ---
-sourceHash: 5e1a0bbb522c32d0
+sourceHash: d836d40bf88060b2
 title: Umgebung & Konfiguration
 sidebar_label: Konfiguration
 description: Alle Umgebungsvariablen und Konfigurationsoptionen für Rebase-Projekte.
@@ -233,7 +233,7 @@ Ein Projekt, das ein Eject durchgeführt hat, steuert diese Entscheidungen statt
 | `REALTIME_CDC` | Change-Capture auf Datenbankebene: `auto` (aktivieren, wo die Verbindung es unterstützt, sonst stillschweigendes Fallback), `trigger` (erzwingen, warnen falls unmöglich), `wal` (degradiert derzeit zu `trigger`), `off`. Siehe [Realtime](/docs/backend/realtime-cdc/). Hat Vorrang vor `realtime.cdc`. | `auto` |
 | `REALTIME_CHANNEL_BUS` | Instanzübergreifender Transport für Broadcast-Kanäle und Presence: `memory` oder `postgres`. Wird ignoriert, wenn `realtime.bus` ein instanziierter Transport übergeben wurde. | `memory` |
 | `REALTIME_MAX_SUBSCRIPTIONS_PER_SOCKET` | Wie viele Subscriptions ein Realtime-Socket halten darf; die nächste wird mit `TOO_MANY_SUBSCRIPTIONS` abgewiesen. Eine positive ganze Zahl – alles andere stoppt den Server beim Start. Hat Vorrang vor `realtime.maxSubscriptionsPerSocket`. Siehe [Realtime](/docs/backend/realtime#what-a-write-costs-and-the-limits). | `1000` |
-| `REALTIME_MAX_SOCKETS_PER_USER` | Wie viele Realtime-Sockets ein Benutzer auf einer Serverinstanz offen halten darf. Die Anmeldung des nächsten Sockets wird mit `TOO_MANY_SOCKETS` abgewiesen und der Socket geschlossen (4002); das SDK versucht es weiter, sodass er verbunden wird, sobald ein anderer schließt. Eine positive ganze Zahl – alles andere stoppt den Server beim Start. Hat Vorrang vor `realtime.maxSocketsPerUser`. | Keine Obergrenze |
+| `REALTIME_MAX_SOCKETS_PER_USER` | Wie viele Realtime-Sockets ein Benutzer oder ein API-Schlüssel auf einer Serverinstanz offen halten darf. Die impersonierenden Sockets eines Administrators zählen gegen den Administrator. Die Anmeldung des nächsten Sockets wird mit `TOO_MANY_SOCKETS` abgewiesen und der Socket geschlossen (4002); das SDK versucht es weiter, sodass er verbunden wird, sobald ein anderer schließt. Eine positive ganze Zahl – alles andere stoppt den Server beim Start. Hat Vorrang vor `realtime.maxSocketsPerUser`. | Keine Obergrenze |
 | `REALTIME_REFETCH_MAX_WAIT_MS` | Die maximale Zeit in ms, die eine Änderung auf das erneute Abrufen (Refetch) wartet, welches sie an Live-Abonnenten ausliefert. Ein Refetch wartet 300 ms ohne Änderung und bei einem kontinuierlichen Schreibstrom höchstens so lange wie hier definiert. Eine positive ganze Zahl – alles andere stoppt den Server beim Start. Hat Vorrang vor `realtime.refetchMaxWaitMs`. | `1000` |
 | `REALTIME_RECOUNT_INTERVAL_MS` | Wie lange der Gesamtwert (Total) eines großen Listen-Abonnements in ms wiederverwendet werden darf, bevor er erneut gezählt wird; Frames, die ihn wiederverwenden, tragen `meta.totalAsOf`. Nicht gesetzt führt dazu, dass jeder Frame zählt. Hat Vorrang vor `realtime.recountIntervalMs`. | Nicht gesetzt |
 | `REALTIME_RECOUNT_MIN_ROWS` | Die Mindestanzahl des letzten Gesamtwerts, für die `REALTIME_RECOUNT_INTERVAL_MS` gilt; kleinere Listen werden bei jedem Frame gezählt. Hat Vorrang vor `realtime.recountMinRows`. | `100000` |
@@ -274,7 +274,7 @@ den Start verweigern –, finden Sie unter **[Split-Prozesse](/docs/deployment/s
 | `REBASE_JOB_WORKERS` | Überschreibt, ob dieser Prozess Job-Queue-Worker ausführt. Wenn nicht gesetzt, richtet es sich nach der Rolle. | — |
 | `REBASE_FUNCTIONS_ONLY` | Nur die benannten benutzerdefinierten Funktionen in diesem Prozess bereitstellen. | — |
 | `REBASE_FUNCTIONS_EXCLUDE` | Alle benutzerdefinierten Funktionen außer den benannten bereitstellen. | — |
-| `REBASE_FUNCTIONS_UPSTREAM` | Wohin der API-Prozess eine Funktionsanfrage weiterleitet, die er nicht selbst bedient. | — |
+| `REBASE_FUNCTIONS_UPSTREAM` | Wohin der API-Prozess eine Funktionsanfrage weiterleitet, die er nicht selbst bedient. Auf einem `worker`: wohin dessen eigene `rebase.functions`-Aufrufe gehen. Eine `http(s)`-URL. | — |
 
 ### MCP-Schnittstelle
 
@@ -371,7 +371,7 @@ Wird von `rebase` gelesen, nicht vom Server. Nichts hier hat Einfluss auf ein De
 | `REBASE_CLOUD_URL` | Die Control-Plane, mit der `rebase cloud` kommuniziert. | — |
 | `REBASE_CLOUD_EMAIL` | Das Konto, als das sich `rebase cloud login` anmeldet, anstatt interaktiv danach zu fragen. | — |
 | `REBASE_CLOUD_PASSWORD` | Das zugehörige Passwort, damit ein Secret-Store es übergeben kann, ohne dass es in der Shell-Historie landet. | — |
-| `REBASE_TOKEN` | Ein Token aus `rebase cloud tokens create`. Wenn gesetzt, authentifiziert sich jeder `rebase cloud`-Befehl damit anstelle der Session aus `rebase cloud login` und liest oder schreibt niemals die gespeicherte Session. Der Weg, um `rebase cloud` in CI auszuführen – siehe [CI und Agenten](/docs/deployment/cloud/#ci-and-agents). Der [MCP-Server](/docs/ai/mcp/) liest denselben Namen als Alias für `REBASE_API_TOKEN`. | — |
+| `REBASE_TOKEN` | Ein Token aus `rebase cloud tokens create`. Wenn gesetzt, authentifiziert sich jeder `rebase cloud`-Befehl damit anstelle der Session aus `rebase cloud login` und liest oder schreibt niemals die gespeicherte Session. <span class="since-badge" data-since="0.26">Seit 0.26</span> In einem Verzeichnis, das `rebase cloud init --claim` verknüpft hat, wird er zugunsten des eigenen Tokens dieses Projekts beiseitegelegt, wenn er auf dem Projekt keinen Scope hält. Der Weg, um `rebase cloud` in CI auszuführen – siehe [CI und Agenten](/docs/deployment/cloud/#ci-and-agents). Der [MCP-Server](/docs/ai/mcp/) reicht ihn an die CLI weiter, die seine Cloud-Tools starten, und sendet ihn nie an die App: Setzen Sie dafür `REBASE_API_TOKEN`. | — |
 | `REBASE_DEBUG` | `1` gibt den zugrunde liegenden Fehler und Request-Details anstelle der kurzen Nachricht aus. Der erste Schritt, wenn ein `rebase cloud`-Befehl mit einer wenig hilfreichen Meldung fehlschlägt. | — |
 | `REBASE_ATLAS_DEV_URL` | Die leere Datenbank, gegen die `rebase db push`, `db generate` und `db migrate` planen, anstelle der `<db>_dev_diff`, die sie neben `DATABASE_URL` anlegen. Rebase erstellt oder löscht hier angegebene Datenbanken nicht und verweigert eine Angabe, die mit `DATABASE_URL` identisch ist. Bei der verwalteten Entwicklungsdatenbank setzt die CLI dies auf ein eigenes, temporäres In-Memory-PGlite. Setzen Sie diesen Wert dort, wo `CREATE DATABASE` nicht gestattet ist. | `<db>_dev_diff` |
 | `REBASE_DEV_NO_DB` | `rebase dev` startet keine Datenbank und provisioniert nichts – Sie bringen Ihre eigene mit. Entspricht `--no-db`. | — |

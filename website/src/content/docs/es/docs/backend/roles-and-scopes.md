@@ -1,5 +1,5 @@
 ---
-sourceHash: 96a224ca982e3d25
+sourceHash: faf5a0ca622c3a50
 title: Roles y alcances
 sidebar_label: Roles y alcances
 description: "Lo que puede hacer quien llama: el plano de datos que tiene toda persona, el plano de administración que conceden los roles, los alcances que una aplicación declara para sí misma y cómo los lleva cada credencial."
@@ -19,7 +19,7 @@ Los alcances se dividen en dos planos, y una persona los tiene de forma distinta
 la sesión iniciada lo tiene entero. Lo que una persona puede hacer con una fila lo
 deciden las [reglas de seguridad](/docs/collections/security-rules/) de la colección,
 fila por fila, y lo que puede hacer con un archivo, las
-[políticas de almacenamiento](/docs/backend/storage/#per-object-authorization). Un
+[políticas de almacenamiento](/docs/backend/storage-authorization/). Un
 alcance nunca decide eso para una persona. En una clave o un token, los alcances del
 plano de datos restringen: una clave que solo tiene `data:read:posts` lee `posts` y
 nada más, permitan lo que permitan las reglas.
@@ -262,6 +262,9 @@ Para las claves:
   salvo que el creador sea administrador. Si no, `403 ROLE_EXCEEDS_CREATOR`.
 - `keys:read` y `keys:write` nunca van en una clave. Una clave que gestiona claves
   podría crear su propia sucesora. `400 KEY_MANAGEMENT_SCOPE`.
+- Quien tiene `keys:write` no puede cambiar ni revocar una clave que tenga un rol o
+  un alcance que él no tiene, salvo que sea administrador: `403 KEY_OUTRANKS_CALLER`.
+  Sin esto, podría ampliar una clave con rol de administrador a todos los alcances de datos.
 
 Para las cuentas, quien tiene `users:write`:
 
@@ -272,6 +275,11 @@ Para las cuentas, quien tiene `users:write`:
 - no puede conceder roles que tengan más de lo que él tiene, `admin` incluido:
   `403 ROLE_EXCEEDS_CALLER`.
 
+Un nombre de rol puede ser cualquiera salvo uno que se leería de vuelta como otros
+roles: un nombre vacío, o que contenga `,` `{` `}` `"` `\` o un carácter de control,
+se rechaza con `400 INVALID_ROLE` allí donde se escriba un rol (usuarios, la
+colección de usuarios, claves de servicio).
+
 ## Cómo lleva los alcances cada credencial
 
 | Credencial | Actúa como | Tiene |
@@ -279,7 +287,7 @@ Para las cuentas, quien tiene `users:write`:
 | La sesión de una persona | la persona | el plano de datos, todos los alcances de la aplicación y los alcances de sus roles. Un administrador lo tiene todo |
 | [Clave de servicio](/docs/backend/api-keys/#service-keys) `rk_live_…` | `api-key:<id>`, con los roles de RLS `service` más sus propios `roles` | exactamente sus alcances |
 | [Clave personal](/docs/backend/api-keys/#personal-keys) `rk_live_…` | su propietario, con los roles que este tenga en cada solicitud | sus alcances, recortados a lo que el propietario tiene ahora |
-| [Token de MCP](/docs/ai/mcp/#the-remote-endpoint) | la persona que lo conectó | `data:read`, `data:write`, `data:delete` según se concedieron, opcionalmente por colección |
+| [Token de MCP](/docs/ai/remote-mcp/) | la persona que lo conectó | `data:read`, `data:write`, `data:delete` según se concedieron, opcionalmente por colección |
 | `REBASE_SERVICE_KEY` | `service`, con el rol `admin` | todo |
 
 Una clave o un token nunca eluden la seguridad a nivel de fila. Sus alcances son un

@@ -1,5 +1,5 @@
 ---
-sourceHash: f37fbfe1270f8317
+sourceHash: 5902e196f7801815
 title: Beziehungen
 sidebar_label: Beziehungen
 description: Definieren Sie Eins-zu-Eins-, Eins-zu-Viele- und Viele-zu-Viele-SQL-Beziehungen zwischen Sammlungen mit Fremdschlüsseln, Verbindungstabellen und Multi-Hop-Joins.
@@ -80,7 +80,7 @@ sie hindurch anfassen darf.
 | `hasOne` | auf der Tabelle des **Ziels** | eine | `foreignKeyOnTarget`, Standard der Singular dieser Collection plus `_id` (`users` → `user_id`) |
 | `hasMany` | auf der Tabelle des **Ziels** | viele | Kinder gehören allein zu diesem Elternteil |
 | `manyToMany` | in einer **Verbindungstabelle** | viele | Zeilen werden geteilt; Ihnen gehört die Verknüpfung |
-| `via` | ein expliziter `joinPath` | beides | schreibgeschützt; `cardinality` geben Sie selbst an |
+| `via` | ein expliziter `joinPath` | beides | beschreibbar bei einem Hop, sonst schreibgeschützt; `cardinality` geben Sie selbst an |
 
 Jedes Feld außer `kind` und `target` (und, bei `via`, `cardinality` und `joinPath`) ist optional — der Rest wird abgeleitet.
 
@@ -138,7 +138,7 @@ relations: [
 die Spalte, aus der diese Seite liest, dieses die Spalte, auf die die andere
 Seite zeigt. Ohne es ist eine Verknüpfung wie die obige als `hasMany` überhaupt
 nicht ausdrückbar und muss auf [`via`](#via--eine-explizite-join-kette)
-zurückfallen, das schreibgeschützt ist.
+zurückfallen, das bei einer Kette wie dieser schreibgeschützt ist.
 
 Die Spalte muss eindeutig sein. Eine Verknüpfung, die mehr als eine Quellzeile
 adressiert, kann nicht sagen, zu welcher eine verwandte Zeile gehört, und
@@ -178,8 +178,23 @@ eigenen Sicht** — `sourceColumn` benennt immer *diese* Sammlung:
 
 Für Verknüpfungen, die die vier obigen Formen nicht ausdrücken können:
 Multi-Hop-Pfade, zusammengesetzte Schlüssel oder ein Join, dessen Bedingung kein
-einfacher Fremdschlüssel ist. Schreibgeschützt — Rebase leitet nicht ab, wie
-durch eine beliebige Kette hindurch geschrieben werden soll.
+einfacher Fremdschlüssel ist.
+
+Eine Kette mit **einem Hop** ist über ein Create oder Update beschreibbar, so wie die Art
+geschrieben wird, für die sie steht:
+
+- eine **To-one**-Kette mit **einem Schritt** — die Zielzeile hält den Schlüssel, sodass
+  `{ badge: "b-1" }` die Spalte dieser Zeile auf diese zeigen lässt und `null` die Verknüpfung
+  löst, wie es ein `hasOne`-Schreibvorgang tut;
+- eine **To-many**-Kette mit **zwei Schritten über eine Tabelle** zwischen den Enden — diese
+  Tabelle hält die Verknüpfungen, sodass `{ tags: ["t-1", "t-2"] }` sie als ihre Zeilen setzt,
+  wie es ein `manyToMany`-Schreibvorgang tut (ein `via` trägt kein `_pivot`).
+
+Alles Längere ist **schreibgeschützt**: Rebase leitet nicht ab, wie durch eine beliebige Kette
+hindurch geschrieben werden soll. Ein Create oder Update, das eine solche nennt, wird mit
+`400 RELATION_NOT_WRITABLE` abgelehnt, und das Admin-Formular zeigt das Feld ohne Auswahl.
+Ein verschachtelter Schreibvorgang (`PATCH users/1/permissions/3`) durch ein beliebiges `via`
+wird auf dieselbe Weise abgelehnt.
 
 ```typescript
 {
@@ -264,8 +279,9 @@ properties: {
 ## Multi-Hop-Joins
 
 Für Beziehungen, die mehrere Tabellen durchqueren, verwenden Sie `kind: "via"`
-mit einem `joinPath`. Diese sind schreibgeschützt: Rebase leitet nicht ab, wie
-durch eine beliebige Kette hindurch geschrieben werden soll.
+mit einem `joinPath`. Eine Kette, die länger als ein Glied ist, ist schreibgeschützt: Rebase
+leitet nicht ab, wie durch eine beliebige Kette hindurch geschrieben werden soll (siehe
+[via](#via--eine-explizite-join-kette) für die Ketten mit einem Hop, die es schreibt).
 
 ```typescript
 // Users → Permissions through Roles
@@ -577,7 +593,7 @@ interface ViaRelation extends RelationBase {
 Was Sie oben schreiben, ist die *Autoren*-Form. Intern arbeitet Rebase mit
 `ResolvedRelation`: dieselbe Verknüpfung mit allen eingesetzten Standardwerten
 und nichts Optionalem, dazu `cardinality`, `targetSlug` und zwei Flags —
-`writable` (nur bei `via` false) und `shared` (true, wenn die Zielzeilen auch
+`writable` (nur bei einem mehrstufigen `via` false) und `shared` (true, wenn die Zielzeilen auch
 anderen Elternteilen gehören, ein Entfernen also die Verknüpfung löst, statt zu
 löschen).
 

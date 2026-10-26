@@ -1,5 +1,5 @@
 ---
-sourceHash: 882f81a3b9bbe750
+sourceHash: 829ce13f7c169a96
 title: Generación de Esquemas
 sidebar_label: Generación de Esquemas
 description: Genere esquemas de Drizzle ORM a partir de las definiciones de colecciones, cree migraciones SQL y mantenga su base de datos sincronizada con la CLI de Rebase.
@@ -169,7 +169,7 @@ rebase db push
 **Qué hace:**
 - Lee el esquema de Drizzle generado
 - Aplica los cambios directamente a la base de datos (CREATE, ALTER, DROP)
-- Ejecuta primero el plan en modo de prueba (dry run) y se detiene ante todo lo que destruya datos: una tabla, columna, esquema, vista o tipo eliminados, un `TRUNCATE`, un cambio de tipo de columna que pueda perder valores (`timestamptz` → `date`, `numeric` → `integer`), o un cambio de clave primaria: `(id)` → `(id, locale)` le da a cada fila un id nuevo, de modo que los enlaces, las claves foráneas y los ids guardados en otros lugares dejan de encontrar su fila. También se detiene antes de eliminar una restricción CHECK o EXCLUDE que la base de datos tiene: no se pierde ninguna fila, pero desde entonces la base de datos acepta las filas que rechazaba. Pregunta en una terminal, donde Ctrl-C o Ctrl-D responden que no, y de lo contrario se niega; `--allow-destructive` (o `--yes`) lo aplica de todos modos. Un push que se detiene ahí elimina por el camino su base de datos temporal `<db>_dev_diff`
+- Ejecuta primero el plan en modo de prueba (dry run) y se detiene ante todo lo que destruya datos: una tabla, columna, esquema, vista o tipo eliminados, un `TRUNCATE`, un cambio de tipo de columna que pueda perder valores (`timestamptz` → `date`, `numeric` → `integer`), o un cambio de clave primaria: `(id)` → `(id, locale)` le da a cada fila un id nuevo, de modo que los enlaces, las claves foráneas y los ids guardados en otros lugares dejan de encontrar su fila. También se detiene antes de eliminar una restricción CHECK o EXCLUDE que la base de datos tiene: no se pierde ninguna fila, pero desde entonces la base de datos acepta las filas que rechazaba. Pregunta en una terminal, donde Ctrl-C o Ctrl-D responden que no, y de lo contrario se niega; `--allow-destructive` lo aplica de todos modos. `--yes` también lo hace todavía en esta versión, con un aviso de obsolescencia; a partir de la siguiente solo aprobará los push que no destruyen nada. Un push que se detiene ahí elimina por el camino su base de datos temporal `<db>_dev_diff`
 - Activa la seguridad a nivel de fila en todas las tablas de colecciones, incluidas las tablas de unión, justo después del cambio de esquema y antes de cualquier paso que pueda fallar, de modo que un push que se detiene a medias deja una tabla nueva denegando todas las solicitudes en lugar de abierta a ellas
 - Aplica las políticas RLS de sus colecciones y **elimina las políticas que un push anterior reemplazó**
 - Deja tal como están todas las restricciones

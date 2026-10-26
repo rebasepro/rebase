@@ -1,5 +1,5 @@
 ---
-sourceHash: be1f8cd1b6c6a95b
+sourceHash: cb80897157f6b539
 title: Tempo Real & WebSocket
 sidebar_label: Tempo Real
 description: Sincronização de dados em tempo real, canais de broadcast e rastreamento de presença via WebSocket.
@@ -194,7 +194,7 @@ O frame é `{ rows, pks, meta }`:
 
 `meta` é contabilizado dentro da mesma transação com restrição de RLS que leu as linhas, portanto descreve exatamente as linhas ao lado dele. Sem isso, um cliente que precisasse de um total teria que emitir um `GET /count` **por push** — uma viagem de ida e volta (round trip) extra por gravação, por assinante, e uma janela na qual a contagem e as linhas descreviam estados diferentes da coleção.
 
-Quando a contagem em si falha, o frame traz `partial: true` e nenhum `total`; isso não é um erro de assinatura, e o cliente deve manter o último total real em vez de substituí-lo pelo tamanho da página. Em uma tabela grande, a contagem é a maior parte do que um frame custa. Com `REALTIME_RECOUNT_INTERVAL_MS` definido, uma lista cujo último total foi de pelo menos `REALTIME_RECOUNT_MIN_ROWS` (100.000 por padrão) reaproveita esse total durante o intervalo em vez de contar a cada gravação, e esse frame traz `meta.totalAsOf`, quando o total foi obtido. Sem definir, como por padrão, todo frame conta.
+Quando a contagem em si falha, o frame traz `partial: true` e nenhum `total`; isso não é um erro de assinatura, e o cliente deve manter o último total real em vez de substituí-lo pelo tamanho da página. Em uma tabela grande, a contagem é a maior parte do que um frame custa. Com `REALTIME_RECOUNT_INTERVAL_MS` definido, uma lista cujo último total foi de pelo menos `REALTIME_RECOUNT_MIN_ROWS` (100.000 por padrão) reaproveita esse total durante o intervalo em vez de contar a cada gravação, e esse frame traz `meta.totalAsOf`, quando o total foi obtido. Quando o intervalo termina, uma lista cujo último frame reaproveitou o total é contada de novo e recebe o novo total, tenha havido ou não alguma gravação desde então. Sem definir, como por padrão, todo frame conta.
 
 ### O que uma gravação custa, e os limites
 
@@ -241,7 +241,7 @@ registros distintos que uma página mantém abertos. Altere isso com
 `REALTIME_MAX_SUBSCRIPTIONS_PER_SOCKET` ou `realtime.maxSubscriptionsPerSocket`
 no adaptador Postgres (a variável de ambiente prevalece); um valor que não é um
 número inteiro positivo interrompe o servidor na inicialização. Na 0.23 as assinaturas de um socket
-não têm limite. **Os sockets que um usuário mantém também podem ser limitados**, por instância de servidor: defina `REALTIME_MAX_SOCKETS_PER_USER` (ou `realtime.maxSocketsPerUser`), e um login além dele é recusado com `TOO_MANY_SOCKETS` e o socket é fechado com 4002. Sem definir, como por padrão, não há limite.
+não têm limite. **Os sockets que um usuário mantém também podem ser limitados**, por instância de servidor: defina `REALTIME_MAX_SOCKETS_PER_USER` (ou `realtime.maxSocketsPerUser`), e um login além dele é recusado com `TOO_MANY_SOCKETS` e o socket é fechado com 4002. Os sockets autenticados com uma chave de API contam contra essa chave, cada chave por si, e não contra a conta que a criou; a chave de serviço é uma só credencial, então todos os seus sockets contam juntos. Os sockets de um administrador que se passam por um usuário contam contra o administrador, junto com os sockets próprios dele, e não contra o usuário que ele representa. O SDK avisa todas as assinaturas ativas e o `onConnectionLost` de uma vez, com um erro `CONNECTION_LOST` cujo `details.reason` é `TOO_MANY_SOCKETS`, e continua tentando, esperando mais a cada vez até 30 s, de modo que a aba entra quando outro socket é fechado. Sem definir, como por padrão, não há limite.
 
 Um id de assinatura é próprio do socket: dois clientes que ambos nomeiam uma
 assinatura `"sub-1"` mantêm cada um a sua, e um `unsubscribe` encerra apenas a

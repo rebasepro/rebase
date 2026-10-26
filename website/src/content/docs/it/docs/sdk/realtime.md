@@ -1,5 +1,5 @@
 ---
-sourceHash: 607e40e364a1e6b0
+sourceHash: 189ee23f6992c2e4
 title: Sottoscrizioni Realtime
 sidebar_label: Realtime
 description: Sottoscrivi le modifiche ai dati in tempo reale con l'SDK tipizzato di Rebase utilizzando listener realtime basati su WebSocket.
@@ -389,7 +389,7 @@ const { messages, retained, latestSeq } = await channel.history({
 :::note[Le riproduzioni possono sovrapporsi, ed è normale]
 Il server non può sapere con precisione quali messaggi ti abbiano raggiunto prima dell'interruzione del socket, quindi un intervallo di catch-up potrebbe includere messaggi che hai già applicato. L'SDK scarta qualsiasi elemento pari o inferiore alla sequenza già consegnata, così i gestori non vedranno mai un messaggio due volte.
 
-I tuoi messaggi personali **non** vengono esclusi da un replay: una riconnessione assegna un nuovo ID client, quindi il caso esatto per cui esiste il catch-up è proprio quello in cui tale filtro fallirebbe. Rendi le operazioni idempotenti se riapplicare le tue creerebbe problemi.
+I tuoi messaggi vengono esclusi da un replay, come lo sono in diretta, compresi quelli inviati prima che una riconnessione desse al socket un nuovo ID client: il canale ricorda gli id da cui ha trasmesso. Un nuovo oggetto canale — dopo un ricaricamento della pagina, ad esempio — non ne ricorda nessuno, quindi un catch-up lì consegna i tuoi messaggi precedenti come quelli di chiunque altro, ed è ciò di cui ha bisogno la ricostruzione dello stato dalla cronologia.
 :::
 
 ## Tracciamento della presenza

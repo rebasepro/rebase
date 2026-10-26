@@ -1,5 +1,5 @@
 ---
-sourceHash: f833e803807f9ac4
+sourceHash: 210827aa1afa92f7
 title: Edição de schema ao vivo
 description: Crie e altere coleções em um backend em execução — comitadas primeiro no seu repositório, depois aplicadas.
 ---
@@ -164,6 +164,11 @@ sem default, o que faz toda inserção futura falhar até que ela seja removida 
 se torne anulável (nullable). Uma alteração sem uma dessas (mover uma chave
 primária, uma relação cuja coluna de vínculo nada cria) não pode ser escrita
 apenas na origem.
+
+Em uma implantação que não altera nada no próprio banco de dados (`REBASE_PROVISION=false`)
+nenhuma alteração é aplicada a partir do painel, então toda alteração segue este caminho: o
+botão principal do diálogo diz **Commit** e envia `"sourceOnly": true`, e o
+processo que altera esse banco de dados aplica o schema.
 
 Excluir uma coleção pelo painel admin segue o mesmo caminho: `/apply` com
 `"remove": true` e `"sourceOnly": true` exclui o arquivo da coleção e sua
@@ -376,11 +381,21 @@ foi construída até que o seu pipeline construa e faça o deploy do commit. O b
 recebe a alteração de imediato; o painel de administração e a API veem a nova definição da coleção
 depois desse deploy.
 
-Por isso uma implantação faz **uma alteração por deploy**. Depois que um commit entra, o próximo
-apply é recusado com `SCHEMA_CHANGE_FAILED`, citando o commit, até que um processo
-executando esse commit substitua este. Uma segunda alteração planejada contra as
+Por isso uma implantação faz **uma alteração por deploy**. Uma segunda alteração planejada contra as
 coleções que esta implantação ainda executa comitaria arquivos de schema gerados
-que deixam a primeira alteração de fora. O planejamento continua disponível nesse meio tempo.
+que deixam a primeira alteração de fora. Por isso cada apply renderiza o
+`schema.generated.ts` a partir das coleções que esta implantação executa e o compara
+com a cópia do repositório. Quando elas diferem, o apply é recusado com
+`SCHEMA_CHANGE_FAILED`, citando o arquivo, até que um processo executando esse commit
+substitua este. A verificação lê o repositório, não a memória deste processo,
+então vale após uma reinicialização, entre réplicas e para uma alteração que um desenvolvedor
+enviou e que ainda não foi implantada. O planejamento continua disponível nesse meio tempo.
+
+As cópias também diferem quando o arquivo foi gerado por outra versão do Rebase,
+reformatado ou editado à mão. Se nada está esperando para ser implantado, execute
+`rebase schema generate` com a versão que a implantação executa, faça o commit do
+resultado e implante-o. Finais de linha e espaços em branco no fim da linha não contam como
+diferença.
 
 ### Fazendo commit em um repositório remoto
 

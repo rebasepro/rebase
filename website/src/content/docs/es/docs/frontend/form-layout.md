@@ -1,5 +1,5 @@
 ---
-sourceHash: a6f7e70d9dfb90ae
+sourceHash: 29363c3f0ab50d98
 title: Diseño de formulario
 sidebar_label: Diseño de formulario
 description: Controla cómo se organiza el formulario de entidad — anchos de columna, secciones y el riel de metadatos.
@@ -16,8 +16,9 @@ El formulario de entidad se genera a partir de tus propiedades:
   campos contiguos con el mismo editor pequeño —dos números, dos interruptores,
   dos fechas del mismo modo, dos selectores con opciones cortas— comparten una fila
 
-Un campo con una etiqueta larga, texto de ayuda de más de 60 caracteres, `conditions` o un
-`Field` personalizado nunca se empareja, y tampoco lo hace ninguna cadena de texto libre: nada en
+Un campo con una etiqueta larga, texto de ayuda de más de 60 caracteres, `conditions`, una
+regla `access` a nivel de campo o `excludeFromApi` (el formulario no muestra nada a un
+usuario que no puede leerlo), o un `Field` personalizado nunca se empareja, y tampoco lo hace ninguna cadena de texto libre: nada en
 un esquema distingue un nombre de rama corto de una URL larga. El formulario nunca comprueba
 qué propiedad es el título. Cualquier otra columna es algo que la colección solicita,
 campo por campo, con `admin.span` —establecido a partir de lo que contiene cada campo, como

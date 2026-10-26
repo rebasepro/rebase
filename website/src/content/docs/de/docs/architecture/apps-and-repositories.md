@@ -1,5 +1,5 @@
 ---
-sourceHash: 87b274f81d5501d1
+sourceHash: 7a29cf6ca21d35be
 title: Apps und Repositories
 sidebar_label: Apps & Repositories
 description: Ein Projekt besteht aus einem Backend und den Apps, die damit kommunizieren, welche jeweils in ihrem eigenen Repository liegen können.
@@ -267,8 +267,11 @@ rebase cloud domains verify admin.example.com
 ```
 
 `rebase cloud domains list` gibt die Records erneut aus, falls sie Ihnen
-abhandenkommen. Sobald die Verifizierung erfolgreich ist, stellt die Plattform
-das HTTPS-Zertifikat für den Hostnamen aus; es gibt nichts hochzuladen. Bis
+abhandenkommen. Ein Hostname, der nicht innerhalb von 7 Tagen nach seiner
+Registrierung verifiziert wird, wird wieder freigegeben, und das nächste
+Deployment registriert ihn erneut. Sobald die Verifizierung erfolgreich ist,
+stellt die Plattform das HTTPS-Zertifikat für den Hostnamen aus; es gibt nichts
+hochzuladen. Bis
 dahin antwortet `admin` nirgends, weil der einzige Hostname, auf dem es
 antwortet, das Projekt noch nicht erreicht – der Rest des Projekts ist so oder
 so live.
@@ -277,9 +280,17 @@ Die Konsole folgt der App auf ihren Hostnamen: Der *Open CMS*-Link und die
 CMS-Adresse in der Projektübersicht lauten `https://admin.example.com/`, nicht
 der Projekt-Host.
 
-Ein Hostname, den bereits ein anderes Projekt hält, lässt das Deployment
+Ein Hostname, den ein anderes Projekt verifiziert hat, lässt das Deployment
 fehlschlagen, bevor irgendetwas ausgerollt wird, ebenso einer unter der eigenen
-Domain der Plattform. Wird die App aus `rebase.json` entfernt, bleibt der
+Domain der Plattform. Einer, den ein anderes Projekt registriert, aber nie
+verifiziert hat, steht Ihnen nicht im Weg: Die Ablehnung nennt Ihnen einen
+TXT-Record für Ihr Projekt, und sobald er existiert, übernimmt das nächste
+Deployment (oder `rebase cloud domains add`) den Hostnamen. Einen Hostnamen
+hinzuzufügen, den das Projekt noch nicht hat, ändert die Domains des Projekts,
+und das darf ein mit `--can deploy` erstellter Access-Token nicht: Fügen Sie
+den Hostnamen aus der CI einmal mit `rebase cloud domains add` hinzu, während
+Sie angemeldet sind; danach deployt der Token ihn wie jeden Hostnamen, der
+bereits im Projekt ist. Wird die App aus `rebase.json` entfernt, bleibt der
 Hostname im Projekt registriert; entfernen Sie ihn mit
 `rebase cloud domains remove admin.example.com`.
 

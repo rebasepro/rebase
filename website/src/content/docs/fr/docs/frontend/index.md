@@ -1,5 +1,5 @@
 ---
-sourceHash: 3dd5a537f812658a
+sourceHash: 12294b1ff06361d9
 title: Vue d'ensemble du Frontend
 sidebar_label: Frontend
 description: "Créez et personnalisez le panneau d'administration — Rebase CMS et Rebase Studio — avec React : contrôleurs, structure (scaffold), routage et vues."
@@ -190,6 +190,11 @@ la suppression de son enregistrement :
     onSaved={({ entity }) => console.log("saved", entity.id)}
     onClose={() => navigate("/posts")}/>
 ```
+
+Si quelqu'un d'autre supprime l'enregistrement pendant que le formulaire est ouvert, le formulaire conserve
+ce qui a été saisi et indique que l'enregistrement a été supprimé ailleurs. Son action « Save as new »
+le transforme en un formulaire qui crée un nouvel enregistrement avec ces valeurs ;
+`onSaved` signale alors le nouvel enregistrement.
 
 Les deux apportent leur propre `CollectionsProvider` lorsqu'aucun n'existe au-dessus d'eux. C'est
 l'étape située en dessous, et vous pouvez la monter vous-même pour partager une seule portée entre

@@ -1,5 +1,5 @@
 ---
-sourceHash: 87b274f81d5501d1
+sourceHash: 7a29cf6ca21d35be
 title: App e repository
 sidebar_label: App & repository
 description: Un progetto è un backend insieme alle app che comunicano con esso, ognuna delle quali può risiedere nel proprio repository.
@@ -265,8 +265,9 @@ Una volta pubblicati i record:
 rebase cloud domains verify admin.example.com
 ```
 
-`rebase cloud domains list` stampa di nuovo i record se li perdi. Quando la
-verifica passa, la piattaforma emette il certificato HTTPS per l'hostname; non
+`rebase cloud domains list` stampa di nuovo i record se li perdi. Un hostname
+che non viene verificato entro 7 giorni dalla registrazione viene rilasciato, e
+il deploy successivo lo registra di nuovo. Quando la verifica passa, la piattaforma emette il certificato HTTPS per l'hostname; non
 c'è niente da caricare. Fino ad allora `admin` non risponde da nessuna parte,
 perché l'unico hostname su cui risponde non raggiunge ancora il progetto; il
 resto del progetto è attivo in ogni caso.
@@ -275,10 +276,18 @@ La console segue l'app sul suo hostname: il link *Open CMS* e l'indirizzo del
 CMS nella panoramica del progetto sono `https://admin.example.com/`, non l'host
 del progetto.
 
-Un hostname già detenuto da un altro progetto fa fallire il deploy prima che
+Un hostname che un altro progetto ha verificato fa fallire il deploy prima che
 venga distribuito qualsiasi cosa, e lo stesso vale per uno sotto il dominio
-della piattaforma. Togliere l'app da `rebase.json` lascia l'hostname registrato
-sul progetto; rimuovilo con `rebase cloud domains remove admin.example.com`.
+della piattaforma. Uno che un altro progetto ha registrato senza mai verificarlo
+non ti ostacola: il rifiuto ti fornisce un record TXT per il tuo progetto e,
+una volta creato, il deploy successivo (o `rebase cloud domains add`) prende
+l'hostname. Aggiungere un hostname che il progetto non ha ancora cambia i domini
+del progetto, cosa che un token di accesso creato con `--can deploy` non può
+fare: da CI, aggiungi l'hostname una sola volta con `rebase cloud domains add`
+mentre sei autenticato, e da quel momento il token lo distribuisce come
+qualsiasi hostname già presente nel progetto. Togliere l'app da `rebase.json`
+lascia l'hostname registrato sul progetto; rimuovilo con
+`rebase cloud domains remove admin.example.com`.
 
 ### Un hostname appartiene a un'app, non a una route
 

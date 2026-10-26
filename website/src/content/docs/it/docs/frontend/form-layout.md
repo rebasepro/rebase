@@ -1,5 +1,5 @@
 ---
-sourceHash: a6f7e70d9dfb90ae
+sourceHash: 29363c3f0ab50d98
 title: Layout del form
 sidebar_label: Layout del form
 description: Controlla la disposizione del form dell'entità — ampiezza delle colonne, sezioni e barra dei metadati.
@@ -16,8 +16,9 @@ Il form dell'entità viene generato a partire dalle tue proprietà:
   campi adiacenti con lo stesso editor compatto — due numeri, due switch,
   due date con la stessa modalità, due select con opzioni brevi — condividono una riga
 
-Un campo con un'etichetta lunga, un testo di aiuto superiore a 60 caratteri, `conditions` o un
-`Field` personalizzato non viene mai affiancato, e lo stesso vale per qualsiasi stringa di testo libero: nulla in
+Un campo con un'etichetta lunga, un testo di aiuto superiore a 60 caratteri, `conditions`, una
+regola `access` a livello di campo o `excludeFromApi` (il form non mostra nulla a un utente che
+non può leggerlo), o un `Field` personalizzato non viene mai affiancato, e lo stesso vale per qualsiasi stringa di testo libero: nulla in
 uno schema distingue il nome breve di un branch da un URL lungo. Il form non controlla mai
 quale proprietà sia il titolo. Qualsiasi altra colonna deve essere richiesta esplicitamente dalla
 collection, campo per campo, tramite `admin.span` — impostato in base a ciò che ciascun campo contiene, come

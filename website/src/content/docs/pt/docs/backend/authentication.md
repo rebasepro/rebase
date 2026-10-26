@@ -1,5 +1,5 @@
 ---
-sourceHash: bd2df1ee8d59330b
+sourceHash: bb2bf60cbaed04eb
 title: Autenticação
 sidebar_label: Autenticação
 description: Configure a autenticação JWT, provedores OAuth, e-mail SMTP, proteção contra bots e a coleção de usuários no backend do Rebase.
@@ -454,23 +454,21 @@ final são ignorados.
 
 O que acontece quando alguém se registra com e-mail/senha como `ada@example.com` e,
 mais tarde, clica em "Entrar com o Google" em uma conta do Google com esse mesmo
-endereço? O Rebase **vincula as duas em uma única conta** — mas somente quando o
-provedor confirmar que o e-mail está verificado *e* o endereço da própria conta
-tiver sido verificado. Ele nunca cria silenciosamente uma segunda conta para o mesmo
-endereço.
+endereço? O Rebase **vincula as duas em uma única conta**, mas somente quando o
+provedor confirmar que o e-mail está verificado. Ele nunca cria silenciosamente
+uma segunda conta para o mesmo endereço.
 
 Em `POST /api/auth/<provider>`, a ordem de resolução é:
 
-1. **Identidade do provedor conhecida** — se essa identidade exata do provedor já
+1. **Identidade do provedor conhecida**: se essa identidade exata do provedor já
    tiver feito login antes, esse usuário é retornado. O e-mail não é consultado.
-2. **Conta existente com o mesmo e-mail, verificada dos dois lados** — o provedor
-   verificou o e-mail, e a conta também. A identidade é vinculada à conta existente
-   e a sessão do usuário é iniciada nela. Uma conta, duas formas de acesso.
-3. **Conta existente com o mesmo e-mail, algum lado não verificado** — rejeitada com
-   `403 EMAIL_NOT_VERIFIED`. Nada é criado ou modificado. `details.reason` diz qual
-   lado: `provider-email-unverified`, ou `local-account-unverified` (a conta tem
-   senha) / `local-account-unverified-passwordless` (não tem).
-4. **Nenhuma conta com esse e-mail** — uma nova conta é criada, verificada se o
+2. **Conta existente com o mesmo e-mail, o provedor verificou o e-mail**: a
+   identidade é vinculada e a sessão do usuário é iniciada nela. Uma conta, duas
+   formas de acesso. Uma conta não verificada é verificada primeiro (veja abaixo).
+3. **Conta existente com o mesmo e-mail, o provedor não o verificou**: rejeitada
+   com `403 EMAIL_NOT_VERIFIED` e `details.reason`
+   `provider-email-unverified`. Nada é criado ou modificado.
+4. **Nenhuma conta com esse e-mail**: uma nova conta é criada, verificada se o
    provedor verificou o e-mail.
 
 O passo 3 é o caso crítico para a segurança. Se um e-mail de provedor não
@@ -481,18 +479,19 @@ contas reais do Google, portanto o passo 2 é o caminho normal para o login do
 Google; o passo 3 captura principalmente provedores que permitem aos usuários
 fornecer um endereço arbitrário não confirmado.
 
-O lado da conta importa pelo mesmo motivo. Nada verifica o endereço que
+O lado da conta também importa. Nada verifica o endereço que
 `POST /auth/register` recebe, então qualquer um pode cadastrar o endereço de outra
 pessoa com uma senha, ou entrar com ele por um provedor que não o garante, e
-esperar. Vincular o login com o Google do titular a essa conta deixaria nela a forma
-de acesso da outra pessoa.
+esperar. Vincular o login com o Google do titular a essa conta não pode deixar
+nela a forma de acesso da outra pessoa.
 
-Um link de verificação, um magic link, um código por e-mail ou uma redefinição de
-senha comprovam o endereço e verificam a conta. Em uma conta que ainda não estava
-verificada, a primeira dessas provas remove a senha (uma redefinição define a nova)
-e cada identidade vinculada cujo provedor não verificou esse endereço, e encerra
-todas as sessões, antes de marcar a conta como verificada. A partir daí vale o
-passo 2.
+Um provedor que verificou o endereço, um link de verificação, um magic link, um
+código por e-mail ou uma redefinição de senha comprovam o endereço e verificam a
+conta. Em uma conta que ainda não estava verificada, a primeira dessas provas
+remove a senha (uma redefinição define a nova) e cada identidade vinculada cujo
+provedor não verificou esse endereço, e encerra todas as sessões, antes de marcar
+a conta como verificada: uma senha que ninguém verificou desaparece depois do
+primeiro login com o Google.
 
 Um link de verificação mantém o que a pessoa que o segue também comprova: uma
 sessão ativa da conta, ou sua senha. Veja [Verificação de e-mail](/docs/backend/email-verification/). Contas criadas por um

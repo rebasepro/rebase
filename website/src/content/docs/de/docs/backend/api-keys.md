@@ -1,5 +1,5 @@
 ---
-sourceHash: 83ba3db403bb8334
+sourceHash: 9feb465f3327d507
 title: API-Schlüssel
 sidebar_label: API-Schlüssel
 description: "Langlebige Schlüssel für Skripte, CI, Agents und Integrationen: Service-Schlüssel und persönliche Schlüssel, die Scopes, die sie halten, wie sie mit Row-Level Security zusammenwirken, und die Routen, die sie verwalten."
@@ -31,7 +31,7 @@ curl "$API_URL/api/data/orders" \
 ```
 
 Derselbe Schlüssel funktioniert mit der REST-API, Storage, benutzerdefinierten Funktionen, den
-Admin-Oberflächen, die seine Scopes erreichen, dem Realtime-WebSocket und dem [`/mcp`-Endpunkt](/docs/ai/mcp/#the-remote-endpoint).
+Admin-Oberflächen, die seine Scopes erreichen, dem Realtime-WebSocket und dem [`/mcp`-Endpunkt](/docs/ai/remote-mcp/).
 
 ## Service-Schlüssel
 
@@ -159,7 +159,7 @@ stellen darf, und jeder Zugangsweg zählt in einem gemeinsamen Bucket dagegen, `
 - seine Daten-Frames auf dem Realtime-Socket: Abrufe, Zählungen, Speichervorgänge und Löschungen,
   sowie Subscriptions und Channel-History-Anfragen jenseits des
   [Kontingents](/docs/backend/realtime/#what-a-write-costs-and-the-limits) jedes Sockets;
-- seine Anfragen an [`/mcp`](/docs/ai/mcp/#the-remote-endpoint).
+- seine Anfragen an [`/mcp`](/docs/ai/remote-mcp/).
 
 Ohne `rate_limit` fasst der Bucket den API-Schlüssel-Standard des Servers, 1000. Ein
 persönlicher Schlüssel hat kein eigenes `rate_limit` und zählt in seinem eigenen Bucket mit diesem
@@ -168,6 +168,12 @@ Standard. Über dem Limit antwortet eine HTTP-Anfrage mit `429` und ein Socket-F
 
 Die Admin-Routen unter `/api/admin` und die Admin-Nachrichten des Sockets, etwa die des
 SQL-Editors, unterliegen keiner Ratenbegrenzung.
+
+Ein Administrator, der einen Schlüssel simuliert („Simulate access“,
+`x-rebase-simulate-api-key-id`), verbraucht sein eigenes Kontingent, nicht das
+des Schlüssels: Die Integration, die mit diesem Schlüssel läuft, behält ihr
+gesamtes Budget. Das Simulieren oder Impersonieren eines Benutzers wird dem
+Administrator auf dieselbe Weise angerechnet.
 
 ## Persönliche Schlüssel
 
@@ -251,7 +257,7 @@ und deckt jeden Schritt eines fortsetzbaren (TUS-)Uploads ab, einschließlich de
 und des Abbruchs. `storage:delete` löscht. Das Ziel ist die ID einer Storage-Quelle. Die
 ID der Standardquelle ist `(default)`, also liest `storage:read:(default)` nur die
 Standardquelle, und `storage:write:avatars` schreibt in eine Quelle namens `avatars`.
-Nach der Scope-Prüfung läuft [`storageAuthorize`](/docs/backend/storage/#per-object-authorization)
+Nach der Scope-Prüfung läuft [`storageAuthorize`](/docs/backend/storage-authorization/)
 weiterhin, mit der Identität des Schlüssels.
 
 ### Funktionen
@@ -307,6 +313,8 @@ Jeder Schlüssel wird gegen den geprüft, der ihn erstellt, auf beiden Routen gl
 | `400 KEY_MANAGEMENT_SCOPE` | `keys:read` oder `keys:write` wurde angefordert |
 | `403 SCOPE_EXCEEDS_CREATOR` | Ein Scope, den der Ersteller nicht hält. Ein Schlüssel hält nie mehr als das Konto, das ihn erstellt hat |
 | `403 ROLE_EXCEEDS_CREATOR` | Eine Service-Schlüssel-Rolle, die der Ersteller nicht hält, wenn der Ersteller kein Admin ist |
+| `400 INVALID_ROLE` | Ein Rollenname ist leer oder enthält `,` `{` `}` `"` `\` oder ein Steuerzeichen, was RLS als andere Rollen zurücklesen würde |
+| `403 KEY_OUTRANKS_CALLER` | Bei einer Änderung (`PUT`) oder einem Widerruf (`DELETE`): Der Schlüssel hält bereits eine Rolle oder einen Scope, den der Aufrufer nicht hält, und der Aufrufer ist kein Admin |
 
 Eine Anfrage, für die dem Schlüssel selbst ein Scope fehlt, antwortet mit `403 SCOPE_MISSING`, mit dem
 Scope in `details.requiredScope`. Siehe [Fehlercodes](/docs/backend/errors/#authentication-and-accounts).

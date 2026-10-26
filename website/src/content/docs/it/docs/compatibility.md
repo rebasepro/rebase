@@ -1,5 +1,5 @@
 ---
-sourceHash: 8382cd50ee7fa41d
+sourceHash: a8656ede47530810
 slug: it/docs/compatibility
 title: Compatibilità
 description: Cosa promette Rebase tra una versione e l'altra e cosa no — i sei contratti con versione, come ciascuno fallisce e cosa può ancora cambiare in una minor.
@@ -67,7 +67,7 @@ I tre livelli di valutazione significano:
 | Sincronizzazione offline | Beta | Le mutazioni includono chiavi di idempotenza rispettate dal server, e i difetti di perdita dati riscontrati nell'audit di luglio sono stati corretti. Il modello di risoluzione dei conflitti è last-write-wins senza merge campo per campo |
 | Cronologia entità | Stable | Basata su snapshot, protetta dalla propria suite di test |
 | Funzioni e cron | Stable | L'entry point portabile (`@rebasepro/server/functions`) è un contratto versionato con una propria sezione di superficie API |
-| Server MCP + skill per agenti | Beta | `@rebasepro/mcp` viene eseguito su stdio: quarantaquattro tool, autenticazione bearer per progetto, i tool distruttivi rifiutano target non locali a meno che non sia esplicitamente richiesto. Dalla 0.21 il server può anche montare un endpoint `/mcp` remoto — OAuth 2.1, otto data tool, ogni chiamata protetta dalle RLS dell'utente autenticato — disattivato a meno che non sia impostato `REBASE_MCP_ENABLED=true`, e solo per Postgres |
+| Server MCP + skill per agenti | Beta | `@rebasepro/mcp` viene eseguito su stdio: cinquantuno tool, autenticazione bearer per progetto, i tool distruttivi rifiutano target non locali a meno che non sia esplicitamente richiesto. Dalla 0.21 il server può anche montare un endpoint `/mcp` remoto — OAuth 2.1, otto data tool, ogni chiamata protetta dalle RLS dell'utente autenticato — disattivato a meno che non sia impostato `REBASE_MCP_ENABLED=true`, e solo per Postgres |
 | Studio (SQL, schema, RLS, API explorer) | Beta | Utilizzato quotidianamente su progetti reali. Il branching è presente nel pacchetto OSS e volutamente non esposto in Rebase Cloud, poiché non esiste ancora una gestione per spostare una distribuzione attiva su un branch |
 | CMS + pannello di amministrazione | Beta | Completo per CRUD, relazioni, campi di archiviazione e ruoli. **La tabella dati non ha semantica grid** — nessun `role`, nessun `aria-rowindex`, `tabIndex` rimosso — quindi gli utenti da tastiera e con screen reader non possono utilizzare la vista principale. Nessuna bozza, nessun contenuto localizzato per lingua, nessun rich text a blocchi |
 | Database di sviluppo gestito PGlite | Beta | `rebase dev` a configurazione zero senza Docker. Una sessione alla volta, quindi le richieste vengono serializzate e la concorrenza non può essere riprodotta; i comandi basati su Atlas (`db push`, `generate`, `migrate`) pianificano su un secondo PGlite temporaneo avviato per il comando (su 0.24 rifiutano il database gestito); `db branch` non funziona lì e lo segnala esplicitamente |
@@ -347,7 +347,7 @@ Nulla di quanto sopra è una semplice convenzione — ognuno dispone di un test 
 | `pnpm check:derived-names` | ogni colonna, vincolo, giunzione, enum e nome di policy che il framework deriva — e che boot e `db push` li derivino in modo identico |
 | `pnpm rls:check` | le policy dello schema generato |
 | `pnpm check:api-surface` | ogni export, e i relativi membri, dei cinque pacchetti forniti dall'immagine — `@rebasepro/server`, `types`, `client`, `common`, `utils` — più l'entry point `@rebasepro/server/functions`, rispetto alle sei sezioni di `contracts/server.api.txt`. Questi sono i pacchetti che `infra/docker/entrypoint.mjs` collega tramite symlink sulle copie del bundle distribuito, quindi la rimozione di un export da uno di essi non è un errore di compilazione per nessuno — è un errore di avvio per l'intera flotta, durante un rollout che nessuno ha richiesto |
-| `pnpm test:gates` | i test stessi dei gate, eseguiti sulle fixture — quarantaquattro file, tra cui `check:api-surface` e il controllo di bump della release riportato di seguito — cosicché un gate che smette di rilevare ciò che protegge fallisce qui. `check:api-surface` ha trascorso la sua intera esistenza incapace di rilevare la scomparsa di un membro da `const rebase` |
+| `pnpm test:gates` | i test stessi dei gate, eseguiti sulle fixture — quarantasette file, tra cui `check:api-surface` e il controllo di bump della release riportato di seguito — cosicché un gate che smette di rilevare ciò che protegge fallisce qui. `check:api-surface` ha trascorso la sua intera esistenza incapace di rilevare la scomparsa di un membro da `const rebase` |
 | `node tooling/scripts/check-release-bump.mjs` | che il livello di bump con cui viene rilasciata una release corrisponda a ciò che la release ha modificato nelle baseline sopra citate — eseguito da `publish.yml` prima che il changelog venga sigillato |
 | saas CI | il control plane compilato rispetto al ramo `main` di questo repository, sui propri push e nelle build notturne (nightly) |
 

@@ -1,5 +1,5 @@
 ---
-sourceHash: 6f3e503eb493c0cf
+sourceHash: 8935b1e530b1bfb3
 title: Integrazione Server Personalizzato
 sidebar_label: Server Personalizzato
 description: Costruisci il backend Rebase da componenti pubblici nel tuo server — createRebaseBackend, i suoi gruppi di rotte, mount, attachRealtime e start — oppure incorpora il driver Postgres in Express.
@@ -15,8 +15,8 @@ usala.
 Quando non lo è, scendi di un gradino. Ogni parte di quella chiamata è un componente
 pubblico che puoi chiamare tu stesso: costruisci il backend, poi monta tutto o solo
 i gruppi di rotte che vuoi, ai percorsi che vuoi, e decidi quale processo avvia i
-timer. L'ultima sezione va un passo oltre e incorpora il solo driver Postgres in
-un'app Express.
+timer. [Incorporare il driver Postgres](/docs/backend/embedding-postgres-driver/)
+va un passo oltre e apre il solo driver Postgres in un'app Express.
 
 ## Configurazione dell'Ambiente
 
@@ -87,7 +87,12 @@ esportato.
 import { createRebaseBackend, installUnhandledRejectionHandler, setDefaultBackend } from "@rebasepro/server";
 
 installUnhandledRejectionHandler();
-const backend = await createRebaseBackend({ ...options, provision: true });
+const backend = await createRebaseBackend({
+    ...options,
+    // `false` or `{ collections: false, realtime: false }` in the cases
+    // the `provision` section below lists.
+    provision: true
+});
 setDefaultBackend(backend);
 backend.mount(app, { basePath: "/api" });
 await backend.attachRealtime(server);
@@ -291,6 +296,12 @@ anche sotto un percorso parametrizzato come `/:tenant/data`. Un gruppo legge anc
 è stato montato, così l'API dei dati instrada ancora ogni collection verso la sua
 sorgente dati e l'elenco delle funzioni riporta i percorsi a cui sono realmente servite.
 
+Un gruppo rifiuta anche da sé `x-rebase-impersonate` e `x-rebase-simulate-*`
+(`400 IMPERSONATION_UNSUPPORTED` / `SIMULATION_UNSUPPORTED`), a meno che non sia il gruppo
+dei dati o quello delle funzioni, che li rispettano; su 0.25 un gruppo montato da solo
+rispondeva come l'amministratore. `refuseUnhonouredImpersonation(honouredMounts)`
+da `@rebasepro/server` fa lo stesso per le rotte tue.
+
 Ciò che un gruppo non porta con sé è il middleware valido per l'intero processo che
 `mount()` mette davanti a tutto. Montando i gruppi uno per uno, aggiungi tu ciò che ti
 serve: un limite del corpo (`bodyLimit` da `hono/body-limit`), la compressione e
@@ -364,6 +375,14 @@ Un backend a cui non è stato dato alcun `auth.jwtSecret`, come uno il cui `auth
 adapter, non firma nulla di suo, quindi il suo `services.jwt` segue il default del
 processo.
 
+**Le risorse sono del processo.** Le dichiarazioni `database()`, `bucket()`, `topic()` e
+`queue()` in `config/resources.ts` sono valori a livello di modulo, e
+ogni backend nel processo le legge tutte: un backend il cui progetto
+non dichiara alcun topic attiva comunque la sua coda di job per il topic di un altro
+progetto, e si rifiuta di avviarsi se il suo driver non può gestirne uno. Esegui le
+risorse di un solo progetto per processo. Più backend di quel singolo progetto, ciascuno sul proprio
+database, vanno bene.
+
 **Dove va `rebase`.** All'interno di una richiesta, di un'esecuzione cron o di un job che
 un backend serve, `rebase`, sia importato da `@rebasepro/server` sia ricevuto come
 `ctx.rebase`, è quel backend, e lo sono anche `publish` di un topic ed `enqueue` di una
@@ -434,148 +453,15 @@ già il server che gli è stato passato, e una seconda chiusura porta a un deadl
 backend creato con `createRebaseBackend` chiude un server solo quando glielo passi,
 `backend.shutdown(timeoutMs, { server })`, come nell'esempio in cima a questa pagina.
 
-## Incorporare il driver Postgres in Express
+## Incorporare il driver Postgres
 
-Un passo più in basso, `@rebasepro/server-postgres` funziona senza alcun server Rebase.
-Dipende da Drizzle e dall'`http.Server` di Node, quindi puoi aprire il driver dei dati e
-il socket realtime dentro Express, Fastify o Node semplice. A questo livello assembli tu
-il backend: non ci sono rotte di autenticazione, né storage, né API di amministrazione, a
-meno che non le costruisca tu.
+Un passo più in basso, `@rebasepro/server-postgres` funziona senza alcun server
+Rebase: apri il suo driver dei dati e il socket realtime dentro Express, Fastify
+o Node semplice, e assembla tu il resto. Vedi
+[Incorporare il driver Postgres](/docs/backend/embedding-postgres-driver/).
 
-### 1. Installazione
+## CORS per un frontend nel browser
 
-```bash
-npm install @rebasepro/server-postgres @rebasepro/types express pg drizzle-orm
-```
-
-### 2. Aprire il driver e il socket
-
-`openPostgresDriver`
-e `postgresDriverConfigFromEnv` sono esportati. Su 0.24, apri il driver con
-`createPostgresBootstrapper(pgConfig).initializeDriver(…)`, il cui `internals` non è
-tipizzato.
-
-```typescript
-import express from "express";
-import { createServer } from "node:http";
-import { sql } from "drizzle-orm";
-import {
-    createPostgresDatabaseConnection,
-    createPostgresWebSocket,
-    openPostgresDriver,
-    postgresDriverConfigFromEnv
-} from "@rebasepro/server-postgres";
-import { collections } from "./collections";
-
-async function startServer() {
-    const app = express();
-
-    // The socket needs the raw http.Server, so listen on it, not on app.listen.
-    // 64 KB of headers, as the Rebase runtime takes: a vector search in the URL
-    // outgrows Node's 16 KB.
-    const server = createServer({ maxHeaderSize: 64 * 1024 }, app);
-
-    const { db, pool, connectionString } = createPostgresDatabaseConnection(process.env.DATABASE_URL!);
-
-    // The environment, read the way the Rebase server's boot reads it:
-    // DATABASE_READ_URL, DATABASE_DIRECT_URL and the REALTIME_* variables.
-    // Leave this call out and the driver reads no environment variable at all.
-    const pgConfig = postgresDriverConfigFromEnv({ connection: db, connectionString });
-
-    // The collections' tables must already exist: the driver serves them and never creates them.
-    // `provision` (default true) is the rest of its DDL: the role requests run as, branch metadata,
-    // channel history and change capture. `provision: false` when none of that may run here.
-    const { driver, internals } = await openPostgresDriver(pgConfig, { collections });
-
-    // The realtime socket. It answers upgrades on `path` only, so a WebSocket
-    // server of your own can share the same http.Server.
-    createPostgresWebSocket(
-        server,
-        internals.realtimeService,
-        internals.driver,
-        { requireAuth: true, jwtSecret: process.env.JWT_SECRET },
-        undefined,
-        { path: "/" }
-    );
-
-    app.use(express.json());
-
-    app.get("/api/health", (req, res) => {
-        res.json({ status: "healthy" });
-    });
-
-    // A write through the driver
-    app.post("/api/products", async (req, res) => {
-        try {
-            const result = await driver.save({
-                path: "products",
-                values: req.body,
-                status: "new"   // required: "new" | "existing" | "copy"
-            });
-            res.status(201).json({ success: true, data: result });
-        } catch (error) {
-            res.status(500).json({ error: error instanceof Error ? error.message : "Internal Server Error" });
-        }
-    });
-
-    // Drizzle directly, typed: `internals.db`, and `internals.readDb` when a
-    // read replica is configured.
-    app.get("/api/stats", async (req, res) => {
-        const result = await internals.db.execute(sql`select count(*) from products`);
-        res.json(result.rows);
-    });
-
-    const port = process.env.PORT || 3000;
-    server.listen(port);
-
-    // Graceful shutdown: stop listening, stop the LISTEN client, evict branch
-    // pools, then end the main pool.
-    const handleShutdown = (signal: string) => {
-        console.log(`Shutdown triggered via ${signal}.`);
-        server.close(async () => {
-            try {
-                await internals.realtimeService.stopListening();
-                await internals.poolManager?.shutdown();
-                await pool.end();
-                process.exit(0);
-            } catch (err) {
-                console.error("Error during graceful shutdown:", err);
-                process.exit(1);
-            }
-        });
-    };
-
-    process.on("SIGTERM", () => handleShutdown("SIGTERM"));
-    process.on("SIGINT", () => handleShutdown("SIGINT"));
-}
-
-startServer();
-```
-
-`openPostgresDriver` è ciò che `createPostgresAdapter` esegue quando il server Rebase si
-avvia, dopo che `postgresDriverConfigFromEnv` ha letto l'ambiente nella configurazione.
-Il suo secondo argomento dice che cosa aprire: le `collections`, se l'apertura può
-eseguire il proprio DDL (`provision`, predefinito `true`) e quale parte ha questo processo
-nel realtime (`realtime: false` per nessuna).
-
-Non crea alcuna tabella delle collection, quindi su un database che non ne ha una `POST /api/products` risponde `500` "Table not found for collection 'products'". Crea prima le tabelle. Lo fa `rebase db push`, da un progetto Rebase il cui `config/collections` le dichiara. In questo server, `await createPostgresAdapter(pgConfig).ensureCollectionSchema?.(collections)` prima di `openPostgresDriver` aggiunge le tabelle e le colonne che mancano al database, come fa l'avvio del server Rebase, e non modifica nulla di ciò che esiste.
-
----
-
-## Concetti Chiave del Backend
-
-### Connessioni alle Read Replica
-Imposta `readConnectionString` nella configurazione del driver, oppure la variabile d'ambiente `DATABASE_READ_URL`, che l'avvio del server e `postgresDriverConfigFromEnv` leggono in essa, e il driver apre un secondo connection pool verso la tua read replica, sotto `internals.readDb`. Le letture vanno alla replica; le scritture restano sul primario.
-
-L'opzione `readConnectionString` viene rispettata. Su 0.24 era dichiarata e ignorata, e funzionava solo `DATABASE_READ_URL`.
-
-### Integrazione con Drizzle
-Non devi scegliere tra Rebase e Drizzle. Il driver compila i tuoi schemi dinamicamente, e `internals.db` è il client Drizzle `NodePgDatabase`, tipizzato, per SQL raw o per i query builder type-safe di Drizzle accanto ai servizi REST di Rebase.
-
-### Drenaggio Corretto delle Connessioni (Graceful Draining)
-Negli ambienti serverless o negli orchestratori (come Kubernetes), la chiusura dei pod può causare interruzioni anomale delle connessioni. Implementa sempre signal handler che richiamino `internals.realtimeService.stopListening()` (il quale chiude il client dedicato a pg LISTEN) e `pool.end()`, per prevenire il leak di slot di connessione nel tuo server di database.
-
-### CORS per un frontend nel browser
 Un server personalizzato possiede la propria configurazione CORS, e un frontend
 su un'altra origine può leggere solo gli header di risposta che espone.
 Esponi quelli che l'SDK legge, altrimenti `etagOf(row)` lì è sempre
@@ -609,6 +495,7 @@ Il runtime di Rebase e il backend ottenuto con `rebase eject` inviano già quest
 
 ## Correlati
 
+- [Incorporare il driver Postgres](/docs/backend/embedding-postgres-driver/) — il solo driver dei dati e socket realtime, in Express
 - [Script e console](/docs/backend/scripts/) — i dati del progetto da uno script, da un test o da un REPL, senza alcun server
 - [Panoramica Backend](/docs/backend/) — dove risiede ciascuna opzione quando viene invece avviato il runtime
 - [Processi Suddivisi](/docs/deployment/split-processes/) — i ruoli che un server personalizzato deve riprodurre

@@ -1,5 +1,5 @@
 ---
-sourceHash: 791588f79f48d44f
+sourceHash: 858a87d510ba1de5
 title: Rebase ne fait pas X
 sidebar_label: Étendre le serveur
 description: L'échelle d'extension côté serveur — déclaration, callback de collection, fonction personnalisée, vos propres routes, votre propre serveur, eject — avec ce que chacun peut et ne peut pas atteindre.
@@ -158,7 +158,8 @@ await backend.attachRealtime(server);
 backend.start();                                // cron, job workers, sweeps
 ```
 
-Un groupe porte son propre contexte d'authentification, ses limites de débit et sa barrière d'administration, de sorte que
+Un groupe porte son propre contexte d'authentification, ses limites de débit et sa barrière d'administration, et refuse
+les en-têtes d'usurpation et de simulation à moins d'être le groupe des données ou des fonctions, de sorte que
 `getDriver(c)` fonctionne dans un groupe monté n'importe où. Ce qu'il ne porte pas, c'est le middleware
 global que `mount()` ajoute : la limite de taille du corps, la compression, la protection CSRF et
 l'enveloppe d'erreur sont à ajouter vous-même lorsque vous montez les groupes un par un.

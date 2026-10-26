@@ -1,5 +1,5 @@
 ---
-sourceHash: 9d4730f8239c48ed
+sourceHash: dd930980301c511c
 title: IA et agents
 sidebar_label: Aperçu
 description: Ce que Rebase fournit pour les assistants de code IA et les agents autonomes — un serveur MCP, des compétences d'agent locales au projet, des fichiers d'instructions échafaudés et le modèle d'identifiants qui détermine ce à quoi un agent peut réellement accéder.
@@ -10,7 +10,7 @@ problèmes différents. Il est utile de savoir lequel vous utilisez :
 
 | | Ce que c'est | Qui le consomme |
 |---|---|---|
-| [**Serveur MCP**](/docs/ai/mcp) | Un serveur Model Context Protocol stdio doté de 44 outils couvrant votre schéma, vos données, vos utilisateurs, votre stockage, vos crons et votre serveur de développement | Un assistant, au moment de l'exécution |
+| [**Serveur MCP**](/docs/ai/mcp) | Un serveur Model Context Protocol stdio doté de 51 outils couvrant votre schéma, vos données, vos utilisateurs, votre stockage, vos crons, votre serveur de développement et votre projet Rebase Cloud | Un assistant, au moment de l'exécution |
 | [**Compétences d'agent**](/docs/ai/skills) | 23 fichiers de compétences Markdown écrits dans votre dépôt par `rebase skills install` | Un assistant, comme documentation de référence |
 | [**Fichiers d'instructions**](/docs/ai/instruction-files) | `ai-instructions.md` ainsi que des fichiers de pointeurs spécifiques à chaque assistant, générés par `rebase init` | Un assistant, comme règles permanentes |
 | [**Clés d'API**](/docs/backend/api-keys) | Identifiants machine qui détiennent des [portées](/docs/backend/roles-and-scopes), par collection et par opération | Tout ce qui appelle l'API HTTP |

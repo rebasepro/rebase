@@ -1,5 +1,5 @@
 ---
-sourceHash: bd2df1ee8d59330b
+sourceHash: bb2bf60cbaed04eb
 title: Autenticazione
 sidebar_label: Autenticazione
 description: Configura l'autenticazione JWT, i provider OAuth, le email SMTP, la protezione dai bot e la collection users sul backend Rebase.
@@ -345,20 +345,20 @@ Se non configurata, l'unico controllo su un redirect OAuth è la corrispondenza 
 
 ### Collegamento degli account tra diversi metodi di accesso
 
-Cosa succede quando qualcuno si registra con email/password come `ada@example.com` e in seguito clicca su "Accedi con Google" con un account Google avente lo stesso indirizzo? Rebase **collega i due accessi in un unico account** — ma solo se il provider certifica l'email come verificata *e* l'indirizzo dell'account stesso è stato verificato. Non crea mai silenziosamente un secondo account per lo stesso indirizzo.
+Cosa succede quando qualcuno si registra con email/password come `ada@example.com` e in seguito clicca su "Accedi con Google" con un account Google avente lo stesso indirizzo? Rebase **collega i due accessi in un unico account**, ma solo se il provider certifica l'email come verificata. Non crea mai silenziosamente un secondo account per lo stesso indirizzo.
 
 Su `POST /api/auth/<provider>` l'ordine di risoluzione è:
 
-1. **Identità del provider nota** — se questa esatta identità del provider ha già effettuato l'accesso in precedenza, viene restituito quell'utente. L'email non viene consultata.
-2. **Account esistente con la stessa email, verificata da entrambi i lati** — il provider ha verificato l'email, e l'account anche. L'identità viene associata all'account esistente e l'utente vi accede. Un solo account, due modalità di accesso.
-3. **Account esistente con la stessa email, un lato non verificato** — la richiesta viene rifiutata con `403 EMAIL_NOT_VERIFIED`. Non viene creato o modificato nulla. `details.reason` indica quale lato: `provider-email-unverified`, oppure `local-account-unverified` (l'account ha una password) / `local-account-unverified-passwordless` (non ce l'ha).
-4. **Nessun account con quell'email** — viene creato un nuovo account, verificato se il provider ha verificato l'email.
+1. **Identità del provider nota**: se questa esatta identità del provider ha già effettuato l'accesso in precedenza, viene restituito quell'utente. L'email non viene consultata.
+2. **Account esistente con la stessa email, email verificata dal provider**: l'identità viene associata e l'utente vi accede. Un solo account, due modalità di accesso. Un account non verificato viene prima verificato (vedi sotto).
+3. **Account esistente con la stessa email, email non verificata dal provider**: la richiesta viene rifiutata con `403 EMAIL_NOT_VERIFIED` e `details.reason` `provider-email-unverified`. Non viene creato o modificato nulla.
+4. **Nessun account con quell'email**: viene creato un nuovo account, verificato se il provider ha verificato l'email.
 
 Il punto 3 rappresenta il caso critico per la sicurezza. Se un'email del provider non verificata fosse sufficiente per il collegamento, chiunque riuscisse a farsi emettere da un provider un indirizzo non proprio potrebbe impossessarsi del relativo account Rebase. Google attesta sempre `email_verified` per i veri account Google, quindi il passaggio 2 è il percorso standard per l'accesso con Google; il passaggio 3 intercetta soprattutto i provider che consentono agli utenti di specificare un indirizzo arbitrario non confermato.
 
-Il lato dell'account conta per lo stesso motivo. Nulla verifica l'indirizzo che riceve `POST /auth/register`, quindi chiunque può registrare l'indirizzo di un'altra persona con una password, o accedere con esso tramite un provider che non lo garantisce, e aspettare. Collegare l'accesso con Google del proprietario a quell'account vi lascerebbe la via d'accesso dell'altra persona.
+Il lato dell'account conta anch'esso. Nulla verifica l'indirizzo che riceve `POST /auth/register`, quindi chiunque può registrare l'indirizzo di un'altra persona con una password, o accedere con esso tramite un provider che non lo garantisce, e aspettare. Collegare l'accesso con Google del proprietario a quell'account non deve lasciarvi la via d'accesso dell'altra persona.
 
-Un link di verifica, un magic link, un codice via email o un ripristino della password dimostrano l'indirizzo e verificano l'account. Su un account non ancora verificato, la prima di queste prove rimuove la password (un ripristino imposta quella nuova) e ogni identità collegata il cui provider non ha verificato quell'indirizzo, e termina tutte le sessioni, prima di contrassegnare l'account come verificato. Da lì in poi vale il passaggio 2.
+Un provider che ha verificato l'indirizzo, un link di verifica, un magic link, un codice via email o un ripristino della password dimostrano tutti l'indirizzo e verificano l'account. Su un account non ancora verificato, la prima di queste prove rimuove la password (un ripristino imposta quella nuova) e ogni identità collegata il cui provider non ha verificato quell'indirizzo, e termina tutte le sessioni, prima di contrassegnare l'account come verificato: una password che nessuno ha verificato sparisce dopo il primo accesso con Google.
 
 Un link di verifica mantiene ciò che la persona che lo segue dimostra anche: una
 sessione attiva dell'account, oppure la sua password. Vedi [Verifica email](/docs/backend/email-verification/). Gli account creati da un amministratore con `POST /api/admin/users` vengono salvati come verificati, quindi un invitato può usare "Accedi con Google" subito. Un repository di autenticazione personalizzato senza `unlinkUserIdentity` rifiuta questa prova con `409 UNVERIFIED_IDENTITIES` quando c'è un'identità da rimuovere.

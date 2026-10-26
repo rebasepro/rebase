@@ -1,5 +1,5 @@
 ---
-sourceHash: 75edbe600ee52a3e
+sourceHash: 63a92d4d1f06a612
 title: Endpunkt-Index
 sidebar_label: Endpunkt-Index
 description: Jede HTTP-Route, die ein Rebase-Backend mountet – Daten, Authentifizierung, Speicher, Admin, Meta – mit dem jeweiligen Gate und der Seite, die sie erklärt.
@@ -140,9 +140,13 @@ der auf eine Collection beschränkt ist, erreicht nichts davon. Siehe [Rollen un
 | `GET` | `/api/admin/backups` | `backups:read` | Backup-Inventar |
 | `GET` | `/api/admin/backups/download` | `backups:read` | Streamt ein Backup. Mit `?token=` aus einem Download-Link ist kein Header nötig, nur für dieses Backup |
 | `POST` | `/api/admin/backups/download-url` | `backups:read` | Ein Link zu einem Backup, `{ key }` → `{ url, token, expiresIn }`, 60 Sekunden gültig — [Backups](/docs/deployment/backups/#download-a-backup) |
-| `GET` | `/api/admin/storage/orphans` | `database:read` | Gespeicherte Dateien, die keine Zeile nennt, `?storageId=&olderThanHours=` — was `rebase storage orphans` ausgibt |
-| `DELETE` | `/api/admin/storage/orphans` | `database:write` | Findet sie erneut und löscht sie; `409 STORAGE_SCAN_INCOMPLETE`, wenn eine Collection nicht gelesen werden konnte |
-| `POST` | `/api/admin/storage/move` | `database:write` | Kopiert einen Ordner unter denselben Schlüsseln in eine andere Quelle, eine Seite pro Aufruf — was `rebase storage move` sendet |
+| `POST` | `/api/admin/storage/orphans/scans` | `database:write` | Startet im Hintergrund einen Scan nach den gespeicherten Dateien, die keine Zeile nennt, `?storageId=&olderThanHours=`. Antwortet `202` mit dem Datensatz des Scans: `id`, `status` (`queued`) und `runner` (`worker`, wenn es ein `storage.orphans`-Job in der Job-Queue ist, `in-process`, wenn der Server ihn selbst ausführt). Sein Datensatz wird in der Quelle unter dem reservierten `_rebase/maintenance/` geschrieben |
+| `GET` | `/api/admin/storage/orphans/scans/:id` | `database:read` | Der Datensatz des Scans, `?storageId=`. Solange er läuft: `progress` (`filesScanned`, `rowsScanned`, `collectionsScanned` von `collectionsTotal`, `unscanned`). Sobald `completed`: `result`, der Bericht, den das frühere `GET /orphans` beantwortet hat. Ein Lauf, der 10 Minuten lang nichts mehr gemeldet hat, wird als `failed` beantwortet. `404 STORAGE_SCAN_NOT_FOUND`, wenn die Quelle keinen solchen Scan enthält |
+| `DELETE` | `/api/admin/storage/orphans?scan=:id` | `database:write` | Löscht die verwaisten Dateien eines abgeschlossenen Scans im Hintergrund, `202`. Jede wird erneut gegen jede Zeile und jeden Verlaufseintrag geprüft und unmittelbar vor dem Löschen noch einmal abgefragt. Das Ergebnis steht im `deletion` des Scan-Datensatzes. `409` mit `STORAGE_SCAN_NOT_COMPLETE`, `STORAGE_SCAN_INCOMPLETE`, `STORAGE_SCAN_EXPIRED` oder `STORAGE_SCAN_DELETION_STARTED` |
+| `GET` | `/api/admin/storage/orphans` | `database:read` | Veraltet: der Scan innerhalb der Anfrage, `?storageId=&olderThanHours=`. Antwortet mit `Deprecation: true`. Verwenden Sie `POST /orphans/scans` |
+| `DELETE` | `/api/admin/storage/orphans` | `database:write` | Veraltet, ohne `?scan=`: scannt erneut und löscht innerhalb der Anfrage. `409 STORAGE_SCAN_INCOMPLETE`, wenn eine Collection nicht gelesen werden konnte |
+| `POST` | `/api/admin/storage/move` | `database:write` | Kopiert einen Ordner unter denselben Schlüsseln in eine andere Quelle, eine Seite pro Aufruf — was `rebase storage move` sendet; `400 STORAGE_SAME_LOCATION` für `deleteSource` zwischen zwei Quellen, die am selben Ort speichern |
+| `POST` | `/api/admin/storage/move/verify` | `database:write` | Listet die Quelle nach einem Move erneut auf, mit demselben Body, eine Seite pro Aufruf: `{ checked, notMoved: [{ key, reason }], cursor? }` — jede Datei, die mit `deleteSource` noch in der Quelle liegt, jede Datei, für die das Ziel ohne `deleteSource` keine Kopie hat. `rebase storage move` fragt es ab, wenn der Move fertig ist |
 | `GET` | `/api/admin/logs` | `logs:read` | Der Puffer der letzten Protokolle |
 | `GET` | `/api/admin/logs/latest` | `logs:read` | Die neuesten Einträge |
 | `GET` | `/api/admin/logs/stream` | `logs:read` | Server-Sent Events |
@@ -150,7 +154,7 @@ der auf eine Collection beschränkt ist, erreicht nichts davon. Siehe [Rollen un
 | `GET` | `/api/admin/rls-simulator/options` | `schema:read` | Die Rollen, die von Regeln genannten Rollen und die gültigen Dienstschlüssel, die ein Administrator simulieren kann |
 | `POST` | `/api/admin/rls-simulator/preview` | `schema:read` | Jede Sammlung, wie `{ role?, userId?, apiKeyId? }` sie erreicht: sichtbare Zeilen gegenüber denen des Aufrufers, verborgen durch Scope oder RLS, maskierte Felder. Nur die Sitzung eines Administrators |
 | `POST` | `/api/admin/sql/csv` | `database:write` | Streamt das gesamte Ergebnis einer schreibgeschützten Abfrage als CSV — „Gesamtes Ergebnis als CSV herunterladen“ in [Studio](/docs/studio/) |
-| `GET` | `/api/admin/branches/:name/diff` | `database:read` | Was ein [Branch](/docs/backend/branching/#reviewing-and-merging-a-branch) geändert hat: Schema, Richtlinien und Zeilen, `?sampleLimit=&schemas=&maxRowsPerTable=` |
+| `GET` | `/api/admin/branches/:name/diff` | `database:write` | Was ein [Branch](/docs/backend/branching/#reviewing-and-merging-a-branch) geändert hat: Schema, Richtlinien und Zeilen, `?sampleLimit=&schemas=&maxRowsPerTable=` |
 | `POST` | `/api/admin/branches/:name/merge` | `database:write` | Schreibt die Zeilen des Branches in seinen Elternteil, `{ expectedFingerprint, onConflict?, skipBlocked? }`; `409`, wenn sich seit dem Diff eine Seite geändert hat oder Zeilen in Konflikt stehen |
 | `GET` | `/api/admin/schema/status` | `schema:read` | [Live-Schema-Bearbeitung](/docs/backend/live-schema-editing/) |
 | `POST` | `/api/admin/schema/plan` | `schema:read` | Plant eine Änderung; wendet sie niemals an |

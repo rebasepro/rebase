@@ -1,5 +1,5 @@
 ---
-sourceHash: 5764a95deb8e4e9c
+sourceHash: 80956abbae707a91
 title: Kubernetes
 sidebar_label: Kubernetes
 description: Déployez Rebase sur un cluster Kubernetes avec le chart Helm officiel — un ou plusieurs Deployments, un Job de migration qui gère le schéma, et des applications statiques sur le même hôte.
@@ -70,6 +70,8 @@ les mêmes valeurs.
 | `url` | Image standard ; le runtime télécharge une archive tarball à chaque démarrage de pod | Un plan de contrôle (control plane) qui distribue les bundles hors bande |
 
 ## Un seul processus, ou plusieurs
+
+<span class="since-badge" data-since="0.26">Depuis 0.26</span>
 
 Par défaut, un seul Deployment gère tout — la même structure que celle
 exécutée par le fichier Compose. Pour séparer les rôles, une seule valeur suffit :

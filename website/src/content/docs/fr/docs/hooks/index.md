@@ -1,5 +1,5 @@
 ---
-sourceHash: c8644465af03e13a
+sourceHash: 6dfae85520b10436
 title: Référence des Hooks
 sidebar_label: Hooks
 description: Hooks React fournis par Rebase pour accéder à l'authentification, aux données, à la navigation, aux panneaux latéraux, au stockage et à l'état de l'interface.
@@ -477,7 +477,15 @@ function EditForm() {
 
 ## `useEffectiveRoleController`
 
-Changer de rôle à l'exécution pour prévisualiser les permissions et tester les politiques de Row-Level Security (RLS) en local sans se déconnecter.
+Changer le rôle pour lequel la navigation du panneau d'administration est construite, sans se déconnecter :
+quelles vues Studio elle liste. Il n'envoie rien au serveur et n'évalue aucune politique de
+sécurité au niveau des lignes : une vue de données montre donc toujours ce que vous pouvez lire. Pour
+tester la RLS, utilisez **Simulate access** (au-dessus de votre avatar dans le tiroir), ou `client.simulate()` depuis
+le code ; voir [Tester l'accès](/docs/frontend/authentication/#testing-access-simulate-access).
+
+`<Rebase>` fournit le contrôleur. `useBuildEffectiveRoleController`, le hook
+qui en construisait un à passer comme `effectiveRoleController`, est obsolète au profit de
+Simulate access et avertit une seule fois lorsqu'il est appelé.
 
 ```typescript
 import { useEffectiveRoleController } from "@rebasepro/app";

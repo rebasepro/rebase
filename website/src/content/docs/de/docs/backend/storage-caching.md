@@ -1,5 +1,5 @@
 ---
-sourceHash: add7e5205bcbe73a
+sourceHash: 2e525d1d6efa4692
 title: Storage-Caching und CDNs
 sidebar_label: Storage-Caching und CDNs
 description: Wie Rebase gespeicherte Dateien ausliefert, damit Browser und CDNs sie zwischenspeichern können — ETags und 304er, Cache-Control je nachdem, wer ein Objekt lesen darf, Byte-Bereiche zum Spulen in Audio und Video, und was an einem vorgeschalteten CDN zu konfigurieren ist.
@@ -89,5 +89,5 @@ Zwei Dinge sollten am CDN selbst konfiguriert werden:
 ## Verwandte Themen
 
 - **[Storage-Konfiguration](/docs/backend/storage/)** — die Backends, von denen diese Header ausgeliefert werden, sowie das `public/`-Präfix und `publicRead`, die ein Objekt `public` machen.
-- **[Autorisierung auf Objektebene](/docs/backend/storage/#per-object-authorization)** — wer ein Objekt lesen darf, was über `public` oder `private` entscheidet.
+- **[Autorisierung auf Objektebene](/docs/backend/storage-authorization/)** — wer ein Objekt lesen darf, was über `public` oder `private` entscheidet.
 - **[Datei-Uploads](/docs/collections/file-uploads/)** — die Collection-Properties, die Dateien speichern.

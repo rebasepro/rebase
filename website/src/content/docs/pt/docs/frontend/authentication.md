@@ -1,5 +1,5 @@
 ---
-sourceHash: 6ac0abb490b5801e
+sourceHash: fe474014627c7510
 title: Autenticação e Login
 sidebar_label: Autenticação e Login
 description: Configure o controlador de autenticação, a tela de login e a simulação de papéis no seu frontend React do Rebase.
@@ -114,18 +114,49 @@ Para adicionar ou remover opções de papéis, atualize o mapeamento `enum` na s
 
 Um papel nesta lista é um nome ao qual suas [regras de segurança](/docs/collections/security-rules) podem corresponder. O que ele pode fazer além das suas linhas (gerenciar usuários, ler logs, alterar o schema) é declarado separadamente, em `auth.roles` na mesma coleção. `admin` é embutido e tem tudo. Consulte [Papéis e escopos](/docs/backend/roles-and-scopes).
 
-## Simulação de Papéis (Modo Dev)
+## Testando o acesso: Simulate access
 
-No modo de desenvolvedor, você pode simular diferentes papéis sem precisar fazer logout. Isso é útil para testar políticas de RLS:
+Para conferir o que um papel, um usuário ou uma service key pode ler, um administrador usa
+**Simulate access**, a pílula acima do seu avatar no drawer do painel de administração (na
+barra do app em uma tela pequena, ou quando o shell não tem drawer). Escolha um papel
+(com um id de usuário opcional, que não precisa ser uma conta), um usuário ou uma
+service key ativa.
+Todas as views de dados, e a aba History de um registro, passam então a ler pelo servidor como
+essa identidade, contra as políticas reais de row-level security: uma grade mostra
+exatamente as linhas que ela pode ler,
+os campos que seus papéis não podem ler são mascarados, e o banner conta as coleções
+em que ela não vê nada. O servidor verifica a cada requisição que você é um
+administrador.
+
+O acesso simulado é somente leitura. Enquanto está ativo, as views não oferecem criar, editar,
+excluir nem reverter o histórico, e o servidor recusa qualquer escrita que traga uma simulação com
+`403 SIMULATION_READ_ONLY`, então nada é salvo como outra pessoa. Pare de simular
+para fazer alterações.
+
+O que ele não simula: o gate `requireAuth` da API de dados, que deixa passar um
+chamador anônimo simulado para que você veja o que as políticas das linhas lhe dão
+(uma função personalizada o vê como sem sessão, como a um chamador anônimo real);
+o armazenamento, cujos arquivos são lidos como você, com uploads desativados durante a simulação; e
+as atualizações em tempo real, que pausam até você parar.
+
+A mesma coisa a partir do código, no SDK, é `client.simulate()`. Ele deriva um
+client cujas requisições carregam a simulação, e apenas a sessão do próprio
+administrador pode usá-lo:
 
 ```typescript
-import { useBuildEffectiveRoleController } from "@rebasepro/app";
-
-const effectiveRoleController = useBuildEffectiveRoleController();
-
-// When active, the UI behaves as if the current user has this role
-effectiveRoleController.setEffectiveRole("editor");
+const asCustomer = client.simulate({ role: "customer", userId: "u_1" });
+const { data } = await asCustomer.data.collection("tickets").find();
+asCustomer.close();
 ```
+
+O client derivado é tipado pelo mesmo `Database` que aquele de que veio, e
+é um client próprio: faça `close()` nele quando terminar.
+
+A troca de papel efetivo não é um testador de RLS: ela apenas muda quais views do Studio
+a navegação lista, não envia nada ao servidor e não avalia nenhuma
+política. `useBuildEffectiveRoleController`, que construía uma, está obsoleto e
+avisa uma vez quando é chamado: `<Rebase>` constrói o próprio controlador quando nenhum é
+passado, e Simulate access é o jeito de testar o que um papel pode fazer.
 
 ## Próximos Passos
 

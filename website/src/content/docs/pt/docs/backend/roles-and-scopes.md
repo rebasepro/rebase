@@ -1,5 +1,5 @@
 ---
-sourceHash: 96a224ca982e3d25
+sourceHash: faf5a0ca622c3a50
 title: Papéis e escopos
 sidebar_label: Papéis e escopos
 description: "O que um chamador pode fazer: o plano de dados que toda pessoa tem, o plano administrativo que os papéis concedem, os escopos que um app declara para si mesmo e como cada credencial os carrega."
@@ -18,7 +18,7 @@ Os escopos se dividem em dois planos, e uma pessoa os tem de formas diferentes.
 **O plano de dados** é `data:*`, `storage:*` e `functions:invoke`. Toda
 pessoa autenticada tem todo ele. O que uma pessoa pode fazer com uma linha é decidido pelas
 [regras de segurança](/docs/collections/security-rules/) da coleção, linha por linha,
-e o que ela pode fazer com um arquivo, pelas [políticas de storage](/docs/backend/storage/#per-object-authorization).
+e o que ela pode fazer com um arquivo, pelas [políticas de storage](/docs/backend/storage-authorization/).
 Um escopo nunca decide isso para uma pessoa. Em uma chave ou em um token, os escopos do plano de dados
 restringem: uma chave que tem apenas `data:read:posts` lê `posts` e nada mais,
 seja o que for que as regras permitiriam.
@@ -249,6 +249,9 @@ Para chaves:
   seja administrador. Caso contrário, `403 ROLE_EXCEEDS_CREATOR`.
 - `keys:read` e `keys:write` nunca vão em uma chave. Uma chave que gerencia chaves poderia
   criar a própria sucessora. `400 KEY_MANAGEMENT_SCOPE`.
+- Quem tem `keys:write` não pode alterar nem revogar uma chave que tenha um papel ou
+  escopo que ele não tem, a menos que seja administrador: `403 KEY_OUTRANKS_CALLER`.
+  Sem isso, essa pessoa poderia ampliar uma chave com papel de administrador para todos os escopos de dados.
 
 Para contas, quem tem `users:write`:
 
@@ -258,6 +261,11 @@ Para contas, quem tem `users:write`:
   de um administrador e entrar como ele.
 - não pode conceder papéis que tenham mais do que ele tem, `admin` incluído: `403 ROLE_EXCEEDS_CALLER`.
 
+Um nome de papel pode ser qualquer coisa, exceto um nome que seria lido de volta como outros
+papéis: um nome vazio, ou que contenha `,` `{` `}` `"` `\` ou um caractere de controle, é recusado com
+`400 INVALID_ROLE` onde quer que um papel seja gravado (usuários, a collection
+de usuários, chaves de serviço).
+
 ## Como cada credencial tem escopos
 
 | Credencial | Age como | Tem |
@@ -265,7 +273,7 @@ Para contas, quem tem `users:write`:
 | A sessão de uma pessoa | a pessoa | o plano de dados, todos os escopos de app e os escopos dos seus papéis. Um administrador tem tudo |
 | [Chave de serviço](/docs/backend/api-keys/#service-keys) `rk_live_…` | `api-key:<id>`, com os papéis de RLS `service` mais os próprios `roles` | exatamente seus escopos |
 | [Chave pessoal](/docs/backend/api-keys/#personal-keys) `rk_live_…` | seu proprietário, com os papéis do proprietário como estão a cada requisição | seus escopos, reduzidos ao que o proprietário tem agora |
-| [Token MCP](/docs/ai/mcp/#the-remote-endpoint) | a pessoa que o conectou | `data:read`, `data:write`, `data:delete` conforme concedidos, opcionalmente por coleção |
+| [Token MCP](/docs/ai/remote-mcp/) | a pessoa que o conectou | `data:read`, `data:write`, `data:delete` conforme concedidos, opcionalmente por coleção |
 | `REBASE_SERVICE_KEY` | `service`, com o papel `admin` | tudo |
 
 Uma chave ou um token nunca ignora a row-level security. Seus escopos são um teto,

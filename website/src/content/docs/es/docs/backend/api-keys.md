@@ -1,5 +1,5 @@
 ---
-sourceHash: 83ba3db403bb8334
+sourceHash: 9feb465f3327d507
 title: Claves de API
 sidebar_label: Claves de API
 description: "Claves de larga duración para scripts, CI, agentes e integraciones: claves de servicio y claves personales, los alcances que tienen, cómo se combinan con la seguridad a nivel de fila y las rutas que las gestionan."
@@ -32,7 +32,7 @@ curl "$API_URL/api/data/orders" \
 
 La misma clave funciona en la API REST, el almacenamiento, las funciones
 personalizadas, las superficies de administración a las que llegan sus alcances, el
-WebSocket de tiempo real y el [endpoint `/mcp`](/docs/ai/mcp/#the-remote-endpoint).
+WebSocket de tiempo real y el [endpoint `/mcp`](/docs/ai/remote-mcp/).
 
 ## Claves de servicio
 
@@ -163,7 +163,7 @@ de 15 minutos, y todas las vías cuentan contra él en un mismo contador, `api-k
 - sus tramas de datos en el socket de tiempo real: lecturas, conteos, guardados y
   eliminaciones, y las suscripciones y las solicitudes de historial de canal que superan la
   [asignación](/docs/backend/realtime/#what-a-write-costs-and-the-limits) de cada socket;
-- sus solicitudes a [`/mcp`](/docs/ai/mcp/#the-remote-endpoint).
+- sus solicitudes a [`/mcp`](/docs/ai/remote-mcp/).
 
 Sin `rate_limit`, el contador tiene el valor predeterminado del servidor para claves
 de API, 1000. Una clave personal no tiene `rate_limit` propio, y cuenta en su propio
@@ -172,6 +172,11 @@ responde `429` y una trama del socket `RATE_LIMITED`.
 
 Las rutas de administración bajo `/api/admin`, y los mensajes de administración del
 socket, como los del editor SQL, no tienen límite de tasa.
+
+Un administrador que simula una clave («Simulate access»,
+`x-rebase-simulate-api-key-id`) gasta su propia asignación, no la de la clave: la
+integración que se ejecuta con esa clave conserva todo su presupuesto. Simular o
+suplantar a un usuario se carga al administrador de la misma forma.
 
 ## Claves personales
 
@@ -257,7 +262,7 @@ desplazamiento y la cancelación. `storage:delete` elimina. El destino es el id 
 origen de almacenamiento. El id del origen predeterminado es `(default)`, así que
 `storage:read:(default)` lee solo el origen predeterminado, y `storage:write:avatars`
 escribe en un origen llamado `avatars`. Tras la comprobación del alcance,
-[`storageAuthorize`](/docs/backend/storage/#per-object-authorization) sigue
+[`storageAuthorize`](/docs/backend/storage-authorization/) sigue
 ejecutándose, con la identidad de la clave.
 
 ### Funciones
@@ -318,6 +323,8 @@ Cada clave se comprueba contra quien la crea, igual en ambas rutas:
 | `400 KEY_MANAGEMENT_SCOPE` | Se pidió `keys:read` o `keys:write` |
 | `403 SCOPE_EXCEEDS_CREATOR` | Un alcance que el creador no tiene. Una clave nunca tiene más que la cuenta que la creó |
 | `403 ROLE_EXCEEDS_CREATOR` | Un rol de clave de servicio que el creador no tiene, cuando el creador no es administrador |
+| `400 INVALID_ROLE` | El nombre de un rol está vacío o contiene `,` `{` `}` `"` `\` o un carácter de control, que RLS leería como otros roles |
+| `403 KEY_OUTRANKS_CALLER` | En un cambio (`PUT`) o una revocación (`DELETE`): la clave ya tiene un rol o un alcance que quien llama no tiene, y quien llama no es administrador |
 
 Una solicitud para la que la propia clave no tiene alcance responde
 `403 SCOPE_MISSING`, con el alcance en `details.requiredScope`. Consulta

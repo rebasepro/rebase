@@ -1,5 +1,5 @@
 ---
-sourceHash: 6c024c2a337ce83c
+sourceHash: a636c0e2f47b6493
 title: Verificação de e-mail
 sidebar_label: Verificação de e-mail
 description: "Como uma conta comprova seu endereço de e-mail: o link enviado no registro, o que segui-lo mantém e remove, e o registro confirm-first com requireEmailVerification."
@@ -44,9 +44,11 @@ Quem se registrou segue o link e informa sua senha
 e faz login. Com isso desativado, que é o padrão, um endereço que já
 tem uma conta recebe `409 EMAIL_EXISTS`, como antes.
 
-Para se recuperar de uma rejeição do passo 3 (`403 EMAIL_NOT_VERIFIED`, veja
-[Vinculação de contas](/docs/backend/authentication/#account-linking-across-sign-in-methods)),
-o usuário entra com seu método existente e chama o endpoint explícito de vinculação:
+Um login por um provedor que verificou o endereço também verifica a conta (veja
+[Vinculação de contas](/docs/backend/authentication/#account-linking-across-sign-in-methods)).
+Para se recuperar de uma rejeição do passo 3 (`403 EMAIL_NOT_VERIFIED`: o provedor
+não verificou o endereço), o usuário entra com seu método existente e chama o
+endpoint explícito de vinculação:
 
 ```http
 POST /api/auth/link/google

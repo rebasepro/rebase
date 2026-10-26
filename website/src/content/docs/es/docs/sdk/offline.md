@@ -1,5 +1,5 @@
 ---
-sourceHash: dc394aa7ff8f8f55
+sourceHash: 4cc7758ee53e304b
 title: Sincronización Offline y Local-First
 sidebar_label: Offline
 description: Active el motor de sincronización local-first del SDK tipado de Rebase — una base de datos local de filas, escrituras offline instantáneas con reversión y consultas en vivo reactivas.
@@ -159,7 +159,7 @@ Una fila que otra persona eliminó es el único caso que no se revierte. Un `del
 
 La cascada es estrecha: un `update` se descarta junto con la escritura que editaba, porque solo puede fallar de la misma manera. Un `create` o `delete` posterior sobre la misma fila se sostiene por sí mismo y se conserva. Un `create` rechazado de una fila creada offline arrastra además consigo toda escritura en cola, en cualquier colección, cuyos valores referencien el id temporal de la fila. Una escritura descartada nunca se envió. Se informa con un `RebaseApiError` cuyo `code` es `DEPENDENCY_REJECTED` y cuyo `cause` es el rechazo que la condenó, para que puedas distinguirla de la escritura que el servidor realmente rechazó. En 0.23 lleva en cambio el propio error de la escritura rechazada.
 
-Las ediciones consecutivas sobre una misma fila mientras está sin conexión se fusionan en una única escritura en cola, de modo que un formulario en el que se está escribiendo no hace crecer la cola. Si el servidor rechaza la escritura fusionada por su contenido (un 400, 403 o 422 — por ejemplo, un campo eliminado por un cambio de esquema mientras el usuario estaba sin conexión), el motor la divide de nuevo en las ediciones separadas y reproduce cada una. Solo se revierte y se informa la edición que el servidor rechaza; las demás se conservan.
+Las ediciones consecutivas sobre una misma fila mientras está sin conexión se fusionan en una única escritura en cola, de modo que un formulario en el que se está escribiendo no hace crecer la cola. En una escritura que la cola ya empezó a enviar no se fusiona nada: una edición hecha después de un intento de reproducción cuya respuesta se perdió se pone en cola como una actualización propia, y la eliminación de una fila creada sin conexión se envía en lugar de cancelarse contra su creación, porque el servidor puede tener ya la fila. Si el servidor rechaza la escritura fusionada por su contenido (un 400, 403 o 422 — por ejemplo, un campo eliminado por un cambio de esquema mientras el usuario estaba sin conexión), el motor la divide de nuevo en las ediciones separadas y reproduce cada una. Solo se revierte y se informa la edición que el servidor rechaza; las demás se conservan.
 
 ### Conflictos
 
@@ -182,7 +182,7 @@ const client = createRebaseClient({
 
 La cola espera mientras se ejecuta `onConflict`, así que puede preguntar al usuario. Si lanza un error, la edición se sobrescribe.
 
-La versión contra la que se hace una edición es la que informó la última lectura de la fila: `findById()`, una trama de `listenById()`, o la respuesta de un `update()` anterior. Una fila leída por última vez en una lista de `find()` o `listen()` no tiene versión, ni tampoco una edición hecha encima de otra escritura en cola sobre la misma fila. Esas se reproducen sin precondición. Un `ifMatch` que pases tú mismo a `update()` se conserva cuando la edición se pone en cola.
+La versión contra la que se hace una edición es la que informó la última lectura de la fila: `findById()`, una trama de `listenById()`, o la respuesta de un `update()` anterior. Una fila leída por última vez en una lista de `find()` o `listen()` no tiene versión, ni tampoco una edición hecha encima de otra escritura en cola sobre la misma fila. Esas se reproducen sin precondición. Un `ifMatch` que pases tú mismo a `update()` o `delete()` se conserva cuando la escritura se pone en cola, con `onConflict` o sin él, y `findById()` en un cliente con offline activado devuelve la fila con su versión, de modo que `etagOf(row)` funciona como en línea. Sin `onConflict`, una escritura en cola rechazada por tu propio `ifMatch` se revierte y se informa a `onSyncError` con un 412 `PRECONDITION_FAILED`.
 
 Un fallo que es meramente temporal — un 429, un 503, una conexión caída — no es un rechazo. Esos permanecen en cola y se reintentan; solo después de `maxRetries` aplazamientos se revierte una escritura.
 
@@ -235,7 +235,11 @@ se reproduce hasta que se confirma la sesión: cuando vuelve la conexión, el
 cliente renueva la sesión, y un inicio de sesión también la confirma. Si el servidor
 rechaza la sesión, o inicia sesión otra persona, el dispositivo cambia de usuario, y
 las escrituras en cola se quedan con su autor hasta que vuelva a iniciar sesión. Mientras tanto
-`status().unverifiedUser` es `true`.
+`status().unverifiedUser` es `true`, y eso vale también en línea: hasta que la
+renovación responde, las escrituras se ponen en cola en lugar de salir sin
+credenciales, y las lecturas se responden desde las filas locales del usuario. Lo
+que el servidor envía a una solicitud sin sesión es lo que puede ver quien no ha
+iniciado sesión, así que no se conserva.
 
 ```typescript
 createRebaseClient({

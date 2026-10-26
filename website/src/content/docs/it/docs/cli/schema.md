@@ -1,5 +1,5 @@
 ---
-sourceHash: 882f81a3b9bbe750
+sourceHash: 829ce13f7c169a96
 title: Generazione dello Schema
 sidebar_label: Generazione dello Schema
 description: Genera schemi Drizzle ORM dalle definizioni delle collezioni, crea migrazioni SQL e mantieni il tuo database sincronizzato con la CLI di Rebase.
@@ -169,7 +169,7 @@ rebase db push
 **Cosa fa:**
 - Legge lo schema Drizzle generato
 - Applica le modifiche direttamente al database (CREATE, ALTER, DROP)
-- Esegue prima il piano in modalità dry run e si ferma prima di tutto ciò che distrugge dati: una tabella, colonna, schema, vista o tipo eliminati, un `TRUNCATE`, un cambio di tipo di colonna che può perdere valori (`timestamptz` → `date`, `numeric` → `integer`), o un cambio di chiave primaria: `(id)` → `(id, locale)` dà a ogni riga un nuovo id, così link, chiavi esterne e id salvati altrove non trovano più la loro riga. Si ferma anche prima dell'eliminazione di un vincolo CHECK o EXCLUDE che il database contiene: nessuna riga va persa, ma da quel momento il database accetta righe che rifiutava. In un terminale chiede conferma, dove Ctrl-C o Ctrl-D rispondono no, altrimenti rifiuta; `--allow-destructive` (o `--yes`) applica comunque la modifica. Un push che si ferma lì elimina all'uscita il proprio database di appoggio `<db>_dev_diff`
+- Esegue prima il piano in modalità dry run e si ferma prima di tutto ciò che distrugge dati: una tabella, colonna, schema, vista o tipo eliminati, un `TRUNCATE`, un cambio di tipo di colonna che può perdere valori (`timestamptz` → `date`, `numeric` → `integer`), o un cambio di chiave primaria: `(id)` → `(id, locale)` dà a ogni riga un nuovo id, così link, chiavi esterne e id salvati altrove non trovano più la loro riga. Si ferma anche prima dell'eliminazione di un vincolo CHECK o EXCLUDE che il database contiene: nessuna riga va persa, ma da quel momento il database accetta righe che rifiutava. In un terminale chiede conferma, dove Ctrl-C o Ctrl-D rispondono no, altrimenti rifiuta; `--allow-destructive` applica comunque la modifica. Anche `--yes` lo fa ancora in questa release, con un avviso di deprecazione; dalla prossima release approverà solo i push che non distruggono nulla. Un push che si ferma lì elimina all'uscita il proprio database di appoggio `<db>_dev_diff`
 - Attiva la sicurezza a livello di riga su ogni tabella di collezione, tabelle di giunzione comprese, subito dopo la modifica dello schema e prima di qualsiasi passaggio che possa fallire: un push che si interrompe a metà lascia una nuova tabella che nega ogni richiesta invece che aperta a tutte
 - Applica le policy RLS delle tue collezioni e **rimuove le policy sostituite da un push precedente**
 - Lascia com'è ogni vincolo CHECK ed EXCLUDE sulla

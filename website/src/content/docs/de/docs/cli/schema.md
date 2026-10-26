@@ -1,5 +1,5 @@
 ---
-sourceHash: 882f81a3b9bbe750
+sourceHash: 829ce13f7c169a96
 title: Schema-Generierung
 sidebar_label: Schema-Generierung
 description: Generieren Sie Drizzle-ORM-Schemas aus Collection-Definitionen, erstellen Sie SQL-Migrationen und halten Sie Ihre Datenbank mit der Rebase-CLI synchron.
@@ -169,7 +169,7 @@ rebase db push
 **Was er tut:**
 - Liest das generierte Drizzle-Schema
 - Wendet Änderungen direkt auf die Datenbank an (CREATE, ALTER, DROP)
-- Führt den Plan zuerst als Dry-Run aus und hält vor jeder Änderung an, die Daten zerstört: eine gelöschte Tabelle, Spalte, View, ein gelöschtes Schema oder ein gelöschter Typ, ein `TRUNCATE` eine Änderung des Spaltentyps, bei der Werte verloren gehen können (`timestamptz` → `date`, `numeric` → `integer`), oder eine Änderung des Primärschlüssels – `(id)` → `(id, locale)` gibt jeder Zeile eine neue ID, sodass Links, Fremdschlüssel und anderswo gespeicherte IDs ihre Zeile nicht mehr finden. Er hält außerdem vor dem Löschen eines CHECK- oder EXCLUDE-Constraints an, den die Datenbank enthält: Keine Zeile geht verloren, aber von da an nimmt die Datenbank Zeilen an, die sie zuvor abgelehnt hat. Im Terminal fragt er nach, wobei Strg-C oder Strg-D mit Nein antwortet, sonst verweigert er; `--allow-destructive` (oder `--yes`) wendet die Änderung trotzdem an. Ein Push, der dort anhält, löscht auf dem Weg hinaus seine Zwischendatenbank `<db>_dev_diff`
+- Führt den Plan zuerst als Dry-Run aus und hält vor jeder Änderung an, die Daten zerstört: eine gelöschte Tabelle, Spalte, View, ein gelöschtes Schema oder ein gelöschter Typ, ein `TRUNCATE` eine Änderung des Spaltentyps, bei der Werte verloren gehen können (`timestamptz` → `date`, `numeric` → `integer`), oder eine Änderung des Primärschlüssels – `(id)` → `(id, locale)` gibt jeder Zeile eine neue ID, sodass Links, Fremdschlüssel und anderswo gespeicherte IDs ihre Zeile nicht mehr finden. Er hält außerdem vor dem Löschen eines CHECK- oder EXCLUDE-Constraints an, den die Datenbank enthält: Keine Zeile geht verloren, aber von da an nimmt die Datenbank Zeilen an, die sie zuvor abgelehnt hat. Im Terminal fragt er nach, wobei Strg-C oder Strg-D mit Nein antwortet, sonst verweigert er; `--allow-destructive` wendet die Änderung trotzdem an. `--yes` tut das in diesem Release ebenfalls, mit einer Deprecation-Warnung; ab dem nächsten Release genehmigt es nur noch Pushes, die nichts zerstören. Ein Push, der dort anhält, löscht auf dem Weg hinaus seine Zwischendatenbank `<db>_dev_diff`
 - Schaltet Row-Level Security für jede Collection-Tabelle ein, Junction-Tabellen eingeschlossen, direkt nach der Schemaänderung und vor jedem Schritt, der fehlschlagen kann – ein Push, der mittendrin abbricht, hinterlässt eine neue Tabelle also verweigernd statt offen für jede Anfrage
 - Wendet die RLS-Policies Ihrer Collections an und **entfernt Policies, die ein früherer Push ersetzt hat**
 - Lässt jeden CHECK- und EXCLUDE-Constraint auf der

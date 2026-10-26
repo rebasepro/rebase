@@ -1,5 +1,5 @@
 ---
-sourceHash: d0d64eef975c9c59
+sourceHash: 21c1631250b71da2
 title: Scripts y la consola
 sidebar_label: Scripts y la consola
 description: Abre los datos de un proyecto desde un script, una prueba o un REPL con openRebase, o desde la terminal con rebase console. Sin servidor, sin cambios de esquema.
@@ -52,7 +52,9 @@ Hay dos nombres en el ámbito, y `await` de nivel superior funciona:
 | `collections` | Las colecciones del proyecto, cargadas como las carga `rebase db push` |
 
 La consola abre el proyecto como lo hace `rebase db push`: el mismo `.env`,
-la misma base de datos y las mismas colecciones. Un proyecto en la base de datos
+la misma base de datos y las mismas colecciones. También carga los `callbacks`
+globales de `config/index.ts`, así que sus escrituras ejecutan los mismos hooks
+que una escritura del servidor. Un proyecto en la base de datos
 de desarrollo gestionada la tiene iniciada primero. El historial de lo que escribiste se
 guarda en `.rebase/console_history`, que el `.gitignore` del scaffold ya
 deja fuera.
@@ -131,7 +133,7 @@ DATABASE_URL="$(pnpm exec rebase db url)" pnpm exec tsx scripts/publish-drafts.t
 | Miembro | Qué hace |
 |---|---|
 | `dataAsAdmin` | Todas las colecciones, leídas y escritas con la identidad de servicio del servidor (`{ uid: "service", roles: ["admin"] }`): administrador, y aun así evaluado por tus políticas RLS, exactamente igual que `rebase.dataAsAdmin` en una función |
-| `sql(query, { params })` | SQL en bruto sobre la conexión del propietario, con la misma convención de llamada que `rebase.sql` en una función |
+| `sql(query, { params })` | SQL en bruto sobre la conexión del propietario, con la misma convención de llamada que `rebase.sql` en una función. Se ejecuta en la única fuente de datos abierta: `{ database }` que nombre cualquier otra se rechaza |
 | `withAuth(user)` | Se resuelve a `{ data }`: las colecciones tal como las ve ese usuario. Cada lectura y escritura se ejecuta como él, filtrada por la seguridad a nivel de fila, como lo sería una solicitud HTTP de ese usuario |
 | `collections` | Las colecciones con las que se abrió |
 | `close()` | Termina el pool de conexiones que creó `openRebase`. Se puede llamar dos veces sin problema |
@@ -145,6 +147,7 @@ Sus opciones:
 | `collections` | Las colecciones del proyecto. Un array vacío las lee de la base de datos en su lugar, como hace un servidor sin archivos de colección, y las sirve en modo de solo lectura |
 | `pool` | Ajustes del pool, junto con `databaseUrl` |
 | `dataSourceKey` | La fuente de datos desde la que se sirven estas colecciones. Por defecto `(default)` |
+| `callbacks` | Los callbacks globales del proyecto, los `callbacks` que exporta tu `config/index.ts`. El servidor los ejecuta antes de los hooks propios de cada colección; pásalos aquí y una escritura de un script también los ejecuta |
 
 `openRebase` no lee ninguna variable de entorno. El `DATABASE_URL` de arriba lo lee
 tu script, y ajustes como `REBASE_DB_POOL_MAX` o `REALTIME_CDC` no cambian
@@ -272,9 +275,22 @@ a escribir la entidad, y en su barrido horario.
 
 ### Lo que deja fuera
 
-`openRebase` abre la capa de datos y nada más. No inicia realtime, así que
-sus escrituras no se anuncian a las consultas en vivo.
+`openRebase` abre la capa de datos y nada más. No inicia realtime por su cuenta,
+pero sus escrituras sí llegan a las consultas en vivo: los triggers de captura de
+cambios de la base de datos anuncian cada escritura, la haga quien la haga, así
+que los suscriptores de un servidor en marcha también vuelven a consultar tras un
+backfill. Solo con `REALTIME_CDC=off` en ese servidor no se anuncian. Consulta
+[Captura de cambios de la base de datos](/docs/backend/realtime-cdc/).
 Almacenamiento, correo electrónico, administración de autenticación y tus funciones no están en él.
+
+Los callbacks de colección se ejecutan en cada escritura, igual que en el servidor.
+Los `callbacks` globales del proyecto solo se ejecutan cuando los pasas como la
+opción `callbacks`. `rebase console` los pasa por ti: lee los `callbacks` que
+exporta tu `config/index.ts`, así que un `beforeSave` global también se ejecuta en
+sus escrituras. Si ese archivo no se puede importar (por ejemplo, necesita una
+variable de entorno que no se le dio a la consola), la consola imprime una línea
+diciendo que los callbacks globales están desactivados en la sesión y se abre sin
+ellos.
 
 Cuando un script también necesita esas piezas, construye el backend sin servirlo:
 `createRebaseBackend({ …, provision: false })` te da `backend.rebase`, el

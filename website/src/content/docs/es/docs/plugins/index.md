@@ -1,5 +1,5 @@
 ---
-sourceHash: 71525adfd73230ec
+sourceHash: e6db89a6b0b8b60d
 title: Sistema de plugins
 sidebar_label: Plugins
 description: Extiende Rebase con plugins — inyecta componentes de UI, modifica colecciones, añade acciones a la barra de herramientas y crea constructores de campos personalizados.
@@ -236,7 +236,9 @@ Otro plugin puede dar a los campos markdown un controlador de la misma forma, co
 
 :::caution[Este plugin envía datos fuera de tu equipo]
 El autocompletado envía los valores de los campos de la entidad a un servicio
-alojado para generar una sugerencia. Por defecto, ese servicio es
+alojado para generar una sugerencia: solo los valores de las propiedades declaradas,
+nunca los de una de solo lectura, deshabilitada u oculta, una con `dynamicProps`, ni
+los de una columna que la colección no declara. Por defecto, ese servicio es
 **`https://app.rebase.pro/api/functions/ai`**, operado por Rebase — de uso
 gratuito, sin configuración y sin credenciales adjuntas: las peticiones son
 anónimas, limitadas por tasa de solicitudes en lugar de por identidad. Tu JWT no

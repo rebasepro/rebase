@@ -1,5 +1,5 @@
 ---
-sourceHash: 75edbe600ee52a3e
+sourceHash: 63a92d4d1f06a612
 title: Indice degli endpoint
 sidebar_label: Indice degli endpoint
 description: Ogni route HTTP montata da un backend Rebase — data, auth, storage, admin, meta — con il relativo gate e la pagina che la descrive.
@@ -140,9 +140,13 @@ una collection non può accedere a nulla di tutto questo. Vedi [Ruoli e scope](/
 | `GET` | `/api/admin/backups` | `backups:read` | Inventario dei backup |
 | `GET` | `/api/admin/backups/download` | `backups:read` | Trasmette in streaming un backup. Con `?token=` da un link di download non serve alcun header, solo per quel backup |
 | `POST` | `/api/admin/backups/download-url` | `backups:read` | Un link a un backup, `{ key }` → `{ url, token, expiresIn }`, valido per 60 secondi — [Backup](/docs/deployment/backups/#download-a-backup) |
-| `GET` | `/api/admin/storage/orphans` | `database:read` | File archiviati che nessuna riga nomina, `?storageId=&olderThanHours=` — ciò che stampa `rebase storage orphans` |
-| `DELETE` | `/api/admin/storage/orphans` | `database:write` | Li individua di nuovo e li elimina; `409 STORAGE_SCAN_INCOMPLETE` quando una collection non ha potuto essere letta |
-| `POST` | `/api/admin/storage/move` | `database:write` | Copia una cartella in un'altra sorgente con le stesse chiavi, una pagina per chiamata — ciò che invia `rebase storage move` |
+| `POST` | `/api/admin/storage/orphans/scans` | `database:write` | Avvia in background una scansione dei file archiviati che nessuna riga nomina, `?storageId=&olderThanHours=`. Risponde `202` con il record della scansione: `id`, `status` (`queued`) e `runner` (`worker` quando è un job `storage.orphans` sulla coda dei job, `in-process` quando lo esegue il server stesso). Il suo record viene scritto nella sorgente, sotto il prefisso riservato `_rebase/maintenance/` |
+| `GET` | `/api/admin/storage/orphans/scans/:id` | `database:read` | Il record della scansione, `?storageId=`. Mentre è in corso: `progress` (`filesScanned`, `rowsScanned`, `collectionsScanned` su `collectionsTotal`, `unscanned`). Una volta `completed`: `result`, il report che rispondeva il vecchio `GET /orphans`. Un'esecuzione che ha smesso di riportare progressi per 10 minuti viene data come `failed`. `404 STORAGE_SCAN_NOT_FOUND` quando la sorgente non contiene una scansione di quel tipo |
+| `DELETE` | `/api/admin/storage/orphans?scan=:id` | `database:write` | Elimina in background gli orfani di una scansione completata, `202`. Ciascuno viene controllato di nuovo rispetto a ogni riga e voce di cronologia, e richiesto ancora una volta subito prima di essere eliminato. L'esito è il `deletion` del record della scansione. `409` con `STORAGE_SCAN_NOT_COMPLETE`, `STORAGE_SCAN_INCOMPLETE`, `STORAGE_SCAN_EXPIRED` o `STORAGE_SCAN_DELETION_STARTED` |
+| `GET` | `/api/admin/storage/orphans` | `database:read` | Deprecato: la scansione dentro la richiesta, `?storageId=&olderThanHours=`. Risponde con `Deprecation: true`. Usa `POST /orphans/scans` |
+| `DELETE` | `/api/admin/storage/orphans` | `database:write` | Deprecato, senza `?scan=`: scansiona di nuovo ed elimina dentro la richiesta. `409 STORAGE_SCAN_INCOMPLETE` quando una collection non ha potuto essere letta |
+| `POST` | `/api/admin/storage/move` | `database:write` | Copia una cartella in un'altra sorgente con le stesse chiavi, una pagina per chiamata — ciò che invia `rebase storage move`; `400 STORAGE_SAME_LOCATION` per `deleteSource` tra due sorgenti che archiviano nello stesso posto |
+| `POST` | `/api/admin/storage/move/verify` | `database:write` | Elenca di nuovo la sorgente dopo uno spostamento, con lo stesso body, una pagina per chiamata: `{ checked, notMoved: [{ key, reason }], cursor? }` — ogni file ancora nella sorgente con `deleteSource`, ogni file di cui la destinazione non ha una copia senza di esso. `rebase storage move` lo richiede quando lo spostamento è terminato |
 | `GET` | `/api/admin/logs` | `logs:read` | Il buffer dei log recenti |
 | `GET` | `/api/admin/logs/latest` | `logs:read` | Le voci più recenti |
 | `GET` | `/api/admin/logs/stream` | `logs:read` | Server-sent events |
@@ -150,7 +154,7 @@ una collection non può accedere a nulla di tutto questo. Vedi [Ruoli e scope](/
 | `GET` | `/api/admin/rls-simulator/options` | `schema:read` | I ruoli, quelli nominati dalle regole e le chiavi di servizio valide che un amministratore può simulare |
 | `POST` | `/api/admin/rls-simulator/preview` | `schema:read` | Ogni collezione come la raggiunge `{ role?, userId?, apiKeyId? }`: righe visibili rispetto a quelle del chiamante, nascoste dallo scope o dalla RLS, campi mascherati. Solo la sessione di un amministratore |
 | `POST` | `/api/admin/sql/csv` | `database:write` | Trasmette in streaming l'intero risultato di una query di sola lettura come CSV — «Download full result as CSV» di [Studio](/docs/studio/) |
-| `GET` | `/api/admin/branches/:name/diff` | `database:read` | Cosa ha cambiato un [branch](/docs/backend/branching/#reviewing-and-merging-a-branch): schema, policy e righe, `?sampleLimit=&schemas=&maxRowsPerTable=` |
+| `GET` | `/api/admin/branches/:name/diff` | `database:write` | Cosa ha cambiato un [branch](/docs/backend/branching/#reviewing-and-merging-a-branch): schema, policy e righe, `?sampleLimit=&schemas=&maxRowsPerTable=` |
 | `POST` | `/api/admin/branches/:name/merge` | `database:write` | Scrive le righe del branch nel suo genitore, `{ expectedFingerprint, onConflict?, skipBlocked? }`; `409` se uno dei lati è cambiato dal diff, o se ci sono righe in conflitto |
 | `GET` | `/api/admin/schema/status` | `schema:read` | [Modifica dello schema in tempo reale](/docs/backend/live-schema-editing/) |
 | `POST` | `/api/admin/schema/plan` | `schema:read` | Pianifica una modifica; non ne applica mai una |

@@ -1,5 +1,5 @@
 ---
-sourceHash: 1d19e29e19f9ce81
+sourceHash: 916ecd6bde4adb6f
 title: Typisiertes SDK — Erste Schritte
 sidebar_label: Erste Schritte
 description: Installieren und konfigurieren Sie das typisierte SDK von Rebase, um von jeder JavaScript- oder TypeScript-Anwendung aus mit Ihrem Backend zu interagieren.
@@ -103,7 +103,7 @@ const { data } = await client.data.products.find();
 
 Wenn `Database` übergeben wird, gibt `createRebaseClient` eine Instanz von `CreateRebaseClientResult<DB>` zurück. Dadurch werden camelCase-Collection-Accessoren auf `client.data` direkt ihren entsprechenden Typen zugeordnet, was Ihnen eine vollständige Autovervollständigung für Collection-Operationen und Typen bietet (z. B. `client.data.products.find()`).
 
-`collectionsDictionary` bildet jeden Accessor wieder auf den Slug ab, der über die Leitung (Wire) verwendet wird. Übergeben Sie es immer dann, wenn ein Slug noch kein gültiger Property-Name ist — `my-notes` ist nur deshalb als `client.data.myNotes` erreichbar, weil das Dictionary dies festlegt.
+`collectionsDictionary` bildet jeden Accessor wieder auf den Slug ab, der über die Leitung (Wire) verwendet wird. **`collections` ist für einen typisierten Client erforderlich.** Die Typen bieten jeden Accessor an, ob Sie es übergeben oder nicht, aber ohne es wird `client.data.myNotes` an `/data/my_notes` gesendet, den Accessor in snake_case, sodass ein Slug wie `my-notes` oder ein umbenannter Accessor mit 404 antwortet. Der Client warnt einmal und nennt den Accessor und die Abhilfe. Eine spätere Version macht `collections` in den Typen erforderlich, wenn `Database` übergeben wird.
 
 Einige Namen auf `client.data` sind vergeben: `collection` ist die dynamische Funktion `collection(slug)`, und `then`, `toJSON` und `$$typeof` bleiben für Promise- und Serialisierungsprüfungen unangetastet. Eine Collection, deren Accessor einer davon wäre, wird als `<name>Collection` generiert – der Slug `collection` ist `client.data.collectionCollection` – und `generate-sdk` gibt eine Warnung aus, die beide nennt. `client.data.collection("collection")` erreicht sie ebenfalls.
 
@@ -113,7 +113,7 @@ Einige Namen auf `client.data` sind vergeben: `collection` ist die dynamische Fu
 
 Ein von *Ihnen* geschriebener Property-Schlüssel bleibt Ihr Schlüssel, unabhängig von seiner Schreibweise — nichts benennt einen von Ihnen gewählten Namen um. Die beiden Schlüssel, die eher abgeleitet als deklariert werden – der Fremdschlüssel einer Relation und eine durch Introspektion zurückgelesene Spalte –, sind in camelCase gehalten.
 
-`Row` beschreibt einen Lesevorgang, `Insert` ein `create()` und `Update` ein `update()` — sie haben nicht dieselbe Struktur. Eine Spalte, die nicht erforderlich ist, ist bei allen drei als `T | null` definiert, sodass ein Schreibvorgang sie leeren kann; der Primärschlüssel ist bei einem Lesevorgang immer vorhanden und bei einem Update niemals setzbar; ein `belongsTo`-Ziel kann entweder als Relation (`{ author: 5 }`) oder als Fremdschlüssel (`{ authorId: 5 }`) geschrieben werden; und eine `hasMany`- oder `manyToMany`-Mitgliedschaft wird als Liste von Ziel-IDs oder `{ id }`-Objekten geschrieben (`{ tags: ["t-1"] }`), jedes mit einem `_pivot`, wenn die Zwischentabelle (Junction) Payload-Spalten deklariert. Ein Feld, das niemand schreiben darf (`access: { write: [] }`), ist weder in `Insert` noch in `Update` enthalten. Eine `date`-Spalte wird als ISO-String gelesen, und ein Schreibvorgang akzeptiert diesen String oder ein `Date`.
+`Row` beschreibt einen Lesevorgang, `Insert` ein `create()` und `Update` ein `update()` — sie haben nicht dieselbe Struktur. Eine Spalte, die nicht erforderlich ist, ist bei allen drei als `T | null` definiert, sodass ein Schreibvorgang sie leeren kann; der Primärschlüssel ist bei einem Lesevorgang immer vorhanden und bei einem Update niemals setzbar; ein `belongsTo`-Ziel kann entweder als Relation (`{ author: 5 }`) oder als Fremdschlüssel (`{ authorId: 5 }`) geschrieben werden, und ein erforderliches wird von beidem erfüllt; ein `hasOne` wird geschrieben, indem die Zielzeile genannt wird (`{ profile: 9 }`), oder mit `null`, um die Verknüpfung zu lösen; ein einstufiges `via` wird als die Art geschrieben, für die es steht (To-one: die ID des Ziels oder `null`; To-many: eine Liste von IDs), und ein mehrstufiges ist schreibgeschützt und in keinem von beiden; und eine `hasMany`- oder `manyToMany`-Mitgliedschaft wird als Liste von Ziel-IDs oder `{ id }`-Objekten geschrieben (`{ tags: ["t-1"] }`), jedes mit einem `_pivot`, wenn die Zwischentabelle (Junction) Payload-Spalten deklariert. Ein Feld, das niemand schreiben darf (`access: { write: [] }`), ist weder in `Insert` noch in `Update` enthalten. Eine `date`-Spalte wird als ISO-String gelesen, und ein Schreibvorgang akzeptiert diesen String oder ein `Date`.
 
 ## Kurzes Beispiel
 

@@ -1,5 +1,5 @@
 ---
-sourceHash: 90e9eafee6523006
+sourceHash: 9b091b775b58ae32
 title: Branching de Banco de Dados
 sidebar_label: Branching
 description: Crie branches de banco de dados isoladas para desenvolvimento, staging e testes usando o CREATE DATABASE ... TEMPLATE do PostgreSQL — cópias instantâneas e de alta fidelidade com zero tempo de inatividade.
@@ -274,14 +274,27 @@ postgresql://user:pass@localhost:5432/rb_dev_sandbox
 
 Um branch é onde um agente, ou uma migração de que você não tem certeza, pode alterar um banco de dados sem tocar no real. Antes que qualquer coisa chegue ao banco de onde o branch foi criado, você pode ver o que mudou e mesclar pelo [Studio](/docs/studio/): abra **Branches** e escolha um.
 
-- **Esquema e políticas RLS** lista cada tabela, coluna, chave primária e política que o branch adicionou, removeu ou alterou, como SQL, com a definição do pai ao lado da do branch.
-- **Alterações de dados** conta, por tabela, as linhas que o branch inseriu, atualizou e excluiu, pareadas pela chave primária, e mostra até 100 por tabela com as colunas que mudaram.
+- **Esquema e políticas RLS** lista cada tabela, coluna, chave primária,
+  constraint (unique, chave estrangeira, check, exclusion), índice, trigger, política,
+  tipo enum (com seus rótulos), view e função que o branch adicionou, removeu ou
+  alterou, como SQL, com a definição do pai ao lado da do branch.
+- **Alterações de dados** conta, por tabela, as linhas que o branch inseriu, atualizou e excluiu, pareadas pela chave primária, e mostra até 100 por tabela (no
+  máximo 1.000 quando você pede mais) com as colunas que mudaram. Uma coluna
+  com nome de credencial — `password_hash`, um `*_token`, qualquer uma com
+  `secret` no nome, um `*_hash` — mostra `[redacted]` em vez do seu valor.
+
+Revisar um branch exige o escopo `database:write`, o que executa SQL como
+dono do banco de dados: as amostras são linhas dos dois bancos, lidas fora da
+row-level security. `database:read` lista branches, mas não lê as
+linhas deles.
 
 O mesmo diff é `rebase db branch diff <name>` num terminal, `GET /api/admin/branches/<name>/diff` via HTTP, a ferramenta MCP `rebase_db_branch_diff` e `admin.diffBranch(name)` no código. As tabelas próprias do Rebase (sessões, histórico, o registro de branches) ficam de fora.
 
 ### Qual lado mudou uma linha
 
-O pai continua recebendo escritas enquanto se trabalha no branch, então «os dois bancos diferem» não é o mesmo que «o branch mudou»: uma linha que o pai inseriu depois de o branch ser criado parece exatamente uma linha que o branch excluiu. O Rebase as distingue pelo momento em que cada linha foi escrita. Os IDs de transação pertencem ao servidor, não a um banco, e a cópia por template os preserva; portanto, uma linha escrita depois da criação do branch — de qualquer lado — é mais recente que a transação que criou o banco do branch.
+O pai continua recebendo escritas enquanto se trabalha no branch, então «os dois bancos diferem» não é o mesmo que «o branch mudou»: uma linha que o pai inseriu depois de o branch ser criado parece exatamente uma linha que o branch excluiu. O Rebase as distingue pelo momento em que cada linha foi escrita. Os IDs de transação pertencem ao servidor, não a um banco, e a cópia por template os preserva; portanto, uma linha escrita depois da criação do branch — de qualquer lado — é mais recente que a transação que criou o banco do branch. Essa transação é lida quando
+o branch é criado e guardada em seu registro, então um `GRANT` ou
+`ALTER DATABASE` posterior no banco do branch não a move.
 
 | A linha do branch | A linha do pai | Conta como |
 | --- | --- | --- |
@@ -293,18 +306,44 @@ O pai continua recebendo escritas enquanto se trabalha no branch, então «os do
 
 Dois casos se parecem e são lidos da forma que não perde nada: uma linha que o branch excluiu e o pai depois alterou é mantida, e uma linha que o pai excluiu e o branch depois alterou é uma inserção do branch. Um `UPDATE` que grava os valores que a linha já tinha ainda conta como escrita.
 
-Quando o ponto de bifurcação não pode ser lido — um branch antigo cuja linha em `pg_database` foi congelada por um vacuum, ou um renomeado com `ALTER DATABASE` — o diff avisa e conta cada diferença como do branch.
+Um branch criado antes de o Rebase guardar essa transação a lê da linha de
+`pg_database` do banco do branch como está agora; qualquer coisa que tenha reescrito a linha desde então
+a move. Quando o ponto de bifurcação não pode ser lido de forma alguma — um branch antigo
+cuja linha foi congelada por um vacuum — o diff avisa e conta cada diferença como
+do branch.
 
 ### O que uma mesclagem faz
 
 **Mesclar** grava no pai as linhas que o branch inseriu, atualizou e excluiu. O que vence:
 
 - **Linhas que só o branch mudou** são gravadas: inseridas, sobrescritas ou excluídas.
-- **Linhas que só o pai mudou** desde a criação do branch ficam exatamente como estão.
+- **Linhas que só o pai mudou** desde a criação do branch ficam exatamente como estão
+  — a menos que uma referencie uma linha que o branch excluiu, o que é um
+  conflito (abaixo).
 - **Linhas que os dois mudaram** são conflitos. Por padrão a mesclagem não grava nada; escolha `onConflict: "branch"` para gravar a linha do branch sobre a do pai, ou `"target"` para manter a do pai.
+- **Uma linha que o branch excluiu e que linhas mais novas do pai ainda referenciam** é
+  um conflito também. Digamos que o branch excluiu um autor, e o pai escreveu desde então
+  um post dele: excluir o autor no pai se propagaria em cascata para esse
+  post, anularia a coluna dele, ou falharia na chave estrangeira. O diff conta o
+  autor como conflito e nomeia as linhas que o referenciam (`referencedBy`: a
+  tabela, a chave estrangeira, seu `ON DELETE` e quantas linhas). Por padrão a
+  mesclagem recusa, nomeando a tabela, as linhas e a saída; `"target"` mantém
+  o autor, e com ele o post; `"branch"` exclui o autor, deixa a chave
+  estrangeira fazer o que diz, e lista o que ela atingiu em `warnings`.
 - **Alterações de esquema e de políticas nunca são mescladas.** Elas pertencem às suas coleções e às migrações delas: aplique-as com `rebase db push` (ou `migrate`) e depois mescle as linhas.
 
-Uma tabela cujas linhas não podem ser pareadas bloqueia a mesclagem: uma que o branch adicionou ou removeu, uma cujas colunas ou chave primária diferem entre os dois, uma sem chave primária, ou uma com mais de 100.000 linhas num dos lados. Passe `skipBlocked` (no Studio, marque **Mesclar as outras tabelas**) para mesclar o resto e deixar essas de lado.
+Uma tabela cujas linhas não podem ser pareadas bloqueia a mesclagem: uma que o branch adicionou ou removeu, uma cujas colunas ou chave primária diferem entre os dois, uma sem chave primária, ou uma com mais de 100.000 linhas num dos lados. Suas contagens aparecem como 0,
+porque não se sabe quais linhas mudaram; `rowCounts` dá a contagem de linhas de cada lado. Uma tabela
+assim que só o pai mudou — o branch não escreveu nenhuma
+de suas linhas, e as de antes da bifurcação são as mesmas — não é bloqueada.
+Passe `skipBlocked` (no Studio, marque **Mesclar as outras tabelas**) para mesclar o
+resto e deixar essas de lado.
+
+Uma tabela reescrita desde a criação do branch também é bloqueada (`TABLE_REWRITTEN`).
+Uma mudança de tipo de coluna, um `ADD COLUMN` com um default volátil, `VACUUM FULL` ou
+`CLUSTER` escreve cada linha de novo, então cada linha aparece como escrita desde a bifurcação e não é mais possível saber
+qual lado mudou o quê. Quando o branch mudou o tipo de uma coluna,
+mescle suas linhas antes de aplicar essa mudança ao pai, ou crie o branch de novo depois dela.
 
 Todas as escritas acontecem numa única instrução no pai — tudo ou nada, com chaves estrangeiras verificadas no fim. Uma mesclagem leva o `fingerprint` do diff que você revisou e não grava nada se algum dos dois bancos mudou desde então: recarregue o diff e olhe de novo. As sequências avançam além de qualquer id que a mesclagem inseriu.
 

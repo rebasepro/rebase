@@ -1,5 +1,5 @@
 ---
-sourceHash: 791588f79f48d44f
+sourceHash: 858a87d510ba1de5
 title: O Rebase não faz X
 sidebar_label: Estendendo o servidor
 description: A escada de extensão do lado do servidor — declaração, callback de coleção, função customizada, suas próprias rotas, seu próprio servidor, eject — com o que cada um pode e não pode alcançar.
@@ -227,8 +227,9 @@ backend.start();                                // cron, job workers, sweeps
 ```
 
 Um grupo traz o próprio contexto de autenticação, os limites de taxa e o portão de
-administração, então `getDriver(c)` funciona em um grupo montado em qualquer lugar.
-O que ele não traz é o middleware de todo o processo que o `mount()` adiciona: o
+administração, e recusa os cabeçalhos de personificação e de simulação, a menos que
+seja o grupo de dados ou o de funções, então `getDriver(c)` funciona em um grupo
+montado em qualquer lugar. O que ele não traz é o middleware de todo o processo que o `mount()` adiciona: o
 limite de corpo, a compressão, o CSRF e o envelope de erro ficam por sua conta
 quando você monta os grupos um a um.
 

@@ -1,5 +1,5 @@
 ---
-sourceHash: 6ac0abb490b5801e
+sourceHash: fe474014627c7510
 title: Autenticazione e Login
 sidebar_label: Autenticazione e Login
 description: Configura il controller di autenticazione, la vista di login e la simulazione dei ruoli nel tuo frontend React Rebase.
@@ -113,18 +113,49 @@ Per aggiungere o rimuovere opzioni di ruolo, aggiorna la mappa `enum` nella tua 
 
 Un ruolo in questo elenco è un nome a cui le tue [regole di sicurezza](/docs/collections/security-rules) possono corrispondere. Cosa può fare oltre alle sue righe (gestire gli utenti, leggere i log, modificare lo schema) si dichiara separatamente, sotto `auth.roles` nella stessa collection. `admin` è integrato e possiede tutto. Vedi [Ruoli e scope](/docs/backend/roles-and-scopes).
 
-## Simulazione dei ruoli (Modalità Dev)
+## Testare gli accessi: Simulate access
 
-In modalità sviluppatore, puoi simulare ruoli diversi senza effettuare il logout. Questo è utile per testare le policy RLS:
+Per verificare cosa può leggere un ruolo, un utente o una service key, un amministratore usa
+**Simulate access**, la pillola sopra il tuo avatar nel drawer del pannello di amministrazione (nella
+barra dell'app su uno schermo piccolo, o quando la shell non ha un drawer). Scegli un ruolo
+(con un id utente facoltativo, che non deve necessariamente essere un account), un utente, o una
+service key attiva.
+Ogni vista dei dati, e la scheda History di un record, legge allora attraverso il server come
+quell'identità, rispetto alle vere policy di sicurezza a livello di riga: una griglia mostra
+esattamente le righe che può leggere,
+i campi che i suoi ruoli non possono leggere sono mascherati, e il banner conta le collection
+in cui non vede nulla. Il server verifica a ogni richiesta che tu sia un
+amministratore.
+
+L'accesso simulato è di sola lettura. Finché è attivo, le viste non offrono creazione, modifica,
+eliminazione né ripristino della cronologia, e il server rifiuta qualsiasi scrittura che porti una simulazione con
+`403 SIMULATION_READ_ONLY`, così nulla viene salvato come qualcun altro. Interrompi la simulazione
+per apportare modifiche.
+
+Ciò che non simula: il gate `requireAuth` dell'API dei dati, che lascia passare un chiamante
+anonimo simulato in modo che tu veda cosa gli concedono le policy delle righe
+(una funzione personalizzata lo vede come privo di sessione, come un vero chiamante anonimo);
+lo storage, i cui file sono letti come te, con i caricamenti disattivati durante la simulazione; e
+gli aggiornamenti live, che restano in pausa finché non interrompi.
+
+La stessa cosa da codice, sull'SDK, è `client.simulate()`. Deriva un
+client le cui richieste portano la simulazione, e solo la sessione di un amministratore
+può usarlo:
 
 ```typescript
-import { useBuildEffectiveRoleController } from "@rebasepro/app";
-
-const effectiveRoleController = useBuildEffectiveRoleController();
-
-// When active, the UI behaves as if the current user has this role
-effectiveRoleController.setEffectiveRole("editor");
+const asCustomer = client.simulate({ role: "customer", userId: "u_1" });
+const { data } = await asCustomer.data.collection("tickets").find();
+asCustomer.close();
 ```
+
+Il client derivato è tipizzato dallo stesso `Database` di quello da cui proviene, ed
+è un client a sé: chiudilo con `close()` quando hai finito.
+
+L'interruttore del ruolo effettivo non è un tester RLS: cambia soltanto quali viste di Studio
+elenca la navigazione, non invia nulla al server e non valuta alcuna
+policy. `useBuildEffectiveRoleController`, che ne costruiva uno, è deprecato e
+avvisa una sola volta quando viene chiamato: `<Rebase>` costruisce il proprio controller quando non
+ne viene passato uno, e Simulate access è il modo per testare cosa può fare un ruolo.
 
 ## Passaggi successivi
 

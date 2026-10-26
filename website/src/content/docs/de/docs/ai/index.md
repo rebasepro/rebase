@@ -1,5 +1,5 @@
 ---
-sourceHash: 9d4730f8239c48ed
+sourceHash: dd930980301c511c
 title: KI & Agenten
 sidebar_label: Übersicht
 description: Was Rebase für KI-Coding-Assistenten und autonome Agenten bereitstellt – ein MCP-Server, projektlokale Agent Skills, gerüstartige Anweisungsdateien und das Berechtigungsmodell, das bestimmt, worauf ein Agent tatsächlich zugreifen kann.
@@ -10,7 +10,7 @@ Probleme. Es lohnt sich zu wissen, wonach Sie greifen:
 
 | | Was es ist | Wer es nutzt |
 |---|---|---|
-| [**MCP-Server**](/docs/ai/mcp) | Ein Stdio-Model-Context-Protocol-Server mit 44 Tools für Ihr Schema, Ihre Daten, Benutzer, Speicher, Cron und Dev-Server | Ein Assistent, zur Laufzeit |
+| [**MCP-Server**](/docs/ai/mcp) | Ein Stdio-Model-Context-Protocol-Server mit 51 Tools für Ihr Schema, Ihre Daten, Benutzer, Speicher, Cron, Dev-Server und Ihr Rebase-Cloud-Projekt | Ein Assistent, zur Laufzeit |
 | [**Agent Skills**](/docs/ai/skills) | 23 Markdown-Skill-Dateien, die durch `rebase skills install` in Ihr Repo geschrieben werden | Ein Assistent, als Referenzmaterial |
 | [**Anweisungsdateien**](/docs/ai/instruction-files) | `ai-instructions.md` plus zeigerbasierte Dateien pro Assistent, geschrieben von `rebase init` | Ein Assistent, als dauerhaft aktive Regeln |
 | [**API-Keys**](/docs/backend/api-keys) | Maschinen-Anmeldedaten, die [Scopes](/docs/backend/roles-and-scopes) halten, pro Collection und pro Operation | Alles, was die HTTP-API aufruft |

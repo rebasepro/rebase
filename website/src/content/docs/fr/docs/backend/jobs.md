@@ -1,5 +1,5 @@
 ---
-sourceHash: cf996dc5a52fc912
+sourceHash: cae2434b532cd67f
 title: Tâches en arrière-plan
 sidebar_label: Tâches en arrière-plan
 description: Une file d'attente de tâches durable, basée sur Postgres — des traitements qui survivent à un redémarrage, réessayés avec un backoff, avec conservation des échecs plutôt que leur abandon.
@@ -147,6 +147,10 @@ Les gestionnaires de file et les abonnements à un topic reçoivent le même `si
 Sûr par conception. Les workers effectuent leur réservation avec `SELECT … FOR UPDATE SKIP LOCKED`, de sorte que chaque job est attribué à exactement l'un d'entre eux et que les autres passent à la ligne suivante plutôt que d'attendre derrière lui. Nul besoin d'élire un leader.
 
 Une instance ne réserve que les tâches pour lesquelles elle a un handler. Lors d'un déploiement progressif (rolling deploy), une instance exécutant une ancienne version du code laisse de côté les jobs dont seule la nouvelle version implémente la tâche : ils restent `pending`, sans qu'aucune tentative ne soit consommée, jusqu'à ce qu'une instance mise à jour les réserve. Une tâche qu'aucune instance n'implémente reste elle aussi `pending`, plutôt que d'être placée en dead-letter.
+
+## Analyses des orphelins du stockage
+
+`rebase storage orphans` s'exécute sur cette file lorsqu'elle est activée : chaque analyse, et chaque suppression à partir d'une analyse, est un job `storage.orphans`, avec une seule tentative. Le backend enregistre lui-même le handler, dans chaque processus où le stockage est configuré, et seuls les processus dont les workers de jobs sont activés l'exécutent. Une analyse est bornée par `timeoutMs` comme n'importe quel job : une source trop volumineuse pour être analysée en 15 minutes demande donc un `timeoutMs` plus élevé, ou 0. Sans la file, le serveur exécute l'analyse dans son propre processus. Voir [la CLI](/docs/cli/#rebase-storage).
 
 ## Webhooks durables
 

@@ -1,5 +1,5 @@
 ---
-sourceHash: 819343e76e0e61e9
+sourceHash: ba40edd634e01a84
 title: Managed-Backend-Runtime
 sidebar_label: Managed Runtime
 description: Was ein Backend mit der Runtime „managed“ auf Rebase Cloud kann und was nicht — Pakete und Binärdateien, Arbeitsspeicher und CPU, Timeouts und Body-Größen, das Dateisystem, In-Memory-Status, Secrets, Speicher für generierte Dateien und ausgehender Netzwerkverkehr.
@@ -285,7 +285,7 @@ in `config/resources.ts` deklariert; siehe
 
 Ein Deploy mit Dateispeicher wird abgewiesen, bis das Projekt festlegt, wer Dateien lesen und schreiben
 darf. Die Gerüstdatei `config/storage.ts` exportiert hierfür einen `storageAuthorize`-Hook.
-Siehe [Autorisierung pro Objekt](/docs/backend/storage/#per-object-authorization).
+Siehe [Autorisierung pro Objekt](/docs/backend/storage-authorization/).
 
 **Wie Dateien ausgeliefert werden.** Ihr Backend liefert jede Datei unter
 `GET /api/storage/file/<key>` aus. Es liest das Objekt aus dem Bucket und streamt
@@ -371,9 +371,18 @@ sind zu jeder Internetadresse ausschließlich auf diesen TCP-Ports erlaubt:
 | 993 | IMAP über TLS |
 
 Alles andere ist blockiert. Das umfasst Port 25, einfaches IMAP sowie Datenbanken oder
-Caches auf ihren Standard-Ports: Ein PostgreSQL auf 5432, Redis auf 6379 oder MongoDB auf
-27017 außerhalb von Rebase Cloud kann nicht erreicht werden. Die Cloud-Metadatenadresse
+Caches auf ihren Standard-Ports: Redis auf 6379 oder MongoDB auf 27017 außerhalb von
+Rebase Cloud kann nicht erreicht werden. Die Cloud-Metadatenadresse
 (`169.254.169.254`) ist ebenfalls blockiert.
+
+Die einzige Ausnahme ist Ihre eigene Datenbank. Bringt das Projekt sein eigenes
+PostgreSQL mit (BYODB), erlaubt jedes Deployment zusätzlich Verbindungen zum Host dieser
+Datenbank auf dem Port in ihrem Connection-String, und zu nichts anderem auf diesem Port.
+Der Host wird beim Deployment in seine IP-Adressen aufgelöst; zieht Ihr Provider die
+Datenbank auf eine andere Adresse um, deployen Sie erneut. Die Datenbank muss Verbindungen
+aus dem Internet annehmen: Die App verbindet sich direkt mit dem Connection-String. Die
+Einstellungen des SSH-Bastion-Hosts werden nur vom Verbindungstest verwendet, nicht von der
+deployten App.
 
 Die Plattform fügt keinen Proxy und kein ausgehendes Rate-Limit hinzu; die von Ihnen aufgerufenen Dienste
 haben ihre eigenen Limits. Übergeben Sie `getSignal(c)` an `fetch`, damit ein Aufruf stoppt,

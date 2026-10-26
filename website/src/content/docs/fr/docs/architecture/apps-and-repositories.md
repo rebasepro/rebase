@@ -1,5 +1,5 @@
 ---
-sourceHash: 87b274f81d5501d1
+sourceHash: 7a29cf6ca21d35be
 title: Applications et dépôts
 sidebar_label: Apps & dépôts
 description: Un projet est un backend accompagné des applications qui communiquent avec lui, chacune pouvant résider dans son propre dépôt.
@@ -190,11 +190,11 @@ Une fois les enregistrements publiés :
 rebase cloud domains verify admin.example.com
 ```
 
-`rebase cloud domains list` affiche de nouveau les enregistrements si vous les perdez. Quand la vérification réussit, la plateforme émet le certificat HTTPS du nom d'hôte ; il n'y a rien à téléverser. D'ici là, `admin` ne répond nulle part, puisque le seul nom d'hôte sur lequel elle répond n'atteint pas encore le projet — le reste du projet est en ligne dans tous les cas.
+`rebase cloud domains list` affiche de nouveau les enregistrements si vous les perdez. Un nom d'hôte qui n'est pas vérifié dans les 7 jours suivant son enregistrement est libéré, et le déploiement suivant l'enregistre de nouveau. Quand la vérification réussit, la plateforme émet le certificat HTTPS du nom d'hôte ; il n'y a rien à téléverser. D'ici là, `admin` ne répond nulle part, puisque le seul nom d'hôte sur lequel elle répond n'atteint pas encore le projet — le reste du projet est en ligne dans tous les cas.
 
 La console suit l'application sur son nom d'hôte : le lien *Ouvrir le CMS* et l'adresse du CMS sur la vue d'ensemble du projet sont `https://admin.example.com/`, et non l'hôte du projet.
 
-Un nom d'hôte déjà détenu par un autre projet fait échouer le déploiement avant que quoi que ce soit ne soit mis en production, tout comme un nom d'hôte situé sous le domaine propre de la plateforme. Retirer l'application de `rebase.json` laisse le nom d'hôte enregistré sur le projet ; supprimez-le avec `rebase cloud domains remove admin.example.com`.
+Un nom d'hôte qu'un autre projet a vérifié fait échouer le déploiement avant que quoi que ce soit ne soit mis en production, tout comme un nom d'hôte situé sous le domaine propre de la plateforme. Un nom d'hôte qu'un autre projet a enregistré sans jamais le vérifier ne vous bloque pas : le refus vous donne un enregistrement TXT pour votre projet, et une fois celui-ci en place, le déploiement suivant (ou `rebase cloud domains add`) prend le nom d'hôte. Ajouter un nom d'hôte que le projet n'a pas encore modifie les domaines du projet, ce qu'un jeton d'accès créé avec `--can deploy` ne peut pas faire : depuis la CI, ajoutez une fois le nom d'hôte avec `rebase cloud domains add` en étant connecté, et le jeton le déploie ensuite comme n'importe quel nom d'hôte déjà présent sur le projet. Retirer l'application de `rebase.json` laisse le nom d'hôte enregistré sur le projet ; supprimez-le avec `rebase cloud domains remove admin.example.com`.
 
 ### Un nom d'hôte appartient à une application, pas à une route
 

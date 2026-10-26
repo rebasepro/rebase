@@ -1,5 +1,5 @@
 ---
-sourceHash: a6f7e70d9dfb90ae
+sourceHash: 29363c3f0ab50d98
 title: Layout do Formulário
 sidebar_label: Layout do Formulário
 description: Controle como o formulário da entidade é organizado — larguras de colunas, seções e a barra lateral de metadados.
@@ -16,8 +16,9 @@ O formulário da entidade é gerado a partir das suas propriedades:
   campos vizinhos com o mesmo editor pequeno — dois números, dois interruptores,
   duas datas do mesmo modo, duas seleções com opções curtas — compartilham uma linha
 
-Um campo com um rótulo longo, texto de ajuda com mais de 60 caracteres, `conditions` ou um
-`Field` customizado nunca é pareado, assim como nenhum texto livre: nada em
+Um campo com um rótulo longo, texto de ajuda com mais de 60 caracteres, `conditions`, uma
+regra `access` no nível do campo ou `excludeFromApi` (o formulário não renderiza nada para um
+usuário que não pode lê-lo), ou um `Field` customizado nunca é pareado, assim como nenhum texto livre: nada em
 um schema diferencia o nome curto de uma branch de uma URL longa. O formulário nunca analisa
 qual propriedade é o título. Quaisquer outras colunas são algo que a collection solicita,
 campo por campo, com `admin.span` — definido com base no que cada campo contém, conforme

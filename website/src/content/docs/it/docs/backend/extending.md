@@ -1,5 +1,5 @@
 ---
-sourceHash: 791588f79f48d44f
+sourceHash: 858a87d510ba1de5
 title: Rebase non fa X
 sidebar_label: Estendere il server
 description: La scala di estensione lato server — dichiarazione, callback di collezione, funzione personalizzata, rotte personalizzate, server personalizzato, eject — con ciò che ciascuno può e non può raggiungere.
@@ -219,8 +219,9 @@ backend.start();                                // cron, job workers, sweeps
 ```
 
 Un gruppo porta con sé il proprio contesto di autenticazione, i rate limit e la protezione
-riservata agli admin, quindi `getDriver(c)` funziona in un gruppo montato ovunque. Ciò che non
-porta con sé è il middleware a livello di processo che aggiunge `mount()`: il limite del body,
+riservata agli admin, e rifiuta le intestazioni di impersonazione e di simulazione a meno che
+non sia il gruppo dei dati o quello delle funzioni, quindi `getDriver(c)` funziona in un gruppo
+montato ovunque. Ciò che non porta con sé è il middleware a livello di processo che aggiunge `mount()`: il limite del body,
 la compressione, il CSRF e l'involucro degli errori toccano a te quando monti i gruppi uno per uno.
 
 Un passo più in basso, `@rebasepro/server-postgres` è agnostico rispetto al framework: dipende

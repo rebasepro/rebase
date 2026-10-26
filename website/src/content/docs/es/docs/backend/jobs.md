@@ -1,5 +1,5 @@
 ---
-sourceHash: cf996dc5a52fc912
+sourceHash: cae2434b532cd67f
 title: Trabajos en segundo plano
 sidebar_label: Trabajos en segundo plano
 description: Una cola de trabajos duradera respaldada por Postgres — trabajo que sobrevive a un reinicio, reintentado con retroceso, donde los fallos se conservan en lugar de descartarse.
@@ -148,6 +148,17 @@ Los handlers de cola y las suscripciones a temas reciben el mismo `signal` en su
 Seguro por diseño. Los workers reclaman con `SELECT … FOR UPDATE SKIP LOCKED`, por lo que cada trabajo va a exactamente uno de ellos y los demás pasan a la siguiente fila en lugar de hacer cola detrás de ella. No es necesario elegir ningún líder.
 
 Una instancia solo reclama las tareas para las que tiene un handler. Durante un despliegue progresivo (rolling deploy), una instancia que ejecuta código más antiguo deja de lado los trabajos cuya tarea solo implementa el código nuevo: permanecen en `pending`, sin gastar ningún intento, hasta que un par actualizado los reclama. Una tarea que ninguna instancia implementa también permanece en `pending`, en lugar de ir a la cola de mensajes fallidos (dead-letter).
+
+## Análisis de huérfanos de almacenamiento
+
+`rebase storage orphans` se ejecuta en esta cola cuando está activada: cada
+análisis, y cada eliminación a partir de un análisis, es un trabajo
+`storage.orphans`, con un solo intento. El backend registra el handler por sí
+mismo, en cada proceso con almacenamiento configurado, y solo lo ejecutan los
+procesos cuyos workers de trabajos están activados. Un análisis está limitado por
+`timeoutMs` como cualquier trabajo, así que un origen demasiado grande para
+analizarlo en 15 minutos necesita un `timeoutMs` mayor, o 0. Sin la cola, el
+servidor ejecuta el análisis dentro de su propio proceso. Consulta [la CLI](/docs/cli/#rebase-storage).
 
 ## Webhooks duraderos
 

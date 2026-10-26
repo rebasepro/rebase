@@ -1,5 +1,5 @@
 ---
-sourceHash: 8c0fc8ebbe0f0b10
+sourceHash: a9c35edb64ea5e56
 title: División en varios procesos
 sidebar_label: Procesos divididos
 description: Ejecute un bundle como varios procesos cooperativos —una API, una capa de funciones, un worker— desde la misma imagen de runtime publicada, para que una función personalizada pesada deje de competir con la API de datos.
@@ -104,12 +104,16 @@ docker compose up --scale functions=3
 
 Ambos procesos necesitan la misma `DATABASE_URL`, el mismo `JWT_SECRET` y la misma
 `REBASE_SERVICE_KEY`: forman un único despliegue, y un token emitido por uno debe
-ser aceptado por el otro.
+ser aceptado por el otro. Un proceso con `REBASE_FUNCTIONS_UPSTREAM` y sin
+`REBASE_SERVICE_KEY` se niega a arrancar: sus propias llamadas
+`rebase.functions.invoke(...)`, desde un hook o un trabajo cron, llegan al proceso de funciones con esa clave.
 
 ## Mantener las URLs iguales
 
 `REBASE_FUNCTIONS_UPSTREAM` le indica al proceso `api` que reenvíe `/api/functions/*`
-al proceso de funciones en lugar de servirlo él mismo. Los clientes, los SDKs generados y las claves
+al proceso de funciones en lugar de servirlo él mismo. Debe ser una URL `http://` o
+`https://`; cualquier otra cosa detiene el arranque. Solo `api` y `worker` la leen
+(consulte [Cron y tareas en segundo plano](#cron-y-tareas-en-segundo-plano) para el worker). Los clientes, los SDKs generados y las claves
 de API ven exactamente la misma superficie que veían antes de la división, por lo que ningún código de aplicación
 cambia y no tiene que configurar un proxy inverso para probarlo.
 
@@ -199,7 +203,30 @@ desactívelo en la API:
     environment:
       REBASE_ROLE: worker
       REBASE_MIGRATE_ON_BOOT: none
+      REBASE_SERVICE_KEY: ${REBASE_SERVICE_KEY}
+      # Only if a job calls rebase.functions:
+      REBASE_FUNCTIONS_UPSTREAM: http://functions:8080
 ```
+
+Un trabajo que pasa a un worker conserva `rebase.dataAsAdmin`, `rebase.sql`,
+`rebase.storage` y `rebase.email`, que hablan directamente con la base de datos, los buckets y
+el servidor de correo. También conserva:
+
+- **`rebase.admin`** (usuarios, roles, restablecimientos de contraseña) **y `rebase.cron`.** Un
+  worker no sirve ninguna superficie de administración en su puerto, pero lleva estas dos en el proceso,
+  solo para sus propios trabajos.
+- **`rebase.functions`, con `REBASE_FUNCTIONS_UPSTREAM`.** Un worker no sirve
+  funciones. Con el upstream definido, sus propias llamadas `rebase.functions.invoke(...)`
+  se reenvían al proceso de funciones, donde la función ve la
+  llamada como el servicio. El worker sigue sin responder nada bajo `/api/functions`
+  en su puerto. Para esto el worker necesita la `REBASE_SERVICE_KEY` del despliegue,
+  igual que `api`.
+
+Pierde `rebase.auth`: son los flujos de inicio de sesión de una persona, y un worker
+no sirve ninguno. Para el trabajo con cuentas desde un trabajo, use `rebase.admin`. También pierde el
+resto de la API de administración (copias de seguridad, registros, el editor de esquemas, etc.), y
+`rebase.functions` cuando no hay upstream definido. Una llamada a cualquiera de ellos responde
+`404 NOT_FOUND` nombrando la superficie que está desactivada y qué hacer en su lugar.
 
 Un proceso `functions` nunca ejecuta ninguno de los dos. Se escala según la carga de peticiones y
 se reemplaza a voluntad, y darle trabajo programado haría que su número de réplicas signifique

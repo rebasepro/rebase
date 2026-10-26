@@ -1,5 +1,5 @@
 ---
-sourceHash: 4b28c5fe78adb3d0
+sourceHash: 19a82f97d9b01fc0
 title: Mehrere Datenbanken und Buckets
 sidebar_label: Mehrere Quellen
 description: Leiten Sie Collections an verschiedene Datenbanken und Properties an verschiedene Storage-Buckets weiter und konfigurieren Sie jedes einzelne über die Umgebung.
@@ -92,6 +92,12 @@ export default defineFunction((app, { rebase }) => {
     });
 });
 ```
+
+`{ database: analytics }` führt die Abfrage auf der eigenen Verbindung dieser Quelle aus —
+worauf auch immer `DATABASE_URL__ANALYTICS` zeigt, auf welchem Server auch immer —, und
+keine Option führt sie auf der Standardquelle aus. Ein Schlüssel, der keine konfigurierte
+Quelle nennt, wird mit einem Fehler abgelehnt, der die vorhandenen auflistet. Bis 0.25.1
+wurde der Schlüssel stattdessen als Datenbankname auf dem Server der Standardquelle gelesen.
 
 ### Sehen, was Sie deklariert haben
 

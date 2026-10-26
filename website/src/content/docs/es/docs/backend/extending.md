@@ -1,5 +1,5 @@
 ---
-sourceHash: 791588f79f48d44f
+sourceHash: 858a87d510ba1de5
 title: Rebase no hace X
 sidebar_label: Extender el servidor
 description: La escalera de extensiones del lado del servidor — declaración, callback de colección, función personalizada, tus propias rutas, tu propio servidor, eject — con lo que cada uno puede y no puede alcanzar.
@@ -236,8 +236,9 @@ backend.start();                                // cron, job workers, sweeps
 ```
 
 Un grupo lleva su propio contexto de autenticación, límites de tasa y control de
-acceso de administración, por lo que `getDriver(c)` funciona en un grupo montado en
-cualquier lugar. Lo que no lleva es el middleware de todo el proceso que añade
+acceso de administración, y rechaza las cabeceras de suplantación y de simulación
+salvo que sea el grupo de datos o el de funciones, por lo que `getDriver(c)`
+funciona en un grupo montado en cualquier lugar. Lo que no lleva es el middleware de todo el proceso que añade
 `mount()`: el límite del cuerpo, la compresión, CSRF y la envoltura de errores los
 añades tú al montar los grupos uno por uno.
 

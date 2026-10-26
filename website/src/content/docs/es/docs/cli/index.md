@@ -1,5 +1,5 @@
 ---
-sourceHash: de64511406443392
+sourceHash: 2df00511c02fed53
 title: Referencia de la CLI
 sidebar_label: CLI
 description: Comandos de Rebase CLI para inicialización de proyectos, generación de esquemas, migraciones de bases de datos y generación de SDK.
@@ -312,6 +312,7 @@ Finaliza con código distinto de cero cuando una comprobación detecta un error 
 rebase verify
 rebase verify --json
 rebase verify --live
+rebase verify --live --database-url postgresql://…
 ```
 
 Si las colecciones están listas para publicarse, en un único comando rápido para CI y para los hooks de un agente de IA. Sin conexión por defecto, y nunca cambia nada.
@@ -321,7 +322,7 @@ Si las colecciones están listas para publicarse, en un único comando rápido p
 | Configuración de colecciones | Un archivo en `config/collections/` que no carga, o que el validador de arranque rechaza — con las claves desconocidas como errores, de modo que una opción mal escrita o una opción de interfaz escrita fuera de `admin: { … }` (un `widget` en el nivel superior) se detecta aquí en lugar de ignorarse en silencio. |
 | Cobertura de RLS | Una colección sin `securityRules` que tampoco hereda ninguna, o una con una columna `user_id`, `owner_id`, `organization_id` o `tenant_id` que depende en su lugar de los valores por defecto del directorio. Una regla que permite a un rol leer todas las filas de una tabla así es una advertencia. |
 | Migraciones al día | Una tabla o columna que las colecciones declaran y que ningún archivo de `backend/drizzle/migrations` crea, o una eliminada que una migración todavía crea. Se omite en un proyecto que aún no tiene migraciones. |
-| Auditoría de RLS en vivo | Con `--live`: el catálogo de [`rls-check`](/docs/rls-check) contra `DATABASE_URL`, y si se ha aplicado cada migración. |
+| Auditoría de RLS en vivo | Con `--live`: el catálogo de [`rls-check`](/docs/rls-check) contra la base de datos del proyecto, y si se ha aplicado cada migración. La base de datos se resuelve como lo hacen los comandos `db` — `--database-url`, `DATABASE_URL`, `--docker`, y si no la base de datos de desarrollo gestionada. Una base de datos que no está configurada o no responde es un error, no una omisión: se pidió la auditoría. Una política de lectura `USING (true)` compilada a partir de una regla `access: "public"` es una advertencia mientras la API exige un token (`AUTH_REQUIRE`, activado por defecto) — todo usuario con sesión iniciada lee cada fila — y un error con `AUTH_REQUIRE=false`, donde las filas son anónimas. |
 
 `--json` imprime un único objeto — cada paso, y cada hallazgo con su `file`, la `path` con puntos dentro de la configuración de la colección y el `fix` —, para que un agente pueda reparar lo que rompió. `--quiet` no imprime nada cuando todo pasa. Termina con un código distinto de cero ante un error; las advertencias no lo hacen fallar.
 
@@ -364,20 +365,45 @@ rebase storage move --from "(default)" --to media --prefix avatars
 rebase storage move --from "(default)" --to media --prefix avatars --delete-source
 ```
 
-`orphans` lee cada fila de cada colección, incluidas las eliminadas lógicamente, y
-lista los archivos de un origen (`--source`, el origen por defecto si se omite)
-que ninguna cadena de ninguna fila nombra: una clave, una URL, una referencia
+`orphans` lee cada fila de cada colección tal como está almacenada (incluidas las filas
+eliminadas lógicamente, sin pasar por ningún hook `beforeQuery` ni `afterRead`) y cada entrada del
+[historial](/docs/backend/history/), ya que una reversión restaura lo que contiene.
+Lista los archivos de un origen (`--source`, el origen por defecto si se omite)
+que ninguna cadena de ninguno de ellos nombra: una clave, una URL, una referencia
 `rebase-storage:` en un texto. Los archivos más recientes que `--older-than` horas (24 por defecto) se
 dejan fuera, porque el panel de administración sube un archivo antes de que se guarde la fila que lo nombra.
+El análisis se ejecuta en el backend en segundo plano, así que un proyecto demasiado grande para analizarse
+dentro de una sola solicitud (tras un ingress que la agota por tiempo) termina igualmente. La
+CLI lo inicia y luego muestra su progreso (archivos listados, filas leídas, colecciones
+terminadas y las que no se pudieron leer) hasta que acaba. Con la
+[cola de trabajos](/docs/backend/jobs/) activada, el análisis es un trabajo `storage.orphans` que
+ejecutan los workers de trabajos. Sin ella, el análisis se ejecuta dentro del proceso del servidor al que
+se le pidió, y la CLI lo indica: reiniciar ese proceso detiene el análisis. Un análisis
+es un intento de trabajo, limitado por `jobs.timeoutMs` (15 minutos por defecto). Auméntalo,
+o ponlo a 0, para un origen que tarde más. `--json` imprime el mismo
+informe que antes, más su `scanId`.
+
 `--delete` pregunta antes de eliminar (`--yes` omite la pregunta, y es obligatorio
-sin terminal), el servidor vuelve a buscar primero los archivos, y no se
-elimina nada mientras una colección no se pueda leer. Los archivos que solo nombran tus propias tablas
-fuera de las colecciones parecen sin uso: comprueba antes de eliminar.
+sin terminal). Elimina solo a partir del análisis que se acaba de imprimir, y solo dentro de
+los 15 minutos siguientes a que ese análisis termine. No se elimina nada mientras una colección
+no se pueda leer: una colección con hooks de lectura en un origen de datos cuyo driver
+no puede leer más allá de ellos cuenta como no leída. Antes de eliminar nada, el servidor
+vuelve a leer cada fila y entrada de historial contra los archivos listados. Después pregunta
+por cada archivo de nuevo justo antes de eliminarlo. Un archivo que una fila nombra ahora,
+que se ha vuelto a subir desde el análisis, o que ya no existe, se conserva, y la CLI
+lo lista como conservado. Los archivos que solo nombran tus propias tablas fuera de las colecciones parecen
+sin uso: comprueba antes de eliminar. Contra un backend de la 0.25.1 o anterior, la
+CLI analiza a la antigua, dentro de una sola solicitud.
 
 `move` copia los archivos bajo `--prefix` a otro origen con las mismas claves,
 una página cada vez. Un archivo que el destino ya tiene con el mismo tamaño se omite,
 así que un traslado interrumpido se reanuda ejecutándolo de nuevo; `--delete-source` elimina cada
-archivo del origen una vez que el destino lo tiene. Ambos necesitan `database:read`, y
+archivo del origen una vez que el destino lo tiene, y se rechaza cuando los dos
+orígenes almacenan en el mismo bucket o directorio. Cuando el traslado termina, la CLI
+vuelve a listar el origen con un recorrido nuevo y nombra cada archivo que el traslado no
+movió: con `--delete-source`, cualquier archivo que siga en el origen; sin ella, cualquier archivo
+del que el destino no tenga una copia del mismo tamaño. Termina con 1 cuando hay alguno, y
+ejecutar el mismo traslado de nuevo lo recoge. `--json` los imprime como `notMoved`. Ambos necesitan `database:read`, y
 eliminar o trasladar `database:write`, que la clave de servicio tiene.
 
 ### `rebase skills install`

@@ -1,5 +1,5 @@
 ---
-sourceHash: 8c0fc8ebbe0f0b10
+sourceHash: a9c35edb64ea5e56
 title: Aufteilen in mehrere Prozesse
 sidebar_label: Prozesse aufteilen
 description: Führen Sie ein Bundle als mehrere zusammenarbeitende Prozesse aus – eine API, eine Functions-Ebene, ein Worker – aus demselben veröffentlichten Runtime-Image, damit eine rechenintensive benutzerdefinierte Funktion nicht mehr mit der Daten-API konkurriert.
@@ -103,12 +103,16 @@ docker compose up --scale functions=3
 
 Beide Prozesse benötigen dieselbe `DATABASE_URL`, dasselbe `JWT_SECRET` und denselben
 `REBASE_SERVICE_KEY` – sie bilden ein gemeinsames Deployment, und ein von einem Prozess erstelltes
-Token muss vom anderen akzeptiert werden.
+Token muss vom anderen akzeptiert werden. Ein Prozess mit `REBASE_FUNCTIONS_UPSTREAM` und ohne
+`REBASE_SERVICE_KEY` verweigert den Start: Seine eigenen `rebase.functions.invoke(...)`-Aufrufe, aus einem
+Hook oder einem Cron-Job, erreichen den Functions-Prozess mit diesem Schlüssel.
 
 ## URLs unverändert lassen
 
 `REBASE_FUNCTIONS_UPSTREAM` weist den `api`-Prozess an, `/api/functions/*` an den Functions-Prozess
-weiterzuleiten, anstatt die Anfragen selbst zu bedienen. Clients, generierte SDKs und API-Schlüssel
+weiterzuleiten, anstatt die Anfragen selbst zu bedienen. Es muss eine `http://`- oder
+`https://`-URL sein; alles andere stoppt den Start. Nur `api` und `worker` lesen es
+(zum Worker siehe [Cron und Hintergrund-Jobs](#cron-und-hintergrund-jobs)). Clients, generierte SDKs und API-Schlüssel
 sehen exakt dieselbe Schnittstelle wie vor dem Split. Daher ändert sich kein Anwendungscode, und Sie
 müssen keinen Reverse Proxy einrichten, um dies auszuprobieren.
 
@@ -196,7 +200,30 @@ möchten, und deaktivieren Sie dies auf der API:
     environment:
       REBASE_ROLE: worker
       REBASE_MIGRATE_ON_BOOT: none
+      REBASE_SERVICE_KEY: ${REBASE_SERVICE_KEY}
+      # Only if a job calls rebase.functions:
+      REBASE_FUNCTIONS_UPSTREAM: http://functions:8080
 ```
+
+Ein Job, der auf einen Worker wechselt, behält `rebase.dataAsAdmin`, `rebase.sql`,
+`rebase.storage` und `rebase.email`, die direkt mit der Datenbank, den Buckets und
+dem Mailserver sprechen. Er behält außerdem:
+
+- **`rebase.admin`** (Benutzer, Rollen, Passwort-Resets) **und `rebase.cron`.** Ein
+  Worker stellt auf seinem Port keine Admin-Oberfläche bereit, trägt diese beiden aber In-Process,
+  nur für seine eigenen Jobs.
+- **`rebase.functions`, mit `REBASE_FUNCTIONS_UPSTREAM`.** Ein Worker stellt keine
+  Funktionen bereit. Ist der Upstream gesetzt, werden seine eigenen `rebase.functions.invoke(...)`-Aufrufe
+  an den Functions-Prozess weitergeleitet, wo die Funktion den
+  Aufruf als den Service sieht. Der Worker beantwortet weiterhin nichts unter `/api/functions`
+  auf seinem Port. Der Worker braucht dafür den `REBASE_SERVICE_KEY` des Deployments,
+  wie die `api`.
+
+Er verliert `rebase.auth`: Das sind die Anmeldeabläufe einer Person, und ein Worker
+stellt keine bereit. Für Kontoarbeiten aus einem Job verwenden Sie `rebase.admin`. Er verliert außerdem den
+Rest der Admin-API (Backups, Logs, den Schema-Editor und so weiter) und
+`rebase.functions`, wenn kein Upstream gesetzt ist. Ein Aufruf einer dieser Oberflächen antwortet mit
+`404 NOT_FOUND` und nennt die Oberfläche, die abgeschaltet ist, und was stattdessen zu tun ist.
 
 Ein `functions`-Prozess führt keines von beiden aus. Er wird anhand der Anfragelast skaliert und nach
 Belieben ersetzt; würde man ihm geplante Aufgaben zuweisen, bekäme seine Replika-Anzahl eine Bedeutung,

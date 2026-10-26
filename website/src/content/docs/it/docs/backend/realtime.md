@@ -1,5 +1,5 @@
 ---
-sourceHash: be1f8cd1b6c6a95b
+sourceHash: cb80897157f6b539
 title: Realtime & WebSocket
 sidebar_label: Realtime
 description: Sincronizzazione dei dati in tempo reale, canali di broadcast e tracciamento della presenza tramite WebSocket.
@@ -188,7 +188,7 @@ Il frame è `{ rows, pks, meta }`:
 
 `meta` viene calcolato all'interno della stessa transazione vincolata da RLS che ha letto le righe, descrivendo quindi con esattezza le righe adiacenti. Senza di esso, un client che necessitava di un totale doveva inviare un `GET /count` **per ogni push** — un round trip aggiuntivo per scrittura, per sottoscrittore, e una finestra temporale in cui il conteggio e le righe descrivevano stati differenti della collezione.
 
-Quando il conteggio stesso fallisce, il frame contiene `partial: true` e nessun `total`; questo non costituisce un errore di sottoscrizione, e il client dovrebbe mantenere l'ultimo totale effettivo anziché sostituirlo con la lunghezza della pagina. Su una tabella grande il conteggio è la parte maggiore del costo di un frame. Con `REALTIME_RECOUNT_INTERVAL_MS` impostato, un elenco il cui ultimo totale era di almeno `REALTIME_RECOUNT_MIN_ROWS` (100.000 per impostazione predefinita) riutilizza quel totale per l'intervallo invece di contare a ogni scrittura, e un frame del genere porta `meta.totalAsOf`, il momento in cui il totale è stato calcolato. Se non è impostato, come per impostazione predefinita, ogni frame conta.
+Quando il conteggio stesso fallisce, il frame contiene `partial: true` e nessun `total`; questo non costituisce un errore di sottoscrizione, e il client dovrebbe mantenere l'ultimo totale effettivo anziché sostituirlo con la lunghezza della pagina. Su una tabella grande il conteggio è la parte maggiore del costo di un frame. Con `REALTIME_RECOUNT_INTERVAL_MS` impostato, un elenco il cui ultimo totale era di almeno `REALTIME_RECOUNT_MIN_ROWS` (100.000 per impostazione predefinita) riutilizza quel totale per l'intervallo invece di contare a ogni scrittura, e un frame del genere porta `meta.totalAsOf`, il momento in cui il totale è stato calcolato. Allo scadere dell'intervallo, un elenco il cui ultimo frame ha riutilizzato il totale viene contato di nuovo e riceve il nuovo totale, che nel frattempo sia stato scritto qualcosa o no. Se non è impostato, come per impostazione predefinita, ogni frame conta.
 
 ### Cosa costa una scrittura, e i limiti
 
@@ -243,7 +243,7 @@ che una pagina ha aperti. Modificalo con
 `realtime.maxSubscriptionsPerSocket` sull'adapter Postgres (la variabile
 d'ambiente prevale); un valore che non è un numero intero positivo blocca
 l'avvio del server. Sulla 0.23 le sottoscrizioni di un socket non sono
-limitate. **Anche i socket di un singolo utente possono essere limitati**, per istanza del server: imposta `REALTIME_MAX_SOCKETS_PER_USER` (o `realtime.maxSocketsPerUser`), e un accesso oltre il limite viene rifiutato con `TOO_MANY_SOCKETS` e il socket chiuso con 4002. Se non è impostato, come per impostazione predefinita, non c'è alcun tetto.
+limitate. **Anche i socket di un singolo utente possono essere limitati**, per istanza del server: imposta `REALTIME_MAX_SOCKETS_PER_USER` (o `realtime.maxSocketsPerUser`), e un accesso oltre il limite viene rifiutato con `TOO_MANY_SOCKETS` e il socket chiuso con 4002. I socket autenticati con una chiave API contano a carico di quella chiave, ciascuna per conto proprio, non dell'account che l'ha creata; la chiave di servizio è un'unica credenziale, quindi tutti i suoi socket contano insieme. I socket di un amministratore che impersonano un utente contano a carico dell'amministratore, insieme ai suoi socket, non dell'utente di cui assumono l'identità. L'SDK comunica a ogni sottoscrizione attiva e a `onConnectionLost`, tutte insieme, un errore `CONNECTION_LOST` il cui `details.reason` è `TOO_MANY_SOCKETS`, e continua a riprovare, attendendo ogni volta di più fino a 30 s, così la scheda entra non appena un altro socket si chiude. Se non è impostato, come per impostazione predefinita, non c'è alcun tetto.
 
 Un id di sottoscrizione è proprio del socket: due client che nominano
 entrambi una sottoscrizione `"sub-1"` mantengono ciascuno la propria, e un
@@ -452,8 +452,6 @@ disconnessi vengono accodati e inviati dopo la riconnessione:
 | `reconnecting` | Il socket è caduto e il client sta ricomponendo. Non è stato ancora segnalato nulla. |
 | `disconnected` | L'interruzione dura da 14 secondi o più. `CONNECTION_LOST` è stato segnalato, e il client continua a ricomporre. |
 | `closed` | È stato chiamato `client.close()`. Definitivo. |
-
-È possibile ascoltare gli eventi del ciclo di vita della connessione:
 
 ```typescript
 // `ws` is undefined on a client built without realtime, so narrow it once.

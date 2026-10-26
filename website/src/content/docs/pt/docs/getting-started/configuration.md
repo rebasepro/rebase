@@ -1,5 +1,5 @@
 ---
-sourceHash: 5e1a0bbb522c32d0
+sourceHash: d836d40bf88060b2
 title: Ambiente e Configuração
 sidebar_label: Configuração
 description: Todas as variáveis de ambiente e opções de configuração para projetos Rebase.
@@ -234,7 +234,7 @@ Um projeto que passou por eject possui essas decisões no seu próprio código.
 | `REALTIME_CDC` | Captura de alterações em nível de banco de dados: `auto` (habilita onde a conexão suportar, recai silenciosamente caso contrário), `trigger` (força o uso, avisa se for impossível), `wal` (atualmente degrada para `trigger`), `off`. Veja [Realtime](/docs/backend/realtime-cdc/). Tem precedência sobre `realtime.cdc`. | `auto` |
 | `REALTIME_CHANNEL_BUS` | Transporte entre instâncias para canais de broadcast e presence: `memory` ou `postgres`. Ignorado quando `realtime.bus` tiver recebido um transporte instanciado. | `memory` |
 | `REALTIME_MAX_SUBSCRIPTIONS_PER_SOCKET` | Quantas inscrições um único socket realtime pode manter; a seguinte é recusada com `TOO_MANY_SUBSCRIPTIONS`. Um número inteiro positivo — qualquer outra coisa interrompe o servidor na inicialização. Tem precedência sobre `realtime.maxSubscriptionsPerSocket`. Veja [Realtime](/docs/backend/realtime#what-a-write-costs-and-the-limits). | `1000` |
-| `REALTIME_MAX_SOCKETS_PER_USER` | Quantos sockets realtime um único usuário pode manter abertos em uma instância de servidor. O login do seguinte é recusado com `TOO_MANY_SOCKETS` e o socket é fechado (4002); o SDK continua tentando novamente, conectando-se assim que outro for fechado. Um número inteiro positivo — qualquer outra coisa interrompe o servidor na inicialização. Tem precedência sobre `realtime.maxSocketsPerUser`. | Sem teto |
+| `REALTIME_MAX_SOCKETS_PER_USER` | Quantos sockets realtime um único usuário, ou uma única chave de API, pode manter abertos em uma instância de servidor. Os sockets de um administrador que se passa por outro usuário contam contra o administrador. O login do seguinte é recusado com `TOO_MANY_SOCKETS` e o socket é fechado (4002); o SDK continua tentando novamente, conectando-se assim que outro for fechado. Um número inteiro positivo — qualquer outra coisa interrompe o servidor na inicialização. Tem precedência sobre `realtime.maxSocketsPerUser`. | Sem teto |
 | `REALTIME_REFETCH_MAX_WAIT_MS` | O tempo máximo que uma alteração aguarda pelo refetch que a entrega aos inscritos ativos, em ms. Um refetch aguarda por 300 ms sem nenhuma alteração e, no máximo, esse período sob um fluxo constante de gravações. Um número inteiro positivo — qualquer outra coisa interrompe o servidor na inicialização. Tem precedência sobre `realtime.refetchMaxWaitMs`. | `1000` |
 | `REALTIME_RECOUNT_INTERVAL_MS` | Por quanto tempo o total de uma inscrição de lista grande pode ser reutilizado antes de ser contado novamente, em ms; os frames que o reutilizam carregam `meta.totalAsOf`. Indefinido, cada frame realiza a contagem. Tem precedência sobre `realtime.recountIntervalMs`. | Indefinido |
 | `REALTIME_RECOUNT_MIN_ROWS` | O menor total anterior ao qual `REALTIME_RECOUNT_INTERVAL_MS` se aplica; listas menores são contadas a cada frame. Tem precedência sobre `realtime.recountMinRows`. | `100000` |
@@ -276,7 +276,7 @@ combinações recusam a inicialização — está documentado em
 | `REBASE_JOB_WORKERS` | Sobrescreve se este processo executa workers da fila de tarefas. Indefinido segue o papel. | — |
 | `REBASE_FUNCTIONS_ONLY` | Atende apenas as funções personalizadas especificadas neste processo. | — |
 | `REBASE_FUNCTIONS_EXCLUDE` | Atende todas as funções personalizadas, exceto as especificadas. | — |
-| `REBASE_FUNCTIONS_UPSTREAM` | Para onde o processo de API encaminha uma requisição de função que ele próprio não atende. | — |
+| `REBASE_FUNCTIONS_UPSTREAM` | Para onde o processo de API encaminha uma requisição de função que ele próprio não atende. Em um `worker`, para onde vão as suas próprias chamadas `rebase.functions`. Uma URL `http(s)`. | — |
 
 ### Superfície MCP
 
@@ -373,7 +373,7 @@ Lido pelo `rebase`, não pelo servidor. Nada aqui afeta uma implantação.
 | `REBASE_CLOUD_URL` | O plano de controle com o qual o `rebase cloud` se comunica. | — |
 | `REBASE_CLOUD_EMAIL` | A conta com a qual o `rebase cloud login` faz login, em vez de solicitar interativamente. | — |
 | `REBASE_CLOUD_PASSWORD` | Sua senha, para que um cofre de segredos possa fornecê-la sem que ela vá para o histórico do shell. | — |
-| `REBASE_TOKEN` | Um token gerado por `rebase cloud tokens create`. Quando definido, todos os comandos do `rebase cloud` se autenticam com ele em vez da sessão do `rebase cloud login`, e nunca leem ou gravam a sessão armazenada. É a forma recomendada de executar o `rebase cloud` no CI — veja [CI e agentes](/docs/deployment/cloud/#ci-and-agents). O [servidor MCP](/docs/ai/mcp/) lê o mesmo nome como um alias de `REBASE_API_TOKEN`. | — |
+| `REBASE_TOKEN` | Um token gerado por `rebase cloud tokens create`. Quando definido, todos os comandos do `rebase cloud` se autenticam com ele em vez da sessão do `rebase cloud login`, e nunca leem ou gravam a sessão armazenada. <span class="since-badge" data-since="0.26">A partir da versão 0.26</span> Em um diretório que o `rebase cloud init --claim` vinculou, ele é deixado de lado em favor do token do próprio projeto quando não tem nenhum escopo no projeto. É a forma recomendada de executar o `rebase cloud` no CI — veja [CI e agentes](/docs/deployment/cloud/#ci-and-agents). O [servidor MCP](/docs/ai/mcp/) o repassa à CLI que as suas ferramentas de cloud iniciam, e nunca o envia ao app: defina `REBASE_API_TOKEN` para isso. | — |
 | `REBASE_DEBUG` | `1` exibe o erro subjacente e detalhes da requisição em vez da mensagem curta. A primeira coisa a definir quando um comando do `rebase cloud` falhar sem fornecer detalhes úteis. | — |
 | `REBASE_ATLAS_DEV_URL` | O banco de dados vazio contra o qual `rebase db push`, `db generate` e `db migrate` planejam alterações, em vez do `<db>_dev_diff` que eles criam ao lado do `DATABASE_URL`. O Rebase não cria nem remove o banco de dados aqui indicado, e recusa um valor idêntico ao `DATABASE_URL`. No banco de desenvolvimento gerenciado, a CLI o define para um PGlite em memória descartável próprio. Configure-o onde a permissão `CREATE DATABASE` não for concedida. | `<db>_dev_diff` |
 | `REBASE_DEV_NO_DB` | O `rebase dev` não inicia nenhum banco de dados e não provisiona nada — você fornece o seu próprio. Equivalente a `--no-db`. | — |

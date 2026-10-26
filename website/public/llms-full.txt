@@ -31925,6 +31925,8 @@ same column, outside `indexes:`, is therefore not seen — declare it in
 
 #### What upgrading does to an existing database
 
+<span class="since-badge" data-since="0.26">Since 0.26</span>
+
 The indexes are new objects on tables that already hold data, and the two doors
 build them differently:
 
@@ -56171,6 +56173,8 @@ To work from a checkout instead — a modified chart, or an air-gapped install �
 | `url` | Stock image; the runtime downloads a tarball at every pod start | A control plane that ships bundles out of band |
 
 ### One process, or several
+
+<span class="since-badge" data-since="0.26">Since 0.26</span>
 
 The default is a single Deployment serving everything — the same shape the
 Compose file runs. Splitting is one value:

@@ -1,5 +1,5 @@
 ---
-sourceHash: 01c8a1a724587153
+sourceHash: bd42729686fb869a
 title: Properties
 sidebar_label: Properties
 description: Property-Typen definieren den Datentyp, die Validierung und das UI-Rendering für jedes Feld in einer Collection. Rebase unterstützt string-, number-, boolean-, date-, array-, map-, reference-, relation- und geopoint-Typen.
@@ -42,7 +42,7 @@ Alle Property-Typen teilen sich diese Optionen:
 | `name` | `string` | Anzeigename (Label). Standardmäßig der Property-Schlüssel, formatiert – `publishDate` → "Publish Date". Setzen Sie ihn, wenn diese Ableitung nicht passt: `"URL"` statt "Url". |
 | `description` | `string` | Hilfetext, der unter dem Feld angezeigt wird |
 | `defaultValue` | `any` | Standardwert für neue Entitäten. Ein literaler Wert – ein String, eine Zahl, ein Boolean, ein Datum, eine Enum-ID oder ein als JSON gespeichertes `map`/`array`-Dokument – wird auch zum `DEFAULT` der Spalte, sodass eine Zeile, die von etwas anderem als dem Admin-Panel eingefügt wird (die REST-API, ein Seed, `psql`), diesen ebenfalls erhält |
-| `databaseDefault` | `boolean \| SqlExpression` | Die Datenbank füllt die Spalte, wenn sie bei der Erstellung leer gelassen wird: eine `NOT NULL DEFAULT <Ausdruck>`-Spalte wie `gen_random_uuid()` oder `nextval(…)`. Ein `required`-Feld damit kann bei der Erstellung im Admin-Formular und über die API weggelassen werden, und ein beim Erstellen übergebenes `null` wird der Datenbank überlassen; beim Bearbeiten bleibt es erforderlich, und der generierte `Insert`-Typ macht es optional. Geben Sie den Ausdruck in der Template-Form an, die auch `isId` verwendet: ``databaseDefault: "sql`gen_random_uuid()`"``, und der Schema-Planer schreibt ihn als `DEFAULT` der Spalte, sodass `rebase db push` ihn beibehält. `true` deklariert ein an anderer Stelle geschriebenes `DEFAULT` und schreibt keines, sodass ein Push das Löschen plant. "Import from table" und `rebase schema introspect` setzen den Ausdruck, den sie auslesen |
+| `databaseDefault` | `boolean \| SqlExpression` | Die Datenbank füllt die Spalte, wenn sie bei der Erstellung leer gelassen wird: eine `NOT NULL DEFAULT <Ausdruck>`-Spalte wie `gen_random_uuid()` oder `nextval(…)`. Ein `required`-Feld damit kann bei der Erstellung im Admin-Formular und über die API weggelassen werden, und ein beim Erstellen übergebenes `null` wird der Datenbank überlassen; beim Bearbeiten bleibt es erforderlich, und der generierte `Insert`-Typ macht es optional. Geben Sie den Ausdruck in der Template-Form an, die auch `isId` verwendet: ``databaseDefault: "sql`gen_random_uuid()`"``, und der Schema-Planer schreibt ihn als `DEFAULT` der Spalte, sodass `rebase db push` ihn beibehält. `true` deklariert ein an anderer Stelle geschriebenes `DEFAULT`: Der Planer schreibt keines, und `rebase db push` lässt das, welches die Datenbank hält, unverändert. "Import from table" und `rebase schema introspect` setzen den Ausdruck, den sie auslesen |
 | `validation` | `object` | Validierungsregeln |
 | `propertyConfig` | `string` | Registrierter Property-Config-Schlüssel |
 | `columnName` | `string` | Expliziter Datenbankspaltenname (umgeht die snake_case-Konvertierung) |

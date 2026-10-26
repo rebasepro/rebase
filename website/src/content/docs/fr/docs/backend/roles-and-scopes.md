@@ -1,5 +1,5 @@
 ---
-sourceHash: 96a224ca982e3d25
+sourceHash: faf5a0ca622c3a50
 title: Rôles et portées
 sidebar_label: Rôles et portées
 description: "Ce qu'un appelant peut faire : le plan des données que détient chaque personne, le plan d'administration que les rôles accordent, les portées qu'une application déclare pour elle-même, et la façon dont chaque identifiant les porte."
@@ -18,7 +18,7 @@ Les portées se répartissent en deux plans, et une personne ne les détient pas
 **Le plan des données** regroupe `data:*`, `storage:*` et `functions:invoke`. Chaque
 personne connectée le détient en entier. Ce qu'une personne peut faire d'une ligne est décidé par
 les [règles de sécurité](/docs/collections/security-rules/) de la collection, ligne par ligne,
-et ce qu'elle peut faire d'un fichier par les [politiques de stockage](/docs/backend/storage/#per-object-authorization).
+et ce qu'elle peut faire d'un fichier par les [politiques de stockage](/docs/backend/storage-authorization/).
 Une portée ne décide jamais cela pour une personne. Sur une clé ou un jeton, les portées du plan
 des données restreignent : une clé qui ne détient que `data:read:posts` lit `posts` et rien d'autre,
 quoi que les règles permettraient.
@@ -249,6 +249,9 @@ Pour les clés :
   créateur est administrateur. Sinon `403 ROLE_EXCEEDS_CREATOR`.
 - `keys:read` et `keys:write` ne vont jamais sur une clé. Une clé qui gère des clés pourrait créer
   sa propre remplaçante. `400 KEY_MANAGEMENT_SCOPE`.
+- Un détenteur de `keys:write` ne peut pas modifier ou révoquer une clé qui détient un rôle ou une
+  portée qu'il ne détient pas, sauf s'il est administrateur : `403 KEY_OUTRANKS_CALLER`.
+  Sans cela, il pourrait élargir une clé au rôle admin à toutes les portées de données.
 
 Pour les comptes, un détenteur de `users:write` :
 
@@ -257,6 +260,8 @@ Pour les comptes, un détenteur de `users:write` :
   réinitialiser le mot de passe d'un administrateur et se connecter à sa place.
 - ne peut pas accorder des rôles qui détiennent plus que lui, `admin` compris : `403 ROLE_EXCEEDS_CALLER`.
 
+Un nom de rôle peut être n'importe quoi, sauf un nom qui serait relu comme d'autres rôles : un nom vide, ou contenant `,` `{` `}` `"` `\` ou un caractère de contrôle, est refusé avec `400 INVALID_ROLE` partout où un rôle est écrit (utilisateurs, collection des utilisateurs, clés de service).
+
 ## Comment chaque identifiant détient des portées
 
 | Identifiant | Agit en tant que | Détient |
@@ -264,7 +269,7 @@ Pour les comptes, un détenteur de `users:write` :
 | La session d'une personne | la personne | le plan des données, toutes les portées d'application, et les portées de ses rôles. Un administrateur détient tout |
 | [Clé de service](/docs/backend/api-keys/#service-keys) `rk_live_…` | `api-key:<id>`, avec les rôles RLS `service` plus ses propres `roles` | exactement ses portées |
 | [Clé personnelle](/docs/backend/api-keys/#personal-keys) `rk_live_…` | son propriétaire, avec les rôles du propriétaire tels qu'ils sont à chaque requête | ses portées, réduites à ce que le propriétaire détient maintenant |
-| [Jeton MCP](/docs/ai/mcp/#the-remote-endpoint) | la personne qui l'a connecté | `data:read`, `data:write`, `data:delete` tels qu'accordés, éventuellement par collection |
+| [Jeton MCP](/docs/ai/remote-mcp/) | la personne qui l'a connecté | `data:read`, `data:write`, `data:delete` tels qu'accordés, éventuellement par collection |
 | `REBASE_SERVICE_KEY` | `service`, avec le rôle `admin` | tout |
 
 Une clé ou un jeton ne contourne jamais la sécurité au niveau des lignes. Ses portées sont un

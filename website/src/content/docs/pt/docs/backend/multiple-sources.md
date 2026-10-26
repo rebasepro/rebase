@@ -1,5 +1,5 @@
 ---
-sourceHash: 4b28c5fe78adb3d0
+sourceHash: 19a82f97d9b01fc0
 title: Múltiplos Bancos de Dados e Buckets
 sidebar_label: Múltiplas Fontes
 description: Direcione coleções para diferentes bancos de dados e propriedades para diferentes buckets de armazenamento, e configure cada um a partir do ambiente.
@@ -92,6 +92,12 @@ export default defineFunction((app, { rebase }) => {
     });
 });
 ```
+
+`{ database: analytics }` executa a consulta na conexão própria dessa fonte —
+seja o que for para onde `DATABASE_URL__ANALYTICS` aponte, em qualquer servidor — e nenhuma
+opção a executa na fonte padrão. Uma chave que não nomeia nenhuma fonte configurada é
+recusada com um erro que lista as que existem. Até a 0.25.1 a chave era
+lida como o nome de um banco de dados no servidor da fonte padrão.
 
 ### Visualizando o que você declarou
 

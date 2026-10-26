@@ -1,5 +1,5 @@
 ---
-sourceHash: dc394aa7ff8f8f55
+sourceHash: 4cc7758ee53e304b
 title: Offline e sincronizzazione local-first
 sidebar_label: Offline
 description: Attiva il motore di sincronizzazione local-first dell'SDK tipizzato di Rebase — un database locale di righe, scritture offline istantanee con rollback e query live reattive.
@@ -159,7 +159,7 @@ Una riga che qualcun altro ha eliminato è l'unico caso che non viene annullato.
 
 La cascata è ristretta: un `update` viene scartato insieme alla scrittura che modificava, perché può fallire solo allo stesso modo. Un `create` o un `delete` successivo per la stessa riga sta in piedi da solo e viene mantenuto. Un `create` rifiutato di una riga creata offline porta con sé anche ogni scrittura in coda, in qualsiasi collezione, i cui valori referenziano l'id temporaneo della riga. Una scrittura scartata non è mai stata inviata. Viene segnalata con un `RebaseApiError` il cui `code` è `DEPENDENCY_REJECTED` e il cui `cause` è il rifiuto che l'ha condannata, così puoi distinguerla dalla scrittura che il server ha effettivamente rifiutato. Sulla 0.23 porta invece l'errore della scrittura rifiutata stessa.
 
-Modifiche consecutive a una stessa riga mentre si è offline vengono unite in un'unica scrittura in coda, così un form in cui si sta digitando non fa crescere la coda. Se il server rifiuta la scrittura unita per il suo contenuto (un 400, 403 o 422 — ad esempio un campo rimosso da una modifica dello schema mentre l'utente era offline), il motore la scompone di nuovo nelle modifiche separate e le riapplica una per una. Viene annullata e segnalata solo la modifica che il server rifiuta; le altre vengono mantenute.
+Modifiche consecutive a una stessa riga mentre si è offline vengono unite in un'unica scrittura in coda, così un form in cui si sta digitando non fa crescere la coda. In una scrittura che la coda ha iniziato a inviare non si fonde nulla: una modifica fatta dopo un tentativo di ritrasmissione la cui risposta è andata persa viene messa in coda come un update a sé, e l'eliminazione di una riga creata offline viene inviata invece di essere annullata contro la sua creazione, dato che il server potrebbe già avere la riga. Se il server rifiuta la scrittura unita per il suo contenuto (un 400, 403 o 422 — ad esempio un campo rimosso da una modifica dello schema mentre l'utente era offline), il motore la scompone di nuovo nelle modifiche separate e le riapplica una per una. Viene annullata e segnalata solo la modifica che il server rifiuta; le altre vengono mantenute.
 
 ### Conflitti
 
@@ -182,7 +182,7 @@ const client = createRebaseClient({
 
 La coda attende mentre `onConflict` è in esecuzione, quindi può interrogare l'utente. Se lancia un'eccezione, la modifica viene sovrascritta.
 
-La versione su cui viene fatta una modifica è quella riportata dall'ultima lettura della riga: `findById()`, un frame di `listenById()`, o la risposta di un precedente `update()`. Una riga letta per ultima in un elenco di `find()` o `listen()` non ha versione, e nemmeno una modifica fatta sopra un'altra scrittura in coda sulla stessa riga. Queste vengono ritrasmesse senza precondizione. Un `ifMatch` che passi tu stesso a `update()` viene mantenuto quando la modifica viene messa in coda.
+La versione su cui viene fatta una modifica è quella riportata dall'ultima lettura della riga: `findById()`, un frame di `listenById()`, o la risposta di un precedente `update()`. Una riga letta per ultima in un elenco di `find()` o `listen()` non ha versione, e nemmeno una modifica fatta sopra un'altra scrittura in coda sulla stessa riga. Queste vengono ritrasmesse senza precondizione. Un `ifMatch` che passi tu stesso a `update()` o `delete()` viene mantenuto quando la scrittura viene messa in coda, con o senza `onConflict`, e `findById()` su un client con offline abilitato restituisce la riga con la sua versione, quindi `etagOf(row)` funziona come online. Senza `onConflict`, una scrittura in coda rifiutata a causa del tuo stesso `ifMatch` viene annullata e segnalata a `onSyncError` con un 412 `PRECONDITION_FAILED`.
 
 Un fallimento che è soltanto temporaneo — un 429, un 503, una connessione caduta — non è un rifiuto. Questi restano in coda e vengono ritentati; solo dopo `maxRetries` rinvii una scrittura viene annullata con un rollback.
 
@@ -235,7 +235,11 @@ viene ritrasmessa finché la sessione non è confermata: quando la connessione t
 client aggiorna la sessione, e anche un accesso la conferma. Se il server
 rifiuta la sessione, o qualcun altro accede, il dispositivo cambia utente, e le
 scritture in coda restano al loro autore finché non accede di nuovo. Nel frattempo
-`status().unverifiedUser` è `true`.
+`status().unverifiedUser` è `true`, e questo vale anche online: finché il
+refresh non risponde, le scritture vengono messe in coda invece di partire senza
+credenziali, e le letture ricevono risposta dalle righe locali dell'utente. Ciò
+che il server invia a una richiesta senza sessione è ciò che un chiamante
+disconnesso può vedere, quindi non viene conservato.
 
 ```typescript
 createRebaseClient({

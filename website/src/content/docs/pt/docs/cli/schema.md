@@ -1,5 +1,5 @@
 ---
-sourceHash: 882f81a3b9bbe750
+sourceHash: 829ce13f7c169a96
 title: Geração de Esquema
 sidebar_label: Geração de Esquema
 description: Gere esquemas Drizzle ORM a partir das definições de coleções, crie migrações SQL e mantenha seu banco de dados sincronizado com a CLI da Rebase.
@@ -170,7 +170,7 @@ rebase db push
 **O que ele faz:**
 - Lê o esquema Drizzle gerado
 - Aplica as mudanças diretamente ao banco de dados (CREATE, ALTER, DROP)
-- Executa o plano primeiro em modo dry run e para antes de tudo o que destrói dados: uma tabela, coluna, schema, view ou tipo removidos, um `TRUNCATE`, uma mudança de tipo de coluna que pode perder valores (`timestamptz` → `date`, `numeric` → `integer`), ou uma mudança de chave primária: `(id)` → `(id, locale)` dá a cada linha um id novo, de modo que links, chaves estrangeiras e ids guardados em outros lugares deixam de encontrar sua linha. Ele também para antes da remoção de uma restrição CHECK ou EXCLUDE que o banco de dados contém: nenhuma linha é perdida, mas a partir daí o banco de dados aceita linhas que recusava. Pergunta em um terminal, onde Ctrl-C ou Ctrl-D responde não, e recusa caso contrário; `--allow-destructive` (ou `--yes`) aplica mesmo assim. Um push que para aí remove, ao sair, o seu banco de dados temporário `<db>_dev_diff`
+- Executa o plano primeiro em modo dry run e para antes de tudo o que destrói dados: uma tabela, coluna, schema, view ou tipo removidos, um `TRUNCATE`, uma mudança de tipo de coluna que pode perder valores (`timestamptz` → `date`, `numeric` → `integer`), ou uma mudança de chave primária: `(id)` → `(id, locale)` dá a cada linha um id novo, de modo que links, chaves estrangeiras e ids guardados em outros lugares deixam de encontrar sua linha. Ele também para antes da remoção de uma restrição CHECK ou EXCLUDE que o banco de dados contém: nenhuma linha é perdida, mas a partir daí o banco de dados aceita linhas que recusava. Pergunta em um terminal, onde Ctrl-C ou Ctrl-D responde não, e recusa caso contrário; `--allow-destructive` aplica mesmo assim. O `--yes` ainda faz o mesmo nesta versão, com um aviso de descontinuação; a partir da próxima versão ele aprova apenas pushes que não destroem nada. Um push que para aí remove, ao sair, o seu banco de dados temporário `<db>_dev_diff`
 - Ativa a segurança em nível de linha em todas as tabelas de coleção, incluindo as tabelas de junção, logo após a mudança de schema e antes de qualquer etapa que possa falhar, de modo que um push que para no meio deixa uma tabela nova negando todas as requisições em vez de aberta a elas
 - Aplica as políticas RLS das suas coleções e **remove as políticas que um push anterior substituiu**
 - Deixa como estão todas as restrições CHECK e

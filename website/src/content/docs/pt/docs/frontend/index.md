@@ -1,5 +1,5 @@
 ---
-sourceHash: 3dd5a537f812658a
+sourceHash: 12294b1ff06361d9
 title: Visão Geral do Frontend
 sidebar_label: Frontend
 description: "Construa e personalize o painel — Rebase CMS e Rebase Studio — com React: controllers, scaffold, roteamento e views."
@@ -169,6 +169,11 @@ seu registro é excluído:
     onSaved={({ entity }) => console.log("saved", entity.id)}
     onClose={() => navigate("/posts")}/>
 ```
+
+Se outra pessoa excluir o registro enquanto o formulário está aberto, o formulário mantém
+o que foi digitado e diz que o registro foi excluído em outro lugar. A ação "Salvar como novo"
+o transforma em um formulário que cria um novo registro com esses valores;
+`onSaved` então informa o novo registro.
 
 Ambos trazem seu próprio `CollectionsProvider` quando não há nenhum acima deles. Esse é
 o passo logo abaixo, e você pode montá-lo você mesmo para compartilhar um único escopo entre

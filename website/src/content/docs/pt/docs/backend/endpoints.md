@@ -1,5 +1,5 @@
 ---
-sourceHash: 75edbe600ee52a3e
+sourceHash: 63a92d4d1f06a612
 title: Índice de endpoints
 sidebar_label: Índice de endpoints
 description: Cada rota HTTP montada por um backend Rebase — dados, autenticação, armazenamento, administração, meta — com a restrição de acesso (gate) de cada uma e a página que a explica.
@@ -140,9 +140,13 @@ uma coleção não acessa nada disso. Consulte [Papéis e escopos](/docs/backend
 | `GET` | `/api/admin/backups` | `backups:read` | Inventário de backups |
 | `GET` | `/api/admin/backups/download` | `backups:read` | Transmite um backup via stream. Com `?token=` de um link de download, nenhum cabeçalho é necessário, apenas para esse backup |
 | `POST` | `/api/admin/backups/download-url` | `backups:read` | Um link para um backup, `{ key }` → `{ url, token, expiresIn }`, válido por 60 segundos — [Backups](/docs/deployment/backups/#download-a-backup) |
-| `GET` | `/api/admin/storage/orphans` | `database:read` | Arquivos armazenados que nenhuma linha nomeia, `?storageId=&olderThanHours=` — o que `rebase storage orphans` imprime |
-| `DELETE` | `/api/admin/storage/orphans` | `database:write` | Encontra-os de novo e os exclui; `409 STORAGE_SCAN_INCOMPLETE` quando uma collection não pôde ser lida |
-| `POST` | `/api/admin/storage/move` | `database:write` | Copia uma pasta para outra fonte sob as mesmas chaves, uma página por chamada — o que `rebase storage move` envia |
+| `POST` | `/api/admin/storage/orphans/scans` | `database:write` | Inicia em segundo plano uma varredura dos arquivos armazenados que nenhuma linha nomeia, `?storageId=&olderThanHours=`. Responde `202` com o registro da varredura: `id`, `status` (`queued`) e `runner` (`worker` quando é um job `storage.orphans` na fila de jobs, `in-process` quando o próprio servidor o executa). O registro é gravado na fonte, sob o `_rebase/maintenance/` reservado |
+| `GET` | `/api/admin/storage/orphans/scans/:id` | `database:read` | O registro da varredura, `?storageId=`. Enquanto ela roda: `progress` (`filesScanned`, `rowsScanned`, `collectionsScanned` de `collectionsTotal`, `unscanned`). Depois de `completed`: `result`, o relatório que o antigo `GET /orphans` respondia. Uma execução que parou de reportar por 10 minutos é respondida como `failed`. `404 STORAGE_SCAN_NOT_FOUND` quando a fonte não tem essa varredura |
+| `DELETE` | `/api/admin/storage/orphans?scan=:id` | `database:write` | Exclui em segundo plano os órfãos de uma varredura concluída, `202`. Cada um é conferido de novo contra todas as linhas e entradas de histórico, e consultado outra vez logo antes de ser excluído. O resultado é o `deletion` do registro da varredura. `409` com `STORAGE_SCAN_NOT_COMPLETE`, `STORAGE_SCAN_INCOMPLETE`, `STORAGE_SCAN_EXPIRED` ou `STORAGE_SCAN_DELETION_STARTED` |
+| `GET` | `/api/admin/storage/orphans` | `database:read` | Obsoleto: a varredura dentro da requisição, `?storageId=&olderThanHours=`. Responde com `Deprecation: true`. Use `POST /orphans/scans` |
+| `DELETE` | `/api/admin/storage/orphans` | `database:write` | Obsoleto, sem `?scan=`: varre de novo e exclui dentro da requisição. `409 STORAGE_SCAN_INCOMPLETE` quando uma collection não pôde ser lida |
+| `POST` | `/api/admin/storage/move` | `database:write` | Copia uma pasta para outra fonte sob as mesmas chaves, uma página por chamada — o que `rebase storage move` envia; `400 STORAGE_SAME_LOCATION` para `deleteSource` entre duas fontes que armazenam no mesmo lugar |
+| `POST` | `/api/admin/storage/move/verify` | `database:write` | Lista a fonte de novo depois de uma movimentação, com o mesmo corpo, uma página por chamada: `{ checked, notMoved: [{ key, reason }], cursor? }` — cada arquivo que ainda está na fonte com `deleteSource`, cada arquivo de que o destino não tem cópia sem ele. O `rebase storage move` o consulta quando a movimentação termina |
 | `GET` | `/api/admin/logs` | `logs:read` | O buffer de logs recentes |
 | `GET` | `/api/admin/logs/latest` | `logs:read` | As entradas mais recentes |
 | `GET` | `/api/admin/logs/stream` | `logs:read` | Server-sent events |
@@ -150,7 +154,7 @@ uma coleção não acessa nada disso. Consulte [Papéis e escopos](/docs/backend
 | `GET` | `/api/admin/rls-simulator/options` | `schema:read` | As funções, as que as regras nomeiam e as chaves de serviço válidas que um administrador pode simular |
 | `POST` | `/api/admin/rls-simulator/preview` | `schema:read` | Cada coleção tal como `{ role?, userId?, apiKeyId? }` a alcança: linhas visíveis face às de quem chama, ocultas pelo âmbito ou pela RLS, campos mascarados. Só a sessão de um administrador |
 | `POST` | `/api/admin/sql/csv` | `database:write` | Transmite via stream o resultado completo de uma consulta somente leitura como CSV — "Baixar resultado completo como CSV" do [Studio](/docs/studio/) |
-| `GET` | `/api/admin/branches/:name/diff` | `database:read` | O que um [branch](/docs/backend/branching/#reviewing-and-merging-a-branch) mudou: esquema, políticas e linhas, `?sampleLimit=&schemas=&maxRowsPerTable=` |
+| `GET` | `/api/admin/branches/:name/diff` | `database:write` | O que um [branch](/docs/backend/branching/#reviewing-and-merging-a-branch) mudou: esquema, políticas e linhas, `?sampleLimit=&schemas=&maxRowsPerTable=` |
 | `POST` | `/api/admin/branches/:name/merge` | `database:write` | Grava as linhas do branch no pai, `{ expectedFingerprint, onConflict?, skipBlocked? }`; `409` se algum lado mudou desde o diff, ou se há linhas em conflito |
 | `GET` | `/api/admin/schema/status` | `schema:read` | [Live schema editing](/docs/backend/live-schema-editing/) |
 | `POST` | `/api/admin/schema/plan` | `schema:read` | Planeja uma alteração; nunca aplica |

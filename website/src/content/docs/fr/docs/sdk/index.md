@@ -1,5 +1,5 @@
 ---
-sourceHash: 1d19e29e19f9ce81
+sourceHash: 916ecd6bde4adb6f
 title: SDK typé — Prise en main
 sidebar_label: Prise en main
 description: Installez et configurez le SDK typé de Rebase pour interagir avec votre backend depuis n'importe quelle application JavaScript ou TypeScript.
@@ -102,7 +102,7 @@ const { data } = await client.data.products.find();
 
 Lorsque `Database` est fourni, `createRebaseClient` renvoie une instance de `CreateRebaseClientResult<DB>`. Cela associe directement les accesseurs de collection en camelCase sur `client.data` à leurs types correspondants, vous offrant une autocomplétion complète sur les opérations et les types de collections (ex. `client.data.products.find()`).
 
-`collectionsDictionary` associe chaque accesseur au slug utilisé sur le réseau. Passez-le chaque fois qu'un slug n'est pas déjà un nom de propriété valide — `my-notes` n'est accessible sous la forme `client.data.myNotes` que parce que le dictionnaire l'indique.
+`collectionsDictionary` associe chaque accesseur au slug utilisé sur le réseau. **`collections` est obligatoire pour un client typé.** Les types proposent chaque accesseur, que vous le passiez ou non, mais sans lui `client.data.myNotes` est envoyé à `/data/my_notes`, l'accesseur en snake_case, de sorte qu'un slug comme `my-notes` ou un accesseur renommé répond 404. Le client avertit une fois, en nommant l'accesseur et le correctif. Une version ultérieure rendra `collections` obligatoire dans les types lorsque `Database` est fourni.
 
 Quelques noms sur `client.data` sont pris : `collection` est la fonction dynamique `collection(slug)`, et `then`, `toJSON` et `$$typeof` sont laissés tranquilles pour les vérifications de promesse et de sérialisation. Une collection dont l'accesseur serait l'un d'eux est générée sous la forme `<name>Collection` — le slug `collection` devient `client.data.collectionCollection` — et `generate-sdk` affiche un avertissement qui nomme les deux. `client.data.collection("collection")` l'atteint aussi.
 
@@ -112,7 +112,7 @@ Quelques noms sur `client.data` sont pris : `collection` est la fonction dynamiq
 
 Une clé de propriété que *vous* avez écrite est votre clé, quelle que soit sa forme — rien ne renomme un nom que vous avez choisi. Les deux clés qui sont dérivées plutôt que déclarées — la clé étrangère d'une relation et une colonne récupérée par introspection — sont en camelCase.
 
-`Row` décrit une lecture, `Insert` un `create()` et `Update` un `update()` — ils n'ont pas la même structure. Une colonne qui n'est pas obligatoire est `T | null` sur les trois, ce qui permet à une écriture de la vider ; la clé primaire est toujours présente lors d'une lecture et ne peut jamais être définie lors d'une mise à jour ; une cible `belongsTo` peut être écrite soit sous forme de relation (`{ author: 5 }`), soit sous forme de sa clé étrangère (`{ authorId: 5 }`) ; et une appartenance `hasMany` ou `manyToMany` s'écrit comme une liste d'identifiants cibles ou d'objets `{ id }` (`{ tags: ["t-1"] }`), chacun portant un `_pivot` lorsque la table de jonction déclare des colonnes de charge utile. Un champ que personne n'a le droit d'écrire (`access: { write: [] }`) ne figure ni sur `Insert` ni sur `Update`. Une colonne `date` se lit sous forme de chaîne ISO, et une écriture accepte soit cette chaîne, soit un `Date`.
+`Row` décrit une lecture, `Insert` un `create()` et `Update` un `update()` — ils n'ont pas la même structure. Une colonne qui n'est pas obligatoire est `T | null` sur les trois, ce qui permet à une écriture de la vider ; la clé primaire est toujours présente lors d'une lecture et ne peut jamais être définie lors d'une mise à jour ; une cible `belongsTo` peut être écrite soit sous forme de relation (`{ author: 5 }`), soit sous forme de sa clé étrangère (`{ authorId: 5 }`), et une cible obligatoire est satisfaite par l'une ou l'autre ; un `hasOne` s'écrit en nommant la ligne cible (`{ profile: 9 }`), ou `null` pour la délier ; une `via` à un seul saut s'écrit comme le kind qu'elle remplace (vers un : l'id de la cible ou `null` ; vers plusieurs : une liste d'ids), et une `via` à plusieurs sauts est en lecture seule et ne figure sur aucune des deux ; et une appartenance `hasMany` ou `manyToMany` s'écrit comme une liste d'identifiants cibles ou d'objets `{ id }` (`{ tags: ["t-1"] }`), chacun portant un `_pivot` lorsque la table de jonction déclare des colonnes de charge utile. Un champ que personne n'a le droit d'écrire (`access: { write: [] }`) ne figure ni sur `Insert` ni sur `Update`. Une colonne `date` se lit sous forme de chaîne ISO, et une écriture accepte soit cette chaîne, soit un `Date`.
 
 ## Exemple rapide
 

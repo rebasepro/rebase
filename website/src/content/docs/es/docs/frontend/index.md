@@ -1,5 +1,5 @@
 ---
-sourceHash: 3dd5a537f812658a
+sourceHash: 12294b1ff06361d9
 title: Visión general del frontend
 sidebar_label: Frontend
 description: "Construye y personaliza el panel — Rebase CMS y Rebase Studio — con React: controladores, scaffold, enrutamiento y vistas."
@@ -169,6 +169,11 @@ su registro:
     onSaved={({ entity }) => console.log("saved", entity.id)}
     onClose={() => navigate("/posts")}/>
 ```
+
+Si otra persona elimina el registro mientras el formulario está abierto, el
+formulario conserva lo que se había escrito y dice que el registro se eliminó en
+otro lugar. Su acción «Save as new» lo convierte en un formulario que crea un
+registro nuevo con esos valores; `onSaved` informa entonces del registro nuevo.
 
 Ambos traen su propio `CollectionsProvider` cuando no hay ninguno por encima. Ese es
 el paso de debajo, y puedes montarlo tú mismo para compartir un único ámbito entre

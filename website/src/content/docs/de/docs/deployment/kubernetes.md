@@ -1,5 +1,5 @@
 ---
-sourceHash: 5764a95deb8e4e9c
+sourceHash: 80956abbae707a91
 title: Kubernetes
 sidebar_label: Kubernetes
 description: Stellen Sie Rebase mit dem offiziellen Helm-Chart auf einem Kubernetes-Cluster bereit – ein Deployment oder mehrere, ein Migrations-Job für das Schema und statische Apps auf demselben Host.
@@ -40,6 +40,8 @@ Um stattdessen aus einem Checkout zu arbeiten – einem modifizierten Chart oder
 | `url` | Standard-Image; die Runtime lädt bei jedem Pod-Start einen Tarball herunter | Eine Control Plane, die Bundles Out-of-Band ausliefert |
 
 ## Ein Prozess oder mehrere
+
+<span class="since-badge" data-since="0.26">Seit 0.26</span>
 
 Der Standard ist ein einzelnes Deployment, das alles bedient – dieselbe Struktur, die auch die Compose-Datei ausführt. Das Aufteilen erfordert nur einen Wert:
 

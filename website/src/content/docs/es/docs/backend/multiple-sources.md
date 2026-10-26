@@ -1,5 +1,5 @@
 ---
-sourceHash: 4b28c5fe78adb3d0
+sourceHash: 19a82f97d9b01fc0
 title: Múltiples bases de datos y buckets
 sidebar_label: Múltiples orígenes
 description: Enrute colecciones a diferentes bases de datos y propiedades a diferentes buckets de almacenamiento, y configure cada uno desde el entorno.
@@ -92,6 +92,13 @@ export default defineFunction((app, { rebase }) => {
     });
 });
 ```
+
+`{ database: analytics }` ejecuta la consulta en la conexión propia de ese origen
+—a lo que apunte `DATABASE_URL__ANALYTICS`, en el servidor que sea— y ninguna
+opción la ejecuta en el predeterminado. Una clave que no nombra ningún origen
+configurado se rechaza con un error que enumera los que hay. Hasta la 0.25.1 la
+clave se leía como el nombre de una base de datos en el servidor del origen
+predeterminado.
 
 ### Ver lo que ha declarado
 

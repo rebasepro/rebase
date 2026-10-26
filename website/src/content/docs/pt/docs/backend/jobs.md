@@ -1,5 +1,5 @@
 ---
-sourceHash: cf996dc5a52fc912
+sourceHash: cae2434b532cd67f
 title: Tarefas em Segundo Plano
 sidebar_label: Tarefas em Segundo Plano
 description: Uma fila de jobs durável, baseada em Postgres — trabalho que sobrevive a reinicializações, com novas tentativas usando backoff e falhas mantidas em vez de descartadas.
@@ -153,6 +153,16 @@ Os handlers de fila e as assinaturas de tópicos recebem o mesmo `signal` em seu
 Seguro por construção. Os workers realizam a reivindicação com `SELECT … FOR UPDATE SKIP LOCKED`, de modo que cada job vai para exatamente um deles e os outros passam para a próxima linha em vez de ficarem esperando em fila atrás dele. Não é necessário eleger nenhum líder.
 
 Uma instância só reivindica as tarefas para as quais tem um handler. Durante um rolling deploy, uma instância executando código antigo deixa de lado os jobs cuja tarefa só o código novo implementa: eles permanecem `pending`, sem gastar tentativas, até que um par atualizado os reivindique. Uma tarefa que nenhuma instância implementa também permanece `pending`, em vez de ir para a dead-letter.
+
+## Varreduras de órfãos do storage
+
+O `rebase storage orphans` roda nesta fila quando ela está ativada: cada varredura, e cada
+exclusão a partir de uma varredura, é um job `storage.orphans`, com uma tentativa. O backend
+registra o handler por conta própria, em todo processo com storage configurado, e só
+os processos cujos workers de job estão ativados o executam. Uma varredura é limitada por
+`timeoutMs` como qualquer job, então uma fonte grande demais para ser varrida em 15 minutos precisa de um
+`timeoutMs` maior, ou 0. Sem a fila, o servidor executa a varredura dentro do
+próprio processo. Veja [a CLI](/docs/cli/#rebase-storage).
 
 ## Webhooks duráveis
 

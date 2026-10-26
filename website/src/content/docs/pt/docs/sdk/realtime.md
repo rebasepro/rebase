@@ -1,5 +1,5 @@
 ---
-sourceHash: 607e40e364a1e6b0
+sourceHash: 189ee23f6992c2e4
 title: Subscrições em Tempo Real
 sidebar_label: Realtime
 description: Inscreva-se em alterações de dados em tempo real com o SDK tipado do Rebase usando listeners em tempo real baseados em WebSocket.
@@ -389,7 +389,7 @@ const { messages, retained, latestSeq } = await channel.history({
 :::note[As reproduções podem se sobrepor, e tudo bem]
 O servidor não tem como saber exatamente quais mensagens chegaram até você antes da queda do socket, portanto um intervalo de catch-up pode incluir algumas que você já aplicou. O SDK descarta qualquer mensagem com sequência igual ou inferior à que já foi entregue, garantindo que os handlers nunca recebam uma mensagem duas vezes.
 
-Suas próprias mensagens **não** são filtradas em um replay: uma reconexão atribui um novo id de cliente, justamente no cenário para o qual o catch-up existe e onde esse filtro falharia. Torne as operações idempotentes caso reaplicar as suas próprias mensagens seja um problema.
+Suas próprias mensagens são filtradas de um replay, como ao vivo, inclusive as enviadas antes de uma reconexão dar ao socket um novo id de cliente: o canal lembra os ids que transmitiu. Um novo objeto de canal — depois de recarregar a página, por exemplo — não lembra de nenhum, então um catch-up ali entrega suas mensagens anteriores como as de qualquer outra pessoa, que é o que reconstruir o estado a partir do histórico precisa.
 :::
 
 ## Rastreamento de Presença

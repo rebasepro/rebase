@@ -1,5 +1,5 @@
 ---
-sourceHash: 83ba3db403bb8334
+sourceHash: 9feb465f3327d507
 title: Chaves de API
 sidebar_label: Chaves de API
 description: "Chaves de longa duração para scripts, CI, agentes e integrações: chaves de serviço e chaves pessoais, os escopos que elas têm, como se combinam com a segurança em nível de linha (RLS) e as rotas que as gerenciam."
@@ -31,7 +31,7 @@ curl "$API_URL/api/data/orders" \
 ```
 
 A mesma chave funciona na REST API, no storage, nas funções personalizadas, nas superfícies
-administrativas que seus escopos alcançam, no WebSocket de realtime e no [endpoint `/mcp`](/docs/ai/mcp/#the-remote-endpoint).
+administrativas que seus escopos alcançam, no WebSocket de realtime e no [endpoint `/mcp`](/docs/ai/remote-mcp/).
 
 ## Chaves de serviço
 
@@ -159,7 +159,7 @@ O `rate_limit` de uma chave é quantas requisições ela pode fazer em uma janel
 - seus frames de dados no socket de realtime: buscas, contagens, salvamentos e exclusões,
   e as assinaturas e requisições de histórico de canal além da
   [cota](/docs/backend/realtime/#what-a-write-costs-and-the-limits) de cada socket;
-- suas requisições ao [`/mcp`](/docs/ai/mcp/#the-remote-endpoint).
+- suas requisições ao [`/mcp`](/docs/ai/remote-mcp/).
 
 Sem um `rate_limit`, o bucket usa o padrão do servidor para chaves de API, 1000. Uma
 chave pessoal não tem um `rate_limit` próprio e conta em seu próprio bucket com esse
@@ -168,6 +168,11 @@ padrão. Passado o limite, uma requisição HTTP responde `429` e um frame do so
 
 As rotas administrativas em `/api/admin` e as mensagens administrativas do socket, como
 as do editor SQL, não têm limite de taxa.
+
+Um administrador que simula uma chave ("Simulate access",
+`x-rebase-simulate-api-key-id`) gasta a própria cota, não a da chave: a integração
+que roda com essa chave mantém o orçamento inteiro. Simular ou se passar por um
+usuário também é cobrado do administrador, da mesma forma.
 
 ## Chaves pessoais
 
@@ -251,7 +256,7 @@ e cobre cada etapa de um upload retomável (TUS), incluindo a verificação de d
 e o cancelamento. `storage:delete` exclui. O alvo é o id de uma fonte de storage. O
 id da fonte padrão é `(default)`, então `storage:read:(default)` lê apenas a fonte padrão,
 e `storage:write:avatars` escreve em uma fonte chamada `avatars`.
-Depois da verificação de escopo, [`storageAuthorize`](/docs/backend/storage/#per-object-authorization)
+Depois da verificação de escopo, [`storageAuthorize`](/docs/backend/storage-authorization/)
 ainda é executado, com a identidade da chave.
 
 ### Funções
@@ -307,6 +312,8 @@ Cada chave é verificada contra quem a cria, da mesma forma nas duas rotas:
 | `400 KEY_MANAGEMENT_SCOPE` | Foi pedido `keys:read` ou `keys:write` |
 | `403 SCOPE_EXCEEDS_CREATOR` | Um escopo que o criador não tem. Uma chave nunca tem mais do que a conta que a criou |
 | `403 ROLE_EXCEEDS_CREATOR` | Um papel de chave de serviço que o criador não tem, quando o criador não é administrador |
+| `400 INVALID_ROLE` | O nome de um papel está vazio ou contém `,` `{` `}` `"` `\` ou um caractere de controle, que o RLS leria de volta como outros papéis |
+| `403 KEY_OUTRANKS_CALLER` | Em uma alteração (`PUT`) ou revogação (`DELETE`): a chave já tem um papel ou escopo que quem chama não tem, e quem chama não é administrador |
 
 Uma requisição para a qual a própria chave não tem o escopo responde `403 SCOPE_MISSING`, com o
 escopo em `details.requiredScope`. Consulte [Códigos de erro](/docs/backend/errors/#authentication-and-accounts).

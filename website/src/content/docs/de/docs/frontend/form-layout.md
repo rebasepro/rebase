@@ -1,5 +1,5 @@
 ---
-sourceHash: a6f7e70d9dfb90ae
+sourceHash: 29363c3f0ab50d98
 title: Formular-Layout
 sidebar_label: Formular-Layout
 description: Steuern Sie die Anordnung des Entitätsformulars – Spaltenbreiten, Abschnitte und die Metadaten-Leiste.
@@ -16,8 +16,9 @@ Das Entitätsformular wird aus Ihren Eigenschaften generiert:
   benachbarte Felder mit demselben kleinen Editor – zwei Zahlen, zwei Schalter,
   zwei Daten desselben Modus, zwei Auswahllisten mit kurzen Optionen – sich eine Zeile teilen
 
-Ein Feld mit einer langen Beschriftung, einem Hilfetext mit mehr als 60 Zeichen, `conditions` oder einem
-benutzerdefinierten `Field` wird nie gepaart, ebenso wenig wie ein Freitext-String: Nichts in
+Ein Feld mit einer langen Beschriftung, einem Hilfetext mit mehr als 60 Zeichen, `conditions`, einer
+`access`-Regel auf Feldebene oder `excludeFromApi` (das Formular rendert nichts für einen Benutzer,
+der es nicht lesen darf) oder einem benutzerdefinierten `Field` wird nie gepaart, ebenso wenig wie ein Freitext-String: Nichts in
 einem Schema unterscheidet einen kurzen Branch-Namen von einer langen URL. Das Formular prüft nie,
 welche Eigenschaft der Titel ist. Alle anderen Spalten werden von der Collection
 Feld für Feld über `admin.span` angefordert – festgelegt anhand des Inhalts jedes Feldes, wie

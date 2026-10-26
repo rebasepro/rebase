@@ -1,5 +1,5 @@
 ---
-sourceHash: be1f8cd1b6c6a95b
+sourceHash: cb80897157f6b539
 title: Temps réel & WebSocket
 sidebar_label: Temps réel
 description: Synchronisation des données en temps réel, canaux de diffusion et suivi de présence via WebSocket.
@@ -190,7 +190,7 @@ La trame est de la forme `{ rows, pks, meta }` :
 
 `meta` est comptabilisé au sein de la même transaction soumise au RLS ayant lu les lignes, il décrit donc précisément les lignes qui l'accompagnent. Sans cela, un client ayant besoin d'un total devait émettre un `GET /count` **par notification reçue** — un aller-retour supplémentaire par écriture et par abonné, et un intervalle durant lequel le total et les lignes décrivaient des états différents de la collection.
 
-Lorsque le décompte lui-même échoue, la trame comporte `partial: true` et aucun `total` ; cela ne constitue pas une erreur d'abonnement, et un client doit conserver le dernier total réel plutôt que de lui substituer la longueur de la page. Sur une grande table, le décompte représente l'essentiel du coût d'une trame. Avec `REALTIME_RECOUNT_INTERVAL_MS` défini, une liste dont le dernier total était d'au moins `REALTIME_RECOUNT_MIN_ROWS` (100 000 par défaut) réutilise ce total pendant l'intervalle au lieu de compter à chaque écriture, et une telle trame porte `meta.totalAsOf`, le moment où le total a été pris. Non défini, comme par défaut, chaque trame compte.
+Lorsque le décompte lui-même échoue, la trame comporte `partial: true` et aucun `total` ; cela ne constitue pas une erreur d'abonnement, et un client doit conserver le dernier total réel plutôt que de lui substituer la longueur de la page. Sur une grande table, le décompte représente l'essentiel du coût d'une trame. Avec `REALTIME_RECOUNT_INTERVAL_MS` défini, une liste dont le dernier total était d'au moins `REALTIME_RECOUNT_MIN_ROWS` (100 000 par défaut) réutilise ce total pendant l'intervalle au lieu de compter à chaque écriture, et une telle trame porte `meta.totalAsOf`, le moment où le total a été pris. Quand l'intervalle est écoulé, une liste dont la dernière trame a réutilisé le total est recomptée et reçoit le nouveau total, que quelque chose ait été écrit ou non depuis. Non défini, comme par défaut, chaque trame compte.
 
 ### Ce que coûte une écriture, et les limites
 
@@ -238,7 +238,7 @@ abonnements identiques sur un socket, ce qui compte donc les listes et enregistr
 distincts qu'une page a ouverts. Changez cela avec `REALTIME_MAX_SUBSCRIPTIONS_PER_SOCKET` ou
 `realtime.maxSubscriptionsPerSocket` sur l'adaptateur Postgres (la variable d'environnement
 l'emporte) ; une valeur qui n'est pas un entier positif arrête le serveur au démarrage. Sur la
-0.23 les abonnements d'un socket ne sont pas limités. **Les sockets qu'un même utilisateur détient peuvent aussi être limités**, par instance de serveur : définissez `REALTIME_MAX_SOCKETS_PER_USER` (ou `realtime.maxSocketsPerUser`), et une connexion au-delà est refusée avec `TOO_MANY_SOCKETS` et le socket fermé avec le code 4002. Non défini, comme par défaut, il n'y a aucun plafond.
+0.23 les abonnements d'un socket ne sont pas limités. **Les sockets qu'un même utilisateur détient peuvent aussi être limités**, par instance de serveur : définissez `REALTIME_MAX_SOCKETS_PER_USER` (ou `realtime.maxSocketsPerUser`), et une connexion au-delà est refusée avec `TOO_MANY_SOCKETS` et le socket fermé avec le code 4002. Les sockets connectés avec une clé d'API comptent pour cette clé, chaque clé séparément, et non pour le compte qui l'a créée ; la clé de service est un seul identifiant, donc tous ses sockets comptent ensemble. Les sockets d'un administrateur qui usurpent un utilisateur comptent pour l'administrateur, avec ses propres sockets, et non pour l'utilisateur qu'il incarne. Le SDK notifie en une fois chaque abonnement actif et `onConnectionLost`, avec une erreur `CONNECTION_LOST` dont `details.reason` vaut `TOO_MANY_SOCKETS`, et continue de réessayer en attendant plus longtemps à chaque fois, jusqu'à 30 s, de sorte que l'onglet finit par entrer une fois qu'un autre socket est fermé. Non défini, comme par défaut, il n'y a aucun plafond.
 
 Un id d'abonnement est propre au socket : deux clients qui nomment tous deux un abonnement
 `"sub-1"` conservent chacun le leur, et un `unsubscribe` ne met fin qu'à celui de l'émetteur.

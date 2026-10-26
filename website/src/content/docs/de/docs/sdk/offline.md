@@ -1,5 +1,5 @@
 ---
-sourceHash: dc394aa7ff8f8f55
+sourceHash: 4cc7758ee53e304b
 title: Offline & Local-First-Sync
 sidebar_label: Offline
 description: Aktivieren Sie die Local-First-Sync-Engine des typisierten SDK von Rebase — eine lokale Zeilendatenbank, sofortige Offline-Schreibvorgänge mit Rollback und reaktive Live-Abfragen.
@@ -159,7 +159,7 @@ Eine Zeile, die jemand anders gelöscht hat, ist der eine Fall, der nicht zurüc
 
 Die Kaskade ist eng gefasst: Ein `update` wird zusammen mit dem Schreibvorgang verworfen, den es bearbeitet hat, weil es nur auf dieselbe Weise scheitern kann. Ein späteres `create` oder `delete` für dieselbe Zeile steht für sich und bleibt erhalten. Ein abgelehntes `create` einer offline erstellten Zeile nimmt außerdem jeden eingereihten Schreibvorgang in jeder Collection mit, dessen Werte auf die temporäre ID der Zeile verweisen. Ein verworfener Schreibvorgang wurde nie gesendet. Er wird mit einem `RebaseApiError` gemeldet, dessen `code` `DEPENDENCY_REJECTED` ist und dessen `cause` die Ablehnung ist, die ihn zu Fall brachte — so lässt er sich von dem Schreibvorgang unterscheiden, den der Server tatsächlich abgelehnt hat. Unter 0.23 trägt er stattdessen den eigenen Fehler des abgelehnten Schreibvorgangs.
 
-Aufeinanderfolgende Bearbeitungen einer Zeile im Offline-Zustand werden zu einem einzigen eingereihten Schreibvorgang zusammengeführt, sodass ein Formular, in das gerade getippt wird, die Warteschlange nicht wachsen lässt. Lehnt der Server den zusammengeführten Schreibvorgang wegen seines Inhalts ab (ein 400, 403 oder 422 — etwa ein Feld, das durch eine Schema-Änderung entfernt wurde, während der Benutzer offline war), teilt die Engine ihn wieder in die einzelnen Bearbeitungen auf und spielt jede erneut ab. Nur die Bearbeitung, die der Server ablehnt, wird zurückgerollt und gemeldet; die anderen bleiben erhalten.
+Aufeinanderfolgende Bearbeitungen einer Zeile im Offline-Zustand werden zu einem einzigen eingereihten Schreibvorgang zusammengeführt, sodass ein Formular, in das gerade getippt wird, die Warteschlange nicht wachsen lässt. In einen Schreibvorgang, den die Warteschlange bereits zu senden begonnen hat, wird nicht hineingeführt: Eine Bearbeitung nach einem Wiederholungsversuch, dessen Antwort verloren ging, wird als eigenes Update eingereiht, und ein Löschen einer offline erstellten Zeile wird gesendet, statt gegen ihr Erstellen aufgerechnet zu werden, da der Server die Zeile möglicherweise bereits hält. Lehnt der Server den zusammengeführten Schreibvorgang wegen seines Inhalts ab (ein 400, 403 oder 422 — etwa ein Feld, das durch eine Schema-Änderung entfernt wurde, während der Benutzer offline war), teilt die Engine ihn wieder in die einzelnen Bearbeitungen auf und spielt jede erneut ab. Nur die Bearbeitung, die der Server ablehnt, wird zurückgerollt und gemeldet; die anderen bleiben erhalten.
 
 ### Konflikte
 
@@ -182,7 +182,7 @@ const client = createRebaseClient({
 
 Die Warteschlange wartet, während `onConflict` läuft, sodass es den Benutzer fragen kann. Wirft es, wird die Bearbeitung überschrieben.
 
-Die Version, gegen die eine Bearbeitung gemacht wird, ist die, die der letzte Lesezugriff der Zeile meldete: `findById()`, ein `listenById()`-Frame oder die Antwort eines früheren `update()`. Eine Zeile, die zuletzt in einer `find()`- oder `listen()`-Liste gelesen wurde, hat keine Version, ebenso wenig eine Bearbeitung, die auf einen anderen eingereihten Schreibvorgang derselben Zeile aufsetzt. Diese werden ohne Vorbedingung wiederholt. Ein `ifMatch`, das Sie selbst an `update()` übergeben, bleibt erhalten, wenn die Bearbeitung eingereiht wird.
+Die Version, gegen die eine Bearbeitung gemacht wird, ist die, die der letzte Lesezugriff der Zeile meldete: `findById()`, ein `listenById()`-Frame oder die Antwort eines früheren `update()`. Eine Zeile, die zuletzt in einer `find()`- oder `listen()`-Liste gelesen wurde, hat keine Version, ebenso wenig eine Bearbeitung, die auf einen anderen eingereihten Schreibvorgang derselben Zeile aufsetzt. Diese werden ohne Vorbedingung wiederholt. Ein `ifMatch`, das Sie selbst an `update()` oder `delete()` übergeben, bleibt erhalten, wenn der Schreibvorgang eingereiht wird, mit oder ohne `onConflict`, und `findById()` auf einem Offline-fähigen Client gibt die Zeile mit ihrer Version zurück, sodass `etagOf(row)` funktioniert wie online. Ohne `onConflict` wird ein eingereihter Schreibvorgang, der wegen Ihres eigenen `ifMatch` abgelehnt wurde, zurückgerollt und mit einem 412 `PRECONDITION_FAILED` an `onSyncError` gemeldet.
 
 Ein Fehlschlag, der lediglich vorübergehend ist — ein 429, ein 503, eine abgebrochene Verbindung —, ist keine Ablehnung. Solche bleiben in der Warteschlange und werden erneut versucht; erst nach `maxRetries` Zurückstellungen wird ein Schreibvorgang zurückgerollt.
 
@@ -235,7 +235,11 @@ wird wiederholt, bevor die Sitzung bestätigt ist: Ist die Verbindung zurück, e
 Client die Sitzung, und auch eine Anmeldung bestätigt sie. Lehnt der Server die Sitzung ab
 oder meldet sich jemand anders an, wechselt das Gerät den Benutzer, und die eingereihten
 Schreibvorgänge bleiben bei ihrem Urheber, bis er sich erneut anmeldet. Währenddessen ist
-`status().unverifiedUser` `true`.
+`status().unverifiedUser` `true`, und das gilt auch online: Bis die Erneuerung antwortet,
+werden Schreibvorgänge eingereiht, statt ohne Anmeldedaten hinauszugehen, und Lesezugriffe
+werden aus den lokalen Zeilen des Benutzers beantwortet. Was der Server einer Anfrage ohne
+Sitzung sendet, ist das, was ein abgemeldeter Aufrufer sehen darf, und wird deshalb nicht
+aufbewahrt.
 
 ```typescript
 createRebaseClient({

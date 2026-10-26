@@ -1,5 +1,5 @@
 ---
-sourceHash: dc394aa7ff8f8f55
+sourceHash: 4cc7758ee53e304b
 title: Hors ligne et synchronisation local-first
 sidebar_label: Hors ligne
 description: Activez le moteur de synchronisation local-first du SDK typé de Rebase — une base de données locale de lignes, des écritures hors ligne instantanées avec annulation, et des requêtes en direct réactives.
@@ -159,7 +159,7 @@ Une ligne supprimée par quelqu'un d'autre est le seul cas qui n'est pas annulé
 
 La cascade est étroite : un `update` est écarté en même temps que l'écriture qu'il modifiait, car il ne peut échouer que de la même manière. Un `create` ou un `delete` ultérieur portant sur la même ligne se suffit à lui-même et est conservé. Un `create` refusé d'une ligne créée hors ligne emporte aussi avec lui toute écriture en file d'attente, dans n'importe quelle collection, dont les valeurs référencent l'id temporaire de la ligne. Une écriture écartée n'a jamais été envoyée. Elle est signalée avec une `RebaseApiError` dont le `code` est `DEPENDENCY_REJECTED` et dont la `cause` est le refus qui l'a condamnée, ce qui permet de la distinguer de l'écriture que le serveur a réellement refusée. Sur la 0.23 elle porte à la place l'erreur propre de l'écriture refusée.
 
-Des modifications consécutives sur une même ligne pendant la déconnexion sont fusionnées en une seule écriture mise en file d'attente, de sorte qu'un formulaire en cours de saisie ne fait pas grossir la file. Si le serveur refuse l'écriture fusionnée en raison de son contenu (un 400, 403 ou 422 — par exemple un champ supprimé par un changement de schéma pendant que l'utilisateur était hors ligne), le moteur la scinde à nouveau en modifications séparées et rejoue chacune d'elles. Seule la modification que le serveur refuse est annulée et signalée ; les autres sont conservées.
+Des modifications consécutives sur une même ligne pendant la déconnexion sont fusionnées en une seule écriture mise en file d'attente, de sorte qu'un formulaire en cours de saisie ne fait pas grossir la file. Une écriture que la file a commencé à envoyer n'absorbe plus rien : une modification faite après une tentative de rejeu dont la réponse s'est perdue est mise en file comme une mise à jour distincte, et la suppression d'une ligne créée hors ligne est envoyée au lieu d'être annulée contre sa création, puisque le serveur détient peut-être déjà la ligne. Si le serveur refuse l'écriture fusionnée en raison de son contenu (un 400, 403 ou 422 — par exemple un champ supprimé par un changement de schéma pendant que l'utilisateur était hors ligne), le moteur la scinde à nouveau en modifications séparées et rejoue chacune d'elles. Seule la modification que le serveur refuse est annulée et signalée ; les autres sont conservées.
 
 ### Conflits
 
@@ -182,7 +182,7 @@ const client = createRebaseClient({
 
 La file attend pendant que `onConflict` s'exécute, il peut donc interroger l'utilisateur. S'il lève une exception, la modification est écrasée.
 
-La version sur laquelle une modification est faite est celle qu'a rapportée la dernière lecture de la ligne : `findById()`, une trame `listenById()`, ou la réponse d'un `update()` antérieur. Une ligne lue en dernier dans une liste `find()` ou `listen()` n'a pas de version, pas plus qu'une modification faite par-dessus une autre écriture en file sur la même ligne. Celles-ci sont rejouées sans précondition. Un `ifMatch` que vous passez vous-même à `update()` est conservé lorsque la modification est mise en file.
+La version sur laquelle une modification est faite est celle qu'a rapportée la dernière lecture de la ligne : `findById()`, une trame `listenById()`, ou la réponse d'un `update()` antérieur. Une ligne lue en dernier dans une liste `find()` ou `listen()` n'a pas de version, pas plus qu'une modification faite par-dessus une autre écriture en file sur la même ligne. Celles-ci sont rejouées sans précondition. Un `ifMatch` que vous passez vous-même à `update()` ou à `delete()` est conservé lorsque l'écriture est mise en file, avec ou sans `onConflict`, et `findById()` sur un client à mode hors ligne renvoie la ligne avec sa version, de sorte que `etagOf(row)` fonctionne comme en ligne. Sans `onConflict`, une écriture en file refusée à cause de votre propre `ifMatch` est annulée et signalée à `onSyncError` avec un 412 `PRECONDITION_FAILED`.
 
 Un échec simplement temporaire — un 429, un 503, une connexion coupée — n'est pas un rejet. Ces écritures restent en file d'attente et sont réessayées ; ce n'est qu'après `maxRetries` reports qu'une écriture est annulée.
 
@@ -225,7 +225,7 @@ client.auth.onAuthStateChange(async (event) => {
 
 En mode cookie, rien sur la session n'est stocké sur l'appareil : un rechargement qui ne peut pas joindre le serveur n'a donc pas d'utilisateur. Par défaut, il est traité comme déconnecté : les lignes locales de l'utilisateur sont masquées, et les écritures faites alors sont mises en file comme celles de l'utilisateur déconnecté.
 
-`keepLastUser: true` change cela. Le client mémorise le dernier utilisateur connecté sur l'appareil (son id seulement), et un rechargement hors ligne ouvre à la place la base locale de cet utilisateur. Les écritures faites alors sont mises en file comme les siennes, mais aucune n'est rejouée tant que la session n'est pas confirmée : lorsque la connexion revient, le client rafraîchit la session, et une connexion la confirme aussi. Si le serveur refuse la session, ou si quelqu'un d'autre se connecte, l'appareil change d'utilisateur, et les écritures en file restent à leur auteur jusqu'à ce qu'il se reconnecte. Pendant ce temps, `status().unverifiedUser` vaut `true`.
+`keepLastUser: true` change cela. Le client mémorise le dernier utilisateur connecté sur l'appareil (son id seulement), et un rechargement hors ligne ouvre à la place la base locale de cet utilisateur. Les écritures faites alors sont mises en file comme les siennes, mais aucune n'est rejouée tant que la session n'est pas confirmée : lorsque la connexion revient, le client rafraîchit la session, et une connexion la confirme aussi. Si le serveur refuse la session, ou si quelqu'un d'autre se connecte, l'appareil change d'utilisateur, et les écritures en file restent à leur auteur jusqu'à ce qu'il se reconnecte. Pendant ce temps, `status().unverifiedUser` vaut `true`, et cela vaut aussi en ligne : tant que le rafraîchissement n'a pas répondu, les écritures sont mises en file au lieu de partir sans identifiants, et les lectures sont servies depuis les lignes locales de l'utilisateur. Ce que le serveur renvoie à une requête sans session est ce qu'un appelant déconnecté peut voir, ce n'est donc pas conservé.
 
 ```typescript
 createRebaseClient({

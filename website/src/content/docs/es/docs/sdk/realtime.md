@@ -1,5 +1,5 @@
 ---
-sourceHash: 607e40e364a1e6b0
+sourceHash: 189ee23f6992c2e4
 title: Suscripciones en tiempo real
 sidebar_label: Tiempo real
 description: Suscríbete a cambios de datos en vivo con el SDK tipado de Rebase utilizando listeners en tiempo real basados en WebSocket.
@@ -389,7 +389,7 @@ const { messages, retained, latestSeq } = await channel.history({
 :::note[Las reproducciones pueden solaparse, y eso no es un problema]
 El servidor no puede saber con certeza qué mensajes recibiste antes de que cayera el socket, por lo que un rango de puesta al día puede incluir algunos que ya hayas aplicado. El SDK descarta cualquier elemento que esté en o por debajo de la secuencia que ya entregó, por lo que los manejadores nunca ven un mensaje dos veces.
 
-Tus propios mensajes **no** se filtran de una reproducción: una reconexión asigna un nuevo client id, por lo que el caso exacto para el que existe la puesta al día es aquel en el que dicho filtro fallaría. Haz que las operaciones sean idempotentes si volver a aplicar las tuyas resultara problemático.
+Tus propios mensajes se filtran de una reproducción, igual que en vivo, incluidos los enviados antes de que una reconexión diera al socket un nuevo client id: el canal recuerda los ids desde los que emitió. Un objeto de canal nuevo —tras recargar la página, por ejemplo— no recuerda ninguno, así que una puesta al día allí entrega tus mensajes anteriores como los de cualquier otro, que es lo que necesita reconstruir el estado desde el historial.
 :::
 
 ## Seguimiento de presencia (Presence Tracking)

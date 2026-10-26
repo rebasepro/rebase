@@ -1,5 +1,5 @@
 ---
-sourceHash: f833e803807f9ac4
+sourceHash: 210827aa1afa92f7
 title: Modifica dello schema live
 description: "Crea e modifica collection a fronte di un backend in esecuzione: prima committate nel repository, poi applicate."
 ---
@@ -142,6 +142,11 @@ senza default, il che fa fallire ogni inserimento successivo finché non viene
 eliminata o resa nullable. Una modifica senza una frase di questo tipo
 (spostare una chiave primaria, una relazione la cui colonna di collegamento
 non è creata da nulla) non può essere scritta nella sola sorgente.
+
+Su un deployment che non cambia nulla nel proprio database (`REBASE_PROVISION=false`)
+nessuna modifica viene applicata dal pannello, quindi ogni modifica segue questo percorso:
+il pulsante principale della finestra di dialogo riporta **Commit** e invia
+`"sourceOnly": true`, e il processo che modifica quel database applica lo schema.
 
 L'eliminazione di una collection dal pannello di amministrazione segue lo
 stesso percorso: `/apply` con `"remove": true` e `"sourceOnly": true` elimina
@@ -313,11 +318,21 @@ stato compilato finché la tua pipeline non compila e distribuisce il commit. Il
 ha la modifica subito; il pannello di amministrazione e l'API vedono la nuova definizione
 della collection dopo quel deploy.
 
-Quindi un deployment fa **una sola modifica per deploy**. Dopo che un commit è stato scritto, la
-successiva applicazione viene rifiutata con `SCHEMA_CHANGE_FAILED`, indicando il commit, finché un processo
-che esegue quel commit non sostituisce questo. Una seconda modifica pianificata sulle
-collection che questo deployment esegue ancora farebbe il commit di file di schema generati
-che escludono la prima. La pianificazione resta disponibile nel frattempo.
+Quindi un deployment fa **una sola modifica per deploy**. Una seconda modifica pianificata
+sulle collection che questo deployment esegue ancora farebbe il commit di file di schema
+generati che escludono la prima. Ogni applicazione quindi produce `schema.generated.ts`
+dalle collection che questo deployment esegue e lo confronta con la copia del repository.
+Quando differiscono, l'applicazione viene rifiutata con `SCHEMA_CHANGE_FAILED`, indicando
+il file, finché un processo che esegue quel commit non sostituisce questo. Il controllo
+legge il repository, non la memoria di questo processo, quindi vale dopo un riavvio, tra
+repliche e per una modifica che uno sviluppatore ha fatto push e che non è ancora stata
+distribuita. La pianificazione resta disponibile nel frattempo.
+
+Le copie differiscono anche quando il file è stato generato da un'altra versione di Rebase,
+riformattato o modificato a mano. Se non c'è nulla in attesa di essere distribuito, esegui
+`rebase schema generate` con la versione che il deployment esegue, fai il commit del
+risultato e distribuiscilo. Le terminazioni di riga e gli spazi finali non contano come
+differenza.
 
 ### Fare il commit su un repository remoto
 

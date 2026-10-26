@@ -1,5 +1,5 @@
 ---
-sourceHash: 3dd5a537f812658a
+sourceHash: 12294b1ff06361d9
 title: Panoramica del Frontend
 sidebar_label: Frontend
 description: "Crea e personalizza il pannello — Rebase CMS e Rebase Studio — con React: controller, scaffold, routing e viste."
@@ -169,6 +169,11 @@ dopo l'eliminazione del suo record:
     onSaved={({ entity }) => console.log("saved", entity.id)}
     onClose={() => navigate("/posts")}/>
 ```
+
+Se qualcun altro elimina il record mentre il form è aperto, il form conserva ciò che è stato
+digitato e dice che il record è stato eliminato altrove. La sua azione "Save as new" lo
+trasforma in un form che crea un nuovo record con quei valori; `onSaved` riporta allora il
+nuovo record.
 
 Entrambi portano con sé un proprio `CollectionsProvider` quando non ce n'è uno sopra di
 loro. È il passo sottostante, e puoi montarlo tu stesso per condividere un unico ambito

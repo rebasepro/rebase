@@ -1,5 +1,5 @@
 ---
-sourceHash: 4527233b1773b5c2
+sourceHash: f7939e13ff2b006a
 title: Commandes de base de données
 sidebar_label: Commandes de base de données
 description: Les commandes rebase db — push, generate et migrate, sauvegardes et restaurations, copie d'une base distante, chaîne de connexion, base de développement gérée et branches.
@@ -247,7 +247,7 @@ passer `--yes` et se termine avec le code 1 ; en 0.24, elle dit « Nothing was c
 `list` et `info` ne font que lire : une base de données sur laquelle aucune branche n'a été créée n'en a aucune, et
 elles n'y créent aucun schéma `rebase`. En 0.24, elles créent le registre.
 
-`diff` montre ce qu'une branche a changé par rapport à la base dont elle a été créée : tables, colonnes et politiques RLS ajoutées, supprimées ou modifiées, et par table les lignes qu'elle a insérées, mises à jour et supprimées. Les lignes que le parent a modifiées de son côté depuis sont comptées à part, et celles que les deux ont modifiées sont des conflits. `--json` affiche tout le diff, avec jusqu'à `--sample-limit` lignes par table (100 par défaut). Il lit les deux bases et n'en modifie aucune ; la fusion se fait dans Studio — voir [Examiner et fusionner une branche](/docs/backend/branching/#reviewing-and-merging-a-branch).
+`diff` montre ce qu'une branche a changé par rapport à la base dont elle a été créée : tables, colonnes, contraintes, index, triggers, politiques RLS, types enum, vues et fonctions ajoutés, supprimés ou modifiés, et par table les lignes qu'elle a insérées, mises à jour et supprimées. Les lignes que le parent a modifiées de son côté depuis sont comptées à part, et celles que les deux ont modifiées sont des conflits. `--json` affiche tout le diff, avec jusqu'à `--sample-limit` lignes par table (100 par défaut). Il lit les deux bases et n'en modifie aucune ; la fusion se fait dans Studio — voir [Examiner et fusionner une branche](/docs/backend/branching/#reviewing-and-merging-a-branch).
 
 `switch` enregistre la branche dans `.rebase/branch.json` et ne modifie jamais `.env`. Elle a la priorité sur `DATABASE_URL` dans `.env` et s'efface devant `--database-url` ou un `DATABASE_URL` dans le shell, de sorte qu'une option sur la ligne de commande prévaut toujours sur un basculement effectué précédemment. `delete` refuse la branche sur laquelle vous vous trouvez, puisque chaque commande
 de l'espace de travail, la suppression comprise, y est pointée : faites d'abord `switch --off`,

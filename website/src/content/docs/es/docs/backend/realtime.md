@@ -1,5 +1,5 @@
 ---
-sourceHash: be1f8cd1b6c6a95b
+sourceHash: cb80897157f6b539
 title: Tiempo real y WebSocket
 sidebar_label: Tiempo real
 description: Sincronización de datos en tiempo real, canales de difusión y seguimiento de presencia mediante WebSocket.
@@ -191,7 +191,7 @@ La trama es `{ rows, pks, meta }`:
 
 `meta` se calcula dentro de la misma transacción sujeta a RLS que leyó las filas, por lo que describe con exactitud las filas que la acompañan. Sin esto, un cliente que necesitara el total tenía que emitir un `GET /count` **por cada push**: un viaje de ida y vuelta adicional por escritura y por suscriptor, además de una ventana en la que el conteo y las filas describían estados distintos de la colección.
 
-Cuando el propio conteo falla, la trama incluye `partial: true` y ningún `total`; esto no constituye un error de suscripción, y el cliente debe conservar el último total real en lugar de sustituirlo por la longitud de la página. En una tabla grande, el conteo es la mayor parte de lo que cuesta una trama. Con `REALTIME_RECOUNT_INTERVAL_MS` definida, una lista cuyo último total fue de al menos `REALTIME_RECOUNT_MIN_ROWS` (100.000 por defecto) reutiliza ese total durante el intervalo en lugar de contar en cada escritura, y esa trama lleva `meta.totalAsOf`, el momento en que se tomó el total. Sin definir, como por defecto, cada trama cuenta.
+Cuando el propio conteo falla, la trama incluye `partial: true` y ningún `total`; esto no constituye un error de suscripción, y el cliente debe conservar el último total real en lugar de sustituirlo por la longitud de la página. En una tabla grande, el conteo es la mayor parte de lo que cuesta una trama. Con `REALTIME_RECOUNT_INTERVAL_MS` definida, una lista cuyo último total fue de al menos `REALTIME_RECOUNT_MIN_ROWS` (100.000 por defecto) reutiliza ese total durante el intervalo en lugar de contar en cada escritura, y esa trama lleva `meta.totalAsOf`, el momento en que se tomó el total. Cuando se cumple el intervalo, una lista cuya última trama reutilizó el total se cuenta de nuevo y recibe el total nuevo, haya habido o no alguna escritura desde entonces. Sin definir, como por defecto, cada trama cuenta.
 
 ### Lo que cuesta una escritura, y los límites
 
@@ -244,7 +244,7 @@ registros distintos que una página tiene abiertos. Cámbialo con
 `REALTIME_MAX_SUBSCRIPTIONS_PER_SOCKET` o `realtime.maxSubscriptionsPerSocket`
 en el adaptador de Postgres (la variable de entorno prevalece); un valor que
 no sea un entero positivo detiene el servidor en el arranque. En 0.23 las
-suscripciones de un socket no tienen límite. **También se pueden limitar los sockets que mantiene un usuario**, por instancia del servidor: define `REALTIME_MAX_SOCKETS_PER_USER` (o `realtime.maxSocketsPerUser`), y un inicio de sesión por encima del límite se rechaza con `TOO_MANY_SOCKETS` y el socket se cierra con 4002. Sin definir, como por defecto, no hay techo.
+suscripciones de un socket no tienen límite. **También se pueden limitar los sockets que mantiene un usuario**, por instancia del servidor: define `REALTIME_MAX_SOCKETS_PER_USER` (o `realtime.maxSocketsPerUser`), y un inicio de sesión por encima del límite se rechaza con `TOO_MANY_SOCKETS` y el socket se cierra con 4002. Los sockets que inician sesión con una clave de API cuentan contra esa clave, cada clave por separado, no contra la cuenta que la creó; la clave de servicio es una sola credencial, así que todos sus sockets cuentan juntos. Los sockets de un administrador que suplantan a un usuario cuentan contra el administrador, junto con sus propios sockets, no contra el usuario cuya identidad adoptan. El SDK avisa a todas las suscripciones activas y a `onConnectionLost` a la vez, con un error `CONNECTION_LOST` cuyo `details.reason` es `TOO_MANY_SOCKETS`, y sigue reintentando, esperando más cada vez hasta 30 s, de modo que la pestaña entra en cuanto se cierra otro socket. Sin definir, como por defecto, no hay techo.
 
 Un id de suscripción es propio del socket: dos clientes que nombran ambos una
 suscripción `"sub-1"` conservan cada uno la suya, y un `unsubscribe` termina

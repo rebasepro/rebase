@@ -1,5 +1,5 @@
 ---
-sourceHash: 607e40e364a1e6b0
+sourceHash: 189ee23f6992c2e4
 title: Realtime-Abonnements
 sidebar_label: Realtime
 description: Abonnieren Sie Live-Datenänderungen mit dem typisierten SDK von Rebase über WebSocket-basierte Realtime-Listener.
@@ -389,7 +389,7 @@ const { messages, retained, latestSeq } = await channel.history({
 :::note[Replays können sich überschneiden, und das ist in Ordnung]
 Der Server kann nicht genau wissen, welche Nachrichten Sie erreicht haben, bevor die Socket-Verbindung abbrach. Daher kann ein Catch-up-Bereich Nachrichten enthalten, die Sie bereits angewendet haben. Das SDK verwirft alles, was auf oder unter der Sequenz liegt, die es bereits ausgeliefert hat, sodass Handler eine Nachricht niemals doppelt empfangen.
 
-Ihre eigenen Nachrichten werden bei einem Replay **nicht** herausgefiltert: Eine Wiederverbindung weist eine neue Client-ID zu, sodass genau in dem Fall, für den Catch-up existiert, dieser Filter fehlschlagen würde. Gestalten Sie Operationen idempotent, falls das erneute Anwenden eigener Operationen problematisch wäre.
+Ihre eigenen Nachrichten werden bei einem Replay herausgefiltert, wie live, auch solche, die gesendet wurden, bevor eine Wiederverbindung dem Socket eine neue Client-ID gab: Der Channel merkt sich die IDs, von denen er gesendet hat. Ein neues Channel-Objekt — etwa nach einem Neuladen der Seite — merkt sich keine, sodass ein Catch-up dort Ihre früheren Nachrichten wie die aller anderen zustellt, was nötig ist, um Zustand aus der History neu aufzubauen.
 :::
 
 ## Presence-Tracking

@@ -1,5 +1,5 @@
 ---
-sourceHash: f37fbfe1270f8317
+sourceHash: 5902e196f7801815
 title: Relações
 sidebar_label: Relações
 description: Defina relações SQL um-para-um, um-para-muitos e muitos-para-muitos entre coleções com chaves estrangeiras, tabelas de junção e junções multi-salto.
@@ -77,7 +77,7 @@ uma linha ou muitas, e o que uma escrita através dela pode tocar.
 | `hasOne` | na tabela do **destino** | uma | `foreignKeyOnTarget`, padrão o singular desta coleção mais `_id` (`users` → `user_id`) |
 | `hasMany` | na tabela do **destino** | muitas | os filhos pertencem só a este pai |
 | `manyToMany` | numa **tabela de junção** | muitas | as linhas são compartilhadas; o vínculo é seu |
-| `via` | um `joinPath` explícito | qualquer | somente leitura; declare você mesmo a `cardinality` |
+| `via` | um `joinPath` explícito | qualquer | gravável quando de um único salto, somente leitura nos outros casos; declare você mesmo a `cardinality` |
 
 Todo campo é opcional exceto `kind` e `target` (e, em `via`, `cardinality`
 e `joinPath`) — o resto é derivado.
@@ -135,7 +135,7 @@ relations: [
 que este lado lê, este nomeia a coluna para a qual o outro lado aponta. Sem ele,
 um vínculo como o acima não é expressável como `hasMany` de forma alguma e tem de
 recorrer a [`via`](#via--uma-cadeia-de-junções-explícita), que é somente
-leitura.
+leitura para uma cadeia como esta.
 
 A coluna precisa ser única. Um vínculo que endereça mais de uma linha de origem
 não consegue dizer a qual uma linha relacionada pertence, e o Postgres também não
@@ -173,8 +173,23 @@ de vista** — `sourceColumn` sempre nomeia *esta* coleção:
 
 Para vínculos que as quatro formas acima não conseguem expressar: caminhos de
 vários saltos, chaves compostas, ou uma junção cuja condição não é uma chave
-estrangeira simples. Somente leitura — o Rebase não vai inferir como escrever
-através de uma cadeia arbitrária.
+estrangeira simples.
+
+Uma cadeia de **um único salto** é gravável em uma criação ou atualização, do mesmo modo
+que o tipo que ela substitui é gravado:
+
+- uma cadeia **para um** de **um passo**: a linha de destino guarda a chave, então
+  `{ badge: "b-1" }` aponta a coluna dessa linha para esta, e `null` a desvincula,
+  como uma escrita de `hasOne` faz;
+- uma cadeia **para muitos** de **dois passos por uma tabela** entre as pontas: essa
+  tabela guarda os vínculos, então `{ tags: ["t-1", "t-2"] }` os define como suas linhas, como uma
+  escrita de `manyToMany` faz (um `via` não traz `_pivot`).
+
+Qualquer coisa mais longa é **somente leitura**: o Rebase não vai inferir como escrever
+através de uma cadeia arbitrária. Uma criação ou atualização que nomeie uma é recusada com
+`400 RELATION_NOT_WRITABLE`, e o formulário de administração mostra o campo sem um seletor.
+Uma escrita aninhada (`PATCH users/1/permissions/3`) através de qualquer `via` é recusada
+da mesma forma.
 
 ```typescript
 {
@@ -256,8 +271,9 @@ properties: {
 ## Junções Multi-Salto
 
 Para relações que atravessam várias tabelas, use `kind: "via"` com um
-`joinPath`. Elas são somente leitura: o Rebase não vai inferir como escrever
-através de uma cadeia arbitrária.
+`joinPath`. Uma cadeia com mais de um vínculo é somente leitura: o Rebase não vai inferir como escrever
+através de uma cadeia arbitrária (veja [via](#via--uma-cadeia-de-junções-explícita) para
+as cadeias de um único salto que ele grava).
 
 ```typescript
 // Users → Permissions through Roles
@@ -561,7 +577,7 @@ interface ViaRelation extends RelationBase {
 O que você escreve acima é a forma de *autoria*. Internamente o Rebase trabalha
 com `ResolvedRelation`: o mesmo vínculo com todos os padrões preenchidos e nada
 opcional, mais `cardinality`, `targetSlug` e duas flags — `writable` (falsa
-apenas para `via`) e `shared` (verdadeira quando as linhas de destino pertencem
+apenas para um `via` de vários saltos) e `shared` (verdadeira quando as linhas de destino pertencem
 também a outros pais, de modo que remover desvincula em vez de excluir).
 
 `sourceKey` é a única exceção a "nada opcional": o seu padrão é a chave primária

@@ -1,5 +1,5 @@
 ---
-sourceHash: 819343e76e0e61e9
+sourceHash: ba40edd634e01a84
 title: Runtime di backend gestito
 sidebar_label: Runtime gestito
 description: Cosa può e non può fare un backend con runtime "managed" su Rebase Cloud — pacchetti e binari, memoria e CPU, timeout e dimensioni del body, filesystem, stato in memoria, secret, storage per i file generati e rete in uscita.
@@ -188,7 +188,7 @@ rebase cloud deploy           # the running backend gets the credentials at depl
 
 In alternativa, puoi collegare il progetto a un bucket di tua proprietà tramite `rebase cloud storage attach` (S3, R2, MinIO o qualsiasi bucket compatibile con S3). Senza una di queste configurazioni, i tentativi di upload risponderanno con `501 STORAGE_NOT_CONFIGURED`. Ulteriori bucket possono essere dichiarati in `config/resources.ts`; consulta [Bucket multipli](/docs/backend/storage/#several-buckets).
 
-Un deploy con storage viene rifiutato finché il progetto non specifica chi dispone dei permessi di lettura e scrittura sui file. Il file scaffold `config/storage.ts` esporta l'hook `storageAuthorize` a questo scopo. Consulta [Autorizzazione per singolo oggetto](/docs/backend/storage/#per-object-authorization).
+Un deploy con storage viene rifiutato finché il progetto non specifica chi dispone dei permessi di lettura e scrittura sui file. Il file scaffold `config/storage.ts` esporta l'hook `storageAuthorize` a questo scopo. Consulta [Autorizzazione per singolo oggetto](/docs/backend/storage-authorization/).
 
 **Modalità di distribuzione dei file.** Il tuo backend serve ciascun file all'indirizzo `GET /api/storage/file/<key>`. L'oggetto viene letto dal bucket e trasmesso in streaming, includendo `Content-Type`, gestione delle richieste range e intestazioni di caching. Non viene fornito un URL diretto al bucket.
 
@@ -256,7 +256,9 @@ Le funzioni possono effettuare chiamate verso servizi esterni. Le connessioni in
 | 465, 587 | Invio di posta tramite SMTP con TLS o STARTTLS |
 | 993 | IMAP su TLS |
 
-Qualsiasi altra porta è bloccata. Ciò include la porta 25, IMAP non crittografato, nonché database o cache che operano sulle proprie porte dedicate: non è possibile raggiungere istanze esterne a Rebase Cloud di PostgreSQL su 5432, Redis su 6379 o MongoDB su 27017. Anche l'indirizzo dei metadati cloud (`169.254.169.254`) è bloccato.
+Qualsiasi altra porta è bloccata. Ciò include la porta 25, IMAP non crittografato, nonché database o cache che operano sulle proprie porte dedicate: non è possibile raggiungere istanze esterne a Rebase Cloud di Redis su 6379 o MongoDB su 27017. Anche l'indirizzo dei metadati cloud (`169.254.169.254`) è bloccato.
+
+L'unica eccezione è il tuo database. Se il progetto porta il proprio PostgreSQL (BYODB), ogni deploy consente anche le connessioni all'host di quel database sulla porta indicata nella sua stringa di connessione, e a nient'altro su quella porta. L'host viene risolto nei suoi indirizzi IP al momento del deploy, quindi se il tuo provider sposta il database a un altro indirizzo, esegui di nuovo il deploy. Il database deve accettare connessioni da internet: l'app si collega direttamente alla stringa di connessione. Le impostazioni del bastion SSH vengono usate solo dal test di connessione, non dall'app distribuita.
 
 La piattaforma non introduce proxy né limiti di frequenza (rate limit) sul traffico in uscita; si applicano unicamente i limiti imposti dai servizi contattati. Assicurati di passare `getSignal(c)` a `fetch` in modo che la chiamata si interrompa qualora la richiesta vada in timeout.
 

@@ -1,5 +1,5 @@
 ---
-sourceHash: 96a224ca982e3d25
+sourceHash: faf5a0ca622c3a50
 title: Ruoli e scope
 sidebar_label: Ruoli e scope
 description: "Cosa può fare un chiamante: il piano dati che ogni persona possiede, il piano di amministrazione che i ruoli concedono, gli scope che un'app dichiara per sé e come ogni credenziale li porta con sé."
@@ -18,7 +18,7 @@ Gli scope si dividono in due piani, e una persona li possiede in modo diverso.
 **Il piano dati** è `data:*`, `storage:*` e `functions:invoke`. Ogni
 persona autenticata lo possiede per intero. Cosa una persona può fare con una riga lo decidono
 le [regole di sicurezza](/docs/collections/security-rules/) della collezione, riga per riga,
-e cosa può fare con un file le [policy dello storage](/docs/backend/storage/#per-object-authorization).
+e cosa può fare con un file le [policy dello storage](/docs/backend/storage-authorization/).
 Per una persona non lo decide mai uno scope. Su una chiave o un token, gli scope del piano dati
 restringono: una chiave che possiede solo `data:read:posts` legge `posts` e nient'altro,
 qualunque cosa consentano le regole.
@@ -250,6 +250,9 @@ Per le chiavi:
   non sia un admin. Altrimenti `403 ROLE_EXCEEDS_CREATOR`.
 - `keys:read` e `keys:write` non vanno mai su una chiave. Una chiave che gestisce le chiavi potrebbe
   creare il proprio successore. `400 KEY_MANAGEMENT_SCOPE`.
+- Chi possiede `keys:write` non può modificare o revocare una chiave che possiede un ruolo o
+  uno scope che lui non ha, a meno che non sia un admin: `403 KEY_OUTRANKS_CALLER`.
+  Senza questa regola, potrebbe estendere una chiave con ruolo admin a ogni scope dei dati.
 
 Per gli account, chi possiede `users:write`:
 
@@ -259,6 +262,11 @@ Per gli account, chi possiede `users:write`:
   password di un admin e accedere come lui.
 - non può concedere ruoli che possiedono più di quanto possiede lui, `admin` incluso: `403 ROLE_EXCEEDS_CALLER`.
 
+Un nome di ruolo può essere qualsiasi cosa tranne un nome che verrebbe riletto come altri
+ruoli: un nome vuoto, o che contiene `,` `{` `}` `"` `\` o un carattere di controllo, viene
+rifiutato con `400 INVALID_ROLE` ovunque si scriva un ruolo (utenti, la collection degli
+utenti, chiavi di servizio).
+
 ## Come ogni credenziale possiede gli scope
 
 | Credenziale | Agisce come | Possiede |
@@ -266,7 +274,7 @@ Per gli account, chi possiede `users:write`:
 | La sessione di una persona | la persona | il piano dati, ogni scope dell'app e gli scope dei suoi ruoli. Un admin possiede tutto |
 | [Chiave di servizio](/docs/backend/api-keys/#service-keys) `rk_live_…` | `api-key:<id>`, con i ruoli RLS `service` più i propri `roles` | esattamente i suoi scope |
 | [Chiave personale](/docs/backend/api-keys/#personal-keys) `rk_live_…` | il suo proprietario, con i ruoli del proprietario così come sono a ogni richiesta | i suoi scope, ridotti a ciò che il proprietario possiede ora |
-| [Token MCP](/docs/ai/mcp/#the-remote-endpoint) | la persona che l'ha collegato | `data:read`, `data:write`, `data:delete` come concessi, eventualmente per collezione |
+| [Token MCP](/docs/ai/remote-mcp/) | la persona che l'ha collegato | `data:read`, `data:write`, `data:delete` come concessi, eventualmente per collezione |
 | `REBASE_SERVICE_KEY` | `service`, con il ruolo `admin` | tutto |
 
 Una chiave o un token non aggira mai la sicurezza a livello di riga. I suoi scope sono un limite,

@@ -1,5 +1,5 @@
 ---
-sourceHash: 791588f79f48d44f
+sourceHash: 858a87d510ba1de5
 title: Rebase unterstützt X nicht
 sidebar_label: Server erweitern
 description: Die serverseitige Erweiterungsleiter – Deklaration, Collection-Callback, benutzerdefinierte Funktion, eigene Routen, eigener Server, Eject – und was die einzelnen Stufen erreichen können und was nicht.
@@ -220,8 +220,10 @@ await backend.attachRealtime(server);
 backend.start();                                // cron, job workers, sweeps
 ```
 
-Eine Gruppe bringt ihren eigenen Auth-Kontext, ihre Rate-Limits und ihr Admin-Gate mit, sodass
-`getDriver(c)` in einer Gruppe funktioniert, die irgendwo eingebunden ist. Was sie nicht mitbringt,
+Eine Gruppe bringt ihren eigenen Auth-Kontext, ihre Rate-Limits und ihr Admin-Gate mit und
+lehnt die Impersonation- und Simulations-Header ab, sofern sie nicht die Daten- oder
+Funktionen-Gruppe ist, sodass `getDriver(c)` in einer Gruppe funktioniert, die irgendwo
+eingebunden ist. Was sie nicht mitbringt,
 ist die prozessweite Middleware, die `mount()` hinzufügt: Body-Limit, Komprimierung, CSRF und
 der Error-Envelope müssen Sie selbst hinzufügen, wenn Sie Gruppen einzeln einbinden.
 

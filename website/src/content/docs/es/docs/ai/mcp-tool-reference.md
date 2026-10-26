@@ -1,5 +1,5 @@
 ---
-sourceHash: a5511fd6dc8fd73e
+sourceHash: 441bdd62f0e1b3f7
 title: Referencia de herramientas MCP
 sidebar_label: Referencia de herramientas MCP
 description: Cada herramienta que registra el servidor MCP de Rebase, por grupo — qué necesita y hace cada una, y cuáles rechaza la barrera de loopback frente a un proyecto no local.
@@ -9,7 +9,7 @@ Las herramientas que [`@rebasepro/mcp`](/docs/ai/mcp) ofrece a un asistente. Có
 conecta, qué credencial posee y cómo decide la [barrera de loopback](/docs/ai/mcp#the-loopback-gate)
 qué significa ⚠ están en la página del [servidor MCP](/docs/ai/mcp).
 
-44 herramientas, en diez grupos. Las herramientas marcadas con ⚠ se rechazan frente a destinos
+51 herramientas, en diez grupos. Las herramientas marcadas con ⚠ se rechazan frente a destinos
 no locales a menos que desactives la protección.
 
 ## Esquema y base de datos (13)
@@ -122,10 +122,26 @@ el modelo. Su radio de impacto abarca todo lo que hagan tus funciones.
 sobre un destino en sí mismo. Por lo tanto, un asistente puede cambiar a un proyecto remoto
 sin activar la barrera; simplemente no podrá ejecutar una herramienta destructiva allí después.
 
-## Rebase Cloud (1)
+## Rebase Cloud (8)
 
-Ejecuta `rebase cloud` en el directorio del proyecto activo.
+<span class="since-badge" data-since="0.26">Desde 0.26</span>
+
+Lanzan `rebase cloud … --json` en el directorio del proyecto activo, contra el
+proyecto al que está vinculado, con la credencial propia de la CLI. Consulta
+[Rebase Cloud](/docs/ai/mcp#rebase-cloud) para ver sobre qué actúan y por qué ninguna
+está restringida por la barrera.
 
 | Herramienta | Requerido | Descripción |
 |---|---|---|
-| `rebase_cloud_provision` ⚠ | — | Aprovisionar un proyecto de Rebase Cloud sin reclamar, sin cuenta (`rebase cloud init --claim`), escribir `REBASE_BASE_URL` y `REBASE_API_TOKEN` en `.env` y desplegar las colecciones; `name` y `deploy` opcionales |
+| `rebase_cloud_provision` | — | Un backend en vivo sin cuenta (`rebase cloud init --claim`): la URL en vivo, la URL de administración y una URL de reclamación (`name`, `deploy`) |
+| `rebase_cloud_status` | — | La URL, el estado, el último despliegue, el runtime, la base de datos y el almacenamiento del proyecto vinculado, y su URL de reclamación mientras no está reclamado |
+| `rebase_cloud_deploy` | — | Desplegar y seguirlo hasta el final (`app`, `bundle`, `message`, `wait`, `timeoutSeconds`, `preview`, `previewName`) |
+| `rebase_cloud_logs` | — | Una instantánea del log de runtime, o el último log de compilación (`source`, `since`, `tail`, `grep`, `level`, `previous`, `preview`). Nunca hace seguimiento |
+| `rebase_cloud_env_list` | — | Claves de las variables, nunca valores (`preview`) |
+| `rebase_cloud_env_set` | `key`, `value` | Definir una variable; el valor pasa por stdin y nunca se devuelve (`secret`, `preview`) |
+| `rebase_cloud_deployments_list` | — | Despliegues recientes, y a cuáles se puede hacer rollback (`limit`) |
+| `rebase_cloud_rollback` | — | Volver a poner en servicio un despliegue exitoso anterior (`deploymentId`) |
+
+`rebase_cloud_provision` crea un proyecto y vincula este directorio. Nunca
+lee la `baseUrl` del proyecto activo, así que la barrera no la comprueba; la CLI
+la rechaza en un directorio que ya está vinculado.

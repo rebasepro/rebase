@@ -1,5 +1,5 @@
 ---
-sourceHash: f833e803807f9ac4
+sourceHash: 210827aa1afa92f7
 title: Live-Schema-Bearbeitung
 description: Erstellen und Ändern von Collections auf einem laufenden Backend – zuerst in Ihr Repository committet, dann angewendet.
 ---
@@ -164,6 +164,11 @@ zurückgelassene Spalte `NOT NULL` ohne Standardwert ist, was jeden späteren In
 lässt, bis sie entfernt oder nullable gemacht wird. Eine Änderung ohne einen solchen Satz (das
 Verschieben eines Primärschlüssels, eine Relation, deren Link-Spalte nichts erzeugt) kann nicht
 allein in die Quelle geschrieben werden.
+
+Auf einem Deployment, das nichts in seiner Datenbank ändert (`REBASE_PROVISION=false`),
+wird keine Änderung aus dem Panel angewendet, sodass jede Änderung diesen Weg nimmt:
+Die Hauptschaltfläche des Dialogs heißt **Commit** und sendet `"sourceOnly": true`,
+und der Prozess, der diese Datenbank ändert, wendet das Schema an.
 
 Das Löschen einer Collection im Admin-Panel nimmt denselben Weg: `/apply` mit `"remove": true`
 und `"sourceOnly": true` löscht die Datei der Collection und ihren Eintrag in `index.ts` und
@@ -371,11 +376,21 @@ wurde, bis Ihre Pipeline den Commit baut und deployt. Die Datenbank
 hat die Änderung sofort; das Admin-Panel und die API sehen die neue Collection-Definition
 erst nach diesem Deploy.
 
-Ein Deployment macht also **eine Änderung pro Deploy**. Nachdem ein Commit gelandet ist, wird die nächste
-Anwendung mit `SCHEMA_CHANGE_FAILED` abgelehnt, unter Nennung des Commits, bis ein Prozess, der
-diesen Commit ausführt, diesen hier ersetzt. Eine zweite Änderung, die gegen die
+Ein Deployment macht also **eine Änderung pro Deploy**. Eine zweite Änderung, die gegen die
 Collections geplant wird, die dieses Deployment noch ausführt, würde generierte Schema-Dateien committen,
-die die erste Änderung auslassen. Das Planen bleibt in der Zwischenzeit verfügbar.
+die die erste Änderung auslassen. Jede Anwendung rendert deshalb `schema.generated.ts` aus den
+Collections, die dieses Deployment ausführt, und vergleicht es mit der Kopie des Repositorys.
+Unterscheiden sie sich, wird die Anwendung mit `SCHEMA_CHANGE_FAILED` abgelehnt, unter Nennung
+der Datei, bis ein Prozess, der diesen Commit ausführt, diesen hier ersetzt. Die Prüfung liest das
+Repository, nicht den Speicher dieses Prozesses, sodass sie über einen Neustart hinweg gilt, über
+Replikate hinweg und für eine Änderung, die ein Entwickler gepusht hat und die noch nicht
+deployt ist. Das Planen bleibt in der Zwischenzeit verfügbar.
+
+Die Kopien unterscheiden sich auch, wenn die Datei von einer anderen Rebase-Version generiert,
+umformatiert oder von Hand bearbeitet wurde. Wartet nichts auf das Deployment, führen Sie
+`rebase schema generate` mit der Version aus, die das Deployment ausführt, committen Sie das
+Ergebnis und deployen Sie es. Zeilenenden und nachgestellte Leerzeichen zählen nicht als
+Unterschied.
 
 ### In ein Remote-Repository committen
 

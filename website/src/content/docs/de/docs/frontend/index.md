@@ -1,5 +1,5 @@
 ---
-sourceHash: 3dd5a537f812658a
+sourceHash: 12294b1ff06361d9
 title: Frontend-Übersicht
 sidebar_label: Frontend
 description: "Erstellen und Anpassen des Panels — Rebase CMS und Rebase Studio — mit React: Controller, Scaffold, Routing und Views."
@@ -169,6 +169,11 @@ sein Datensatz gelöscht wurde:
     onSaved={({ entity }) => console.log("saved", entity.id)}
     onClose={() => navigate("/posts")}/>
 ```
+
+Löscht jemand anderes den Datensatz, während das Formular geöffnet ist, behält das Formular,
+was eingegeben wurde, und sagt, dass der Datensatz anderswo gelöscht wurde. Seine Aktion
+„Als neu speichern“ macht daraus ein Formular, das einen neuen Datensatz mit diesen Werten
+anlegt; `onSaved` meldet dann den neuen Datensatz.
 
 Beide bringen ihren eigenen `CollectionsProvider` mit, wenn über ihnen keiner liegt. Das ist
 der Schritt darunter, und Sie können ihn selbst einbinden, um einen Scope zwischen
