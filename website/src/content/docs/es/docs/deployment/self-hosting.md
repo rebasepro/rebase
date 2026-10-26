@@ -1,5 +1,5 @@
 ---
-sourceHash: c6f65640f646f804
+sourceHash: 8710aaf2fefe9cfe
 title: Autoalojamiento (Self-Hosting)
 sidebar_label: Autoalojamiento
 description: Ejecuta Rebase en cualquier lugar con la imagen oficial de runtime y el bundle de tu proyecto — Docker Compose, Fly, Railway o un VPS convencional.
@@ -470,6 +470,8 @@ apps, permitiera lo que permitiera el cliente. Una respuesta que fija su propia
 política la conserva (la página de consentimiento de MCP envía `no-referrer`);
 una página que quiera una más estricta puede indicarlo con
 `<meta name="referrer" content="no-referrer">`.
+`X-Frame-Options` funciona igual: `SAMEORIGIN`, salvo que la respuesta fije el
+suyo, como hace la página de consentimiento de MCP con `DENY`.
 
 Las aplicaciones estáticas — el panel de administración del CMS y cualquier frontend que sirva el bundle — también incluyen
 `Content-Security-Policy: frame-ancestors 'self'; object-src 'none'; base-uri
