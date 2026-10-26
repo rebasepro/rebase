@@ -339,9 +339,9 @@ export default function RebaseMosaicDemo() {
                                             <div className="p-3 space-y-3 text-xs">
                                                 {/* Name Input */}
                                                 <div
-                                                    className="relative rounded-lg bg-neutral-950/70 border border-neutral-800/60 p-2">
+                                                    className="relative rounded-lg bg-surface-field p-2">
                                                     <span
-                                                        className="absolute top-1 left-2 text-[9px] font-semibold text-primary uppercase tracking-wider">Product Name</span>
+                                                        className="absolute top-1 left-2 text-[9px] font-medium text-primary">Product Name</span>
                                                     <div
                                                         className="pt-3 pb-0.5 font-medium text-neutral-200">{prod.name}</div>
                                                 </div>
@@ -350,15 +350,15 @@ export default function RebaseMosaicDemo() {
                                                 <div className="grid grid-cols-3 gap-2">
                                                     {/* Price input */}
                                                     <div
-                                                        className="col-span-1 relative rounded-lg bg-neutral-950/70 border border-neutral-800/60 p-2">
+                                                        className="col-span-1 relative rounded-lg bg-surface-field p-2">
                                                         <span
-                                                            className="absolute top-1 left-2 text-[9px] font-semibold text-neutral-500 uppercase tracking-wider">Price ($)</span>
+                                                            className="absolute top-1 left-2 text-[9px] font-medium text-neutral-400">Price ($)</span>
                                                         <div
                                                             className="pt-3 pb-0.5 font-medium text-neutral-200">{prod.price}</div>
                                                     </div>
                                                     {/* Image preview grid */}
                                                     <div
-                                                        className="col-span-2 rounded-lg bg-neutral-950/70 border border-neutral-800/60 p-1 flex items-center justify-center relative overflow-hidden">
+                                                        className="col-span-2 rounded-lg bg-surface-field p-1 flex items-center justify-center relative overflow-hidden">
                                                         <img
                                                             src={prod.imageUrl} {...imgDims(prod.imageUrl)}
                                                             alt={prod.name}
@@ -373,10 +373,10 @@ export default function RebaseMosaicDemo() {
 
                                                 {/* Variants selector dropdown */}
                                                 <div
-                                                    className="relative rounded-lg bg-neutral-950/70 border border-neutral-800/60 p-2 flex items-center justify-between">
+                                                    className="relative rounded-lg bg-surface-field p-2 flex items-center justify-between">
                                                     <div>
                                                         <span
-                                                            className="absolute top-1 left-2 text-[9px] font-semibold text-neutral-500 uppercase tracking-wider">Variants</span>
+                                                            className="absolute top-1 left-2 text-[9px] font-medium text-neutral-400">Variants</span>
                                                         <div className="pt-3 pb-0.5 text-neutral-400">Select
                                                             options...
                                                         </div>
@@ -509,7 +509,7 @@ export default function RebaseMosaicDemo() {
                                         <div
                                             className="absolute top-6 left-2 bg-neutral-900 border border-neutral-800 rounded-lg shadow-2xl p-1 w-44 z-20 animate-in fade-in slide-in-from-top-1 duration-200">
                                             <div
-                                                className="px-2 py-1 text-[8px] font-semibold text-neutral-500 uppercase tracking-wider">Basic
+                                                className="px-2 py-1 text-[8px] font-medium text-neutral-400 tracking-wider">Basic
                                                 Blocks
                                             </div>
 
@@ -777,17 +777,17 @@ export default function RebaseMosaicDemo() {
                             {/* Left Column: Form Fields Panel */}
                             <div className="border-r border-neutral-800 p-3 space-y-3 bg-neutral-950/30 text-[10px]">
                                 {/* Title field */}
-                                <div className="relative rounded bg-neutral-900/50 border border-neutral-800 p-1.5">
-                                    <span className="text-[8px] font-semibold text-neutral-500 uppercase">Page Title</span>
+                                <div className="relative rounded-md bg-surface-field p-1.5">
+                                    <span className="text-[8px] font-medium text-neutral-400">Page Title</span>
                                     <div
                                         className="pt-1 font-medium text-neutral-300 leading-normal truncate">{currentLivePreviewText}</div>
                                 </div>
 
                                 {/* Status field */}
                                 <div
-                                    className="relative rounded bg-neutral-900/50 border border-neutral-800 p-1.5 flex items-center justify-between">
+                                    className="relative rounded-md bg-surface-field p-1.5 flex items-center justify-between">
                                     <div>
-                                        <span className="text-[8px] font-semibold text-neutral-500 uppercase">Status</span>
+                                        <span className="text-[8px] font-medium text-neutral-400">Status</span>
                                         <div className="pt-0.5 font-medium text-emerald-400">Published</div>
                                     </div>
                                     <Check size={10} className="text-emerald-500"/>
@@ -795,11 +795,11 @@ export default function RebaseMosaicDemo() {
 
                                 {/* Banner image selector */}
                                 <div
-                                    className="relative rounded bg-neutral-900/50 border border-neutral-800 p-1.5 flex items-center gap-2">
+                                    className="relative rounded-md bg-surface-field p-1.5 flex items-center gap-2">
                                     <ImageIcon size={14} className="text-neutral-600"/>
                                     <div className="truncate">
                                         <span
-                                            className="text-[8px] font-semibold text-neutral-500 uppercase block leading-none">Banner Image</span>
+                                            className="text-[8px] font-medium text-neutral-400 block leading-none">Banner Image</span>
                                         <span className="text-neutral-400">banner.webp</span>
                                     </div>
                                 </div>
