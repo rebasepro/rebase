@@ -305,25 +305,25 @@ function OrderRow({ order, isHovered, isActive, columns, onHover, onLeave }: {
 
      EntityForm / FieldBlock  the 52px top bar on the SHEET, the folder tab
                               strip, and the record pane's own `bg-surface-card`
-     FieldBlock               label ABOVE the control, 13px medium in the
-                              PRIMARY ink, the property's type icon before it at
-                              14px in the disabled tier, required marker after,
-                              description under the control in the caption tier
+     one-line fields          the FireCMS field: a filled box with no edge
+                              (`field`), 64px plus its transparent 1px border,
+                              the label and its type icon SHRUNK into the top
+                              edge (10.5px, secondary ink), the value under it
+                              at 16px; the description under the box, indented
+                              to the value (`ml-3.5`), in the caption tier
+     a computed field         the same box, outlined with `hairline-strong` and
+                              unfilled — the panel says "you cannot type here"
+                              with the box, not with a disabled grey
      FormSections             `flex flex-col gap-8`; every section after the
                               first carries an uppercase rule-header
-     the grid                 `gap-x-4 gap-y-5 grid-cols-1 @2xl:grid-cols-4`
+     the grid                 `gap-x-4 gap-y-6 grid-cols-1 @2xl:grid-cols-4`
                               with per-field spans
-     the controls             an editable field is `bg-surface-field` + hairline
-                              at `min-h-[32px]`; a COMPUTED one is a
-                              `hairline-strong` outline with no fill at
-                              `min-h-12 opacity-80` — the panel says "you cannot
-                              type here" with the box, not with a disabled grey
 
-   The outlined box with a shrunk label floating inside its border is the form
-   this one replaced; nothing in the panel draws one any more. */
+   Only a multi-select, an upload, markdown and a relation keep a label above
+   the box; this record has none of them. */
 
-/** One field: label, control, description. */
-function FormField({ label, icon, span, required, description, highlighted, children }: {
+/** One field: a box with its label inside, then the description. */
+function FormField({ label, icon, span, required, description, highlighted, computed, chevron, children }: {
   label: string;
   icon: React.ReactNode;
   /** Columns on the four-column grid. */
@@ -331,6 +331,10 @@ function FormField({ label, icon, span, required, description, highlighted, chil
   required?: boolean;
   description?: string;
   highlighted?: boolean;
+  /** A value the panel computes: outlined, unfilled, held back to 80%. */
+  computed?: boolean;
+  /** A select: the chevron centred at the box's right edge. */
+  chevron?: boolean;
   children: React.ReactNode;
 }) {
   const spanClass = span === 1 ? "@2xl/col:col-span-1"
@@ -340,16 +344,23 @@ function FormField({ label, icon, span, required, description, highlighted, chil
   return (
     <div className={spanClass}>
       <div className="relative flex flex-col min-w-0">
-        <div className="flex items-center gap-1.5 font-medium mb-1.5 text-[13px] text-text-primary dark:text-text-primary-dark">
-          <span className="shrink-0 text-text-disabled dark:text-text-disabled-dark [&>svg]:size-3.5">{icon}</span>
-          <span className="truncate">{label}</span>
-          {required && <span className="text-red-500 dark:text-red-500 -ml-1">*</span>}
-        </div>
-        <div className={`min-w-0 rounded-lg transition-shadow duration-300 ${highlighted ? "ring-2 ring-primary" : ""}`}>
-          {children}
+        <div className={`relative min-w-0 min-h-[66px] rounded-lg transition-shadow duration-300 ${computed
+          ? "border border-hairline-strong"
+          : "field"} ${highlighted ? "ring-2 ring-primary" : ""}`}>
+          {/* The kit's shrunk InputLabel: icon and name at 75%, 1px in from
+              the border like the panel's. */}
+          <span className="field-label flex items-center gap-1.5 [&>svg]:size-[15px] [&>svg]:shrink-0">
+            {icon}
+            <span className="truncate">{label}{required && " *"}</span>
+          </span>
+          <div className={`flex items-center gap-2 min-w-0 px-3 pt-8 pb-2 text-base leading-6 ${computed ? "opacity-80" : ""} ${chevron ? "pr-10" : ""}`}>
+            {children}
+          </div>
+          {chevron && <ChevronDown size={20}
+            className="absolute right-3 top-1/2 -translate-y-1/2 text-text-secondary dark:text-text-secondary-dark"/>}
         </div>
         {description && (
-          <p className="typography-caption text-text-disabled dark:text-text-disabled-dark mt-1.5 ml-0.5 leading-snug">
+          <p className="typography-caption text-text-disabled dark:text-text-disabled-dark mt-1.5 ml-3.5 leading-snug">
             {description}
           </p>
         )}
@@ -368,11 +379,28 @@ function SectionHeader({ title }: { title: string }) {
   );
 }
 
-const FORM_GRID = "grid min-w-0 gap-x-4 gap-y-5 grid-cols-1 @2xl/col:grid-cols-4";
-/** An editable control: filled, hairlined, 32px. */
-const CONTROL = "rounded-lg relative max-w-full bg-surface-field border border-hairline min-h-[32px] flex items-center px-3 text-sm";
-/** A computed one: outlined, unfilled, 48px, held back to 80%. */
-const COMPUTED = "w-full flex items-center rounded-lg border border-hairline-strong px-3 min-h-12 opacity-80";
+const FORM_GRID = "grid min-w-0 gap-x-4 gap-y-6 grid-cols-1 @2xl/col:grid-cols-4";
+
+/** A switch carries its label inside the box too: name on the left at body
+ *  size, the switch on the right, the same 66px as the fields beside it. */
+function PriorityField() {
+  return (
+    <div className="@2xl/col:col-span-1">
+      <div className="relative flex flex-col min-w-0">
+        <div className="field min-h-[66px] flex items-center justify-between gap-3 pl-4 pr-4">
+          <span className="flex items-center gap-2 min-w-0 text-sm font-medium text-text-primary dark:text-text-primary-dark">
+            <Flag size={20} className="shrink-0"/>
+            <span className="truncate">Priority</span>
+          </span>
+          <span className="switch-track shrink-0"><span className="switch-knob"/></span>
+        </div>
+        <p className="typography-caption text-text-disabled dark:text-text-disabled-dark mt-1.5 ml-3.5 leading-snug">
+          Ships before the rest of the queue
+        </p>
+      </div>
+    </div>
+  );
+}
 
 /** One meta row of the record block. */
 function MetaRow({ label, value }: { label: string; value: string }) {
@@ -443,35 +471,27 @@ function OrderDetailPanel({ order, highlightedField }: {
               <div className={FORM_GRID}>
                 <FormField label="Customer" icon={<TextAlignStart/>} span={2} required
                   highlighted={highlightedField === "customer"}>
-                  <div className={CONTROL}>{order.customer}</div>
+                  <span className="truncate">{order.customer}</span>
                 </FormField>
 
                 <FormField label="Email" icon={<TextAlignStart/>} span={2} required
                   highlighted={highlightedField === "email"}>
-                  <div className={CONTROL}>{order.email}</div>
+                  <span className="truncate">{order.email}</span>
                 </FormField>
 
-                <FormField label="Status" icon={<List/>} span={2}
+                <FormField label="Status" icon={<List/>} span={2} chevron
                   highlighted={highlightedField === "status"}>
-                  <div className={`${CONTROL} justify-between gap-2`}>
-                    <span className={`chip ${STATUS_CHIP[order.status]}`}>{order.status}</span>
-                    <ChevronDown size={16} className="text-text-disabled dark:text-text-disabled-dark shrink-0"/>
-                  </div>
+                  <span className={`chip ${STATUS_CHIP[order.status]}`}>{order.status}</span>
                 </FormField>
 
-                <FormField label="Payment" icon={<List/>} span={2}
+                <FormField label="Payment" icon={<List/>} span={2} chevron
                   highlighted={highlightedField === "payment"}>
-                  <div className={`${CONTROL} justify-between gap-2`}>
-                    <span className={`chip ${PAYMENT_CHIP[order.paymentStatus]}`}>{PAYMENT_LABEL[order.paymentStatus]}</span>
-                    <ChevronDown size={16} className="text-text-disabled dark:text-text-disabled-dark shrink-0"/>
-                  </div>
+                  <span className={`chip ${PAYMENT_CHIP[order.paymentStatus]}`}>{PAYMENT_LABEL[order.paymentStatus]}</span>
                 </FormField>
 
                 <FormField label="Shipping Address" icon={<TextAlignStart/>} span={4}
                   highlighted={highlightedField === "address"}>
-                  <div className="rounded-md relative max-w-full min-h-[64px] bg-surface-field border border-hairline px-3 py-2 text-sm">
-                    {order.address}
-                  </div>
+                  <span>{order.address}</span>
                 </FormField>
               </div>
             </section>
@@ -479,24 +499,19 @@ function OrderDetailPanel({ order, highlightedField }: {
             <section className="min-w-0">
               <SectionHeader title="Totals"/>
               <div className={FORM_GRID}>
-                <FormField label="Total" icon={<Hash/>} span={1}
+                <FormField label="Total" icon={<Hash/>} span={1} computed
                   description="Sum of the order's line items"
                   highlighted={highlightedField === "total"}>
-                  <div className={COMPUTED}><span className="font-mono tabular-nums">{order.total}</span></div>
+                  <span className="font-mono tabular-nums">{order.total}</span>
                 </FormField>
 
-                <FormField label="Items" icon={<Hash/>} span={1}
+                <FormField label="Items" icon={<Hash/>} span={1} computed
                   description="Line items in this order"
                   highlighted={highlightedField === "items"}>
-                  <div className={COMPUTED}><span className="font-mono tabular-nums">{order.items}</span></div>
+                  <span className="font-mono tabular-nums">{order.items}</span>
                 </FormField>
 
-                <FormField label="Priority" icon={<Flag/>} span={1}
-                  description="Ships before the rest of the queue">
-                  <div className={COMPUTED}>
-                    <span className="border-2 shrink-0 w-5 h-5 rounded flex items-center justify-center bg-surface-card border-surface-accent-800 dark:border-surface-accent-500"/>
-                  </div>
-                </FormField>
+                <PriorityField/>
               </div>
             </section>
           </div>

@@ -90,20 +90,24 @@ export const focusedClasses = "z-30 outline-none ring-2 ring-primary/60 ring-off
  *
  * A field is the one surface that goes the other way: it is INSET into
  * whatever holds it, so `surface-field` is an alpha fill rather than a solid,
- * and it composes over a card, the sheet or a dialog alike. It also carries
- * the hairline: a field is an object (DESIGN.md rule 2), and without the line
- * a 4% fill on a card reads as a soft slab rather than a control — measured on
- * the product form, eight of them in a row looked like a wall. The reference
- * draws every input with its 1px edge, on both themes.
+ * and it composes over a card, the sheet or a dialog alike.
  *
- * The 1px inset top highlight that used to sit here was the recessed-edge
- * device from before the field had a border; with a real hairline above it
- * the two stacked into a doubled top edge. The border does its work now.
+ * It is a filled box with no visible edge — the FireCMS field. From 0.20 it
+ * carried a hairline, because a 4% fill on a card read as a soft slab rather
+ * than a control; the fill is now strong enough to be the edge on its own
+ * (`--surface-field` in theme.css), and a column of fields reads as a set of
+ * boxes rather than a ruled table.
+ *
+ * The border is still there, transparent, and that is load-bearing. Every
+ * height in the kit was measured with a 1px border inside the box (MultiSelect
+ * and the read-only field compensate for it explicitly), and the error state
+ * recolours it (`border-red-500`) rather than adding one, so a field that
+ * turns invalid does not grow by 2px and shove the form down.
  *
  * Exactly one element carries this mixin per field — the box, never the
  * input inside it — so the alpha fill and its hover composite once.
  */
-export const fieldBackgroundMixin = "bg-surface-field border border-hairline";
+export const fieldBackgroundMixin = "bg-surface-field border border-transparent";
 export const fieldBackgroundInvisibleMixin = "bg-transparent";
 export const fieldBackgroundDisabledMixin = "bg-surface-field/60";
 
@@ -117,7 +121,7 @@ export const fieldBackgroundHoverMixin = "transition-colors duration-150 hover:b
 /**
  * The hairline. One value per theme (`--hairline` in theme.css), and where it
  * goes matters more than what it is: a line marks an OBJECT — a card on the
- * sheet, a field, a floating surface. It does not mark a region: a tile inside
+ * sheet, a floating surface. It does not mark a region: a tile inside
  * a card, a row, a segmented track, a button, a chip are fills, and the
  * lightness step between them is the whole separation. One exception, and it
  * is the sheet's own edge against the frame: that step is about 3 L* on both

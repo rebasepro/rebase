@@ -153,11 +153,11 @@ light/dark pair. The ladder and its rules are in `packages/ui/DESIGN.md`.
 | `bg-surface-card`              | `#ffffff`   | `#16181c`   | cards, paper, dialogs, menus, table rows         |
 | `hover:bg-surface-card-hover`  | `#f6f7f9`   | `#1b1d21`   | a clickable card or row                          |
 | `bg-surface-raised`            | `#eaecef`   | `#212429`   | neutral buttons, chips, tiles inside a card      |
-| `bg-surface-field`             | black 3.5%  | white 4%    | inputs, search, segmented tracks                 |
+| `bg-surface-field`             | black 5%    | white 6.5%  | inputs, search, segmented tracks (no edge)       |
 | `hover:bg-surface-hover`       | black 4%    | white 6%    | hover on a transparent row, nav item, menu item  |
 | `bg-surface-active`            | black 7%    | white 9%    | selected or checked item                         |
 | `bg-surface-well`              | `#f4f5f7`   | `#090a0c`   | an inset code well (`codeSurfaceMixin`)          |
-| `border-hairline`              | black 8%    | white 8%    | cards on the sheet, fields, dividers             |
+| `border-hairline`              | black 8%    | white 8%    | cards on the sheet, dividers                     |
 | `border-hairline-strong`       | black 13%   | white 14%   | menus, popovers, dialogs, outlined buttons       |
 
 #### Surface Scale (Neutrals)
@@ -480,7 +480,7 @@ Always import and use these mixins rather than hardcoding equivalent classes. Th
 
 | Mixin                            | Classes                                                                                          |
 |----------------------------------|--------------------------------------------------------------------------------------------------|
-| `fieldBackgroundMixin`           | `bg-surface-field border border-hairline`                                                        |
+| `fieldBackgroundMixin`           | `bg-surface-field border border-transparent` — a filled box, no visible edge (the border keeps heights and takes the error colour) |
 | `fieldBackgroundInvisibleMixin`  | `bg-transparent` — fully transparent field background                                            |
 | `fieldBackgroundDisabledMixin`   | `bg-surface-field/60` — disabled field background                                                |
 | `fieldBackgroundHoverMixin`      | `transition-colors duration-150 hover:bg-surface-field-hover` — hover highlight for fields       |
@@ -708,6 +708,13 @@ Form inputs should use `@rebasepro/ui` components directly without excessive cla
 // ❌ WRONG: Overriding input styling
 <TextField className="rounded-lg border-surface-200 dark:border-surface-850 focus:border-violet-500 focus:ring-violet-500" />
 ```
+
+A field is a filled box with no visible edge, and a one-line control carries its
+label inside it (`TextField`, `DateTimeField` and `BooleanSwitchWithLabel` take a
+`label` and draw it there). Do not add a border to a field to make it stand out:
+its fill is the edge. The record form follows the same rule — text, numbers,
+dates, switches and single selects are labelled inside a 64px box; a
+`MultiSelect`, whose chips wrap, takes its label above.
 
 ---
 

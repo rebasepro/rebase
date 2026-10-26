@@ -4,7 +4,6 @@ import { SearchIcon, XIcon } from "lucide-react";
 import { iconSize } from "../icons/Icon";
 import React, { useCallback, useState } from "react";
 
-import { defaultBorderMixin } from "../styles";
 import { CircularProgress } from "./CircularProgress";
 import { IconButton } from "./IconButton";
 
@@ -91,8 +90,9 @@ export function SearchBar({
             onClick={onClick}
             className={cls("relative transition-all",
                 heightClass,
-                "bg-surface-field border",
-                defaultBorderMixin,
+                // A field like any other: filled, with its border kept but
+                // transparent so focus can colour it without moving anything.
+                "bg-surface-field border border-transparent",
                 "focus-within:ring-1 focus-within:ring-primary/60 focus-within:border-primary focus-within:shadow-[0_0_0_3px_rgba(0,112,244,0.1)]",
                 "rounded-full overflow-hidden",
                 className)}>

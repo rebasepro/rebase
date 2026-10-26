@@ -4,6 +4,7 @@ import { RichTextEditor } from "@rebasepro/cms/editor";
 import {
     TextField,
     TextareaAutosize,
+    InputLabel,
     BooleanSwitchWithLabel,
     Select,
     SelectItem,
@@ -126,7 +127,7 @@ function LabelWithIcon({ icon, title, required }: { icon: React.ReactNode; title
         <div className="align-middle inline-flex items-center my-0.5 gap-2">
             {icon}
             <span className="text-start font-medium text-sm">
-                {title}{required ? " *" : ""}
+                {title}{required && <span aria-hidden={true}> *</span>}
             </span>
         </div>
     );
@@ -163,6 +164,7 @@ function TextFieldPreview() {
                 onChange={e => setV(e.target.value)}
                 label={<LabelWithIcon icon={<TextIcon size={iconSize.small}/>} title="Name" required/>}
                 size="large"
+                inputClassName="text-base"
             />
         </>
     );
@@ -173,13 +175,13 @@ function MultilinePreview() {
     const [v, setV] = useState("A longer description that spans multiple lines in the text area.");
     return (
         <div className={cls(
-            "rounded-md relative max-w-full min-h-[64px]",
+            "rounded-lg relative max-w-full min-h-[64px]",
             fieldBackgroundMixin,
             fieldBackgroundHoverMixin
         )}>
-            <div className="pointer-events-none absolute top-1 text-xs font-medium px-3 text-text-secondary dark:text-text-secondary-dark">
+            <InputLabel shrink className="pointer-events-none absolute top-1 text-text-secondary dark:text-text-secondary-dark">
                 <LabelWithIcon icon={<AlignLeftIcon size={iconSize.small}/>} title="Description"/>
-            </div>
+            </InputLabel>
             <TextareaAutosize
                 value={v}
                 onChange={e => setV(e.target.value)}
@@ -231,6 +233,7 @@ function EmailPreview() {
             label={<LabelWithIcon icon={<MailIcon size={iconSize.small}/>} title="User email" required/>}
             type="email"
             size="large"
+            inputClassName="text-base"
         />
     );
 }
@@ -245,6 +248,7 @@ function UrlPreview() {
             label={<LabelWithIcon icon={<GlobeIcon size={iconSize.small}/>} title="Amazon link"/>}
             type="url"
             size="large"
+            inputClassName="text-base"
         />
     );
 }
@@ -276,10 +280,15 @@ function FileUploadPreview() {
 function SelectPreview() {
     const [v, setV] = useState("electronics");
     return (
+        // SelectFieldBinding lays the kit's floating label over the box, as a
+        // text field draws its own, and pushes the chip down under it.
+        <div className="relative">
         <Select
             value={v}
             onValueChange={setV}
-            label={<LabelWithIcon icon={<TextIcon size={iconSize.small}/>} title="Category"/>}
+            aria-label="Category"
+            size="large"
+            inputClassName="w-full min-h-[64px] pl-3"
             renderValue={(val: string) => {
                 const map: Record<string, { label: string; color: string }> = {
                     electronics: { label: "Electronics", color: "blueDark" },
@@ -287,9 +296,9 @@ function SelectPreview() {
                     books: { label: "Books", color: "orangeLight" }
                 };
                 const item = map[val];
-                return item
+                return <div className="pt-6">{item
                     ? <Chip colorScheme={item.color as "blueDark" | "pinkLight" | "orangeLight"} size="small">{item.label}</Chip>
-                    : val;
+                    : val}</div>;
             }}
             fullWidth
         >
@@ -303,6 +312,10 @@ function SelectPreview() {
                 <Chip colorScheme="orangeLight" size="small">Books</Chip>
             </SelectItem>
         </Select>
+        <InputLabel shrink className="pointer-events-none absolute top-[5px] left-px text-text-secondary dark:text-text-secondary-dark">
+            <LabelWithIcon icon={<TextIcon size={iconSize.small}/>} title="Category"/>
+        </InputLabel>
+        </div>
     );
 }
 
@@ -330,6 +343,7 @@ function NumberPreview() {
             label={<LabelWithIcon icon={<HashIcon size={iconSize.small}/>} title="Price" required/>}
             type="number"
             size="large"
+            inputClassName="text-base"
         />
     );
 }
@@ -343,6 +357,7 @@ function BooleanPreview() {
             onValueChange={setV}
             label={<LabelWithIcon icon={<FlagIcon size={iconSize.small}/>} title="Selectable"/>}
             size="large"
+            className="min-h-[66px]"
         />
     );
 }
@@ -355,6 +370,8 @@ function DatePreview() {
             onChange={() => {}}
             label={<LabelWithIcon icon={<CalendarIcon size={iconSize.small}/>} title="Expiry date"/>}
             mode="date"
+            size="large"
+            inputClassName="text-base"
         />
     );
 }
@@ -367,6 +384,8 @@ function DateTimePreview() {
             onChange={() => {}}
             label={<LabelWithIcon icon={<CalendarIcon size={iconSize.small}/>} title="Arrival time"/>}
             mode="date_time"
+            size="large"
+            inputClassName="text-base"
         />
     );
 }

@@ -2,14 +2,12 @@ import type { FieldProps } from "../../types/fields";
 import type { Property } from "@rebasepro/types";
 import React from "react";
 
-;
-
 import { PropertyPreview } from "../../preview";
 import { FieldHelperText } from "../components/FieldHelperText";
 import { LabelWithIcon } from "../components/LabelWithIcon";
-import { ErrorBoundary } from "@rebasepro/ui";
+import { cls, ErrorBoundary, InputLabel } from "@rebasepro/ui";
 import { getIconForProperty } from "../../util/property_utils";
-import { cls } from "@rebasepro/ui";
+import { readOnlyLabelsInside } from "../label_placement";
 
 /**
  *
@@ -36,6 +34,42 @@ export function ReadOnlyFieldBinding({
     //     throw new Error("ReadOnlyFieldBinding: Entity id is null");
 
     const skipCardWrapper = property.type === "relation" || property.type === "reference";
+
+    // A one-line value at the form's size is drawn like the one-line fields
+    // around it: the same 64px box, the label shrunk into its top edge. It keeps
+    // the outline and drops the fill — that is what says it cannot be edited.
+    if (!minimalistView && !hideLabel && size === "large" && readOnlyLabelsInside(property)) {
+        return (
+            <>
+                <div className={"relative w-full min-h-[66px] rounded-lg border border-hairline-strong px-3 pt-8 pb-2 text-base"}>
+                    {/* `left-0` is the box's padding edge, where a text field's
+                        label starts; left to its static position it would
+                        start after the `px-3`, 12px too far in. */}
+                    <InputLabel shrink
+                        className={"pointer-events-none absolute top-1 left-0 text-text-secondary dark:text-text-secondary-dark"}>
+                        <LabelWithIcon
+                            icon={getIconForProperty(property, "small")}
+                            required={property.validation?.required}
+                            title={property.name ?? propertyKey}/>
+                    </InputLabel>
+                    <div className={"min-h-6 flex items-center overflow-x-auto no-scrollbar opacity-80"}>
+                        <ErrorBoundary>
+                            <PropertyPreview propertyKey={propertyKey}
+                                value={value}
+                                property={property}
+                                hideLabel
+                                size={"medium"}/>
+                        </ErrorBoundary>
+                    </div>
+                </div>
+
+                <FieldHelperText includeDescription={includeDescription}
+                    showError={showError}
+                    error={error}
+                    property={property}/>
+            </>
+        );
+    }
 
     return (
 

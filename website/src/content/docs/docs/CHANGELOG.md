@@ -381,6 +381,20 @@ description: Every released change to Rebase — new features, fixes, and the br
   `excludeFromApi`. Free-text strings are never paired, nothing reads the title
   property, and rows are no longer stretched to close a gap. A span written on a
   property is used as written.
+- **Fields are filled boxes with the label inside, the way FireCMS draws
+  them.** A field in `@rebasepro/ui` no longer draws a hairline: its fill is
+  stronger (white 6.5% in dark mode, black 5% in light, from 4% and 3.5%) and is
+  the whole edge, everywhere a `TextField`, `Select`, `MultiSelect`,
+  `DateTimeField`, switch row or search bar is used. The 1px border stays,
+  transparent, so no control changes height and an error still colours it
+  without moving the form. In the record form, text, number, date, switch,
+  single-select and one-line read-only fields carry their label inside a 64px
+  box, with the value at 16px; a read-only value keeps its outline and no fill.
+  Multi-selects, uploads, markdown, relations and custom editors keep their
+  label above a 48px box. The description sits under the box, indented to the
+  value, and the property's key shows at the end of that line on hover. Rows
+  are 24px apart. A required field's asterisk is no longer read out as part of
+  its name.
 
 #### CLI
 

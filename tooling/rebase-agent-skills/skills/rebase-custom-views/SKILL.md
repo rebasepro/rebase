@@ -348,8 +348,8 @@ these rules is indistinguishable from a built-in screen:
   a hover on something transparent `hover:bg-surface-hover`. Never a
   `bg-white dark:bg-…` pair: the theme decides the value.
 - **Lines.** `border border-hairline` around an object on a surface,
-  `border-hairline-strong` on a floating one. No rule under a header that sits
-  on the sheet.
+  `border-hairline-strong` on a floating one. A field is not one of those: it
+  is a filled box with no edge. No rule under a header that sits on the sheet.
 - **Shape.** `rounded-xl` for a card or sheet, `rounded-lg` for a control or
   row highlight, `rounded-md` for a chip or tile. Never a pixel radius.
 - **One primary action.** At most one `color="primary"` filled `Button` per
