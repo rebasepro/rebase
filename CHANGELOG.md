@@ -182,8 +182,15 @@
   carries `strict-origin-when-cross-origin`, the browsers' own default: other
   sites see the origin, never the path or query. A response that sets its own
   policy keeps it, so the MCP consent page stays `no-referrer`. An ejected
-  backend gets the same through `defaultReferrerPolicy()` from
+  backend gets the same through `overridableSecurityHeaders()` from
   `@rebasepro/server`.
+- **The MCP consent page goes out with `X-Frame-Options: DENY`.** It asks for
+  `DENY`, but `secureHeaders()` runs after the route and overwrote it with its
+  own `SAMEORIGIN`, so a browser that ignores CSP could frame the consent screen
+  from the same origin. Its `frame-ancestors 'none'` still held everywhere CSP
+  is read. `SAMEORIGIN` is now the default for a response that sets none, the
+  same way `Referrer-Policy` is; an ejected backend turns `xFrameOptions` off in
+  its `secureHeaders()` and installs `overridableSecurityHeaders()`.
 - **A function that imports `hono` itself loads on the managed runtime.** The
   bundler removes `hono` and `@hono/node-server` from a bundle's dependencies
   because the image provides them, but nothing linked the image's copy into

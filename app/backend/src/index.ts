@@ -7,12 +7,12 @@ import path from "path";
 import { fileURLToPath } from "url";
 import {
     cleanupDevPortFile,
-    defaultReferrerPolicy,
     HonoEnv,
     initializeRebaseBackend,
     installShutdownHandlers,
     listenWithPortRetry,
     logger,
+    overridableSecurityHeaders,
     serveSPA
 } from "@rebasepro/server";
 import { createPostgresAdapter, createPostgresDatabaseConnection } from "@rebasepro/server-postgres";
@@ -43,10 +43,12 @@ app.use("/*", cors({
 app.use("/*", secureHeaders({
     crossOriginResourcePolicy: "cross-origin",
     crossOriginOpenerPolicy: "same-origin-allow-popups",
-    // `no-referrer` would hide the origin Google sign-in checks.
-    referrerPolicy: false
+    // Sent below, leaving a route's own alone: `no-referrer` would hide the
+    // origin Google sign-in checks, and the MCP consent page sends `DENY`.
+    referrerPolicy: false,
+    xFrameOptions: false
 }));
-app.use("/*", defaultReferrerPolicy());
+app.use("/*", overridableSecurityHeaders());
 
 // ─── Database ────────────────────────────────────────────────────────
 const postgresResources = createPostgresDatabaseConnection(env.DATABASE_URL, undefined, {

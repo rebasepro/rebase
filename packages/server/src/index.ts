@@ -488,7 +488,7 @@ export {
     loadUsersCollection
 } from "./boot/bundle";
 export type { LoadedBundle, BundleConfigExports } from "./boot/bundle";
-export { defaultReferrerPolicy, DEFAULT_REFERRER_POLICY } from "./boot/security-headers";
+export { overridableSecurityHeaders, DEFAULT_REFERRER_POLICY } from "./boot/security-headers";
 export { loadBootEnv, resolveCorsOrigin, isLocalhostOrigin, CORS_EXPOSED_HEADERS } from "./boot/env";
 export type { RebaseBootEnv, CorsOriginResolver } from "./boot/env";
 export { resolveAuthOptions, resolveEmailOptions } from "./boot/options";
