@@ -1,5 +1,5 @@
 ---
-sourceHash: 64dad399c92c2e1c
+sourceHash: c6f65640f646f804
 title: Auto-hospedagem
 sidebar_label: Auto-hospedagem
 description: Execute o Rebase em qualquer lugar com a imagem oficial de runtime e o bundle do seu projeto — Docker Compose, Fly, Railway ou uma VPS simples.
@@ -452,13 +452,23 @@ retidas por callbacks de escrita que aguardam por operações lentas; consulte
 ## Cabeçalhos de segurança
 
 Todas as respostas incluem `X-Frame-Options: SAMEORIGIN`, `X-Content-Type-Options:
-nosniff`, uma `Referrer-Policy` e `Strict-Transport-Security: max-age=15552000`
+nosniff`, `Referrer-Policy: strict-origin-when-cross-origin` e `Strict-Transport-Security: max-age=15552000`
 (180 dias). O cabeçalho HSTS omite `includeSubDomains`: incluí-lo instruiria os
 navegadores a recusarem HTTP simples em todos os subdomínios do seu domínio, inclusive naqueles com os quais
 este servidor não tem relação, e o navegador reteria isso pelo período indicado no
 cabeçalho.
 Defina `REBASE_HSTS_INCLUDE_SUBDOMAINS=true` quando todos os subdomínios operarem exclusivamente em HTTPS;
 até a versão 0.23 inclusive, o cabeçalho sempre incluía `includeSubDomains`.
+
+`strict-origin-when-cross-origin` é o padrão dos próprios navegadores: uma
+requisição para outro site leva a sua origem e nunca o caminho ou a query da
+página. Não é `no-referrer` porque as verificações de origem precisam da origem:
+o botão de login do Google a compara com as origens JavaScript autorizadas do
+cliente OAuth e, com `no-referrer`, respondia "The given origin is not allowed
+for the given client ID" em todos os apps, independentemente do que o cliente
+permitisse. Uma resposta que define a própria política a mantém (a página de
+consentimento do MCP envia `no-referrer`); uma página que queira uma mais
+restritiva pode indicá-lo com `<meta name="referrer" content="no-referrer">`.
 
 As aplicações estáticas — o painel administrativo do CMS e qualquer frontend servido pelo bundle — também trazem
 `Content-Security-Policy: frame-ancestors 'self'; object-src 'none'; base-uri

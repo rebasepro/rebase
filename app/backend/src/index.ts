@@ -7,6 +7,7 @@ import path from "path";
 import { fileURLToPath } from "url";
 import {
     cleanupDevPortFile,
+    defaultReferrerPolicy,
     HonoEnv,
     initializeRebaseBackend,
     installShutdownHandlers,
@@ -41,8 +42,11 @@ app.use("/*", cors({
 
 app.use("/*", secureHeaders({
     crossOriginResourcePolicy: "cross-origin",
-    crossOriginOpenerPolicy: "same-origin-allow-popups"
+    crossOriginOpenerPolicy: "same-origin-allow-popups",
+    // `no-referrer` would hide the origin Google sign-in checks.
+    referrerPolicy: false
 }));
+app.use("/*", defaultReferrerPolicy());
 
 // ─── Database ────────────────────────────────────────────────────────
 const postgresResources = createPostgresDatabaseConnection(env.DATABASE_URL, undefined, {

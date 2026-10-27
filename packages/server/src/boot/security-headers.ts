@@ -32,9 +32,38 @@ export function strictTransportSecurity(includeSubDomains: boolean): string {
  */
 export const STATIC_APP_CSP = "frame-ancestors 'self'; object-src 'none'; base-uri 'self'";
 
+/**
+ * The `Referrer-Policy` this runtime sends: `strict-origin-when-cross-origin`,
+ * the browsers' own default. A cross-origin request carries the page's origin
+ * and never its path or query.
+ *
+ * Not `no-referrer`, the `secureHeaders()` default it used to send: an origin
+ * check then sees no origin at all. Google's "Sign in with Google" button is the
+ * one that bit — it compares the page's origin with the OAuth client's
+ * authorized JavaScript origins, and under `no-referrer` it refused every
+ * Rebase-hosted app with "The given origin is not allowed for the given client
+ * ID", whatever the client allowed.
+ */
+export const DEFAULT_REFERRER_POLICY = "strict-origin-when-cross-origin";
+
+/**
+ * Sends `DEFAULT_REFERRER_POLICY` on every response that does not set its own.
+ *
+ * Its own middleware because `secureHeaders()` overwrites whatever the route
+ * set, and some routes set a stricter one on purpose: the MCP consent page sends
+ * `no-referrer` so the `client_id` and `state` in its URL go nowhere. A static
+ * app that wants the same says so with `<meta name="referrer">`.
+ */
+export function defaultReferrerPolicy(): MiddlewareHandler {
+    return async (c, next) => {
+        await next();
+        if (!c.res.headers.has("Referrer-Policy")) c.header("Referrer-Policy", DEFAULT_REFERRER_POLICY);
+    };
+}
+
 /** The security headers both boot paths — backend and static-only — install. */
 export function runtimeSecureHeaders(options: { hstsIncludeSubDomains: boolean }): MiddlewareHandler {
-    return secureHeaders({
+    const headers = secureHeaders({
         // An API serves assets and tokens to origins other than its own, so the
         // browser defaults are wrong here in two specific ways:
         //
@@ -49,6 +78,10 @@ export function runtimeSecureHeaders(options: { hstsIncludeSubDomains: boolean }
         // needs the same: its assets load from custom domains and the console.
         crossOriginResourcePolicy: "cross-origin",
         crossOriginOpenerPolicy: "same-origin-allow-popups",
-        strictTransportSecurity: strictTransportSecurity(options.hstsIncludeSubDomains)
+        strictTransportSecurity: strictTransportSecurity(options.hstsIncludeSubDomains),
+        // Sent by `defaultReferrerPolicy`, which leaves a route's own alone.
+        referrerPolicy: false
     });
+    const referrerPolicy = defaultReferrerPolicy();
+    return (c, next) => headers(c, async () => { await referrerPolicy(c, next); });
 }

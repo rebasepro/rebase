@@ -1,5 +1,5 @@
 ---
-sourceHash: 64dad399c92c2e1c
+sourceHash: c6f65640f646f804
 title: Self-Hosting
 sidebar_label: Self-Hosting
 description: Führen Sie Rebase überall mit dem offiziellen Runtime-Image und Ihrem Projekt-Bundle aus – Docker Compose, Fly, Railway oder auf einem einfachen VPS.
@@ -298,8 +298,10 @@ Stellt Prometheus-Metriken unter `/metrics` bereit: Anzahl der Anfragen und Late
 
 ## Sicherheits-Header
 
-Jede Antwort enthält `X-Frame-Options: SAMEORIGIN`, `X-Content-Type-Options: nosniff`, eine `Referrer-Policy` und `Strict-Transport-Security: max-age=15552000` (180 Tage). Der HSTS-Header lässt `includeSubDomains` aus: Dies würde Browser anweisen, unverschlüsseltes HTTP auf jeder Subdomain Ihrer Domain zu verweigern – einschließlich solcher, mit denen dieser Server nichts zu tun hat –, und ein Browser speichert dies so lange, wie der Header vorgibt.
+Jede Antwort enthält `X-Frame-Options: SAMEORIGIN`, `X-Content-Type-Options: nosniff`, `Referrer-Policy: strict-origin-when-cross-origin` und `Strict-Transport-Security: max-age=15552000` (180 Tage). Der HSTS-Header lässt `includeSubDomains` aus: Dies würde Browser anweisen, unverschlüsseltes HTTP auf jeder Subdomain Ihrer Domain zu verweigern – einschließlich solcher, mit denen dieser Server nichts zu tun hat –, und ein Browser speichert dies so lange, wie der Header vorgibt.
 Setzen Sie `REBASE_HSTS_INCLUDE_SUBDOMAINS=true`, wenn jede Subdomain ausschließlich HTTPS verwendet; bis einschließlich Version 0.23 enthielt der Header immer `includeSubDomains`.
+
+`strict-origin-when-cross-origin` ist die Voreinstellung der Browser selbst: Eine Anfrage an eine andere Website enthält Ihren Origin, aber nie den Pfad oder die Query der Seite. Es ist nicht `no-referrer`, weil Origin-Prüfungen den Origin brauchen – der Google-Anmeldebutton vergleicht ihn mit den autorisierten JavaScript-Ursprüngen des OAuth-Clients und antwortete unter `no-referrer` bei jeder App mit „The given origin is not allowed for the given client ID“, unabhängig davon, was der Client erlaubte. Eine Antwort, die ihre eigene Richtlinie setzt, behält diese (die MCP-Zustimmungsseite sendet `no-referrer`); eine Seite, die eine strengere möchte, gibt das mit `<meta name="referrer" content="no-referrer">` an.
 
 Die statischen Apps – die CMS-Admin-Oberfläche und jedes Frontend, das das Bundle ausliefert – enthalten außerdem `Content-Security-Policy: frame-ancestors 'self'; object-src 'none'; base-uri 'self'`. Dies bestimmt, wer die App in einem Frame einbetten darf, schließt Plugins aus und bindet `<base>` an Ihren Origin; darüber hinaus schränkt es nichts ein, sodass Inline-Skripte, Worker und Anmeldungen über Drittanbieter weiterhin funktionieren. Eine Antwort, die ihre eigene Richtlinie setzt, behält diese bei. Für strengere Regeln platzieren Sie die Richtlinie auf dem vorgeschalteten Reverse-Proxy.
 
