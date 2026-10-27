@@ -486,6 +486,17 @@ description: Every released change to Rebase — new features, fixes, and the br
 
 #### Runtime
 
+- **Google sign-in works on a Rebase-hosted app.** The runtime sent
+  `Referrer-Policy: no-referrer`, the `secureHeaders()` default, so a page told
+  other sites nothing about where it came from — and the "Sign in with Google"
+  button, which checks the page's origin against the OAuth client's authorized
+  JavaScript origins, answered "The given origin is not allowed for the given
+  client ID" on every app, however the client was configured. Every response now
+  carries `strict-origin-when-cross-origin`, the browsers' own default: other
+  sites see the origin, never the path or query. A response that sets its own
+  policy keeps it, so the MCP consent page stays `no-referrer`. An ejected
+  backend gets the same through `defaultReferrerPolicy()` from
+  `@rebasepro/server`.
 - **The Helm chart's migration Job starts.** It ran as `REBASE_ROLE=worker`
   with `REBASE_MIGRATE_ON_BOOT=ensure`, and the runtime refuses that pair, so
   every default `helm install` and `helm upgrade` stopped at its pre-install
