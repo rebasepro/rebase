@@ -164,9 +164,18 @@ production, and it is worth making on purpose rather than discovering.
 
 `migrationJob.enabled` (default) runs a `pre-install,pre-upgrade` Job that
 provisions and exits, and every pod boots with `REBASE_MIGRATE_ON_BOOT=none`.
-Nothing on the request path owns DDL — the cleanest available answer to "exactly
-one process provisions the schema", because it stops being a rule anyone has to
-remember.
+Nothing on the request path owns the collection schema — the cleanest available
+answer to "exactly one process provisions the schema", because it stops being a
+rule anyone has to remember. The pods still keep the framework's own tables
+(auth, API keys, jobs, cron) current at boot.
+
+`provision: false` is for a database whose schema may only change through your
+own change process. Every pod boots with `REBASE_PROVISION=false` and changes
+nothing in the database, the framework's tables included, and the Job is not
+rendered. Run the provisioning step yourself before each upgrade: the same
+image with `REBASE_PROVISION_ONLY=true`, and `REBASE_PROVISION_SQL_OUT` to keep
+the SQL it ran for review. See
+[When only your change process may change the database](https://rebase.pro/docs/deployment/self-hosting/#when-only-your-change-process-may-change-the-database).
 
 `mode: ensure` creates what is missing, additively, and is the only mode the
 runtime image accepts. `push` is refused at boot: applying collection schema

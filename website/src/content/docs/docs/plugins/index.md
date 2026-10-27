@@ -16,7 +16,7 @@ Plugins are the primary extension mechanism in the panel. They can:
 
 - Wrap the entire app with a **provider** (context, state management)
 - Add **home page actions** and widgets
-- Inject **collection view** components (toolbar, column builders)
+- Inject **collection view** components (toolbar, column headers)
 - Add **form** components (field builders, additional panels)
 - **Inject or modify collections** dynamically
 
@@ -29,7 +29,7 @@ interface RebasePlugin {
 
     // UI contributions — a flat array, each entry naming its slot.
     // This replaced the old per-area objects (homePage, collectionView, form).
-    slots?: SlotContribution[];
+    slots?: AnySlotContribution[];
 
     // HOC providers. `scope: "root"` wraps the whole admin below
     // RebaseContext; `scope: "form"` wraps each entity form / edit view.
@@ -230,7 +230,9 @@ one. Another plugin can give markdown fields a controller the same way, with
 
 :::caution[This one sends data off your machine]
 Autofill posts the entity's field values to a hosted service to generate a
-suggestion. By default that service is **`https://app.rebase.pro/api/functions/ai`**,
+suggestion: the values of declared properties only, never of a read-only,
+disabled or hidden one, one with `dynamicProps`, or a column the collection does
+not declare. By default that service is **`https://app.rebase.pro/api/functions/ai`**,
 which Rebase runs — free to use, no configuration, and no credential attached:
 the requests are anonymous, bounded by rate limit rather than by identity. Your
 JWT is not sent. The editor's slash autocomplete posts text too: up to 8,000

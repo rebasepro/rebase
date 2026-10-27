@@ -169,4 +169,7 @@ server.listen(PORT, "127.0.0.1", () => {
     console.log(`  Open it in Chrome (speech recognition is Chrome's), allow the camera and`);
     console.log(`  microphone, press Space and read. Try it without a camera first:`);
     console.log(`  http://localhost:${PORT}/?simulate\n`);
+    console.log(`  Record a film of the series:  http://localhost:${PORT}/?film=<id>`);
+    console.log(`  typed · security · agents · own · one-definition · zero · realtime ·`);
+    console.log(`  panel · backend · existing   (scripts: VOICEOVER-SERIES.md)\n`);
 });

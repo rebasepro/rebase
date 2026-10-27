@@ -29,7 +29,7 @@ class ApiAnswered extends Error {}
 /** Everything the switch below dispatches, for the did-you-mean. */
 export const AUTH_SUBCOMMANDS = ["reset-password"] as const;
 import { parseCommandArgs, wantsHelp } from "../utils/args";
-import { resolveBackendAddress } from "./api-keys";
+import { cloudTargetNote, resolveBackendAddress } from "./api-keys";
 
 /** A user as the admin API returns it, reduced to what this command needs. */
 export interface ResolvedUser {
@@ -239,7 +239,10 @@ async function resetPassword(rawArgs: string[]): Promise<void> {
     // `.rebase-dev-url`, outlive a killed `rebase dev`, and the port they name
     // may be another server's by now. With neither, the reset goes to the
     // database directly.
-    const baseUrl = resolveBackendAddress(readEnvFile(projectRoot), projectRoot).url;
+    const address = resolveBackendAddress(readEnvFile(projectRoot), projectRoot);
+    const cloudNote = cloudTargetNote(address);
+    if (cloudNote) console.error(chalk.yellow(`  ⚠ ${cloudNote}`));
+    const baseUrl = address.url;
 
     if (baseUrl && serviceKey) {
         console.log("Trying API-first reset via running backend...");

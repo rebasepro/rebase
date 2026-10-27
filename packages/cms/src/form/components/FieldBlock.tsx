@@ -85,6 +85,13 @@ export interface FieldBlockProps {
     /** Rendered by the form rather than by the field, unless self-labelling. */
     showLabel: boolean;
     /**
+     * The control draws its label inside its own box — the one-line fields of a
+     * record form (see `labelsInsideControl`). The block then draws no label
+     * row, but it still owns what goes under the box: the description, indented
+     * to the value inside the box, and the property's key, on that same line.
+     */
+    labelInside?: boolean;
+    /**
      * Which of the two renderings this block frames.
      *
      * The **label is identical in both** — same size, same weight, same colour,
@@ -128,6 +135,7 @@ export function FieldBlock({
     propertyKey,
     property,
     showLabel,
+    labelInside = false,
     mode = "edit",
     label,
     icon,
@@ -137,6 +145,7 @@ export function FieldBlock({
     const reading = mode === "read";
     const description = property?.description?.trim();
     const required = Boolean(property?.validation?.required);
+    const footed = labelInside && !reading;
 
     return (
         // Top-aligned: with the description below the control, every label is a
@@ -144,7 +153,9 @@ export function FieldBlock({
         // was only needed while the description sat between label and control.)
         <div
             id={`form_field_${propertyKey}`}
-            className={"relative flex flex-col min-w-0"}>
+            // With the label inside the control there is no label row to hover
+            // for the key; the whole field reveals it instead.
+            className={cls("relative flex flex-col min-w-0", footed && "group/label")}>
 
             {showLabel && (
                 <div className={cls(
@@ -174,7 +185,10 @@ export function FieldBlock({
                 </div>
             )}
 
-            <div className={"min-w-0"}>
+            {/* `data-field-control` names the slot for anything measuring the
+                control itself. A class cannot: the label row carries
+                `min-w-0` too, and a selector for it measured the label. */}
+            <div className={"min-w-0"} data-field-control={""}>
                 <ErrorBoundary>
                     {children}
                 </ErrorBoundary>
@@ -188,6 +202,29 @@ export function FieldBlock({
                     className={"mt-1.5 ml-0.5 leading-snug"}>
                     {description}
                 </Typography>
+            )}
+
+            {/* A label drawn inside the box: the description is indented to
+                the value, as the binding's own error line is (`ml-3.5`), and
+                the key sits at the end of that line. A field with no
+                description has no line to put it on, so the key hangs in the
+                row gap below the box rather than reserving a line under every
+                field for something only a hover shows. */}
+            {footed && (description || property) && (
+                <div className={cls(
+                    "flex items-start gap-2 min-w-0 ml-3.5",
+                    description ? "mt-1.5" : "absolute top-full right-0 mt-1"
+                )}>
+                    {description && (
+                        <Typography variant={"caption"}
+                            color={"disabled"}
+                            className={"grow min-w-0 leading-snug"}>
+                            {description}
+                        </Typography>
+                    )}
+                    {property && <PropertyKeyHint propertyKey={propertyKey}
+                        className={description ? "ml-auto shrink-0" : undefined}/>}
+                </div>
             )}
         </div>
     );

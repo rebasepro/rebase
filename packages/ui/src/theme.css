@@ -290,10 +290,11 @@
  *      Lifted means lighter on both themes; the light frame is the greyest
  *      thing on the page. Fields are the one exception — a field is inset, so
  *      it is an alpha fill that goes the other way.
- *   2. A hairline marks an object, not a region. Cards on the sheet, floating
- *      surfaces and fields get a line. The sheet edge, tiles inside a card,
+ *   2. A hairline marks an object, not a region. Cards on the sheet and
+ *      floating surfaces get a line. The sheet edge, tiles inside a card,
  *      rows, tracks, buttons and chips do not; the lightness step separates
- *      them.
+ *      them. Fields do not either: a field is a filled box, and its fill is
+ *      set strong enough to be the whole edge (see `--surface-field` below).
  *
  * These are plain custom properties, deliberately outside `@theme`, so they
  * can switch on the theme selector. The `@theme inline` entries above alias
@@ -323,8 +324,11 @@
     --surface-raised: #eaecef;
     --surface-raised-hover: #e1e4e7;
     --surface-lifted: #ffffff;
-    --surface-field: rgb(0 0 0 / 0.035);
-    --surface-field-hover: rgb(0 0 0 / 0.055);
+    /* A field has no edge, so the fill alone has to read as a box on white
+       and on the sheet. 3.5% did that only with a hairline round it; 5% is
+       the FireCMS field (slate-200 at half strength), on the graphite hue. */
+    --surface-field: rgb(0 0 0 / 0.05);
+    --surface-field-hover: rgb(0 0 0 / 0.075);
     --surface-hover: rgb(0 0 0 / 0.04);
     --surface-active: rgb(0 0 0 / 0.07);
     --surface-scrim: rgb(0 0 0 / 0.4);
@@ -344,8 +348,11 @@
     --surface-raised: #212429;
     --surface-raised-hover: #292c32;
     --surface-lifted: #292c32;
-    --surface-field: rgb(255 255 255 / 0.04);
-    --surface-field-hover: rgb(255 255 255 / 0.07);
+    /* 4% was tuned to sit inside a hairline. Without one it read as a soft
+       slab on a card; 6.5% lifts a field about as far off `surface-card` as
+       the FireCMS field sits off its own card. */
+    --surface-field: rgb(255 255 255 / 0.065);
+    --surface-field-hover: rgb(255 255 255 / 0.095);
     --surface-hover: rgb(255 255 255 / 0.06);
     --surface-active: rgb(255 255 255 / 0.09);
     --surface-scrim: rgb(0 0 0 / 0.6);

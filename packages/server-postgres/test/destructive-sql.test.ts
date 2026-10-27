@@ -1,9 +1,12 @@
 import { PGlite } from "@electric-sql/pglite";
+import { resetDeprecationWarningsForTests } from "@rebasepro/common";
 import {
     detectDestructiveStatements,
     splitSqlStatements,
     decidePushSafety,
     destructiveOptInFlag,
+    warnIfYesApprovedDestructive,
+    YES_APPROVES_DESTRUCTIVE_DEPRECATION,
     isLosslessTypeChange,
     COLUMN_TYPES_SQL,
     type ExistingColumnType
@@ -299,5 +302,34 @@ describe("the catalogue read the gate compares against", () => {
         expect(isLosslessTypeChange(typeOf("tags"), "text[]")).toBe(true);
         // Catalogue tables stay out of it.
         expect(rows.some(row => row.schema === "pg_catalog" || row.schema === "information_schema")).toBe(false);
+    });
+});
+
+describe("db push --yes on a destructive plan: deprecated, still honoured for one release", () => {
+    let warn: jest.SpyInstance;
+    beforeEach(() => {
+        resetDeprecationWarningsForTests();
+        warn = jest.spyOn(console, "warn").mockImplementation(() => undefined);
+    });
+    afterEach(() => warn.mockRestore());
+
+    it("still lets --yes approve the destructive push", () => {
+        const optIn = destructiveOptInFlag({ "--yes": true });
+        expect(decidePushSafety({ destructiveCount: 1, allowDestructive: optIn !== undefined, interactive: false })).toBe("apply");
+    });
+
+    it("warns once per process, naming --allow-destructive, when --yes is what let it through", () => {
+        warnIfYesApprovedDestructive("--yes", 2);
+        warnIfYesApprovedDestructive("--yes", 2);
+        expect(warn).toHaveBeenCalledTimes(1);
+        expect(String(warn.mock.calls[0][0])).toContain(YES_APPROVES_DESTRUCTIVE_DEPRECATION);
+        expect(YES_APPROVES_DESTRUCTIVE_DEPRECATION).toContain("--allow-destructive");
+    });
+
+    it("says nothing for --allow-destructive, or for a push that destroys nothing", () => {
+        warnIfYesApprovedDestructive("--allow-destructive", 3);
+        warnIfYesApprovedDestructive("--yes", 0);
+        warnIfYesApprovedDestructive(undefined, 3);
+        expect(warn).not.toHaveBeenCalled();
     });
 });

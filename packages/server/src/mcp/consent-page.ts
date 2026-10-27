@@ -28,7 +28,14 @@
  *  5. **Never post the password anywhere but the existing login endpoint.**
  *     The form below sends credentials to `${basePath}/auth/login` and nowhere
  *     else; this file's own endpoint receives only the resulting session token.
- *  6. **Refuse to be framed.** See {@link consentPageHeaders} — a consent screen
+ *  6. **Say where the code goes.** Registration is open by default and the
+ *     client name is the registrant's to choose, so "“Claude” wants access"
+ *     can be anyone. The redirect host cannot, and the page names it.
+ *  7. **Let every account that can sign in consent.** An account with a second
+ *     factor finishes here through the existing MFA routes; an account that
+ *     has only ever used Google, GitHub or an email link is told how to get a
+ *     password, rather than shown an error it cannot act on.
+ *  8. **Refuse to be framed.** See {@link consentPageHeaders} — a consent screen
  *     that can be iframed is a consent screen an attacker can have clicked.
  */
 
@@ -40,6 +47,24 @@ export interface ConsentPageParams {
     requestToken: string;
     /** The existing auth endpoint the sign-in form posts to. */
     loginUrl: string;
+    /**
+     * The existing MFA routes (`POST /auth/mfa/challenge` and
+     * `/auth/mfa/challenge/verify`). An account with a verified factor answers
+     * the login with `MFA_REQUIRED` and a pending token; the page opens a
+     * challenge with it and posts the code, which is where that account's
+     * session is minted. Without this step such an account could never consent.
+     */
+    mfaChallengeUrl: string;
+    mfaVerifyUrl: string;
+    /**
+     * Where the authorization code goes once the person allows.
+     *
+     * The client's name is free text anyone may register, so it proves nothing;
+     * the redirect URI is the one fact on this screen an attacker cannot make
+     * look like someone else's without owning that host. It is shown, as a
+     * host, with a plain statement that this server has not verified it.
+     */
+    redirectUri: string;
     /** Where the decision is posted. */
     decisionUrl: string;
     /** The canonical resource, shown so the user can see which person this is. */
@@ -93,6 +118,7 @@ export function consentPageHeaders(nonce: string): Record<string, string> {
 export function renderConsentPage(params: ConsentPageParams): string {
     const clientName = escapeHtml(params.clientName.slice(0, 120));
     const resource = escapeHtml(params.resource);
+    const destination = describeRedirect(params.redirectUri);
     const permissions = params.scopeDescriptions
         .map(s => `<li><strong>${escapeHtml(s.description)}</strong></li>`)
         .join("");
@@ -148,12 +174,28 @@ export function renderConsentPage(params: ConsentPageParams): string {
   button[disabled] { opacity: .55; cursor: progress; }
   .error { color: var(--danger); font-size: 13px; margin-top: 12px; min-height: 1em; }
   .who { font-size: 13px; color: var(--muted); margin-top: 4px; }
+  .destination {
+    margin: 0 0 18px; padding: 12px 14px; border-radius: 9px; font-size: 13.5px;
+    border: 1px solid var(--line); background: var(--bg); word-break: break-all;
+  }
+  .destination strong { font-size: 15px; color: var(--ink); }
+  .destination span { display: block; color: var(--muted); margin-top: 4px; word-break: normal; }
+  .note { font-size: 12.5px; color: var(--muted); margin: 14px 0 0; }
+  input[inputmode=text] {
+    width: 100%; padding: 9px 11px; border-radius: 8px; letter-spacing: .08em;
+    border: 1px solid var(--line); background: var(--bg); color: var(--ink); font: inherit;
+  }
 </style>
 </head>
 <body>
 <main class="card">
   <h1>&ldquo;${clientName}&rdquo; wants access to your account</h1>
   <p class="resource">${resource}</p>
+
+  <p class="destination">
+    After you allow, you will be sent back to <strong>${escapeHtml(destination.label)}</strong>
+    <span>${escapeHtml(destination.note)}</span>
+  </p>
 
   <p style="margin:0 0 8px">If you allow it, this application will be able to:</p>
   <ul>${permissions}</ul>
@@ -175,6 +217,13 @@ export function renderConsentPage(params: ConsentPageParams): string {
       <input type="email" id="email" name="email" autocomplete="username" required>
       <label for="password">Password</label>
       <input type="password" id="password" name="password" autocomplete="current-password" required>
+      <p class="note">Signed in to this app with Google, GitHub or an email link before? This screen
+      needs a password. Use &ldquo;Forgot password&rdquo; on the app's sign-in screen to set one, then
+      come back.</p>
+    </div>
+    <div id="mfa" hidden>
+      <label for="mfa_code">Code from your authenticator app, or a recovery code</label>
+      <input type="text" id="mfa_code" name="mfa_code" inputmode="text" autocomplete="one-time-code">
     </div>
     <p class="who" id="who" hidden></p>
 
@@ -191,19 +240,135 @@ export function renderConsentPage(params: ConsentPageParams): string {
   var form = document.getElementById("consent");
   var email = document.getElementById("email");
   var password = document.getElementById("password");
+  var signin = document.getElementById("signin");
+  var mfa = document.getElementById("mfa");
+  var mfaCode = document.getElementById("mfa_code");
   var sessionToken = document.getElementById("session_token");
   var decision = document.getElementById("decision");
   var error = document.getElementById("error");
   var allow = document.getElementById("allow");
 
+  // Set once the password was accepted and the account answered MFA_REQUIRED.
+  var mfaToken = null;
+  var factorId = null;
+  var challengeId = null;
+
   document.getElementById("deny").addEventListener("click", function () {
     decision.value = "deny";
-    // The password fields are required, and a denial must not be blocked by
+    // The credential fields are required, and a denial must not be blocked by
     // them: refusing is the one answer that should never need a credential.
-    email.removeAttribute("required");
-    password.removeAttribute("required");
+    email.required = false;
+    password.required = false;
+    mfaCode.required = false;
     form.submit();
   });
+
+  // The words to show for a failed answer. The canonical envelope is
+  // { error: { message, code } }; the flat spellings are what an OAuth-style
+  // body or a deployment's transformed auth response may carry instead.
+  function messageOf(r, fallback) {
+    var b = r.body;
+    if (b && b.error && typeof b.error === "object" && typeof b.error.message === "string") return b.error.message;
+    if (b && typeof b.error_description === "string") return b.error_description;
+    if (b && typeof b.message === "string") return b.message;
+    if (b && typeof b.error === "string") return b.error;
+    return fallback + (r.status ? " (HTTP " + r.status + ")." : ".");
+  }
+  function codeOf(r) {
+    var b = r.body;
+    return (b && b.error && typeof b.error === "object" && b.error.code) || null;
+  }
+  function failure(message) {
+    var err = new Error(message);
+    err.shown = true;
+    return err;
+  }
+
+  // A body that is not JSON (a proxy's HTML error page) is a failure with no
+  // message, not a parse error to print.
+  function post(url, body, bearer) {
+    var headers = { "Content-Type": "application/json" };
+    if (bearer) headers.Authorization = "Bearer " + bearer;
+    return fetch(url, { method: "POST", headers: headers, body: JSON.stringify(body) })
+      .then(function (res) {
+        return res.json().then(
+          function (b) { return { ok: res.ok, status: res.status, body: b }; },
+          function () { return { ok: res.ok, status: res.status, body: null }; }
+        );
+      });
+  }
+
+  // buildAuthResponse returns { user, tokens: { accessToken } }. The flatter
+  // spellings are fallbacks rather than guesses: the response passes through
+  // applyTransformHook, so a deployment can legitimately reshape it.
+  //
+  // No backticks anywhere in this script: it lives inside a template literal,
+  // and one would end the string early.
+  function sessionFrom(r) {
+    var tokens = (r.body && r.body.tokens) || {};
+    return tokens.accessToken || (r.body && (r.body.accessToken || r.body.access_token)) || null;
+  }
+
+  function finish(token) {
+    sessionToken.value = token;
+    form.submit();
+  }
+
+  function openChallenge() {
+    return post(${JSON.stringify(params.mfaChallengeUrl)}, { factorId: factorId }, mfaToken).then(function (r) {
+      if (!r.ok || !r.body || !r.body.challengeId) throw failure(messageOf(r, "Could not start the second step"));
+      challengeId = r.body.challengeId;
+    });
+  }
+
+  function signIn() {
+    // The password goes to the EXISTING login endpoint and nowhere else. This
+    // page never posts it to the OAuth surface, which sees only the resulting
+    // session token.
+    return post(${JSON.stringify(params.loginUrl)}, { email: email.value, password: password.value }).then(function (r) {
+      var token = sessionFrom(r);
+      if (r.ok && token) return finish(token);
+
+      var details = r.body && r.body.error && r.body.error.details;
+      if (codeOf(r) === "MFA_REQUIRED" && details && details.mfaToken) {
+        var factors = details.factors || [];
+        var factor = null;
+        for (var i = 0; i < factors.length; i++) {
+          if (factors[i].factorType === "totp") { factor = factors[i]; break; }
+        }
+        factor = factor || factors[0];
+        if (!factor) throw failure("This account needs a second factor, but has none this screen can use.");
+        mfaToken = details.mfaToken;
+        factorId = factor.id;
+        return openChallenge().then(function () {
+          signin.hidden = true;
+          email.required = false;
+          password.required = false;
+          mfa.hidden = false;
+          mfaCode.required = true;
+          allow.textContent = "Verify and allow";
+          mfaCode.focus();
+        });
+      }
+      throw failure(messageOf(r, "Sign-in failed"));
+    });
+  }
+
+  function verifyCode() {
+    var code = String(mfaCode.value || "").trim();
+    return post(${JSON.stringify(params.mfaVerifyUrl)}, { challengeId: challengeId, code: code }, mfaToken).then(function (r) {
+      var token = sessionFrom(r);
+      if (r.ok && token) return finish(token);
+      var message = messageOf(r, "Verification failed");
+      var errorCode = codeOf(r);
+      // A spent or expired challenge cannot take another guess; open a fresh
+      // one so the person can simply type the next code.
+      if (errorCode === "CHALLENGE_EXHAUSTED" || errorCode === "INVALID_CHALLENGE") {
+        return openChallenge().then(function () { throw failure(message + " Enter a new code."); });
+      }
+      throw failure(message);
+    });
+  }
 
   form.addEventListener("submit", function (event) {
     if (decision.value === "deny") return;
@@ -213,43 +378,43 @@ export function renderConsentPage(params: ConsentPageParams): string {
     error.textContent = "";
     allow.disabled = true;
 
-    // The password goes to the EXISTING login endpoint and nowhere else. This
-    // page never posts it to the OAuth surface, which sees only the resulting
-    // session token.
-    fetch(${JSON.stringify(params.loginUrl)}, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email: email.value, password: password.value })
-    })
-      .then(function (res) { return res.json().then(function (b) { return { ok: res.ok, body: b }; }); })
-      .then(function (r) {
-        // buildAuthResponse returns { user, tokens: { accessToken } }. The
-        // flatter spellings are fallbacks rather than guesses: the login
-        // response passes through applyTransformHook, so a deployment can
-        // legitimately reshape it, and a consent screen that broke because
-        // someone customised their auth response would be a very hard failure
-        // to attribute.
-        //
-        // No backticks anywhere in this script: it lives inside a template
-        // literal, and one would end the string early — which is exactly how
-        // this comment broke the build the first time it was written.
-        var tokens = (r.body && r.body.tokens) || {};
-        var token = tokens.accessToken || (r.body && (r.body.accessToken || r.body.access_token));
-        if (!r.ok || !token) {
-          throw new Error((r.body && (r.body.error || r.body.message)) || "Sign-in failed.");
-        }
-        sessionToken.value = token;
-        form.submit();
-      })
+    (mfaToken ? verifyCode() : signIn())
+      .then(function () { allow.disabled = false; })
       .catch(function (err) {
         allow.disabled = false;
-        error.textContent = err.message || "Sign-in failed.";
+        error.textContent = (err && err.shown && err.message) || "Sign-in failed.";
       });
   });
 })();
 </script>
 </body>
 </html>`;
+}
+
+/**
+ * What to call the redirect target on the consent screen.
+ *
+ * The host, not the whole URI: a path is the registrant's to dress up
+ * ("/claude/official/callback"), the host is what they must own. A loopback
+ * redirect is a native client on this person's own machine; a private-use
+ * scheme (`com.example.app:/cb`) has no host, so it is shown whole.
+ */
+export function describeRedirect(redirectUri: string): { label: string; note: string } {
+    const unverified = "This server has not verified that this address belongs to the application named above. Allow only if you recognise it.";
+    let url: URL;
+    try {
+        url = new URL(redirectUri);
+    } catch {
+        return { label: redirectUri.slice(0, 200), note: unverified };
+    }
+    if (url.protocol === "http:" || url.protocol === "https:") {
+        const host = url.host;
+        if (url.hostname === "127.0.0.1" || url.hostname === "[::1]" || url.hostname === "::1" || url.hostname === "localhost") {
+            return { label: `${host} (this computer)`, note: "An application running on this computer receives the access. It is not verified by this server." };
+        }
+        return { label: host, note: unverified };
+    }
+    return { label: redirectUri.slice(0, 200), note: unverified };
 }
 
 function escapeHtml(value: string): string {

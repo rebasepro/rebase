@@ -1,5 +1,5 @@
 ---
-sourceHash: de9051fe769a602b
+sourceHash: 88050e5f44c6457a
 title: Exécuter plusieurs instances
 sidebar_label: Plusieurs instances
 description: Chaque élément d'état qu'un processus Rebase conserve pour lui-même, et le paramètre pour le partager — ce qu'il faut configurer avant qu'un second réplica, un déploiement progressif ou un déploiement scindé ne reçoive du trafic.
@@ -48,7 +48,8 @@ Les sections ci-dessous expliquent le comportement de chaque élément lorsqu'il
 `JWT_SECRET` signe chaque session et `REBASE_SERVICE_KEY` authentifie
 les appels de serveur à serveur. En développement, chaque processus génère le sien lorsqu'ils
 ne sont pas définis, de sorte qu'un jeton émis par un processus est refusé par le suivant. En production,
-le démarrage est refusé sans eux ; ce qui importe avec plusieurs processus,
+le démarrage est refusé sans `JWT_SECRET` (sans `REBASE_SERVICE_KEY`, il démarre
+sans aucune clé de service) ; ce qui importe avec plusieurs processus,
 c'est que chacun reçoive les **mêmes** valeurs — issues d'un unique secret, et non d'un secret par réplica.
 
 ## Limites de débit et adresse client

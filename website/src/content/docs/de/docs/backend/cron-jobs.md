@@ -1,5 +1,5 @@
 ---
-sourceHash: 008801863c78b3e5
+sourceHash: 05002dc371e1e1e7
 title: Cron-Jobs
 sidebar_label: Cron-Jobs
 description: Planen Sie wiederkehrende Hintergrundaufgaben mit dem integrierten Cron-Job-System von Rebase. Definieren Sie Jobs als TypeScript-Dateien, überwachen Sie sie in Studio und verwalten Sie sie über die REST-API.
@@ -151,8 +151,8 @@ interface CronJobDefinition {
     // loads rather than read as local time.
     timezone?: string;
 
-    // Human-readable name shown in Studio
-    name: string;
+    // Human-readable name shown in Studio (default: the job id, the file's name)
+    name?: string;
 
     // Optional description shown in Studio
     description?: string;
@@ -348,7 +348,7 @@ geplanten Ausführung läuft, steht unter [Cron über mehrere Instanzen](/docs/b
   `Error: Cron job "<id>" timed out after <N>ms`
   Der Abbruch ist der Teil, der die *Arbeit* stoppt; die Rejection beendet lediglich das Warten des Schedulers. Ein Handler, der `ctx.signal` ignoriert, läuft über seinen eigenen Durchlauf hinaus weiter.
 - **Herunterfahren**: `backend.shutdown()` wartet auf eine laufende Ausführung, innerhalb desselben Budgets wie die Job-Warteschlange (zwei Drittel des Shutdown-Timeouts). Bei einer Ausführung, die danach noch läuft, wird `ctx.signal` abgebrochen, und sie wird mit dem Grund als fehlgeschlagen protokolliert. Ihr Slot bleibt beansprucht, sodass keine andere Instanz ihn erneut ausführt.
-- **Fail-Safe Try/Catch**: Jeder Job-Handler läuft in einem isolierten Wrapper. Alle nicht abgefangenen Exceptions werden abgefangen, der Traceback des Fehlers in einen String formatiert, der Jobstatus auf `"error"` gesetzt und den Fehlerzähler des Jobs aktualisiert. Ein Absturz innerhalb eines einzelnen Cron-Tasks bringt niemals die Scheduler-Schleife oder den primären Hono-HTTP-Webserver zum Absturz.
+- **Fail-Safe Try/Catch**: Jeder Job-Handler läuft in einem isolierten Wrapper. Alle nicht abgefangenen Exceptions werden abgefangen, die Meldung des Fehlers (geschwärzt) als String aufgezeichnet, der Jobstatus auf `"error"` gesetzt und den Fehlerzähler des Jobs aktualisiert. Ein Absturz innerhalb eines einzelnen Cron-Tasks bringt niemals die Scheduler-Schleife oder den primären Hono-HTTP-Webserver zum Absturz.
 - **In-Memory-Ringpuffer**: Der Scheduler verwaltet einen Ringpuffer mit den letzten **50 Ausführungen** pro Job. Dieser Puffer wird im Speicher gehalten, um nahezu verzögerungsfreie Lesevorgänge aus Rebase Studio zu ermöglichen.
 
 ---
@@ -367,7 +367,7 @@ CREATE TABLE IF NOT EXISTS rebase.cron_logs (
     finished_at  TIMESTAMPTZ NOT NULL,
     duration_ms  INTEGER NOT NULL,
     success      BOOLEAN NOT NULL DEFAULT true,
-    error        TEXT,                                 -- Stack trace or error message
+    error        TEXT,                                 -- The error's message, redacted
     result       JSONB,                                -- Return value of handler
     logs         JSONB,                                -- Ring buffer array of ctx.log outputs
     manual       BOOLEAN NOT NULL DEFAULT false        -- True if triggered from Studio/REST

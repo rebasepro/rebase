@@ -62,10 +62,18 @@ export class ChannelPresenceStore {
      * `tablesReady` is now set from a probe of what exists, not from having been
      * the instance that created it.
      */
-    async ensureTables(): Promise<void> {
-        if (this.tablesReady) return;
+    async ensureTables(options: { provision?: boolean } = {}): Promise<boolean> {
+        if (this.tablesReady) return true;
 
         const ddl = drizzleDdlBootstrapper(this.db, "channel-presence");
+
+        // A backend that changes nothing in its database uses the roster table
+        // if an earlier provisioning run made it, and neither creates it nor
+        // revokes on it.
+        if (options.provision === false) {
+            this.tablesReady = await ddl.isReadable("rebase.channel_presence");
+            return this.tablesReady;
+        }
 
         await ddl.ensureObject("rebase schema", "CREATE SCHEMA IF NOT EXISTS rebase");
 
@@ -117,6 +125,7 @@ export class ChannelPresenceStore {
             );
             this.tablesReady = true;
         }
+        return this.tablesReady;
     }
 
     /** Record (or refresh) a client's presence. */

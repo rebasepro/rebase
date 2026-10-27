@@ -41,7 +41,7 @@ export function BrandedLoginView({ authController }: { authController: AuthContr
     const failure = error ?? (authController.authProviderError ? String(authController.authProviderError) : undefined);
 
     return (
-        <div className={"min-h-screen flex items-center justify-center bg-surface-50 dark:bg-surface-950 p-4"}>
+        <div className={"min-h-screen flex items-center justify-center bg-surface-frame p-4"}>
             <Card className={"w-full max-w-sm p-6"}>
                 <form onSubmit={signIn} className={"flex flex-col gap-4"}>
                     <Typography variant={"h5"}>Acme back office</Typography>

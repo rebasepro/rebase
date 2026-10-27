@@ -8,7 +8,7 @@ import { storageReference } from "@rebasepro/types";
 
 import { LocalStorageController } from "../src/storage/LocalStorageController";
 import { DefaultStorageRegistry } from "../src/storage/storage-registry";
-import { findOrphans, keysNamedBy, moveObjects, walkObjects } from "../src/storage/maintenance";
+import { findOrphans, keysNamedBy, moveObjects, verifyMove, walkObjects } from "../src/storage/maintenance";
 import { createStorageMaintenanceRoutes } from "../src/storage/maintenance-routes";
 import { errorHandler } from "../src/api/errors";
 import type { HonoEnv } from "../src/api/types";
@@ -116,6 +116,60 @@ describe("storage orphans", () => {
         expect(report.orphans.map(o => o.key)).not.toContain("avatars/old.png");
     });
 
+    it("reads rows as stored when the driver can, and never through a read hook otherwise", async () => {
+        const data = rows();
+        // The documented `beforeQuery`: a scan has no user, so it would see no row.
+        const hooked = {
+            ...collection("users"),
+            callbacks: { beforeQuery: () => ({ filter: { owner_id: ["==", null] } }) }
+        } as unknown as CollectionConfig;
+        const fetchOnly = driverOver([]);
+        const scanning = {
+            ...driverOver([]),
+            async *scanStoredRows() { yield data.users; }
+        } as unknown as DataDriver;
+
+        const refused = await findOrphans({
+            controller: storage, collections: [hooked], driverFor: () => fetchOnly, olderThanMs: 24 * HOUR
+        });
+        expect(refused.unscanned.map(u => u.collection)).toEqual(["users"]);
+
+        // A global hook applies to every collection.
+        const global = await findOrphans({
+            controller: storage, collections: [collection("users")], driverFor: () => fetchOnly, olderThanMs: 24 * HOUR,
+            globalCallbacks: { afterRead: ({ row }) => row }
+        });
+        expect(global.unscanned.map(u => u.collection)).toEqual(["users"]);
+
+        const scanned = await findOrphans({
+            controller: storage, collections: [hooked], driverFor: () => scanning, olderThanMs: 24 * HOUR
+        });
+        expect(scanned.unscanned).toEqual([]);
+        expect(scanned.orphans.map(o => o.key)).not.toContain("avatars/kept.png");
+    });
+
+    it("counts a file a history entry names as in use, and history it cannot read as unread", async () => {
+        const data = rows();
+        const kept = await findOrphans({
+            controller: storage,
+            collections: [collection("users"), collection("posts")],
+            driverFor: (c) => driverOver(data[c.slug as keyof typeof data]),
+            history: { async *scanStoredValues() { yield [[{ avatar: "avatars/kept.png" }, { avatar: "avatars/old.png" }]]; } },
+            olderThanMs: 24 * HOUR
+        });
+        expect(kept.orphans).toEqual([]);
+        expect(kept.scanned).toContain("(row history)");
+
+        const unread = await findOrphans({
+            controller: storage,
+            collections: [collection("users"), collection("posts")],
+            driverFor: (c) => driverOver(data[c.slug as keyof typeof data]),
+            history: {},
+            olderThanMs: 24 * HOUR
+        });
+        expect(unread.unscanned.map(u => u.collection)).toEqual(["(row history)"]);
+    });
+
     describe("through the admin route", () => {
         const app = (fail?: string) => {
             const data = rows();
@@ -210,6 +264,55 @@ describe("storage move", () => {
         expect(await to.statObject("posts/elsewhere.png")).not.toBeNull();
     });
 
+    it("moves every file of a local folder over many pages, deleting as it goes", async () => {
+        // Each page deletes what it moved, and the local page token used to be
+        // an index into the folder: the next page started that many entries
+        // into the shrunken folder, and half the files were never moved.
+        for (let i = 0; i < 60; i++) await put(from, `bulk/${String(i).padStart(3, "0")}.txt`, `file ${i}`);
+        const counts = { copied: 0, deleted: 0, other: 0 };
+        let cursor: string | undefined;
+        do {
+            const page = await moveObjects({ from, to, prefix: "bulk", cursor, limit: 25, deleteSource: true });
+            for (const m of page.moved) {
+                if (m.outcome === "copied") counts.copied++;
+                else counts.other++;
+                if (m.deleted) counts.deleted++;
+            }
+            cursor = page.cursor;
+        } while (cursor);
+
+        expect(counts).toEqual({ copied: 60, deleted: 60, other: 0 });
+        expect((await from.listObjects("bulk")).items).toEqual([]);
+        expect((await to.listObjects("bulk")).items).toHaveLength(60);
+    });
+
+    it("finds again, after a move, every file the move left behind", async () => {
+        // Defence in depth for the class of bug the local page token was: a
+        // walk that skipped files reported success over the half it moved.
+        await moveObjects({ from, to, prefix: "avatars", limit: 100, deleteSource: true });
+        // One the walk "skipped", and one whose copy the target lost.
+        await put(from, "avatars/skipped.png", "skipped");
+        await put(from, "avatars/9.png", "copied once");
+        await put(to, "avatars/9.png", "copied once");
+
+        const checked: { key: string; reason: string }[] = [];
+        let cursor: string | undefined;
+        do {
+            const page = await verifyMove({ from, to, prefix: "avatars", cursor, limit: 1, deleteSource: true });
+            checked.push(...page.notMoved);
+            cursor = page.cursor;
+        } while (cursor);
+        expect(checked.map(entry => entry.key).sort()).toEqual(["avatars/9.png", "avatars/skipped.png"]);
+        expect(checked.find(entry => entry.key === "avatars/skipped.png")?.reason).toMatch(/still in the source.*no copy/);
+        expect(checked.find(entry => entry.key === "avatars/9.png")?.reason).toMatch(/still in the source.*holds a copy/);
+
+        // Without --delete-source the source keeps its files: only one the
+        // target has no copy of is not moved.
+        const kept = await verifyMove({ from, to, prefix: "avatars", limit: 100 });
+        expect(kept.notMoved).toEqual([{ key: "avatars/skipped.png", reason: "the target has no copy" }]);
+        expect(kept.checked).toBe(2);
+    });
+
     it("keeps the source's copy when the target did not take one", async () => {
         // A target that answers every write and stores nothing.
         const leaky = Object.assign(Object.create(LocalStorageController.prototype), to, {
@@ -233,6 +336,39 @@ describe("storage move", () => {
         expect(keys.sort()).toEqual([...Array.from({ length: 7 }, (_, i) => `avatars/${i}.png`), "avatars/nested/deep.png", "posts/elsewhere.png"].sort());
     });
 
+    it("refuses to delete from a source that stores in the same place as the target", async () => {
+        // Two sources declared over one directory (or one bucket): every
+        // object is "already there" in the target — it is the same object —
+        // so `--delete-source` deleted each one from both.
+        const twin = new LocalStorageController({ type: "local", basePath: fromRoot });
+        // A custom controller that cannot say where it stores: found out by a probe.
+        const opaque = Object.assign(Object.create(LocalStorageController.prototype), twin, {
+            storageLocation: undefined
+        }) as LocalStorageController;
+        for (const target of [twin, opaque]) {
+            const hono = new Hono<HonoEnv>();
+            hono.onError(errorHandler);
+            hono.route("/admin/storage", createStorageMaintenanceRoutes({
+                registry: DefaultStorageRegistry.create({ "(default)": from, uploads: target }),
+                collections: () => [],
+                driverFor: () => undefined
+            }));
+            const refused = await hono.request("/admin/storage/move", {
+                method: "POST",
+                body: JSON.stringify({ to: "uploads", prefix: "avatars", deleteSource: true })
+            });
+            expect(refused.status).toBe(400);
+            expect((await refused.json()).error.code).toBe("STORAGE_SAME_LOCATION");
+            expect(await from.statObject("avatars/0.png")).not.toBeNull();
+        }
+        // Nothing left behind by the probe.
+        expect((await from.listObjects("_rebase/move-probe")).items).toEqual([]);
+
+        // Two places: the move goes ahead.
+        const separate = await moveObjects({ from, to, prefix: "posts", deleteSource: true });
+        expect(separate.moved).toEqual([{ key: "posts/elsewhere.png", outcome: "copied", deleted: true }]);
+    });
+
     it("refuses a move into the source it reads", async () => {
         const hono = new Hono<HonoEnv>();
         hono.onError(errorHandler);
@@ -250,5 +386,15 @@ describe("storage move", () => {
         });
         expect(moved.status).toBe(200);
         expect((await moved.json()).data.moved).toEqual([{ key: "posts/elsewhere.png", outcome: "copied" }]);
+
+        // Listed again: the move left nothing behind, and a file added since is named.
+        const verify = (body: Record<string, unknown>) => hono.request("/admin/storage/move/verify", { method: "POST", body: JSON.stringify(body) });
+        const clean = await verify({ to: "media", prefix: "posts" });
+        expect(clean.status).toBe(200);
+        expect((await clean.json()).data).toMatchObject({ from: "(default)", to: "media", checked: 1, notMoved: [] });
+        await put(from, "posts/late.png");
+        const late = await (await verify({ to: "media", prefix: "posts" })).json();
+        expect(late.data.notMoved).toEqual([{ key: "posts/late.png", reason: "the target has no copy" }]);
+        expect((await verify({ from: "media", to: "media" })).status).toBe(400);
     });
 });

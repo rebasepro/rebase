@@ -34,6 +34,7 @@ const tickets = {
 
 describe("recipe: bulk set status", () => {
     beforeEach(() => {
+        db.failSaveOf = undefined;
         db.rows = {
             tickets: [
                 { id: "t1", subject: "Printer on fire", status: "open" },
@@ -64,5 +65,25 @@ describe("recipe: bulk set status", () => {
             ["t1", "archived"], ["t2", "archived"], ["t3", "open"]
         ]));
         await waitFor(() => expect(screen.queryByRole("button", { name: "Archive selected" })).toBeNull());
+    });
+
+    it("says how many rows it archived when one fails, and keeps the rest selected", async () => {
+        // Rows before the failure were already archived, but the toast showed
+        // only the error and the selection still held every row.
+        db.failSaveOf = "t2";
+        render(<InRebase><CollectionPanel collection={tickets} viewMode={"table"}/></InRebase>);
+        await screen.findByText("Printer on fire");
+
+        const rowCheckboxes = screen.getAllByRole("checkbox").slice(-3);
+        await act(async () => {
+            rowCheckboxes.forEach(checkbox => fireEvent.click(checkbox));
+        });
+        fireEvent.click(await screen.findByRole("button", { name: "Archive selected" }));
+
+        expect(await screen.findByText(/Archived 1 of 3 rows.*Saving t2 was refused/)).toBeTruthy();
+        expect(db.rows.tickets.find(t => t.id === "t1")?.status).toBe("archived");
+        // The rows still to archive stay selected, ready for another try.
+        await waitFor(() => expect(screen.getAllByRole("checkbox").slice(-3).map(c => c.getAttribute("aria-checked") ?? String((c as HTMLInputElement).checked)))
+            .toEqual(["false", "true", "true"]));
     });
 });

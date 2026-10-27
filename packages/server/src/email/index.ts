@@ -31,6 +31,7 @@ export {
     extractLinks,
     registerDevEmailSink,
     activeDevEmailSink,
+    devEmailSinkFor,
     clearActiveDevEmailSink
 } from "./dev-sink";
 export type { DevEmailSink, CapturedEmail } from "./dev-sink";

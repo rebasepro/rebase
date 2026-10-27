@@ -191,7 +191,7 @@ describe("rebase cloud <group> --help", () => {
         ["env", "pull", "--output"],
         ["db", "pitr", "--target"],
         ["db", "backup", "--yes"],
-        ["webhooks", "create", "--events"],
+        ["notifications", "add", "--events"],
         ["deployments", "list", "--limit"],
         ["domains", "add", "<domain>"]
     ] as const)("prints %s %s's own page, not its group's index", async (group, action, expected) => {

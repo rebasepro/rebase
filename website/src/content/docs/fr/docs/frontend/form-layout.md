@@ -1,5 +1,5 @@
 ---
-sourceHash: fef2eb56c7043526
+sourceHash: 29363c3f0ab50d98
 title: Disposition du formulaire
 sidebar_label: Disposition du formulaire
 description: Contrôlez l'agencement du formulaire d'entité — largeurs de colonnes, sections et rail de métadonnées.
@@ -14,7 +14,7 @@ Le formulaire d'entité est généré à partir de vos propriétés :
 - l'identifiant (id) et les horodatages `createdAt` / `updatedAt` sont placés dans un rail de métadonnées, en lecture seule
 - tous les autres champs occupent la pleine largeur de la colonne principale, sauf si deux champs adjacents partagent le même type de petit éditeur — deux nombres, deux interrupteurs, deux dates avec le même mode, deux sélecteurs aux options courtes — auquel cas ils partagent une même ligne
 
-Un champ doté d'un libellé long, d'un texte d'aide de plus de 60 caractères, de `conditions` ou d'un composant `Field` personnalisé n'est jamais combiné avec un autre, de même que les chaînes de texte libre : rien dans un schéma ne permet de différencier un nom de branche court d'une longue URL. Le formulaire ne cherche jamais à savoir quelle propriété correspond au titre. Toutes les autres colonnes doivent être explicitement demandées par la collection, champ par champ, via `admin.span` — déterminé en fonction du contenu de chaque champ, comme indiqué ci-dessous. Utilisez `admin.form` pour regrouper les champs en sections et les déplacer vers le rail.
+Un champ doté d'un libellé long, d'un texte d'aide de plus de 60 caractères, de `conditions`, d'une règle `access` au niveau du champ ou de `excludeFromApi` (le formulaire n'affiche rien pour un utilisateur qui n'a pas le droit de le lire), ou d'un composant `Field` personnalisé n'est jamais combiné avec un autre, de même que les chaînes de texte libre : rien dans un schéma ne permet de différencier un nom de branche court d'une longue URL. Le formulaire ne cherche jamais à savoir quelle propriété correspond au titre. Toutes les autres colonnes doivent être explicitement demandées par la collection, champ par champ, via `admin.span` — déterminé en fonction du contenu de chaque champ, comme indiqué ci-dessous. Utilisez `admin.form` pour regrouper les champs en sections et les déplacer vers le rail.
 
 ## Largeur des champs
 
@@ -141,7 +141,7 @@ Définissez `sidebar: []` pour désactiver complètement le rail généré et co
 | `admin.form.sections` | `FormSection[]` | Groupes avec titre pour la colonne principale |
 | `admin.form.showRecordMeta` | `boolean` | Affiche id/créé/mis à jour au bas du rail |
 
-`FormSection` correspond à `{ key, title?, properties, collapsed?, collapsible? }`.
+`FormSection` correspond à `{ key, title?, properties, collapsed?, collapsible?, readVariant? }`. `readVariant: "summary"` empile les champs de la section sous forme de lignes libellé/valeur dans la vue en lecture seule de l'enregistrement ; la valeur par défaut, `"grid"`, utilise la grille du formulaire.
 
 ## Liens associés
 

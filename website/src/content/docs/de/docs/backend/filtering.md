@@ -1,5 +1,5 @@
 ---
-sourceHash: ebc75b9bd33595a6
+sourceHash: f4fe63c58f66c539
 title: Filterung in der REST-API
 sidebar_label: Filterung
 description: Listenabfragen über REST mit Operatoren im PostgREST-Stil, or/and-Gruppen und dem JSON-Dialekt where filtern – und wie die Filter zusammenwirken.
@@ -56,9 +56,11 @@ Die vier Muster-Operatoren vergleichen Text. Eine Enum-Spalte wird über ihren W
 abgeglichen (`?status=like.draft%25`); bei einer Zahl, einem Datum oder jeder anderen
 Spalte, die kein Text ist, ergeben sie einen 400 `INVALID_FILTER_OPERATOR`.
 
-`isnull` und `notnull` ignorieren ihren Wert — der Operator ist die gesamte Bedingung,
-und alles nach dem Punkt wird verworfen. Das SDK schreibt `.null`, daher ist dies
-die Schreibweise, die Sie bei der Übertragung sehen werden.
+`isnull` und `notnull` nehmen keinen Operanden — der Operator ist die gesamte Bedingung, und
+`.null`, `.true`, `.false` oder nichts nach dem Punkt bedeuten alle dasselbe. Das SDK
+schreibt `.null`, daher ist dies die Schreibweise, die Sie bei der Übertragung sehen werden. Alles andere
+nach dem Punkt ist kein Operand, den sie haben, daher wird die ganze Zeichenfolge als
+Wert gelesen: `?reason=notnull.reason` trifft auf den Text `notnull.reason` zu.
 
 :::caution[`eq.null` ist die vier Zeichen lange Zeichenkette, nicht `IS NULL`]
 `?deleted_at=eq.null` sucht nach dem buchstäblichen Text `null`. SQL `= NULL` ist
@@ -144,7 +146,8 @@ verworfen: Das Verwerfen würde den Lesevorgang ungefiltert ausführen und alles
 was Row-Level Security zufällig erlaubt.
 
 ## Wie die Filter kombiniert werden
-`?field=op.value`, `?where=`, `?or=`/`?and=` und `?searchString=` sind unabhängig
+
+`?field=op.value`, `?where=`, `?or=`/`?and=`/`?not=` und `?searchString=` sind unabhängig
 voneinander, und jeder vorhandene Parameter muss zutreffen:
 
 ```text
@@ -152,6 +155,10 @@ voneinander, und jeder vorhandene Parameter muss zutreffen:
   AND (the logical group)
   AND (the search string)
 ```
+
+Die eine Ausnahme ist ein Feld, das sowohl in `?field=op.value` als auch in `where` genannt wird: Dort
+**ersetzt** der Query-Parameter die `where`-Bedingung auf diesem Feld, da er die spezifischere
+Anfrage ist, statt mit ihr per AND verknüpft zu werden.
 
 Es gibt keine Möglichkeit, diese untereinander mit OR zu verknüpfen. Alles, was
 kein einfaches AND dieser Gruppen ist, gehört in einen einzigen `or=`/`and=`-Baum.

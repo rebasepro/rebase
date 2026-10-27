@@ -1,5 +1,5 @@
 ---
-sourceHash: eeb3c8895a643633
+sourceHash: 63a92d4d1f06a612
 title: Índice de endpoints
 sidebar_label: Índice de endpoints
 description: Cada ruta HTTP que monta un backend de Rebase — datos, autenticación, almacenamiento, administración, meta — con el control de acceso de cada una y la página que la explica.
@@ -35,7 +35,6 @@ lista fija. `:slug` es el `slug` de una colección.
 
 | Método | Ruta | Gate | Más |
 |---|---|---|---|
-| `GET` | `/api/data/collections` | session | [API REST](/docs/backend/api/) |
 | `GET` | `/api/data/:slug` | RLS | [Consultas](/docs/backend/filtering/) |
 | `POST` | `/api/data/:slug` | RLS | [API REST](/docs/backend/api/) |
 | `POST` | `/api/data/:slug/query` | RLS | El listado, con los parámetros de consulta en el cuerpo — [Consultas demasiado largas para una URL](/docs/backend/vector-search/#queries-too-long-for-a-url) |
@@ -59,7 +58,7 @@ para que `aggregate` no se interprete como el id de una entidad. `?select=` y
 
 La búsqueda de texto, la búsqueda vectorial, la inclusión de relaciones y la
 selección de campos *son* parámetros de consulta en `GET /api/data/:slug` en
-lugar de rutas — `search`, `vector_search`, `include`, `fields`. Consulte
+lugar de rutas — `searchString`, `vector_search`, `include`, `fields`. Consulte
 [API REST](/docs/backend/api/).
 
 Un proyecto que no declara colecciones y no realiza introspección de ninguna
@@ -83,6 +82,8 @@ sirve este prefijo como un único `404 NO_COLLECTIONS`. Consulte
 | `POST` | `/api/auth/forgot-password` | none | [Autenticación](/docs/backend/authentication/) |
 | `POST` | `/api/auth/reset-password` | none (un token de restablecimiento) | [Autenticación](/docs/backend/authentication/) |
 | `POST` | `/api/auth/change-password` | session | [Autenticación](/docs/backend/authentication/) |
+| `POST` | `/api/auth/change-email` | session | Envía por correo un enlace de confirmación a la dirección nueva — [Cambiar una dirección de correo](/docs/backend/auth-endpoints/#changing-an-email-address) |
+| `POST` | `/api/auth/confirm-email-change` | none (un token de enlace) | Mueve la cuenta a la dirección nueva — [Cambiar una dirección de correo](/docs/backend/auth-endpoints/#changing-an-email-address) |
 | `POST` | `/api/auth/send-verification` | session | [Autenticación](/docs/backend/authentication/) |
 | `GET` | `/api/auth/verify-email` | none (un token de verificación) | [Autenticación](/docs/backend/authentication/) |
 | `POST` | `/api/auth/verify-email` | none (un token de verificación, y una sesión o la contraseña para conservarlo) | [Verificación de correo electrónico](/docs/backend/email-verification/) |
@@ -142,9 +143,13 @@ puede acceder a nada de esto. Consulte [Roles y alcances](/docs/backend/roles-an
 | `GET` | `/api/admin/backups` | `backups:read` | Inventario de copias de seguridad |
 | `GET` | `/api/admin/backups/download` | `backups:read` | Transmite en flujo una copia de seguridad. Con `?token=` de un enlace de descarga no hace falta cabecera, solo para esa copia |
 | `POST` | `/api/admin/backups/download-url` | `backups:read` | Un enlace a una copia de seguridad, `{ key }` → `{ url, token, expiresIn }`, válido durante 60 segundos — [Copias de seguridad](/docs/deployment/backups/#download-a-backup) |
-| `GET` | `/api/admin/storage/orphans` | `database:read` | Archivos almacenados que ninguna fila nombra, `?storageId=&olderThanHours=` — lo que imprime `rebase storage orphans` |
-| `DELETE` | `/api/admin/storage/orphans` | `database:write` | Los vuelve a buscar y los elimina; `409 STORAGE_SCAN_INCOMPLETE` cuando no se pudo leer una colección |
-| `POST` | `/api/admin/storage/move` | `database:write` | Copia una carpeta a otro origen con las mismas claves, una página por llamada — lo que envía `rebase storage move` |
+| `POST` | `/api/admin/storage/orphans/scans` | `database:write` | Inicia en segundo plano un análisis de los archivos almacenados que ninguna fila nombra, `?storageId=&olderThanHours=`. Responde `202` con el registro del análisis: `id`, `status` (`queued`) y `runner` (`worker` cuando es un trabajo `storage.orphans` en la cola de trabajos, `in-process` cuando lo ejecuta el propio servidor). Su registro se escribe en el origen, bajo el prefijo reservado `_rebase/maintenance/` |
+| `GET` | `/api/admin/storage/orphans/scans/:id` | `database:read` | El registro del análisis, `?storageId=`. Mientras se ejecuta: `progress` (`filesScanned`, `rowsScanned`, `collectionsScanned` de `collectionsTotal`, `unscanned`). Una vez `completed`: `result`, el informe que respondía el antiguo `GET /orphans`. Una ejecución que dejó de informar durante 10 minutos se responde como `failed`. `404 STORAGE_SCAN_NOT_FOUND` cuando el origen no contiene ese análisis |
+| `DELETE` | `/api/admin/storage/orphans?scan=:id` | `database:write` | Elimina en segundo plano los huérfanos de un análisis completado, `202`. Cada uno se comprueba de nuevo contra todas las filas y entradas de historial, y se vuelve a pedir justo antes de eliminarlo. El resultado es el `deletion` del registro del análisis. `409` con `STORAGE_SCAN_NOT_COMPLETE`, `STORAGE_SCAN_INCOMPLETE`, `STORAGE_SCAN_EXPIRED` o `STORAGE_SCAN_DELETION_STARTED` |
+| `GET` | `/api/admin/storage/orphans` | `database:read` | Obsoleto: el análisis dentro de la solicitud, `?storageId=&olderThanHours=`. Responde con `Deprecation: true`. Usa `POST /orphans/scans` |
+| `DELETE` | `/api/admin/storage/orphans` | `database:write` | Obsoleto, sin `?scan=`: vuelve a analizar y elimina dentro de la solicitud. `409 STORAGE_SCAN_INCOMPLETE` cuando no se pudo leer una colección |
+| `POST` | `/api/admin/storage/move` | `database:write` | Copia una carpeta a otro origen con las mismas claves, una página por llamada — lo que envía `rebase storage move`; `400 STORAGE_SAME_LOCATION` para `deleteSource` entre dos orígenes que almacenan en el mismo lugar |
+| `POST` | `/api/admin/storage/move/verify` | `database:write` | Vuelve a listar el origen tras un traslado, con el mismo cuerpo, una página por llamada: `{ checked, notMoved: [{ key, reason }], cursor? }` — cada archivo que sigue en el origen con `deleteSource`, cada archivo del que el destino no tiene copia sin él. `rebase storage move` lo consulta cuando termina el traslado |
 | `GET` | `/api/admin/logs` | `logs:read` | El búfer de registros recientes |
 | `GET` | `/api/admin/logs/latest` | `logs:read` | Las entradas más recientes |
 | `GET` | `/api/admin/logs/stream` | `logs:read` | Server-sent events |
@@ -152,7 +157,7 @@ puede acceder a nada de esto. Consulte [Roles y alcances](/docs/backend/roles-an
 | `GET` | `/api/admin/rls-simulator/options` | `schema:read` | Los roles, los roles que nombran las reglas y las claves de servicio vigentes que un administrador puede simular |
 | `POST` | `/api/admin/rls-simulator/preview` | `schema:read` | Cada colección tal como la alcanza `{ role?, userId?, apiKeyId? }`: filas visibles frente a las de quien llama, ocultas por alcance o por RLS, campos enmascarados. Solo la sesión de un administrador |
 | `POST` | `/api/admin/sql/csv` | `database:write` | Transmite en flujo el resultado completo de una consulta de solo lectura como CSV — «Descargar el resultado completo como CSV» de [Studio](/docs/studio/) |
-| `GET` | `/api/admin/branches/:name/diff` | `database:read` | Qué cambió una [rama](/docs/backend/branching/#reviewing-and-merging-a-branch): esquema, políticas y filas, `?sampleLimit=&schemas=&maxRowsPerTable=` |
+| `GET` | `/api/admin/branches/:name/diff` | `database:write` | Qué cambió una [rama](/docs/backend/branching/#reviewing-and-merging-a-branch): esquema, políticas y filas, `?sampleLimit=&schemas=&maxRowsPerTable=` |
 | `POST` | `/api/admin/branches/:name/merge` | `database:write` | Escribe las filas de la rama en su padre, `{ expectedFingerprint, onConflict?, skipBlocked? }`; `409` si algún lado cambió desde el diff, o si hay filas en conflicto |
 | `GET` | `/api/admin/schema/status` | `schema:read` | [Edición de esquema en vivo](/docs/backend/live-schema-editing/) |
 | `POST` | `/api/admin/schema/plan` | `schema:read` | Planifica un cambio; nunca lo aplica |
@@ -190,17 +195,20 @@ a la ruta canónica.
 
 Un despliegue sin almacenamiento configurado responde en este prefijo con un error
 `501` indicando la variable que necesita, en lugar de responder con un 404 como si
-la funcionalidad no existiera.
+la funcionalidad no existiera —
+excepto `GET /api/storage/sources`, que responde `200` con una lista vacía.
 
 ## Funciones
 
 | Método | Ruta | Gate | Más |
 |---|---|---|---|
+| `GET` | `/api/functions` | session | Los nombres de las funciones servidas y cuántos archivos fallaron al cargarse |
 | cualquiera | `/api/functions/<name>` | lo que declare la función. Una clave de API también necesita `functions:invoke` | [Funciones personalizadas](/docs/backend/custom-functions/) |
 
 Una ruta por archivo bajo `backend/functions/`, por lo que las rutas provienen de
-su proyecto. `GET /api/functions` **no** las lista: el inventario de endpoints
-personalizados de un despliegue no es público.
+su proyecto. `GET /api/functions` las lista solo para un emisor con sesión iniciada —
+una sesión, una clave de API o la service key— y responde `401` a cualquier otro: el
+inventario de endpoints personalizados de un despliegue no es público.
 
 ## Meta y operaciones
 
@@ -208,9 +216,9 @@ personalizados de un despliegue no es público.
 |---|---|---|---|
 | `GET` | `/livez` | none | Solo actividad (liveness): si este proceso se está ejecutando. No interactúa con la base de datos, razón por la cual es la ruta de sondeo que debe usar un contenedor — `RUNTIME_LIVENESS_PATH` |
 | `GET` | `/health`, `/api/health` | none | Actividad (liveness) y disponibilidad (readiness). Informa sobre cada fuente de datos configurada, no solo la predeterminada |
-| `GET` | `/api/docs` | none (`schema:read` en producción) | El documento de OpenAPI 3.0 |
-| `GET` | `/api/swagger` | none | Swagger UI. Solo en desarrollo a menos que `REBASE_ENABLE_SWAGGER` |
-| `GET` | `/api/meta/schema-version` | none | El hash del esquema a partir del cual se compiló este backend, y nada más |
+| `GET` | `/api/docs` | none (`schema:read` cuando `enableSwagger` es `false`, el valor predeterminado del runtime en producción) | El documento de OpenAPI 3.0 |
+| `GET` | `/api/swagger` | none | Swagger UI. Solo fuera de producción; `REBASE_ENABLE_SWAGGER` no puede activarlo en producción |
+| `GET` | `/api/meta/schema-version` | none | El hash del esquema a partir del cual se compiló este backend y la versión del runtime, y nada más |
 | `GET` | `/api/meta/contract` | `schema:read` | El contrato completo de la colección, para `rebase generate-sdk --from`. `404` cuando no hay autenticación configurada |
 | `GET` | `/metrics` | `REBASE_METRICS_TOKEN` cuando esté configurado | Métricas de Prometheus, cuando `REBASE_METRICS=true` |
 | `GET` | `/metrics/history` | `REBASE_METRICS_TOKEN` cuando esté configurado | Las series registradas detrás de los gráficos de Studio. `501` en un entorno de ejecución sin backend |

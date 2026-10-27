@@ -55,6 +55,7 @@ export const authorsCollection = defineCollection({
     }
 });
 
+export default authorsCollection;
 ```
 
 ### Categories
@@ -93,12 +94,15 @@ export const categoriesCollection = defineCollection({
     }
 });
 
+export default categoriesCollection;
 ```
 
 ### Articles
 
 ```typescript
 import { defineCollection } from "@rebasepro/cms-types";
+import authorsCollection from "./authors";
+import categoriesCollection from "./categories";
 // The row shape, so callbacks below see typed `values` instead of `unknown`.
 type Article = {
     title: string;
@@ -214,11 +218,14 @@ export const articlesCollection = defineCollection({
     }
 });
 
+export default articlesCollection;
 ```
 
 ## Setup
 
-1. Save the three files in `config/collections/`. Add them to the `collections`
+1. Save the three files in `config/collections/` — `authors.ts`, `categories.ts`
+   and `articles.ts`; each one must default-export its collection, or boot
+   refuses the directory. Add them to the `collections`
    array in `config/collections/index.ts` to choose where they appear in the
    navigation — every file in the directory is loaded either way.
 2. With `rebase dev` running, that is all: saving regenerates the schema,

@@ -1,5 +1,5 @@
 ---
-sourceHash: db02ecc36f64f46c
+sourceHash: af7e2ab87a0b3b4f
 title: Benutzerdefinierte Felder
 sidebar_label: Benutzerdefinierte Felder
 description: Erstellen Sie benutzerdefinierte Formularfelder für die Entitätsbearbeitung mit vollem Zugriff auf den Formular-Kontext, Entitätswerte und Rebase-Hooks.
@@ -47,7 +47,7 @@ function ColorPickerField({ value, setValue, error, showError }: FieldProps<Stri
 | `property` | `Property` | Die Eigenschaftskonfiguration |
 | `context` | `FormContext` | Voller Formular-Kontext mit allen Entitätswerten |
 | `disabled` | `boolean` | Feld ist schreibgeschützt |
-| `tableMode` | `boolean` | Rendern innerhalb der Tabelle (kompakter Modus) |
+| `minimalistView` | `boolean` | Rendern im Popup-Zelleneditor der Tabelle (kompakter Modus) |
 
 ## Registrieren eines benutzerdefinierten Feldes
 
@@ -80,8 +80,8 @@ properties: {
         type: "string",
         name: "Brand Color",
         admin: {
-            Field: () => import("../../../frontend/src/ColorPickerField"),
-            Preview: () => import("../../../frontend/src/ColorPreview")
+            Field: () => import("../../frontend/src/ColorPickerField"),
+            Preview: () => import("../../frontend/src/ColorPreview")
         }
     }
 }
@@ -145,12 +145,12 @@ function PriceWithTaxField({ value, setValue, context }: FieldProps<NumberProper
 
 ## Tabellenmodus
 
-Beim Rendern in der Tabellenansicht sollten Felder kompakt sein. Überprüfen Sie `tableMode`:
+Ein benutzerdefiniertes Feld wird nicht innerhalb einer Tabellenzelle gezeichnet: Die Zelle zeigt den Wert (oder Ihre `Preview`), und beim Bearbeiten öffnet sich das Feld in einem Popup, in dem `minimalistView` gesetzt ist. Halten Sie es dort kompakt:
 
 ```tsx
 function MyField({ value, setValue, minimalistView }: FieldProps<StringProperty>) {
     if (minimalistView) {
-        return <span onClick={() => { /* open editor */ }}>{value}</span>;
+        return <input value={value ?? ""} onChange={(e) => setValue(e.target.value)}/>;
     }
 
     return (
@@ -180,7 +180,7 @@ function ColorPreview({ value }: { value: string }) {
     );
 }
 
-// Registrieren Sie es
+// Register it
 properties: {
     color: {
         type: "string",

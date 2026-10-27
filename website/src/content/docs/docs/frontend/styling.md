@@ -39,7 +39,7 @@ export function DashboardView() {
 }
 ```
 
-Every component in the kit is catalogued under [UI components](/docs/ui/components/card/) with its real props, generated from the source. Check there before hand-rolling: `Card`, `Chip`, `Badge`, `Alert`, `Button`, `Typography`, `Paper`, `Container`, `Table`, `Tooltip`, `Dialog` and about forty more already exist.
+Every component in the kit is catalogued under [UI components](/docs/ui/components/card/) with its real props, generated from the source. Check there before hand-rolling: `Card`, `Chip`, `Badge`, `Alert`, `Button`, `Typography`, `Paper`, `Container`, `Table`, `Tooltip`, `Dialog` and about seventy more already exist.
 
 ## Colour: use tokens, never literals
 
@@ -60,9 +60,9 @@ Two rules that come from real breakage:
 
 ## Type: use the scale
 
-`Typography` carries the whole scale — `h1`–`h6`, `subtitle1`/`subtitle2`, `body1`/`body2`, `caption`, `label`. Use `variant`, not a font-size class. The scale already encodes the tracking each tier needs (`--tracking-display` at ≥30px, `--tracking-title` at 20–24px, `--tracking-heading` below that), which a `text-[27px]` does not.
+`Typography` carries the whole scale — `h1`–`h6`, `subtitle1`/`subtitle2`, `body1`/`body2`, `lead`, `caption`, `label`, `button`, `stat`, `micro`, `mono`. Use `variant`, not a font-size class. The scale already encodes the tracking each tier needs (`--tracking-display` at ≥30px, `--tracking-title` at 20–24px, `--tracking-heading` below that), which a `text-[27px]` does not.
 
-Product UI does not go below `text-xs`. The `text-2xs` and `text-3xs` tiers exist for marketing pages only.
+Product UI does not go below `text-xs`, with one exception: the `micro` variant, the uppercase label above a value, sits on `text-2xs`. The `text-3xs` tier exists for marketing pages only.
 
 ## Setup
 

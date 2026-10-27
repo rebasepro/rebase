@@ -22,7 +22,7 @@ Rebase ships a complete, built-in authentication system with JWT sessions, OAuth
 - [Rate Limiting](#rate-limiting)
 - [Custom Auth Adapters](#custom-auth-adapters)
 - [Roles & Scopes](#roles--scopes)
-- [Backend Hooks](#backend-hooks)
+- [Auth hooks](#auth-hooks-authhooks)
 - [Email Configuration](#email-configuration)
 - [Security Concepts](#security-concepts)
 - [References](#references)
@@ -151,7 +151,7 @@ const membersCollection: PostgresCollectionConfig = {
 
 When custom hooks (`onCreateUser`, `onResetPassword`) are called, they receive an `AuthCollectionContext` facade containing:
 - `hashPassword(password: string): Promise<string>` — Hash password using the configured hashing algorithm (e.g. scrypt).
-- `sendEmail?: (options) => Promise<void>` — Send an email (only available when email service is configured).
+- `sendEmail?: (options) => Promise<EmailSendResult>` — Send an email (only available when email service is configured).
 - `emailConfigured: boolean` — Whether email service is configured.
 - `appName: string` — The app name from email config.
 - `resetPasswordUrl: string` — The password reset link base URL.
@@ -231,12 +231,12 @@ When an OAuth user signs in via `POST /api/auth/{provider}`:
 
 1. If an identity record exists for `(provider, providerId)` → log in that user. The email is not consulted.
 2. If no identity exists but a user with the same email exists:
-   - **The provider asserted `emailVerified: true` and the account's own email is verified** → **link** the provider to the existing account and log in as that user. One account, two sign-in methods.
-   - **Either side is unverified** → reject with `403 EMAIL_NOT_VERIFIED`. Nothing is created or modified. `details.reason` is `provider-email-unverified`, `local-account-unverified` (the account has a password) or `local-account-unverified-passwordless`.
+   - **The provider asserted `emailVerified: true`** → **link** the provider to the existing account and log in as that user. One account, two sign-in methods. If the account's own email was not verified, this sign-in proves the address and verifies it, after removing the password and every identity whose provider did not verify the address and ending every session (the pre-hijack defence).
+   - **The provider did not assert it** → reject with `403 EMAIL_NOT_VERIFIED`. Nothing is created or modified. `details.reason` is `provider-email-unverified`.
 3. If neither exists → create a new user (verified if the provider verified the email), link the identity, assign `defaultRole`.
 
-A magic link, an email code or a password reset proves the address and verifies
-the account. On an unverified account, the first such proof removes the password
+A provider that verified the address, a magic link, an email code or a password
+reset proves the address and verifies the account. On an unverified account, the first such proof removes the password
 (a reset sets the new one) and every linked identity whose provider did not
 verify that address, and ends every session, before it marks the account
 verified — so whoever made an account for someone else's address keeps no way in. Accounts created with
@@ -245,8 +245,8 @@ verified — so whoever made an account for someone else's address keeps no way 
 
 > **IMPORTANT FOR AGENTS:** A second account is **never** silently created for
 > an email that already exists. If asked "does signing in with Google create a
-> duplicate user?", the answer is no — it either links (both sides verified) or
-> errors (either unverified). This is **not configurable**; there is deliberately no option to
+> duplicate user?", the answer is no — it either links (the provider verified
+> the email) or errors (it did not). This is **not configurable**; there is deliberately no option to
 > auto-link on unverified emails, because that would let anyone who can make a
 > provider emit an address they don't own take over the matching account.
 > Google always asserts `email_verified` for real Google accounts, so linking
@@ -332,10 +332,13 @@ The `AuthHooks` interface lets you customize specific behaviors of the built-in 
 | `onPasswordReset` | `(userId: string) => Promise<void>` | — | Called after successful password reset. Fire-and-forget. |
 | `beforeUserDelete` | `(userId: string) => Promise<void>` | — | Throw to prevent deletion. |
 | `afterUserDelete` | `(userId: string) => Promise<void>` | — | Post-deletion cleanup. Fire-and-forget. |
+| `beforeEmailChange` | `(user: UserData, newEmail: string) => Promise<void>` | — | Before `POST /auth/change-email` mails anything. Throw to refuse (`400 HOOK_REJECTED`). |
+| `onAdminCreateUser` | `(values, ctx) => Promise<{ values, temporaryPassword?, invitationSent? }>` | Built-in password + invitation | Replaces how an administrator's `POST /admin/users` creates the account. A collection's `auth.onCreateUser` takes precedence. |
+| `onAdminResetPassword` | `(uid, ctx) => Promise<{ temporaryPassword?, invitationSent? }>` | Built-in reset email | Replaces an administrator's password reset. A returned `temporaryPassword` becomes the password. |
 
 ### AuthMethod Values
 
-`"login"` | `"register"` | `"oauth"` | `"refresh"` | `"password-reset"` | `"anonymous"` | `"magic-link"` | `"mfa"`
+`"login"` | `"register"` | `"oauth"` | `"refresh"` | `"password-reset"` | `"anonymous"` | `"magic-link"` | `"otp"` | `"mfa"`
 
 ### AuthResponsePayload
 
@@ -346,6 +349,9 @@ interface AuthResponsePayload {
     email: string;
     displayName: string | null;
     photoURL: string | null;
+    providerId?: string;
+    isAnonymous?: boolean;
+    emailVerified?: boolean;
     roles: string[];
     metadata: Record<string, unknown>;
   };
@@ -364,7 +370,7 @@ interface AuthResponsePayload {
 interface TransformAuthResponseContext {
   /** The authenticated user's ID. */
   uid: string;
-  method: "login" | "register" | "oauth" | "refresh" | "anonymous" | "magic-link" | "mfa";
+  method: "login" | "register" | "oauth" | "refresh" | "anonymous" | "magic-link" | "otp" | "mfa";
   request: Request;
 }
 ```
@@ -457,19 +463,20 @@ Rebase supports Multi-Factor Authentication via TOTP (Time-based One-Time Passwo
 
 ### MFA Flow
 
-1. **Enroll** — `POST /api/auth/mfa/enroll` returns a TOTP secret, URI (for QR), and 10 recovery codes.
+1. **Enroll** — `POST /api/auth/mfa/enroll` returns a TOTP secret, URI (for QR), and — with the account's first factor only — 10 recovery codes.
 2. **Verify enrollment** — `POST /api/auth/mfa/verify` with a 6-digit TOTP code to confirm the factor.
-3. **Challenge on login** — After normal login (aal1), call `POST /api/auth/mfa/challenge` to create a challenge.
-4. **Complete challenge** — `POST /api/auth/mfa/challenge/verify` with TOTP or recovery code. Upgrades token from `aal1` → `aal2`.
+3. **Challenge on login** — Once an account has a verified factor, a sign-in (password, OAuth, magic link, OTP, …) issues **no session**: it answers `401 MFA_REQUIRED` with `details.mfaToken` and `details.factors`. Call `POST /api/auth/mfa/challenge` with `Authorization: Bearer <mfaToken>` (or a live session, to step it up).
+4. **Complete challenge** — `POST /api/auth/mfa/challenge/verify` with TOTP or recovery code, same bearer. Returns the session's tokens at `aal2`.
 
 ### MFA Endpoints
 
 | Method | Endpoint | Auth | Description |
 |---|---|---|---|
-| `POST` | `/api/auth/mfa/enroll` | Required | Start enrollment. Returns `{ factor, totp: { secret, uri, qrUri }, recoveryCodes }`. |
+| `POST` | `/api/auth/mfa/enroll` | Required | Start enrollment. Returns `{ factor, totp: { secret, uri, qrUri }, recoveryCodes }` (`201`); `recoveryCodes` is `null` once the account already has a verified factor. |
 | `POST` | `/api/auth/mfa/verify` | Required | Verify enrollment with `{ factorId, code }` (6-digit TOTP). |
-| `POST` | `/api/auth/mfa/challenge` | Required | Create challenge with `{ factorId }`. Returns `{ challengeId, factorId, expiresAt }`. Challenge expires in 5 minutes. |
-| `POST` | `/api/auth/mfa/challenge/verify` | Required | Complete challenge with `{ challengeId, code }`. Returns new tokens with `aal2`. Accepts TOTP (6 digits) or recovery code (>6 chars). |
+| `POST` | `/api/auth/mfa/recovery-codes` | `aal2` session | Replace the recovery codes with ten new ones. |
+| `POST` | `/api/auth/mfa/challenge` | `mfaToken` or session | Create challenge with `{ factorId }`. Returns `{ challengeId, factorId, expiresAt }`. Challenge expires in 5 minutes. |
+| `POST` | `/api/auth/mfa/challenge/verify` | `mfaToken` or session | Complete challenge with `{ challengeId, code }`. Returns new tokens with `aal2`. Accepts TOTP (6 digits) or recovery code (>6 chars). |
 | `GET` | `/api/auth/mfa/factors` | Required | List enrolled factors: `{ factors: [{ id, factorType, friendlyName, verified, createdAt }] }`. |
 | `DELETE` | `/api/auth/mfa/unenroll` | Required | Remove factor with `{ factorId }` in body. Auto-cleans recovery codes when no verified factors remain. |
 
@@ -573,7 +580,7 @@ interface CreateApiKeyRequest {
   name: string;
   scopes: string[];              // at least one, e.g. ["data:read:orders", "cron:write"]
   roles?: string[];              // RLS roles beside "service", e.g. ["admin"]
-  rate_limit?: number | null;    // requests per 15-min window; null = server default (1000)
+  rate_limit?: number | null;    // requests per rate-limit window (15 min by default); null = server default (1000)
   expires_at?: string | null;    // ISO-8601; omit for no expiry
 }
 
@@ -641,7 +648,7 @@ The same key works on REST data, storage, functions, the admin surfaces its scop
 
 1. The token is SHA-256 hashed and looked up in `rebase.api_keys`; expiry and revocation are checked.
 2. A service key becomes `{ uid: "api-key:<id>", roles: ["service", ...key.roles] }`; a personal key becomes its owner, with the owner's roles read from the database now.
-3. The key's scopes go on the request (`c.get("scopes")`) and are checked by every route: data by HTTP method (`GET` → `read`, `POST`/`PUT`/`PATCH` → `write`, `DELETE` → `delete`; `POST /bulk/delete` is a delete); on a nested path the target collection needs the operation and each parent `data:read`.
+3. The key's scopes go on the request (`c.get("scopes")`) and are checked by every route: data by HTTP method (`GET` → `read`, `POST`/`PUT`/`PATCH` → `write`, `DELETE` → `delete`; `POST /bulk/delete` is a delete, `POST /query` and `POST /count` are reads); on a nested path the target collection needs the operation and each parent `data:read`.
 4. The DataDriver is scoped with `withAuth()` to that identity. This does **not** bypass RLS — statements run as `rebase_user` with `app.uid` set, and your policies are evaluated.
 5. Per-key rate limiting applies (`rate_limit`, else the server's API-key default).
 
@@ -682,10 +689,10 @@ All auth endpoints are mounted under `/api/auth`. Admin endpoints are under `/ap
 | `POST` | `/auth/{providerId}` | default | No | OAuth sign-in. Body varies by provider. |
 | `POST` | `/auth/refresh` | — | No | Refresh access token. Body: `{ refreshToken }`. Rotates refresh token. |
 | `POST` | `/auth/logout` | — | No | Invalidate refresh token. Body: `{ refreshToken? }`. |
-| `POST` | `/auth/anonymous` | strict (50/15min) | No | Create anonymous user with temp credentials. |
+| `POST` | `/auth/anonymous` | strict (50/15min) | No | Create anonymous user with temp credentials. Off unless `allowAnonymous: true` (`403 ANONYMOUS_AUTH_DISABLED` otherwise). |
 | `POST` | `/auth/forgot-password` | strict | No | Request password reset email. Body: `{ email }`. Always returns success (security). |
 | `POST` | `/auth/reset-password` | strict | No | Reset password with token. Body: `{ token, password }`. Invalidates all sessions. |
-| `GET` | `/auth/verify-email` | — | No | Verify email. Query: `?token=<token>`. |
+| `GET` | `/auth/verify-email` | strict | No | Verify email. Query: `?token=<token>`. (`POST /auth/verify-email` takes `{ token }` in the body.) |
 | `GET` | `/auth/config` | default | No | Get auth capabilities for frontend: `{ needsSetup, registrationEnabled, passwordReset, emailVerification, magicLink, anonymousLogin, enabledProviders, … }`. |
 
 ### Authenticated Endpoints
@@ -751,7 +758,7 @@ All login/register/OAuth endpoints return:
 | Code | HTTP | Description |
 |---|---|---|
 | `INVALID_CREDENTIALS` | 401 | Wrong email/password. |
-| `INVALID_TOKEN` | 401 | Invalid or expired refresh/reset token. |
+| `INVALID_TOKEN` | 401 / 400 | Unknown refresh token (401); invalid or expired reset, verification or magic-link token (400). |
 | `TOKEN_EXPIRED` | 401 | Refresh token has expired. |
 | `REGISTRATION_DISABLED` | 403 | `allowRegistration` is `false`. |
 | `EMAIL_EXISTS` | 409 | Email already registered. |
@@ -779,6 +786,7 @@ The client SDK's `auth` module is created via `createAuth(transport, options?)`.
 | `authPath` | `string` | `"/auth"` | Base path for auth endpoints. |
 | `autoRefresh` | `boolean` | `true` | Auto-refresh access tokens 2 minutes before expiry. |
 | `persistSession` | `boolean` | `true` | Persist session to storage between page loads. |
+| `authFlowMode` | `"json" \| "cookie"` | `"json"` | `"cookie"`: the refresh token travels in an httpOnly cookie and the session's `refreshToken` is `""`. |
 
 ### Client SDK Methods
 
@@ -896,7 +904,7 @@ On initialization (when `persistSession` is `true`):
 1. Load stored session from storage.
 2. If access token is still valid → restore session and schedule refresh.
 3. If access token is expired but refresh token exists → immediately attempt refresh.
-4. If refresh fails → clear session and emit `SIGNED_OUT`.
+4. If the server refuses the refresh token → clear the session. If it cannot be reached (offline, restarting) → keep the session and retry on the backoff schedule.
 
 ---
 
@@ -915,14 +923,14 @@ or an API key can see; the answers are not the same as an end user's.
 
 ## Rate Limiting
 
-Rebase uses an in-memory sliding-window rate limiter with IP-based keying.
+Rebase uses a sliding-window rate limiter. The auth limiters below key by IP (a few also by recipient address or user); the data limiter keys by API key, then user, then IP. Counts live in process memory unless `rateLimit.store` is set or `REBASE_RATE_LIMIT_STORE=sql`.
 
 ### Pre-configured Limiters
 
 | Limiter | Window | Limit | Applied To |
 |---|---|---|---|
-| `defaultAuthLimiter` | 15 minutes | 200 requests | `/auth/register`, `/auth/login`, `/auth/{provider}`, `/auth/config` |
-| `strictAuthLimiter` | 15 minutes | 50 requests | `/auth/forgot-password`, `/auth/reset-password`, `/auth/anonymous` |
+| `defaultAuthLimiter` | 15 minutes | 200 requests | `/auth/register`, `/auth/login`, `/auth/{provider}`, `/auth/link/{provider}`, `/auth/find-user`, `/auth/config` |
+| `strictAuthLimiter` | 15 minutes | 50 requests | `/auth/forgot-password`, `/auth/reset-password`, `/auth/verify-email`, `/auth/send-verification`, `/auth/anonymous`, `/auth/anonymous/link`, `/auth/magic-link*`, `/auth/otp*`, `/auth/change-email`, `/auth/mfa/*` |
 
 ### Rate Limit Response Headers
 
@@ -932,12 +940,12 @@ All rate-limited endpoints include:
 |---|---|
 | `X-RateLimit-Limit` | Maximum requests in the window. |
 | `X-RateLimit-Remaining` | Remaining requests in current window. |
-| `X-RateLimit-Reset` | Unix timestamp (seconds) when the window resets. |
+| `X-RateLimit-Reset` | Unix timestamp (seconds) when the client may retry (only on 429). |
 | `Retry-After` | Seconds until the client can retry (only on 429). |
 
 ### API Key Rate Limiting
 
-API keys have their own per-key rate limiter. The `rate_limit` on each key specifies requests per 15-minute window. When `rate_limit` is `null`, a default of 1000 requests per 15 minutes is applied.
+API keys have their own per-key rate limiter. The `rate_limit` on each key specifies requests per rate-limit window (`rateLimit.windowMs`, 15 minutes by default). When `rate_limit` is `null`, `rateLimit.apiKey` applies — 1000 by default.
 
 ### Rate Limit Error Response
 
@@ -961,9 +969,9 @@ const backend = await initializeRebaseBackend({
     // ... server, app, database, auth
     rateLimit: {
         windowMs: 60 * 1000,   // the window every count below is measured in
-        user: 1000,            // per signed-in user
-        apiKey: 1000,          // fallback for a key with no `rate_limit` of its own
-        anonymous: 100,        // per IP for unauthenticated callers; null disables
+        user: 1000,            // per signed-in user (default 1000)
+        apiKey: 1000,          // fallback for a key with no `rate_limit` of its own (default 1000)
+        anonymous: 100,        // per IP for unauthenticated callers (default 300); null disables
         // enabled: false      // for a deployment whose proxy already rate-limits
         // store: myStore      // share counts across replicas (defaults to this process)
     }
@@ -984,9 +992,10 @@ interface AuthAdapter {
   readonly id: string;
   verifyRequest(request: Request): Promise<AuthenticatedUser | null>;
   verifyToken?(token: string): Promise<AuthenticatedUser | null>;
+  resolveUser?(uid: string): Promise<AuthenticatedUser | null>;
   userManagement?: UserManagementAdapter;
-  createAuthRoutes?(): Hono<any> | undefined;
-  createAdminRoutes?(): Hono<any> | undefined;
+  createAuthRoutes?(): MountableRouter | undefined;
+  createAdminRoutes?(): MountableRouter | undefined;
   getCapabilities(): AuthAdapterCapabilities | Promise<AuthAdapterCapabilities>;
   initialize?(): Promise<void>;
   destroy?(): Promise<void>;
@@ -1001,8 +1010,10 @@ interface AuthenticatedUser {
   photoUrl?: string | null;
   roles: string[];
   isAdmin: boolean;
+  isAnonymous?: boolean;
   rawToken?: string;
   claims?: Record<string, unknown>;
+  scopes?: string[];
 }
 ```
 
@@ -1126,6 +1137,7 @@ interface AuthAdapterCapabilities {
   profileUpdate: boolean;
   emailVerification: boolean;
   magicLink: boolean;
+  emailOtp?: boolean;               // six-digit email sign-in codes (POST /auth/otp)
   anonymousLogin: boolean;          // POST /auth/anonymous is open
   enabledProviders: string[];       // e.g. ["google", "github"]
   externalLoginUrl?: string;        // Redirect URL for external auth
@@ -1261,11 +1273,12 @@ A role nobody declares (e.g. `editor`) holds no admin-plane scope but still mean
 | `transformAuthResponse` | — | Reshape the JSON an auth route returns |
 | `onPasswordReset` | `(uid) => Promise<void>` | Fires after a reset completes |
 | `beforeUserDelete` / `afterUserDelete` | `(uid) => Promise<void>` | Throw in `before` to prevent deletion |
-| `onAdminCreateUser` | — | Fires when an administrator creates a user |
-| `onAdminResetPassword` | — | Fires when an administrator resets a password |
+| `beforeEmailChange` | `(user, newEmail) => Promise<void>` | Throw to refuse an address change |
+| `onAdminCreateUser` | `(values, ctx) => Promise<{ values, … }>` | Replaces how an administrator creates a user |
+| `onAdminResetPassword` | `(uid, ctx) => Promise<{ temporaryPassword?, … }>` | Replaces an administrator's password reset |
 
 `AuthMethod` is `"login" | "register" | "oauth" | "refresh" | "password-reset" |
-"anonymous" | "magic-link" | "mfa"`.
+"anonymous" | "magic-link" | "otp" | "mfa"`.
 
 ```typescript no-verify
 await initializeRebaseBackend({
@@ -1315,9 +1328,9 @@ Email is required for password reset, email verification, and welcome emails. Co
 |---|---|---|---|
 | `from` | `string` | Yes | Sender address (e.g. `"MyApp <noreply@myapp.com>"`). |
 | `smtp` | `SMTPConfig` | One of `smtp` or `sendEmail` | SMTP server configuration. |
-| `sendEmail` | `(options) => Promise<void>` | One of `smtp` or `sendEmail` | Custom email sending function (e.g. AWS SES, Resend SDK). |
-| `resetPasswordUrl` | `string` | No | Base URL for reset links: `{url}/reset-password?token=xxx`. |
-| `verifyEmailUrl` | `string` | No | Base URL for verification links: `{url}/verify-email?token=xxx`. |
+| `sendEmail` | `(options) => Promise<EmailSendResult \| void>` | One of `smtp` or `sendEmail` | Custom email sending function (e.g. AWS SES, Resend SDK). |
+| `resetPasswordUrl` | `string` | Yes, in effect | Absolute base URL for reset links: `{url}/reset-password?token=xxx`. The other link bases fall back to it, so boot refuses email configured without it (or with a relative URL). |
+| `verifyEmailUrl` | `string` | No | Base URL for verification links: `{url}/verify-email?token=xxx`. Falls back to `resetPasswordUrl`. |
 | `appName` | `string` | No | App name in email templates. Defaults to `"Rebase"`. |
 | `templates` | Object | No | Custom template functions (see below). |
 
@@ -1330,6 +1343,8 @@ interface SMTPConfig {
   secure?: boolean;
   auth?: { user: string; pass: string };
   name?: string;
+  maxConnections?: number;   // default 5
+  timeoutMs?: number;        // default 30000
 }
 ```
 
@@ -1360,6 +1375,8 @@ email: {
   },
 }
 ```
+
+`user.displayName` is user input. In real templates build the HTML with the `html` tagged template from `@rebasepro/server`, which escapes every interpolation, rather than a plain template literal as above. `magicLink`, `emailOtp`, `emailChange` and `emailChangeNotice` templates exist too.
 
 ### Custom Email Provider (Non-SMTP)
 
@@ -1426,7 +1443,7 @@ All auth endpoints validate input with Zod schemas:
 | `password` | Min 1 char, max 128 chars (the request shape only: register, reset and change also apply the password policy, 8+ chars with upper, lower and digit, and answer `400 WEAK_PASSWORD`) |
 | `displayName` | Max 255 chars |
 | `photoURL` | Valid URL, max 2048 chars |
-| `refreshToken` | Min 1 char |
+| `refreshToken` | Optional string (under `cookieAuth` it comes from the cookie); none presented → `401 NO_SESSION` |
 
 ---
 
@@ -1445,4 +1462,4 @@ All auth endpoints validate input with Zod schemas:
 - Source: `packages/server/src/email/types.ts` — Email configuration
 - Source: `packages/types/src/types/scopes.ts` — the scope vocabulary, `scopesForRoles`, `scopeGrants`
 - Source: `packages/server/src/auth/access.ts` — `requireScope`, the access model, the "never more than the caller" checks
-- **Reserved Identities**: `"service"` / `"anon"` / `"api-key:{id}"` — see [Row-Level Security > Reserved System Identities](#reserved-system-identities)
+- **Reserved Identities**: `"service"` / `"anonymous"` / `"api-key:{id}"` — see `references/rls-scoping.md` (Reserved System Identities)

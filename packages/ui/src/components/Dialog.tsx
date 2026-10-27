@@ -13,10 +13,16 @@ export type DialogProps = {
     children: React.ReactNode;
     className?: string;
     containerClassName?: string;
+    /**
+     * Size the paper to most of the viewport's width (`w-11/12`), capped at
+     * `maxWidth`. On by default. Off, the paper takes `maxWidth`'s width, still
+     * capped at that share of the viewport, so it never runs off a phone.
+     */
     fullWidth?: boolean;
     fullHeight?: boolean;
     fullScreen?: boolean;
     scrollable?: boolean;
+    /** The widest the paper gets (default `"lg"`). Ignored when `fullScreen`. */
     maxWidth?: keyof typeof widthClasses;
     modal?: boolean;
     onOpenAutoFocus?: (e: Event) => void;
@@ -52,19 +58,26 @@ export type DialogProps = {
     "aria-describedby"?: string;
 };
 
+/**
+ * Each size as the paper's cap (`max`) and as its width when it does not fill
+ * a share of the viewport (`width`). The two are never applied together with
+ * another width: the class merge keeps the last of two widths, and that is how
+ * `w-lg` used to drop `w-11/12` and make every default dialog 512px wide on a
+ * 375px phone.
+ */
 const widthClasses = {
-    xs: "max-w-xs w-xs",
-    sm: "max-w-sm w-sm",
-    md: "max-w-md w-md",
-    lg: "max-w-lg w-lg",
-    xl: "max-w-xl w-xl",
-    "2xl": "max-w-2xl w-2xl",
-    "3xl": "max-w-3xl w-3xl",
-    "4xl": "max-w-4xl w-4xl",
-    "5xl": "max-w-5xl w-5xl",
-    "6xl": "max-w-6xl w-6xl",
-    "7xl": "max-w-7xl w-7xl",
-    full: "max-w-full w-full"
+    xs: { max: "max-w-xs", width: "w-xs" },
+    sm: { max: "max-w-sm", width: "w-sm" },
+    md: { max: "max-w-md", width: "w-md" },
+    lg: { max: "max-w-lg", width: "w-lg" },
+    xl: { max: "max-w-xl", width: "w-xl" },
+    "2xl": { max: "max-w-2xl", width: "w-2xl" },
+    "3xl": { max: "max-w-3xl", width: "w-3xl" },
+    "4xl": { max: "max-w-4xl", width: "w-4xl" },
+    "5xl": { max: "max-w-5xl", width: "w-5xl" },
+    "6xl": { max: "max-w-6xl", width: "w-6xl" },
+    "7xl": { max: "max-w-7xl", width: "w-7xl" },
+    full: { max: "max-w-full", width: "w-full" }
 };
 
 export const Dialog = ({
@@ -186,10 +199,16 @@ export const Dialog = ({
                             // Focused on open so a screen reader announces it; it is
                             // a container, not a control, so it draws no ring.
                             focusedDisabled,
+                            // Never wider than the screen: a share of the viewport
+                            // capped at `maxWidth`, or `maxWidth`'s width capped at
+                            // that share.
                             fullWidth && !fullScreen ? "w-11/12" : undefined,
                             fullHeight && !fullScreen ? "h-[90vh]" : undefined,
                             fullScreen ? "h-screen w-screen" : undefined,
-                            maxWidth && !fullScreen ? widthClasses[maxWidth] : undefined
+                            maxWidth && !fullScreen
+                                ? (fullWidth ? widthClasses[maxWidth].max : [widthClasses[maxWidth].width, "max-w-11/12"])
+                                : undefined,
+                            !maxWidth && !fullWidth && !fullScreen ? "max-w-11/12" : undefined
                         )}
                     >
                         <div

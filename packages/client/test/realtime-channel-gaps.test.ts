@@ -102,6 +102,36 @@ describe("gaps on a retained channel", () => {
         expect(received.map((e) => e.seq)).toEqual([1, 2, 4]);
     });
 
+    it("after a reconnect, its own message from the previous socket is not replayed back to it", async () => {
+        // The ack for a broadcast sent just before the socket dropped was
+        // lost; the catch-up on the new socket replays it from history under
+        // the old socket's id, and the sender applied its own op twice.
+        let socketId = "me-1";
+        let reconnect: (() => void) | undefined;
+        const sent: Record<string, unknown>[] = [];
+        let handler: ((m: ChannelMessage) => void) | undefined;
+        const transport: ChannelTransport = {
+            sendMessage: async (message) => { sent.push(message); return undefined; },
+            onChannelMessage: (_channel, h) => { handler = h; return () => { handler = undefined; }; },
+            onReconnect: (h) => { reconnect = h; return () => undefined; },
+            hasServerOptIn: (name) => name === "channel_seq",
+            get socketClientId() { return socketId; }
+        };
+        const channel = new RebaseRealtimeChannel(CHANNEL, transport);
+        channel.onBroadcast((event) => received.push(event));
+        await channel.join();
+        handler?.(live(1));
+        await channel.broadcast("op", { mine: true });
+
+        socketId = "me-2";
+        reconnect?.();
+        await Promise.resolve();
+        handler?.({ type: "broadcast_ack", channel: CHANNEL, seq: 4 });
+        handler?.({ type: "channel_history", channel: CHANNEL, messages: [entry(2, "me-1"), entry(3), entry(4, "me-2")], retained: true, latestSeq: 4 });
+
+        expect(received.map((e) => e.seq)).toEqual([1, 3]);
+    });
+
     it("against a server that does not number the sender's messages, a jump is delivered as before", async () => {
         const { fake } = await joinedChannel([]);
         fake.push(live(1));

@@ -1,5 +1,5 @@
 ---
-sourceHash: af85efb5a9d69006
+sourceHash: 640b52048be1b1c6
 title: Vistas de Entidad
 sidebar_label: Vistas de Entidad
 description: Añada pestañas y vistas personalizadas a las páginas de detalles de la entidad para previsualizaciones, análisis, datos relacionados o UI personalizada.
@@ -51,13 +51,14 @@ function ArticlePreview({
     modifiedValues,
     formContext
 }: EntityCustomViewParams) {
-    // modifiedValues has the unsaved, live form values
-    const title = modifiedValues?.title ?? entity?.values?.title;
-    const content = modifiedValues?.content ?? entity?.values?.content;
+    // modifiedValues has the unsaved, live form values. Both it and
+    // entity.values are open records, so narrow before rendering.
+    const title = String(modifiedValues?.title ?? entity?.values?.title ?? "");
+    const content = String(modifiedValues?.content ?? entity?.values?.content ?? "");
 
     return (
         <div className="p-8 max-w-2xl mx-auto">
-            <h1 className="text-3xl font-semibold">{title}</h1>
+            <h1 className="text-xl font-semibold tracking-[-0.01em]">{title}</h1>
             <div dangerouslySetInnerHTML={{ __html: content }} />
         </div>
     );
@@ -68,10 +69,10 @@ function ArticlePreview({
 
 | Prop | Type | Descripción |
 |------|------|-------------|
-| `entity` | `Entity` | La entidad guardada (null para nuevas entidades) |
+| `entity` | `Entity` | La entidad guardada (ausente mientras se crea una nueva) |
 | `modifiedValues` | `EntityValues` | Valores actuales del formulario sin guardar (en vivo a medida que el usuario escribe) |
 | `formContext` | `FormContext` | Contexto completo del formulario |
-| `collection` | `CollectionConfig` | Definición de colección |
+| `collection` | `AdminCollection` | Definición de colección |
 
 ![Vista de entidad con formulario secundario](/img/entity_view_secondary_form.png)
 

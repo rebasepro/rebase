@@ -17,7 +17,8 @@
 | `rebase init [name]` | Scaffold a new Rebase project interactively |
 | `rebase dev` | Start development server (backend + frontend concurrently) |
 | `rebase build` | Build the apps declared in rebase.json into a deployable bundle |
-| `rebase start` | Start the backend server in production mode |
+| `rebase start` | Run the built bundle, as a deployment does, in the `NODE_ENV` you set (the scaffold's `.env` says `development`) |
+| `rebase upgrade` | Move every `@rebasepro/*` pin in the project to one release (`--to <version\|tag>`, default `latest`), then install. `--dry-run`, `--no-install`, `--allow-downgrade`, `--drop-local-overrides`, `--json` |
 | `rebase apps list` | Show the apps `rebase.json` declares and their build outputs. `apps init` writes a `rebase.json` inferred from the project and takes no app name; `--force` replaces an existing one, keeping each app's name, `path` and `cms` (0.25+); `apps config <app>` prints an app's client configuration |
 | `rebase eject [app]` | Take ownership of the server process: writes the backend entrypoint and a Dockerfile, and sets `runtime: "custom"`. One-way — platform runtime upgrades stop reaching the project. `--dry-run` lists the changes |
 
@@ -29,12 +30,15 @@ output so Node ESM can load it; `--check` reports instead of rewriting.
 | Option | Alias | Description |
 |--------|-------|-------------|
 | `--headless` | — | Backend only: no admin panel, no collections. Prompts when omitted |
-| `--template` | `-t` | Starter template to scaffold from |
+| `--template` | `-t` | Starter template to scaffold from: `blog` (default), `ecommerce` or `blank` |
 | `--git` | `-g` | Initialize a git repository |
 | `--install` | `-i` | Install dependencies with the detected PM |
+| `--no-install` | — | Install nothing, and do not ask |
 | `--database-url` | — | PostgreSQL connection string (skip prompt) |
-| `--introspect` | — | Auto-introspect the database after init |
-| `--yes` | `-y` | Non-interactive mode (use all defaults) |
+| `--introspect` | — | Generate collections from that database (implies `--template blank`; needs `--install`) |
+| `--project` | — | Link the scaffold to a Rebase Cloud project |
+| `--setup-key` | — | One-time key authenticating that cloud link (with `--project`) |
+| `--yes` | `-y` | Non-interactive mode (use all defaults; git init and the install are skipped unless `--git` / `--install` is passed) |
 | `--agent` | `-a` | Install the skills and register the MCP server for these AI agents (`claude,cursor`, or `all`). Without it the prompt asks, pre-ticking the agents installed on the machine; under `--yes`, none |
 
 #### What gets scaffolded
@@ -66,12 +70,15 @@ rebase init my-app --yes --database-url "postgresql://user:pass@host:5432/db" --
 | `--backend-only` | `-b` | Only start the backend server |
 | `--frontend-only` | `-f` | Only start the frontend server |
 | `--port` | `-P` | Set the backend port (default: deterministic per-project hash) |
+| `--database-url` | — | Use this Postgres, ahead of everything else |
+| `--docker` | — | Use the project's docker-compose `db` service, starting it if needed |
+| `--no-db` | — | Start no database at all |
 
 > **IMPORTANT FOR AGENTS:** Each project automatically receives a **unique default port** derived from its directory path (range 3001–3999), preventing collisions when running multiple Rebase instances. The resolved port is saved to `.rebase-dev-port` for affinity across restarts. The backend URL is saved to `.rebase-dev-url` so scripts can read it. The frontend receives `VITE_API_URL` automatically.
 
 **Port resolution order:**
 1. Explicit `--port` flag (highest priority)
-2. `PORT` environment variable
+2. `PORT` in the shell environment (a `PORT` in `.env` is not read for this)
 3. Previously saved port from `.rebase-dev-port` (port affinity)
 4. Deterministic hash from project path (unique per project)
 
@@ -98,6 +105,8 @@ Takes an optional list of app names; with none, every app in the manifest is bui
 | `--skip-schema` | | Do not regenerate the database schema from collections |
 | `--no-static` | | Do not fold the frontend assets into the backend bundle |
 | `--skip-static-build` | | Fold already-built assets without re-running the app's build |
+| `--no-vendor` | | Do not install the dependencies into the bundle (they install on every start instead) |
+| `--vendor` | | Install them into the bundle whatever the tree's size |
 | `--workspace` | | Run every workspace's own `build` script instead of bundling |
 | `--help` | `-h` | Show build command help |
 
@@ -154,6 +163,11 @@ booting and prints that line.
 | Option | Alias | Description |
 |--------|-------|-------------|
 | `--output` | `-o` | Output directory for generated collection files |
+| `--collections` | `-c` | Collections directory |
+| `--schema` | — | The Postgres schema to read |
+| `--force` | — | Overwrite collection files that are already there |
+| `--data-inference` / `--no-data-inference` | — | Sample up to 100 rows per table to detect formats, or read the structure only. Without either it asks; with no terminal, structure only |
+| `--database-url` / `--docker` | — | Read that database, or the compose one, instead of the one `rebase db url` prints |
 
 ### Database Commands
 
@@ -162,7 +176,7 @@ booting and prints that line.
 | `rebase db push` | Apply schema directly to database (development only) |
 | `rebase db generate` | Generate SQL migration files |
 | `rebase db migrate` | Run pending SQL migrations |
-| `rebase db branch` | Database branching (create, list, switch, delete, info, prune) — needs a real PostgreSQL. `prune` asks first; with no terminal it needs `--yes`, and since 0.25 it exits 1 without it |
+| `rebase db branch` | Database branching (create, list, switch, delete, info, diff, prune) — needs a real PostgreSQL. `prune` asks first; with no terminal it needs `--yes`, and since 0.25 it exits 1 without it |
 | `rebase db backup` | Write a backup of the current database (default `./backups` where you run `rebase`; unknown options are refused) |
 | `rebase db backups list` | List the backups taken so far |
 | `rebase db restore` | Restore the database from a backup |
@@ -173,10 +187,10 @@ booting and prints that line.
 | `rebase db --help` | Show database command help |
 
 <!-- docs-verify: ignore -->
-> **IMPORTANT FOR AGENTS:** There is no `rebase db studio`. The driver accepts exactly
+> **IMPORTANT FOR AGENTS:** There is no `rebase db studio`. The CLI accepts exactly
 > the subcommands above and exits 1 on anything else.
 
-> **IMPORTANT FOR AGENTS:** Like schema commands, database commands are delegated to the active database driver plugin. The plugin provides the actual implementation.
+> **IMPORTANT FOR AGENTS:** Like schema commands, `push`, `generate`, `migrate`, `branch`, `backup`, `backups` and `restore` are delegated to the active database driver plugin, which provides the actual implementation. `url`, `pull`, `stop`, `reset` and `branch switch` are answered by the CLI itself.
 
 ```bash
 # Development workflow (fast, no migration files)
@@ -228,8 +242,10 @@ The same object from a script is `openRebase` from `@rebasepro/server-postgres`
 
 | Option | Alias | Default | Description |
 |--------|-------|---------|-------------|
-| `--collections-dir` | `-c` | `./config/collections` | Path to collections directory |
-| `--output` | `-o` | `./generated/sdk` | Output path for generated SDK |
+| `--collections` (or `--collections-dir`) | `-c` | `config/collections` under the project root | Path to collections directory |
+| `--output` (or `--out`) | `-o` | `./generated/sdk` | Output path for generated SDK |
+| `--register` | — | — | Also type server-side data (`dataAsAdmin`, a function's or cron's `rebase`): writes the types and the `Register` declaration to `config/generated/` and remembers it in `rebase.json` |
+| `--from` / `--token` | — | — | Fetch the schema from a running project (`link` = this checkout's linked one) instead of local collection files; the token defaults to `$REBASE_SERVICE_KEY` |
 
 The SDK generator uses `jiti` for dynamic TypeScript import of collection files. It loads every top-level collection file in the directory — the same files the backend serves — whether or not the `index.ts` barrel lists them, and a file that does not load is an error, as it is at boot.
 
@@ -241,7 +257,7 @@ rebase generate-sdk --collections-dir ./config/collections --output ./generated/
 
 | Command | Description |
 |---------|-------------|
-| `rebase auth reset-password` | Reset a user's password directly in the database |
+| `rebase auth reset-password` | Reset a user's password — through the running backend when it has one and a service key, otherwise directly in the database |
 | `rebase auth --help` | Show auth command help |
 
 | Option | Alias | Default | Description |
@@ -261,7 +277,8 @@ rebase auth reset-password user@example.com MyNewPass!
 
 | Command | Description |
 |---------|-------------|
-| `rebase doctor` | Detect three-way schema drift between collections, Drizzle schema, and live DB |
+| `rebase doctor` | Detect three-way schema drift between collections, Drizzle schema, and live DB. `--policies` also audits the RLS policies (the CI-gate form) |
+| `rebase verify` | Offline checks that the collections are safe to ship: config validity, RLS coverage, migration freshness. `--live` also checks DATABASE_URL (migrations applied, the rls-check audit); `--json`, `--quiet`. Exits 1 on an error, not on a warning |
 | `rebase status` | Show every declared resource (databases, buckets, topics, queues, crons, functions) and whether the variables it reads are set. `--json` for scripts |
 | `rebase resources` | List the resources this project declares, declared and implicit. `--write` regenerates the committed resource graph; `--check` fails when it is stale, and `--check --json` is the CI form (error envelope, exit 1) |
 
@@ -284,7 +301,17 @@ rebase auth reset-password user@example.com MyNewPass!
 
 | Command | Description |
 |---------|-------------|
-| `rebase skills install` | Install these skills for your AI coding assistant. `--agent claude,cursor` (or `all`) skips detection, and is required without a TTY |
+| `rebase skills install` | Install these skills for your AI coding assistant. `--agent claude,cursor` (or `all`) skips detection, and is required without a TTY. `--mcp` also registers the MCP server, `--hooks` the Claude Code `rebase verify` hook; `--force` replaces edited files |
+| `rebase skills --hooks` | Install only the Claude Code hook that runs `rebase verify --quiet` after each edit under `config/collections/` |
+
+### Other commands
+
+| Command | Description |
+|---------|-------------|
+| `rebase generate view <slug>` | Scaffold a custom admin screen; `--collection <slug>` makes it a record tab (`--name`, `--icon`, `--dry-run`, `--force`) |
+| `rebase storage orphans` | List the stored files no row names (`--delete` to delete them) |
+| `rebase storage move` | Copy a folder of files to another storage source (`--from`, `--to`, `--prefix`, `--delete-source`) |
+| `rebase cloud …` | Rebase Cloud: `login`, `link`, `deploy`, `tokens create`, and more — `rebase cloud --help` (see the `rebase-cloud` skill) |
 
 ### Usage Sharing
 

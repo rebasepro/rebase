@@ -1,5 +1,5 @@
 ---
-sourceHash: b40368f94c74dfb6
+sourceHash: e515564ee1857435
 title: Dati lato server tipizzati
 sidebar_label: Dati lato server tipizzati
 description: "Registra una volta il tuo tipo Database generato, e context.data, rebase.dataAsAdmin e il rebase che una function o un cron riceve sono tipizzati a partire da esso: righe, filtri, ordinamenti, include e input di scrittura."
@@ -49,9 +49,14 @@ esattamente ciò che faceva prima.
 
 Il flag viene ricordato in `rebase.json`, come `"registerDatabase": true` sull'app
 backend, così ogni `rebase generate-sdk` successivo, e `rebase dev` a ogni
-modifica di collection, mantiene aggiornati entrambi i file. Questo vale anche su un clone nuovo e in
-CI: il `.gitignore` dello scaffold ignora le directory `generated/`, e il
-primo `rebase generate-sdk` o `rebase dev` le scrive di nuovo. Un progetto senza
+modifica di collection, mantiene aggiornati entrambi i file. Il `.gitignore` dello scaffold
+ignora le directory `generated/`, quindi un clone nuovo non ha nessuno dei due file finché
+qualcosa non li scrive di nuovo. `rebase build` (e `rebase cloud deploy`, che compila lo
+stesso bundle) li scrive a partire dalle collection prima di compilare, quindi un job di CI
+che esegue `rebase build` su un clone nuovo compila callback tipizzate. Un passaggio di CI
+che compila il backend o il pacchetto `config` in un altro modo (`tsc`, `pnpm build`) ha
+ancora bisogno prima di `rebase generate-sdk`, altrimenti le callback che leggono righe
+tipizzate compilano contro il `context.data` non tipizzato e falliscono. Un progetto senza
 `rebase.json` continua a registrare finché `config/generated/register.ts`
 è presente. Per tornare ai dati lato server non tipizzati, rimuovi `registerDatabase` ed
 elimina `config/generated/`.

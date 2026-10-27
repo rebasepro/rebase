@@ -1,5 +1,5 @@
 ---
-sourceHash: 8b0cf8dec1186f45
+sourceHash: f7939e13ff2b006a
 title: Comandos de Banco de Dados
 sidebar_label: Comandos de Banco de Dados
 description: Os comandos rebase db — push, generate e migrate, backups e restaurações, importar uma cópia, a string de conexão, o banco de dados de desenvolvimento gerenciado e os branches.
@@ -49,7 +49,7 @@ Gera arquivos de migração SQL a partir de alterações de schema:
 rebase db generate
 ```
 
-Cria arquivos de migração com carimbo de data/hora em `drizzle/migrations/` que podem ser revisados e comitados.
+Cria arquivos de migração com carimbo de data/hora em `backend/drizzle/migrations/` que podem ser revisados e comitados.
 
 ### `rebase db migrate`
 
@@ -246,7 +246,7 @@ passar `--yes` e termina com código 1; na 0.24 ele diz "Nothing was changed." e
 `list` e `info` apenas leem: um banco de dados em que nenhum branch foi criado não tem nenhum, e
 eles não criam o schema `rebase` ali. Na 0.24 eles criam o registro.
 
-`diff` mostra o que um branch mudou em relação ao banco de onde foi criado: tabelas, colunas e políticas RLS adicionadas, removidas ou alteradas, e por tabela as linhas que inseriu, atualizou e excluiu. As linhas que o pai mudou por conta própria desde então são contadas à parte, e as que os dois mudaram são conflitos. `--json` imprime o diff inteiro, com até `--sample-limit` linhas por tabela (100 por padrão). Ele lê os dois bancos e não altera nenhum; a mesclagem fica no Studio — veja [Revisar e mesclar um branch](/docs/backend/branching/#reviewing-and-merging-a-branch).
+`diff` mostra o que um branch mudou em relação ao banco de onde foi criado: tabelas, colunas, restrições, índices, triggers, políticas RLS, tipos enum, views e funções adicionados, removidos ou alterados, e por tabela as linhas que inseriu, atualizou e excluiu. As linhas que o pai mudou por conta própria desde então são contadas à parte, e as que os dois mudaram são conflitos. `--json` imprime o diff inteiro, com até `--sample-limit` linhas por tabela (100 por padrão). Ele lê os dois bancos e não altera nenhum; a mesclagem fica no Studio — veja [Revisar e mesclar um branch](/docs/backend/branching/#reviewing-and-merging-a-branch).
 
 `switch` registra o branch em `.rebase/branch.json` e nunca edita o `.env`. Ele tem precedência sobre `DATABASE_URL` no `.env` e perde para `--database-url` ou um `DATABASE_URL` definido no shell; portanto, uma flag na linha de comando sempre sobrepõe uma troca feita anteriormente. `delete` recusa o branch em que você está, já que todo comando no checkout, inclusive o delete, aponta para ele: primeiro `switch --off`, depois exclua-o. O fluxo completo está em [Branching de Banco de Dados](/docs/backend/branching/).
 

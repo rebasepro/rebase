@@ -1,5 +1,5 @@
 ---
-sourceHash: 1d19e29e19f9ce81
+sourceHash: 916ecd6bde4adb6f
 title: SDK tipado — Primeros pasos
 sidebar_label: Primeros pasos
 description: Instala y configura el SDK tipado de Rebase para interactuar con tu backend desde cualquier aplicación JavaScript o TypeScript.
@@ -65,7 +65,7 @@ const client = createRebaseClient({
 Por defecto, el cliente no imprime nada sobre su conexión en tiempo real, así que una página pública no revela nada de su backend en la consola de un visitante. Las advertencias y los errores se imprimen siempre. Para ver cómo la conexión se abre, se autentica, se cae y vuelve a marcar, pasa `debug: true`, o actívalo en un solo navegador sin cambiar el sitio ejecutando esto en su consola:
 
 ```js
-localStorage.setItem("rebase_debug", "1"); // localStorage.removeItem("rebase_debug") para desactivarlo
+localStorage.setItem("rebase_debug", "1"); // localStorage.removeItem("rebase_debug") to stop
 ```
 
 Se aplica desde la siguiente línea que registre el cliente, así que una página ya conectada no necesita recargarse. Fuera de un navegador, usa `globalThis.__REBASE_DEBUG__ = true`. Los navegadores muestran `console.debug` solo en el nivel Detallado (Verbose).
@@ -99,7 +99,7 @@ const { data } = await client.data.products.find();
 
 Cuando se proporciona `Database`, `createRebaseClient` devuelve una instancia de `CreateRebaseClientResult<DB>`. Esto mapea los accesores de colecciones en camelCase directamente en `client.data` a sus tipos correspondientes, brindándote autocompletado completo en las operaciones y tipos de colecciones (p. ej., `client.data.products.find()`).
 
-`collectionsDictionary` mapea cada accesor de vuelta al slug que se usa en la transmisión de datos. Pásalo siempre que un slug no sea ya un nombre de propiedad válido — `my-notes` es accesible como `client.data.myNotes` solo porque el diccionario así lo indica.
+`collectionsDictionary` mapea cada accesor de vuelta al slug que se usa en la transmisión de datos. **`collections` es obligatorio para un cliente tipado.** Los tipos ofrecen todos los accesores lo pases o no, pero sin él `client.data.myNotes` se envía a `/data/my_notes`, el accesor en snake_case, así que un slug como `my-notes` o un accesor renombrado responde 404. El cliente avisa una vez, nombrando el accesor y la solución. Una versión futura hará que `collections` sea obligatorio en los tipos cuando se proporcione `Database`.
 
 Algunos nombres de `client.data` están ocupados: `collection` es la función dinámica `collection(slug)`, y `then`, `toJSON` y `$$typeof` se dejan intactos para las comprobaciones de promesas y de serialización. Una colección cuyo accesor fuera uno de ellos se genera como `<name>Collection` — el slug `collection` es `client.data.collectionCollection` — y `generate-sdk` imprime una advertencia que nombra ambos. `client.data.collection("collection")` también llega a ella.
 
@@ -109,7 +109,7 @@ Algunos nombres de `client.data` están ocupados: `collection` es la función di
 
 Una clave de propiedad que *tú* escribiste es tu clave, cualquiera que sea su formato — nada renombra un nombre que hayas elegido. Las dos claves que se derivan en lugar de declararse, la clave foránea de una relación y una columna leída mediante introspección, están en camelCase.
 
-`Row` describe una lectura, `Insert` un `create()` y `Update` un `update()` — no tienen la misma forma. Una columna que no es obligatoria es `T | null` en las tres, de modo que una escritura pueda vaciarla; la clave primaria siempre está presente en una lectura y nunca se puede establecer en una actualización; un destino `belongsTo` se puede escribir tanto como la relación (`{ author: 5 }`) o como su clave foránea (`{ authorId: 5 }`); y una pertenencia `hasMany` o `manyToMany` se escribe como una lista de ids de destino u objetos `{ id }` (`{ tags: ["t-1"] }`), cada uno con un `_pivot` cuando la tabla de unión declara columnas de payload. Un campo que nadie puede escribir (`access: { write: [] }`) no está ni en `Insert` ni en `Update`. Una columna `date` se lee como una cadena ISO, y una escritura acepta esa cadena o un `Date`.
+`Row` describe una lectura, `Insert` un `create()` y `Update` un `update()` — no tienen la misma forma. Una columna que no es obligatoria es `T | null` en las tres, de modo que una escritura pueda vaciarla; la clave primaria siempre está presente en una lectura y nunca se puede establecer en una actualización; un destino `belongsTo` se puede escribir tanto como la relación (`{ author: 5 }`) o como su clave foránea (`{ authorId: 5 }`), y una obligatoria se satisface con cualquiera de las dos; un `hasOne` se escribe nombrando la fila destino (`{ profile: 9 }`), o `null` para desenlazarla; un `via` de un solo salto se escribe como el tipo al que sustituye (a uno: el id del destino o `null`; a muchos: una lista de ids), y uno de varios saltos es de solo lectura y no está en ninguno de los dos; y una pertenencia `hasMany` o `manyToMany` se escribe como una lista de ids de destino u objetos `{ id }` (`{ tags: ["t-1"] }`), cada uno con un `_pivot` cuando la tabla de unión declara columnas de payload. Un campo que nadie puede escribir (`access: { write: [] }`) no está ni en `Insert` ni en `Update`. Una columna `date` se lee como una cadena ISO, y una escritura acepta esa cadena o un `Date`.
 
 ## Ejemplo rápido
 

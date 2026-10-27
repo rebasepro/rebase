@@ -1,6 +1,6 @@
 ---
 name: rebase-studio
-description: Guide for using and customizing the Rebase Studio developer tools layer. Use this skill when the user needs help with Studio dev tools (SQL/JS/RLS/Storage/Cron/Schema Visualizer/Branches/API Explorer/Logs), admin modes (cms/studio/settings), Studio home page customization, bridge hooks, or Studio configuration. Studio is NOT the CMS — the CMS lives in @rebasepro/cms.
+description: Guide for using and customizing the Rebase Studio developer tools layer. Use this skill when the user needs help with Studio dev tools (SQL/JS/RLS/Storage/Cron/Schema Visualizer/Branches/API Explorer/Logs), admin modes (cms/studio), Studio home page customization, bridge hooks, or Studio configuration. Studio is NOT the CMS — the CMS lives in @rebasepro/cms.
 ---
 
 # Rebase Studio
@@ -52,7 +52,7 @@ function MyComponent() {
 
 ### Drawer Mode Switch
 
-When `<RebaseStudio>` is registered, the drawer automatically renders a segmented **Content / Studio** toggle. Clicking "Content" (the button label is unchanged) sets mode to `"cms"` and navigates to the base path. Clicking "Studio" sets mode to `"studio"` and navigates to `/s`.
+When `<RebaseStudio>` is registered, the drawer automatically renders a segmented **CMS / Studio** toggle. Clicking "CMS" sets mode to `"cms"` and navigates to the base path. Clicking "Studio" sets mode to `"studio"` and navigates to `/s`.
 
 ## Effective Role Simulation
 
@@ -100,7 +100,7 @@ The Studio ships 11 built-in dev tools, all **lazy-loaded** (code-split) so they
 | `"logs"` | `LogsExplorer` | Logs Explorer | Database | `Activity` | Real-time system, query, and authentication logs |
 | `"api-keys"` | `ApiKeysView` | API Keys | Access Control | `KeyRound` | Create and manage scoped service API keys |
 
-> **IMPORTANT FOR AGENTS:** The `"schema"` tool (collection editor) is **NOT** registered by `<RebaseStudio>`. It is auto-injected by `<RebaseShell>` when `collectionEditor` is enabled on `<RebaseCMS>`. Do not try to register it manually.
+> **IMPORTANT FOR AGENTS:** The `"schema"` tool (collection editor) is **NOT** registered by `<RebaseStudio>`. It is auto-injected by `<RebaseShell>` when `collectionEditor` is enabled on `<RebaseCMS>` and `<RebaseStudio>` is mounted with `tools` omitted or containing `"schema"`. Do not try to register it manually — but when you pass a `tools` list, include `"schema"` in it or the collection editor's route is not registered.
 
 ### Enabling/Disabling Tools
 
@@ -111,11 +111,11 @@ By default, **all 11 tools** are enabled. Use the `tools` prop on `<RebaseStudio
 <RebaseStudio />
 <RebaseStudio tools={undefined} />
 
-// Enable only specific tools
+// Enable only specific tools (no collection editor: "schema" is not listed)
 <RebaseStudio tools={["sql", "rls", "storage"]} />
 
-// Enable everything except branches
-<RebaseStudio tools={["sql", "js", "rls", "storage", "cron", "schema-visualizer", "backups", "api", "logs", "api-keys"]} />
+// Enable everything except branches ("schema" keeps the collection editor)
+<RebaseStudio tools={["sql", "js", "rls", "schema", "storage", "cron", "schema-visualizer", "backups", "api", "logs", "api-keys"]} />
 ```
 
 The `tools` prop accepts an array of tool key strings:
@@ -124,7 +124,7 @@ The `tools` prop accepts an array of tool key strings:
 type ToolKey = "sql" | "js" | "rls" | "schema" | "storage" | "cron"
     | "schema-visualizer" | "branches" | "backups" | "api" | "logs" | "api-keys";
 
-// Default when tools is undefined:
+// Default when tools is undefined (plus "schema", injected when collectionEditor is on):
 const DEFAULT_TOOLS: ToolKey[] = [
     "sql", "js", "rls", "storage", "cron", "schema-visualizer",
     "branches", "backups", "api", "logs", "api-keys"
@@ -133,7 +133,8 @@ const DEFAULT_TOOLS: ToolKey[] = [
 
 ### Individual tools are not importable
 
-`@rebasepro/studio` exports **only** `RebaseStudio` and `StudioHomePage`. The
+`@rebasepro/studio` exports **only** `RebaseStudio`, `StudioHomePage` and the
+Studio Bridge re-exports (below). The
 tools (SQLEditor, JSEditor, RLSEditor,
 StorageView, …) are lazy-loaded inside `RebaseStudio.tsx` and deliberately not
 re-exported, so that importing the Studio does not pull every tool into the
@@ -148,7 +149,7 @@ bundle.
 
 ## Frontend Composition
 
-The Studio is mounted using the declarative composition API. All four components (`<Rebase>`, `<RebaseAuth>`, `<RebaseCMS>`, `<RebaseStudio>`, `<RebaseShell>`) are purely declarative — they **render nothing** and only register configuration into the registry (`RebaseRegistryController`, read with `useRebaseRegistry()`). `<RebaseShell>` then reads the registry and builds the actual UI.
+The Studio is mounted using the declarative composition API. Under the `<Rebase>` provider, `<RebaseAuth>`, `<RebaseCMS>` and `<RebaseStudio>` are purely declarative — they **render nothing** and only register configuration into the registry (`RebaseRegistryController`, read with `useRebaseRegistry()`). `<RebaseShell>` then reads the registry and builds the actual UI.
 
 ```tsx
 import { useRebaseAuthController, RebaseAuth } from "@rebasepro/app";
@@ -160,10 +161,14 @@ import React from "react";
 import { createRebaseClient } from "@rebasepro/client";
 import { collections } from "virtual:rebase-collections";
 
-const API_URL = import.meta.env.VITE_API_URL || (import.meta.env.DEV ? "http://localhost:3001" : undefined);
+// `rebase dev` injects VITE_API_URL with the port it bound (derived from the
+// project path, not a fixed 3001); a deployed build serves the API same-origin.
+const API_URL = import.meta.env.VITE_API_URL;
+
+// Module scope: inside a component, StrictMode builds a second client in development.
+const rebaseClient = createRebaseClient({ baseUrl: API_URL });
 
 export function App() {
-    const rebaseClient = React.useMemo(() => createRebaseClient({ baseUrl: API_URL }), []);
     const authController = useRebaseAuthController({ client: rebaseClient });
     const dataEnhancementPlugin = useDataEnhancementPlugin();
 
@@ -178,15 +183,11 @@ export function App() {
 }
 ```
 
-### TypeScript Strict Props Warning
+### Props are optional
 
-Under strict TypeScript checks, `<RebaseStudio/>` without props throws:
-`Type '{}' is missing the following properties from type '{ tools: any; homePage: any; }': tools, homePage`
-
-Pass `tools={undefined} homePage={undefined}` explicitly:
-```tsx
-<RebaseStudio tools={undefined} homePage={undefined} />
-```
+Every `RebaseStudioConfig` prop is optional, so `<RebaseStudio/>` alone type-checks
+and registers every built-in tool; `tools={undefined} homePage={undefined}` is
+the same thing spelled out.
 
 ### Key Components
 
@@ -287,17 +288,20 @@ These components can be overridden globally on `<Rebase>` (applied to every coll
 `<RebaseCMS>` accepts the full `RebaseCMSConfig`:
 
 ```typescript
-interface RebaseCMSConfig<EC extends CollectionConfig = CollectionConfig> {
+interface RebaseCMSConfig<EC extends AdminCollection = AdminCollection> {
     collections?: EC[] | CollectionConfigsBuilder<EC>;
     views?: AppView[] | AppViewsBuilder;
     homePage?: ReactNode;
     entityViews?: EntityCustomView[];
+    collectionViews?: CollectionCustomView[];  // view modes, opted into by admin.customViews
     entityActions?: EntityAction[];
-    plugins?: RebasePlugin[];
     navigationGroupMappings?: NavigationGroupMapping[];
     collectionEditor?: boolean | CollectionEditorOptions;
+    basePath?: string;                        // URL prefix when not mounted via a router basename
 }
 ```
+
+`plugins` is a prop of `<Rebase>`, not of `<RebaseCMS>`.
 
 ### Collection Editor Options
 
@@ -320,6 +324,7 @@ Control how collections and views are grouped in the sidebar and home page:
 interface NavigationGroupMapping {
     name: string;           // Group header display name
     entries: string[];      // Collection slugs or view paths
+    icon?: string;          // Lucide icon name for the group header
     collapsedByDefault?: boolean | {
         drawer?: boolean;   // Collapse in sidebar
         home?: boolean;     // Collapse on home page
@@ -345,7 +350,7 @@ interface RebaseStudioConfig {
     tools?: ("sql" | "js" | "rls" | "schema" | "storage" | "cron"
         | "schema-visualizer" | "branches" | "backups" | "api" | "logs" | "api-keys")[];
     homePage?: ReactNode;
-    devViews?: AppView[];  // Computed internally — not passed by consumers
+    devViews?: AppView[];  // Your own Studio tools, added beside the built-in ones
 }
 ```
 
@@ -359,7 +364,7 @@ interface StudioHomePageProps {
     additionalChildrenStart?: React.ReactNode;  // Content before tool sections
     additionalChildrenEnd?: React.ReactNode;    // Content after tool sections
     sections?: HomePageSection[];               // Extra sections after tools
-    hiddenGroups?: string[];                    // Groups to hide (unused by default sections)
+    hiddenGroups?: string[];                    // Tool section labels to hide (e.g. "Compute")
 }
 
 interface HomePageSection {
@@ -371,15 +376,20 @@ interface HomePageSection {
 
 ### Built-in Home Page Sections
 
-The default `StudioHomePage` renders tools grouped into these sections:
+The default `StudioHomePage` builds its sections from the Studio views actually
+registered (each view's `group`), so a card exists only when its route does. With
+every tool enabled:
 
-| Section | Dot Color | Tools |
-|---------|-----------|-------|
-| Database | Emerald | Collections, Schema Visualizer, SQL Console, Branches, RLS Policies, Logs Explorer |
-| Compute | Blue | JS Console, Cron Jobs |
-| API | Violet | API Explorer |
-| Storage | Amber | Storage |
-| Access Control | Rose | Users, Roles |
+| Section | Tools |
+|---------|-------|
+| Database | Collections (when the collection editor is on), SQL Console, RLS Policies, Schema Visualizer, Branches, Backups, Logs Explorer |
+| Compute | JS Console, Cron Jobs |
+| Storage | Storage |
+| API | API Explorer |
+| Access Control | API Keys |
+
+Sections follow that order; a `devViews` group not in it is appended after, and
+a view with no `group` lands in "Tools".
 
 ### Custom Home Page Examples
 
@@ -437,7 +447,7 @@ The `loginView` is registered into the registry via `registerAuth()` and consume
 
 ## Custom Views
 
-Add custom React views to the Studio navigation using the `AppView` interface:
+Custom React views are described with the `AppView` interface:
 
 ```typescript
 interface AppView {
@@ -447,13 +457,14 @@ interface AppView {
     icon?: string | React.ReactNode; // Lucide icon name or custom element
     hideFromNavigation?: boolean;    // Hide from sidebar (still accessible by URL)
     group?: string;                  // Navigation group name
-    view: React.ReactNode;           // React component to render
+    pinToBottom?: boolean;           // Sink this view's group to the bottom of the drawer
+    view: React.ReactNode | React.ComponentType; // Element, or a component rendered on visit
     nestedRoutes?: boolean;          // Enable nested routing (slug/*)
     roles?: string[];                // Only show to users with at least one matching role
 }
 ```
 
-Custom top-level views are added through the `views` prop on `<RebaseCMS>`. They can also be contributed by plugins via `plugin.views`.
+A view passed to `<RebaseStudio devViews={[…]}>` is a Studio tool, shown in Studio mode. Custom top-level views for the CMS (content mode) are added through the `views` prop on `<RebaseCMS>`. They can also be contributed by plugins via `plugin.views`.
 
 ```tsx
 // Static array
@@ -487,7 +498,8 @@ Custom top-level views are added through the `views` prop on `<RebaseCMS>`. They
 import { CollectionPanel } from "@rebasepro/cms";
 
 type CollectionPanelProps = {
-    path: string;                           // Collection slug (required)
+    path?: string;                          // Collection slug — required unless `collection` is given
+    collection?: AdminCollection;           // The collection as a value — required unless `path` names a registered one
     title?: string | false;                 // Title above the collection (false = hide)
     viewMode?: ViewMode;                    // Force view mode (table, card, etc.)
     sort?: [string, "asc" | "desc"];        // Override sort
@@ -495,7 +507,7 @@ type CollectionPanelProps = {
     updateUrl?: boolean;                    // Sync filter/sort with URL (default: false)
     openEntityMode?: "side_panel" | "full_screen" | "split" | "dialog";
     className?: string;                     // Container CSS class
-    collectionOverrides?: Partial<CollectionConfig>; // Additional overrides
+    collectionOverrides?: Partial<AdminCollection>; // Additional overrides
 };
 ```
 
@@ -543,10 +555,12 @@ The Studio Bridge provides CMS capabilities to Studio components. When CMS is pr
 ```typescript
 interface StudioBridge {
     collectionRegistry: CollectionRegistryController;
+    schemaEditing: StudioSchemaEditing;   // { available, updateCollection(id, patch) }
     sidePanelController: SidePanelController;
     urlController: UrlController;
     navigationState: NavigationStateController;
     breadcrumbs: BreadcrumbsController;
+    capabilities: StudioCapabilities;     // { codebase: boolean }
 }
 ```
 
@@ -578,14 +592,12 @@ import {
 interface BreadcrumbEntry {
     title: string;
     url: string;
-    count?: number | null;
     id?: string;
 }
 
 interface BreadcrumbsController {
     breadcrumbs: BreadcrumbEntry[];
     set: (props: { breadcrumbs: BreadcrumbEntry[] }) => void;
-    updateCount: (id: string, count: number | null | undefined) => void;
 }
 ```
 
@@ -617,12 +629,12 @@ These hooks are exported from `@rebasepro/app` and available inside any `<Rebase
 |------|-------------|-------------|
 | `useRebaseContext()` | `RebaseContext` | Full Rebase context with all controllers |
 | `useAuthController()` | `AuthController` | Access current user and auth state |
-| `useAdminModeController()` | `AdminModeController` | Read/set admin mode (`content` / `studio` / `settings`) |
+| `useAdminModeController()` | `AdminModeController` | Read/set admin mode (`cms` / `studio`) |
 | `useEffectiveRoleController()` | `EffectiveRoleController` | Simulate a role for previewing |
 | `useModeController()` | `ModeController` | Read/set color theme (`light` / `dark`) |
 | `useSnackbarController()` | `SnackbarController` | Show toast notifications |
 | `useStorageSource()` | `StorageSource` | Access file storage |
-| `useData()` | `DataSource` | Access the data source for CRUD ops |
+| `useData()` | `RebaseData` | Entity-shaped data API for CRUD ops (rows are `Entity` objects) |
 | `useDialogsController()` | `DialogsController` | Programmatic dialog management |
 | `useCustomizationController()` | `CustomizationController` | Access plugins, slots, property configs |
 | `usePermissions()` | `{ canCreate, canEdit, canDelete, canRead }` | Role-aware permission checks |
@@ -642,7 +654,7 @@ These hooks are exported from `@rebasepro/app` and available inside any `<Rebase
 | Hook | Package | Description |
 |------|---------|-------------|
 | `useSidePanel()` | `@rebasepro/cms` | Open/close entity side panels |
-| `useNavigationStateController()` | `@rebasepro/cms` | Navigate between views |
+| `useNavigationStateController()` | `@rebasepro/cms` | Read navigation state (views, top-level entries, loading, refresh) |
 | `useUrlController()` | `@rebasepro/cms` | Build URLs and navigate |
 | `useBreadcrumbsController()` | `@rebasepro/cms` | Set breadcrumbs |
 | `useRebaseRegistry()` | `@rebasepro/app` | Access the full registry (CMS + Studio + Auth configs) |
@@ -709,7 +721,7 @@ const context = useRebaseContext();
 
 // Access any controller
 context.authController        // Auth state
-context.data                  // Data source
+context.data                  // Flat-row SDK data (RebaseSdkData), not useData()'s Entity rows
 context.storageSource         // File storage
 context.snackbarController    // Toast notifications
 context.effectiveRoleController // Role simulation
@@ -724,9 +736,11 @@ context.client                // RebaseClient instance
 ```typescript
 interface RebaseShellProps {
     title?: string;              // App title (default: "Rebase")
-    appBar?: React.ReactNode;    // Custom app bar
+    appBar?: React.ReactNode;    // Top bar — only rendered when given (or "Shell.AppBar" is overridden)
     drawer?: React.ReactNode;    // Custom drawer
     autoOpenDrawer?: boolean;    // Expand the drawer on hover (default: true)
+    defaultDrawerOpen?: boolean; // Start with the drawer expanded (default: false)
+    logo?: string;               // Logo path for the drawer and top bar
     children?: React.ReactNode;  // Additional route content
 }
 ```

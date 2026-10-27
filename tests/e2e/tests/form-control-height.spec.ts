@@ -2,6 +2,12 @@
  * Every single-line control in the entity form stands at one height, and a
  * read-only value is printed at the size of the inputs beside it.
  *
+ * The one-line controls carry their label INSIDE their box (the FireCMS field):
+ * text, number, date, single select and a one-line read-only value are all the
+ * same 64px box plus the field's 1px border, with a 16px value. A multi-select
+ * keeps its label above, so its box is the form's control height without the
+ * label's 16px.
+ *
  * Guards the fix for the reported defect. The form moved its controls to
  * `small` (32px, 14px text) by passing `size` to every field binding, and two
  * bindings did not follow: the date field never forwarded `size`, so it drew
@@ -65,13 +71,18 @@ async function openCreateForm(page: Page, linkName: RegExp, path: RegExp, fields
 
 /**
  * The control box of each field. `FieldBlock` wraps a field as
- * `#form_field_<key>`: the label, then a slot holding what the binding
- * rendered, then the description. The control box is the slot's first child.
+ * `#form_field_<key>`: the label (unless the control draws it inside), then a
+ * slot holding what the binding rendered, then the description. The control
+ * box is the slot's first child.
+ *
+ * The slot is found by `data-field-control`. It used to be `:scope > .min-w-0`,
+ * which the label row matches first — it carries `min-w-0` too — so every field
+ * measured as its 14px type icon, and the heights always agreed.
  */
 async function measureFields(page: Page, fields: Fields): Promise<Measured[]> {
     return page.evaluate((keys: string[]) => keys.map(key => {
         const field = document.getElementById(`form_field_${key}`);
-        const box = field?.querySelector(":scope > .min-w-0")?.firstElementChild;
+        const box = field?.querySelector(":scope > [data-field-control]")?.firstElementChild;
         if (!box) return { key, height: -1, fontSize: "" };
         const text = box.querySelector("input") ?? box;
         return {
@@ -116,9 +127,21 @@ test.describe("entity form controls", () => {
         ).toBe(byKey.order_number.fontSize);
     });
 
-    test("a multi-select is the height of the text field and the select beside it", async ({ page }) => {
+    test("a select is the text field's height, and a multi-select that height less the label inside it", async ({ page }) => {
         await openCreateForm(page, /Products/i, /\/c\/products/, PRODUCT_FIELDS);
         const measured = await measureFields(page, PRODUCT_FIELDS);
-        expectOneHeight(measured, PRODUCT_FIELDS, "name");
+        const byKey = Object.fromEntries(measured.map(m => [m.key, m]));
+        const describe = measured
+            .map(m => `  ${m.key} (${PRODUCT_FIELDS[m.key as keyof typeof PRODUCT_FIELDS]}): ${m.height}px`)
+            .join("\n");
+
+        expect(byKey.name.height, `the text field's control box was not found:\n${describe}`).toBeGreaterThan(0);
+        expect(byKey.status.height, `the select is not the text field's height:\n${describe}`)
+            .toBe(byKey.name.height);
+        // The label sits above a multi-select, not in its box: the box is the
+        // labelled one less the 16px a label inside adds.
+        expect(byKey.available_locales.height, `the multi-select box is off the form's size:\n${describe}`)
+            .toBe(byKey.name.height - 16);
+        await expect(page.locator("#form_field_available_locales > :first-child")).toContainText("Available Locales");
     });
 });

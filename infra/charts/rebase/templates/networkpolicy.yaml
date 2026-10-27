@@ -31,7 +31,7 @@ spec:
     - from:
         - namespaceSelector:
             matchLabels:
-              kubernetes.io/metadata.name: ingress-nginx
+              kubernetes.io/metadata.name: {{ .Values.networkPolicy.ingressNamespace | quote }}
       ports:
         - port: {{ .Values.service.port }}
           protocol: TCP
@@ -52,7 +52,7 @@ spec:
     - from:
         - namespaceSelector:
             matchLabels:
-              kubernetes.io/metadata.name: ingress-nginx
+              kubernetes.io/metadata.name: {{ .Values.networkPolicy.ingressNamespace | quote }}
         {{/* And the api, which forwards /api/functions/* when a deployment uses
              the proxy path instead of an ingress rule. */}}
         - podSelector:

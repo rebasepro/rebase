@@ -1,5 +1,5 @@
 ---
-sourceHash: cc1736a186791d89
+sourceHash: 7f46b01ad01541e2
 title: Speicher-Konfiguration
 sidebar_label: Speicher-Konfiguration
 description: Konfigurieren Sie lokales Dateisystem, S3-kompatible Backends oder GCS/Firebase Storage für Datei-Uploads, Bilder und Medien.
@@ -16,7 +16,7 @@ Rebase unterstützt drei Speicher-Backends:
 ## Konfiguration
 
 :::note[Wo dies hingehört]
-**Managed Runtime** — die `STORAGE_*`-Variablen in `.env` (`STORAGE_TYPE`, `STORAGE_BUCKET` oder `S3_BUCKET` / `GCS_BUCKET`, `STORAGE_PATH`, `STORAGE_PUBLIC_READ`, … — fügen Sie an jede davon das Suffix `__<KEY>` für eine benannte Quelle an), plus eine `bucket("<key>")`-Deklaration in `config/resources.ts` für jedes Bucket über das Standard-Bucket hinaus, und `export const storageAuthorize` aus `config/index.ts`. `storageAuthorize` existiert bewusst nicht als Umgebungsvariable: Keine Variable kann ausdrücken: „Dieser Benutzer darf diesen Schlüssel lesen“.
+**Managed Runtime** — die `STORAGE_*`-Variablen in `.env` (`STORAGE_TYPE`, `S3_BUCKET` / `GCS_BUCKET`, `STORAGE_PATH`, `STORAGE_PUBLIC_READ`, … — fügen Sie an jede davon das Suffix `__<KEY>` für eine benannte Quelle an), plus eine `bucket("<key>")`-Deklaration in `config/resources.ts` für jedes Bucket über das Standard-Bucket hinaus, und `export const storageAuthorize` aus `config/index.ts`. `storageAuthorize` existiert bewusst nicht als Umgebungsvariable: Keine Variable kann ausdrücken: „Dieser Benutzer darf diesen Schlüssel lesen“.
 
 **Ejected** — der `storage`-Block in `initializeRebaseBackend({ … })`. `storagePolicies` und `storageTriggers` sind nur im Ejected-Modus verfügbar.
 
@@ -99,7 +99,7 @@ image: {
 
 | Methode | Pfad | Beschreibung |
 |--------|------|-------------|
-| `POST` | `/api/storage/upload` | Direkter Datei-Upload, ein einziger `multipart/form-data`-Body: `file` (Pflichtfeld); `key`, der Objektschlüssel samt Ordnern (`author_pictures/ada.jpg`), sonst der Dateiname im Wurzelverzeichnis; `bucket`, sonst der Standard-Bucket; `storageId`; und `metadata_<name>` für eigene Metadaten. Jedes andere Feld wird ignoriert: Ein Feld `path` gibt es nicht |
+| `POST` | `/api/storage/upload` | Direkter Datei-Upload, ein einziger `multipart/form-data`-Body: `file` (Pflichtfeld); `key`, der Objektschlüssel samt Ordnern (`author_pictures/ada.jpg`), sonst der Dateiname im Wurzelverzeichnis; `bucket`, sonst der Standard-Bucket; `storageId`; `collection` und `property`, die die Datei an `maxSize` und `acceptedFiles` dieser Property binden; und `metadata_<name>` für eigene Metadaten. Jedes andere Feld wird ignoriert: Ein Feld `path` gibt es nicht |
 | `POST` | `/api/storage/upload?storageId=<key>` | Upload in ein bestimmtes benanntes Backend |
 | `GET` | `/api/storage/file/*` | Eine Datei abrufen — alles nach `/file/` ist der Objektschlüssel |
 | `GET` | `/api/storage/file/*?storageId=<key>` | Eine Datei von einem bestimmten Backend abrufen |
@@ -258,6 +258,13 @@ sowohl `storageAuthorize` als auch die deklarativen Richtlinien — bezieht sich
 *Quell*-Schlüssel, und ein Rendering, das unter seinem eigenen Pfad ausgeliefert wird, würde eine Anfrage beantworten,
 die niemand gestellt hat.
 
+`_rebase/maintenance/` ist auf dieselbe Weise reserviert. `rebase storage orphans` legt dort den
+Datensatz jedes Scans ab, in der Quelle, die er gescannt hat, damit der Prozess, der den Scan
+ausführt, und der, der seinen Status beantwortet, denselben Datensatz lesen. Ein
+Aufrufer, der einen Datensatz schreiben könnte, könnte bestimmen, was ein späteres Löschen entfernt, daher
+beantwortet auch das Lesen, Schreiben oder Auflisten des Präfixes 400. Datensätze werden 7
+Tage nach ihrem letzten Schreibvorgang gelöscht, wenn der nächste Scan dieser Quelle beginnt.
+
 ### Was ausgeliefert wird
 
 Der gespeicherte Content-Type entspricht dem, was der Uploader angegeben hat — die Bytes werden
@@ -362,8 +369,8 @@ Leiten Sie eine Eigenschaft über `storageSource` an eine Quelle weiter:
 ```ts
 {
     name: "Cover",
-    dataType: "string",
-    storage: { storageSource: "media", acceptedFiles: ["image/*"] }
+    type: "string",
+    storage: { storagePath: "covers", storageSource: "media", acceptedFiles: ["image/*"] }
 }
 ```
 
@@ -401,7 +408,7 @@ sodass eine Quelle den Provider wechseln kann, ohne die anderen zu beeinträchti
 
 ## Frontend-Speicherquellen
 
-Wenn Sie mehrere Speicher-Backends verwenden, übergeben Sie `storageSources` an den `<Rebase>`-Provider, damit das Frontend weiß, wie Uploads direkt weitergeleitet werden:
+Das Frontend erfährt die Quellen des Servers über `GET /api/storage/sources`, eine `server`-Quelle braucht also keinen Eintrag. Übergeben Sie `storageSources` an den `<Rebase>`-Provider für eine `direct`-Quelle, die direkt zu ihrem Provider hochlädt, oder um ein Label oder den Transport selbst festzulegen:
 
 ```tsx
 import { Rebase } from "@rebasepro/app";
@@ -420,7 +427,7 @@ import { Rebase } from "@rebasepro/app";
 </Rebase>
 ```
 
-Der `key` jeder Quelle muss mit einem Backend-Schlüssel übereinstimmen, der in der `storage`-Map des Servers registriert ist. Der React-Kontext `StorageSourcesContext` löst die aktive Quelle für jedes Upload-Feld auf.
+Der `key` einer `server`-Quelle muss mit einem Backend-Schlüssel übereinstimmen, der in der `storage`-Map des Servers registriert ist. Der React-Kontext `StorageSourcesContext` löst die aktive Quelle für jedes Upload-Feld auf.
 
 ## Caching und CDNs
 
@@ -442,109 +449,16 @@ Setzen Sie `STORAGE_TYPE=s3` oder `gcs`. Wenn ein **dauerhaftes Volume (Durable 
 - Binden Sie ein **persistentes Volume** über das übergeordnete Verzeichnis von `STORAGE_PATH` ein, wenn Sie lokalen Speicher unter Docker/Kubernetes verwenden, und setzen Sie `FORCE_LOCAL_STORAGE=true` — siehe [Self-Hosting](/docs/deployment/self-hosting/#file-storage)
 - Verwenden Sie **S3** oder kompatible Dienste (R2, MinIO) bzw. **GCS** für Produktions-Deployments
 - Schalten Sie aus Performancegründen ein **CDN** (CloudFront, Cloudflare) vor — siehe [Ein CDN vorschalten](/docs/backend/storage-caching/#putting-a-cdn-in-front)
-- **Jede Anwendung mit Speicher in der Produktion muss ein Zugriffsmodell deklarieren** — siehe unten.
+- **Jede Anwendung mit Speicher in der Produktion muss ein Zugriffsmodell deklarieren** — siehe
+  [Speicher-Autorisierung](/docs/backend/storage-authorization/).
   Nicht nur mandantenfähige Anwendungen: Der Server *verweigert den Start* ohne ein solches Modell.
 
 ## Objektbezogene Autorisierung
 
-### Richtlinien (Policies)
-
-Die deklarative Form. Eine Liste von Pfadmustern, die ausgewertet wird, ohne Code auszuführen:
-
-```ts
-storagePolicies: [
-    { path: "public/**", operations: ["read"], allow: "public" },
-    { path: "users/:uid/**", allow: ({ params, user }) => user?.uid === params.uid }
-]
-```
-
-**Ein Schlüssel, auf den keine Richtlinie zutrifft, wird abgelehnt.** Jede Lockerung erfordert eine explizite Zeile,
-und ein Konfigurationsfehler verweigert den Zugriff, anstatt ihn versehentlich zu gewähren.
-
-Muster matchen **nach Segmenten, niemals nach Teilzeichenfolgen** — `public/**` matcht nicht
-auf `publicity/secret.png`:
-
-| Muster | Treffer |
-|---|---|
-| `avatars/logo.png` | Exakt dieser Schlüssel |
-| `users/*/avatar.png` | Genau ein Segment an der Stelle von `*` |
-| `users/:uid/**` | Ein erfasstes Segment, danach der Rest — einschließlich leerer Pfade |
-
-`**` ist nur als abschließendes Segment zulässig. `:name` erfasst ein Segment und erstreckt
-sich nie über ein `/` hinweg; die Erfassungen werden als `params` an das Prädikat übergeben.
-
-`allow` ist `"public"` (jeder), `"authenticated"` (jeder Aufrufer mit einer UID) oder ein
-Prädikat, das die erfassten Parameter, den Benutzer, die Operation und das Bucket empfängt.
-`operations` umfasst standardmäßig alle vier: `read`, `write`, `delete`, `list`.
-
-Richtlinien erfüllen den Boot-Guard für die Produktion eigenständig, und ein fehlerhaftes Muster
-lässt den Start scheitern, anstatt erst beim ersten Upload fehlzuschlagen.
-
-### Der Hook
-
-`requireAuth` und `publicRead` sind *globale* Schalter: Sie entscheiden, ob ein Aufrufer angemeldet sein muss, nicht worauf dieser Aufrufer zugreifen darf. Ohne einen Autorisierungs-Hook **kann jeder authentifizierte Benutzer jeden Schlüssel lesen, dessen Namen er kennt** — das Einzige, was die Dateien zweier Mandanten trennt, ist die Unvorhersehbarkeit der Schlüssel, was kein tragfähiges Zugriffskontrollmodell darstellt. Schlimmer noch: Sie können zuerst `GET /storage/list?prefix=` aufrufen, sodass Schlüssel nicht einmal erraten werden müssen.
-
-:::caution[Speicher startet in der Produktion nicht ohne Modell]
-Collections werden durch Row-Level Security geschützt; Speicher nicht. Es gibt kein
-objektbezogenes Äquivalent im Bucket, daher *ist* dieser Hook das Modell — und
-`initializeRebaseBackend` **wirft beim Starten** unter `NODE_ENV=production` einen Fehler,
-wenn Speicher konfiguriert ist und keine der folgenden Optionen gesetzt wurde:
-
-- `storageAuthorize` — Ein Hook pro Objekt. Empfohlen.
-- `storagePublicRead: true` — Das Bucket dient tatsächlich als rein öffentliches Lese-CDN.
-- `storageInsecureAllowAnyAuthenticated: true` — Eine Single-Tenant-Anwendung, bei der jedem
-  angemeldeten Benutzer jede Datei anvertraut werden kann. Der Name soll zum zweimaligen Nachdenken anregen.
-
-In der Entwicklungsumgebung wird stattdessen nur eine Warnung ausgegeben. Daher kann ein Projekt hier falsch
-konfiguriert sein und lokal einwandfrei funktionieren, bis es produktiv ausgerollt wird. Ein neu generiertes Projekt
-enthält in `config/storage.ts` bereits einen Hook — prüfen Sie diesen, bevor Sie ihn ersetzen. Beachten Sie,
-dass dieser die *gemeinsame Medienbibliothek* eines CMS abbildet, was sich von benutzerspezifischen Dateien unterscheidet.
-:::
-
-`storageAuthorize` ist das Speicher-Pendant zu den Sicherheitsregeln einer Collection und wird nach der Authentifizierung auf jeder Speicher-Route ausgeführt:
-
-```typescript no-verify
-await initializeRebaseBackend({
-    storage: { type: "s3", bucket: "app-files", /* ... */ },
-    storageAuthorize: async ({ key, bucket, operation, user }) => {
-        if (!user) return false;
-        // Keys are laid out as `{teamId}/{docId}/...`
-        const [teamId] = key.split("/");
-        return isTeamMember(user.uid, teamId);
-    }
-});
-```
-
-| Feld | Beschreibung |
-|-------|-------------|
-| `key` | Objektschlüssel, bereinigt um das Bucket-Präfix und Pfad-Traversal-Muster |
-| `bucket` | Aufgelöstes Bucket (`"default"`, wenn nicht angegeben) |
-| `operation` | `"read"`, `"write"`, `"delete"` oder `"list"` |
-| `user` | `{ uid, email?, roles? }`, oder `null`, falls die Route anonymen Zugriff erlaubt |
-| `storageId` | Das benannte Backend, falls die Anfrage darauf abzielte — dessen kanonischer Schlüssel (`storageId=%20media` wird zu `"media"`). Fehlt für die Standardquelle, unabhängig davon, wie die Anfrage sie benannt hat (kein Parameter, leer oder `(default)`) |
-| `data` | Vertrauenswürdiger Lesezugriff unter **Umgehung von RLS** — `data.collection(slug).find(query)` / `.findById(id)`. Die Eigentümerschaft ist in einem Datensatz hinterlegt, nicht in einem Schlüsselpräfix; der Hook benötigt daher eine Lesemöglichkeit, um zu prüfen: „Wem gehört dieses Objekt?“. Er umgeht die Row-Level Security bewusst: Dieser Hook *ist* die Autorisierungsentscheidung. Würde er über einen Leser laufen, der bereits durch die Rechte des Aufrufers eingeschränkt ist, ergäbe sich ein Zirkelschluss. Konzeptionsbedingt schreibgeschützt. |
-
-Geben Sie `false` zurück, um mit **403** abzulehnen. Das Werfen eines Fehlers lehnt ebenfalls ab — eine Eigentumsprüfung, die fehlschlägt, öffnet das System nicht fälschlicherweise.
-
-Wissenswertes:
-
-- **Auf der Metadaten-Route wird der Lesezugriff tatsächlich entschieden.** Sie generiert das kurzlebige, pfadgebundene Download-Token, dem die Datei-Route vertraut; daher schützt der Hook den Zugriff dort. Zwei Lesearten überspringen den Hook bewusst: Erstens eine Anfrage mit einem solchen Token — der Hook hat die Anfrage beim Generieren des Tokens für genau diesen Pfad und diese Quelle freigegeben; ein Hook, der nun ablehnen würde (weil z. B. eine Mitgliedschaft inzwischen entzogen wurde), stoppt den Zugriff nicht, bevor das Token abläuft (`storageDownloadTokenTtl`, standardmäßig 300 Sekunden). Zweitens das Lesen eines Schlüssels unter `public/` durch einen Aufrufer ohne Anmeldedaten: Das Präfix deklariert, dass jeder die Datei lesen darf, einschließlich anonymer Besucher und CDNs. Ein angemeldeter Aufrufer wird dennoch geprüft, ein anonymer jedoch nicht; ein Hook kann einen `public/`-Schlüssel also nicht privat machen; speichern Sie die Datei stattdessen außerhalb von `public/`. Nur diese beiden Fälle überspringen den Hook: Ein Benutzer, den Ihr Auth-Adapter zufällig `public` nennt, wird wie jeder andere geprüft.
-- **Ein Bucket, ein Name.** Auf S3 und GCS lautet das `bucket` des Hooks immer `"default"`, auch wenn eine Anfrage das Bucket des Providers nennt, da dieselben Objekte erreicht werden.
-- **Ein Pfad ist öffentlich, wenn der referenzierte Schlüssel öffentlich ist.** Das `public/`-Präfix wird am kanonischen Schlüssel geprüft, den die Route ausliefert — nachdem ein führendes `default/`-Bucket-Segment entfernt und `//`, `./` sowie ein führendes `/` bereinigt wurden — niemals an der URL im Rohzustand. `/api/storage/file/notes://public/x.txt` referenziert den privaten Schlüssel `notes:/public/x.txt`, und der Schlüssel `default/public/x.txt` (aufgerufen als `/api/storage/file/default/default/public/x.txt`) liegt in einem Ordner namens `default`; beide sind nicht öffentlich. Prüfen Sie in einem Hook den übergebenen `key` mit `isPublicStorageKey` aus `@rebasepro/types` — `isPublicStoragePath` wertet clientseitige Pfade oder URLs aus und würde beide fälschlicherweise als öffentlich einstufen.
-- **`list` wird am Präfix autorisiert.** Über Listenoperationen lassen sich Schlüssel finden, die einem sonst nicht bekannt wären.
-- **Fortsetzbare (TUS) Uploads werden beim Erstellen autorisiert**, sodass ein abgelehnter Upload keine temporäre Datei hinterlässt.
-- Das Weglassen des Hooks behält das bisherige Verhalten bei, sodass Single-Tenant-Anwendungen nicht beeinträchtigt werden.
-
-### API-Schlüssel und Tokens
-
-Ein angemeldeter Benutzer besitzt jeden Speicher-Scope, sodass der Hook und die obigen Richtlinien
-für ihn entscheiden. Ein [API-Schlüssel](/docs/backend/api-keys/) benötigt zusätzlich den Speicher-Scope
-für die jeweilige Operation auf der in der Anfrage benannten Quelle: `storage:read` für
-Downloads, Metadaten und Listings; `storage:write` für Uploads, Ordner und alle
-Schritte eines fortsetzbaren Uploads; `storage:delete` für Löschvorgänge. Das Ziel ist die
-Quell-ID, und die Standardquelle lautet `(default)`: `storage:read:(default)`,
-`storage:write:avatars`. Fehlt der Scope, lautet die Antwort `403 SCOPE_MISSING`. Ist er vorhanden,
-wird der Hook dennoch ausgeführt — stellvertretend für die Identität des Schlüssels.
+Wer jeden Schlüssel lesen, schreiben, löschen oder auflisten darf, entscheiden `storagePolicies`
+und der Hook `storageAuthorize`, und ein API-Schlüssel braucht zusätzlich den Speicher-Scope für
+die Operation. Die Produktion verweigert den Start mit Speicher und ohne Zugriffsmodell. Siehe
+[Speicher-Autorisierung](/docs/backend/storage-authorization/).
 
 ## Auf einen Upload reagieren
 

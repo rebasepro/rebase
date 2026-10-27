@@ -17,7 +17,7 @@ Scopes come in two planes, and a person holds them differently.
 **The data plane** is `data:*`, `storage:*` and `functions:invoke`. Every
 signed-in person holds all of it. What a person may do with a row is decided by
 the collection's [security rules](/docs/collections/security-rules/), row by row,
-and what they may do with a file by the [storage policies](/docs/backend/storage/#per-object-authorization).
+and what they may do with a file by the [storage policies](/docs/backend/storage-authorization/).
 A scope never decides that for a person. On a key or a token, data-plane scopes
 narrow: a key that holds only `data:read:posts` reads `posts` and nothing else,
 whatever the rules would allow.
@@ -249,13 +249,22 @@ For keys:
   is an admin. Otherwise `403 ROLE_EXCEEDS_CREATOR`.
 - `keys:read` and `keys:write` never go on a key. A key that manages keys could
   mint its own successor. `400 KEY_MANAGEMENT_SCOPE`.
+- A holder of `keys:write` cannot change or revoke a key that holds a role or
+  scope they do not, unless they are an admin: `403 KEY_OUTRANKS_CALLER`.
+  Without this, they could widen an admin-role key to every data scope.
 
 For accounts, a holder of `users:write`:
 
-- cannot edit, reset or delete an account that holds a role or scope they do not:
+- cannot edit, reset or delete an account whose roles hold a scope they do not,
+  or `admin` when they are not an admin:
   `403 ACCOUNT_OUTRANKS_CALLER`. Without this, a support role could reset an
   admin's password and sign in as them.
-- cannot grant roles that hold more than they do: `403 ROLE_EXCEEDS_CALLER`.
+- cannot grant roles that hold more than they do, `admin` included: `403 ROLE_EXCEEDS_CALLER`.
+
+A role name may be anything except a name that would be read back as other
+roles: an empty name, or one containing `,` `{` `}` `"` `\` or a control
+character, is refused with `400 INVALID_ROLE` wherever a role is written (users,
+the users collection, service keys).
 
 ## How each credential holds scopes
 
@@ -264,7 +273,7 @@ For accounts, a holder of `users:write`:
 | A person's session | the person | the data plane, every app scope, and their roles' scopes. An admin holds everything |
 | [Service key](/docs/backend/api-keys/#service-keys) `rk_live_…` | `api-key:<id>`, with the RLS roles `service` plus its own `roles` | exactly its scopes |
 | [Personal key](/docs/backend/api-keys/#personal-keys) `rk_live_…` | its owner, with the owner's roles as they are at each request | its scopes, cut down to what the owner holds now |
-| [MCP token](/docs/ai/mcp/#the-remote-endpoint) | the person who connected it | `data:read`, `data:write`, `data:delete` as granted, optionally per collection |
+| [MCP token](/docs/ai/remote-mcp/) | the person who connected it | `data:read`, `data:write`, `data:delete` as granted, optionally per collection |
 | `REBASE_SERVICE_KEY` | `service`, with the `admin` role | everything |
 
 A key or a token never bypasses row-level security. Its scopes are one ceiling,

@@ -1,5 +1,5 @@
 ---
-sourceHash: 8dc5279c89b40f48
+sourceHash: a9c35edb64ea5e56
 title: Divisão em vários processos
 sidebar_label: Processos Divididos
 description: Execute um bundle como vários processos cooperantes — uma API, uma camada de funções, um worker — a partir da mesma imagem de runtime publicada, para que uma função customizada pesada deixe de concorrer com a API de dados.
@@ -82,11 +82,15 @@ services:
 docker compose up --scale functions=3
 ```
 
-Ambos os processos precisam da mesma `DATABASE_URL`, do mesmo `JWT_SECRET` e da mesma `REBASE_SERVICE_KEY` — eles são uma única implantação, e um token gerado por um deve ser aceito pelo outro.
+Ambos os processos precisam da mesma `DATABASE_URL`, do mesmo `JWT_SECRET` e da mesma `REBASE_SERVICE_KEY` — eles são uma única implantação, e um token gerado por um deve ser aceito pelo outro. Um processo com `REBASE_FUNCTIONS_UPSTREAM` e sem
+`REBASE_SERVICE_KEY` se recusa a inicializar: as suas próprias chamadas `rebase.functions.invoke(...)`,
+a partir de um hook ou de um cron job, chegam ao processo de funções com essa chave.
 
 ## Mantendo as mesmas URLs
 
-A variável `REBASE_FUNCTIONS_UPSTREAM` instrui o processo `api` a encaminhar `/api/functions/*` para o processo de funções em vez de servi-lo. Clientes, SDKs gerados e chaves de API enxergam exatamente a mesma superfície que viam antes da divisão, portanto nenhum código de aplicação muda e você não precisa configurar um proxy reverso para testar isso.
+A variável `REBASE_FUNCTIONS_UPSTREAM` instrui o processo `api` a encaminhar `/api/functions/*` para o processo de funções em vez de servi-lo. Ela deve ser uma URL `http://` ou
+`https://`; qualquer outra coisa interrompe a inicialização. Apenas `api` e `worker` a leem
+(veja [Cron e jobs em segundo plano](#cron-e-jobs-em-segundo-plano) para o worker). Clientes, SDKs gerados e chaves de API enxergam exatamente a mesma superfície que viam antes da divisão, portanto nenhum código de aplicação muda e você não precisa configurar um proxy reverso para testar isso.
 
 Uma implantação de produção pode preferir rotear o caminho no seu ingress; nesse caso, deixe `REBASE_FUNCTIONS_UPSTREAM` não definido — o processo `api` então responderá 404 para esses caminhos e o proxy à frente decidirá para onde eles vão.
 
@@ -149,7 +153,30 @@ Adicione um processo `worker` quando quiser trabalho agendado fora do caminho da
     environment:
       REBASE_ROLE: worker
       REBASE_MIGRATE_ON_BOOT: none
+      REBASE_SERVICE_KEY: ${REBASE_SERVICE_KEY}
+      # Only if a job calls rebase.functions:
+      REBASE_FUNCTIONS_UPSTREAM: http://functions:8080
 ```
+
+Um job que passa para um worker mantém `rebase.dataAsAdmin`, `rebase.sql`,
+`rebase.storage` e `rebase.email`, que falam diretamente com o banco de dados, os buckets e
+o servidor de e-mail. Ele também mantém:
+
+- **`rebase.admin`** (usuários, roles, redefinições de senha) **e `rebase.cron`.** Um
+  worker não serve nenhuma superfície de administração na sua porta, mas carrega esses dois em processo,
+  apenas para os seus próprios jobs.
+- **`rebase.functions`, com `REBASE_FUNCTIONS_UPSTREAM`.** Um worker não serve
+  funções. Com o upstream definido, as suas próprias chamadas `rebase.functions.invoke(...)`
+  são encaminhadas ao processo de funções, onde a função vê a
+  chamada como o serviço. O worker continua não respondendo nada em `/api/functions`
+  na sua porta. O worker precisa da `REBASE_SERVICE_KEY` da implantação para isso,
+  como a `api`.
+
+Ele perde `rebase.auth`: esses são os fluxos de login de uma pessoa, e um worker
+não serve nenhum. Para trabalho com contas a partir de um job, use `rebase.admin`. Ele também perde o
+restante da API de administração (backups, logs, o editor de schema e assim por diante), e
+`rebase.functions` quando nenhum upstream está definido. Uma chamada a qualquer um desses responde
+`404 NOT_FOUND` nomeando a superfície que está desativada e o que fazer em vez disso.
 
 Um processo `functions` nunca executa nenhum dos dois. Ele é escalado pela carga de requisições e substituído à vontade, e atribuir a ele trabalho agendado faria com que sua contagem de réplicas significasse algo que não deveria.
 
@@ -208,7 +235,7 @@ Nada verifica a *direção* — a versão do schema é um hash, portanto ela pod
 
 ## Atualização
 
-Inalterado: cada processo executa a mesma imagem publicada, portanto um upgrade consiste na mesma alteração de tag em cada um deles. Atualize a `api` por último se quiser que o provisionamento do schema ocorra em relação à nova versão primeiro — embora, na prática, a ordem não importe, pois a etapa do schema é aditiva e idempotente.
+Inalterado: cada processo executa a mesma imagem publicada, portanto um upgrade consiste na mesma alteração de tag em cada um deles. Atualize primeiro o processo que é dono do schema — a `api`, ou o Job de migração —, para que o schema da nova versão já esteja no lugar antes que os demais processos rodem contra ele: uma unidade pode ficar para trás, nunca à frente (veja [A regra](#a-regra)).
 
 ## Relacionado
 

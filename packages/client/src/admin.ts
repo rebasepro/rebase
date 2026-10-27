@@ -15,6 +15,14 @@ export interface ListUsersOptions {
     offset?: number;
     orderBy?: string;
     orderDir?: "asc" | "desc";
+    /** Only the users holding this role id (`?role=`). */
+    role?: string;
+    /**
+     * Resolve exactly these users in one round trip (`?ids=`), for turning
+     * stored ids into names. The window, search and role are ignored when it
+     * is given, and ids that name no user are left out of the answer.
+     */
+    ids?: readonly string[];
 }
 
 export function createAdmin(transport: Transport, options?: CreateAdminOptions) {
@@ -38,6 +46,8 @@ export function createAdmin(transport: Transport, options?: CreateAdminOptions) 
         if (options?.search) params.set("search", options.search);
         if (options?.orderBy) params.set("orderBy", options.orderBy);
         if (options?.orderDir) params.set("orderDir", options.orderDir);
+        if (options?.role) params.set("role", options.role);
+        if (options?.ids) params.set("ids", options.ids.join(","));
         const qs = params.toString();
         return transport.request<{ users: AdminUser[]; total: number; limit: number; offset: number }>(
             adminPath + "/users" + (qs ? "?" + qs : ""), { method: "GET" }

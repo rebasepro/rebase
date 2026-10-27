@@ -1,5 +1,5 @@
 ---
-sourceHash: ed69210a7093e29f
+sourceHash: a5bdb4bcc6886af4
 title: Desplegar Rebase en Fly.io
 description: Aprende cómo desplegar Rebase globalmente o restringirlo a centros de datos europeos usando Fly.io.
 sidebar_label: Fly.io
@@ -67,8 +67,6 @@ primary_region = "fra"
 ```
 
 `/livez` en lugar de `/health`: el segundo realiza un viaje de ida y vuelta a la base de datos, por lo que una comprobación de actividad (liveness check) en él reiniciaría una máquina en buen estado durante un breve fallo temporal de la base de datos.
-
-`DISABLE_SELF_REGISTRATION` es nuevo: en 0.17.3 no existe dicho modificador, y la primera cuenta en registrarse se convierte en el administrador.
 
 Actualizar Rebase más adelante consiste simplemente en cambiar esa línea `FROM`. Tu bundle no se modifica.
 

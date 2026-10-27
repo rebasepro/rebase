@@ -33,9 +33,7 @@ export default defineFunction((app) => {
 
 This mounts at **`/api/functions/hello`**. The filename (without extension) becomes the route prefix.
 
-`POST`, because that is what the SDK sends by default — see
-[Invoke from the client](#invoke-from-the-client). A `GET` route is just as
-valid; the caller then has to say `{ method: "GET" }`.
+`POST`, because that is what the SDK sends by default — see [Invoke from the client](#invoke-from-the-client). A `GET` route is just as valid; the caller then has to say `{ method: "GET" }`.
 
 `rebase dev` watches the functions directory, so a file added while it is
 running is mounted on the next reload — no restart. (It has to be told: the
@@ -96,7 +94,7 @@ See [Runtime portability](#runtime-portability) for the full contract.
 ## Configuration
 
 :::note[Where this goes]
-**Managed runtime:** nothing to configure — the runtime discovers `backend/functions/` on its own (`functions` in the backend app's `rebase.json` entry if you moved it). `REBASE_FUNCTIONS_ONLY` / `REBASE_FUNCTIONS_EXCLUDE` narrow which ones a process serves.
+**Managed runtime:** nothing to configure — the runtime discovers `backend/functions/` on its own (`functions` in the backend app's `rebase.json` entry if you moved it). `REBASE_FUNCTIONS_ONLY` / `REBASE_FUNCTIONS_EXCLUDE` narrow which ones a `REBASE_ROLE=functions` process serves; any other role refuses to boot with them set.
 **Ejected:** `initializeRebaseBackend({ functionsDir })`, or `functions` (below), in `backend/src/index.ts`.
 :::
 
@@ -561,7 +559,7 @@ declare function notifyFulfilment(url: string, session: Record<string, string>):
 
 ## Debugging
 
-When a function is loaded successfully, you'll see:
+When functions load, the boot logs `Loaded custom functions` with their count. Each function's own line is logged at `debug` (`LOG_LEVEL=debug`):
 
 ```
 ⚡ Loaded function route: hello
@@ -574,6 +572,8 @@ If loading fails, the loader provides diagnostic output:
   export type: object (SomeClass)
   prototype methods: constructor, someMethod
   Hint: ensure the function exports a Hono app created with the same hono version as the server.
+  Author with `defineFunction(...)` from @rebasepro/server/functions for a typed, checked contract.
+  The loader checks for .fetch() and .routes — any Hono-compatible app will work.
 ```
 
 The router is mounted for the **directory**, not for the functions in it. If every file fails to import — one missing environment variable at module scope is enough to take all of them down — `GET /api/functions` still answers `200` with an empty list plus a `skipped` count, so "nothing loaded" is distinguishable from "this build shipped no functions". The listing itself requires a signed-in caller, an API key holding the plain `functions:invoke` scope, or the service key — the functions stay callable by whoever each one admits, but the inventory of them is not public. The reasons stay in the boot log.

@@ -1,5 +1,5 @@
 ---
-sourceHash: 2d930362e74e2a12
+sourceHash: 8f3cdbfa7f75e54b
 title: Collections
 sidebar_label: Collections
 description: Collections sind der zentrale Baustein von Rebase – jede Collection wird auf eine Datenbanktabelle abgebildet und definiert deren Schema, Relationen, Sicherheit und UI-Verhalten.
@@ -50,14 +50,15 @@ const products = defineCollection({
     }
 ```
 
-Die geprüften Felder sind `display`, `sort`, `propertiesOrder` und `listProperties`.
-Neben einem einfachen Property-Schlüssel werden drei Formen akzeptiert:
+Die geprüften Felder sind `display`, `sort`, `propertiesOrder`, `listProperties`,
+`previewProperties`, `orderProperty` und die Filter `defaultFilter`, `fixedFilter`
+und `filterPresets`. Neben einem einfachen Property-Schlüssel werden drei Formen akzeptiert:
 
 | Form | Beispiel | Hinweise |
 | --- | --- | --- |
-| Pfad mit Punktnotation in eine `map` | `"profile.displayName"` | Die **Root** muss eine echte Property sein; der darunter liegende Pfad wird nicht geprüft. |
+| Pfad mit Punktnotation in eine `map` | `"profile.displayName"` | Die **Root** muss eine echte Property sein; der darunter liegende Pfad wird nicht geprüft. Nicht bei `previewProperties` / `orderProperty`, die einen Schlüssel der obersten Ebene erwarten. |
 | Spalte einer Child-Collection | `"subcollection:orders"` | Nur `propertiesOrder` / `listProperties`. |
-| Ein `additionalFields`-Schlüssel | `"score" as AdditionalFieldKey` | Erfordert den Cast – siehe unten. |
+| Ein `additionalFields`-Schlüssel | `"score" as AdditionalFieldKey` | Nur bei `propertiesOrder` / `listProperties`. Erfordert den Cast – siehe unten. |
 
 `AdditionalFieldDelegate.key` ist ein einfacher `string`, daher kann das Typsystem nicht wissen,
 welche zusätzlichen Schlüssel eine Collection deklariert. Anstatt diese Felder für jeden beliebigen String zu öffnen,
@@ -172,7 +173,7 @@ der Authoring-Typ.
 :::note[Warum ein BaaS-Projekt keinen Overhead hat]
 Ein Property-Typ in einer BaaS-Installation besitzt kein `Field`, kein `columnWidth`, kein
 `hideFromCollection` – diese befinden sich in `AdminPropertyOptions` im Admin-Paket. Die
-Garantie wird nicht nur behauptet, sondern überprüft: `e2e/baas-typecheck/src/admin_absent.ts` verwendet
+Garantie wird nicht nur behauptet, sondern überprüft: `tests/e2e/baas-typecheck/src/admin_absent.ts` verwendet
 `@ts-expect-error` auf `admin`, sodass der Build fehlschlägt, falls das Feld im
 Core jemals wieder beschreibbar werden sollte.
 :::
@@ -182,7 +183,7 @@ Core jemals wieder beschreibbar werden sollte.
 Vor Version 0.11 befanden sich diese Felder auf der obersten Ebene. Um sie zu verschieben:
 
 ```bash
-node scripts/codemod/collections-admin-block.mjs config/collections
+node tooling/scripts/codemod/collections-admin-block.mjs config/collections
 ```
 
 Es meldet alles, was nicht sicher verschoben werden kann – insbesondere Darstellungsoptionen innerhalb von
@@ -333,7 +334,7 @@ Und innerhalb von `admin`, da nur das Panel sie darstellt:
 | Property | Typ | Beschreibung |
 |----------|------|-------------|
 | `admin.entityActions` | `EntityAction[]` | Benutzerdefinierte Aktionen auf Entities (Archivieren, Veröffentlichen etc.) |
-| `admin.Actions` | `React.ComponentType` | Benutzerdefinierte Komponente für Toolbar-Aktionen |
+| `admin.Actions` | `ComponentRef<CollectionActionsProps>[]` | Benutzerdefinierte Komponenten für Toolbar-Aktionen |
 | `admin.entityViews` | `EntityCustomView[]` | Benutzerdefinierte Tabs in der Entity-Detailansicht |
 | `admin.additionalFields` | `AdditionalFieldDelegate[]` | Berechnete/virtuelle Spalten |
 | `admin.exportable` | `boolean \| ExportConfig` | Datenexport aktivieren |
@@ -416,14 +417,14 @@ Fehler für unbekannte Schlüssel abgelehnt.
 
 ### Auswahl der Titel-Property
 Wenn `display.title` nicht festgelegt ist, wird die Property, die als Anzeige-Titel der Entity verwendet wird (Vorschauen, Überschriften), automatisch aufgelöst:
-1. Wenn `propertiesOrder` explizit definiert ist, wird die erste Property (außer der ID), die entweder vom Typ `relation` oder `string` ist, als Titel ausgewählt.
-2. Wenn keine `propertiesOrder` definiert ist, durchsucht das Framework die Properties der Reihe nach und wählt die erste Property vom Typ `string` aus.
+1. Wenn `propertiesOrder` explizit definiert ist, wird die erste Property in dieser Reihenfolge ausgewählt, die ein Titel sein kann: ein `string`, eine `relation` mit Kardinalität eins oder eine `reference`. Bezeichner (Primär- und Fremdschlüssel, `uuid`-Spalten, `isId`), Datei-Upload-Felder und versteckte Properties kommen nie infrage.
+2. Wenn keine `propertiesOrder` definiert ist, werden dieselben Kandidaten gerankt: zuerst ein String, dessen Schlüssel ein Label benennt (`name`, `title`, `label`, …), dann kurzer Klartext, eine E-Mail, ein Enum, langer Text, eine Relation oder ein User-Picker und zuletzt eine Reference. Bei Gleichstand entscheidet die Deklarationsreihenfolge.
 
 ### Relation-Vorschauen in Tabellen
 Wenn `propertiesOrder` explizit gesetzt ist, werden Relation-Properties **nicht** automatisch aus den Standard-Vorschau-Spalten herausgefiltert (während sie bei ungeordneten Standardeinstellungen ausgeschlossen werden, um langsame Join-Operationen zu vermeiden).
 
 ### Wie ein Titelwert gerendert wird
-Ganz gleich, was die Titel-Property enthält, das Panel rendert einen String. Ein Datum wird formatiert, ein Array zusammengefügt und eine Relation – die als `{ id, data: { values } }` anstelle von reinem Text ankommt – wird in der zugehörigen Zeile nach der ersten Übereinstimmung von `name`, `title`, `label` oder `displayName` durchsucht, mit Fallback auf deren ID. So kann ein Titel eine `relation`-Property referenzieren und dennoch als Name statt als UUID lesbar sein.
+Ganz gleich, was die Titel-Property enthält, das Panel rendert einen String. Ein Datum wird formatiert, ein Array zusammengefügt und eine Relation – die als `{ id, data: { values } }` anstelle von reinem Text ankommt – wird in der zugehörigen Zeile nach der ersten Übereinstimmung von `name`, `title`, `label` oder `displayName` durchsucht, danach nach ihrem ersten kurzen String-Wert, mit Fallback auf deren ID. So kann ein Titel eine `relation`-Property referenzieren und dennoch als Name statt als UUID lesbar sein.
 
 Dies ist kein exportierter Helper: Es ist genau das, was jede Oberfläche, die einen Datensatz anzeigt, bereits automatisch tut. Es muss nichts aufgerufen und nichts importiert werden.
 

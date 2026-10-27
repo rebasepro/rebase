@@ -1,5 +1,5 @@
 ---
-sourceHash: fa5ea5eeb92e1460
+sourceHash: d672b029e72aca9e
 title: L'API context.data
 sidebar_label: API context.data
 description: Leggi e scrivi altre collection dall'interno di un callback con context.data — i suoi metodi, i privilegi con cui viene eseguito, la semantica transazionale e la connessione che un callback occupa.
@@ -38,10 +38,10 @@ Ogni funzione di accesso alla collezione (`context.data.<slug>`) fornisce questi
 
 | Metodo | Firma | Descrizione |
 |--------|-----------|-------------|
-| `.find()` | `find(params?: FindParams) → FindResponse` | Interroga entità con filtri, ordinamento e paginazione |
-| `.findById()` | `findById(id: string \| number) → Entity \| undefined` | Recupera una singola entità per ID |
-| `.create()` | `create(data: Partial<Values>, id?: string) → Entity` | Crea una nuova entità |
-| `.update()` | `update(id: string \| number, data: Partial<Values>) → Entity` | Aggiorna un'entità esistente |
+| `.find()` | `find(params?: FindParams) → FindResult` | Interroga entità con filtri, ordinamento e paginazione |
+| `.findById()` | `findById(id: string \| number) → Row \| undefined` | Recupera una singola riga per ID |
+| `.create()` | `create(data: Insert, id?: string \| number) → Row` | Crea una nuova riga e la restituisce come memorizzata |
+| `.update()` | `update(id: string \| number, data: Update) → Row` | Aggiorna una riga esistente e la restituisce come memorizzata |
 | `.delete()` | `delete(id: string \| number) → void` | Elimina un record |
 | `.count()` | `count(params?: FindParams) → number` | Conta le entità corrispondenti |
 | `.listen()` | `listen(params, onUpdate, onError?) → unsubscribe` | Sottoscrizione in tempo reale (dove supportato) |
@@ -50,7 +50,7 @@ Ogni funzione di accesso alla collezione (`context.data.<slug>`) fornisce questi
 
 ## Interrogare con `.find()`
 
-Il metodo `find()` filtra con tuple `[operatore, valore]` — la forma tipizzata della stringa di query `?status=eq.published` letta dall'API REST:
+Il metodo `find()` filtra con tuple `[operator, value]` — la forma tipizzata della stringa di query `?status=eq.published` letta dall'API REST:
 
 ```typescript
 afterSave: async ({ values, context }) => {

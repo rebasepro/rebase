@@ -18,6 +18,7 @@ import {
     findBackendDir,
     findDevDir,
     envDeclaredProject,
+    envAppToken,
     autoDiscoverLocal,
     describeForeignDevServer,
     explainToolError,
@@ -1535,6 +1536,44 @@ describe("the environment block outranks the persisted registry", () => {
         rmSync(dir, { recursive: true, force: true });
     });
 
+    it("does not send the local service key to a remote REBASE_BASE_URL", async () => {
+        // `rebase cloud init --claim` (or rebase_cloud_provision with
+        // deploy: false) writes REBASE_BASE_URL for the cloud tenant and mints
+        // no REBASE_API_TOKEN. The .env's REBASE_SERVICE_KEY is this machine's
+        // dev backend's admin secret; the tenant does not take it, and runs
+        // agent-written code that must never see it.
+        const dir = mkdtempSync(join(tmpdir(), "rebase-mcp-env-"));
+        writeFileSync(join(dir, ".env"), `REBASE_SERVICE_KEY=${"s".repeat(40)}\n`);
+        const warn = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+        const mod = await bootWith(persistedDefault(join(dir, "stale")), {
+            REBASE_PROJECT_DIR: dir,
+            REBASE_BASE_URL: "https://todo-x.rebase.website"
+        });
+
+        const current = await currentProject(mod);
+        expect(current.baseUrl).toBe("https://todo-x.rebase.website");
+        expect(current.hasToken).toBe(false);
+        const written = warn.mock.calls.map((c) => String(c[0])).join("");
+        expect(written).toContain("REBASE_API_TOKEN");
+        expect(written).toContain("todo-x.rebase.website");
+        warn.mockRestore();
+        rmSync(dir, { recursive: true, force: true });
+    });
+
+    it("still uses the local service key for a loopback REBASE_BASE_URL", async () => {
+        const dir = mkdtempSync(join(tmpdir(), "rebase-mcp-env-"));
+        writeFileSync(join(dir, ".env"), `REBASE_SERVICE_KEY=${"s".repeat(40)}\n`);
+        const mod = await bootWith(persistedDefault(join(dir, "stale")), {
+            REBASE_PROJECT_DIR: dir,
+            REBASE_BASE_URL: "http://localhost:4321"
+        });
+
+        const current = await currentProject(mod);
+        expect(current.hasToken).toBe(true);
+        expect(current.tokenPrefix).toBe("ssssssss...");
+        rmSync(dir, { recursive: true, force: true });
+    });
+
     it("keeps the persisted default when the client declares none of the three", async () => {
         const dir = mkdtempSync(join(tmpdir(), "rebase-mcp-env-"));
         const mod = await bootWith(persistedDefault(join(dir, "kept")), {});
@@ -1677,11 +1716,35 @@ describe("the environment block outranks the persisted registry", () => {
 
     it("reports nothing when the environment is silent", () => {
         expect(envDeclaredProject({} as NodeJS.ProcessEnv)).toBeNull();
-        expect(envDeclaredProject({ REBASE_TOKEN: "rk_x" } as NodeJS.ProcessEnv)).toEqual({
+        expect(envDeclaredProject({ REBASE_API_TOKEN: "rk_x" } as NodeJS.ProcessEnv)).toEqual({
             projectDir: undefined,
             baseUrl: undefined,
             token: "rk_x"
         });
+    });
+
+    it("never takes the CLI's control-plane token (REBASE_TOKEN) as the app's key", () => {
+        // `init --claim` points REBASE_BASE_URL at a cloud tenant running
+        // agent-written code; a deploy token for the person's real projects
+        // must not be sent there.
+        expect(envDeclaredProject({
+            REBASE_BASE_URL: "https://todo-x.rebase.website",
+            REBASE_TOKEN: "rk_live_control_plane"
+        } as NodeJS.ProcessEnv)).toEqual({
+            projectDir: undefined,
+            baseUrl: "https://todo-x.rebase.website",
+            token: undefined
+        });
+        expect(envDeclaredProject({ REBASE_TOKEN: "rk_live_control_plane" } as NodeJS.ProcessEnv)).toBeNull();
+    });
+
+    it("says once that REBASE_TOKEN is no longer sent to the app", () => {
+        const notes: string[] = [];
+        const env = { REBASE_TOKEN: "rk_live_control_plane" } as NodeJS.ProcessEnv;
+        expect(envAppToken(env, (m) => notes.push(m))).toBeUndefined();
+        expect(envAppToken(env, (m) => notes.push(m))).toBeUndefined();
+        expect(notes.length).toBeLessThanOrEqual(1);
+        expect(envAppToken({ REBASE_API_TOKEN: "rk_app", REBASE_TOKEN: "rk_cp" } as NodeJS.ProcessEnv, (m) => notes.push(m))).toBe("rk_app");
     });
 });
 
@@ -1715,6 +1778,14 @@ describe("local discovery fills gaps only", () => {
         expect(written).toContain("http://localhost:3070");
         expect(written).toContain("registered URL wins");
         warn.mockRestore();
+    });
+
+    it("does not fill an empty token with the dev server's key for a remote baseUrl", () => {
+        // The discovered key is the local dev server's admin secret; a project
+        // registered against another host has no use for it.
+        const resolved = autoDiscoverLocal({ ...registered, token: "" }, devState);
+        expect(resolved.baseUrl).toBe("https://staging.example.com");
+        expect(resolved.token).toBe("");
     });
 
     it("leaves the project alone when no dev server is running", () => {
@@ -2223,13 +2294,37 @@ describe("rebase_cloud_provision", () => {
         expect(result.content[0].text).toContain("rate_limited");
     });
 
+    it("says what to do when the control plane has not switched provisioning on", async () => {
+        cliPrints(JSON.stringify({ error: {
+            code: "not_configured",
+            message: "Provisioning without an account is not enabled on this control plane."
+        } }), 1);
+        const result = await call({});
+        expect(result.isError).toBe(true);
+        const text = result.content[0].text;
+        // The way forward is the server's own text, before the fenced refusal.
+        expect(text.indexOf("rebase cloud login")).toBeGreaterThanOrEqual(0);
+        expect(text.indexOf("rebase cloud login")).toBeLessThan(text.indexOf("UNTRUSTED_DATA"));
+        expect(text).toContain("not enabled on this control plane");
+    });
+
+    it("does not tell an agent that asked for no deploy to fix a deploy", async () => {
+        cliPrints(JSON.stringify({ ...RESULT, adminUrl: null, deploy: null }), 0);
+        const result = await call({ deploy: false });
+        const next = (JSON.parse(result.content[0].text) as { next: string }).next;
+        expect(next).not.toContain("fix what");
+        expect(next).toContain("as asked");
+    });
+
     it("keeps a name a value, never a flag, and refuses one argv must not carry", () => {
         expect(cloudProvisionArgv({ name: "--url=https://evil.example" })).toEqual(
             ["cloud", "init", "--claim", "--json", "--name=--url=https://evil.example"]
         );
         expect(cloudProvisionArgv({ deploy: false })).toEqual(["cloud", "init", "--claim", "--json", "--no-deploy"]);
         expect(() => cloudProvisionArgv({ name: "a\nb" })).toThrow();
-        expect(() => cloudProvisionArgv({ name: "x".repeat(61) })).toThrow();
+        // The control plane's own limit, not a tighter one of this server's.
+        expect(cloudProvisionArgv({ name: "x".repeat(200) })).toContain(`--name=${"x".repeat(200)}`);
+        expect(() => cloudProvisionArgv({ name: "x".repeat(201) })).toThrow();
         expect(() => cloudProvisionArgv({ name: 42 })).toThrow();
         expect(() => cloudProvisionArgv({ deploy: "no" })).toThrow();
     });

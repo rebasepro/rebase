@@ -158,7 +158,7 @@ A row someone else deleted is the one case that is not rolled back. A queued `de
 
 The cascade is narrow: an `update` is discarded along with the write it edited, because it can only fail the same way. A later `create` or `delete` for the same row stands on its own and is kept. A refused `create` of a row created offline also takes with it every queued write, in any collection, whose values reference the row's temporary id. A discarded write was never sent. It is reported with a `RebaseApiError` whose `code` is `DEPENDENCY_REJECTED` and whose `cause` is the refusal that doomed it, so you can tell it from the write the server actually refused. On 0.23 it carries the refused write's own error instead.
 
-Consecutive edits to one row while offline are merged into a single queued write, so a form being typed into does not grow the queue. If the server refuses the merged write over its contents (a 400, 403 or 422 — say, a field removed by a schema change while the user was offline), the engine splits it back into the separate edits and replays each one. Only the edit the server refuses is rolled back and reported; the others are kept.
+Consecutive edits to one row while offline are merged into a single queued write, so a form being typed into does not grow the queue. A write the queue has started sending is not merged into: an edit made after a replay attempt whose answer was lost queues as an update of its own, and a delete of a row created offline is sent rather than cancelled against its create, since the server may already hold the row. If the server refuses the merged write over its contents (a 400, 403 or 422 — say, a field removed by a schema change while the user was offline), the engine splits it back into the separate edits and replays each one. Only the edit the server refuses is rolled back and reported; the others are kept.
 
 ### Conflicts
 
@@ -181,7 +181,7 @@ const client = createRebaseClient({
 
 The queue waits while `onConflict` runs, so it can ask the user. If it throws, the edit is overwritten.
 
-The version an edit is made against is the one the row's last read reported: `findById()`, a `listenById()` frame, or the answer to an earlier `update()`. A row last read in a `find()` or `listen()` list has no version, and neither has an edit made on top of another queued write to the same row. Those replay without a precondition. An `ifMatch` you pass to `update()` yourself is kept when the edit queues.
+The version an edit is made against is the one the row's last read reported: `findById()`, a `listenById()` frame, or the answer to an earlier `update()`. A row last read in a `find()` or `listen()` list has no version, and neither has an edit made on top of another queued write to the same row. Those replay without a precondition. An `ifMatch` you pass to `update()` or `delete()` yourself is kept when the write queues, with or without `onConflict`, and `findById()` on an offline-enabled client returns the row with its version, so `etagOf(row)` works as it does online. Without `onConflict`, a queued write refused over your own `ifMatch` is rolled back and reported to `onSyncError` with a 412 `PRECONDITION_FAILED`.
 
 A failure that is merely temporary — a 429, a 503, a dropped connection — is not a rejection. Those stay queued and are retried; only after `maxRetries` deferrals does a write get rolled back.
 
@@ -234,7 +234,10 @@ replays until the session is confirmed: when the connection is back the
 client refreshes the session, and a sign-in confirms it too. If the server
 refuses the session, or someone else signs in, the device switches users, and
 the queued writes stay with their author until they sign in again. Meanwhile
-`status().unverifiedUser` is `true`.
+`status().unverifiedUser` is `true`, and that holds online too: until the
+refresh answers, writes queue rather than go out without credentials, and reads
+are answered from the user's local rows. What the server sends a request with
+no session is what a signed-out caller may see, so it is not kept.
 
 ```typescript
 createRebaseClient({

@@ -1,11 +1,11 @@
 import React from "react";
-import { AbsoluteFill, OffthreadVideo, Sequence, staticFile, useCurrentFrame, useVideoConfig } from "remotion";
+import { AbsoluteFill, OffthreadVideo, Sequence, staticFile, useCurrentFrame } from "remotion";
 import { ramp, SHIFT } from "../components/motion";
 import { Mark } from "../components/Mark";
 import { FONT, RADIUS, SURFACE, TRACKING } from "../theme";
 import { useTone } from "../Plane";
 import { cell, Editor, TIMING } from "./Editor";
-import { Callout, type CalloutSpec, Drift, type Focus, GUTTER, LEAD, ProductWindow, SIZE, Verb, WINDOW, Word } from "./kit";
+import { Callout, type CalloutSpec, type Focus, GUTTER, LEAD, WINDOW_LANDS, ProductWindow, SIZE, Verb, WINDOW, Word } from "./kit";
 import { BAR, BEAT, FPS } from "./score";
 
 /**
@@ -63,7 +63,10 @@ function beats(
             { label: b.label, text: b.text, target: b.target, at: B_ON },
         ],
         focus: [
-            { at: 0, target: a.target, scale: a.scale },
+            // The first move waits for the window to land: started on the
+            // downbeat, the push accelerated while the entrance decelerated
+            // and the frame read as a stall followed by a lurch.
+            { at: WINDOW_LANDS, target: a.target, scale: a.scale },
             { at: MOVE_AT, target: b.target, scale: b.scale },
         ],
     };
@@ -75,15 +78,13 @@ const inEditor = (x: number, y: number): [number, number] => [x / WINDOW.width, 
 export const Build: React.FC = () => {
     const row = cell(5, 35);
     const listen = cell(8, 0);
-    const { callouts, focus } = beats(
+    const { callouts } = beats(
         {
             label: "Typed SDK",
             text: "Autocomplete from your own tables.",
             // The "products" row of the completion list.
             target: inEditor(row.x + 30, row.y + 4 + 1 + 6 + 3 * 42 + 21),
-            // Code is legible at full size; a nudge, not a push, so the
-            // left margin and the tab stay in frame.
-            scale: 1.06,
+            scale: 1,
         },
         {
             label: "Realtime",
@@ -91,14 +92,20 @@ export const Build: React.FC = () => {
             // In the margin left of the line number, so the ring frames the
             // line without sitting on its first letters.
             target: inEditor(24, listen.y + 22),
-            // Pulls back out, so the event arriving in the corner is seen.
             scale: 1,
         },
     );
+    // No camera on code. Text cannot move slower than a pixel at a time: the
+    // browser snaps glyphs to the pixel grid, so a slow push held the code
+    // still and then jumped it a pixel every five to nine frames, and the push
+    // itself sped up while the window's entrance slowed down, so the two
+    // motions met as a stall and a lurch (Francesco, 2026-10-21: "when the
+    // code zooms in, it feels glitchy"). Code is legible at full size, and
+    // with nothing scaling under them the callout rings stay on their lines.
     return (
         <AbsoluteFill>
             <Verb word="Build." product="The backend" />
-            <ProductWindow focus={focus}>
+            <ProductWindow>
                 <Editor />
             </ProductWindow>
             <Callouts items={[{ ...callouts[0], at: TIMING.popup + 4 }, callouts[1]]} />
@@ -159,20 +166,20 @@ export const Claim: React.FC = () => {
     const frame = useCurrentFrame();
     const tone = useTone();
     return (
-        <Drift frames={BAR * 2}>
+        <AbsoluteFill>
             <div style={{ position: "absolute", left: GUTTER, top: 290, display: "flex", flexDirection: "column", rowGap: 6 }}>
                 {CLAIMS.map((text, i) => {
                     const at = i * BEAT * 2;
                     const next = (i + 1) * BEAT * 2;
                     const current = i === CLAIMS.length - 1 || frame < next;
                     return (
-                        <Word key={text} at={at} size={SIZE.list} color={current ? tone.high : tone.muted}>
+                        <Word key={text} at={at} size={SIZE.line} slam color={current ? tone.high : tone.muted}>
                             {text}
                         </Word>
                     );
                 })}
             </div>
-        </Drift>
+        </AbsoluteFill>
     );
 };
 
@@ -189,14 +196,15 @@ const CMD_ROW = 56 + 70 + 20 + 32;
 
 export const EndCard: React.FC = () => {
     const frame = useCurrentFrame();
-    const { durationInFrames } = useVideoConfig();
     const tone = useTone();
-    const push = 1 + 0.06 * (frame / durationInFrames);
+
     const grow = ramp(frame, BAR - LEAD, 30, SHIFT);
     const cmd = ramp(frame, BAR - LEAD, 24);
     const url = ramp(frame, BAR + BEAT - LEAD, 24);
     return (
-        <AbsoluteFill style={{ alignItems: "center", justifyContent: "center", transform: `scale(${push})` }}>
+        // No slow push-in: type scaled by a fraction of a pixel a frame snaps
+        // to the grid and twitches. The ribbon behind it carries the motion.
+        <AbsoluteFill style={{ alignItems: "center", justifyContent: "center" }}>
             <div style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 40 }}>
                     {/* The brand's own entrance: the facets assemble in a wave

@@ -327,9 +327,11 @@ export interface ViaRelation extends RelationBase {
      * The joins, in order, from this collection's table to the target's.
      *
      * Each step names a table and the columns to join it on; the last step's
-     * table is the target. Read-only, because Rebase will not work out how to
-     * write through an arbitrary chain, and guessing is what this kind exists to
-     * stop.
+     * table is the target. A single-hop chain is writable through a create or
+     * update — to-one in one step (the target holds the key), to-many through
+     * one junction table — and a longer one is read-only, because Rebase will
+     * not work out how to write through an arbitrary chain, and guessing is
+     * what this kind exists to stop.
      */
     joinPath: JoinStep[];
 }
@@ -405,8 +407,12 @@ export interface ResolvedRelationBase {
      */
     cardinality: "one" | "many";
     /**
-     * Whether Rebase knows how to write through this link. False only for
-     * {@link ResolvedVia}, whose join chain it will not invent a write for.
+     * Whether Rebase writes this link through a create or update. True for
+     * every kind but a multi-hop {@link ResolvedVia}: a `via` is writable when
+     * it has a single link to set — a to-one chain of one step (the target
+     * holds the key) or a to-many chain through one junction table — and
+     * read-only otherwise, since Rebase will not invent a write for a longer
+     * chain.
      */
     writable: boolean;
     /**
@@ -494,7 +500,12 @@ export interface ResolvedManyToMany extends ResolvedRelationBase {
 /** @group Models */
 export interface ResolvedVia extends ResolvedRelationBase {
     kind: "via";
-    writable: false;
+    /**
+     * True for a single-hop chain — to-one through one step, or to-many through
+     * one junction table — and false for anything longer. See
+     * {@link ResolvedRelationBase.writable}.
+     */
+    writable: boolean;
     /** The chain as authored — see {@link ViaRelation.joinPath}. Nothing to default. */
     joinPath: JoinStep[];
 }

@@ -1,5 +1,5 @@
 ---
-sourceHash: 8b0cf8dec1186f45
+sourceHash: f7939e13ff2b006a
 title: Datenbank-Befehle
 sidebar_label: Datenbank-Befehle
 description: Die rebase-db-Befehle — push, generate und migrate, Backups und Wiederherstellungen, eine Kopie ziehen, der Verbindungsstring, die verwaltete Entwicklungsdatenbank und Branches.
@@ -48,7 +48,7 @@ Generiert SQL-Migrationsdateien aus Schema-Änderungen:
 rebase db generate
 ```
 
-Erstellt mit Zeitstempeln versehene Migrationsdateien in `drizzle/migrations/`, die überprüft und committed werden können.
+Erstellt mit Zeitstempeln versehene Migrationsdateien in `backend/drizzle/migrations/`, die überprüft und committed werden können.
 
 ### `rebase db migrate`
 
@@ -261,7 +261,7 @@ unter 0.24 sagt es „Nothing was changed.“ und beendet sich mit 0. `list` und
 Datenbank, auf der kein Branch angelegt wurde, hat keine, und sie legen dort kein `rebase`-Schema an.
 Unter 0.24 legen sie das Register an.
 
-`diff` zeigt, was ein Branch gegenüber der Datenbank geändert hat, aus der er erstellt wurde: hinzugefügte, entfernte oder geänderte Tabellen, Spalten und RLS-Richtlinien, und pro Tabelle die Zeilen, die er eingefügt, aktualisiert und gelöscht hat. Zeilen, die der Elternteil seitdem selbst geändert hat, werden getrennt gezählt, und Zeilen, die beide geändert haben, sind Konflikte. `--json` gibt den ganzen Diff aus, mit bis zu `--sample-limit` Zeilen pro Tabelle (Standard 100). Er liest beide Datenbanken und ändert keine; zusammengeführt wird in Studio – siehe [Einen Branch prüfen und zusammenführen](/docs/backend/branching/#reviewing-and-merging-a-branch).
+`diff` zeigt, was ein Branch gegenüber der Datenbank geändert hat, aus der er erstellt wurde: hinzugefügte, entfernte oder geänderte Tabellen, Spalten, Constraints, Indizes, Trigger, RLS-Richtlinien, Enum-Typen, Views und Funktionen, und pro Tabelle die Zeilen, die er eingefügt, aktualisiert und gelöscht hat. Zeilen, die der Elternteil seitdem selbst geändert hat, werden getrennt gezählt, und Zeilen, die beide geändert haben, sind Konflikte. `--json` gibt den ganzen Diff aus, mit bis zu `--sample-limit` Zeilen pro Tabelle (Standard 100). Er liest beide Datenbanken und ändert keine; zusammengeführt wird in Studio – siehe [Einen Branch prüfen und zusammenführen](/docs/backend/branching/#reviewing-and-merging-a-branch).
 
 `switch` speichert den Branch in `.rebase/branch.json` und bearbeitet `.env` niemals. Es
 hat Vorrang vor `DATABASE_URL` in `.env` und unterliegt `--database-url` oder einer

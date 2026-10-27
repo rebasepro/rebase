@@ -2,6 +2,7 @@
 sourceHash: 3e450f0960514c50
 title: "API de Cron Jobs"
 sidebar_label: "API de Cron Jobs"
+description: "Liste, dispare, pause e retome cron jobs pela REST API, ou com o `client.cron` do SDK tipado."
 ---
 
 ## REST API

@@ -320,6 +320,13 @@ type SubscriptionGroup = {
      * {@link RealtimeService.recountIntervalMs} allows. See `collectionMeta`.
      */
     lastCount?: { total: number; at: number };
+    /**
+     * The refetch that counts the list again once its reused total expires.
+     * A frame that reused a total may be the last one for a while: a
+     * count-only frame is nothing but that total, so the next equals it and is
+     * not sent, and without this the total stayed wrong until the next write.
+     */
+    recountTimer?: ReturnType<typeof setTimeout>;
     /** Whether the group's frames carry the row's `ETag`. See {@link Subscription.etag}. */
     etag?: boolean;
     authContext?: SubscriptionAuthContext;
@@ -631,6 +638,14 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
     private refetchQueue = new Set<SubscriptionGroup>();
     /** Group refetches running now — at most {@link maxConcurrentRefetches}. */
     private refetchesRunning = 0;
+    /**
+     * What a group refetch runs inside — see {@link setScopeRunner}. A refetch
+     * runs on a timer armed by whatever announced the change; one armed by a
+     * change-capture notification inherits the LISTEN connection's context,
+     * which is no backend's, so a hook the read reached saw the process
+     * default as `rebase`.
+     */
+    private runInScope: <T>(fn: () => T) => T = (fn) => fn();
     /** See {@link refetchConcurrencyFor}. */
     public maxConcurrentRefetches: number;
     /**
@@ -941,6 +956,7 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
         if (group.pending !== "all") group.pending.delete(key);
         if (group.members.size > 0) return;
         if (group.timer) clearTimeout(group.timer);
+        if (group.recountTimer) clearTimeout(group.recountTimer);
         this.refetchQueue.delete(group);
         this.groups.delete(group.key);
         const [index, address] = group.type === "collection"
@@ -1028,7 +1044,7 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
             this.refetchQueue.delete(group);
             if (this.groups.get(group.key) !== group) continue;
             this.refetchesRunning++;
-            void this.refetchGroup(group).finally(() => {
+            void this.runInScope(() => this.refetchGroup(group)).finally(() => {
                 this.refetchesRunning--;
                 this.drainRefetchQueue();
             });
@@ -2166,6 +2182,18 @@ roles: ["anon"] };
     }
 
     /**
+     * Refetch `group` — and so count it again — at `at`, when the total its
+     * last frame reused expires. One pending at a time per group.
+     */
+    private scheduleRecount(group: SubscriptionGroup, at: number): void {
+        if (group.recountTimer) return;
+        group.recountTimer = setTimeout(() => {
+            group.recountTimer = undefined;
+            if (this.groups.get(group.key) === group) this.scheduleGroupRefetch(group);
+        }, Math.max(0, at - Date.now()) + 1);
+    }
+
+    /**
      * The `meta` a `collection_update` frame carries beside its rows, counted
      * through `service` — the subscriber's own transaction, read only, with
      * its auth context and `beforeQuery` narrowing already bound.
@@ -2209,6 +2237,7 @@ roles: ["anon"] };
             && Date.now() - reusable.at < this.recountIntervalMs) {
             total = reusable.total;
             totalAsOf = new Date(reusable.at).toISOString();
+            if (group) this.scheduleRecount(group, reusable.at + this.recountIntervalMs);
         } else {
             try {
                 total = await service.count(notifyPath, {
@@ -2971,7 +3000,7 @@ roles: ["anon"] };
      * what it was before this existed, whereas refusing to boot takes the whole
      * backend down for it.
      */
-    async configureChannelBus(bus: ChannelBus): Promise<void> {
+    async configureChannelBus(bus: ChannelBus, options: { provision?: boolean } = {}): Promise<void> {
         if (bus.kind === "memory") {
             this.bus = bus;
             return;
@@ -2996,7 +3025,13 @@ roles: ["anon"] };
         // `channel-presence.ts`. It comes up with the bus and only with it.
         try {
             const store = new ChannelPresenceStore(this.db, this.instanceId);
-            await store.ensureTables();
+            const ready = await store.ensureTables({ provision: options.provision });
+            if (!ready && options.provision === false) {
+                throw new Error(
+                    "rebase.channel_presence does not exist, and this backend changes nothing in its database. " +
+                    "A provisioning run with the same channel bus configured creates it."
+                );
+            }
             this.presenceStore = store;
             this.ensurePresenceSweep();
         } catch (error) {
@@ -3476,6 +3511,8 @@ lastSeen: Date.now() });
         for (const group of this.groups.values()) {
             if (group.timer) clearTimeout(group.timer);
             group.timer = undefined;
+            if (group.recountTimer) clearTimeout(group.recountTimer);
+            group.recountTimer = undefined;
         }
 
         // 2. Clear subscriptions, callbacks and the groups and indexes over them
@@ -3559,6 +3596,11 @@ lastSeen: Date.now() });
      */
     public isCdcActive(): boolean {
         return this.cdcActive && this.cdcListener?.connected === true;
+    }
+
+    /** See `RealtimeProvider.setScopeRunner`. */
+    setScopeRunner(run: <T>(fn: () => T) => T): void {
+        this.runInScope = run;
     }
 
     /** The LISTEN connections this service depends on — see `RealtimeProvider.health`. */

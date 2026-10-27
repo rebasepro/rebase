@@ -1,5 +1,5 @@
 ---
-sourceHash: 867178ccdf409a3f
+sourceHash: 12294b1ff06361d9
 title: Visão Geral do Frontend
 sidebar_label: Frontend
 description: "Construa e personalize o painel — Rebase CMS e Rebase Studio — com React: controllers, scaffold, roteamento e views."
@@ -11,7 +11,7 @@ O frontend do Rebase é um **framework React** que renderiza o seu painel de adm
 
 No scaffold padrão, o painel de administração **é** o frontend: ele é servido na raiz da sua URL de deploy. Se, em vez disso, você construir o seu próprio aplicativo de produto, poderá montar o painel de administração sob um prefixo como `/admin` no mesmo deploy — consulte [Alterando a URL Base](/docs/getting-started/deployment#changing-the-base-url).
 
-Este é o `frontend/src/App.tsx` como o `rebase init` o gera — todo o painel de administração, quatro declarações dentro de um único provider:
+Este é o `frontend/src/App.tsx` como o `rebase init` o gera, sem as importações de fontes, o error boundary e o client id do Google — todo o painel de administração, quatro declarações dentro de um único provider:
 
 ```tsx
 import React from "react";
@@ -77,9 +77,9 @@ Todas as vinte e três, na íntegra — a tabela costumava listar dez, e duas de
 | `plugins` | Instâncias de plugins — consulte [Plugins](/docs/plugins) |
 | `slots` | Contribuições de slot declaradas diretamente, sem um plugin |
 | `propertyConfigs` | Widgets de campos personalizados, indexados pelo nome que uma propriedade define em `propertyConfig` |
-| `entityViews` | Abas globais personalizadas de visualização de entidade |
+| `entityViews` | Abas personalizadas de visualização de entidade, disponíveis para qualquer coleção que cite a `key` delas em `admin.entityViews` |
 | `collectionViews` | Modos personalizados de visualização de coleção, disponíveis para qualquer coleção por `key` |
-| `entityActions` | Ações globais de entidade |
+| `entityActions` | Ações de entidade, disponíveis para qualquer coleção que cite a `key` delas em `admin.entityActions` |
 | `effectiveRoleController` | Simula um papel (role) diferente enquanto o modo de desenvolvimento está ativo |
 | `modeController` | Entrega ao Rebase o modo claro/escuro do app host; o Rebase então nunca toca em `<html>`, em `prefers-color-scheme` nem no localStorage — consulte [Estilização](#estilização) |
 | `translations` | Substitui ou estende qualquer string da UI, indexada por locale — consulte [Traduções](/docs/frontend/i18n) |
@@ -169,6 +169,11 @@ seu registro é excluído:
     onSaved={({ entity }) => console.log("saved", entity.id)}
     onClose={() => navigate("/posts")}/>
 ```
+
+Se outra pessoa excluir o registro enquanto o formulário está aberto, o formulário mantém
+o que foi digitado e diz que o registro foi excluído em outro lugar. A ação "Salvar como novo"
+o transforma em um formulário que cria um novo registro com esses valores;
+`onSaved` então informa o novo registro.
 
 Ambos trazem seu próprio `CollectionsProvider` quando não há nenhum acima deles. Esse é
 o passo logo abaixo, e você pode montá-lo você mesmo para compartilhar um único escopo entre

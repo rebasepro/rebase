@@ -38,6 +38,11 @@ import { bootEnvExtension, loadBootEnv, resolveCorsOptions, resolveEnableSwagger
 import { runtimeCors } from "./runtime-cors";
 import { numericEnvVar } from "../env";
 import { resolveRole, RoleConfigurationError } from "./role";
+import { resolveProvisionOnly } from "./provision-only";
+
+// Where it has always been importable from. It has a module of its own now, so
+// `check:chart` can ask it about a rendered unit without loading the boot.
+export { resolveProvisionOnly };
 import { FunctionSelectionError } from "../functions/selection";
 import { CollectionConfigError } from "../collections/validate-config";
 import {
@@ -58,6 +63,8 @@ import { createMetricsRoutes, createMetricsMiddleware } from "../metrics";
 import { recordPoolWaits } from "../metrics/pool-wait";
 import { fetchBundle, shouldFetchBundle, usableBundleFallback, dedupeRuntimePackages, imageModulesDir, BUNDLE_URL_ENV, BUNDLE_TOKEN_ENV, BUNDLE_FETCH_DIR_ENV } from "./fetch-bundle.js";
 import { describeDriverSkew, readRuntimeVersion, schemaRecoveryGuidance } from "./version-skew";
+import { describeDatabase, recordSchemaChanges, renderSchemaChangeScript, type SchemaChangeRecorder } from "./schema-change-recorder";
+import { provisionFirstUseTables } from "./provision";
 
 /** A running runtime, and the handle to stop it. */
 export interface BootedRuntime {
@@ -246,6 +253,44 @@ export async function bootFromBundle(options: BootOptions = {}): Promise<BootedR
     // half-mounting a server.
     const runtimeRole = resolveRole(env);
 
+    // Whether this run provisions and stops rather than serving: the shape a
+    // migration step takes. Decided once, here, because the refusals below, the
+    // timers, the first-use tables and the socket at the end all ask it.
+    // `listen: false` is not one: it is how a test drives a runtime in-process.
+    const provisionOnlyRun = resolveProvisionOnly(process.env);
+    if (!env.REBASE_PROVISION && provisionOnlyRun) {
+        throw new RoleConfigurationError(
+            "REBASE_PROVISION=false and REBASE_PROVISION_ONLY=true ask for a provisioning run that may not provision.",
+            "Unset REBASE_PROVISION on the run that provisions — the migration step your change process runs — " +
+            "and keep REBASE_PROVISION=false on the processes that serve."
+        );
+    }
+    const sqlOut = env.REBASE_PROVISION_SQL_OUT?.trim() || undefined;
+    if (sqlOut) {
+        if (!provisionOnlyRun) {
+            throw new RoleConfigurationError(
+                "REBASE_PROVISION_SQL_OUT is written by a provisioning run, and this process serves.",
+                "Set REBASE_PROVISION_ONLY=true beside it: the run provisions, writes the SQL it executed, and exits."
+            );
+        }
+        if (!env.REBASE_PROVISION) {
+            throw new RoleConfigurationError(
+                "REBASE_PROVISION_SQL_OUT records the schema changes a run makes, and REBASE_PROVISION=false makes none.",
+                "Unset REBASE_PROVISION on the run that records."
+            );
+        }
+        // Before anything touches the database: a path that cannot be written
+        // must not be discovered after the changes it was meant to record.
+        try {
+            fs.writeFileSync(sqlOut, "");
+        } catch (err) {
+            throw new RoleConfigurationError(
+                `REBASE_PROVISION_SQL_OUT="${sqlOut}" cannot be written: ${err instanceof Error ? err.message : String(err)}`,
+                "Point it at a file in a directory that exists and that this process can write."
+            );
+        }
+    }
+
     // Live schema editing from this bundle — off unless the environment names
     // a repository to commit to. Resolved here, beside the role, so a target
     // that is named but unusable stops the boot before a pool is opened.
@@ -289,6 +334,20 @@ export async function bootFromBundle(options: BootOptions = {}): Promise<BootedR
     const rlsAudit = await resolveRlsAuditOptions(env, driverRoots);
     const dataSources = await initializeDataSources(resolvedSources, schema, driverRoots);
     warnOnDriverSkew(dataSources, readRuntimeVersion(driverRoots));
+    // Installed while the pools are still empty — a `pg.Pool` connects lazily —
+    // so the first statement of the run is already on the record.
+    let schemaChangeRecorder: SchemaChangeRecorder | undefined;
+    if (sqlOut) {
+        const unrecordable = dataSources.filter(source => typeof source.connection.pool?.connect !== "function");
+        if (unrecordable.length > 0) {
+            throw new RoleConfigurationError(
+                `REBASE_PROVISION_SQL_OUT cannot record data source ${unrecordable.map(source => `"${source.key}"`).join(", ")}: ` +
+                "its driver hands back no connection pool to observe.",
+                "Recording is for SQL drivers that pool their connections, as the Postgres driver does."
+            );
+        }
+        schemaChangeRecorder = recordSchemaChanges(dataSources.map(source => source.connection.pool ?? {}));
+    }
 
     // ── HTTP ─────────────────────────────────────────────────────────────────
     const app = new Hono<HonoEnv>();
@@ -356,8 +415,9 @@ export async function bootFromBundle(options: BootOptions = {}): Promise<BootedR
         // keeps the framework's own tables current, as every process always
         // has; only the collection schema and change capture are left to the
         // owner. `REBASE_MIGRATE_ON_BOOT=none` turns the collection schema off
-        // on top of this, where the DDL runs.
-        provision: ownsSchema ? true : { collections: false, realtime: false },
+        // on top of this, where the DDL runs. `REBASE_PROVISION=false` turns
+        // off everything, the framework's own tables included.
+        provision: !env.REBASE_PROVISION ? false : ownsSchema ? true : { collections: false, realtime: false },
         // The schema hooks run before any driver initializes, so they need a
         // stand-in for the result they are declared to take. This path has one
         // — the coordinator opened the connection itself — and passes it
@@ -423,7 +483,12 @@ export async function bootFromBundle(options: BootOptions = {}): Promise<BootedR
     setDefaultBackend(createdBackend);
     createdBackend.mount(app, { basePath: env.REBASE_BASE_PATH });
     await createdBackend.attachRealtime(server);
-    createdBackend.start();
+    // Not on a run that provisions and exits: `start()` is timers and workers —
+    // cron, the job queue, the hourly sweeps — and a migration step has no
+    // business running the project's jobs. Their tables are made below
+    // instead, deterministically, rather than by whichever first tick happened
+    // to land before the process exited.
+    if (!provisionOnlyRun) createdBackend.start();
     // This process owns the server, so the backend's shutdown drains and
     // closes it — the signal handlers and `BootedRuntime.shutdown` rely on it.
     const backend: RebaseBackendInstance = {
@@ -562,6 +627,28 @@ export async function bootFromBundle(options: BootOptions = {}): Promise<BootedR
         }
     }
 
+    // ── Provisioning run: the tables made on first use ───────────────────────
+    //
+    // A serving process creates a few tables on first use — idempotency keys,
+    // the shared rate-limit counters, the claims the hourly sweeps take —
+    // rather than at boot, because most deployments never need them or the
+    // boot should not wait for them. A provisioning run creates them now: it is
+    // the only step that will ever create anything for a deployment whose
+    // serving processes run with REBASE_PROVISION=false, and its recording has
+    // to be the whole schema those processes will use.
+    if (provisionOnlyRun && env.REBASE_PROVISION) {
+        await provisionFirstUseTables(createdBackend.driver, process.env);
+    }
+    if (schemaChangeRecorder && sqlOut) {
+        schemaChangeRecorder.stop();
+        const statements = schemaChangeRecorder.statements();
+        fs.writeFileSync(sqlOut, renderSchemaChangeScript(statements, {
+            runtimeVersion: readRuntimeVersion(driverRoots),
+            database: describeDatabase(dataSources[0]?.connection.connectionString)
+        }));
+        logger.info(`Wrote the ${statements.length} schema change(s) this run made to ${sqlOut}.`);
+    }
+
     // ── Listen ───────────────────────────────────────────────────────────────
     let port = env.PORT;
     // A provisioning run has already done its work by the time it gets here:
@@ -569,8 +656,7 @@ export async function bootFromBundle(options: BootOptions = {}): Promise<BootedR
     // serving. Deciding it at the socket rather than earlier is what keeps this
     // honest — the process that migrates is byte-identical to the one that
     // serves, right up to the point where one of them binds a port.
-    const provisionOnly = options.listen === false || resolveProvisionOnly(process.env);
-    if (!provisionOnly) {
+    if (options.listen !== false && !provisionOnlyRun) {
         if (isProduction) {
             await new Promise<void>((resolve, reject) => {
                 server.once("error", reject);
@@ -847,25 +933,6 @@ async function bootStaticApp(
  * answer is "set DATABASE_URL". Anything else keeps its stack, because it is a
  * bug and the trace is the point.
  */
-/**
- * Whether this process should provision the schema and stop, rather than serve.
- *
- * The shape a migration Job wants: same image, same bundle, same boot — and no
- * socket. Nothing else changes, which is the point. A separate migration image
- * would be a second artifact to build, publish and keep in step with the
- * runtime, and the failure mode of it drifting is a schema applied by a version
- * that is not the one about to run against it.
- *
- * A blank value is *unset*: `REBASE_PROVISION_ONLY=${SOMETHING}` with SOMETHING
- * undefined is the ordinary way to write a compose file or a Helm template, and
- * reading it as true would turn an ordinary deployment into one that migrates
- * and then refuses to serve.
- */
-export function resolveProvisionOnly(env: NodeJS.ProcessEnv = process.env): boolean {
-    const raw = (env.REBASE_PROVISION_ONLY ?? "").trim().toLowerCase();
-    return raw === "1" || raw === "true";
-}
-
 export async function runFromBundle(options: BootOptions = {}): Promise<BootedRuntime> {
     try {
         const booted = await bootFromBundle(options);

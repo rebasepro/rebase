@@ -1,7 +1,7 @@
 import React from "react";
 import { AbsoluteFill, OffthreadVideo, interpolate, staticFile, useCurrentFrame } from "remotion";
 import { ramp, ENTER } from "./motion";
-import { FRAME } from "../theme";
+import { FRAME, SURFACE } from "../theme";
 
 /**
  * Studio's SQL editor, as a window: a real capture from the live demo of a
@@ -43,7 +43,7 @@ export const StudioWindow: React.FC<{
                 aspectRatio: "1280 / 800",
                 borderRadius: FRAME.radius,
                 border: FRAME.border,
-                background: "#000",
+                background: SURFACE.frame,
                 boxShadow: FRAME.boxShadow,
                 overflow: "hidden",
                 position: "relative",

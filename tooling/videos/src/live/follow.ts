@@ -1,4 +1,5 @@
 import { DESK_NARRATION } from "../desk/script";
+import type { Script } from "../spoken/narration";
 import type { Timing } from "../desk/timeline";
 import { COMMON, exactWord, sameWord, tokensOf, tokensOfTranscript } from "./words";
 
@@ -104,20 +105,24 @@ export class Follower {
     /** Bumps whenever `timing()` would return something different. */
     version = 0;
 
-    constructor(fps = 30, latency = 15) {
+    /** The script being read: the desk film's unless the page says which. */
+    readonly script: Script;
+
+    constructor(fps = 30, latency = 15, script: Script = DESK_NARRATION) {
         this.fps = fps;
         this.latency = latency;
-        DESK_NARRATION.forEach((line, l) => {
+        this.script = script;
+        script.forEach((line, l) => {
             this.firstToken.push([]);
             line.words.forEach((w, i) => {
                 this.firstToken[l].push(this.tokens.length);
                 for (const text of tokensOf(w)) this.tokens.push({ text, line: l, word: i });
             });
         });
-        this.said = DESK_NARRATION.map((l) => l.words.map(() => null));
-        this.heard = DESK_NARRATION.map((l) => l.words.map(() => null));
-        this.recognized = DESK_NARRATION.map((l) => l.words.map(() => null));
-        this.ends = DESK_NARRATION.map(() => null);
+        this.said = this.script.map((l) => l.words.map(() => null));
+        this.heard = this.script.map((l) => l.words.map(() => null));
+        this.recognized = this.script.map((l) => l.words.map(() => null));
+        this.ends = this.script.map(() => null);
     }
 
     get done(): boolean {
@@ -127,8 +132,8 @@ export class Follower {
     /** The line being said, or about to be, and the next word in it. */
     position(): { line: number; word: number } {
         if (this.done) {
-            const line = DESK_NARRATION.length - 1;
-            return { line, word: DESK_NARRATION[line].words.length };
+            const line = this.script.length - 1;
+            return { line, word: this.script[line].words.length };
         }
         const t = this.tokens[this.cursor];
         return { line: t.line, word: t.word };
@@ -281,13 +286,13 @@ export class Follower {
     tick(now: number): void {
         if (this.done || this.speaking) return;
         const { line, word } = this.position();
-        const total = DESK_NARRATION[line].words.length;
+        const total = this.script[line].words.length;
         const left = total - word;
         const quiet = now - this.voiceSince;
         /* The LAST line may end on silence with more of it unheard: there is
            no next line for the camera to leave for early, and without this a
            misheard ending left the film running with nothing more to say. */
-        const last = line === DESK_NARRATION.length - 1;
+        const last = line === this.script.length - 1;
         const tail = left <= TAIL_WORDS && quiet >= TAIL_SILENCE;
         const close = last && word >= total * 0.7 && quiet >= LAST_LINE_SILENCE;
         if (word === 0 || !(tail || close)) return;
@@ -316,7 +321,7 @@ export class Follower {
     timing(): Timing {
         return {
             live: true,
-            lines: DESK_NARRATION.map((l, k) => {
+            lines: this.script.map((l, k) => {
                 const words: number[] = [];
                 const heard: number[] = [];
                 for (let w = 0; w < l.words.length; w++) {
@@ -384,9 +389,9 @@ export class Follower {
             previous = said;
         });
         /* Lines the cursor has left are over. */
-        for (let l = 0; l < DESK_NARRATION.length; l++) {
+        for (let l = 0; l < this.script.length; l++) {
             if (this.ends[l] !== null) continue;
-            const lastWord = DESK_NARRATION[l].words.length - 1;
+            const lastWord = this.script[l].words.length - 1;
             if (this.heard[l][lastWord] === null) continue;
             this.endLine(l, now, null);
         }
@@ -395,7 +400,7 @@ export class Follower {
 
     /** Mark what is left of `line` as said by `until` and end it there. */
     private finishLine(line: number, now: number, until: number) {
-        const total = DESK_NARRATION[line].words.length;
+        const total = this.script[line].words.length;
         const firstMissing = this.heard[line].findIndex((h) => h === null);
         if (firstMissing >= 0) {
             const last = this.lastSaid();
@@ -421,7 +426,7 @@ export class Follower {
         this.endLine(line, now, until);
         /* The cursor jumps to the next line; recognition's alignment must
            restart from there, ignoring what it has already transcribed. */
-        const next = line + 1 < DESK_NARRATION.length ? this.firstToken[line + 1][0] : this.tokens.length;
+        const next = line + 1 < this.script.length ? this.firstToken[line + 1][0] : this.tokens.length;
         this.cursor = Math.max(this.cursor, next);
         this.base = this.cursor;
         this.skip = this.lastTokens;
@@ -432,7 +437,7 @@ export class Follower {
         const words = this.said[line];
         const last = words[words.length - 1] ?? now;
         const start = words[0] ?? last;
-        const next = line + 1 < DESK_NARRATION.length ? this.said[line + 1][0] : null;
+        const next = line + 1 < this.script.length ? this.said[line + 1][0] : null;
         let end = at ?? last + this.perWord;
         if (next !== null) end = Math.min(end, next - 1);
         end = Math.max(end, last + 1);

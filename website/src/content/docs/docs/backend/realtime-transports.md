@@ -16,7 +16,7 @@ Because connection poolers like **pgBouncer** do not support the persistent conn
 
 ### Notification Mechanics & Payload Layout
 
-When a record is modified on Instance A, it broadcasts a notification on the `rebase_entity_changes` channel. To minimize database overhead and network bandwidth, the notification payload is kept extremely compact:
+With [database change capture](/docs/backend/realtime-cdc/) active — the default wherever the database role can create triggers — every instance hears every commit on the `rebase_cdc` channel, and nothing below is sent. Without it, when a record is modified on Instance A, it broadcasts a notification on the `rebase_entity_changes` channel. To minimize database overhead and network bandwidth, the notification payload is kept extremely compact:
 
 ```json
 {

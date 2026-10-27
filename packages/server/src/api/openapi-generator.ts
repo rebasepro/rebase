@@ -1714,12 +1714,9 @@ export function buildCollectionInputSchema(collection: CollectionConfig): Record
         emitted.add(idKey);
     }
 
-    // The two ways a write may name a `belongsTo` target, both of which the
-    // server accepts and the generated SDK's `Insert` already offered: the
-    // foreign key under its own wire name (`authorId`), and the relation
-    // property (`author`), which the write transformer maps onto that column.
-    // Neither reached the document, so the spec described a create that could
-    // not set a relation at all.
+    // Every relation a write may set, as the generated SDK's `Insert` types
+    // them: both spellings of a `belongsTo`, a `hasOne` or single-hop to-one
+    // `via`, and the to-many memberships. See `emitWritableRelations`.
     emitWritableRelations(collection, properties, emitted);
     annotateTenantField(collection, properties, "write");
 
@@ -1738,19 +1735,29 @@ export function buildCollectionInputSchema(collection: CollectionConfig): Record
 }
 
 /**
- * The writable half of a collection's relations: `belongsTo` only.
+ * The writable half of a collection's relations — the same set the SDK
+ * generator's `emitWritableRelations` types on `Insert`, kind for kind:
  *
- * A to-many is not writable through the body — the server links rows through
- * the nested routes — so offering `tags: [...]` on a create would describe a
- * write that does nothing. Same rule, same reason, as `emitWritableRelations`
- * in the SDK generator, whose `Insert` type this mirrors key for key.
+ * - a `belongsTo`, under both spellings the server accepts: the foreign key
+ *   (`authorId`) and the relation property (`author`);
+ * - a `hasOne`, and a single-hop to-one `via`, under the property: the target's
+ *   id, or `null` to unlink — the server points the target's key at this row;
+ * - a to-many membership — `hasMany`, `manyToMany`, and a single-hop to-many
+ *   `via` — under the relation's name: a list of target ids or `{ id }`
+ *   objects, a `manyToMany`'s carrying a `_pivot` of its junction columns.
  *
- * Neither spelling is listed in `required`, even for a relation the collection
- * declares `validation: { required: true }` on: the two keys are alternatives,
- * and a schema naming both would tell a spec-validating gateway to reject a
- * create that the server accepts. (The SDK's `Insert` marks both non-optional
- * for the same relation, which is the same fact stated less carefully; a
- * document is the half that a gateway enforces.)
+ * A multi-hop `via` is refused (`RELATION_NOT_WRITABLE`) and left out. This
+ * used to offer `belongsTo` only, on the claim that a to-many could not be
+ * written through the body; the server has written all of the above through a
+ * create or update, and a client generated from the document could set none.
+ *
+ * None is listed in `required`, even for a relation the collection declares
+ * `validation: { required: true }` on: a belongsTo's two keys are
+ * alternatives, and a schema naming both would tell a spec-validating gateway
+ * to reject a create that the server accepts. (The SDK's `Insert` states the
+ * same fact as a type: both keys optional, intersected with
+ * `({ authorId } | { author })`. A JSON schema could say it with `anyOf`,
+ * which not every gateway reads.)
  */
 function emitWritableRelations(
     collection: CollectionConfig,
@@ -1759,25 +1766,55 @@ function emitWritableRelations(
 ): void {
     const resolved = resolveRelationsForDocument(collection);
 
-    const emit = (key: string, relation: ResolvedRelation): void => {
+    const emit = (key: string, schema: Record<string, unknown>): void => {
         if (emitted.has(key)) return;
-        properties[key] = {
-            ...idSchemaFor(relationTarget(relation)),
-            description: `The \`${relation.targetSlug}\` row this belongs to.`
-        };
+        properties[key] = schema;
         emitted.add(key);
     };
+    const belongsTo = (relation: ResolvedRelation): Record<string, unknown> => ({
+        ...idSchemaFor(relationTarget(relation)),
+        description: `The \`${relation.targetSlug}\` row this belongs to.`
+    });
 
     for (const relation of Object.values(resolved)) {
         if (relation.kind === "belongsTo" && relation.localKey) {
-            emit(fieldKeyForColumn(collection, relation.localKey), relation);
+            emit(fieldKeyForColumn(collection, relation.localKey), belongsTo(relation));
         }
     }
 
     for (const [key, property] of Object.entries(collection.properties ?? {})) {
         if ((property as Property)?.type !== "relation") continue;
         const relation = findRelation(resolved, key);
-        if (relation?.kind === "belongsTo" && relation.localKey) emit(key, relation);
+        if (!relation) continue;
+        if (relation.kind === "belongsTo" && relation.localKey) {
+            emit(key, belongsTo(relation));
+        } else if (relation.kind === "hasOne" || (relation.kind === "via" && relation.cardinality === "one" && relation.writable)) {
+            emit(key, {
+                ...idSchemaFor(relationTarget(relation)),
+                nullable: true,
+                description: `The \`${relation.targetSlug}\` row to link to this one; \`null\` unlinks it.`
+            });
+        }
+    }
+
+    for (const [key, relation] of Object.entries(resolved)) {
+        if (relation.cardinality !== "many" || !relation.writable) continue;
+        const id = idSchemaFor(relationTarget(relation));
+        const pivotProperties = relation.kind === "manyToMany" ? relation.through.properties : {};
+        const pivot = Object.keys(pivotProperties).length > 0
+            ? {
+                _pivot: {
+                    type: "object",
+                    properties: Object.fromEntries(Object.entries(pivotProperties)
+                        .map(([name, prop]) => [name, convertPropertyToSchema(prop as Property)]))
+                }
+            }
+            : {};
+        emit(key, {
+            type: "array",
+            description: `The \`${relation.targetSlug}\` rows linked to this one — the whole set, replacing the current links.`,
+            items: { oneOf: [id, { type: "object", required: ["id"], properties: { id, ...pivot } }] }
+        });
     }
 }
 

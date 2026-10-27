@@ -17,7 +17,8 @@ import { fileURLToPath } from "url";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { createRebaseApp, type TemplatePreset } from "./init";
-import { runVerify, verifyCommand, type VerifyReport } from "./verify";
+import { authRequiredFrom, pendingMigrations, runVerify, verifyCommand, type VerifyReport } from "./verify";
+import { compareMigrationVersions, migrationVersionOf } from "@rebasepro/server-postgres";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const PACKAGE_ROOT = path.resolve(HERE, "..", "..");
@@ -163,6 +164,28 @@ describe("rebase verify: RLS coverage", () => {
         expect(report.findings[0].message).toContain("defaultSecurityRules");
     });
 
+    it("reads a belongsTo's column the way the generator names it, from its relationName", async () => {
+        // `relationName: "tenant"` makes the column `tenant_id`, whatever the
+        // property is called. Derived from the key instead (`workspace_id`),
+        // the owner column was missed and the table passed as public.
+        collectionFile("index.ts", `export const defaultSecurityRules = [{ operation: "select", access: "public" }];\n`);
+        collectionFile("tenants.ts", collection(`
+    slug: "tenants",
+    table: "tenants",
+    name: "Tenants",
+    properties: { label: { type: "string", name: "Label" } }`));
+        collectionFile("invoices.ts", collection(`
+    slug: "invoices",
+    table: "invoices",
+    name: "Invoices",
+    properties: {
+        workspace: { type: "relation", name: "Workspace", relation: { kind: "belongsTo", target: () => ({ slug: "tenants" }), relationName: "tenant" } }
+    }`));
+        const report = await verify();
+        expect(report.findings.map(f => f.check)).toEqual(["rls-missing"]);
+        expect(report.findings[0].message).toContain("tenant_id");
+    });
+
     it("accepts a collection that inherits directory defaults and has no owner column", async () => {
         collectionFile("index.ts", `export const defaultSecurityRules = [{ operation: "select", access: "public" }];\n`);
         collectionFile("tags.ts", collection(`
@@ -272,6 +295,75 @@ describe("rebase verify: migration freshness", () => {
     });
 });
 
+describe("rebase verify --live: which migrations are applied", () => {
+    const files = ["20261025000100_init.sql", "20261025000126_add_tags.sql", "20261026090000_add_slug.sql"];
+    const pending = (revisions: { version: string; type: number }[]) =>
+        pendingMigrations(files, revisions, compareMigrationVersions, migrationVersionOf);
+
+    it("counts every migration at or behind a baseline as applied, as Atlas does", () => {
+        // `rebase db migrate --baseline 20261025000126` records that version alone, type 1.
+        expect(pending([{ version: "20261025000126", type: 1 }])).toEqual(["20261026090000_add_slug.sql"]);
+    });
+
+    it("still names a migration past the baseline, and one with no row and no baseline", () => {
+        expect(pending([{ version: "20261025000100", type: 2 }])).toEqual(["20261025000126_add_tags.sql", "20261026090000_add_slug.sql"]);
+        expect(pending([])).toEqual(files);
+    });
+
+    it("reads executed and `migrate set` rows by membership", () => {
+        expect(pending([
+            { version: "20261025000100", type: 4 },
+            { version: "20261025000126", type: 4 },
+            { version: "20261026090000", type: 2 }
+        ])).toEqual([]);
+    });
+});
+
+describe("rebase verify --live: whether the API requires a token", () => {
+    it("reads AUTH_REQUIRE the way every boolean env var is read", () => {
+        for (const off of ["false", "0", "no", "off", "FALSE", " false "]) {
+            expect(authRequiredFrom({ AUTH_REQUIRE: off }, {}), off).toBe(false);
+        }
+        for (const on of ["true", "1", "yes"]) expect(authRequiredFrom({ AUTH_REQUIRE: on }, {}), on).toBe(true);
+    });
+
+    it("is on by default, and takes .env when the environment says nothing", () => {
+        expect(authRequiredFrom({}, {})).toBe(true);
+        expect(authRequiredFrom({}, { AUTH_REQUIRE: "0" })).toBe(false);
+        expect(authRequiredFrom({ AUTH_REQUIRE: "true" }, { AUTH_REQUIRE: "0" })).toBe(true);
+    });
+});
+
+describe("rebase verify --live", () => {
+    const NOTES = collection(`
+    slug: "notes",
+    table: "notes",
+    name: "Notes",${NOTES_RULES}
+    properties: { title: { type: "string", name: "Title" } }`);
+
+    it("fails, rather than skipping the audit, when the database does not answer", async () => {
+        collectionFile("notes.ts", NOTES);
+        const report = await runVerify({
+            projectRoot: root,
+            collectionsDir: path.join(root, "config", "collections"),
+            backendDir: null,
+            live: true,
+            // Port 1 on loopback: nothing listens, the connection is refused at once.
+            databaseUrl: "postgresql://nobody:nothing@127.0.0.1:1/none"
+        });
+        expect(report.ok).toBe(false);
+        expect(report.findings.map(f => [f.step, f.check, f.severity])).toEqual([["live", "live-unreachable", "error"]]);
+        expect(report.steps.find(s => s.id === "live")?.status).toBe("failed");
+    });
+
+    it("fails when it was asked to audit and no database is configured", async () => {
+        collectionFile("notes.ts", NOTES);
+        const report = await verify({ live: true });
+        expect(report.ok).toBe(false);
+        expect(report.findings.map(f => f.check)).toEqual(["live-no-database"]);
+    });
+});
+
 describe("rebase verify --json", () => {
     let cwd: string;
     let stdout: string[];
@@ -315,6 +407,43 @@ describe("rebase verify --json", () => {
         await verifyCommand(["node", "rebase", "verify", "--quiet"]);
         expect(stdout).toEqual([]);
         expect(process.exitCode).toBeUndefined();
+    });
+});
+
+describe("rebase verify --collections", () => {
+    let cwd: string;
+    let stdout: string[];
+    let stderr: string[];
+
+    beforeEach(() => {
+        cwd = process.cwd();
+        stdout = [];
+        stderr = [];
+        vi.spyOn(console, "log").mockImplementation((...args: unknown[]) => { stdout.push(args.map(String).join(" ")); });
+        vi.spyOn(console, "error").mockImplementation((...args: unknown[]) => { stderr.push(args.map(String).join(" ")); });
+        vi.spyOn(process, "exit").mockImplementation(((code?: number) => {
+            throw new Error(`exit ${code}`);
+        }) as typeof process.exit);
+    });
+
+    afterEach(() => {
+        process.chdir(cwd);
+        process.exitCode = undefined;
+    });
+
+    it("refuses a mistyped path instead of passing every step over nothing", async () => {
+        process.chdir(root);
+        await expect(verifyCommand(["node", "rebase", "verify", "-c", "config/colections"])).rejects.toThrow("exit 1");
+        expect(stderr.join("\n")).toContain('Collections path not found: "config/colections"');
+        expect(stdout.join("\n")).not.toContain("0 errors");
+    });
+
+    it("refuses it with a JSON envelope under --json", async () => {
+        process.chdir(root);
+        await expect(verifyCommand(["node", "rebase", "verify", "--json", "--collections", "nope"])).rejects.toThrow("exit 1");
+        const envelope = JSON.parse(stdout.join("\n")) as { error: { code: string; message: string } };
+        expect(envelope.error.code).toBe("collections_not_found");
+        expect(envelope.error.message).toContain("nope");
     });
 });
 

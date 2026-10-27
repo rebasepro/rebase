@@ -1,5 +1,5 @@
 ---
-sourceHash: 65085708df65a92e
+sourceHash: aba79f55ccca539b
 title: Autenticación
 sidebar_label: Autenticación
 description: Autenticación del lado del cliente con el SDK de Rebase — inicio de sesión con correo electrónico/contraseña, proveedores OAuth, gestión de sesiones y escuchadores de estado de autenticación.
@@ -132,7 +132,7 @@ const { user } = await client.auth.verifyMagicLink(token);
 
 `sendMagicLink` responde lo mismo independientemente de si la dirección tiene o no una cuenta. Esto es deliberado: un endpoint que respondiera "no existe dicho usuario" sería un oráculo de enumeración de cuentas, así que no uses el resultado para decirle a una persona si está registrada — no lo sabe.
 
-Ambos necesitan un servicio de correo electrónico configurado en el backend, o responderán 503 `EMAIL_NOT_CONFIGURED`.
+Enviar uno necesita un servicio de correo electrónico configurado en el backend, o `sendMagicLink` responde 503 `EMAIL_NOT_CONFIGURED`.
 
 ## Códigos de un solo uso
 
@@ -341,8 +341,8 @@ unsubscribe();
 |--------|--------|
 | `SIGNED_IN` | Se completó un inicio de sesión o registro |
 | `TOKEN_REFRESHED` | El token de acceso fue renovado — incluida la renovación silenciosa que restaura una sesión al cargar la página |
-| `USER_UPDATED` | `updateUser()` modificó el perfil, o `confirmEmailChange()` trasladó esta cuenta a su nueva dirección |
-| `SIGNED_OUT` | Un cierre de sesión, o una actualización que falló definitivamente |
+| `USER_UPDATED` | `updateUser()` modificó el perfil, `linkAnonymous()` convirtió a un invitado en una cuenta, `changeEmail()` inició un cambio de dirección, o `confirmEmailChange()` trasladó esta cuenta a su nueva dirección |
+| `SIGNED_OUT` | Un cierre de sesión, `revokeAllSessions()`, o una actualización que falló definitivamente |
 
 ## Gestión de contraseñas
 

@@ -320,7 +320,20 @@ export async function ensureAppRole(run: RawSqlRunner, schemas: string[]): Promi
     const roleRows = await run(`SELECT 1 FROM pg_roles WHERE rolname = '${REBASE_USER_ROLE}'`);
     if (roleRows.length === 0) {
         try {
-            await run(`CREATE ROLE ${REBASE_USER_ROLE} NOLOGIN NOSUPERUSER NOBYPASSRLS NOINHERIT`);
+            // Guarded in the statement as well as by the probe above. A role
+            // belongs to the cluster, not the database, so a recorded
+            // provisioning run (REBASE_PROVISION_SQL_OUT) replayed into another
+            // database on a cluster that already has the role must find this a
+            // no-op rather than its first error.
+            await run(`
+                DO $rebase_role$
+                BEGIN
+                    IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = '${REBASE_USER_ROLE}') THEN
+                        CREATE ROLE ${REBASE_USER_ROLE} NOLOGIN NOSUPERUSER NOBYPASSRLS NOINHERIT;
+                    END IF;
+                END
+                $rebase_role$
+            `);
         } catch (err) {
             throw new Error(
                 `Failed to create the "${REBASE_USER_ROLE}" role: ${err instanceof Error ? err.message : String(err)}\n\n` +
@@ -357,6 +370,38 @@ export async function ensureAppRole(run: RawSqlRunner, schemas: string[]): Promi
 const sqlLiteral = (value: string): string => `'${value.replace(/'/g, "''")}'`;
 const textArray = (values: readonly string[]): string =>
     values.length === 0 ? "ARRAY[]::text[]" : `ARRAY[${values.map(sqlLiteral).join(", ")}]::text[]`;
+
+/**
+ * The framework's internal tables in `schemas` that the request role can
+ * reach — `schema.table`, sorted — when nothing is left to take it back off.
+ *
+ * Every provisioning boot repairs this: each store revokes on its own table
+ * and {@link ensureAppRole}'s sweep revokes on the rest, because the grant
+ * tier hands the request role DML on whole schemas. A backend that changes
+ * nothing in its database runs neither, so a database whose `rebase_user` can
+ * read `refresh_tokens` or `api_keys` would stay that way for as long as it
+ * served. This is the question the sweep would have answered, asked instead.
+ *
+ * "Can reach" is what the role can actually do — through a grant to it, to a
+ * role it inherits, or to PUBLIC, on the table or on any of its columns —
+ * because that, not how the ACL is spelled, is what a request running as it
+ * gets. A table with RLS on is somebody's collection by that same rule as the
+ * sweep's, and is left out.
+ */
+export async function findExposedInternalTables(run: RawSqlRunner, schemas: string[]): Promise<string[]> {
+    const rows = await run(`
+        SELECT n.nspname || '.' || c.relname AS name
+        FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
+        WHERE n.nspname = ANY(${textArray(Array.from(new Set(schemas)))})
+          AND c.relname = ANY(${textArray(REBASE_INTERNAL_TABLES)})
+          AND c.relkind IN ('r', 'p')
+          AND NOT c.relrowsecurity
+          AND (has_table_privilege(${sqlLiteral(REBASE_USER_ROLE)}, c.oid, 'SELECT, INSERT, UPDATE, DELETE')
+               OR has_any_column_privilege(${sqlLiteral(REBASE_USER_ROLE)}, c.oid, 'SELECT, INSERT, UPDATE'))
+        ORDER BY 1
+    `);
+    return rows.map(row => String(row.name));
+}
 
 /** What the grant tier would find already in place in one schema. */
 interface SchemaGrants {

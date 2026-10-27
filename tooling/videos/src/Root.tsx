@@ -1,9 +1,10 @@
 import "./index.css";
 import React from "react";
-import { Composition, Series } from "remotion";
+import { Composition, Series, Still } from "remotion";
 import { loadFonts } from "./fonts";
 import { RebaseIntro, RebaseIntroVO, STANDALONE } from "./Intro";
 import { deskDuration, RebaseDesk, RebaseDeskVO, type DeskProps } from "./desk/DeskFilm";
+import { SERIES_FILMS } from "./series";
 import { DeskPlane } from "./desk/DeskPlane";
 import { INTRO_DURATION, SCENES } from "./film";
 import { OVERLAP } from "./transitions";
@@ -26,6 +27,7 @@ import { Matrix, MATRIX_DURATION } from "./reel/Matrix";
 import { Routes, ROUTES_DURATION } from "./reel/Routes";
 import { Plausible, PLAUSIBLE_DURATION } from "./reel/Plausible";
 import { RebaseLaunch } from "./launch/Launch";
+import { LaunchThumbnail } from "./launch/Thumbnail";
 import { DEFAULT_TRACK, DURATION as LAUNCH_DURATION, FPS as LAUNCH_FPS } from "./launch/score";
 
 loadFonts();
@@ -71,6 +73,37 @@ export const RemotionRoot: React.FC = () => (
             height={HEIGHT}
         />
 
+        {/* The teaser's YouTube thumbnails, three ways in. */}
+        {(["trust", "panel", "rules"] as const).map((variant) => (
+            <Still key={variant} id={`LaunchThumb-${variant}`} component={LaunchThumbnail} defaultProps={{ variant }} width={WIDTH} height={HEIGHT} />
+        ))}
+
+        {/* THE SERIES — ten short films, one benefit each, wide and tall from
+            the same take. See src/series/kit.tsx. */}
+        {SERIES_FILMS.map(({ spec, component, duration }) => (
+            <React.Fragment key={spec.id}>
+                <Composition
+                    id={`Series-${spec.id}`}
+                    component={component}
+                    defaultProps={{ timing: null, take: null }}
+                    calculateMetadata={({ props }) => ({ durationInFrames: duration(props) })}
+                    durationInFrames={duration({})}
+                    fps={FPS}
+                    width={WIDTH}
+                    height={HEIGHT}
+                />
+                <Composition
+                    id={`Series-${spec.id}-Tall`}
+                    component={component}
+                    defaultProps={{ timing: null, take: null }}
+                    calculateMetadata={({ props }) => ({ durationInFrames: duration(props) })}
+                    durationInFrames={duration({})}
+                    fps={FPS}
+                    width={HEIGHT}
+                    height={WIDTH}
+                />
+            </React.Fragment>
+        ))}
         {/* THE DESK — one workspace, a camera, no cuts. See src/desk/beats.ts.
             Its length is its narration's: the authored read by default, a
             take's with --props=takes/<id>/props.json (scripts/take.mjs). */}

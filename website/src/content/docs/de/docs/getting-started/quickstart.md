@@ -1,5 +1,5 @@
 ---
-sourceHash: 44951a600db63629
+sourceHash: 0199b2905455975d
 title: Schnellstart
 sidebar_label: Schnellstart
 description: Erstellen Sie ein neues Rebase-Projekt und führen Sie es in weniger als 2 Minuten lokal aus.
@@ -35,7 +35,7 @@ Keine Datenbank muss installiert werden und kein Docker ist nötig. `rebase dev`
 `init` generiert ein sofort einsatzbereites `.env` im Projektstammverzeichnis mit einem echten `JWT_SECRET`, einem Datenbankpasswort und einem freien lokalen Datenbankport. Sie müssen nichts erstellen oder bearbeiten, um loszulegen.
 
 :::caution
-Führen Sie nicht `cp .env.example .env` aus. `.env.example` dient als Referenz für die verfügbaren Variablen — das Überschreiben Ihrer `.env` verwirft die generierten Secrets und setzt `DATABASE_URL` auf eine Datenbank, die nicht existiert. Bearbeiten Sie stattdessen die `.env` direkt, wenn Sie einen Wert ändern möchten.
+Führen Sie nicht `cp .env.example .env` aus. `.env.example` dient als Referenz für die verfügbaren Variablen — das Überschreiben Ihrer `.env` verwirft die generierten Secrets — `JWT_SECRET`, den Service-Key, das Datenbankpasswort und die Zugangsdaten des ersten Admins, die dort alle leer oder auskommentiert sind. Bearbeiten Sie stattdessen die `.env` direkt, wenn Sie einen Wert ändern möchten.
 :::
 
 ## Die Dev-Server starten

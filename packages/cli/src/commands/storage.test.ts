@@ -21,7 +21,7 @@ vi.mock("../utils/project", async importOriginal => {
     };
 });
 
-import { describeOrphanReport, storageCommand, type OrphanReport } from "./storage";
+import { describeOrphanReport, orphanScanPolling, storageCommand, type OrphanReport } from "./storage";
 
 function argv(...line: string[]): string[] {
     return ["/usr/bin/node", "/usr/local/bin/rebase", ...line];
@@ -37,6 +37,24 @@ const report: OrphanReport = {
     recent: 1,
     scanned: ["users", "posts"],
     unscanned: []
+};
+
+const SCAN = "6f1d7a52-3c51-4a8e-9a43-0d3cbf6a7e11";
+const progress = { phase: "rows", filesScanned: 5, rowsScanned: 40, historyEntriesScanned: 0, collectionsScanned: 1, collectionsTotal: 2, unscanned: [] };
+const { storageId: _storageId, ...result } = report;
+/** A scan's record at each point the command asks about it. */
+const scan = {
+    queued: { id: SCAN, storageId: "(default)", runner: "worker", status: "queued", progress },
+    running: { id: SCAN, storageId: "(default)", runner: "worker", status: "running", progress },
+    completed: { id: SCAN, storageId: "(default)", runner: "worker", status: "completed", progress, result },
+    deleted: {
+        id: SCAN, storageId: "(default)", runner: "worker", status: "completed", progress, result,
+        deletion: {
+            status: "completed",
+            progress: { ...progress, phase: "done", candidates: 2, deleted: 1 },
+            result: { deleted: ["avatars/old.png"], kept: [{ key: "avatars/other.png", reason: "a row or a history entry names it now" }], failed: [] }
+        }
+    }
 };
 
 let calls: { method: string; url: string; body?: unknown; auth?: string }[];
@@ -60,6 +78,10 @@ beforeEach(() => {
     vi.spyOn(console, "error").mockImplementation((...args: unknown[]) => { printed.push(args.map(String).join(" ")); });
 });
 
+beforeEach(() => {
+    orphanScanPolling.intervalMs = 0;
+});
+
 afterEach(() => {
     vi.unstubAllGlobals();
     vi.restoreAllMocks();
@@ -67,23 +89,43 @@ afterEach(() => {
 });
 
 describe("rebase storage orphans", () => {
-    it("lists, with the service key, and deletes nothing", async () => {
-        answers.push(report);
+    it("starts a scan with the service key, asks about it until it is done, and deletes nothing", async () => {
+        answers.push(scan.queued, scan.running, scan.completed);
         await storageCommand("orphans", argv("storage", "orphans", "--source", "media", "--older-than", "48"));
 
-        expect(calls).toEqual([{
-            method: "GET",
-            url: "http://rebase.test/api/admin/storage/orphans?olderThanHours=48&storageId=media",
-            body: undefined,
-            auth: "Bearer svc_test_key"
-        }]);
+        expect(calls.map(({ method, url, auth }) => ({ method, url, auth }))).toEqual([
+            { method: "POST", url: "http://rebase.test/api/admin/storage/orphans/scans?olderThanHours=48&storageId=media", auth: "Bearer svc_test_key" },
+            { method: "GET", url: `http://rebase.test/api/admin/storage/orphans/scans/${SCAN}?storageId=media`, auth: "Bearer svc_test_key" },
+            { method: "GET", url: `http://rebase.test/api/admin/storage/orphans/scans/${SCAN}?storageId=media`, auth: "Bearer svc_test_key" }
+        ]);
         const text = printed.join("\n").replace(ANSI, "");
         expect(text).toContain("avatars/old.png");
         expect(text).toContain("Nothing was deleted");
     });
 
+    it("prints the report as JSON with --json, the scan's id beside it", async () => {
+        answers.push(scan.queued, scan.completed);
+        await storageCommand("orphans", argv("storage", "orphans", "--json"));
+        expect(JSON.parse(printed.join("\n"))).toEqual({ ...report, scanId: SCAN });
+    });
+
+    it("says so when the scan runs inside the server process, for want of a job queue", async () => {
+        answers.push({ ...scan.queued, runner: "in-process" }, scan.completed);
+        await storageCommand("orphans", argv("storage", "orphans"));
+        expect(printed.join("\n").replace(ANSI, "")).toContain("runs no job queue, so the scan runs inside the server process");
+    });
+
+    it("stops with the reason when the scan failed", async () => {
+        answers.push(scan.queued, { ...scan.running, status: "failed", error: "The scan stopped reporting progress 11 minutes ago" });
+        vi.spyOn(process, "exit").mockImplementation(((code?: number) => {
+            throw new Error(`exit:${code}`);
+        }) as never);
+        await expect(storageCommand("orphans", argv("storage", "orphans"))).rejects.toThrow("exit:1");
+        expect(printed.join("\n").replace(ANSI, "")).toContain("The scan failed: The scan stopped reporting progress");
+    });
+
     it("does not delete without a yes when there is no terminal to ask", async () => {
-        answers.push(report);
+        answers.push(scan.queued, scan.completed);
         const isTTY = process.stdin.isTTY;
         Object.defineProperty(process.stdin, "isTTY", { value: false, configurable: true });
         try {
@@ -91,15 +133,52 @@ describe("rebase storage orphans", () => {
         } finally {
             Object.defineProperty(process.stdin, "isTTY", { value: isTTY, configurable: true });
         }
-        expect(calls.map(call => call.method)).toEqual(["GET"]);
+        expect(calls.map(call => call.method)).toEqual(["POST", "GET"]);
     });
 
-    it("deletes with --yes, asking the server to find them again", async () => {
-        answers.push(report, { deleted: ["avatars/old.png"], failed: [] });
+    it("deletes with --yes from the completed scan, and says which files the server kept", async () => {
+        const deletionQueued = { ...scan.completed, deletion: { status: "queued", progress: { ...progress, candidates: 2, deleted: 0 } } };
+        answers.push(scan.queued, scan.completed, deletionQueued, deletionQueued, scan.deleted);
         await storageCommand("orphans", argv("storage", "orphans", "--delete", "--yes"));
-        expect(calls.map(call => `${call.method} ${call.url}`)).toEqual([
-            "GET http://rebase.test/api/admin/storage/orphans?olderThanHours=24",
-            "DELETE http://rebase.test/api/admin/storage/orphans?olderThanHours=24"
+        expect(calls.map(call => `${call.method} ${call.url.replace("http://rebase.test/api/admin/storage", "")}`)).toEqual([
+            "POST /orphans/scans?olderThanHours=24",
+            `GET /orphans/scans/${SCAN}`,
+            `DELETE /orphans?scan=${SCAN}`,
+            `GET /orphans/scans/${SCAN}`,
+            `GET /orphans/scans/${SCAN}`
+        ]);
+        const text = printed.join("\n").replace(ANSI, "");
+        expect(text).toContain("Deleted 1 file(s)");
+        expect(text).toContain("Kept avatars/other.png: a row or a history entry names it now");
+        expect(process.exitCode).toBeUndefined();
+    });
+
+    it("does not fall back to the old way for a source the backend does not serve", async () => {
+        vi.stubGlobal("fetch", vi.fn(async (url: string, init: RequestInit) => {
+            calls.push({ method: init.method ?? "GET", url });
+            return new Response(JSON.stringify({ error: { code: "UNKNOWN_STORAGE_SOURCE", message: "This server has no storage source \"media\"." } }), { status: 404 });
+        }));
+        vi.spyOn(process, "exit").mockImplementation(((code?: number) => {
+            throw new Error(`exit:${code}`);
+        }) as never);
+        await expect(storageCommand("orphans", argv("storage", "orphans", "--source", "media"))).rejects.toThrow("exit:1");
+        expect(calls.map(call => call.method)).toEqual(["POST"]);
+    });
+
+    it("asks a backend from before background scans the old way, in one request", async () => {
+        const legacy: unknown[] = [report, { deleted: ["avatars/old.png"], failed: [] }];
+        vi.stubGlobal("fetch", vi.fn(async (url: string, init: RequestInit) => {
+            calls.push({ method: init.method ?? "GET", url });
+            if (url.includes("/orphans/scans")) {
+                return new Response(JSON.stringify({ error: { code: "NOT_FOUND", message: "Not Found" } }), { status: 404 });
+            }
+            return new Response(JSON.stringify({ data: legacy.shift() }), { status: 200 });
+        }));
+        await storageCommand("orphans", argv("storage", "orphans", "--delete", "--yes"));
+        expect(calls.map(call => `${call.method} ${call.url.replace("http://rebase.test/api/admin/storage", "")}`)).toEqual([
+            "POST /orphans/scans?olderThanHours=24",
+            "GET /orphans?olderThanHours=24",
+            "DELETE /orphans?olderThanHours=24"
         ]);
         expect(printed.join("\n").replace(ANSI, "")).toContain("Deleted 1 file(s)");
     });
@@ -129,18 +208,64 @@ describe("rebase storage move", () => {
     it("asks for page after page until the folder is done", async () => {
         answers.push(
             { moved: [{ key: "avatars/1.png", outcome: "copied" }, { key: "avatars/2.png", outcome: "exists" }], cursor: "c1" },
-            { moved: [{ key: "avatars/3.png", outcome: "failed", error: "too big" }] }
+            { moved: [{ key: "avatars/3.png", outcome: "failed", error: "too big" }] },
+            { checked: 3, notMoved: [{ key: "avatars/3.png", reason: "the target has no copy" }] }
         );
         await storageCommand("move", argv("storage", "move", "--from", "(default)", "--to", "media", "--prefix", "avatars"));
 
         expect(calls.map(call => call.body)).toEqual([
             { from: "(default)", to: "media", prefix: "avatars", deleteSource: false },
-            { from: "(default)", to: "media", prefix: "avatars", cursor: "c1", deleteSource: false }
+            { from: "(default)", to: "media", prefix: "avatars", cursor: "c1", deleteSource: false },
+            { from: "(default)", to: "media", prefix: "avatars", deleteSource: false, limit: 500 }
         ]);
         const text = printed.join("\n").replace(ANSI, "");
         expect(text).toContain("1 copied, 1 already there");
         expect(text).toContain("avatars/3.png: too big");
         expect(process.exitCode).toBe(1);
+    });
+
+    it("lists the source again afterwards, and names every file the move left behind", async () => {
+        // A walk that skipped files reported success over the half it moved.
+        answers.push(
+            { moved: [{ key: "a/1.png", outcome: "copied", deleted: true }] },
+            { checked: 1, notMoved: [{ key: "a/2.png", reason: "still in the source, and the target has no copy of the same size" }], cursor: "v1" },
+            { checked: 1, notMoved: [] }
+        );
+        await storageCommand("move", argv("storage", "move", "--to", "media", "--delete-source"));
+
+        expect(calls.map(call => call.url.replace("http://rebase.test/api/admin/storage", ""))).toEqual(["/move", "/move/verify", "/move/verify"]);
+        expect(calls[2].body).toMatchObject({ to: "media", cursor: "v1", deleteSource: true });
+        const text = printed.join("\n").replace(ANSI, "");
+        expect(text).toContain("1 copied");
+        expect(text).toMatch(/1 file\(s\) were not moved/);
+        expect(text).toContain("a/2.png: still in the source");
+        expect(process.exitCode).toBe(1);
+    });
+
+    it("says so when the move left nothing behind, and in --json", async () => {
+        answers.push(
+            { moved: [{ key: "a/1.png", outcome: "copied" }] },
+            { checked: 1, notMoved: [] }
+        );
+        await storageCommand("move", argv("storage", "move", "--to", "media", "--json"));
+        const json = JSON.parse(printed.join("\n")) as { copied: number; notMoved: unknown[]; verified: boolean };
+        expect(json).toMatchObject({ copied: 1, notMoved: [], verified: true });
+        expect(process.exitCode).toBeUndefined();
+    });
+
+    it("moves anyway against a backend that cannot list the source again, and says it did not check", async () => {
+        vi.stubGlobal("fetch", vi.fn(async (url: string, init: RequestInit) => {
+            calls.push({ method: init.method ?? "GET", url, body: init.body ? JSON.parse(String(init.body)) : undefined });
+            if (url.endsWith("/move/verify")) {
+                return new Response(JSON.stringify({ error: { code: "NOT_FOUND", message: "Not Found" } }), { status: 404 });
+            }
+            return new Response(JSON.stringify({ data: { moved: [{ key: "a/1.png", outcome: "copied" }] } }), { status: 200 });
+        }));
+        await storageCommand("move", argv("storage", "move", "--to", "media"));
+        const text = printed.join("\n").replace(ANSI, "");
+        expect(text).toContain("1 copied");
+        expect(text).toContain("did not check");
+        expect(process.exitCode).toBeUndefined();
     });
 
     it("names the flag a typo was one swap away from, and sends nothing", async () => {

@@ -1,5 +1,5 @@
 ---
-sourceHash: b40368f94c74dfb6
+sourceHash: e515564ee1857435
 title: Données côté serveur typées
 sidebar_label: Données côté serveur typées
 description: "Enregistrez une fois votre type Database généré, et context.data, rebase.dataAsAdmin et le rebase que reçoit une fonction ou un cron sont typés à partir de lui : lignes, filtres, tris, includes et entrées d'écriture."
@@ -48,9 +48,15 @@ exactement ce qu'il faisait avant.
 
 Le choix est mémorisé dans `rebase.json`, sous la forme `"registerDatabase": true` sur l'application
 backend, si bien que chaque `rebase generate-sdk` ultérieur, et `rebase dev` à chaque
-changement de collection, maintient les deux fichiers à jour. Cela vaut aussi pour un clone neuf et pour la CI :
-le `.gitignore` du scaffold ignore les répertoires `generated/`, et le
-premier `rebase generate-sdk` ou `rebase dev` les réécrit. Un projet sans
+changement de collection, maintient les deux fichiers à jour. Le `.gitignore` du scaffold
+ignore les répertoires `generated/`, si bien qu'un clone neuf n'a aucun des deux fichiers tant que
+quelque chose ne les réécrit pas. `rebase build` (et `rebase cloud deploy`, qui
+compile le même bundle) les écrit à partir des collections avant de compiler,
+de sorte qu'un job de CI qui exécute `rebase build` sur un clone neuf compile des callbacks typés.
+Une étape de CI qui compile le backend ou le package `config` autrement
+(`tsc`, `pnpm build`) a encore besoin de `rebase generate-sdk` au préalable, faute de quoi les callbacks
+qui lisent des lignes typées se compilent contre le `context.data` non typé et échouent. Un
+projet sans
 `rebase.json` continue d'enregistrer tant que `config/generated/register.ts`
 est présent. Pour revenir à des données côté serveur non typées, retirez `registerDatabase` et
 supprimez `config/generated/`.

@@ -1196,24 +1196,28 @@ width: "100%" }}
                   </code>
                 </div>
 
-                {/* Form fields */}
-                <div className="flex flex-col gap-3">
+                {/* Form fields — as the record form draws them: a one-line
+                    field is a filled 66px box (`field`, no edge) with its label
+                    shrunk inside and a 16px value; an upload and a relation
+                    take their label above the box (13px, primary ink). */}
+                <div className="flex flex-col gap-4">
                   {/* Title field */}
-                  <div className="field min-h-[48px] flex flex-col justify-center">
+                  <div className="field min-h-[66px] flex flex-col justify-center">
                     <span className="field-label text-primary">
                       Title <span className="text-red-500">*</span>
                     </span>
-                    <div className="px-3 pt-6 pb-2 text-sm text-surface-900 dark:text-surface-200">
+                    <div className="px-3 pt-8 pb-2 text-base leading-6 text-surface-900 dark:text-surface-200">
                       {formValues.title}
                     </div>
                   </div>
 
-                  {/* Image field */}
-                  <div className="field min-h-[64px] flex flex-col">
-                    <span className="field-label">
+                  {/* Image field — an upload, so its label sits above */}
+                  <div className="flex flex-col min-w-0">
+                    <span className="flex items-center gap-1.5 mb-1.5 text-[13px] font-medium leading-tight text-text-primary dark:text-text-primary-dark">
+                      <MI size={14} className="text-text-disabled dark:text-text-disabled-dark">image</MI>
                       Image
                     </span>
-                    <div className="px-3 pt-6 pb-2">
+                    <div className="field p-3">
                       {formValues.image ? (
                         <img src={formValues.image} {...imgDims(formValues.image)} alt="" className="w-[100px] h-[100px] object-cover rounded-md"/>
                       ) : (
@@ -1224,91 +1228,84 @@ width: "100%" }}
                     </div>
                   </div>
 
-                  {/* Status field */}
-                  <div className={`field min-h-[48px] flex flex-col justify-center transition-all duration-300 ${highlightedFormField === "status" ? "ring-2 ring-primary" : ""}`}>
+                  {/* Status field — a single select: label inside, the chip
+                      under it, the chevron centred in the box */}
+                  <div className={`field min-h-[66px] flex flex-col justify-center transition-all duration-300 ${highlightedFormField === "status" ? "ring-2 ring-primary" : ""}`}>
                     <span className="field-label">
                       Status
                     </span>
-                    <div className="px-3 pt-6 pb-2 flex items-center justify-between">
+                    <div className="px-3 pt-8 pb-2 pr-10 flex items-center">
                       {formValues.status && (
                         <span className={`chip ${statusChip(formValues.status)}`}>
                           {formValues.status}
                         </span>
                       )}
-                      <MI size={18} className="text-surface-400">
-                        expand_more
-                      </MI>
                     </div>
+                    <MI size={20} className="absolute right-3 top-1/2 -translate-y-1/2 text-surface-400">
+                      expand_more
+                    </MI>
                   </div>
 
-                  {/* Brand field */}
-                  <div className="field min-h-[48px] flex flex-col justify-center">
-                    <span className="field-label">
+                  {/* Brand field — a relation, so its label sits above */}
+                  <div className="flex flex-col min-w-0">
+                    <span className="flex items-center gap-1.5 mb-1.5 text-[13px] font-medium leading-tight text-text-primary dark:text-text-primary-dark">
+                      <Link size={14} className="shrink-0 text-text-disabled dark:text-text-disabled-dark"/>
                       Brand
                     </span>
-                    <div className="px-3 pt-6 pb-2 flex items-center justify-between">
+                    <div className="field min-h-[50px] px-3 flex items-center justify-between gap-2">
                       {formValues.brand ? (
-                        <span className="inline-flex items-center gap-1.5 min-w-0 max-w-full">
-                          <Link size={13} className="shrink-0 opacity-40"/>
-                          <span className="text-sm font-medium text-surface-900 dark:text-white truncate">
-                            {formValues.brand}
-                          </span>
+                        <span className="text-sm font-medium text-surface-900 dark:text-white truncate">
+                          {formValues.brand}
                         </span>
                       ) : (
                         <span className="text-surface-400 text-sm">—</span>
                       )}
-                      <MI size={18} className="text-surface-400">
+                      <MI size={18} className="text-surface-400 flex-shrink-0">
                         expand_more
                       </MI>
                     </div>
                   </div>
 
-                  {/* Category field */}
-                  <div className="field min-h-[48px] flex flex-col justify-center">
+                  {/* Category field — a single select */}
+                  <div className="field min-h-[66px] flex flex-col justify-center">
                     <span className="field-label">
                       Category
                     </span>
-                    <div className="px-3 pt-6 pb-2 flex items-center justify-between gap-2">
-                      <div className="flex flex-wrap gap-1 flex-1">
-                        {formValues.category ? (
-                          <span className={`chip ${categoryChip(formValues.category)}`}>
-                            {categoryLabel(formValues.category)}
-                          </span>
-                        ) : (
-                          <span className="text-surface-400 text-sm">
-                            —
-                          </span>
-                        )}
-                      </div>
-                      <MI
-                        size={18}
-                        className="text-surface-400 flex-shrink-0"
-                      >
-                        expand_more
-                      </MI>
+                    <div className="px-3 pt-8 pb-2 pr-10 flex flex-wrap items-center gap-1">
+                      {formValues.category ? (
+                        <span className={`chip ${categoryChip(formValues.category)}`}>
+                          {categoryLabel(formValues.category)}
+                        </span>
+                      ) : (
+                        <span className="text-surface-400 text-sm">
+                          —
+                        </span>
+                      )}
                     </div>
+                    <MI size={20} className="absolute right-3 top-1/2 -translate-y-1/2 text-surface-400">
+                      expand_more
+                    </MI>
                   </div>
 
                   {/* Number: mono and tabular, as the product previews it. */}
-                  <div className="field min-h-[48px] flex flex-col justify-center">
+                  <div className="field min-h-[66px] flex flex-col justify-center">
                     <span className="field-label">
                       Price
                     </span>
-                    <div className="px-3 pt-6 pb-2 text-sm font-mono tabular-nums text-surface-900 dark:text-surface-200">
+                    <div className="px-3 pt-8 pb-2 text-base leading-6 font-mono tabular-nums text-surface-900 dark:text-surface-200">
                       {typeof formValues.price === "number" ? formValues.price.toFixed(2) : "—"}
                     </div>
                   </div>
 
-                  {/* BooleanSwitch, `size="medium"` — geometry and both palettes
-                      come from the `switch-*` utilities in global.css. */}
-                  <div className="field min-h-[48px] flex flex-row items-center justify-between pl-3 pr-3 pt-4 pb-2">
-                    <span className="field-label">
+                  {/* A switch carries its label inside too, at body size on
+                      the left, with the switch on the right — the same 66px.
+                      Geometry and both palettes come from the `switch-*`
+                      utilities in global.css. */}
+                  <div className="field min-h-[66px] flex flex-row items-center justify-between pl-4 pr-4">
+                    <span className="text-sm font-medium text-surface-900 dark:text-surface-200">
                       Featured
                     </span>
-                    <span className="text-sm text-surface-900 dark:text-surface-200 pt-2">
-                      {formValues.featured ? "Yes" : "No"}
-                    </span>
-                    <span className={`switch-track mt-2 ${formValues.featured ? "switch-track-on" : ""}`}>
+                    <span className={`switch-track ${formValues.featured ? "switch-track-on" : ""}`}>
                       <span className={`switch-knob ${formValues.featured ? "switch-knob-on" : ""}`}/>
                     </span>
                   </div>

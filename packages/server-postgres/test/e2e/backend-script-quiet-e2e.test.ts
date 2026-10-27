@@ -108,7 +108,7 @@ describe("a script that builds a backend and never mounts it (E2E)", () => {
 
     it("with provision: false, prints only its JSON, and no warning about a route it never mounted", async () => {
         const result = await runScript(scriptSource(false));
-        expect(result.code).toBe(0);
+        expect(result.code, result.stderr).toBe(0);
         expect(result.stdout).toBe("{\"rows\":0,\"status\":200}\n");
         expect(result.stderr).not.toMatch(/mounted but DISABLED/);
         expect(result.stderr).not.toMatch(/Contract endpoint disabled/);

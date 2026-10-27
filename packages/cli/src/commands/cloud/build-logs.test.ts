@@ -251,7 +251,9 @@ describe("rebase cloud logs in JSON mode", () => {
 
         await logsCommand(["node", "rebase", "cloud", "logs", "--json", "--runtime"], "shop");
 
-        expect(result()).toEqual({ runtime: true, logs: "GET /api/health 200\n" });
+        // The pods, the state and the resume cursor ride along since `--follow`
+        // learned to follow; the log is still the one field it always was.
+        expect(result()).toMatchObject({ runtime: true, logs: "GET /api/health 200\n" });
     });
 });
 

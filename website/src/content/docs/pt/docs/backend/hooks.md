@@ -1,5 +1,5 @@
 ---
-sourceHash: b0d41379c997dc49
+sourceHash: 15dd4d33e0af52d5
 title: Hooks Globais de Backend
 sidebar_label: Hooks Globais
 description: Aplique callbacks de ciclo de vida transversais a todas as coleções no nível do servidor usando CollectionCallbacks.
@@ -95,13 +95,15 @@ Cada callback recebe um único objeto de propriedades. Campos comuns:
 | `collection` | `CollectionConfig` | Todos os callbacks |
 | `path` | `string` | Todos os callbacks |
 | `row` | `Record<string, unknown>` | `afterRead`, `beforeDelete`, `afterDelete` |
-| `id` | `string` | `beforeSave` (opcional), `afterSave`, `afterSaveError`, `beforeDelete`, `afterDelete` |
+| `id` | `string \| number` | `beforeSave` (opcional), `afterSave`, `afterSaveError` (opcional), `beforeDelete`, `afterDelete` |
 | `values` | `EntityValues` | `beforeSave`, `afterSave`, `afterSaveError` |
 | `previousValues` | `EntityValues` (opcional) | `beforeSave`, `afterSave`, `afterSaveError` |
-| `status` | `"new" \| "existing"` | `beforeSave`, `afterSave`, `afterSaveError` |
+| `status` | `"new" \| "existing" \| "copy"` | `beforeSave`, `afterSave`, `afterSaveError` |
 | `context` | `RebaseCallContext` | Todos os callbacks |
 
-`context.user` contém o usuário autenticado (`uid`, `roles`, etc.), ou é `undefined` para requisições públicas.
+`context.user` contém o usuário autenticado (`uid`, `roles`, etc.). Uma requisição sem token, quando a API a deixa entrar, carrega a identidade anônima `{ uid: "anonymous", roles: ["anon"] }` em vez de `undefined`.
+
+<span class="since-badge" data-since="0.26">A partir da versão 0.26</span> `context.credential` nomeia a chave de API com que uma escrita foi feita: `{ kind, id, name }`, em que `kind` é `"personal"` ou `"service"`. Uma chave pessoal age como seu proprietário, então `context.user` é o proprietário, quer ele tenha salvado à mão, quer um job de CI tenha escrito com a chave dele; `context.credential` diferencia os dois casos. Ele é definido na API de dados, no socket de realtime e no `/mcp`, e fica ausente em uma sessão, na chave de serviço, no trabalho em contexto de servidor (`rebase.dataAsAdmin`, crons) e no navegador. Nunca carrega o segredo.
 
 `collection` está sempre presente. Um callback global é disparado para todas as coleções, portanto
 é a única camada registrada independentemente de qualquer uma delas — mas
@@ -288,6 +290,8 @@ const instance = await initializeRebaseBackend({
                 collection: collection.slug,
                 entity_id: String(id),
                 actor: context.user?.uid ?? "anonymous",
+                // The API key, when the delete was made with one.
+                via_key: context.credential?.name ?? null,
                 snapshot: row
             });
         }
@@ -298,6 +302,9 @@ const instance = await initializeRebaseBackend({
 Observe o que isso garante e o que custa: se a linha de auditoria não puder ser gravada, a
 exclusão também não acontece. Para uma trilha de auditoria, isso geralmente é o que se deseja.
 Se não for esse o caso, capture o erro no callback e documente isso em um comentário.
+
+A coluna `via_key` lê `context.credential`, que é novo: <span class="since-badge" data-since="0.26">A partir da versão 0.26</span> Em uma
+versão anterior, deixe-a de fora.
 
 ### Lógica Específica por Coleção
 

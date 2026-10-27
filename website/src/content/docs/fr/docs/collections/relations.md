@@ -1,5 +1,5 @@
 ---
-sourceHash: e3130fcc43e901ed
+sourceHash: 5902e196f7801815
 title: Relations
 sidebar_label: Relations
 description: Définir les relations SQL un-à-un, un-à-plusieurs et plusieurs-à-plusieurs entre les collections avec des clés étrangères, des tables de jonction et des jointures multi-sauts.
@@ -77,9 +77,9 @@ ou plusieurs reviennent, et ce qu'une écriture au travers peut toucher.
 | `hasOne` | sur la table de la **cible** | une | `foreignKeyOnTarget`, par défaut le singulier de cette collection suivi de `_id` (`users` → `user_id`) |
 | `hasMany` | sur la table de la **cible** | plusieurs | les enfants appartiennent à ce seul parent |
 | `manyToMany` | dans une **table de jonction** | plusieurs | les lignes sont partagées ; le lien vous appartient |
-| `via` | un `joinPath` explicite | l'un ou l'autre | lecture seule ; indiquez vous-même la `cardinality` |
+| `via` | un `joinPath` explicite | l'un ou l'autre | modifiable à un seul saut, en lecture seule sinon ; indiquez vous-même la `cardinality` |
 
-Tous les champs sont optionnels sauf `kind` et `target` — le reste est déduit.
+Tous les champs sont optionnels sauf `kind` et `target` (et, sur `via`, `cardinality` et `joinPath`) — le reste est déduit.
 
 ### belongsTo — la clé est sur cette table
 
@@ -134,7 +134,7 @@ relations: [
 colonne que ce côté lit, celui-ci nomme la colonne que l'autre côté vise. Sans
 lui, un lien comme celui ci-dessus n'est pas exprimable en `hasMany` du tout et
 doit retomber sur [`via`](#via--une-chaîne-de-jointures-explicite), qui est en
-lecture seule.
+lecture seule pour une chaîne comme celle-ci.
 
 La colonne doit être unique. Un lien qui adresse plus d'une ligne source ne peut
 pas dire à laquelle une ligne liée appartient, et Postgres n'accepte pas
@@ -173,8 +173,23 @@ point de vue** — `sourceColumn` nomme toujours *cette* collection :
 
 Pour les liens que les quatre formes ci-dessus ne peuvent pas exprimer : chemins
 multi-sauts, clés composites, ou une jointure dont la condition n'est pas une
-simple clé étrangère. En lecture seule — Rebase ne déduira pas comment écrire au
-travers d'une chaîne arbitraire.
+simple clé étrangère.
+
+Une chaîne à **un seul saut** est modifiable par une création ou une mise à jour, de la
+même manière que le kind qu'elle remplace :
+
+- une chaîne **vers un** à **une étape** — la ligne cible détient la clé, de sorte que
+  `{ badge: "b-1" }` fait pointer la colonne de cette ligne vers celle-ci, et `null` la délie,
+  comme le fait une écriture `hasOne` ;
+- une chaîne **vers plusieurs** à **deux étapes à travers une table** entre les extrémités — cette
+  table détient les liens, de sorte que `{ tags: ["t-1", "t-2"] }` les définit comme ses lignes, comme le fait une
+  écriture `manyToMany` (une `via` ne porte pas de `_pivot`).
+
+Tout ce qui est plus long est en **lecture seule** : Rebase ne déduira pas comment écrire
+au travers d'une chaîne arbitraire. Une création ou une mise à jour qui en nomme une est refusée avec
+`400 RELATION_NOT_WRITABLE`, et le formulaire d'administration affiche le champ sans sélecteur.
+Une écriture imbriquée (`PATCH users/1/permissions/3`) au travers de n'importe quelle `via` est refusée
+de la même manière.
 
 ```typescript
 {
@@ -256,8 +271,10 @@ properties: {
 ## Jointures Multi-Sauts
 
 Pour les relations qui traversent plusieurs tables, utilisez `kind: "via"` avec
-un `joinPath`. Elles sont en lecture seule : Rebase ne déduira pas comment
-écrire au travers d'une chaîne arbitraire.
+un `joinPath`.
+Une chaîne de plus d'un lien est en lecture seule : Rebase ne déduira pas comment
+écrire au travers d'une chaîne arbitraire (voir [via](#via--une-chaîne-de-jointures-explicite) pour les
+chaînes à un seul saut qu'il sait écrire).
 
 ```typescript
 // Users → Permissions through Roles
@@ -357,7 +374,7 @@ demandez explicitement :
     kind: "belongsTo",
     relationName: "order",
     target: () => ordersCollection,
-    // Une ligne de commande n'a aucun sens sans sa commande — dites-le.
+    // A line item is meaningless without its order — say so.
     onDelete: "cascade"
 }
 ```
@@ -415,7 +432,7 @@ for (const article of data) {
 }
 ```
 
-> Les noms de relation passés à `include()` doivent correspondre au `relationName` défini dans le tableau `relations` de la collection.
+> Les noms de relation passés à `include()` doivent correspondre au nom de la relation : le `relationName` d'une entrée du tableau `relations` de la collection, ou la clé de la propriété qui la déclare en ligne.
 
 Pour la référence complète du constructeur de requêtes (filtrage, tri, pagination, temps réel), consultez la [documentation du SDK typé](/docs/sdk).
 
@@ -547,7 +564,12 @@ interface HasManyRelation extends RelationBase {
 
 interface ManyToManyRelation extends RelationBase {
     kind: "manyToMany";
-    through?: { table?: string; sourceColumn?: string; targetColumn?: string };
+    through?: {
+        table?: string;
+        sourceColumn?: string;
+        targetColumn?: string;
+        properties?: Properties;    // extra columns on the junction row, served under `_pivot`
+    };
 }
 
 interface ViaRelation extends RelationBase {
@@ -562,7 +584,7 @@ interface ViaRelation extends RelationBase {
 Ce que vous écrivez ci-dessus est la forme *d'écriture*. En interne, Rebase
 travaille avec `ResolvedRelation` : le même lien avec toutes les valeurs par
 défaut remplies et rien d'optionnel, plus `cardinality`, `targetSlug` et deux
-drapeaux — `writable` (faux uniquement pour `via`) et `shared` (vrai lorsque les
+drapeaux — `writable` (faux uniquement pour une `via` à plusieurs sauts) et `shared` (vrai lorsque les
 lignes cibles appartiennent aussi à d'autres parents, un retrait déliant alors
 au lieu de supprimer).
 

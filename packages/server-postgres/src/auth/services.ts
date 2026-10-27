@@ -23,6 +23,7 @@ import {
     PendingEmailChange,
     ApiError
 } from "@rebasepro/server";
+import { roleNameProblem } from "@rebasepro/types";
 import { toSnakeCase, camelCase } from "@rebasepro/utils";
 import { escapeLikePattern } from "../utils/drizzle-conditions";
 import { extractPgError } from "../utils/pg-error-utils";
@@ -578,14 +579,30 @@ export class UserService implements UserRepository {
     }
 
     /**
-     * Set roles for a user (replaces existing roles)
+     * Set roles for a user (replaces existing roles).
+     *
+     * Each role is its own bound parameter. The array used to be spelled as a
+     * literal, `{${roles.join(",")}}`, so the database parsed what the caller
+     * had only checked as strings: `"support,admin"` was stored as two roles,
+     * one of them `admin`, and `"NULL"` as a SQL NULL. A name that would be read
+     * back as other roles is refused (`roleNameProblem`) — RLS splits the
+     * comma-joined `app.user_roles` the same way.
      */
     async setUserRoles(uid: string, roleIds: string[]): Promise<void> {
+        const problems = roleIds.flatMap(role => {
+            const problem = roleNameProblem(role);
+            return problem ? [`${JSON.stringify(role)} ${problem}`] : [];
+        });
+        if (problems.length > 0) {
+            throw ApiError.badRequest(`Not valid role names: ${problems.join("; ")}`, "INVALID_ROLE");
+        }
         const usersTableName = this.getQualifiedUsersTableName();
-        const rolesArray = `{${roleIds.join(",")}}`;
+        const rolesArray = roleIds.length === 0
+            ? sql`'{}'::text[]`
+            : sql`ARRAY[${sql.join(roleIds.map(role => sql`${role}`), sql`, `)}]::text[]`;
         await this.withServerContext(async (db) => db.execute(sql`
             UPDATE ${sql.raw(usersTableName)}
-            SET roles = ${rolesArray}::text[], updated_at = NOW()
+            SET roles = ${rolesArray}, updated_at = NOW()
             WHERE id = ${uid}
         `));
     }

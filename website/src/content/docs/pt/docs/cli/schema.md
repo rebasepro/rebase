@@ -1,5 +1,5 @@
 ---
-sourceHash: 36aded03c38207a4
+sourceHash: 829ce13f7c169a96
 title: Geração de Esquema
 sidebar_label: Geração de Esquema
 description: Gere esquemas Drizzle ORM a partir das definições de coleções, crie migrações SQL e mantenha seu banco de dados sincronizado com a CLI da Rebase.
@@ -23,7 +23,7 @@ Suas definições de coleções em `config/collections/` descrevem tabelas, colu
 
 ### 2. Esquema Drizzle → Migrações
 
-A partir do esquema Drizzle gerado, `db generate` compara com as migrações que já estão em `drizzle/migrations/`, reaplicadas em um banco de dados temporário, e produz arquivos de migração SQL com carimbo de data/hora. Ele nunca lê o seu banco de dados: uma coluna que a inicialização ou o `db push` já adicionou ainda sai como `ADD COLUMN`.
+A partir do esquema Drizzle gerado, `db generate` compara com as migrações que já estão em `backend/drizzle/migrations/`, reaplicadas em um banco de dados temporário, e produz arquivos de migração SQL com carimbo de data/hora. Ele nunca lê o seu banco de dados: uma coluna que a inicialização ou o `db push` já adicionou ainda sai como `ADD COLUMN`.
 
 ### 3. Migrações → PostgreSQL
 
@@ -85,7 +85,7 @@ rebase schema introspect
 ```
 
 **O que ele faz:**
-- Conecta-se ao seu banco de dados (usando a string de conexão do seu `.env`)
+- Conecta-se ao banco de dados deste projeto, o que `rebase db url` imprime (o gerenciado é iniciado se for esse); `--database-url` indica outro, e `--docker` usa o do compose
 - Inspeciona todas as tabelas, colunas, tipos e chaves estrangeiras
 - Gera arquivos de definição de coleções
 - Lê as políticas de
@@ -139,6 +139,9 @@ rebase schema introspect
 | `--output, -o` | Diretório de saída para os arquivos de coleção gerados |
 | `--schema` | O schema do Postgres a ler (padrão: `public`) |
 | `--force, -f` | Sobrescreve os arquivos de coleção que já existem; sem ele, um arquivo existente é ignorado |
+| `--database-url` | Lê este banco de dados em vez do próprio do projeto |
+| `--docker` | Lê o banco de dados do compose, iniciando-o se necessário |
+| `--data-inference` / `--no-data-inference` | Amostra até 100 linhas por tabela para detectar formatos, restrições e configurações de UI, ou lê apenas a estrutura. Sem nenhum dos dois ele pergunta, e sem um terminal lê apenas a estrutura |
 
 Isso é útil ao adotar a Rebase em um banco de dados existente — faça a introspecção primeiro, depois personalize as coleções geradas.
 
@@ -167,7 +170,7 @@ rebase db push
 **O que ele faz:**
 - Lê o esquema Drizzle gerado
 - Aplica as mudanças diretamente ao banco de dados (CREATE, ALTER, DROP)
-- Executa o plano primeiro em modo dry run e para antes de tudo o que destrói dados: uma tabela, coluna, schema, view ou tipo removidos, um `TRUNCATE`, uma mudança de tipo de coluna que pode perder valores (`timestamptz` → `date`, `numeric` → `integer`), ou uma mudança de chave primária: `(id)` → `(id, locale)` dá a cada linha um id novo, de modo que links, chaves estrangeiras e ids guardados em outros lugares deixam de encontrar sua linha. Ele também para antes da remoção de uma restrição CHECK ou EXCLUDE que o banco de dados contém: nenhuma linha é perdida, mas a partir daí o banco de dados aceita linhas que recusava. Pergunta em um terminal, onde Ctrl-C ou Ctrl-D responde não, e recusa caso contrário; `--allow-destructive` (ou `--yes`) aplica mesmo assim. Um push que para aí remove, ao sair, o seu banco de dados temporário `<db>_dev_diff`
+- Executa o plano primeiro em modo dry run e para antes de tudo o que destrói dados: uma tabela, coluna, schema, view ou tipo removidos, um `TRUNCATE`, uma mudança de tipo de coluna que pode perder valores (`timestamptz` → `date`, `numeric` → `integer`), ou uma mudança de chave primária: `(id)` → `(id, locale)` dá a cada linha um id novo, de modo que links, chaves estrangeiras e ids guardados em outros lugares deixam de encontrar sua linha. Ele também para antes da remoção de uma restrição CHECK ou EXCLUDE que o banco de dados contém: nenhuma linha é perdida, mas a partir daí o banco de dados aceita linhas que recusava. Pergunta em um terminal, onde Ctrl-C ou Ctrl-D responde não, e recusa caso contrário; `--allow-destructive` aplica mesmo assim. O `--yes` ainda faz o mesmo nesta versão, com um aviso de descontinuação; a partir da próxima versão ele aprova apenas pushes que não destroem nada. Um push que para aí remove, ao sair, o seu banco de dados temporário `<db>_dev_diff`
 - Ativa a segurança em nível de linha em todas as tabelas de coleção, incluindo as tabelas de junção, logo após a mudança de schema e antes de qualquer etapa que possa falhar, de modo que um push que para no meio deixa uma tabela nova negando todas as requisições em vez de aberta a elas
 - Aplica as políticas RLS das suas coleções e **remove as políticas que um push anterior substituiu**
 - Deixa como estão todas as restrições CHECK e
@@ -266,7 +269,7 @@ rebase db generate
 
 **O que ele faz:**
 - Compara o esquema Drizzle com o estado que as migrações em `drizzle/migrations/` constroem, não com o seu banco de dados
-- Produz arquivos de migração SQL com carimbo de data/hora em `drizzle/migrations/`
+- Produz arquivos de migração SQL com carimbo de data/hora em `backend/drizzle/migrations/`
 - Os arquivos podem ser revisados, editados e commitados no controle de versão
 - Nomeia cada instrução da nova migração que destrói dados, usando a verificação que o `db push` executa antes de aplicar: uma tabela, coluna, schema, view ou tipo removido, um `TRUNCATE`, uma mudança de tipo de coluna que pode perder valores, uma mudança de chave primária, ou a remoção de uma restrição CHECK ou EXCLUDE que o banco de dados contém. Ele ainda escreve o arquivo e sai com 0, ou seja, avisa e não recusa.
 - Termina dizendo o
@@ -374,7 +377,7 @@ Execute `doctor` sempre que algo parecer fora de sincronia. Ele aponta exatament
 
 A comparação com o banco de dados inclui a que a inicialização faz antes de avisar que o `schema.generated.ts` e o banco de dados divergem, executada pelo mesmo código. Assim, toda diferença de que a inicialização avisa também está no relatório, com as mesmas palavras: uma coluna que é NOT NULL de um lado e anulável do outro, e uma coluna que o banco de dados ainda tem e o arquivo não (a inicialização nunca remove uma, então uma propriedade renomeada deixa a sua coluna antiga para trás). Cada uma é um aviso, e a correção nomeia o `rebase db push`.
 
-A comparação com o banco de dados precisa de `DATABASE_URL` (ou `ADMIN_CONNECTION_STRING`). Sem uma delas, essa fase é reportada como **ignorada** (skipped) em vez de aprovada, e a execução nunca termina com "All schemas are in sync" — uma verificação que não aconteceu não é um atestado de saúde.
+A comparação com o banco de dados lê o banco de dados do projeto, resolvido da mesma forma que `rebase db url` o resolve — num scaffold novo, o gerenciado, que o `doctor` inicia. Quando nenhum pode ser resolvido, essa fase é reportada como **ignorada** (skipped) em vez de aprovada, e a execução nunca termina com "All schemas are in sync" — uma verificação que não aconteceu não é um atestado de saúde.
 
 Ele também nomeia toda coleção sem [bloco `search`](/docs/backend/search) cuja tabela tenha mais de cerca de 10.000 linhas. Uma busca ali — a caixa de busca do admin, `.search()`, `?searchString=` — é `ILIKE '%term%'` sobre as colunas de texto, que nenhum índice consegue atender, então cada uma lê a tabela inteira, e a sua contagem a lê de novo (cerca de um terço de segundo com 100.000 linhas, crescendo com a tabela). A contagem de linhas é a estimativa do próprio Postgres, então a verificação não varre nada. É uma dica: ela não muda o código de saída, e nada é indexado para você.
 
@@ -459,9 +462,9 @@ rebase schema generate
 # 3. Generate SQL migration files
 rebase db generate
 
-# 4. Review the generated SQL in drizzle/migrations/
+# 4. Review the generated SQL in backend/drizzle/migrations/
 # 5. Commit the migration to version control
-git add drizzle/migrations/
+git add backend/drizzle/migrations/
 
 # 6. Apply in production
 #    A database Rebase has already booted needs a baseline the first time —

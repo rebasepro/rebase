@@ -1,5 +1,5 @@
 ---
-sourceHash: fef2eb56c7043526
+sourceHash: 29363c3f0ab50d98
 title: Layout do Formulário
 sidebar_label: Layout do Formulário
 description: Controle como o formulário da entidade é organizado — larguras de colunas, seções e a barra lateral de metadados.
@@ -16,8 +16,9 @@ O formulário da entidade é gerado a partir das suas propriedades:
   campos vizinhos com o mesmo editor pequeno — dois números, dois interruptores,
   duas datas do mesmo modo, duas seleções com opções curtas — compartilham uma linha
 
-Um campo com um rótulo longo, texto de ajuda com mais de 60 caracteres, `conditions` ou um
-`Field` customizado nunca é pareado, assim como nenhum texto livre: nada em
+Um campo com um rótulo longo, texto de ajuda com mais de 60 caracteres, `conditions`, uma
+regra `access` no nível do campo ou `excludeFromApi` (o formulário não renderiza nada para um
+usuário que não pode lê-lo), ou um `Field` customizado nunca é pareado, assim como nenhum texto livre: nada em
 um schema diferencia o nome curto de uma branch de uma URL longa. O formulário nunca analisa
 qual propriedade é o título. Quaisquer outras colunas são algo que a collection solicita,
 campo por campo, com `admin.span` — definido com base no que cada campo contém, conforme
@@ -172,7 +173,7 @@ na coluna principal.
 | `admin.form.sections` | `FormSection[]` | Grupos com título para a coluna principal |
 | `admin.form.showRecordMeta` | `boolean` | Exibir id/criado/atualizado no rodapé da barra lateral |
 
-`FormSection` é `{ key, title?, properties, collapsed?, collapsible? }`.
+`FormSection` é `{ key, title?, properties, collapsed?, collapsible?, readVariant? }`. `readVariant: "summary"` empilha os campos da seção como linhas rótulo/valor na visualização somente leitura do registro; o padrão, `"grid"`, usa a grade do formulário.
 
 ## Relacionados
 

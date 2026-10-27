@@ -37,7 +37,7 @@ The MCP server supports managing multiple Rebase projects simultaneously. This i
 
 One precedence, in this order:
 
-1. **The environment block** — `REBASE_PROJECT_DIR`, `REBASE_BASE_URL`, `REBASE_API_TOKEN` / `REBASE_TOKEN`. If any of them is set, the `default` project is rebuilt from them on **every** start. The rebuild is whole-entry: a token registered against the old `projectDir` is dropped rather than carried into a directory it was never issued for.
+1. **The environment block** — `REBASE_PROJECT_DIR`, `REBASE_BASE_URL`, `REBASE_API_TOKEN`. If any of them is set, the `default` project is rebuilt from them on **every** start. The rebuild is whole-entry: a token registered against the old `projectDir` is dropped rather than carried into a directory it was never issued for.
 2. **The server's working directory**, when it holds a `rebase.json`. `~/.rebase/projects.json` is machine-wide, and a project you are standing in outranks a home-directory cache.
 3. **The persisted `default`**, when neither of the first two says anything.
 
@@ -55,7 +55,7 @@ The server reads configuration from environment variables and `.env` files:
 |---|---|---|
 | `REBASE_PROJECT_DIR` | `process.cwd()` | Project root directory (the `rebase.json` directory) |
 | `REBASE_BASE_URL` | `http://localhost:3001` | Rebase backend URL, when discovery finds no dev server |
-| `REBASE_API_TOKEN` / `REBASE_TOKEN` | (empty) | Auth token for API calls |
+| `REBASE_API_TOKEN` | (empty) | Auth token for API calls to the app. `REBASE_TOKEN` (the CLI's control-plane token) is never sent to the app; the cloud tools pass it to the CLI only |
 | `REBASE_MCP_ALLOW_REMOTE_WRITES` | `false` | Allow destructive tools to run against non-local targets (see below) |
 
 The server attempts to load `.env` from `$REBASE_PROJECT_DIR/.env` or `$REBASE_PROJECT_DIR/app/.env`. Those values configure the server itself. They are not passed on to the CLI or the dev server it spawns: those read the active project's own `.env`, and a variable handed down would outrank it, and the branch the checkout is switched to, as if you had exported it in your shell.
@@ -66,7 +66,8 @@ The server attempts to load `.env` from `$REBASE_PROJECT_DIR/.env` or `$REBASE_P
 
 **Every tool that changes the target environment is refused unless that target is on the loopback interface.** The gate is a list of what is *not* gated, so a newly added tool is protected by default:
 
-- **Not gated — reads:** `rebase_schema_plan`, `rebase_doctor`, `rebase_db_branch_list`, `rebase_db_branch_info`, `list_documents`, `get_document`, `list_users`, `list_roles`, `storage_list_objects`, `storage_get_download_url`, `cron_list_jobs`, `cron_get_job`, `cron_get_job_logs`, `rebase_dev_logs`.
+- **Not gated — reads:** `rebase_schema_plan`, `rebase_doctor`, `rebase_db_branch_list`, `rebase_db_branch_info`, `rebase_db_branch_diff`, `list_documents`, `get_document`, `list_users`, `list_roles`, `storage_list_objects`, `storage_get_download_url`, `cron_list_jobs`, `cron_get_job`, `cron_get_job_logs`, `rebase_dev_logs`, and the Rebase Cloud reads `rebase_cloud_status`, `rebase_cloud_logs`, `rebase_cloud_env_list`, `rebase_cloud_deployments_list`.
+- **Not gated — Rebase Cloud writes:** `rebase_cloud_provision`, `rebase_cloud_deploy`, `rebase_cloud_env_set`, `rebase_cloud_rollback`. Provisioning creates a project and links this directory; the others change the linked cloud project, but they spawn `rebase cloud`, which acts on the project `.rebase/cloud.json` links with the CLI's own credential and the control plane's own permission checks; they never use `baseUrl` or `DATABASE_URL`, which is all the gate can check.
 - **Not gated — local only:** `rebase_schema_introspect`, `rebase_db_branch_switch`, `rebase_schema_generate`, `rebase_db_generate`, `rebase_generate_sdk`, the dev-server tools, and the project-registry tools. These write local files or local state and have no remote target to check.
 - **Gated against `DATABASE_URL`:** every other CLI tool — `rebase_db_push`, `rebase_db_migrate`, `rebase_db_branch_create`, `rebase_db_branch_delete`.
 - **Gated against the project `baseUrl`:** every other SDK tool — `create_document`, `update_document`, `delete_document`, `create_user`, `update_user`, `delete_user`, `rebase_auth_reset_password`, `storage_delete_object`, `cron_trigger_job`, `cron_toggle_job`, `invoke_function`.
@@ -91,7 +92,7 @@ Rows, user records, storage listings, cron jobs, function responses and CLI outp
 
 <!-- generated: mcp tool tables — pnpm generate:mcp-readme -->
 
-44 tools, in 10 groups. Tools marked ⚠ are refused against a non-local
+51 tools, in 10 groups. Tools marked ⚠ are refused against a non-local
 target unless `REBASE_MCP_ALLOW_REMOTE_WRITES=true` — see the gate above.
 
 ### Schema & database (13)
@@ -111,7 +112,7 @@ Spawn the Rebase CLI in the active project directory.
 | `rebase_db_branch_list` | — | List all database branches (Admins only) |
 | `rebase_db_branch_delete` ⚠ | `name` | Delete an existing database branch (Admins only) |
 | `rebase_db_branch_info` | `name` | Show information and status for a database branch (Admins only) |
-| `rebase_db_branch_diff` | `name` | Show what a database branch changed against the database it was made from (Admins only): added, dropped  |
+| `rebase_db_branch_diff` | `name` | Show what a database branch changed against the database it was made from (Admins only): added, dropped and altered tables, columns, constraints, indexes, triggers, RLS policies, enum types, views and functions as SQL, and per table the rows the branch inserted, updated and deleted, matched by primary key, with sample rows |
 | `rebase_db_branch_switch` | — | Point this checkout at a database branch, or back at the main database (Admins only) |
 
 ### Schema planning (1)
@@ -188,13 +189,20 @@ CRUD over a collection through `@rebasepro/client`.
 | `rebase_project_current` | — | Show details about the currently active Rebase project, including resolved URL and auth status |
 | `rebase_project_status` | — | Health-check the active project's backend by calling GET /health |
 
-### Rebase Cloud (1)
+### Rebase Cloud (8)
 
-Spawn `rebase cloud` in the active project directory.
+Spawn `rebase cloud … --json` in the active project directory, against the project it is linked to, with the CLI's own credential. Provisioning creates a project; deploy, env set and rollback change the linked one. The loopback gate does not apply to them, because they never use `baseUrl` or `DATABASE_URL`.
 
 | Tool | Required | Description |
 |---|---|---|
-| `rebase_cloud_provision` ⚠ | — | Give the active project a live backend on Rebase Cloud with no account or signup: provisions a project,  |
+| `rebase_cloud_provision` | — | Give the active project a live backend on Rebase Cloud with no account or signup: provisions a project, sets REBASE_BASE_URL in .env, links the directory and deploys the local collections to it (`rebase cloud init --claim`), then sets REBASE_API_TOKEN in .env: a key the deployed app accepts, for reading and writing data through its row-level security, expiring with the claim window |
+| `rebase_cloud_status` | — | Show the Rebase Cloud project this directory is linked to (`rebase cloud status`) |
+| `rebase_cloud_deploy` | — | Deploy this directory to its linked Rebase Cloud project (`rebase cloud deploy`) |
+| `rebase_cloud_logs` | — | Read the linked Rebase Cloud project's log once, the running app's or the latest build's (`rebase cloud logs`) |
+| `rebase_cloud_env_list` | — | List the linked Rebase Cloud project's environment variables, never their values (`rebase cloud env list`) |
+| `rebase_cloud_env_set` | `key`, `value` | Set one environment variable on the linked Rebase Cloud project (`rebase cloud env set KEY --stdin`) |
+| `rebase_cloud_deployments_list` | — | List the linked Rebase Cloud project's recent deployments, newest first (`rebase cloud deployments list`) |
+| `rebase_cloud_rollback` | — | Put a previous successful deployment of the linked Rebase Cloud project back into service (`rebase cloud rollback`) |
 
 <!-- /generated: mcp tool tables -->
 

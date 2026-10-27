@@ -183,6 +183,7 @@ export default defineConfig({
                         { label: "Auth endpoints", slug: "docs/backend/auth-endpoints" },
                         { label: "Custom auth adapters", slug: "docs/backend/auth-adapters" },
                         { label: "Storage Configuration", slug: "docs/backend/storage" },
+                        { label: "Storage Authorization", slug: "docs/backend/storage-authorization" },
                         { label: "Storage caching and CDNs", slug: "docs/backend/storage-caching" },
                         { label: "Resumable uploads (TUS)", slug: "docs/backend/storage-resumable-uploads" },
                         { label: "Multiple Sources", slug: "docs/backend/multiple-sources" },
@@ -203,6 +204,7 @@ export default defineConfig({
                         { label: "Entity History", slug: "docs/backend/history" },
                         { label: "Database Branching", slug: "docs/backend/branching" },
                         { label: "Custom Server Integration", slug: "docs/backend/custom-server" },
+                        { label: "Embedding the Postgres Driver", slug: "docs/backend/embedding-postgres-driver" },
                         { label: "Scripts and the Console", slug: "docs/backend/scripts" }
                     ]
                 },
@@ -277,6 +279,7 @@ export default defineConfig({
                         { label: "Overview", slug: "docs/ai" },
                         { label: "MCP Server", slug: "docs/ai/mcp" },
                         { label: "MCP tool reference", slug: "docs/ai/mcp-tool-reference" },
+                        { label: "Remote MCP endpoint", slug: "docs/ai/remote-mcp" },
                         { label: "Agent Skills", slug: "docs/ai/skills" },
                         { label: "AI Instruction Files", slug: "docs/ai/instruction-files" }
                     ]
@@ -309,6 +312,8 @@ export default defineConfig({
                         { label: "Overview", slug: "docs/deployment" },
                         { label: "Deployment Guide", slug: "docs/getting-started/deployment" },
                         { label: "Rebase Cloud", slug: "docs/deployment/cloud" },
+                        { label: "Cloud CI and Agents", slug: "docs/deployment/cloud-agents" },
+                        { label: "Cloud Notifications", slug: "docs/deployment/cloud-notifications" },
                         { label: "Managed Runtime", slug: "docs/deployment/managed-runtime" },
                         { label: "Self-Hosting", slug: "docs/deployment/self-hosting" },
                         { label: "Split Processes", slug: "docs/deployment/split-processes" },

@@ -35,6 +35,15 @@ function collection(slug: string): CollectionConfig {
 
 const executed: string[] = [];
 
+/** What the fake planner renders for a collection set. */
+function generatedFrom(collections: CollectionConfig[]): string {
+    const tables = collections.map(c => [c.slug, Object.keys(c.properties ?? {}).sort()]);
+    return `export const tables = ${JSON.stringify(tables)};\n`;
+}
+
+/** The generated file for the collections `bootBundle` serves. */
+const SERVED = ["posts", "authors", "tags"];
+
 function planningBootstrapper(): BackendBootstrapper {
     return {
         type: "fake",
@@ -50,8 +59,11 @@ function planningBootstrapper(): BackendBootstrapper {
                     checkUniqueField: async () => true,
                     healthCheck: async () => ({ healthy: true, latencyMs: 1 }),
                     admin: {
-                        planSchemaChange: async () => ({
-                            files: [{ path: "config/schema.generated.ts", contents: "export const tables = {};\n" }],
+                        // Rendered from `after`, as the real planner renders
+                        // the Drizzle schema, so the generated file differs
+                        // between collection sets.
+                        planSchemaChange: async (_before: unknown[], after: CollectionConfig[]) => ({
+                            files: [{ path: "config/schema.generated.ts", contents: generatedFrom(after) }],
                             statements: ['ALTER TABLE "posts" ADD COLUMN IF NOT EXISTS "author_id" UUID;'],
                             classified: { changes: [], verdict: "safe", applicable: true },
                             message: "feat(schema): link posts to authors\n"
@@ -104,7 +116,7 @@ async function bootBundle(config: Record<string, unknown> = {}): Promise<Hono> {
     await initializeRebaseBackend({
         app: app as never,
         server: {} as never,
-        collections: [collection("posts"), collection("authors"), collection("tags")],
+        collections: SERVED.map(collection),
         collectionsDir: compiledDir,
         schemaEditor: false,
         cronPersistence: false,
@@ -153,10 +165,14 @@ const REMOTE: Record<string, string> = {
     ].join("\n")
 };
 
-/** GitHub, as far as a schema commit reaches it. */
-function fakeGitHub() {
+/**
+ * GitHub, as far as a schema commit reaches it. A commit whose ref update is
+ * accepted lands: the contents API answers what it wrote.
+ */
+function fakeGitHub(initial: Record<string, string> = {}) {
     const calls: { method: string; path: string; body?: Record<string, unknown> }[] = [];
     const blobs = new Map<string, string>();
+    const files: Record<string, string> = { ...REMOTE, ...initial };
     jest.spyOn(globalThis, "fetch").mockImplementation((async (input: string | URL | Request, init: RequestInit = {}) => {
         const url = new URL(String(input));
         expect(url.host).toBe("api.github.com");
@@ -167,10 +183,10 @@ function fakeGitHub() {
 
         const base = "/repos/acme/shop";
         if (url.pathname === `${base}/git/trees/main` && method === "GET") {
-            return json({ tree: Object.keys(REMOTE).map(p => ({ path: p, type: "blob" })), truncated: false });
+            return json({ tree: Object.keys(files).map(p => ({ path: p, type: "blob" })), truncated: false });
         }
         if (url.pathname.startsWith(`${base}/contents/`)) {
-            const file = REMOTE[decodeURIComponent(url.pathname.slice(`${base}/contents/`.length))];
+            const file = files[decodeURIComponent(url.pathname.slice(`${base}/contents/`.length))];
             return file === undefined
                 ? json({ message: "Not Found" }, 404)
                 : json({ content: Buffer.from(file).toString("base64"), encoding: "base64" });
@@ -184,7 +200,13 @@ function fakeGitHub() {
         }
         if (url.pathname === `${base}/git/trees` && method === "POST") return json({ sha: "newtree" });
         if (url.pathname === `${base}/git/commits` && method === "POST") return json({ sha: "newcommit" });
-        if (url.pathname === `${base}/git/refs/heads/main` && method === "PATCH") return json({});
+        if (url.pathname === `${base}/git/refs/heads/main` && method === "PATCH") {
+            for (const [entryPath, contents] of Object.entries(committed())) {
+                if (contents === null || contents === undefined) delete files[entryPath];
+                else files[entryPath] = contents;
+            }
+            return json({});
+        }
         return json({ message: `unexpected ${method} ${url.pathname}` }, 500);
     }) as typeof fetch);
 
@@ -302,9 +324,61 @@ describe("a bundle with liveSchema.repository", () => {
 
         expect(second.status).toBe(400);
         expect(second.body).toMatchObject({ error: { code: "SCHEMA_CHANGE_FAILED" } });
-        expect(String((second.body.error as { message: string }).message)).toMatch(/newcommi.*[Dd]eploy/s);
+        expect(String((second.body.error as { message: string }).message))
+            .toMatch(/config\/schema\.generated\.ts.*Deploy it/s);
         expect(github.calls.filter(c => c.method === "PATCH")).toHaveLength(1);
     }, BOOTS_A_BACKEND);
+
+    // The guard used to be a flag this process set when it committed. These
+    // are the three ways past it: nothing in a fresh process's memory says a
+    // change is waiting, and the repository does.
+    describe("a fresh process (a restart, another replica) over a repository holding an undeployed change", () => {
+        const change = {
+            collectionId: "posts",
+            patch: [{ op: "set", path: ["properties", "subtitle"], value: { name: "Subtitle", type: "string" } }]
+        };
+
+        it("refuses a change after a schema change committed here and not deployed yet", async () => {
+            // What the first process committed: the generated file for the
+            // collections *with* its change.
+            const ahead = generatedFrom([...SERVED.map(collection), {
+                ...collection("extra"),
+                properties: { id: { name: "ID", type: "string" }, note: { name: "Note", type: "string" } }
+            } as unknown as CollectionConfig]);
+            const github = fakeGitHub({ "config/schema.generated.ts": ahead });
+            const app = await bootBundle({ liveSchema: { repository: REPOSITORY } });
+
+            const result = await apply(app, change);
+
+            expect(result.status).toBe(400);
+            expect(result.body).toMatchObject({ error: { code: "SCHEMA_CHANGE_FAILED" } });
+            expect(String((result.body.error as { message: string }).message))
+                .toMatch(/config\/schema\.generated\.ts.*pushed to main.*Nothing was changed/s);
+            expect(github.calls.filter(c => c.method === "POST" || c.method === "PATCH")).toHaveLength(0);
+            expect(executed).not.toContain('ALTER TABLE "posts" ADD COLUMN IF NOT EXISTS "author_id" UUID;');
+        }, BOOTS_A_BACKEND);
+
+        it("refuses a change after a developer pushed one that is not deployed yet", async () => {
+            const github = fakeGitHub({
+                "config/schema.generated.ts": generatedFrom(SERVED.slice(0, 2).map(collection))
+            });
+            const app = await bootBundle({ liveSchema: { repository: REPOSITORY } });
+
+            expect((await apply(app, change)).status).toBe(400);
+            expect(github.calls.filter(c => c.method === "PATCH")).toHaveLength(0);
+        }, BOOTS_A_BACKEND);
+
+        it("commits when the repository's generated file is what this deployment's collections generate", async () => {
+            // Line endings are not a difference: a checkout on Windows.
+            const github = fakeGitHub({
+                "config/schema.generated.ts": generatedFrom(SERVED.map(collection)).replace(/\n/g, "\r\n")
+            });
+            const app = await bootBundle({ liveSchema: { repository: REPOSITORY } });
+
+            expect((await apply(app, change)).status).toBe(200);
+            expect(github.calls.filter(c => c.method === "PATCH")).toHaveLength(1);
+        }, BOOTS_A_BACKEND);
+    });
 
     it("does not count a commit that was refused", async () => {
         const github = fakeGitHub();

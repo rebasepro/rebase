@@ -3,6 +3,7 @@ import os from "os";
 import path from "path";
 import { fileURLToPath } from "url";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import type { RebaseBackendAppConfig } from "@rebasepro/types";
 import {
     assessManagedCompatibility,
     buildableApps,
@@ -1034,6 +1035,39 @@ describe("writeManifest preserves the whole file", () => {
 
         const raw = JSON.parse(fs.readFileSync(path.join(scratch, "rebase.json"), "utf8"));
         expect(raw.someFutureKey).toEqual({ kept: true });
+    });
+
+    it("carries an app field it does not model — a typo or a newer CLI's — through a rewrite", () => {
+        // `generate-sdk --register` adds `registerDatabase` and writes the
+        // validated manifest back, whose apps are constructed field by field:
+        // `futureField` and the typo `pathh` used to vanish from the file.
+        fs.writeFileSync(path.join(scratch, "rebase.json"), `${JSON.stringify({
+            ...full,
+            apps: {
+                backend: { type: "backend", runtime: "managed", futureField: { on: true } },
+                admin: { type: "static", root: "frontend", output: "frontend/dist", pathh: "/admin" }
+            }
+        }, null, 4)}\n`);
+        const loaded = loadManifest(scratch).manifest;
+        writeManifest(scratch, {
+            ...loaded,
+            apps: { ...loaded.apps, backend: { ...loaded.apps.backend, registerDatabase: true } as RebaseBackendAppConfig }
+        });
+
+        const raw = JSON.parse(fs.readFileSync(path.join(scratch, "rebase.json"), "utf8"));
+        expect(raw.apps.backend).toEqual({ type: "backend", runtime: "managed", registerDatabase: true, futureField: { on: true } });
+        expect(raw.apps.admin.pathh).toBe("/admin");
+    });
+
+    it("does not carry an old app's fields onto an app of another type, or one the caller removed", () => {
+        fs.writeFileSync(path.join(scratch, "rebase.json"), `${JSON.stringify({
+            ...full,
+            apps: { backend: { type: "backend", runtime: "managed", futureField: 1 }, gone: { type: "backend", runtime: "managed", x: 1 } }
+        }, null, 4)}\n`);
+        writeManifest(scratch, { rebase: "^1", apps: { backend: { type: "static", root: "web", output: "web/dist" } } });
+        const raw = JSON.parse(fs.readFileSync(path.join(scratch, "rebase.json"), "utf8"));
+        expect(raw.apps.backend).not.toHaveProperty("futureField");
+        expect(raw.apps).not.toHaveProperty("gone");
     });
 
     it("rejects a telemetry value that is not a boolean, rather than ignoring it", () => {

@@ -26,6 +26,7 @@ import { parseCommandArgs } from "../../utils/args";
 import { cliUserAgent } from "../../utils/version";
 import { summarizeError, wantsRawError } from "./errors";
 import { parseEnvBoolean } from "@rebasepro/types";
+import { scopesReachProject } from "./token-capabilities";
 
 /* ═══════════════════════════════════════════════════════════════
    Constants & paths
@@ -126,15 +127,31 @@ function readCredentials(): CredentialsFile {
     }
 }
 
+/**
+ * Replace the credentials file with `data`: written beside it, then renamed
+ * over it. Every command reads the whole file and writes it back, and several
+ * may run at once (MCP runs cloud tools concurrently). Written in place, a
+ * reader landing between the truncate and the write saw a half file, read it
+ * as empty, and wrote back one without the login and the grants; a disk-full
+ * error left it empty. A rename is atomic: a reader sees the old file or the
+ * new one.
+ */
 function writeCredentials(data: CredentialsFile): void {
     const file = credentialsPath();
     fs.mkdirSync(path.dirname(file), { recursive: true });
-    // Written with private perms — this file holds refresh tokens.
-    fs.writeFileSync(file, JSON.stringify(data, null, 2), { mode: 0o600 });
+    const temporary = `${file}.${process.pid}.${Date.now()}.tmp`;
     try {
-        fs.chmodSync(file, 0o600);
-    } catch {
-        // best effort on platforms without chmod semantics
+        // Written with private perms — this file holds refresh tokens.
+        fs.writeFileSync(temporary, JSON.stringify(data, null, 2), { mode: 0o600 });
+        try {
+            fs.chmodSync(temporary, 0o600);
+        } catch {
+            // best effort on platforms without chmod semantics
+        }
+        fs.renameSync(temporary, file);
+    } catch (error) {
+        fs.rmSync(temporary, { force: true });
+        throw error;
     }
 }
 
@@ -164,14 +181,76 @@ export function ephemeralGrantFor(url: string, projectId: string, now: number = 
 }
 
 /**
+ * The grant as it is stored, expired or not: what a message about a refused
+ * token can still show (the claim link) after the token itself stops counting.
+ */
+export function storedEphemeralGrant(url: string, projectId: string): EphemeralGrant | undefined {
+    return readCredentials().contexts[url]?.ephemeral?.[projectId];
+}
+
+/**
  * The grant for the project this directory is linked to, when the command
  * targets the host it was provisioned on.
  */
-function linkedEphemeralGrant(url: string): { projectId: string; grant: EphemeralGrant } | undefined {
+export function linkedEphemeralGrant(url: string): { projectId: string; grant: EphemeralGrant } | undefined {
     const link = readLink();
     if (!link?.projectId || link.mode === "direct" || normalizeUrl(link.url) !== url) return undefined;
     const grant = ephemeralGrantFor(url, link.projectId);
     return grant ? { projectId: link.projectId, grant } : undefined;
+}
+
+/**
+ * The unexpired grant for the project a link names, on the host it names: what
+ * `status`, `unlink` and `init` read the claim URL back from. Undefined for a
+ * claimed project (its grant is gone), a direct link, or no link.
+ */
+export function grantForLink(link: ProjectLink | null | undefined): EphemeralGrant | undefined {
+    if (!link?.projectId || link.mode === "direct") return undefined;
+    return ephemeralGrantFor(normalizeUrl(link.url), link.projectId);
+}
+
+/**
+ * The grant a link names as it is stored, expired or not, with the host it is
+ * kept under: what `rebase cloud claim` reads, so it can say "expired" rather
+ * than "never had one".
+ */
+export function storedGrantForLink(link: ProjectLink | null | undefined): { url: string; grant: EphemeralGrant } | undefined {
+    if (!link?.projectId || link.mode === "direct") return undefined;
+    const url = normalizeUrl(link.url);
+    const grant = storedEphemeralGrant(url, link.projectId);
+    return grant ? { url, grant } : undefined;
+}
+
+/** Whether a `.env` sets a variable to something: an empty `KEY=` or `KEY=""` does not. */
+export function dotenvSets(file: string, key: string): boolean {
+    if (!fs.existsSync(file)) return false;
+    const pattern = new RegExp(`^\\s*(export\\s+)?${key}\\s*=(.*)$`);
+    return fs.readFileSync(file, "utf-8").split("\n").some((l) => {
+        const value = pattern.exec(l)?.[2]?.trim();
+        return value !== undefined && value !== "" && value !== "\"\"" && value !== "''";
+    });
+}
+
+/** The variable `init --claim` writes the app's key to, and the MCP server and the SDK read. */
+const APP_KEY_ENV = "REBASE_API_TOKEN";
+
+/** Whether this project's `.env` (at its root, else here) holds an app key. */
+export function projectDotenvSetsAppKey(): boolean {
+    return dotenvSets(path.join(findProjectRoot() ?? process.cwd(), ".env"), APP_KEY_ENV);
+}
+
+/**
+ * When the app key `init --claim` minted stops working, and what to do about
+ * it. It is minted to expire with the claim window; a claim hands it over to
+ * the person who claims (the control plane lifts its expiry), so an unclaimed
+ * project's key stops at the window's end and a claimed one's does not. The
+ * claimer replaces it — the agent holds a copy — with `rebase cloud app-key
+ * rotate`. Every command that knows the date says so.
+ */
+export function appKeyExpiryNote(expiresAt: string): string {
+    return `${APP_KEY_ENV} in .env stops working at ${new Date(expiresAt).toLocaleString()} unless the project is claimed first: `
+        + "claiming hands the key to the person who claims it, and it stops expiring. "
+        + `They can replace it with \`rebase cloud app-key rotate\`.`;
 }
 
 /** Host that a bare `rebase cloud` command should target, if any. */
@@ -398,6 +477,18 @@ export function envToken(): string | undefined {
 /** The token each token-authenticated client was built with — see {@link freshAccessToken}. */
 const STATIC_TOKENS = new WeakMap<object, string>();
 
+/** The project each client built from an `init --claim` grant acts for — see {@link grantProjectOf}. */
+const GRANT_CLIENTS = new WeakMap<object, string>();
+
+/**
+ * The project whose `rebase cloud init --claim` token a client holds, or
+ * undefined for a session or `REBASE_TOKEN`: what `whoami` reports, since
+ * {@link requireClient} may pick the grant over `REBASE_TOKEN`.
+ */
+export function grantProjectOf(client: object): string | undefined {
+    return GRANT_CLIENTS.get(client);
+}
+
 /**
  * A client that sends `token` as its bearer and nothing else.
  *
@@ -412,6 +503,8 @@ export function createTokenClient(url: string, token: string, ephemeralProjectId
         baseUrl: url,
         realtime: false,
         headers: { "User-Agent": cliUserAgent() },
+        // Watches for the control plane saying a token's request is deprecated.
+        fetch: deprecationAwareFetch,
         token,
         auth: {
             storage: createMemoryStorage(),
@@ -420,10 +513,118 @@ export function createTokenClient(url: string, token: string, ephemeralProjectId
         }
     });
     client.setOnUnauthorized(() => ephemeralProjectId
-        ? explainRefusedGrant(url, ephemeralProjectId)
+        ? explainRefusedGrant(url, ephemeralProjectId, token)
         : explainRefusedToken(url, token));
     STATIC_TOKENS.set(client, token);
+    if (ephemeralProjectId) GRANT_CLIENTS.set(client, ephemeralProjectId);
     return client;
+}
+
+/** The deprecation notices already printed, once each per process. */
+const TOLD_DEPRECATED = new Set<string>();
+
+/**
+ * Say, once, that the control plane marked a token's request as deprecated.
+ *
+ * The control plane answers a request it still serves, but will not in a later
+ * release, with `Deprecation: true` (RFC 9745), a `Link` with
+ * `rel="deprecation"` to the page that explains it, and an
+ * `X-Rebase-Deprecation` sentence saying what to do — a token from before
+ * `org:billing` reading billing is the first. CI logs are where that is seen,
+ * so it goes to stderr as a warning, once per notice per process, and never
+ * into the `--json` value on stdout.
+ *
+ * Exported so its test can hand it a response.
+ */
+export function noticeDeprecation(response: Response): void {
+    if (response.headers?.get?.("Deprecation") == null) return;
+    const notice = response.headers.get("X-Rebase-Deprecation")?.trim()
+        || "The control plane marked a request this command made as deprecated: it may stop working in a later release.";
+    if (TOLD_DEPRECATED.has(notice)) return;
+    TOLD_DEPRECATED.add(notice);
+    const link = /<([^>]+)>\s*;\s*rel="?deprecation"?/i.exec(response.headers.get("Link") ?? "")?.[1];
+    warn(notice, link ? `See ${link}` : undefined);
+}
+
+/**
+ * `fetch` for a token client: the global one — read at call time, so a test's
+ * stand-in is used — with every answer shown to {@link noticeDeprecation}.
+ */
+const deprecationAwareFetch: typeof globalThis.fetch = async (input, init) => {
+    const response = await globalThis.fetch(input, init);
+    noticeDeprecation(response);
+    return response;
+};
+
+/** What `/api/auth/scopes` said each token holds, asked once per process. */
+const TOKEN_SCOPES = new Map<string, Promise<string[] | undefined>>();
+
+/** The projects already told that `REBASE_TOKEN` was set aside for their own token. */
+const TOLD_GRANT_PREFERRED = new Set<string>();
+
+/**
+ * The scopes the control plane says a token holds — one `/api/auth/scopes`
+ * request per token and host for the life of the process — or undefined when
+ * it could not say: refused, unreachable, or an answer without `held`.
+ */
+function tokenScopes(url: string, token: string): Promise<string[] | undefined> {
+    const key = `${url}\n${token}`;
+    let pending = TOKEN_SCOPES.get(key);
+    if (!pending) {
+        pending = (async () => {
+            try {
+                const res = await fetch(`${url}/api/auth/scopes`, {
+                    headers: { Authorization: `Bearer ${token}`, "User-Agent": cliUserAgent() }
+                });
+                if (!res.ok) return undefined;
+                const body: unknown = await res.json();
+                const held = typeof body === "object" && body !== null ? (body as { held?: unknown }).held : undefined;
+                return Array.isArray(held) && held.every(s => typeof s === "string") ? held : undefined;
+            } catch {
+                return undefined;
+            }
+        })();
+        TOKEN_SCOPES.set(key, pending);
+    }
+    return pending;
+}
+
+/** Forget what {@link tokenScopes} asked and who was told — each test is a new process. */
+export function resetTokenScopesForTest(): void {
+    TOKEN_SCOPES.clear();
+    TOLD_GRANT_PREFERRED.clear();
+    TOLD_DEPRECATED.clear();
+}
+
+/**
+ * Whether a command line names a project other than the linked one with
+ * `--project`: the grant acts only on its own project, so such a command
+ * keeps `REBASE_TOKEN` whatever it holds.
+ */
+function namesAnotherProject(rawArgs: string[], projectId: string): boolean {
+    const parsed = arg({ "--project": String, "-p": "--project" }, { argv: rawArgs.slice(2), permissive: true });
+    const ref = parsed["--project"];
+    if (!ref) return false;
+    const link = readLink();
+    return ref !== projectId && ref !== link?.slug;
+}
+
+/**
+ * Whether the control plane still accepts a token: one request to
+ * `/api/auth/scopes`, the route every token may read. `refused` only when it
+ * answered 401 or 403; `unknown` when it could not be asked, or answered
+ * something else — which proves nothing about the token.
+ */
+export async function probeToken(url: string, token: string): Promise<"accepted" | "refused" | "unknown"> {
+    try {
+        const probe = await fetch(`${url}/api/auth/scopes`, {
+            headers: { Authorization: `Bearer ${token}`, "User-Agent": cliUserAgent() }
+        });
+        if (probe.ok) return "accepted";
+        return probe.status === 401 || probe.status === 403 ? "refused" : "unknown";
+    } catch {
+        return "unknown";
+    }
 }
 
 /**
@@ -438,16 +639,7 @@ export function createTokenClient(url: string, token: string, ephemeralProjectId
  * neither is answered with the other's remedy.
  */
 async function explainRefusedToken(url: string, token: string): Promise<never> {
-    let tokenAccepted = false;
-    try {
-        const probe = await fetch(`${url}/api/auth/scopes`, {
-            headers: { Authorization: `Bearer ${token}`, "User-Agent": cliUserAgent() }
-        });
-        tokenAccepted = probe.ok;
-    } catch {
-        // Unreachable: say what is certain — the request was refused.
-    }
-    if (tokenAccepted) {
+    if (await probeToken(url, token) === "accepted") {
         fail(
             `This command needs a signed-in session, and ${TOKEN_ENV} is an API token.`,
             `Unset ${TOKEN_ENV} and run ${chalk.bold("rebase cloud login")} to run it.`,
@@ -495,17 +687,60 @@ export async function freshAccessToken(client: SessionHolder): Promise<string> {
 }
 
 /**
- * An unclaimed project's token was refused: the project was claimed (which
- * revokes it) or it expired. Forget it, so the next command uses the login, and
- * say which. Never returns.
+ * A request made with an unclaimed project's token was refused. Never returns.
+ *
+ * Two causes reach that 401, as for {@link explainRefusedToken}. The project was
+ * claimed (which revokes the token) or expired, and the token is dead. Or the
+ * command called a route that takes only a person's session — `whoami` and
+ * `projects create` read `/auth/me` — which refuses a perfectly good token too.
+ * The grant holds the project's only token and the only stored copy of its
+ * claim link, so it is forgotten only once `/api/auth/scopes` refuses the token
+ * as well; and even then the claim link is printed before it goes.
  */
-function explainRefusedGrant(url: string, projectId: string): never {
+async function explainRefusedGrant(url: string, projectId: string, token: string): Promise<never> {
+    const verdict = await probeToken(url, token);
+    if (verdict === "accepted") {
+        fail(
+            `This command needs a signed-in session, and this directory uses the token \`rebase cloud init --claim\` stored for project ${projectId}.`,
+            // As narrowed on the control plane: an unclaimed project's token
+            // reads no secret back — no variable's value, no database
+            // password — and opens no tunnel or preview.
+            "That token still deploys, reads logs and metrics, sets environment variables and runs `db info`, "
+                + "but reads no secret back (no variable's value, no database password) and cannot open `db connect` or a preview; "
+                + `${chalk.bold("rebase cloud whoami")} shows it, the claim URL and when it expires. `
+                + `Run this command as a person once the project is claimed: ${chalk.bold("rebase cloud login")}.`,
+            "session_required"
+        );
+    }
+    if (verdict === "unknown") {
+        fail(
+            `The token \`rebase cloud init --claim\` stored for project ${projectId} was refused by ${url}, and the control plane could not say why.`,
+            `The token and the claim URL are kept. Check your connection and run the command again; ${chalk.bold("rebase cloud whoami")} shows the claim URL.`,
+            "token_rejected"
+        );
+    }
+    const grant = storedEphemeralGrant(url, projectId);
     forgetEphemeralGrant(url, projectId);
+    // The person who just claimed it has often just signed in, too. With the
+    // grant gone the next run uses that login, so "sign in" would send them to
+    // do what they have already done: tell them to run the command again.
+    const keyNote = grant && projectDotenvSetsAppKey() ? ` ${appKeyExpiryNote(grant.expiresAt)}` : "";
+    if (readCredentials().contexts[url]?.auth) {
+        fail(
+            `The token \`rebase cloud init --claim\` stored for project ${projectId} was refused by ${url}: the project was claimed, or it expired.`,
+            `It is forgotten, and you are signed in to ${url}: run the command again and it uses your login.${keyNote}`,
+            "token_rejected"
+        );
+    }
+    const claim = grant
+        ? ` If nobody has claimed it yet, its claim URL was ${chalk.bold(grant.claimUrl)} (expires ${new Date(grant.expiresAt).toLocaleString()}).`
+            + keyNote
+        : "";
     fail(
         `The token \`rebase cloud init --claim\` stored for project ${projectId} was refused by ${url}.`,
         "Once a project is claimed its agent token stops working: sign in with "
             + `${chalk.bold("rebase cloud login")} as the account that claimed it, or create a token there with `
-            + `${chalk.bold("rebase cloud tokens create")}.`,
+            + `${chalk.bold("rebase cloud tokens create")}.${claim}`,
         "token_rejected"
     );
 }
@@ -514,7 +749,10 @@ function explainRefusedGrant(url: string, projectId: string): never {
  * Return an authenticated client for the resolved host.
  *
  * With `REBASE_TOKEN` set, that token is the credential for every request and
- * the stored login is not consulted at all. Next, a directory linked to a
+ * the stored login is not consulted at all — except in a directory linked to a
+ * project `init --claim` provisioned, when `REBASE_TOKEN` holds no scope on that
+ * project (one `/api/auth/scopes` call): the project's own token acts there
+ * instead, and the command says so once. Next, a directory linked to a
  * project `rebase cloud init --claim` provisioned uses the token stored for it
  * (see {@link EphemeralGrant}) until it expires: nobody can sign in as that
  * project's owner, so a login could not reach it anyway. Otherwise it is the
@@ -534,6 +772,31 @@ export async function requireClient(rawArgs: string[]): Promise<{ client: CloudC
     // against.
     refuseDirectLink(rawArgs);
     const url = resolveCloudUrl(rawArgs);
+    // REBASE_TOKEN wins, as documented — unless it holds no scope on the
+    // project `init --claim` linked here, which it would only be refused on:
+    // a CI token made for other projects, set in the shell. Then the
+    // project's own token acts, and the command says so once. When the
+    // control plane cannot say what REBASE_TOKEN holds, it still wins.
+    const displaced = linkedEphemeralGrant(url);
+    if (displaced) {
+        if (!namesAnotherProject(rawArgs, displaced.projectId)) {
+            const held = await tokenScopes(url, token);
+            if (held && !scopesReachProject(held, displaced.projectId)) {
+                if (!TOLD_GRANT_PREFERRED.has(displaced.projectId)) {
+                    TOLD_GRANT_PREFERRED.add(displaced.projectId);
+                    warn(
+                        `${TOKEN_ENV} holds no scope on project ${displaced.projectId}, so the token \`rebase cloud init --claim\` stored for it is used instead.`,
+                        `Pass --project to act on another project with ${TOKEN_ENV}, or give ${TOKEN_ENV} a capability on this one.`
+                    );
+                }
+                return { client: createTokenClient(url, displaced.grant.token, displaced.projectId), url };
+            }
+        }
+        warn(
+            `${TOKEN_ENV} is set, so it is used instead of the token \`rebase cloud init --claim\` stored for project ${displaced.projectId}.`,
+            `Unset ${TOKEN_ENV} to act on that project with its own token.`
+        );
+    }
     return { client: createTokenClient(url, token), url };
 }
 
@@ -545,9 +808,14 @@ export async function requireClient(rawArgs: string[]): Promise<{ client: CloudC
  *
  * For the commands a token cannot run — minting and revoking tokens: a key that
  * could mint keys could mint its own successor, so the control plane refuses
- * every key on those routes.
+ * every key on those routes. Inviting people is the other: it hands out access
+ * to every project in an organization, which no token capability grants.
+ * `action` names what the refusal says a token cannot do.
  */
-export async function requireSessionClient(rawArgs: string[]): Promise<{ client: CloudClient; url: string }> {
+export async function requireSessionClient(
+    rawArgs: string[],
+    action = "manage tokens"
+): Promise<{ client: CloudClient; url: string }> {
     // Before anything else: everything downstream of here is a control-plane
     // call, and a direct-linked directory has no control plane to make it
     // against.
@@ -560,7 +828,7 @@ export async function requireSessionClient(rawArgs: string[]): Promise<{ client:
         if (envToken()) {
             fail(
                 `This command needs a signed-in session for ${chalk.cyan(url)}, and ${TOKEN_ENV} is an API token.`,
-                `A token cannot manage tokens. Run ${chalk.bold("rebase cloud login")} first.`,
+                `A token cannot ${action}. Run ${chalk.bold("rebase cloud login")} first.`,
                 "session_required"
             );
         }

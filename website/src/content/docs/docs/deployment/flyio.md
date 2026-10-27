@@ -67,9 +67,6 @@ primary_region = "fra"
 
 `/livez` rather than `/health`: the second performs a database round-trip, so a liveness check on it restarts a healthy machine during a brief database hiccup.
 
-`DISABLE_SELF_REGISTRATION` is new: on 0.17.3 there is no such
-switch, and the first account to register becomes the administrator.
-
 Upgrading Rebase later is a change to that `FROM` line. Your bundle is untouched.
 
 ## 3. Set production secrets

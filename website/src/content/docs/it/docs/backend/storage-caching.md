@@ -1,5 +1,5 @@
 ---
-sourceHash: add7e5205bcbe73a
+sourceHash: 2e525d1d6efa4692
 title: Caching dello storage e CDN
 sidebar_label: Caching dello storage e CDN
 description: Come Rebase serve i file memorizzati in modo che browser e CDN possano metterli in cache — ETag e 304, Cache-Control in base a chi può leggere un oggetto, byte range per il seeking in audio e video, e cosa configurare su una CDN davanti.
@@ -85,5 +85,5 @@ Due aspetti da configurare direttamente sulla CDN:
 ## Correlati
 
 - [Storage](/docs/backend/storage/) — i backend da cui vengono serviti questi header, e il prefisso `public/` e `publicRead` che rendono un oggetto `public`.
-- [Autorizzazione per Oggetto](/docs/backend/storage/#per-object-authorization) — chi può leggere un oggetto, ciò che decide tra `public` e `private`.
+- [Autorizzazione per Oggetto](/docs/backend/storage-authorization/) — chi può leggere un oggetto, ciò che decide tra `public` e `private`.
 - [Campi di caricamento file](/docs/collections/file-uploads/) — le proprietà di collezione che memorizzano i file.

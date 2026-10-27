@@ -1,5 +1,5 @@
 ---
-sourceHash: 9426e0b3511c31f5
+sourceHash: bd42729686fb869a
 title: Propriedades
 sidebar_label: Propriedades
 description: Os tipos de propriedade definem o tipo de dados, a validação e a renderização da interface do usuário para cada campo em uma coleção. O Rebase suporta os tipos string, number, boolean, date, array, map, reference, relation e geopoint.
@@ -20,10 +20,10 @@ As propriedades definem as colunas na tabela do seu banco de dados e como elas s
 
 | Tipo | Descrição | Coluna PostgreSQL |
 |------|-----------|-------------------|
-| `string` | Texto, select, markdown, upload de arquivo, URL, e-mail | `text` por padrão; `varchar`, `char` ou `uuid` com `columnType` |
+| `string` | Texto, select, markdown, upload de arquivo, URL, e-mail | `text` por padrão; `varchar`, `char` ou `uuid` com `columnType`; um tipo enum do Postgres (`<table>_<column>`) com `enum` |
 | `number` | Inteiro, decimal, moeda | `integer`, `numeric`, `bigint`, `serial` |
 | `boolean` | Alternador verdadeiro/falso | `boolean` |
-| `date` | Data, data e hora, timestamp | `timestamp`, `date` |
+| `date` | Data, data e hora, timestamp | `timestamptz` por padrão; `date` ou `time` com `columnType` |
 | `array` | Lista ordenada de valores | Um array nativo (`text[]`, `integer[]`, `numeric[]`, `boolean[]`) quando `of` é uma propriedade string, number ou boolean; caso contrário, `jsonb` |
 | `map` | Objeto chave-valor | `jsonb` |
 | `geopoint` | Par de latitude/longitude | `jsonb` |
@@ -41,8 +41,8 @@ Todos os tipos de propriedade compartilham estas opções:
 | `type` | `string` | **Obrigatório.** Tipo de dados (veja acima) |
 | `name` | `string` | Rótulo de exibição. O padrão é a chave da propriedade, formatada — `publishDate` → "Publish Date". Defina-o quando essa derivação estiver incorreta: `"URL"` em vez de "Url". |
 | `description` | `string` | Texto de ajuda exibido abaixo do campo |
-| `defaultValue` | `any` | Valor padrão para novas entidades. Um valor literal — uma string, number, boolean, date, enum id ou um documento `map`/`array` — também se torna o `DEFAULT` da coluna, de modo que uma linha inserida por qualquer coisa que não seja o painel de administração (a API REST, um seed, `psql`) também o recebe |
-| `databaseDefault` | `boolean \| SqlExpression` | O banco de dados preenche a coluna quando uma criação a deixa vazia: uma coluna `NOT NULL DEFAULT <expressão>`, como `gen_random_uuid()` ou `nextval(…)`. Um campo `required` com essa opção pode ser omitido na criação, tanto pelo formulário de administração quanto pela API, e um `null` enviado na criação é deixado para o banco de dados; ele continua obrigatório na edição, e o tipo `Insert` gerado o torna opcional. Forneça a expressão no formato de template que o `isId` aceita, ``databaseDefault: "sql`gen_random_uuid()`"``, e o planejador de esquema a grava como o `DEFAULT` da coluna, para que o `rebase db push` a mantenha. `true` declara um `DEFAULT` gravado em outro lugar e não grava nenhum, fazendo com que o push planeje sua remoção. "Import from table" e `rebase schema introspect` definem a expressão que leem |
+| `defaultValue` | `any` | Valor padrão para novas entidades. Um valor literal — uma string, number, boolean, date, enum id ou um documento `map`/`array` armazenado como JSON — também se torna o `DEFAULT` da coluna, de modo que uma linha inserida por qualquer coisa que não seja o painel de administração (a API REST, um seed, `psql`) também o recebe |
+| `databaseDefault` | `boolean \| SqlExpression` | O banco de dados preenche a coluna quando uma criação a deixa vazia: uma coluna `NOT NULL DEFAULT <expression>`, como `gen_random_uuid()` ou `nextval(…)`. Um campo `required` com essa opção pode ser omitido na criação, tanto pelo formulário de administração quanto pela API, e um `null` enviado na criação é deixado para o banco de dados; ele continua obrigatório na edição, e o tipo `Insert` gerado o torna opcional. Forneça a expressão no formato de template que o `isId` aceita, ``databaseDefault: "sql`gen_random_uuid()`"``, e o planejador de esquema a grava como o `DEFAULT` da coluna, para que o `rebase db push` a mantenha. `true` declara um `DEFAULT` gravado em outro lugar: o planejador não grava nenhum, e o `rebase db push` deixa como está o que o banco de dados tem. "Import from table" e `rebase schema introspect` definem a expressão que leem |
 | `validation` | `object` | Regras de validação |
 | `propertyConfig` | `string` | Chave de configuração de propriedade registrada |
 | `columnName` | `string` | Nome explícito da coluna no banco de dados (ignora a conversão para snake_case) |
@@ -89,9 +89,9 @@ price: {
 | `admin.hideFromCollection` | `boolean` | Ocultar da visualização em tabela. Apenas para exibição: as linhas relacionadas de uma propriedade de relação oculta ainda são incorporadas na leitura da lista (consulte [Relações](/docs/collections/relations)) |
 | `admin.columnWidth` | `number` | Largura da coluna em pixels (visualização em tabela) |
 | `admin.span` | `1 \| 2 \| 3 \| 4` | Largura do campo na grade de formulário de quatro colunas |
-| `admin.Field` | `React.ComponentType` | Componente de campo personalizado |
-| `admin.Preview` | `React.ComponentType` | Componente de célula de tabela personalizado |
-| `admin.Filter` | `React.ComponentType` | Campo de filtro personalizado para esta propriedade. Tem precedência sobre a sobreposição de `Collection.FilterField` no nível da coleção e sobre o campo embutido por tipo |
+| `admin.Field` | `ComponentRef` | Componente de campo personalizado |
+| `admin.Preview` | `ComponentRef` | Componente de célula de tabela personalizado |
+| `admin.Filter` | `ComponentRef` | Campo de filtro personalizado para esta propriedade. Tem precedência sobre a sobreposição de `Collection.FilterField` no nível da coleção e sobre o campo embutido por tipo |
 | `admin.filterOperators` | `WhereFilterOp[]` | Restringe os operadores oferecidos ao filtrar por esta propriedade. O conjunto oferecido é a **interseção** das capacidades do motor, dos padrões do tipo e desta lista — você só pode restringir, nunca adicionar um operador que o motor não possa executar. `[]` desativa a filtragem na propriedade |
 | `admin.customProps` | `unknown` | Qualquer coisa de que seu próprio `Field` ou `Preview` precise. O Rebase repassa isso intocado |
 
@@ -262,7 +262,7 @@ locales: {
 | `userSelect` | `boolean` | Renderiza como um seletor de usuário. O valor é uma coluna de string simples contendo o id do usuário — nada o resolve ou verifica na entrada. **Apenas no formulário administrativo — não é aplicado pela API nem pelo banco de dados.** O seletor lista nomes, e-mails e avatares dos usuários para qualquer pessoa que possa gravar na coleção, por meio de [`GET /api/admin/users/pick`](/docs/backend/auth-endpoints/), sem o escopo `users:read`. Uma coleção cujas regras de gravação sejam SQL puro não conta, pois não podem ser avaliadas com antecedência: nela, apenas portadores de `users:read` podem selecionar. |
 | `admin.previewAsTag` | `boolean` | Renderiza esta string como uma tag nas pré-visualizações |
 | `admin.clearable` | `boolean` | Adiciona um ícone para limpar o valor (definir como null) |
-| `admin.urlPreview` | `PreviewType` | Como renderizar uma string que contém uma URL: um link ou uma prévia incorporada de imagem, áudio ou vídeo. Apenas apresentação — se o valor *é* uma URL é determinado pela flag `url` na propriedade, a partir da qual o contrato OpenAPI é gerado |
+| `admin.urlPreview` | `PreviewType \| boolean` | Como renderizar uma string que contém uma URL: `true` para um link, ou `"image"`, `"video"`, `"audio"` ou `"file"` para uma prévia incorporada. Apenas apresentação — se o valor *é* uma URL é determinado pela flag `url` na propriedade, a partir da qual o contrato OpenAPI é gerado |
 
 ### Colunas de auditoria
 

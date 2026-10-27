@@ -293,7 +293,7 @@ result.meta;  // { operations: 4 }
 `values` au schéma `Insert` ou `Update` généré pour cette collection — une colonne
 que la collection ne possède pas est une erreur de compilation, de même qu'une
 création omettant un champ obligatoire. `collection` est l'accesseur, le nom que
-prend `client.data.<accesseur>` (`orderItems` pour le slug `order_items`) ; le
+prend `client.data.<accessor>` (`orderItems` pour le slug `order_items`) ; le
 client envoie le slug, via le dictionnaire `collections` avec lequel il a été
 créé. Sur la 0.23 un lot typé envoie l'accesseur tel qu'écrit, si bien qu'une
 collection en snake_case ne peut pas être atteinte par ce biais, et qu'une

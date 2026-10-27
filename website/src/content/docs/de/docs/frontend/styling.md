@@ -1,5 +1,5 @@
 ---
-sourceHash: 8721ee795ebd8dce
+sourceHash: bbef56d48a3598af
 title: Custom UI stylen
 sidebar_label: Custom UI stylen
 description: Erstellen Sie benutzerdefinierte Ansichten, Startseiten und Aktionen aus denselben Komponenten und Theme-Tokens wie der Rest des Admins, damit sie nativ aussehen und dem Theme folgen.
@@ -40,7 +40,7 @@ export function DashboardView() {
 }
 ```
 
-Jede Komponente im Kit ist unter [UI components](/docs/ui/components/card/) mit ihren echten, aus dem Quellcode generierten Props katalogisiert. Schauen Sie dort nach, bevor Sie etwas selbst bauen: `Card`, `Chip`, `Badge`, `Alert`, `Button`, `Typography`, `Paper`, `Container`, `Table`, `Tooltip`, `Dialog` und etwa vierzig weitere existieren bereits.
+Jede Komponente im Kit ist unter [UI components](/docs/ui/components/card/) mit ihren echten, aus dem Quellcode generierten Props katalogisiert. Schauen Sie dort nach, bevor Sie etwas selbst bauen: `Card`, `Chip`, `Badge`, `Alert`, `Button`, `Typography`, `Paper`, `Container`, `Table`, `Tooltip`, `Dialog` und etwa siebzig weitere existieren bereits.
 
 ## Farben: Verwenden Sie Tokens, niemals literale Werte
 
@@ -61,9 +61,9 @@ Zwei Regeln, die aus echten Fehlern in der Praxis resultieren:
 
 ## Typografie: Verwenden Sie die Skala
 
-`Typography` deckt die gesamte Skala ab – `h1`–`h6`, `subtitle1`/`subtitle2`, `body1`/`body2`, `caption`, `label`. Verwenden Sie `variant`, nicht eine Schriftgrößenklasse. Die Skala kodiert bereits das für jede Stufe erforderliche Tracking (`--tracking-display` bei ≥30px, `--tracking-title` bei 20–24px, `--tracking-heading` darunter), was bei einem `text-[27px]` nicht der Fall ist.
+`Typography` deckt die gesamte Skala ab – `h1`–`h6`, `subtitle1`/`subtitle2`, `body1`/`body2`, `lead`, `caption`, `label`, `button`, `stat`, `micro`, `mono`. Verwenden Sie `variant`, nicht eine Schriftgrößenklasse. Die Skala kodiert bereits das für jede Stufe erforderliche Tracking (`--tracking-display` bei ≥30px, `--tracking-title` bei 20–24px, `--tracking-heading` darunter), was bei einem `text-[27px]` nicht der Fall ist.
 
-Die Produkt-UI geht nicht unter `text-xs`. Die Stufen `text-2xs` und `text-3xs` existieren ausschließlich für Marketingseiten.
+Die Produkt-UI geht nicht unter `text-xs`, mit einer Ausnahme: Die `micro`-Variante, das Label in Großbuchstaben über einem Wert, sitzt auf `text-2xs`. Die Stufe `text-3xs` existiert ausschließlich für Marketingseiten.
 
 ## Einrichtung
 

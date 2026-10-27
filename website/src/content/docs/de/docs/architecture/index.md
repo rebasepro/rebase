@@ -1,5 +1,5 @@
 ---
-sourceHash: 840da8865bd3eab7
+sourceHash: 7f14a487f380e2c9
 title: Architektur-Überblick
 sidebar_label: Architektur
 description: Erfahren Sie, wie Backend, Frontend, typisiertes SDK und Datenbank von Rebase ineinandergreifen, um ein vollständiges Backend-as-a-Service zu bilden.
@@ -58,17 +58,17 @@ Die `BackendCollectionRegistry` ist der Laufzeitindex aller Collections, ihrer P
 
 Die Echtzeitsynchronisierung nutzt den nativen `LISTEN/NOTIFY`-Mechanismus von PostgreSQL:
 
-1. Eine Datenmutation findet statt (Insert, Update, Delete)
-2. Das Backend sendet ein `NOTIFY` auf einem Kanal
+1. Eine Datenmutation findet statt (Insert, Update, Delete) – über die API oder über alles andere, das die Tabelle beschreibt: `psql`, ein Cron, der SQL-Editor
+2. Ein Trigger auf der Tabelle sendet ein `NOTIFY` auf einem Kanal (wo sich der Trigger nicht installieren lässt, sendet es das Backend, und zwar nur für über die API ausgeführte Schreibvorgänge)
 3. Der `RealtimeService` empfängt die Benachrichtigung
 4. Er überträgt die Änderung per Broadcast an alle verbundenen WebSocket-Clients
 5. React-Komponenten werden mit den neuen Daten neu gerendert
 
-Geben Sie bei **Multi-Instanz-Deployments** (z. B. Cloud Run mit mehreren Replikaten) einen `connectionString` in Ihrem PostgresBootstrapper an, damit alle Replikate dieselbe `LISTEN`-Verbindung gemeinsam nutzen.
+Bei **Multi-Instanz-Deployments** (z. B. Cloud Run mit mehreren Replikaten) hält jedes Replikat seine eigene `LISTEN`-Verbindung zur selben Datenbank, sodass eine Änderung die Abonnenten jedes Replikats erreicht. Hinter einem Pooler im Transaction-Modus wie PgBouncer, der kein `LISTEN` aufrechterhält, setzen Sie `DATABASE_DIRECT_URL` auf die Datenbank selbst.
 
 ### Storage-Registry
 
-Wie Treiber werden auch Storage-Backends in einer Registry registriert. Sie können mehrere Storage-Provider (lokal, S3) verwenden und verschiedene Dateifelder mithilfe von `storageId` an unterschiedliche Backends weiterleiten.
+Wie Treiber werden auch Storage-Backends in einer Registry registriert. Sie können mehrere Storage-Provider (lokal, S3) verwenden und verschiedene Dateifelder mithilfe von `storage.storageSource` an unterschiedliche Backends weiterleiten.
 
 ## Paketübersicht
 
@@ -77,14 +77,13 @@ Wie Treiber werden auch Storage-Backends in einer Registry registriert. Sie kön
 | `@rebasepro/types` | TypeScript-Schnittstellen für Collections, Eigenschaften, Entitäten, Plugins | Alles |
 | `@rebasepro/server` | Backend-Server-Initialisierung, REST-API, Auth, Storage, WebSocket | Backend |
 | `@rebasepro/client` | Typisiertes SDK – HTTP-Transport, WebSocket, Auth | Frontend |
-| `@rebasepro/app` | React-Framework – Scaffold, Controller, Formulare, Routen, Hooks | Frontend |
+| `@rebasepro/app` | React-Framework – Scaffold, Controller, Formulare, Routen, Hooks, Login-Ansichten, Auth-Controller-Hooks | Frontend |
 | `@rebasepro/ui` | Eigenständige UI-Komponentenbibliothek (Tailwind v4 + Radix) | Frontend |
-| `@rebasepro/app` | Login-Ansichten, Auth-Controller-Hooks, Benutzerverwaltung | Frontend |
 | `@rebasepro/studio` | Collection-Editor, SQL-Konsole, JS-Konsole, RLS-Editor, Storage-Browser | Frontend |
 | `@rebasepro/cli` | CLI für Schemagenerierung, DB-Migrationen, SDK-Generierung | Dev-Tooling |
 | `@rebasepro/forms` | Leichtgewichtiges React-Formular-Zustandsmanagement | Frontend |
 | `@rebasepro/plugin-ai` | KI-gestütztes Plugin zur automatischen Feldvervollständigung | Frontend |
-| `@rebasepro/plugin-data-import-export` | CSV/JSON/Excel-Import und -Export | Frontend |
+| `@rebasepro/cms` | Content-Management-Ansichten, Formulare und Routing, einschließlich CSV/JSON/Excel-Import und -Export | Frontend |
 | `@rebasepro/inference` | Leitet Collection-Properties aus Beispielzeilen ab (der Import „Collection aus einer Datei erstellen“ im Admin) | Frontend |
 
 ## Datenfluss

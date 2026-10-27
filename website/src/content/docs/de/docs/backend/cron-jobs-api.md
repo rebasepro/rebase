@@ -21,7 +21,7 @@ Siehe [Rollen und Scopes](/docs/backend/roles-and-scopes/).
 |--------|------|-------------|
 | `GET` | `/api/admin/cron` | Alle registrierten Cron-Jobs auflisten |
 | `GET` | `/api/admin/cron/:id` | Status eines einzelnen Jobs abrufen |
-| `POST` | `/api/admin/cron/:id/trigger` | Einen Job manuell auslösen — `409`, solange er bereits läuft |
+| `POST` | `/api/admin/cron/:id/trigger` | Einen Job manuell auslösen — `409`, solange er bereits läuft. `?async=1` antwortet mit `202`, sobald der Lauf gestartet ist |
 | `GET` | `/api/admin/cron/:id/logs` | Ausführungsverlauf abrufen (`?limit=N`), die letzten 30 Tage davon. `503`, wenn `rebase.cron_logs` nicht gelesen werden kann, statt eines leeren Verlaufs |
 | `PUT` | `/api/admin/cron/:id` | Einen Job überall pausieren oder fortsetzen (`{ "enabled": false }`); `null` folgt wieder dem Code |
 

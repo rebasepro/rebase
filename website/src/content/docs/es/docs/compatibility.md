@@ -1,5 +1,5 @@
 ---
-sourceHash: 36e5e343075cc0f8
+sourceHash: a8656ede47530810
 slug: es/docs/compatibility
 title: Compatibilidad
 description: "Lo que Rebase promete entre versiones y lo que no: los seis contratos versionados, cómo falla cada uno y qué puede seguir cambiando en una versión menor."
@@ -41,7 +41,7 @@ Las tres calificaciones significan:
 | Sincronización offline | Beta | Las mutaciones llevan claves de idempotencia que el servidor respeta, y los defectos de pérdida de datos encontrados en la auditoría de julio están solucionados. El modelo de resolución de conflictos es el último que escribe gana (last-write-wins) sin fusión por campo |
 | Historial de entidades | Stable | Basado en instantáneas (snapshots), protegido por su propia suite de pruebas |
 | Funciones y crons | Stable | El punto de entrada portable (`@rebasepro/server/functions`) es un contrato versionado con su propia sección de superficie de API |
-| Servidor MCP + agent skills | Beta | `@rebasepro/mcp` se ejecuta sobre stdio: cuarenta y dos herramientas, autenticación bearer por proyecto, las herramientas destructivas rechazan destinos no locales a menos que se habilite explícitamente. Desde 0.21, el servidor también puede montar un endpoint `/mcp` remoto — OAuth 2.1, seis herramientas de datos, cada llamada bajo el propio RLS del usuario autenticado — desactivado a menos que `REBASE_MCP_ENABLED=true`, y solo para Postgres |
+| Servidor MCP + agent skills | Beta | `@rebasepro/mcp` se ejecuta sobre stdio: cincuenta y una herramientas, autenticación bearer por proyecto, las herramientas destructivas rechazan destinos no locales a menos que se habilite explícitamente. Desde 0.21, el servidor también puede montar un endpoint `/mcp` remoto — OAuth 2.1, ocho herramientas de datos, cada llamada bajo el propio RLS del usuario autenticado — desactivado a menos que `REBASE_MCP_ENABLED=true`, y solo para Postgres |
 | Studio (SQL, esquema, RLS, explorador de API) | Beta | Utilizado a diario en proyectos reales. La creación de ramas (branching) está presente en el paquete OSS y deliberadamente no está expuesta en Rebase Cloud, porque migrar un despliegue en ejecución a una rama aún no tiene un flujo definido |
 | CMS + panel de administración | Beta | Completo para CRUD, relaciones, campos de almacenamiento y roles. **La tabla de datos no tiene semántica de cuadrícula (grid)** — sin `role`, sin `aria-rowindex`, con `tabIndex` eliminado —, por lo que los usuarios de teclado y lectores de pantalla no pueden operar la vista principal. Sin borradores, sin contenido por configuración regional (locale), sin texto enriquecido por bloques |
 | Base de datos de desarrollo gestionada PGlite | Beta | `rebase dev` sin configuración y sin Docker. Una sesión a la vez, por lo que las solicitudes se serializan y la concurrencia no se puede reproducir en ella; los comandos respaldados por Atlas (`db push`, `generate`, `migrate`) planifican contra un segundo PGlite desechable que se inicia para el comando (en la 0.24 rechazan la base de datos gestionada); `db branch` no funciona allí y lo advierte |
@@ -197,7 +197,7 @@ Dicho claramente, para que nadie deduzca una promesa que nunca se hizo:
 - La API de TypeScript creada: configuración de colecciones, opciones de `initializeRebaseBackend`, propiedades de administración, nombres de métodos del SDK. Los breaking changes se incorporan en versiones menores y se anuncian en el changelog.
 - `@rebasepro/studio`, `@rebasepro/mcp`, `@rebasepro/inference`, `@rebasepro/plugin-*` — estos avanzan más rápido y tienen la menor cantidad de consumidores.
 - Cualquier elemento bajo el `src/` de un paquete que no esté reexportado desde su archivo raíz (barrel). `packages/client/src/index.ts` incluye una nota que explica que su lista de exportaciones está seleccionada minuciosamente para que una exportación interna no se vuelva pública por accidente.
-- El esquema de base de datos de *sus* colecciones. Eso es de su propiedad; Rebase solo es dueño de los esquemas `rebase` y `auth`.
+- El esquema de base de datos de *sus* colecciones. Eso es de su propiedad; Rebase solo es dueño del esquema `rebase` (y, en una base de datos aprovisionada antes de la 0.13, del antiguo esquema `auth` hasta que el arranque lo retira).
 
 ## Los gates que sostienen esto
 
@@ -213,7 +213,7 @@ Nada de lo anterior es una simple convención: cada elemento tiene una prueba qu
 | `pnpm check:derived-names` | cada nombre de columna, restricción, tabla de unión, enum y política que el framework deriva, y que el arranque y `db push` los deriven de forma idéntica |
 | `pnpm rls:check` | las políticas del esquema generado |
 | `pnpm check:api-surface` | cada exportación, y sus miembros, de los cinco paquetes que suministra la imagen (`@rebasepro/server`, `types`, `client`, `common`, `utils`), más el punto de entrada `@rebasepro/server/functions`, contra las seis secciones de `contracts/server.api.txt`. Estos son los paquetes que `infra/docker/entrypoint.mjs` enlaza simbólicamente sobre las copias del propio bundle desplegado, por lo que eliminar una exportación de uno no es un error de compilación para nadie: es un fallo de arranque en toda la flota durante un despliegue que nadie solicitó |
-| `pnpm test:gates` | las propias pruebas de los gates sobre fixtures (once archivos, entre ellos `check:api-surface` y la comprobación de incremento de versión más abajo), para que un gate que deje de detectar lo que protege falle aquí. `check:api-surface` pasó toda su vida sin poder detectar la desaparición de un miembro de `const rebase` |
+| `pnpm test:gates` | las propias pruebas de los gates sobre fixtures (cuarenta y siete archivos, entre ellos `check:api-surface` y la comprobación de incremento de versión más abajo), para que un gate que deje de detectar lo que protege falle aquí. `check:api-surface` pasó toda su vida sin poder detectar la desaparición de un miembro de `const rebase` |
 | `node tooling/scripts/check-release-bump.mjs` | que el nivel de incremento con el que se publica una versión coincida con lo que el lanzamiento le hizo a las líneas base anteriores; ejecutado por `publish.yml` antes de estampar el changelog |
 | saas CI | el plano de control compilado contra la rama `main` de este repositorio, en sus propios pushes y ejecuciones nocturnas |
 

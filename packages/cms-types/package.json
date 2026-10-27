@@ -91,9 +91,6 @@
       "node"
     ],
     "testEnvironment": "node",
-    "testPathIgnorePatterns": [
-      "/bivariance/"
-    ],
     "moduleNameMapper": {
       "\\\\.(css|less)$": "<rootDir>/test/__mocks__/styleMock.js",
       "^@rebasepro/common$": "<rootDir>/../common/src/index.ts",

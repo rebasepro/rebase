@@ -21,7 +21,7 @@
  * is a second lock, not the main one: a `data:write` token still cannot write
  * a row the user could not write themselves.
  */
-import type { AuthAdapter, CollectionConfig, DataDriver, OrderBySpec } from "@rebasepro/types";
+import type { AuthAdapter, CallerCredential, CollectionConfig, DataDriver, OrderBySpec } from "@rebasepro/types";
 import { ALL_WHERE_FILTER_OPS, DEFAULT_LIST_LIMIT, MAX_LIST_LIMIT, getCollectionDataPath, scopeGrants, scopeGrantsAny } from "@rebasepro/types";
 import { type FieldViewer, OrderBySpecError, restoresSoftDeletedRow, serializeOrderBy, softDeleteFieldOf } from "@rebasepro/common";
 import { scopeDataDriver } from "../auth/rls-scope.js";
@@ -49,6 +49,12 @@ export interface McpCaller {
     /** The scopes granted to this connection — `data:read`, `data:write:posts`, … */
     scopes: string[];
     clientId: string;
+    /**
+     * The API key the connection authenticated with, when it was one rather
+     * than an OAuth grant. Handed to collection callbacks as
+     * `context.credential`.
+     */
+    credential?: CallerCredential;
 }
 
 export interface McpToolContext {
@@ -133,7 +139,8 @@ async function scopedDriver(ctx: McpToolContext): Promise<DataDriver> {
     return scopeDataDriver(ctx.driver, {
         uid: ctx.caller.uid,
         roles: ctx.caller.roles,
-        isAnonymous: false
+        isAnonymous: false,
+        ...(ctx.caller.credential ? { credential: ctx.caller.credential } : {})
     });
 }
 
@@ -284,6 +291,14 @@ function readOptions(args: Record<string, unknown>, collection: CollectionConfig
     }
     if (args.limit !== undefined && args.limit !== null) query.limit = String(args.limit);
     if (args.offset !== undefined && args.offset !== null) query.offset = String(args.offset);
+    if (args.deleted !== undefined && args.deleted !== null) {
+        // REST's `?deleted=`, refused here in the tool's own words: REST's
+        // message names a query parameter the model never sent.
+        if (args.deleted !== "include" && args.deleted !== "only") {
+            throw new McpToolError("`deleted` takes \"include\" (live rows and trashed ones) or \"only\" (trashed rows alone). Omit it for the live rows.");
+        }
+        query.deleted = args.deleted;
+    }
     return parseQueryOptions(query, {}, { collection, viewer: viewerOf(ctx) });
 }
 
@@ -335,6 +350,18 @@ const WHERE_ARG = {
         + "{\"status\": [\"==\", \"paid\"], \"total\": [\">\", 100]}. Several conditions on one field: "
         + "{\"total\": [[\">=\", 10], [\"<\", 100]]}. A belongsTo relation is filtered by its foreign key, "
         + "as the rows carry it (e.g. \"authorId\"). Operators: " + ALL_WHERE_FILTER_OPS.join(", ") + "."
+};
+
+/**
+ * REST's `?deleted=`. Without it every read hides the trash, so a row
+ * delete_document sent there could never be found again to restore — while
+ * describe_collection told the model that update_document restores it.
+ */
+const DELETED_ARG = {
+    type: "string",
+    enum: ["include", "only"],
+    description: "On a collection with a `softDeleteField` (see describe_collection): \"only\" reads the trashed "
+        + "rows alone, \"include\" reads them with the live ones. Omit it for the live rows."
 };
 
 const SEARCH_ARG = {
@@ -435,7 +462,8 @@ const TOOLS: McpToolDefinition[] = [
                     type: "number",
                     description: `Rows to return, 1 to ${MAX_LIST_LIMIT} (default ${DEFAULT_LIST_LIMIT}). A larger limit is refused.`
                 },
-                offset: { type: "number", description: "Rows to skip." }
+                offset: { type: "number", description: "Rows to skip." },
+                deleted: DELETED_ARG
             },
             required: ["collection"],
             additionalProperties: false
@@ -463,7 +491,8 @@ const TOOLS: McpToolDefinition[] = [
             properties: {
                 collection: COLLECTION_ARG,
                 where: WHERE_ARG,
-                searchString: SEARCH_ARG
+                searchString: SEARCH_ARG,
+                deleted: DELETED_ARG
             },
             required: ["collection"],
             additionalProperties: false
@@ -587,7 +616,10 @@ const TOOLS: McpToolDefinition[] = [
 
     {
         name: "delete_document",
-        description: "Delete a row by id. This cannot be undone.",
+        description:
+            "Delete a row by id. On a collection with a `softDeleteField` (see describe_collection) the row goes "
+            + "to the trash: query_collection with `deleted: \"only\"` finds it, and update_document setting that "
+            + "field to null restores it. On any other collection the delete is permanent.",
         requiredScope: "data:delete",
         inputSchema: {
             type: "object",

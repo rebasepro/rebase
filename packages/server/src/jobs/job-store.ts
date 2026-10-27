@@ -2,7 +2,7 @@ import type { DataDriver } from "@rebasepro/types";
 import { isSQLAdmin } from "@rebasepro/types";
 import { REBASE_USER_ROLE, revokeInternalTableSql, sqlRows, firstSqlRow } from "@rebasepro/common";
 import { logger } from "../utils/logger.js";
-import { createDdlBootstrapper, hasInCauseChain, type SqlExec } from "../boot/ddl-bootstrap.js";
+import { createDdlBootstrapper, hasInCauseChain, provisioningExec, type SqlExec } from "../boot/ddl-bootstrap.js";
 import { currentAmbientTransaction } from "../db/ambient-transaction.js";
 import type { JobRecord } from "./types.js";
 
@@ -184,7 +184,17 @@ function warnStaleOutcome(id: string, claim: JobClaim, outcome: "success" | "fai
     );
 }
 
-export function createJobStore(driver: DataDriver): JobStore | undefined {
+export function createJobStore(
+    driver: DataDriver,
+    options: {
+        /**
+         * Default `true`. `false` is a backend that changes nothing in its
+         * database: `ensureTable` uses the queue and its enqueue function if
+         * they are there, and creates, grants and revokes nothing.
+         */
+        provision?: boolean;
+    } = {}
+): JobStore | undefined {
     const admin = driver.admin;
     if (!isSQLAdmin(admin)) {
         logger.warn(
@@ -197,8 +207,11 @@ export function createJobStore(driver: DataDriver): JobStore | undefined {
     // Two shapes of the same call: the bootstrapper's `SqlExec` takes an
     // options object, while everything below reads better with a positional
     // parameter array.
-    const execRaw: SqlExec = (sqlText, options) =>
-        admin.executeSql(sqlText, options?.params ? { params: options.params } : undefined);
+    const execRaw: SqlExec = provisioningExec(
+        (sqlText, execOptions) =>
+            admin.executeSql(sqlText, execOptions?.params ? { params: execOptions.params } : undefined),
+        options.provision
+    );
     const exec = (sqlText: string, params?: unknown[]) =>
         execRaw(sqlText, params ? { params } : undefined);
 

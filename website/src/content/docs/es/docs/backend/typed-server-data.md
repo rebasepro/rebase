@@ -1,5 +1,5 @@
 ---
-sourceHash: b40368f94c74dfb6
+sourceHash: e515564ee1857435
 title: Datos tipados del lado del servidor
 sidebar_label: Datos tipados del lado del servidor
 description: "Registra tu tipo Database generado una sola vez, y context.data, rebase.dataAsAdmin y el rebase que recibe una función o un cron quedan tipados a partir de él: filas, filtros, ordenaciones, includes y entradas de escritura."
@@ -48,9 +48,15 @@ exactamente lo mismo que antes.
 
 La opción se recuerda en `rebase.json`, como `"registerDatabase": true` en la
 app del backend, de modo que cada `rebase generate-sdk` posterior, y `rebase dev` en cada
-cambio de colección, mantiene ambos archivos al día. Eso vale también en un clon nuevo y en
-CI: el `.gitignore` del scaffold ignora los directorios `generated/`, y el
-primer `rebase generate-sdk` o `rebase dev` los escribe de nuevo. Un proyecto sin
+cambio de colección, mantiene ambos archivos al día. El `.gitignore` del scaffold ignora los
+directorios `generated/`, así que un clon nuevo no tiene ninguno de los dos
+archivos hasta que algo los escribe de nuevo. `rebase build` (y `rebase cloud deploy`,
+que construye el mismo bundle) los escribe a partir de las colecciones antes de
+compilar, así que un trabajo de CI que ejecuta `rebase build` en un clon nuevo
+compila callbacks tipados. Un paso de CI que compila el backend o el paquete
+`config` de otra forma (`tsc`, `pnpm build`) sigue necesitando antes
+`rebase generate-sdk`, o los callbacks que leen filas tipadas se compilan contra
+el `context.data` sin tipos y fallan. Un proyecto sin
 `rebase.json` sigue registrando mientras `config/generated/register.ts`
 esté ahí. Para volver a datos del servidor sin tipos, elimina `registerDatabase` y
 borra `config/generated/`.

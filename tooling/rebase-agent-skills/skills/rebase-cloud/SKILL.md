@@ -28,9 +28,14 @@ namespace, and a mistyped one exits 1.
 
 ```bash
 rebase cloud login
+rebase cloud billing setup     # once per organization
 rebase cloud projects create --name "My App" --subdomain my-app --link
 rebase cloud deploy
 ```
+
+`billing setup` attaches a card to the organization, once. Without one the
+control plane answers a deploy with 402, so `deploy` refuses before it builds
+(`code: payment_required`).
 
 `projects create` attaches a **managed database** in the same call. That is the
 step that used to be missing, and its absence is the single most expensive trap
@@ -63,7 +68,7 @@ the app that holds it a hostname of its own:
 
 | Project type | What the root URL shows | Where the admin is |
 |---|---|---|
-| Default scaffold (`rebase init`) | The admin panel itself (login / bootstrap) | `/` — the frontend **is** the admin |
+| Default scaffold (`rebase init`) | The admin panel itself (login) | `/` — the frontend **is** the admin |
 | Custom product frontend | Your product app | Wherever you mount it — commonly `/admin` |
 | Admin as its own app with `"path": "https://admin.example.com"` | Your product app | `https://admin.example.com/`, once its DNS verifies — see [Multi-app projects](#multi-app-projects) |
 | Backend-only (`rebase init --headless`) | Nothing (API only) | Not deployed |
@@ -71,11 +76,15 @@ the app that holds it a hostname of its own:
 The `cms` field of the app in `rebase.json` is what the console's *Open CMS*
 link points at; on an app with a hostname it is a path on that hostname.
 
-> **IMPORTANT FOR AGENTS:** On the **first visit** to a freshly deployed
-> project's admin, Rebase shows the bootstrap screen ("Create your admin
-> account"). The earliest-registered account receives admin privileges — the
-> project owner should claim it immediately after deploying. **Never fill this
-> form on the user's behalf.**
+> **IMPORTANT FOR AGENTS:** Every Cloud project runs with `NODE_ENV=production`,
+> where there is no first-visit bootstrap screen: the first account to register
+> is **not** promoted to admin, and an empty user table refuses the bootstrap
+> registration with `SETUP_REQUIRED`. The owner names the first admin before the
+> first deploy — `rebase cloud env set REBASE_ADMIN_EMAIL=…` and
+> `rebase cloud env set REBASE_ADMIN_PASSWORD=… --secret` (at least 12
+> characters) — and the runtime creates that account once, while the user table
+> is empty. **Never choose these values, or register an account, on the user's
+> behalf.**
 
 ---
 
@@ -108,7 +117,7 @@ rebase cloud status --json
 | `null` | The platform is genuinely working | **This is the only value you may poll on.** |
 | `no_database` | No database attached | Run the `nextAction` — this state never resolves itself |
 | `never_deployed` | Database attached, nothing shipped | `rebase cloud deploy` |
-| `last_deploy_failed` | The build failed | `rebase cloud logs`, fix, deploy again |
+| `last_deploy_failed` | The last deploy failed — in its build, or booting after it | The `nextAction`: `rebase cloud logs` (the build log), or `rebase cloud logs --runtime` when it died booting; fix, deploy again |
 | `database_unreachable` | Attached but not answering | `rebase cloud db test` |
 
 > **IMPORTANT FOR AGENTS:** Never poll `status` while `blockedOn` is non-null.
@@ -163,7 +172,8 @@ rebase cloud db create --type byodb --connection-string "$DATABASE_URL" --wait
 `byodb` is the right answer when the database has to be somewhere the platform
 does not run. There is no longer a pooled tier to outgrow: every managed
 database is already a CloudNativePG cluster of the project's own, sized with
-`--db-cpu`, `--db-memory`, `--db-instances` and `--storage`.
+`rebase cloud compute set --db-cpu`, `--db-memory` and `--db-instances`
+(`--storage` is the object-storage mode, not the database volume).
 
 > **A project has exactly one database.** The platform reads its `databases`
 > rows with `limit: 1` in three places, so a second row does not add a database —
@@ -197,11 +207,13 @@ Values are encrypted at rest and decrypted at deploy time. A change is
 
 <!-- docs-verify: ignore -->
 ```
-$ rebase cloud env set VITE_API_URL=https://api.example.com
-✗ VITE_API_URL is read by your bundler at BUILD time. Project variables are
-  applied at rollout — after the image is built.
-  code: build_time_variable
+$ rebase cloud env set VITE_GOOGLE_CLIENT_ID=1234.apps.googleusercontent.com
+✗ VITE_GOOGLE_CLIENT_ID is read by your bundler at BUILD time, and project
+  variables are applied at rollout — after the image is built. Setting it here
+  would not reach the bundle.
 ```
+
+(`--json` carries `code: build_time_variable`.)
 
 This is correct and you should not force past it. `VITE_*`, `NEXT_PUBLIC_*`,
 `PUBLIC_*` and `REACT_APP_*` are **inlined into the JavaScript by the bundler**
@@ -209,12 +221,19 @@ before the image exists. Setting one here produces a variable that is present in
 the container and `undefined` in the bundle — nothing fails, the deploy
 succeeds, and the app breaks in the browser several steps away from the cause.
 
-Put them in the source you deploy:
+A managed deploy builds the frontend on your machine, so put them where that
+build reads them — the shell that runs `rebase cloud deploy`, or an env file
+Vite loads (the scaffold's `vite.config.ts` sets `envDir` to the project root):
 
 ```bash
-# frontend/.env.production — committed, read by the bundler at build time
-VITE_API_URL=https://my-app.rebase.website
+# .env.production at the project root — committed, read by the bundler at build time
+VITE_GOOGLE_CLIENT_ID=1234.apps.googleusercontent.com
 ```
+
+`VITE_API_URL` is the exception: the deploy builds every static app with it
+taken from the shell, blank (same origin) when unset, so a value in an env file
+never wins. Same origin is right for an app the backend serves; to point at
+another origin, run `VITE_API_URL=https://… rebase cloud deploy`.
 
 `--force` exists for the rare app that genuinely reads such a name at run time.
 Do not reach for it to make an error go away.
@@ -226,6 +245,12 @@ them with `code: env_var_key_reserved`:
 
 `DATABASE_URL` · `DATABASE_DIRECT_URL` · `DATABASE_READ_URL` · `JWT_SECRET` ·
 `REBASE_SERVICE_KEY` · `PORT` · `NODE_ENV`
+
+…and the runtime-topology names the platform pins on every pod (`REBASE_ROLE`,
+`TRUSTED_PROXY_HOPS`, `REBASE_RATE_LIMIT_STORE`, `REBASE_CRON_SCHEDULER`,
+`REBASE_JOB_WORKERS`, `REBASE_MCP_ENABLED`, …). The refusal lists every reserved
+name. `REBASE_SERVICE_KEY` cannot be set, but an owner or admin can read it with
+`rebase cloud env reveal REBASE_SERVICE_KEY`.
 
 Names that merely look similar (`MY_DATABASE_URL`, `JWT_SECRET_KEY`, `PORTAL`)
 are yours to set.
@@ -585,21 +610,26 @@ rebase cloud tokens create --project shop --can deploy,logs --expires-in 90
 | `rebase cloud tokens list` / `create --can …` / `revoke <id>` | Tokens for CI and agents (`REBASE_TOKEN`) |
 | `rebase cloud use` | Select the active organization |
 | `rebase cloud link` / `unlink` / `open` | Link this directory to a project |
+| `rebase cloud init --claim` | A live backend with no account, and a link to claim it within 72 hours |
 | `rebase cloud projects list` / `create` / `info` / `delete` | Projects |
-| `rebase cloud db list` / `create` / `info` / `test` | Databases |
-| `rebase cloud db backup list` / `create` / `restore` | Backups |
+| `rebase cloud db list` / `create` / `info` / `connect` / `test` | Databases (`connect` tunnels a local port to it; owner or admin) |
+| `rebase cloud db backup list` / `create` / `restore` / `status` / `download` | Backups |
 | `rebase cloud db pitr status` / `restore` / `cutover` / `discard` | Point-in-time recovery |
 | `rebase cloud deploy` / `logs` / `deployments list` | Ship and observe |
+| `rebase cloud previews` / `previews delete <name>` | Builds served at their own address by `deploy --preview` |
 | `rebase cloud rollback` / `cancel` | Recover |
 | `rebase cloud start` / `stop` / `restart` / `status` / `metrics` / `debug` | Operate |
-| `rebase cloud env list` / `set` / `unset` / `reveal` / `pull` | Configuration |
+| `rebase cloud cron` | The deployed app's cron jobs and their runs. Read-only |
+| `rebase cloud env list` / `set` / `unset` / `reset` / `reveal` / `pull` | Configuration |
 | `rebase cloud domains list` / `add` / `verify` / `remove` | Custom domains |
 | `rebase cloud extensions list` / `enable` / `disable` | Postgres extensions |
 | `rebase cloud settings show` / `set` | Name, branch, repo, subdomain |
 | `rebase cloud compute` / `compute set` | What it reserves, and what it costs |
+| `rebase cloud resources` / `resources prune database <key>` | What the platform holds against what the code declares |
 | `rebase cloud storage` / `storage create` / `storage attach` | Object storage |
+| `rebase cloud webhooks list` / `create` / `delete` | Deploy hooks |
 | `rebase cloud orgs list` / `create` / `members` | Organizations |
-| `rebase cloud billing` / `billing setup` | Card on file |
+| `rebase cloud billing` / `billing setup` / `billing checkout` | Card on file |
 | `rebase cloud clusters` / `clusters add` / `clusters verify` | Platform admin |
 
 Global flags on every one of them: `--project, -p <slug>`, `--json`,

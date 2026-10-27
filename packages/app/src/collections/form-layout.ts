@@ -19,6 +19,7 @@ import type {
     PropertySpan
 } from "@rebasepro/cms-types";
 import type { EnumValues, Property } from "@rebasepro/types";
+import { effectiveAccess } from "@rebasepro/common";
 import { isHidden } from "./property_presentation";
 
 /**
@@ -165,6 +166,9 @@ export function pairKind(property: Property): PairKind | undefined {
     // condition strands the other half of its row.
     if (property.admin?.Field) return undefined;
     if (property.conditions) return undefined;
+    // Nor does one the form may not render for its user: a field-level read
+    // rule (or `excludeFromApi`) hides it, as `EntityForm` does.
+    if (effectiveAccess(property)) return undefined;
     if ((property.name?.length ?? 0) > PAIR_MAX_LABEL) return undefined;
     if ((property.description?.length ?? 0) > PAIR_MAX_DESCRIPTION) return undefined;
 

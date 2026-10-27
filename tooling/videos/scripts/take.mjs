@@ -259,7 +259,12 @@ export async function processTake(id, { log = console.log } = {}) {
         ...rows,
     ].join("\n");
     await writeFile(path.join(dir, "summary.txt"), summary + "\n");
-    const render = `pnpm exec remotion render src/index.ts RebaseDesk out/rebase-desk-${id}.mp4 --props=takes/${id}/props.json --scale=2 --timeout=120000`;
+    /* A take names its film; each film renders as one or more compositions
+       (the series: wide and tall from the same take). */
+    const compositions = live.compositions ?? ["RebaseDesk"];
+    const render = compositions
+        .map((c) => `pnpm exec remotion render src/index.ts ${c} out/${c}-${id}.mp4 --props=takes/${id}/props.json --scale=2 --timeout=120000`)
+        .join("\n  ");
     return { id, summary, render, props };
 }
 

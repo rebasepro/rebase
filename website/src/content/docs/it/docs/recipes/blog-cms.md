@@ -1,5 +1,5 @@
 ---
-sourceHash: fb83f7a9f5e95709
+sourceHash: ff3d56f359f32429
 title: "Ricetta: Blog CMS"
 sidebar_label: Blog CMS
 description: Crea un CMS completo per blog con articoli, autori, categorie, editing rich text e caricamento di immagini.
@@ -56,6 +56,7 @@ export const authorsCollection = defineCollection({
     }
 });
 
+export default authorsCollection;
 ```
 
 ### Categorie
@@ -94,12 +95,15 @@ export const categoriesCollection = defineCollection({
     }
 });
 
+export default categoriesCollection;
 ```
 
 ### Articoli
 
 ```typescript
 import { defineCollection } from "@rebasepro/cms-types";
+import authorsCollection from "./authors";
+import categoriesCollection from "./categories";
 // The row shape, so callbacks below see typed `values` instead of `unknown`.
 type Article = {
     title: string;
@@ -215,11 +219,12 @@ export const articlesCollection = defineCollection({
     }
 });
 
+export default articlesCollection;
 ```
 
 ## Configurazione
 
-1. Salva i tre file in `config/collections/`. Aggiungili all'array `collections`
+1. Salva i tre file in `config/collections/` — `authors.ts`, `categories.ts` e `articles.ts`; ciascuno deve esportare la propria collezione come export predefinito (default export), altrimenti l'avvio rifiuta la cartella. Aggiungili all'array `collections`
    in `config/collections/index.ts` per scegliere dove compaiono nella
    navigazione — ogni file nella cartella viene comunque caricato.
 2. Con `rebase dev` in esecuzione è tutto: salvare rigenera lo schema, riavvia

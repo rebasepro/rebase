@@ -3,16 +3,18 @@
  */
 import { act, renderHook, waitFor } from "@testing-library/react";
 
-// The hook reads only its API base and auth token out of `@rebasepro/app`.
-// The config object is hoisted, not rebuilt per call: the real one comes from
-// a context and is referentially stable, and the hook's fetch callback keys off
-// its identity.
+// The hook reads only its API base, auth token and the access simulation out
+// of `@rebasepro/app`. The config object is hoisted, not rebuilt per call: the
+// real one comes from a context and is referentially stable, and the hook's
+// fetch callback keys off its identity.
+const simulationState: { simulation: { role?: string; userId?: string } | null } = { simulation: null };
 jest.mock("@rebasepro/app", () => {
     const apiConfig = { apiUrl: "http://api.test",
         getAuthToken: async () => "token" };
     return {
         useApiBase: () => "http://api.test/api",
-        useApiConfig: () => apiConfig
+        useApiConfig: () => apiConfig,
+        useRlsSimulation: () => simulationState
     };
 });
 
@@ -144,5 +146,53 @@ describe("useHistory — loading more", () => {
         await waitFor(() => expect(result.current.entries).toHaveLength(25));
         expect(result.current.hasMore).toBe(false);
         expect(result.current.entries.map(e => e.id)).toEqual(Array.from({ length: TOTAL }, (_, i) => `h${i}`));
+    });
+});
+
+/**
+ * While access is simulated, the history is read as the simulated identity.
+ * Every data view went through `client.simulate()`; the History tab fetched
+ * with the administrator's token alone, and listed versions (and fields) the
+ * simulated identity cannot read.
+ */
+describe("useHistory — while access is simulated", () => {
+
+    const fetchMock = jest.fn((..._args: unknown[]) => respondWith([{ id: "create" }]));
+
+    beforeEach(() => {
+        fetchMock.mockClear();
+        global.fetch = fetchMock as unknown as typeof fetch;
+    });
+
+    afterEach(() => {
+        simulationState.simulation = null;
+    });
+
+    function headersOf(call: unknown[]): Record<string, string> {
+        return ((call[1] as RequestInit | undefined)?.headers ?? {}) as Record<string, string>;
+    }
+
+    it("sends the simulation with every history request", async () => {
+        simulationState.simulation = { role: "customer", userId: "u42" };
+        const { result } = renderHook(() => useHistory({ slug: "posts", entityId: "p1" }));
+        await waitFor(() => expect(result.current.entries).toHaveLength(1));
+
+        expect(headersOf(fetchMock.mock.calls[0])).toEqual(expect.objectContaining({
+            "x-rebase-simulate-role": "customer",
+            "x-rebase-simulate-user-id": "u42"
+        }));
+
+        // A revert carries it too, so the server refuses it as the simulated
+        // write it would be.
+        await act(async () => { await result.current.revert("h1").catch(() => undefined); });
+        const revertCall = fetchMock.mock.calls.find(call => String(call[0]).endsWith("/revert"));
+        expect(revertCall && headersOf(revertCall)["x-rebase-simulate-role"]).toBe("customer");
+    });
+
+    it("sends none when nothing is simulated", async () => {
+        const { result } = renderHook(() => useHistory({ slug: "posts", entityId: "p1" }));
+        await waitFor(() => expect(result.current.entries).toHaveLength(1));
+
+        expect(Object.keys(headersOf(fetchMock.mock.calls[0])).filter(h => h.startsWith("x-rebase-simulate"))).toEqual([]);
     });
 });

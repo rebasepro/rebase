@@ -27,12 +27,13 @@ import {
     adminPanelUrl,
     dotenvSets,
     mintMissingAppKey,
+    bundleDeployEnv,
     INIT_CHILD_DEPLOY_ENV,
     type AppKey,
     type InitDeps,
     type ProvisionedProject
 } from "./init";
-import { ephemeralGrantFor, forgetEphemeralGrant, initOutputMode, readLink, requireClient } from "./context";
+import { ephemeralGrantFor, forgetEphemeralGrant, initOutputMode, readLink, requireClient, resetTokenScopesForTest } from "./context";
 
 class Exited extends Error {
     constructor(readonly code: number) {
@@ -118,6 +119,7 @@ beforeEach(() => {
     delete process.env.REBASE_TOKEN;
     delete process.env[INIT_CHILD_DEPLOY_ENV];
     process.env.REBASE_JSON = "1";
+    resetTokenScopesForTest();
 
     sent = [];
     said = [];
@@ -349,6 +351,283 @@ describe("the stored token afterwards", () => {
         expect(refusal()).toMatchObject({ code: "token_rejected" });
         expect(refusal().message).toContain("rebase cloud init --claim");
         expect(ephemeralGrantFor(CP, PROVISIONED.projectId)).toBeUndefined();
+        // The only stored copy of the claim link goes with it: it is printed first.
+        expect(said.join("\n")).toContain(PROVISIONED.claimUrl);
+    });
+
+    it("says to run the command again when the person who claimed it is already signed in", async () => {
+        await init(["--claim", "--no-deploy"]);
+        // What `rebase cloud login` leaves for this host.
+        const file = path.join(home, ".rebase", "credentials.json");
+        const creds = credentials() as { contexts: Record<string, Record<string, unknown>> };
+        creds.contexts[CP].auth = JSON.stringify({ accessToken: "a", refreshToken: "r", expiresAt: Date.now() + 3600_000 });
+        fs.writeFileSync(file, JSON.stringify(creds));
+        respond = () => json(401, { error: { code: "UNAUTHORIZED", message: "API key has been revoked" } });
+        said = [];
+
+        await expect(cloudCommand("logs", line("logs"))).rejects.toThrow(Exited);
+
+        expect(refusal().code).toBe("token_rejected");
+        expect(said.join("\n")).toContain("run the command again");
+        expect(said.join("\n")).not.toContain("sign in with");
+        expect(ephemeralGrantFor(CP, PROVISIONED.projectId)).toBeUndefined();
+    });
+
+    /** A control plane where the token is good and `/auth/me` takes only a person's session. */
+    function sessionOnlyMe(): void {
+        respond = (request) => {
+            if (request.path === "/api/auth/me") return json(401, { error: { code: "UNAUTHORIZED", message: "Invalid token" } });
+            if (request.path === "/api/auth/scopes") return json(200, { held: [`project:deploy:${PROVISIONED.projectId}`, `project:logs:${PROVISIONED.projectId}`] });
+            return json(404, { error: { code: "NOT_FOUND", message: "no route" } });
+        };
+    }
+
+    it("shows the project, the claim URL and the expiry on `whoami`, and keeps the token", async () => {
+        await init(["--claim", "--no-deploy"]);
+        sessionOnlyMe();
+        said = [];
+        await cloudCommand("whoami", line("whoami"));
+        expect(printedJson()).toMatchObject({
+            credential: "ephemeral",
+            projectId: PROVISIONED.projectId,
+            claimUrl: PROVISIONED.claimUrl,
+            expiresAt: PROVISIONED.expiresAt
+        });
+        expect(sent.some(r => r.path === "/api/auth/me")).toBe(false);
+        expect(ephemeralGrantFor(CP, PROVISIONED.projectId)?.claimUrl).toBe(PROVISIONED.claimUrl);
+    });
+
+    it("is kept when a session-only route refuses it, and the refusal says a session is needed", async () => {
+        // `rebase cloud projects create` reads `/auth/me` with whatever client it was handed.
+        await init(["--claim", "--no-deploy"]);
+        sessionOnlyMe();
+        said = [];
+        const { client } = await requireClient(line("projects", "create"));
+        await expect(client.auth.getUser()).rejects.toBeInstanceOf(Exited);
+        expect(refusal().code).toBe("session_required");
+        expect(ephemeralGrantFor(CP, PROVISIONED.projectId)?.claimUrl).toBe(PROVISIONED.claimUrl);
+        // What the token can still do, as narrowed: no secret read back, no tunnel.
+        const hint = (printedJson() as { error: { hint?: string } }).error.hint ?? "";
+        expect(hint).toContain("db info");
+        expect(hint).toContain("not open `db connect`");
+        expect(hint).not.toContain("and database");
+    });
+
+    it("is kept when the control plane cannot say whether it still holds", async () => {
+        await init(["--claim", "--no-deploy"]);
+        respond = (request) => request.path === "/api/auth/scopes"
+            ? json(502, { error: { code: "upstream_error", message: "Bad gateway" } })
+            : json(401, { error: { code: "UNAUTHORIZED", message: "Invalid token" } });
+        said = [];
+        await expect(cloudCommand("logs", line("logs"))).rejects.toThrow(Exited);
+        expect(refusal().code).toBe("token_rejected");
+        expect(ephemeralGrantFor(CP, PROVISIONED.projectId)?.claimUrl).toBe(PROVISIONED.claimUrl);
+    });
+});
+
+describe("reading the claim URL back", () => {
+    /** Enough of a control plane for `status`: the project row, and empty lists for everything else. */
+    function projectRow(): void {
+        const row = { id: PROVISIONED.projectId, name: PROVISIONED.name, subdomain: PROVISIONED.slug, status: "active" };
+        respond = (request) => {
+            if (request.path === `/api/data/projects/${PROVISIONED.projectId}`) return json(200, row);
+            if (request.path.startsWith("/api/data/projects")) return json(200, { data: [row] });
+            if (request.path.startsWith("/api/data/")) return json(200, { data: [] });
+            return json(404, { error: { code: "NOT_FOUND", message: "no route" } });
+        };
+    }
+
+    it("`status` carries the claim URL and the expiry while the project is unclaimed", async () => {
+        await init(["--claim", "--no-deploy"]);
+        projectRow();
+        said = [];
+        await cloudCommand("status", line("status"));
+        expect(printedJson()).toMatchObject({
+            projectId: PROVISIONED.projectId,
+            unclaimed: { claimUrl: PROVISIONED.claimUrl, expiresAt: PROVISIONED.expiresAt }
+        });
+    });
+
+    it("`status` carries none once the grant is gone", async () => {
+        await init(["--claim", "--no-deploy"]);
+        projectRow();
+        // Gone the way a claim takes it: the token is refused and forgotten.
+        // `status` then needs another credential; REBASE_TOKEN stands in for the login.
+        forgetEphemeralGrant(CP, PROVISIONED.projectId);
+        process.env.REBASE_TOKEN = "rk_live_ci";
+        said = [];
+        await cloudCommand("status", line("status"));
+        expect(printedJson()).toMatchObject({ unclaimed: null });
+    });
+
+    it("`unlink` warns that an unclaimed project keeps running, with its claim URL", async () => {
+        await init(["--claim", "--no-deploy"]);
+        said = [];
+        await cloudCommand("unlink", line("unlink"));
+        expect(printedJson()).toMatchObject({
+            unlinked: true,
+            unclaimed: { projectId: PROVISIONED.projectId, claimUrl: PROVISIONED.claimUrl }
+        });
+        expect(said.join("\n")).toContain("Unlinking does not delete it");
+        expect(readLink()).toBeNull();
+    });
+
+    it("a second `init --claim` points at the existing claim URL, not at `unlink`", async () => {
+        await init(["--claim", "--no-deploy"]);
+        said = [];
+        await expect(init(["--claim", "--no-deploy"])).rejects.toBeInstanceOf(Exited);
+        expect(refusal().code).toBe("already_linked");
+        const hint = said.join("\n");
+        expect(hint).toContain(PROVISIONED.claimUrl);
+        expect(hint).not.toContain("rebase cloud unlink");
+    });
+});
+
+describe("when the app's key stops working", () => {
+    // r3-cloud-access item 1: a claim hands the key over (no expiry), so the
+    // note no longer says it dies at 72h once claimed. Was pinned as "even once
+    // the project is claimed".
+    it("init says the key expires unless the project is claimed, that a claim hands it over, and how to replace it", async () => {
+        await init(["--claim"]);
+        const note = (printedJson() as { appKey: { note: string } }).appKey.note;
+        expect(note).toContain("unless the project is claimed first");
+        expect(note).toContain("stops expiring");
+        expect(note).toContain("rebase cloud app-key rotate");
+        expect(note).not.toContain("even once the project is claimed");
+    });
+
+    it("`whoami` says it while the project is unclaimed", async () => {
+        await init(["--claim"]);
+        respond = (request) => request.path === "/api/auth/scopes"
+            ? json(200, { held: [`project:deploy:${PROVISIONED.projectId}`] })
+            : json(404, { error: { code: "NOT_FOUND", message: "no route" } });
+        said = [];
+        await cloudCommand("whoami", line("whoami"));
+        expect((printedJson() as { appKeyNote: string | null }).appKeyNote).toContain("unless the project is claimed first");
+    });
+
+    it("the refusal that follows a claim says it, with the date", async () => {
+        await init(["--claim"]);
+        respond = () => json(401, { error: { code: "UNAUTHORIZED", message: "API key has been revoked" } });
+        said = [];
+        await expect(cloudCommand("logs", line("logs"))).rejects.toThrow(Exited);
+        expect(said.join("\n")).toContain("REBASE_API_TOKEN in .env stops working at");
+    });
+
+    it("says nothing about a key `.env` does not hold", async () => {
+        await init(["--claim", "--no-deploy"]);
+        respond = (request) => request.path === "/api/auth/scopes"
+            ? json(200, { held: [] })
+            : json(404, { error: { code: "NOT_FOUND", message: "no route" } });
+        said = [];
+        await cloudCommand("whoami", line("whoami"));
+        expect((printedJson() as { appKeyNote: string | null }).appKeyNote).toBeNull();
+    });
+});
+
+describe("with REBASE_TOKEN in the environment", () => {
+    it("init's own deploy runs without it, so the project is deployed with its own token", () => {
+        const env = bundleDeployEnv({ PATH: "/bin", REBASE_TOKEN: "rk_live_other_projects" });
+        expect(env).not.toHaveProperty("REBASE_TOKEN");
+        expect(env[INIT_CHILD_DEPLOY_ENV]).toBe("1");
+        expect(env.PATH).toBe("/bin");
+    });
+
+    it("a command in the linked directory says it displaced the project's own token", async () => {
+        await init(["--claim", "--no-deploy"]);
+        process.env.REBASE_TOKEN = "rk_live_other_projects";
+        said = [];
+        const { client } = await requireClient(line("status"));
+        respond = () => json(200, { data: [] });
+        await client.data.collection("projects").find({ limit: 1 });
+        expect(sent.at(-1)?.authorization).toBe("Bearer rk_live_other_projects");
+        expect(said.join("\n")).toContain(`REBASE_TOKEN is set, so it is used instead of the token`);
+    });
+
+    /** The control plane answering `/api/auth/scopes` with `held`, and `{ data: [] }` to anything else. */
+    function tokenHolds(held: string[]): void {
+        respond = (request) => request.path === "/api/auth/scopes"
+            ? json(200, { scopes: [], held })
+            : json(200, { data: [] });
+    }
+
+    it("uses the project's own token when REBASE_TOKEN holds nothing on the linked project, and says so once", async () => {
+        await init(["--claim", "--no-deploy"]);
+        process.env.REBASE_TOKEN = "rk_live_other_projects";
+        tokenHolds(["data:read:projects", "project:deploy:proj_someone_else", "project:read:proj_someone_else"]);
+        said = [];
+        sent = [];
+
+        const first = await requireClient(line("status"));
+        await first.client.data.collection("projects").find({ limit: 1 });
+        expect(sent.at(-1)?.authorization).toBe(`Bearer ${PROVISIONED.apiKey}`);
+        const second = await requireClient(line("logs"));
+        await second.client.data.collection("projects").find({ limit: 1 });
+        expect(sent.at(-1)?.authorization).toBe(`Bearer ${PROVISIONED.apiKey}`);
+
+        // One scopes call for the process, asked with REBASE_TOKEN.
+        const asked = sent.filter(request => request.path === "/api/auth/scopes");
+        expect(asked).toHaveLength(1);
+        expect(asked[0].authorization).toBe("Bearer rk_live_other_projects");
+        const told = said.join("\n");
+        expect(told.match(/holds no scope on project proj_eph/g)).toHaveLength(1);
+        expect(told).not.toContain("so it is used instead of the token");
+    });
+
+    it("keeps REBASE_TOKEN when it reaches the linked project", async () => {
+        await init(["--claim", "--no-deploy"]);
+        process.env.REBASE_TOKEN = "rk_live_also_this_one";
+        tokenHolds(["data:read:projects", `project:deploy:${PROVISIONED.projectId}`]);
+        said = [];
+        const { client } = await requireClient(line("status"));
+        await client.data.collection("projects").find({ limit: 1 });
+        expect(sent.at(-1)?.authorization).toBe("Bearer rk_live_also_this_one");
+        expect(said.join("\n")).toContain("REBASE_TOKEN is set, so it is used instead of the token");
+    });
+
+    it("keeps REBASE_TOKEN when it holds an unnarrowed project scope", async () => {
+        await init(["--claim", "--no-deploy"]);
+        process.env.REBASE_TOKEN = "rk_live_every_project";
+        tokenHolds(["project:read"]);
+        const { client } = await requireClient(line("status"));
+        await client.data.collection("projects").find({ limit: 1 });
+        expect(sent.at(-1)?.authorization).toBe("Bearer rk_live_every_project");
+    });
+
+    it("keeps REBASE_TOKEN for a command aimed at another project with --project", async () => {
+        await init(["--claim", "--no-deploy"]);
+        process.env.REBASE_TOKEN = "rk_live_other_projects";
+        tokenHolds(["project:deploy:proj_someone_else"]);
+        sent = [];
+        const { client } = await requireClient(line("logs", "--project", "someone-elses-shop"));
+        await client.data.collection("projects").find({ limit: 1 });
+        expect(sent.at(-1)?.authorization).toBe("Bearer rk_live_other_projects");
+        expect(sent.some(request => request.path === "/api/auth/scopes")).toBe(false);
+    });
+
+    it("keeps REBASE_TOKEN when the control plane cannot say what it holds", async () => {
+        await init(["--claim", "--no-deploy"]);
+        process.env.REBASE_TOKEN = "rk_live_other_projects";
+        respond = (request) => request.path === "/api/auth/scopes"
+            ? json(502, { error: { code: "upstream_error", message: "Bad gateway" } })
+            : json(200, { data: [] });
+        const { client } = await requireClient(line("status"));
+        await client.data.collection("projects").find({ limit: 1 });
+        expect(sent.at(-1)?.authorization).toBe("Bearer rk_live_other_projects");
+    });
+
+    it("whoami reports the project's token when that is what is used", async () => {
+        await init(["--claim", "--no-deploy"]);
+        process.env.REBASE_TOKEN = "rk_live_other_projects";
+        respond = (request) => {
+            if (request.path !== "/api/auth/scopes") return json(404, { error: { code: "NOT_FOUND", message: "no route" } });
+            return request.authorization === "Bearer rk_live_other_projects"
+                ? json(200, { held: ["project:deploy:proj_someone_else"] })
+                : json(200, { held: [`project:deploy:${PROVISIONED.projectId}`] });
+        };
+        said = [];
+        await cloudCommand("whoami", line("whoami"));
+        expect(printedJson()).toMatchObject({ credential: "ephemeral", projectId: PROVISIONED.projectId });
     });
 });
 
@@ -360,6 +639,19 @@ describe("asking for the app's key", () => {
         expect(outcome).toEqual({ ok: false, code: "upstream_error", message: "The project's app is not answering yet." });
         expect(sent).toHaveLength(3);
         expect(waits).toHaveLength(2);
+    });
+
+    it("asks again while the app's gateway answers for it, which the control plane passes on as 502", async () => {
+        // A mint that races the rollout: the tenant's ingress answers 503 with
+        // no ready pod, and the control plane reports any non-2xx from the app
+        // as 502. Only 503 was asked again, so the key was given up on at once.
+        let calls = 0;
+        respond = () => ++calls === 1
+            ? json(502, { error: { code: "upstream_error", message: "The project's app could not mint a key (503)." } })
+            : json(201, APP_KEY);
+        const outcome = await requestAppKey(CP, "rk_live_x", "p1", { attempts: 3, sleep: async () => {} });
+        expect(outcome).toEqual({ ok: true, key: APP_KEY });
+        expect(sent).toHaveLength(2);
     });
 
     it("does not ask again on any other refusal", async () => {
@@ -482,6 +774,20 @@ describe("the helpers", () => {
         expect(fs.readFileSync(file, "utf-8")).toBe("A=1\nREBASE_BASE_URL=https://x.rebase.website\nB=2\n");
         upsertDotenv(path.join(project, "new.env"), "K", "v");
         expect(fs.readFileSync(path.join(project, "new.env"), "utf-8")).toBe("K=v\n");
+    });
+
+    it("creates a .env private, since it holds keys", () => {
+        const file = path.join(project, "fresh.env");
+        upsertDotenv(file, "REBASE_API_TOKEN", "rk_live_app_key");
+        expect(fs.statSync(file).mode & 0o777).toBe(0o600);
+    });
+
+    it("keeps a REBASE_API_TOKEN already in .env, and mints none to throw away", async () => {
+        fs.appendFileSync(path.join(project, ".env"), "REBASE_API_TOKEN=rk_live_made_by_hand\n");
+        await init(["--claim"]);
+        expect(fs.readFileSync(path.join(project, ".env"), "utf-8")).toContain("REBASE_API_TOKEN=rk_live_made_by_hand");
+        expect(sent.some(r => r.path === "/api/functions/ephemeral/app-key")).toBe(false);
+        expect(printedJson()).toMatchObject({ appKey: { ok: false, error: { code: "env_has_key" } } });
     });
 
     it("finds the admin panel where rebase.json mounts the CMS, and nowhere when it mounts none", () => {

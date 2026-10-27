@@ -26,6 +26,7 @@ import type {
     UserCreationPrepareResult
 } from "@rebasepro/types";
 import { ApiError } from "../api/errors";
+import { readRoleNames } from "./access";
 import { getUserInvitationTemplate, resolveEmailBranding, USER_INVITATION_LINK_TTL_MS } from "../email/templates";
 import { resolveEmailLinkBase } from "../email/link-base";
 import { logger } from "../utils/logger";
@@ -179,6 +180,8 @@ export async function prepareAdminUserValues(
     options?: UserCreationOptions
 ): Promise<AdminUserPrepareResult> {
     const { resolvedHooks, collectionAuthConfig } = ctx;
+    // Roles written through the auth collection obey the rule `POST /users` does.
+    if (rawBody.roles !== undefined && rawBody.roles !== null) readRoleNames(rawBody.roles);
     const body = enforceCreationPasswordPolicy(rawBody, resolvedHooks, options);
 
     // 1. Collection-level hook (closest to the data)
@@ -455,6 +458,9 @@ export function authCollectionUserAdmin(ctx: {
     const { authRepo, resolvedHooks } = ctx;
     return {
         async prepareUserUpdates(updates) {
+            for (const { values } of updates) {
+                if (values.roles !== undefined && values.roles !== null) readRoleNames(values.roles);
+            }
             await assertRoleChangesAllowed(
                 authRepo,
                 updates.flatMap(({ uid, values }) => Array.isArray(values.roles) ? [{ uid, roles: values.roles }] : [])

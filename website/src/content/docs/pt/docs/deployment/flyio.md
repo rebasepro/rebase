@@ -1,5 +1,5 @@
 ---
-sourceHash: ed69210a7093e29f
+sourceHash: a5bdb4bcc6886af4
 title: Implantando o Rebase no Fly.io
 description: Aprenda como implantar o Rebase globalmente ou restringi-lo a data centers europeus usando o Fly.io.
 sidebar_label: Fly.io
@@ -67,8 +67,6 @@ primary_region = "fra"
 ```
 
 `/livez` em vez de `/health`: o segundo realiza uma viagem de ida e volta ao banco de dados, portanto uma verificação de liveness nele reiniciaria uma máquina saudável durante uma breve oscilação do banco de dados.
-
-`DISABLE_SELF_REGISTRATION` é novo: na versão 0.17.3 não existe essa opção, e a primeira conta a se registrar torna-se o administrador.
 
 Atualizar o Rebase posteriormente consiste apenas em alterar essa linha `FROM`. Seu bundle permanece intocado.
 

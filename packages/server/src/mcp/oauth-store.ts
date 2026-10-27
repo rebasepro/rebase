@@ -22,7 +22,7 @@ import type { DataDriver } from "@rebasepro/types";
 import { isSQLAdmin } from "@rebasepro/types";
 import { revokeInternalTableSql } from "@rebasepro/common";
 import { logger } from "../utils/logger.js";
-import { createDdlBootstrapper } from "../boot/ddl-bootstrap.js";
+import { createDdlBootstrapper, provisioningExec, type SqlExec } from "../boot/ddl-bootstrap.js";
 import { sha256Hex } from "../utils/portable-crypto.js";
 
 const CLIENTS = "rebase.oauth_clients";
@@ -171,10 +171,10 @@ export interface OAuthStore {
      * there was nothing to revoke, which lets the route answer 404 rather than
      * reporting success for a client the user never connected.
      *
-     * Access tokens already issued are NOT invalidated — they are self-contained
-     * JWTs with no per-request database lookup, which is what makes `/mcp` cheap.
-     * The window is therefore one access-token lifetime (an hour), and the
-     * route's response says so rather than implying an instant cut-off.
+     * Access tokens already issued are NOT invalidated — `/mcp` re-checks the
+     * account on each request, not the grant. The window is therefore one
+     * access-token lifetime (an hour), and the route's response says so rather
+     * than implying an instant cut-off.
      */
     revokeGrant(uid: string, clientId: string): Promise<boolean>;
 }
@@ -197,12 +197,26 @@ export interface GrantSummary {
  * server that cannot persist a code is not a degraded authorization server, it
  * is one that hands out credentials it cannot check.
  */
-export function createOAuthStore(driver: DataDriver): OAuthStore | null {
+export function createOAuthStore(
+    driver: DataDriver,
+    options: {
+        /**
+         * Default `true`. `false` is a backend that changes nothing in its
+         * database: `ensureTables` creates and revokes nothing, and throws
+         * when the tables are not already there.
+         */
+        provision?: boolean;
+    } = {}
+): OAuthStore | null {
     const admin = driver.admin;
     if (!isSQLAdmin(admin)) return null;
 
-    const exec = (sql: string, params?: unknown[]) => admin.executeSql(sql, params ? { params } : undefined);
-    const ddl = createDdlBootstrapper(sql => exec(sql), "oauth-store");
+    const run: SqlExec = provisioningExec(
+        (sql, execOptions) => admin.executeSql(sql, execOptions?.params ? { params: execOptions.params } : undefined),
+        options.provision
+    );
+    const exec = (sql: string, params?: unknown[]) => run(sql, params ? { params } : undefined);
+    const ddl = createDdlBootstrapper(run, "oauth-store");
 
     // Expired codes are worthless the minute they lapse and there is no audit
     // value in keeping them: they carry a redirect URI and a PKCE challenge for
@@ -320,6 +334,12 @@ export function createOAuthStore(driver: DataDriver): OAuthStore | null {
             for (const table of OAUTH_TABLES) {
                 const rows = await exec(`SELECT to_regclass($1) AS present`, [table]);
                 if (rows[0]?.present == null) missing.push(table);
+            }
+            if (missing.length > 0 && options.provision === false) {
+                throw new Error(
+                    `The OAuth tables do not exist: ${missing.join(", ")}, and this backend changes nothing in its `
+                    + "database. A provisioning run with the MCP surface on creates them."
+                );
             }
             if (missing.length > 0) {
                 throw new Error(

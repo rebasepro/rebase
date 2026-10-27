@@ -141,6 +141,10 @@ export class LazyOfflineManager {
         void this.run((engine) => engine.setScope(uid, options)).catch(() => undefined);
     }
 
+    onReachedUnconfirmed(listener: () => void): () => void {
+        return this.subscribe((engine) => engine.onReachedUnconfirmed(listener));
+    }
+
     async resumeLastUser(): Promise<void> {
         await (await this.run((engine) => engine.resumeLastUser()));
     }

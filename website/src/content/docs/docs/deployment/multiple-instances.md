@@ -47,7 +47,8 @@ The sections below say what each one does when it is left per process.
 `JWT_SECRET` signs every session and `REBASE_SERVICE_KEY` authenticates
 server-to-server calls. In development each process generates its own when they
 are unset, so a token one process issued is refused by the next. Production
-already refuses to boot without them; what matters with several processes is
+already refuses to boot without `JWT_SECRET` (without `REBASE_SERVICE_KEY` it boots
+with no service key at all); what matters with several processes is
 that every one gets the **same** values — from one secret, not one per replica.
 
 ## Rate limits and the client address

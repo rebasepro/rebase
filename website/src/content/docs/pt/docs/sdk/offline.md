@@ -1,5 +1,5 @@
 ---
-sourceHash: dc394aa7ff8f8f55
+sourceHash: 4cc7758ee53e304b
 title: Offline e Sincronização Local-First
 sidebar_label: Offline
 description: Ative o motor de sincronização local-first do SDK tipado do Rebase — um banco de dados local de linhas, escritas offline instantâneas com reversão e consultas ao vivo reativas.
@@ -159,7 +159,7 @@ Uma linha que outra pessoa excluiu é o único caso que não é revertido. Um `d
 
 A cascata é estreita: um `update` é descartado junto com a escrita que ele editava, porque só pode falhar da mesma maneira. Um `create` ou `delete` posterior para a mesma linha se sustenta por conta própria e é mantido. Um `create` recusado de uma linha criada offline também leva consigo toda escrita enfileirada, em qualquer coleção, cujos valores referenciem o id temporário da linha. Uma escrita descartada nunca foi enviada. Ela é reportada com um `RebaseApiError` cujo `code` é `DEPENDENCY_REJECTED` e cujo `cause` é a recusa que a condenou, para que você possa distingui-la da escrita que o servidor de fato recusou. Na 0.23 ela carrega em vez disso o próprio erro da escrita recusada.
 
-Edições consecutivas em uma mesma linha enquanto offline são mescladas em uma única escrita na fila, para que um formulário sendo digitado não faça a fila crescer. Se o servidor recusar a escrita mesclada por causa do seu conteúdo (um 400, 403 ou 422 — por exemplo, um campo removido por uma alteração de esquema enquanto o usuário estava offline), o motor a divide novamente nas edições separadas e reproduz cada uma. Apenas a edição que o servidor recusa é revertida e reportada; as demais são mantidas.
+Edições consecutivas em uma mesma linha enquanto offline são mescladas em uma única escrita na fila, para que um formulário sendo digitado não faça a fila crescer. Uma escrita que a fila já começou a enviar não recebe mesclagem: uma edição feita depois de uma tentativa de reexecução cuja resposta se perdeu entra na fila como uma atualização própria, e uma exclusão de uma linha criada offline é enviada em vez de ser cancelada contra a sua criação, já que o servidor pode ter a linha. Se o servidor recusar a escrita mesclada por causa do seu conteúdo (um 400, 403 ou 422 — por exemplo, um campo removido por uma alteração de esquema enquanto o usuário estava offline), o motor a divide novamente nas edições separadas e reproduz cada uma. Apenas a edição que o servidor recusa é revertida e reportada; as demais são mantidas.
 
 ### Conflitos
 
@@ -182,7 +182,7 @@ const client = createRebaseClient({
 
 A fila espera enquanto `onConflict` é executado, então ele pode perguntar ao usuário. Se lançar um erro, a edição é sobrescrita.
 
-A versão contra a qual uma edição é feita é a que a última leitura da linha informou: `findById()`, um frame de `listenById()` ou a resposta de um `update()` anterior. Uma linha lida pela última vez numa lista de `find()` ou `listen()` não tem versão, nem uma edição feita sobre outra escrita enfileirada para a mesma linha. Essas são reexecutadas sem pré-condição. Um `ifMatch` que você mesmo passa a `update()` é mantido quando a edição entra na fila.
+A versão contra a qual uma edição é feita é a que a última leitura da linha informou: `findById()`, um frame de `listenById()` ou a resposta de um `update()` anterior. Uma linha lida pela última vez numa lista de `find()` ou `listen()` não tem versão, nem uma edição feita sobre outra escrita enfileirada para a mesma linha. Essas são reexecutadas sem pré-condição. Um `ifMatch` que você mesmo passa a `update()` ou `delete()` é mantido quando a escrita entra na fila, com ou sem `onConflict`, e `findById()` em um cliente com offline habilitado devolve a linha com a sua versão, de modo que `etagOf(row)` funciona como online. Sem `onConflict`, uma escrita enfileirada recusada por causa do seu próprio `ifMatch` é revertida e reportada ao `onSyncError` com um 412 `PRECONDITION_FAILED`.
 
 Uma falha que é meramente temporária — um 429, um 503, uma conexão interrompida — não é uma rejeição. Essas permanecem na fila e são repetidas; somente após `maxRetries` adiamentos uma escrita é revertida.
 
@@ -235,7 +235,10 @@ local desse usuário. As escritas feitas então entram na fila como dele, mas ne
 cliente renova a sessão, e um login também a confirma. Se o servidor
 recusar a sessão, ou outra pessoa entrar, o dispositivo troca de usuário, e as
 escritas enfileiradas ficam com o seu autor até que ele entre de novo. Enquanto isso,
-`status().unverifiedUser` é `true`.
+`status().unverifiedUser` é `true`, e isso vale online também: até que a
+renovação responda, as escritas entram na fila em vez de sair sem credenciais, e as leituras
+são respondidas a partir das linhas locais do usuário. O que o servidor envia a uma requisição sem
+sessão é o que um chamador sem login pode ver, então isso não é guardado.
 
 ```typescript
 createRebaseClient({
@@ -301,7 +304,8 @@ O cliente não é uma réplica do seu banco de dados, e não finge ser:
 - **A reexecução é pelo menos uma vez.** Uma escrita que chega ao servidor mas cuja resposta se perde pode ser enviada de novo. Prefira escritas idempotentes (`createMany` com `upsert`) onde duplicatas fizerem diferença.
 - **A lixeira precisa do servidor.** A base de dados local guarda apenas linhas ativas, então `trash.find()`, `trash.count()`, `trash.restore()` e `trash.purge()` (veja [soft delete](/docs/collections/soft-delete#from-the-sdk)) nunca são respondidos localmente nem enfileirados: offline falham com o erro `OFFLINE`. Restaurar ou excluir definitivamente uma linha com uma escrita ainda na fila sincroniza a fila primeiro, e é recusado com `TRASH_PENDING_WRITE` se a escrita ainda não puder ser enviada.
 - **Um upsert em uma chave natural precisa do servidor.** Qual linha um destino `onConflict` indica só o servidor consegue descobrir, então `upsert()` em uma chave natural (ou sem o id da linha), e um `createMany()` com `onConflict` que nunca foi enviado, são recusados offline com `OFFLINE_UPSERT_UNSUPPORTED`. Um upsert na chave primária, com a chave em cada linha, é colocado na fila.
-- **As leituras locais aplicam a semântica do Postgres, não os dados do banco de dados.** Os filtros são avaliados como o SQL faria — comparações com `NULL` são desconhecidas, `ORDER BY` coloca os nulos por último em ordem crescente —, mas sobre a cópia das linhas que o cliente tem, que pode estar desatualizada.
+- **As leituras locais aplicam a semântica do Postgres, não os dados do banco de dados.** Os filtros são avaliados como o SQL faria — comparações com `NULL` são desconhecidas, `ORDER BY` coloca os nulos por último em ordem crescente e desempata o restante pelo id da linha em ordem decrescente, exatamente como o servidor faz —, mas sobre a cópia das linhas que o cliente tem, que pode estar desatualizada.
+- **Uma ordenação que o cliente não consegue reproduzir não é aplicada.** Ordenar texto é tarefa do servidor: o PostgreSQL o ordena pela collation do *banco de dados*, que este processo nunca recebeu, e sob a collation C `Banana` vem antes de `apple`, onde um collator do JavaScript diz o contrário. Quando uma coluna de ordenação não pode ser comparada numericamente, as linhas mantêm a ordem que o servidor enviou, e o resultado é marcado como `partial` em vez de ser apresentado como a página ordenada que foi pedida. Toda chave de uma ordenação com várias colunas precisa ser reproduzível, não só a primeira — uma ordenação com a qual o lado local só concorda até a segunda coluna é uma com a qual ele discorda.
 
 ## Receita: Um Indicador de Offline
 

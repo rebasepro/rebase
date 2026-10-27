@@ -1,5 +1,5 @@
 ---
-sourceHash: 9210bf054bc3c431
+sourceHash: 2df00511c02fed53
 title: CLI-Referenz
 sidebar_label: CLI
 description: Rebase-CLI-Befehle für Projektinitialisierung, Schemagenerierung, Datenbankmigrationen und SDK-Generierung.
@@ -88,7 +88,7 @@ Anwendungs-Image selbst gebaut werden muss. Nützliche Flags:
 |------|------------|
 | `--output <dir>` (oder `--out`) | Schreibt das Bundle an einen anderen Ort als `dist-bundle/` (jeweils eine App) |
 | `--vendor` | Die Abhängigkeiten des Bundles immer installieren und mitliefern |
-| `--no-vendor` | Niemals vendoren; der Pod installiert beim ersten Start |
+| `--no-vendor` | Niemals vendoren; der Pod installiert sie bei jedem Start |
 | `--skip-type-check` | Typechecking überspringen (schneller, weniger sicher) |
 | `--no-static` | Das Frontend nicht ins Backend-Bundle einfalten (jede statische App bekommt trotzdem ihr eigenes Bundle) |
 | `--skip-static-build` | Das Frontend als bereits gebaut einfalten, ohne dessen Build-Befehl auszuführen |
@@ -382,7 +382,7 @@ daran hindert, überhaupt zu funktionieren, passiert, bevor eine Tabelle verglic
 | Verbindungsstrings | Ein nicht-kodiertes `=` in einem URL-Parameter, das die bordeigenen Tools von PostgreSQL nicht parsen können — Backups und `psql` schlagen fehl, während die App weiterläuft. |
 | Benutzerdefinierte Funktionen | Was jede Funktion von ihrem Host benötigt und welche davon nicht auf einer Edge-Runtime laufen würden. |
 
-**Gegen die Datenbank**, wenn `DATABASE_URL` gesetzt ist:
+**Gegen die Datenbank** — die des Projekts selbst, aufgelöst so, wie `rebase db url` sie auflöst; bei einem frischen Scaffold ist das die verwaltete Datenbank, die `doctor` startet:
 
 | Prüfung | Warum |
 | --- | --- |
@@ -398,7 +398,7 @@ Begründung als übersprungen gemeldet und der Rest läuft trotzdem weiter — s
 
 Beendet mit einem Exit-Code ungleich null, wenn eine Prüfung einen Fehler findet oder wenn eine Phase nicht ausgeführt werden konnte,
 weil die angegebene Datenbank Verbindungen ablehnt. Eine Phase, die übersprungen wurde, weil
-Sie keine `DATABASE_URL` angegeben haben, gilt nicht als Fehler.
+keine Datenbank aufgelöst werden konnte, gilt nicht als Fehler.
 
 `rebase doctor --policies` führt nur die RLS-Prüfungen aus — kein Schema-Diff, keine SDK-Typen —
 und schlägt im Zweifelsfall fehl ("fails closed"), was es zur geeigneten Form für ein CI-Gate gegen eine
@@ -410,6 +410,7 @@ deployte Datenbank macht.
 rebase verify
 rebase verify --json
 rebase verify --live
+rebase verify --live --database-url postgresql://…
 ```
 
 Ob die Collections auslieferbar sind, in einem schnellen Befehl für CI und für die Hooks eines KI-Agenten. Standardmäßig offline, und er ändert nie etwas.
@@ -419,7 +420,7 @@ Ob die Collections auslieferbar sind, in einem schnellen Befehl für CI und für
 | Collection-Konfiguration | Eine Datei unter `config/collections/`, die nicht lädt oder die der Boot-Validator ablehnt — mit unbekannten Schlüsseln als Fehler, sodass eine falsch geschriebene Option oder eine UI-Option außerhalb von `admin: { … }` (ein `widget` auf oberster Ebene) hier auffällt, statt still ignoriert zu werden. |
 | RLS-Abdeckung | Eine Collection ohne `securityRules`, die auch keine erbt, oder eine mit einer Spalte `user_id`, `owner_id`, `organization_id` oder `tenant_id`, die sich stattdessen auf Verzeichnis-Defaults verlässt. Eine Regel, die eine Rolle jede Zeile einer solchen Tabelle lesen lässt, ist eine Warnung. |
 | Aktualität der Migrationen | Eine Tabelle oder Spalte, die die Collections deklarieren und die keine Datei in `backend/drizzle/migrations` anlegt, oder eine entfernte, die eine Migration noch anlegt. Übersprungen, solange ein Projekt noch keine Migrationen hat. |
-| Live-RLS-Audit | Mit `--live`: der [`rls-check`](/docs/rls-check)-Katalog gegen `DATABASE_URL`, und ob jede Migration angewendet wurde. |
+| Live-RLS-Audit | Mit `--live`: der [`rls-check`](/docs/rls-check)-Katalog gegen die Datenbank des Projekts, und ob jede Migration angewendet wurde. Die Datenbank wird so aufgelöst, wie die `db`-Befehle sie auflösen — `--database-url`, `DATABASE_URL`, `--docker`, sonst die verwaltete Entwicklungsdatenbank. Eine Datenbank, die nicht konfiguriert ist oder nicht antwortet, ist ein Fehler, kein Überspringen: Das Audit wurde angefordert. Eine aus einer `access: "public"`-Regel kompilierte `USING (true)`-Leserichtlinie ist eine Warnung, solange die API ein Token verlangt (`AUTH_REQUIRE`, standardmäßig an) — jeder angemeldete Benutzer liest jede Zeile — und ein Fehler mit `AUTH_REQUIRE=false`, wo die Zeilen anonym sind. |
 
 `--json` gibt ein einziges Objekt aus — jeden Schritt und jeden Befund mit seiner `file`, dem gepunkteten `path` in die Collection-Konfiguration und dem `fix` —, damit ein Agent reparieren kann, was er kaputt gemacht hat. `--quiet` gibt nichts aus, wenn alles besteht. Beendet sich bei einem Fehler mit einem Exit-Code ungleich null; Warnungen lassen ihn nicht fehlschlagen.
 
@@ -466,20 +467,45 @@ rebase storage move --from "(default)" --to media --prefix avatars
 rebase storage move --from "(default)" --to media --prefix avatars --delete-source
 ```
 
-`orphans` liest jede Zeile jeder Collection, soft-gelöschte Zeilen eingeschlossen, und
-listet die Dateien einer Quelle (`--source`, bei Weglassen die Standardquelle) auf,
-die kein String in irgendeiner Zeile nennt: ein Schlüssel, eine URL, eine `rebase-storage:`-Referenz in
+`orphans` liest jede Zeile jeder Collection so, wie sie gespeichert ist (soft-gelöschte Zeilen
+eingeschlossen, an jedem `beforeQuery`- und `afterRead`-Hook vorbei) und jeden
+[History](/docs/backend/history/)-Eintrag, da ein Revert wiederherstellt, was er enthält.
+Es listet die Dateien einer Quelle (`--source`, bei Weglassen die Standardquelle) auf,
+die kein String in irgendeinem davon nennt: ein Schlüssel, eine URL, eine `rebase-storage:`-Referenz in
 einem Text. Dateien, die neuer sind als `--older-than` Stunden (standardmäßig 24), bleiben außen vor,
 weil das Admin-Panel eine Datei hochlädt, bevor die Zeile gespeichert wird, die sie nennt.
+Der Scan läuft im Hintergrund auf dem Backend, sodass auch ein Projekt, das zu groß ist, um
+innerhalb einer Anfrage gescannt zu werden (hinter einem Ingress, der sie per Timeout abbricht), fertig wird. Die
+CLI startet ihn und zeigt dann seinen Fortschritt (aufgelistete Dateien, gelesene Zeilen, fertige
+Collections und alle, die nicht gelesen werden konnten), bis er fertig ist. Ist die
+[Job-Queue](/docs/backend/jobs/) aktiv, ist der Scan ein `storage.orphans`-Job, den
+die Job-Worker ausführen. Ohne sie läuft der Scan im Serverprozess, der
+gefragt wurde, und die CLI sagt das: Ein Neustart dieses Prozesses stoppt den Scan. Ein Scan
+ist ein Job-Versuch, begrenzt durch `jobs.timeoutMs` (standardmäßig 15 Minuten). Erhöhen Sie
+den Wert oder setzen Sie ihn auf 0 für eine Quelle, die länger braucht. `--json` gibt denselben
+Bericht wie zuvor aus, plus seine `scanId`.
+
 `--delete` fragt vor dem Löschen nach (`--yes` überspringt die Frage und ist ohne Terminal
-erforderlich), der Server findet die Dateien zuvor erneut, und nichts wird
-gelöscht, solange eine Collection nicht gelesen werden kann. Dateien, die nur Ihre eigenen Tabellen
-außerhalb von Collections nennen, wirken ungenutzt: Prüfen Sie vor dem Löschen.
+erforderlich). Es löscht nur aus dem soeben ausgegebenen Scan, und nur innerhalb von
+15 Minuten nach dessen Abschluss. Nichts wird gelöscht, solange eine Collection
+nicht gelesen werden kann: Eine Collection mit Lese-Hooks auf einer Datenquelle, deren Treiber
+nicht an ihnen vorbei lesen kann, zählt als ungelesen. Bevor irgendetwas gelöscht wird, liest der Server
+jede Zeile und jeden History-Eintrag erneut gegen die aufgelisteten Dateien. Dann fragt er
+unmittelbar vor dem Löschen jeder Datei erneut nach ihr. Eine Datei, die jetzt von einer Zeile genannt wird,
+eine, die seit dem Scan erneut hochgeladen wurde, oder eine, die verschwunden ist, bleibt erhalten, und die CLI
+listet sie als behalten auf. Dateien, die nur Ihre eigenen Tabellen außerhalb von Collections nennen, wirken
+ungenutzt: Prüfen Sie vor dem Löschen. Gegen ein Backend ab 0.25.1 oder früher
+scannt die CLI auf die alte Weise, innerhalb einer Anfrage.
 
 `move` kopiert die Dateien unter `--prefix` seitenweise unter denselben Schlüsseln in eine andere Quelle.
 Eine Datei, die das Ziel bereits mit derselben Größe hält, wird übersprungen,
 sodass ein abgebrochenes Verschieben durch erneutes Ausführen fortgesetzt wird; `--delete-source` löscht jede
-Datei aus der Quelle, sobald das Ziel sie hält. Beide brauchen `database:read`, und
+Datei aus der Quelle, sobald das Ziel sie hält, und wird verweigert, wenn die beiden
+Quellen im selben Bucket oder Verzeichnis speichern. Nach dem Verschieben
+listet die CLI die Quelle erneut mit einem frischen Durchlauf auf und nennt jede Datei, die das Verschieben nicht
+verschoben hat: mit `--delete-source` jede Datei, die noch in der Quelle liegt; ohne es jede Datei,
+von der das Ziel keine Kopie derselben Größe hält. Sie endet mit Exit-Code 1, wenn es eine gibt, und
+dasselbe Verschieben erneut auszuführen holt sie nach. `--json` gibt sie als `notMoved` aus. Beide brauchen `database:read`, und
 Löschen oder Verschieben `database:write`, was der Service-Key hält.
 
 ### `rebase skills install`

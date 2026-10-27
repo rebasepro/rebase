@@ -1,5 +1,5 @@
 ---
-sourceHash: c35ed2ce1194af56
+sourceHash: fe474014627c7510
 title: Autenticación e inicio de sesión
 sidebar_label: Autenticación e inicio de sesión
 description: Configura el controlador de autenticación, la vista de inicio de sesión y la simulación de roles en tu frontend React de Rebase.
@@ -35,7 +35,7 @@ authController.signOut()      // Log out
 authController.getAuthToken() // Get current JWT for API calls
 ```
 
-Pasa el `authController` al controlador de navegación de Rebase para proteger todo el panel de administración tras la autenticación.
+Pasa el `authController` a `<Rebase authController>`. `<RebaseShell>` (o `<RebaseAuthGate>` en un layout manual) lo lee de ahí y protege todo el panel de administración tras la autenticación.
 
 ## Tu propio proveedor de autenticación
 
@@ -113,18 +113,49 @@ Para agregar o eliminar opciones de roles, actualiza el mapa `enum` en tu colecc
 
 Un rol de esta lista es un nombre con el que pueden coincidir tus [reglas de seguridad](/docs/collections/security-rules). Lo que puede hacer más allá de sus filas (gestionar usuarios, leer registros, cambiar el esquema) se declara por separado, bajo `auth.roles` en la misma colección. `admin` está integrado y lo tiene todo. Consulta [Roles y alcances](/docs/backend/roles-and-scopes).
 
-## Simulación de roles (modo de desarrollo)
+## Probar el acceso: Simulate access
 
-En el modo de desarrollo, puedes simular diferentes roles sin cerrar sesión. Esto resulta útil para probar políticas RLS:
+Para comprobar qué puede leer un rol, un usuario o una clave de servicio, un administrador usa
+**Simulate access**, la píldora sobre tu avatar en el cajón lateral del panel de administración (en
+la barra de la aplicación en una pantalla pequeña, o cuando el shell no tiene cajón). Elige un rol
+(con un id de usuario opcional, que no tiene por qué ser una cuenta), un usuario o una clave de
+servicio activa.
+Cada vista de datos, y la pestaña History de un registro, lee entonces a través del servidor como
+esa identidad, contra las políticas reales de seguridad a nivel de fila: una cuadrícula muestra
+exactamente las filas que puede leer,
+los campos que sus roles no pueden leer aparecen enmascarados, y el banner cuenta las colecciones
+en las que no ve nada. El servidor comprueba en cada solicitud que eres
+administrador.
+
+El acceso simulado es de solo lectura. Mientras está activo, las vistas no ofrecen crear, editar,
+borrar ni revertir el historial, y el servidor rechaza cualquier escritura que lleve una simulación con
+`403 SIMULATION_READ_ONLY`, así que nada se guarda como otra persona. Deja de simular
+para hacer cambios.
+
+Lo que no simula: la barrera `requireAuth` de la API de datos, que deja pasar a un llamante anónimo
+simulado para que veas lo que las políticas de las filas le dan
+(una función personalizada lo ve como sin sesión, igual que a un llamante anónimo real);
+el almacenamiento, cuyos archivos se leen como tú, con las subidas desactivadas mientras se simula; y
+las actualizaciones en vivo, que se pausan hasta que dejas de simular.
+
+Lo mismo desde código, en el SDK, es `client.simulate()`. Deriva un
+cliente cuyas solicitudes llevan la simulación, y solo la sesión propia de un administrador
+puede usarlo:
 
 ```typescript
-import { useBuildEffectiveRoleController } from "@rebasepro/app";
-
-const effectiveRoleController = useBuildEffectiveRoleController();
-
-// When active, the UI behaves as if the current user has this role
-effectiveRoleController.setEffectiveRole("editor");
+const asCustomer = client.simulate({ role: "customer", userId: "u_1" });
+const { data } = await asCustomer.data.collection("tickets").find();
+asCustomer.close();
 ```
+
+El cliente derivado está tipado por el mismo `Database` que aquel del que viene, y
+es un cliente por derecho propio: ciérralo con `close()` cuando termines.
+
+El selector de rol efectivo no es un probador de RLS: solo cambia qué vistas de Studio
+lista la navegación, no envía nada al servidor y no evalúa ninguna
+política. `useBuildEffectiveRoleController`, que construía uno, está obsoleto y
+avisa una vez cuando se llama: `<Rebase>` construye su propio controlador cuando no se
+le pasa ninguno, y Simulate access es la forma de probar lo que puede hacer un rol.
 
 ## Próximos pasos
 

@@ -271,6 +271,30 @@ export class HistoryService {
     }
 
     /**
+     * Every entry's `values` and `previous_values`, of every row, a page at a
+     * time in id order — for a whole-store sweep. `rebase storage orphans`
+     * reads it because a history revert restores the values an entry holds,
+     * so a file only an entry names is still in use.
+     */
+    async *scanStoredValues(pageSize = 1000): AsyncGenerator<unknown[]> {
+        const limit = Math.max(1, pageSize);
+        let after: string | undefined;
+        for (;;) {
+            const result = await this.db.execute(sql`
+                SELECT id, "values", previous_values
+                FROM rebase.entity_history
+                ${after === undefined ? sql`` : sql`WHERE id > ${after}`}
+                ORDER BY id
+                LIMIT ${limit}
+            `);
+            const rows = sqlRows<{ id: string; values: unknown; previous_values: unknown }>(result);
+            if (rows.length > 0) yield rows.map(row => [row.values, row.previous_values]);
+            if (rows.length < limit) return;
+            after = rows[rows.length - 1].id;
+        }
+    }
+
+    /**
      * Each entry's `format`. A table without the column holds only entries
      * that store the whole previous row, which is what `1` says.
      */

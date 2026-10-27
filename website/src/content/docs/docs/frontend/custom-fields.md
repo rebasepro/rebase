@@ -46,7 +46,7 @@ function ColorPickerField({ value, setValue, error, showError }: FieldProps<Stri
 | `property` | `Property` | The property configuration |
 | `context` | `FormContext` | Full form context with all entity values |
 | `disabled` | `boolean` | Field is readonly |
-| `minimalistView` | `boolean` | Rendering inside the spreadsheet (compact mode) |
+| `minimalistView` | `boolean` | Rendering in the table's popup cell editor (compact mode) |
 
 ## Registering a Custom Field
 
@@ -144,12 +144,12 @@ function PriceWithTaxField({ value, setValue, context }: FieldProps<NumberProper
 
 ## Table Mode
 
-When rendering inside the spreadsheet view, fields should be compact. Check `minimalistView`:
+A custom field is not drawn inside a table cell: the cell shows the value (or your `Preview`), and editing it opens the field in a popup with `minimalistView` set. Keep it compact there:
 
 ```tsx
 function MyField({ value, setValue, minimalistView }: FieldProps<StringProperty>) {
     if (minimalistView) {
-        return <span onClick={() => { /* open editor */ }}>{value}</span>;
+        return <input value={value ?? ""} onChange={(e) => setValue(e.target.value)}/>;
     }
 
     return (

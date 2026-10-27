@@ -1,5 +1,5 @@
 ---
-sourceHash: 7368bcbe77416455
+sourceHash: 8710aaf2fefe9cfe
 title: Auto-hospedagem
 sidebar_label: Auto-hospedagem
 description: Execute o Rebase em qualquer lugar com a imagem oficial de runtime e o bundle do seu projeto — Docker Compose, Fly, Railway ou uma VPS simples.
@@ -44,8 +44,8 @@ isso ocorre porque cada um foi escrito para o seu próprio gerador: este lê
 grava no seu `.env`.
 
 ```bash
-rebase build                    # produz ./dist-bundle
-./infra/docker/quickstart.sh    # grava infra/docker/.env se ausente e depois o inicializa
+rebase build                    # produces ./dist-bundle
+./infra/docker/quickstart.sh    # writes infra/docker/.env if absent, then brings it up
 ```
 
 O `quickstart.sh` é um comando único que faz duas coisas óbvias e imprime ambas. A
@@ -96,10 +96,11 @@ Três segredos, uma definição e a conta com a qual você faz login:
   uma única vez, enquanto a tabela de usuários estiver vazia, e não faz nada em todas as inicializações
   subsequentes.
 
-Cada um dos três segredos deve ter pelo menos 32 caracteres, e a senha de admin,
-pelo menos 12. Use um endereço com ponto em seu domínio: `POST /auth/login` valida
-seu corpo com `z.string().email()`, portanto `admin@localhost` inicializaria uma conta
-e depois recusaria qualquer tentativa de usá-la. O arquivo compose declara todos os seis com
+`JWT_SECRET` e `REBASE_SERVICE_KEY` devem ter cada um pelo menos 32 caracteres, e
+a senha de admin, pelo menos 12. Use um endereço com ponto em seu domínio: `POST /auth/login` valida
+seu corpo com `z.string().email()`, portanto o runtime se recusa a criar a conta
+`admin@localhost` — uma conta na qual ninguém conseguiria entrar — e registra o
+motivo em vez disso. O arquivo compose declara todos os seis com
 `${VAR:?…}`, de modo que a ausência de um deles interrompe a stack com uma mensagem indicando-o
 em vez de iniciar algo configurado pela metade — e o autorregistro vem desativado
 (`DISABLE_SELF_REGISTRATION`, padrão `true`), para que nada fique desprotegido.
@@ -164,6 +165,53 @@ assim que o schema estiver configurado, caso o banco de dados não deva ser aces
 `REBASE_MIGRATE_ON_BOOT` aceita apenas `ensure` e `none` — a
 imagem **recusa a inicialização** caso configurada com `push`, pelo motivo explicado acima.
 
+## Quando só o seu processo de mudanças pode alterar o banco de dados
+
+<span class="since-badge" data-since="0.26">A partir da versão 0.26</span>
+
+`REBASE_MIGRATE_ON_BOOT=none` deixa suas coleções em paz. Não deixa o banco de dados em paz: as tabelas próprias do framework (auth, chaves de API, jobs, cron) continuam sendo criadas e mantidas atualizadas a cada boot. Quando o banco de dados só pode mudar por meio de um processo de mudanças revisado, defina `REBASE_PROVISION=false` em cada processo que serve:
+
+| Configuração | Tabelas e políticas das coleções | Tabelas do framework |
+|---|---|---|
+| padrão (`REBASE_MIGRATE_ON_BOOT=ensure`) | criadas e mantidas atualizadas no boot | criadas e mantidas atualizadas |
+| `REBASE_MIGRATE_ON_BOOT=none` | intactas | criadas e mantidas atualizadas |
+| `REBASE_PROVISION=false` | intactas | intactas; o que faltar é nomeado no log |
+
+Com o provisionamento desligado, o runtime não cria nem altera nada: nenhuma tabela, coluna, índice, função, trigger, política, role ou permissão. Isso vale no boot e depois, incluindo as tabelas que um processo que serve criaria no primeiro uso (chaves de idempotência, claims do cron, os contadores compartilhados de rate limit). Em vez disso, ele lê o que existe:
+
+- **Faltam tabelas de auth, ou uma coluna que o auth lê:** o boot é recusado e cada uma é listada.
+- **O role das requisições alcança uma tabela do framework** como `rebase.refresh_tokens` ou `rebase.api_keys`: o boot é recusado e imprime o `REVOKE` a executar. Um boot que provisiona retira esses privilégios sozinho. Com o provisionamento desligado, nada faz isso.
+- **Falta uma tabela opcional** (chaves de API, chaves de idempotência, claims do cron, contadores de rate limit, presença, histórico de métricas): essa funcionalidade fica desligada, e o log diz qual tabela ela precisa.
+
+As linhas continuam mudando, como em qualquer banco de dados: logins, sessões, uso de chaves de API, chaves de idempotência, claims do cron. A primeira conta de administrador (`REBASE_ADMIN_EMAIL`) é criada pela execução de provisionamento, não pelos processos que servem. A [edição de schema ao vivo](/docs/backend/live-schema-editing) ainda pode fazer commit de uma mudança como código-fonte, mas se recusa a aplicá-la ao banco de dados.
+
+### A execução de provisionamento
+
+<span class="since-badge" data-since="0.26">A partir da versão 0.26</span>
+
+O schema vem de uma execução que o seu processo de mudanças controla. Use a mesma imagem e o mesmo bundle do servidor, com `REBASE_PROVISION_ONLY=true`, conectado como um role que pode criar no banco de dados. `REBASE_PROVISION_SQL_OUT` guarda cada mudança de schema que a execução fez, como um script SQL:
+
+```bash
+docker run --rm \
+  -e DATABASE_URL="postgres://admin:…@scratch-db:5432/app" \
+  -e JWT_SECRET="…" \
+  -e REBASE_PROVISION_ONLY=true \
+  -e REBASE_PROVISION_SQL_OUT=/out/rebase.sql \
+  -v "$PWD/out:/out" \
+  -v "$PWD/dist-bundle:/bundle" \
+  "rebasepro/server:$REBASE_VERSION"
+```
+
+O script é um registro, não um plano: cada instrução nele foi executada, em ordem, e teve sucesso. Gravado contra um banco de dados vazio, é o schema inteiro de que a versão precisa. Gravado contra uma cópia restaurada da produção, é exatamente a atualização. As linhas que a execução escreveu não estão nele. Revise-o e depois aplique-o ao banco de dados real:
+
+```bash
+psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f out/rebase.sql
+```
+
+Faça isso de novo a cada atualização do Rebase, antes de implantar os processos que servem. Uma versão pode adicionar uma tabela ou uma coluna, e um processo que não pode criá-la a informa como ausente em vez de criá-la.
+
+Um servidor que você mesmo constrói segue a mesma regra: `initializeRebaseBackend` lê `REBASE_PROVISION`, e `createRebaseBackend` aceita [`provision: false`](/docs/backend/custom-server#what-creating-a-backend-may-change-provision).
+
 ## Armazenamento de arquivos
 
 O armazenamento fica **desativado** a menos que um bucket seja configurado, e isso é proposital: a
@@ -172,15 +220,18 @@ arquivos enviados no próximo reinício. Os uploads são recusados com
 `501 STORAGE_NOT_CONFIGURED` até que você configure um.
 
 Para usar um bucket, defina `STORAGE_TYPE=s3` (ou `gcs`) juntamente com seu bucket e credenciais —
-o arquivo compose lista as variáveis comentadas.
+o arquivo compose lista as variáveis comentadas. O `gcs` carrega
+`@google-cloud/storage`, que a imagem oficial não inclui, então nessa imagem
+acesse o Google Cloud Storage pelo seu endpoint compatível com S3
+(`STORAGE_TYPE=s3`, `S3_ENDPOINT=https://storage.googleapis.com`, chaves HMAC).
 
 Para disco local, o que só é apropriado quando o caminho for um volume real que
 persista além da vida útil do contêiner:
 
 ```yaml
       STORAGE_TYPE: local
-      # Cada bucket declarado ganha um diretório ao lado deste, bucket("media")
-      # /storage/uploads__media, portanto o volume vai no diretório pai deles.
+      # Each declared bucket gets a directory beside this one, bucket("media")
+      # /storage/uploads__media, so the volume goes on their parent.
       STORAGE_PATH: /storage/uploads
       FORCE_LOCAL_STORAGE: "true"
     volumes:
@@ -245,7 +296,7 @@ contêineres funcionará. Dois pontos que devem ser configurados corretamente em
 
 ```toml
 [build]
-  image = "rebasepro/server:0.25.1"
+  dockerfile = "Dockerfile"   # FROM rebasepro/server:0.25.1 + COPY dist-bundle /bundle
 
 [http_service]
   internal_port = 8080
@@ -270,7 +321,7 @@ rebase-server /srv/myapp/dist-bundle
 ```
 
 O comando `rebase-server --help` lista as variáveis que ele lê. Sob o systemd — as
-três linhas de admin são recentes e, na versão 0.17.3, a primeira conta a
+duas linhas `REBASE_ADMIN_*` exigem a versão 0.18 ou posterior e, na versão 0.17.3, a primeira conta a
 se registrar torna-se administradora:
 
 ```ini title="/etc/systemd/system/rebase.service"
@@ -326,9 +377,9 @@ postgres://rebase:$POSTGRES_PASSWORD@your-host:6432/rebase
 ```
 
 ```bash
-PGBOUNCER_PORT=6432           # porta no host
-PGBOUNCER_MAX_CLIENT_CONN=500 # conexões de clientes aceitas
-PGBOUNCER_POOL_SIZE=20        # conexões com o servidor usadas para atendê-los
+PGBOUNCER_PORT=6432           # host port
+PGBOUNCER_MAX_CLIENT_CONN=500 # client connections accepted
+PGBOUNCER_POOL_SIZE=20        # server connections used to serve them
 ```
 
 A autenticação dos clientes é gerada a partir de `DATABASE_URL` na inicialização, de modo que a

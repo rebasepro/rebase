@@ -1,6 +1,10 @@
 import { createServer } from "http";
+import type { AddressInfo } from "node:net";
+import { Hono } from "hono";
+import { getRequestListener } from "@hono/node-server";
 import type { RealtimeProvider } from "@rebasepro/types";
 import { createShutdown, installShutdownHandlers } from "../src/init/shutdown";
+import { waitUntil } from "../src/functions/wait-until";
 import { createExpiredTokenSweep } from "../src/auth/expired-token-sweep";
 import { createJobQueue } from "../src/jobs";
 import { CronScheduler } from "../src/cron/cron-scheduler";
@@ -280,6 +284,34 @@ describe("createShutdown", () => {
 
         expect(signal?.aborted).toBe(true);
         expect((await run)?.success).toBe(false);
+    });
+
+    it("waits for waitUntil() work a request still in flight hands over after the signal", async () => {
+        // A function 800ms long that registers a webhook with waitUntil() and
+        // returns. SIGTERM lands 300ms in. The waitUntil drain used to run
+        // before `server.close()` — the step that waits for that request — so
+        // it found nothing pending, and the webhook registered afterwards was
+        // cut off by the pool closing and exit(0), without a warning.
+        let backgroundDone = false;
+        const app = new Hono();
+        app.get("/slow", async (c) => {
+            await new Promise(resolve => setTimeout(resolve, 800));
+            waitUntil(c, async () => {
+                await new Promise(resolve => setTimeout(resolve, 300));
+                backgroundDone = true;
+            });
+            return c.text("ok");
+        });
+        const server = createServer(getRequestListener(app.fetch));
+        await new Promise<void>(resolve => server.listen(0, "127.0.0.1", resolve));
+        const port = (server.address() as AddressInfo).port;
+        const response = fetch(`http://127.0.0.1:${port}/slow`).then(res => res.text());
+        await new Promise(resolve => setTimeout(resolve, 300));
+
+        await createShutdown({ server, realtimeServices: {} })(15_000);
+
+        expect(await response).toBe("ok");
+        expect(backgroundDone).toBe(true);
     });
 
     it("resolves at its timeout even when a teardown step hangs", async () => {

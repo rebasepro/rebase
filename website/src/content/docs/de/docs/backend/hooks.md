@@ -1,5 +1,5 @@
 ---
-sourceHash: b0d41379c997dc49
+sourceHash: 15dd4d33e0af52d5
 title: Globale Backend-Hooks
 sidebar_label: Globale Hooks
 description: Wenden Sie querschnittliche Lifecycle-Callbacks auf Serverebene mithilfe von CollectionCallbacks auf jede Collection an.
@@ -95,13 +95,15 @@ Jeder Callback erhält ein einzelnes Props-Objekt. Gemeinsame Felder:
 | `collection` | `CollectionConfig` | Allen Callbacks |
 | `path` | `string` | Allen Callbacks |
 | `row` | `Record<string, unknown>` | `afterRead`, `beforeDelete`, `afterDelete` |
-| `id` | `string` | `beforeSave` (optional), `afterSave`, `afterSaveError`, `beforeDelete`, `afterDelete` |
+| `id` | `string \| number` | `beforeSave` (optional), `afterSave`, `afterSaveError` (optional), `beforeDelete`, `afterDelete` |
 | `values` | `EntityValues` | `beforeSave`, `afterSave`, `afterSaveError` |
 | `previousValues` | `EntityValues` (optional) | `beforeSave`, `afterSave`, `afterSaveError` |
-| `status` | `"new" \| "existing"` | `beforeSave`, `afterSave`, `afterSaveError` |
+| `status` | `"new" \| "existing" \| "copy"` | `beforeSave`, `afterSave`, `afterSaveError` |
 | `context` | `RebaseCallContext` | Allen Callbacks |
 
-`context.user` enthält den authentifizierten Benutzer (`uid`, `roles` usw.) oder ist bei öffentlichen Anfragen `undefined`.
+`context.user` enthält den authentifizierten Benutzer (`uid`, `roles` usw.). Eine Anfrage ohne Token, wo die API sie zulässt, trägt die anonyme Identität `{ uid: "anonymous", roles: ["anon"] }` statt `undefined`.
+
+<span class="since-badge" data-since="0.26">Seit 0.26</span> `context.credential` nennt den API-Schlüssel, mit dem ein Schreibzugriff erfolgte: `{ kind, id, name }`, wobei `kind` entweder `"personal"` oder `"service"` ist. Ein persönlicher Schlüssel handelt als sein Eigentümer, sodass `context.user` der Eigentümer ist, egal ob er von Hand gespeichert hat oder ein CI-Job mit seinem Schlüssel geschrieben hat; `context.credential` unterscheidet die beiden. Es ist gesetzt bei der Daten-API, dem Realtime-Socket und `/mcp`, und fehlt bei einer Sitzung, dem Service-Schlüssel, Arbeit im Server-Kontext (`rebase.dataAsAdmin`, Crons) und im Browser. Es trägt nie das Secret.
 
 `collection` ist immer vorhanden. Ein globaler Callback wird für jede Collection ausgelöst, ist also
 die einzige Ebene, die unabhängig von einer bestimmten Collection registriert wird – dennoch wird ihm
@@ -155,6 +157,14 @@ zusammen committet oder gar nicht.
 - **`afterSave`, `afterDelete`** — Werden *vor* dem Commit ausgeführt und abgewartet. Ein Fehler (throw) an dieser Stelle rollt die Zeile zurück und antwortet ebenfalls mit **400 `CALLBACK_REJECTED`**, wobei `details.stage` den Hook benennt. Sie halten die Transaktion während ihrer Ausführung offen; ein langsamer Hook blockiert somit Sperren (Locks).
 - **`afterSaveError`** — Wird ausgeführt, wenn das Speichern fehlgeschlagen ist, auf dem Rückweg. Bei einem Request läuft er, nachdem die Transaktion des fehlgeschlagenen Schreibvorgangs zurückgerollt wurde, mit einem `context`, dessen Aufrufe jeweils eine eigene Transaktion sind, sodass ein Job, den er einreiht, um den Fehler zu melden, erhalten bleibt. Ein Fehler (throw) aus ihm wird protokolliert; der Aufrufer erhält den eigenen Fehler des Speichervorgangs.
 
+:::caution[Diese Seite besagte früher das Gegenteil]
+Frühere Versionen besagten, dass `afterSave` und `afterDelete` „nach dem Commit der Transaktion ausgeführt werden“
+und „die HTTP-Antwort nicht blockieren“. Beides war nie der Fall. Code, der
+auf Basis dieser Aussage geschrieben wurde – etwa ein Webhook-Aufruf in `afterSave` –, hielt
+eine Datenbanktransaktion für die Dauer eines HTTP-Roundtrips offen
+und rollte die Zeile jedes Mal zurück, wenn die Gegenstelle nicht erreichbar war.
+:::
+
 ### Wann `afterSaveError` ausgeführt wird
 
 Er meldet einen Speichervorgang, der **auf Datenbankebene oder danach** fehlgeschlagen ist — ab dem INSERT- oder UPDATE-Statement. Ein Speichervorgang, der vor diesem Punkt abgelehnt wurde, hat die Datenbank nie erreicht, daher wird der Hook darüber nicht informiert.
@@ -168,14 +178,6 @@ Er meldet einen Speichervorgang, der **auf Datenbankebene oder danach** fehlgesc
 | | Ein Löschvorgang — dafür gibt es kein Gegenstück |
 
 Bei einem Bulk- oder `_batch`-Schreibvorgang wird er für die Zeile ausgeführt, die fehlgeschlagen ist; die Zeilen davor werden mit dem Batch zurückgerollt und nicht gemeldet.
-
-:::caution[Diese Seite besagte früher das Gegenteil]
-Frühere Versionen besagten, dass `afterSave` und `afterDelete` „nach dem Commit der Transaktion ausgeführt werden“
-und „die HTTP-Antwort nicht blockieren“. Beides war nie der Fall. Code, der
-auf Basis dieser Aussage geschrieben wurde – etwa ein Webhook-Aufruf in `afterSave` –, hielt
-eine Datenbanktransaktion für die Dauer eines HTTP-Roundtrips offen
-und rollte die Zeile jedes Mal zurück, wenn die Gegenstelle nicht erreichbar war.
-:::
 
 ### Seiteneffekte, die die Transaktion nicht blockieren dürfen
 
@@ -286,6 +288,8 @@ const instance = await initializeRebaseBackend({
                 collection: collection.slug,
                 entity_id: String(id),
                 actor: context.user?.uid ?? "anonymous",
+                // The API key, when the delete was made with one.
+                via_key: context.credential?.name ?? null,
                 snapshot: row
             });
         }
@@ -296,6 +300,9 @@ const instance = await initializeRebaseBackend({
 Beachten Sie, was dies bringt und was es kostet: Wenn die Audit-Zeile nicht geschrieben werden kann,
 findet auch die Löschung nicht statt. Für ein Audit-Trail ist das meist genau das, was Sie wollen.
 Wenn dies nicht gewünscht ist, fangen Sie den Fehler im Callback ab und vermerken Sie dies in einem Kommentar.
+
+Die Spalte `via_key` liest `context.credential`, das neu ist: <span class="since-badge" data-since="0.26">Seit 0.26</span> Lassen Sie sie
+bei einer früheren Version weg.
 
 ### Collection-spezifische Logik
 

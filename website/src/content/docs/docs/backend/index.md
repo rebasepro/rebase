@@ -77,6 +77,7 @@ Both paths reach the same `RebaseBackendConfig`. This is the whole map.
 | `basePath` | `REBASE_BASE_PATH` (default `/api`) |
 | `collections`, `collectionsDir` | the `config/collections/` directory, declared by `rebase.json` |
 | `functions`, `functionsDir` | `backend/functions/` |
+| `functionsTimeoutMs` | `REBASE_FUNCTIONS_TIMEOUT_MS` |
 | `crons`, `cronsDir` | `backend/crons/` |
 | `bootstrappers`, `database` | `DATABASE_URL`, plus a `database("<key>")` declaration in `config/resources.ts` for every database beyond the default |
 | `auth` | `JWT_SECRET`, the `OAUTH_*` variables, and `config/collections/users` |
@@ -85,12 +86,15 @@ Both paths reach the same `RebaseBackendConfig`. This is the whole map.
 | `storagePublicRead` | `STORAGE_PUBLIC_READ` |
 | `storageRenditionCache` | `STORAGE_RENDITION_CACHE` |
 | `storageInsecureAllowAnyAuthenticated` | `STORAGE_ALLOW_ANY_AUTHENTICATED` |
+| `storageDownloadTokenTtl` | `STORAGE_DOWNLOAD_TOKEN_TTL` |
 | `callbacks` | `export const callbacks` from `config/index.ts` |
 | `history` | `REBASE_HISTORY` (on by default) — the boolean form only |
 | `enableSwagger` | `REBASE_ENABLE_SWAGGER`; unset means on outside production |
 | `compression` | `REBASE_COMPRESSION` |
 | `maxBodySize` | `REBASE_MAX_BODY_SIZE` |
 | `logging` | `LOG_LEVEL` |
+| `liveSchema` | `REBASE_LIVE_SCHEMA_REPOSITORY` and its `REBASE_LIVE_SCHEMA_*` credentials — the repository form only |
+| `rlsAudit` | `REBASE_RLS_AUDIT` |
 | `provisionSchema`, `surfaces`, `ownership`, `functionsSelection`, `functionsUpstream` | `REBASE_ROLE` — see [Split Processes](/docs/deployment/split-processes/) |
 | `corsHandled` | CORS is installed by the runtime from `CORS_ORIGINS` |
 | `schemaVersion`, `runtimeVersion` | the build stamps both into the bundle |
@@ -102,8 +106,8 @@ These have no environment variable and no config export. They are reachable
 only from a hand-written `initializeRebaseBackend` call — `rebase eject`, or a
 [custom server](/docs/backend/custom-server/):
 
-`rateLimit` · `jobs` · `csrf` · `cronPersistence` · `functionsTimeoutMs` ·
-`storagePolicies` · `storageTriggers` · `baas` · `liveSchema` · `rlsAudit` ·
+`rateLimit` · `jobs` · `csrf` · `cronPersistence` ·
+`storagePolicies` · `storageTriggers` · `baas` ·
 `history` in its object form (`{ retention }`)
 
 `schemaEditor` is forced off in a built bundle: the editor rewrites collection
@@ -120,8 +124,8 @@ After initialization, these routes are mounted:
 | `/api/storage/*` | File upload, download, and deletion |
 | `/api/data/:slug` | CRUD operations per collection (GET, POST, PATCH, DELETE) |
 | `/api/data/:slug/:id/history` | Entity change history (when enabled) |
-| `/api/docs` | OpenAPI spec (when `enableSwagger: true`) |
-| `/api/swagger` | Swagger UI (dev mode, when `enableSwagger: true`) |
+| `/api/docs` | OpenAPI spec (public unless `enableSwagger: false`, which puts it behind `schema:read`) |
+| `/api/swagger` | Swagger UI (outside production only) |
 | `/api/meta/contract` | The project's collection schema (needs `schema:read`) |
 | `/api/meta/schema-version` | A version string for that schema (unauthenticated) |
 | `/api/functions/*` | Custom function routes (when `functions` or `functionsDir` is set) |
@@ -138,13 +142,13 @@ When you invoke `initializeRebaseBackend()`, the framework triggers a sequential
 [Start Boot]
      │
      ▼
-1. ENV validation (Zod parsing of jwt, databases, cors)
+1. Configuration (the database adapter, the auth and storage options you passed)
      │
      ▼
-2. Dynamic Collection Loading (Chokidar watches .ts files, AST parsing)
+2. Collection Loading (imports each file in collectionsDir, strict-validates every collection)
      │
      ▼
-3. Database Bootstrapping (Acquires advisory lock, creates schemas/auth/helper SQL functions)
+3. Database Bootstrapping (creates schemas/auth/helper SQL functions, as `provision` allows)
      │
      ▼
 4. Service Initialization (Auth, Storage S3/Local client instances, Cron store seeding)
@@ -191,7 +195,12 @@ into a restart loop.
 `/health` is unauthenticated, so it publishes the verdict and not the reason —
 outside development it names which data source is degraded and nothing else. The
 driver's error text quotes the host, port, database name and role, and that goes
-to the logs. Both paths are also served under `basePath` (`/api/health`).
+to the logs. `/health` is also served under `basePath` (`/api/health`);
+`/livez` is not.
+
+Both probes are the managed runtime's. An ejected `backend/src/index.ts` serves
+`/health` and `/api/health` itself, probing the default database only, and has
+no `/livez` until you add one.
 
 ---
 

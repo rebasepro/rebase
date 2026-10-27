@@ -150,8 +150,23 @@ url: "https://p.rebase.website" };
 
 describe("probeOnce", () => {
     it("probes a backend's health route, not its API root", () => {
-        expect(probeUrl(backend)).toBe("https://p.rebase.website/api/health");
+        // The bare `/health`: every rebase-server registers it whatever its
+        // REBASE_BASE_PATH, and the platform routes it to the backend ahead of
+        // any static app.
+        expect(probeUrl(backend)).toBe("https://p.rebase.website/health");
         expect(probeUrl(site)).toBe("https://p.rebase.website");
+    });
+
+    it("finds a backend live when its API is not under /api", async () => {
+        // REBASE_BASE_PATH=/v1 with a site folded in: `/api/health` is the
+        // site's index.html, and the deploy used to be reported as not live.
+        const { impl } = fakeFetch((url) => url.endsWith("/api/health") ? html(200) : json({ status: "ok" }));
+        await expect(probeOnce(backend, "d1", impl)).resolves.toMatchObject({ live: true, url: "https://p.rebase.website/health" });
+    });
+
+    it("still reads `/api/health` from a server that has only that", async () => {
+        const { impl } = fakeFetch((url) => url.endsWith("/api/health") ? json({ status: "ok" }) : html(404));
+        await expect(probeOnce(backend, "d1", impl)).resolves.toMatchObject({ live: true, url: "https://p.rebase.website/api/health" });
     });
 
     it("calls a backend live on 200 {status: ok}", async () => {
@@ -224,7 +239,9 @@ fetchImpl: impl,
         expect(result.map(r => [r.app, r.live])).toEqual([["game", true], ["backend", true]]);
         // The site was live on the first round and is not asked again.
         expect(calls.get("https://p.rebase.website")).toBe(1);
-        expect(calls.get("https://p.rebase.website/api/health")).toBe(3);
+        expect(calls.get("https://p.rebase.website/health")).toBe(3);
+        // A backend that answered "degraded" has answered: not asked again elsewhere.
+        expect(calls.get("https://p.rebase.website/api/health")).toBeUndefined();
     });
 
     it("gives up at the timeout with the last reason", async () => {

@@ -56,6 +56,36 @@ export interface OrphanReport {
     unscanned: { collection: string; reason: string }[];
 }
 
+/** An orphan scan's record, as `GET /admin/storage/orphans/scans/:id` answers it. */
+interface OrphanScanState {
+    id: string;
+    storageId: string;
+    runner: "worker" | "in-process";
+    status: "queued" | "running" | "completed" | "failed";
+    progress: {
+        phase: string;
+        filesScanned: number;
+        rowsScanned: number;
+        historyEntriesScanned: number;
+        collectionsScanned: number;
+        collectionsTotal: number;
+        unscanned: { collection: string; reason: string }[];
+    };
+    result?: Omit<OrphanReport, "storageId">;
+    error?: string;
+    note?: string;
+    deletion?: {
+        status: "queued" | "running" | "completed" | "failed";
+        progress: OrphanScanState["progress"] & { candidates: number; deleted: number };
+        result?: { deleted: string[]; kept: { key: string; reason: string }[]; failed: { key: string; error: string }[] };
+        error?: string;
+        note?: string;
+    };
+}
+
+/** How often a running scan is asked about. A setting so the tests need not wait. */
+export const orphanScanPolling = { intervalMs: 1_000 };
+
 interface MovedObject {
     key: string;
     outcome: "copied" | "exists" | "failed";
@@ -174,6 +204,136 @@ async function confirm(question: string): Promise<boolean> {
     }
 }
 
+const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
+/** Whether an error is a backend without the route asked for, as opposed to a source it does not serve. */
+const isMissingRoute = (error: unknown) => error instanceof RebaseApiError && error.status === 404
+    && error.code !== "UNKNOWN_STORAGE_SOURCE" && error.code !== "STORAGE_SCAN_NOT_FOUND";
+
+/** One line of a running scan's progress, rewritten in place on a terminal. */
+function progressLine(text: string, quiet: boolean): void {
+    if (!quiet && process.stdout.isTTY) process.stdout.write(`\r\x1b[2K  ${text}`);
+}
+
+function endProgressLine(quiet: boolean): void {
+    if (!quiet && process.stdout.isTTY) process.stdout.write("\n");
+}
+
+/** Ask for a scan's record until `done` says so, printing its progress. */
+async function pollScan(
+    backend: Backend,
+    id: string,
+    sourceQuery: string,
+    done: (state: OrphanScanState) => boolean,
+    describe: (state: OrphanScanState) => string,
+    quiet: boolean
+): Promise<OrphanScanState> {
+    let noted = false;
+    for (;;) {
+        let state: OrphanScanState;
+        try {
+            state = await backend.request<OrphanScanState>("GET", `/orphans/scans/${encodeURIComponent(id)}${sourceQuery}`);
+        } catch (error: unknown) {
+            endProgressLine(quiet);
+            fail("Failed to read the scan's progress", error, backend.baseUrl);
+        }
+        if (done(state)) {
+            endProgressLine(quiet);
+            return state;
+        }
+        progressLine(describe(state), quiet);
+        const note = state.note ?? state.deletion?.note;
+        if (note && !noted && !quiet) {
+            noted = true;
+            endProgressLine(quiet);
+            console.log(chalk.yellow(`  ${note}`));
+        }
+        await sleep(orphanScanPolling.intervalMs);
+    }
+}
+
+/**
+ * Scan for orphans: started on the backend and asked about until it is done,
+ * so a scan longer than any request timeout still finishes. A backend from
+ * before scans ran in the background is asked the old way, in one request.
+ */
+async function scanForOrphans(
+    backend: Backend,
+    query: URLSearchParams,
+    sourceQuery: string,
+    quiet: boolean
+): Promise<{ report: OrphanReport; scanId?: string }> {
+    let started: OrphanScanState;
+    try {
+        started = await backend.request<OrphanScanState>("POST", `/orphans/scans?${query}`);
+    } catch (error: unknown) {
+        if (!isMissingRoute(error)) fail("Failed to start a storage scan", error, backend.baseUrl);
+        try {
+            return { report: await backend.request<OrphanReport>("GET", `/orphans?${query}`) };
+        } catch (legacyError: unknown) {
+            fail("Failed to scan storage", legacyError, backend.baseUrl);
+        }
+    }
+    if (!quiet && started.runner === "in-process") {
+        console.log(chalk.gray("  This backend runs no job queue, so the scan runs inside the server process, in the background. A restart of that process stops it."));
+    }
+    const finished = await pollScan(
+        backend,
+        started.id,
+        sourceQuery,
+        state => state.status === "completed" || state.status === "failed",
+        state => state.status === "queued"
+            ? "Waiting for the scan to start…"
+            : `Scanning "${state.storageId}": ${state.progress.filesScanned} file(s) listed, ${state.progress.rowsScanned} row(s) read, ` +
+              `${state.progress.collectionsScanned}/${state.progress.collectionsTotal} collection(s)` +
+              (state.progress.unscanned.length > 0 ? `, ${state.progress.unscanned.length} unreadable` : "") + "…",
+        quiet
+    );
+    if (finished.status === "failed" || !finished.result) {
+        console.error(chalk.red(`✗ The scan failed: ${finished.error ?? "no reason was recorded"}`));
+        process.exit(1);
+    }
+    return { report: { storageId: finished.storageId, ...finished.result }, scanId: finished.id };
+}
+
+/** Delete a completed scan's orphans, in the background, and wait for it. */
+async function deleteFromScan(
+    backend: Backend,
+    scanId: string,
+    sourceQuery: string,
+    quiet: boolean
+): Promise<{ deleted: string[]; failed: { key: string; error: string }[]; kept: { key: string; reason: string }[]; error?: string }> {
+    const deleteQuery = new URLSearchParams(sourceQuery.replace(/^\?/, ""));
+    deleteQuery.set("scan", scanId);
+    try {
+        await backend.request("DELETE", `/orphans?${deleteQuery}`);
+    } catch (error: unknown) {
+        fail("Failed to delete unused files", error, backend.baseUrl);
+    }
+    const finished = await pollScan(
+        backend,
+        scanId,
+        sourceQuery,
+        state => state.deletion?.status === "completed" || state.deletion?.status === "failed",
+        state => {
+            const progress = state.deletion?.progress;
+            if (!progress || state.deletion?.status === "queued") return "Waiting for the delete to start…";
+            return progress.phase === "deleting"
+                ? `Deleting: ${progress.deleted} of ${progress.candidates} file(s)…`
+                : `Checking every row again before deleting: ${progress.rowsScanned} row(s) read, ` +
+                  `${progress.collectionsScanned}/${progress.collectionsTotal} collection(s)…`;
+        },
+        quiet
+    );
+    const deletion = finished.deletion!;
+    return {
+        deleted: deletion.result?.deleted ?? [],
+        failed: deletion.result?.failed ?? [],
+        kept: deletion.result?.kept ?? [],
+        ...(deletion.status === "failed" ? { error: deletion.error ?? "no reason was recorded" } : {})
+    };
+}
+
 async function orphans(rawArgs: string[]): Promise<void> {
     const { flags } = parseCommandArgs({ spec: ORPHANS_FLAGS, rawArgs, commandWords: 2, command: "storage orphans", maxPositionals: 0 });
     const olderThan = flags["--older-than"] ?? 24;
@@ -182,18 +342,15 @@ async function orphans(rawArgs: string[]): Promise<void> {
     }
     const query = new URLSearchParams({ olderThanHours: String(olderThan) });
     if (flags["--source"]) query.set("storageId", flags["--source"]);
+    const sourceQuery = flags["--source"] ? `?${new URLSearchParams({ storageId: flags["--source"] })}` : "";
+    const quiet = flags["--json"] === true;
     const backend = connect();
 
-    let report: OrphanReport;
-    try {
-        report = await backend.request<OrphanReport>("GET", `/orphans?${query}`);
-    } catch (error: unknown) {
-        fail("Failed to scan storage", error, backend.baseUrl);
-    }
+    const { report, scanId } = await scanForOrphans(backend, query, sourceQuery, quiet);
 
     if (!flags["--delete"]) {
         if (flags["--json"]) {
-            console.log(JSON.stringify(report, null, 2));
+            console.log(JSON.stringify({ ...report, ...(scanId ? { scanId } : {}) }, null, 2));
             return;
         }
         console.log("");
@@ -226,22 +383,30 @@ async function orphans(rawArgs: string[]): Promise<void> {
         }
     }
 
-    let result: { deleted: string[]; failed: { key: string; error: string }[] };
-    try {
-        // The server finds them again before it deletes: a file a row has
-        // named since the list was printed is not deleted.
-        result = await backend.request("DELETE", `/orphans?${query}`);
-    } catch (error: unknown) {
-        fail("Failed to delete unused files", error, backend.baseUrl);
+    let result: { deleted: string[]; failed: { key: string; error: string }[]; kept?: { key: string; reason: string }[]; error?: string };
+    if (scanId) {
+        // The server reads every row again against these files, and asks for
+        // each file again right before deleting it: one a row has named since
+        // the list was printed, or that was uploaded again, is kept.
+        result = await deleteFromScan(backend, scanId, sourceQuery, quiet);
+    } else {
+        try {
+            // A backend from before background scans finds them again, inside the request.
+            result = await backend.request("DELETE", `/orphans?${query}`);
+        } catch (error: unknown) {
+            fail("Failed to delete unused files", error, backend.baseUrl);
+        }
     }
     if (flags["--json"]) {
-        console.log(JSON.stringify(result, null, 2));
+        console.log(JSON.stringify({ storageId: report.storageId, ...result, recent: report.recent }, null, 2));
     } else {
+        if (result.error) console.error(chalk.red(`  ✗ ${result.error}`));
         console.log(chalk.green(`  ✓ Deleted ${result.deleted.length} file(s).`));
+        for (const kept of result.kept ?? []) console.log(chalk.yellow(`  Kept ${kept.key}: ${kept.reason}`));
         for (const failure of result.failed) console.error(chalk.red(`  ✗ ${failure.key}: ${failure.error}`));
         console.log("");
     }
-    if (result.failed.length > 0) process.exitCode = 1;
+    if (result.failed.length > 0 || result.error) process.exitCode = 1;
 }
 
 async function move(rawArgs: string[]): Promise<void> {
@@ -279,18 +444,67 @@ async function move(rawArgs: string[]): Promise<void> {
         cursor = page.cursor;
     } while (cursor);
 
+    // The source listed again, by a walk of its own: a move reports what its
+    // walk saw, and a walk that skipped files once reported success over the
+    // half it moved.
+    const verified = await listLeftBehind(backend, {
+        from,
+        to,
+        prefix: flags["--prefix"],
+        deleteSource: flags["--delete-source"] === true
+    }, flags["--json"] === true);
+    const reported = new Set(failures.map(failure => failure.key));
+    const leftBehind = verified?.filter(entry => !reported.has(entry.key)) ?? [];
+
     if (flags["--json"]) {
-        console.log(JSON.stringify({ ...counts, failures }, null, 2));
+        console.log(JSON.stringify({ ...counts, failures, verified: verified !== undefined, notMoved: verified ?? [] }, null, 2));
     } else {
         if (process.stdout.isTTY) process.stdout.write("\n");
         console.log(chalk.green(`  ✓ ${counts.copied} copied, ${counts.exists} already there` +
             `${flags["--delete-source"] ? `, ${counts.deleted} deleted from the source` : ""}.`));
         for (const failure of failures) console.error(chalk.red(`  ✗ ${failure.key}: ${failure.error ?? "failed"}`));
+        if (verified === undefined) {
+            console.log(chalk.gray("  This backend cannot list the source again (it needs a backend newer than 0.25.1), so the CLI did not check for files the move left behind."));
+        } else if (leftBehind.length > 0) {
+            console.error(chalk.red(`  ✗ Listed again, the source holds ${leftBehind.length} more file(s) the move did not report: ${leftBehind.length} file(s) were not moved.`));
+            for (const entry of leftBehind) console.error(chalk.red(`    ${entry.key}: ${entry.reason}`));
+            console.error(chalk.gray("  Run the same move again to pick them up."));
+        }
         if (counts.copied + counts.exists > 0 && !flags["--delete-source"]) {
             console.log(chalk.gray("  The source keeps its copies. Point the property at the new source, then run again with --delete-source."));
         }
     }
-    if (failures.length > 0) process.exitCode = 1;
+    if (failures.length > 0 || leftBehind.length > 0) process.exitCode = 1;
+}
+
+/**
+ * Every file under the moved folder the move did not move, read by the
+ * backend's `/move/verify` — or `undefined` from a backend without it.
+ */
+async function listLeftBehind(
+    backend: Backend,
+    request: { from?: string; to?: string; prefix?: string; deleteSource: boolean },
+    quiet: boolean
+): Promise<{ key: string; reason: string }[] | undefined> {
+    const notMoved: { key: string; reason: string }[] = [];
+    let cursor: string | undefined;
+    let checked = 0;
+    do {
+        let page: { checked: number; notMoved: { key: string; reason: string }[]; cursor?: string };
+        try {
+            page = await backend.request("POST", "/move/verify", { ...request, ...(cursor ? { cursor } : {}), limit: 500 });
+        } catch (error: unknown) {
+            if (error instanceof RebaseApiError && error.status === 404 && error.code !== "UNKNOWN_STORAGE_SOURCE") return undefined;
+            fail("Failed to list the source again after the move", error, backend.baseUrl);
+        }
+        checked += page.checked;
+        notMoved.push(...page.notMoved);
+        if (!quiet && process.stdout.isTTY) {
+            process.stdout.write(`\r  Checking the source again: ${checked} file(s) listed…`);
+        }
+        cursor = page.cursor;
+    } while (cursor);
+    return notMoved;
 }
 
 export async function storageCommand(subcommand: string | undefined, rawArgs: string[]): Promise<void> {
@@ -341,6 +555,11 @@ ${chalk.green.bold("Notes")}
   or source holds it. Files newer than ${chalk.blue("--older-than")} are left out: the admin
   panel uploads a file before the row that names it is saved. Files your own
   tables name, outside collections, are not seen: check before deleting.
+
+  The scan runs on the backend in the background — a ${chalk.blue("storage.orphans")} job
+  on the job queue, or inside the server process when there is none — and the
+  CLI shows its progress until it is done. ${chalk.blue("--delete")} deletes from that scan
+  only; the backend reads every row again and asks for each file again first.
 
   Both read ${chalk.blue("REBASE_SERVICE_KEY")} from .env and need the backend running.
 `);

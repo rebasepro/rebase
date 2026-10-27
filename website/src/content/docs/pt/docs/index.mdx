@@ -1,5 +1,5 @@
 ---
-sourceHash: b2a395fe87b59669
+sourceHash: d26aa741e787a03f
 title: Introdução
 sidebar_label: Introdução
 description: O Rebase é o backend de código aberto para Postgres, com um painel de administração para a sua equipe, construído com React e TypeScript. Defina seu esquema em TypeScript e o Rebase gera uma interface CRUD completa, API REST, autenticação, armazenamento e sincronização em tempo real — desenvolvido sobre o PostgreSQL.
@@ -15,7 +15,7 @@ O Rebase é o **backend de código aberto para PostgreSQL**, com um **painel de 
 
 - **Schema as Code** — Defina seus modelos de dados como coleções em TypeScript. O Rebase gera tabelas PostgreSQL, uma interface CRUD completa, endpoints de API REST e um SDK tipado a partir de uma única fonte da verdade.
 - **Painel de administração instantâneo** — Um painel elegante e rápido baseado em React com tabelas estilo planilha, listas, formulários, quadros Kanban, edição inline e sincronização em tempo real.
-- **Backend integrado** — Autenticação (senhas, magic links, códigos únicos, MFA, chaves de API e doze provedores OAuth/OIDC), armazenamento de arquivos (local ou S3), Row Level Security, histórico de entidades e tempo real via WebSocket — tudo integrado.
+- **Backend integrado** — Autenticação (senhas, magic links, códigos únicos, MFA, chaves de API e doze provedores OAuth/OIDC), armazenamento de arquivos (local, S3 ou GCS), Row Level Security, histórico de entidades e tempo real via WebSocket — tudo integrado.
 - **Radicalmente extensível** — Se você consegue criar em React, você pode adicionar ao Rebase. Campos personalizados, visualizações personalizadas, plugins e acesso completo aos hooks internos.
 
 :::tip
@@ -90,7 +90,7 @@ Para usar seu próprio Postgres em vez disso, descomente `DATABASE_URL` no `.env
 | **Relações** | Um-para-um, um-para-muitos, muitos-para-muitos com tabelas de junção e junções multi-hop |
 | **Row Level Security** | Políticas de RLS no estilo Supabase definidas na configuração da sua coleção |
 | **Autenticação** | JWT + tokens de atualização (refresh tokens), doze provedores OAuth/OIDC, magic links, códigos únicos, MFA via TOTP, chaves de API com escopo, controle de acesso baseado em funções (RBAC) |
-| **Armazenamento de arquivos** | Sistema de arquivos local ou compatível com S3 com campos de upload e gerenciador integrado |
+| **Armazenamento de arquivos** | Sistema de arquivos local, compatível com S3 ou Google Cloud Storage, com campos de upload e gerenciador integrado |
 | **Sincronização em tempo real** | Atualizações em tempo real via WebSocket entre todos os clientes conectados |
 | **Histórico de entidades** | Trilha de auditoria completa para cada criação, atualização e exclusão |
 | **API REST** | Endpoints CRUD gerados automaticamente para cada coleção |

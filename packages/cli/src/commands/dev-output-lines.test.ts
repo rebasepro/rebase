@@ -10,7 +10,7 @@
 import { PassThrough } from "stream";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { forEachOutputLine } from "./dev";
+import { collectionChangeSummary, forEachOutputLine } from "./dev";
 
 function collect(idleFlushMs?: number) {
     const stream = new PassThrough();
@@ -70,5 +70,25 @@ describe("forEachOutputLine", () => {
         stream.write("…\n");
         await vi.advanceTimersByTimeAsync(0);
         expect(lines).toEqual(["Waiting for the database", "…"]);
+    });
+});
+
+describe("collectionChangeSummary: what dev says after a collection edit", () => {
+    // eslint-disable-next-line no-control-regex
+    const plain = (lines: string[]) => lines.join("\n").replace(/\u001b\[[0-9;]*m/g, "");
+
+    it("says regenerated only when both halves were", () => {
+        expect(plain(collectionChangeSummary("generated", "generated"))).toContain("✓ Schema and SDK types regenerated");
+    });
+
+    it("never prints the success line after a failed regeneration, and names what failed", () => {
+        const schemaFailed = plain(collectionChangeSummary("failed", "generated"));
+        expect(schemaFailed).not.toContain("regenerated.");
+        expect(schemaFailed).not.toContain("✓");
+        expect(schemaFailed).toContain("Not regenerated: the database schema");
+
+        const both = plain(collectionChangeSummary("failed", "failed"));
+        expect(both).toContain("the database schema and the SDK types");
+        expect(plain(collectionChangeSummary("generated", "failed"))).toContain("Not regenerated: the SDK types");
     });
 });

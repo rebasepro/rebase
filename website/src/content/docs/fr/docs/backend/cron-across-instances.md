@@ -70,11 +70,11 @@ dans Studio reste en pause.
 par `rebase dev` ; voir l'[API REST](/docs/backend/cron-jobs-api/).
 
 ```bash
-# Mettre en pause, pour tous les processus, jusqu'à ce que quelqu'un la reprenne
+# Pause, for every process, until someone resumes it
 curl -X PUT -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
     -d '{ "enabled": false }' "$API_URL/api/admin/cron/health-check"
 
-# Ne plus surcharger : suivre de nouveau le `enabled` que déclare le fichier de la tâche
+# Stop overriding: follow the `enabled` the job's file declares again
 curl -X PUT -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
     -d '{ "enabled": null }' "$API_URL/api/admin/cron/health-check"
 ```

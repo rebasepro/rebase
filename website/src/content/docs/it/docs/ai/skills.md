@@ -1,11 +1,11 @@
 ---
-sourceHash: 372e9392b24d3148
+sourceHash: eaecd9a09c46ba94
 title: Agent Skills
 sidebar_label: Agent Skills
-description: rebase skills install scrive 21 skill di riferimento di Rebase nel tuo repository, nel layout previsto dal tuo assistente IA — Cursor, Claude Code, Windsurf, Gemini CLI e Antigravity.
+description: rebase skills install scrive 23 skill di riferimento di Rebase nel tuo repository, nel layout previsto dal tuo assistente IA — Cursor, Claude Code, Windsurf, Gemini CLI e Antigravity.
 ---
 
-Un assistente IA che ha letto la documentazione di Rebase scrive codice Rebase migliore rispetto a uno che cerca di indovinare dalla struttura delle API. `rebase skills install` copia 21 file di skill Markdown nel tuo repository, nel layout previsto dal tuo assistente:
+Un assistente IA che ha letto la documentazione di Rebase scrive codice Rebase migliore rispetto a uno che cerca di indovinare dalla struttura delle API. `rebase skills install` copia 23 file di skill Markdown nel tuo repository, nel layout previsto dal tuo assistente:
 
 ```bash
 rebase skills install
@@ -114,7 +114,7 @@ Le istruzioni specifiche del progetto vanno comunque in [`ai-instructions.md`](/
 
 Il comando funziona anche al di fuori di un progetto Rebase, ripiegando sulla directory di lavoro corrente — utile per un repository frontend separato che comunica con un backend Rebase.
 
-## Le 21 skill
+## Le 23 skill
 
 | Skill | Argomenti trattati |
 |---|---|
@@ -133,6 +133,8 @@ Il comando funziona anche al di fuori di un progetto Rebase, ripiegando sulla di
 | `rebase-email` | SMTP, template, provider personalizzati, il singleton `rebase.email` |
 | `rebase-entity-history` | Controllo delle versioni delle entità, tracciamento delle modifiche, log di audit, ripristino |
 | `rebase-admin` | Navigazione nel pannello di amministrazione, drawer laterali, URL, incorporamento di pannelli di collection |
+| `rebase-customize-admin` | Personalizzazione dell'admin con componenti React — singleton, pagine delle impostazioni, azioni in blocco, modalità di visualizzazione, campi personalizzati, sostituzione di parti integrate |
+| `rebase-custom-views` | Schermate personalizzate nell'admin — `rebase generate view`, viste di primo livello, schede dei record, widget dei campi |
 | `rebase-ui-components` | La libreria di componenti `@rebasepro/ui` |
 | `rebase-design-language` | Il design system dell'interfaccia utente: token, colori, tipografia, spaziatura, anti-pattern |
 | `rebase-studio` | Il livello degli strumenti di sviluppo Studio — SQL, RLS, storage, cron, visualizzatore di schemi, log |
@@ -145,9 +147,9 @@ Due di queste richiedono di essere lette spontaneamente. `rebase-basics` specifi
 ## Esempio di esecuzione
 
 ```text
-  Found 21 Rebase skills
+  Found 23 Rebase skills
 
-  ✓ Claude Code — 21 skills installed (+ 8 reference files) to .claude/skills
+  ✓ Claude Code — 23 skills installed (+ 8 reference files) to .claude/skills
 ```
 
 Le skill sono distribuite dal pacchetto `@rebasepro/agent-skills`, da cui dipende la CLI, quindi il set ottenuto corrisponde alla versione della CLI installata.

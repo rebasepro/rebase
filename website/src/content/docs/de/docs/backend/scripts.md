@@ -1,5 +1,5 @@
 ---
-sourceHash: d0d64eef975c9c59
+sourceHash: 21c1631250b71da2
 title: Skripte und die Konsole
 sidebar_label: Skripte und Konsole
 description: Öffnen Sie die Daten eines Projekts aus einem Skript, einem Test oder einer REPL mit openRebase oder über das Terminal mit rebase console. Kein Server, keine Schemaänderungen.
@@ -52,7 +52,9 @@ Zwei Namen sind im Geltungsbereich, und `await` auf oberster Ebene funktioniert:
 | `collections` | Die Collections des Projekts, geladen so, wie `rebase db push` sie lädt |
 
 Die Konsole öffnet das Projekt so, wie es `rebase db push` tut: dieselbe `.env`,
-dieselbe Datenbank und dieselben Collections. Bei einem Projekt auf der verwalteten
+dieselbe Datenbank und dieselben Collections. Sie lädt außerdem die globalen
+`callbacks` aus `config/index.ts`, sodass ihre Schreibvorgänge dieselben Hooks
+ausführen wie ein Server-Schreibvorgang. Bei einem Projekt auf der verwalteten
 Entwicklungsdatenbank wird diese zuerst gestartet. Der Verlauf dessen, was Sie eingegeben haben,
 wird in `.rebase/console_history` gespeichert, das das `.gitignore` des Scaffolds bereits
 ausschließt.
@@ -131,7 +133,7 @@ DATABASE_URL="$(pnpm exec rebase db url)" pnpm exec tsx scripts/publish-drafts.t
 | Member | Was es bewirkt |
 |---|---|
 | `dataAsAdmin` | Jede Collection, gelesen und geschrieben als Service-Identität des Servers (`{ uid: "service", roles: ["admin"] }`): Admin, und dennoch von Ihren RLS-Policies ausgewertet, genau wie `rebase.dataAsAdmin` in einer Funktion |
-| `sql(query, { params })` | Rohes SQL auf der Owner-Verbindung, mit derselben Aufrufkonvention wie `rebase.sql` in einer Funktion |
+| `sql(query, { params })` | Rohes SQL auf der Owner-Verbindung, mit derselben Aufrufkonvention wie `rebase.sql` in einer Funktion. Es läuft auf der einen geöffneten Datenquelle: `{ database }` mit einem anderen Namen wird abgelehnt |
 | `withAuth(user)` | Löst zu `{ data }` auf: die Collections, wie dieser Benutzer sie sieht. Jedes Lesen und Schreiben läuft als er, gefiltert durch Row-Level-Security, so wie eine HTTP-Anfrage dieses Benutzers |
 | `collections` | Die Collections, mit denen es geöffnet wurde |
 | `close()` | Beendet den Connection-Pool, den `openRebase` erstellt hat. Kann gefahrlos zweimal aufgerufen werden |
@@ -145,6 +147,7 @@ Seine Optionen:
 | `collections` | Die Collections des Projekts. Ein leeres Array liest sie stattdessen aus der Datenbank, wie es ein Server ohne Collection-Dateien tut, und stellt sie schreibgeschützt bereit |
 | `pool` | Pool-Einstellungen, zusammen mit `databaseUrl` |
 | `dataSourceKey` | Die Datenquelle, aus der diese Collections bereitgestellt werden. Standard `(default)` |
+| `callbacks` | Die globalen Callbacks des Projekts, die `callbacks`, die Ihre `config/index.ts` exportiert. Der Server führt sie vor den eigenen Hooks jeder Collection aus; übergeben Sie sie hier, und ein Skript-Schreibvorgang führt sie ebenfalls aus |
 
 `openRebase` liest keine Umgebungsvariable. Die `DATABASE_URL` oben wird von Ihrem Skript gelesen,
 und Einstellungen wie `REBASE_DB_POOL_MAX` oder `REALTIME_CDC` ändern hier nichts.
@@ -271,9 +274,21 @@ Entität das nächste Mal schreibt und in seinem stündlichen Durchlauf.
 
 ### Was es auslässt
 
-`openRebase` öffnet die Datenschicht und sonst nichts. Es startet kein Realtime, daher werden
-seine Schreibvorgänge Live-Abfragen nicht mitgeteilt. Storage, E-Mail, Auth-Verwaltung und
+`openRebase` öffnet die Datenschicht und sonst nichts. Es startet kein eigenes Realtime,
+aber seine Schreibvorgänge erreichen Live-Abfragen trotzdem: Die Change-Capture-Trigger
+der Datenbank melden jeden Schreibvorgang, wer auch immer ihn gemacht hat, sodass
+Abonnenten auf einem laufenden Server auch nach einem Backfill neu laden. Nur mit
+`REALTIME_CDC=off` auf diesem Server werden sie nicht gemeldet. Siehe
+[Change Capture auf Datenbankebene](/docs/backend/realtime-cdc/). Storage, E-Mail, Auth-Verwaltung und
 Ihre Funktionen sind nicht darauf vorhanden.
+
+Collection-Callbacks laufen bei jedem Schreibvorgang, wie auf dem Server. Die globalen
+`callbacks` des Projekts laufen nur, wenn Sie sie als Option `callbacks` übergeben.
+`rebase console` übergibt sie für Sie: Sie liest die `callbacks`, die Ihre
+`config/index.ts` exportiert, sodass ein globales `beforeSave` auch bei ihren Schreibvorgängen
+läuft. Lässt sich diese Datei nicht importieren (zum Beispiel, weil sie eine Umgebungsvariable
+braucht, die der Konsole nicht mitgegeben wurde), gibt die Konsole eine Zeile aus, die sagt, dass
+globale Callbacks für die Sitzung aus sind, und öffnet ohne sie.
 
 Braucht ein Skript auch diese, bauen Sie das Backend, ohne es auszuliefern:
 `createRebaseBackend({ …, provision: false })` gibt Ihnen `backend.rebase`, den

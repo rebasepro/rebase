@@ -270,7 +270,7 @@ connection](/docs/collections/context-data-api#a-callback-holds-a-connection).
 ```typescript
 beforeSave: async ({
     values,       // Entity values
-    id,           // Entity ID (null for new entities)
+    id,           // Entity ID (undefined for a new entity, unless the caller sent one)
     status,       // "new" | "existing" | "copy"
     previousValues, // Previous values (for updates)
     context       // Full Rebase context

@@ -90,6 +90,21 @@ export async function scanWithSnapshot(options: ScanOptions): Promise<{ result: 
         statementTimeoutMs: options.statementTimeoutMs ?? DEFAULT_TIMEOUT_MS
     });
 
+    return { result: scanSnapshot(snapshot, diagnostics, options), snapshot };
+}
+
+/**
+ * The half of {@link scan} after introspection: run the checks over a snapshot
+ * and assemble the result. Pure, and exported so the wiring below is tested
+ * without a database — the unit suite passed with it removed.
+ *
+ * `diagnostics` is extended in place with any check that crashed.
+ */
+export function scanSnapshot(
+    snapshot: DbSnapshot,
+    diagnostics: ScanResult["diagnostics"],
+    options: Pick<ScanOptions, "connectionString" | "only" | "skip" | "now">
+): ScanResult {
     // A check that crashed degrades the scan, as a failed catalogue read does:
     // exit 2, and the report names it.
     const findings = runChecks(snapshot, {
@@ -101,14 +116,12 @@ export async function scanWithSnapshot(options: ScanOptions): Promise<{ result: 
         })
     });
 
-    const result = buildScanResult(snapshot, findings, {
+    return buildScanResult(snapshot, findings, {
         connectionString: options.connectionString,
         checksRun: selectCheckIds(options).length,
         scannedAt: (options.now ?? new Date()).toISOString(),
         diagnostics
     });
-
-    return { result, snapshot };
 }
 
 /**

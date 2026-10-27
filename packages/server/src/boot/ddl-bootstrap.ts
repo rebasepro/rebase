@@ -27,6 +27,94 @@ import { logger } from "../utils/logger.js";
 /** A driver's `executeSql`, narrowed to what a bootstrap needs. */
 export type SqlExec = (sqlText: string, options?: { params?: unknown[] }) => Promise<Record<string, unknown>[]>;
 
+/**
+ * The first keyword of every statement that changes what the database *is* —
+ * its tables, columns, indexes, types, functions, triggers, policies, roles and
+ * privileges — as opposed to the rows in it.
+ *
+ * `DO` is here because every anonymous block Rebase runs exists to make a
+ * guarded `GRANT`, `REVOKE` or `CREATE`; there is no row write anywhere in the
+ * framework that needs one. `TRUNCATE`, `VACUUM` and `ANALYZE` are not: they
+ * act on data and statistics, and none of them is something a change process
+ * reviews.
+ */
+const SCHEMA_CHANGE_KEYWORDS = new Set([
+    "CREATE", "ALTER", "DROP", "GRANT", "REVOKE", "COMMENT", "DO",
+    "REINDEX", "CLUSTER", "SECURITY", "IMPORT", "REASSIGN"
+]);
+
+/** A statement with any leading whitespace and comments removed. */
+export function withoutLeadingComments(sqlText: string): string {
+    let rest = sqlText;
+    for (;;) {
+        rest = rest.trimStart();
+        if (rest.startsWith("--")) {
+            const end = rest.indexOf("\n");
+            rest = end === -1 ? "" : rest.slice(end + 1);
+        } else if (rest.startsWith("/*")) {
+            const end = rest.indexOf("*/");
+            rest = end === -1 ? "" : rest.slice(end + 2);
+        } else {
+            return rest;
+        }
+    }
+}
+
+/** The statement's first keyword, past any leading comments, upper-cased. */
+function leadingKeyword(sqlText: string): string {
+    return (withoutLeadingComments(sqlText).match(/^[A-Za-z]+/)?.[0] ?? "").toUpperCase();
+}
+
+/**
+ * Whether a statement changes the database's structure or its privileges.
+ *
+ * Decided on the leading keyword, which is exact for every statement the
+ * framework writes: none of them hides DDL behind a `WITH` or a function call.
+ */
+export function isSchemaChange(sqlText: string): boolean {
+    return SCHEMA_CHANGE_KEYWORDS.has(leadingKeyword(sqlText));
+}
+
+/**
+ * Raised in place of a schema change on a backend that provisions nothing.
+ *
+ * Its own class so a bootstrap step can tell "this was not run on purpose" from
+ * "this failed", and say the first at `debug` rather than as an error per
+ * statement on every boot.
+ */
+export class SchemaChangeRefusedError extends Error {
+    readonly code = "REBASE_PROVISIONING_OFF";
+
+    constructor(readonly statement: string) {
+        super(
+            "Not run: this backend changes nothing in its database (provisioning is off). " +
+            `Statement: ${statement.trim().split("\n")[0]}`
+        );
+        this.name = "SchemaChangeRefusedError";
+    }
+}
+
+/**
+ * `exec`, with every schema change refused and every other statement passed
+ * through.
+ *
+ * What a store is built on when its backend provisions nothing. The store's own
+ * bootstrap still runs, so it reads what is there exactly as it always has and
+ * reports what is missing in its own words; only the statements that would
+ * have changed the database stop here. A guard rather than a branch per store,
+ * because a branch is a thing the next store can forget.
+ */
+export function refuseSchemaChanges(exec: SqlExec): SqlExec {
+    return (sqlText, options) => isSchemaChange(sqlText)
+        ? Promise.reject(new SchemaChangeRefusedError(sqlText))
+        : exec(sqlText, options);
+}
+
+/** {@link refuseSchemaChanges} when `provision` is `false`; `exec` itself otherwise. */
+export function provisioningExec(exec: SqlExec, provision: boolean | undefined): SqlExec {
+    return provision === false ? refuseSchemaChanges(exec) : exec;
+}
+
 
 /**
  * SQLSTATEs a *simultaneous boot* can raise from statements that are otherwise
@@ -177,6 +265,10 @@ export function createDdlBootstrapper(exec: SqlExec, scope: string): DdlBootstra
         try {
             await run();
         } catch (err) {
+            if (hasInCauseChain(err, e => e.code === "REBASE_PROVISIONING_OFF")) {
+                logger.debug(`[${scope}] ${label}: not run — this backend changes nothing in its database`);
+                return;
+            }
             logger.error(`[${scope}] ${label} failed`, { error: err });
         }
     };

@@ -1,11 +1,11 @@
 ---
-sourceHash: 372e9392b24d3148
+sourceHash: eaecd9a09c46ba94
 title: Habilidades del agente
 sidebar_label: Habilidades del agente
-description: rebase skills install escribe 21 habilidades de referencia de Rebase en tu repositorio, en el formato que espera tu asistente de IA — Cursor, Claude Code, Windsurf, Gemini CLI y Antigravity.
+description: rebase skills install escribe 23 habilidades de referencia de Rebase en tu repositorio, en el formato que espera tu asistente de IA — Cursor, Claude Code, Windsurf, Gemini CLI y Antigravity.
 ---
 
-Un asistente de IA que ha leído la documentación de Rebase escribe mejor código de Rebase que uno que intenta adivinar a partir de la estructura de la API. `rebase skills install` copia 21 archivos de habilidades en Markdown en tu repositorio, en la estructura que espere tu asistente:
+Un asistente de IA que ha leído la documentación de Rebase escribe mejor código de Rebase que uno que intenta adivinar a partir de la estructura de la API. `rebase skills install` copia 23 archivos de habilidades en Markdown en tu repositorio, en la estructura que espere tu asistente:
 
 ```bash
 rebase skills install
@@ -119,7 +119,7 @@ deja de recibir actualizaciones hasta que la fuerces con `--force`.
 
 El comando también funciona fuera de un proyecto de Rebase, recurriendo al directorio de trabajo actual; esto resulta útil para un repositorio frontend independiente que se comunica con un backend de Rebase.
 
-## Las 21 habilidades
+## Las 23 habilidades
 
 | Habilidad | Qué cubre |
 |---|---|
@@ -138,6 +138,8 @@ El comando también funciona fuera de un proyecto de Rebase, recurriendo al dire
 | `rebase-email` | SMTP, plantillas, proveedores personalizados y el singleton `rebase.email` |
 | `rebase-entity-history` | Control de versiones de entidades, seguimiento de cambios, registros de auditoría y reversión |
 | `rebase-admin` | Navegación por el panel de administración, paneles laterales (side drawers), URLs e incrustación de paneles de colecciones |
+| `rebase-customize-admin` | Personalización del panel de administración con componentes de React: singletons, páginas de ajustes, acciones masivas, modos de vista, campos personalizados y sustitución de piezas integradas |
+| `rebase-custom-views` | Pantallas personalizadas dentro del panel de administración: `rebase generate view`, vistas de nivel superior, pestañas de registro y widgets de campo |
 | `rebase-ui-components` | La biblioteca de componentes `@rebasepro/ui` |
 | `rebase-design-language` | El lenguaje de diseño de la interfaz: tokens, color, tipografía, espaciado y antipatrones |
 | `rebase-studio` | La capa de herramientas de desarrollo de Studio: SQL, RLS, almacenamiento, cron, visualizador de esquemas y logs |
@@ -150,9 +152,9 @@ Dos de ellas solicitan ser leídas sin petición previa. `rebase-basics` indica 
 ## Cómo se ve una ejecución
 
 ```text
-  Found 21 Rebase skills
+  Found 23 Rebase skills
 
-  ✓ Claude Code — 21 skills installed (+ 8 reference files) to .claude/skills
+  ✓ Claude Code — 23 skills installed (+ 8 reference files) to .claude/skills
 ```
 
 Las habilidades se distribuyen desde el paquete `@rebasepro/agent-skills`, del cual depende la CLI, por lo que el conjunto que obtienes coincide con la versión instalada de tu CLI.

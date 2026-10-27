@@ -86,7 +86,10 @@ function createApp(opts: AppOptions = {}) {
         listRefreshTokensForUser: jest.fn<() => Promise<unknown[]>>().mockResolvedValue([]),
         deleteRefreshTokenById: jest.fn<() => Promise<void>>().mockResolvedValue(undefined),
         getTokensValidAfter: jest.fn<() => Promise<null>>().mockResolvedValue(null),
-        setTokensValidAfter: jest.fn<() => Promise<void>>().mockResolvedValue(undefined)
+        setTokensValidAfter: jest.fn<() => Promise<void>>().mockResolvedValue(undefined),
+        updatePassword: jest.fn<() => Promise<void>>().mockResolvedValue(undefined),
+        setEmailVerified: jest.fn<() => Promise<void>>().mockResolvedValue(undefined),
+        unlinkUserIdentity: jest.fn<() => Promise<void>>().mockResolvedValue(undefined)
     } as unknown as jest.Mocked<AuthRepository>;
 
     const config: AuthModuleConfig = {
@@ -152,19 +155,22 @@ beforeEach(() => {
 // ═══════════════════════════════════════════════════════════════════════════
 
 describe("decideOAuthAutoLink", () => {
-    const cases: Array<[string, Parameters<typeof decideOAuthAutoLink>[0], boolean, string | undefined]> = [
-        ["provider verified + local verified", { providerEmailVerified: true, existingUser: { emailVerified: true, passwordHash: "h" } }, true, undefined],
-        ["provider verified + local has no password, never verified", { providerEmailVerified: true, existingUser: { emailVerified: false, passwordHash: null } }, false, "local-account-unverified-passwordless"],
-        ["provider verified + local has no password, verified", { providerEmailVerified: true, existingUser: { emailVerified: true, passwordHash: null } }, true, undefined],
-        ["provider verified + local password never verified", { providerEmailVerified: true, existingUser: { emailVerified: false, passwordHash: "h" } }, false, "local-account-unverified"],
-        ["provider unverified", { providerEmailVerified: false, existingUser: { emailVerified: true, passwordHash: "h" } }, false, "provider-email-unverified"],
-        ["provider omitted the flag entirely", { providerEmailVerified: undefined, existingUser: { emailVerified: true, passwordHash: "h" } }, false, "provider-email-unverified"]
+    // [name, args, allowed, refusal reason, proves the address]
+    const cases: Array<[string, Parameters<typeof decideOAuthAutoLink>[0], boolean, string | undefined, boolean | undefined]> = [
+        ["provider verified + local verified", { providerEmailVerified: true, existingUser: { emailVerified: true, passwordHash: "h" } }, true, undefined, false],
+        ["provider verified + local has no password, never verified", { providerEmailVerified: true, existingUser: { emailVerified: false, passwordHash: null } }, true, undefined, true],
+        ["provider verified + local has no password, verified", { providerEmailVerified: true, existingUser: { emailVerified: true, passwordHash: null } }, true, undefined, false],
+        ["provider verified + local password never verified", { providerEmailVerified: true, existingUser: { emailVerified: false, passwordHash: "h" } }, true, undefined, true],
+        ["provider unverified", { providerEmailVerified: false, existingUser: { emailVerified: true, passwordHash: "h" } }, false, "provider-email-unverified", undefined],
+        ["provider unverified + local unverified", { providerEmailVerified: false, existingUser: { emailVerified: false, passwordHash: "h" } }, false, "provider-email-unverified", undefined],
+        ["provider omitted the flag entirely", { providerEmailVerified: undefined, existingUser: { emailVerified: false, passwordHash: null } }, false, "provider-email-unverified", undefined]
     ];
 
-    it.each(cases)("%s", (_name, args, allowed, reason) => {
+    it.each(cases)("%s", (_name, args, allowed, reason, provesAddress) => {
         const decision = decideOAuthAutoLink(args);
         expect(decision.allowed).toBe(allowed);
         if (!decision.allowed) expect(decision.reason).toBe(reason);
+        else expect(decision.provesAddress).toBe(provesAddress);
     });
 });
 
@@ -283,19 +289,22 @@ describe("POST /auth/<provider> — registration policy", () => {
 });
 
 describe("POST /auth/<provider> — auto-linking onto an existing account", () => {
-    it("refuses when the local account holds a password nobody ever verified", async () => {
+    it("proves the address of a local account whose password nobody ever verified: password removed, sessions ended, then linked", async () => {
+        // The pre-hijack: somebody registered this address with a password.
+        // The provider vouching for it is the owner's proof, as an email code
+        // is, so the password goes and every session ends before the owner is
+        // signed in — never linked with the password still on the account.
         const app = createApp();
         repo.getUserByEmail.mockResolvedValue(mockUser({ id: "pw-user", passwordHash: "salt:hash", emailVerified: false }));
 
         const res = await signIn(app);
 
-        expect(res.status).toBe(403);
-        const { error } = (await res.json()) as { error: { code: string; details?: { reason?: string } } };
-        expect(error.code).toBe("EMAIL_NOT_VERIFIED");
-        // What a login screen reads to say "sign in with your password" rather
-        // than quote an endpoint at the visitor.
-        expect(error.details?.reason).toBe("local-account-unverified");
-        expect(repo.linkUserIdentity).not.toHaveBeenCalled();
+        expect(res.status).toBe(200);
+        expect(repo.updatePassword).toHaveBeenCalledWith("pw-user", null);
+        expect(repo.deleteAllRefreshTokensForUser).toHaveBeenCalledWith("pw-user");
+        expect(repo.setEmailVerified).toHaveBeenCalledWith("pw-user", true);
+        expect(repo.linkUserIdentity).toHaveBeenCalledWith("pw-user", "acme", "acme-1", expect.any(Object));
+        expect(repo.updatePassword.mock.invocationCallOrder[0]).toBeLessThan(repo.linkUserIdentity.mock.invocationCallOrder[0]);
         expect(repo.createUser).not.toHaveBeenCalled();
     });
 
@@ -309,23 +318,43 @@ describe("POST /auth/<provider> — auto-linking onto an existing account", () =
         expect(repo.linkUserIdentity).toHaveBeenCalledWith("pw-user", "acme", "acme-1", expect.any(Object));
     });
 
-    it("refuses when the local account has no password but its address was never verified either", async () => {
+    it("detaches an identity whose provider did not vouch, before linking onto a password-less unverified account", async () => {
         // The account an attacker makes by signing in, as the victim's
         // address, through a provider that does not vouch for it. "No
         // password" is not "nothing planted": the attacker's own identity is
-        // on it, and linking the victim's here shares the account with them.
+        // on it, and it has to go before the victim's is linked.
         const app = createApp();
         repo.getUserByEmail.mockResolvedValue(mockUser({ id: "oauth-user", passwordHash: null, emailVerified: false }));
+        const planted = new Date("2026-01-01T00:00:00Z");
+        repo.getUserIdentities.mockResolvedValue([{
+            id: "identity-1",
+            uid: "oauth-user",
+            provider: "spotify",
+            providerId: "attacker",
+            profileData: { email: "user@example.com", emailVerified: false },
+            createdAt: planted,
+            updatedAt: planted
+        }]);
 
         const res = await signIn(app);
 
-        expect(res.status).toBe(403);
-        const { error } = (await res.json()) as { error: { code: string; details?: { reason?: string } } };
-        expect(error.code).toBe("EMAIL_NOT_VERIFIED");
-        // Its own reason, so a login screen does not tell its owner to use a
-        // password the account does not have.
-        expect(error.details?.reason).toBe("local-account-unverified-passwordless");
-        expect(repo.linkUserIdentity).not.toHaveBeenCalled();
+        expect(res.status).toBe(200);
+        expect(repo.unlinkUserIdentity).toHaveBeenCalledWith("oauth-user", "spotify", "attacker");
+        expect(repo.setEmailVerified).toHaveBeenCalledWith("oauth-user", true);
+        const unlink = repo.unlinkUserIdentity;
+        if (!unlink) throw new Error("the repository under test implements unlinkUserIdentity");
+        expect(jest.mocked(unlink).mock.invocationCallOrder[0]).toBeLessThan(repo.linkUserIdentity.mock.invocationCallOrder[0]);
+    });
+
+    it("leaves an already verified account's password and sessions alone", async () => {
+        const app = createApp();
+        repo.getUserByEmail.mockResolvedValue(mockUser({ id: "pw-user", passwordHash: "salt:hash", emailVerified: true }));
+
+        const res = await signIn(app);
+
+        expect(res.status).toBe(200);
+        expect(repo.updatePassword).not.toHaveBeenCalled();
+        expect(repo.deleteAllRefreshTokensForUser).not.toHaveBeenCalled();
     });
 
     it("links when the local account has no password and its address was verified", async () => {

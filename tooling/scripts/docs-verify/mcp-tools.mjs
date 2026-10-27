@@ -28,7 +28,7 @@ const GROUPS = [
     { const: "CRON_TOOLS", title: "Cron", note: "" },
     { const: "FUNCTION_TOOLS", title: "Functions", note: "" },
     { const: "PROJECT_TOOLS", title: "Project registry", note: "" },
-    { const: "CLOUD_TOOLS", title: "Rebase Cloud", note: "Spawn `rebase cloud` in the active project directory." }
+    { const: "CLOUD_TOOLS", title: "Rebase Cloud", note: "Spawn `rebase cloud … --json` in the active project directory, against the project it is linked to, with the CLI's own credential. Provisioning creates a project; deploy, env set and rollback change the linked one. The loopback gate does not apply to them, because they never use `baseUrl` or `DATABASE_URL`." }
 ];
 
 /** The body of the array literal whose `[` sits at `open`. */
@@ -98,11 +98,21 @@ function objectsIn(body) {
     return out;
 }
 
-/** The value of a double-quoted `key: "…"` at the top level of an object literal. */
+/**
+ * The value of a double-quoted `key: "…"` at the top level of an object
+ * literal, with any `"…" + "…"` continuation joined on.
+ *
+ * Reading only the first literal cut a long description at its first line
+ * break in the source: `rebase_db_branch_diff` went into the README as "Show
+ * what a database branch changed … (Admins only): added, dropped".
+ */
 function stringField(objectSource, key) {
-    const re = new RegExp(`(?:^|[,{\\s])${key}\\s*:\\s*"((?:[^"\\\\]|\\\\.)*)"`);
+    const re = new RegExp(`(?:^|[,{\\s])${key}\\s*:\\s*((?:"(?:[^"\\\\]|\\\\.)*"\\s*\\+\\s*)*"(?:[^"\\\\]|\\\\.)*")`);
     const m = re.exec(objectSource);
-    return m ? m[1].replace(/\\"/g, '"').replace(/\\\\/g, "\\") : null;
+    if (!m) return null;
+    return [...m[1].matchAll(/"((?:[^"\\]|\\.)*)"/g)]
+        .map((part) => part[1].replace(/\\"/g, '"').replace(/\\\\/g, "\\"))
+        .join("");
 }
 
 /** A `required: ["a", "b"]` list, in source order. */
@@ -146,6 +156,9 @@ export function loadMcpTools(root) {
     const text = readFileSync(path.join(root, "packages", "mcp", "src", "index.ts"), "utf8");
     const readOnly = setMembers(text, "READ_ONLY_TOOLS");
     const localOnly = setMembers(text, "LOCAL_ONLY_TOOLS");
+    // Cloud writes: they change the linked cloud project, but the gate checks
+    // baseUrl and DATABASE_URL, which they never use. See the set's comment.
+    const controlPlane = setMembers(text, "CLOUD_CONTROL_PLANE_TOOLS");
 
     const groups = [];
     let total = 0;
@@ -160,7 +173,7 @@ export function loadMcpTools(root) {
                     name,
                     description: stringField(src, "description") ?? "",
                     required: requiredIn(src),
-                    gated: !readOnly.has(name) && !localOnly.has(name)
+                    gated: !readOnly.has(name) && !localOnly.has(name) && !controlPlane.has(name)
                 };
             })
             .filter(Boolean);

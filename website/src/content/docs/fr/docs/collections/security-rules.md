@@ -1,5 +1,5 @@
 ---
-sourceHash: bf198f4f8752c00d
+sourceHash: 0a89002005014cb6
 title: Règles de sécurité (RLS)
 sidebar_label: Règles de sécurité
 description: Définissez des stratégies de sécurité au niveau des lignes (RLS) pour vos collections à l'aide de raccourcis pratiques ou d'expressions SQL brutes.
@@ -67,7 +67,7 @@ Cela génère : `USING ((user_id)::text = (SELECT rebase.uid()))` — voir
 
 ### Accès public
 
-Permettre à quiconque (y compris les utilisateurs non authentifiés) de lire :
+Ne mettre aucun filtre de lignes sur les lectures, de sorte que tout appelant que l'API laisse entrer lise toutes les lignes :
 
 ```typescript
 securityRules: [
@@ -76,6 +76,8 @@ securityRules: [
 ```
 
 Cela génère : `USING (true)`
+
+Cela élargit les lignes qu'un appelant voit, pas qui peut appeler. Par défaut, l'API répond toujours 401 à une requête sans jeton. Définissez `AUTH_REQUIRE=false` (`auth.requireAuth: false`) pour supprimer cette barrière et laisser les politiques décider seules ; un appelant non authentifié lit alors aussi ces lignes.
 
 ### Accès authentifié
 
@@ -152,7 +154,8 @@ Importé depuis `@rebasepro/types`. Les expressions se composent ; les opérande
 | `policy.outerField(name)` | dans `existsIn`, une colonne de la ligne externe |
 | `policy.literal(value)` | une chaîne, un nombre, un booléen ou `null` |
 | `policy.authUid()` | `rebase.uid()` |
-| `policy.authRoles()` | `rebase.roles()` |
+| `policy.authRoles()` | les rôles de l'appelant sous forme de tableau, `string_to_array(rebase.roles(), ',')` |
+| `policy.authClaim(name)` | une revendication personnalisée du jeton de session, `NULLIF(rebase.jwt() ->> '<name>', '')`, convertie vers le type de la colonne à laquelle elle est comparée |
 
 #### Évalué une fois par instruction
 
@@ -322,7 +325,7 @@ securityRules: [
 
 ## Accès anonyme (insertions publiques)
 
-Un besoin courant consiste à autoriser les **utilisateurs non authentifiés** à soumettre des données — formulaires de contact, inscriptions à des newsletters, candidatures publiques. Rebase fournit un modèle clair pour cela.
+Un besoin courant consiste à autoriser les **utilisateurs non authentifiés** à soumettre des données — formulaires de contact, inscriptions à des newsletters, candidatures publiques. Rebase fournit un modèle clair pour cela. Une requête sans jeton n'atteint ces politiques que lorsque `AUTH_REQUIRE=false` (`auth.requireAuth: false`) ; sinon l'API y répond d'abord par un 401.
 
 ### Recommandé : une règle `withCheck` brute
 
@@ -351,7 +354,7 @@ const contactMessagesCollection = defineCollection({
 });
 ```
 
-Le raccourci `access: "public"` génère une stratégie qui autorise l'opération sans nécessiter d'authentification.
+Le raccourci `access: "public"` génère une stratégie sans filtre de lignes. Qu'un appelant sans jeton l'atteigne dépend de `AUTH_REQUIRE`, pas de la stratégie.
 
 ### Pour la capture de leads / inscriptions
 
@@ -376,11 +379,11 @@ const leadSignupsCollection = defineCollection({
 
 ### Comment fonctionnent les requêtes anonymes
 
-Lorsqu'une requête arrive sans jeton JWT, le backend Rebase définit les variables de session PostgreSQL comme suit :
+Lorsqu'une requête arrive sans jeton JWT (et que `AUTH_REQUIRE=false` la laisse passer), le backend Rebase définit les variables de session PostgreSQL comme suit :
 
 | Variable | Valeur |
 |----------|--------|
-| `app.user_id` | `'anonymous'` |
+| `app.uid` (et son alias historique `app.user_id`) | `'anonymous'` |
 | `app.user_roles` | `''` (vide) |
 
 Cela signifie que :

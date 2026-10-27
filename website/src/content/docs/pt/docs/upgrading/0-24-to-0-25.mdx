@@ -1,5 +1,5 @@
 ---
-sourceHash: 5fe43cc6af8d171f
+sourceHash: 6c20228a92368bc2
 slug: pt/docs/upgrading/0-24-to-0-25
 title: Atualizando da versão 0.24 para a 0.25
 sidebar_label: 0.24 → 0.25
@@ -249,7 +249,7 @@ else await client.data.users.update(String(found.id), user);
 Leituras informando tanto `page` quanto `offset` agora são recusadas. O servidor responde com
 `400 PAGE_WITH_OFFSET`, e o SDK recusa a combinação antes de disparar qualquer requisição, com um
 `RebaseClientError` trazendo o mesmo código: via HTTP, em processo
-(`rebase.data`) e offline. Anteriormente, `page` prevalecia e o `offset` era descartado
+(`rebase.dataAsAdmin`) e offline. Anteriormente, `page` prevalecia e o `offset` era descartado
 sem aviso.
 
 **Quem é afetado:** código que envia ambos, por exemplo, `find({ page, offset })`
@@ -350,7 +350,7 @@ exemplo, formulários ou importações que enviam todas as colunas independentem
 dever prevalecer, ou remova `required` de campos que possam legitimamente ser vazios.
 Coleções que declaram `beforeSave` não sofrem essa validação na borda (pois o hook
 pode preencher o valor), assim como antes. Códigos de servidor executados em processo
-(`rebase.data`) não são afetados.
+(`rebase.dataAsAdmin`) não são afetados.
 
 ## 83. `QueryBuilder` e `createBackups` não são mais exportados por `@rebasepro/client`
 

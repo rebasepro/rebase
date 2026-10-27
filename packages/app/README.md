@@ -58,7 +58,7 @@ This package is **framework-agnostic** in the sense that it doesn't depend on an
 | `useAuthSubscription` | Subscribe to auth state changes |
 | `usePermissions` | Check permissions for collections/actions |
 | `useAdminModeController` / `useBuildAdminModeController` | Admin mode toggle |
-| `useEffectiveRoleController` / `useBuildEffectiveRoleController` | Current user's effective role |
+| `useEffectiveRoleController` | The role Studio's navigation is listed for (`useBuildEffectiveRoleController` is deprecated: use Simulate access to test permissions) |
 
 ### Hooks — UI & State
 

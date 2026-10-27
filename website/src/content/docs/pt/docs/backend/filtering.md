@@ -1,5 +1,5 @@
 ---
-sourceHash: ebc75b9bd33595a6
+sourceHash: f4fe63c58f66c539
 title: Filtragem na API REST
 sidebar_label: Filtragem
 description: Filtre as listas da API REST com operadores no estilo PostgREST, grupos or/and e o dialeto JSON where, e veja como os filtros se combinam.
@@ -56,9 +56,11 @@ Os quatro operadores de padrão comparam texto. Uma coluna enum é comparada pel
 (`?status=like.draft%25`); em um número, uma data ou qualquer outra coluna que não seja
 texto, resultam em um 400 `INVALID_FILTER_OPERATOR`.
 
-`isnull` e `notnull` ignoram o valor fornecido — o operador é a condição completa,
-e qualquer coisa após o ponto é descartada. O SDK escreve `.null`, portanto essa é a
-grafia que você verá trafegando na rede.
+`isnull` e `notnull` não recebem operando — o operador é a condição completa, e
+`.null`, `.true`, `.false` ou nada após o ponto significam a mesma coisa. O SDK
+escreve `.null`, portanto essa é a grafia que você verá trafegando na rede. Qualquer outra
+coisa após o ponto não é um operando que eles tenham, então a string inteira é lida como
+um valor: `?reason=notnull.reason` corresponde ao texto `notnull.reason`.
 
 :::caution[`eq.null` é a string de quatro caracteres, não `IS NULL`]
 `?deleted_at=eq.null` pesquisa pelo texto literal `null`. Em SQL, `= NULL` nunca
@@ -118,7 +120,7 @@ Os filtros de campo acima são uma das duas formas de enviar um filtro. A outra 
 GET /api/data/products?where={"status":["==","active"],"price":[">=",100]}
 ```
 
-Cada chave é um campo e cada valor é uma tupla canônica `[operador, valor]` — as mesmas
+Cada chave é um campo e cada valor é uma tupla canônica `[operator, value]` — as mesmas
 tuplas que o SDK escreve. Um valor também pode ser uma string pré-serializada com ponto
 (`{"status":"eq.active"}`) ou um escalar simples (`{"status":"active"}`); todos os três
 compilam para a mesma condição. Um array de valores simples é um `in` implícito: `{"category":["electronics","gadgets"]}` é lido como
@@ -141,7 +143,7 @@ em nível de linha (RLS) porventura permitisse.
 
 ## Como os filtros se combinam
 
-`?field=op.value`, `?where=`, `?or=`/`?and=` e `?searchString=` são
+`?field=op.value`, `?where=`, `?or=`/`?and=`/`?not=` e `?searchString=` são
 independentes, e cada um deles presente deve corresponder:
 
 ```text
@@ -149,6 +151,10 @@ independentes, e cada um deles presente deve corresponder:
   AND (the logical group)
   AND (the search string)
 ```
+
+A única exceção é um campo citado tanto em `?field=op.value` quanto em `where`: nesse
+caso, o parâmetro de consulta **substitui** a condição de `where` naquele campo, por ser
+a solicitação mais específica, em vez de ser combinado com ela por AND.
 
 Não há como fazer uma operação OR entre eles. Qualquer coisa que não seja um AND
 simples desses grupos deve ficar dentro de uma única árvore `or=`/`and=`.

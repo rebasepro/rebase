@@ -17,7 +17,7 @@
  */
 import { configureJwt, generateAccessToken } from "../src/auth/jwt";
 import {
-    buildApp, authorize, redeem, refreshWith, connectedClient,
+    buildApp, authorize, redeem, refreshWith, connectedClient, rpc, stubDriver,
     registerClient, PUBLIC_URL, REDIRECT, JWT_SECRET
 } from "./helpers/mcp-harness";
 import { grantIdentityFromRepository, type McpGrantIdentity } from "../src/mcp/oauth-routes";
@@ -311,8 +311,15 @@ describe("the consent screen's promise", () => {
         // The consent page must never send a password to the OAuth surface.
         const { app } = buildApp();
         const { html } = await authorize(app);
-        const fetchTargets = [...html.matchAll(/fetch\((\"[^\"]+\")/g)].map(m => JSON.parse(m[1]));
-        expect(fetchTargets).toEqual(["/api/auth/login"]);
+        // Every request goes through one `post(url, …)` helper. The MFA step
+        // (an account with a second factor) adds the two existing challenge
+        // routes, which take a code and the pending token — never the password.
+        const targets = [...html.matchAll(/post\((\"[^\"]+\")/g)].map(m => JSON.parse(m[1]));
+        expect([...targets].sort()).toEqual(["/api/auth/login", "/api/auth/mfa/challenge", "/api/auth/mfa/challenge/verify"]);
+        expect(html.match(/fetch\(/g)).toHaveLength(1);
+        const passwordPosts = [...html.matchAll(/post\((\"[^\"]+\")[^\n]*password\.value/g)].map(m => JSON.parse(m[1]));
+        expect(passwordPosts).toEqual(["/api/auth/login"]);
+        expect(html.match(/password\.value/g)).toHaveLength(1);
     });
 
     it("tells search engines not to index it", async () => {
@@ -489,6 +496,67 @@ describe("a grant follows the account it was made for", () => {
         const retried = await refreshed(await refreshWith(app, clientId, refreshToken));
         expect(retried.status).toBe(200);
         expect(tokenRoles(String(retried.body.access_token))).toEqual(["admin"]);
+    });
+
+    describe("an access token already issued", () => {
+        // A refresh re-reads the account; an access token is spent at `/mcp`
+        // without one, so it used to outlive a deletion, a disable or a
+        // demotion by up to an hour. Every other door judges the account per
+        // request; `/mcp` now does too.
+        const query = {
+            jsonrpc: "2.0", id: 1, method: "tools/call",
+            params: { name: "query_collection", arguments: { collection: "candidates" } }
+        };
+
+        it("stops working the moment the account is deleted or disabled", async () => {
+            const account = accounts();
+            const { driver, calls } = stubDriver();
+            const { app } = buildApp({ identity: account.identity, driver });
+            const { accessToken } = await connectedClient(app, { roles: ["admin"] });
+            expect((await rpc(app, accessToken, query)).status).toBe(200);
+            const before = calls.length;
+
+            account.roles.delete("user-1");
+            const res = await rpc(app, accessToken, query);
+            expect(res.status).toBe(401);
+            expect((await res.json() as { error: string }).error).toBe("invalid_token");
+            expect(res.headers.get("www-authenticate")).toContain("resource_metadata");
+            expect(calls.length).toBe(before);
+        });
+
+        it("runs the tool with the roles the account has now, not the ones it was minted with", async () => {
+            const account = accounts();
+            const { driver, scopedAs } = stubDriver();
+            const { app } = buildApp({ identity: account.identity, driver });
+            const { accessToken } = await connectedClient(app, { roles: ["admin"] });
+            expect(tokenRoles(accessToken)).toEqual(["admin"]);
+
+            account.roles.set("user-1", ["recruiter"]);
+            expect((await rpc(app, accessToken, query)).status).toBe(200);
+            expect(scopedAs.at(-1)).toMatchObject({ uid: "user-1", roles: ["recruiter"] });
+        });
+
+        it("stops working after sign-out-everywhere", async () => {
+            const account = accounts();
+            const { app } = buildApp({ identity: account.identity });
+            const { accessToken } = await connectedClient(app, { roles: ["admin"] });
+
+            account.signOutEverywhere("user-1");
+            expect((await rpc(app, accessToken, query)).status).toBe(401);
+        });
+
+        it("answers 503, not the token's own roles, when the account lookup fails", async () => {
+            const account = accounts();
+            const { driver, calls } = stubDriver();
+            const { app } = buildApp({ identity: account.identity, driver });
+            const { accessToken } = await connectedClient(app, { roles: ["admin"] });
+            const before = calls.length;
+
+            account.failNextLookup();
+            expect((await rpc(app, accessToken, query)).status).toBe(503);
+            expect(calls.length).toBe(before);
+            expect((await rpc(app, accessToken, query)).status).toBe(200);
+        });
     });
 
     it("refuses a revoked session on the connected-applications endpoints too", async () => {

@@ -1,12 +1,12 @@
 ---
-sourceHash: 372e9392b24d3148
+sourceHash: eaecd9a09c46ba94
 title: Compétences d'agent
 sidebar_label: Compétences d'agent
-description: rebase skills install écrit 21 compétences de référence Rebase dans votre dépôt, selon l'organisation attendue par votre assistant IA — Cursor, Claude Code, Windsurf, Gemini CLI et Antigravity.
+description: rebase skills install écrit 23 compétences de référence Rebase dans votre dépôt, selon l'organisation attendue par votre assistant IA — Cursor, Claude Code, Windsurf, Gemini CLI et Antigravity.
 ---
 
 Un assistant IA qui a lu la documentation de Rebase écrit un meilleur code Rebase
-qu'un assistant qui devine d'après la structure de l'API. `rebase skills install` copie 21
+qu'un assistant qui devine d'après la structure de l'API. `rebase skills install` copie 23
 fichiers de compétences Markdown dans votre dépôt, selon l'organisation attendue
 par votre assistant :
 
@@ -148,7 +148,7 @@ de recevoir des mises à jour tant que vous ne la remplacez pas avec `--force`.
 La commande fonctionne également en dehors d'un projet Rebase, en se rabattant sur le répertoire de
 travail — ce qui est utile pour un dépôt frontend distinct qui communique avec un backend Rebase.
 
-## Les 21 compétences
+## Les 23 compétences
 
 | Compétence | Sujets couverts |
 |---|---|
@@ -167,6 +167,8 @@ travail — ce qui est utile pour un dépôt frontend distinct qui communique av
 | `rebase-email` | SMTP, modèles, fournisseurs personnalisés, le singleton `rebase.email` |
 | `rebase-entity-history` | Gestion des versions d'entités, suivi des modifications, journaux d'audit, restauration |
 | `rebase-admin` | Navigation dans le panneau d'administration, volets latéraux, URL, intégration de panneaux de collection |
+| `rebase-customize-admin` | Personnalisation de l'admin avec des composants React — singletons, pages de paramètres, actions groupées, modes d'affichage, champs personnalisés, remplacement des éléments intégrés |
+| `rebase-custom-views` | Écrans personnalisés dans l'admin — `rebase generate view`, vues de premier niveau, onglets d'enregistrement, widgets de champ |
 | `rebase-ui-components` | La bibliothèque de composants `@rebasepro/ui` |
 | `rebase-design-language` | Le langage de design UI : tokens, couleurs, typographie, espacement, anti-patterns |
 | `rebase-studio` | La couche d'outils de développement Studio — SQL, RLS, stockage, cron, visualiseur de schéma, journaux |
@@ -183,9 +185,9 @@ base de code.
 ## À quoi ressemble une exécution
 
 ```text
-  Found 21 Rebase skills
+  Found 23 Rebase skills
 
-  ✓ Claude Code — 21 skills installed (+ 8 reference files) to .claude/skills
+  ✓ Claude Code — 23 skills installed (+ 8 reference files) to .claude/skills
 ```
 
 Les compétences sont fournies par le paquet `@rebasepro/agent-skills`, dont dépend la CLI,

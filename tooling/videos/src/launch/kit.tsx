@@ -19,10 +19,13 @@ import { ENTER, ramp, SHIFT } from "../components/motion";
 export const SIZE = {
     /** One word or a short claim that IS the frame. */
     word: 150,
-    /** A sentence set across the frame. */
-    line: 96,
-    /** A claim in a stacked list. */
-    list: 112,
+    /** A sentence set across the frame, and the claims' stacked list. Set
+     *  large on purpose: the film opens on it and has a second to be read
+     *  in a feed (was 96 for the headline and 112 for the list). */
+    line: 132,
+    /** The opening: a statement set as a poster, a few words a line, as
+     *  large as the frame's width allows (each page fits itself under this). */
+    poster: 220,
 } as const;
 
 /** The callout hue. Cyan is in the mark and on the site's ribbon, and on the
@@ -61,12 +64,42 @@ export const Word: React.FC<{
     color?: string;
     /** Frames for the rise. Short: a word lands on a beat, it does not drift. */
     duration?: number;
+    /** Land by SLAMMING: down from 125% scale, out of a blur, instead of
+     *  rising through a mask. For the words that have to stop a scroll. */
+    slam?: boolean;
     style?: React.CSSProperties;
-}> = ({ children, at, size, color, duration = 16, style }) => {
+}> = ({ children, at, size, color, duration = 16, slam = false, style }) => {
     const frame = useCurrentFrame();
     const tone = useTone();
     const start = at - LEAD;
     const t = ramp(frame, start, duration);
+    if (slam) {
+        // The tail of an ease-out is where text scales by a fraction of a
+        // pixel per frame, and text cannot do that without twitching (glyphs
+        // snap to the grid), so the last 3% is skipped and the word lands.
+        const k = t > 0.97 ? 1 : t;
+        return (
+            <span
+                style={{
+                    display: "inline-block",
+                    fontFamily: FONT.display,
+                    fontWeight: 600,
+                    fontSize: size,
+                    lineHeight: 1.02,
+                    letterSpacing: TRACKING.display,
+                    color: color ?? tone.high,
+                    whiteSpace: "pre",
+                    opacity: frame < start ? 0 : Math.min(1, k * 1.6),
+                    transform: k < 1 ? `scale(${1 + 0.25 * (1 - k)})` : undefined,
+                    transformOrigin: "0% 70%",
+                    filter: k < 1 ? `blur(${(1 - k) * 12}px)` : undefined,
+                    ...style,
+                }}
+            >
+                {children}
+            </span>
+        );
+    }
     return (
         <span
             style={{
@@ -100,14 +133,16 @@ export const Word: React.FC<{
 
 /** A line of words, each landing on its own frame. */
 export const Sentence: React.FC<{
-    words: [text: string, at: number][];
+    /** [text, frame it lands on, optional colour for this word group]. */
+    words: [text: string, at: number, color?: string][];
     size: number;
     color?: string;
+    slam?: boolean;
     style?: React.CSSProperties;
-}> = ({ words, size, color, style }) => (
+}> = ({ words, size, color, slam, style }) => (
     <div style={{ display: "flex", flexWrap: "nowrap", columnGap: size * 0.26, ...style }}>
-        {words.map(([text, at], i) => (
-            <Word key={i} at={at} size={size} color={color}>
+        {words.map(([text, at, own], i) => (
+            <Word key={i} at={at} size={size} color={own ?? color} slam={slam} duration={slam ? 13 : undefined}>
                 {text}
             </Word>
         ))}
@@ -139,6 +174,12 @@ export const Eyebrow: React.FC<{ children: React.ReactNode; at: number; color?: 
         </div>
     );
 };
+
+/** The window's entrance, in frames, and the section frame it has landed
+ *  by: it starts two LEADs before the downbeat. A camera move must not start
+ *  before this, or it fights the entrance's own easing. */
+const ENTRANCE = 30;
+export const WINDOW_LANDS = ENTRANCE - LEAD * 2;
 
 /** Where the product window sits in every verb section, in frame pixels.
  *  8:5, the demo footage's own aspect, so a clip fills it uncropped. */
@@ -192,7 +233,7 @@ export const ProductWindow: React.FC<{
 }> = ({ children, at = 0, focus = [], rect = WINDOW }) => {
     const frame = useCurrentFrame();
     // Lands on the downbeat with the verb, rather than starting from it.
-    const t = ramp(frame, at - LEAD * 2, 30);
+    const t = ramp(frame, at - LEAD * 2, ENTRANCE);
     const cam = camera(frame, focus);
     return (
         <div
@@ -356,13 +397,19 @@ function displayWidth(text: string, size: number): number {
     return width;
 }
 
+/** The largest size, up to `base`, at which every line fits `max` pixels. */
+export function fitSize(lines: string[], max: number, base: number): number {
+    const widest = Math.max(...lines.map((l) => displayWidth(l, base)), 1);
+    return Math.min(base, Math.floor((base * max) / widest));
+}
+
 export const Verb: React.FC<{ word: string; product: string }> = ({ word, product }) => {
     const size = Math.min(SIZE.word, Math.floor((SIZE.word * VERB_MAX) / Math.max(1, displayWidth(word, SIZE.word))));
     return (
         <div style={{ position: "absolute", left: GUTTER, top: 250 }}>
             <Eyebrow at={4}>{product}</Eyebrow>
             <div style={{ marginTop: 22 }}>
-                <Word at={0} size={size} duration={20}>
+                <Word at={0} size={size} duration={14} slam>
                     {word}
                 </Word>
             </div>
@@ -415,20 +462,6 @@ export const Caption: React.FC<{ label: string; text: string; at: number }> = ({
                 {text}
             </div>
         </div>
-    );
-};
-
-/**
- * A type slide's slow push: the frame is never quite still while it is
- * read. Without it the holds between word hits measured as frozen video
- * (0.5-0.8 s at a time, five times) under freezedetect.
- */
-export const Drift: React.FC<{ children: React.ReactNode; frames: number }> = ({ children, frames }) => {
-    const frame = useCurrentFrame();
-    return (
-        <AbsoluteFill style={{ transform: `scale(${1 + 0.03 * (frame / frames)})`, transformOrigin: "30% 50%" }}>
-            {children}
-        </AbsoluteFill>
     );
 };
 

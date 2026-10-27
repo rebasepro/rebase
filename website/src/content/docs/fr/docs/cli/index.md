@@ -1,5 +1,5 @@
 ---
-sourceHash: 9210bf054bc3c431
+sourceHash: 2df00511c02fed53
 title: Référence de la CLI
 sidebar_label: CLI
 description: Commandes de la CLI Rebase pour l'initialisation de projet, la génération de schéma, les migrations de base de données et la génération de SDK.
@@ -77,7 +77,7 @@ Le bundle est l'artefact que vous déployez — l'image du runtime le charge, il
 |------|--------|
 | `--output <dir>` (ou `--out`) | Écrire le bundle ailleurs que dans `dist-bundle/` (une application à la fois) |
 | `--vendor` | Toujours installer et inclure les dépendances du bundle |
-| `--no-vendor` | Ne jamais inclure les dépendances ; le pod les installe au premier démarrage |
+| `--no-vendor` | Ne jamais inclure les dépendances ; le pod les installe à chaque démarrage |
 | `--skip-type-check` | Ignorer la vérification de types (plus rapide, moins sûr) |
 | `--no-static` | Ne pas intégrer le frontend dans le bundle backend (chaque application statique obtient tout de même son propre bundle) |
 | `--skip-static-build` | Intégrer le frontend comme déjà compilé, sans exécuter sa commande de build |
@@ -325,7 +325,7 @@ La commande à exécuter lorsque quelque chose ne va pas et que vous ne savez pa
 | Chaînes de connexion | Un `=` non encodé dans un paramètre d'URL, que les outils de PostgreSQL refusent de parser — ainsi, les sauvegardes et `psql` échouent alors que l'application continue de fonctionner. |
 | Fonctions personnalisées | Ce dont chaque fonction a besoin de son hôte, et lesquelles ne s'exécuteraient pas sur un runtime edge. |
 
-**Sur la base de données**, lorsque `DATABASE_URL` est définie :
+**Sur la base de données** — celle du projet lui-même, résolue comme le fait `rebase db url`, donc sur un scaffold neuf il s'agit de la base gérée, que `doctor` démarre :
 
 | Vérification | Raison |
 | --- | --- |
@@ -338,7 +338,7 @@ La commande à exécuter lorsque quelque chose ne va pas et que vous ne savez pa
 
 Si la base de données est inaccessible, ses étapes sont signalées comme ignorées avec la raison correspondante et le reste s'exécute quand même — voir [Dépannage](/docs/troubleshooting/).
 
-Renvoie un code de sortie non nul lorsqu'une vérification détecte une erreur, ou lorsqu'une étape n'a pas pu s'exécuter parce que la base de données fournie refuse les connexions. Une étape ignorée parce qu'aucune variable `DATABASE_URL` n'a été définie n'est pas considérée comme un échec.
+Renvoie un code de sortie non nul lorsqu'une vérification détecte une erreur, ou lorsqu'une étape n'a pas pu s'exécuter parce que la base de données fournie refuse les connexions. Une étape ignorée parce qu'aucune base de données n'a pu être résolue n'est pas considérée comme un échec.
 
 `rebase doctor --policies` n'exécute que les vérifications RLS — pas de diff de schéma, pas de types de SDK — et échoue par défaut, ce qui en fait la forme idéale à utiliser comme barrière de contrôle en CI sur une base de données déployée.
 
@@ -348,6 +348,7 @@ Renvoie un code de sortie non nul lorsqu'une vérification détecte une erreur, 
 rebase verify
 rebase verify --json
 rebase verify --live
+rebase verify --live --database-url postgresql://…
 ```
 
 Les collections sont-elles prêtes à être livrées : une seule commande rapide, pour la CI et pour les hooks d'un agent IA. Hors ligne par défaut, et elle ne modifie jamais rien.
@@ -357,7 +358,7 @@ Les collections sont-elles prêtes à être livrées : une seule commande rapide
 | Configuration des collections | Un fichier de `config/collections/` qui ne se charge pas, ou que le validateur de démarrage rejette — avec les clés inconnues comme erreurs, si bien qu'une option mal orthographiée ou une option d'interface écrite hors de `admin: { … }` (un `widget` au premier niveau) est détectée ici au lieu d'être ignorée en silence. |
 | Couverture RLS | Une collection sans `securityRules` qui n'en hérite d'aucune, ou une collection avec une colonne `user_id`, `owner_id`, `organization_id` ou `tenant_id` qui s'appuie à la place sur les valeurs par défaut du répertoire. Une règle qui laisse un rôle lire toutes les lignes d'une telle table est un avertissement. |
 | Fraîcheur des migrations | Une table ou une colonne que les collections déclarent et qu'aucun fichier de `backend/drizzle/migrations` ne crée, ou une colonne supprimée qu'une migration crée encore. Ignorée pour un projet qui n'a pas encore de migrations. |
-| Audit RLS en direct | Avec `--live` : le catalogue [`rls-check`](/docs/rls-check) sur `DATABASE_URL`, et la vérification que chaque migration a été appliquée. |
+| Audit RLS en direct | Avec `--live` : le catalogue [`rls-check`](/docs/rls-check) sur la base de données du projet, et la vérification que chaque migration a été appliquée. La base de données est résolue comme le font les commandes `db` — `--database-url`, `DATABASE_URL`, `--docker`, sinon la base de données de développement gérée. Une base de données qui n'est pas configurée ou qui ne répond pas est une erreur, pas une étape ignorée : l'audit a été demandé. Une politique de lecture `USING (true)` compilée à partir d'une règle `access: "public"` est un avertissement tant que l'API exige un jeton (`AUTH_REQUIRE`, activé par défaut) — chaque utilisateur connecté lit chaque ligne — et une erreur avec `AUTH_REQUIRE=false`, où les lignes sont anonymes. |
 
 `--json` affiche un objet unique — chaque étape, et chaque constat avec son `file`, le `path` pointé dans la configuration de la collection et le `fix` — pour qu'un agent puisse réparer ce qu'il a cassé. `--quiet` n'affiche rien quand tout passe. Le code de sortie est non nul en cas d'erreur ; les avertissements ne font pas échouer la commande.
 
@@ -398,9 +399,46 @@ rebase storage move --from "(default)" --to media --prefix avatars
 rebase storage move --from "(default)" --to media --prefix avatars --delete-source
 ```
 
-`orphans` lit chaque ligne de chaque collection, lignes supprimées logiquement comprises, et liste les fichiers d'une source (`--source`, la source par défaut si omis) qu'aucune chaîne d'aucune ligne ne nomme : une clé, une URL, une référence `rebase-storage:` dans un texte. Les fichiers plus récents que `--older-than` heures (24 par défaut) sont écartés, car le panneau d'administration téléverse un fichier avant d'enregistrer la ligne qui le nomme. `--delete` demande confirmation avant de supprimer (`--yes` passe la question, et est obligatoire sans terminal), le serveur retrouve d'abord les fichiers, et rien n'est supprimé tant qu'une collection ne peut pas être lue. Les fichiers que seules vos propres tables hors collections nomment paraissent inutilisés : vérifiez avant de supprimer.
+`orphans` lit chaque ligne de chaque collection telle qu'elle est stockée (lignes supprimées
+logiquement comprises, sans passer par aucun hook `beforeQuery` ni `afterRead`) et chaque entrée de
+l'[historique](/docs/backend/history/), puisqu'une restauration rétablit ce qu'elle contient.
+Elle liste les fichiers d'une source (`--source`, la source par défaut si omis)
+qu'aucune chaîne d'aucun d'eux ne nomme : une clé, une URL, une référence `rebase-storage:`
+dans un texte. Les fichiers plus récents que `--older-than` heures (24 par défaut) sont écartés,
+car le panneau d'administration téléverse un fichier avant d'enregistrer la ligne qui le nomme.
+L'analyse s'exécute sur le backend en arrière-plan, de sorte qu'un projet trop gros pour être analysé
+dans une seule requête (derrière un ingress qui l'interrompt) se termine quand même. Le
+CLI la démarre, puis affiche sa progression (fichiers listés, lignes lues, collections
+terminées, et celles qui n'ont pas pu être lues) jusqu'à la fin. Avec la
+[file de jobs](/docs/backend/jobs/) activée, l'analyse est un job `storage.orphans` que
+les workers de jobs exécutent. Sans elle, l'analyse s'exécute dans le processus serveur
+sollicité, et le CLI l'indique : redémarrer ce processus arrête l'analyse. Une analyse
+est une tentative de job, limitée par `jobs.timeoutMs` (15 minutes par défaut). Augmentez-le,
+ou mettez-le à 0, pour une source qui demande plus de temps. `--json` affiche le même
+rapport qu'auparavant, plus son `scanId`.
 
-`move` copie les fichiers placés sous `--prefix` vers une autre source sous les mêmes clés, une page à la fois. Un fichier que la cible détient déjà à la même taille est ignoré, si bien qu'un déplacement interrompu reprend en le relançant ; `--delete-source` supprime chaque fichier de la source dès que la cible le détient. Les deux exigent `database:read`, et la suppression ou le déplacement `database:write`, que détient la clé de service.
+`--delete` demande confirmation avant de supprimer (`--yes` passe la question, et est obligatoire
+sans terminal). Il ne supprime qu'à partir de l'analyse qui vient d'être affichée, et seulement dans les
+15 minutes qui suivent la fin de cette analyse. Rien n'est supprimé tant qu'une collection
+ne peut pas être lue : une collection avec des hooks de lecture sur une source de données dont le driver
+ne peut pas lire au-delà d'eux compte comme non lue. Avant de supprimer quoi que ce soit, le serveur
+relit chaque ligne et chaque entrée d'historique par rapport aux fichiers listés. Puis il interroge
+de nouveau chaque fichier juste avant de le supprimer. Un fichier qu'une ligne nomme maintenant,
+qui a été téléversé de nouveau depuis l'analyse, ou qui a disparu est conservé, et le CLI
+le liste comme conservé. Les fichiers que seules vos propres tables hors collections nomment paraissent
+inutilisés : vérifiez avant de supprimer. Face à un backend en 0.25.1 ou antérieur, le
+CLI analyse à l'ancienne, dans une seule requête.
+
+`move` copie les fichiers placés sous `--prefix` vers une autre source sous les mêmes clés,
+une page à la fois. Un fichier que la cible détient déjà à la même taille est ignoré,
+si bien qu'un déplacement interrompu reprend en le relançant ; `--delete-source` supprime chaque
+fichier de la source dès que la cible le détient, et est refusé lorsque les deux
+sources stockent dans le même bucket ou répertoire. Une fois le déplacement terminé, le CLI
+liste de nouveau la source par un parcours neuf et nomme chaque fichier que le déplacement n'a pas
+déplacé : avec `--delete-source`, tout fichier encore dans la source ; sans, tout fichier
+dont la cible ne détient aucune copie de même taille. Il se termine avec le code 1 s'il y en a un, et
+relancer le même déplacement le reprend. `--json` les affiche comme `notMoved`. Les deux exigent `database:read`, et
+la suppression ou le déplacement `database:write`, que détient la clé de service.
 
 ### `rebase skills install`
 

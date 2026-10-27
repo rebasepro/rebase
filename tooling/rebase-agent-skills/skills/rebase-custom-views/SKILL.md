@@ -184,8 +184,8 @@ export default defineCollection({
 Entry fields: `key` (unique on the record), `name` (tab label), `Builder`,
 `icon`, and `position` — `"end"` (default, after the form) or `"start"` (before
 it: a read-only cover of the record, with the form one tab to the right).
-Never import the component into the collection file: that pulls React into the
-backend and `pnpm check:headless` fails.
+Never import the component into the collection file: the backend loads that
+file too, and the import pulls React into it.
 
 The component receives `EntityCustomViewParams`:
 
@@ -270,8 +270,10 @@ export default defineCollection({
 });
 ```
 
-The field owns the input; the label, the validation and the error line stay
-with the form. `FieldProps` carries `value`, `setValue(value)`, `property`,
+The component replaces the whole field: it draws the input, the label and the
+error line (`error`, when `showError`) itself, as the built-in fields do;
+validation stays with the form, which computes `error` from the property's
+rules. `FieldProps` carries `value`, `setValue(value)`, `property`,
 `propertyKey`, `disabled`, `error`, `showError`, `customProps`, and `context`
 (the whole form: `values`, `setFieldValue`, `entityId`, …).
 
@@ -346,8 +348,8 @@ these rules is indistinguishable from a built-in screen:
   a hover on something transparent `hover:bg-surface-hover`. Never a
   `bg-white dark:bg-…` pair: the theme decides the value.
 - **Lines.** `border border-hairline` around an object on a surface,
-  `border-hairline-strong` on a floating one. No rule under a header that sits
-  on the sheet.
+  `border-hairline-strong` on a floating one. A field is not one of those: it
+  is a filled box with no edge. No rule under a header that sits on the sheet.
 - **Shape.** `rounded-xl` for a card or sheet, `rounded-lg` for a control or
   row highlight, `rounded-md` for a chip or tile. Never a pixel radius.
 - **One primary action.** At most one `color="primary"` filled `Button` per

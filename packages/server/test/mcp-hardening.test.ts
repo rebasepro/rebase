@@ -14,6 +14,7 @@
 import { DEFAULT_LIST_LIMIT, RebaseApiError, type CollectionConfig } from "@rebasepro/types";
 import { ApiError } from "../src/api/errors";
 import { parseQueryOptions } from "../src/api/rest/query-parser";
+import { MCP_TOOLS } from "../src/mcp/mcp-tools";
 import { configureJwt, generateAccessToken, generateMcpAccessToken, signPurposeToken } from "../src/auth/jwt";
 import {
     buildApp, stubDriver, authorize, redeem, connectedClient, registerClient,
@@ -419,6 +420,49 @@ describe("tool inputs", () => {
         const { body } = await call("query_collection", { collection: "candidates", offset });
         expect(body.result?.isError).toBe(true);
         expect(body.result?.content[0].text).toBe(restRefusal({ offset: String(offset) }));
+    });
+
+    it("reads the trash with `deleted`, as REST's ?deleted= does", async () => {
+        // describe_collection says update_document restores a trashed row; the
+        // id to restore has to be findable, and every read hid the trash.
+        for (const [deleted, withDeleted] of [["only", "only"], ["include", true]] as const) {
+            const { body, calls } = await call("query_collection", { collection: "candidates", deleted });
+            expect(body.result?.isError).toBeFalsy();
+            expect((calls.find(c => c.method === "fetchCollection")?.args as { withDeleted?: unknown }).withDeleted)
+                .toBe(withDeleted);
+        }
+        const { calls } = await call("query_collection", { collection: "candidates" });
+        expect((calls.find(c => c.method === "fetchCollection")?.args as { withDeleted?: unknown }).withDeleted)
+            .toBeUndefined();
+    });
+
+    it("refuses a `deleted` value other than include or only, before reading", async () => {
+        const { body, calls } = await call("query_collection", { collection: "candidates", deleted: "true" });
+        expect(body.result?.isError).toBe(true);
+        expect(body.result?.content[0].text).toContain("include");
+        expect(calls.filter(c => c.method === "fetchCollection")).toHaveLength(0);
+    });
+
+    it("counts the trash with `deleted` too", async () => {
+        const { driver } = stubDriver();
+        const counted: unknown[] = [];
+        (driver as unknown as { count: (a: unknown) => Promise<number> }).count = async (a) => { counted.push(a); return 2; };
+        const { app } = buildApp({ driver });
+        const { accessToken } = await connectedClient(app, { scope: "data:read" });
+        const res = await rpc(app, accessToken, {
+            jsonrpc: "2.0", id: 1, method: "tools/call",
+            params: { name: "count_documents", arguments: { collection: "candidates", deleted: "only" } }
+        });
+        const body = await res.json() as { result?: { isError?: boolean } };
+        expect(body.result?.isError).toBeFalsy();
+        expect(JSON.stringify(counted)).toContain("\"withDeleted\":\"only\"");
+    });
+
+    it("does not tell the model a delete is permanent when the collection keeps a trash", () => {
+        const description = MCP_TOOLS.find(t => t.name === "delete_document")?.description ?? "";
+        expect(description).not.toMatch(/^Delete a row by id\. This cannot be undone\.$/);
+        expect(description).toContain("softDeleteField");
+        expect(description).toContain("deleted");
     });
 
     it("says whether more rows follow from the count, not from a full page", async () => {

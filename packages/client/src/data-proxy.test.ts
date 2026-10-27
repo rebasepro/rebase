@@ -170,6 +170,13 @@ describe("client.data proxy — untyped mode (no collections dictionary)", () =>
             expect(warnSpy).toHaveBeenCalledWith(
                 expect.stringContaining("[Rebase] Untyped data access detected")
             );
+            // It names the accessor, where it went, and the fix.
+            const message = String(warnSpy.mock.calls[0][0]);
+            expect(message).toContain("client.data.firstAccess");
+            expect(message).toContain("/data/first_access");
+            expect(message).toContain("collections: collectionsDictionary");
+            expect(message).toContain("generated/sdk/database.types");
+            expect(message).toContain('client.data.collection("<slug>")');
 
             // Second access should NOT warn again
             warnSpy.mockClear();

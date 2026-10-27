@@ -1,5 +1,5 @@
 ---
-sourceHash: 3d6a5a62a25e5b8c
+sourceHash: a636c0e2f47b6493
 title: E-Mail-Verifizierung
 sidebar_label: E-Mail-Verifizierung
 description: "Wie ein Konto seine E-Mail-Adresse nachweist: der bei der Registrierung versendete Link, was das Folgen behält und entfernt, und Registrierung mit vorheriger Bestätigung über requireEmailVerification."
@@ -47,8 +47,12 @@ Die registrierende Person folgt dem Link und gibt ihr Passwort ein
 anmeldet. Ist es aus, was der Standard ist, wird eine Adresse, die bereits ein Konto hat, wie
 bisher mit `409 EMAIL_EXISTS` beantwortet.
 
-Um eine Zurückweisung aus Schritt 3 aufzulösen, meldet sich der Benutzer mit seiner bestehenden
-Methode an und ruft den expliziten Verknüpfungsendpunkt auf:
+Eine Anmeldung über einen Provider, der die Adresse verifiziert hat, verifiziert
+auch das Konto (siehe
+[Account-Verknüpfung](/docs/backend/authentication/#account-linking-across-sign-in-methods)).
+Um eine Zurückweisung aus Schritt 3 aufzulösen (`403 EMAIL_NOT_VERIFIED`: Der
+Provider hat die Adresse nicht verifiziert), meldet sich der Benutzer mit seiner
+bestehenden Methode an und ruft den expliziten Verknüpfungsendpunkt auf:
 
 ```http
 POST /api/auth/link/google

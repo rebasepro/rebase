@@ -167,7 +167,7 @@ POST /api/data/_batch
 
 ### `$ref` : pointer vers une ligne créée dans le même lot
 
-Une opération peut se nommer elle-même via `ref`, et toute opération ultérieure peut placer `{ "$ref": "<nom>.<champ>" }` là où une valeur est attendue — dans `values` à n'importe quel niveau d'imbrication, ou en tant qu'`id`. Cela correspond au champ de la ligne écrite par l'opération désignée.
+Une opération peut se nommer elle-même via `ref`, et toute opération ultérieure peut placer `{ "$ref": "<name>.<field>" }` là où une valeur est attendue — dans `values` à n'importe quel niveau d'imbrication, ou en tant qu'`id`. Cela correspond au champ de la ligne écrite par l'opération désignée.
 
 C'est la raison d'être de ce point de terminaison par rapport à une simple boucle : la clé étrangère d'un enfant est inconnue tant que le parent n'a pas été inséré, donc sans cela, le parent et les enfants doivent faire l'objet de requêtes distinctes — précisément la séquence susceptible d'échouer à mi-chemin. Seules les références **vers l'arrière** sont résolues ; une référence vers l'avant est refusée avant même l'ouverture de la transaction.
 

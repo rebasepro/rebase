@@ -96,12 +96,12 @@ Una colonna `json` o `jsonb` può essere filtrata per percorso (path), usando la
 di Postgres:
 
 ```typescript
-// Ordini i cui metadati indicano che il paese è US
+// Orders whose metadata says the country is US
 const { data } = await client.data.orders
     .where("metadata->>country", "==", "US")
     .find();
 
-// I percorsi nidificati si navigano con -> e si estrae il valore foglia con ->>
+// Nested paths walk with -> and take the leaf with ->>
 await client.data.orders.where("metadata->address->>city", "==", "Berlin").find();
 ```
 
@@ -119,8 +119,8 @@ I segmenti del percorso vengono sempre inviati come parametri associati (bound p
 operatore di ordinamento (`>`, `>=`, `<`, `<=`) viene passato un **numero**, nel qual caso esegue il cast a numerico:
 
 ```typescript
-await client.data.orders.where("metadata->>score", ">", 100).find();     // numerico: 9 < 100
-await client.data.orders.where("metadata->>version", ">", "1.2").find(); // testo
+await client.data.orders.where("metadata->>score", ">", 100).find();     // numeric: 9 < 100
+await client.data.orders.where("metadata->>version", ">", "1.2").find(); // text
 ```
 
 Le righe il cui valore in quel percorso non è un numero vengono escluse dal
@@ -135,12 +135,12 @@ singolo percorso — pongono una condizione sull'intero documento, quindi vanno 
 ## Ricerca di testo
 
 ```typescript
-// Tramite parametri find
+// Via find params
 const { data } = await client.data.products.find({
     searchString: "wireless headphones"
 });
 
-// Stile fluent
+// Fluent style
 const { data } = await client.data.products
     .search("wireless headphones")
     .limit(10)
@@ -240,10 +240,10 @@ Puoi configurarlo, o disattivarlo, direttamente sulla proprietà:
 embedding: {
     type: "vector",
     dimensions: 1536,
-    // Valori predefiniti: un indice HNSW, cosine. Ognuno di questi parametri può essere omesso.
+    // Defaults: one HNSW index, cosine. Any of these may be omitted.
     index: {
-        method: "hnsw",              // o "ivfflat"
-        distance: ["cosine", "l2"],  // un indice per ciascuno
+        method: "hnsw",              // or "ivfflat"
+        distance: ["cosine", "l2"],  // one index each
         m: 24,                       // hnsw
         efConstruction: 128          // hnsw
     }

@@ -20,7 +20,7 @@
  */
 
 import type { Context, MiddlewareHandler } from "hono";
-import { intersectScopes, scopesForRoles, scopeGrants, scopeGrantsAny, type DataDriver } from "@rebasepro/types";
+import { intersectScopes, scopesForRoles, scopeGrants, scopeGrantsAny, type CallerCredential, type DataDriver } from "@rebasepro/types";
 import type { HonoEnv } from "../../api/types";
 import type { ApiKeyStore } from "./api-key-store";
 import type { ApiKeyMasked } from "./api-key-types";
@@ -30,6 +30,8 @@ import { accessOf, processAccessControl, type AccessControl } from "../access";
 import { logger } from "../../utils/logger";
 import { sha256Hex } from "../../utils/portable-crypto";
 import { ApiError, errorHandler } from "../../api/errors";
+import { refuseSimulatedWrite } from "../simulation-read-only";
+import { httpMethodToOperation } from "./http-operation";
 
 /**
  * Check whether a token looks like a Rebase API key.
@@ -101,6 +103,14 @@ export async function resolveApiKey(
 }
 
 /**
+ * What a collection callback is told about the key a request authenticated
+ * with (`context.credential`): its kind, id and name, never the secret.
+ */
+export function credentialOf(apiKey: Pick<ApiKeyMasked, "id" | "name" | "kind">): CallerCredential {
+    return { kind: apiKey.kind, id: apiKey.id, name: apiKey.name };
+}
+
+/**
  * Who a stored key acts as and what it holds — the half of
  * {@link resolveApiKey} that does not depend on how the key was found. The RLS
  * simulator asks it of a key named by id, so "view as this key" and a request
@@ -168,7 +178,10 @@ export async function validateApiKey(
     try {
         c.set("driver", await scopeDataDriver(options.driver, {
             uid: resolved.uid,
-            roles: resolved.roles
+            roles: resolved.roles,
+            // So a collection callback can tell this key's write from its
+            // owner's own session: `context.credential`.
+            credential: credentialOf(resolved.apiKey)
         }));
     } catch (error) {
         logger.error("[AUTH] RLS scoping failed for API key", { error: error });
@@ -226,9 +239,18 @@ export function createTusScopeGuard(): MiddlewareHandler<HonoEnv> {
  *                      name from the request path. Omitted, it is the
  *                      `mountPath` the functions group recorded for this
  *                      request — wherever the application mounted it.
+ *
+ * It also keeps "Simulate access" read-only here: a function called with a
+ * simulation header by any verb but GET, HEAD or OPTIONS is refused
+ * (`SIMULATION_READ_ONLY`), since it would run as the simulated identity.
  */
 export function createFunctionScopeGuard(mountPrefix?: string): MiddlewareHandler<HonoEnv> {
     return async (c, next) => {
+        try {
+            refuseSimulatedWrite(c, httpMethodToOperation(c.req.method));
+        } catch (error: unknown) {
+            return errorHandler(error instanceof Error ? error : new Error(String(error)), c) as Response;
+        }
         const narrowed = c.get("scopes");
         if (!narrowed) return next();
 

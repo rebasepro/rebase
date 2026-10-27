@@ -68,10 +68,10 @@ function ArticlePreview({
 
 | Prop | Type | Description |
 |------|------|-------------|
-| `entity` | `Entity` | The saved entity (null for new entities) |
+| `entity` | `Entity` | The saved entity (absent while a new one is being created) |
 | `modifiedValues` | `EntityValues` | Current unsaved form values (live as user types) |
 | `formContext` | `FormContext` | Full form context |
-| `collection` | `CollectionConfig` | Collection definition |
+| `collection` | `AdminCollection` | Collection definition |
 
 ![Entity view with secondary form](/img/entity_view_secondary_form.png)
 

@@ -1,5 +1,5 @@
 ---
-sourceHash: ce1b04dc7278a010
+sourceHash: 80956abbae707a91
 title: Kubernetes
 sidebar_label: Kubernetes
 description: Stellen Sie Rebase mit dem offiziellen Helm-Chart auf einem Kubernetes-Cluster bereit – ein Deployment oder mehrere, ein Migrations-Job für das Schema und statische Apps auf demselben Host.
@@ -16,15 +16,21 @@ helm install rebase oci://registry-1.docker.io/rebasepro/rebase \
   --set config.databaseUrl='postgres://user:pass@host:5432/db' \
   --set config.jwtSecret="$(openssl rand -hex 32)" \
   --set config.serviceKey="$(openssl rand -hex 32)" \
+  --set config.adminEmail=you@example.com \
+  --set config.adminPassword="$(openssl rand -hex 16)" \
   --set ingress.host=api.example.com \
   --set image.repository=my-registry/my-app
 ```
 
+Das Chart wird mit deaktivierter Selbstregistrierung ausgeliefert, daher muss ein Release das Konto benennen, mit dem sich sein Betreiber anmeldet – andernfalls startet es mit einer leeren Benutzertabelle und ohne eine Möglichkeit, den ersten authentifizierten Aufrufer zu erzeugen. `config.adminPassword` muss mindestens 12 Zeichen lang sein, und `config.adminEmail` braucht einen Punkt in der Domain: Die Login-Route parst ihren Body mit `z.string().email()`, sodass `admin@localhost` ein Konto ist, bei dem sich niemand anmelden könnte, und die Runtime es nicht anlegt. Beides sind Verweigerungen beim Rendern statt Überraschungen zur Laufzeit – siehe [was das Chart verweigert zu rendern](#was-das-chart-verweigert-zu-rendern). Melden Sie sich an und ändern Sie das Passwort; diese Werte landen in einem Secret.
+
+Verwalten Sie sie stattdessen außerhalb des Charts, indem Sie `existingSecret` auf ein Secret richten, das `REBASE_ADMIN_EMAIL` und `REBASE_ADMIN_PASSWORD` neben `DATABASE_URL` und dem Rest enthält.
+
 Das Chart stellt **nur die Runtime** bereit. Es stellt kein Postgres bereit – verwenden Sie CloudNativePG, eine verwaltete Datenbank oder Ihr eigenes StatefulSet und verweisen Sie mit `config.databaseUrl` darauf. Ein Chart, das auch Ihre Datenbank verwalten würde, wäre auch für Ihre Backups und Ihr Failover verantwortlich, was ein viel größeres Versprechen ist als „die App ausführen“.
 
-> **Reifegrad.** Das Chart wird in der CI gegen Helm v4.2.4 gelintet und gerendert – jede dokumentierte Topologie und ein Fall für jede unten aufgeführte Verweigerung. Es wurde **noch nicht an einem Live-Cluster getestet**. Betrachten Sie es als gut getesteten Ausgangspunkt und nicht als praxiserprobten Standard, und lesen Sie [Self-Hosting](/docs/deployment/self-hosting) für den Pfad, der es ist.
+> **Reifegrad.** In der CI werden zwei getrennte Dinge geprüft, ein drittes nicht. Das Chart wird gegen Helm v4.2.4 gelintet und gerendert – jede auf dieser Seite dokumentierte Topologie, einschließlich des Installationsbefehls oben, und ein Fall, der jede unten aufgeführte Verweigerung erreicht. Das Runtime-Image, das das Chart bereitstellt, wird gegen ein echtes Postgres gebaut und gestartet, auf beiden Wegen, auf denen ein Bundle ankommen kann. Was **noch nie gelaufen ist, ist das Chart gegen einen Live-Cluster**: Nichts hat diese Manifeste je eingeplant, sodass die Probes, die Reihenfolge des Pre-Install-Migrations-Jobs und der Ingress als YAML korrekt und als Deployment unbewiesen sind. Betrachten Sie es als gut getesteten Ausgangspunkt und nicht als praxiserprobten Standard, und lesen Sie [Self-Hosting](/docs/deployment/self-hosting) für den Pfad, der es ist.
 
-Um stattdessen aus einem Checkout zu arbeiten – einem modifizierten Chart oder einer Air-Gapped-Installation – akzeptiert `helm install rebase ./charts/rebase` dieselben Werte.
+Um stattdessen aus einem Checkout zu arbeiten – einem modifizierten Chart oder einer Air-Gapped-Installation – akzeptiert `helm install rebase ./infra/charts/rebase` dieselben Werte.
 
 ## Ihr Projekt in den Pod bringen
 
@@ -34,6 +40,8 @@ Um stattdessen aus einem Checkout zu arbeiten – einem modifizierten Chart oder
 | `url` | Standard-Image; die Runtime lädt bei jedem Pod-Start einen Tarball herunter | Eine Control Plane, die Bundles Out-of-Band ausliefert |
 
 ## Ein Prozess oder mehrere
+
+<span class="since-badge" data-since="0.26">Seit 0.26</span>
 
 Der Standard ist ein einzelnes Deployment, das alles bedient – dieselbe Struktur, die auch die Compose-Datei ausführt. Das Aufteilen erfordert nur einen Wert:
 
@@ -88,9 +96,9 @@ Das Deployment des Admin-Panels ist dann lediglich die Aktualisierung eines Imag
 
 ## Schema
 
-`migrationJob.enabled` (der Standard) führt einen `pre-install,pre-upgrade`-Job aus, der die Bereitstellung vornimmt und sich beendet, und jeder Pod startet mit `REBASE_MIGRATE_ON_BOOT=none`. Nichts auf dem Request-Pfad besitzt DDL, was die sauberste Lösung für „genau ein Prozess provisioniert das Schema“ ist – es ist keine Regel mehr, an die man sich erinnern muss.
+`migrationJob.enabled` (der Standard) führt einen `pre-install,pre-upgrade`-Job aus, der die Bereitstellung vornimmt und sich beendet, und jeder Pod startet mit `REBASE_MIGRATE_ON_BOOT=none`. Nichts auf dem Request-Pfad besitzt das Collection-Schema, was die sauberste verfügbare Lösung für „genau ein Prozess provisioniert das Schema“ ist – es ist keine Regel mehr, an die man sich erinnern muss. Die Pods halten beim Start weiterhin die eigenen Tabellen des Frameworks (Auth, API-Schlüssel, Jobs, Cron) aktuell; `provision: false` stoppt auch das, rendert keinen Job und überlässt das Schema einem [Provisioning-Lauf](/docs/deployment/self-hosting/#when-only-your-change-process-may-change-the-database) unter Ihrem eigenen Änderungsprozess.
 
-`mode: ensure` erstellt, was fehlt. `mode: push` wendet auch Schema-Änderungen an Collections an und **ist destruktiv**; es ist nicht der Standard.
+`mode: ensure` erstellt additiv, was fehlt, und ist der einzige Modus, den das Runtime-Image akzeptiert. `push` wird beim Start verweigert: Das Anwenden von Collection-Schema-Änderungen ist destruktiv, und `rebase db push` aus einem Checkout oder einer CI führt die Änderung als Dry Run aus, verweigert destruktive ohne Bestätigung und kann zuvor ein Backup erstellen – nichts davon kann ein Pod, der unbeaufsichtigt startet.
 
 ## Was das Chart verweigert zu rendern
 
@@ -102,6 +110,8 @@ Jede dieser Konfigurationen erzeugt zur Laufzeit keinen Fehler – das Deploymen
 - `bundle.mode=image`, während `image.repository` noch das Standard-Runtime-Image ist
 - `ingress.enabled` ohne Host oder `bundle.mode=url` ohne URL
 - ein unbekannter `migrationJob.mode` oder `sharedState.rateLimitStore`
+- kein `config.adminEmail` bei deaktivierter Selbstregistrierung – ein Release, bei dem sich niemand anmelden kann. Setzen Sie die beiden Admin-Werte oder `config.allowSelfRegistration=true`, im Wissen, dass die erste Person, die das Registrierungsformular erreicht, dessen Administrator wird
+- ein `config.adminPassword` unter 12 Zeichen oder ein `config.adminEmail`, dessen Domain keinen Punkt hat. Die Runtime weigert sich, beides beim Start anzulegen, und hinterlässt dasselbe ausgesperrte Release
 
 ## Was das Chart nicht für Sie tun kann
 

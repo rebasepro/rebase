@@ -97,6 +97,11 @@ export class GCSStorageController implements StorageController {
         return ["default", this.config.bucket];
     }
 
+    /** See {@link StorageController.storageLocation}: bucket names are global. */
+    storageLocation(): string {
+        return `gcs:${this.config.bucket}`;
+    }
+
     async putObject({
         file,
         key,

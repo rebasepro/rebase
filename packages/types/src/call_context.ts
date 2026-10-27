@@ -4,6 +4,7 @@ import type { RebaseClient } from "./controllers/client";
 import type { RebaseSdkData } from "./controllers/data";
 import type { User } from "./users";
 import type { Register, RegisteredDatabase } from "./types/register";
+import type { CallerCredential } from "./types/api_keys";
 
 /**
  * The client a collection callback is handed as `context.client`: the Rebase
@@ -163,4 +164,22 @@ export type RebaseCallContext<USER extends User = User, DB = RegisteredDatabase>
      * Set by the backend when callbacks are executed on the server.
      */
     user?: USER;
+
+    /**
+     * The API key the write was made with, when it was one: its `kind`, `id`
+     * and `name`. Absent for a person's own session, a service-key request,
+     * server-context work (`rebase.dataAsAdmin`, crons) and in the browser.
+     *
+     * A personal key acts as its owner, so {@link user} is the owner whether
+     * they saved by hand or a CI job wrote with their key. Read this to tell
+     * the two apart, for example to attribute an audit entry to the token.
+     *
+     * @example
+     * afterSave: async ({ context }) => {
+     *     const who = context.credential
+     *         ? `${context.credential.name} (key of ${context.user?.uid})`
+     *         : context.user?.uid;
+     * }
+     */
+    credential?: CallerCredential;
 }

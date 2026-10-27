@@ -1,5 +1,5 @@
 ---
-sourceHash: 648de86871ab3d3d
+sourceHash: fdbf8e3627811576
 slug: de/docs/troubleshooting
 title: Fehlerbehebung
 description: Die Fehler, die verhindern, dass ein Rebase-Backend startet oder Anfragen bedient – eine nicht erreichbare Datenbank, falsche Anmeldedaten, eine fehlende Extension, eine RLS-Verweigerung, Schema-Drift, ein belegter Port, eine Funktion, die nicht lädt – und wie jeder davon aussieht.
@@ -147,10 +147,10 @@ Dev bindet den nächsten freien Port und meldet dies. Die Meldung ist wichtig, d
 
 ## Das Backend ist abgestürzt und `rebase dev` lief weiter
 
-Ein Backend, das beim Booten einen Fehler wirft, stoppt den Watcher nicht – es gibt den Stacktrace aus und wartet auf eine Dateiänderung. `rebase dev` meldet Folgendes:
+Ein Backend, das beim Booten einen Fehler wirft, stoppt den Watcher nicht – es gibt den Stacktrace aus und wartet auf eine Dateiänderung. Hat sich das Backend nicht innerhalb von `REBASE_DEV_READY_TIMEOUT_MS` (standardmäßig 30 Sekunden) gemeldet, meldet `rebase dev` Folgendes:
 
 ```
-  ✗ The backend crashed on startup.
+  ✗ The backend has not started after 30s.
     Fix the error above; the watcher restarts it on the next change.
 ```
 

@@ -17,8 +17,11 @@
  * Transaction ids are the server's, not a database's, and the template copy
  * keeps every row's `xmin`. So a row written after the branch was made — on
  * either side — has an `xmin` younger than the transaction that created the
- * branch database, which is the `xmin` of its `pg_database` row. That is the
- * fork point, and with it each difference has an author:
+ * branch database. That is the fork point: the `xmin` of the new database's
+ * `pg_database` row, read when the branch is made and kept in its record
+ * (`BranchInfo.forkXid`), because a `GRANT`, an `ALTER DATABASE` or a forced
+ * copy from the branch rewrites that row later. With it each difference has an
+ * author:
  *
  * | branch row          | target row          | the change                     |
  * |---------------------|---------------------|--------------------------------|
@@ -34,9 +37,17 @@
  * branch's insert. An update that wrote the same values still counts as a
  * write, so it can make a conflict of a row only one side meant to change.
  *
- * When the fork point cannot be read — the `pg_database` row was frozen by a
- * vacuum, or rewritten by an `ALTER DATABASE` — every difference is counted as
- * the branch's and the diff says so (`forkPointKnown: false`).
+ * A delete reaches further than its row. A row the branch deleted can be
+ * referenced, through a foreign key, by a row the target wrote since — a post
+ * by an author the branch removed. Deleting it on the target would cascade
+ * into that post, null its column, or fail outright, so it is a conflict, not
+ * a delete: `onConflict: "target"` keeps the row, `"branch"` deletes it and
+ * says what the foreign key reached (`referencedBy` on the diff).
+ *
+ * A branch recorded before the fork point was kept falls back to the
+ * `pg_database` row as it is now. When the fork point cannot be read — that
+ * row was frozen by a vacuum — every difference is counted as the branch's and
+ * the diff says so (`forkPointKnown: false`).
  *
  * ## What a merge does
  *
@@ -55,6 +66,7 @@ import {
     type BranchMergeBlock,
     type BranchMergeOptions,
     type BranchMergeResult,
+    type BranchReferencingRows,
     type BranchRowChange,
     type BranchSchemaChange,
     type BranchTableDataDiff,
@@ -66,6 +78,29 @@ import { ApiError } from "@rebasepro/server";
 
 /** Rows shown per table when the caller does not say. */
 export const DEFAULT_BRANCH_DIFF_SAMPLE_LIMIT = 100;
+
+/** The most rows a diff samples per table, whatever the caller asks for. */
+export const MAX_BRANCH_DIFF_SAMPLE_LIMIT = 1000;
+
+/** What a sample shows in place of a secret's value. */
+export const REDACTED = "[redacted]";
+
+/**
+ * Columns whose values a sample never shows: the auth users table's password
+ * hash and mailed tokens, and anything named like a secret, a token or a hash
+ * in any table — a diff is read by whoever reviews a branch, and these are
+ * credentials, not data to review. Matched by name, so a users table in
+ * another schema, or an app's own `api_secret`, is covered too.
+ */
+const SECRET_COLUMN = /password|secret|(^|_)token$|_token_hash$|(^|_)hash$/i;
+
+/** `row` with every secret column's value replaced by {@link REDACTED}. */
+function redacted(row: Record<string, string | null> | undefined): Record<string, string | null> | undefined {
+    if (!row) return row;
+    const shown: Record<string, string | null> = {};
+    for (const [column, value] of Object.entries(row)) shown[column] = value !== null && SECRET_COLUMN.test(column) ? REDACTED : value;
+    return shown;
+}
 
 /** Rows a table may hold, per side, to be matched row by row, when the caller does not say. */
 export const DEFAULT_BRANCH_DIFF_MAX_ROWS = 100_000;
@@ -154,12 +189,37 @@ function keyExpression(primaryKey: readonly string[]): string {
 }
 
 /**
+ * `t.<column>` as text that reads the same in any session.
+ *
+ * A row's text output follows the session's settings, and a database-level
+ * `ALTER DATABASE … SET timezone` (or `datestyle`) is not copied to a branch
+ * made from it — so the same `timestamptz` wrote different text on the two
+ * sides, and every untouched row read as changed. Times, timestamps and dates
+ * are written out with `to_char` in UTC instead; infinities keep their own
+ * words, which no setting changes.
+ */
+function settledValue(column: { name: string; type: string }): string {
+    const value = `t.${ident(column.name)}`;
+    const finite = (expression: string, format: string) =>
+        `CASE WHEN isfinite(${value}) THEN to_char(${expression}, '${format}') ELSE ${value}::text END`;
+    if (column.type === "timestamp with time zone" || (column.type.startsWith("timestamp(") && column.type.endsWith("with time zone"))) {
+        return finite(`${value} AT TIME ZONE 'UTC'`, "YYYY-MM-DD\"T\"HH24:MI:SS.US");
+    }
+    if (column.type === "timestamp without time zone" || column.type.startsWith("timestamp(")) {
+        return finite(value, "YYYY-MM-DD\"T\"HH24:MI:SS.US");
+    }
+    if (column.type === "date") return finite(value, "YYYY-MM-DD");
+    return value;
+}
+
+/**
  * A digest of `t`'s values in `columns`. A row constructor rather than a
  * function call, which would stop at 100 columns. The same columns, of the
- * same types, write the same text on both sides.
+ * same types, write the same text on both sides, whatever either session's
+ * timezone or date style.
  */
-function hashExpression(columns: readonly string[]): string {
-    return `md5(ROW(${columns.map((column) => `t.${ident(column)}`).join(", ")})::text)`;
+function hashExpression(columns: readonly { name: string; type: string }[]): string {
+    return `md5(ROW(${columns.map(settledValue).join(", ")})::text)`;
 }
 
 // ── The catalogue ────────────────────────────────────────────────────────────
@@ -185,6 +245,12 @@ export interface PolicyFacts {
     withCheck: string | null;
 }
 
+/** An object of a table — a constraint, an index, a trigger — as the SQL that declares it. */
+export interface NamedDefinition {
+    name: string;
+    definition: string;
+}
+
 export interface TableFacts {
     schema: string;
     table: string;
@@ -193,10 +259,28 @@ export interface TableFacts {
     columns: ColumnFacts[];
     primaryKey: string[];
     policies: PolicyFacts[];
+    /** Unique, foreign-key, check and exclusion constraints: everything but the primary key and NOT NULL. */
+    constraints?: NamedDefinition[];
+    /** Indexes that back no constraint — a constraint's own index comes and goes with it. */
+    indexes?: NamedDefinition[];
+    /** Triggers someone wrote: not the ones Postgres makes for a foreign key. */
+    triggers?: NamedDefinition[];
 }
 
 /** Tables by `schema.table`, as a JSON pair so no name can collide with another. */
 export type Catalog = Map<string, TableFacts>;
+
+/** An object of a schema rather than a table: an enum type, a view, a function. */
+export interface SchemaObjectFacts {
+    object: "enum" | "view" | "function";
+    schema: string;
+    /** Its name; a function's carries its argument types, as overloads differ by them. */
+    name: string;
+    definition: string;
+}
+
+/** Schema objects by kind, schema and name. */
+export type SchemaObjects = Map<string, SchemaObjectFacts>;
 
 const tableKey = (schema: string, table: string): string => JSON.stringify([schema, table]);
 
@@ -241,13 +325,102 @@ SELECT schemaname::text AS schema_name, tablename::text AS table_name, policynam
  WHERE ${schemaFilter("schemaname::text")}
  ORDER BY schemaname, tablename, policyname`;
 
+const CONSTRAINTS_SQL = `
+SELECT n.nspname AS schema_name, c.relname AS table_name, con.conname AS object_name,
+       pg_get_constraintdef(con.oid) AS definition
+  FROM pg_constraint con
+  JOIN pg_class c ON c.oid = con.conrelid
+  JOIN pg_namespace n ON n.oid = c.relnamespace
+ WHERE con.contype IN ('u', 'f', 'c', 'x') AND ${TABLE_FILTER} AND ${schemaFilter("n.nspname")}
+ ORDER BY n.nspname, c.relname, con.conname`;
+
+const INDEXES_SQL = `
+SELECT n.nspname AS schema_name, c.relname AS table_name, i.relname AS object_name,
+       pg_get_indexdef(i.oid) AS definition
+  FROM pg_index x
+  JOIN pg_class i ON i.oid = x.indexrelid
+  JOIN pg_class c ON c.oid = x.indrelid
+  JOIN pg_namespace n ON n.oid = c.relnamespace
+ WHERE NOT EXISTS (SELECT 1 FROM pg_constraint con WHERE con.conindid = x.indexrelid AND con.contype IN ('p', 'u', 'x'))
+   AND ${TABLE_FILTER} AND ${schemaFilter("n.nspname")}
+ ORDER BY n.nspname, c.relname, i.relname`;
+
+const TRIGGERS_SQL = `
+SELECT n.nspname AS schema_name, c.relname AS table_name, t.tgname AS object_name,
+       pg_get_triggerdef(t.oid) AS definition
+  FROM pg_trigger t
+  JOIN pg_class c ON c.oid = t.tgrelid
+  JOIN pg_namespace n ON n.oid = c.relnamespace
+ WHERE NOT t.tgisinternal AND ${TABLE_FILTER} AND ${schemaFilter("n.nspname")}
+ ORDER BY n.nspname, c.relname, t.tgname`;
+
+/** Not an extension's: `CREATE EXTENSION` owns those, not a migration. */
+const notFromExtension = (catalog: string, oid: string) => `NOT EXISTS (SELECT 1 FROM pg_depend dep
+     WHERE dep.classid = '${catalog}'::regclass AND dep.objid = ${oid} AND dep.deptype = 'e')`;
+
+const ENUMS_SQL = `
+SELECT n.nspname AS schema_name, t.typname AS object_name,
+       json_agg(e.enumlabel::text ORDER BY e.enumsortorder)::text AS labels
+  FROM pg_type t
+  JOIN pg_namespace n ON n.oid = t.typnamespace
+  JOIN pg_enum e ON e.enumtypid = t.oid
+ WHERE ${schemaFilter("n.nspname")} AND ${notFromExtension("pg_type", "t.oid")}
+ GROUP BY n.nspname, t.typname`;
+
+const VIEWS_SQL = `
+SELECT n.nspname AS schema_name, c.relname AS object_name, c.relkind::text AS kind,
+       pg_get_viewdef(c.oid) AS definition
+  FROM pg_class c
+  JOIN pg_namespace n ON n.oid = c.relnamespace
+ WHERE c.relkind IN ('v', 'm') AND ${schemaFilter("n.nspname")} AND ${notFromExtension("pg_class", "c.oid")}`;
+
+const FUNCTIONS_SQL = `
+SELECT n.nspname AS schema_name,
+       p.proname || '(' || pg_get_function_identity_arguments(p.oid) || ')' AS object_name,
+       pg_get_functiondef(p.oid) AS definition
+  FROM pg_proc p
+  JOIN pg_namespace n ON n.oid = p.pronamespace
+ WHERE p.prokind IN ('f', 'p') AND ${schemaFilter("n.nspname")} AND ${notFromExtension("pg_proc", "p.oid")}`;
+
+const literal = (value: string): string => `'${value.replace(/'/g, "''")}'`;
+
+/** The enum types, views and functions of the schemas a diff reads. */
+async function readSchemaObjects(sql: SQLAdmin, database: string, schemas: string[] | null): Promise<SchemaObjects> {
+    const params = [schemas];
+    const [enums, views, functions] = await Promise.all([
+        sql.executeSql(ENUMS_SQL, { database, params }),
+        sql.executeSql(VIEWS_SQL, { database, params }),
+        sql.executeSql(FUNCTIONS_SQL, { database, params })
+    ]);
+    const objects: SchemaObjects = new Map();
+    const add = (facts: SchemaObjectFacts) => objects.set(JSON.stringify([facts.object, facts.schema, facts.name]), facts);
+    for (const row of enums) {
+        const schema = text(row, "schema_name");
+        const name = text(row, "object_name");
+        add({ object: "enum", schema, name, definition: `CREATE TYPE ${qualified(schema, name)} AS ENUM (${stringList(text(row, "labels")).map(literal).join(", ")});` });
+    }
+    for (const row of views) {
+        const schema = text(row, "schema_name");
+        const name = text(row, "object_name");
+        const kind = text(row, "kind") === "m" ? "MATERIALIZED VIEW" : "VIEW";
+        add({ object: "view", schema, name, definition: `CREATE ${kind} ${qualified(schema, name)} AS\n${text(row, "definition").trim()}` });
+    }
+    for (const row of functions) {
+        add({ object: "function", schema: text(row, "schema_name"), name: text(row, "object_name"), definition: text(row, "definition").trim() });
+    }
+    return objects;
+}
+
 async function readCatalog(sql: SQLAdmin, database: string, schemas: string[] | null): Promise<Catalog> {
     const params = [schemas];
-    const [tables, columns, primaryKeys, policies] = await Promise.all([
+    const [tables, columns, primaryKeys, policies, constraints, indexes, triggers] = await Promise.all([
         sql.executeSql(TABLES_SQL, { database, params }),
         sql.executeSql(COLUMNS_SQL, { database, params }),
         sql.executeSql(PRIMARY_KEYS_SQL, { database, params }),
-        sql.executeSql(POLICIES_SQL, { database, params })
+        sql.executeSql(POLICIES_SQL, { database, params }),
+        sql.executeSql(CONSTRAINTS_SQL, { database, params }),
+        sql.executeSql(INDEXES_SQL, { database, params }),
+        sql.executeSql(TRIGGERS_SQL, { database, params })
     ]);
     const catalog: Catalog = new Map();
     for (const row of tables) {
@@ -263,7 +436,10 @@ async function readCatalog(sql: SQLAdmin, database: string, schemas: string[] | 
             forceRls: flag(row, "force_rls"),
             columns: [],
             primaryKey: [],
-            policies: []
+            policies: [],
+            constraints: [],
+            indexes: [],
+            triggers: []
         });
     }
     for (const row of columns) {
@@ -293,6 +469,15 @@ async function readCatalog(sql: SQLAdmin, database: string, schemas: string[] | 
             withCheck: nullableText(row, "with_check")
         });
     }
+    const named = (rows: Row[], list: (facts: TableFacts) => NamedDefinition[] | undefined) => {
+        for (const row of rows) {
+            const facts = catalog.get(tableKey(text(row, "schema_name"), text(row, "table_name")));
+            if (facts) list(facts)?.push({ name: text(row, "object_name"), definition: text(row, "definition") });
+        }
+    };
+    named(constraints, (facts) => facts.constraints);
+    named(indexes, (facts) => facts.indexes);
+    named(triggers, (facts) => facts.triggers);
     return catalog;
 }
 
@@ -345,12 +530,26 @@ function primaryKeySql(facts: TableFacts): string {
         : `ALTER TABLE ${qualified(facts.schema, facts.table)} ADD PRIMARY KEY (${facts.primaryKey.map(ident).join(", ")});`;
 }
 
+/** A table's constraint, index or trigger, as the SQL that would create it. */
+function tableObjectSql(object: "constraint" | "index" | "trigger", facts: TableFacts, item: NamedDefinition): string {
+    return object === "constraint"
+        ? `ALTER TABLE ${qualified(facts.schema, facts.table)} ADD CONSTRAINT ${ident(item.name)} ${item.definition};`
+        : `${item.definition};`;
+}
+
+const TABLE_OBJECTS = [
+    ["constraint", (facts: TableFacts) => facts.constraints ?? []],
+    ["index", (facts: TableFacts) => facts.indexes ?? []],
+    ["trigger", (facts: TableFacts) => facts.triggers ?? []]
+] as const;
+
 const sameList = (a: readonly string[], b: readonly string[]): boolean =>
     a.length === b.length && a.every((item, index) => item === b[index]);
 
 /**
  * The schema changes from `target` to `branch`: tables, columns, primary keys,
- * row-level security and policies, ordered by table.
+ * constraints, indexes, triggers, row-level security and policies, ordered by
+ * table.
  */
 export function diffCatalogs(target: Catalog, branch: Catalog): BranchSchemaChange[] {
     const changes: BranchSchemaChange[] = [];
@@ -389,6 +588,25 @@ export function diffCatalogs(target: Catalog, branch: Catalog): BranchSchemaChan
                 changes.push({ object: "rls", change: "altered", schema, table, before: rlsSql(before), after: rlsSql(after) });
             }
         }
+        // A dropped table takes its constraints, indexes and triggers with it;
+        // an added one brings them.
+        if (after) {
+            for (const [object, list] of TABLE_OBJECTS) {
+                const old = new Map((before ? list(before) : []).map((item) => [item.name, item]));
+                const now = new Map(list(after).map((item) => [item.name, item]));
+                for (const [name, item] of now) {
+                    const was = old.get(name);
+                    const definition = tableObjectSql(object, after, item);
+                    if (!was) changes.push({ object, change: "added", schema, table, name, after: definition });
+                    else if (was.definition !== item.definition) {
+                        changes.push({ object, change: "altered", schema, table, name, before: tableObjectSql(object, after, was), after: definition });
+                    }
+                }
+                for (const [name, item] of old) {
+                    if (!now.has(name)) changes.push({ object, change: "dropped", schema, table, name, before: tableObjectSql(object, after, item) });
+                }
+            }
+        }
         const policiesBefore = new Map((before?.policies ?? []).map((policy) => [policy.name, policy]));
         const policiesAfter = new Map((after?.policies ?? []).map((policy) => [policy.name, policy]));
         for (const [name, policy] of policiesAfter) {
@@ -404,6 +622,24 @@ export function diffCatalogs(target: Catalog, branch: Catalog): BranchSchemaChan
             if (!policiesAfter.has(name)) {
                 changes.push({ object: "policy", change: "dropped", schema, table, name, before: policySql(schema, table, policy) });
             }
+        }
+    }
+    return changes;
+}
+
+/** The enum types, views and functions added, dropped or altered from `target` to `branch`. */
+export function diffSchemaObjects(target: SchemaObjects, branch: SchemaObjects): BranchSchemaChange[] {
+    const changes: BranchSchemaChange[] = [];
+    for (const key of [...new Set([...target.keys(), ...branch.keys()])].sort()) {
+        const before = target.get(key);
+        const after = branch.get(key);
+        const facts = after ?? before;
+        if (!facts) continue;
+        const base = { object: facts.object, schema: facts.schema, table: facts.name };
+        if (!before && after) changes.push({ ...base, change: "added", after: after.definition });
+        else if (before && !after) changes.push({ ...base, change: "dropped", before: before.definition });
+        else if (before && after && before.definition !== after.definition) {
+            changes.push({ ...base, change: "altered", before: before.definition, after: after.definition });
         }
     }
     return changes;
@@ -457,6 +693,25 @@ export function classifyRows(target: readonly RowState[], branch: readonly RowSt
     return result;
 }
 
+/**
+ * The sides that rewrote the table since the fork, as far as its rows tell.
+ *
+ * `ALTER COLUMN … TYPE`, an `ADD COLUMN` with a volatile default, `VACUUM
+ * FULL`, `CLUSTER`, `pg_repack`: each writes every row anew, so every row of
+ * that side reads as written after the fork, and the provenance the
+ * classification rests on is gone. Its mark is a side whose every row is
+ * young while some of them hold exactly what the other side holds — rows
+ * nobody changed, written again.
+ */
+export function rewrittenSides(target: readonly RowState[], branch: readonly RowState[]): ("target" | "branch")[] {
+    const branchHashes = new Map(branch.map((row) => [row.key, row.hash]));
+    if (!target.some((row) => branchHashes.get(row.key) === row.hash)) return [];
+    const sides: ("target" | "branch")[] = [];
+    if (target.length > 0 && target.every((row) => row.young)) sides.push("target");
+    if (branch.length > 0 && branch.every((row) => row.young)) sides.push("branch");
+    return sides;
+}
+
 /** Up to `limit` keys, taken in turn from each kind so that no kind crowds out the rest. */
 export function pickSamples(kinds: readonly (readonly string[])[], limit: number): string[][] {
     const picked = kinds.map((): string[] => []);
@@ -475,6 +730,116 @@ export function pickSamples(kinds: readonly (readonly string[])[], limit: number
     return picked;
 }
 
+// ── Foreign keys into deleted rows ───────────────────────────────────────────
+
+/** A foreign key that references a table, read from the target. */
+interface ReferencingKey {
+    constraint: string;
+    schema: string;
+    table: string;
+    onDelete: BranchReferencingRows["onDelete"];
+    /** The referencing columns, in the key's order. */
+    columns: string[];
+    /** The columns of the referenced table they point at, in the same order. */
+    referenced: string[];
+}
+
+const ON_DELETE: Record<string, BranchReferencingRows["onDelete"]> = {
+    a: "no action",
+    r: "restrict",
+    c: "cascade",
+    n: "set null",
+    d: "set default"
+};
+
+/**
+ * Every foreign key that references `$1.$2`, on any table of any schema — a
+ * delete reaches a referencing row wherever it is. A partition's copy of a
+ * key (`conparentid`) is its parent's, and counted once.
+ */
+const REFERENCING_KEYS_SQL = `
+SELECT con.conname AS constraint_name, cn.nspname AS schema_name, cc.relname AS table_name,
+       con.confdeltype::text AS on_delete,
+       (SELECT json_agg(a.attname::text ORDER BY k.ord)
+          FROM unnest(con.conkey) WITH ORDINALITY AS k(attnum, ord)
+          JOIN pg_attribute a ON a.attrelid = con.conrelid AND a.attnum = k.attnum)::text AS columns,
+       (SELECT json_agg(a.attname::text ORDER BY k.ord)
+          FROM unnest(con.confkey) WITH ORDINALITY AS k(attnum, ord)
+          JOIN pg_attribute a ON a.attrelid = con.confrelid AND a.attnum = k.attnum)::text AS referenced
+  FROM pg_constraint con
+  JOIN pg_class cc ON cc.oid = con.conrelid
+  JOIN pg_namespace cn ON cn.oid = cc.relnamespace
+  JOIN pg_class pc ON pc.oid = con.confrelid
+  JOIN pg_namespace pn ON pn.oid = pc.relnamespace
+ WHERE con.contype = 'f' AND con.conparentid = 0 AND pn.nspname = $1 AND pc.relname = $2
+ ORDER BY cn.nspname, cc.relname, con.conname`;
+
+async function referencingKeys(sql: SQLAdmin, database: string, facts: TableFacts): Promise<ReferencingKey[]> {
+    const rows = await sql.executeSql(REFERENCING_KEYS_SQL, { database, params: [facts.schema, facts.table] });
+    return rows.map((row) => ({
+        constraint: text(row, "constraint_name"),
+        schema: text(row, "schema_name"),
+        table: text(row, "table_name"),
+        onDelete: ON_DELETE[text(row, "on_delete")] ?? "no action",
+        columns: stringList(text(row, "columns")),
+        referenced: stringList(text(row, "referenced"))
+    }));
+}
+
+/**
+ * The rows of `key`'s table, written after the fork, that reference a row of
+ * `facts` among the keys in `keysParam` — joined from the referenced table, so
+ * the result is per referenced key. `forkParam` is the fork point's
+ * transaction id.
+ */
+function referencingRowsFrom(facts: TableFacts, keyExpr: string, key: ReferencingKey, keysParam: string, forkParam: string): string {
+    const join = key.columns.map((column, index) => `c.${ident(column)} = t.${ident(key.referenced[index] ?? column)}`).join(" AND ");
+    return `FROM ${qualified(facts.schema, facts.table)} t
+              JOIN ${qualified(key.schema, key.table)} c ON ${join}
+             WHERE ${keyExpr} = ANY(${keysParam}::text[])
+               AND age(c.xmin) < age(${forkParam}::text::xid)`;
+}
+
+/** What {@link deleteConflicts} found: the keys in conflict, and through which keys. */
+interface DeleteConflicts {
+    keys: string[];
+    referencedBy: (BranchReferencingRows & { key: ReferencingKey })[];
+}
+
+/**
+ * Of the keys the branch deleted from `facts`, the ones that rows the target
+ * wrote after the fork still reference. Read on the target only: on the
+ * branch, the delete already went through its foreign keys.
+ */
+async function deleteConflicts(
+    sql: SQLAdmin,
+    targetDb: string,
+    forkXid: string,
+    facts: TableFacts,
+    keyExpr: string,
+    deleted: readonly string[]
+): Promise<DeleteConflicts> {
+    const found: DeleteConflicts = { keys: [], referencedBy: [] };
+    if (deleted.length === 0) return found;
+    const keys = await referencingKeys(sql, targetDb, facts);
+    const conflicting = new Set<string>();
+    for (const key of keys) {
+        const rows = await sql.executeSql(
+            `SELECT ${keyExpr} AS k, count(*)::text AS n ${referencingRowsFrom(facts, keyExpr, key, "$1", "$2")} GROUP BY 1`,
+            { database: targetDb, params: [[...deleted], forkXid] }
+        );
+        if (rows.length === 0) continue;
+        let count = 0;
+        for (const row of rows) {
+            conflicting.add(text(row, "k"));
+            count += Number(text(row, "n"));
+        }
+        found.referencedBy.push({ schema: key.schema, table: key.table, constraint: key.constraint, onDelete: key.onDelete, rows: count, key });
+    }
+    found.keys = deleted.filter((rowKey) => conflicting.has(rowKey));
+    return found;
+}
+
 /** What a merge needs to know about a table the diff matched row by row. */
 interface MatchedTable {
     facts: TableFacts;
@@ -483,12 +848,17 @@ interface MatchedTable {
     /** `md5` of every `key:hash` on the target, in `"C"` key order — what the merge's guard recomputes. */
     targetDigest: string;
     branchHashes: Map<string, string>;
+    /** Who changed each row. `deleted` leaves out {@link deleteConflicts}. */
     rows: RowClassification;
+    /** Keys the branch deleted that rows the target wrote since reference: conflicts. */
+    deleteConflicts: DeleteConflicts;
 }
 
 interface ComputedDiff {
     diff: BranchDiff;
     matched: Map<string, MatchedTable>;
+    /** The fork point's transaction id, or `null` when it is not known. */
+    forkXid: string | null;
 }
 
 async function rowStates(
@@ -497,16 +867,16 @@ async function rowStates(
     facts: TableFacts,
     keyExpr: string,
     hashExpr: string,
-    forkDatabase: string | null
+    forkXid: string | null
 ): Promise<RowState[]> {
-    const young = forkDatabase === null
+    const young = forkXid === null
         ? "false"
-        : "(age(t.xmin) < (SELECT age(d.xmin) FROM pg_database d WHERE d.datname = $1))";
+        : "(age(t.xmin) < age($1::text::xid))";
     const rows = await sql.executeSql(
         `SELECT ${keyExpr} AS k, ${hashExpr} AS h, ${young} AS young
            FROM ${qualified(facts.schema, facts.table)} t
           ORDER BY (${keyExpr}) COLLATE "C"`,
-        { database, params: forkDatabase === null ? undefined : [forkDatabase] }
+        { database, params: forkXid === null ? undefined : [forkXid] }
     );
     return rows.map((row) => ({ key: text(row, "k"), hash: text(row, "h"), young: flag(row, "young") }));
 }
@@ -529,6 +899,28 @@ async function checksums(
         result[index] = { count: Number(text(row, "n")), sum: text(row, "s") };
     }
     return result;
+}
+
+/**
+ * Of one side's rows, how many were written after the fork, and the checksum
+ * of the ones written before it.
+ */
+async function forkSplit(
+    sql: SQLAdmin,
+    database: string,
+    facts: TableFacts,
+    keyExpr: string,
+    hashExpr: string,
+    forkXid: string
+): Promise<{ young: number; oldSum: string }> {
+    const young = "(age(t.xmin) < age($1::text::xid))";
+    const [row] = await sql.executeSql(
+        `SELECT count(*) FILTER (WHERE ${young})::text AS young,
+                coalesce(sum(('x' || left(md5(${keyExpr} || ':' || ${hashExpr}), 15))::bit(60)::bigint) FILTER (WHERE NOT ${young}), 0)::text AS s
+           FROM ${qualified(facts.schema, facts.table)} t`,
+        { database, params: [forkXid] }
+    );
+    return row ? { young: Number(text(row, "young")), oldSum: text(row, "s") } : { young: 0, oldSum: "0" };
 }
 
 async function sampleRows(
@@ -600,7 +992,7 @@ function requireAdmin(admin: DatabaseAdmin | undefined): SQLAdmin & BranchAdmin 
 
 async function computeDiff(admin: DatabaseAdmin | undefined, branchName: string, options: BranchDiffOptions = {}): Promise<ComputedDiff> {
     const sql = requireAdmin(admin);
-    const sampleLimit = positiveInteger(options.sampleLimit, DEFAULT_BRANCH_DIFF_SAMPLE_LIMIT, "sampleLimit", true);
+    const sampleLimit = Math.min(positiveInteger(options.sampleLimit, DEFAULT_BRANCH_DIFF_SAMPLE_LIMIT, "sampleLimit", true), MAX_BRANCH_DIFF_SAMPLE_LIMIT);
     const maxRows = positiveInteger(options.maxRowsPerTable, DEFAULT_BRANCH_DIFF_MAX_ROWS, "maxRowsPerTable", false);
     const schemas = options.schemas && options.schemas.length > 0 ? [...new Set(options.schemas)].sort() : null;
 
@@ -609,16 +1001,20 @@ async function computeDiff(admin: DatabaseAdmin | undefined, branchName: string,
     const branchDb = branch.database;
     const targetDb = branch.parentDatabase;
 
-    const [targetCatalog, branchCatalog, fork] = await Promise.all([
+    const [targetCatalog, branchCatalog, targetObjects, branchObjects, fork] = await Promise.all([
         readCatalog(sql, targetDb, schemas),
         readCatalog(sql, branchDb, schemas),
-        sql.executeSql("SELECT age(xmin)::text AS age FROM pg_database WHERE datname = $1", { database: targetDb, params: [branchDb] })
+        readSchemaObjects(sql, targetDb, schemas),
+        readSchemaObjects(sql, branchDb, schemas),
+        branch.forkXid !== undefined
+            ? sql.executeSql("SELECT $1::text AS xid, age($1::text::xid)::text AS age", { database: targetDb, params: [branch.forkXid] })
+            : sql.executeSql("SELECT xmin::text AS xid, age(xmin)::text AS age FROM pg_database WHERE datname = $1", { database: targetDb, params: [branchDb] })
     ]);
     const forkAge = fork[0] ? Number(text(fork[0], "age")) : NaN;
-    const forkPointKnown = Number.isFinite(forkAge) && forkAge < FROZEN_AGE;
-    const forkDatabase = forkPointKnown ? branchDb : null;
+    const forkPointKnown = Number.isFinite(forkAge) && forkAge >= 0 && forkAge < FROZEN_AGE;
+    const forkXid = forkPointKnown && fork[0] ? text(fork[0], "xid") : null;
 
-    const schemaChanges = diffCatalogs(targetCatalog, branchCatalog);
+    const schemaChanges = [...diffCatalogs(targetCatalog, branchCatalog), ...diffSchemaObjects(targetObjects, branchObjects)];
     const data: BranchTableDataDiff[] = [];
     const matched = new Map<string, MatchedTable>();
     /** What the fingerprint covers, per table, beyond the schema. */
@@ -649,7 +1045,7 @@ async function computeDiff(admin: DatabaseAdmin | undefined, branchName: string,
         if (after) entry.inserted = count;
         else entry.deleted = count;
         entry.samples = (await firstRows(sql, database, facts, sampleLimit)).map(({ key: rowKey, row }) =>
-            after ? { change, key: rowKey, after: row } : { change, key: rowKey, before: row });
+            after ? { change, key: rowKey, after: redacted(row) } : { change, key: rowKey, before: redacted(row) });
         entry.blocked = after
             ? { code: "TABLE_ADDED", message: "The table is new on the branch. Create it on the target with your migrations (rebase db push), then merge its rows." }
             : { code: "TABLE_DROPPED", message: "The branch dropped the table. A merge never drops one; drop it with your migrations." };
@@ -660,7 +1056,9 @@ async function computeDiff(admin: DatabaseAdmin | undefined, branchName: string,
     const probes = shared.map(({ target, compared }) => ({
         facts: target,
         keyExpr: target.primaryKey.length > 0 ? keyExpression(target.primaryKey) : "''",
-        hashExpr: hashExpression(compared.length > 0 ? compared : target.columns.map((column) => column.name))
+        hashExpr: hashExpression(compared.length > 0
+            ? target.columns.filter((column) => compared.includes(column.name)).sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0))
+            : target.columns)
     }));
     const [targetSums, branchSums] = await Promise.all([
         checksums(sql, targetDb, probes),
@@ -686,24 +1084,72 @@ async function computeDiff(admin: DatabaseAdmin | undefined, branchName: string,
             block = { code: "TOO_LARGE", message: `The table holds more than ${maxRows} rows on one side, more than a diff matches row by row.` };
         }
         if (block) {
+            // Rows that cannot be matched can still be told untouched by the
+            // branch: it wrote none since the fork, and the rows from before
+            // it are the same on both sides. Then every difference is the
+            // target's, and there is nothing to merge or to block.
+            if (forkXid !== null) {
+                const [targetSplit, branchSplit] = await Promise.all([
+                    forkSplit(sql, targetDb, target, keyExpr, hashExpr, forkXid),
+                    forkSplit(sql, branchDb, branchFacts, keyExpr, hashExpr, forkXid)
+                ]);
+                if (branchSplit.young === 0 && targetSplit.oldSum === branchSplit.oldSum) {
+                    entry.targetChanges = targetSplit.young;
+                    seen.push({ key, untouched: true, targetSum, branchSum });
+                    data.push(entry);
+                    continue;
+                }
+            }
+            // Which rows changed, and on which side, is unknown: the counts
+            // stay 0, `rowCounts` says what each side holds, and a merge
+            // refuses the table unless told to skip it. A count difference
+            // is not the branch's inserts or deletes — the target may have
+            // made it.
             entry.blocked = block;
             entry.rowCounts = rowCounts;
-            if (branchSum.count > targetSum.count) entry.inserted = branchSum.count - targetSum.count;
-            else entry.deleted = targetSum.count - branchSum.count;
             seen.push({ key, block: block.code, targetSum, branchSum });
             data.push(entry);
             continue;
         }
 
         const [targetRows, branchRows] = await Promise.all([
-            rowStates(sql, targetDb, target, keyExpr, hashExpr, forkDatabase),
-            rowStates(sql, branchDb, branchFacts, keyExpr, hashExpr, forkDatabase)
+            rowStates(sql, targetDb, target, keyExpr, hashExpr, forkXid),
+            rowStates(sql, branchDb, branchFacts, keyExpr, hashExpr, forkXid)
         ]);
         const rows = classifyRows(targetRows, branchRows, forkPointKnown);
+
+        // A table the target rewrote reads as all the target's: the branch's
+        // deletes would be kept and its updates become conflicts. One the
+        // branch rewrote misreads only what the target changed, as conflicts.
+        // Either way it is blocked, never merged on a guess.
+        const rewritten = forkPointKnown ? rewrittenSides(targetRows, branchRows) : [];
+        if (rewritten.includes("target") || (rewritten.includes("branch") && rows.conflicts.length > 0)) {
+            const who = rewritten.includes("target") ? targetDb : "The branch";
+            entry.blocked = {
+                code: "TABLE_REWRITTEN",
+                message: `${who} rewrote the table after the branch was made — a column type change, a volatile DEFAULT, VACUUM FULL or ` +
+                    "CLUSTER writes every row anew — so every row reads as written since, and which side changed which row can no longer " +
+                    `be told. Merge the branch before such a migration, or make the branch again from ${targetDb}.`
+            };
+            entry.rowCounts = rowCounts;
+            seen.push({ key, block: "TABLE_REWRITTEN", targetSum, branchSum });
+            data.push(entry);
+            continue;
+        }
+        // Without a fork point every target-only row is already the branch's
+        // delete, and nothing can be told the target's.
+        const referenced = forkXid !== null
+            ? await deleteConflicts(sql, targetDb, forkXid, target, keyExpr, rows.deleted)
+            : { keys: [], referencedBy: [] };
+        if (referenced.keys.length > 0) {
+            const inConflict = new Set(referenced.keys);
+            rows.deleted = rows.deleted.filter((rowKey) => !inConflict.has(rowKey));
+            entry.referencedBy = referenced.referencedBy.map(({ key: _key, ...rest }) => rest);
+        }
         entry.inserted = rows.inserted.length;
         entry.updated = rows.updated.length;
         entry.deleted = rows.deleted.length;
-        entry.conflicts = rows.conflicts.length;
+        entry.conflicts = rows.conflicts.length + referenced.keys.length;
         entry.targetChanges = rows.targetChanges;
         const branchChanged = entry.inserted + entry.updated + entry.deleted + entry.conflicts > 0;
         if (!branchChanged && entry.targetChanges === 0) continue;
@@ -712,13 +1158,15 @@ async function computeDiff(admin: DatabaseAdmin | undefined, branchName: string,
         if (branchChanged && columnsDiffer) {
             entry.blocked = {
                 code: "COLUMNS_DIFFER",
-                message: "The table's columns differ between the branch and the target. Rows are compared on the columns they share; " +
-                    "apply the schema to the target with your migrations (rebase db push), then merge."
+                message: "The table's columns differ between the branch and the target, so its rows are compared on the columns they " +
+                    "share and cannot be merged. Add the missing columns to the target with your migrations (rebase db push) and merge " +
+                    "again. A migration that rewrites the table — a column type change does — makes every row read as written since " +
+                    "and blocks the table for good: merge before such a change, or make the branch again after it."
             };
         }
 
         const [conflictKeys, insertedKeys, updatedKeys, deletedKeys] = pickSamples(
-            [rows.conflicts, rows.inserted, rows.updated, rows.deleted], sampleLimit);
+            [[...rows.conflicts, ...referenced.keys], rows.inserted, rows.updated, rows.deleted], sampleLimit);
         const [before, after] = await Promise.all([
             sampleRows(sql, targetDb, target, keyExpr, [...conflictKeys, ...updatedKeys, ...deletedKeys]),
             sampleRows(sql, branchDb, branchFacts, keyExpr, [...conflictKeys, ...insertedKeys, ...updatedKeys])
@@ -728,25 +1176,33 @@ async function computeDiff(admin: DatabaseAdmin | undefined, branchName: string,
             const now = after.get(rowKey) ?? {};
             return compared.filter((column) => old[column] !== now[column]);
         };
+        // Which columns changed is read from the values; what is shown of
+        // them leaves secrets out.
+        const shownBefore = (rowKey: string) => redacted(before.get(rowKey));
+        const shownAfter = (rowKey: string) => redacted(after.get(rowKey));
         const samples: BranchRowChange[] = [
-            ...conflictKeys.map((rowKey): BranchRowChange => ({ change: "conflict", key: rowKey, before: before.get(rowKey), after: after.get(rowKey), changedColumns: changed(rowKey) })),
-            ...insertedKeys.map((rowKey): BranchRowChange => ({ change: "inserted", key: rowKey, after: after.get(rowKey) })),
-            ...updatedKeys.map((rowKey): BranchRowChange => ({ change: "updated", key: rowKey, before: before.get(rowKey), after: after.get(rowKey), changedColumns: changed(rowKey) })),
-            ...deletedKeys.map((rowKey): BranchRowChange => ({ change: "deleted", key: rowKey, before: before.get(rowKey) }))
+            ...conflictKeys.map((rowKey): BranchRowChange => after.has(rowKey)
+                ? { change: "conflict", key: rowKey, before: shownBefore(rowKey), after: shownAfter(rowKey), changedColumns: changed(rowKey) }
+                // Deleted on the branch, and referenced by the target's rows.
+                : { change: "conflict", key: rowKey, before: shownBefore(rowKey) }),
+            ...insertedKeys.map((rowKey): BranchRowChange => ({ change: "inserted", key: rowKey, after: shownAfter(rowKey) })),
+            ...updatedKeys.map((rowKey): BranchRowChange => ({ change: "updated", key: rowKey, before: shownBefore(rowKey), after: shownAfter(rowKey), changedColumns: changed(rowKey) })),
+            ...deletedKeys.map((rowKey): BranchRowChange => ({ change: "deleted", key: rowKey, before: shownBefore(rowKey) }))
         ];
         entry.samples = samples;
         data.push(entry);
 
         const targetDigest = md5(targetRows.map((row) => `${row.key}:${row.hash}`).join(","));
         const stateDigest = (states: readonly RowState[]) => md5(states.map((row) => `${row.key}:${row.hash}:${row.young ? 1 : 0}`).join(","));
-        seen.push({ key, target: stateDigest(targetRows), branch: stateDigest(branchRows) });
+        seen.push({ key, target: stateDigest(targetRows), branch: stateDigest(branchRows), referencedBy: entry.referencedBy ?? [] });
         matched.set(key, {
             facts: target,
             keyExpression: keyExpr,
             hashExpression: hashExpr,
             targetDigest,
             branchHashes: new Map(branchRows.map((row) => [row.key, row.hash])),
-            rows
+            rows,
+            deleteConflicts: referenced
         });
     }
 
@@ -767,7 +1223,8 @@ async function computeDiff(admin: DatabaseAdmin | undefined, branchName: string,
             sampleLimit,
             computedAt: new Date().toISOString()
         },
-        matched
+        matched,
+        forkXid
     };
 }
 
@@ -786,6 +1243,47 @@ export async function diffDatabaseBranch(
 }
 
 // ── Merge ────────────────────────────────────────────────────────────────────
+
+/** Up to ten keys, for a message. */
+function keyList(keys: readonly string[]): string {
+    return keys.length > 10 ? `${keys.slice(0, 10).join(", ")} and ${keys.length - 10} more` : keys.join(", ");
+}
+
+/** `public.posts (1 row, ON DELETE CASCADE)`, for each foreign key. */
+function referencingList(found: readonly BranchReferencingRows[]): string {
+    return found.map((entry) => `${entry.schema}.${entry.table} (${entry.rows} row(s), ON DELETE ${entry.onDelete.toUpperCase()})`).join(", ");
+}
+
+/** What Postgres said about a failed statement, found on the error or anywhere down its `cause`. */
+interface DatabaseFailure {
+    sqlState: string;
+    message: string;
+    table?: string;
+    constraint?: string;
+    detail?: string;
+}
+
+function databaseFailure(error: unknown): DatabaseFailure | undefined {
+    const field = (value: object, key: string): string | undefined => {
+        const found: unknown = Reflect.get(value, key);
+        return typeof found === "string" && found !== "" ? found : undefined;
+    };
+    let current: unknown = error;
+    for (let depth = 0; depth < 5 && typeof current === "object" && current !== null; depth += 1) {
+        const sqlState = field(current, "code");
+        if (sqlState && /^[0-9A-Z]{5}$/.test(sqlState)) {
+            return {
+                sqlState,
+                message: field(current, "message") ?? sqlState,
+                table: field(current, "table"),
+                constraint: field(current, "constraint"),
+                detail: field(current, "detail")
+            };
+        }
+        current = Reflect.get(current, "cause");
+    }
+    return undefined;
+}
 
 /** The marker a merge statement's own refusal carries, to be told from any other failure. */
 const MERGE_REFUSAL = "rebase branch merge refused";
@@ -808,7 +1306,7 @@ export async function mergeDatabaseBranch(
         throw new ApiError(400, "INVALID_INPUT", "`onConflict` must be \"abort\", \"branch\" or \"target\".", undefined, EXPECTED);
     }
 
-    const { diff, matched } = await computeDiff(admin, branchName, {
+    const { diff, matched, forkXid } = await computeDiff(admin, branchName, {
         sampleLimit: 0,
         schemas: options.schemas,
         maxRowsPerTable: options.maxRowsPerTable
@@ -817,19 +1315,45 @@ export async function mergeDatabaseBranch(
         throw new ApiError(409, "BRANCH_DIFF_STALE", `The branch or ${diff.targetDatabase} changed since the diff was read. Nothing was merged; review the diff again.`, undefined, EXPECTED);
     }
 
-    const branchChanges = (entry: BranchTableDataDiff) => entry.inserted + entry.updated + entry.deleted + entry.conflicts;
-    const blocked = diff.data.filter((entry) => entry.blocked && branchChanges(entry) > 0);
+    // Every blocked table: one whose rows could not be matched differs in
+    // ways nobody counted, and a zero there means "unknown", not "unchanged".
+    const blocked = diff.data.filter((entry) => entry.blocked);
     if (blocked.length > 0 && options.skipBlocked !== true) {
-        throw new ApiError(409, "BRANCH_MERGE_BLOCKED", `${blocked.length} table(s) with changed rows cannot be merged. Nothing was merged.`,
+        throw new ApiError(409, "BRANCH_MERGE_BLOCKED", `${blocked.length} table(s) with changed rows cannot be merged ` +
+            `(${blocked.map((entry) => `${entry.schema}.${entry.table}: ${entry.blocked?.code}`).join(", ")}). Nothing was merged. ` +
+            "Merge with skipBlocked to leave them as they are.",
             { tables: blocked.map((entry): RefusedTable => ({ schema: entry.schema, table: entry.table, code: entry.blocked?.code, reason: entry.blocked?.message ?? "" })) },
             EXPECTED
         );
     }
     const conflicted = diff.data.filter((entry) => !entry.blocked && entry.conflicts > 0);
     if (conflicted.length > 0 && onConflict === "abort") {
-        throw new ApiError(409, "BRANCH_MERGE_CONFLICT", `${conflicted.reduce((sum, entry) => sum + entry.conflicts, 0)} row(s) were changed on both the branch and ${diff.targetDatabase}. ` +
-            "Nothing was merged. Merge again choosing which side wins.",
-            { tables: conflicted.map((entry): RefusedTable => ({ schema: entry.schema, table: entry.table, reason: `${entry.conflicts} conflicting row(s)` })) },
+        const referenced = conflicted.flatMap((entry) => {
+            const table = matched.get(tableKey(entry.schema, entry.table));
+            return table && table.deleteConflicts.keys.length > 0 ? [{ entry, conflicts: table.deleteConflicts }] : [];
+        });
+        const both = conflicted.reduce((sum, entry) => sum + entry.conflicts, 0) -
+            referenced.reduce((sum, { conflicts }) => sum + conflicts.keys.length, 0);
+        const sentences: string[] = [];
+        if (both > 0) sentences.push(`${both} row(s) were changed on both the branch and ${diff.targetDatabase}.`);
+        for (const { entry, conflicts } of referenced) {
+            sentences.push(`The branch deleted ${conflicts.keys.length} row(s) of ${entry.schema}.${entry.table} (${keyList(conflicts.keys)}) that rows ` +
+                `${diff.targetDatabase} wrote since still reference: ${referencingList(conflicts.referencedBy)}.`);
+        }
+        const remedy = referenced.length > 0
+            ? "Merge again with onConflict \"target\" to keep those rows, or \"branch\" to delete them and let the foreign keys reach the rows that reference them."
+            : "Merge again choosing which side wins.";
+        throw new ApiError(409, "BRANCH_MERGE_CONFLICT", `${sentences.join(" ")} Nothing was merged. ${remedy}`,
+            {
+                tables: conflicted.map((entry): RefusedTable => {
+                    const keys = matched.get(tableKey(entry.schema, entry.table))?.deleteConflicts;
+                    const reason = keys && keys.keys.length > 0
+                        ? `${entry.conflicts} conflicting row(s); deleted on the branch and referenced by rows ${diff.targetDatabase} wrote since: ` +
+                            `${keyList(keys.keys)} (${referencingList(keys.referencedBy)})`
+                        : `${entry.conflicts} conflicting row(s)`;
+                    return { schema: entry.schema, table: entry.table, reason };
+                })
+            },
             EXPECTED
         );
     }
@@ -861,7 +1385,7 @@ export async function mergeDatabaseBranch(
         if (!table) continue;
         const updates = onConflict === "branch" ? [...table.rows.updated, ...table.rows.conflicts] : table.rows.updated;
         const inserts = table.rows.inserted;
-        const deletes = table.rows.deleted;
+        const deletes = onConflict === "branch" ? [...table.rows.deleted, ...table.deleteConflicts.keys] : table.rows.deleted;
         if (updates.length + inserts.length + deletes.length === 0) continue;
 
         const branchRows = await sql.executeSql(
@@ -920,10 +1444,35 @@ export async function mergeDatabaseBranch(
             `(SELECT md5(coalesce(string_agg(${table.keyExpression} || ':' || ${table.hashExpression}, ',' ORDER BY (${table.keyExpression}) COLLATE "C"), '')) ` +
             `FROM ${target} t) = ${param(table.targetDigest)}`
         );
+        // The target's rows that reference what this deletes, as many as the
+        // diff counted: none for a plain delete, the ones it named for a
+        // conflict the branch won. A row written since would be reached by a
+        // delete nobody reviewed.
+        if (deletes.length > 0 && forkXid !== null) {
+            const counted = new Map(table.deleteConflicts.referencedBy.map((found) => [found.constraint + "\u0000" + found.schema + "." + found.table, found.rows]));
+            const keys = await referencingKeys(sql, diff.targetDatabase, table.facts);
+            const keysParam = keys.length > 0 ? param([...deletes]) : "";
+            const forkParam = keys.length > 0 ? param(forkXid) : "";
+            for (const key of keys) {
+                const expected = onConflict === "branch" ? counted.get(key.constraint + "\u0000" + key.schema + "." + key.table) ?? 0 : 0;
+                guards.push(`(SELECT count(*) ${referencingRowsFrom(table.facts, table.keyExpression, key, keysParam, forkParam)}) = ${expected}`);
+            }
+        }
         written.push({ entry, table, inserted: inserts.length, updated: updates.length, deleted: deletes.length });
     }
 
     if (written.length === 0) return result;
+
+    if (onConflict === "branch") {
+        for (const { entry, table } of written) {
+            const { keys, referencedBy } = table.deleteConflicts;
+            if (keys.length === 0) continue;
+            result.warnings.push(
+                `Deleting ${keys.length} row(s) of ${entry.schema}.${entry.table} the branch deleted (${keyList(keys)}) reached rows ` +
+                `${diff.targetDatabase} wrote since the branch was made: ${referencingList(referencedBy)}.`
+            );
+        }
+    }
 
     // One statement: the guard, every write, and a check that each wrote what
     // it was meant to. Non-deferrable foreign keys are checked at its end, so
@@ -946,6 +1495,19 @@ export async function mergeDatabaseBranch(
         const message = error instanceof Error ? error.message : String(error);
         if (message.includes(MERGE_REFUSAL)) {
             throw new ApiError(409, "BRANCH_MERGE_CONFLICT", `${diff.targetDatabase} refused part of the merge — a row changed meanwhile, a trigger skipped it, or a policy hid it. Nothing was merged.`, undefined, EXPECTED);
+        }
+        // The target refused the branch's rows: a constraint, an enum label,
+        // a foreign key it holds and the branch did not. The rows are the
+        // two databases disagreeing, not a request error — left to the
+        // generic mapping, an enum label read as a bad filter value (400).
+        const failure = databaseFailure(error);
+        if (failure && /^(22|23|P0|42501)/.test(failure.sqlState)) {
+            const where = [failure.table ? `table ${failure.table}` : "", failure.constraint ? `constraint ${failure.constraint}` : ""].filter(Boolean).join(", ");
+            throw new ApiError(409, "BRANCH_MERGE_FAILED",
+                `${diff.targetDatabase} refused the branch's rows${where ? ` (${where})` : ""}: ${failure.message}. Nothing was merged. ` +
+                "The branch's rows break a rule the target holds — its schema or constraints differ from the branch's; see the diff's schema changes.",
+                { sqlState: failure.sqlState, table: failure.table, constraint: failure.constraint, detail: failure.detail },
+                EXPECTED);
         }
         throw error;
     }

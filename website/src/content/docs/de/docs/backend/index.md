@@ -1,5 +1,5 @@
 ---
-sourceHash: bf72686388b55887
+sourceHash: be8f292cf1e7986c
 title: Backend-Übersicht
 sidebar_label: Backend
 description: Das Rebase-Backend bietet einen vollständigen Server mit REST-API, Authentifizierung, Storage, WebSocket-Echtzeit und Entitätshistorie – alles initialisiert mit einem einzigen Funktionsaufruf.
@@ -65,6 +65,7 @@ Beide Pfade führen zur selben `RebaseBackendConfig`. Dies ist die vollständige
 | `basePath` | `REBASE_BASE_PATH` (Standard: `/api`) |
 | `collections`, `collectionsDir` | das von `rebase.json` deklarierte Verzeichnis `config/collections/` |
 | `functions`, `functionsDir` | `backend/functions/` |
+| `functionsTimeoutMs` | `REBASE_FUNCTIONS_TIMEOUT_MS` |
 | `crons`, `cronsDir` | `backend/crons/` |
 | `bootstrappers`, `database` | `DATABASE_URL`, plus eine `database("<key>")`-Deklaration in `config/resources.ts` für jede Datenbank jenseits des Standards |
 | `auth` | `JWT_SECRET`, die `OAUTH_*`-Variablen und `config/collections/users` |
@@ -73,12 +74,15 @@ Beide Pfade führen zur selben `RebaseBackendConfig`. Dies ist die vollständige
 | `storagePublicRead` | `STORAGE_PUBLIC_READ` |
 | `storageRenditionCache` | `STORAGE_RENDITION_CACHE` |
 | `storageInsecureAllowAnyAuthenticated` | `STORAGE_ALLOW_ANY_AUTHENTICATED` |
+| `storageDownloadTokenTtl` | `STORAGE_DOWNLOAD_TOKEN_TTL` |
 | `callbacks` | `export const callbacks` aus `config/index.ts` |
 | `history` | `REBASE_HISTORY` (standardmäßig aktiviert) — nur die boolesche Form |
 | `enableSwagger` | `REBASE_ENABLE_SWAGGER`; nicht gesetzt bedeutet außerhalb der Produktion aktiviert |
 | `compression` | `REBASE_COMPRESSION` |
 | `maxBodySize` | `REBASE_MAX_BODY_SIZE` |
 | `logging` | `LOG_LEVEL` |
+| `liveSchema` | `REBASE_LIVE_SCHEMA_REPOSITORY` und dessen `REBASE_LIVE_SCHEMA_*`-Zugangsdaten — nur die Repository-Form |
+| `rlsAudit` | `REBASE_RLS_AUDIT` |
 | `provisionSchema`, `surfaces`, `ownership`, `functionsSelection`, `functionsUpstream` | `REBASE_ROLE` — siehe [Split Processes](/docs/deployment/split-processes/) |
 | `corsHandled` | CORS wird von der Runtime aus `CORS_ORIGINS` installiert |
 | `schemaVersion`, `runtimeVersion` | der Build stempelt beide in das Bundle ein |
@@ -88,8 +92,8 @@ Beide Pfade führen zur selben `RebaseBackendConfig`. Dies ist die vollständige
 
 Diese besitzen weder Umgebungsvariablen noch Konfigurationsexporte. Sie sind nur über einen manuell geschriebenen `initializeRebaseBackend`-Aufruf erreichbar – per `rebase eject` oder über einen [Custom Server](/docs/backend/custom-server/):
 
-`rateLimit` · `jobs` · `csrf` · `cronPersistence` · `functionsTimeoutMs` ·
-`storagePolicies` · `storageTriggers` · `baas` · `liveSchema` · `rlsAudit` ·
+`rateLimit` · `jobs` · `csrf` · `cronPersistence` ·
+`storagePolicies` · `storageTriggers` · `baas` ·
 `history` in seiner Objektform (`{ retention }`)
 
 `schemaEditor` wird in einem erstellten Bundle zwangsweise deaktiviert: Der Editor schreibt *Quelldateien* von Collections um, und ein Bundle enthält kompilierten Output.
@@ -105,8 +109,8 @@ Nach der Initialisierung werden diese Routen gemountet:
 | `/api/storage/*` | Datei-Upload, -Download und -Löschung |
 | `/api/data/:slug` | CRUD-Operationen pro Collection (GET, POST, PATCH, DELETE) |
 | `/api/data/:slug/:id/history` | Änderungshistorie der Entität (wenn aktiviert) |
-| `/api/docs` | OpenAPI-Spezifikation (wenn `enableSwagger: true`) |
-| `/api/swagger` | Swagger UI (Dev-Modus, wenn `enableSwagger: true`) |
+| `/api/docs` | OpenAPI-Spezifikation (öffentlich, außer bei `enableSwagger: false`, wodurch sie hinter `schema:read` liegt) |
+| `/api/swagger` | Swagger UI (nur außerhalb der Produktion) |
 | `/api/meta/contract` | Das Collection-Schema des Projekts (braucht `schema:read`) |
 | `/api/meta/schema-version` | Ein Versions-String für dieses Schema (nicht authentifiziert) |
 | `/api/functions/*` | Benutzerdefinierte Funktionsrouten (wenn `functions` oder `functionsDir` gesetzt ist) |
@@ -123,13 +127,13 @@ Wenn Sie `initializeRebaseBackend()` aufrufen, löst das Framework eine sequenti
 [Start Boot]
      │
      ▼
-1. ENV validation (Zod parsing of jwt, databases, cors)
+1. Configuration (the database adapter, the auth and storage options you passed)
      │
      ▼
-2. Dynamic Collection Loading (Chokidar watches .ts files, AST parsing)
+2. Collection Loading (imports each file in collectionsDir, strict-validates every collection)
      │
      ▼
-3. Database Bootstrapping (Acquires advisory lock, creates schemas/auth/helper SQL functions)
+3. Database Bootstrapping (creates schemas/auth/helper SQL functions, as `provision` allows)
      │
      ▼
 4. Service Initialization (Auth, Storage S3/Local client instances, Cron store seeding)
@@ -162,7 +166,9 @@ Zwei Probes, die zwei unterschiedliche Fragen beantworten.
 
 Eine Liveness-Probe auf `/health` ist ein Fehler, der erwähnenswert ist: Ein kurzer Datenbank-Schluckauf würde den Orchestrator dazu veranlassen, einen ansonsten gesunden Prozess zu beenden, was einen kurzen Ausfall in eine Neustartschleife verwandeln würde.
 
-Da `/health` nicht authentifiziert ist, gibt der Endpunkt das Ergebnis aus und nicht die Begründung – außerhalb der Entwicklungsumgebung nennt er lediglich, welche Datenquelle beeinträchtigt ist, und sonst nichts. Der Fehlertext des Treibers nennt Host, Port, Datenbankname und Rolle, und dies wird in die Logs geschrieben. Beide Pfade werden auch unter `basePath` bereitgestellt (`/api/health`).
+Da `/health` nicht authentifiziert ist, gibt der Endpunkt das Ergebnis aus und nicht die Begründung – außerhalb der Entwicklungsumgebung nennt er lediglich, welche Datenquelle beeinträchtigt ist, und sonst nichts. Der Fehlertext des Treibers nennt Host, Port, Datenbankname und Rolle, und dies wird in die Logs geschrieben. `/health` wird auch unter `basePath` bereitgestellt (`/api/health`); `/livez` nicht.
+
+Beide Probes gehören zur Managed Runtime. Ein ejected `backend/src/index.ts` stellt `/health` und `/api/health` selbst bereit, prüft dabei nur die Standarddatenbank und hat kein `/livez`, bis Sie eines hinzufügen.
 
 ---
 

@@ -1,5 +1,5 @@
 ---
-sourceHash: a0bd19745c59b12b
+sourceHash: e6db89a6b0b8b60d
 title: Plugin-System
 sidebar_label: Plugins
 description: Erweitern Sie Rebase mit Plugins – injizieren Sie UI-Komponenten, modifizieren Sie Collections, fügen Sie Toolbar-Aktionen hinzu und erstellen Sie benutzerdefinierte Field Builder.
@@ -17,7 +17,7 @@ Plugins sind der primäre Erweiterungsmechanismus im Panel. Sie können:
 
 - Die gesamte App mit einem **Provider** kapseln (Kontext, State-Management)
 - **Aktionen für die Startseite** und Widgets hinzufügen
-- Komponenten für die **Collection-Ansicht** injizieren (Toolbar, Column Builder)
+- Komponenten für die **Collection-Ansicht** injizieren (Toolbar, Spaltenköpfe)
 - **Formular**-Komponenten hinzufügen (Field Builder, zusätzliche Panels)
 - **Collections dynamisch injizieren oder modifizieren**
 
@@ -30,7 +30,7 @@ interface RebasePlugin {
 
     // UI contributions — a flat array, each entry naming its slot.
     // This replaced the old per-area objects (homePage, collectionView, form).
-    slots?: SlotContribution[];
+    slots?: AnySlotContribution[];
 
     // HOC providers. `scope: "root"` wraps the whole admin below
     // RebaseContext; `scope: "form"` wraps each entity form / edit view.
@@ -233,7 +233,9 @@ diesen. Ein anderes Plugin kann Markdown-Feldern auf dieselbe Weise einen Contro
 
 :::caution[Dieses Plugin sendet Daten von Ihrem Rechner]
 Autofill sendet die Feldwerte der Entität an einen gehosteten Dienst, um einen
-Vorschlag zu generieren. Standardmäßig ist dieser Dienst **`https://app.rebase.pro/api/functions/ai`**,
+Vorschlag zu generieren: nur die Werte deklarierter Properties, nie die einer schreibgeschützten,
+deaktivierten oder verborgenen, einer mit `dynamicProps` oder einer Spalte, die die Collection
+nicht deklariert. Standardmäßig ist dieser Dienst **`https://app.rebase.pro/api/functions/ai`**,
 der von Rebase betrieben wird – kostenlos nutzbar, ohne Konfiguration und ohne Anmeldedaten:
 Die Anfragen sind anonym und werden durch Ratenbegrenzung statt durch Identität beschränkt. Ihr
 JWT wird nicht gesendet. Auch die Slash-Autovervollständigung des Editors sendet Text: bis zu 8.000

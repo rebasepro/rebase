@@ -1,5 +1,5 @@
 ---
-sourceHash: fa5ea5eeb92e1460
+sourceHash: d672b029e72aca9e
 title: Die context.data-API
 sidebar_label: context.data-API
 description: Andere Collections aus einem Callback heraus mit context.data lesen und schreiben – Methoden, die Rechte, mit denen es läuft, Transaktionssemantik und die Verbindung, die ein Callback belegt.
@@ -38,10 +38,10 @@ Jeder Kollektions-Accessor (`context.data.<slug>`) stellt die folgenden Methoden
 
 | Methode | Signatur | Beschreibung |
 |--------|-----------|-------------|
-| `.find()` | `find(params?: FindParams) → FindResponse` | Entitäten mit Filtern, Sortierung und Paginierung abfragen |
-| `.findById()` | `findById(id: string \| number) → Entity \| undefined` | Eine einzelne Entität anhand der ID abrufen |
-| `.create()` | `create(data: Partial<Values>, id?: string) → Entity` | Eine neue Entität erstellen |
-| `.update()` | `update(id: string \| number, data: Partial<Values>) → Entity` | Eine bestehende Entität aktualisieren |
+| `.find()` | `find(params?: FindParams) → FindResult` | Entitäten mit Filtern, Sortierung und Paginierung abfragen |
+| `.findById()` | `findById(id: string \| number) → Row \| undefined` | Eine einzelne Zeile anhand der ID abrufen |
+| `.create()` | `create(data: Insert, id?: string \| number) → Row` | Eine neue Zeile erstellen und so zurückgeben, wie sie gespeichert wurde |
+| `.update()` | `update(id: string \| number, data: Update) → Row` | Eine bestehende Zeile aktualisieren und so zurückgeben, wie sie gespeichert wurde |
 | `.delete()` | `delete(id: string \| number) → void` | Einen Datensatz löschen |
 | `.count()` | `count(params?: FindParams) → number` | Übereinstimmende Entitäten zählen |
 | `.listen()` | `listen(params, onUpdate, onError?) → unsubscribe` | Echtzeit-Abonnement (sofern unterstützt) |

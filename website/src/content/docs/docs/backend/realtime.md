@@ -64,8 +64,8 @@ const unsubscribe = client.data.products.listen(
 );
 ```
 
-The callback receives a `FindResponse<M>` containing:
-- `data` — Array of `Entity<M>` objects.
+The callback receives a `FindResult<M>` containing:
+- `data` — The rows, flat, as `find()` returns them (`row.name`, not `row.values.name`).
 - `meta` — Pagination info (`total`, `limit`, `offset`, `hasMore`).
 
 ### Subscribing to a Collection with Filters
@@ -148,7 +148,7 @@ const unsubscribe = client.data.orders
 ```
 
 :::note
-The `.listen()` method on the query builder is only available when the `RebaseClient` is configured with a `websocketUrl`. If the WebSocket connection is not configured, calling `.listen()` will throw an error.
+`.listen()` — on the query builder and on the collection accessor alike — needs the client's WebSocket. The client derives its URL from `baseUrl` unless `websocketUrl` is given. On a client created with `realtime: false`, or one that could derive no URL, calling `.listen()` throws an error.
 :::
 
 ## Update Delivery: Instant Patch + Correctness Refetch
@@ -225,7 +225,7 @@ states of the collection.
 
 When the count itself fails, the frame carries `partial: true` and no `total`;
 that is not a subscription error, and a client should keep the last real total
-rather than substituting the page length. On a big table the count is most of what a frame costs. With `REALTIME_RECOUNT_INTERVAL_MS` set, a list whose last total was at least `REALTIME_RECOUNT_MIN_ROWS` (100,000 by default) reuses that total for the interval instead of counting on every write, and such a frame carries `meta.totalAsOf`, when the total was taken. Unset, as by default, every frame counts.
+rather than substituting the page length. On a big table the count is most of what a frame costs. With `REALTIME_RECOUNT_INTERVAL_MS` set, a list whose last total was at least `REALTIME_RECOUNT_MIN_ROWS` (100,000 by default) reuses that total for the interval instead of counting on every write, and such a frame carries `meta.totalAsOf`, when the total was taken. When the interval is up, a list whose last frame reused the total is counted again and sent the new total, whether or not anything was written since. Unset, as by default, every frame counts.
 
 ### What a write costs, and the limits
 
@@ -264,7 +264,7 @@ start to lag. Beyond that, prefer narrower subscriptions (a page, a filter on
 the user's own rows) or a [broadcast channel](#broadcast-channels) carrying the
 change for clients to re-fetch on their own schedule.
 
-**One socket may hold at most 1,000 subscriptions.** The next is refused with an error frame coded `TOO_MANY_SUBSCRIPTIONS`; re-subscribing under an id the socket already holds replaces that subscription and does not count again. The SDK shares identical subscriptions on a socket, so this counts the distinct lists and records a page has open. Change it with `REALTIME_MAX_SUBSCRIPTIONS_PER_SOCKET` or `realtime.maxSubscriptionsPerSocket` on the Postgres adapter (the environment variable wins); a value that is not a positive whole number stops the server at boot. On 0.23 a socket's subscriptions are not limited. **The sockets one user holds can be limited too**, per server instance: set `REALTIME_MAX_SOCKETS_PER_USER` (or `realtime.maxSocketsPerUser`), and a sign-in past it is refused with `TOO_MANY_SOCKETS` and the socket closed with 4002. Unset, as by default, there is no ceiling.
+**One socket may hold at most 1,000 subscriptions.** The next is refused with an error frame coded `TOO_MANY_SUBSCRIPTIONS`; re-subscribing under an id the socket already holds replaces that subscription and does not count again. The SDK shares identical subscriptions on a socket, so this counts the distinct lists and records a page has open. Change it with `REALTIME_MAX_SUBSCRIPTIONS_PER_SOCKET` or `realtime.maxSubscriptionsPerSocket` on the Postgres adapter (the environment variable wins); a value that is not a positive whole number stops the server at boot. On 0.23 a socket's subscriptions are not limited. **The sockets one user holds can be limited too**, per server instance: set `REALTIME_MAX_SOCKETS_PER_USER` (or `realtime.maxSocketsPerUser`), and a sign-in past it is refused with `TOO_MANY_SOCKETS` and the socket closed with 4002. Sockets signed in with an API key count against that key, each key on its own, not against the account that made it; the service key is one credential, so all of its sockets count together. An administrator's sockets that impersonate a user count against the administrator, with their own sockets, not against the user they act as. The SDK tells every live subscription and `onConnectionLost` at once, with a `CONNECTION_LOST` error whose `details.reason` is `TOO_MANY_SOCKETS`, and keeps retrying, waiting longer each time up to 30 s, so the tab gets in once another socket closes. Unset, as by default, there is no ceiling.
 
 A subscription id is the socket's own: two clients that both name a subscription `"sub-1"` each keep theirs, and an `unsubscribe` ends only the sender's.
 
@@ -413,7 +413,7 @@ Presence tracks which users are currently online in a channel and lets each user
 | `presence_track`  | Client → Server | Start tracking presence with custom state            |
 | `presence_untrack`| Client → Server | Stop tracking presence                               |
 | `presence_state`  | Client → Server | Request the full presence state for a channel        |
-| `presence_state`  | Server → Client | Full entity of all presences in a channel          |
+| `presence_state`  | Server → Client | Every presence in the channel, in full               |
 | `presence_diff`   | Server → Client | Incremental update (joins and leaves)                |
 
 When a client sends `presence_track`, the server automatically joins them to the channel (no separate `join_channel` needed) and broadcasts a `presence_diff` to all channel members. The SDK re-sends its state every ~20 seconds as a heartbeat; a heartbeat whose state is unchanged only refreshes the client's timeout and sends no `presence_diff`.
@@ -469,7 +469,7 @@ messages sent while disconnected are queued and sent after reconnecting:
 | `connecting` | Dialling, with no outage in progress. |
 | `connected` | The socket is open. |
 | `reconnecting` | The socket dropped and the client is redialling. Nothing has been reported yet. |
-| `disconnected` | The outage has lasted about 15 seconds or more. `CONNECTION_LOST` has been reported, and the client keeps redialling. |
+| `disconnected` | The outage has lasted 14 seconds or more. `CONNECTION_LOST` has been reported, and the client keeps redialling. |
 | `closed` | `client.close()` was called. Final. |
 
 ```typescript
@@ -521,9 +521,9 @@ SDK, Studio, `psql`, a cron job in another service. How the capture works, the
 
 To prevent client requests from hanging indefinitely, all pending WebSocket operations that expect a server response (such as one-shot collection fetches `FETCH_COLLECTION`, single entity fetches `FETCH_ONE`, creating/updating `SAVE`, deletes `DELETE`, counts `COUNT`, and uniqueness checks `CHECK_UNIQUE_FIELD`) have a default timeout of 30 seconds.
 
-If the server does not respond within this 30-second window, the client automatically deletes the pending request and rejects the promise with an `ApiError` with the message `"Request timed out"`.
+If the server does not respond within this 30-second window, the client automatically deletes the pending request and rejects the promise with a `RebaseApiError` whose code is `REQUEST_TIMEOUT`.
 
-One-way messages that do not expect a response (like `subscribe_collection`, `subscribe_one`, `unsubscribe`, `join_channel`, `leave_channel`, `broadcast`, `presence_track`, `presence_untrack`, and `presence_state`) resolve immediately upon transmission and do not trigger timeouts.
+One-way messages that do not expect a response (like `subscribe_collection`, `subscribe_one`, `unsubscribe`, `join_channel`, `leave_channel`, `broadcast`, `presence_track`, `presence_untrack`, `presence_state` and `channel_history`) resolve immediately upon transmission and do not trigger this timeout. A subscription whose first frame has not arrived 30 seconds after its subscribe was sent fails instead, with `SUBSCRIPTION_TIMEOUT` on its `onError`.
 
 ### When a channel frame is refused
 
@@ -547,7 +547,7 @@ channel.onError((error) => {
 | Code | Means |
 |------|-------|
 | `CHANNEL_FORBIDDEN` | You are not a member of the channel — join it before broadcasting or reading its history |
-| `RATE_LIMITED` | Past the channel frame budget above, or, for a history request, past the [data rate limit](#what-a-write-costs-and-the-limits) |
+| `RATE_LIMITED` | Past the channel frame budget (7,200 channel frames a minute per socket), or, for a history request, past the [data rate limit](#what-a-write-costs-and-the-limits) |
 | `CHANNEL_HISTORY_WRITE_FAILED` | A retained broadcast could not be persisted, so it was dropped |
 | `CHANNEL_HISTORY_READ_FAILED` | A catch-up request could not be served |
 | `CHANNEL_HISTORY_GAP` | Raised by the client: a catch-up found that the server no longer retains messages this client never received. `details` is `{ from, to }`, the sequence numbers missed. Resync the channel's state from its source of truth |

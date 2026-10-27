@@ -241,10 +241,21 @@ preStopDrainSeconds: 5
 
 # ─── Schema ────────────────────────────────────────────────────────────────
 #
-# Exactly one thing provisions the schema. With this enabled it is a Job that
-# runs before the pods roll, and every unit — the api included — boots with
-# REBASE_MIGRATE_ON_BOOT=none. That is the cleanest split available: nothing on
-# the request path owns DDL.
+# `false` when the database's schema may only change through your own change
+# process. Every unit then boots with REBASE_PROVISION=false and changes nothing
+# in the database: no table, column, policy, role or grant, the framework's own
+# included. The migration Job below is not rendered; run the provisioning step
+# yourself (the same image, REBASE_PROVISION_ONLY=true, REBASE_PROVISION_SQL_OUT
+# to keep the SQL it ran) under that process before every upgrade. See
+# https://rebase.pro/docs/deployment/self-hosting/#when-only-your-change-process-may-change-the-database
+provision: true
+
+# Otherwise exactly one thing provisions the collection schema. With this
+# enabled it is a Job that runs before the pods roll, and every unit — the api
+# included — boots with REBASE_MIGRATE_ON_BOOT=none, so nothing on the request
+# path owns the collection schema. The pods still keep the framework's own
+# tables (auth, API keys, jobs, cron) current at boot; `provision: false` above
+# is what stops that too.
 #
 # Disable it and the api provisions at boot instead, which is the single-process
 # default and is what an unsplit deployment already does.
@@ -333,6 +344,12 @@ service:
 # switched on deliberately.
 networkPolicy:
   enabled: false
+  # The namespace your ingress controller's pods run in — the only source the
+  # policy admits to the API. ingress-nginx installs into `ingress-nginx`; k3s's
+  # bundled Traefik runs in `kube-system`. Wrong here, every request is dropped
+  # at L4 and the release serves timeouts with nothing in its logs — set it
+  # whenever ingress.className is not nginx.
+  ingressNamespace: ingress-nginx
 
 podDisruptionBudget:
   enabled: false

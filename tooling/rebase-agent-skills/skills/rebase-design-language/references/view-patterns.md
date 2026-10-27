@@ -33,7 +33,7 @@ import { Container, Typography, Button, PlusIcon } from "@rebasepro/ui";
 
 export function ProjectsPage() {
     return (
-        <div className="py-2 overflow-auto h-full w-full bg-surface-50 dark:bg-surface-800">
+        <div className="py-2 overflow-auto h-full w-full bg-surface-sheet">
             <Container maxWidth="6xl">
 
                 {/* Page header — title grows, actions sit right */}
@@ -55,11 +55,12 @@ export function ProjectsPage() {
 Rules:
 - `h4` is the page title. Never `h1`/`h2` — they are display sizes, too loud for the shell.
 - The action button lives on the title row, not in a separate toolbar strip.
-- Page background is `bg-surface-50 dark:bg-surface-800` — **not** `dark:bg-surface-950`.
+- Page background is the role surface `bg-surface-sheet` (what `ContentHomePage` uses) — **not** a numbered light/dark pair.
 
 ## B. Section header
 
-Sections inside a page are labelled with a small uppercase caption, not a heading.
+Sections inside a page are labelled with the small uppercase `micro` tier, not a
+heading — the label `NavigationGroup` puts over each group on the home page.
 
 ```tsx
 import React from "react";
@@ -69,10 +70,10 @@ export function PipelineSection({ children }: { children: React.ReactNode }) {
     return (
         <div className="my-10">
             <Typography
-                variant="caption"
+                variant="micro"
                 component="h2"
                 color="secondary"
-                className="px-4 py-1 rounded font-medium text-[10px] uppercase tracking-[0.08em] text-surface-400 dark:text-surface-500"
+                className="py-1 rounded"
             >
                 Pipeline stages
             </Typography>
@@ -315,16 +316,16 @@ export function EditorSidebar() {
     return (
         <div className={cls("border rounded-lg overflow-hidden w-[320px]", defaultBorderMixin)}>
             <Tabs value="schema" onValueChange={() => {}} variant="boxy"
-                  className="border-b border-surface-200 dark:border-surface-950">
+                  className="border-b border-hairline">
                 <Tab value="schema">Schema</Tab>
                 <Tab value="snippets">Snippets</Tab>
             </Tabs>
-            <div className={cls("p-3 border-b flex justify-between items-center bg-surface-50 dark:bg-surface-900", defaultBorderMixin)}>
+            <div className={cls("p-3 border-b flex justify-between items-center", defaultBorderMixin)}>
                 <Typography variant="caption"
                             className="font-semibold uppercase tracking-wider text-text-disabled dark:text-text-disabled-dark">
                     TABLES
                 </Typography>
-                <IconButton size="small"><SettingsIcon size={iconSize.smallest}/></IconButton>
+                <IconButton aria-label="Settings" size="small"><SettingsIcon size={iconSize.smallest}/></IconButton>
             </div>
             <div className="p-2">{/* scrollable list */}</div>
         </div>
@@ -365,7 +366,7 @@ and never use an `Alert` for a transient result — that is a toast.
 | Between a toolbar and its table | `space-y-3` |
 | Grid gap (cards, metrics, form fields) | `gap-4` |
 | Card padding | `p-4` (`p-6` for a dialog-sized panel) |
-| Corner radius | `rounded-lg` — never `rounded-2xl` |
+| Corner radius | `rounded-lg` for controls and bordered panels, `rounded-xl` for cards (what `Card` applies) — never `rounded-2xl` |
 | Table row actions | `IconButton size="smallest"` in an 80px column |
 | Numeric display | `tabular-nums` |
 
@@ -376,5 +377,5 @@ and never use an `Alert` for a transient result — that is a toast.
 3. Every class list through `cls()` — no template literals.
 4. Only `primary` blue as an accent, used sparingly. No second accent colour.
 5. Loading states are `Skeleton`s sized like the real content.
-6. Check it in dark mode. Surfaces need an explicit `dark:` variant.
+6. Check it in dark mode. Role surfaces (`bg-surface-sheet`, `bg-surface-card`, `border-hairline`) switch on their own; any numbered colour you write needs an explicit `dark:` variant.
 7. Compare against the UI reference in the running app (mounted at `/debug/ui` — see "Ground truth" in `SKILL.md`) before calling it done.

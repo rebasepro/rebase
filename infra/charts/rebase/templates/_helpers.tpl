@@ -95,7 +95,7 @@ api does exactly what an unsplit deployment already does. Two places deciding
 this independently is how you get either nobody provisioning or a race.
 */}}
 {{- define "rebase.jobOwnsSchema" -}}
-{{- if .Values.migrationJob.enabled -}}true{{- else -}}false{{- end -}}
+{{- if and .Values.migrationJob.enabled .Values.provision -}}true{{- else -}}false{{- end -}}
 {{- end -}}
 
 {{/* Resolved rate-limit store: `auto` becomes sql as soon as a second HTTP
@@ -241,8 +241,15 @@ both have an opinion is one where the failure is invisible.
 - name: REBASE_ROLE
   value: {{ $role | quote }}
 {{- end }}
-{{- $provisions := and (eq (include "rebase.jobOwnsSchema" $root) "false") (or (eq $role "api") (eq $role "all")) -}}
-{{- if $provisions }}
+{{- $provisions := and $root.Values.provision (eq (include "rebase.jobOwnsSchema" $root) "false") (or (eq $role "api") (eq $role "all")) -}}
+{{- if not $root.Values.provision }}
+{{/* The database changes only through the operator's own change process:
+     nothing in this release creates or alters anything in it. */}}
+- name: REBASE_PROVISION
+  value: "false"
+- name: REBASE_MIGRATE_ON_BOOT
+  value: "none"
+{{- else if $provisions }}
 - name: REBASE_MIGRATE_ON_BOOT
   value: {{ $root.Values.migrationJob.mode | quote }}
 {{- else }}

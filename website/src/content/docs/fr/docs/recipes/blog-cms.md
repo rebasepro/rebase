@@ -1,5 +1,5 @@
 ---
-sourceHash: fb83f7a9f5e95709
+sourceHash: ff3d56f359f32429
 title: "Recette : CMS de blog"
 sidebar_label: CMS de blog
 description: Créez un CMS de blog complet avec des articles, des auteurs, des catégories, l'édition de texte enrichi et le téléversement d'images.
@@ -56,6 +56,7 @@ export const authorsCollection = defineCollection({
     }
 });
 
+export default authorsCollection;
 ```
 
 ### Catégories
@@ -94,12 +95,15 @@ export const categoriesCollection = defineCollection({
     }
 });
 
+export default categoriesCollection;
 ```
 
 ### Articles
 
 ```typescript
 import { defineCollection } from "@rebasepro/cms-types";
+import authorsCollection from "./authors";
+import categoriesCollection from "./categories";
 // The row shape, so callbacks below see typed `values` instead of `unknown`.
 type Article = {
     title: string;
@@ -215,11 +219,14 @@ export const articlesCollection = defineCollection({
     }
 });
 
+export default articlesCollection;
 ```
 
 ## Configuration
 
-1. Enregistrez les trois fichiers dans `config/collections/`. Ajoutez-les au
+1. Enregistrez les trois fichiers dans `config/collections/` — `authors.ts`, `categories.ts`
+   et `articles.ts` ; chacun doit exporter sa collection par défaut (export par défaut), sinon le démarrage
+   refuse le répertoire. Ajoutez-les au
    tableau `collections` dans `config/collections/index.ts` pour choisir où ils
    apparaissent dans la navigation — chaque fichier du répertoire est chargé
    dans tous les cas.

@@ -71,7 +71,7 @@ Setzen Sie `collapsed: false` für die Aktion, wegen der man den Datensatz öffn
 {
     name: "Publish",
     icon: "Upload",
-    collapsed: false, // eine Schaltfläche am Datensatz, ein Symbol in der Zeile
+    collapsed: false, // a button on the record, an icon on the row
     onClick: async ({ entity, context }) => { /* … */ }
 }
 ```
@@ -93,7 +93,7 @@ Eine deaktivierte Aktion, die nicht sagt warum, wirkt defekt. `disabledReason` e
 {
     name: "Resend to Shopify",
     isEnabled: ({ entity }) => Boolean(entity?.values.shopify_id),
-    disabledReason: () => "Dieser Kunde hat kein Shopify-Konto",
+    disabledReason: () => "This customer has no Shopify account",
     onClick: async ({ entity, context }) => { /* … */ }
 }
 ```

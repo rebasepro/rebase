@@ -1,5 +1,5 @@
 ---
-sourceHash: 6c8e1509d678993c
+sourceHash: 9b091b775b58ae32
 title: Datenbank-Branching
 sidebar_label: Branching
 description: Erstellen Sie isolierte Datenbank-Branches für Entwicklung, Staging und Tests mit PostgreSQLs CREATE DATABASE ... TEMPLATE – sofortige, originalgetreue Kopien ohne Ausfallzeiten.
@@ -96,7 +96,7 @@ Branch-Konfigurationen werden in der Standarddatenbank in der Tabelle `rebase.br
 CREATE SCHEMA IF NOT EXISTS rebase;
 
 CREATE TABLE IF NOT EXISTS rebase.branches (
-    name         TEXT PRIMARY KEY,              -- Sanitize user branch name (alphanumeric & underscores)
+    name         TEXT PRIMARY KEY,              -- Branch name as given (letters, digits, underscores, hyphens)
     db_name      TEXT NOT NULL UNIQUE,          -- Actual PostgreSQL database name (prefixed with 'rb_')
     parent_db    TEXT NOT NULL,                 -- Source database cloned from
     created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -213,7 +213,7 @@ rebase db branch switch --off
 # Show one branch's parent, age and size
 rebase db branch info dev_sandbox
 
-# Was der Branch geändert hat: Schema, RLS-Richtlinien und Zeilen (--json für alles)
+# What the branch changed: schema, RLS policies and rows (--json for all of it)
 rebase db branch diff dev_sandbox
 
 # Delete a branch
@@ -265,18 +265,24 @@ Das Erstellen eines Branches ändert **nicht**, mit welcher Datenbank Ihr Projek
 postgresql://user:pass@localhost:5432/rb_dev_sandbox
 ```
 
+---
+
 ## Einen Branch prüfen und zusammenführen
+
+<span class="since-badge" data-since="0.26">Seit 0.26</span>
 
 Ein Branch ist der Ort, an dem ein Agent – oder eine Migration, bei der Sie sich nicht sicher sind – eine Datenbank ändern kann, ohne die echte anzufassen. Bevor davon etwas die Datenbank erreicht, aus der der Branch erstellt wurde, können Sie in [Studio](/docs/studio/) sehen, was sich geändert hat, und es zusammenführen: Öffnen Sie **Branches** und wählen Sie einen aus.
 
-- **Schema und RLS-Richtlinien** listet jede Tabelle, Spalte, jeden Primärschlüssel und jede Richtlinie, die der Branch hinzugefügt, entfernt oder geändert hat, als SQL – die Definition des Elternteils neben der des Branches.
-- **Datenänderungen** zählt pro Tabelle die Zeilen, die der Branch eingefügt, aktualisiert und gelöscht hat, zugeordnet über den Primärschlüssel, und zeigt bis zu 100 davon pro Tabelle mit den geänderten Spalten.
+- **Schema und RLS-Richtlinien** listet jede Tabelle, Spalte, jeden Primärschlüssel, jeden Constraint (Unique, Fremdschlüssel, Check, Exclusion), Index, Trigger, jede Richtlinie, jeden Enum-Typ (mit seinen Labels), jede View und Funktion, die der Branch hinzugefügt, entfernt oder geändert hat, als SQL – die Definition des Elternteils neben der des Branches.
+- **Datenänderungen** zählt pro Tabelle die Zeilen, die der Branch eingefügt, aktualisiert und gelöscht hat, zugeordnet über den Primärschlüssel, und zeigt bis zu 100 davon pro Tabelle (höchstens 1.000, wenn Sie mehr anfordern) mit den geänderten Spalten. Eine Spalte, die wie ein Credential benannt ist – `password_hash`, ein `*_token`, alles mit `secret` darin, ein `*_hash` –, zeigt `[redacted]` statt ihres Werts.
+
+Das Prüfen eines Branches erfordert den Scope `database:write`, den, der SQL als Datenbankeigentümer ausführt: Die Stichproben sind Zeilen beider Datenbanken, außerhalb der Row-Level Security gelesen. `database:read` listet Branches auf, liest aber nicht ihre Zeilen.
 
 Derselbe Diff ist `rebase db branch diff <name>` im Terminal, `GET /api/admin/branches/<name>/diff` über HTTP, das MCP-Tool `rebase_db_branch_diff` und `admin.diffBranch(name)` im Code. Rebases eigene Tabellen (Sitzungen, Verlauf, das Branch-Register) bleiben außen vor.
 
 ### Welche Seite eine Zeile geändert hat
 
-Der Elternteil nimmt weiter Schreibzugriffe an, während am Branch gearbeitet wird. „Die beiden Datenbanken unterscheiden sich“ heißt daher nicht „der Branch hat es geändert“: Eine Zeile, die der Elternteil nach dem Erstellen des Branches eingefügt hat, sieht genauso aus wie eine Zeile, die der Branch gelöscht hat. Rebase unterscheidet sie danach, wann jede Zeile geschrieben wurde. Transaktions-IDs gehören dem Server, nicht einer einzelnen Datenbank, und die Template-Kopie behält sie bei – eine Zeile, die nach dem Erstellen des Branches geschrieben wurde, auf welcher Seite auch immer, ist also jünger als die Transaktion, die die Branch-Datenbank erstellt hat.
+Der Elternteil nimmt weiter Schreibzugriffe an, während am Branch gearbeitet wird. „Die beiden Datenbanken unterscheiden sich“ heißt daher nicht „der Branch hat es geändert“: Eine Zeile, die der Elternteil nach dem Erstellen des Branches eingefügt hat, sieht genauso aus wie eine Zeile, die der Branch gelöscht hat. Rebase unterscheidet sie danach, wann jede Zeile geschrieben wurde. Transaktions-IDs gehören dem Server, nicht einer einzelnen Datenbank, und die Template-Kopie behält sie bei – eine Zeile, die nach dem Erstellen des Branches geschrieben wurde, auf welcher Seite auch immer, ist also jünger als die Transaktion, die die Branch-Datenbank erstellt hat. Diese Transaktion wird beim Erstellen des Branches gelesen und in dessen Eintrag festgehalten, sodass ein späteres `GRANT` oder `ALTER DATABASE` auf der Branch-Datenbank sie nicht verschiebt.
 
 | Die Zeile des Branches | Die Zeile des Elternteils | Zählt als |
 | --- | --- | --- |
@@ -288,33 +294,34 @@ Der Elternteil nimmt weiter Schreibzugriffe an, während am Branch gearbeitet wi
 
 Zwei Fälle sehen gleich aus und werden so gelesen, dass nichts verloren geht: Eine Zeile, die der Branch gelöscht und der Elternteil danach geändert hat, bleibt erhalten, und eine Zeile, die der Elternteil gelöscht und der Branch danach geändert hat, gilt als Einfügung des Branches. Ein `UPDATE`, das die Werte schreibt, die eine Zeile schon hatte, zählt trotzdem als Schreibvorgang.
 
-Lässt sich der Abzweigpunkt nicht lesen – bei einem langlebigen Branch, dessen `pg_database`-Zeile ein Vacuum eingefroren hat, oder einem, der mit `ALTER DATABASE` umbenannt wurde –, sagt der Diff das und zählt jeden Unterschied als Änderung des Branches.
+Ein Branch, der erstellt wurde, bevor Rebase diese Transaktion festhielt, liest sie aus der `pg_database`-Zeile der Branch-Datenbank, so wie sie jetzt ist; alles, was die Zeile seitdem neu geschrieben hat, verschiebt sie. Lässt sich der Abzweigpunkt gar nicht lesen – bei einem langlebigen Branch, dessen Zeile ein Vacuum eingefroren hat –, sagt der Diff das und zählt jeden Unterschied als Änderung des Branches.
 
 ### Was ein Zusammenführen tut
 
 **Zusammenführen** schreibt die Zeilen, die der Branch eingefügt, aktualisiert und gelöscht hat, in den Elternteil. Was gewinnt:
 
 - **Zeilen, die nur der Branch geändert hat**, werden geschrieben: eingefügt, überschrieben oder gelöscht.
-- **Zeilen, die nur der Elternteil** seit dem Erstellen des Branches geändert hat, bleiben genau so, wie sie sind.
+- **Zeilen, die nur der Elternteil** seit dem Erstellen des Branches geändert hat, bleiben genau so, wie sie sind – es sei denn, eine verweist auf eine Zeile, die der Branch gelöscht hat; das ist ein Konflikt (siehe unten).
 - **Zeilen, die beide geändert haben**, sind Konflikte. Standardmäßig schreibt das Zusammenführen dann gar nichts; wählen Sie `onConflict: "branch"`, um die Zeile des Branches über die des Elternteils zu schreiben, oder `"target"`, um die des Elternteils zu behalten.
+- **Eine Zeile, die der Branch gelöscht hat und auf die neuere Zeilen des Elternteils noch verweisen**, ist ebenfalls ein Konflikt. Angenommen, der Branch hat einen Autor gelöscht, und der Elternteil hat seitdem einen Beitrag von ihm geschrieben: Das Löschen des Autors auf dem Elternteil würde in diesen Beitrag kaskadieren, seine Spalte auf null setzen oder am Fremdschlüssel scheitern. Der Diff zählt den Autor als Konflikt und nennt die referenzierenden Zeilen (`referencedBy`: die Tabelle, den Fremdschlüssel, sein `ON DELETE` und wie viele Zeilen). Standardmäßig verweigert das Zusammenführen und nennt die Tabelle, die Zeilen und den Ausweg; `"target"` behält den Autor und damit den Beitrag; `"branch"` löscht den Autor, lässt den Fremdschlüssel tun, was er sagt, und listet in `warnings`, was dadurch erreicht wurde.
 - **Schema- und Richtlinienänderungen werden nie zusammengeführt.** Sie gehören zu Ihren Collections und deren Migrationen: Wenden Sie sie mit `rebase db push` (oder `migrate`) an und führen Sie dann die Zeilen zusammen.
 
-Eine Tabelle, deren Zeilen sich nicht zuordnen lassen, blockiert das Zusammenführen: eine, die der Branch hinzugefügt oder entfernt hat, eine, deren Spalten oder Primärschlüssel sich zwischen beiden unterscheiden, eine ohne Primärschlüssel oder eine mit mehr als 100.000 Zeilen auf einer Seite. Übergeben Sie `skipBlocked` (in Studio: **Die übrigen Tabellen zusammenführen** ankreuzen), um den Rest zusammenzuführen und diese in Ruhe zu lassen.
+Eine Tabelle, deren Zeilen sich nicht zuordnen lassen, blockiert das Zusammenführen: eine, die der Branch hinzugefügt oder entfernt hat, eine, deren Spalten oder Primärschlüssel sich zwischen beiden unterscheiden, eine ohne Primärschlüssel oder eine mit mehr als 100.000 Zeilen auf einer Seite. Ihre Zähler zeigen 0, weil nicht bekannt ist, welche Zeilen sich geändert haben; `rowCounts` nennt die Zeilenanzahl jeder Seite. Eine solche Tabelle, die nur der Elternteil geändert hat – der Branch hat keine ihrer Zeilen geschrieben, und die von vor der Abzweigung sind gleich –, ist nicht blockiert. Übergeben Sie `skipBlocked` (in Studio: **Die übrigen Tabellen zusammenführen** ankreuzen), um den Rest zusammenzuführen und diese in Ruhe zu lassen.
+
+Eine Tabelle, die seit dem Erstellen des Branches neu geschrieben wurde, ist ebenfalls blockiert (`TABLE_REWRITTEN`). Eine Änderung des Spaltentyps, ein `ADD COLUMN` mit einem volatilen Default, `VACUUM FULL` oder `CLUSTER` schreibt jede Zeile neu, sodass jede Zeile als seitdem geschrieben gilt und sich nicht mehr sagen lässt, welche Seite was geändert hat. Wenn der Branch den Typ einer Spalte geändert hat, führen Sie seine Zeilen zusammen, bevor Sie diese Änderung auf den Elternteil anwenden, oder erstellen Sie den Branch danach neu.
 
 Jeder Schreibvorgang geschieht in einer einzigen Anweisung auf dem Elternteil – alles oder nichts, Fremdschlüssel am Ende geprüft. Ein Zusammenführen trägt den `fingerprint` des Diffs, den Sie geprüft haben, und schreibt nichts, wenn sich seitdem eine der beiden Datenbanken geändert hat: Laden Sie den Diff neu und sehen Sie noch einmal hin. Sequenzen werden über alle IDs hinaus vorgerückt, die das Zusammenführen eingefügt hat.
 
 ```typescript
 const diff = await admin.diffBranch("agent_run_17");
-// …diff.schema und diff.data prüfen…
+// …review diff.schema and diff.data…
 const result = await admin.mergeBranch("agent_run_17", {
     expectedFingerprint: diff.fingerprint,
-    onConflict: "abort" // oder "branch", oder "target"
+    onConflict: "abort" // or "branch", or "target"
 });
 ```
 
 Zusammenführen ist bewusst kein MCP-Tool: Ein Agent schlägt auf seinem Branch vor, und ein Mensch führt zusammen.
-
----
 
 ---
 

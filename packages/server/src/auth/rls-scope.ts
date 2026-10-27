@@ -12,7 +12,7 @@
  * @module
  */
 
-import type { DataDriver } from "@rebasepro/types";
+import type { CallerCredential, DataDriver } from "@rebasepro/types";
 
 /**
  * The identity the trusted server plane runs as: `rebase.dataAsAdmin`, and any
@@ -38,6 +38,22 @@ import type { DataDriver } from "@rebasepro/types";
 export const SERVICE_IDENTITY: { uid: string; roles: string[] } = { uid: "service", roles: ["admin"] };
 
 /**
+ * Who a request runs as, as a driver is scoped to it.
+ *
+ * `credential` is the API key the request authenticated with, when it was one.
+ * It changes nothing the database sees; the driver hands it to collection
+ * callbacks as `context.credential`, so a personal key's write can be told
+ * from its owner's own.
+ */
+export interface ScopeIdentity {
+    uid: string;
+    roles?: string[];
+    isAnonymous?: boolean;
+    claims?: Record<string, unknown>;
+    credential?: CallerCredential;
+}
+
+/**
  * A DataDriver that supports RLS scoping via `withAuth()`.
  *
  * This is not part of the public DataDriver interface because not all
@@ -45,7 +61,7 @@ export const SERVICE_IDENTITY: { uid: string; roles: string[] } = { uid: "servic
  * extend DataDriver with this method.
  */
 interface RLSScopedDriver extends DataDriver {
-    withAuth(user: { uid: string; roles?: string[]; isAnonymous?: boolean; claims?: Record<string, unknown> }): Promise<DataDriver>;
+    withAuth(user: ScopeIdentity): Promise<DataDriver>;
 }
 
 /**
@@ -93,7 +109,7 @@ export async function scopeDataDriver(
      * without this the database sees the same principal either way. See
      * `rebase.is_anonymous()`.
      */
-    user: { uid: string; roles?: string[]; isAnonymous?: boolean; claims?: Record<string, unknown> }
+    user: ScopeIdentity
 ): Promise<DataDriver> {
     if (isRLSScopedDriver(driver)) {
         // Fail closed — do NOT catch and swallow errors here.

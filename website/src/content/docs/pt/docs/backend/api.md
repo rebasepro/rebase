@@ -1,5 +1,5 @@
 ---
-sourceHash: 6d6edea2e91b0bbc
+sourceHash: e61d261c8dae7e37
 title: API REST
 sidebar_label: API REST
 description: Endpoints de API REST gerados automaticamente para cada coleção, com filtragem, ordenação, paginação e inclusão de relações.
@@ -288,9 +288,9 @@ pessoa lendo um console e estão sujeitas a alterações. O status HTTP fica na 
 
 | Status | Código comum | Significado |
 |--------|--------------|-------|
-| 400 | `BAD_REQUEST`, `VALIDATION_ERROR`, `INVALID_LIMIT`, `INVALID_OFFSET`, `INVALID_PAGE` | A requisição está malformada ou solicita algo impossível |
+| 400 | `BAD_REQUEST`, `INVALID_INPUT`, `INVALID_LIMIT`, `INVALID_OFFSET`, `INVALID_PAGE` | A requisição está malformada ou solicita algo impossível |
 | 401 | `UNAUTHORIZED` | Nenhuma credencial informada, ou uma credencial que não identifica ninguém |
-| 403 | `FORBIDDEN`, `DB_PERMISSION_DENIED` | Uma credencial que identifica alguém sem a devida permissão |
+| 403 | `FORBIDDEN`, `SCOPE_MISSING`, `WRITE_DENIED` | Uma credencial que identifica alguém sem a devida permissão |
 | 404 | `NOT_FOUND` | O recurso solicitado não existe |
 | 409 | `CONFLICT` | Conflito de estado — chave duplicada, árvore desatualizada (dirty tree) |
 | 501 | varia | O recurso existe, mas **não está configurado** nesta implantação |
@@ -417,15 +417,15 @@ Todo hook é aguardado, e um erro lançado por qualquer um deles desfaz a escrit
 | Método | Caminho | Autenticação | Descrição |
 |--------|------|------|-------------|
 | `GET` | `/health` e `/api/health` | nenhuma | Verificação de vivacidade/prontidão (liveness/readiness check) |
-| `GET` | `/api/docs` | nenhuma | A especificação OpenAPI 3.0 em JSON |
-| `GET` | `/api/swagger` | nenhuma | Swagger UI. Ativo em desenvolvimento, desativado em produção; `REBASE_ENABLE_SWAGGER` sobrescreve em ambos os casos |
-| `GET` | `/api/meta/schema-version` | nenhuma | O hash do schema a partir do qual este backend foi construído — deliberadamente não autenticado, e retorna apenas esse hash |
+| `GET` | `/api/docs` | nenhuma; `schema:read` quando `enableSwagger` é `false` (o padrão do runtime em produção) | A especificação OpenAPI 3.0 em JSON |
+| `GET` | `/api/swagger` | nenhuma | Swagger UI. Servido apenas fora de produção; `REBASE_ENABLE_SWAGGER` não consegue ativá-lo em produção |
+| `GET` | `/api/meta/schema-version` | nenhuma | O hash do schema a partir do qual este backend foi construído, e a versão do runtime — deliberadamente não autenticado, e nada que descreva o schema |
 | `GET` | `/api/meta/contract` | `schema:read`: um admin, a chave de serviço ou uma chave de API que o tenha | O contrato completo da coleção, para `rebase generate-sdk --from`. Comportamento fail-closed: `404` quando nenhuma autenticação está configurada |
 | `GET` | `/metrics` | `REBASE_METRICS_TOKEN` quando definido | Métricas do Prometheus, quando `REBASE_METRICS=true` |
 
 ## OpenAPI / Swagger
 
-A especificação OpenAPI é gerada automaticamente a partir das definições das suas coleções: ela descreve os endpoints de listagem, leitura, criação, atualização, exclusão e operações em lote de cada coleção atendida pelo backend, com seus parâmetros de consulta e esquemas de resposta. Não se trata de um mapa completo de toda a superfície HTTP — as rotas de auth, storage, functions e cron estão documentadas apenas neste site — e colunas marcadas como `excludeFromApi` são omitidas dela.
+A especificação OpenAPI é gerada automaticamente a partir das definições das suas coleções: ela descreve os endpoints de listagem, consulta, contagem, agregação, leitura, criação, atualização, exclusão e operações em lote de cada coleção atendida pelo backend, suas rotas aninhadas e `_batch`, com seus parâmetros de consulta e esquemas de resposta. Não se trata de um mapa completo de toda a superfície HTTP — as rotas de auth, storage, functions e cron estão documentadas apenas neste site — e colunas marcadas como `excludeFromApi` são omitidas dela.
 
 Para uma coleção com [`softDelete`](/docs/collections/soft-delete/), a especificação diz
 que uma exclusão, individual ou em lote, move a linha para a lixeira, e documenta
@@ -456,8 +456,8 @@ GET /api/meta/schema-version
 ```
 
 Para o formato dos endpoints em vez do schema por trás deles, o documento OpenAPI
-fica em `GET /api/docs`, com o Swagger UI em `/api/swagger` quando
-`enableSwagger` estiver ativado.
+fica em `GET /api/docs`, com o Swagger UI em `/api/swagger` fora de
+produção.
 
 ## Próximos passos
 

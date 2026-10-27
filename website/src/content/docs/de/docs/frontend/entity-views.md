@@ -1,5 +1,5 @@
 ---
-sourceHash: af85efb5a9d69006
+sourceHash: 640b52048be1b1c6
 title: Entitätsansichten
 sidebar_label: Entitätsansichten
 description: Fügen Sie benutzerdefinierte Tabs und Ansichten zu Entitätsdetailseiten für Vorschauen, Analysen, verknüpfte Daten oder benutzerdefinierte Benutzeroberflächen hinzu.
@@ -51,13 +51,14 @@ function ArticlePreview({
     modifiedValues,
     formContext
 }: EntityCustomViewParams) {
-    // modifiedValues has the unsaved, live form values
-    const title = modifiedValues?.title ?? entity?.values?.title;
-    const content = modifiedValues?.content ?? entity?.values?.content;
+    // modifiedValues has the unsaved, live form values. Both it and
+    // entity.values are open records, so narrow before rendering.
+    const title = String(modifiedValues?.title ?? entity?.values?.title ?? "");
+    const content = String(modifiedValues?.content ?? entity?.values?.content ?? "");
 
     return (
         <div className="p-8 max-w-2xl mx-auto">
-            <h1 className="text-3xl font-semibold">{title}</h1>
+            <h1 className="text-xl font-semibold tracking-[-0.01em]">{title}</h1>
             <div dangerouslySetInnerHTML={{ __html: content }} />
         </div>
     );
@@ -68,10 +69,10 @@ function ArticlePreview({
 
 | Eigenschaft | Typ | Beschreibung |
 |------|------|-------------|
-| `entity` | `Entity` | Die gespeicherte Entität (null für neue Entitäten) |
+| `entity` | `Entity` | Die gespeicherte Entität (nicht vorhanden, solange eine neue erstellt wird) |
 | `modifiedValues` | `EntityValues` | Aktuelle ungespeicherte Formularwerte (live während der Benutzereingabe) |
 | `formContext` | `FormContext` | Voller Formular-Kontext |
-| `collection` | `CollectionConfig` | Sammlungsdefinition |
+| `collection` | `AdminCollection` | Sammlungsdefinition |
 
 ![Entitätsansicht mit sekundärem Formular](/img/entity_view_secondary_form.png)
 
@@ -85,7 +86,7 @@ entityViews: [
         key: "preview",
         name: "Preview",
         Builder: ArticlePreview,
-        position: "start"  // Erscheint vor dem Standard-Formular-Tab
+        position: "start"  // Appears before the default form tab
     }
 ]
 ```

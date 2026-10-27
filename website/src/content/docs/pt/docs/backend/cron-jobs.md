@@ -1,5 +1,5 @@
 ---
-sourceHash: 008801863c78b3e5
+sourceHash: 05002dc371e1e1e7
 title: Cron Jobs
 sidebar_label: Cron Jobs
 description: Agende tarefas em segundo plano recorrentes com o sistema integrado de cron jobs do Rebase. Defina jobs como arquivos TypeScript, monitore-os no Studio e gerencie-os via REST API.
@@ -151,8 +151,8 @@ interface CronJobDefinition {
     // loads rather than read as local time.
     timezone?: string;
 
-    // Human-readable name shown in Studio
-    name: string;
+    // Human-readable name shown in Studio (default: the job id, the file's name)
+    name?: string;
 
     // Optional description shown in Studio
     description?: string;
@@ -320,7 +320,7 @@ As contagens são de toda a vida; o histórico são os últimos 30 dias. A linha
 ## Validação de Agendamento e Análise AST
 
 Na inicialização do backend, o Rebase analisa todos os agendamentos de cron registrados usando um expansor de cron em JS com zero dependências:
-- **Verificação de Sintaxe**: Garante que a string contenha exatamente 5 campos separados por espaços (`minuto`, `hora`, `dia do mês`, `mês`, `dia da semana`).
+- **Verificação de Sintaxe**: Garante que a string contenha exatamente 5 campos separados por espaços (`minute`, `hour`, `day of month`, `month`, `day of week`).
 - **Expansão de Intervalos**: Decompõe passos (`*/15`), faixas (`9-17`) e listas separadas por vírgulas (`0,30`) em arrays explícitos de inteiros válidos mapeados para seus respectivos limites (ex.: minutos `0-59`, horas `0-23`, meses `1-12`).
 - Se alguma expressão de cron falhar na validação, o Rebase rejeita a definição, grava um erro de inicialização no log e recusa registrar o job para evitar falhas durante o tempo de execução.
 
@@ -352,7 +352,7 @@ está em [Cron entre instâncias](/docs/backend/cron-across-instances).
   `Error: Cron job "<id>" timed out after <N>ms`
   A ação de abortar é a parte que realmente interrompe o *trabalho*; a rejeição apenas faz o agendador parar de esperar. Um handler que ignora `ctx.signal` continua sendo executado além de sua própria execução.
 - **Encerramento**: `backend.shutdown()` aguarda uma execução em andamento, dentro do mesmo orçamento da fila de jobs (dois terços do timeout de encerramento). Uma execução que ainda esteja rodando quando ele se esgota tem `ctx.signal` abortado e é registrada como falha, com o motivo. Seu slot continua reivindicado, então nenhuma outra instância a executa de novo.
-- **Try/Catch com Proteção contra Falhas**: Cada handler de job roda dentro de um wrapper isolado. Quaisquer exceções não tratadas são interceptadas, formatando o rastreamento do erro (traceback) em uma string, alterando o status do job para `"error"` e atualizando o contador de falhas do job. Uma pane dentro de uma tarefa de cron específica nunca derrubará o loop do agendador ou o servidor web HTTP Hono principal.
+- **Try/Catch com Proteção contra Falhas**: Cada handler de job roda dentro de um wrapper isolado. Quaisquer exceções não tratadas são interceptadas, registrando a mensagem do erro (com dados sensíveis ocultados) como uma string, alterando o status do job para `"error"` e atualizando o contador de falhas do job. Uma pane dentro de uma tarefa de cron específica nunca derrubará o loop do agendador ou o servidor web HTTP Hono principal.
 - **Ring Buffer em Memória**: O agendador mantém um ring buffer contendo as últimas **50 execuções** de cada job. Esse buffer permanece em memória para viabilizar leituras quase instantâneas a partir do Rebase Studio.
 
 ---
@@ -371,7 +371,7 @@ CREATE TABLE IF NOT EXISTS rebase.cron_logs (
     finished_at  TIMESTAMPTZ NOT NULL,
     duration_ms  INTEGER NOT NULL,
     success      BOOLEAN NOT NULL DEFAULT true,
-    error        TEXT,                                 -- Stack trace or error message
+    error        TEXT,                                 -- The error's message, redacted
     result       JSONB,                                -- Return value of handler
     logs         JSONB,                                -- Ring buffer array of ctx.log outputs
     manual       BOOLEAN NOT NULL DEFAULT false        -- True if triggered from Studio/REST

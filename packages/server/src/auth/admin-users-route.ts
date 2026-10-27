@@ -19,7 +19,7 @@ import { normalizeEmail } from "@rebasepro/common";
 import { ApiError, errorHandler } from "../api/errors";
 import type { AuthRepository } from "./interfaces";
 import { createRequireAuth } from "./middleware";
-import { assertMayGrantRoles, assertMayManageAccount, callerIsAdmin, requireScope } from "./access";
+import { assertMayGrantRoles, assertMayManageAccount, callerIsAdmin, readRoleNames, requireScope } from "./access";
 import { mayPickUsers } from "./user-picking";
 import type { AuthHooks } from "./auth-hooks";
 import { resolveAuthHooks } from "./auth-hooks";
@@ -329,13 +329,15 @@ offset: 0 });
 
     router.post("/users", requireScope("users:write"), async (c) => {
         const body = await c.req.json();
-        const { email, roles } = body;
+        const { email } = body;
         if (!email) {
             throw ApiError.badRequest("Email is required");
         }
 
-        if (roles !== undefined && Array.isArray(roles)) {
-            assertMayGrantRoles(c, roles.filter((role): role is string => typeof role === "string"));
+        // One list: the roles judged here are the roles written below.
+        const roles = body.roles === undefined || body.roles === null ? undefined : readRoleNames(body.roles);
+        if (roles !== undefined) {
+            assertMayGrantRoles(c, roles);
         }
 
         const existing = await authRepo.getUserByEmail(normalizeEmail(email));
@@ -381,7 +383,7 @@ offset: 0 });
 
         const user = await authRepo.createUser(createData);
 
-        if (roles && Array.isArray(roles)) {
+        if (roles !== undefined) {
             await authRepo.setUserRoles(user.id, roles);
         }
 
@@ -412,7 +414,8 @@ values: prepResult.values },
     router.put("/users/:uid", requireScope("users:write"), async (c) => {
         const uid = c.req.param("uid");
         const body = await c.req.json();
-        const { password, email, displayName, roles, disabled } = body;
+        const { password, email, displayName, disabled } = body;
+        const roles = body.roles === undefined || body.roles === null ? undefined : readRoleNames(body.roles);
 
         const existing = await authRepo.getUserById(uid);
         if (!existing) {
@@ -435,8 +438,8 @@ values: prepResult.values },
         // leave the email or password it arrived with applied. Nobody edits an
         // account holding more than they do, nor grants more than they hold.
         assertMayManageAccount(c, await authRepo.getUserRoleIds(uid));
-        if (roles !== undefined && Array.isArray(roles)) {
-            assertMayGrantRoles(c, roles.filter((role): role is string => typeof role === "string"));
+        if (roles !== undefined) {
+            assertMayGrantRoles(c, roles);
             await assertRoleChangesAllowed(authRepo, [{ uid, roles }]);
         }
 
@@ -465,7 +468,7 @@ values: prepResult.values },
             await replaceUserPassword(authRepo, uid, passwordHash);
         }
 
-        if (roles !== undefined && Array.isArray(roles)) {
+        if (roles !== undefined) {
             await authRepo.setUserRoles(uid, roles);
         }
 

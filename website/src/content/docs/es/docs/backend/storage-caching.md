@@ -1,5 +1,5 @@
 ---
-sourceHash: add7e5205bcbe73a
+sourceHash: 2e525d1d6efa4692
 title: Caché de almacenamiento y CDN
 sidebar_label: Caché de almacenamiento y CDN
 description: Cómo sirve Rebase los archivos almacenados para que los navegadores y las CDN puedan almacenarlos en caché — ETags y 304, Cache-Control según quién puede leer un objeto, rangos de bytes para desplazarse en audio y vídeo, y qué configurar en una CDN por delante.
@@ -77,5 +77,5 @@ Dos cosas que debe configurar en la propia CDN:
 ## Relacionado
 
 - [Configuración de almacenamiento](/docs/backend/storage/) — los backends desde los que se sirven estas cabeceras, y el prefijo `public/` y `publicRead` que hacen `public` a un objeto.
-- [Autorización por objeto](/docs/backend/storage/#per-object-authorization) — quién puede leer un objeto, que es lo que decide entre `public` y `private`.
+- [Autorización por objeto](/docs/backend/storage-authorization/) — quién puede leer un objeto, que es lo que decide entre `public` y `private`.
 - [Campos de subida de archivos](/docs/collections/file-uploads/) — las propiedades de colección que almacenan archivos.

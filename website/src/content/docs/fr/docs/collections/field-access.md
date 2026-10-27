@@ -1,5 +1,5 @@
 ---
-sourceHash: cd33d688b582283c
+sourceHash: 155fe61b0635a331
 title: Accès aux champs
 sidebar_label: Accès aux champs
 description: Permissions de lecture et d'écriture par propriété et par rôle. Un appelant autorisé par les règles de sécurité de la ligne ne reçoit toujours pas un champ que ses rôles ne permettent pas de lire.
@@ -136,11 +136,11 @@ Une opération de champ exige aussi `read` sur son champ. Une opération sur un 
 
 La recherche de secours — une collection sans bloc `search` — effectue une correspondance `ILIKE` sur vos propriétés de type chaîne, et ignore celles que l'appelant ne peut pas lire. Aucune donnée ne fuite par ce biais.
 
-Une collection qui déclare **effectivement** un [bloc `search`](/docs/backend/api/) compile vers une colonne générée unique `tsvector` partagée par tous les appelants. Il n'en existe aucune variante par rôle ; ainsi, un champ restreint mentionné dans `search.fields` resterait *interrogeable* par des appelants qui ne peuvent pourtant jamais voir sa valeur — devenant récupérable terme par terme. Rebase refuse cette combinaison au démarrage : retirez le champ de `search.fields`, ou supprimez la restriction de lecture.
+Une collection qui déclare **effectivement** un [bloc `search`](/docs/backend/search) compile vers une colonne générée unique `tsvector` partagée par tous les appelants. Il n'en existe aucune variante par rôle ; ainsi, un champ restreint mentionné dans `search.fields` resterait *interrogeable* par des appelants qui ne peuvent pourtant jamais voir sa valeur — devenant récupérable terme par terme. Rebase refuse cette combinaison au démarrage : retirez le champ de `search.fields`, ou supprimez la restriction de lecture.
 
 ## Historique
 
-L'[historique des entités](/docs/backend/api/) stocke la ligne complète, et il est accessible à toute personne pouvant lire la ligne — la condition d'accès est "pouvez-vous récupérer cette entité", et non "êtes-vous administrateur". La règle de lecture s'applique donc également à chaque instantané stocké : l'entrée est toujours listée, avec l'auteur et la date de modification, mais les colonnes restreintes sont retirées de ses `values`.
+L'[historique des entités](/docs/backend/history) stocke la ligne complète, et il est accessible à toute personne pouvant lire la ligne — la condition d'accès est "pouvez-vous récupérer cette entité", et non "êtes-vous administrateur". La règle de lecture s'applique donc également à chaque instantané stocké : l'entrée est toujours listée, avec l'auteur et la date de modification, mais les colonnes restreintes sont retirées de ses `values`.
 
 Le rétablissement (revert) n'est pas affecté. La route de rétablissement lit l'entrée stockée côté serveur, de sorte qu'un appelant peut restaurer une version dont il ne peut pas voir tous les champs — exactement comme il peut déjà écraser une ligne sans la lire en intégralité.
 
@@ -168,7 +168,7 @@ Un champ que personne ne peut lire est absent du schéma de lecture et des param
 
 Les écritures in-process — `context.data` dans un callback, `rebase.dataAsAdmin` dans un callback, une fonction ou une tâche cron — ne sont pas soumises au contrôle d'écriture. Il s'agit de la même exemption dont `excludeFromApi` a toujours bénéficié, et c'est ce qui rend la règle applicable en pratique : un mécanisme doit bien être en mesure de stocker le hachage du mot de passe.
 
-Les lectures via `rebase.dataAsAdmin` disposent du rôle `admin`, de sorte qu'une règle de rôle ne leur masque rien. `[]` continue de s'appliquer — y compris pour `dataAsAdmin`. Utilisez [`rebase.sql()`](/docs/backend/api/) si vous avez besoin d'accéder directement à la colonne brute.
+Les lectures via `rebase.dataAsAdmin` disposent du rôle `admin`, de sorte qu'une règle de rôle ne leur masque rien. `[]` continue de s'appliquer — y compris pour `dataAsAdmin`. Utilisez [`rebase.sql()`](/docs/backend/custom-functions) si vous avez besoin d'accéder directement à la colonne brute.
 
 ## Validation
 

@@ -1,8 +1,8 @@
 import chalk from "chalk";
 import arg from "arg";
 import { errorClass, isEnabled, recordEvent } from "./telemetry";
-import { requireProjectRoot } from "./utils/project";
-import { parseCommandArgs } from "./utils/args";
+import { failAsJson, requireProjectRoot, wantsJsonOutput } from "./utils/project";
+import { parseCommandArgs, UsageError } from "./utils/args";
 import { unknownCommand } from "./utils/unknown-command";
 import { cliVersion } from "./utils/version";
 import path from "path";
@@ -241,6 +241,14 @@ export async function entry(args: string[]) {
             error_type: errorClass(error),
             usage: Boolean(error && typeof error === "object" && (error as { isUsageError?: unknown }).isUsageError)
         }, { projectRoot: process.cwd() });
+        // The one failure printed here rather than by `bin/rebase.js`: a caller
+        // that asked for `--json` is promised one JSON value on stdout on every
+        // exit, and a mistyped flag (`rebase status --json --bogus`) left stdout
+        // empty — an agent parsing it unconditionally got an empty-input error
+        // instead of the reason.
+        if (error instanceof UsageError && wantsJsonOutput(args)) {
+            failAsJson(error.message, "usage", `Run \`rebase ${command} --help\` for the flags it takes.`);
+        }
         throw error;
     }
 }
@@ -325,7 +333,8 @@ async function dispatch(
             const sdkRoot = sdkHelp ? process.cwd() : requireProjectRoot();
             const { generateSdkCommand } = await import("./commands/generate_sdk");
             await generateSdkCommand({
-                collectionsDir: sdkArgs["--collections"] || path.join(sdkRoot, "config/collections"),
+                collectionsDir: sdkArgs["--collections"]
+                    || (sdkHelp ? path.join(sdkRoot, "config/collections") : (await import("./utils/collections-dir")).resolveCollectionsDir(sdkRoot)),
                 output: sdkArgs["--output"] || path.join(sdkRoot, "generated/sdk"),
                 from: sdkArgs["--from"],
                 token: sdkArgs["--token"],

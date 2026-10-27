@@ -24,7 +24,7 @@
  */
 import chalk from "chalk";
 import { emitHelp, GLOBAL_HELP_FLAGS } from "./context";
-import { TOKEN_CAPABILITIES, TOKEN_CAPABILITY_NAMES } from "./token-capabilities";
+import { ORG_CAPABILITIES, ORG_CAPABILITY_NAMES, TOKEN_CAPABILITIES, TOKEN_CAPABILITY_NAMES } from "./token-capabilities";
 
 export interface ActionHelp {
     /** `cloud projects create` — no leading `rebase`. */
@@ -73,6 +73,22 @@ export const ACTION_HELP: Record<string, ActionHelp> = {
         ]
     },
 
+    claim: {
+        command: "cloud claim",
+        usage: "cloud claim [--open]",
+        summary:
+            "Print the claim link of the project `rebase cloud init --claim` provisioned in this directory, and how long "
+            + "is left before it is deleted unclaimed. Asks the control plane first, and refuses once the project has "
+            + "been claimed.",
+        flags: [["--open", "Also open the link in a browser"]],
+        examples: ["rebase cloud claim", "rebase cloud claim --open", "rebase cloud claim --json"],
+        notes: [
+            "The link exists only on the machine that ran `init --claim` (in ~/.rebase/credentials.json); the control "
+                + "plane keeps a hash of it and cannot print it again.",
+            "`rebase cloud status` and `rebase cloud whoami` show the same link while the project is unclaimed."
+        ]
+    },
+
     projects: {
         command: "cloud projects",
         usage: "cloud projects <list|create|info|delete> [options]",
@@ -88,13 +104,14 @@ export const ACTION_HELP: Record<string, ActionHelp> = {
 
     clusters: {
         command: "cloud clusters",
-        usage: "cloud clusters [list|add|verify] [options]",
+        usage: "cloud clusters [list|add|verify|registry] [options]",
         summary: "The compute clusters tenants run on. Platform-admin only.",
         flags: [],
         examples: [
             "rebase cloud clusters",
             "rebase cloud clusters verify <cluster-id> --baseline",
-            "rebase cloud clusters add --name gke-eu --provider gcp --region europe-west1 --kubeconfig ./kubeconfig"
+            "rebase cloud clusters add --name gke-eu --provider gcp --region europe-west1 --kubeconfig ./kubeconfig",
+            "rebase cloud clusters registry <cluster-id> --repository europe-west1-docker.pkg.dev/p/rlc-acme --push-service-account rlc-acme-push@p.iam.gserviceaccount.com --pull-key-file ./rlc-acme-pull.json"
         ]
     },
 
@@ -129,7 +146,7 @@ export const ACTION_HELP: Record<string, ActionHelp> = {
             ["--db-instances <n>", "Database instance count"],
             ["--db-cpu <n>", "vCPU per database instance"],
             ["--db-memory <size>", "Memory per database instance"],
-            ["--storage <size>", "Database volume size"]
+            ["--storage <mode>", "Object storage: shared-prefix or dedicated-bucket"]
         ],
         examples: [
             "rebase cloud projects create --name \"Shop\" --subdomain shop --link",
@@ -256,10 +273,14 @@ export const ACTION_HELP: Record<string, ActionHelp> = {
             "Undo a bad deploy with `rebase cloud rollback`: it restores the previous successful backend "
                 + "deployment, static apps folded into it included. A static app deployed on its own "
                 + "(`cloud deploy <app>`) cannot be rolled back yet; deploy its last good version again.",
-            "--preview prints the preview's own address, https://<project>--<name>.rebase.website. A preview of a "
-                + "static app calls the production backend; a preview of the backend runs its own, on an empty "
-                + "database of its own. It uploads no source and registers no apps or hostnames. "
-                + "`rebase cloud previews` lists and deletes previews.",
+            "--preview prints the preview's own address, https://<project>--<name>.rebase.website. A preview of the "
+                + "backend runs its own, on an empty database of its own, with its static apps folded in. It uploads "
+                + "no source and registers no apps or hostnames. `rebase cloud previews` lists and deletes previews.",
+            "A backend preview is billed while it exists; the deploy prints what it costs per month, as the control "
+                + "plane quotes it (`cost` under --json).",
+            "A static app previewed on its own (`cloud deploy <app> --preview`) needs a control plane that serves "
+                + "static sites by themselves. Rebase Cloud does not yet, and refuses it with PREVIEW_STATIC_UNSERVED; "
+                + "nothing is published.",
             "A control plane without previews refuses --preview with previews_unavailable, and nothing is deployed."
         ]
     },
@@ -300,13 +321,33 @@ export const ACTION_HELP: Record<string, ActionHelp> = {
 
     logs: {
         command: "cloud logs",
-        usage: "cloud logs [--runtime] [--follow]",
-        summary: "The latest build log, or the running container's log with --runtime.",
+        usage: "cloud logs [--runtime] [--follow] [--preview [<name>]] [--since <t>] [--tail <n>] [--grep <text>] [--level <l>] [--previous]",
+        summary: "The latest build log, or what the running app prints with --runtime — from every pod, followed live with -f.",
         flags: [
             ["--runtime", "The running app's log instead of the build log"],
-            ["--follow, -f", "Tail a build that is still running"]
+            ["--follow, -f", "Keep printing new lines until Ctrl-C (exits 0); with no --runtime, tail a build still running"],
+            ["--preview [<name>]", "A preview's log instead of production's: its name, or the deployment id a preview deploy printed; alone, the project's only preview"],
+            ["--since <t>", "With --runtime: start from 30s / 5m / 1h ago, or from an RFC3339 time"],
+            ["--tail <n>", "With --runtime: at most this many lines per pod to start with (the control plane caps it at 2000)"],
+            ["--grep <text>", "With --runtime: only lines containing the text (any case); `/re/flags` for a regular expression"],
+            ["--level <l>", "With --runtime: only lines at this severity or worse — error, warn, info or debug"],
+            ["--previous", "With --runtime: the last instance of a container that restarted, where a crash's reason usually is"]
         ],
-        examples: ["rebase cloud logs", "rebase cloud logs --runtime", "rebase cloud logs -f"]
+        examples: [
+            "rebase cloud logs",
+            "rebase cloud logs -f",
+            "rebase cloud logs --runtime -f",
+            "rebase cloud logs --runtime -f --level error",
+            "rebase cloud logs --runtime --since 15m --grep timeout",
+            "rebase cloud logs --runtime --previous",
+            "rebase cloud logs --preview new-quiz -f",
+            "rebase cloud logs --runtime --json -f | jq -r 'select(.type == \"line\") | .text'"
+        ],
+        notes: [
+            "Under --json a followed runtime log is NDJSON: one `{\"type\":\"line\",\"ts\",\"pod\",\"text\"}` per log line, "
+                + "and `{\"type\":\"event\",\"event\":…}` when a pod starts, restarts or goes, or the connection drops and comes back.",
+            "A container that restarts while you follow has its previous instance's last lines printed — usually the crash's reason."
+        ]
     },
 
     status: {
@@ -353,6 +394,29 @@ export const ACTION_HELP: Record<string, ActionHelp> = {
         notes: [
             "The backup flags go together; a bucket without a key is a cluster with no backup store.",
             "A Hetzner cluster registered with --platform-capacity must bring its own backup store."
+        ]
+    },
+
+    "clusters registry": {
+        command: "cloud clusters registry",
+        usage: "cloud clusters registry <cluster-id> --repository <host/project/repo> --push-service-account <email> --pull-key-file <key.json>",
+        summary:
+            "Give a customer's own cluster an image registry of its own. Its admin can read every Secret there, so "
+            + "without one it is handed the platform's shared registry credentials, and every deploy to it says so. "
+            + "With one, its builds push to this repository as this account, and its pods pull with this key only.",
+        flags: [
+            ["--repository <host/project/repo>", "The cluster's own Artifact Registry repository (Terraform output tenant_registry)"],
+            ["--push-service-account <email>", "Writer on that repository only; the control plane impersonates it (push_service_account)"],
+            ["--pull-key-file <key.json>", "The JSON key of the cluster's read-only account (pull_service_account). Sealed at write, never shown again"],
+            ["--clear", "Forget the cluster's registry and go back to the shared one"]
+        ],
+        examples: [
+            "rebase cloud clusters registry <cluster-id> --repository europe-west1-docker.pkg.dev/p/rlc-acme --push-service-account rlc-acme-push@p.iam.gserviceaccount.com --pull-key-file ./rlc-acme-pull.json",
+            "rebase cloud clusters registry <cluster-id> --clear"
+        ],
+        notes: [
+            "All three values go together: the control plane ignores a partial set and keeps the shared credentials.",
+            "The repository and both accounts come from saas/infra/gcp/registry-linked-clusters.tf. Takes effect on each project's next deploy."
         ]
     },
 
@@ -488,13 +552,14 @@ export const ACTION_HELP: Record<string, ActionHelp> = {
 
     "env set": {
         command: "cloud env set",
-        usage: "cloud env set KEY=VALUE | KEY VALUE [--secret] [--force] [--preview]",
+        usage: "cloud env set KEY=VALUE | KEY VALUE | KEY --stdin [--secret] [--force] [--preview]",
         summary:
             "Set one environment variable on the project. Takes effect on the next deploy — "
             + "a running instance does not pick it up.",
         flags: [
             ["--secret", "Store it encrypted and never return it in a listing"],
             ["--force", "Set a build-time key (VITE_*, NEXT_PUBLIC_*, …) anyway, for a build that reads it at run time"],
+            ["--stdin", "Read the value from standard input, so it never appears in `ps` or your shell history. Give only KEY"],
             ["--preview", "Set it for the project's previews only; production keeps its value"]
         ],
         examples: [
@@ -505,6 +570,7 @@ export const ACTION_HELP: Record<string, ActionHelp> = {
         ],
         notes: [
             "A value starting with `-` must use the KEY=VALUE form; the KEY VALUE form refuses it.",
+            "`printf %s \"$STRIPE_KEY\" | rebase cloud env set STRIPE_KEY --stdin --secret` sets a value without putting it on the command line.",
             "Variables the platform sets for every project cannot be overridden — `env reveal` reads them."
         ]
     },
@@ -569,34 +635,6 @@ export const ACTION_HELP: Record<string, ActionHelp> = {
         ]
     },
 
-    "webhooks create": {
-        command: "cloud webhooks create",
-        usage:
-            "cloud webhooks create --name <name> --table <table> --endpoint <url> [--events <list>]",
-        summary: "Register an outbound webhook on a table's row changes.",
-        flags: [
-            ["--name <name>", "Required. What it is called in listings"],
-            ["--table <table>", "Required. The table whose changes fire it"],
-            ["--endpoint <url>", "Required. Where the POST goes"],
-            ["--events <list>", "Comma-separated: insert, update, delete. Default: all three"]
-        ],
-        examples: [
-            "rebase cloud webhooks create --name notify --table orders --endpoint https://example.com/hook",
-            "rebase cloud webhooks create --name audit --table users --endpoint https://example.com/hook --events insert,delete"
-        ],
-        notes: [
-            "`--endpoint`, not `--url`: every cloud command's `--url` names the control plane, and one written here would be authenticated against instead of called."
-        ]
-    },
-
-    "webhooks delete": {
-        command: "cloud webhooks delete",
-        usage: "cloud webhooks delete <id>",
-        summary: "Remove one webhook by the id `webhooks list` prints.",
-        flags: [],
-        examples: ["rebase cloud webhooks delete 42"]
-    },
-
     deployments: {
         command: "cloud deployments",
         usage: "cloud deployments [list] [options]",
@@ -607,32 +645,195 @@ export const ACTION_HELP: Record<string, ActionHelp> = {
 
     webhooks: {
         command: "cloud webhooks",
-        usage: "cloud webhooks <list|create|delete> [options]",
-        summary: "Outbound webhooks on a table's row changes.",
+        usage: "cloud webhooks",
+        summary:
+            "Retired: it never delivered anything, and every action now exits 1 with code `command_retired`. "
+            + "A project's events (deploy failed, backups, billing, usage) go to Slack, Discord or any URL with "
+            + "`rebase cloud notifications`; a POST when rows of your app's own tables change is a WebhookDispatcher "
+            + "in your app's code.",
+        flags: [],
+        examples: ["rebase cloud notifications add https://hooks.slack.com/services/…"]
+    },
+
+    notifications: {
+        command: "cloud notifications",
+        usage: "cloud notifications [list|add|test|remove] [options]",
+        summary:
+            "Where the linked project's events are POSTed: a Slack or Discord incoming webhook, or any https URL. "
+            + "`list` (the default) shows each destination, masked, with the outcome of its last delivery; any "
+            + "member of the organization may read it. `add`, `test` and `remove` take the owner or admin role. "
+            + "Which emails you get is set in the console, under Account → Notifications. A token manages them with "
+            + "the `notifications` capability on the organization (`rebase cloud tokens create --can notifications`).",
         flags: [],
         examples: [
-            "rebase cloud webhooks list",
-            "rebase cloud webhooks create --help",
-            "rebase cloud webhooks delete 42"
+            "rebase cloud notifications",
+            "rebase cloud notifications add https://hooks.slack.com/services/T000/B000/XXXX",
+            "rebase cloud notifications test 6f1c…",
+            "rebase cloud notifications remove 6f1c… --yes"
         ]
+    },
+
+    "notifications add": {
+        command: "cloud notifications add",
+        usage: "cloud notifications add <url> [--events <list>] [--format json|slack] [--name <name>]",
+        summary:
+            "Send the project's events to a URL. The control plane refuses a URL that is not https, or that "
+            + "resolves to a private, loopback, link-local or metadata address, now and at every delivery. "
+            + "Prints the signing secret once.",
+        flags: [
+            ["--events <list>", "Comma-separated: deploy.failed, deploy.succeeded, deploy.rolled_back, backup.unhealthy, billing.payment_failed, usage.threshold, preview.paused. Default: deploy.failed"],
+            ["--format <json|slack>", "json (default): the event's facts plus a `text` line Slack reads as-is. slack: `{ text }` only"],
+            ["--name <name>", "What it is called in listings"]
+        ],
+        examples: [
+            "rebase cloud notifications add https://hooks.slack.com/services/T000/B000/XXXX",
+            "rebase cloud notifications add https://discord.com/api/webhooks/1/abc/slack --events deploy.failed,backup.unhealthy",
+            "rebase cloud notifications add https://ops.example.com/rebase --events deploy.failed,deploy.succeeded --name pager"
+        ],
+        notes: [
+            "The URL is a positional argument: `--url` names the control plane in every cloud command.",
+            "Each POST carries `X-Webhook-Signature: sha256=<hex HMAC-SHA256 of the raw body>` with the secret, "
+                + "`X-Webhook-Event`, and an `X-Webhook-Delivery` id that is the same on every retry of one delivery.",
+            "Discord takes Slack's format at its webhook URL with `/slack` appended."
+        ]
+    },
+
+    "notifications test": {
+        command: "cloud notifications test",
+        usage: "cloud notifications test <id>",
+        summary:
+            "POST a `notification.test` event now and report what the receiver answered. Exits 1, code "
+            + "`delivery_failed`, when it was not delivered.",
+        flags: [],
+        examples: ["rebase cloud notifications test 6f1c…"]
+    },
+
+    "notifications remove": {
+        command: "cloud notifications remove",
+        usage: "cloud notifications remove <id> [--yes]",
+        summary: "Stop sending events to a destination. Adding it again mints a new signing secret.",
+        flags: [],
+        examples: ["rebase cloud notifications remove 6f1c… --yes"]
     },
 
     billing: {
         command: "cloud billing",
-        usage: "cloud billing [setup|checkout]",
+        usage: "cloud billing [setup|checkout|invoices|upcoming]",
         summary:
             "The selected organization's billing. Bare, it prints the billing account, the card on "
             + "file and what the linked project costs per month; `setup` attaches a card (one-time, "
-            + "opens a browser); `checkout` opens a Stripe session for one project. "
-            + "Organization-scoped, not project-scoped.",
-        flags: [],
+            + "opens a browser); `checkout` opens a Stripe session for one project; `invoices` lists "
+            + "the issued invoices with Stripe's hosted page for each; `upcoming` previews the next "
+            + "invoice of every subscription. Organization-scoped, not project-scoped.",
+        flags: [
+            ["--limit <n>", "`invoices` only: how many to list, newest first. Default 24, at most 100"]
+        ],
         examples: [
             "rebase cloud billing",
             "rebase cloud billing setup",
-            "rebase cloud billing checkout --project shop"
+            "rebase cloud billing checkout --project shop",
+            "rebase cloud billing invoices --json",
+            "rebase cloud billing upcoming"
         ],
         notes: [
-            "`setup` comes before the first deploy: without a card the control plane answers 402, and `deploy` refuses before it builds."
+            "`setup` comes before the first deploy: without a card the control plane answers 402, and `deploy` refuses before it builds.",
+            "A token reaches billing with the `billing` capability on the organization (`rebase cloud tokens create --can billing --org <id>`). "
+            + "A token made before that capability existed still works for one release, and each answer warns that it will stop."
+        ]
+    },
+
+    "app-key": {
+        command: "cloud app-key",
+        usage: "cloud app-key [rotate]",
+        summary:
+            "The key `rebase cloud init --claim` minted on the project's app and wrote into .env as REBASE_API_TOKEN. "
+            + "Claiming the project hands it over: it stops expiring. Without an action, lists the app's agent keys "
+            + "(never their value). `rotate` mints a new key, revokes every earlier agent key at once, and writes the "
+            + "new one into a .env that already sets REBASE_API_TOKEN, or prints it once. Owners and admins, signed in.",
+        flags: [],
+        examples: [
+            "rebase cloud app-key",
+            "rebase cloud app-key rotate",
+            "rebase cloud app-key rotate --yes --json"
+        ],
+        notes: [
+            "Anything still using the old key (a hosted frontend, CI) is refused until it is given the new one.",
+            "Keys made in the app's own admin panel are not touched.",
+            "It runs with your login: no access-token capability grants it, so REBASE_TOKEN is refused."
+        ]
+    },
+    "service-key": {
+        command: "cloud service-key",
+        usage: "cloud service-key [rotate]",
+        summary:
+            "The project's REBASE_SERVICE_KEY, admin on the app's own API. Without an action, prints its generation, "
+            + "when it was last rotated and whether the app is still restarting onto the newest one (never the key: "
+            + "that is `rebase cloud env reveal REBASE_SERVICE_KEY`). `rotate` issues a new key and restarts the app "
+            + "onto it; the old key works until the restart has finished and nothing after. Refused while a deploy is "
+            + "running. Owners and admins, signed in.",
+        flags: [],
+        examples: [
+            "rebase cloud service-key",
+            "rebase cloud service-key rotate",
+            "rebase cloud service-key rotate --yes --json"
+        ],
+        notes: [
+            "Anything that copied the old key (a script, a CI job) is refused once the restart has finished.",
+            "Claiming a project rotates its service key too.",
+            "It runs with your login: no access-token capability grants it, so REBASE_TOKEN is refused."
+        ]
+    },
+    usage: {
+        command: "cloud usage",
+        usage: "cloud usage [org] [--month YYYY-MM]",
+        summary:
+            "Requests the linked project has used this month (UTC) against its included allowance, the 5xx errors, "
+            + "the overage so far and where the month is heading at this pace. `org` lists every project of the "
+            + "selected organization with the organization's total. The overage is counted exactly as the invoice "
+            + "counts it; the month-end figure is an estimate. Read-only; any member of the organization.",
+        flags: [
+            ["--month <YYYY-MM>", "A past month instead of the current one"]
+        ],
+        examples: [
+            "rebase cloud usage",
+            "rebase cloud usage --month 2026-09 --json",
+            "rebase cloud usage org"
+        ],
+        notes: [
+            "The figures carry their limits as `caveats`: object storage is not measured yet, a project that can run "
+            + "two or more app pods undercounts requests, and days with missed samples are partial.",
+            "A month's overage is billed on the following month's invoice.",
+            "A token reads it with the `logs` capability on the project (`rebase cloud tokens create --can logs`); "
+            + "`usage org` lists the projects the token holds it on."
+        ]
+    },
+
+    activity: {
+        command: "cloud activity",
+        usage: "cloud activity [--project <id|slug>] [--action <area|action>] [--actor <email>] [--limit <n>]",
+        summary:
+            "The selected organization's audit log, newest first: who deployed, rolled back, set or deleted an "
+            + "environment variable (by name, never by value), added or removed a domain, created, restored or "
+            + "downloaded a backup, changed compute, stopped or deleted a project, added a member or changed a role, "
+            + "and created or revoked an access token. Owners and admins of the organization.",
+        flags: [
+            ["--action <area|action>", "An area (deploy, deploy_hook, env, domain, backup, pitr, database, extension, storage, project, org, member, token) or a full action such as env.set"],
+            ["--actor <email>", "Only what this person did, their tokens included"],
+            ["--limit <n>", "Events per page, 1 to 100 (default 50)"],
+            ["--before <cursor>", "The next page: the cursor the previous page printed"],
+            ["--org <id>", "Another organization than the selected one"]
+        ],
+        examples: [
+            "rebase cloud activity",
+            "rebase cloud activity --action env --json",
+            "rebase cloud activity --project shop --actor ana@example.com"
+        ],
+        notes: [
+            "--project narrows to one project's events; a deleted project's id still works.",
+            "Times are UTC. A project that was deleted still shows by the name it had.",
+            "A token reads it only with the `audit` capability on the organization "
+            + "(`rebase cloud tokens create --can audit --org <id>`), and only while you are its owner or admin.",
+            "The same log is the Activity page in the console."
         ]
     },
 
@@ -701,9 +902,9 @@ export const ACTION_HELP: Record<string, ActionHelp> = {
             ["--replicas <n>", "Instances that always exist — the autoscaler's floor, and what is billed at rest"],
             ["--spot <true|false>", "Preemptible capacity: cheaper, and restarted without notice"],
             ["--db-instances <n>", "1–3. 1 is a single instance with no failover; 2 adds an automatic standby"],
-            ["--db-cpu <n>", "Database CPU request per instance. Default: 500m"],
-            ["--db-memory <size>", "Database memory request per instance. Default: 2Gi"],
-            ["--storage <size>", "Database volume size"],
+            ["--db-cpu <n>", "Database CPU request per instance. Default: 160m"],
+            ["--db-memory <size>", "Database memory request per instance. Default: 1Gi"],
+            ["--storage <mode>", "Object storage: shared-prefix or dedicated-bucket"],
             ["--autoscale-max <n>", "1–16. The ceiling the app may reach, and the worst case it may be billed"],
             ["--autoscale-cpu-target <pct>", "10–95. CPU utilisation the autoscaler holds, against the request. Default: 70"],
             ["--no-autoscale", "Turn autoscaling off. The only way to: a ceiling at or below --replicas is refused"]
@@ -729,24 +930,30 @@ export const ACTION_HELP: Record<string, ActionHelp> = {
 
     login: {
         command: "cloud login",
-        usage: "cloud login [--email <address>] [--password <password>]",
+        usage: "cloud login [--email <address>] [--password <password> | --code]",
         summary:
             "Sign in to the control plane and write the session to ~/.rebase/credentials.json. "
             + "Prompts for whatever is missing when attached to a terminal, and refuses rather than "
             + "hangs when it is not.",
         flags: [
             ["--email, -e <address>", "The account's email. Prompted when omitted, or REBASE_CLOUD_EMAIL"],
-            ["--password <password>", "Discouraged: a password written here is recorded in your shell history and visible in the process table. Prefer the prompt, or REBASE_CLOUD_PASSWORD"]
+            ["--password <password>", "Discouraged: a password written here is recorded in your shell history and visible in the process table. Prefer the prompt, or REBASE_CLOUD_PASSWORD"],
+            ["--code", "Sign in with a 6-digit code emailed to you instead of a password: the way in for accounts made with Google, GitHub or LinkedIn. Needs a terminal"]
         ],
         examples: [
             "rebase cloud login",
             "rebase cloud login --email me@example.com",
+            "rebase cloud login --code --email me@example.com",
             "rebase cloud login --url https://cloud.example.com"
         ],
         notes: [
+            "At a terminal with no password given, login asks whether to use your password or an emailed code, when the control plane sends codes.",
+            "With two-factor authentication on, login then asks for the code from your authenticator app (or a recovery code), whichever way you signed in.",
+            "Without a terminal, a code or a second factor cannot be typed: create an access token in the console (Settings → Access tokens) and set REBASE_TOKEN instead.",
             "--password warns, once, before the request: by the time a login succeeds the password is already in the history file.",
-            "There is no machine token yet, so CI genuinely needs a human's credentials. REBASE_CLOUD_EMAIL and "
-                + "REBASE_CLOUD_PASSWORD are how a secret store hands them over without them appearing on a command line.",
+            "CI should not log in at all: `rebase cloud tokens create` mints a token for REBASE_TOKEN. Where a login is "
+                + "still wanted, REBASE_CLOUD_EMAIL and REBASE_CLOUD_PASSWORD are how a secret store hands the "
+                + "credentials over without them appearing on a command line.",
             "In a directory whose .rebase/cloud.json names a control plane you have not signed in to before, login "
                 + "names it and asks first, and refuses without a terminal: a cloned repository does not choose where "
                 + "your password goes. Pass --url <that host> to sign in there on purpose."
@@ -801,23 +1008,27 @@ export const ACTION_HELP: Record<string, ActionHelp> = {
 
     "tokens create": {
         command: "cloud tokens create",
-        usage: "cloud tokens create --can <capabilities> [--project <slug>] [--name <name>] [--expires-in <days>]",
+        usage: "cloud tokens create --can <capabilities> [--project <slug>] [--org <id>] [--name <name>] [--expires-in <days>]",
         summary:
             "Create a token for one project — the linked one unless --project names another — holding only "
-            + "the capabilities --can names. The token is printed once, as the `export REBASE_TOKEN=…` line "
-            + "to hand to CI.",
+            + "the capabilities --can names. `billing`, `audit` and `notifications` act on an organization instead: "
+            + "--org, else the project's own, else the selected one; a token may hold only those. The token is "
+            + "printed once, as the `export REBASE_TOKEN=…` line to hand to CI.",
         flags: [
-            ["--can <capabilities>", `Comma-separated or repeated: ${TOKEN_CAPABILITY_NAMES.join(", ")}`],
+            ["--can <capabilities>", `Comma-separated or repeated: ${[...TOKEN_CAPABILITY_NAMES, ...ORG_CAPABILITY_NAMES].join(", ")}`],
+            ["--org <id>", "The organization billing, audit and notifications are for"],
             ["--name <name>", "What to call it. Defaults to the project and its capabilities"],
             ["--expires-in <days>", "Days until it stops working. Default: it does not expire"]
         ],
         examples: [
             "rebase cloud tokens create --can deploy",
             "rebase cloud tokens create --project shop --can deploy,logs --name \"GitHub Actions\" --expires-in 90",
-            "rebase cloud tokens create --project shop --can env,database"
+            "rebase cloud tokens create --project shop --can env,database",
+            "rebase cloud tokens create --can billing,audit --org 3f2a9c1e --name invoices"
         ],
         notes: [
             ...TOKEN_CAPABILITY_NAMES.map(name => `${name}: ${TOKEN_CAPABILITIES[name].label}.`),
+            ...ORG_CAPABILITY_NAMES.map(name => `${name}: ${ORG_CAPABILITIES[name].label}.`),
             "A token never holds more than your account does when it is used, and cannot create tokens."
         ]
     },

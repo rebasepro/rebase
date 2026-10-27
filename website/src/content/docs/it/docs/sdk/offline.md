@@ -1,5 +1,5 @@
 ---
-sourceHash: dc394aa7ff8f8f55
+sourceHash: 4cc7758ee53e304b
 title: Offline e sincronizzazione local-first
 sidebar_label: Offline
 description: Attiva il motore di sincronizzazione local-first dell'SDK tipizzato di Rebase — un database locale di righe, scritture offline istantanee con rollback e query live reattive.
@@ -159,7 +159,7 @@ Una riga che qualcun altro ha eliminato è l'unico caso che non viene annullato.
 
 La cascata è ristretta: un `update` viene scartato insieme alla scrittura che modificava, perché può fallire solo allo stesso modo. Un `create` o un `delete` successivo per la stessa riga sta in piedi da solo e viene mantenuto. Un `create` rifiutato di una riga creata offline porta con sé anche ogni scrittura in coda, in qualsiasi collezione, i cui valori referenziano l'id temporaneo della riga. Una scrittura scartata non è mai stata inviata. Viene segnalata con un `RebaseApiError` il cui `code` è `DEPENDENCY_REJECTED` e il cui `cause` è il rifiuto che l'ha condannata, così puoi distinguerla dalla scrittura che il server ha effettivamente rifiutato. Sulla 0.23 porta invece l'errore della scrittura rifiutata stessa.
 
-Modifiche consecutive a una stessa riga mentre si è offline vengono unite in un'unica scrittura in coda, così un form in cui si sta digitando non fa crescere la coda. Se il server rifiuta la scrittura unita per il suo contenuto (un 400, 403 o 422 — ad esempio un campo rimosso da una modifica dello schema mentre l'utente era offline), il motore la scompone di nuovo nelle modifiche separate e le riapplica una per una. Viene annullata e segnalata solo la modifica che il server rifiuta; le altre vengono mantenute.
+Modifiche consecutive a una stessa riga mentre si è offline vengono unite in un'unica scrittura in coda, così un form in cui si sta digitando non fa crescere la coda. In una scrittura che la coda ha iniziato a inviare non si fonde nulla: una modifica fatta dopo un tentativo di ritrasmissione la cui risposta è andata persa viene messa in coda come un update a sé, e l'eliminazione di una riga creata offline viene inviata invece di essere annullata contro la sua creazione, dato che il server potrebbe già avere la riga. Se il server rifiuta la scrittura unita per il suo contenuto (un 400, 403 o 422 — ad esempio un campo rimosso da una modifica dello schema mentre l'utente era offline), il motore la scompone di nuovo nelle modifiche separate e le riapplica una per una. Viene annullata e segnalata solo la modifica che il server rifiuta; le altre vengono mantenute.
 
 ### Conflitti
 
@@ -182,7 +182,7 @@ const client = createRebaseClient({
 
 La coda attende mentre `onConflict` è in esecuzione, quindi può interrogare l'utente. Se lancia un'eccezione, la modifica viene sovrascritta.
 
-La versione su cui viene fatta una modifica è quella riportata dall'ultima lettura della riga: `findById()`, un frame di `listenById()`, o la risposta di un precedente `update()`. Una riga letta per ultima in un elenco di `find()` o `listen()` non ha versione, e nemmeno una modifica fatta sopra un'altra scrittura in coda sulla stessa riga. Queste vengono ritrasmesse senza precondizione. Un `ifMatch` che passi tu stesso a `update()` viene mantenuto quando la modifica viene messa in coda.
+La versione su cui viene fatta una modifica è quella riportata dall'ultima lettura della riga: `findById()`, un frame di `listenById()`, o la risposta di un precedente `update()`. Una riga letta per ultima in un elenco di `find()` o `listen()` non ha versione, e nemmeno una modifica fatta sopra un'altra scrittura in coda sulla stessa riga. Queste vengono ritrasmesse senza precondizione. Un `ifMatch` che passi tu stesso a `update()` o `delete()` viene mantenuto quando la scrittura viene messa in coda, con o senza `onConflict`, e `findById()` su un client con offline abilitato restituisce la riga con la sua versione, quindi `etagOf(row)` funziona come online. Senza `onConflict`, una scrittura in coda rifiutata a causa del tuo stesso `ifMatch` viene annullata e segnalata a `onSyncError` con un 412 `PRECONDITION_FAILED`.
 
 Un fallimento che è soltanto temporaneo — un 429, un 503, una connessione caduta — non è un rifiuto. Questi restano in coda e vengono ritentati; solo dopo `maxRetries` rinvii una scrittura viene annullata con un rollback.
 
@@ -235,7 +235,11 @@ viene ritrasmessa finché la sessione non è confermata: quando la connessione t
 client aggiorna la sessione, e anche un accesso la conferma. Se il server
 rifiuta la sessione, o qualcun altro accede, il dispositivo cambia utente, e le
 scritture in coda restano al loro autore finché non accede di nuovo. Nel frattempo
-`status().unverifiedUser` è `true`.
+`status().unverifiedUser` è `true`, e questo vale anche online: finché il
+refresh non risponde, le scritture vengono messe in coda invece di partire senza
+credenziali, e le letture ricevono risposta dalle righe locali dell'utente. Ciò
+che il server invia a una richiesta senza sessione è ciò che un chiamante
+disconnesso può vedere, quindi non viene conservato.
 
 ```typescript
 createRebaseClient({
@@ -302,6 +306,7 @@ Il client non è una replica del tuo database, e non finge di esserlo:
 - **Il cestino ha bisogno del server.** Il database locale contiene solo righe attive, quindi `trash.find()`, `trash.count()`, `trash.restore()` e `trash.purge()` (vedi [soft delete](/docs/collections/soft-delete#from-the-sdk)) non ricevono mai risposta in locale né vengono messi in coda: offline falliscono con l'errore `OFFLINE`. Un ripristino o un'eliminazione definitiva di una riga con una scrittura ancora in coda sincronizza prima la coda, e viene rifiutato con `TRASH_PENDING_WRITE` se la scrittura non può ancora essere inviata.
 - **Un upsert su una chiave naturale ha bisogno del server.** Quale riga indichi un target `onConflict` può scoprirlo solo il server, quindi `upsert()` su una chiave naturale (o senza l'id della riga), e un `createMany()` con `onConflict` mai inviato, vengono rifiutati offline con `OFFLINE_UPSERT_UNSUPPORTED`. Un upsert sulla chiave primaria, con la chiave in ogni riga, viene messo in coda.
 - **Le letture locali applicano la semantica di Postgres, non i dati del database.** I filtri vengono valutati come farebbe SQL — i confronti con `NULL` sono ignoti, `ORDER BY` mette i null per ultimi in ordine crescente — ma sulla copia delle righe che ha il client, che può essere obsoleta.
+- **Un ordinamento che il client non può riprodurre non viene applicato.** L'ordinamento del testo spetta al server: PostgreSQL lo ordina secondo la collation del *database*, che questo processo non conosce, e con la collation C `Banana` viene prima di `apple` mentre un collator JavaScript dice il contrario. Quando una colonna di ordinamento non può essere confrontata numericamente, le righe mantengono l'ordine inviato dal server e il risultato viene contrassegnato come `partial` anziché essere presentato come la pagina ordinata che era stata richiesta. Ogni chiave di un ordinamento su più colonne deve essere riproducibile, non solo la prima — un ordinamento su cui il lato locale concorda solo fino alla seconda colonna è un ordinamento su cui non concorda.
 
 ## Ricetta: un indicatore offline
 

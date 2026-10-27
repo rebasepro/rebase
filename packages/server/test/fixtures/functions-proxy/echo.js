@@ -26,4 +26,12 @@ app.get("/headers", (c) => c.json({
     host: c.req.header("host") ?? null
 }));
 
+// A sign-in sets more than one cookie. Each is its own Set-Cookie header, and
+// the proxy has to forward every one of them.
+app.get("/cookies", (c) => {
+    c.header("set-cookie", "session=abc; Path=/; HttpOnly", { append: true });
+    c.header("set-cookie", "csrf=xyz; Path=/", { append: true });
+    return c.json({ ok: true });
+});
+
 module.exports = app;

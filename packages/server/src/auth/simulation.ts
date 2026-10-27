@@ -28,10 +28,15 @@
  * Where: the data API and custom functions, like impersonation. Every other
  * route refuses the headers (`refuseUnhonouredImpersonation`).
  *
- * Not simulated: the API-level `requireAuth` gate. A simulated anonymous
+ * Read-only: a write, delete, batch, revert or non-GET function call that
+ * carries the headers is refused (`SIMULATION_READ_ONLY`, see
+ * {@link ./simulation-read-only}) rather than run as the simulated identity.
+ *
+ * Not simulated: the data API's `requireAuth` gate. A simulated anonymous
  * caller is let past it, so the answer is what the rows' policies give an
  * anonymous caller — a 401 there would send the admin panel to refresh a
- * session that is fine.
+ * session that is fine. Everywhere else it is no session, as a real anonymous
+ * caller is: it carries no `user`, so a function's `requireAuth` refuses it.
  *
  * @module
  */
@@ -300,7 +305,13 @@ export async function applySimulation(
     if ("refused" in decision) return errorHandler(decision.refused, c) as Response;
 
     const identity = decision.granted;
-    c.set("user", { uid: identity.uid, roles: identity.roles, isAnonymous: identity.isAnonymous });
+    // A simulated anonymous caller has no session, as a real one has none: no
+    // `user`, so a function's `requireAuth` refuses it and `callerScopes`
+    // gives it nothing. As a user it was let through both, and the simulator
+    // over-reported what anonymous callers reach. Only the driver is anonymous.
+    c.set("user", identity.uid === ANONYMOUS_USER_ID
+        ? undefined
+        : { uid: identity.uid, roles: identity.roles, isAnonymous: identity.isAnonymous });
     c.set("impersonator", { uid: decision.simulator });
     c.set("scopes", identity.scopes);
     c.set("apiKey", identity.apiKey);

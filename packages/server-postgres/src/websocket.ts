@@ -11,7 +11,7 @@ import { deserializeFilter, redactSqlLiterals, UnknownFilterOperatorError } from
 import { budgetSendBuffers, reapSilentSockets, terminateIfBacklogged } from "./services/socket-liveness";
 import { DEFAULT_HEARTBEAT_INTERVAL_MS, helloFrame, requestedOptIns, startHeartbeats, type SocketOptIn } from "./socket-opt-ins";
 import { ANONYMOUS_USER_ID, hasAdminRole, isSQLAdmin, isSchemaAdmin, resolveClientListLimit, ListLimitError, scopeGrants, scopesForRoles, type AccessModel, type AdminScope } from "@rebasepro/types";
-import type { User } from "@rebasepro/types";
+import type { CallerCredential, User } from "@rebasepro/types";
 
 import { WebSocketServer, WebSocket, type RawData } from "ws";
 import type { Server, IncomingMessage } from "http";
@@ -117,6 +117,12 @@ interface WsUserIdentity {
      * requests do.
      */
     apiKey?: { id: string; rate_limit: number | null };
+    /**
+     * The same key as collection callbacks are told about it
+     * (`context.credential`), so a write frame made with a personal key can be
+     * told from its owner's own session.
+     */
+    credential?: CallerCredential;
 }
 
 /**
@@ -268,6 +274,24 @@ export const SESSION_ENDED_CLOSE_CODE = 4001;
  * with backoff, so a tab refused this way gets in once another one closes.
  */
 export const TOO_MANY_SOCKETS_CLOSE_CODE = 4002;
+
+/**
+ * What a socket counts against under `REALTIME_MAX_SOCKETS_PER_USER`: the
+ * credential that opened it. That is the user it signed in as; for an API key,
+ * that key; and for an administrator impersonating someone, the administrator.
+ *
+ * A key acts as the account that made it, and a fleet of workers holding
+ * sockets under its keys counted against that account's ceiling, locking out
+ * its people and each other; each key is a credential of its own, with its own
+ * ceiling. An impersonating socket counted against the user it acts as: an
+ * administrator checking on someone spent that person's places, and could
+ * hold any number of sockets by spreading them over users. It is the
+ * administrator's traffic, as its rate-limit bucket already says.
+ */
+function socketCeilingBucket(user: Pick<WsUserIdentity, "uid" | "apiKey" | "impersonator">): string {
+    if (user.impersonator) return `user:${user.impersonator}`;
+    return user.apiKey ? `key:${user.apiKey.id}` : `user:${user.uid}`;
+}
 
 /**
  * When a JWT expires, in ms, or undefined for a credential that is not one
@@ -606,12 +630,21 @@ export function createPostgresWebSocket(
     // it does not claim itself (the cloud control plane does) is then the
     // only listener, and gets the same refusal.
     const socketPath = normalizeSocketPath(options?.path ?? "/");
+    // The backend this socket belongs to, entered for each connection and each
+    // frame, so a hook a frame reaches — `afterRead`, `beforeSave`, a publish —
+    // sees that backend as `rebase`, as it does over REST. The events arrive
+    // in the context the HTTP connection was accepted in, which is no
+    // backend's: with two backends in one process a hook on B's socket wrote
+    // to the process default's database, or threw "not initialized".
+    const runInScope = options?.runInScope;
+    const inBackendScope = <A extends unknown[], R>(listener: (...args: A) => R) =>
+        runInScope ? (...args: A): R => runInScope(() => listener(...args)) : listener;
     const onUpgrade = (request: IncomingMessage, socket: Duplex, head: Buffer) => {
         if (upgradePathOf(request) !== socketPath) {
             if (server.listenerCount("upgrade") <= 1) refuseUpgrade(socket);
             return;
         }
-        wss.handleUpgrade(request, socket, head, (client) => wss.emit("connection", client, request));
+        wss.handleUpgrade(request, socket, head, inBackendScope((client: WebSocket) => wss.emit("connection", client, request)));
     };
     if (typeof server.on === "function") {
         server.on("upgrade", onUpgrade);
@@ -659,7 +692,10 @@ export function createPostgresWebSocket(
                     isAdmin: hasAdminRole(resolved.roles),
                     isAnonymous: false,
                     scopes: resolved.scopes,
-                    ...(resolved.apiKey ? { apiKey: { id: resolved.apiKey.id, rate_limit: resolved.apiKey.rate_limit } } : {})
+                    ...(resolved.apiKey ? { apiKey: { id: resolved.apiKey.id, rate_limit: resolved.apiKey.rate_limit } } : {}),
+                    ...(resolved.apiKey?.name !== undefined && resolved.apiKey.kind !== undefined
+                        ? { credential: { kind: resolved.apiKey.kind, id: resolved.apiKey.id, name: resolved.apiKey.name } }
+                        : {})
                 }
             };
         }
@@ -1051,7 +1087,7 @@ fetchAllowanceAt: Date.now() });
         });
 
         // Route all messages through RealtimeService for unified handling
-        ws.on("message", async (message: RawData) => {
+        ws.on("message", inBackendScope(async (message: RawData) => {
             // Every frame is answered, so one from a client that has not read
             // its earlier answers would only add to a backlog it is not draining.
             if (terminateIfBacklogged(ws, clientId)) return;
@@ -1181,12 +1217,13 @@ fetchAllowanceAt: Date.now() });
                         // auth error sends the SDK to refresh the session —
                         // then closed, so the tab does not run on as nobody.
                         if (maxSocketsPerUser !== undefined && session) {
+                            const bucket = socketCeilingBucket(verifiedUser);
                             let held = 0;
                             for (const other of clientSessions.values()) {
-                                if (other !== session && other.user?.uid === verifiedUser.uid) held++;
+                                if (other !== session && other.user && socketCeilingBucket(other.user) === bucket) held++;
                             }
                             if (held >= maxSocketsPerUser) {
-                                logger.warn(`[WebSocket Server] Refused a socket for ${verifiedUser.uid}: ${held} already open, ceiling ${maxSocketsPerUser}`);
+                                logger.warn(`[WebSocket Server] Refused a socket for ${verifiedUser.uid} (counted as ${bucket}): ${held} already open, ceiling ${maxSocketsPerUser}`);
                                 sendError(
                                     "ERROR",
                                     "TOO_MANY_SOCKETS",
@@ -1294,10 +1331,13 @@ roles: verifiedUser.roles }
                 // SOCKET_FETCH_ALLOWANCE for why a socket has one.
                 if (options?.dataRateLimit && (PUBLIC_TYPES.has(type)
                     || (FETCHING_REALTIME_TYPES.has(type) && !spendFetchAllowance(clientId)))) {
+                    // An impersonating socket is the administrator's traffic,
+                    // and counts in their bucket, not the impersonated user's.
+                    const sessionUser = clientSessions.get(clientId)?.user;
                     const decision = await options.dataRateLimit({
                         ...origin,
-                        uid: clientSessions.get(clientId)?.user?.uid,
-                        apiKey: clientSessions.get(clientId)?.user?.apiKey
+                        uid: sessionUser?.impersonator ?? sessionUser?.uid,
+                        apiKey: sessionUser?.impersonator ? undefined : sessionUser?.apiKey
                     });
                     if (decision && !decision.allowed) {
                         sendError("ERROR", "RATE_LIMITED", "Too many requests, please try again later.");
@@ -1443,7 +1483,9 @@ roles: verifiedUser.roles }
                     // Check if the driver supports RLS-scoped delegates
                     if (typeof driver.withAuth === "function") {
                         try {
-                            const who = sessionAuthContext(clientSessions.get(clientId));
+                            const session = clientSessions.get(clientId);
+                            const who = sessionAuthContext(session);
+                            const credential = session?.user?.impersonator ? undefined : session?.user?.credential;
                             const userForAuth: User = {
                                 uid: who.uid,
                                 displayName: null,
@@ -1452,7 +1494,8 @@ roles: verifiedUser.roles }
                                 providerId: "websocket",
                                 isAnonymous: who.isAnonymous === true,
                                 roles: who.roles,
-                                ...(who.claims ? { claims: who.claims } : {})
+                                ...(who.claims ? { claims: who.claims } : {}),
+                                ...(credential ? { credential } : {})
                             };
                             return await driver.withAuth(userForAuth);
                         } catch (e) {
@@ -2097,7 +2140,7 @@ code: "BRANCHING_UNSUPPORTED" } }
                 };
                 ws.send(JSON.stringify(errorResponse));
             }
-        });
+        }));
     });
 
     // A peer that vanished without a close — lost signal, sleep, a forgotten

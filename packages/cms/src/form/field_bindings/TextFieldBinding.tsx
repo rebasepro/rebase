@@ -9,6 +9,7 @@ import {
     fieldBackgroundHoverMixin,
     fieldBackgroundMixin,
     IconButton,
+    InputLabel,
     TextareaAutosize,
     TextField,
     XIcon
@@ -99,6 +100,11 @@ export function TextFieldBinding<T extends string | number>({
                 title={property.name ?? propertyKey}/>
         );
 
+    // A value under a label inside the box is set at 16px, the FireCMS field:
+    // the 64px box is sized for a 24px line. Everywhere a text field stands
+    // without its label — a table cell, a dense dialog — it keeps the kit's 14.
+    const valueText = label && size === "large" ? "text-base" : undefined;
+
     // The control needs a name of its own in two cases, and between them they
     // cover every text field in an entity form:
     //
@@ -117,15 +123,25 @@ export function TextFieldBinding<T extends string | number>({
     return (<>
             {isMultiline ? (
                 <div className={cls(
-                    "rounded-md relative max-w-full min-h-[64px]",
+                    "rounded-lg relative max-w-full min-h-[64px]",
                     fieldBackgroundMixin,
                     fieldBackgroundHoverMixin,
                     showError && error ? "border border-red-500 dark:border-red-600" : ""
                 )}>
-                    {label && <div
-                        className="pointer-events-none absolute top-1 text-xs font-medium px-3 text-text-secondary dark:text-text-secondary-dark">
+                    {/* The single-line field's shrunk label, at the same spot:
+                        this was its own 14px label pinned to the top, a size up
+                        from the label of the field above it. Always shrunk —
+                        the box is tall, and a label resting in its middle would
+                        sit on the text. */}
+                    {label && <InputLabel shrink
+                        className={cls(
+                            "pointer-events-none absolute top-1",
+                            showError && error
+                                ? "text-red-500 dark:text-red-600"
+                                : "text-text-secondary dark:text-text-secondary-dark"
+                        )}>
                         {label}
-                    </div>}
+                    </InputLabel>}
                     <TextareaAutosize
                         value={displayValue}
                         onChange={onChange}
@@ -134,6 +150,7 @@ export function TextFieldBinding<T extends string | number>({
                         aria-label={accessibleName}
                         className={cls(
                             "rounded-md resize-none w-full outline-none text-sm bg-transparent min-h-[64px] px-3",
+                            valueText,
                             label ? "pt-8 pb-2" : "py-2",
                             disabled && "outline-none opacity-50 text-surface-accent-600 dark:text-surface-accent-500",
                             showError && error ? "text-red-500 dark:text-red-600" : ""
@@ -165,7 +182,7 @@ export function TextFieldBinding<T extends string | number>({
                         </IconButton>
                     }
                     error={showError ? !!error : undefined}
-                    inputClassName={error ? "text-red-500 dark:text-red-600" : ""}/>
+                    inputClassName={cls(valueText, error && "text-red-500 dark:text-red-600")}/>
             )}
             <FieldHelperText includeDescription={includeDescription}
                              showError={showError}

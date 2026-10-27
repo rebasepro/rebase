@@ -22,7 +22,7 @@ Rate-limit counts: {{ include "rebase.rateLimitStore" . }}
 {{- else }} (this process's memory — correct for a single process, and only for a single process)
 {{- end }}
 
-Schema: {{ if .Values.migrationJob.enabled }}owned by the pre-upgrade Job ({{ .Values.migrationJob.mode }}); every pod boots with REBASE_MIGRATE_ON_BOOT=none{{ else }}provisioned by the api at boot ({{ .Values.migrationJob.mode }}){{ end }}
+Schema: {{ if not .Values.provision }}changed only by your own change process; every pod boots with REBASE_PROVISION=false and changes nothing in the database. Run the provisioning step (the image with REBASE_PROVISION_ONLY=true) before each upgrade{{ else if .Values.migrationJob.enabled }}owned by the pre-upgrade Job ({{ .Values.migrationJob.mode }}); every pod boots with REBASE_MIGRATE_ON_BOOT=none{{ else }}provisioned by the api at boot ({{ .Values.migrationJob.mode }}){{ end }}
 
 {{ if .Values.ingress.enabled -}}
 Reachable at:

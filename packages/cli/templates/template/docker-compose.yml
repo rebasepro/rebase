@@ -138,8 +138,11 @@ services:
       #
       # `rebase db push` is still what applies the rest: any change that is not
       # purely additive.
-      # Set this to `none` to take a deployment out of provisioning entirely.
+      # Set this to `none` to leave your collections' schema alone; auth's
+      # tables are still kept current. REBASE_PROVISION=false changes nothing
+      # in the database at all.
       REBASE_MIGRATE_ON_BOOT: ${REBASE_MIGRATE_ON_BOOT:-ensure}
+      REBASE_PROVISION: ${REBASE_PROVISION:-true}
 
       # Uploads land on the named volume below, which survives restarts. That is
       # the case FORCE_LOCAL_STORAGE exists to acknowledge — without a durable

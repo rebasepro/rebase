@@ -1,5 +1,5 @@
 ---
-sourceHash: 0a56c2d3dea31616
+sourceHash: cb80897157f6b539
 title: Realtime & WebSocket
 sidebar_label: Realtime
 description: Echtzeit-Datensynchronisierung, Broadcast-Kanäle und Presence-Tracking über WebSocket.
@@ -65,8 +65,8 @@ const unsubscribe = client.data.products.listen(
 );
 ```
 
-Der Callback erhält eine `FindResponse<M>`, die Folgendes enthält:
-- `data` — Array von `Entity<M>`-Objekten.
+Der Callback erhält eine `FindResult<M>`, die Folgendes enthält:
+- `data` — Die Zeilen, flach, so wie `find()` sie zurückgibt (`row.name`, nicht `row.values.name`).
 - `meta` — Paginierungsinformationen (`total`, `limit`, `offset`, `hasMore`).
 
 ### Eine Collection mit Filtern abonnieren
@@ -149,7 +149,7 @@ const unsubscribe = client.data.orders
 ```
 
 :::note
-Die Methode `.listen()` im Query-Builder ist nur verfügbar, wenn der `RebaseClient` mit einer `websocketUrl` konfiguriert ist. Wenn die WebSocket-Verbindung nicht konfiguriert ist, löst der Aufruf von `.listen()` einen Fehler aus.
+`.listen()` — sowohl im Query-Builder als auch im Collection-Accessor — braucht den WebSocket des Clients. Der Client leitet seine URL aus `baseUrl` ab, sofern keine `websocketUrl` angegeben ist. Bei einem Client, der mit `realtime: false` erstellt wurde, oder einem, der keine URL ableiten konnte, löst der Aufruf von `.listen()` einen Fehler aus.
 :::
 
 ## Update-Bereitstellung: Sofortiger Patch + Refetch zur Korrektheit
@@ -188,7 +188,7 @@ Der Frame hat das Format `{ rows, pks, meta }`:
 
 `meta` wird innerhalb derselben RLS-gebundenen Transaktion gezählt, die auch die Zeilen gelesen hat, sodass es exakt die danebenstehenden Zeilen beschreibt. Ohne dies müsste ein Client, der eine Gesamtzahl benötigt, **pro Push** ein `GET /count` ausführen – ein zusätzlicher Roundtrip pro Schreibvorgang und Abonnent sowie ein Zeitfenster, in dem die Anzahl und die Zeilen unterschiedliche Zustände der Collection widerspiegelten.
 
-Wenn die Zählung selbst fehlschlägt, enthält der Frame `partial: true` und kein `total`; dies ist kein Abonnement-Fehler, und ein Client sollte den letzten echten Gesamtwert beibehalten, anstatt die Seitenlänge einzusetzen. Bei einer großen Tabelle macht die Zählung den Großteil der Kosten eines Frames aus. Ist `REALTIME_RECOUNT_INTERVAL_MS` gesetzt, verwendet eine Liste, deren letzte Gesamtzahl mindestens `REALTIME_RECOUNT_MIN_ROWS` betrug (standardmäßig 100.000), diese Gesamtzahl für das Intervall weiter, statt bei jedem Schreibvorgang zu zählen, und ein solcher Frame trägt `meta.totalAsOf`, den Zeitpunkt, zu dem die Gesamtzahl ermittelt wurde. Ungesetzt, wie standardmäßig, zählt jeder Frame.
+Wenn die Zählung selbst fehlschlägt, enthält der Frame `partial: true` und kein `total`; dies ist kein Abonnement-Fehler, und ein Client sollte den letzten echten Gesamtwert beibehalten, anstatt die Seitenlänge einzusetzen. Bei einer großen Tabelle macht die Zählung den Großteil der Kosten eines Frames aus. Ist `REALTIME_RECOUNT_INTERVAL_MS` gesetzt, verwendet eine Liste, deren letzte Gesamtzahl mindestens `REALTIME_RECOUNT_MIN_ROWS` betrug (standardmäßig 100.000), diese Gesamtzahl für das Intervall weiter, statt bei jedem Schreibvorgang zu zählen, und ein solcher Frame trägt `meta.totalAsOf`, den Zeitpunkt, zu dem die Gesamtzahl ermittelt wurde. Ist das Intervall abgelaufen, wird eine Liste, deren letzter Frame die Gesamtzahl weiterverwendet hat, erneut gezählt und erhält die neue Gesamtzahl, ob seither etwas geschrieben wurde oder nicht. Ungesetzt, wie standardmäßig, zählt jeder Frame.
 
 ### Was ein Schreibvorgang kostet, und die Grenzen
 
@@ -207,7 +207,7 @@ Auf einem Laptop gegen ein lokales PostgreSQL mit einem Verbindungspool von 20 V
 
 300 ms davon sind das Debounce. Die zweite Zeile ist die Obergrenze, mit der Sie planen sollten. Die Refetches laufen im selben Pool wie Ihr REST-Traffic, aber höchstens auf einem Viertel seiner Verbindungen gleichzeitig (5 der standardmäßigen 20, nie weniger als 2); die übrigen warten im Server auf ihren Zug, sodass der Fan-out eines Schreibvorgangs seine eigenen Frames verzögert statt Ihrer Anfragen. Eine Collection, die mehrmals pro Sekunde geschrieben wird, während **Hunderte unterschiedlicher Benutzer** dieselbe Liste beobachten, ist der Punkt, an dem diese Frames zu verzögern beginnen. Bevorzugen Sie darüber hinaus engere Abonnements (eine Seite, ein Filter auf die eigenen Zeilen des Benutzers) oder einen [Broadcast-Kanal](#broadcast-kanäle), der die Änderung trägt, damit Clients nach ihrem eigenen Zeitplan erneut abrufen können.
 
-**Ein Socket darf höchstens 1.000 Abonnements halten.** Das nächste wird mit einem Fehler-Frame mit dem Code `TOO_MANY_SUBSCRIPTIONS` abgelehnt; das erneute Abonnieren unter einer ID, die der Socket bereits hält, ersetzt dieses Abonnement und zählt nicht erneut. Das SDK teilt sich identische Abonnements auf einem Socket, sodass dies die unterschiedlichen Listen und Datensätze zählt, die eine Seite offen hat. Ändern Sie dies mit `REALTIME_MAX_SUBSCRIPTIONS_PER_SOCKET` oder `realtime.maxSubscriptionsPerSocket` auf dem Postgres-Adapter (die Umgebungsvariable gewinnt); ein Wert, der keine positive ganze Zahl ist, stoppt den Server beim Start. Auf 0.23 sind die Abonnements eines Sockets nicht begrenzt. **Auch die Sockets, die ein Benutzer hält, lassen sich begrenzen**, pro Server-Instanz: Setzen Sie `REALTIME_MAX_SOCKETS_PER_USER` (oder `realtime.maxSocketsPerUser`), und eine Anmeldung darüber hinaus wird mit `TOO_MANY_SOCKETS` abgelehnt und der Socket mit 4002 geschlossen. Ungesetzt, wie standardmäßig, gibt es keine Obergrenze.
+**Ein Socket darf höchstens 1.000 Abonnements halten.** Das nächste wird mit einem Fehler-Frame mit dem Code `TOO_MANY_SUBSCRIPTIONS` abgelehnt; das erneute Abonnieren unter einer ID, die der Socket bereits hält, ersetzt dieses Abonnement und zählt nicht erneut. Das SDK teilt sich identische Abonnements auf einem Socket, sodass dies die unterschiedlichen Listen und Datensätze zählt, die eine Seite offen hat. Ändern Sie dies mit `REALTIME_MAX_SUBSCRIPTIONS_PER_SOCKET` oder `realtime.maxSubscriptionsPerSocket` auf dem Postgres-Adapter (die Umgebungsvariable gewinnt); ein Wert, der keine positive ganze Zahl ist, stoppt den Server beim Start. Auf 0.23 sind die Abonnements eines Sockets nicht begrenzt. **Auch die Sockets, die ein Benutzer hält, lassen sich begrenzen**, pro Server-Instanz: Setzen Sie `REALTIME_MAX_SOCKETS_PER_USER` (oder `realtime.maxSocketsPerUser`), und eine Anmeldung darüber hinaus wird mit `TOO_MANY_SOCKETS` abgelehnt und der Socket mit 4002 geschlossen. Mit einem API-Schlüssel angemeldete Sockets zählen gegen diesen Schlüssel, jeder Schlüssel für sich, nicht gegen das Konto, das ihn erstellt hat; der Service-Schlüssel ist ein einziges Credential, sodass alle seine Sockets zusammen zählen. Die Sockets eines Administrators, die einen Benutzer impersonieren, zählen gegen den Administrator, zusammen mit seinen eigenen Sockets, nicht gegen den Benutzer, als der er handelt. Das SDK benachrichtigt jedes aktive Abonnement und `onConnectionLost` auf einmal mit einem `CONNECTION_LOST`-Fehler, dessen `details.reason` `TOO_MANY_SOCKETS` ist, und versucht es weiter, wobei es jedes Mal länger wartet, bis zu 30 s, sodass der Tab hineinkommt, sobald ein anderer Socket schließt. Ungesetzt, wie standardmäßig, gibt es keine Obergrenze.
 
 Eine Abonnement-ID gehört dem jeweiligen Socket: Zwei Clients, die beide ein Abonnement `"sub-1"` nennen, behalten jeweils ihr eigenes, und ein `unsubscribe` beendet nur das des Absenders.
 
@@ -337,7 +337,7 @@ Presence verfolgt, welche Benutzer aktuell in einem Kanal online sind, und ermö
 | `presence_track`  | Client → Server | Presence-Tracking mit benutzerdefiniertem Status starten            |
 | `presence_untrack`| Client → Server | Presence-Tracking beenden                               |
 | `presence_state`  | Client → Server | Den vollständigen Presence-Status für einen Kanal anfordern        |
-| `presence_state`  | Server → Client | Vollständige Entität aller Presences in einem Kanal          |
+| `presence_state`  | Server → Client | Jede Presence im Kanal, vollständig               |
 | `presence_diff`   | Server → Client | Inkrementelles Update (Beitritte und Austritte)                |
 
 Wenn ein Client `presence_track` sendet, lässt der Server ihn dem Kanal automatisch beitreten (kein separater Aufruf von `join_channel` erforderlich) und sendet ein `presence_diff` als Broadcast an alle Kanalmitglieder. Das SDK sendet seinen Status alle ~20 Sekunden erneut als Heartbeat; ein Heartbeat mit unverändertem Status aktualisiert nur den Timeout des Clients und sendet kein `presence_diff`.
@@ -395,7 +395,7 @@ Wiederverbindung gesendet:
 | `connecting` | Es wird gewählt, ohne dass eine Störung vorliegt. |
 | `connected` | Der Socket ist offen. |
 | `reconnecting` | Der Socket ist abgebrochen, und der Client verbindet sich erneut. Es wurde noch nichts gemeldet. |
-| `disconnected` | Die Störung dauert bereits etwa 15 Sekunden oder länger. `CONNECTION_LOST` wurde gemeldet, und der Client verbindet sich weiterhin erneut. |
+| `disconnected` | Die Störung dauert bereits 14 Sekunden oder länger. `CONNECTION_LOST` wurde gemeldet, und der Client verbindet sich weiterhin erneut. |
 | `closed` | `client.close()` wurde aufgerufen. Endgültig. |
 
 ```typescript
@@ -438,15 +438,15 @@ Der Betrieb mehrerer Instanzen – der LISTEN/NOTIFY-Bus, wie Presence über Pro
 
 ## Change Capture auf Datenbankebene (CDC)
 
-→ [Change Capture auf Datenbankebene (CDC)](/docs/backend/realtime-cdc/)
+Jeder committete Schreibvorgang löst Realtime-Events aus, gleich wie er erfolgt ist: REST, das SDK, Studio, `psql`, ein Cron-Job in einem anderen Dienst. Wie die Erfassung funktioniert, die Einstellung `REALTIME_CDC` und was sie braucht: [Change Capture auf Datenbankebene](/docs/backend/realtime-cdc/).
 
 ## Timeout für ausstehende Anfragen
 
 Um zu verhindern, dass Client-Anfragen unbegrenzt hängen bleiben, haben alle ausstehenden WebSocket-Operationen, die eine Serverantwort erwarten (z. B. einmalige Collection-Abfragen `FETCH_COLLECTION`, Einzelentitäts-Abfragen `FETCH_ONE`, Erstellen/Aktualisieren `SAVE`, Löschvorgänge `DELETE`, Zählungen `COUNT` und Eindeutigkeitsprüfungen `CHECK_UNIQUE_FIELD`), ein standardmäßiges Timeout von 30 Sekunden.
 
-Wenn der Server nicht innerhalb dieses 30-Sekunden-Fensters antwortet, löscht der Client die ausstehende Anfrage automatisch und weist das Promise mit einem `ApiError` und der Meldung `"Request timed out"` ab.
+Wenn der Server nicht innerhalb dieses 30-Sekunden-Fensters antwortet, löscht der Client die ausstehende Anfrage automatisch und weist das Promise mit einem `RebaseApiError` ab, dessen Code `REQUEST_TIMEOUT` ist.
 
-Einweg-Nachrichten, die keine Antwort erwarten (wie `subscribe_collection`, `subscribe_one`, `unsubscribe`, `join_channel`, `leave_channel`, `broadcast`, `presence_track`, `presence_untrack` und `presence_state`), werden unmittelbar nach dem Senden aufgelöst (resolve) und lösen keine Timeouts aus.
+Einweg-Nachrichten, die keine Antwort erwarten (wie `subscribe_collection`, `subscribe_one`, `unsubscribe`, `join_channel`, `leave_channel`, `broadcast`, `presence_track`, `presence_untrack`, `presence_state` und `channel_history`), werden unmittelbar nach dem Senden aufgelöst (resolve) und lösen diesen Timeout nicht aus. Ein Abonnement, dessen erster Frame 30 Sekunden nach dem Senden seines Subscribe nicht eingetroffen ist, schlägt stattdessen fehl, und zwar mit `SUBSCRIPTION_TIMEOUT` auf seinem `onError`.
 
 ### Wenn ein Kanal-Frame abgelehnt wird
 
@@ -466,7 +466,7 @@ channel.onError((error) => {
 | Code | Means |
 |------|-------|
 | `CHANNEL_FORBIDDEN` | Sie sind kein Mitglied des Kanals – treten Sie ihm bei, bevor Sie Nachrichten senden oder seinen Verlauf lesen |
-| `RATE_LIMITED` | Das oben genannte Kanal-Frame-Budget wurde überschritten, oder, bei einer History-Anfrage, das [Datenratenlimit](#was-ein-schreibvorgang-kostet-und-die-grenzen) |
+| `RATE_LIMITED` | Das Kanal-Frame-Budget (7.200 Kanal-Frames pro Minute und Socket) wurde überschritten, oder, bei einer History-Anfrage, das [Datenratenlimit](#was-ein-schreibvorgang-kostet-und-die-grenzen) |
 | `CHANNEL_HISTORY_WRITE_FAILED` | Ein gespeicherter Broadcast konnte nicht persistent gesichert werden und wurde daher verworfen |
 | `CHANNEL_HISTORY_READ_FAILED` | Eine Catch-up-Anfrage konnte nicht bedient werden |
 | `CHANNEL_HISTORY_GAP` | Vom Client ausgelöst: Ein Catch-up hat festgestellt, dass der Server Nachrichten, die dieser Client nie erhalten hat, nicht mehr vorhält. `details` ist `{ from, to }`, die verpassten Sequenznummern. Synchronisieren Sie den Zustand des Kanals erneut aus seiner maßgeblichen Quelle |

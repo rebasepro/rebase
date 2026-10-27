@@ -1,5 +1,5 @@
 ---
-sourceHash: acd1967fc17b4924
+sourceHash: b95e3733ef1e2cda
 slug: pt/docs/upgrading/0-23-to-0-24
 title: Atualizando da versão 0.23 para a 0.24
 sidebar_label: 0.23 → 0.24
@@ -179,7 +179,7 @@ mantém a sua chave. Um upsert cuja chave pertencia a uma linha assim gravava se
 linha oculta e respondia `201 Created`, então a linha continuava excluída e o
 chamador via um sucesso. Agora ele é recusado com `409 ROW_IN_TRASH` e nada
 é gravado, em toda porta de upsert: `?on_conflict=`, `/bulk`, `/_batch`, o SDK, o
-socket, e `rebase.data` ou `context.data` no servidor.
+socket, e `rebase.dataAsAdmin` ou `context.data` no servidor.
 
 **O que alterar:** nada, a menos que algo faça upsert em uma coleção com soft delete
 e espere trazer uma linha de volta. Restaure a linha primeiro, com uma
@@ -195,7 +195,7 @@ atualização que define o seu campo de soft delete como `null`, e depois faça 
 ## 49. Uma atualização que muda a chave de uma linha é recusada com `400 KEY_IMMUTABLE`
 
 Uma atualização cujo corpo nomeava a chave da linha com outro valor, ou um `beforeSave`
-que a alterava, respondia `500`. Em processo, por `rebase.data`, a linha já
+que a alterava, respondia `500`. Em processo, por `rebase.dataAsAdmin`, a linha já
 tinha se movido para a nova chave quando a escrita lançava o erro. Agora toda porta a recusa
 com `400 KEY_IMMUTABLE` antes que qualquer hook execute, nomeando o campo, e nada é
 gravado. Enviar a chave que a linha já tem ainda é aceito.
@@ -371,7 +371,7 @@ Veja [O endpoint remoto](/docs/ai/mcp/#the-remote-endpoint).
 
 ## 57. Escritas em processo recusam `ifMatch` e `idempotencyKey`
 
-Uma escrita por `context.data` em um callback, ou `rebase.data` em uma função,
+Uma escrita por `context.data` em um callback, ou `rebase.dataAsAdmin` em uma função,
 cron job ou seed, nunca sai do processo: não há `If-Match` para verificar e
 nenhum armazenamento de idempotência. Ambas as opções eram ignoradas silenciosamente, então uma escrita condicional
 ali era incondicional. Agora elas lançam `UNSUPPORTED_OPTION` antes que qualquer coisa seja
@@ -387,7 +387,7 @@ HTTP, que respeita ambas.
 ```
 
 ```bash
-grep -rnE "(context|rebase)\.data\..*(ifMatch|idempotencyKey)" --exclude-dir=node_modules .
+grep -rnE "(context\.data|rebase\.dataAsAdmin)\..*(ifMatch|idempotencyKey)" --exclude-dir=node_modules .
 ```
 
 ## 58. `Button` e `IconButton` são tipados contra o elemento que renderizam

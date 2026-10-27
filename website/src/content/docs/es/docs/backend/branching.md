@@ -1,5 +1,5 @@
 ---
-sourceHash: 6c8e1509d678993c
+sourceHash: 9b091b775b58ae32
 title: Ramificación de bases de datos
 sidebar_label: Ramificación
 description: Crea ramas aisladas de bases de datos para desarrollo, staging y pruebas usando CREATE DATABASE ... TEMPLATE de PostgreSQL — copias instantáneas y de fidelidad total sin tiempo de inactividad.
@@ -98,7 +98,7 @@ Las configuraciones de las ramas se almacenan en la base de datos predeterminada
 CREATE SCHEMA IF NOT EXISTS rebase;
 
 CREATE TABLE IF NOT EXISTS rebase.branches (
-    name         TEXT PRIMARY KEY,              -- Sanitize user branch name (alphanumeric & underscores)
+    name         TEXT PRIMARY KEY,              -- Branch name as given (letters, digits, underscores, hyphens)
     db_name      TEXT NOT NULL UNIQUE,          -- Actual PostgreSQL database name (prefixed with 'rb_')
     parent_db    TEXT NOT NULL,                 -- Source database cloned from
     created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -217,7 +217,7 @@ rebase db branch switch --off
 # Show one branch's parent, age and size
 rebase db branch info dev_sandbox
 
-# Qué cambió la rama: esquema, políticas RLS y filas (--json para todo)
+# What the branch changed: schema, RLS policies and rows (--json for all of it)
 rebase db branch diff dev_sandbox
 
 # Delete a branch
@@ -270,18 +270,24 @@ Crear una rama **no** cambia la base de datos con la que se comunica tu proyecto
 postgresql://user:pass@localhost:5432/rb_dev_sandbox
 ```
 
+---
+
 ## Revisar y fusionar una rama
+
+<span class="since-badge" data-since="0.26">Desde 0.26</span>
 
 Una rama es donde un agente, o una migración de la que no estás seguro, puede cambiar una base de datos sin tocar la real. Antes de que nada de eso llegue a la base de datos de la que se creó la rama, puedes ver qué cambió y fusionarlo desde [Studio](/docs/studio/): abre **Ramas** y elige una.
 
-- **Esquema y políticas RLS** lista cada tabla, columna, clave primaria y política que la rama añadió, eliminó o modificó, como SQL, con la definición del padre junto a la de la rama.
-- **Cambios de datos** cuenta, por tabla, las filas que la rama insertó, actualizó y borró, emparejadas por clave primaria, y muestra hasta 100 por tabla con las columnas que cambiaron.
+- **Esquema y políticas RLS** lista cada tabla, columna, clave primaria, restricción (unique, foreign key, check, exclusion), índice, trigger, política, tipo enum (con sus etiquetas), vista y función que la rama añadió, eliminó o modificó, como SQL, con la definición del padre junto a la de la rama.
+- **Cambios de datos** cuenta, por tabla, las filas que la rama insertó, actualizó y borró, emparejadas por clave primaria, y muestra hasta 100 por tabla (como máximo 1.000 cuando pides más) con las columnas que cambiaron. Una columna con nombre de credencial —`password_hash`, un `*_token`, cualquiera con `secret` en el nombre, un `*_hash`— muestra `[redacted]` en lugar de su valor.
+
+Revisar una rama requiere el scope `database:write`, el que ejecuta SQL como propietario de la base de datos: las muestras son filas de ambas bases de datos, leídas fuera de la seguridad a nivel de fila. `database:read` lista las ramas pero no lee sus filas.
 
 El mismo diff es `rebase db branch diff <name>` en una terminal, `GET /api/admin/branches/<name>/diff` por HTTP, la herramienta MCP `rebase_db_branch_diff` y `admin.diffBranch(name)` en código. Las tablas propias de Rebase (sesiones, historial, el registro de ramas) quedan fuera.
 
 ### Qué lado cambió una fila
 
-El padre sigue recibiendo escrituras mientras se trabaja en la rama, así que «las dos bases de datos difieren» no es lo mismo que «la rama lo cambió»: una fila que el padre insertó después de crear la rama se ve exactamente igual que una fila que la rama borró. Rebase las distingue por el momento en que se escribió cada fila. Los identificadores de transacción pertenecen al servidor, no a una base de datos, y la copia por plantilla los conserva, así que una fila escrita después de crear la rama —en cualquiera de los dos lados— es más reciente que la transacción que creó la base de datos de la rama.
+El padre sigue recibiendo escrituras mientras se trabaja en la rama, así que «las dos bases de datos difieren» no es lo mismo que «la rama lo cambió»: una fila que el padre insertó después de crear la rama se ve exactamente igual que una fila que la rama borró. Rebase las distingue por el momento en que se escribió cada fila. Los identificadores de transacción pertenecen al servidor, no a una base de datos, y la copia por plantilla los conserva, así que una fila escrita después de crear la rama —en cualquiera de los dos lados— es más reciente que la transacción que creó la base de datos de la rama. Esa transacción se lee cuando se crea la rama y se guarda en su registro, así que un `GRANT` o un `ALTER DATABASE` posterior sobre la base de datos de la rama no la mueve.
 
 | La fila de la rama | La fila del padre | Cuenta como |
 | --- | --- | --- |
@@ -293,33 +299,34 @@ El padre sigue recibiendo escrituras mientras se trabaja en la rama, así que «
 
 Dos casos se parecen y se leen de la forma que no pierde nada: una fila que la rama borró y que el padre cambió después se conserva, y una fila que el padre borró y que la rama cambió después es una inserción de la rama. Un `UPDATE` que escribe los valores que una fila ya tenía sigue contando como escritura.
 
-Cuando no se puede leer el punto de bifurcación —una rama de larga duración cuya fila de `pg_database` congeló un vacuum, o una renombrada con `ALTER DATABASE`— el diff lo indica y cuenta cada diferencia como de la rama.
+Una rama creada antes de que Rebase guardara esa transacción la lee de la fila de `pg_database` de la base de datos de la rama tal como está ahora; cualquier cosa que haya reescrito la fila desde entonces la mueve. Cuando no se puede leer el punto de bifurcación en absoluto —una rama de larga duración cuya fila congeló un vacuum— el diff lo indica y cuenta cada diferencia como de la rama.
 
 ### Qué hace una fusión
 
 **Fusionar** escribe en el padre las filas que la rama insertó, actualizó y borró. Qué gana:
 
 - **Las filas que solo cambió la rama** se escriben: insertadas, sobrescritas o borradas.
-- **Las filas que solo cambió el padre** desde que se creó la rama se dejan exactamente como están.
+- **Las filas que solo cambió el padre** desde que se creó la rama se dejan exactamente como están —salvo que una haga referencia a una fila que la rama borró, que es un conflicto (más abajo).
 - **Las filas que cambiaron ambos** son conflictos. Por defecto la fusión no escribe nada; elige `onConflict: "branch"` para escribir la fila de la rama sobre la del padre, o `"target"` para conservar la del padre.
+- **Una fila que la rama borró y a la que todavía hacen referencia filas más nuevas del padre** también es un conflicto. Digamos que la rama borró un autor, y el padre ha escrito desde entonces una publicación suya: borrar el autor en el padre se propagaría en cascada a esa publicación, pondría a nulo su columna, o fallaría por la clave foránea. El diff cuenta el autor como un conflicto y nombra las filas que lo referencian (`referencedBy`: la tabla, la clave foránea, su `ON DELETE` y cuántas filas). Por defecto la fusión se niega, nombrando la tabla, las filas y la salida; `"target"` conserva el autor, y con él la publicación; `"branch"` borra el autor, deja que la clave foránea haga lo que dice, y lista lo que alcanzó en `warnings`.
 - **Los cambios de esquema y de políticas nunca se fusionan.** Pertenecen a tus colecciones y sus migraciones: aplícalos con `rebase db push` (o `migrate`) y luego fusiona las filas.
 
-Una tabla cuyas filas no se pueden emparejar bloquea la fusión: una que la rama añadió o eliminó, una cuyas columnas o clave primaria difieren entre las dos, una sin clave primaria, o una con más de 100.000 filas en un lado. Pasa `skipBlocked` (en Studio, marca **Fusionar las demás tablas**) para fusionar el resto y dejar esas en paz.
+Una tabla cuyas filas no se pueden emparejar bloquea la fusión: una que la rama añadió o eliminó, una cuyas columnas o clave primaria difieren entre las dos, una sin clave primaria, o una con más de 100.000 filas en un lado. Sus recuentos son 0, porque no se sabe qué filas cambiaron; `rowCounts` da el número de filas de cada lado. Una tabla así que solo cambió el padre —la rama no escribió ninguna de sus filas, y las de antes de la bifurcación son las mismas— no se bloquea. Pasa `skipBlocked` (en Studio, marca **Fusionar las demás tablas**) para fusionar el resto y dejar esas en paz.
+
+Una tabla reescrita desde que se creó la rama también se bloquea (`TABLE_REWRITTEN`). Un cambio de tipo de columna, un `ADD COLUMN` con un valor por defecto volátil, `VACUUM FULL` o `CLUSTER` escribe de nuevo cada fila, así que cada fila se lee como escrita desde entonces y ya no se puede saber qué lado cambió qué. Cuando la rama cambió el tipo de una columna, fusiona sus filas antes de aplicar ese cambio al padre, o vuelve a crear la rama después.
 
 Todas las escrituras ocurren en una sola sentencia en el padre —todo o nada—, con las claves foráneas comprobadas al final. Una fusión lleva el `fingerprint` del diff que revisaste y no escribe nada si alguna de las dos bases de datos cambió desde entonces: recarga el diff y vuelve a mirarlo. Las secuencias se adelantan más allá de cualquier id que la fusión insertó.
 
 ```typescript
 const diff = await admin.diffBranch("agent_run_17");
-// …revisa diff.schema y diff.data…
+// …review diff.schema and diff.data…
 const result = await admin.mergeBranch("agent_run_17", {
     expectedFingerprint: diff.fingerprint,
-    onConflict: "abort" // o "branch", o "target"
+    onConflict: "abort" // or "branch", or "target"
 });
 ```
 
 Fusionar no es, a propósito, una herramienta MCP: un agente propone en su rama y una persona fusiona.
-
----
 
 ---
 

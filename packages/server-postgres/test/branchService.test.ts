@@ -159,7 +159,7 @@ describe("BranchService", () => {
             db.execute
                 .mockResolvedValueOnce({ rows: [] } as never) // existence check
                 .mockResolvedValueOnce(undefined as never) // disconnectDatabase (noop)
-                .mockResolvedValueOnce(undefined as never) // CREATE DATABASE
+                .mockResolvedValueOnce({ rows: [{ xid: "4242" }] } as never) // the fork point
                 .mockResolvedValueOnce(undefined as never); // INSERT metadata
 
             const result = await service.createBranch("staging");
@@ -168,20 +168,27 @@ describe("BranchService", () => {
             expect(result.database).toBe("rb_staging");
             expect(result.parentDatabase).toBe("my_app_db");
             expect(result.createdAt).toBeInstanceOf(Date);
+            expect(result.forkXid).toBe("4242");
 
             // poolManager.disconnectDatabase should be called with the source db
             expect(poolManager.disconnectDatabase).toHaveBeenCalledWith("my_app_db");
 
-            // Should have 4 execute calls: existence-check, disconnect (on poolManager), CREATE DB, INSERT
-            // The disconnect is on poolManager, not db, so db.execute has 3 calls
-            expect(db.execute).toHaveBeenCalledTimes(3);
+            // existence check, CREATE DB, the fork point, INSERT. The disconnect
+            // is on poolManager, not db.
+            expect(db.execute).toHaveBeenCalledTimes(4);
+            // The fork point is read from the new database's catalog row right
+            // after it is made, and kept: that row's xmin moves on any later
+            // GRANT or ALTER DATABASE.
+            expect(statementAt(db, 2).sql).toBe("SELECT xmin::text AS xid FROM pg_database WHERE datname = $1");
+            expect(statementAt(db, 2).params).toEqual(["rb_staging"]);
+            expect(statementAt(db, 3).params[4]).toBe(JSON.stringify({ forkXid: "4242" }));
         });
 
         it("should use a custom source database when provided", async () => {
             db.execute
                 .mockResolvedValueOnce({ rows: [] } as never)
                 .mockResolvedValueOnce(undefined as never)
-                .mockResolvedValueOnce(undefined as never);
+                .mockResolvedValueOnce({ rows: [{ xid: "4242" }] } as never); // the fork point
 
             const result = await service.createBranch("preview", { source: "production_db" });
 
@@ -193,7 +200,7 @@ describe("BranchService", () => {
             db.execute
                 .mockResolvedValueOnce({ rows: [] } as never)
                 .mockResolvedValueOnce(undefined as never)
-                .mockResolvedValueOnce(undefined as never);
+                .mockResolvedValueOnce({ rows: [{ xid: "4242" }] } as never); // the fork point
 
             const result = await service.createBranch("my-feature-branch");
 
@@ -212,12 +219,23 @@ describe("BranchService", () => {
             expect(statementAt(db, 1).params).toEqual([]);
 
             // The metadata row, by contrast, is fully parameterised.
-            expect(statementAt(db, 2).params).toEqual([
+            expect(statementAt(db, 3).params).toEqual([
                 "my-feature-branch",
                 "rb_my-feature-branch",
                 "my_app_db",
-                expect.any(String)
+                expect.any(String),
+                JSON.stringify({ forkXid: "4242" })
             ]);
+        });
+
+        it("names the missing registry instead of a raw 'relation does not exist'", async () => {
+            // With REBASE_PROVISION=false the server never creates
+            // rebase.branches, and the first statement that reads it failed
+            // with Postgres's own words.
+            db.execute.mockRejectedValueOnce(
+                Object.assign(new Error('relation "rebase.branches" does not exist'), { code: "42P01" }) as never
+            );
+            await expect(service.createBranch("staging")).rejects.toThrow(/rebase\.branches.*REBASE_PROVISION/s);
         });
 
         it("refuses a name it cannot represent rather than quietly changing it", async () => {
@@ -517,7 +535,7 @@ created_at: now }]
             db.execute
                 .mockResolvedValueOnce({ rows: [] } as never)
                 .mockResolvedValueOnce(undefined as never)
-                .mockResolvedValueOnce(undefined as never);
+                .mockResolvedValueOnce({ rows: [{ xid: "4242" }] } as never); // the fork point
 
             const result = await service.createBranch("feature_auth_v2");
 
@@ -528,7 +546,7 @@ created_at: now }]
             db.execute
                 .mockResolvedValueOnce({ rows: [] } as never)
                 .mockResolvedValueOnce(undefined as never)
-                .mockResolvedValueOnce(undefined as never);
+                .mockResolvedValueOnce({ rows: [{ xid: "4242" }] } as never); // the fork point
 
             const result = await service.createBranch("MyBranch123");
 
@@ -539,7 +557,7 @@ created_at: now }]
             db.execute
                 .mockResolvedValueOnce({ rows: [] } as never)
                 .mockResolvedValueOnce(undefined as never)
-                .mockResolvedValueOnce(undefined as never);
+                .mockResolvedValueOnce({ rows: [{ xid: "4242" }] } as never); // the fork point
 
             // A hyphen is representable, so it survives. `my branch.v2-rc1` used
             // to come back as `mybranchv2rc1` — three characters quietly gone.

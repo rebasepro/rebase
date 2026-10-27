@@ -56,7 +56,7 @@ renders it, and `rebase doctor` compares it to the live database.
 | Decide who may read or write a row | `securityRules` | [Authentication](/docs/backend/authentication) |
 | Search text properly — accents, JSONB, ranking, substrings | a `search` block | [Search](/docs/backend/search) |
 | Find rows by meaning | a `vector` property | [Search](/docs/backend/search) |
-| Keep deleted rows | `softDelete` | [Writes](/docs/backend/writes) |
+| Keep deleted rows | `softDelete` | [Soft delete](/docs/collections/soft-delete) |
 | Record who changed what | `history` | [History](/docs/backend/history) |
 | Run something on a schedule | a cron job file | [Cron Jobs](/docs/backend/cron-jobs) |
 | Run something after a write, out of band | a job | [Jobs](/docs/backend/jobs) |
@@ -103,7 +103,7 @@ callbacks: {
 }
 ```
 
-Three properties are worth knowing before you rely on it:
+Four properties are worth knowing before you rely on it:
 
 - **It can only narrow.** The return value is a filter to AND in, and there is
   no shape it can return that widens the read. That is deliberate: a hook handed
@@ -225,8 +225,9 @@ await backend.attachRealtime(server);
 backend.start();                                // cron, job workers, sweeps
 ```
 
-A group carries its own auth context, rate limits and admin gate, so
-`getDriver(c)` works in a group mounted anywhere. What it does not carry is the
+A group carries its own auth context, rate limits and admin gate, and refuses
+the impersonation and simulation headers unless it is the data or functions
+group, so `getDriver(c)` works in a group mounted anywhere. What it does not carry is the
 process-wide middleware `mount()` adds: the body limit, compression, CSRF and
 the error envelope are yours to add when you mount groups one by one.
 

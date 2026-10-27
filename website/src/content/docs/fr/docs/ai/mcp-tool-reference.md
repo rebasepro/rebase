@@ -1,5 +1,5 @@
 ---
-sourceHash: e68d814b6b83ef41
+sourceHash: 441bdd62f0e1b3f7
 title: Référence des outils MCP
 sidebar_label: Référence des outils MCP
 description: Chaque outil que le serveur MCP Rebase enregistre, par groupe — ce dont chacun a besoin, ce qu'il fait, et ceux que le verrou loopback refuse sur un projet non local.
@@ -9,10 +9,10 @@ Les outils que [`@rebasepro/mcp`](/docs/ai/mcp) propose à un assistant. La faç
 connecte, l'identifiant qu'il détient et la façon dont le [verrou loopback](/docs/ai/mcp#the-loopback-gate)
 décide ce que signifie ⚠ sont décrits sur la page du [serveur MCP](/docs/ai/mcp).
 
-42 outils, répartis en neuf groupes. Les outils marqués d'un ⚠ sont refusés sur les cibles non locales
+51 outils, répartis en dix groupes. Les outils marqués d'un ⚠ sont refusés sur les cibles non locales
 à moins que vous ne désactiviez cette protection.
 
-## Schéma et base de données (12)
+## Schéma et base de données (13)
 
 Lancent la CLI Rebase dans le répertoire du projet actif.
 
@@ -29,6 +29,7 @@ Lancent la CLI Rebase dans le répertoire du projet actif.
 | `rebase_db_branch_list` | — | Lister les branches de base de données (admins uniquement) |
 | `rebase_db_branch_delete` ⚠ | `name` | Supprimer une branche de base de données (admins uniquement) |
 | `rebase_db_branch_info` | `name` | Informations et statut de la branche (admins uniquement) |
+| `rebase_db_branch_diff` | `name` | Ce qu'une branche a changé par rapport à la base de données dont elle est issue — schéma, politiques et lignes, avec les conflits ; ne modifie ni l'une ni l'autre (admins uniquement) |
 | `rebase_db_branch_switch` | — | Pointer cette copie locale sur une branche, ou revenir à la base principale (admins uniquement) |
 
 ## Planification de schéma (1)
@@ -112,7 +113,7 @@ Son rayon d'impact correspond à tout ce que vos fonctions réalisent.
 |---|---|---|
 | `rebase_project_list` | — | Lister les projets enregistrés et afficher le projet actif |
 | `rebase_project_switch` | `name` | Changer le projet actif |
-| `rebase_project_add` | `name` | Enregistrer un projet (`baseUrl`, `projectDir` et `token` facultatifs) |
+| `rebase_project_add` | `name` | Enregistrer un projet (`projectDir`, `baseUrl` et `token` facultatifs) |
 | `rebase_project_remove` | `name` | Supprimer un projet (le projet default ne peut pas être supprimé) |
 | `rebase_project_current` | — | Afficher le projet actif et son statut d'authentification |
 | `rebase_project_status` | — | Vérifier la santé du backend actif |
@@ -120,3 +121,27 @@ Son rayon d'impact correspond à tout ce que vos fonctions réalisent.
 `rebase_project_switch` n'est pas verrouillé, car il réoriente tout le reste plutôt que d'agir
 directement sur une cible. Un assistant peut donc basculer vers un projet distant sans déclencher
 le verrou — il ne pourra simplement pas y exécuter d'outil destructeur ensuite.
+
+## Rebase Cloud (8)
+
+<span class="since-badge" data-since="0.26">Depuis 0.26</span>
+
+Lancent `rebase cloud … --json` dans le répertoire du projet actif, sur le
+projet auquel il est lié, avec l'identifiant propre au CLI. Voir
+[Rebase Cloud](/docs/ai/mcp#rebase-cloud) pour ce sur quoi ils agissent et pourquoi aucun
+n'est verrouillé.
+
+| Outil | Requis | Description |
+|---|---|---|
+| `rebase_cloud_provision` | — | Un backend en ligne sans compte (`rebase cloud init --claim`) : l'URL en ligne, l'URL d'administration et une URL de réclamation (`name`, `deploy`) |
+| `rebase_cloud_status` | — | L'URL du projet lié, son statut, son dernier déploiement, son runtime, sa base de données, son stockage, et son URL de réclamation tant qu'il n'est pas réclamé |
+| `rebase_cloud_deploy` | — | Déployer et suivre le déploiement jusqu'à la fin (`app`, `bundle`, `message`, `wait`, `timeoutSeconds`, `preview`, `previewName`) |
+| `rebase_cloud_logs` | — | Un instantané du log d'exécution, ou le dernier log de build (`source`, `since`, `tail`, `grep`, `level`, `previous`, `preview`). Ne suit jamais |
+| `rebase_cloud_env_list` | — | Les clés des variables, jamais les valeurs (`preview`) |
+| `rebase_cloud_env_set` | `key`, `value` | Définir une variable ; la valeur passe par stdin et n'est jamais renvoyée (`secret`, `preview`) |
+| `rebase_cloud_deployments_list` | — | Les déploiements récents, et ceux vers lesquels on peut revenir en arrière (`limit`) |
+| `rebase_cloud_rollback` | — | Remettre en service un déploiement réussi précédent (`deploymentId`) |
+
+`rebase_cloud_provision` crée un projet et lie ce répertoire. Il ne lit jamais
+la `baseUrl` du projet actif, le verrou ne le vérifie donc pas ; le CLI
+le refuse dans un répertoire déjà lié.

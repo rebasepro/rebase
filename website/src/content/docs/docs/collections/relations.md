@@ -76,9 +76,10 @@ one row or many come back, and what a write through it may touch.
 | `hasOne` | on the **target's** table | one | `foreignKeyOnTarget`, defaults to the singular of this collection plus `_id` (`users` → `user_id`) |
 | `hasMany` | on the **target's** table | many | children belong to this parent alone |
 | `manyToMany` | in a **junction table** | many | rows are shared; you own the link |
-| `via` | an explicit `joinPath` | either | read-only; state `cardinality` yourself |
+| `via` | an explicit `joinPath` | either | writable when single-hop, read-only otherwise; state `cardinality` yourself |
 
-Every field is optional except `kind` and `target` — the rest is derived.
+Every field is optional except `kind` and `target` (and, on `via`, `cardinality`
+and `joinPath`) — the rest is derived.
 
 ### belongsTo — the key is on this table
 
@@ -132,7 +133,8 @@ relations: [
 `sourceKey` is the mirror of `localKey` on `belongsTo`: that one names the
 column this side reads *from*, this one names the column the other side points
 *at*. Without it a link like the above is not expressible as `hasMany` at all
-and has to drop to [`via`](#via--an-explicit-join-chain), which is read-only.
+and has to drop to [`via`](#via--an-explicit-join-chain), which is read-only for
+a chain like this one.
 
 The column must be unique. A link that addresses more than one source row
 cannot say which one a related row belongs to, and Postgres will not accept a
@@ -169,8 +171,23 @@ view** — `sourceColumn` always names *this* collection:
 ### via — an explicit join chain
 
 For links the four shapes above cannot express: multi-hop paths, composite keys,
-or a join whose condition is not a plain foreign key. Read-only — Rebase will
-not infer how to write through an arbitrary chain.
+or a join whose condition is not a plain foreign key.
+
+A **single-hop** chain is writable through a create or update, the way the kind
+it stands in for is written:
+
+- a **to-one** chain of **one step** — the target row holds the key, so
+  `{ badge: "b-1" }` points that row's column at this one, and `null` unlinks it,
+  as a `hasOne` write does;
+- a **to-many** chain of **two steps through one table** between the ends — that
+  table holds the links, so `{ tags: ["t-1", "t-2"] }` sets them as its rows, as a
+  `manyToMany` write does (a `via` carries no `_pivot`).
+
+Anything longer is **read-only**: Rebase will not infer how to write through an
+arbitrary chain. A create or update naming one is refused with
+`400 RELATION_NOT_WRITABLE`, and the admin form shows the field without a picker.
+A nested write (`PATCH users/1/permissions/3`) through any `via` is refused the
+same way.
 
 ```typescript
 {
@@ -252,7 +269,9 @@ properties: {
 ## Multi-Hop Joins
 
 For relationships that traverse multiple tables, use `kind: "via"` with a `joinPath`.
-These are read-only: Rebase will not infer how to write through an arbitrary chain.
+A chain longer than one link is read-only: Rebase will not infer how to write
+through an arbitrary chain (see [via](#via--an-explicit-join-chain) for the
+single-hop chains it does write).
 
 ```typescript
 // Users → Permissions through Roles
@@ -409,7 +428,7 @@ for (const article of data) {
 }
 ```
 
-> The relation names passed to `include()` must match the `relationName` defined in the collection's `relations` array.
+> The relation names passed to `include()` must match the relation's name: the `relationName` of an entry in the collection's `relations` array, or the key of the property that declares it inline.
 
 For the full query builder reference (filtering, sorting, pagination, real-time), see the [typed SDK documentation](/docs/sdk).
 
@@ -534,7 +553,12 @@ interface HasManyRelation extends RelationBase {
 
 interface ManyToManyRelation extends RelationBase {
     kind: "manyToMany";
-    through?: { table?: string; sourceColumn?: string; targetColumn?: string };
+    through?: {
+        table?: string;
+        sourceColumn?: string;
+        targetColumn?: string;
+        properties?: Properties;    // extra columns on the junction row, served under `_pivot`
+    };
 }
 
 interface ViaRelation extends RelationBase {
@@ -549,7 +573,7 @@ interface ViaRelation extends RelationBase {
 What you write above is the *authoring* shape. Internally Rebase works with
 `ResolvedRelation`: the same link with every default filled in and nothing
 optional, plus `cardinality`, `targetSlug`, and two flags — `writable` (false
-only for `via`) and `shared` (true when the target rows belong to other parents
+only for a multi-hop `via`) and `shared` (true when the target rows belong to other parents
 too, so a removal unlinks rather than deletes).
 
 `sourceKey` is the one exception to "nothing optional": its default is the

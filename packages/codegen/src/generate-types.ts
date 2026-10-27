@@ -1,5 +1,5 @@
 import { getDeclaredSubcollections, CollectionConfig, Property, Properties, MapProperty, ArrayProperty, StringProperty, NumberProperty, ResolvedRelation } from "@rebasepro/types";
-import { effectiveAccess, fieldKeyForColumn, findRelation, isRelationRequired, resolveCollectionRelations, sortCollectionsBySlug } from "@rebasepro/common";
+import { effectiveAccess, fieldKeyForColumn, findRelation, isRelationRequired, resolveCollectionRelations, restrictedFieldNames, sortCollectionsBySlug } from "@rebasepro/common";
 import { toCollectionAccessor, toSafeIdentifier } from "./utils";
 
 /**
@@ -303,20 +303,41 @@ function line(key: string, type: string, optional: boolean): string {
  * reader who holds `hr` and one who does not. The server is the enforcement
  * point; the types describe the surface a caller may name.
  *
- * Keyed by the property name *and* by its column name, the same pair the
- * server's `stripUnreadable` deletes, so a foreign key or a relation addressed
- * under the column name cannot put the property back.
+ * Every spelling the server restricts, read from the server's own function
+ * (`restrictedFieldNames`): the property name, its column name, and — for a
+ * closed to-one relation — the foreign key that names the same row. Keying on
+ * the property and column alone, which this used to, kept `authorId` on all
+ * three types for an `excludeFromApi` `author`, though the server strips it
+ * from every read and refuses it on every write.
  */
-function excludedApiKeys(properties: Properties): Set<string> {
-    const excluded = new Set<string>();
-    for (const [key, rawProp] of Object.entries(properties)) {
-        const prop = rawProp as Property;
-        const access = effectiveAccess(prop);
-        if (access?.read?.length !== 0 || access?.write?.length !== 0) continue;
-        excluded.add(key);
-        if (prop.columnName) excluded.add(prop.columnName);
+function excludedApiKeys(collection: CollectionConfig): Set<string> {
+    const unreadable = closedNames(collection, "read");
+    const unwritable = closedNames(collection, "write");
+    return new Set([...unreadable].filter(name => unwritable.has(name)));
+}
+
+/**
+ * The names nobody may read (or write), as the server judges them: no viewer
+ * is the trusted plane, which every role-naming rule admits, so what is left
+ * is exactly the empty rules.
+ *
+ * `restrictedFieldNames` resolves the relations of a closed relation property
+ * to find its foreign key. When those cannot be resolved — already warned
+ * about by the caller — the property and column names are still closed.
+ */
+function closedNames(collection: CollectionConfig, kind: "read" | "write"): Set<string> {
+    try {
+        return restrictedFieldNames(collection, undefined, kind).refused;
+    } catch {
+        const names = new Set<string>();
+        for (const [key, rawProp] of Object.entries((collection.properties ?? {}) as Properties)) {
+            const prop = rawProp as Property;
+            if (effectiveAccess(prop)?.[kind]?.length !== 0) continue;
+            names.add(key);
+            if (prop.columnName) names.add(prop.columnName);
+        }
+        return names;
     }
-    return excluded;
 }
 
 /**
@@ -329,17 +350,11 @@ function excludedApiKeys(properties: Properties): Set<string> {
  * generated `create({ computed })` compiled and could only ever be a 400.
  *
  * A write rule naming *roles* is not this: some caller can write it, and one
- * generated shape cannot say which.
+ * generated shape cannot say which. A closed to-one relation's foreign key is:
+ * the server refuses `reviewerId` exactly as it refuses `reviewer`.
  */
-function unwritableKeys(properties: Properties): Set<string> {
-    const unwritable = new Set<string>();
-    for (const [key, rawProp] of Object.entries(properties)) {
-        const prop = rawProp as Property;
-        if (effectiveAccess(prop)?.write?.length !== 0) continue;
-        unwritable.add(key);
-        if (prop.columnName) unwritable.add(prop.columnName);
-    }
-    return unwritable;
+function unwritableKeys(collection: CollectionConfig): Set<string> {
+    return closedNames(collection, "write");
 }
 
 export function generateTypedefs(input: CollectionConfig[]): string {
@@ -456,7 +471,7 @@ export function generateTypedefs(input: CollectionConfig[]): string {
         // set means every later pass (foreign keys, relations, unresolved
         // relations) skips them too, since each of those already refuses to
         // emit a key twice.
-        const excluded = excludedApiKeys(properties);
+        const excluded = excludedApiKeys(collection);
         for (const key of excluded) emittedKeys.add(key);
 
         // 1. Direct properties
@@ -535,7 +550,7 @@ export function generateTypedefs(input: CollectionConfig[]): string {
         // property is off the API surface in both directions, so a generated
         // client never names it — and minus every field nobody may write.
         lines.push("    Insert: {");
-        const notWritable = new Set([...excluded, ...unwritableKeys(properties)]);
+        const notWritable = new Set([...excluded, ...unwritableKeys(collection)]);
         emittedKeys.clear();
         for (const key of notWritable) emittedKeys.add(key);
 
@@ -551,8 +566,11 @@ export function generateTypedefs(input: CollectionConfig[]): string {
             emittedKeys.add(key);
         }
 
-        emitWritableRelations(lines, collection, properties, resolvedRelations, emittedKeys, false);
-        lines.push("    };");
+        const eitherSpelling = emitWritableRelations(lines, collection, properties, resolvedRelations, emittedKeys, false);
+        // A required `belongsTo` written under either of its names: see
+        // `emitWritableRelations`. One `& (A | B)` per such relation, so each is
+        // satisfied on its own.
+        lines.push(eitherSpelling.length === 0 ? "    };" : `    } & ${eitherSpelling.join(" & ")};`);
 
         // ── Update Type ──
         //
@@ -589,12 +607,17 @@ export function generateTypedefs(input: CollectionConfig[]): string {
         // the same type for `keyof` (never), but `{}` is what typescript-eslint's
         // recommended `no-empty-object-type` refuses, in every project that
         // lints its generated SDK.
-        if (Object.keys(resolvedRelations).length === 0) {
+        //
+        // An `excludeFromApi` relation is left out: the server answers an
+        // include naming one as it answers a typo (`UNKNOWN_RELATION`), so
+        // `IncludeFor` must not offer it.
+        const includable = Object.entries(resolvedRelations).filter(([key]) => !excluded.has(key));
+        if (includable.length === 0) {
             lines.push("    Relations: Record<never, never>;");
         } else {
             lines.push("    Relations: {");
         }
-        for (const [key, relation] of Object.entries(resolvedRelations)) {
+        for (const [key, relation] of includable) {
             const target = resolveTargetCollection(relation);
             const slug = target?.slug ?? relation.targetSlug;
             const accessor = slug ? accessors.get(slug) : undefined;
@@ -603,7 +626,7 @@ export function generateTypedefs(input: CollectionConfig[]): string {
             // something that does not exist.
             lines.push(`      ${emitKey(key)}: ${accessor ? emitString(accessor) : "never"};`);
         }
-        if (Object.keys(resolvedRelations).length > 0) lines.push("    };");
+        if (includable.length > 0) lines.push("    };");
 
         // ── Slug ──
         //
@@ -745,6 +768,13 @@ function includeHelperLines(): string[] {
  * finds there is one. A relation whose `relationName` differs from its property
  * key is reachable as the property and not as the name, so emitting the name
  * would have offered a key that writes to a column that does not exist.
+ *
+ * A **required** `belongsTo` is satisfied by either spelling — the server's
+ * required check reads both (`write-validation.ts`). Emitting each name as a
+ * required key made a create name the same row twice to compile. So on an
+ * `Insert` both names go in optional, and the requirement comes back as one
+ * returned `({ authorId: T } | { author: T })` for the caller to intersect
+ * with the object. Both stay in the object so `keyof Insert` still names them.
  */
 function emitWritableRelations(
     lines: string[],
@@ -753,7 +783,28 @@ function emitWritableRelations(
     resolvedRelations: Record<string, ResolvedRelation>,
     emittedKeys: Set<string>,
     allOptional: boolean
-): void {
+): string[] {
+    // Every name each `belongsTo` can still be written under, so `emit` knows
+    // whether a required one has a second spelling to fall back on.
+    const spellings = new Map<ResolvedRelation, string[]>();
+    const addSpelling = (relation: ResolvedRelation, key: string): void => {
+        if (emittedKeys.has(key)) return;
+        const keys = spellings.get(relation) ?? [];
+        if (!keys.includes(key)) keys.push(key);
+        spellings.set(relation, keys);
+    };
+    for (const relation of Object.values(resolvedRelations)) {
+        if (relation.kind === "belongsTo" && relation.localKey) {
+            addSpelling(relation, fieldKeyForColumn(collection, relation.localKey));
+        }
+    }
+    for (const [key, rawProp] of Object.entries(properties)) {
+        if ((rawProp as Property).type !== "relation") continue;
+        const relation = findRelation(resolvedRelations, key);
+        if (relation?.kind === "belongsTo" && relation.localKey) addSpelling(relation, key);
+    }
+
+    const eitherSpelling: string[] = [];
     // The target's primary key type is the same one `Row` uses. A hardcoded
     // `string | number` here accepted a string for a numeric-keyed target.
     const emit = (key: string, relation: ResolvedRelation): void => {
@@ -762,8 +813,13 @@ function emitWritableRelations(
         // A foreign key that is not required can be unassigned, which is a
         // write of `null` — see `writableType`.
         const type = required ? foreignKeyType(relation) : `${foreignKeyType(relation)} | null`;
-        lines.push(line(key, type, allOptional || !required));
+        const names = spellings.get(relation) ?? [key];
+        const oneOfSeveral = required && !allOptional && names.length > 1;
+        lines.push(line(key, type, allOptional || !required || oneOfSeveral));
         emittedKeys.add(key);
+        if (oneOfSeveral && names[0] === key) {
+            eitherSpelling.push(`(${names.map(name => `{ ${emitKey(name)}: ${type} }`).join(" | ")})`);
+        }
     };
 
     for (const relation of Object.values(resolvedRelations)) {
@@ -778,12 +834,33 @@ function emitWritableRelations(
         if (relation?.kind === "belongsTo" && relation.localKey) emit(key, relation);
     }
 
+    // A `hasOne` is written by naming the target row: the server points the
+    // target's foreign key at this row (`inverseRelationUpdates`), and `null`
+    // unlinks it. Its resolved relation says `writable: true`, but only
+    // `belongsTo` and the to-many kinds were emitted, so the write the server
+    // performs was a type error. A single-hop to-one `via` (one step, the
+    // target holds the key) is written the same way, by the join-path writer.
+    // Keyed by the property, as the second `belongsTo` spelling is: the write
+    // transformer only recognises the relation through the property that
+    // declares it.
+    for (const [key, rawProp] of Object.entries(properties)) {
+        if ((rawProp as Property).type !== "relation" || emittedKeys.has(key)) continue;
+        const relation = findRelation(resolvedRelations, key);
+        const toOneWritable = relation?.kind === "hasOne"
+            || (relation?.kind === "via" && relation.cardinality === "one" && relation.writable);
+        if (!relation || !toOneWritable) continue;
+        lines.push(line(key, `${foreignKeyType(relation)} | null`, true));
+        emittedKeys.add(key);
+    }
+
     // A to-many membership: `hasMany` (the targets' foreign key is pointed at
     // this row) and `manyToMany` (junction rows). The server writes both on a
     // create and an update — bare keys, or `{ id }`, or `{ id, _pivot }` where
     // the junction declares payload columns — but only `belongsTo` was
-    // emitted, so the field a read returns could not be written back. A `via`
-    // is read-only (`writable: false`), and stays off.
+    // emitted, so the field a read returns could not be written back. A
+    // single-hop to-many `via` is written as its one junction's rows and
+    // carries no payload; a multi-hop one is read-only (`writable: false`) and
+    // stays off.
     for (const [key, relation] of Object.entries(resolvedRelations)) {
         if (relation.cardinality !== "many" || !relation.writable) continue;
         if (emittedKeys.has(key)) continue;
@@ -793,6 +870,8 @@ function emitWritableRelations(
         lines.push(line(key, `Array<${element}>`, true));
         emittedKeys.add(key);
     }
+
+    return eitherSpelling;
 }
 
 /**

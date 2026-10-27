@@ -673,6 +673,11 @@ export class PostgresBackendDriver implements DataDriver {
         const client = this.client;
         return {
             user: this.user,
+            // The key the request authenticated with rides on the identity
+            // `withAuth` was given, which every per-request driver carries
+            // as `user`. Named apart so a hook can tell a personal key's
+            // write from its owner's own, which `user` cannot.
+            ...(this.user?.credential ? { credential: this.user.credential } : {}),
             driver: this,
             data: this.data,
             get client() {
@@ -913,6 +918,16 @@ export class PostgresBackendDriver implements DataDriver {
         }
 
         return rows;
+    }
+
+    /**
+     * Every stored row of a collection, past every read hook, for a whole-store
+     * sweep — see `DataDriver.scanStoredRows`. Only this unscoped driver has
+     * it: {@link AuthenticatedPostgresBackendDriver} reads as a caller, and a
+     * caller's reads are scoped.
+     */
+    scanStoredRows(props: { path: string; collection: CollectionConfig; pageSize?: number }): AsyncIterable<Record<string, unknown>[]> {
+        return this.dataService.getFetchService().scanStoredRows(props.path, props.pageSize);
     }
 
     /**
@@ -3186,6 +3201,7 @@ export class AuthenticatedPostgresBackendDriver implements DataDriver {
         const client = this.delegate.client;
         writeScope?.setSettledContext({
             user: this.user,
+            ...(this.user?.credential ? { credential: this.user.credential } : {}),
             driver: this,
             data: this.data,
             get client() {

@@ -1,5 +1,5 @@
 ---
-sourceHash: a874bc209f13c746
+sourceHash: 2888be015d5ef43f
 title: Rebase erweitern
 sidebar_label: Rebase erweitern
 description: Ein Entscheidungsleitfaden für die Wahl des richtigen Erweiterungsmechanismus — Plugins, Slots, Komponenten-Overrides, Entity-Views, Aktionen und mehr.
@@ -28,7 +28,7 @@ für das Backend darstellt.
 | Die Login-Seite ersetzen | `components` (`Auth.LoginView`) | App | [Komponenten-Overrides](/docs/frontend/component-overrides) |
 | Die Startseite ersetzen | `components` (`HomePage`) | App | [Komponenten-Overrides](/docs/frontend/component-overrides) |
 | Das Aussehen des Formulars einer Collection komplett ändern | `formView` | Collection | [unten](#formview) |
-| Eine einzelne Komponente innerhalb einer Collection austauschen | `collection.components` | Collection | [Komponenten-Overrides](/docs/frontend/component-overrides) |
+| Eine einzelne Komponente innerhalb einer Collection austauschen | `admin.components` | Collection | [Komponenten-Overrides](/docs/frontend/component-overrides) |
 | Standard-Komponenten-Overrides für alle Collections festlegen | `components` (Collection-spezifische Namen) | App | [Komponenten-Overrides](/docs/frontend/component-overrides) |
 | Eine Schaltfläche zur Collection-Toolbar hinzufügen | Collection `Actions` | Collection | [Entity-Aktionen](/docs/frontend/entity-actions#collection-actions) |
 | UI in einen Collection-Toolbar-Slot injizieren | `collection.actions`-Slot | App/Plugin | [Slots](/docs/frontend/slots) |
@@ -56,7 +56,7 @@ eine Admin-Ansicht, und eine fest verdrahtete Farbe ist in einem der beiden Them
 
 **Scope:** App.
 
-Ein Plugin bündelt Collections, Ansichten, Komponenten-Overrides, Slot-Beiträge, Authentifizierung, Datenquellen, Provider, Hooks und Lifecycle-Callbacks in einer einzigen installierbaren Einheit. Alle anderen hier aufgeführten Mechanismen können über die Schnittstelle eines Plugins bereitgestellt werden.
+Ein Plugin bündelt injizierte oder geänderte Collections, Ansichten, Slot-Beiträge, Feld-Wrapper, Provider, Hooks und Lifecycle-Callbacks in einer einzigen installierbaren Einheit. Komponenten-Overrides, Entity-Views, Entity-Aktionen und `propertyConfigs` sind keine Plugin-Felder: Sie gehören an `<Rebase>` oder an die Collection.
 
 → [Plugin-Referenz](/docs/plugins)
 
@@ -99,7 +99,7 @@ Zwei Modi: **Eject** (vollständiger Ersatz) oder **Wrap** (das Original erweite
 - `EntityPreview`
 - `Entity.MissingReference`
 
-**Rangfolge:** `components` auf Collection-Ebene überschreiben die Standardwerte auf App-Ebene für denselben Komponentennamen (einfacher Object Spread — Collection-Werte überschreiben globale Werte). Reine App-Komponentennamen (`Shell.*`, `HomePage`, `Auth.*`) können nur auf der `<Rebase>`-Ebene überschrieben werden.
+**Rangfolge:** `components` auf Collection-Ebene gelten über den Standardwerten auf App-Ebene für denselben Komponentennamen: Ein Ersatz auf Collection-Ebene ersetzt beides, und ein Collection-Override mit `wrap: true` umschließt den auf App-Ebene. Reine App-Komponentennamen (`Shell.*`, `HomePage`, `Auth.*`) können nur auf der `<Rebase>`-Ebene überschrieben werden.
 
 → [Komponenten-Overrides](/docs/frontend/component-overrides)
 
@@ -107,7 +107,7 @@ Zwei Modi: **Eject** (vollständiger Ersatz) oder **Wrap** (das Original erweite
 
 **Scope:** Entity (fügt Tabs hinzu).
 
-Benutzerdefinierte Ansichten, die als Tabs auf der Entity-Detailseite erscheinen. Können global auf `<Rebase>` oder pro Collection definiert werden.
+Benutzerdefinierte Ansichten, die als Tabs auf der Entity-Detailseite erscheinen. Pro Collection definiert oder einmalig auf `<Rebase entityViews>` (oder `<RebaseCMS entityViews>`) registriert und per `key` in `admin.entityViews` einer Collection benannt.
 
 → [Entity-Views](/docs/frontend/entity-views)
 
@@ -115,7 +115,7 @@ Benutzerdefinierte Ansichten, die als Tabs auf der Entity-Detailseite erscheinen
 
 **Scope:** Entity.
 
-Benutzerdefinierte Aktionsschaltflächen für einzelne Entities (Veröffentlichen, Archivieren, Klonen usw.). Können global oder pro Collection definiert werden.
+Benutzerdefinierte Aktionsschaltflächen für einzelne Entities (Veröffentlichen, Archivieren, Klonen usw.). Pro Collection definiert oder einmalig auf `<Rebase entityActions>` (oder `<RebaseCMS entityActions>`) registriert und per `key` in `admin.entityActions` einer Collection benannt.
 
 → [Entity-Aktionen](/docs/frontend/entity-actions)
 
@@ -195,14 +195,14 @@ const collection = {
     admin: {
         formView: {
             Builder: MyCustomProductForm,
-            includeActions: true  // Speichern und Verwerfen in der Leiste (Standard: true)
+            includeActions: true  // Save and Discard in the bar (default: true)
         }
     }
 };
 
 ```
 
-Verwenden Sie dies, wenn Sie ein vollständig individuelles Layout für die Bearbeitung von Entities einer Collection benötigen. Für kleinere Anpassungen empfiehlt sich stattdessen `collection.components` mit einem `Entity.Form`-Override.
+Verwenden Sie dies, wenn Sie ein vollständig individuelles Layout für die Bearbeitung von Entities einer Collection benötigen. Für kleinere Anpassungen empfiehlt sich stattdessen `admin.components` mit einem `Entity.Form`-Override.
 
 Der Builder wird innerhalb des Datensatzformulars gerendert und empfängt dessen aktiven `formContext`: Schreiben Sie mit `formContext.setFieldValue`, und die Schaltfläche „Speichern“ der Leiste sichert den Datensatz. Wenn der Datensatz nicht bearbeitet werden kann — in der schreibgeschützten Detailansicht oder für einen Benutzer ohne Bearbeitungsrechte — ist `formContext.disabled` gleich `true`, und Schreibvorgänge werfen einen Fehler. Setzen Sie `includeActions: false`, wenn Ihr Builder selbstständig über `formContext.submit()` speichert.
 
@@ -239,7 +239,7 @@ möchten, sind Sie auf dieser Seite falsch. Für den Server gibt es eine eigene 
 
 ## Zusammenfassung der Rangfolge
 
-- **`collection.components` hat Vorrang vor globalen `components`** innerhalb dieser Collection. Ein Ersatz auf Collection-Ebene ersetzt beides; ein Collection-Override mit `wrap: true` umschließt den globalen Override, sofern vorhanden (in Version 0.24 umschließt er die integrierte Komponente und der globale Override wird übersprungen). Siehe [Komponenten-Overrides](/docs/frontend/component-overrides#when-both-scopes-override-a-component).
+- **`admin.components` einer Collection hat Vorrang vor globalen `components`** innerhalb dieser Collection. Ein Ersatz auf Collection-Ebene ersetzt beides; ein Collection-Override mit `wrap: true` umschließt den globalen Override, sofern vorhanden (in Version 0.24 umschließt er die integrierte Komponente und der globale Override wird übersprungen). Siehe [Komponenten-Overrides](/docs/frontend/component-overrides#when-both-scopes-override-a-component).
 - **Collection `Actions` und der Slot `collection.actions` verhalten sich additiv** — `Actions` werden zuerst gerendert, danach die Slot-Beiträge.
-- **`entityActions` und `entityViews` auf Collection-Ebene erweitern globale Einträge (sie ersetzen sie nicht).**
+- **`entityActions` und `entityViews` auf App-Ebene sind eine Registry, keine Standardwerte:** Eine Collection zeigt eine davon nur, wenn ihr eigenes `admin.entityActions` / `admin.entityViews` deren `key` nennt.
 - **Plugins werden in der Reihenfolge des `plugins`-Arrays angewendet**, nicht nach `key`. Slot-Beiträge werden anhand ihres `order`-Werts gerendert (niedrigere Werte zuerst, standardmäßig 50), und bei Gleichstand bleibt diese Reihenfolge erhalten. Feld-Wrapper aus mehreren Plugins greifen in dieser Reihenfolge ineinander, wobei das erste Plugin am weitesten innen liegt; in Version 0.24 wurde nur der letzte Wrapper gerendert. Siehe [Plugins](/docs/plugins#field-wrappers-from-several-plugins).

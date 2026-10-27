@@ -1,5 +1,5 @@
 ---
-sourceHash: 83ba3db403bb8334
+sourceHash: 9feb465f3327d507
 title: Clés API
 sidebar_label: Clés API
 description: "Des clés de longue durée pour les scripts, la CI, les agents et les intégrations : clés de service et clés personnelles, les portées qu'elles détiennent, leur articulation avec la sécurité au niveau des lignes, et les routes qui les gèrent."
@@ -31,7 +31,7 @@ curl "$API_URL/api/data/orders" \
 ```
 
 La même clé fonctionne sur l'API REST, le stockage, les fonctions personnalisées, les surfaces
-d'administration que ses portées atteignent, le WebSocket temps réel et le [point de terminaison `/mcp`](/docs/ai/mcp/#the-remote-endpoint).
+d'administration que ses portées atteignent, le WebSocket temps réel et le [point de terminaison `/mcp`](/docs/ai/remote-mcp/).
 
 ## Clés de service
 
@@ -159,7 +159,7 @@ Le `rate_limit` d'une clé est le nombre de requêtes qu'elle peut faire dans un
 - ses trames de données sur le socket temps réel : lectures, comptages, enregistrements et suppressions,
   ainsi que les abonnements et les demandes d'historique de canal au-delà de
   l'[allocation](/docs/backend/realtime/#what-a-write-costs-and-the-limits) de chaque socket ;
-- ses requêtes vers [`/mcp`](/docs/ai/mcp/#the-remote-endpoint).
+- ses requêtes vers [`/mcp`](/docs/ai/remote-mcp/).
 
 Sans `rate_limit`, le compartiment reçoit la valeur par défaut du serveur pour les clés API, 1000.
 Une clé personnelle n'a pas de `rate_limit` propre, et est décomptée dans son propre compartiment
@@ -168,6 +168,8 @@ socket `RATE_LIMITED`.
 
 Les routes d'administration sous `/api/admin`, et les messages d'administration du socket comme
 ceux de l'éditeur SQL, ne sont pas soumis à la limite de débit.
+
+Un administrateur qui simule une clé (« Simulate access », `x-rebase-simulate-api-key-id`) dépense sa propre allocation, pas celle de la clé : l'intégration qui tourne avec cette clé garde tout son budget. Simuler ou usurper un utilisateur est facturé de la même manière à l'administrateur.
 
 ## Clés personnelles
 
@@ -250,7 +252,7 @@ chaque étape d'un téléversement avec reprise (TUS), y compris la vérificatio
 l'annulation. `storage:delete` supprime. La cible est un identifiant de source de stockage.
 L'identifiant de la source par défaut est `(default)`, donc `storage:read:(default)` ne lit que la
 source par défaut, et `storage:write:avatars` écrit dans une source nommée `avatars`.
-Après la vérification de la portée, [`storageAuthorize`](/docs/backend/storage/#per-object-authorization)
+Après la vérification de la portée, [`storageAuthorize`](/docs/backend/storage-authorization/)
 s'exécute quand même, avec l'identité de la clé.
 
 ### Fonctions
@@ -306,6 +308,8 @@ Chaque clé est vérifiée par rapport à celui qui la crée, de la même maniè
 | `400 KEY_MANAGEMENT_SCOPE` | `keys:read` ou `keys:write` a été demandée |
 | `403 SCOPE_EXCEEDS_CREATOR` | Une portée que le créateur ne détient pas. Une clé ne détient jamais plus que le compte qui l'a créée |
 | `403 ROLE_EXCEEDS_CREATOR` | Un rôle de clé de service que le créateur ne détient pas, quand le créateur n'est pas administrateur |
+| `400 INVALID_ROLE` | Un nom de rôle est vide ou contient `,` `{` `}` `"` `\` ou un caractère de contrôle, que RLS relirait comme d'autres rôles |
+| `403 KEY_OUTRANKS_CALLER` | Lors d'une modification (`PUT`) ou d'une révocation (`DELETE`) : la clé détient déjà un rôle ou une portée que l'appelant n'a pas, et l'appelant n'est pas administrateur |
 
 Une requête pour laquelle la clé elle-même n'a pas la portée répond `403 SCOPE_MISSING`, avec la
 portée dans `details.requiredScope`. Voir [Codes d'erreur](/docs/backend/errors/#authentication-and-accounts).

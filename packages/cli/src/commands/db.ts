@@ -24,6 +24,7 @@ import { redactConnectionPasswords } from "../utils/redact";
 import { suggestCommand, unknownCommand } from "../utils/unknown-command";
 import { argsFromCommand, commandWords } from "../utils/command-words";
 import { COLLECTIONS_FLAG_HELP, refuseMissingCollectionsPath } from "../utils/path-flags";
+import { collectionsDirArgs } from "../utils/collections-dir";
 import { recordEvent } from "../telemetry";
 import { DEV_DATABASE_KIND_ENV, devDatabaseKind, type PreparedDatabase } from "../dev-db/prepare";
 import { type DevDatabase } from "../dev-db/resolve";
@@ -571,7 +572,8 @@ export async function runDriverSchemaCommand(
     options: { quiet?: boolean } = {}
 ): Promise<void> {
     const resolved = await resolveDriverCli();
-    await execDriverCli(resolved, rawArgs.slice(2), options);
+    const driverArgs = rawArgs.slice(2);
+    await execDriverCli(resolved, [...driverArgs, ...collectionsDirArgs(resolved.projectRoot, driverArgs)], options);
 }
 
 export async function runDriverDbCommand(
@@ -656,7 +658,10 @@ export async function runDriverDbCommand(
     // of `args[0]`, so `rebase --debug db push` spawned it with ["--debug",
     // "db", "push"] and it answered "Unknown domain command: --debug" — for a
     // flag this CLI prints after every failure as the thing to re-run with.
-    const childArgs = absolutizeLocalPathArgs(argsFromCommand(rawArgs, "db"), process.cwd());
+    const typedArgs = absolutizeLocalPathArgs(argsFromCommand(rawArgs, "db"), process.cwd());
+    // The collections `rebase.json` declares (`apps.<backend>.config`), when the
+    // line names none — the driver alone would read `../config/collections`.
+    const childArgs = [...typedArgs, ...collectionsDirArgs(projectRoot, typedArgs)];
 
     try {
         await spawnDriverCli({ projectRoot, backendDir, pluginCli, env }, childArgs, options);
@@ -1704,6 +1709,8 @@ const DB_ACTION_HELP: Record<string, { usage: string; summary: string; notes?: s
         notes: [
             "--dry-run prints the SQL and applies nothing. Read it before you approve it.",
             "A change that drops data, or re-keys a table (every row gets a new id), needs --allow-destructive.",
+            "--yes approves non-destructive pushes. It still approves destructive ones too in this release, with a "
+                + "deprecation warning; from the next release it will not — pass --allow-destructive for those.",
             `--collections <dir>: ${COLLECTIONS_FLAG_HELP}.`,
             DATABASE_FLAGS_HELP
         ]

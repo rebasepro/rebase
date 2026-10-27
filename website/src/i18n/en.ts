@@ -3,7 +3,7 @@ export const en = {
   "hero.title.part1": "The backend for your Postgres.",
   "hero.title.part2": "Built for your team. Safe for your agents.",
   "hero.subtitle":
-    "REST, a typed SDK, realtime, auth and storage for your app; an admin panel with spreadsheets, media, relations and review queues for your team; scoped MCP tools and Postgres RLS for your agents. Twenty-three collections run our own CRM — not one hand-written screen.",
+    "Stop rebuilding — or prompting — the same backend and admin panel on every project. Run a battle-tested, Postgres-enforced one from minute one.",
   "hero.cta.demo": "Try the demo",
 
   // Free-tool section. The copy stays useful to someone who will never adopt
@@ -24,8 +24,8 @@ export const en = {
   // Beat 03 — what you get: the SDK/REST/realtime demos, then the panel as a
   // sub-block of the same chapter (merged 2026-09-09; panel.badge is no longer
   // rendered on the home page).
-  "panel.badge": "The panel that ships with it",
-  "panel.title": "And the admin panel your team opens every morning.",
+  "panel.badge": "Where your team works",
+  "panel.title": "Agents don't need a UI. Your team still does.",
   "engine.badge": "What you get",
   "engine.title": "Working APIs against your database, from minute one.",
   "engine.subtitle":
@@ -59,7 +59,7 @@ export const en = {
   "showcase.title.part1": "Dozens of products.",
   "showcase.title.part2": "All of them in production.",
   "showcase.subtitle":
-    "A <b>certified medical device</b>, a <b>retail loyalty programme</b>, a <b>two-sided marketplace</b>, <b>public data</b>, an outbound sales agent, a design tool and a CRM \u2014 some of them ours, some of them our customers'.",
+    "A <b>certified medical device</b>, a <b>retail loyalty programme</b>, a <b>two-sided marketplace</b>, a <b>living-room music quiz</b>, an outbound sales agent, a design tool and a CRM \u2014 some of them ours, some of them our customers'.",
   "showcase.nolink": "Internal tool — no public site",
   "showcase.case0.badge": "Vector Design Tool · Built by the Rebase team",
   "showcase.case0.title": "Dadaki",
@@ -73,10 +73,10 @@ export const en = {
   "showcase.case2.title": "MedicalMotion",
   "showcase.case2.desc":
     "A certified digital medical device delivering AI-personalized pain therapy. Rebase runs the entire backend — patient records, therapy plans, the exercise content library, and the clinical dashboards on top of them.",
-  "showcase.case3.badge": "Public data · Built by the Rebase team",
-  "showcase.case3.title": "A dónde va el dinero de España",
-  "showcase.case3.desc":
-    "A public reading of Spanish government spending, from €725bn down to a single budget line. There is no database in the read path: a cron recompiles the official figures each month, storage serves them as JSON, and the page itself makes zero API calls.",
+  "showcase.case7.badge": "Party game · Built by the Rebase team",
+  "showcase.case7.title": "SongBuzz",
+  "showcase.case7.desc":
+    "A music quiz for the living room: the TV plays the songs, every phone is a buzzer, and nobody installs an app. Each room is a row and a realtime channel; functions serve the music and the AI host's voice, and crons keep the catalogue playable.",
   "showcase.case4.badge": "AI sales agent · Built by the Rebase team",
   "showcase.case4.title": "Prospector",
   "showcase.case4.desc":
@@ -108,7 +108,26 @@ export const en = {
   "cta.lane.cloud.link": "Request access",
   "cta.button.demo": "Try the demo",
   "cta.button.docs": "Read the docs",
-  "engine.plus": "Plus auth and roles, S3-compatible storage, scheduled jobs, serverless functions and backups. None of it is a separate service to sign up for and wire together.",
+  "engine.plus": "And the rest of the backend, in the same server. None of it is a separate service to sign up for and wire together.",
+  // The capability grid under the demos (2026-10-25). Every line names a
+  // shipped feature and the handle that turns it on — an evaluator read the
+  // old one-sentence list as "no functions, no branching, no backups".
+  "engine.cap.auth.title": "Auth",
+  "engine.cap.auth.desc": "Email and password, magic links, twelve OAuth providers and scoped API keys.",
+  "engine.cap.storage.title": "File storage",
+  "engine.cap.storage.desc": "S3-compatible, GCS or local disk, with resumable uploads and per-file access rules.",
+  "engine.cap.functions.title": "Functions",
+  "engine.cap.functions.desc": "Your own endpoints beside the generated ones. Drop a file in functions/ and it is mounted.",
+  "engine.cap.jobs.title": "Cron and jobs",
+  "engine.cap.jobs.desc": "Scheduled tasks, and a queue in Postgres that retries with backoff and survives a restart.",
+  "engine.cap.vector.title": "Vector search",
+  "engine.cap.vector.desc": "Nearest-neighbour queries over pgvector columns, through the same REST API.",
+  "engine.cap.branches.title": "Database branches",
+  "engine.cap.branches.desc": "A full copy of your database to try a migration on, while the real one stays untouched.",
+  "engine.cap.history.title": "History",
+  "engine.cap.history.desc": "Who changed which row and when, with the full before and after.",
+  "engine.cap.backups.title": "Backups",
+  "engine.cap.backups.desc": "pg_dump to disk or S3 on a schedule, restored into a fresh database. Point-in-time recovery on Rebase Cloud.",
   "personas.badge": "Who touches it",
   "personas.title": "Three people touch this. None of them the same way.",
   "personas.dev.title": "The developer who owns the database",

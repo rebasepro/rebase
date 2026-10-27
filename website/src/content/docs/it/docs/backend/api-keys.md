@@ -1,5 +1,5 @@
 ---
-sourceHash: 83ba3db403bb8334
+sourceHash: 9feb465f3327d507
 title: Chiavi API
 sidebar_label: Chiavi API
 description: "Chiavi di lunga durata per script, CI, agenti e integrazioni: chiavi di servizio e chiavi personali, gli scope che possiedono, come si combinano con la sicurezza a livello di riga e le route che le gestiscono."
@@ -31,7 +31,7 @@ curl "$API_URL/api/data/orders" \
 ```
 
 La stessa chiave funziona sull'API REST, sullo storage, sulle funzioni personalizzate, sulle
-superfici di amministrazione raggiunte dai suoi scope, sul WebSocket realtime e sull'[endpoint `/mcp`](/docs/ai/mcp/#the-remote-endpoint).
+superfici di amministrazione raggiunte dai suoi scope, sul WebSocket realtime e sull'[endpoint `/mcp`](/docs/ai/remote-mcp/).
 
 ## Chiavi di servizio
 
@@ -158,7 +158,7 @@ di 15 minuti, e ogni porta d'accesso lo consuma in un unico bucket, `api-key:<id
 - i suoi frame di dati sul WebSocket realtime: fetch, conteggi, salvataggi ed eliminazioni,
   più le sottoscrizioni e le richieste di cronologia dei canali oltre la
   [quota](/docs/backend/realtime/#what-a-write-costs-and-the-limits) di ogni socket;
-- le sue richieste a [`/mcp`](/docs/ai/mcp/#the-remote-endpoint).
+- le sue richieste a [`/mcp`](/docs/ai/remote-mcp/).
 
 Senza un `rate_limit` il bucket ha il valore predefinito del server per le chiavi API, 1000. Una
 chiave personale non ha un `rate_limit` proprio, e conta in un suo bucket con quel valore
@@ -167,6 +167,12 @@ predefinito. Oltre il limite una richiesta HTTP risponde `429` e un frame del so
 
 Le route di amministrazione sotto `/api/admin`, e i messaggi admin del socket come quelli
 dell'editor SQL, non hanno limite di richieste.
+
+Un amministratore che simula una chiave ("Simulate access",
+`x-rebase-simulate-api-key-id`) consuma il proprio limite, non quello della
+chiave: l'integrazione che gira su quella chiave conserva tutto il suo budget.
+Simulare o impersonare un utente viene addebitato allo stesso modo
+all'amministratore.
 
 ## Chiavi personali
 
@@ -250,7 +256,7 @@ e copre ogni passaggio di un caricamento ripristinabile (TUS), inclusi il contro
 e l'annullamento. `storage:delete` elimina. Il target è l'id di una sorgente di storage. L'id
 della sorgente predefinita è `(default)`, quindi `storage:read:(default)` legge solo la sorgente
 predefinita, e `storage:write:avatars` scrive su una sorgente chiamata `avatars`.
-Dopo il controllo dello scope, [`storageAuthorize`](/docs/backend/storage/#per-object-authorization)
+Dopo il controllo dello scope, [`storageAuthorize`](/docs/backend/storage-authorization/)
 viene comunque eseguito, con l'identità della chiave.
 
 ### Funzioni
@@ -306,6 +312,8 @@ Ogni chiave viene verificata rispetto a chi la crea, allo stesso modo su entramb
 | `400 KEY_MANAGEMENT_SCOPE` | Sono stati richiesti `keys:read` o `keys:write` |
 | `403 SCOPE_EXCEEDS_CREATOR` | Uno scope che il creatore non possiede. Una chiave non possiede mai più dell'account che l'ha creata |
 | `403 ROLE_EXCEEDS_CREATOR` | Un ruolo di una chiave di servizio che il creatore non possiede, quando il creatore non è un admin |
+| `400 INVALID_ROLE` | Il nome di un ruolo è vuoto o contiene `,` `{` `}` `"` `\` o un carattere di controllo, che l'RLS rileggerebbe come altri ruoli |
+| `403 KEY_OUTRANKS_CALLER` | Su una modifica (`PUT`) o una revoca (`DELETE`): la chiave possiede già un ruolo o uno scope che il chiamante non ha, e il chiamante non è un admin |
 
 Una richiesta per cui alla chiave stessa manca uno scope risponde `403 SCOPE_MISSING`, con lo
 scope in `details.requiredScope`. Vedi [Codici di errore](/docs/backend/errors/#authentication-and-accounts).

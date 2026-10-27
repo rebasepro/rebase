@@ -18,6 +18,8 @@ vi.mock("../../telemetry", async (importOriginal) => {
 });
 
 import { cloudCommand } from "./index";
+import { previewsCommand } from "./previews";
+import { setJsonModeForTest } from "./context";
 
 class Exited extends Error {
     constructor(readonly code: number) {
@@ -52,13 +54,24 @@ const PREVIEWS = [
     { name: "k3x9", url: "songbuzz--k3x9.rebase.website", app: "game", backend: "production", status: "success" }
 ];
 
+/** A preview the control plane paused because its database outgrew the limit. */
+const PAUSED = {
+    name: "big-import",
+    url: "https://songbuzz--big-import.rebase.website",
+    app: "backend",
+    backend: "preview",
+    status: "paused",
+    statusMessage: "This preview was paused: its database holds 2.4 GB, past the 2.0 GB previews may use."
+};
+let previewsAnswer: unknown[] = PREVIEWS;
+
 function respond(method: string, p: string): Response {
     if (p === "/api/data/projects") return json(200, { data: [{ id: PROJECT_ID, subdomain: "songbuzz" }], meta: { hasMore: false } });
     if (p.startsWith("/api/functions/previews")) {
         if (!previewsServed) {
             return json(404, { error: { code: "FUNCTION_NOT_FOUND", message: "No function named 'previews'." } });
         }
-        if (method === "GET" && p === `/api/functions/previews/${PROJECT_ID}`) return json(200, { previews: PREVIEWS });
+        if (method === "GET" && p === `/api/functions/previews/${PROJECT_ID}`) return json(200, { previews: previewsAnswer });
         if (method === "DELETE" && p === `/api/functions/previews/${PROJECT_ID}/new-quiz`) return json(200, { success: true });
         if (method === "DELETE") return json(404, { error: { code: "NOT_FOUND", message: "No such preview." } });
     }
@@ -77,6 +90,7 @@ beforeEach(() => {
     sent = [];
     stdout = [];
     previewsServed = true;
+    previewsAnswer = PREVIEWS;
     vi.spyOn(console, "log").mockImplementation((...args: unknown[]) => { stdout.push(args.map(String).join(" ")); });
     vi.spyOn(console, "error").mockImplementation(() => undefined);
     vi.spyOn(process.stdout, "write").mockImplementation(((chunk: string) => { stdout.push(String(chunk)); return true; }) as never);
@@ -124,6 +138,24 @@ describe("rebase cloud previews list", () => {
             // A bare host is given its scheme, so the address is one a browser opens.
             expect.objectContaining({ name: "k3x9", url: "https://songbuzz--k3x9.rebase.website", backend: "production" })
         ]);
+    });
+
+    it("says why a paused preview is paused, in JSON and on screen", async () => {
+        previewsAnswer = [PAUSED];
+        const out = await run("list");
+        expect(out.previews).toEqual([expect.objectContaining({ status: "paused", statusMessage: PAUSED.statusMessage })]);
+
+        stdout = [];
+        setJsonModeForTest(false);
+        try {
+            await previewsCommand("list", ["node", "rebase", "cloud", "previews", "list", "--project", "songbuzz", "--url", CP]);
+        } finally {
+            setJsonModeForTest(true);
+        }
+        const screen = stdout.join("\n");
+        expect(screen).not.toContain("{");
+        expect(screen).toContain("paused");
+        expect(screen).toContain(PAUSED.statusMessage);
     });
 
     it("is the default action, and answers to the singular", async () => {

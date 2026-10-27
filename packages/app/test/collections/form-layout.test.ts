@@ -69,6 +69,16 @@ describe("pairKind", () => {
         expect(pairKind(p({ type: "number", name: "Score", admin: { Field: () => null } }))).toBeUndefined();
         expect(pairKind(p({ type: "number", name: "Score", conditions: { hidden: {} } }))).toBeUndefined();
     });
+
+    it("keeps a field some users may not read on its own row", () => {
+        // The form renders nothing for a field its user may not read, and a
+        // partner paired with it sat alone at half width.
+        expect(pairKind(p({ type: "number", name: "Cost", access: { read: ["finance"] } }))).toBeUndefined();
+        expect(pairKind(p({ type: "number", name: "Score", excludeFromApi: true }))).toBeUndefined();
+        // A write rule alone hides nothing, but it is the same rule the form
+        // reads, so it is treated alike.
+        expect(pairKind(p({ type: "number", name: "Cost", access: { write: ["finance"] } }))).toBeUndefined();
+    });
 });
 
 describe("pairCompactFields", () => {
@@ -242,6 +252,22 @@ describe("resolveFormLayout — defaults", () => {
 
         const editing = resolveFormLayout({ collection: manual, fieldKeys: ["id", "name"], status: "existing" });
         expect(keysOf(editing)).not.toContain("id");
+    });
+
+    it("leaves a number full width when its neighbour may not be read", () => {
+        const layout = resolveFormLayout({
+            collection: collection({
+                price: { type: "number", name: "Price" },
+                cost: { type: "number", name: "Cost", access: { read: ["finance"] } },
+                stock: { type: "number", name: "Stock" },
+                weight: { type: "number", name: "Weight" }
+            }),
+            fieldKeys: ["price", "cost", "stock", "weight"],
+            status: "existing"
+        });
+        expect(spanOf(layout, "price")).toBe(spanOf(layout, "cost"));
+        expect(spanOf(layout, "stock")).toBe(spanOf(layout, "weight"));
+        expect(spanOf(layout, "price")).not.toBe(spanOf(layout, "stock"));
     });
 
     it("pairs the two neighbouring numbers and leaves every string full width", () => {

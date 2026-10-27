@@ -160,6 +160,31 @@ describe("reviewing a schema change", () => {
         expect(client.apply).not.toHaveBeenCalled();
     });
 
+    // REBASE_PROVISION=false: the server applies nothing, and says to commit
+    // the change as source only. An applicable change has to be able to.
+    it("commits an applicable change as source only when the deployment provisions nothing", async () => {
+        const client = fakeClient({
+            status: jest.fn(async () => ({
+                enabled: true, canPlan: true, canApply: false, repository: "/repo",
+                applyRefusedCode: "SCHEMA_EDITING_PROVISIONING_OFF",
+                applyRefusedBecause: "This deployment changes nothing in its database (provisioning is off). Commit it as source only."
+            })) as never,
+            apply: jest.fn(async () => ({ ...APPLIED, applied: false, sourceOnly: true, statements: [], summary: "Committed abc123def on main — source only." })) as never
+        });
+        const settled = jest.fn();
+        render(<Harness client={client} onSettled={settled}/>);
+
+        await start();
+        await waitFor(() => expect(screen.getByText("Ready to apply")).toBeTruthy());
+        const commit = screen.getByText("Commit").closest("button");
+        await waitFor(() => expect(commit?.disabled).toBe(false));
+        expect(screen.queryByText("Commit and apply")).toBeNull();
+
+        await act(async () => { commit?.click(); });
+        await waitFor(() => expect(settled).toHaveBeenCalledWith("resolved"));
+        expect(client.apply).toHaveBeenCalledWith({ ...change, sourceOnly: true });
+    });
+
     it("cannot be confirmed when the change is refused", async () => {
         const client = fakeClient({ plan: jest.fn(async () => REFUSED_PLAN) as never });
         render(<Harness client={client} onSettled={jest.fn()}/>);

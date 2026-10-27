@@ -54,7 +54,11 @@ export const LabelWithIcon = forwardRef<HTMLDivElement, LabelWithIconProps>(
                     className={`text-start font-medium text-${small ? "base" : "sm"} origin-top-left transform ${small ? "translate-x-2 scale-75" : ""
                         }`}
                 >
-                    {(title ?? "") + (required ? " *" : "")}
+                    {title ?? ""}
+                    {/* Hidden from the accessible name: a field labelled inside
+                        its box is named by this label, and "SKU star" is not
+                        its name. */}
+                    {required && <span aria-hidden={true}> *</span>}
                 </span>
                 {propertyKey && <PropertyKeyHint propertyKey={propertyKey}/>}
             </div>

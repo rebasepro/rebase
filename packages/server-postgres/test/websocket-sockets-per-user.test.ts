@@ -29,14 +29,21 @@ import type { PostgresBackendDriver } from "../src/PostgresBackendDriver";
  * and the socket is closed with 4002. Unset, nothing changes.
  */
 
-const accounts = new Map([["ada", { uid: "ada", roles: ["user"] }], ["bob", { uid: "bob", roles: ["user"] }]]);
+const accounts = new Map([
+    ["ada", { uid: "ada", roles: ["user"] }],
+    ["bob", { uid: "bob", roles: ["user"] }],
+    ["root", { uid: "root", roles: ["admin"] }]
+]);
 const adapter = {
     verifyToken: async (token: string) => {
         const account = accounts.get(token);
-        return account ? { ...account, isAdmin: false } : null;
+        return account ? { ...account, isAdmin: account.roles.includes("admin") } : null;
     },
     verifyRequest: async () => null,
-    resolveUser: async () => null
+    resolveUser: async (uid: string) => {
+        const account = accounts.get(uid);
+        return account ? { ...account, isAnonymous: false } : null;
+    }
 } as unknown as AuthAdapter;
 
 function handler(event: string): (...args: unknown[]) => unknown {
@@ -59,7 +66,11 @@ function connect() {
     const on = (event: string) => ws.on.mock.calls.find((call) => call[0] === event)![1] as (data?: Buffer) => Promise<void>;
     return {
         ws,
-        authenticate: (token: string) => on("message")(Buffer.from(JSON.stringify({ type: "AUTHENTICATE", requestId: "auth", payload: { token } }))),
+        authenticate: (token: string, impersonate?: string) => on("message")(Buffer.from(JSON.stringify({
+            type: "AUTHENTICATE",
+            requestId: "auth",
+            payload: { token, ...(impersonate ? { impersonate } : {}) }
+        }))),
         close: () => on("close")(),
         last: () => JSON.parse(ws.send.mock.calls.at(-1)![0] as string) as { type: string; requestId?: string; payload?: { error?: { code?: string } } }
     };
@@ -107,6 +118,56 @@ describe("the per-user socket ceiling", () => {
         const second = connect();
         await second.authenticate("ada");
         expect(second.last().type).toBe("AUTH_SUCCESS");
+    });
+
+    it("counts each API key's sockets on their own, not against the key's owner", async () => {
+        // Workers holding sockets under keys made by one account shared that
+        // account's ceiling, and locked it (and each other) out.
+        start({
+            maxSocketsPerUser: 1,
+            resolveApiKey: async (token) => ({ uid: "ada", roles: ["user"], scopes: ["data:read"], apiKey: { id: token.slice(3), rate_limit: null } })
+        });
+        const session = connect();
+        const keyA = connect();
+        const keyB = connect();
+        const keyAAgain = connect();
+        await session.authenticate("ada");
+        await keyA.authenticate("rk_a");
+        await keyB.authenticate("rk_b");
+        await keyAAgain.authenticate("rk_a");
+
+        expect(session.last().type).toBe("AUTH_SUCCESS");
+        expect(keyA.last().type).toBe("AUTH_SUCCESS");
+        expect(keyB.last().type).toBe("AUTH_SUCCESS");
+        expect(keyAAgain.last()).toMatchObject({ type: "ERROR", payload: { error: { code: "TOO_MANY_SOCKETS" } } });
+    });
+
+    it("counts an impersonating admin's sockets against the admin, not the user they act as", async () => {
+        // The administrator holds the credential: their impersonating sockets
+        // are their traffic, as their rate-limit bucket already says. Counted
+        // against the user, an admin checking on someone used up that user's
+        // place — and could open any number of sockets by spreading them
+        // over users.
+        start({ maxSocketsPerUser: 2 });
+        const ada = connect();
+        const own = connect();
+        const asAda = connect();
+        const asBob = connect();
+        await ada.authenticate("ada");
+        await own.authenticate("root");
+        await asAda.authenticate("root", "ada");
+        await asBob.authenticate("root", "bob");
+
+        expect(ada.last().type).toBe("AUTH_SUCCESS");
+        expect(own.last().type).toBe("AUTH_SUCCESS");
+        expect(asAda.last().type).toBe("AUTH_SUCCESS");
+        // The admin's third socket, whoever it acts as.
+        expect(asBob.last()).toMatchObject({ type: "ERROR", payload: { error: { code: "TOO_MANY_SOCKETS" } } });
+
+        // Ada's own place was not spent by the admin acting as her.
+        const adaAgain = connect();
+        await adaAgain.authenticate("ada");
+        expect(adaAgain.last().type).toBe("AUTH_SUCCESS");
     });
 
     it("unset, there is no ceiling", async () => {

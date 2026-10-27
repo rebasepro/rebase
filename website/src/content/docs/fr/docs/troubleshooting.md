@@ -1,5 +1,5 @@
 ---
-sourceHash: 648de86871ab3d3d
+sourceHash: fdbf8e3627811576
 slug: fr/docs/troubleshooting
 title: Dépannage
 description: Les pannes qui empêchent un backend Rebase de démarrer ou de répondre — base de données inaccessible, identifiants incorrects, extension manquante, refus RLS, dérive de schéma, port occupé, fonction qui ne se charge pas — et à quoi ressemble chacune d'entre elles.
@@ -204,10 +204,11 @@ il n'y a pas de nouvelle tentative : le port configuré est le port imposé, et
 ## Le backend a planté et `rebase dev` a continué de tourner
 
 Un backend qui lève une erreur au démarrage n'arrête pas le watcher — il affiche
-la pile d'exécution et attend une modification de fichier. `rebase dev` indique ceci :
+la pile d'exécution et attend une modification de fichier. Lorsque le backend ne s'est pas annoncé
+dans le délai `REBASE_DEV_READY_TIMEOUT_MS` (30 secondes par défaut), `rebase dev` indique ceci :
 
 ```
-  ✗ The backend crashed on startup.
+  ✗ The backend has not started after 30s.
     Fix the error above; the watcher restarts it on the next change.
 ```
 

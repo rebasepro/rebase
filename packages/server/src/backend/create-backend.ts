@@ -29,6 +29,7 @@ import {
     CollectionConfig,
     HealthCheckResult,
     InitializedDriver,
+    isSchemaEditingAdmin,
     isSQLAdmin,
     MountableRouter,
     RealtimeProvider,
@@ -61,6 +62,8 @@ import {
     type ProvisionTarget,
     provisionCollectionPolicies,
     provisionCollectionTables,
+    PROVISIONING_OFF_NOTICE,
+    PROVISIONING_OFF_SKIP_REASON,
     verifyProvisioningConnection
 } from "../boot/provision";
 import { enforceSchemaStamp, resolveSchemaMismatchPolicy } from "../boot/schema-stamp";
@@ -74,6 +77,7 @@ import { reportSimulatedContext } from "../auth/simulation";
 import { createAdapterAuthMiddleware } from "../auth/adapter-middleware";
 import { scopeDataDriver, SERVICE_IDENTITY } from "../auth/rls-scope";
 import { createBuiltinAuthAdapter } from "../auth/builtin-auth-adapter";
+import { withBackendServiceKey } from "../auth/adapter-service-key";
 import { ApiError, errorHandler } from "../api/errors";
 import { createSchemaDriftDetector } from "../api/schema-drift";
 import { installRootErrorHandler, installUnmatchedApiEnvelope } from "../api/root-error-handler";
@@ -98,6 +102,7 @@ import {
 } from "../schema-edit/project-root";
 import { createGitHubRepository } from "../schema-edit/github-repository";
 import { rewriteRemoteCollection } from "../schema-edit/remote-source";
+import { refuseWhenRepositoryIsAhead } from "../schema-edit/deployed-schema-guard";
 import { editCollectionSource, writeLocalCollectionSource } from "../schema-edit/local-source";
 import type { SchemaSourceEditor } from "../schema-edit/source-editor";
 import { createLocalGitRepository, findRepositoryRoot } from "../schema-edit/local-git-repository";
@@ -117,6 +122,12 @@ import { createJwtService, DEFAULT_REFRESH_EXPIRES_IN, processJwtService, type J
 import { createJwksRoutes } from "../auth/jwks-routes";
 import { readRuntimeVersion } from "../boot/version-skew";
 import { createStorageMaintenanceRoutes } from "../storage/maintenance-routes";
+import {
+    createOrphanScanService,
+    STORAGE_ORPHANS_TASK,
+    type OrphanScanService,
+    type OrphanScanTaskPayload
+} from "../storage/orphan-scans";
 import { supportsRlsScoping } from "../auth/rls-scope";
 import { createOAuthStore, type OAuthStore } from "../mcp/oauth-store";
 import { createOAuthRoutes, grantIdentityFromRepository } from "../mcp/oauth-routes";
@@ -153,7 +164,7 @@ import { createHistoryRoutes } from "../history";
 import type { HistoryService } from "../history/history-routes";
 import type { EmailService } from "../email";
 import { createEmailService, createUnconfiguredEmailService } from "../email";
-import { activeDevEmailSink } from "../email/dev-sink";
+import { activeDevEmailSink, devEmailSinkFor } from "../email/dev-sink";
 import type { OAuthProvider } from "../auth/interfaces";
 import { isAuthAdapter, resolveRequireAuth } from "../auth/require-auth";
 import {
@@ -485,6 +496,13 @@ interface ResolvedProvision {
     database: boolean;
     collections: boolean;
     realtime: boolean;
+    /**
+     * `provision: false`: this backend changes nothing in its database. Kept
+     * apart from the three above because the reason a step is skipped differs
+     * — "nothing here changes the database" rather than "another process in
+     * this deployment provisions" — and the boot log has to say the right one.
+     */
+    off: boolean;
 }
 
 function resolveProvision(provision: boolean | ProvisionOptions | undefined): ResolvedProvision {
@@ -497,12 +515,13 @@ function resolveProvision(provision: boolean | ProvisionOptions | undefined): Re
         );
     }
     if (typeof provision === "boolean") {
-        return { database: provision, collections: provision, realtime: provision };
+        return { database: provision, collections: provision, realtime: provision, off: !provision };
     }
     return {
         database: true,
         collections: provision.collections ?? true,
-        realtime: provision.realtime ?? true
+        realtime: provision.realtime ?? true,
+        off: false
     };
 }
 
@@ -521,6 +540,12 @@ function resolveProvision(provision: boolean | ProvisionOptions | undefined): Re
  * its backend. The one process-wide setting it touches is the log level, and
  * only when `logging.level` is given: the logger is the process's.
  *
+ * What it reads process-wide is the resource graph: the `database()`,
+ * `bucket()`, `topic()` and `queue()` declarations are module-level values,
+ * and every backend in the process sees all of them. So a process holds one
+ * project's resources — several backends of that project are fine, two
+ * projects declaring different resources are not.
+ *
  * What the build logs at info is written when the backend first serves — see
  * `boot-announcements.ts` — so a script that builds one and never mounts it
  * prints nothing of the boot's on its stdout.
@@ -538,8 +563,20 @@ export async function createRebaseBackend(options: RebaseBackendOptions): Promis
 }
 
 async function buildRebaseBackend(options: RebaseBackendOptions, announcements: BootAnnouncements): Promise<RebaseBackend> {
-    const config = options;
+    // A copy, down to the auth config, because the build fills in what the
+    // caller left out — the users collection it discovers, for one — and the
+    // options are the caller's. Written back, a second backend built from the
+    // same `auth` object bootstrapped auth against the first one's users
+    // collection. An adapter is an instance and is passed as it is.
+    const config: RebaseBackendOptions = {
+        ...options,
+        auth: options.auth && !isAuthAdapter(options.auth) ? { ...options.auth } : options.auth
+    };
     const provision = resolveProvision(config.provision);
+    if (provision.off) logger.info(PROVISIONING_OFF_NOTICE);
+    // Why a provisioning step does not run, when it does not — the same words
+    // in every step's line, so the log reads as one decision.
+    const provisionSkipReason = provision.off ? PROVISIONING_OFF_SKIP_REASON : undefined;
 
     // One level system, and the process's: every line any backend in this
     // process writes goes through the one logger, so the level is set only
@@ -728,7 +765,8 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
 
     let schemaOutcome = await provisionCollectionTables(provisionable, provisionTarget, {
         introspecting: introspectCollections,
-        provision: provision.collections
+        provision: provision.collections,
+        skipReason: provisionSkipReason
     });
     for (const target of provisionTargets.slice(1)) {
         const mine = provisionableBy.get(target) ?? [];
@@ -740,7 +778,8 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
         await verifyProvisioningConnection(target);
         const outcome = await provisionCollectionTables(mine, target, {
             introspecting: introspectCollections,
-            provision: provision.collections
+            provision: provision.collections,
+            skipReason: provisionSkipReason
         });
         if (outcome.status === "applied" && schemaOutcome.status === "applied") {
             schemaOutcome = { status: "applied", applied: schemaOutcome.applied + outcome.applied };
@@ -1042,7 +1081,8 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
     // to an empty result.
     const policyOutcome = await provisionCollectionPolicies(provisionable, provisionTarget, {
         introspecting: introspectCollections,
-        provision: provision.collections
+        provision: provision.collections,
+        skipReason: provisionSkipReason
     });
     for (const target of provisionTargets.slice(1)) {
         const mine = provisionableBy.get(target) ?? [];
@@ -1056,7 +1096,8 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
         }
         await provisionCollectionPolicies(mine, target, {
             introspecting: introspectCollections,
-            provision: provision.collections
+            provision: provision.collections,
+            skipReason: provisionSkipReason
         });
     }
 
@@ -1143,6 +1184,18 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
     // Resolved BEFORE route mounting so every admin surface — including the
     // adapter-created admin routes, whose middleware captures the key at
     // creation time — gates on the same key.
+    //
+    // Not for a process that forwards its functions to another one: its own
+    // `rebase.functions.invoke(...)` crosses to that process carrying this
+    // key, and a per-boot key is one the other process never heard of — every
+    // call from a hook or a cron job answered 401 "Invalid or expired token".
+    if (config.functionsUpstream && !surfaces.functions && !serviceKey) {
+        throw new Error(
+            "REBASE_FUNCTIONS_UPSTREAM is set but REBASE_SERVICE_KEY is not. This process's own " +
+            "rebase.functions calls reach the functions process with the service key, so set REBASE_SERVICE_KEY " +
+            "to the same value on this process and on the functions process."
+        );
+    }
     const internalServiceKey = serviceKey || randomBytes(48).toString("base64");
     if (!serviceKey) {
         logger.info("No REBASE_SERVICE_KEY configured. Generated internal per-boot key for singleton control-plane APIs.");
@@ -1150,9 +1203,11 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
 
     // For user-provided AuthAdapters (the built-in one receives the key at
     // creation below): expose the internal key so the adapter and the
-    // websocket auth path recognize the singleton's control-plane requests.
+    // websocket auth path recognize the singleton's control-plane requests —
+    // on this backend's own view of the adapter, never written onto the
+    // caller's instance, which another backend may share.
     if (authAdapter && !authAdapter.serviceKey) {
-        authAdapter.serviceKey = internalServiceKey;
+        authAdapter = withBackendServiceKey(authAdapter, internalServiceKey);
     }
 
     // ─── API Key Store Bootstrap ──────────────────────────────────────────
@@ -1160,10 +1215,14 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
     // front of every admin surface (Hono runs middleware in registration order
     // — a `use()` after `route()` would never fire for that router).
     let apiKeyStore: ApiKeyStore | undefined;
-    const apiKeyStoreResult = createApiKeyStore(defaultDriver);
+    const apiKeyStoreResult = createApiKeyStore(defaultDriver, { provision: provision.database });
     if (apiKeyStoreResult) {
         apiKeyStore = apiKeyStoreResult;
-        if (provision.database) await apiKeyStore.ensureTable();
+        // Every backend runs this, one that provisions nothing included: built
+        // with `provision: false` the store creates nothing and only reads, so
+        // a table that is missing is named here at boot rather than met as a
+        // 500 on the first request that carries a key.
+        await apiKeyStore.ensureTable();
         logger.debug("Service API Keys initialized");
     }
 
@@ -1299,7 +1358,7 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
             // `undefined` when the driver has no SQL admin — it warns and we
             // fall back, rather than refusing to serve on a Mongo deployment
             // that asked for something Mongo cannot give.
-            ? createSqlRateLimitStore(defaultDriver)
+            ? createSqlRateLimitStore(defaultDriver, { provision: provision.database })
             : undefined
     );
     const rateLimitStore = sharedRateLimitStore ?? new MemoryRateLimitStore(rateLimitWindowMs);
@@ -1505,7 +1564,11 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
             if (authRoutes) adapterAuthRouter = adapterRouter(authRoutes, "Auth");
         }
 
-        if (authAdapter && authAdapter.createAdminRoutes && surfaces.admin) {
+        // Built whether or not the admin surface is served: on a role that
+        // turns it off (a `worker`), the in-process client's `rebase.admin`
+        // still reaches them — see `inProcessAdmin` below. Building a router
+        // loads no user code and opens nothing.
+        if (authAdapter && authAdapter.createAdminRoutes) {
             const adminRoutes = authAdapter.createAdminRoutes();
             if (adminRoutes) adapterAdminRouter = adapterRouter(adminRoutes, "Admin");
         }
@@ -1530,7 +1593,14 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
         // Awaited, so the account exists before the server accepts a request.
         // A write, so only a backend allowed to change the database makes it.
         // See ./auth/seed-admin.
-        if (provision.database) await seedInitialAdmin(authAdapter?.userManagement);
+        if (provision.database) {
+            await seedInitialAdmin(authAdapter?.userManagement);
+        } else if (process.env.REBASE_ADMIN_EMAIL?.trim()) {
+            logger.info(
+                "REBASE_ADMIN_EMAIL is set, but this backend changes nothing in its database, so no admin " +
+                "account is seeded here. The provisioning run seeds it."
+            );
+        }
     }
     // Settled now — the app's own adapter, or the built-in one just made — so
     // a session is judged the same way at every door, `verifyCredential`
@@ -1579,7 +1649,7 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
                 "Every MCP call must run under the caller's own row-level security; a driver without " +
                 "`withAuth()` would run them as the database owner instead.");
         } else {
-            const store = createOAuthStore(driver);
+            const store = createOAuthStore(driver, { provision: provision.database });
             if (!store) {
                 logger.error("[mcp] Surface enabled but the driver cannot persist OAuth state — not mounting.");
             } else {
@@ -1589,15 +1659,14 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
                 // switched on `mcp` should get a server that runs everything
                 // else and one loud line explaining what did not mount, not a
                 // process that refuses to start. A backend that provisions
-                // nothing leaves the tables to whoever does.
+                // nothing creates nothing here, and is told by the same check
+                // whether the tables it needs are there.
                 let ready = true;
-                if (provision.database) {
-                    try {
-                        await store.ensureTables();
-                    } catch (error) {
-                        ready = false;
-                        logger.error("[mcp] Could not prepare the OAuth tables — not mounting.", { error });
-                    }
+                try {
+                    await store.ensureTables();
+                } catch (error) {
+                    ready = false;
+                    logger.error("[mcp] Could not prepare the OAuth tables — not mounting.", { error });
                 }
                 if (ready) mcpReady = { store, publicUrl };
             }
@@ -1614,9 +1683,14 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
         const { store, publicUrl } = mcpReady;
         const mcpPath = "/mcp";
         const oauthBasePath = `${basePath}/oauth`;
+        // The repository the admin gate re-reads from, so a grant answers to
+        // the same revocation, roles and account a session does — at consent,
+        // every refresh, and every `/mcp` request.
+        const identity = grantIdentityFromRepository(adminIdentityRepo);
         const mcpConfig = {
             // Tokens this backend's OAuth server minted, with its own key.
             jwt,
+            identity,
             publicUrl,
             mcpPath,
             oauthBasePath,
@@ -1645,8 +1719,14 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
         };
 
         app.route("/", createMcpWellKnownRoutes(mcpConfig));
-        app.route(mcpPath, createMcpRoutes(mcpConfig));
-        app.route(oauthBasePath, createOAuthRoutes({
+        // Through `group()`, like every other door into this backend's data:
+        // its services on the request, and the request run in its scope, so a
+        // hook a tool call reaches sees this backend as `rebase`. Mounted bare,
+        // it saw the process default — another backend's database — or threw.
+        // The `.well-known` documents above read nothing and stay bare: at
+        // the origin, a group's `/*` middleware would wrap every path there is.
+        app.route(mcpPath, group(createMcpRoutes(mcpConfig)));
+        app.route(oauthBasePath, group(createOAuthRoutes({
             store,
             jwt,
             publicUrl,
@@ -1658,11 +1738,8 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
             // issue IDs itself — with any spelling of no; `!== "false"` left it
             // open on `=0`.
             allowDynamicRegistration: parseEnvBoolean(process.env.REBASE_MCP_OPEN_REGISTRATION) !== false,
-            // The repository the admin gate re-reads from, so a grant answers
-            // to the same revocation, roles and account a session does — at
-            // consent and every refresh.
-            identity: grantIdentityFromRepository(adminIdentityRepo)
-        }));
+            identity
+        })));
 
         if (announce) logger.info(`MCP endpoint mounted at ${publicUrl}${mcpPath} (OAuth at ${oauthBasePath})`);
     };
@@ -1983,13 +2060,6 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
                 ? await findRepositoryRoot(collectionsDir)
                 : undefined;
             const liveSchemaRouter = new Hono<HonoEnv>();
-            // A commit to the remote repository that this process is not
-            // running yet. The generated schema files in a commit are built
-            // from the collections this process serves, and a remote commit
-            // does not change those until it is deployed — so a second change
-            // before then would commit generated files that leave the first
-            // one out. Set only once a commit has landed.
-            let undeployedCommit: string | undefined;
             // `apply` additionally needs `schema:write` — checked on its route.
             applyAdminGate(liveSchemaRouter, "Live schema editing", "schema:read");
             liveSchemaRouter.use("/*", sayEditorNeedsTsMorph);
@@ -2028,6 +2098,17 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
                 // With a repository the source-only editor's reasons do not
                 // apply — that path never uses it — so only its own does.
                 sourceEditingOff: remoteRepo ? remoteEditingOff : schemaEditorOff,
+                // A backend that provisions nothing does not change its schema
+                // from the panel either: the change is committed as source and
+                // reaches the database through whatever applies the rest.
+                databaseChangesOff: provision.off
+                    ? {
+                        code: "SCHEMA_EDITING_PROVISIONING_OFF",
+                        message: "This deployment changes nothing in its database (provisioning is off), so a " +
+                            "change cannot be applied from here. Commit it as source only, and let the process " +
+                            "that changes this database apply it."
+                    }
+                    : undefined,
                 // Only answerable for a project on this machine. A deployment
                 // committing to a remote repository is a built bundle, which is
                 // provisioned by boot-ensure rather than by replaying
@@ -2060,14 +2141,7 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
                             branch: remoteRepo.branch ?? "main",
                             author
                         });
-                        return {
-                            ...repository,
-                            commit: async (paths, message) => {
-                                const sha = await repository.commit(paths, message);
-                                undeployedCommit = sha;
-                                return sha;
-                            }
-                        };
+                        return repository;
                     }
                     if (!repositoryRoot) return undefined;
                     return createLocalGitRepository({ root: repositoryRoot, author });
@@ -2092,24 +2166,30 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
                         // keeping a collection file's imports, comments and
                         // formatting for the remote case would be a second
                         // thing to get wrong.
-                        if (undeployedCommit) {
-                            throw new Error(
-                                `This deployment already committed a schema change (${undeployedCommit.slice(0, 9)}) ` +
-                                "that it is not running yet. Deploy that commit, then make the next change: " +
-                                "until then a change here is planned against the collections this deployment " +
-                                "runs, and its generated schema files would leave the first change out. " +
-                                "Nothing was changed."
-                            );
+                        const repository = createGitHubRepository({
+                            auth: remoteRepo.auth,
+                            owner: remoteRepo.owner,
+                            repo: remoteRepo.repo,
+                            branch: remoteRepo.branch ?? "main"
+                        });
+                        // One undeployed change at a time. The commit's
+                        // generated files are rendered from the collections
+                        // this deployment serves, so a change committed and
+                        // not yet running here — by this process, a replica,
+                        // a process before a restart, or a developer — would
+                        // be left out of them. Read from the repository on
+                        // every apply rather than remembered, because memory
+                        // is exactly what a restart or a second replica lacks.
+                        const admin = defaultDriver.admin;
+                        if (isSchemaEditingAdmin(admin)) {
+                            const served = collectionRegistry.getRawCollections();
+                            const generated = await admin.planSchemaChange(served, served, { paths: commitPaths });
+                            await refuseWhenRepositoryIsAhead(repository, generated.files);
                         }
                         const { AstSchemaEditor } = remoteEditor!;
                         return rewriteRemoteCollection(
                             {
-                                repository: createGitHubRepository({
-                                    auth: remoteRepo.auth,
-                                    owner: remoteRepo.owner,
-                                    repo: remoteRepo.repo,
-                                    branch: remoteRepo.branch ?? "main"
-                                }),
+                                repository,
                                 collectionsPath: remoteRepo.collectionsPath ?? DEFAULT_COLLECTIONS_PATH,
                                 edit: async (dir, collectionId, edit: typeof change) => {
                                     const editor = new AstSchemaEditor(dir);
@@ -2185,6 +2265,8 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
     // and the admin group's storage maintenance surface.
     let storageSurface: Hono<HonoEnv>;
     let storageMaintenanceSurface: Hono<HonoEnv> | undefined;
+    /** The orphan scan's background half, whenever storage is on: the job queue's `storage.orphans` handler. */
+    let orphanScans: OrphanScanService | undefined;
     /** Whether the storage group carries its own upload body limit, in place of the global one. */
     let storageCarriesUploadLimit = false;
 
@@ -2249,19 +2331,33 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
         // source against every row, and copies between sources. Whole-store
         // operations past every storage policy, so admin-only: reading every
         // row is `database:read`, deleting or copying files `database:write`.
+        //
+        // The orphan scan runs in the background: built in every process that
+        // has storage, admin surface or not, because a worker pod (no admin
+        // surface) is what runs its `storage.orphans` jobs.
+        const maintenanceSources = {
+            registry: storageRegistry,
+            controller: storageController,
+            collections: () => collectionRegistry.getRawCollections(),
+            // Unscoped, and read through `scanStoredRows` — past policies
+            // and read hooks alike: a row a policy or a `beforeQuery` hides
+            // from the admin still names its files.
+            driverFor: (collection: CollectionConfig) => {
+                const key = resolveDataSource(collection, dataSourceRegistry).key;
+                return !key || key === DEFAULT_DRIVER_ID ? defaultDriver : driverRegistry.get(key);
+            },
+            globalCallbacks: () => collectionRegistry.getGlobalCallbacks(),
+            // A revert restores what an entry holds: its files are in use.
+            history: historyConfigResult?.historyService,
+            // Read per scan: the queue is built further down. Without one, a
+            // scan runs in the process that was asked.
+            jobs: () => jobQueue
+        };
+        orphanScans = createOrphanScanService(maintenanceSources);
         if (surfaces.admin) {
             const maintenanceRouter = new Hono<HonoEnv>();
             applyAdminGate(maintenanceRouter, "Storage maintenance", { read: "database:read", write: "database:write" });
-            maintenanceRouter.route("/", createStorageMaintenanceRoutes({
-                registry: storageRegistry,
-                controller: storageController,
-                collections: () => collectionRegistry.getRawCollections(),
-                // Unscoped: a row a policy hides from the admin still names its files.
-                driverFor: (collection) => {
-                    const key = resolveDataSource(collection, dataSourceRegistry).key;
-                    return !key || key === DEFAULT_DRIVER_ID ? defaultDriver : driverRegistry.get(key);
-                }
-            }));
+            maintenanceRouter.route("/", createStorageMaintenanceRoutes({ ...maintenanceSources, orphanScans }));
             storageMaintenanceSurface = maintenanceRouter;
         }
 
@@ -2527,7 +2623,10 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
         const restGenerator = new RestApiGenerator(
             serverCollections,
             defaultDriver,
-            authAdapter
+            authAdapter,
+            undefined,
+            undefined,
+            { provision: provision.database }
         );
         dataRouter.route("/", restGenerator.generateRoutes());
 
@@ -2733,13 +2832,36 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
     // Document databases (MongoDB, Firestore) won't have this.
     const driverAdmin = defaultBootstrapper.getAdmin?.(defaultDriverResult);
     if (isSQLAdmin(driverAdmin)) {
+        // `{ database }` names a declared data source — `database("analytics")`
+        // or its key — and the query runs on THAT source's own connection, as
+        // `rebase.dataAsAdmin` does for a collection routed there. It used to be
+        // handed to the default admin as a Postgres database name, which opened
+        // `<default host>/analytics`: "database does not exist" when the source
+        // lives on another server, and the wrong database, silently, wherever
+        // the name resolved anyway (PGlite ignores it).
+        const sqlAdminFor = (key: string): import("@rebasepro/types").SQLAdmin => {
+            if (key === DEFAULT_DRIVER_ID || key === defaultDriverId) return driverAdmin;
+            const source = bootstrappers.find(b => (b.id || b.type) === key);
+            if (!source) {
+                const known = bootstrappers.map(b => `"${b.id || b.type}"`).join(", ");
+                throw new Error(
+                    `rebase.sql: no data source "${key}" is configured on this backend. ` +
+                    `Configured: ${known}. Declare it with database("${key}") in config/resources.ts ` +
+                    "and bind it — `rebase status` shows which variable."
+                );
+            }
+            const result = driverResults.get(source);
+            const admin = result ? source.getAdmin?.(result) : undefined;
+            if (!isSQLAdmin(admin)) {
+                throw new Error(`rebase.sql: data source "${key}" is not a SQL database, so it cannot run raw SQL.`);
+            }
+            return admin;
+        };
         Object.assign(serverClient, {
-            sql: (query: string, sqlOptions?: { database?: import("@rebasepro/types").ResourceRef; role?: string; params?: unknown[] }) =>
-                driverAdmin.executeSql(query, sqlOptions && {
-                    role: sqlOptions.role,
-                    params: sqlOptions.params,
-                    ...(sqlOptions.database !== undefined ? { database: resourceKeyOf(sqlOptions.database) } : {})
-                })
+            sql: async (query: string, sqlOptions?: { database?: import("@rebasepro/types").ResourceRef; role?: string; params?: unknown[] }) => {
+                const admin = sqlOptions?.database !== undefined ? sqlAdminFor(resourceKeyOf(sqlOptions.database)) : driverAdmin;
+                return admin.executeSql(query, sqlOptions && { role: sqlOptions.role, params: sqlOptions.params });
+            }
         });
         logger.debug("SQL capability attached to singleton");
     }
@@ -2759,6 +2881,13 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
     // answer, every cron run and job it executes. Not the process's — that is
     // whichever backend `setDefaultBackend` installed.
     const ownScope: BackendScope = { rebase: serverSingleton };
+    // The refetches a change schedules run on timers armed by whatever
+    // announced it — change capture's LISTEN connection among them, which is
+    // no backend's — so each provider is told which backend it reads for.
+    const runInOwnScope = <T>(fn: () => T): T => runInBackendScope(ownScope, fn);
+    const realtimeProviders = new Set(Object.values(realtimeServices));
+    if (defaultRealtimeService) realtimeProviders.add(defaultRealtimeService);
+    for (const provider of realtimeProviders) provider.setScopeRunner?.(runInOwnScope);
 
     // Retroactively inject the server client into every source's driver so that
     // entity callbacks receive `context.client` at runtime — see
@@ -2902,6 +3031,13 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
 
     // 5a. Or forward them, when another process serves them.
     //
+    // A process that serves no HTTP surface of its own — the `worker` shape —
+    // forwards only its own in-process calls: the upstream is how a cron job's
+    // `rebase.functions.invoke(...)` reaches the functions process, and it
+    // does not turn the worker's port into another door to `/api/functions`.
+    const forwardsFunctionsOnlyInProcess = !surfaces.functions
+        && !surfaces.auth && !surfaces.data && !surfaces.storage && !surfaces.admin && !surfaces.meta;
+    //
     // Mutually exclusive with mounting: a process either serves these routes or
     // hands them on, and a deployment that configured both would have the local
     // copy silently win. The `surfaces.functions` check is what makes that
@@ -2911,7 +3047,9 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
         // No `basePath`: the forwarder asks the upstream for the path it was
         // asked for, wherever the group is mounted.
         functionsSurface = createFunctionsProxy({ upstream: config.functionsUpstream });
-        logger.info("Forwarding custom functions to another process", {
+        logger.info(forwardsFunctionsOnlyInProcess
+            ? "Forwarding this process's own function calls (rebase.functions) to another process"
+            : "Forwarding custom functions to another process", {
             upstream: config.functionsUpstream
         });
     }
@@ -2969,9 +3107,13 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
 
             // Attach database persistence if the driver supports SQL and persistence is enabled
             const admin = defaultBootstrapper.getAdmin?.(defaultDriverResult);
-            const store = (admin && config.cronPersistence !== false) ? createCronStore(defaultDriver) : undefined;
+            const store = (admin && config.cronPersistence !== false)
+                ? createCronStore(defaultDriver, { provision: provision.database })
+                : undefined;
             if (store) {
-                if (provision.database) await store.ensureTable();
+                // Run by a backend that provisions nothing too: it then only
+                // reads, and says which capability each missing table costs.
+                await store.ensureTable();
                 cronScheduler.setStore(store);
             }
         }
@@ -3060,10 +3202,10 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
     let metricsHistory: MetricsHistory | undefined;
     try {
         const { createMetricsHistory } = await import("../metrics/history-recorder.js");
-        metricsHistory = createMetricsHistory(defaultDriver);
-        if (metricsHistory && provision.database) {
-            await metricsHistory.ensure();
-        }
+        metricsHistory = createMetricsHistory(defaultDriver, { provision: provision.database });
+        // Without provisioning this reads the table rather than making it, and
+        // a missing one lands in the catch below like a create that failed.
+        if (metricsHistory) await metricsHistory.ensure();
     } catch (err) {
         // A backend that serves is worth more than one that charts. This is the
         // only subsystem here whose absence costs nothing but a graph.
@@ -3074,10 +3216,13 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
     let jobQueue: JobQueue | undefined;
     if (jobsOptions?.enabled) {
         const { createJobStore, createJobQueue } = await import("../jobs");
-        const store = createJobStore(defaultDriver);
+        const store = createJobStore(defaultDriver, { provision: provision.database });
 
         if (store) {
-            if (provision.database) await store.ensureTable();
+            // Without provisioning this creates nothing and still finds out
+            // whether the queue's enqueue function is there to ride a write's
+            // transaction.
+            await store.ensureTable();
             // Each job runs in this backend's scope, so a handler that imports
             // `rebase`, or publishes to a topic, reaches this backend.
             const tasks = Object.fromEntries(Object.entries(jobsOptions.tasks ?? {}).map(([task, handler]) => [
@@ -3085,6 +3230,13 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
                 (ctx: Parameters<typeof handler>[0]) => runInBackendScope(ownScope, () => handler(ctx))
             ]));
             jobQueue = createJobQueue(store, { ...jobsOptions, tasks });
+            // `rebase storage orphans`: a scan too long for one request runs as
+            // a job, wherever this backend's workers run.
+            if (orphanScans) {
+                const scans = orphanScans;
+                jobQueue.register<OrphanScanTaskPayload>(STORAGE_ORPHANS_TASK, (ctx) =>
+                    runInBackendScope(ownScope, () => scans.runTask(ctx.payload, ctx.signal)));
+            }
             // Topics publish through the queue, in every process — enqueueing is
             // a write, so an api pod that runs no workers still publishes. The
             // handlers only *run* where the workers do, which is the same split
@@ -3232,13 +3384,16 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
 
     // 6b-ii-b. Studio's branch review: a branch's diff, and merging it.
     //
-    // Read and write split by method: `database:read` sees the diff, the
-    // scope listing branches asks; `database:write` merges, the scope creating
-    // one asks.
+    // `database:write` for both. The diff's samples are whole rows of both
+    // databases — `before` values from the main one, every row of a table the
+    // branch dropped, `rebase.users` among them — read as the database owner,
+    // outside row-level security. That is what `database:write` ("Run SQL as
+    // the database owner") already reaches; `database:read` lists databases
+    // and branches and reads no rows.
     if (surfaces.admin) {
         const { createBranchRoutes } = await import("../api/branch-routes");
         const branchRouter = new Hono<HonoEnv>();
-        applyAdminGate(branchRouter, "Branch review", { read: "database:read", write: "database:write" });
+        applyAdminGate(branchRouter, "Branch review", "database:write");
         branchRouter.route("/", createBranchRoutes({ getAdmin: () => defaultDriver.admin }));
         branchSurface = branchRouter;
     }
@@ -3280,8 +3435,16 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
             }
         } as const;
 
+        // The mailbox this backend was given: the sink its own
+        // `auth.email.sendEmail` came from. Only a backend configured with no
+        // mail at all falls back to the process's registered one — one with a
+        // mail server, or a sender of its own, has nothing captured to show,
+        // and the process's mailbox would be another backend's.
+        const ownEmail = config.auth && !isAuthAdapter(config.auth) ? config.auth.email : undefined;
+        const devMailbox = () => ownEmail ? devEmailSinkFor(ownEmail.sendEmail) : activeDevEmailSink();
+
         devMailRouter.get("/", (c) => {
-            const sink = activeDevEmailSink();
+            const sink = devMailbox();
             if (!sink) return c.json(unavailable, 501);
             return c.json({ enabled: true, messages: sink.list() });
         });
@@ -3290,7 +3453,7 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
         // message in. DELETE rather than POST /clear: it removes a collection
         // of things, which is what DELETE means.
         devMailRouter.delete("/", (c) => {
-            const sink = activeDevEmailSink();
+            const sink = devMailbox();
             if (!sink) return c.json(unavailable, 501);
             sink.clear();
             return c.json({ cleared: true });
@@ -3456,10 +3619,20 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
     /**
      * A group: this backend's services on every request first, then a fresh
      * router over `router`'s handlers.
+     *
+     * Each group also answers the impersonation and simulation headers itself,
+     * so one mounted on its own (`backend.routes.storage()` at `/v2/storage`)
+     * keeps the rule `mount()` installs on its base path. A group that does
+     * not run requests as someone else refuses them; the data and functions
+     * groups (`"honoured"`), whose auth middleware applies them, report what a
+     * simulated request ran as. Without this a custom server's storage or
+     * admin group answered `x-rebase-impersonate: <B>` as the administrator
+     * who sent it, under B's label.
      */
-    const group = (router?: Hono<HonoEnv>): Hono<HonoEnv> => {
+    const group = (router?: Hono<HonoEnv>, identitySwap: "refused" | "honoured" = "refused"): Hono<HonoEnv> => {
         const composed = new Hono<HonoEnv>();
         composed.use("/*", provideServices);
+        composed.use("/*", identitySwap === "honoured" ? reportSimulatedContext() : refuseUnhonouredImpersonation([]));
         return router ? composed.route("/", router) : composed;
     };
 
@@ -3487,7 +3660,7 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
         },
         data: () => {
             requireSurface("data");
-            return group(dataSurface);
+            return group(dataSurface, "honoured");
         },
         storage: () => {
             requireSurface("storage");
@@ -3500,7 +3673,7 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
                     "with the functions surface on, or `functionsUpstream` with it off to forward them."
                 );
             }
-            return group(functionsSurface);
+            return group(functionsSurface, "honoured");
         },
         admin: () => {
             requireSurface("admin");
@@ -3614,11 +3787,12 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
         // else, never answered as the administrator who sent it. See
         // `auth/impersonation.ts`.
         app.use(`${basePath}/*`, refuseUnhonouredImpersonation([`${basePath}/data`, `${basePath}/functions`]));
-        // The other end of the RLS simulator: a simulated request's response
-        // names what it ran as and the fields that identity cannot read.
-        app.use(`${basePath}/*`, reportSimulatedContext());
+        // The other end of the RLS simulator — a simulated request's response
+        // naming what it ran as — is installed by the data and functions
+        // groups themselves (see `group`), so it holds wherever they are mounted.
 
         if (surfaces.admin) app.route(`${basePath}/admin`, groups.admin());
+        else if (!announce) mountInProcessAdmin(app, basePath);
         if (surfaces.auth) app.route(`${basePath}/auth`, groups.auth());
 
         // ── JWKS ─────────────────────────────────────────────────────────
@@ -3679,7 +3853,9 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
             });
         }
 
-        if (functionsSurface) {
+        // `announce` is off for the in-process app alone, which carries the
+        // forwarder whatever the process serves on its port.
+        if (functionsSurface && (!announce || !forwardsFunctionsOnlyInProcess)) {
             app.route(`${basePath}/functions`, groups.functions());
             if (announce) logger.debug("Function routes mounted", { path: `${basePath}/functions` });
         }
@@ -3698,6 +3874,24 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
         if (announce) logger.debug("Rebase backend mounted", { basePath });
     };
 
+    // What `rebase.admin` and `rebase.cron` reach in-process on a role that
+    // serves no admin surface — a `worker`, where a cron job runs. The account
+    // administration the auth adapter answers (users, roles, password resets)
+    // and the cron controls, nothing else: those are built from this backend's
+    // own configuration and load no user code, where the rest of the admin
+    // group (backups, the schema editor, logs, SQL export, …) is built only
+    // where it is served. A path outside them answers the named refusal below.
+    // Only the service key this backend minted reaches them: nothing mounts
+    // this on a port.
+    const mountInProcessAdmin = (app: Hono<HonoEnv>, basePath: string): void => {
+        if (adapterAdminRouter) {
+            const adminGroup = group();
+            adminGroup.route("/", adapterAdminRouter);
+            app.route(`${basePath}/admin`, adminGroup);
+        }
+        if (cronSurface && !surfaces.cron) app.route(`${basePath}/admin/cron`, group(cronSurface));
+    };
+
     // The app the in-process client and `fetch` dispatch into: everything,
     // laid out at `IN_PROCESS_BASE_PATH`, built on first use — a backend whose
     // control plane is never called in-process never builds it.
@@ -3706,8 +3900,58 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
         if (!inProcess) {
             inProcess = new Hono<HonoEnv>();
             mountInto(inProcess, IN_PROCESS_BASE_PATH, false);
+            refuseSurfacesOffByName(inProcess);
         }
         return inProcess;
+    };
+
+    // What `backend.rebase.functions`, `.auth` and `.admin` reach on a process
+    // whose role turned their surface off — a `worker` turns off every one.
+    // There is no route to dispatch into, and the generic envelope ("No route
+    // for POST /api/functions/send-digest on this backend.") named no surface,
+    // no role and nothing to do: a cron job moved to a worker, as
+    // docs/deployment/split-processes.md suggests, failed with it every night.
+    // Same status and code; the message says which surface and what instead.
+    const refuseSurfacesOffByName = (app: Hono<HonoEnv>): void => {
+        const elsewhere = "Call it over HTTP on a process that serves it, or run this code on one.";
+        const off: Array<{ path: string; surface: RuntimeSurface; consequence: string; roles: string; remedy: string }> = [];
+        if (!functionsSurface) {
+            off.push({
+                path: "functions", surface: "functions", roles: "REBASE_ROLE=worker and REBASE_ROLE=api",
+                consequence: "rebase.functions has nothing to call in this process",
+                remedy: "Set REBASE_FUNCTIONS_UPSTREAM to the functions process's URL on this process to forward " +
+                    "these calls there, or call the function over HTTP on a process that serves it."
+            });
+        }
+        if (!surfaces.auth) {
+            off.push({
+                path: "auth", surface: "auth", roles: "REBASE_ROLE=worker and REBASE_ROLE=functions",
+                // Every `rebase.auth` call is a person's sign-in flow, behind the
+                // rate limits and bot protection meant for public traffic; the
+                // server's own account work is `rebase.admin`, which answers here.
+                consequence: "rebase.auth has nothing to call in this process",
+                remedy: `For account administration from server code use rebase.admin, which works here. ${elsewhere}`
+            });
+        }
+        if (!surfaces.admin) {
+            off.push({
+                path: "admin", surface: "admin", roles: "REBASE_ROLE=worker and REBASE_ROLE=functions",
+                consequence: adapterAdminRouter || cronSurface
+                    ? "this process carries only the user and role administration (rebase.admin) and the cron controls (rebase.cron) in-process, and this is neither"
+                    : "rebase.admin and rebase.cron have nothing to call in this process",
+                remedy: elsewhere
+            });
+        }
+        for (const { path, surface, consequence, roles, remedy } of off) {
+            app.all(`${IN_PROCESS_BASE_PATH}/${path}/*`, (c) => errorHandler(new ApiError(
+                404,
+                "NOT_FOUND",
+                `No route for ${c.req.method} ${c.req.path} on this backend: its ${surface} surface is off ` +
+                `(${roles} turn it off), so ${consequence}. ${remedy}`,
+                undefined,
+                true
+            ), c));
+        }
     };
 
     // ── Realtime ──────────────────────────────────────────────────────────
@@ -3725,7 +3969,10 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
             throw new Error("attachRealtime(): this backend's websocket is already attached to a server.");
         }
         realtimeAttached = true;
-        await defaultBootstrapper.initializeWebsockets(server, effectiveRealtimeService, defaultDriver, config.auth, authAdapter, {
+        // The adapter as this backend sees it, in the place of the caller's
+        // instance: the socket reads the service key off its auth config.
+        const socketAuthConfig = config.auth && isAuthAdapter(config.auth) ? authAdapter : config.auth;
+        await defaultBootstrapper.initializeWebsockets(server, effectiveRealtimeService, defaultDriver, socketAuthConfig, authAdapter, {
             // The socket is another door into the rows the data router serves,
             // and not under `${basePath}/*` where that router's body limit and
             // rate limiter are registered: it carries both itself — the same
@@ -3742,7 +3989,11 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
             accessModel: access.model,
             // Its own path, so it shares the server with the application's
             // websockets instead of claiming every upgrade on it.
-            path: attachOptions.path ?? realtimeSocketPath(mountedBasePath)
+            path: attachOptions.path ?? realtimeSocketPath(mountedBasePath),
+            // Every connection and frame in this backend's scope, as `group()`
+            // puts every request: a hook a frame reaches sees this backend as
+            // `rebase`, not the process default.
+            runInScope: runInOwnScope
         });
     };
 
@@ -3817,7 +4068,8 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
             authRepo: adminIdentityRepo,
             driver: defaultDriver,
             ownsTimers: ownership.cronScheduler,
-            persistClaims: config.cronPersistence !== false
+            persistClaims: config.cronPersistence !== false,
+            provision: provision.database
         });
 
         // ── History retention ─────────────────────────────────────────────
@@ -3829,7 +4081,8 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
             historyService: historyConfigResult?.historyService,
             driver: defaultDriver,
             ownsTimers: ownership.cronScheduler,
-            persistClaims: config.cronPersistence !== false
+            persistClaims: config.cronPersistence !== false,
+            provision: provision.database
         });
     };
 
@@ -3846,6 +4099,7 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
             authTokenSweep,
             historyRetentionSweep,
             stopMetricsSampler,
+            ownedRateLimitStore: config.rateLimit?.store ? undefined : sharedRateLimitStore,
             realtimeServices,
             closeLongLivedResponses: () => longLivedResponses.abort(),
             emailService

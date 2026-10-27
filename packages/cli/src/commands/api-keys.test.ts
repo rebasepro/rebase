@@ -45,6 +45,7 @@ import {
     apiKeysCommand,
     CREATE_KEY_FLAGS,
     describeFailure,
+    cloudTargetNote,
     resolveBackendAddress,
     describeKey,
     describeScopes,
@@ -594,6 +595,30 @@ describe("resolveBackendAddress", () => {
         process.env.REBASE_BASE_URL = "http://shell.local:9000";
         expect(resolveBackendAddress({ REBASE_BASE_URL: "http://api.local:8080" }, root))
             .toEqual({ url: "http://shell.local:9000", source: "configured" });
+    });
+
+    /** `.rebase/cloud.json`, as `rebase cloud init --claim` writes it. */
+    function writeCloudLink(apiUrl: string): void {
+        fs.mkdirSync(path.join(root, ".rebase"), { recursive: true });
+        fs.writeFileSync(path.join(root, ".rebase", "cloud.json"), JSON.stringify({
+            url: "https://cp.example", projectId: "proj_eph", slug: "todo-x", apiUrl
+        }));
+    }
+
+    it("says so when `.env`'s address is the cloud project `init --claim` linked, not one the developer chose", () => {
+        writeCloudLink("https://todo-x.rebase.website");
+        const address = resolveBackendAddress({ REBASE_BASE_URL: "https://todo-x.rebase.website/" }, root);
+
+        expect(address).toMatchObject({ url: "https://todo-x.rebase.website/", cloudProject: "todo-x" });
+        expect(cloudTargetNote(address)).toContain("REBASE_BASE_URL in .env is the address of cloud project todo-x");
+    });
+
+    it("says nothing when the address was set in the shell, or is not the linked project's", () => {
+        writeCloudLink("https://todo-x.rebase.website");
+        expect(cloudTargetNote(resolveBackendAddress({ REBASE_BASE_URL: "http://api.local:8080" }, root))).toBeUndefined();
+
+        process.env.REBASE_BASE_URL = "https://todo-x.rebase.website";
+        expect(cloudTargetNote(resolveBackendAddress({}, root))).toBeUndefined();
     });
 });
 

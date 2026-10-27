@@ -40,13 +40,13 @@ on screen with every card darker than the sheet it sat on.
 | Raised | `bg-surface-raised` | `#eaecef` | `#212429` | neutral buttons, chips, tiles inside a card, avatars, skeletons |
 | Raised hover | `hover:bg-surface-raised-hover` | `#e1e4e7` | `#292c32` | also badges, disabled slider parts |
 | Lifted | `bg-surface-lifted` | `#ffffff` | `#292c32` | the active segment on a track, a switch thumb |
-| Field | `bg-surface-field` | black 3.5% | white 4% | inputs, search, segmented tracks, kanban columns, neutral alerts |
-| Field hover | `hover:bg-surface-field-hover` | black 5.5% | white 7% | |
+| Field | `bg-surface-field` | black 5% | white 6.5% | inputs, search, segmented tracks, kanban columns, neutral alerts. A field has no edge, so this fill is the whole box |
+| Field hover | `hover:bg-surface-field-hover` | black 7.5% | white 9.5% | |
 | Hover | `hover:bg-surface-hover` | black 4% | white 6% | a transparent row, nav item, menu item, icon button |
 | Active | `bg-surface-active` | black 7% | white 9% | selected or checked item, slider track, drop target |
 | Scrim | `bg-surface-scrim` | black 40% | black 60% | dialog and sheet backdrops |
 | Well | `bg-surface-well` | `#f4f5f7` | `#090a0c` | an inset code well (a query, a log tail, a connection string): the one surface that goes down the ladder, darker than its card on purpose |
-| Hairline | `border-hairline` | black 8% | white 8% | cards on the sheet, fields, dividers |
+| Hairline | `border-hairline` | black 8% | white 8% | cards on the sheet, dividers |
 | Hairline strong | `border-hairline-strong` | black 13% | white 14% | menus, popovers, dialogs, outlined buttons and chips |
 
 ### The two rules
@@ -59,10 +59,14 @@ on screen with every card darker than the sheet it sat on.
    theme already says "this is a control". Fields are grey on both themes for
    the same reason, as an alpha fill that composes over whatever holds it.
 2. **A hairline marks an object, not a region, with one exception.** Cards on
-   the sheet, floating surfaces and fields get a line. Tiles inside a card, rows,
+   the sheet and floating surfaces get a line. Tiles inside a card, rows,
    segmented tracks, buttons and chips do not; the lightness step is their
-   separation. Floating surfaces use `hairline-strong` because they have to
-   read against anything underneath them. The exception is the **sheet edge
+   separation. Fields do not either: a field is a filled box (the FireCMS
+   field), and `surface-field` is set strong enough to be its edge. The mixin
+   keeps a transparent 1px border, so every measured height still holds and an
+   error recolours the border instead of adding one. Floating surfaces use
+   `hairline-strong` because they have to read against anything underneath
+   them. The exception is the **sheet edge
    against the frame**: that step is about 3 L\* on both themes (#090a0c to
    #111316, #eff0f3 to #f8f9fa), under what a dimmed screen renders, so the
    sheet carries a plain hairline in the inset layout. The first pass removed
@@ -180,20 +184,40 @@ underline.
 
 ## Form density
 
-Measured on the product form before this was written: inputs at 48px with 16px
-text, selects at 48px, no edge on any field. The reference sets its inputs at
-32px with 13px text and a 1px edge. Record-form fields are `large` (48px): the
-entity form passes it and the field bindings default to it, so a field nested
-in a map, an array or a table's popup editor is the same height as a top-level
-one. The input and textarea text is `text-sm` (14px, the body size) at every
-size, the field label is 13px medium in the primary ink with a muted 14px type
-icon, and `fieldBackgroundMixin` carries `border-hairline`, so a field is an
-object with an edge on both themes. `medium` (40px) is the toolbar and dialog
-control height; `small` (32px) is for controls inside dense chrome.
+The record form draws the FireCMS field: a filled box with no edge, the label
+inside it. Measured on the product form, every one-line control is the same
+box — 64px plus the field's transparent 1px border, so 66px — with the label
+shrunk into its top edge and a 16px value under it.
 
-0.20.0 took record forms to `small`, the reference's own height. It read as
-cramped against the 48px the forms had had, and they went back to `large`. The
-reference's density stayed where it fits: toolbars, tables, rows and pickers.
+- **Label inside**: text, number, email, URL, multiline, date, switch, single
+  select, and a one-line read-only value. Empty, the label rests in the middle
+  of the box at full size and floats up on focus or a value. The read-only box
+  keeps an outline (`hairline-strong`) and drops the fill: that is what says it
+  cannot be edited.
+- **Label above** (`FieldBlock`, 13px medium in the primary ink with a muted
+  14px type icon): multi-select, whose chips wrap and would read the label as
+  one more chip; uploads, markdown, relations and references; and anything with
+  a custom editor, which the form cannot vouch for. Their box is `large`, 48px.
+- **Their own header**: maps, arrays and blocks.
+
+`labelsInsideControl` (`packages/cms/src/form/label_placement.ts`) is the one
+place that decides. Auto-layout only pairs fields of the same kind on a row,
+so a row never mixes a label inside with a label above.
+
+The description sits under the box, indented to the value (`ml-3.5`, where the
+binding's error line already was), and the property's key shows at the end of
+that line on hover — or, with no description, hangs in the 24px row gap below
+the box. Rows are 24px apart: with no edge on a field, the gap is what keeps two
+rows from reading as one block.
+
+The 16px value is the record form's: a text field without its label (a table
+cell, a dialog, a toolbar) keeps the kit's 14px. `medium` (40px) is the toolbar
+and dialog control height; `small` (32px) is for controls inside dense chrome.
+
+History: 0.20.0 took record forms to `small` (32px, 13px text, a hairline on
+every field), the reference's own height, and labelled every field above. It
+read as cramped against the forms people had had; the height came back first,
+then the FireCMS field.
 
 ## Table and list density
 

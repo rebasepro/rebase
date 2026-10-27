@@ -146,7 +146,7 @@ export function compose(s) {
             swell(fx, t(8), s.beat * 2, { vel: 0.35 });
             if (b.kind === "verb") for (let k = 0; k < 4; k++) snare(perc, t(12 + k), { vel: 0.25 + k * 0.12 });
         }
-        if (b.kind === "premise" && b.last) riser(fx, t(0), s.beat * 4, { vel: 0.7 });
+        if (b.intoFirstVerb) riser(fx, t(0), s.beat * 4, { vel: 0.7 });
         if (b.kind === "claim" && b.last) {
             riser(fx, t(0), s.beat * 4, { vel: 0.9 });
             const hits = [0, 2, 4, 6, 8, 9, 10, 11, 12, 12.5, 13, 13.5, 14, 14.5, 15, 15.5];

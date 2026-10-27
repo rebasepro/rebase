@@ -90,8 +90,9 @@ export type EntityDisplayResolver<
      * admin block invariant in `M`, and a typed collection stops being usable as
      * a collection. Method syntax is bivariant under `strictFunctionTypes`; the
      * sibling callbacks (`EntityAction.onClick`, `AdditionalFieldDelegate.value`)
-     * are all written this way, and `packages/types/__tests__/bivariance` is the
-     * record of finding it out the hard way.
+     * are all written this way. `test/admin_collection.test.ts` ("a typed
+     * collection's admin block is usable as a generic one") fails typecheck the
+     * day one is written as an arrow property.
      */
     resolve(params: EntityDisplayResolverParams<M, USER>): T | undefined | Promise<T | undefined>;
 }["resolve"];

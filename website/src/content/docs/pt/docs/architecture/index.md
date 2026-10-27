@@ -1,5 +1,5 @@
 ---
-sourceHash: 840da8865bd3eab7
+sourceHash: 7f14a487f380e2c9
 title: Visão Geral da Arquitetura
 sidebar_label: Arquitetura
 description: Entenda como o backend, frontend, SDK tipado e banco de dados do Rebase se integram para formar um Backend-as-a-Service completo.
@@ -58,17 +58,17 @@ O `BackendCollectionRegistry` é o índice em tempo de execução de todas as co
 
 A sincronização em tempo real usa o mecanismo nativo de `LISTEN/NOTIFY` do PostgreSQL:
 
-1. Uma mutação de dados acontece (inserção, atualização, exclusão)
-2. O backend emite um `NOTIFY` em um canal
+1. Uma mutação de dados acontece (inserção, atualização, exclusão) — pela API ou por qualquer outra coisa que escreva na tabela: `psql`, um cron, o editor SQL
+2. Um trigger na tabela emite um `NOTIFY` em um canal (onde o trigger não pode ser instalado, o backend o emite, apenas para escritas feitas pela API)
 3. O `RealtimeService` recebe a notificação
 4. Ele transmite a alteração para todos os clientes WebSocket conectados
 5. Os componentes React são renderizados novamente com os novos dados
 
-Para **implantações com múltiplas instâncias** (por exemplo, Cloud Run com múltiplas réplicas), forneça uma `connectionString` no seu PostgresBootstrapper para que todas as réplicas compartilhem a mesma conexão `LISTEN`.
+Para **implantações com múltiplas instâncias** (por exemplo, Cloud Run com múltiplas réplicas), cada réplica mantém a sua própria conexão `LISTEN` com o mesmo banco de dados, de modo que uma alteração chega aos assinantes de todas as réplicas. Atrás de um pooler em modo de transação como o PgBouncer, que não mantém um `LISTEN`, defina `DATABASE_DIRECT_URL` apontando para o próprio banco de dados.
 
 ### Registro de Armazenamento
 
-Assim como os drivers, os backends de armazenamento são registrados em um registro central. Você pode ter vários provedores de armazenamento (local, S3) e rotear diferentes campos de arquivos para diferentes backends usando `storageId`.
+Assim como os drivers, os backends de armazenamento são registrados em um registro central. Você pode ter vários provedores de armazenamento (local, S3) e rotear diferentes campos de arquivos para diferentes backends usando `storage.storageSource`.
 
 ## Mapa de Pacotes
 
@@ -77,14 +77,13 @@ Assim como os drivers, os backends de armazenamento são registrados em um regis
 | `@rebasepro/types` | Interfaces TypeScript para coleções, propriedades, entidades, plugins | Tudo |
 | `@rebasepro/server` | Inicialização do servidor backend, API REST, autenticação, armazenamento, WebSocket | Backend |
 | `@rebasepro/client` | SDK tipado — transporte HTTP, WebSocket, autenticação | Frontend |
-| `@rebasepro/app` | Framework React — Scaffold, controladores, formulários, rotas, hooks | Frontend |
+| `@rebasepro/app` | Framework React — Scaffold, controladores, formulários, rotas, hooks, telas de login, hooks de controlador de autenticação | Frontend |
 | `@rebasepro/ui` | Biblioteca de componentes de UI independente (Tailwind v4 + Radix) | Frontend |
-| `@rebasepro/app` | Telas de login, hooks de controlador de autenticação, gerenciamento de usuários | Frontend |
 | `@rebasepro/studio` | Editor de coleções, console SQL, console JS, editor de RLS, navegador de armazenamento | Frontend |
 | `@rebasepro/cli` | CLI para geração de esquema, migrações de banco de dados, geração de SDK | Ferramentas de desenvolvimento |
 | `@rebasepro/forms` | Gerenciamento leve de estado de formulários em React | Frontend |
 | `@rebasepro/plugin-ai` | Plugin de preenchimento automático de campos com IA | Frontend |
-| `@rebasepro/plugin-data-import-export` | Importação e exportação de CSV/JSON/Excel | Frontend |
+| `@rebasepro/cms` | Views de gerenciamento de conteúdo, formulários e roteamento, incluindo importação e exportação de CSV/JSON/Excel | Frontend |
 | `@rebasepro/inference` | Infere propriedades de coleção a partir de linhas de exemplo (a importação "criar uma coleção a partir de um arquivo" do admin) | Frontend |
 
 ## Fluxo de Dados

@@ -118,8 +118,8 @@ account. That is deliberate: an endpoint that said "no such user" is an account
 enumeration oracle, so do not use the result to tell a person whether they are
 registered — it does not know.
 
-Both need an email service configured on the backend, or they answer 503
-`EMAIL_NOT_CONFIGURED`.
+Sending one needs an email service configured on the backend, or
+`sendMagicLink` answers 503 `EMAIL_NOT_CONFIGURED`.
 
 ## One-Time Codes
 
@@ -350,8 +350,8 @@ unsubscribe();
 |-------|------|
 | `SIGNED_IN` | A sign-in or sign-up completed |
 | `TOKEN_REFRESHED` | The access token was renewed — including the silent renewal that restores a session on page load |
-| `USER_UPDATED` | `updateUser()` changed the profile, or `confirmEmailChange()` moved this account to its new address |
-| `SIGNED_OUT` | A sign-out, or a refresh that failed for good |
+| `USER_UPDATED` | `updateUser()` changed the profile, `linkAnonymous()` made a guest an account, `changeEmail()` started an address change, or `confirmEmailChange()` moved this account to its new address |
+| `SIGNED_OUT` | A sign-out, `revokeAllSessions()`, or a refresh that failed for good |
 
 ## Password Management
 

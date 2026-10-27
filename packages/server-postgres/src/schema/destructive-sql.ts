@@ -30,6 +30,7 @@
  * without Atlas or a database.
  */
 
+import { warnDeprecated } from "@rebasepro/common";
 import type { ExistingConstraint } from "./undeclarable-constraints";
 
 /**
@@ -583,6 +584,29 @@ export function destructiveOptInFlag(args: { "--allow-destructive"?: boolean; "-
     if (args["--allow-destructive"] === true) return "--allow-destructive";
     if (args["--yes"] === true) return "--yes";
     return undefined;
+}
+
+/**
+ * What a destructive push approved by `--yes` says, once per process.
+ *
+ * `--yes` is an alias of `--allow-destructive` on `db push`, and nothing else
+ * spells it that way: on `rebase init` it means "take the defaults", and an
+ * agent passes it by reflex to get past prompts — so one habitual flag
+ * dropped a column ("Proceeding because --yes was passed" → DROP COLUMN). It
+ * keeps working for one release, as the deprecate-before-removing rule asks,
+ * and says what changes next.
+ */
+export const YES_APPROVES_DESTRUCTIVE_DEPRECATION =
+    "`rebase db push --yes` approved a change that destroys data. Next release, --yes will only approve " +
+    "non-destructive pushes; pass --allow-destructive to apply destructive changes.";
+
+/**
+ * Warn — once per process, through `warnDeprecated` — when it was `--yes`, not
+ * `--allow-destructive`, that let destructive statements through.
+ */
+export function warnIfYesApprovedDestructive(optIn: "--allow-destructive" | "--yes" | undefined, destructiveCount: number): void {
+    if (optIn !== "--yes" || destructiveCount === 0) return;
+    warnDeprecated("db push --yes approves destructive changes", YES_APPROVES_DESTRUCTIVE_DEPRECATION);
 }
 
 /**

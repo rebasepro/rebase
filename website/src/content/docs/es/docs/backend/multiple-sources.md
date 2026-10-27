@@ -1,5 +1,5 @@
 ---
-sourceHash: 7f10dbaa07451bc9
+sourceHash: 19a82f97d9b01fc0
 title: Múltiples bases de datos y buckets
 sidebar_label: Múltiples orígenes
 description: Enrute colecciones a diferentes bases de datos y propiedades a diferentes buckets de almacenamiento, y configure cada uno desde el entorno.
@@ -42,9 +42,8 @@ signups.subscription("send-welcome", async (event) => {
 });
 ```
 
-`queue()` es nuevo. `database()`, `bucket()` y `topic()`
-se pueden declarar desde la versión 0.17, por lo que un proyecto en la versión publicada declara
-esos tres y accede al trabajo en segundo plano a través de `jobs.tasks` en su lugar.
+`database()`, `bucket()` y `topic()` se pueden declarar desde la versión 0.17, y
+`queue()` desde la versión 0.18.
 
 Luego, apunte una colección a uno de ellos, por handle —el mismo nombre, escrito una sola vez:
 
@@ -69,7 +68,7 @@ import { media } from "../resources";
 coverImage: {
     name: "Cover image",
     type: "string",
-    storage: { storageSource: media, acceptedFiles: ["image/*"] }
+    storage: { storagePath: "covers", storageSource: media, acceptedFiles: ["image/*"] }
 }
 ```
 
@@ -93,6 +92,13 @@ export default defineFunction((app, { rebase }) => {
     });
 });
 ```
+
+`{ database: analytics }` ejecuta la consulta en la conexión propia de ese origen
+—a lo que apunte `DATABASE_URL__ANALYTICS`, en el servidor que sea— y ninguna
+opción la ejecuta en el predeterminado. Una clave que no nombra ningún origen
+configurado se rechaza con un error que enumera los que hay. Hasta la 0.25.1 la
+clave se leía como el nombre de una base de datos en el servidor del origen
+predeterminado.
 
 ### Ver lo que ha declarado
 
@@ -230,7 +236,7 @@ El motor proviene de la declaración, por lo que no hay ningún `STORAGE_TYPE` q
 Una propiedad de almacenamiento que no especifica ningún `storageSource` escribe en el bucket
 **predeterminado**. Declarar buckets con nombre nunca lo mueve. El bucket predeterminado
 conserva su propia configuración, sea lo que sea lo que declare `config/resources.ts`:
-`STORAGE_TYPE`, `STORAGE_PATH` (`./uploads` si no está definida) y las variables `S3_*` /
+`STORAGE_TYPE`, `STORAGE_PATH` (`<project>/uploads` si no está definida) y las variables `S3_*` /
 `GCS_*` sin sufijo. Añadir `bucket("media", { engine: "s3" })` a un proyecto que ya tiene
 archivos en `./uploads` los deja donde están y se siguen sirviendo. `media` lee sus propias
 variables `__MEDIA` y, en desarrollo, hace de sustituto como su propio directorio,
@@ -297,8 +303,8 @@ await signups.publish({ userId });
 ```
 
 Una cola es la otra variante de trabajo en segundo plano: una lista de trabajo con **un solo
-manejador**, donde el emisor conserva el id del trabajo. Las colas son nuevas
- —los topics se introdujeron en la versión 0.17.
+manejador**, donde el emisor conserva el id del trabajo. Las colas se introdujeron en la
+versión 0.18, los topics en la 0.17.
 
 ```ts
 export const thumbnails = queue<{ key: string }>("thumbnails");
@@ -379,8 +385,8 @@ export const storageAuthorize: StorageAuthorize = async ({ key, user, operation 
 
 Existen dos vías de escape por variables de entorno para los casos en que ese sea realmente el modelo:
 
-- `STORAGE_PUBLIC_READ=true` — el bucket es una CDN pública de solo lectura. Las operaciones de escritura,
-  eliminación y listado siguen requiriendo autenticación.
+- `STORAGE_PUBLIC_READ=true` — el bucket es una CDN pública de solo lectura. Sin un hook
+  `storageAuthorize`, las escrituras, eliminaciones y el listado son solo para administradores.
 - `STORAGE_ALLOW_ANY_AUTHENTICATED=true` — se confía en todo usuario autenticado para
   cualquier archivo. Defendible para una aplicación de un solo inquilino (single-tenant), nunca para una multi-tenant.
 

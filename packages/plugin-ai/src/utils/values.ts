@@ -43,15 +43,17 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
 }
 
 /**
- * Drop the values of properties the panel will not let anyone edit.
+ * Keep only the values the service may see: those of properties the property
+ * map declares and does not lock.
  *
- * A `readOnly` or `disabled` property is already excluded from what the service
- * may fill, but the values map was built from the whole record, and the prompt
- * includes every value it is given as context. So a field marked read-only
- * because a backend hook owns it — an internal note, a customer id — was still
- * being transmitted and pasted into the prompt. The collection config lives
- * here, so this is the honest place to decide it: disabled means neither
- * fillable nor context.
+ * An allow-list, because the claim is one. A `readOnly` or `disabled` property
+ * is excluded from what the service may fill, and its value must not travel as
+ * context either — a field marked read-only because a backend hook owns it (an
+ * internal note, a customer id) was being pasted into the prompt. This used to
+ * be a deny-list over the map, which can only drop what the map describes: a
+ * property with `dynamicProps` (the serializer cannot resolve it, so it never
+ * reached the map, `admin.readOnly` and all) and any column that is no declared
+ * property went out by default.
  *
  * Prefixes match too: a disabled map takes its children with it.
  */
@@ -59,15 +61,8 @@ export function omitDisabledValues(
     values: Record<string, unknown>,
     properties: Record<string, InputProperty>
 ): Record<string, unknown> {
-    const disabled = Object.entries(properties ?? {})
-        // A property map can carry a non-object at a path (see the `oneOf`
-        // branch of `getSimplifiedProperty`), and `"disabled" in aString` throws.
-        .filter(([, property]) => property && typeof property === "object" && property.disabled)
-        .map(([key]) => key);
-    if (disabled.length === 0) return values;
     return Object.fromEntries(
-        Object.entries(values).filter(([key]) =>
-            !disabled.some((prefix) => key === prefix || key.startsWith(`${prefix}.`)))
+        Object.entries(values).filter(([key]) => isRequestedSuggestion(key, properties))
     );
 }
 
