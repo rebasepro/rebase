@@ -1,5 +1,5 @@
 ---
-sourceHash: c6f65640f646f804
+sourceHash: 8710aaf2fefe9cfe
 title: Self-Hosting
 sidebar_label: Self-Hosting
 description: Esegui Rebase ovunque con l'immagine di runtime ufficiale e il bundle del tuo progetto — Docker Compose, Fly, Railway o un semplice VPS.
@@ -303,7 +303,7 @@ Espone metriche Prometheus su `/metrics`: conteggio delle richieste e istogrammi
 Ogni risposta include `X-Frame-Options: SAMEORIGIN`, `X-Content-Type-Options: nosniff`, `Referrer-Policy: strict-origin-when-cross-origin` e `Strict-Transport-Security: max-age=15552000` (180 giorni). L'header HSTS omette `includeSubDomains`: includerlo imporrebbe ai browser di rifiutare il traffico HTTP su ogni sottodominio del tuo dominio, compresi quelli non gestiti da questo server, memorizzandolo per l'intera durata specificata.
 Imposta `REBASE_HSTS_INCLUDE_SUBDOMAINS=true` quando tutti i sottodomini sono esclusivamente HTTPS; fino alla versione 0.23 inclusa, l'header conteneva sempre `includeSubDomains`.
 
-`strict-origin-when-cross-origin` è il valore predefinito dei browser stessi: una richiesta verso un altro sito porta la tua origine e mai il percorso o la query della pagina. Non è `no-referrer` perché i controlli sull'origine hanno bisogno dell'origine: il pulsante di accesso con Google la confronta con le origini JavaScript autorizzate del client OAuth e, con `no-referrer`, rispondeva "The given origin is not allowed for the given client ID" su ogni app, qualunque cosa il client consentisse. Una risposta che imposta una propria policy la mantiene (la pagina di consenso MCP invia `no-referrer`); una pagina che ne vuole una più restrittiva può indicarlo con `<meta name="referrer" content="no-referrer">`.
+`strict-origin-when-cross-origin` è il valore predefinito dei browser stessi: una richiesta verso un altro sito porta la tua origine e mai il percorso o la query della pagina. Non è `no-referrer` perché i controlli sull'origine hanno bisogno dell'origine: il pulsante di accesso con Google la confronta con le origini JavaScript autorizzate del client OAuth e, con `no-referrer`, rispondeva "The given origin is not allowed for the given client ID" su ogni app, qualunque cosa il client consentisse. Una risposta che imposta una propria policy la mantiene (la pagina di consenso MCP invia `no-referrer`); una pagina che ne vuole una più restrittiva può indicarlo con `<meta name="referrer" content="no-referrer">`. `X-Frame-Options` funziona allo stesso modo: `SAMEORIGIN`, a meno che la risposta non imposti un proprio valore, come fa la pagina di consenso MCP con `DENY`.
 
 Le applicazioni statiche — l'admin CMS e qualsiasi frontend servito dal bundle — includono anche `Content-Security-Policy: frame-ancestors 'self'; object-src 'none'; base-uri 'self'`. Questa direttiva definisce chi può incorporare l'app in un frame, esclude plugin e vincola `<base>` alla tua origine, senza limitare altro: script inline, worker e accessi tramite terze parti continuano a funzionare regolarmente. Una risposta che imposta una propria policy mantiene la propria. Per criteri più restrittivi, configura la policy sul reverse proxy a monte.
 

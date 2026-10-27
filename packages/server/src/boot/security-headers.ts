@@ -47,17 +47,33 @@ export const STATIC_APP_CSP = "frame-ancestors 'self'; object-src 'none'; base-u
 export const DEFAULT_REFERRER_POLICY = "strict-origin-when-cross-origin";
 
 /**
- * Sends `DEFAULT_REFERRER_POLICY` on every response that does not set its own.
+ * The headers a route may set for itself, and what every other response gets.
  *
- * Its own middleware because `secureHeaders()` overwrites whatever the route
- * set, and some routes set a stricter one on purpose: the MCP consent page sends
- * `no-referrer` so the `client_id` and `state` in its URL go nowhere. A static
- * app that wants the same says so with `<meta name="referrer">`.
+ * `secureHeaders()` overwrites whatever the route set, and some routes set a
+ * stricter value on purpose — the MCP consent page sends `no-referrer`, so the
+ * `client_id` and `state` in its URL go nowhere, and `X-Frame-Options: DENY`,
+ * because a consent screen that can be framed is one an attacker can have
+ * clicked. So these two are sent here instead, and only when the route did not.
  */
-export function defaultReferrerPolicy(): MiddlewareHandler {
+const OVERRIDABLE_DEFAULTS: ReadonlyArray<readonly [name: string, value: string]> = [
+    ["Referrer-Policy", DEFAULT_REFERRER_POLICY],
+    ["X-Frame-Options", "SAMEORIGIN"]
+];
+
+/**
+ * Sends `Referrer-Policy: strict-origin-when-cross-origin` and
+ * `X-Frame-Options: SAMEORIGIN` on every response that does not set its own.
+ *
+ * Use it beside `secureHeaders({ referrerPolicy: false, xFrameOptions: false })`;
+ * left on, those two options overwrite the route's value. A static app that
+ * wants a stricter referrer policy says so with `<meta name="referrer">`.
+ */
+export function overridableSecurityHeaders(): MiddlewareHandler {
     return async (c, next) => {
         await next();
-        if (!c.res.headers.has("Referrer-Policy")) c.header("Referrer-Policy", DEFAULT_REFERRER_POLICY);
+        for (const [name, value] of OVERRIDABLE_DEFAULTS) {
+            if (!c.res.headers.has(name)) c.header(name, value);
+        }
     };
 }
 
@@ -79,9 +95,10 @@ export function runtimeSecureHeaders(options: { hstsIncludeSubDomains: boolean }
         crossOriginResourcePolicy: "cross-origin",
         crossOriginOpenerPolicy: "same-origin-allow-popups",
         strictTransportSecurity: strictTransportSecurity(options.hstsIncludeSubDomains),
-        // Sent by `defaultReferrerPolicy`, which leaves a route's own alone.
-        referrerPolicy: false
+        // Sent by `overridableSecurityHeaders`, which leaves a route's own alone.
+        referrerPolicy: false,
+        xFrameOptions: false
     });
-    const referrerPolicy = defaultReferrerPolicy();
-    return (c, next) => headers(c, async () => { await referrerPolicy(c, next); });
+    const overridable = overridableSecurityHeaders();
+    return (c, next) => headers(c, async () => { await overridable(c, next); });
 }
