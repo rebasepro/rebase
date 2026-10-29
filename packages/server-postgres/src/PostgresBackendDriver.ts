@@ -47,7 +47,7 @@ import {
 } from "@rebasepro/types";
 import { sql as drizzleSql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
-import { DatabaseError, Pool, type PoolClient } from "pg";
+import { Client, DatabaseError, Pool, type PoolClient } from "pg";
 import { sqlRows, applyDefaultValuesOnCreate, buildPropertyCallbacks, hasFieldAccessRules, buildSdkData, callbackRefusal, createAccessorSlugResolver, classifyTable, getTableName, detectJunctionTables, getTenantConfig, requireCallbackClient, requireCallbackCollection, resolveCollectionRelations, resolveTenantWrite, restoresSoftDeletedRow, tenantBypassRoles, toCallbackError, updateDateAutoValues, updateUserAutoValues } from "@rebasepro/common";
 import { PostgresCollectionRegistry } from "./collections/PostgresCollectionRegistry";
 import { deriveRowAddress, getPrimaryKeys, parseIdValues } from "./services/collection-helpers";
@@ -484,6 +484,7 @@ export class PostgresBackendDriver implements DataDriver {
     get admin(): DatabaseAdmin {
         return {
             executeSql: (...args: Parameters<NonNullable<DatabaseAdmin["executeSql"]>>) => this.executeSql(...args),
+            probe: (timeoutMs: number) => this.probe(timeoutMs),
             runSqlScript: (...args: Parameters<NonNullable<DatabaseAdmin["runSqlScript"]>>) => this.runSqlScript(...args),
             openSqlCursor: (...args: Parameters<NonNullable<DatabaseAdmin["openSqlCursor"]>>) => this.openSqlCursor(...args),
             fetchAvailableDatabases: () => this.fetchAvailableDatabases(),
@@ -2612,6 +2613,34 @@ export class PostgresBackendDriver implements DataDriver {
             ? await this.dataService.executeSql(sqlText, options?.params)
             : await this.executeSqlOn(await this.getTargetDb(options?.database), sqlText, options);
         return options?.maxResultBytes === undefined ? rows : refuseOversizedRows(rows, options.maxResultBytes);
+    }
+
+    /**
+     * `SQLAdmin.probe`: `SELECT 1` on a connection opened for it, outside the
+     * pool, so a pool whose connections are all serving slow requests does not
+     * read as a database that is down. Without a pg pool (PGlite) there is no
+     * queue to bypass, and the query runs as any other.
+     */
+    async probe(timeoutMs: number): Promise<void> {
+        const pool = "$client" in this.db ? this.db.$client : undefined;
+        if (!(pool instanceof Pool)) {
+            await this.db.execute(drizzleSql.raw("SELECT 1"));
+            return;
+        }
+        const client = new Client({
+            ...pool.options,
+            connectionTimeoutMillis: timeoutMs,
+            query_timeout: timeoutMs,
+            statement_timeout: timeoutMs
+        });
+        // a probe that times out must not leave an error unhandled on the socket
+        client.on("error", () => {});
+        try {
+            await client.connect();
+            await client.query("SELECT 1");
+        } finally {
+            await client.end().catch(() => {});
+        }
     }
 
     /**

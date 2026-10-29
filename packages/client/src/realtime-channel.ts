@@ -302,6 +302,30 @@ export class RebaseRealtimeChannel {
         if (this.wantsHistory) await this.requestHistory();
     }
 
+    /** Consecutive re-joins asked for by refusals, for the backoff; reset after a quiet minute. */
+    private rejoinAttempts = 0;
+    private rejoinTimer?: ReturnType<typeof setTimeout>;
+    private lastRejoinAt = 0;
+
+    /**
+     * Re-join after the server refused this channel for a reason a retry can
+     * change: it could not check permissions at that moment, or it has no record
+     * of the join (a join that was itself refused, so every broadcast after it
+     * came back "not a member"). The join was fire-and-forget and `joined` was
+     * already set, so nothing else would ever send it again. Backs off 1, 2, 4…
+     * up to 30 seconds, one re-join at a time.
+     */
+    private scheduleRejoin(): void {
+        if (this.rejoinTimer || !this.joined) return;
+        if (Date.now() - this.lastRejoinAt > 60_000) this.rejoinAttempts = 0;
+        const delay = Math.min(30_000, 1000 * 2 ** this.rejoinAttempts++);
+        this.rejoinTimer = setTimeout(() => {
+            this.rejoinTimer = undefined;
+            this.lastRejoinAt = Date.now();
+            if (this.joined) void this.rejoin();
+        }, delay);
+    }
+
     private async rejoin(): Promise<void> {
         try {
             await this.send("join_channel");
@@ -525,6 +549,7 @@ export class RebaseRealtimeChannel {
     /** Leave the channel and release every listener and timer. */
     async leave(): Promise<void> {
         this.stopHeartbeat();
+        if (this.rejoinTimer) { clearTimeout(this.rejoinTimer); this.rejoinTimer = undefined; }
         this.trackedState = null;
         this.presences = {};
         this.presenceHandlers.clear();
@@ -710,6 +735,7 @@ export class RebaseRealtimeChannel {
                 this.emitError(new RebaseApiError(text, {
                     ...(asObject?.code ? { code: asObject.code } : {})
                 }));
+                if (this.joined && rejoinsAfter(asObject?.code, text)) this.scheduleRejoin();
                 break;
             }
         }
@@ -794,4 +820,15 @@ export class RebaseRealtimeChannel {
         const snapshot = { ...this.presences };
         for (const handler of this.presenceHandlers) handler(snapshot, diff);
     }
+}
+
+/**
+ * Whether a channel refusal is one a re-join can recover from: the server's
+ * auth store could not answer (`ROLE_LOOKUP_FAILED`, `DATABASE_UNAVAILABLE`), or
+ * it no longer counts this client a member. A channel the client may not use
+ * (any other `CHANNEL_FORBIDDEN`) is not retried.
+ */
+export function rejoinsAfter(code: string | undefined, message: string): boolean {
+    if (code === "ROLE_LOOKUP_FAILED" || code === "DATABASE_UNAVAILABLE") return true;
+    return code === "CHANNEL_FORBIDDEN" && /not a member/i.test(message);
 }
