@@ -1372,11 +1372,12 @@ and the fix.
 
 ## Upgrading an existing app
 
-Eight hops, newest first. Start at the one above the version you are on and work
+Nine hops, newest first. Start at the one above the version you are on and work
 downwards — or, if you are coming from 0.12, start at the bottom and work up.
 
 | You are on | Read | What it does to you |
 |---|---|---|
+| **0.25** | [0.25 → 0.26](/docs/upgrading/0-25-to-0-26/) | A write naming a multi-hop `via` relation, a role name that is not one role, a local storage page token from before the upgrade and a functions upstream that cannot work are refused. OAuth sign-in settles an unverified account instead of answering `local-account-unverified`, the MCP server no longer sends `REBASE_TOKEN` to the app, and generated types drop the key of an `excludeFromApi` belongsTo. On Rebase Cloud, `rebase cloud webhooks` and `--scale-to-zero true` are retired, and older tokens may need creating again. |
 | **0.24** | [0.24 → 0.25](/docs/upgrading/0-24-to-0-25/) | `?count=` on a REST list becomes the switch for the count behind `meta.total`, so a filter on a column named `count` goes inside `?where=`; the remote MCP's `list_collections` sends its listing only in the text block, without `structuredContent`; and `@rebasepro/app` no longer exports the Spanish translation table `es`. A plain `OPTIONS` to a route with no handler, colliding table names at boot, an upsert on the users collection, `page` with `offset`, an empty string on a required field and an administrator's password that fails the password policy are refused. Sessions last 30 days of inactivity by default, `client.cron` calls `/api/admin/cron`, offline reads that cannot be answered in full fail with `OFFLINE`, and a few internal exports and unused props are gone. |
 | **0.23** | [0.23 → 0.24](/docs/upgrading/0-23-to-0-24/) | The SQL `db push` and `db generate` render moves out of `drizzle/` into the uncommitted `.rebase/sql/`, the `--generate` flag of `rebase dev` is gone because `dev` always regenerates the SDK types, and a live schema edit commits no SQL. Permissions become scopes: admin surfaces ask for a scope rather than the admin role, API keys hold scopes instead of a permission list and an `admin` flag, and `schema-admin` is no longer an administrator. A relative `--collections` is read from where the command runs, an upsert into a trashed row and an update that changes a key are refused, the remote MCP endpoint takes the SDK's arguments, and open realtime sockets, email-verification links, `signUp` and MFA recovery codes change how they treat a session. |
 | **0.21 – 0.22** | [0.21 → 0.23](/docs/upgrading/0-21-to-0-23/) | An API key on a nested path needs `read` on its parents, unreadable numeric variables and session lifetimes refuse to boot, a custom auth repository needs `unlinkUserIdentity`, and guest upgrades take the `register` captcha. 0.22 declares no breaking change, so this is one hop from 0.21. |
@@ -1450,6 +1451,179 @@ packages nor the type system will tell you: the change lives in the database, an
 - [Changelog](/docs/changelog/) — the release notes each of these sections summarises
 - [Compatibility](/docs/compatibility/) — the six contracts, and which ones a version can break
 - [CLI Commands](/docs/cli/) — `rebase doctor` and the commands the checklists run
+
+## Upgrading 0.25 to 0.26
+
+## Upgrading 0.25 → 0.26
+
+These are the `#### Breaking` entries 0.26 carries for an app on 0.25.
+
+Most of them turn a call that used to fail later, or quietly do the wrong thing,
+into a refusal you see straight away: a multi-hop `via` write, a role name that
+is not one role, a page token from before the upgrade, a functions upstream that
+cannot work. Two come from security fixes: the MCP server no longer sends the
+CLI's control-plane token to your app, and an OAuth sign-in settles an
+unverified account instead of refusing it. One is a compile error in generated
+types. The last three are Rebase Cloud: a retired command, a retired dial, and
+tokens created before this release.
+
+---
+
+### 87. A write naming a multi-hop `via` relation is a 400
+
+A create or update that sets a `via` relation whose chain is longer than one
+link is now refused up front with `400 RELATION_NOT_WRITABLE`, naming the field.
+That covers a to-many chain with no single junction table and a to-one chain of
+two or more steps. Before, the first failed inside the transaction as
+`500 RELATION_MISCONFIGURED`. The second was written, by re-pointing the
+target's key at the first step's column, which is rarely what you meant.
+
+Single-hop `via` writes work as before: to-one in one step, and to-many through
+one junction table. The generated SDK now types those, and the admin form
+disables the picker of a multi-hop `via`.
+
+**What to change:** write the link the chain walks through, on the collection
+that owns it, instead of writing the far end of the chain. Read the relation
+through the `via` as before. See
+[via — an explicit join chain](/docs/collections/relations/#via--an-explicit-join-chain).
+
+### 88. Role names with `,` `{` `}` `"` `\` or a control character are refused
+
+Users, the users collection and service keys answer `400 INVALID_ROLE` for a
+role whose name holds a comma, a brace, a double quote, a backslash or a control
+character, and for an empty name. Roles used to be written into a Postgres array
+literal, where `"support,admin"` became two roles, `support` and `admin`; they
+are now stored as bound parameters.
+
+**What to change:** nothing for roles named like identifiers. Look for any other
+name before upgrading, and rename it:
+
+```sql
+SELECT id, roles FROM rebase.users
+WHERE EXISTS (
+  SELECT 1 FROM unnest(roles) r
+  WHERE r = '' OR r ~ '[,{}"\\]' OR r ~ '[[:cntrl:]]'
+);
+```
+
+See [Declaring roles](/docs/backend/roles-and-scopes/#declaring-roles).
+
+### 89. Local storage page tokens from before the upgrade are refused
+
+Listing files on the local storage engine now issues page tokens in a new
+format, starting `n.`. A token issued before the upgrade answers
+`400 INVALID_LIST_OPTIONS`.
+
+**What to change:** nothing for code that pages within one run. A client that
+saved a page token across the upgrade starts that listing over, without the
+token. S3 and GCS tokens are unchanged.
+
+### 90. A functions upstream must be an http(s) URL with the service key
+
+A `REBASE_FUNCTIONS_UPSTREAM` that is not `http://` or `https://`, or one set
+without `REBASE_SERVICE_KEY`, now stops the boot with a message naming the
+variable. Before, the boot succeeded, every forwarded call failed with 502, and
+without the key every in-process `rebase.functions.invoke` answered 401.
+
+**What to change:** in a split deployment, give the `api` process the full URL of
+the functions process and the same `REBASE_SERVICE_KEY` that process has:
+
+```bash
+REBASE_FUNCTIONS_UPSTREAM=http://functions:8080
+REBASE_SERVICE_KEY=<the functions process's key>
+```
+
+A process that serves functions itself sets no upstream. See
+[What each role serves](/docs/deployment/split-processes/#what-each-role-serves).
+
+### 91. OAuth sign-in no longer returns `local-account-unverified`
+
+When a provider has verified the email, signing in with it now verifies the
+matching unverified account instead of refusing it. Before linking, it removes
+the account's password, every identity whose provider did not vouch for the
+address, and every session, as a magic link or email code already did. The
+refusal reasons `local-account-unverified` and
+`local-account-unverified-passwordless` are no longer returned.
+
+A provider that does not assert `email_verified` still gets
+`403 EMAIL_NOT_VERIFIED` (`provider-email-unverified`). A custom user store
+without `unlinkUserIdentity` answers `409 UNVERIFIED_IDENTITIES` and changes
+nothing.
+
+**What to change:** remove any client branch that told the user to verify their
+email first on those two reasons; the sign-in now succeeds. A user who never
+verified their password loses it on their first provider sign-in, and signs in
+with the provider, or resets the password, from then on. See
+[Account linking across sign-in methods](/docs/backend/authentication/#account-linking-across-sign-in-methods).
+
+### 92. The MCP server no longer takes `REBASE_TOKEN` as the app's key
+
+`@rebasepro/mcp` accepted `REBASE_TOKEN` as the app's API key when
+`REBASE_API_TOKEN` was unset. `REBASE_TOKEN` is the CLI's control-plane token,
+the one that can deploy and read secrets, so it reached every backend the MCP
+server called. It is no longer sent to the app. With only `REBASE_TOKEN` set,
+the server says so once on stderr and stops authenticating with the app.
+
+**What to change:** set `REBASE_API_TOKEN` to an API key of the app in the MCP
+server's environment, and keep `REBASE_TOKEN` for the CLI:
+
+```bash
+rebase api-keys create -n mcp --scopes data:read,data:write
+```
+
+`rebase cloud init --claim` writes `REBASE_API_TOKEN` itself. See
+[Giving it a narrow credential instead](/docs/ai/mcp/#giving-it-a-narrow-credential-instead).
+
+### 93. Generated types drop the key of an `excludeFromApi` belongsTo
+
+An `excludeFromApi` `belongsTo` no longer puts its foreign key on the generated
+`Row`, `Insert` or `Update`, matching the API, which never returned or accepted
+it. A `write: []` relation no longer offers its key on writes, and `IncludeFor`
+no longer offers an `excludeFromApi` relation, which the server answers with
+`UNKNOWN_RELATION`.
+
+**What to change:** run `rebase generate-sdk` and build. The compiler finds every
+place that read or wrote the key; those reads were `undefined` and those writes
+were refused. Read or set the column on the server, through `context.data` in a
+callback or `rebase.dataAsAdmin`. See
+[Typed SDK generation](/docs/sdk/#typed-sdk-generation).
+
+### 94. `rebase cloud webhooks` is retired
+
+`rebase cloud webhooks` never delivered anything. Every action now exits 1 with
+code `command_retired`.
+
+**What to change:** remove it from scripts. For alerts about the project, use
+`rebase cloud notifications`. For row changes, register a `WebhookDispatcher` in
+the app's own code.
+
+### 95. `rebase cloud compute set --scale-to-zero true` is refused
+
+The dial never did anything: every backend ran as an always-on instance whatever
+it said. `true` is now refused with a message naming `--replicas` and
+`--autoscale-max`; `false` is ignored with a warning, so scripts that pass it
+keep working.
+
+**What to change:** drop the flag, and size the backend with `--replicas` and
+`--autoscale-max`. See [Compute](/docs/cli/cloud/#compute).
+
+### 96. Cloud tokens created before 0.26 may need creating again
+
+A token made with `rebase cloud tokens create --can deploy`, `--can env` or
+`--can logs` before this release does not cover previews
+(`rebase cloud deploy --preview`). Reading the audit log with a token now needs
+`--can audit`. A token from before `billing` existed keeps billing access for
+one release, and the CLI prints the control plane's deprecation notice once.
+
+**What to change:** create the token again with the capabilities it needs, swap
+it into CI, and revoke the old one:
+
+```bash
+rebase cloud tokens create --can deploy,env,logs
+rebase cloud tokens list
+```
+
+See [Organizations](/docs/cli/cloud/#organizations).
 
 ## Upgrading 0.24 to 0.25
 
@@ -4068,6 +4242,76 @@ yet, listed so that nobody reads a promise into them:
 
 ### [Unreleased]
 
+#### Breaking
+
+##### Server & REST
+
+- **A create or update naming a multi-hop via relation is refused with a 400.**
+  A `via` chain longer than one link (a to-many chain with no single junction
+  table, or a to-one chain of two or more steps) failed inside the transaction
+  as `500 RELATION_MISCONFIGURED`, telling you to run `rebase schema generate`;
+  a two-step to-one chain was written by re-pointing the target's key at the
+  first step's column. Both are now refused up front with
+  `400 RELATION_NOT_WRITABLE`, naming the field. Single-hop `via` writes (to-one
+  in one step, to-many through one junction table) work as before, the generated
+  SDK now types them, and the admin form disables the picker of a multi-hop
+  `via`.
+
+- **Role names with a comma, a brace, a double quote, a backslash or a control
+  character are refused.** Users, the users collection and service keys answer
+  `400 INVALID_ROLE` for one, and for an empty name. Roles are now stored as
+  bound parameters (see Security).
+
+- **Local storage listing page tokens have a new format** (`n.…`). A token
+  issued before the upgrade is refused with `400 INVALID_LIST_OPTIONS`; start
+  the listing over.
+
+- **The functions upstream must be an http(s) URL, and a forwarder needs the
+  service key.** A `REBASE_FUNCTIONS_UPSTREAM` that is not `http://` or
+  `https://`, or one set without `REBASE_SERVICE_KEY`, now stops the boot with
+  a message naming the variable. Before, the boot
+  succeeded, every forwarded call failed with 502, and without the key every
+  in-process `rebase.functions.invoke` answered 401.
+
+- **An OAuth sign-in no longer refuses an unverified account with a provider
+  that verified the email.** The reasons `local-account-unverified` and
+  `local-account-unverified-passwordless` are gone: the sign-in now verifies
+  the matching unverified account, and removes its unproven password,
+  identities and sessions first (see Security). A client that branched on
+  those reasons never sees them again.
+
+##### MCP
+
+- **The MCP server no longer accepts the CLI's control-plane token as the
+  app's API key.** `@rebasepro/mcp` ignores `REBASE_TOKEN` for the app. Set
+  `REBASE_API_TOKEN` for the app; `REBASE_TOKEN` is the CLI's control-plane
+  token and stays the CLI's (see Security). Until you do, the MCP server stops
+  authenticating with the app and says so once on stderr.
+
+##### Client SDK
+
+- **The generated types drop the foreign key of a to-one relation the API
+  closes.** For an `excludeFromApi` `belongsTo`, `Row`, `Insert` and `Update` no
+  longer carry it, and a `write: []` relation no longer offers its key on
+  writes, matching what the server already refused (see Fixed). Code that read
+  or wrote that key stops compiling after `rebase generate-sdk`.
+
+##### CLI & Cloud
+
+- **The cloud webhooks command is retired.** `rebase cloud webhooks` never
+  delivered anything. Every action now exits 1 with code `command_retired` and
+  names `rebase cloud notifications`, and a `WebhookDispatcher` in app code for
+  row changes.
+
+- **Asking a cloud backend to scale to zero is refused.**
+  `rebase cloud compute set --scale-to-zero true` never did anything; use
+  `--replicas` and `--autoscale-max`. `false` is ignored with a warning (see
+  Fixed).
+
+- **Cloud tokens may need creating again.** A `--can deploy`, `--can env` or
+  `--can logs` token created before this release does not cover previews, and
+  reading the audit log with a token now needs `--can audit` (see Added).
+
 #### Added
 
 ##### Studio
@@ -4403,6 +4647,51 @@ yet, listed so that nobody reads a promise into them:
   refused before it leaves the machine, and the key is never printed. A deploy
   to a cluster Rebase does not operate that still uses the shared registry says
   so in its deploy log.
+
+- **`rebase verify` checks a project in one fast, offline pass.** Every
+  collection file loads and passes the boot validator, with unknown keys as
+  errors (a misspelt option, a top-level `widget` instead of `admin.widget`).
+  Every collection declares or inherits `securityRules`, and one with a
+  `user_id`, `owner_id`, `organization_id` or `tenant_id` column does not lean
+  on directory defaults. The migrations still build the declared tables and
+  columns, which `findUnmigratedSchema` from `@rebasepro/server-postgres`
+  reports by replaying the migration files, with no Atlas and no dev database.
+  `--live` also runs the rls-check catalogue against `DATABASE_URL` and checks
+  that every migration is applied. `--json` names each finding's file, config
+  path and fix; `--quiet` prints only problems.
+
+- **Scaffolds ship a Claude Code hook that runs `rebase verify` on every
+  collection edit.** `.claude/settings.json` and
+  `.claude/hooks/post-edit-collection.sh` run `rebase verify --quiet` after an
+  edit under `config/collections/` and hand the findings back to the agent.
+  `rebase skills --hooks` (or `skills install --hooks`) installs the same files
+  into an existing project, merging into a settings file already there.
+
+- **`rebase generate view <slug>` scaffolds a custom admin screen.** It writes
+  `<frontend>/src/views/<Name>View.tsx`, built with `@rebasepro/ui` and wired
+  to `useData`, `useAuthController` and `useSnackbarController`, lists it in
+  `views/index.ts` and, on the first run, passes that list to
+  `<RebaseCMS views>`. With `--collection <slug>` it is an entity view instead,
+  registered in the collection's `admin.entityViews`. An `App.tsx` or a
+  collection it cannot read safely gets the view file and a printed line to add.
+
+- **`rebase cloud init --claim` gives a project a live Rebase Cloud backend with
+  no account.** It provisions the project, links the directory, deploys the
+  collections and prints the live URL, the admin panel URL and a 72-hour claim
+  link. It writes `REBASE_BASE_URL` and `REBASE_API_TOKEN` into `.env`; that
+  key holds `data:read` and `data:write` only and expires with the claim
+  window. The project's own token and claim link stay in
+  `~/.rebase/credentials.json`, never in the repository. With `--no-deploy`, or
+  after a failed first deploy, the next successful `rebase cloud deploy` mints
+  the key. The MCP tool `rebase_cloud_provision` runs the same command.
+
+- **`npx @rebasepro/rls-check --format agent` prints a remediation for each
+  finding.** One JSON document names each finding's check id and failing
+  object, and says whether the fix belongs in SQL or in a collection's
+  `securityRules`. It gives the statements, the placeholders it cannot fill,
+  alternatives and caveats, and the same fix as a
+  `defineCollection({ securityRules: [...] })` snippet, or why rules cannot
+  express it. `--json` is unchanged; `--json` with `--format agent` is refused.
 ##### Client SDK
 
 - **`client.admin.listUsers({ role, ids })` filters by role and resolves a known
@@ -4475,10 +4764,6 @@ yet, listed so that nobody reads a promise into them:
   `rebase db push --yes` warns, once per process, when it approves a destructive
   change. From the next release `--yes` approves only non-destructive pushes;
   pass `--allow-destructive` for the rest.
-- **The cloud webhooks command is retired.** `rebase cloud webhooks` never
-  delivered anything. Every action now exits 1 with code `command_retired` and
-  names `rebase cloud notifications`, and a `WebhookDispatcher` in app code for
-  row changes.
 - **Local commands warn when .env points them at the linked cloud project.**
   `rebase api-keys`, `rebase storage` and `rebase auth reset-password` say so on
   stderr when `.env`'s `REBASE_BASE_URL` is the address of the cloud project
@@ -4491,34 +4776,11 @@ yet, listed so that nobody reads a promise into them:
   and listed.
 ##### Server
 
-- **A create or update naming a multi-hop via relation is refused with a 400.**
-  A `via` chain longer than one link (a to-many chain with no single junction
-  table, or a to-one chain of two or more steps) failed inside the transaction
-  as `500 RELATION_MISCONFIGURED`, telling you to run `rebase schema generate`;
-  a two-step to-one chain was written by re-pointing the target's key at the
-  first step's column. Both are now refused up front with
-  `400 RELATION_NOT_WRITABLE`, naming the field. Single-hop `via` writes (to-one
-  in one step, to-many through one junction table) work as before, the generated
-  SDK now types them, and the admin form disables the picker of a multi-hop
-  `via`.
-- **Role names with a comma, a brace, a double quote, a backslash or a control
-  character are refused.** Users, the users collection and service keys answer
-  `400 INVALID_ROLE` for one, and for an empty name. Roles are now stored as
-  bound parameters (see Security).
-- **Local storage listing page tokens have a new format** (`n.…`). A token
-  issued before the upgrade is refused with `400 INVALID_LIST_OPTIONS`; start
-  the listing over.
 - **The realtime per-user socket ceiling counts each API key's sockets against
   that key,** not against the account that made it
   (`REALTIME_MAX_SOCKETS_PER_USER`).
 - **An impersonating administrator's sockets count against the administrator**
   under `REALTIME_MAX_SOCKETS_PER_USER`, not against the user they act as.
-- **The functions upstream must be an http(s) URL, and a forwarder needs the
-  service key.** A `REBASE_FUNCTIONS_UPSTREAM` that is not `http://` or
-  `https://`, or one set without `REBASE_SERVICE_KEY`, now stops the boot with
-  a message naming the variable. Before, the boot
-  succeeded, every forwarded call failed with 502, and without the key every
-  in-process `rebase.functions.invoke` answered 401.
 - **An application's own `notFound` handler answers unmatched paths under the
   API base path too.** Only Hono's default `404 Not Found` is turned into the
   JSON envelope.
@@ -4656,6 +4918,11 @@ yet, listed so that nobody reads a promise into them:
   routes were dropped, and every route answered 404.
 - **`backend.shutdown()` stops the SQL rate-limit store's sweep timer** when
   the backend created the store itself.
+- **A legacy `auth` schema the boot cannot drop is reported.** The drop
+  matched only an `auth.uid()` that reads `app.uid`, so the one every release
+  before 0.10.0 wrote (reading `app.user_id`) kept the schema, silently. Both
+  bodies now match, and when the schema still stands after the drop, the boot
+  warns and names the objects keeping it.
 ##### CLI
 
 - **A cloud deploy's result lists the project's own host.** The control plane
@@ -4786,6 +5053,10 @@ yet, listed so that nobody reads a promise into them:
   `rebase generate-sdk` writes them) before the type check, when the backend
   sets `registerDatabase` or an earlier `--register` left one. They keep that
   one current and refuse to overwrite a `register.ts` they did not write.
+
+- **`rebase cloud compute set --help` gives the real database defaults**
+  (160m / 1Gi, not 500m / 2Gi), and says `--storage` sets the storage mode
+  (`shared-prefix` or `dedicated-bucket`), not a volume size.
 ##### Client SDK
 
 - **A public page no longer prints the client's connection messages to every
@@ -4906,7 +5177,7 @@ yet, listed so that nobody reads a promise into them:
 - **A role holding users:write can no longer grant itself, or anyone, admin.** A
   role name like `"support,admin"`, a nested array or a quoted name was written
   into the roles array literal as more than one role. Roles are now stored as
-  bound parameters, and such names are refused (see Changed).
+  bound parameters, and such names are refused (see Breaking).
 - **A route group mounted on its own refuses impersonation and simulation it
   cannot honour.** `backend.routes.storage()`, `routes.admin()` and the others
   answered a request carrying `x-rebase-impersonate` or `x-rebase-simulate-*` as
@@ -49885,6 +50156,8 @@ Or run any command without installing it: `pnpm dlx @rebasepro/cli <command>`.
 
 ### Machine-readable output
 
+<span class="since-badge" data-since="0.26">Since 0.26</span>
+
 `--json` is the switch, and outside the `cloud` family it is the only one: `rebase status`, `rebase resources`, `rebase apps list`, `rebase upgrade` and `rebase verify` then put one JSON value on stdout — the result, or a `{"error": {"message", "code", "hint", "issues"}}` envelope with a non-zero exit — on **every** exit of the command, so a caller can parse stdout unconditionally. Without it they write human text and failures go to stderr. `rebase cloud` uses the same envelope and is the one exception to the switch: it also turns JSON on by itself when stdout is not a TTY, or when `REBASE_JSON=1` is set. So `rebase cloud status | cat` is JSON while `rebase status | cat` is not — in a script, pass `--json` explicitly rather than relying on either rule.
 
 ### Commands
@@ -50277,6 +50550,8 @@ types — and fails closed, which makes it the form to use as a CI gate against 
 deployed database.
 
 #### `rebase verify`
+
+<span class="since-badge" data-since="0.26">Since 0.26</span>
 
 ```bash
 rebase verify

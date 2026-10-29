@@ -18,6 +18,8 @@ Or run any command without installing it: `pnpm dlx @rebasepro/cli <command>`.
 
 ## Machine-readable output
 
+<span class="since-badge" data-since="0.26">Since 0.26</span>
+
 `--json` is the switch, and outside the `cloud` family it is the only one: `rebase status`, `rebase resources`, `rebase apps list`, `rebase upgrade` and `rebase verify` then put one JSON value on stdout — the result, or a `{"error": {"message", "code", "hint", "issues"}}` envelope with a non-zero exit — on **every** exit of the command, so a caller can parse stdout unconditionally. Without it they write human text and failures go to stderr. `rebase cloud` uses the same envelope and is the one exception to the switch: it also turns JSON on by itself when stdout is not a TTY, or when `REBASE_JSON=1` is set. So `rebase cloud status | cat` is JSON while `rebase status | cat` is not — in a script, pass `--json` explicitly rather than relying on either rule.
 
 ## Commands
@@ -410,6 +412,8 @@ types — and fails closed, which makes it the form to use as a CI gate against 
 deployed database.
 
 ### `rebase verify`
+
+<span class="since-badge" data-since="0.26">Since 0.26</span>
 
 ```bash
 rebase verify

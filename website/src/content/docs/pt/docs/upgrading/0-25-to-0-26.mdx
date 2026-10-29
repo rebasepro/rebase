@@ -1,0 +1,171 @@
+---
+sourceHash: 7408bfbaa0aac9ec
+slug: pt/docs/upgrading/0-25-to-0-26
+title: Atualizando da versão 0.25 para a 0.26
+sidebar_label: 0.25 → 0.26
+description: As mudanças drásticas que a versão 0.26 traz para uma aplicação na versão 0.25 — escritas em `via` de vários saltos, nomes de papéis, tokens de página do armazenamento, o upstream de funções, motivos de recusa do OAuth, a chave da aplicação no servidor MCP, chaves estrangeiras geradas e três comandos e tokens da nuvem.
+---
+
+# Atualizando da versão 0.25 → 0.26
+
+Estas são as entradas `### Breaking` que a versão 0.26 traz para uma aplicação na versão 0.25.
+
+A maioria delas transforma uma chamada que antes falhava mais tarde, ou fazia a coisa errada
+sem avisar, em uma recusa que você vê de imediato: uma escrita em `via` de vários saltos, um
+nome de papel que não é um único papel, um token de página anterior à atualização, um upstream
+de funções que não pode funcionar. Duas vêm de correções de segurança: o servidor MCP não envia
+mais à sua aplicação o token do plano de controle da CLI, e um login por OAuth resolve uma conta
+não verificada em vez de recusá-la. Uma é um erro de compilação nos tipos gerados. As três
+últimas são do Rebase Cloud: um comando aposentado, um ajuste aposentado e tokens criados antes
+desta versão.
+
+---
+
+## 87. Uma escrita que nomeia uma relação `via` de vários saltos resulta em 400
+
+Uma criação ou atualização que define uma relação `via` cuja cadeia tem mais de um elo agora é
+recusada de imediato com `400 RELATION_NOT_WRITABLE`, informando o campo. Isso vale para uma
+cadeia para-muitos sem uma única tabela de junção e para uma cadeia para-um de dois ou mais
+passos. Antes, a primeira falhava dentro da transação como `500 RELATION_MISCONFIGURED`. A
+segunda era gravada, apontando a chave do alvo para a coluna do primeiro passo, o que raramente
+era o que você queria.
+
+Escritas em `via` de um único salto funcionam como antes: para-um em um passo e para-muitos por
+uma tabela de junção. O SDK gerado agora tipa essas escritas, e o formulário do painel
+administrativo desativa o seletor de um `via` de vários saltos.
+
+**O que mudar:** escreva o elo pelo qual a cadeia passa, na coleção que o possui, em vez de
+escrever a outra ponta da cadeia. Leia a relação pelo `via`, como antes. Consulte
+[via — an explicit join chain](/docs/collections/relations/#via--an-explicit-join-chain).
+
+## 88. Nomes de papéis com `,` `{` `}` `"` `\` ou um caractere de controle são recusados
+
+Os usuários, a coleção de usuários e as chaves de serviço respondem `400 INVALID_ROLE` para um
+papel cujo nome contenha uma vírgula, uma chave, aspas duplas, uma barra invertida ou um
+caractere de controle, e para um nome vazio. Os papéis eram escritos em um literal de array do
+Postgres, no qual `"support,admin"` virava dois papéis, `support` e `admin`; agora são
+armazenados como parâmetros vinculados (bound parameters).
+
+**O que mudar:** nada para papéis nomeados como identificadores. Procure qualquer outro nome
+antes de atualizar e renomeie-o:
+
+```sql
+SELECT id, roles FROM rebase.users
+WHERE EXISTS (
+  SELECT 1 FROM unnest(roles) r
+  WHERE r = '' OR r ~ '[,{}"\\]' OR r ~ '[[:cntrl:]]'
+);
+```
+
+Consulte [Declaring roles](/docs/backend/roles-and-scopes/#declaring-roles).
+
+## 89. Tokens de página do armazenamento local anteriores à atualização são recusados
+
+A listagem de arquivos no mecanismo de armazenamento local agora emite tokens de página em um
+novo formato, que começa com `n.`. Um token emitido antes da atualização responde
+`400 INVALID_LIST_OPTIONS`.
+
+**O que mudar:** nada para código que pagina dentro de uma mesma execução. Um cliente que
+guardou um token de página através da atualização recomeça essa listagem, sem o token. Os tokens
+do S3 e do GCS não mudam.
+
+## 90. Um upstream de funções deve ser uma URL http(s) com a service key
+
+Um `REBASE_FUNCTIONS_UPSTREAM` que não seja `http://` nem `https://`, ou definido sem
+`REBASE_SERVICE_KEY`, agora interrompe a inicialização com uma mensagem que nomeia a variável.
+Antes, a inicialização era concluída, toda chamada encaminhada falhava com 502 e, sem a chave,
+todo `rebase.functions.invoke` em processo respondia 401.
+
+**O que mudar:** em uma implantação dividida, dê ao processo `api` a URL completa do processo de
+funções e a mesma `REBASE_SERVICE_KEY` que esse processo tem:
+
+```bash
+REBASE_FUNCTIONS_UPSTREAM=http://functions:8080
+REBASE_SERVICE_KEY=<the functions process's key>
+```
+
+Um processo que serve as funções por conta própria não define nenhum upstream. Consulte
+[What each role serves](/docs/deployment/split-processes/#what-each-role-serves).
+
+## 91. O login por OAuth não retorna mais `local-account-unverified`
+
+Quando um provedor verificou o e-mail, entrar com ele agora verifica a conta correspondente não
+verificada em vez de recusá-la. Antes de vincular, remove a senha da conta, toda identidade cujo
+provedor não atestou o endereço e todas as sessões, como um link mágico ou um código por e-mail
+já faziam. Os motivos de recusa `local-account-unverified` e
+`local-account-unverified-passwordless` não são mais retornados.
+
+Um provedor que não declara `email_verified` continua recebendo `403 EMAIL_NOT_VERIFIED`
+(`provider-email-unverified`). Um repositório de usuários próprio sem `unlinkUserIdentity`
+responde `409 UNVERIFIED_IDENTITIES` e não altera nada.
+
+**O que mudar:** remova qualquer ramificação do cliente que pedia ao usuário que verificasse o
+e-mail primeiro nesses dois motivos; o login agora é bem-sucedido. Um usuário que nunca
+verificou sua senha a perde no primeiro login pelo provedor e, a partir daí, entra com o
+provedor ou redefine a senha. Consulte
+[Account linking across sign-in methods](/docs/backend/authentication/#account-linking-across-sign-in-methods).
+
+## 92. O servidor MCP não aceita mais `REBASE_TOKEN` como a chave da aplicação
+
+O `@rebasepro/mcp` aceitava `REBASE_TOKEN` como a chave de API da aplicação quando
+`REBASE_API_TOKEN` não estava definido. `REBASE_TOKEN` é o token do plano de controle da CLI,
+aquele que pode fazer deploy e ler segredos, e por isso chegava a todo backend que o servidor
+MCP chamava. Ele não é mais enviado à aplicação. Com apenas `REBASE_TOKEN` definido, o servidor
+avisa uma única vez no stderr e deixa de se autenticar na aplicação.
+
+**O que mudar:** defina `REBASE_API_TOKEN` com uma chave de API da aplicação no ambiente do
+servidor MCP e mantenha `REBASE_TOKEN` para a CLI:
+
+```bash
+rebase api-keys create -n mcp --scopes data:read,data:write
+```
+
+O `rebase cloud init --claim` escreve o `REBASE_API_TOKEN` por conta própria. Consulte
+[Giving it a narrow credential instead](/docs/ai/mcp/#giving-it-a-narrow-credential-instead).
+
+## 93. Os tipos gerados deixam de ter a chave de um belongsTo com `excludeFromApi`
+
+Um `belongsTo` com `excludeFromApi` não coloca mais sua chave estrangeira em `Row`, `Insert` ou
+`Update` gerados, em acordo com a API, que nunca a retornou nem a aceitou. Uma relação com
+`write: []` não oferece mais sua chave nas escritas, e `IncludeFor` não oferece mais uma relação
+com `excludeFromApi`, que o servidor responde com `UNKNOWN_RELATION`.
+
+**O que mudar:** execute `rebase generate-sdk` e compile. O compilador encontra todos os pontos
+que liam ou escreviam a chave; essas leituras eram `undefined` e essas escritas eram recusadas.
+Leia ou defina a coluna no servidor, por meio de `context.data` em um callback ou de
+`rebase.dataAsAdmin`. Consulte [Typed SDK generation](/docs/sdk/#typed-sdk-generation).
+
+## 94. `rebase cloud webhooks` foi aposentado
+
+O `rebase cloud webhooks` nunca entregou nada. Agora toda ação termina com o código de saída 1 e
+o código `command_retired`.
+
+**O que mudar:** remova-o dos scripts. Para alertas sobre o projeto, use
+`rebase cloud notifications`. Para mudanças em linhas, registre um `WebhookDispatcher` no código
+da própria aplicação.
+
+## 95. `rebase cloud compute set --scale-to-zero true` é recusado
+
+O ajuste nunca fez nada: todo backend rodava como uma instância sempre ativa, qualquer que fosse
+o valor. `true` agora é recusado com uma mensagem que nomeia `--replicas` e `--autoscale-max`;
+`false` é ignorado com um aviso, de modo que os scripts que o passam continuam funcionando.
+
+**O que mudar:** remova a flag e dimensione o backend com `--replicas` e `--autoscale-max`.
+Consulte [Compute](/docs/cli/cloud/#compute).
+
+## 96. Tokens da nuvem criados antes da 0.26 podem precisar ser criados de novo
+
+Um token feito com `rebase cloud tokens create --can deploy`, `--can env` ou `--can logs` antes
+desta versão não cobre previews (`rebase cloud deploy --preview`). Ler o log de auditoria com um
+token agora exige `--can audit`. Um token de antes da existência de `billing` mantém o acesso à
+cobrança por uma versão, e a CLI imprime uma vez o aviso de obsolescência do plano de controle.
+
+**O que mudar:** crie o token de novo com as capacidades de que ele precisa, troque-o no CI e
+revogue o antigo:
+
+```bash
+rebase cloud tokens create --can deploy,env,logs
+rebase cloud tokens list
+```
+
+Consulte [Organizations](/docs/cli/cloud/#organizations).

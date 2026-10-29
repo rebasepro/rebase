@@ -1,5 +1,5 @@
 ---
-sourceHash: 2df00511c02fed53
+sourceHash: c1d3d5c90320a651
 title: Riferimento CLI
 sidebar_label: CLI
 description: Comandi della CLI di Rebase per l'inizializzazione del progetto, la generazione dello schema, le migrazioni del database e la generazione dell'SDK.
@@ -18,6 +18,8 @@ pnpm add -g @rebasepro/cli
 Oppure esegui qualsiasi comando senza installarla: `pnpm dlx @rebasepro/cli <command>`.
 
 ## Output leggibile da macchina (Machine-readable)
+
+<span class="since-badge" data-since="0.26">Da 0.26</span>
 
 `--json` è il flag principale e, al di fuori della famiglia `cloud`, è l'unico: `rebase status`, `rebase resources`, `rebase apps list`, `rebase upgrade` e `rebase verify` restituiscono un singolo valore JSON su stdout — il risultato, oppure un envelope `{"error": {"message", "code", "hint", "issues"}}` con un codice di uscita diverso da zero — a **ogni** uscita del comando, in modo che un chiamante possa analizzare stdout incondizionatamente. Senza questo flag, scrivono testo leggibile per gli umani e gli errori vanno su stderr. `rebase cloud` utilizza lo stesso envelope ed è l'unica eccezione al flag: abilita il JSON automaticamente anche quando stdout non è una TTY, o quando è impostato `REBASE_JSON=1`. Quindi `rebase cloud status | cat` è in formato JSON mentre `rebase status | cat` non lo è — all'interno di uno script, passa esplicitamente `--json` invece di affidarti a queste regole.
 
@@ -364,6 +366,8 @@ Il comando restituisce un codice di uscita diverso da zero qualora un controllo 
 `rebase doctor --policies` esegue esclusivamente i controlli relativi a RLS — escludendo la verifica delle differenze di schema e i tipi dell'SDK — e adotta una modalità restrittiva con blocco in caso di anomalie (fail closed), risultando ideale come controllo di gate nei sistemi di CI a fronte di un database di produzione.
 
 ### `rebase verify`
+
+<span class="since-badge" data-since="0.26">Da 0.26</span>
 
 ```bash
 rebase verify

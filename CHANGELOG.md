@@ -2,6 +2,76 @@
 
 ## [Unreleased]
 
+### Breaking
+
+#### Server & REST
+
+- **A create or update naming a multi-hop via relation is refused with a 400.**
+  A `via` chain longer than one link (a to-many chain with no single junction
+  table, or a to-one chain of two or more steps) failed inside the transaction
+  as `500 RELATION_MISCONFIGURED`, telling you to run `rebase schema generate`;
+  a two-step to-one chain was written by re-pointing the target's key at the
+  first step's column. Both are now refused up front with
+  `400 RELATION_NOT_WRITABLE`, naming the field. Single-hop `via` writes (to-one
+  in one step, to-many through one junction table) work as before, the generated
+  SDK now types them, and the admin form disables the picker of a multi-hop
+  `via`.
+
+- **Role names with a comma, a brace, a double quote, a backslash or a control
+  character are refused.** Users, the users collection and service keys answer
+  `400 INVALID_ROLE` for one, and for an empty name. Roles are now stored as
+  bound parameters (see Security).
+
+- **Local storage listing page tokens have a new format** (`n.…`). A token
+  issued before the upgrade is refused with `400 INVALID_LIST_OPTIONS`; start
+  the listing over.
+
+- **The functions upstream must be an http(s) URL, and a forwarder needs the
+  service key.** A `REBASE_FUNCTIONS_UPSTREAM` that is not `http://` or
+  `https://`, or one set without `REBASE_SERVICE_KEY`, now stops the boot with
+  a message naming the variable. Before, the boot
+  succeeded, every forwarded call failed with 502, and without the key every
+  in-process `rebase.functions.invoke` answered 401.
+
+- **An OAuth sign-in no longer refuses an unverified account with a provider
+  that verified the email.** The reasons `local-account-unverified` and
+  `local-account-unverified-passwordless` are gone: the sign-in now verifies
+  the matching unverified account, and removes its unproven password,
+  identities and sessions first (see Security). A client that branched on
+  those reasons never sees them again.
+
+#### MCP
+
+- **The MCP server no longer accepts the CLI's control-plane token as the
+  app's API key.** `@rebasepro/mcp` ignores `REBASE_TOKEN` for the app. Set
+  `REBASE_API_TOKEN` for the app; `REBASE_TOKEN` is the CLI's control-plane
+  token and stays the CLI's (see Security). Until you do, the MCP server stops
+  authenticating with the app and says so once on stderr.
+
+#### Client SDK
+
+- **The generated types drop the foreign key of a to-one relation the API
+  closes.** For an `excludeFromApi` `belongsTo`, `Row`, `Insert` and `Update` no
+  longer carry it, and a `write: []` relation no longer offers its key on
+  writes, matching what the server already refused (see Fixed). Code that read
+  or wrote that key stops compiling after `rebase generate-sdk`.
+
+#### CLI & Cloud
+
+- **The cloud webhooks command is retired.** `rebase cloud webhooks` never
+  delivered anything. Every action now exits 1 with code `command_retired` and
+  names `rebase cloud notifications`, and a `WebhookDispatcher` in app code for
+  row changes.
+
+- **Asking a cloud backend to scale to zero is refused.**
+  `rebase cloud compute set --scale-to-zero true` never did anything; use
+  `--replicas` and `--autoscale-max`. `false` is ignored with a warning (see
+  Fixed).
+
+- **Cloud tokens may need creating again.** A `--can deploy`, `--can env` or
+  `--can logs` token created before this release does not cover previews, and
+  reading the audit log with a token now needs `--can audit` (see Added).
+
 ### Added
 
 #### Studio
@@ -337,6 +407,51 @@
   refused before it leaves the machine, and the key is never printed. A deploy
   to a cluster Rebase does not operate that still uses the shared registry says
   so in its deploy log.
+
+- **`rebase verify` checks a project in one fast, offline pass.** Every
+  collection file loads and passes the boot validator, with unknown keys as
+  errors (a misspelt option, a top-level `widget` instead of `admin.widget`).
+  Every collection declares or inherits `securityRules`, and one with a
+  `user_id`, `owner_id`, `organization_id` or `tenant_id` column does not lean
+  on directory defaults. The migrations still build the declared tables and
+  columns, which `findUnmigratedSchema` from `@rebasepro/server-postgres`
+  reports by replaying the migration files, with no Atlas and no dev database.
+  `--live` also runs the rls-check catalogue against `DATABASE_URL` and checks
+  that every migration is applied. `--json` names each finding's file, config
+  path and fix; `--quiet` prints only problems.
+
+- **Scaffolds ship a Claude Code hook that runs `rebase verify` on every
+  collection edit.** `.claude/settings.json` and
+  `.claude/hooks/post-edit-collection.sh` run `rebase verify --quiet` after an
+  edit under `config/collections/` and hand the findings back to the agent.
+  `rebase skills --hooks` (or `skills install --hooks`) installs the same files
+  into an existing project, merging into a settings file already there.
+
+- **`rebase generate view <slug>` scaffolds a custom admin screen.** It writes
+  `<frontend>/src/views/<Name>View.tsx`, built with `@rebasepro/ui` and wired
+  to `useData`, `useAuthController` and `useSnackbarController`, lists it in
+  `views/index.ts` and, on the first run, passes that list to
+  `<RebaseCMS views>`. With `--collection <slug>` it is an entity view instead,
+  registered in the collection's `admin.entityViews`. An `App.tsx` or a
+  collection it cannot read safely gets the view file and a printed line to add.
+
+- **`rebase cloud init --claim` gives a project a live Rebase Cloud backend with
+  no account.** It provisions the project, links the directory, deploys the
+  collections and prints the live URL, the admin panel URL and a 72-hour claim
+  link. It writes `REBASE_BASE_URL` and `REBASE_API_TOKEN` into `.env`; that
+  key holds `data:read` and `data:write` only and expires with the claim
+  window. The project's own token and claim link stay in
+  `~/.rebase/credentials.json`, never in the repository. With `--no-deploy`, or
+  after a failed first deploy, the next successful `rebase cloud deploy` mints
+  the key. The MCP tool `rebase_cloud_provision` runs the same command.
+
+- **`npx @rebasepro/rls-check --format agent` prints a remediation for each
+  finding.** One JSON document names each finding's check id and failing
+  object, and says whether the fix belongs in SQL or in a collection's
+  `securityRules`. It gives the statements, the placeholders it cannot fill,
+  alternatives and caveats, and the same fix as a
+  `defineCollection({ securityRules: [...] })` snippet, or why rules cannot
+  express it. `--json` is unchanged; `--json` with `--format agent` is refused.
 #### Client SDK
 
 - **`client.admin.listUsers({ role, ids })` filters by role and resolves a known
@@ -409,10 +524,6 @@
   `rebase db push --yes` warns, once per process, when it approves a destructive
   change. From the next release `--yes` approves only non-destructive pushes;
   pass `--allow-destructive` for the rest.
-- **The cloud webhooks command is retired.** `rebase cloud webhooks` never
-  delivered anything. Every action now exits 1 with code `command_retired` and
-  names `rebase cloud notifications`, and a `WebhookDispatcher` in app code for
-  row changes.
 - **Local commands warn when .env points them at the linked cloud project.**
   `rebase api-keys`, `rebase storage` and `rebase auth reset-password` say so on
   stderr when `.env`'s `REBASE_BASE_URL` is the address of the cloud project
@@ -425,34 +536,11 @@
   and listed.
 #### Server
 
-- **A create or update naming a multi-hop via relation is refused with a 400.**
-  A `via` chain longer than one link (a to-many chain with no single junction
-  table, or a to-one chain of two or more steps) failed inside the transaction
-  as `500 RELATION_MISCONFIGURED`, telling you to run `rebase schema generate`;
-  a two-step to-one chain was written by re-pointing the target's key at the
-  first step's column. Both are now refused up front with
-  `400 RELATION_NOT_WRITABLE`, naming the field. Single-hop `via` writes (to-one
-  in one step, to-many through one junction table) work as before, the generated
-  SDK now types them, and the admin form disables the picker of a multi-hop
-  `via`.
-- **Role names with a comma, a brace, a double quote, a backslash or a control
-  character are refused.** Users, the users collection and service keys answer
-  `400 INVALID_ROLE` for one, and for an empty name. Roles are now stored as
-  bound parameters (see Security).
-- **Local storage listing page tokens have a new format** (`n.…`). A token
-  issued before the upgrade is refused with `400 INVALID_LIST_OPTIONS`; start
-  the listing over.
 - **The realtime per-user socket ceiling counts each API key's sockets against
   that key,** not against the account that made it
   (`REALTIME_MAX_SOCKETS_PER_USER`).
 - **An impersonating administrator's sockets count against the administrator**
   under `REALTIME_MAX_SOCKETS_PER_USER`, not against the user they act as.
-- **The functions upstream must be an http(s) URL, and a forwarder needs the
-  service key.** A `REBASE_FUNCTIONS_UPSTREAM` that is not `http://` or
-  `https://`, or one set without `REBASE_SERVICE_KEY`, now stops the boot with
-  a message naming the variable. Before, the boot
-  succeeded, every forwarded call failed with 502, and without the key every
-  in-process `rebase.functions.invoke` answered 401.
 - **An application's own `notFound` handler answers unmatched paths under the
   API base path too.** Only Hono's default `404 Not Found` is turned into the
   JSON envelope.
@@ -590,6 +678,11 @@
   routes were dropped, and every route answered 404.
 - **`backend.shutdown()` stops the SQL rate-limit store's sweep timer** when
   the backend created the store itself.
+- **A legacy `auth` schema the boot cannot drop is reported.** The drop
+  matched only an `auth.uid()` that reads `app.uid`, so the one every release
+  before 0.10.0 wrote (reading `app.user_id`) kept the schema, silently. Both
+  bodies now match, and when the schema still stands after the drop, the boot
+  warns and names the objects keeping it.
 #### CLI
 
 - **A cloud deploy's result lists the project's own host.** The control plane
@@ -720,6 +813,10 @@
   `rebase generate-sdk` writes them) before the type check, when the backend
   sets `registerDatabase` or an earlier `--register` left one. They keep that
   one current and refuse to overwrite a `register.ts` they did not write.
+
+- **`rebase cloud compute set --help` gives the real database defaults**
+  (160m / 1Gi, not 500m / 2Gi), and says `--storage` sets the storage mode
+  (`shared-prefix` or `dedicated-bucket`), not a volume size.
 #### Client SDK
 
 - **A public page no longer prints the client's connection messages to every
@@ -840,7 +937,7 @@
 - **A role holding users:write can no longer grant itself, or anyone, admin.** A
   role name like `"support,admin"`, a nested array or a quoted name was written
   into the roles array literal as more than one role. Roles are now stored as
-  bound parameters, and such names are refused (see Changed).
+  bound parameters, and such names are refused (see Breaking).
 - **A route group mounted on its own refuses impersonation and simulation it
   cannot honour.** `backend.routes.storage()`, `routes.admin()` and the others
   answered a request carrying `x-rebase-impersonate` or `x-rebase-simulate-*` as

@@ -1,0 +1,114 @@
+---
+sourceHash: 7408bfbaa0aac9ec
+slug: fr/docs/upgrading/0-25-to-0-26
+title: Mise à niveau de 0.25 à 0.26
+sidebar_label: 0.25 → 0.26
+description: Les changements cassants apportés par la version 0.26 pour une application sur la 0.25 — les écritures `via` multi-sauts, les noms de rôles, les jetons de page du stockage, l'amont des fonctions, les motifs de refus OAuth, la clé d'application du serveur MCP, les clés étrangères générées, ainsi que trois commandes et jetons cloud.
+---
+
+# Mise à niveau 0.25 → 0.26
+
+Voici les entrées `### Breaking` qu'apporte la version 0.26 pour une application sous 0.25.
+
+La plupart transforment un appel qui échouait plus tard, ou qui faisait silencieusement autre chose que prévu, en un refus immédiat et visible : une écriture `via` multi-sauts, un nom de rôle qui ne désigne pas un seul rôle, un jeton de page antérieur à la mise à niveau, un amont de fonctions qui ne peut pas fonctionner. Deux proviennent de correctifs de sécurité : le serveur MCP n'envoie plus à votre application le jeton de plan de contrôle de la CLI, et une connexion OAuth régularise un compte non vérifié au lieu de la refuser. Une est une erreur de compilation dans les types générés. Les trois dernières concernent Rebase Cloud : une commande retirée, un réglage retiré et des jetons créés avant cette version.
+
+---
+
+## 87. Une écriture désignant une relation `via` multi-sauts renvoie une 400
+
+Une création ou une mise à jour qui renseigne une relation `via` dont la chaîne comporte plus d'un lien est désormais refusée d'emblée avec `400 RELATION_NOT_WRITABLE`, en nommant le champ. Cela couvre une chaîne vers plusieurs lignes sans table de jonction unique, ainsi qu'une chaîne vers une seule ligne de deux étapes ou plus. Auparavant, la première échouait dans la transaction avec `500 RELATION_MISCONFIGURED`. La seconde était écrite, en repointant la clé de la cible vers la colonne de la première étape, ce qui correspond rarement à l'intention.
+
+Les écritures `via` à un seul saut fonctionnent comme avant : vers une seule ligne en une étape, et vers plusieurs lignes à travers une seule table de jonction. Le SDK généré les type désormais, et le formulaire d'administration désactive le sélecteur d'un `via` multi-sauts.
+
+**Ce qu'il faut changer :** écrivez le lien que la chaîne emprunte, dans la collection qui le possède, plutôt que l'extrémité lointaine de la chaîne. Lisez la relation à travers le `via` comme auparavant. Consultez
+[via — an explicit join chain](/docs/collections/relations/#via--an-explicit-join-chain).
+
+## 88. Les noms de rôles contenant `,` `{` `}` `"` `\` ou un caractère de contrôle sont refusés
+
+Les utilisateurs, la collection des utilisateurs et les clés de service répondent `400 INVALID_ROLE` pour un rôle dont le nom contient une virgule, une accolade, un guillemet double, une barre oblique inverse ou un caractère de contrôle, ainsi que pour un nom vide. Les rôles étaient auparavant écrits dans un littéral de tableau Postgres, où `"support,admin"` devenait deux rôles, `support` et `admin` ; ils sont désormais stockés comme paramètres liés.
+
+**Ce qu'il faut changer :** rien pour des rôles nommés comme des identifiants. Cherchez tout autre nom avant la mise à niveau, et renommez-le :
+
+```sql
+SELECT id, roles FROM rebase.users
+WHERE EXISTS (
+  SELECT 1 FROM unnest(roles) r
+  WHERE r = '' OR r ~ '[,{}"\\]' OR r ~ '[[:cntrl:]]'
+);
+```
+
+Consultez [Declaring roles](/docs/backend/roles-and-scopes/#declaring-roles).
+
+## 89. Les jetons de page du stockage local antérieurs à la mise à niveau sont refusés
+
+Le listing des fichiers sur le moteur de stockage local émet désormais des jetons de page dans un nouveau format, commençant par `n.`. Un jeton émis avant la mise à niveau répond `400 INVALID_LIST_OPTIONS`.
+
+**Ce qu'il faut changer :** rien pour le code qui pagine au sein d'une même exécution. Un client qui a conservé un jeton de page au travers de la mise à niveau reprend ce listing depuis le début, sans le jeton. Les jetons S3 et GCS ne changent pas.
+
+## 90. Un amont de fonctions doit être une URL http(s) accompagnée de la clé de service
+
+Un `REBASE_FUNCTIONS_UPSTREAM` qui n'est pas en `http://` ou `https://`, ou défini sans `REBASE_SERVICE_KEY`, interrompt désormais le démarrage avec un message nommant la variable. Auparavant, le démarrage réussissait, chaque appel transféré échouait avec une 502, et sans la clé, chaque `rebase.functions.invoke` in-process répondait 401.
+
+**Ce qu'il faut changer :** dans un déploiement scindé, donnez au processus `api` l'URL complète du processus functions et la même `REBASE_SERVICE_KEY` que ce dernier :
+
+```bash
+REBASE_FUNCTIONS_UPSTREAM=http://functions:8080
+REBASE_SERVICE_KEY=<the functions process's key>
+```
+
+Un processus qui sert lui-même les fonctions ne définit aucun amont. Consultez
+[What each role serves](/docs/deployment/split-processes/#what-each-role-serves).
+
+## 91. La connexion OAuth ne renvoie plus `local-account-unverified`
+
+Lorsqu'un fournisseur a vérifié l'e-mail, s'y connecter vérifie désormais le compte non vérifié correspondant au lieu de le refuser. Avant de lier les comptes, la connexion supprime le mot de passe du compte, toute identité dont le fournisseur ne s'est pas porté garant pour l'adresse, ainsi que toutes les sessions, comme le faisaient déjà un lien magique ou un code par e-mail. Les motifs de refus `local-account-unverified` et `local-account-unverified-passwordless` ne sont plus renvoyés.
+
+Un fournisseur qui n'affirme pas `email_verified` reçoit toujours `403 EMAIL_NOT_VERIFIED` (`provider-email-unverified`). Un dépôt d'utilisateurs personnalisé sans `unlinkUserIdentity` répond `409 UNVERIFIED_IDENTITIES` et ne modifie rien.
+
+**Ce qu'il faut changer :** supprimez toute branche côté client qui invitait l'utilisateur à vérifier d'abord son e-mail sur ces deux motifs ; la connexion réussit désormais. Un utilisateur qui n'a jamais vérifié son mot de passe le perd lors de sa première connexion via le fournisseur, et se connecte ensuite avec le fournisseur, ou réinitialise son mot de passe. Consultez
+[Account linking across sign-in methods](/docs/backend/authentication/#account-linking-across-sign-in-methods).
+
+## 92. Le serveur MCP ne prend plus `REBASE_TOKEN` comme clé de l'application
+
+`@rebasepro/mcp` acceptait `REBASE_TOKEN` comme clé d'API de l'application lorsque `REBASE_API_TOKEN` n'était pas défini. `REBASE_TOKEN` est le jeton de plan de contrôle de la CLI, celui qui peut déployer et lire les secrets ; il parvenait donc à chaque backend appelé par le serveur MCP. Il n'est plus envoyé à l'application. Lorsque seul `REBASE_TOKEN` est défini, le serveur le signale une fois sur stderr et cesse de s'authentifier auprès de l'application.
+
+**Ce qu'il faut changer :** définissez `REBASE_API_TOKEN` avec une clé d'API de l'application dans l'environnement du serveur MCP, et réservez `REBASE_TOKEN` à la CLI :
+
+```bash
+rebase api-keys create -n mcp --scopes data:read,data:write
+```
+
+`rebase cloud init --claim` écrit lui-même `REBASE_API_TOKEN`. Consultez
+[Giving it a narrow credential instead](/docs/ai/mcp/#giving-it-a-narrow-credential-instead).
+
+## 93. Les types générés suppriment la clé d'un belongsTo `excludeFromApi`
+
+Un `belongsTo` marqué `excludeFromApi` ne place plus sa clé étrangère sur les types générés `Row`, `Insert` ou `Update`, conformément à l'API, qui ne l'a jamais renvoyée ni acceptée. Une relation `write: []` ne propose plus sa clé en écriture, et `IncludeFor` ne propose plus une relation `excludeFromApi`, que le serveur refuse avec `UNKNOWN_RELATION`.
+
+**Ce qu'il faut changer :** lancez `rebase generate-sdk` puis compilez. Le compilateur repère chaque endroit qui lisait ou écrivait la clé ; ces lectures valaient `undefined` et ces écritures étaient refusées. Lisez ou définissez la colonne côté serveur, via `context.data` dans un callback ou `rebase.dataAsAdmin`. Consultez
+[Typed SDK generation](/docs/sdk/#typed-sdk-generation).
+
+## 94. `rebase cloud webhooks` est retiré
+
+`rebase cloud webhooks` n'a jamais rien livré. Chaque action se termine désormais avec le code de sortie 1 et le code `command_retired`.
+
+**Ce qu'il faut changer :** retirez-le de vos scripts. Pour des alertes sur le projet, utilisez `rebase cloud notifications`. Pour les changements de lignes, enregistrez un `WebhookDispatcher` dans le code même de l'application.
+
+## 95. `rebase cloud compute set --scale-to-zero true` est refusé
+
+Ce réglage n'a jamais rien fait : chaque backend tournait comme une instance toujours active, quelle que soit sa valeur. `true` est désormais refusé par un message nommant `--replicas` et `--autoscale-max` ; `false` est ignoré avec un avertissement, de sorte que les scripts qui le passent continuent de fonctionner.
+
+**Ce qu'il faut changer :** supprimez l'option, et dimensionnez le backend avec `--replicas` et `--autoscale-max`. Consultez [Compute](/docs/cli/cloud/#compute).
+
+## 96. Les jetons cloud créés avant la 0.26 devront peut-être être recréés
+
+Un jeton créé avec `rebase cloud tokens create --can deploy`, `--can env` ou `--can logs` avant cette version ne couvre pas les aperçus (`rebase cloud deploy --preview`). Lire le journal d'audit avec un jeton exige désormais `--can audit`. Un jeton antérieur à l'existence de `billing` conserve l'accès à la facturation pendant une version, et la CLI affiche une fois l'avis d'obsolescence du plan de contrôle.
+
+**Ce qu'il faut changer :** recréez le jeton avec les capacités dont il a besoin, remplacez-le dans la CI, puis révoquez l'ancien :
+
+```bash
+rebase cloud tokens create --can deploy,env,logs
+rebase cloud tokens list
+```
+
+Consultez [Organizations](/docs/cli/cloud/#organizations).

@@ -1,0 +1,177 @@
+---
+slug: docs/upgrading/0-25-to-0-26
+title: Upgrading 0.25 to 0.26
+sidebar_label: 0.25 → 0.26
+description: The breaking changes 0.26 carries for an app on 0.25 — multi-hop via writes, role names, storage page tokens, the functions upstream, OAuth refusal reasons, the MCP server's app key, generated foreign keys, and three cloud commands and tokens.
+---
+
+# Upgrading 0.25 → 0.26
+
+These are the `### Breaking` entries 0.26 carries for an app on 0.25.
+
+Most of them turn a call that used to fail later, or quietly do the wrong thing,
+into a refusal you see straight away: a multi-hop `via` write, a role name that
+is not one role, a page token from before the upgrade, a functions upstream that
+cannot work. Two come from security fixes: the MCP server no longer sends the
+CLI's control-plane token to your app, and an OAuth sign-in settles an
+unverified account instead of refusing it. One is a compile error in generated
+types. The last three are Rebase Cloud: a retired command, a retired dial, and
+tokens created before this release.
+
+---
+
+## 87. A write naming a multi-hop `via` relation is a 400
+
+A create or update that sets a `via` relation whose chain is longer than one
+link is now refused up front with `400 RELATION_NOT_WRITABLE`, naming the field.
+That covers a to-many chain with no single junction table and a to-one chain of
+two or more steps. Before, the first failed inside the transaction as
+`500 RELATION_MISCONFIGURED`. The second was written, by re-pointing the
+target's key at the first step's column, which is rarely what you meant.
+
+Single-hop `via` writes work as before: to-one in one step, and to-many through
+one junction table. The generated SDK now types those, and the admin form
+disables the picker of a multi-hop `via`.
+
+**What to change:** write the link the chain walks through, on the collection
+that owns it, instead of writing the far end of the chain. Read the relation
+through the `via` as before. See
+[via — an explicit join chain](/docs/collections/relations/#via--an-explicit-join-chain).
+
+## 88. Role names with `,` `{` `}` `"` `\` or a control character are refused
+
+Users, the users collection and service keys answer `400 INVALID_ROLE` for a
+role whose name holds a comma, a brace, a double quote, a backslash or a control
+character, and for an empty name. Roles used to be written into a Postgres array
+literal, where `"support,admin"` became two roles, `support` and `admin`; they
+are now stored as bound parameters.
+
+**What to change:** nothing for roles named like identifiers. Look for any other
+name before upgrading, and rename it:
+
+```sql
+SELECT id, roles FROM rebase.users
+WHERE EXISTS (
+  SELECT 1 FROM unnest(roles) r
+  WHERE r = '' OR r ~ '[,{}"\\]' OR r ~ '[[:cntrl:]]'
+);
+```
+
+See [Declaring roles](/docs/backend/roles-and-scopes/#declaring-roles).
+
+## 89. Local storage page tokens from before the upgrade are refused
+
+Listing files on the local storage engine now issues page tokens in a new
+format, starting `n.`. A token issued before the upgrade answers
+`400 INVALID_LIST_OPTIONS`.
+
+**What to change:** nothing for code that pages within one run. A client that
+saved a page token across the upgrade starts that listing over, without the
+token. S3 and GCS tokens are unchanged.
+
+## 90. A functions upstream must be an http(s) URL with the service key
+
+A `REBASE_FUNCTIONS_UPSTREAM` that is not `http://` or `https://`, or one set
+without `REBASE_SERVICE_KEY`, now stops the boot with a message naming the
+variable. Before, the boot succeeded, every forwarded call failed with 502, and
+without the key every in-process `rebase.functions.invoke` answered 401.
+
+**What to change:** in a split deployment, give the `api` process the full URL of
+the functions process and the same `REBASE_SERVICE_KEY` that process has:
+
+```bash
+REBASE_FUNCTIONS_UPSTREAM=http://functions:8080
+REBASE_SERVICE_KEY=<the functions process's key>
+```
+
+A process that serves functions itself sets no upstream. See
+[What each role serves](/docs/deployment/split-processes/#what-each-role-serves).
+
+## 91. OAuth sign-in no longer returns `local-account-unverified`
+
+When a provider has verified the email, signing in with it now verifies the
+matching unverified account instead of refusing it. Before linking, it removes
+the account's password, every identity whose provider did not vouch for the
+address, and every session, as a magic link or email code already did. The
+refusal reasons `local-account-unverified` and
+`local-account-unverified-passwordless` are no longer returned.
+
+A provider that does not assert `email_verified` still gets
+`403 EMAIL_NOT_VERIFIED` (`provider-email-unverified`). A custom user store
+without `unlinkUserIdentity` answers `409 UNVERIFIED_IDENTITIES` and changes
+nothing.
+
+**What to change:** remove any client branch that told the user to verify their
+email first on those two reasons; the sign-in now succeeds. A user who never
+verified their password loses it on their first provider sign-in, and signs in
+with the provider, or resets the password, from then on. See
+[Account linking across sign-in methods](/docs/backend/authentication/#account-linking-across-sign-in-methods).
+
+## 92. The MCP server no longer takes `REBASE_TOKEN` as the app's key
+
+`@rebasepro/mcp` accepted `REBASE_TOKEN` as the app's API key when
+`REBASE_API_TOKEN` was unset. `REBASE_TOKEN` is the CLI's control-plane token,
+the one that can deploy and read secrets, so it reached every backend the MCP
+server called. It is no longer sent to the app. With only `REBASE_TOKEN` set,
+the server says so once on stderr and stops authenticating with the app.
+
+**What to change:** set `REBASE_API_TOKEN` to an API key of the app in the MCP
+server's environment, and keep `REBASE_TOKEN` for the CLI:
+
+```bash
+rebase api-keys create -n mcp --scopes data:read,data:write
+```
+
+`rebase cloud init --claim` writes `REBASE_API_TOKEN` itself. See
+[Giving it a narrow credential instead](/docs/ai/mcp/#giving-it-a-narrow-credential-instead).
+
+## 93. Generated types drop the key of an `excludeFromApi` belongsTo
+
+An `excludeFromApi` `belongsTo` no longer puts its foreign key on the generated
+`Row`, `Insert` or `Update`, matching the API, which never returned or accepted
+it. A `write: []` relation no longer offers its key on writes, and `IncludeFor`
+no longer offers an `excludeFromApi` relation, which the server answers with
+`UNKNOWN_RELATION`.
+
+**What to change:** run `rebase generate-sdk` and build. The compiler finds every
+place that read or wrote the key; those reads were `undefined` and those writes
+were refused. Read or set the column on the server, through `context.data` in a
+callback or `rebase.dataAsAdmin`. See
+[Typed SDK generation](/docs/sdk/#typed-sdk-generation).
+
+## 94. `rebase cloud webhooks` is retired
+
+`rebase cloud webhooks` never delivered anything. Every action now exits 1 with
+code `command_retired`.
+
+**What to change:** remove it from scripts. For alerts about the project, use
+`rebase cloud notifications`. For row changes, register a `WebhookDispatcher` in
+the app's own code.
+
+## 95. `rebase cloud compute set --scale-to-zero true` is refused
+
+The dial never did anything: every backend ran as an always-on instance whatever
+it said. `true` is now refused with a message naming `--replicas` and
+`--autoscale-max`; `false` is ignored with a warning, so scripts that pass it
+keep working.
+
+**What to change:** drop the flag, and size the backend with `--replicas` and
+`--autoscale-max`. See [Compute](/docs/cli/cloud/#compute).
+
+## 96. Cloud tokens created before 0.26 may need creating again
+
+A token made with `rebase cloud tokens create --can deploy`, `--can env` or
+`--can logs` before this release does not cover previews
+(`rebase cloud deploy --preview`). Reading the audit log with a token now needs
+`--can audit`. A token from before `billing` existed keeps billing access for
+one release, and the CLI prints the control plane's deprecation notice once.
+
+**What to change:** create the token again with the capabilities it needs, swap
+it into CI, and revoke the old one:
+
+```bash
+rebase cloud tokens create --can deploy,env,logs
+rebase cloud tokens list
+```
+
+See [Organizations](/docs/cli/cloud/#organizations).

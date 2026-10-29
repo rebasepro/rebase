@@ -1,5 +1,5 @@
 ---
-sourceHash: 2df00511c02fed53
+sourceHash: c1d3d5c90320a651
 title: Référence de la CLI
 sidebar_label: CLI
 description: Commandes de la CLI Rebase pour l'initialisation de projet, la génération de schéma, les migrations de base de données et la génération de SDK.
@@ -18,6 +18,8 @@ pnpm add -g @rebasepro/cli
 Ou exécutez n'importe quelle commande sans l'installer : `pnpm dlx @rebasepro/cli <command>`.
 
 ## Sortie lisible par une machine
+
+<span class="since-badge" data-since="0.26">Depuis 0.26</span>
 
 `--json` est l'option dédiée, et en dehors de la famille `cloud`, c'est la seule : `rebase status`, `rebase resources`, `rebase apps list`, `rebase upgrade` et `rebase verify` écrivent alors une valeur JSON unique sur stdout — le résultat, ou une enveloppe `{"error": {"message", "code", "hint", "issues"}}` avec un code de sortie non nul — à **chaque** sortie de la commande, de sorte qu'un appelant peut parser stdout sans condition. Sans cette option, elles affichent du texte lisible par un humain et les erreurs vont sur stderr. `rebase cloud` utilise la même enveloppe et constitue la seule exception à cette option : elle active également le JSON d'elle-même lorsque stdout n'est pas un TTY, ou lorsque `REBASE_JSON=1` est défini. Ainsi, `rebase cloud status | cat` produit du JSON tandis que `rebase status | cat` n'en produit pas — dans un script, passez explicitement `--json` plutôt que de vous fier à l'une ou l'autre règle.
 
@@ -343,6 +345,8 @@ Renvoie un code de sortie non nul lorsqu'une vérification détecte une erreur, 
 `rebase doctor --policies` n'exécute que les vérifications RLS — pas de diff de schéma, pas de types de SDK — et échoue par défaut, ce qui en fait la forme idéale à utiliser comme barrière de contrôle en CI sur une base de données déployée.
 
 ### `rebase verify`
+
+<span class="since-badge" data-since="0.26">Depuis 0.26</span>
 
 ```bash
 rebase verify
