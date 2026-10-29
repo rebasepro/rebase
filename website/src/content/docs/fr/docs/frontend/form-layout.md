@@ -1,13 +1,11 @@
 ---
-sourceHash: 29363c3f0ab50d98
+sourceHash: 42da06ee7f0f6c0c
 title: Disposition du formulaire
 sidebar_label: Disposition du formulaire
 description: Contrôlez l'agencement du formulaire d'entité — largeurs de colonnes, sections et rail de métadonnées.
 ---
 
 ## Vue d'ensemble
-
-<span class="since-badge" data-since="0.26">Depuis 0.26</span>
 
 Le formulaire d'entité est généré à partir de vos propriétés :
 
@@ -131,8 +129,6 @@ Le rail n'utilise pas la grille ; `span` est donc ignoré pour les champs qu'il 
 Définissez `sidebar: []` pour désactiver complètement le rail généré et conserver l'intégralité des champs dans la colonne principale.
 
 ## Référence
-
-<span class="since-badge" data-since="0.26">Depuis 0.26</span>
 
 | Propriété | Type | Description |
 |-----------|------|-------------|

@@ -1,5 +1,5 @@
 ---
-sourceHash: 958615612ce5d124
+sourceHash: bf0e0428a86e411f
 title: Notifiche di Cloud
 sidebar_label: Notifiche
 description: Come Rebase Cloud avvisa le persone quando un deploy fallisce, i backup si fermano, un pagamento viene rifiutato o l'utilizzo supera l'80% — webhook firmati verso Slack, Discord o qualsiasi URL, ed email per singola persona.
@@ -12,8 +12,6 @@ Fa parte di [Rebase Cloud](/docs/deployment/cloud/), e ogni comando qui riportat
 è nel [riferimento cloud della CLI](/docs/cli/cloud/).
 
 ## Webhook
-
-<span class="since-badge" data-since="0.26">Da 0.26</span>
 
 Un progetto può inviare questi eventi a un webhook in ingresso di Slack o Discord,
 o a qualsiasi URL https, da **Settings → Notifications** nella

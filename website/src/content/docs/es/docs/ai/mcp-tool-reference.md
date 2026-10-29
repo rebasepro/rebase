@@ -1,5 +1,5 @@
 ---
-sourceHash: 441bdd62f0e1b3f7
+sourceHash: e2f4e2f2165a93fe
 title: Referencia de herramientas MCP
 sidebar_label: Referencia de herramientas MCP
 description: Cada herramienta que registra el servidor MCP de Rebase, por grupo — qué necesita y hace cada una, y cuáles rechaza la barrera de loopback frente a un proyecto no local.
@@ -123,8 +123,6 @@ sobre un destino en sí mismo. Por lo tanto, un asistente puede cambiar a un pro
 sin activar la barrera; simplemente no podrá ejecutar una herramienta destructiva allí después.
 
 ## Rebase Cloud (8)
-
-<span class="since-badge" data-since="0.26">Desde 0.26</span>
 
 Lanzan `rebase cloud … --json` en el directorio del proyecto activo, contra el
 proyecto al que está vinculado, con la credencial propia de la CLI. Consulta

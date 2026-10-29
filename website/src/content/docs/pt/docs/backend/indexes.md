@@ -1,5 +1,5 @@
 ---
-sourceHash: 0c021da7af2a852e
+sourceHash: d74cc2ea4835551d
 title: Índices
 sidebar_label: Índices
 description: Declare índices comuns do Postgres em uma coleção — btree, GIN e BRIN, parciais, compostos, de cobertura e únicos — e por que um índice manual costumava desaparecer.
@@ -326,8 +326,6 @@ na mesma coluna, fora de `indexes:`, portanto não é visto — declare-o em
 `indexes:`, ou defina `index: false`, para manter um índice em vez de dois.
 
 ### O que a atualização faz em um banco de dados existente
-
-<span class="since-badge" data-since="0.26">A partir da versão 0.26</span>
 
 Os índices são objetos novos em tabelas que já contêm dados, e as duas portas os
 constroem de modos diferentes:

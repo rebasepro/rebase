@@ -1,5 +1,5 @@
 ---
-sourceHash: 8935b1e530b1bfb3
+sourceHash: 05c7a9d34080d853
 title: Integrazione Server Personalizzato
 sidebar_label: Server Personalizzato
 description: Costruisci il backend Rebase da componenti pubblici nel tuo server — createRebaseBackend, i suoi gruppi di rotte, mount, attachRealtime e start — oppure incorpora il driver Postgres in Express.
@@ -257,7 +257,7 @@ decidere:
 mentre si apre e collega l'acquisizione delle modifiche a quelle che esistono in quel
 momento. Un `provision()` chiamato dopo verrebbe eseguito quando il driver ha già
 deciso che cosa esiste. `REBASE_MIGRATE_ON_BOOT=none` continua a disattivare lo schema
-delle collection per qualsiasi backend del processo. <span class="since-badge" data-since="0.26">Da 0.26</span> `initializeRebaseBackend` passa `false` quando `REBASE_PROVISION=false`.
+delle collection per qualsiasi backend del processo. `initializeRebaseBackend` passa `false` quando `REBASE_PROVISION=false`.
 
 ## Montare solo i gruppi che vuoi
 

@@ -1,5 +1,5 @@
 ---
-sourceHash: 5ce5071347b9d6a7
+sourceHash: bfdc82eab01277a9
 title: Fehlercodes
 sidebar_label: Fehlercodes
 description: Jeder Fehlercode, den ein Rebase-Backend zurückgeben kann, mit seinem HTTP-Status, seiner Bedeutung und Lösungsansätzen – plus Response-Envelope, X-Request-ID und den Details-Regeln.
@@ -311,7 +311,7 @@ Diese besagen eher, dass eine Funktion deaktiviert oder unkonfiguriert ist, als 
 | `SCHEMA_EDIT_REQUIRES_A_PERSON` | 403 | Ein API-Schlüssel oder ein anderer maschineller Principal hat versucht, eine Schemaänderung anzuwenden. | Melden Sie sich als Benutzer an oder setzen Sie `liveSchema.allowMachineApply`. |
 | `SCHEMA_EDITING_NO_COLLECTIONS_DIR` | 501 | Die Live-Schema-Bearbeitung erfordert `collectionsDir` oder `liveSchema.repository`, und dieser Server wurde ohne beides gestartet. | Konfigurieren Sie eines von beiden. |
 | `SCHEMA_EDITING_NO_REPOSITORY` | 503 | Die Planung funktioniert; es ist kein Repository vorhanden, in das die Änderung committet werden könnte. | Konfigurieren Sie `liveSchema.repository`. |
-| `SCHEMA_EDITING_PROVISIONING_OFF` | 409 | Dieses Deployment ändert nichts an seiner Datenbank (`REBASE_PROVISION=false`), daher kann eine Änderung nicht über das Panel angewendet werden. <span class="since-badge" data-since="0.26">Seit 0.26</span> | Committen Sie sie nur als Quellcode und lassen Sie den Prozess, der die Datenbank ändert, sie anwenden. |
+| `SCHEMA_EDITING_PROVISIONING_OFF` | 409 | Dieses Deployment ändert nichts an seiner Datenbank (`REBASE_PROVISION=false`), daher kann eine Änderung nicht über das Panel angewendet werden. | Committen Sie sie nur als Quellcode und lassen Sie den Prozess, der die Datenbank ändert, sie anwenden. |
 | `SCHEMA_EDITING_UNSUPPORTED` | 503 | Dieser Treiber kann keine Schemaänderungen planen. | Live-Bearbeitung ist unter Postgres verfügbar. |
 | `SCHEMA_EDITOR_BAAS_MODE` | 501 | Collections werden hier aus der Datenbank introspektiert, daher gibt es keine Quelldateien zum Bearbeiten. | Ändern Sie das Schema über eine Migration. |
 | `SCHEMA_EDITOR_DISABLED` | 501 | Der Schema-Editor ist für diesen Server deaktiviert. Ein gebautes Bundle antwortet immer so. | Aktivieren Sie ihn über `schemaEditor`. Setzen Sie bei einem Bundle `REBASE_LIVE_SCHEMA_REPOSITORY`, um Collections über ein Repository zu bearbeiten — siehe [Live-Schema-Bearbeitung](/docs/backend/live-schema-editing#from-a-built-bundle). |

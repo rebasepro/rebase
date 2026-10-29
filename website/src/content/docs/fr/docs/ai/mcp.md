@@ -1,5 +1,5 @@
 ---
-sourceHash: 781e0136e6dc1271
+sourceHash: b20067fcabaf42ec
 title: Serveur MCP
 sidebar_label: Serveur MCP
 description: Connectez Claude Code, Cursor, Gemini CLI ou n'importe quel client MCP à un projet Rebase — les 51 outils exposés, l'identifiant avec lequel il s'authentifie et le verrou loopback qui s'interpose entre un agent et la production.
@@ -175,7 +175,7 @@ De quel identifiant il s'agit, par ordre de priorité :
    que `rebase dev` s'exécute
 
 Les options 2 et 3 sont la clé du backend de dev de cette machine, utilisée uniquement lorsque la cible est en
-loopback. Lorsque `REBASE_BASE_URL` pointe ailleurs — <span class="since-badge" data-since="0.26">Depuis 0.26</span> `rebase cloud init --claim`
+loopback. Lorsque `REBASE_BASE_URL` pointe ailleurs — `rebase cloud init --claim`
 écrit l'adresse du projet cloud, et aucun `REBASE_API_TOKEN` tant qu'un déploiement
 n'a pas réussi —, le serveur n'envoie aucun jeton et l'indique une fois sur stderr.
 
@@ -306,7 +306,7 @@ verrouillé, de sorte qu'un outil ajouté ultérieurement est protégé par déf
   `rebase_db_branch_list`, `rebase_db_branch_info`, `rebase_db_branch_diff`, `list_documents`,
   `get_document`, `list_users`, `list_roles`, `storage_list_objects`,
   `storage_get_download_url`, `cron_list_jobs`, `cron_get_job`, `cron_get_job_logs`,
-  `rebase_dev_logs`, et <span class="since-badge" data-since="0.26">Depuis 0.26</span> les lectures Rebase Cloud `rebase_cloud_status`,
+  `rebase_dev_logs`, et les lectures Rebase Cloud `rebase_cloud_status`,
   `rebase_cloud_logs`, `rebase_cloud_env_list`, `rebase_cloud_deployments_list`.
 - **Non verrouillés — écritures Rebase Cloud :** `rebase_cloud_provision`,
   `rebase_cloud_deploy`, `rebase_cloud_env_set`, `rebase_cloud_rollback`.
@@ -422,8 +422,6 @@ personnel qui contient des identifiants administrateurs pour chaque projet que v
 traitez-le en conséquence.
 
 ## Rebase Cloud
-
-<span class="since-badge" data-since="0.26">Depuis 0.26</span>
 
 Huit outils mènent une app de ce répertoire à un backend en ligne sur
 [Rebase Cloud](/docs/deployment/cloud/) et le maintiennent en fonctionnement. Chacun lance

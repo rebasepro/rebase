@@ -328,8 +328,6 @@ same column, outside `indexes:`, is therefore not seen — declare it in
 
 ### What upgrading does to an existing database
 
-<span class="since-badge" data-since="0.26">Since 0.26</span>
-
 The indexes are new objects on tables that already hold data, and the two doors
 build them differently:
 

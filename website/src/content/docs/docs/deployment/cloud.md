@@ -61,7 +61,7 @@ before sending your email and password there. Without a terminal, or with
 `--json`, it refuses with `unknown_control_plane`; pass `--url <host>` (or set
 `REBASE_CLOUD_URL`) to sign in there on purpose.
 
-**Signed up with Google, GitHub or LinkedIn?** <span class="since-badge" data-since="0.26">Since 0.26</span> Your account has no password, so
+**Signed up with Google, GitHub or LinkedIn?** Your account has no password, so
 sign in with a code instead:
 
 ```bash
@@ -181,8 +181,6 @@ stops instead.
 
 ### The syntax check before the upload
 
-<span class="since-badge" data-since="0.26">Since 0.26</span>
-
 A static app's files are served exactly as they are. When its `build` only
 copies hand-written scripts into `output`, nothing has parsed them, and a file
 with a typo in it goes live and stops the page from loading. So before anything
@@ -219,8 +217,6 @@ platform is genuinely working and polling is the right thing to do; when it name
 something, that something is waiting for you.
 
 ## Preview a change
-
-<span class="since-badge" data-since="0.26">Since 0.26</span>
 
 ```bash
 rebase cloud deploy --preview
@@ -399,11 +395,11 @@ trust under **Settings → Access tokens**.
 sends email) that works once, for 7 days, for an account that has verified that
 address; nobody joins until they accept. Invite an admin or a member, and make
 them an owner once they have joined. Owners and admins see, resend or revoke it in
-**Pending invitations**; from a terminal, <span class="since-badge" data-since="0.26">Since 0.26</span> [`rebase cloud orgs members invite`](/docs/cli/cloud/#organizations).
+**Pending invitations**; from a terminal, [`rebase cloud orgs members invite`](/docs/cli/cloud/#organizations).
 
 ## See who did what
 
-The console's **Activity** page and <span class="since-badge" data-since="0.26">Since 0.26</span> `rebase cloud activity` show the
+The console's **Activity** page and `rebase cloud activity` show the
 organization's owners and admins who deployed, set or revealed an environment
 variable (by name, never by value), changed a domain, restored a backup,
 resized, stopped or deleted a project, changed a member's role, or created a
@@ -424,8 +420,6 @@ GitHub Actions workflow and what stays with a signed-in person are in
 [CI and agents](/docs/deployment/cloud-agents/#ci-and-agents).
 
 ## A backend with no account
-
-<span class="since-badge" data-since="0.26">Since 0.26</span>
 
 `rebase cloud init --claim` gives an app a live backend before anyone has signed
 up, and prints a claim URL for the person to keep it; a project nobody claims
@@ -541,7 +535,7 @@ Stated plainly, because finding out later is worse:
   `DATABASE_URL` and `JWT_SECRET`, so code a member deploys can read them,
   even though only owners and admins can reveal them in the console. Invite
   as a member only someone you would trust with those values.
-- **The service key can be replaced.** <span class="since-badge" data-since="0.26">Since 0.26</span> The project's **Settings**
+- **The service key can be replaced.** The project's **Settings**
   (or `rebase cloud service-key rotate`) issue a new `REBASE_SERVICE_KEY`
   and restart the app onto it. The old key works until the restart has
   finished, and nothing after, so anything that copied it is refused from

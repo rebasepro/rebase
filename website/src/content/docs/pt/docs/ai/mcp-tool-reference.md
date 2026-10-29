@@ -1,5 +1,5 @@
 ---
-sourceHash: 441bdd62f0e1b3f7
+sourceHash: e2f4e2f2165a93fe
 title: Referência de ferramentas do MCP
 sidebar_label: Referência de ferramentas do MCP
 description: Toda ferramenta que o servidor MCP do Rebase registra, por grupo — o que cada uma precisa e faz, e quais o gate de loopback recusa contra um projeto não local.
@@ -125,8 +125,6 @@ projeto remoto sem disparar o gate — ele apenas não poderá executar uma ferr
 destrutiva lá.
 
 ## Rebase Cloud (8)
-
-<span class="since-badge" data-since="0.26">A partir da versão 0.26</span>
 
 Executam `rebase cloud … --json` no diretório do projeto ativo, contra o
 projeto ao qual ele está vinculado, com a credencial da própria CLI. Veja

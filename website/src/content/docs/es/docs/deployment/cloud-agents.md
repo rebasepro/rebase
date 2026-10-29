@@ -1,5 +1,5 @@
 ---
-sourceHash: 582293a88fb2d626
+sourceHash: 9bf5476f1a977fe3
 title: CI, agentes y backends reclamables
 sidebar_label: CI y agentes
 description: Despliega en Rebase Cloud desde CI o un agente con un token acotado en lugar de una contraseña, y deja que un agente aprovisione un backend en vivo sin cuenta que una persona reclama después.
@@ -59,7 +59,7 @@ jobs:
 | `database` | `db list`, `db info` y `db connect`, que incluye la contraseña de la base de datos |
 | `backups` | Listar, crear, inspeccionar y descargar copias de seguridad, y leer la ventana de recuperación a un punto en el tiempo |
 
-<span class="since-badge" data-since="0.26">Desde 0.26</span> Tres capacidades más actúan sobre una organización en lugar de sobre un proyecto. Un token
+Tres capacidades más actúan sobre una organización en lugar de sobre un proyecto. Un token
 tiene una únicamente cuando `--can` la nombra, sobre la organización que nombra `--org` (o,
 sin `--org`, la organización del proyecto, y luego la seleccionada con
 `rebase cloud use`). Un token puede tener estas y ninguna capacidad de proyecto:
@@ -103,8 +103,6 @@ proyecto u organización. La pantalla **Access tokens** de la consola ofrece las
 capacidades, las de organización bajo **Organization access**. `rebase cloud tokens revoke <id> --yes` lo detiene al instante.
 
 ## Un backend sin cuenta
-
-<span class="since-badge" data-since="0.26">Desde 0.26</span>
 
 Un agente que ha construido una app puede darle un backend en vivo antes de que nadie
 se haya registrado, y entregar a la persona para la que trabaja un enlace para quedárselo:

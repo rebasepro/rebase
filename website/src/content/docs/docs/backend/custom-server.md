@@ -254,7 +254,7 @@ It is an option rather than a later step on purpose. The driver reads the
 tables as it opens, and attaches change capture to the ones that exist then.
 A `provision()` called afterwards would run after the driver had already
 decided what exists. `REBASE_MIGRATE_ON_BOOT=none` still turns the collection
-schema off for any backend in the process. <span class="since-badge" data-since="0.26">Since 0.26</span> `initializeRebaseBackend` passes
+schema off for any backend in the process. `initializeRebaseBackend` passes
 `false` when `REBASE_PROVISION=false`.
 
 ## Mounting only the groups you want

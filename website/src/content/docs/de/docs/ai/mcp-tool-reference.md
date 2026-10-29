@@ -1,5 +1,5 @@
 ---
-sourceHash: 441bdd62f0e1b3f7
+sourceHash: e2f4e2f2165a93fe
 title: MCP-Tool-Referenz
 sidebar_label: MCP-Tool-Referenz
 description: Jedes Tool, das der Rebase-MCP-Server registriert, nach Gruppe – was jedes einzelne benötigt und tut, und welche das Loopback-Gate bei einem nicht lokalen Projekt abweist.
@@ -128,8 +128,6 @@ Ein Assistent kann daher zu einem Remote-Projekt wechseln, ohne das Gate auszul�
 er kann dort anschließend lediglich keine destruktiven Tools ausführen.
 
 ## Rebase Cloud (8)
-
-<span class="since-badge" data-since="0.26">Seit 0.26</span>
 
 Starten `rebase cloud … --json` im aktiven Projektverzeichnis, gegen das Projekt, mit
 dem es verknüpft ist, mit dem eigenen Credential der CLI. Was sie bewirken und warum keines

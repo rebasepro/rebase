@@ -1,5 +1,5 @@
 ---
-sourceHash: 8710aaf2fefe9cfe
+sourceHash: a364dc4a57852453
 title: Autoalojamiento (Self-Hosting)
 sidebar_label: Autoalojamiento
 description: Ejecuta Rebase en cualquier lugar con la imagen oficial de runtime y el bundle de tu proyecto — Docker Compose, Fly, Railway o un VPS convencional.
@@ -130,7 +130,7 @@ Para un despliegue real, es preferible integrar ambos dentro de una imagen, lo q
 lo que se ejecuta:
 
 ```dockerfile
-FROM rebasepro/server:0.25.1
+FROM rebasepro/server:0.26.0
 COPY dist-bundle /bundle
 ```
 
@@ -167,8 +167,6 @@ imagen **se negará a arrancar** si se establece en `push`, por la razón mencio
 
 ## Cuando solo su proceso de cambios puede modificar la base de datos
 
-<span class="since-badge" data-since="0.26">Desde 0.26</span>
-
 `REBASE_MIGRATE_ON_BOOT=none` deja en paz sus colecciones. No deja en paz la base de datos: las tablas propias del framework (auth, claves de API, jobs, cron) se siguen creando y manteniendo al día en cada arranque. Cuando la base de datos solo puede cambiar mediante un proceso de cambios revisado, establezca `REBASE_PROVISION=false` en cada proceso que sirve:
 
 | Ajuste | Tablas y políticas de las colecciones | Tablas del framework |
@@ -186,8 +184,6 @@ Con el aprovisionamiento desactivado, el runtime no crea ni altera nada: ninguna
 Las filas siguen cambiando, como en cualquier base de datos: inicios de sesión, sesiones, uso de claves de API, claves de idempotencia, claims de cron. La primera cuenta de administrador (`REBASE_ADMIN_EMAIL`) la crea la ejecución de aprovisionamiento, no los procesos que sirven. La [edición del esquema en vivo](/docs/backend/live-schema-editing) puede seguir haciendo commit de un cambio como código fuente, pero se niega a aplicarlo a la base de datos.
 
 ### La ejecución de aprovisionamiento
-
-<span class="since-badge" data-since="0.26">Desde 0.26</span>
 
 El esquema proviene de una ejecución que controla su proceso de cambios. Use la misma imagen y el mismo bundle que el servidor, con `REBASE_PROVISION_ONLY=true`, conectado como un rol que puede crear en la base de datos. `REBASE_PROVISION_SQL_OUT` conserva cada cambio de esquema que hizo la ejecución, como un script SQL:
 
@@ -296,7 +292,7 @@ contenedores funcionará. Hay dos aspectos clave que debes configurar correctame
 
 ```toml
 [build]
-  dockerfile = "Dockerfile"   # FROM rebasepro/server:0.25.1 + COPY dist-bundle /bundle
+  dockerfile = "Dockerfile"   # FROM rebasepro/server:0.26.0 + COPY dist-bundle /bundle
 
 [http_service]
   internal_port = 8080
@@ -499,7 +495,7 @@ cooperativos. Consulta [Procesos divididos](/docs/deployment/split-processes/).
 ## Actualización
 
 ```yaml
-image: rebasepro/server:0.25.1
+image: rebasepro/server:0.26.0
 ```
 
 Reinicia. Tu bundle permanece inalterado. Dentro de una misma versión mayor del contrato del runtime, un bundle que

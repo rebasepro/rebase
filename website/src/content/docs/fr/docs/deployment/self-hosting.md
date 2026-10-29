@@ -1,5 +1,5 @@
 ---
-sourceHash: 8710aaf2fefe9cfe
+sourceHash: a364dc4a57852453
 title: Auto-hébergement
 sidebar_label: Auto-hébergement
 description: Exécutez Rebase n'importe où avec l'image runtime officielle et le bundle de votre projet — Docker Compose, Fly, Railway ou un simple VPS.
@@ -85,7 +85,7 @@ Comme elles sont déjà présentes, vous pouvez monter le bundle en lecture seul
 Pour un déploiement réel, préférez intégrer les deux dans une image, ce qui fige également avec précision ce qui s'exécute :
 
 ```dockerfile
-FROM rebasepro/server:0.25.1
+FROM rebasepro/server:0.26.0
 COPY dist-bundle /bundle
 ```
 
@@ -108,8 +108,6 @@ Exécutez-le depuis une copie locale du code ou une tâche de CI, pointant vers 
 
 ## Quand seul votre processus de changement peut modifier la base de données
 
-<span class="since-badge" data-since="0.26">Depuis 0.26</span>
-
 `REBASE_MIGRATE_ON_BOOT=none` laisse vos collections tranquilles. Il ne laisse pas la base de données tranquille : les tables propres au framework (auth, clés d'API, jobs, cron) sont toujours créées et tenues à jour à chaque démarrage. Quand la base de données ne peut changer que par un processus de changement relu, définissez `REBASE_PROVISION=false` sur chaque processus qui sert :
 
 | Réglage | Tables et politiques des collections | Tables du framework |
@@ -127,8 +125,6 @@ Provisionnement désactivé, le runtime ne crée et ne modifie rien : aucune tab
 Les lignes changent toujours, comme dans n'importe quelle base de données : connexions, sessions, usage des clés d'API, clés d'idempotence, claims de cron. Le premier compte administrateur (`REBASE_ADMIN_EMAIL`) est créé par l'exécution de provisionnement, pas par les processus qui servent. L'[édition du schéma en direct](/docs/backend/live-schema-editing) peut toujours committer un changement comme source, mais refuse de l'appliquer à la base de données.
 
 ### L'exécution de provisionnement
-
-<span class="since-badge" data-since="0.26">Depuis 0.26</span>
 
 Le schéma vient d'une exécution que contrôle votre processus de changement. Utilisez la même image et le même bundle que le serveur, avec `REBASE_PROVISION_ONLY=true`, connecté avec un rôle autorisé à créer dans la base de données. `REBASE_PROVISION_SQL_OUT` conserve chaque changement de schéma effectué par l'exécution, sous forme de script SQL :
 
@@ -201,7 +197,7 @@ Le runtime est un conteneur ordinaire écoutant sur `$PORT`, de sorte que tout c
 
 ```toml
 [build]
-  dockerfile = "Dockerfile"   # FROM rebasepro/server:0.25.1 + COPY dist-bundle /bundle
+  dockerfile = "Dockerfile"   # FROM rebasepro/server:0.26.0 + COPY dist-bundle /bundle
 
 [http_service]
   internal_port = 8080
@@ -322,7 +318,7 @@ Tout ce qui précède correspond à un conteneur unique servant l'intégralité 
 ## Mise à jour
 
 ```yaml
-image: rebasepro/server:0.25.1
+image: rebasepro/server:0.26.0
 ```
 
 Redémarrez. Votre bundle reste inchangé. Au sein d'une version majeure du contrat de runtime, un bundle validé continue de fonctionner — voir [Compatibilité](/docs/architecture/runtime-and-bundles/#compatibility).

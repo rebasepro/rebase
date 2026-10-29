@@ -1,5 +1,5 @@
 ---
-sourceHash: 64d01f9888fd5011
+sourceHash: 5e903a73cd2a8463
 title: Implantando o Rebase no Google Cloud Platform
 description: Implante sua instância do Rebase com segurança no GCP usando Cloud SQL e Cloud Run, com foco em regiões de data center da UE.
 sidebar_label: Google Cloud
@@ -34,7 +34,7 @@ rebase build
 O Cloud Run baixa imagens de um registro (registry), portanto, empacote o bundle em uma imagem derivada. Três linhas são suficientes para fixar exatamente o que será executado:
 
 ```dockerfile title="Dockerfile"
-FROM rebasepro/server:0.25.1
+FROM rebasepro/server:0.26.0
 COPY dist-bundle /bundle
 ```
 

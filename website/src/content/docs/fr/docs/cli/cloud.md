@@ -1,5 +1,5 @@
 ---
-sourceHash: 60c333829202e6eb
+sourceHash: d4f01e8b2b1972c4
 title: rebase cloud
 sidebar_label: rebase cloud
 description: Les groupes de commandes pour Rebase Cloud dans la CLI — auth, liaison de projet, déploiements, notifications, config, organisations, bases de données, ressources, compute, stockage, clusters, facturation et utilisation.
@@ -27,7 +27,7 @@ rebase cloud tokens create --can billing --org <id>   # a token for an organizat
 ```
 
 `--can` accepte `deploy`, `logs`, `env`, `database` et `backups` sur un projet
-(`--project`, ou celui qui est lié), et <span class="since-badge" data-since="0.26">Depuis 0.26</span> `billing`, `audit` et
+(`--project`, ou celui qui est lié), et `billing`, `audit` et
 `notifications` sur une organisation : `--org`, sinon l'organisation du projet,
 sinon celle qui est sélectionnée. Un jeton peut ne détenir que des capacités d'organisation.
 `logs` couvre aussi `usage`. Ce que chacune permet d'atteindre se trouve dans
@@ -36,7 +36,7 @@ contrôle marque une réponse à un jeton comme dépréciée (un jeton antérieu
 qui lit la facturation), le CLI affiche l'avis une fois sur stderr, jamais dans la
 valeur `--json`.
 
-Dans un terminal, sans mot de passe fourni, <span class="since-badge" data-since="0.26">Depuis 0.26</span> `login` demande s'il faut utiliser votre mot de passe
+Dans un terminal, sans mot de passe fourni, `login` demande s'il faut utiliser votre mot de passe
 ou un code que le plan de contrôle vous envoie par e-mail. Si l'authentification à deux facteurs est activée, il
 demande ensuite le code de votre application d'authentification (ou un code de récupération). Sans terminal,
 ni l'un ni l'autre ne peut être saisi : définissez `REBASE_TOKEN` avec un jeton d'accès créé dans la console
@@ -63,7 +63,7 @@ rebase cloud projects info [id]
 rebase cloud projects delete [id]
 ```
 
-<span class="since-badge" data-since="0.26">Depuis 0.26</span> `claim` affiche le lien de réclamation du projet que `init --claim` a provisionné dans ce
+`claim` affiche le lien de réclamation du projet que `init --claim` a provisionné dans ce
 répertoire, ainsi que le temps restant avant sa suppression s'il n'est pas réclamé (`Unclaimed: deleted
 in 41h`). `--open` l'ouvre aussi dans un navigateur. Le lien n'est conservé que sur la
 machine qui a exécuté `init --claim`, dans `~/.rebase/credentials.json` ; le plan de
@@ -123,7 +123,7 @@ rebase cloud logs --runtime --previous            # a restarted container's last
   le `severity` structuré qu'un backend Rebase journalise, un mot de niveau au début d'une
   ligne simple, ou une forme d'erreur telle que `TypeError:`. Les lignes sans aucun de ces éléments sont exclues.
 
-<span class="since-badge" data-since="0.26">Depuis 0.26</span> Un suivi interroge toutes les deux secondes et affiche chaque ligne une seule fois. Il signale les pods
+Un suivi interroge toutes les deux secondes et affiche chaque ligne une seule fois. Il signale les pods
 qui démarrent, s'arrêtent ou redémarrent. Lorsqu'un conteneur redémarre, il affiche aussi les dernières
 lignes de l'instance qui est morte, là où se trouve généralement la raison. Il attend tant qu'aucun
 pod ne tourne, et après une connexion interrompue il réessaie avec un backoff et
@@ -147,7 +147,7 @@ rebase cloud app-key [rotate]           # the app key init --claim wrote; owners
 rebase cloud service-key [rotate]       # REBASE_SERVICE_KEY; owners and admins
 ```
 
-<span class="since-badge" data-since="0.26">Depuis 0.26</span> `app-key` liste la
+`app-key` liste la
 clé que `rebase cloud init --claim` a créée sur l'app et écrite dans `.env` sous le nom
 `REBASE_API_TOKEN`, par son préfixe et jamais par sa valeur. Réclamer le projet
 transmet cette clé et elle cesse d'expirer. `app-key rotate` en crée une nouvelle et
@@ -156,7 +156,7 @@ qui définit déjà `REBASE_API_TOKEN`, et la garde hors de `--json` dans ce cas
 tout autre répertoire, il affiche la clé une seule fois. Les clés créées dans le panneau d'administration de l'app
 ne sont pas touchées. Il s'exécute avec votre session : aucune capacité de jeton ne l'autorise.
 
-<span class="since-badge" data-since="0.26">Depuis 0.26</span> `service-key`
+`service-key`
 affiche la génération du `REBASE_SERVICE_KEY` du projet, la date de sa dernière
 rotation, et si l'app est encore en train de redémarrer sur la plus récente. Il n'affiche jamais
 la clé : c'est le rôle de `env reveal REBASE_SERVICE_KEY`. `service-key rotate`
@@ -167,7 +167,7 @@ de service.
 
 Un aperçu de backend démarre avec les variables de la production, clés live comprises. `env set KEY=VALUE --preview` donne aux aperçus leur propre valeur, `env unset KEY --preview` exclut la variable des aperçus, `env reset KEY --preview` rend la valeur de la production, et `env list --preview` montre les différences. Aucune de ces commandes ne modifie la production.
 
-<span class="since-badge" data-since="0.26">Depuis 0.26</span> `env set KEY --stdin` lit la valeur sur l'entrée standard plutôt que sur la
+`env set KEY --stdin` lit la valeur sur l'entrée standard plutôt que sur la
 ligne de commande, où `ps` et l'historique de votre shell l'afficheraient :
 
 ```bash
@@ -187,7 +187,7 @@ rebase cloud orgs invites [list] | revoke <id|email> | resend <id|email>
 rebase cloud activity [--project <id|slug>] [--action <area|action>] [--actor <email>] [--limit N] [--before <cursor>]
 ```
 
-<span class="since-badge" data-since="0.26">Depuis 0.26</span> `members invite` ouvre une invitation et affiche son lien : à usage unique,
+`members invite` ouvre une invitation et affiche son lien : à usage unique,
 valable 7 jours, acceptée uniquement par un compte ayant vérifié cette adresse.
 Personne ne rejoint l'organisation tant qu'il n'a pas accepté, même quelqu'un qui a déjà un compte Rebase.
 La sortie (et `emailDelivery` dans `--json`) indique si le lien a été envoyé par e-mail ; sinon,
@@ -202,7 +202,7 @@ un membre en est informé.
 exige un propriétaire, et le dernier propriétaire reste. `--org <id>` choisit une organisation
 autre que celle qui est sélectionnée.
 
-<span class="since-badge" data-since="0.26">Depuis 0.26</span> `activity` est le journal d'audit de l'organisation sélectionnée, du plus récent au plus ancien : qui a
+`activity` est le journal d'audit de l'organisation sélectionnée, du plus récent au plus ancien : qui a
 déployé, annulé un déploiement, défini, supprimé ou révélé une variable d'environnement (par son
 nom, jamais par sa valeur), modifié un domaine, créé, restauré ou téléchargé une
 sauvegarde, modifié le compute d'un projet, arrêté ou supprimé un projet, changé le rôle d'un
@@ -275,7 +275,7 @@ rebase cloud usage [--month YYYY-MM]   # requests used this month against the al
 rebase cloud usage org           # every project of the selected organization, with the total
 ```
 
-<span class="since-badge" data-since="0.26">Depuis 0.26</span> `notifications add <url>` envoie les événements du projet lié vers une URL. `--events`
+`notifications add <url>` envoie les événements du projet lié vers une URL. `--events`
 accepte une liste séparée par des virgules parmi `deploy.failed` (par défaut),
 `deploy.succeeded`, `deploy.rolled_back`, `backup.unhealthy`,
 `billing.payment_failed`, `usage.threshold` et `preview.paused`. `--format slack` envoie
@@ -288,7 +288,7 @@ et `remove` exigent le rôle de propriétaire ou d'administrateur. Un jeton les 
 capacité `notifications` sur l'organisation, selon la même règle de rôle. Voir
 [Cloud notifications](/docs/deployment/cloud-notifications/).
 
-<span class="since-badge" data-since="0.26">Depuis 0.26</span> `clusters registry <cluster-id> --repository <host/project/repo>
+`clusters registry <cluster-id> --repository <host/project/repo>
 --push-service-account <email> --pull-key-file <key.json>` donne au cluster
 d'un client son propre registre d'images, utilisé pour ce seul cluster. Sans
 registre, un tel cluster utilise le registre partagé de la plateforme, et chaque déploiement vers lui
@@ -301,7 +301,7 @@ est scellée à l'écriture et jamais relue. Comme le reste de `clusters`,
 il exige le rôle d'administrateur de la plateforme. L'opérateur crée le dépôt et les deux
 comptes avec Terraform (`saas/infra/gcp/registry-linked-clusters.tf`).
 
-<span class="since-badge" data-since="0.26">Depuis 0.26</span> `billing invoices` et `billing upcoming` lisent les mêmes données Stripe que la
+`billing invoices` et `billing upcoming` lisent les mêmes données Stripe que la
 page Billing de la console, et sont réservés aux propriétaires et administrateurs de l'organisation.
 Un jeton y accède, comme au reste de `billing`, avec la capacité
 `billing` sur l'organisation ; un jeton créé avant cette capacité continue de
@@ -309,7 +309,7 @@ fonctionner pendant une version, avec un avertissement à chaque réponse. Les m
 Stripe les envoie. Les factures brouillon ne sont pas listées ; l'aperçu est calculé par
 Stripe et ses lignes mesurées continuent de croître jusqu'à la clôture de la période.
 
-<span class="since-badge" data-since="0.26">Depuis 0.26</span> `usage` lit ce que le projet lié (ou `--project`) a consommé sur un mois
+`usage` lit ce que le projet lié (ou `--project`) a consommé sur un mois
 calendaire, en UTC : les requêtes par rapport au quota inclus, les erreurs 5xx, le dépassement
 à ce jour en euros et, pour le mois en cours, la projection à ce
 rythme (une estimation). Le dépassement est le calcul propre du rapport de dépassement, celui

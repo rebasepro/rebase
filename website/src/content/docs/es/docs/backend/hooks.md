@@ -1,5 +1,5 @@
 ---
-sourceHash: 15dd4d33e0af52d5
+sourceHash: ba272fed815c24ef
 title: Hooks globales del backend
 sidebar_label: Hooks globales
 description: Aplica callbacks de ciclo de vida transversales a cada colección a nivel de servidor usando CollectionCallbacks.
@@ -103,7 +103,7 @@ Cada callback recibe un único objeto de props. Campos comunes:
 
 `context.user` contiene el usuario autenticado (`uid`, `roles`, etc.). Una solicitud sin token, cuando la API la deja pasar, lleva la identidad anónima `{ uid: "anonymous", roles: ["anon"] }` en lugar de `undefined`.
 
-<span class="since-badge" data-since="0.26">Desde 0.26</span> `context.credential` nombra la clave de API con la que se hizo una escritura: `{ kind, id, name }`, donde `kind` es `"personal"` o `"service"`. Una clave personal actúa como su propietario, así que `context.user` es el propietario tanto si guardó a mano como si un trabajo de CI escribió con su clave; `context.credential` distingue ambos casos. Se establece en la API de datos, en el socket de tiempo real y en `/mcp`, y está ausente en una sesión, en la clave de servicio, en el trabajo en contexto de servidor (`rebase.dataAsAdmin`, crons) y en el navegador. Nunca lleva el secreto.
+`context.credential` nombra la clave de API con la que se hizo una escritura: `{ kind, id, name }`, donde `kind` es `"personal"` o `"service"`. Una clave personal actúa como su propietario, así que `context.user` es el propietario tanto si guardó a mano como si un trabajo de CI escribió con su clave; `context.credential` distingue ambos casos. Se establece en la API de datos, en el socket de tiempo real y en `/mcp`, y está ausente en una sesión, en la clave de servicio, en el trabajo en contexto de servidor (`rebase.dataAsAdmin`, crons) y en el navegador. Nunca lleva el secreto.
 
 `collection` siempre está presente. Un callback global se dispara para cada colección, por lo que
 es el único nivel que se registra independientemente de cualquiera de ellas, pero aun así
@@ -302,7 +302,7 @@ Tenga en cuenta lo que esto aporta y lo que cuesta: si la fila de auditoría no 
 eliminación tampoco se produce. Para un registro de auditoría, esto suele ser lo que se desea.
 Si no es así, capture el error en el callback e indíquelo en un comentario.
 
-La columna `via_key` lee `context.credential`, que es nuevo: <span class="since-badge" data-since="0.26">Desde 0.26</span> En una
+La columna `via_key` lee `context.credential`, que es nuevo: En una
 versión anterior, omítala.
 
 ### Lógica específica por colección

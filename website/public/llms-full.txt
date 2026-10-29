@@ -804,8 +804,8 @@ image. A project that has ejected owns these decisions in its own code instead.
 | `REBASE_METRICS` | Expose Prometheus metrics at `/metrics`. | `false` |
 | `REBASE_HSTS_INCLUDE_SUBDOMAINS` | Add `includeSubDomains` to the `Strict-Transport-Security` header, so browsers refuse plain HTTP on every subdomain of the host for six months — hosts this process does not serve included. Turn it on only when every subdomain of the domain is HTTPS-only. Anything but `true`/`false` refuses to boot. See [Security headers](/docs/deployment/self-hosting/#security-headers). | `false` |
 | `REBASE_METRICS_TOKEN` | Bearer token guarding `/metrics`. Unset leaves the endpoint open to anything that can reach the port — fine on a private network, not on a public one, and the boot logs say so. | — |
-| `REBASE_MIGRATE_ON_BOOT` | What the runtime may do to the collection schema at boot. `ensure` (the default, everywhere — production included) runs the **additive** pass: create missing tables, columns and enum types, never drop or rewrite one. `none` leaves the collection schema alone, but the framework's own tables (auth, API keys, jobs, cron) are still created and kept current; <span class="since-badge" data-since="0.26">Since 0.26</span> `REBASE_PROVISION=false` turns those off too. The published image accepts only those two and **refuses to boot on `push`**. In a [split deployment](/docs/deployment/split-processes) exactly one process may provision, so every other role must set `none` or refuse to boot. | `ensure` |
-| `REBASE_PROVISION` | <span class="since-badge" data-since="0.26">Since 0.26</span> `false` makes the runtime change nothing in its database: no table, column, index, function, trigger, policy, role or grant, at boot or later, the framework's own included. It reports what is missing by name instead. For a database that only your change process may change. See [When only your change process may change the database](/docs/deployment/self-hosting/#when-only-your-change-process-may-change-the-database). Only `true` and `false` are accepted. | `true` |
+| `REBASE_MIGRATE_ON_BOOT` | What the runtime may do to the collection schema at boot. `ensure` (the default, everywhere — production included) runs the **additive** pass: create missing tables, columns and enum types, never drop or rewrite one. `none` leaves the collection schema alone, but the framework's own tables (auth, API keys, jobs, cron) are still created and kept current; `REBASE_PROVISION=false` turns those off too. The published image accepts only those two and **refuses to boot on `push`**. In a [split deployment](/docs/deployment/split-processes) exactly one process may provision, so every other role must set `none` or refuse to boot. | `ensure` |
+| `REBASE_PROVISION` | `false` makes the runtime change nothing in its database: no table, column, index, function, trigger, policy, role or grant, at boot or later, the framework's own included. It reports what is missing by name instead. For a database that only your change process may change. See [When only your change process may change the database](/docs/deployment/self-hosting/#when-only-your-change-process-may-change-the-database). Only `true` and `false` are accepted. | `true` |
 | `REBASE_REQUIRE_SCHEMA_MATCH` | Refuse to boot when the database was last provisioned from a different set of collections than this process was built from. Unset (or anything other than `true`/`1`) warns instead. | warn |
 | `REALTIME_CDC` | Database-level change capture: `auto` (enable where the connection supports it, silently fall back otherwise), `trigger` (force it, warn if impossible), `wal` (degrades to `trigger` today), `off`. See [Realtime](/docs/backend/realtime-cdc/). Wins over `realtime.cdc`. | `auto` |
 | `REALTIME_CHANNEL_BUS` | Cross-instance transport for broadcast channels and presence: `memory` or `postgres`. Ignored when `realtime.bus` was given a constructed transport. | `memory` |
@@ -816,8 +816,8 @@ image. A project that has ejected owns these decisions in its own code instead.
 | `REALTIME_RECOUNT_MIN_ROWS` | The smallest last total `REALTIME_RECOUNT_INTERVAL_MS` applies to; smaller lists are counted on every frame. Wins over `realtime.recountMinRows`. | `100000` |
 | `ALLOW_LOCALHOST_IN_PRODUCTION` | Permit `localhost`/loopback values under `NODE_ENV=production`. Off, so a production boot fails loudly rather than connecting to a database that is not there. | `false` |
 | `REBASE_STRICT_COLLECTION_CONFIG` | What boot does with a key in your collections that this version does not read: `warn`, `error` (refuse to boot — worth turning on in CI), or `off`. Only governs keys it does not *recognise*, which are usually a typo and occasionally deliberate metadata; a key it knows has moved is always fatal, because the feature it configured is silently absent otherwise. | `warn` |
-| `REBASE_PROVISION_ONLY` | `1`/`true` runs the schema pass and exits without opening a socket — the shape a migration Job wants, from the same image and the same bundle as the server that follows it. It also creates the tables a serving process would otherwise make on first use, and starts no cron or job queue. An empty value is *unset*, so an unsubstituted `${SOMETHING}` in a compose file cannot turn an ordinary deployment into one that migrates and refuses to serve. Refused together with <span class="since-badge" data-since="0.26">Since 0.26</span> `REBASE_PROVISION=false`. | — |
-| `REBASE_PROVISION_SQL_OUT` | <span class="since-badge" data-since="0.26">Since 0.26</span> A file path. A provisioning run (`REBASE_PROVISION_ONLY=true`) writes every schema change it made to it, in order, as a SQL script to review and apply with `psql`. Rows it wrote are not included. Refused on a process that serves. | — |
+| `REBASE_PROVISION_ONLY` | `1`/`true` runs the schema pass and exits without opening a socket — the shape a migration Job wants, from the same image and the same bundle as the server that follows it. It also creates the tables a serving process would otherwise make on first use, and starts no cron or job queue. An empty value is *unset*, so an unsubstituted `${SOMETHING}` in a compose file cannot turn an ordinary deployment into one that migrates and refuses to serve. Refused together with `REBASE_PROVISION=false`. | — |
+| `REBASE_PROVISION_SQL_OUT` | A file path. A provisioning run (`REBASE_PROVISION_ONLY=true`) writes every schema change it made to it, in order, as a SQL script to review and apply with `psql`. Rows it wrote are not included. Refused on a process that serves. | — |
 | `REBASE_LIVE_SCHEMA_ALLOW_MACHINE_APPLY` | `true` lets a machine — an agent, a CI job — *apply* a schema change through `/api/admin/schema`, not only plan one. Off unless asked for: the credential that would make such a change is the one most likely to be sitting in a CI variable. | `false` |
 | `REBASE_FUNCTIONS_TIMEOUT_MS` | How long a custom function may run before its request is aborted. Same knob as the `functionsTimeoutMs` option. `0` turns it off. | `30000` |
 | `REBASE_EXIT_ON_UNHANDLED_REJECTION` | `true` makes an unhandled promise rejection terminate the process instead of logging it. On under an orchestrator that will restart you; off where a restart is worse than a leak. | `false` |
@@ -950,7 +950,7 @@ Read by `rebase`, not by the server. Nothing here affects a deployment.
 | `REBASE_CLOUD_URL` | The control plane `rebase cloud` talks to. | — |
 | `REBASE_CLOUD_EMAIL` | The account `rebase cloud login` signs in as, instead of prompting. | — |
 | `REBASE_CLOUD_PASSWORD` | Its password, so a secret store can hand it over without it reaching the shell's history. | — |
-| `REBASE_TOKEN` | A token from `rebase cloud tokens create`. Set, every `rebase cloud` command authenticates with it instead of the `rebase cloud login` session, and never reads or writes the stored session. <span class="since-badge" data-since="0.26">Since 0.26</span> In a directory `rebase cloud init --claim` linked, it is set aside for that project's own token when it holds no scope on the project. The way to run `rebase cloud` in CI — see [CI and agents](/docs/deployment/cloud/#ci-and-agents). The [MCP server](/docs/ai/mcp/) passes it to the CLI its cloud tools spawn, and never sends it to the app: set `REBASE_API_TOKEN` for that. | — |
+| `REBASE_TOKEN` | A token from `rebase cloud tokens create`. Set, every `rebase cloud` command authenticates with it instead of the `rebase cloud login` session, and never reads or writes the stored session. In a directory `rebase cloud init --claim` linked, it is set aside for that project's own token when it holds no scope on the project. The way to run `rebase cloud` in CI — see [CI and agents](/docs/deployment/cloud/#ci-and-agents). The [MCP server](/docs/ai/mcp/) passes it to the CLI its cloud tools spawn, and never sends it to the app: set `REBASE_API_TOKEN` for that. | — |
 | `REBASE_DEBUG` | `1` prints the underlying error and request detail instead of the short message. The first thing to set when a `rebase cloud` command fails unhelpfully. | — |
 | `REBASE_ATLAS_DEV_URL` | The empty database `rebase db push`, `db generate` and `db migrate` plan against, instead of the `<db>_dev_diff` they create beside `DATABASE_URL`. Rebase neither creates nor drops a database named here, and refuses one equal to `DATABASE_URL`. On the managed development database the CLI sets it to a throwaway in-memory PGlite of its own. Set it where `CREATE DATABASE` is not granted. | `<db>_dev_diff` |
 | `REBASE_DEV_NO_DB` | `rebase dev` starts no database and provisions nothing — you bring your own. Same as `--no-db`. | — |
@@ -4241,6 +4241,8 @@ yet, listed so that nobody reads a promise into them:
 ## Changelog
 
 ### [Unreleased]
+
+### [0.26.0] - 2026-10-29
 
 #### Breaking
 
@@ -21363,8 +21365,6 @@ enforces for everyone.
 
 #### UI Configuration (`admin`)
 
-<span class="since-badge" data-since="0.26">Since 0.26</span>
-
 UI-related options are nested under the `admin` sub-object:
 
 ```typescript
@@ -26937,7 +26937,7 @@ so a panel can grey the feature out instead of showing an error.
 | `SCHEMA_EDIT_REQUIRES_A_PERSON` | 403 | An API key or other machine principal tried to apply a schema change. | Sign in as a user, or set `liveSchema.allowMachineApply`. |
 | `SCHEMA_EDITING_NO_COLLECTIONS_DIR` | 501 | Live schema editing needs `collectionsDir` or `liveSchema.repository`, and this server was started with neither. | Configure one. |
 | `SCHEMA_EDITING_NO_REPOSITORY` | 503 | Planning works; there is no repository to commit the change to. | Configure `liveSchema.repository`. |
-| `SCHEMA_EDITING_PROVISIONING_OFF` | 409 | This deployment changes nothing in its database (`REBASE_PROVISION=false`), so a change cannot be applied from the panel. <span class="since-badge" data-since="0.26">Since 0.26</span> | Commit it as source only, and let the process that changes the database apply it. |
+| `SCHEMA_EDITING_PROVISIONING_OFF` | 409 | This deployment changes nothing in its database (`REBASE_PROVISION=false`), so a change cannot be applied from the panel. | Commit it as source only, and let the process that changes the database apply it. |
 | `SCHEMA_EDITING_UNSUPPORTED` | 503 | This driver cannot plan schema changes. | Live editing is available on Postgres. |
 | `SCHEMA_EDITOR_BAAS_MODE` | 501 | Collections are introspected from the database here, so there are no source files to edit. | Change the schema with a migration. |
 | `SCHEMA_EDITOR_DISABLED` | 501 | The schema editor is turned off for this server. A built bundle always answers this. | Turn it on with `schemaEditor`. On a bundle, set `REBASE_LIVE_SCHEMA_REPOSITORY` to edit collections through a repository — see [Live schema editing](/docs/backend/live-schema-editing#from-a-built-bundle). |
@@ -32214,8 +32214,6 @@ same column, outside `indexes:`, is therefore not seen — declare it in
 
 #### What upgrading does to an existing database
 
-<span class="since-badge" data-since="0.26">Since 0.26</span>
-
 The indexes are new objects on tables that already hold data, and the two doors
 build them differently:
 
@@ -34144,7 +34142,7 @@ Each callback receives a single props object. Common fields:
 
 `context.user` contains the authenticated user (`uid`, `roles`, etc.). A request with no token, where the API lets one in, carries the anonymous identity `{ uid: "anonymous", roles: ["anon"] }` rather than `undefined`.
 
-<span class="since-badge" data-since="0.26">Since 0.26</span> `context.credential` names the API key a write was made with: `{ kind, id, name }`, where `kind` is `"personal"` or `"service"`. A personal key acts as its owner, so `context.user` is the owner whether they saved by hand or a CI job wrote with their key; `context.credential` tells the two apart. It is set on the data API, the realtime socket and `/mcp`, and absent for a session, the service key, server-context work (`rebase.dataAsAdmin`, crons) and in the browser. It never carries the secret.
+`context.credential` names the API key a write was made with: `{ kind, id, name }`, where `kind` is `"personal"` or `"service"`. A personal key acts as its owner, so `context.user` is the owner whether they saved by hand or a CI job wrote with their key; `context.credential` tells the two apart. It is set on the data API, the realtime socket and `/mcp`, and absent for a session, the service key, server-context work (`rebase.dataAsAdmin`, crons) and in the browser. It never carries the secret.
 
 `collection` is always there. A global callback fires for every collection, so
 it is the one tier that is registered independently of any of them — but it is
@@ -34345,7 +34343,7 @@ Note what this buys and what it costs: if the audit row cannot be written, the
 delete does not happen either. For an audit trail that is usually what you want.
 If it is not, catch the error in the callback and say so in a comment.
 
-The `via_key` column reads `context.credential`, which is new: <span class="since-badge" data-since="0.26">Since 0.26</span> On an
+The `via_key` column reads `context.credential`, which is new: On an
 earlier version, leave it out.
 
 #### Collection-Specific Logic
@@ -34856,8 +34854,6 @@ postgresql://user:pass@localhost:5432/rb_dev_sandbox
 
 ### Reviewing and merging a branch
 
-<span class="since-badge" data-since="0.26">Since 0.26</span>
-
 A branch is where an agent, or a migration you are not sure of, can change a
 database without touching the real one. Before any of it reaches the database
 the branch was made from, you can see what changed and merge it from
@@ -35274,7 +35270,7 @@ It is an option rather than a later step on purpose. The driver reads the
 tables as it opens, and attaches change capture to the ones that exist then.
 A `provision()` called afterwards would run after the driver had already
 decided what exists. `REBASE_MIGRATE_ON_BOOT=none` still turns the collection
-schema off for any backend in the process. <span class="since-badge" data-since="0.26">Since 0.26</span> `initializeRebaseBackend` passes
+schema off for any backend in the process. `initializeRebaseBackend` passes
 `false` when `REBASE_PROVISION=false`.
 
 ### Mounting only the groups you want
@@ -37989,8 +37985,6 @@ properties: {
 
 ### Overview
 
-<span class="since-badge" data-since="0.26">Since 0.26</span>
-
 The entity form is generated from your properties:
 
 - the id and the `createdAt` / `updatedAt` timestamps go to a metadata rail, read-only
@@ -38145,8 +38139,6 @@ Set `sidebar: []` to suppress the derived rail entirely and keep every field in
 the main column.
 
 ### Reference
-
-<span class="since-badge" data-since="0.26">Since 0.26</span>
 
 | Property | Type | Description |
 |----------|------|-------------|
@@ -49192,7 +49184,7 @@ Which credential that is, in priority order:
    is running
 
 2 and 3 are this machine's dev backend's key, used only when the target is on
-loopback. When `REBASE_BASE_URL` points elsewhere — <span class="since-badge" data-since="0.26">Since 0.26</span> `rebase cloud init --claim`
+loopback. When `REBASE_BASE_URL` points elsewhere — `rebase cloud init --claim`
 writes the cloud project's address, and no `REBASE_API_TOKEN` until a deploy
 succeeds — the server sends no token and says so once on stderr.
 
@@ -49324,7 +49316,7 @@ gated, so a tool added later arrives protected by default.
   `rebase_db_branch_list`, `rebase_db_branch_info`, `rebase_db_branch_diff`, `list_documents`,
   `get_document`, `list_users`, `list_roles`, `storage_list_objects`,
   `storage_get_download_url`, `cron_list_jobs`, `cron_get_job`, `cron_get_job_logs`,
-  `rebase_dev_logs`, and <span class="since-badge" data-since="0.26">Since 0.26</span> the Rebase Cloud reads `rebase_cloud_status`,
+  `rebase_dev_logs`, and the Rebase Cloud reads `rebase_cloud_status`,
   `rebase_cloud_logs`, `rebase_cloud_env_list`, `rebase_cloud_deployments_list`.
 - **Not gated — Rebase Cloud writes:** `rebase_cloud_provision`,
   `rebase_cloud_deploy`, `rebase_cloud_env_set`, `rebase_cloud_rollback`.
@@ -49446,8 +49438,6 @@ directory holding admin credentials for every project you have registered; treat
 it accordingly.
 
 ### Rebase Cloud
-
-<span class="since-badge" data-since="0.26">Since 0.26</span>
 
 Eight tools take an app from this directory to a live backend on
 [Rebase Cloud](/docs/deployment/cloud/) and keep it running. Each one spawns
@@ -49694,8 +49684,6 @@ remote project without tripping the gate — it just cannot then run a destructi
 tool there.
 
 ### Rebase Cloud (8)
-
-<span class="since-badge" data-since="0.26">Since 0.26</span>
 
 Spawn `rebase cloud … --json` in the active project directory, against the
 project it is linked to, with the CLI's own credential. See
@@ -50156,8 +50144,6 @@ Or run any command without installing it: `pnpm dlx @rebasepro/cli <command>`.
 
 ### Machine-readable output
 
-<span class="since-badge" data-since="0.26">Since 0.26</span>
-
 `--json` is the switch, and outside the `cloud` family it is the only one: `rebase status`, `rebase resources`, `rebase apps list`, `rebase upgrade` and `rebase verify` then put one JSON value on stdout — the result, or a `{"error": {"message", "code", "hint", "issues"}}` envelope with a non-zero exit — on **every** exit of the command, so a caller can parse stdout unconditionally. Without it they write human text and failures go to stderr. `rebase cloud` uses the same envelope and is the one exception to the switch: it also turns JSON on by itself when stdout is not a TTY, or when `REBASE_JSON=1` is set. So `rebase cloud status | cat` is JSON while `rebase status | cat` is not — in a script, pass `--json` explicitly rather than relying on either rule.
 
 ### Commands
@@ -50550,8 +50536,6 @@ types — and fails closed, which makes it the form to use as a CI gate against 
 deployed database.
 
 #### `rebase verify`
-
-<span class="since-badge" data-since="0.26">Since 0.26</span>
 
 ```bash
 rebase verify
@@ -51041,7 +51025,7 @@ rebase cloud tokens create --can billing --org <id>   # a token for an organizat
 ```
 
 `--can` takes `deploy`, `logs`, `env`, `database` and `backups` on one project
-(`--project`, or the linked one), and <span class="since-badge" data-since="0.26">Since 0.26</span> `billing`, `audit` and
+(`--project`, or the linked one), and `billing`, `audit` and
 `notifications` on one organization: `--org`, else the project's organization,
 else the selected one. A token may hold only organization capabilities.
 `logs` also covers `usage`. What each one reaches is in
@@ -51050,7 +51034,7 @@ plane marks an answer to a token as deprecated (a token from before `billing`
 reading billing), the CLI prints the notice once on stderr, never in the
 `--json` value.
 
-At a terminal with no password given, <span class="since-badge" data-since="0.26">Since 0.26</span> `login` asks whether to use your password
+At a terminal with no password given, `login` asks whether to use your password
 or a code the control plane emails you. With two-factor authentication on, it
 then asks for your authenticator code (or a recovery code). Without a terminal
 neither can be typed: set `REBASE_TOKEN` to an access token made in the console
@@ -51077,7 +51061,7 @@ rebase cloud projects info [id]
 rebase cloud projects delete [id]
 ```
 
-<span class="since-badge" data-since="0.26">Since 0.26</span> `claim` prints the claim link of the project `init --claim` provisioned in this
+`claim` prints the claim link of the project `init --claim` provisioned in this
 directory, and the time left before it is deleted unclaimed (`Unclaimed: deleted
 in 41h`). `--open` also opens it in a browser. The link is kept only on the
 machine that ran `init --claim`, in `~/.rebase/credentials.json`; the control
@@ -51162,7 +51146,7 @@ rebase cloud logs --runtime --previous            # a restarted container's last
   the structured `severity` a Rebase backend logs, a level word at the start of a
   plain line, or an error shape such as `TypeError:`. Lines with none are left out.
 
-<span class="since-badge" data-since="0.26">Since 0.26</span> A follow polls every two seconds and prints each line once. It announces pods
+A follow polls every two seconds and prints each line once. It announces pods
 that start, stop or restart. When a container restarts it also prints the last
 lines of the instance that died, where the reason usually is. It waits while no
 pod is running, and after a dropped connection it retries with backoff and
@@ -51186,7 +51170,7 @@ rebase cloud app-key [rotate]           # the app key init --claim wrote; owners
 rebase cloud service-key [rotate]       # REBASE_SERVICE_KEY; owners and admins
 ```
 
-<span class="since-badge" data-since="0.26">Since 0.26</span> `app-key` lists the
+`app-key` lists the
 key `rebase cloud init --claim` minted on the app and wrote into `.env` as
 `REBASE_API_TOKEN`, by its prefix and never its value. Claiming the project
 hands that key over and it stops expiring. `app-key rotate` mints a new one and
@@ -51195,7 +51179,7 @@ that already sets `REBASE_API_TOKEN`, and keeps it out of `--json` there. In
 any other directory it prints the key once. Keys made in the app's admin panel
 are not touched. It runs with your login: no token capability grants it.
 
-<span class="since-badge" data-since="0.26">Since 0.26</span> `service-key`
+`service-key`
 prints the generation of the project's `REBASE_SERVICE_KEY`, when it was last
 rotated, and whether the app is still restarting onto the newest one. It never
 prints the key: that is `env reveal REBASE_SERVICE_KEY`. `service-key rotate`
@@ -51210,7 +51194,7 @@ A backend preview starts from production's variables, live keys included.
 back production's value, and `env list --preview` shows the differences.
 Production is never changed by any of them.
 
-<span class="since-badge" data-since="0.26">Since 0.26</span> `env set KEY --stdin` reads the value from standard input instead of the
+`env set KEY --stdin` reads the value from standard input instead of the
 command line, where `ps` and your shell history would show it:
 
 ```bash
@@ -51230,7 +51214,7 @@ rebase cloud orgs invites [list] | revoke <id|email> | resend <id|email>
 rebase cloud activity [--project <id|slug>] [--action <area|action>] [--actor <email>] [--limit N] [--before <cursor>]
 ```
 
-<span class="since-badge" data-since="0.26">Since 0.26</span> `members invite` opens an invitation and prints its link: single use,
+`members invite` opens an invitation and prints its link: single use,
 valid 7 days, accepted only by an account that has verified that address.
 Nobody joins until they accept, even someone who already has a Rebase account.
 The output (and `emailDelivery` in `--json`) says whether it was emailed; when
@@ -51245,7 +51229,7 @@ role; a member is told so.
 takes an owner, and the last owner stays. `--org <id>` picks an organization
 other than the selected one.
 
-<span class="since-badge" data-since="0.26">Since 0.26</span> `activity` is the selected organization's audit log, newest first: who
+`activity` is the selected organization's audit log, newest first: who
 deployed, rolled back, set, deleted or revealed an environment variable (by
 name, never by value), changed a domain, created, restored or downloaded a
 backup, changed a project's compute, stopped or deleted a project, changed a
@@ -51318,7 +51302,7 @@ rebase cloud usage [--month YYYY-MM]   # requests used this month against the al
 rebase cloud usage org           # every project of the selected organization, with the total
 ```
 
-<span class="since-badge" data-since="0.26">Since 0.26</span> `notifications add <url>` sends the linked project's events to a URL. `--events`
+`notifications add <url>` sends the linked project's events to a URL. `--events`
 takes a comma-separated list of `deploy.failed` (the default),
 `deploy.succeeded`, `deploy.rolled_back`, `backup.unhealthy`,
 `billing.payment_failed`, `usage.threshold` and `preview.paused`. `--format slack` sends
@@ -51331,7 +51315,7 @@ and `remove` need the owner or admin role. A token manages them with the
 `notifications` capability on the organization, within the same role rule. See
 [Cloud notifications](/docs/deployment/cloud-notifications/).
 
-<span class="since-badge" data-since="0.26">Since 0.26</span> `clusters registry <cluster-id> --repository <host/project/repo>
+`clusters registry <cluster-id> --repository <host/project/repo>
 --push-service-account <email> --pull-key-file <key.json>` gives a customer's
 own cluster an image registry of its own, used for that cluster alone. Without
 one, such a cluster uses the platform's shared registry, and every deploy to it
@@ -51344,7 +51328,7 @@ is sealed when it is written and never read back. Like the rest of `clusters`,
 it needs the platform-admin role. The operator creates the repository and both
 accounts with Terraform (`saas/infra/gcp/registry-linked-clusters.tf`).
 
-<span class="since-badge" data-since="0.26">Since 0.26</span> `billing invoices` and `billing upcoming` read the same Stripe data as the
+`billing invoices` and `billing upcoming` read the same Stripe data as the
 console's Billing page, and are open to the organization's owners and admins
 only. A token reaches them, and the rest of `billing`, with the `billing`
 capability on the organization; a token made before that capability keeps
@@ -51352,7 +51336,7 @@ working for one release, with a warning on each answer. Amounts in `--json` are 
 Stripe sends them. Draft invoices are not listed; the preview is computed by
 Stripe and its metered lines keep growing until the period closes.
 
-<span class="since-badge" data-since="0.26">Since 0.26</span> `usage` reads what the linked project (or `--project`) has used in a calendar
+`usage` reads what the linked project (or `--project`) has used in a calendar
 month, in UTC: requests against the included allowance, 5xx errors, the overage
 so far in euros and, for the month in progress, where it is heading at this
 pace (an estimate). The overage is the overage report's own calculation, the
@@ -52832,7 +52816,7 @@ before it agrees to boot:
 ```jsonc
 {
   "bundleFormat": 2,
-  "runtime": { "range": "^1", "builtAgainst": "0.25.1", "contract": 1 },
+  "runtime": { "range": "^1", "builtAgainst": "0.26.0", "contract": 1 },
   "schemaVersion": "v1:c5d97d0f96b7f87a",
   "kind": "backend",
   "entry": {
@@ -52883,7 +52867,7 @@ different one rather than start and misbehave later.
 This is why upgrading Rebase in a self-hosted deployment is a tag change:
 
 ```yaml
-image: rebasepro/server:0.25.1   # a newer tag — your bundle is untouched
+image: rebasepro/server:0.26.0   # a newer tag — your bundle is untouched
 ```
 
 ### Development uses the same path
@@ -53296,7 +53280,7 @@ version stamp reveals nothing about the schema it stands for:
 
 ```bash
 curl -s https://api.example.com/api/meta/schema-version
-# {"schemaVersion":"v1:c5d97d0f96b7f87a","runtime":{"version":"0.25.1","contract":1}}
+# {"schemaVersion":"v1:c5d97d0f96b7f87a","runtime":{"version":"0.26.0","contract":1}}
 ```
 
 Comparing the two in CI turns a silent mismatch into a failed check. The stamp
@@ -53822,7 +53806,7 @@ before sending your email and password there. Without a terminal, or with
 `--json`, it refuses with `unknown_control_plane`; pass `--url <host>` (or set
 `REBASE_CLOUD_URL`) to sign in there on purpose.
 
-**Signed up with Google, GitHub or LinkedIn?** <span class="since-badge" data-since="0.26">Since 0.26</span> Your account has no password, so
+**Signed up with Google, GitHub or LinkedIn?** Your account has no password, so
 sign in with a code instead:
 
 ```bash
@@ -53942,8 +53926,6 @@ stops instead.
 
 #### The syntax check before the upload
 
-<span class="since-badge" data-since="0.26">Since 0.26</span>
-
 A static app's files are served exactly as they are. When its `build` only
 copies hand-written scripts into `output`, nothing has parsed them, and a file
 with a typo in it goes live and stops the page from loading. So before anything
@@ -53980,8 +53962,6 @@ platform is genuinely working and polling is the right thing to do; when it name
 something, that something is waiting for you.
 
 ### Preview a change
-
-<span class="since-badge" data-since="0.26">Since 0.26</span>
 
 ```bash
 rebase cloud deploy --preview
@@ -54160,11 +54140,11 @@ trust under **Settings → Access tokens**.
 sends email) that works once, for 7 days, for an account that has verified that
 address; nobody joins until they accept. Invite an admin or a member, and make
 them an owner once they have joined. Owners and admins see, resend or revoke it in
-**Pending invitations**; from a terminal, <span class="since-badge" data-since="0.26">Since 0.26</span> [`rebase cloud orgs members invite`](/docs/cli/cloud/#organizations).
+**Pending invitations**; from a terminal, [`rebase cloud orgs members invite`](/docs/cli/cloud/#organizations).
 
 ### See who did what
 
-The console's **Activity** page and <span class="since-badge" data-since="0.26">Since 0.26</span> `rebase cloud activity` show the
+The console's **Activity** page and `rebase cloud activity` show the
 organization's owners and admins who deployed, set or revealed an environment
 variable (by name, never by value), changed a domain, restored a backup,
 resized, stopped or deleted a project, changed a member's role, or created a
@@ -54185,8 +54165,6 @@ GitHub Actions workflow and what stays with a signed-in person are in
 [CI and agents](/docs/deployment/cloud-agents/#ci-and-agents).
 
 ### A backend with no account
-
-<span class="since-badge" data-since="0.26">Since 0.26</span>
 
 `rebase cloud init --claim` gives an app a live backend before anyone has signed
 up, and prints a claim URL for the person to keep it; a project nobody claims
@@ -54302,7 +54280,7 @@ Stated plainly, because finding out later is worse:
   `DATABASE_URL` and `JWT_SECRET`, so code a member deploys can read them,
   even though only owners and admins can reveal them in the console. Invite
   as a member only someone you would trust with those values.
-- **The service key can be replaced.** <span class="since-badge" data-since="0.26">Since 0.26</span> The project's **Settings**
+- **The service key can be replaced.** The project's **Settings**
   (or `rebase cloud service-key rotate`) issue a new `REBASE_SERVICE_KEY`
   and restart the app onto it. The old key works until the restart has
   finished, and nothing after, so anything that copied it is refused from
@@ -54370,7 +54348,7 @@ jobs:
 | `database` | `db list`, `db info` and `db connect`, which includes the database password |
 | `backups` | List, create, inspect and download backups, and read the point-in-time window |
 
-<span class="since-badge" data-since="0.26">Since 0.26</span> Three more capabilities act on an organization rather than a project. A token
+Three more capabilities act on an organization rather than a project. A token
 holds one only when `--can` names it, on the organization `--org` names (or,
 without `--org`, the project's organization, then the one selected with
 `rebase cloud use`). A token may hold them and no project capability:
@@ -54414,8 +54392,6 @@ project or organization. The console's **Access tokens** screen offers the same
 capabilities, the organization ones under **Organization access**. `rebase cloud tokens revoke <id> --yes` stops it at once.
 
 ### A backend with no account
-
-<span class="since-badge" data-since="0.26">Since 0.26</span>
 
 An agent that has built an app can give it a live backend before anyone has
 signed up, and hand the person it works for a link to keep it:
@@ -54511,8 +54487,6 @@ It is part of [Rebase Cloud](/docs/deployment/cloud/), and every command here
 is in the [CLI's cloud reference](/docs/cli/cloud/).
 
 ### Webhooks
-
-<span class="since-badge" data-since="0.26">Since 0.26</span>
 
 A project can send these events to a Slack or Discord incoming
 webhook, or to any https URL, from **Settings → Notifications** in the console
@@ -55140,7 +55114,7 @@ For a real deployment, prefer baking both into an image, which also pins exactly
 what runs:
 
 ```dockerfile
-FROM rebasepro/server:0.25.1
+FROM rebasepro/server:0.26.0
 COPY dist-bundle /bundle
 ```
 
@@ -55177,8 +55151,6 @@ image **refuses to boot** on `push`, for the reason above.
 
 ### When only your change process may change the database
 
-<span class="since-badge" data-since="0.26">Since 0.26</span>
-
 `REBASE_MIGRATE_ON_BOOT=none` leaves your collections alone. It does not leave
 the database alone: the framework's own tables (auth, API keys, jobs, cron) are
 still created and kept current at every boot. When the database may only change
@@ -55214,8 +55186,6 @@ processes. [Live schema editing](/docs/backend/live-schema-editing) can still
 commit a change as source, but refuses to apply it to the database.
 
 #### The provisioning run
-
-<span class="since-badge" data-since="0.26">Since 0.26</span>
 
 The schema comes from a run your change process controls. Use the same image and
 bundle as the server, with `REBASE_PROVISION_ONLY=true`, connected as a role that
@@ -55334,7 +55304,7 @@ containers works. Two things to get right everywhere:
 
 ```toml
 [build]
-  dockerfile = "Dockerfile"   # FROM rebasepro/server:0.25.1 + COPY dist-bundle /bundle
+  dockerfile = "Dockerfile"   # FROM rebasepro/server:0.26.0 + COPY dist-bundle /bundle
 
 [http_service]
   internal_port = 8080
@@ -55535,7 +55505,7 @@ processes. See [Split processes](/docs/deployment/split-processes/).
 ### Upgrading
 
 ```yaml
-image: rebasepro/server:0.25.1
+image: rebasepro/server:0.26.0
 ```
 
 Restart. Your bundle is unchanged. Within a runtime contract major, a bundle that
@@ -55812,7 +55782,7 @@ split: true
 functions:
   enabled: true
   image:
-    tag: "0.25.1"     # this unit only; the rest stay on the release-wide tag
+    tag: "0.26.0"     # this unit only; the rest stay on the release-wide tag
 ```
 
 Only the tag is usually worth pinning: the repository is inherited, so this is
@@ -56478,8 +56448,6 @@ To work from a checkout instead — a modified chart, or an air-gapped install �
 
 ### One process, or several
 
-<span class="since-badge" data-since="0.26">Since 0.26</span>
-
 The default is a single Deployment serving everything — the same shape the
 Compose file runs. Splitting is one value:
 
@@ -56634,7 +56602,7 @@ rebase build
 For App Runner, which pulls from a registry, bake the bundle into a derived image. That is three lines and it pins exactly what runs:
 
 ```dockerfile title="Dockerfile"
-FROM rebasepro/server:0.25.1
+FROM rebasepro/server:0.26.0
 COPY dist-bundle /bundle
 ```
 
@@ -56734,7 +56702,7 @@ rebase build
 Cloud Run pulls from a registry, so bake the bundle into a derived image. Three lines, and it pins exactly what runs:
 
 ```dockerfile title="Dockerfile"
-FROM rebasepro/server:0.25.1
+FROM rebasepro/server:0.26.0
 COPY dist-bundle /bundle
 ```
 
@@ -56838,7 +56806,7 @@ rebase build
 Container Apps pulls from a registry, so bake the bundle into a derived image. Three lines, and it pins exactly what runs:
 
 ```dockerfile title="Dockerfile"
-FROM rebasepro/server:0.25.1
+FROM rebasepro/server:0.26.0
 COPY dist-bundle /bundle
 ```
 
@@ -56928,7 +56896,7 @@ module "rebase" {
   admin_email     = "you@example.com"
 
   bundle_url      = "https://storage.example.com/bundles/app-1.4.0.tar.gz"
-  runtime_version = "0.25.1" # required with bundle_url: `latest` is refused at plan
+  runtime_version = "0.26.0" # required with bundle_url: `latest` is refused at plan
 
   s3_bucket            = "example-uploads"
   s3_access_key_id     = var.s3_access_key_id
@@ -56967,7 +56935,7 @@ rsync -a dist-bundle/ root@<your-server-ip>:/opt/rebase/dist-bundle/
 
 For a real deployment, prefer one of the two shapes that do not involve copying files to a box by hand:
 
-- **Bake it into an image** — `FROM rebasepro/server:0.25.1` then `COPY dist-bundle /bundle`, and deploy by changing a tag.
+- **Bake it into an image** — `FROM rebasepro/server:0.26.0` then `COPY dist-bundle /bundle`, and deploy by changing a tag.
 - **Serve it over HTTP** — set `REBASE_BUNDLE_URL` and the runtime fetches and unpacks the bundle on every start. This is what the Terraform module above does, and the same mechanism the Helm chart uses.
 
 ### 4. Configure and run
@@ -57108,7 +57076,7 @@ rebase build
 Serverless Containers pulls from a registry, so bake the bundle into a derived image. Three lines, and it pins exactly what runs:
 
 ```dockerfile title="Dockerfile"
-FROM rebasepro/server:0.25.1
+FROM rebasepro/server:0.26.0
 COPY dist-bundle /bundle
 ```
 
@@ -57219,7 +57187,7 @@ rebase build
 Commit a three-line `Dockerfile` at the repository root, so Railway's build step is a copy rather than a compilation:
 
 ```dockerfile title="Dockerfile"
-FROM rebasepro/server:0.25.1
+FROM rebasepro/server:0.26.0
 COPY dist-bundle /bundle
 ```
 
@@ -57312,7 +57280,7 @@ rebase build
 Commit a three-line `Dockerfile` at the project root:
 
 ```dockerfile title="Dockerfile"
-FROM rebasepro/server:0.25.1
+FROM rebasepro/server:0.26.0
 COPY dist-bundle /bundle
 ```
 

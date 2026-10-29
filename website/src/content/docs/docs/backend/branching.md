@@ -277,8 +277,6 @@ postgresql://user:pass@localhost:5432/rb_dev_sandbox
 
 ## Reviewing and merging a branch
 
-<span class="since-badge" data-since="0.26">Since 0.26</span>
-
 A branch is where an agent, or a migration you are not sure of, can change a
 database without touching the real one. Before any of it reaches the database
 the branch was made from, you can see what changed and merge it from

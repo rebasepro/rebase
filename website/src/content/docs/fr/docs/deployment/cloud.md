@@ -1,5 +1,5 @@
 ---
-sourceHash: cbd1289dcc8b5347
+sourceHash: 1ed19c3d147505c2
 title: Rebase Cloud
 sidebar_label: Rebase Cloud
 description: Rebase Cloud est le même Rebase, opéré pour vous. Ce que c'est, comment lier et déployer un projet, et ce que la bêta privée n'inclut pas encore.
@@ -62,7 +62,7 @@ confirmation avant d'y envoyer votre e-mail et votre mot de passe. Sans terminal
 `--json`, il refuse avec l'erreur `unknown_control_plane` ; passez `--url <host>` (ou définissez
 `REBASE_CLOUD_URL`) pour vous y connecter délibérément.
 
-**Inscrit avec Google, GitHub ou LinkedIn ?** <span class="since-badge" data-since="0.26">Depuis 0.26</span> Votre compte n'a pas de mot de passe, connectez-vous donc
+**Inscrit avec Google, GitHub ou LinkedIn ?** Votre compte n'a pas de mot de passe, connectez-vous donc
 avec un code :
 
 ```bash
@@ -171,8 +171,6 @@ un script qui la contiendrait.
 
 ### La vérification de syntaxe avant le téléversement
 
-<span class="since-badge" data-since="0.26">Depuis 0.26</span>
-
 Les fichiers d'une application statique sont servis tels quels. Lorsque son `build` se contente de copier des scripts écrits à la main dans `output`, personne ne les a analysés, et un fichier contenant une faute de frappe est mis en ligne et empêche la page de se charger. C'est pourquoi, avant tout téléversement, `deploy` analyse chaque fichier `.js`, `.mjs` et `.cjs` du `output` de chaque application statique, ainsi que chaque `<script>` en ligne de ses fichiers `.html`. Cela couvre une application statique déployée seule comme les applications statiques intégrées au bundle du backend. Une erreur de syntaxe arrête le déploiement en indiquant le fichier, la ligne et la colonne :
 
 ```
@@ -197,8 +195,6 @@ plateforme travaille réellement et le polling est la bonne chose à faire ; lor
 une valeur, cette étape est en attente d'une action de votre part.
 
 ## Prévisualiser un changement
-
-<span class="since-badge" data-since="0.26">Depuis 0.26</span>
 
 ```bash
 rebase cloud deploy --preview
@@ -370,11 +366,11 @@ confiance sous **Settings → Access tokens**.
 envoie des e-mails) qui ne fonctionne qu'une fois, pendant 7 jours, pour un compte ayant vérifié cette
 adresse ; personne ne rejoint l'organisation tant qu'il n'a pas accepté. Invitez un administrateur ou un membre, et faites-en
 un propriétaire une fois qu'il a rejoint l'organisation. Les propriétaires et administrateurs la voient, la renvoient ou la révoquent dans
-**Pending invitations** ; depuis un terminal, <span class="since-badge" data-since="0.26">Depuis 0.26</span> [`rebase cloud orgs members invite`](/docs/cli/cloud/#organizations).
+**Pending invitations** ; depuis un terminal, [`rebase cloud orgs members invite`](/docs/cli/cloud/#organizations).
 
 ## Voir qui a fait quoi
 
-La page **Activity** de la console et <span class="since-badge" data-since="0.26">Depuis 0.26</span> `rebase cloud activity` montrent aux
+La page **Activity** de la console et `rebase cloud activity` montrent aux
 propriétaires et administrateurs de l'organisation qui a déployé, défini ou révélé une variable d'environnement
 (par son nom, jamais par sa valeur), modifié un domaine, restauré une sauvegarde,
 redimensionné, arrêté ou supprimé un projet, changé le rôle d'un membre, ou créé un
@@ -395,8 +391,6 @@ workflow GitHub Actions et ce qui reste réservé à une personne connectée se 
 [CI et agents](/docs/deployment/cloud-agents/#ci-and-agents).
 
 ## Un backend sans compte
-
-<span class="since-badge" data-since="0.26">Depuis 0.26</span>
 
 `rebase cloud init --claim` donne à une app un backend en ligne avant que quiconque se soit
 inscrit, et affiche une URL de réclamation pour que la personne le garde ; un projet que personne ne réclame
@@ -511,7 +505,7 @@ Indiqué en toute transparence, car s'en rendre compte plus tard est toujours d�
   `DATABASE_URL` et `JWT_SECRET` ; le code qu'un membre déploie peut donc les lire,
   même si seuls les propriétaires et administrateurs peuvent les révéler dans la console. N'invitez
   comme membre qu'une personne à qui vous confieriez ces valeurs.
-- **La clé de service peut être remplacée.** <span class="since-badge" data-since="0.26">Depuis 0.26</span> Les **Settings** du projet
+- **La clé de service peut être remplacée.** Les **Settings** du projet
   (ou `rebase cloud service-key rotate`) émettent un nouveau `REBASE_SERVICE_KEY`
   et redémarrent l'app dessus. L'ancienne clé fonctionne jusqu'à la fin du
   redémarrage, et plus du tout ensuite ; tout ce qui l'avait copiée est donc refusé

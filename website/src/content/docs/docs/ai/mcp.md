@@ -175,7 +175,7 @@ Which credential that is, in priority order:
    is running
 
 2 and 3 are this machine's dev backend's key, used only when the target is on
-loopback. When `REBASE_BASE_URL` points elsewhere — <span class="since-badge" data-since="0.26">Since 0.26</span> `rebase cloud init --claim`
+loopback. When `REBASE_BASE_URL` points elsewhere — `rebase cloud init --claim`
 writes the cloud project's address, and no `REBASE_API_TOKEN` until a deploy
 succeeds — the server sends no token and says so once on stderr.
 
@@ -307,7 +307,7 @@ gated, so a tool added later arrives protected by default.
   `rebase_db_branch_list`, `rebase_db_branch_info`, `rebase_db_branch_diff`, `list_documents`,
   `get_document`, `list_users`, `list_roles`, `storage_list_objects`,
   `storage_get_download_url`, `cron_list_jobs`, `cron_get_job`, `cron_get_job_logs`,
-  `rebase_dev_logs`, and <span class="since-badge" data-since="0.26">Since 0.26</span> the Rebase Cloud reads `rebase_cloud_status`,
+  `rebase_dev_logs`, and the Rebase Cloud reads `rebase_cloud_status`,
   `rebase_cloud_logs`, `rebase_cloud_env_list`, `rebase_cloud_deployments_list`.
 - **Not gated — Rebase Cloud writes:** `rebase_cloud_provision`,
   `rebase_cloud_deploy`, `rebase_cloud_env_set`, `rebase_cloud_rollback`.
@@ -429,8 +429,6 @@ directory holding admin credentials for every project you have registered; treat
 it accordingly.
 
 ## Rebase Cloud
-
-<span class="since-badge" data-since="0.26">Since 0.26</span>
 
 Eight tools take an app from this directory to a live backend on
 [Rebase Cloud](/docs/deployment/cloud/) and keep it running. Each one spawns

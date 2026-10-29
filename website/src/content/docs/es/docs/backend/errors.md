@@ -1,5 +1,5 @@
 ---
-sourceHash: 5ce5071347b9d6a7
+sourceHash: bfdc82eab01277a9
 title: Códigos de error
 sidebar_label: Códigos de error
 description: Todos los códigos de error que un backend de Rebase puede devolver, con su estado HTTP, qué significan y qué hacer al respecto; además del envelope de respuesta, X-Request-ID y las reglas de details.
@@ -353,7 +353,7 @@ funcionalidad en lugar de mostrar un error.
 | `SCHEMA_EDIT_REQUIRES_A_PERSON` | 403 | Una clave de API u otra entidad no humana intentó aplicar un cambio de esquema. | Inicia sesión como usuario o configura `liveSchema.allowMachineApply`. |
 | `SCHEMA_EDITING_NO_COLLECTIONS_DIR` | 501 | La edición de esquemas en vivo necesita `collectionsDir` o `liveSchema.repository`, y este servidor se inició sin ninguno de los dos. | Configura uno. |
 | `SCHEMA_EDITING_NO_REPOSITORY` | 503 | La planificación funciona; no hay repositorio en el que hacer commit del cambio. | Configura `liveSchema.repository`. |
-| `SCHEMA_EDITING_PROVISIONING_OFF` | 409 | Este despliegue no cambia nada en su base de datos (`REBASE_PROVISION=false`), así que un cambio no se puede aplicar desde el panel. <span class="since-badge" data-since="0.26">Desde 0.26</span> | Haz commit solo como código fuente y deja que el proceso que cambia la base de datos lo aplique. |
+| `SCHEMA_EDITING_PROVISIONING_OFF` | 409 | Este despliegue no cambia nada en su base de datos (`REBASE_PROVISION=false`), así que un cambio no se puede aplicar desde el panel. | Haz commit solo como código fuente y deja que el proceso que cambia la base de datos lo aplique. |
 | `SCHEMA_EDITING_UNSUPPORTED` | 503 | Este driver no puede planificar cambios de esquema. | La edición en vivo está disponible en Postgres. |
 | `SCHEMA_EDITOR_BAAS_MODE` | 501 | Aquí las colecciones se introspeccionan desde la base de datos, por lo que no hay archivos fuente para editar. | Modifica el esquema mediante una migración. |
 | `SCHEMA_EDITOR_DISABLED` | 501 | El editor de esquemas está desactivado para este servidor. Un bundle compilado siempre responde esto. | Actívalo con `schemaEditor`. En un bundle, define `REBASE_LIVE_SCHEMA_REPOSITORY` para editar las colecciones a través de un repositorio — consulta [Edición de esquemas en vivo](/docs/backend/live-schema-editing#from-a-built-bundle). |

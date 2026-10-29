@@ -1,5 +1,5 @@
 ---
-sourceHash: 441bdd62f0e1b3f7
+sourceHash: e2f4e2f2165a93fe
 title: Référence des outils MCP
 sidebar_label: Référence des outils MCP
 description: Chaque outil que le serveur MCP Rebase enregistre, par groupe — ce dont chacun a besoin, ce qu'il fait, et ceux que le verrou loopback refuse sur un projet non local.
@@ -123,8 +123,6 @@ directement sur une cible. Un assistant peut donc basculer vers un projet distan
 le verrou — il ne pourra simplement pas y exécuter d'outil destructeur ensuite.
 
 ## Rebase Cloud (8)
-
-<span class="since-badge" data-since="0.26">Depuis 0.26</span>
 
 Lancent `rebase cloud … --json` dans le répertoire du projet actif, sur le
 projet auquel il est lié, avec l'identifiant propre au CLI. Voir

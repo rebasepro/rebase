@@ -1,5 +1,5 @@
 ---
-sourceHash: 7a29cf6ca21d35be
+sourceHash: d812198f15996530
 title: Applications et dépôts
 sidebar_label: Apps & dépôts
 description: Un projet est un backend accompagné des applications qui communiquent avec lui, chacune pouvant résider dans son propre dépôt.
@@ -266,7 +266,7 @@ Et chaque projet publie son schéma actuel, sans authentification, car un identi
 
 ```bash
 curl -s https://api.example.com/api/meta/schema-version
-# {"schemaVersion":"v1:c5d97d0f96b7f87a","runtime":{"version":"0.25.1","contract":1}}
+# {"schemaVersion":"v1:c5d97d0f96b7f87a","runtime":{"version":"0.26.0","contract":1}}
 ```
 
 Comparer les deux dans la CI transforme une incompatibilité silencieuse en un échec de vérification. L'identifiant change lorsque les types générés sont susceptibles de changer — une nouvelle propriété, une relation modifiée — et délibérément *pas* lorsqu'un hook, une règle de sécurité ou une icône change, évitant ainsi les fausses alertes.

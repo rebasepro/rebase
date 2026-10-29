@@ -1,5 +1,5 @@
 ---
-sourceHash: 15dd4d33e0af52d5
+sourceHash: ba272fed815c24ef
 title: Hook di backend globali
 sidebar_label: Hook globali
 description: Applica callback di ciclo di vita trasversali a ogni collection a livello server utilizzando CollectionCallbacks.
@@ -103,7 +103,7 @@ Ogni callback riceve un singolo oggetto props. Campi comuni:
 
 `context.user` contiene l'utente autenticato (`uid`, `roles`, ecc.), Una richiesta senza token, dove l'API la lascia passare, porta l'identità anonima `{ uid: "anonymous", roles: ["anon"] }` anziché `undefined`.
 
-<span class="since-badge" data-since="0.26">Da 0.26</span> `context.credential` nomina la chiave API con cui è stata fatta una scrittura: `{ kind, id, name }`, dove `kind` è `"personal"` o `"service"`. Una chiave personale agisce come il suo proprietario, quindi `context.user` è il proprietario sia che abbia salvato a mano sia che un job di CI abbia scritto con la sua chiave; `context.credential` distingue i due casi. È impostato sull'API dei dati, sul socket realtime e su `/mcp`, e assente per una sessione, la chiave di servizio, il lavoro in contesto server (`rebase.dataAsAdmin`, cron) e nel browser. Non porta mai il segreto.
+`context.credential` nomina la chiave API con cui è stata fatta una scrittura: `{ kind, id, name }`, dove `kind` è `"personal"` o `"service"`. Una chiave personale agisce come il suo proprietario, quindi `context.user` è il proprietario sia che abbia salvato a mano sia che un job di CI abbia scritto con la sua chiave; `context.credential` distingue i due casi. È impostato sull'API dei dati, sul socket realtime e su `/mcp`, e assente per una sessione, la chiave di servizio, il lavoro in contesto server (`rebase.dataAsAdmin`, cron) e nel browser. Non porta mai il segreto.
 
 `collection` è sempre presente. Un callback globale scatta per ogni collection, quindi
 è l'unico livello registrato indipendentemente da ciascuna di esse — ma non
@@ -303,7 +303,7 @@ Nota i pro e i contro di questo approccio: se la riga di audit non può essere s
 l'eliminazione. Per un audit trail questo è solitamente ciò che si desidera.
 In caso contrario, intercetta l'errore nel callback e indicalo in un commento.
 
-La colonna `via_key` legge `context.credential`, che è nuovo: <span class="since-badge" data-since="0.26">Da 0.26</span> Su una
+La colonna `via_key` legge `context.credential`, che è nuovo: Su una
 versione precedente, omettila.
 
 ### Logica specifica per collection

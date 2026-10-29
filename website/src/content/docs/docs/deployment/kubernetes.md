@@ -69,8 +69,6 @@ To work from a checkout instead — a modified chart, or an air-gapped install �
 
 ## One process, or several
 
-<span class="since-badge" data-since="0.26">Since 0.26</span>
-
 The default is a single Deployment serving everything — the same shape the
 Compose file runs. Splitting is one value:
 

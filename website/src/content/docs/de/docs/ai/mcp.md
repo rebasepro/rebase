@@ -1,5 +1,5 @@
 ---
-sourceHash: 781e0136e6dc1271
+sourceHash: b20067fcabaf42ec
 title: MCP Server
 sidebar_label: MCP Server
 description: Verbinden Sie Claude Code, Cursor, Gemini CLI oder beliebige MCP-Clients mit einem Rebase-Projekt – die 51 bereitgestellten Tools, die Anmeldedaten zur Authentifizierung und das Loopback-Gate, das zwischen einem Agenten und der Produktion steht.
@@ -183,7 +183,7 @@ Welche Zugangsdaten verwendet werden (nach Priorität geordnet):
    `rebase dev` läuft
 
 2 und 3 sind der Schlüssel des Dev-Backends dieses Rechners und werden nur verwendet, wenn das Ziel auf
-Loopback liegt. Zeigt `REBASE_BASE_URL` woandershin – <span class="since-badge" data-since="0.26">Seit 0.26</span> `rebase cloud init --claim`
+Loopback liegt. Zeigt `REBASE_BASE_URL` woandershin – `rebase cloud init --claim`
 schreibt die Adresse des Cloud-Projekts, aber kein `REBASE_API_TOKEN`, bis ein Deployment
 gelingt –, sendet der Server kein Token und sagt das einmal auf stderr.
 
@@ -324,7 +324,7 @@ standardmäßig geschützt.
   `rebase_db_branch_list`, `rebase_db_branch_info`, `rebase_db_branch_diff`, `list_documents`,
   `get_document`, `list_users`, `list_roles`, `storage_list_objects`,
   `storage_get_download_url`, `cron_list_jobs`, `cron_get_job`, `cron_get_job_logs`,
-  `rebase_dev_logs` und <span class="since-badge" data-since="0.26">Seit 0.26</span> die Rebase-Cloud-Lesetools `rebase_cloud_status`,
+  `rebase_dev_logs` und die Rebase-Cloud-Lesetools `rebase_cloud_status`,
   `rebase_cloud_logs`, `rebase_cloud_env_list`, `rebase_cloud_deployments_list`.
 - **Nicht beschränkt – Rebase-Cloud-Schreibtools:** `rebase_cloud_provision`,
   `rebase_cloud_deploy`, `rebase_cloud_env_set`, `rebase_cloud_rollback`.
@@ -451,8 +451,6 @@ Datei in Ihrem Home-Verzeichnis, die Admin-Zugangsdaten für jedes registrierte 
 enthält; behandeln Sie sie entsprechend sorgfältig.
 
 ## Rebase Cloud
-
-<span class="since-badge" data-since="0.26">Seit 0.26</span>
 
 Acht Tools bringen eine App aus diesem Verzeichnis zu einem Live-Backend auf
 [Rebase Cloud](/docs/deployment/cloud/) und halten es am Laufen. Jedes startet

@@ -1,5 +1,5 @@
 ---
-sourceHash: 958615612ce5d124
+sourceHash: bf0e0428a86e411f
 title: Notificaciones de Cloud
 sidebar_label: Notificaciones
 description: Cómo Rebase Cloud avisa a las personas cuando falla un despliegue, se detienen las copias de seguridad, se rechaza un pago o el uso supera el 80 % — webhooks firmados a Slack, Discord o cualquier URL, y correo por persona.
@@ -12,8 +12,6 @@ Es parte de [Rebase Cloud](/docs/deployment/cloud/), y cada comando de aquí est
 en la [referencia de cloud de la CLI](/docs/cli/cloud/).
 
 ## Webhooks
-
-<span class="since-badge" data-since="0.26">Desde 0.26</span>
 
 Un proyecto puede enviar estos eventos a un webhook entrante de Slack o Discord,
 o a cualquier URL https, desde **Settings → Notifications** en la consola

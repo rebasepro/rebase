@@ -1,5 +1,5 @@
 ---
-sourceHash: cbd1289dcc8b5347
+sourceHash: 1ed19c3d147505c2
 title: Rebase Cloud
 sidebar_label: Rebase Cloud
 description: Rebase Cloud ist dasselbe Rebase, für Sie betrieben. Was es ist, wie ein Projekt verknüpft und bereitgestellt wird und was die private Beta noch nicht enthält.
@@ -60,7 +60,7 @@ bevor Ihre E-Mail-Adresse und Ihr Passwort dorthin gesendet werden. Ohne Termina
 `--json` verweigert der Befehl die Ausführung mit `unknown_control_plane`; übergeben Sie `--url <host>` (oder setzen Sie
 `REBASE_CLOUD_URL`), um sich dort gezielt anzumelden.
 
-**Mit Google, GitHub oder LinkedIn registriert?** <span class="since-badge" data-since="0.26">Seit 0.26</span> Ihr Konto hat kein Passwort, melden Sie sich also stattdessen mit einem Code an:
+**Mit Google, GitHub oder LinkedIn registriert?** Ihr Konto hat kein Passwort, melden Sie sich also stattdessen mit einem Code an:
 
 ```bash
 rebase cloud login --code --email me@example.com
@@ -140,8 +140,6 @@ stoppt.
 
 ### Die Syntaxprüfung vor dem Upload
 
-<span class="since-badge" data-since="0.26">Seit 0.26</span>
-
 Die Dateien einer statischen App werden genau so ausgeliefert, wie sie sind. Wenn ihr `build` nur handgeschriebene Skripte nach `output` kopiert, hat sie niemand geparst, und eine Datei mit einem Tippfehler geht live und verhindert, dass die Seite lädt. Deshalb parst `deploy` vor jedem Upload jede `.js`-, `.mjs`- und `.cjs`-Datei im `output` jeder statischen App, dazu jedes Inline-`<script>` in ihren `.html`-Dateien. Das gilt für eine statische App, die allein deployt wird, ebenso wie für statische Apps, die in das Bundle des Backends eingebettet werden. Ein Syntaxfehler stoppt das Deployment mit Datei, Zeile und Spalte:
 
 ```
@@ -166,8 +164,6 @@ arbeitet die Plattform tatsächlich und Polling ist das Richtige; wenn dort etwa
 angegeben ist, wartet dieses Etwas auf Sie.
 
 ## Eine Änderung in der Vorschau ansehen
-
-<span class="since-badge" data-since="0.26">Seit 0.26</span>
 
 ```bash
 rebase cloud deploy --preview
@@ -265,19 +261,17 @@ Ihr Konsolen-Konto kann Produktionsdatenbanken, Secrets und die Abrechnung errei
 
 ## Ihr Team einladen
 
-**Members → Invite member** liefert einen Link zum Kopieren (per E-Mail verschickt, wenn diese Control Plane E-Mails versendet), der einmal funktioniert, 7 Tage lang gilt und für ein Konto gedacht ist, das diese Adresse verifiziert hat; niemand tritt bei, bevor er annimmt. Laden Sie einen Admin oder ein Mitglied ein und machen Sie es zum Owner, sobald es beigetreten ist. Owners und Admins sehen die Einladung unter **Pending invitations**, können sie erneut senden oder widerrufen; von einem Terminal aus <span class="since-badge" data-since="0.26">Seit 0.26</span> [`rebase cloud orgs members invite`](/docs/cli/cloud/#organizations).
+**Members → Invite member** liefert einen Link zum Kopieren (per E-Mail verschickt, wenn diese Control Plane E-Mails versendet), der einmal funktioniert, 7 Tage lang gilt und für ein Konto gedacht ist, das diese Adresse verifiziert hat; niemand tritt bei, bevor er annimmt. Laden Sie einen Admin oder ein Mitglied ein und machen Sie es zum Owner, sobald es beigetreten ist. Owners und Admins sehen die Einladung unter **Pending invitations**, können sie erneut senden oder widerrufen; von einem Terminal aus [`rebase cloud orgs members invite`](/docs/cli/cloud/#organizations).
 
 ## Nachvollziehen, wer was getan hat
 
-Die Seite **Activity** der Konsole und <span class="since-badge" data-since="0.26">Seit 0.26</span> `rebase cloud activity` zeigen den Owners und Admins der Organisation, wer deployt, eine Umgebungsvariable gesetzt oder angezeigt (nur dem Namen nach, nie dem Wert), eine Domain geändert, ein Backup wiederhergestellt, ein Projekt skaliert, gestoppt oder gelöscht, die Rolle eines Mitglieds geändert oder ein Token erstellt hat, und wann. Die **Settings** eines Projekts verlinken auf dessen eigene Einträge; ein Eintrag über ein gelöschtes Projekt bleibt bestehen. Ein Skript liest sie mit einem Token, das mit `--can audit` für die Organisation erstellt wurde. Einträge werden ein Jahr lang aufbewahrt. Die Filter stehen unter [`rebase cloud`](/docs/cli/cloud/#organizations).
+Die Seite **Activity** der Konsole und `rebase cloud activity` zeigen den Owners und Admins der Organisation, wer deployt, eine Umgebungsvariable gesetzt oder angezeigt (nur dem Namen nach, nie dem Wert), eine Domain geändert, ein Backup wiederhergestellt, ein Projekt skaliert, gestoppt oder gelöscht, die Rolle eines Mitglieds geändert oder ein Token erstellt hat, und wann. Die **Settings** eines Projekts verlinken auf dessen eigene Einträge; ein Eintrag über ein gelöschtes Projekt bleibt bestehen. Ein Skript liest sie mit einem Token, das mit `--can audit` für die Organisation erstellt wurde. Einträge werden ein Jahr lang aufbewahrt. Die Filter stehen unter [`rebase cloud`](/docs/cli/cloud/#organizations).
 
 ## CI und Agents
 
 Ein CI-Job oder ein Agent sollte nicht Ihr Passwort enthalten. Geben Sie ihm ein Token, das auf wenige Aktionen für ein einzelnes Projekt beschränkt ist, erstellt von einem angemeldeten Terminal aus mit `rebase cloud tokens create --project shop --can deploy,logs`, und setzen Sie es als `REBASE_TOKEN`. Abrechnung, Aktivitätsprotokoll und Benachrichtigungseinstellungen einer Organisation sind eigene Capabilities (`--can billing`, `audit`, `notifications`), die ein Token nur hält, wenn sie angefordert wurden. Die Capabilities, ein GitHub-Actions-Workflow und was einer angemeldeten Person vorbehalten bleibt, stehen unter [CI und Agents](/docs/deployment/cloud-agents/#ci-and-agents).
 
 ## Ein Backend ohne Konto
-
-<span class="since-badge" data-since="0.26">Seit 0.26</span>
 
 `rebase cloud init --claim` gibt einer App ein Live-Backend, bevor sich irgendjemand registriert hat, und gibt eine Claim-URL aus, mit der die Person es behalten kann; ein Projekt, das innerhalb von 72 Stunden niemand übernimmt, wird gelöscht. Was das Token des nicht übernommenen Projekts darf, das `REBASE_API_TOKEN`, das es schreibt, und was die Übernahme ändert, steht unter [Ein Backend ohne Konto](/docs/deployment/cloud-agents/#a-backend-with-no-account).
 
@@ -387,7 +381,7 @@ Klar ausgedrückt, denn es erst später herauszufinden, ist ärgerlicher:
   `REBASE_SERVICE_KEY` (Admin auf der eigenen API), `DATABASE_URL` und `JWT_SECRET`, sodass Code,
   den ein Mitglied deployt, sie lesen kann, obwohl nur Owners und Admins sie in der Konsole anzeigen
   können. Laden Sie nur jemanden als Mitglied ein, dem Sie diese Werte anvertrauen würden.
-- **Der Service Key lässt sich ersetzen.** <span class="since-badge" data-since="0.26">Seit 0.26</span> Die **Settings** des Projekts
+- **Der Service Key lässt sich ersetzen.** Die **Settings** des Projekts
   (oder `rebase cloud service-key rotate`) stellen einen neuen `REBASE_SERVICE_KEY` aus
   und starten die App damit neu. Der alte Schlüssel funktioniert, bis der Neustart
   abgeschlossen ist, und danach nicht mehr, sodass alles, was ihn kopiert hat, ab

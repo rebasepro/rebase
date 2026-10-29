@@ -1,5 +1,5 @@
 ---
-sourceHash: 9b091b775b58ae32
+sourceHash: 297a89400496895a
 title: Datenbank-Branching
 sidebar_label: Branching
 description: Erstellen Sie isolierte Datenbank-Branches für Entwicklung, Staging und Tests mit PostgreSQLs CREATE DATABASE ... TEMPLATE – sofortige, originalgetreue Kopien ohne Ausfallzeiten.
@@ -268,8 +268,6 @@ postgresql://user:pass@localhost:5432/rb_dev_sandbox
 ---
 
 ## Einen Branch prüfen und zusammenführen
-
-<span class="since-badge" data-since="0.26">Seit 0.26</span>
 
 Ein Branch ist der Ort, an dem ein Agent – oder eine Migration, bei der Sie sich nicht sicher sind – eine Datenbank ändern kann, ohne die echte anzufassen. Bevor davon etwas die Datenbank erreicht, aus der der Branch erstellt wurde, können Sie in [Studio](/docs/studio/) sehen, was sich geändert hat, und es zusammenführen: Öffnen Sie **Branches** und wählen Sie einen aus.
 

@@ -1,5 +1,5 @@
 ---
-sourceHash: 582293a88fb2d626
+sourceHash: 9bf5476f1a977fe3
 title: CI, Agents und übernehmbare Backends
 sidebar_label: CI und Agents
 description: Deployen Sie aus CI oder durch einen Agenten mit einem Token mit begrenztem Umfang statt mit einem Passwort, und lassen Sie einen Agenten ein Live-Backend ohne Konto bereitstellen, das eine Person später übernimmt.
@@ -59,7 +59,7 @@ jobs:
 | `database` | `db list`, `db info` und `db connect`, was das Datenbankpasswort einschließt |
 | `backups` | Backups auflisten, erstellen, einsehen und herunterladen sowie das Point-in-Time-Fenster lesen |
 
-<span class="since-badge" data-since="0.26">Seit 0.26</span> Drei weitere Capabilities beziehen sich auf eine Organisation statt auf ein Projekt. Ein Token
+Drei weitere Capabilities beziehen sich auf eine Organisation statt auf ein Projekt. Ein Token
 hält eine davon nur, wenn `--can` sie nennt, und zwar für die Organisation, die `--org` nennt (oder,
 ohne `--org`, die Organisation des Projekts, dann die mit
 `rebase cloud use` ausgewählte). Ein Token darf sie halten und keine Projekt-Capability:
@@ -102,8 +102,6 @@ Projekt oder welcher Organisation. Die Konsolen-Seite **Access tokens** bietet d
 Capabilities, die der Organisation unter **Organization access**. `rebase cloud tokens revoke <id> --yes` stoppt es sofort.
 
 ## Ein Backend ohne Konto
-
-<span class="since-badge" data-since="0.26">Seit 0.26</span>
 
 Ein Agent, der eine App gebaut hat, kann ihr ein Live-Backend geben, bevor sich jemand
 registriert hat, und der Person, für die er arbeitet, einen Link übergeben, um es zu behalten:

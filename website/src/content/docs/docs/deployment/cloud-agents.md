@@ -58,7 +58,7 @@ jobs:
 | `database` | `db list`, `db info` and `db connect`, which includes the database password |
 | `backups` | List, create, inspect and download backups, and read the point-in-time window |
 
-<span class="since-badge" data-since="0.26">Since 0.26</span> Three more capabilities act on an organization rather than a project. A token
+Three more capabilities act on an organization rather than a project. A token
 holds one only when `--can` names it, on the organization `--org` names (or,
 without `--org`, the project's organization, then the one selected with
 `rebase cloud use`). A token may hold them and no project capability:
@@ -102,8 +102,6 @@ project or organization. The console's **Access tokens** screen offers the same
 capabilities, the organization ones under **Organization access**. `rebase cloud tokens revoke <id> --yes` stops it at once.
 
 ## A backend with no account
-
-<span class="since-badge" data-since="0.26">Since 0.26</span>
 
 An agent that has built an app can give it a live backend before anyone has
 signed up, and hand the person it works for a link to keep it:

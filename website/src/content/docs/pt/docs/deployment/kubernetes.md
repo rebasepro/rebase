@@ -1,5 +1,5 @@
 ---
-sourceHash: 80956abbae707a91
+sourceHash: 5764a95deb8e4e9c
 title: Kubernetes
 sidebar_label: Kubernetes
 description: Faça o deploy do Rebase em um cluster Kubernetes com o Helm chart oficial — um Deployment ou vários, um Job de migração responsável pelo schema, e aplicações estáticas no mesmo host.
@@ -60,8 +60,6 @@ Para trabalhar a partir de um clone local — um chart modificado ou uma instala
 | `url` | Imagem padrão; o runtime baixa um tarball a cada inicialização do pod | Um painel de controle (control plane) que entrega bundles fora de banda |
 
 ## Um processo ou vários
-
-<span class="since-badge" data-since="0.26">A partir da versão 0.26</span>
 
 O padrão é um único Deployment servindo tudo — o mesmo formato executado pelo arquivo Compose. A divisão requer apenas um valor:
 

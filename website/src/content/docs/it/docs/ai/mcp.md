@@ -1,5 +1,5 @@
 ---
-sourceHash: 781e0136e6dc1271
+sourceHash: b20067fcabaf42ec
 title: Server MCP
 sidebar_label: Server MCP
 description: Connetti Claude Code, Cursor, Gemini CLI o qualsiasi client MCP a un progetto Rebase — i 51 tool esposti, le credenziali con cui si autentica e il loopback gate che si interpone tra un agent e la produzione.
@@ -176,7 +176,7 @@ Quale sia questa credenziale, in ordine di priorità:
    è in esecuzione
 
 Le opzioni 2 e 3 sono la chiave del backend di sviluppo di questa macchina, usata solo quando la destinazione è
-in loopback. Quando `REBASE_BASE_URL` punta altrove — <span class="since-badge" data-since="0.26">Da 0.26</span> `rebase cloud init --claim`
+in loopback. Quando `REBASE_BASE_URL` punta altrove — `rebase cloud init --claim`
 scrive l'indirizzo del progetto cloud, e nessun `REBASE_API_TOKEN` finché un deploy
 non riesce — il server non invia alcun token e lo segnala una volta su stderr.
 
@@ -308,7 +308,7 @@ soggetto al gate, pertanto un tool aggiunto successivamente risulterà protetto 
   `rebase_db_branch_list`, `rebase_db_branch_info`, `rebase_db_branch_diff`, `list_documents`,
   `get_document`, `list_users`, `list_roles`, `storage_list_objects`,
   `storage_get_download_url`, `cron_list_jobs`, `cron_get_job`, `cron_get_job_logs`,
-  `rebase_dev_logs`, e <span class="since-badge" data-since="0.26">Da 0.26</span> le letture di Rebase Cloud `rebase_cloud_status`,
+  `rebase_dev_logs`, e le letture di Rebase Cloud `rebase_cloud_status`,
   `rebase_cloud_logs`, `rebase_cloud_env_list`, `rebase_cloud_deployments_list`.
 - **Non soggetti a gate — scritture su Rebase Cloud:** `rebase_cloud_provision`,
   `rebase_cloud_deploy`, `rebase_cloud_env_set`, `rebase_cloud_rollback`.
@@ -430,8 +430,6 @@ directory che contiene credenziali di amministrazione per ogni progetto registra
 con la dovuta cautela.
 
 ## Rebase Cloud
-
-<span class="since-badge" data-since="0.26">Da 0.26</span>
 
 Otto tool portano un'app da questa directory a un backend attivo su
 [Rebase Cloud](/docs/deployment/cloud/) e lo mantengono in esecuzione. Ciascuno avvia

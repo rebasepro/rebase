@@ -1,5 +1,5 @@
 ---
-sourceHash: 8935b1e530b1bfb3
+sourceHash: 05c7a9d34080d853
 title: Integration eines eigenen Servers
 sidebar_label: Eigener Server
 description: Bauen Sie das Rebase-Backend aus öffentlichen Bausteinen in Ihrem eigenen Server – createRebaseBackend, seine Routengruppen, mount, attachRealtime und start – oder betten Sie den Postgres-Treiber in Express ein.
@@ -248,7 +248,7 @@ Es ist mit Absicht eine Option und kein späterer Schritt. Der Treiber liest die
 Tabellen beim Öffnen und hängt die Änderungserfassung an die an, die dann existieren.
 Ein danach aufgerufenes `provision()` würde laufen, nachdem der Treiber bereits
 entschieden hätte, was existiert. `REBASE_MIGRATE_ON_BOOT=none` schaltet das
-Collection-Schema weiterhin für jedes Backend im Prozess ab. <span class="since-badge" data-since="0.26">Seit 0.26</span> `initializeRebaseBackend` übergibt `false`, wenn `REBASE_PROVISION=false` gesetzt ist.
+Collection-Schema weiterhin für jedes Backend im Prozess ab. `initializeRebaseBackend` übergibt `false`, wenn `REBASE_PROVISION=false` gesetzt ist.
 
 ## Nur die gewünschten Gruppen einbinden
 

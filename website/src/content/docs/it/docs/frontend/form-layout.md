@@ -1,13 +1,11 @@
 ---
-sourceHash: 29363c3f0ab50d98
+sourceHash: 42da06ee7f0f6c0c
 title: Layout del form
 sidebar_label: Layout del form
 description: Controlla la disposizione del form dell'entità — ampiezza delle colonne, sezioni e barra dei metadati.
 ---
 
 ## Panoramica
-
-<span class="since-badge" data-since="0.26">Da 0.26</span>
 
 Il form dell'entità viene generato a partire dalle tue proprietà:
 
@@ -163,8 +161,6 @@ Imposta `sidebar: []` per disattivare del tutto la barra laterale derivata e man
 colonna principale.
 
 ## Riferimento
-
-<span class="since-badge" data-since="0.26">Da 0.26</span>
 
 | Proprietà | Tipo | Descrizione |
 |-----------|------|-------------|

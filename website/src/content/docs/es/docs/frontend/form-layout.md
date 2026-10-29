@@ -1,13 +1,11 @@
 ---
-sourceHash: 29363c3f0ab50d98
+sourceHash: 42da06ee7f0f6c0c
 title: Diseño de formulario
 sidebar_label: Diseño de formulario
 description: Controla cómo se organiza el formulario de entidad — anchos de columna, secciones y el riel de metadatos.
 ---
 
 ## Descripción general
-
-<span class="since-badge" data-since="0.26">Desde 0.26</span>
 
 El formulario de entidad se genera a partir de tus propiedades:
 
@@ -163,8 +161,6 @@ Establece `sidebar: []` para suprimir el riel derivado por completo y mantener t
 la columna principal.
 
 ## Referencia
-
-<span class="since-badge" data-since="0.26">Desde 0.26</span>
 
 | Propiedad | Tipo | Descripción |
 |-----------|------|-------------|

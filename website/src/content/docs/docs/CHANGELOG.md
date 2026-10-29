@@ -7,6 +7,8 @@ description: Every released change to Rebase — new features, fixes, and the br
 
 ## [Unreleased]
 
+## [0.26.0] - 2026-10-29
+
 ### Breaking
 
 #### Server & REST

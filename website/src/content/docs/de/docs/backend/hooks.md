@@ -1,5 +1,5 @@
 ---
-sourceHash: 15dd4d33e0af52d5
+sourceHash: ba272fed815c24ef
 title: Globale Backend-Hooks
 sidebar_label: Globale Hooks
 description: Wenden Sie querschnittliche Lifecycle-Callbacks auf Serverebene mithilfe von CollectionCallbacks auf jede Collection an.
@@ -103,7 +103,7 @@ Jeder Callback erhält ein einzelnes Props-Objekt. Gemeinsame Felder:
 
 `context.user` enthält den authentifizierten Benutzer (`uid`, `roles` usw.). Eine Anfrage ohne Token, wo die API sie zulässt, trägt die anonyme Identität `{ uid: "anonymous", roles: ["anon"] }` statt `undefined`.
 
-<span class="since-badge" data-since="0.26">Seit 0.26</span> `context.credential` nennt den API-Schlüssel, mit dem ein Schreibzugriff erfolgte: `{ kind, id, name }`, wobei `kind` entweder `"personal"` oder `"service"` ist. Ein persönlicher Schlüssel handelt als sein Eigentümer, sodass `context.user` der Eigentümer ist, egal ob er von Hand gespeichert hat oder ein CI-Job mit seinem Schlüssel geschrieben hat; `context.credential` unterscheidet die beiden. Es ist gesetzt bei der Daten-API, dem Realtime-Socket und `/mcp`, und fehlt bei einer Sitzung, dem Service-Schlüssel, Arbeit im Server-Kontext (`rebase.dataAsAdmin`, Crons) und im Browser. Es trägt nie das Secret.
+`context.credential` nennt den API-Schlüssel, mit dem ein Schreibzugriff erfolgte: `{ kind, id, name }`, wobei `kind` entweder `"personal"` oder `"service"` ist. Ein persönlicher Schlüssel handelt als sein Eigentümer, sodass `context.user` der Eigentümer ist, egal ob er von Hand gespeichert hat oder ein CI-Job mit seinem Schlüssel geschrieben hat; `context.credential` unterscheidet die beiden. Es ist gesetzt bei der Daten-API, dem Realtime-Socket und `/mcp`, und fehlt bei einer Sitzung, dem Service-Schlüssel, Arbeit im Server-Kontext (`rebase.dataAsAdmin`, Crons) und im Browser. Es trägt nie das Secret.
 
 `collection` ist immer vorhanden. Ein globaler Callback wird für jede Collection ausgelöst, ist also
 die einzige Ebene, die unabhängig von einer bestimmten Collection registriert wird – dennoch wird ihm
@@ -301,7 +301,7 @@ Beachten Sie, was dies bringt und was es kostet: Wenn die Audit-Zeile nicht gesc
 findet auch die Löschung nicht statt. Für ein Audit-Trail ist das meist genau das, was Sie wollen.
 Wenn dies nicht gewünscht ist, fangen Sie den Fehler im Callback ab und vermerken Sie dies in einem Kommentar.
 
-Die Spalte `via_key` liest `context.credential`, das neu ist: <span class="since-badge" data-since="0.26">Seit 0.26</span> Lassen Sie sie
+Die Spalte `via_key` liest `context.credential`, das neu ist: Lassen Sie sie
 bei einer früheren Version weg.
 
 ### Collection-spezifische Logik

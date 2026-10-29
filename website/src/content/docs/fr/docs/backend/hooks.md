@@ -1,5 +1,5 @@
 ---
-sourceHash: 15dd4d33e0af52d5
+sourceHash: ba272fed815c24ef
 title: Hooks Backend Globaux
 sidebar_label: Hooks Globaux
 description: Appliquez des callbacks de cycle de vie transversaux à chaque collection au niveau du serveur à l'aide de CollectionCallbacks.
@@ -103,7 +103,7 @@ Chaque callback reçoit un objet props unique. Champs communs :
 
 `context.user` contient l'utilisateur authentifié (`uid`, `roles`, etc.). Une requête sans jeton, là où l'API en laisse passer une, porte l'identité anonyme `{ uid: "anonymous", roles: ["anon"] }` plutôt que `undefined`.
 
-<span class="since-badge" data-since="0.26">Depuis 0.26</span> `context.credential` nomme la clé d'API avec laquelle une écriture a été faite : `{ kind, id, name }`, où `kind` vaut `"personal"` ou `"service"`. Une clé personnelle agit en tant que son propriétaire, de sorte que `context.user` est le propriétaire, qu'il ait enregistré à la main ou qu'un job de CI ait écrit avec sa clé ; `context.credential` permet de distinguer les deux. Il est renseigné sur l'API de données, le socket temps réel et `/mcp`, et absent pour une session, la clé de service, le travail en contexte serveur (`rebase.dataAsAdmin`, crons) et dans le navigateur. Il ne porte jamais le secret.
+`context.credential` nomme la clé d'API avec laquelle une écriture a été faite : `{ kind, id, name }`, où `kind` vaut `"personal"` ou `"service"`. Une clé personnelle agit en tant que son propriétaire, de sorte que `context.user` est le propriétaire, qu'il ait enregistré à la main ou qu'un job de CI ait écrit avec sa clé ; `context.credential` permet de distinguer les deux. Il est renseigné sur l'API de données, le socket temps réel et `/mcp`, et absent pour une session, la clé de service, le travail en contexte serveur (`rebase.dataAsAdmin`, crons) et dans le navigateur. Il ne porte jamais le secret.
 
 `collection` est toujours présent. Un callback global se déclenche pour chaque collection, c'est
 donc le seul niveau enregistré indépendamment de chacune d'elles — mais il n'est
@@ -301,7 +301,7 @@ Notez bien ce que cela apporte et ce que cela implique : si la ligne d'audit ne 
 suppression n'a pas lieu non plus. Pour une piste d'audit, c'est généralement ce que l'on recherche.
 Si ce n'est pas le cas, interceptez l'erreur dans le callback et explicitez-le dans un commentaire.
 
-La colonne `via_key` lit `context.credential`, qui est nouveau : <span class="since-badge" data-since="0.26">Depuis 0.26</span> Sur une version antérieure, omettez-la.
+La colonne `via_key` lit `context.credential`, qui est nouveau : Sur une version antérieure, omettez-la.
 
 ### Logique spécifique à une collection
 

@@ -1,13 +1,11 @@
 ---
-sourceHash: 29363c3f0ab50d98
+sourceHash: 42da06ee7f0f6c0c
 title: Formular-Layout
 sidebar_label: Formular-Layout
 description: Steuern Sie die Anordnung des Entitätsformulars – Spaltenbreiten, Abschnitte und die Metadaten-Leiste.
 ---
 
 ## Übersicht
-
-<span class="since-badge" data-since="0.26">Seit 0.26</span>
 
 Das Entitätsformular wird aus Ihren Eigenschaften generiert:
 
@@ -163,8 +161,6 @@ Setzen Sie `sidebar: []`, um die abgeleitete Leiste vollständig zu unterdrücke
 der Hauptspalte zu belassen.
 
 ## Referenz
-
-<span class="since-badge" data-since="0.26">Seit 0.26</span>
 
 | Eigenschaft | Typ | Beschreibung |
 |-------------|-----|--------------|

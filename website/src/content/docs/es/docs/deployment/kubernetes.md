@@ -1,5 +1,5 @@
 ---
-sourceHash: 80956abbae707a91
+sourceHash: 5764a95deb8e4e9c
 title: Kubernetes
 sidebar_label: Kubernetes
 description: Despliega Rebase en un clúster de Kubernetes con el chart oficial de Helm — uno o varios Deployments, un Job de migración que gestiona el esquema y aplicaciones estáticas en el mismo host.
@@ -71,8 +71,6 @@ instalación aislada (air-gapped) —, `helm install rebase ./infra/charts/rebas
 | `url` | Imagen base; el runtime descarga un archivo tarball en cada inicio del pod | Un plano de control que distribuye bundles fuera de banda |
 
 ## Un proceso, o varios
-
-<span class="since-badge" data-since="0.26">Desde 0.26</span>
 
 La configuración predeterminada es un único Deployment que sirve todo — la misma
 estructura que ejecuta el archivo Compose. Dividirlo requiere solo un valor:

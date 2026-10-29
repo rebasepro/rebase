@@ -1,5 +1,5 @@
 ---
-sourceHash: 9b091b775b58ae32
+sourceHash: 297a89400496895a
 title: Ramificación de bases de datos
 sidebar_label: Ramificación
 description: Crea ramas aisladas de bases de datos para desarrollo, staging y pruebas usando CREATE DATABASE ... TEMPLATE de PostgreSQL — copias instantáneas y de fidelidad total sin tiempo de inactividad.
@@ -273,8 +273,6 @@ postgresql://user:pass@localhost:5432/rb_dev_sandbox
 ---
 
 ## Revisar y fusionar una rama
-
-<span class="since-badge" data-since="0.26">Desde 0.26</span>
 
 Una rama es donde un agente, o una migración de la que no estás seguro, puede cambiar una base de datos sin tocar la real. Antes de que nada de eso llegue a la base de datos de la que se creó la rama, puedes ver qué cambió y fusionarlo desde [Studio](/docs/studio/): abre **Ramas** y elige una.
 

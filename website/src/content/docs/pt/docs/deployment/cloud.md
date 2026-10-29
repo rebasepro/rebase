@@ -1,5 +1,5 @@
 ---
-sourceHash: cbd1289dcc8b5347
+sourceHash: 1ed19c3d147505c2
 title: Rebase Cloud
 sidebar_label: Rebase Cloud
 description: O Rebase Cloud é o mesmo Rebase, operado para você. O que é, como um projeto se vincula e faz deploy, e o que o beta privado ainda não inclui.
@@ -62,7 +62,7 @@ confirmação antes de enviar seu e-mail e senha para lá. Sem um terminal, ou c
 `--json`, ele recusa a operação com `unknown_control_plane`; passe `--url <host>` (ou defina
 `REBASE_CLOUD_URL`) para autenticar-se lá intencionalmente.
 
-**Criou a conta com Google, GitHub ou LinkedIn?** <span class="since-badge" data-since="0.26">A partir da versão 0.26</span> Sua conta não tem senha, então
+**Criou a conta com Google, GitHub ou LinkedIn?** Sua conta não tem senha, então
 entre com um código:
 
 ```bash
@@ -173,8 +173,6 @@ serão interrompidos.
 
 ### A verificação de sintaxe antes do upload
 
-<span class="since-badge" data-since="0.26">A partir da versão 0.26</span>
-
 Os arquivos de um app estático são servidos exatamente como estão. Quando o `build` dele só copia scripts escritos à mão para `output`, ninguém os analisou, e um arquivo com um erro de digitação vai ao ar e impede a página de carregar. Por isso, antes de enviar qualquer coisa, `deploy` analisa cada arquivo `.js`, `.mjs` e `.cjs` no `output` de cada app estático, junto com cada `<script>` inline dos seus arquivos `.html`. Isso vale tanto para um app estático implantado sozinho quanto para os apps estáticos incorporados ao bundle do backend. Um erro de sintaxe interrompe o deploy com o arquivo, a linha e a coluna:
 
 ```
@@ -199,8 +197,6 @@ plataforma está genuinamente trabalhando e fazer polling é o correto; quando i
 algo, esse algo está aguardando você.
 
 ## Pré-visualizar uma mudança
-
-<span class="since-badge" data-since="0.26">A partir da versão 0.26</span>
 
 ```bash
 rebase cloud deploy --preview
@@ -373,11 +369,11 @@ confia mais em **Settings → Access tokens**.
 envia e-mail) que funciona uma única vez, por 7 dias, para uma conta que tenha verificado esse
 endereço; ninguém entra até aceitar. Convide um admin ou um membro, e torne-o
 owner depois que ele entrar. Owners e admins o veem, reenviam ou revogam em
-**Pending invitations**; a partir de um terminal, <span class="since-badge" data-since="0.26">A partir da versão 0.26</span> [`rebase cloud orgs members invite`](/docs/cli/cloud/#organizations).
+**Pending invitations**; a partir de um terminal, [`rebase cloud orgs members invite`](/docs/cli/cloud/#organizations).
 
 ## Ver quem fez o quê
 
-A página **Activity** do console e <span class="since-badge" data-since="0.26">A partir da versão 0.26</span> `rebase cloud activity` mostram aos
+A página **Activity** do console e `rebase cloud activity` mostram aos
 owners e admins da organização quem fez deploy, definiu ou revelou uma variável de ambiente
 (pelo nome, nunca pelo valor), alterou um domínio, restaurou um backup,
 redimensionou, parou ou excluiu um projeto, alterou o papel de um membro ou criou um
@@ -398,8 +394,6 @@ GitHub Actions e o que continua restrito a uma pessoa autenticada estão em
 [CI e agentes](/docs/deployment/cloud-agents/#ci-and-agents).
 
 ## Um backend sem conta
-
-<span class="since-badge" data-since="0.26">A partir da versão 0.26</span>
 
 `rebase cloud init --claim` dá a um app um backend no ar antes que alguém tenha se
 cadastrado, e imprime uma URL de reivindicação para a pessoa ficar com ele; um projeto que ninguém reivindica
@@ -515,7 +509,7 @@ Explicado abertamente, porque descobrir depois é pior:
   `JWT_SECRET`, então o código que um membro implanta pode lê-los,
   mesmo que somente owners e admins possam revelá-los no console. Convide
   como membro apenas alguém em quem você confiaria com esses valores.
-- **A service key pode ser substituída.** <span class="since-badge" data-since="0.26">A partir da versão 0.26</span> As **Settings** do projeto
+- **A service key pode ser substituída.** As **Settings** do projeto
   (ou `rebase cloud service-key rotate`) emitem uma nova `REBASE_SERVICE_KEY`
   e reiniciam o app com ela. A chave antiga funciona até o fim da reinicialização,
   e nada depois, então tudo o que a copiou é recusado a partir

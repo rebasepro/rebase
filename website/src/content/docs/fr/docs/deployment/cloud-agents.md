@@ -1,5 +1,5 @@
 ---
-sourceHash: 582293a88fb2d626
+sourceHash: 9bf5476f1a977fe3
 title: CI, agents et backends réclamables
 sidebar_label: CI et agents
 description: Déployez sur Rebase Cloud depuis la CI ou un agent avec un jeton restreint plutôt qu'un mot de passe, et laissez un agent provisionner un backend en ligne sans compte, qu'une personne réclamera plus tard.
@@ -59,7 +59,7 @@ jobs:
 | `database` | `db list`, `db info` et `db connect`, ce qui inclut le mot de passe de la base de données |
 | `backups` | Lister, créer, inspecter et télécharger les sauvegardes, et lire la fenêtre de restauration à un instant précis |
 
-<span class="since-badge" data-since="0.26">Depuis 0.26</span> Trois capacités de plus agissent sur une organisation plutôt que sur un projet. Un jeton
+Trois capacités de plus agissent sur une organisation plutôt que sur un projet. Un jeton
 n'en détient une que si `--can` la nomme, sur l'organisation que nomme `--org` (ou,
 sans `--org`, l'organisation du projet, puis celle sélectionnée avec
 `rebase cloud use`). Un jeton peut en détenir sans aucune capacité de projet :
@@ -103,8 +103,6 @@ projet ou quelle organisation. L'écran **Access tokens** de la console propose 
 capacités, celles de l'organisation sous **Organization access**. `rebase cloud tokens revoke <id> --yes` l'arrête aussitôt.
 
 ## Un backend sans compte
-
-<span class="since-badge" data-since="0.26">Depuis 0.26</span>
 
 Un agent qui a construit une app peut lui donner un backend en ligne avant que quiconque se soit
 inscrit, et remettre à la personne pour qui il travaille un lien pour le garder :

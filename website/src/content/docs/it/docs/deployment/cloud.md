@@ -1,5 +1,5 @@
 ---
-sourceHash: cbd1289dcc8b5347
+sourceHash: 1ed19c3d147505c2
 title: Rebase Cloud
 sidebar_label: Rebase Cloud
 description: Rebase Cloud è lo stesso Rebase, gestito per te. Di cosa si tratta, come collegare e distribuire un progetto, e cosa la beta privata non include ancora.
@@ -62,7 +62,7 @@ conferma prima di inviarvi email e password. Senza terminale, o con
 `--json`, rifiuta l'operazione con `unknown_control_plane`; passa `--url <host>` (oppure imposta
 `REBASE_CLOUD_URL`) per accedere intenzionalmente a quell'endpoint.
 
-**Ti sei registrato con Google, GitHub o LinkedIn?** <span class="since-badge" data-since="0.26">Da 0.26</span> Il tuo account non ha una password, quindi
+**Ti sei registrato con Google, GitHub o LinkedIn?** Il tuo account non ha una password, quindi
 accedi con un codice:
 
 ```bash
@@ -171,8 +171,6 @@ la utilizzavano.
 
 ### Il controllo della sintassi prima dell'upload
 
-<span class="since-badge" data-since="0.26">Da 0.26</span>
-
 I file di un'app statica vengono serviti così come sono. Quando il suo `build` si limita a copiare script scritti a mano in `output`, nessuno li ha mai analizzati, e un file con un refuso va online e impedisce alla pagina di caricarsi. Per questo, prima di caricare qualsiasi cosa, `deploy` analizza ogni file `.js`, `.mjs` e `.cjs` nell'`output` di ogni app statica, insieme a ogni `<script>` inline nei suoi file `.html`. Vale sia per un'app statica distribuita da sola sia per le app statiche incorporate nel bundle del backend. Un errore di sintassi interrompe il deploy indicando file, riga e colonna:
 
 ```
@@ -197,8 +195,6 @@ piattaforma sta lavorando regolarmente ed eseguire un polling è la procedura co
 un valore, significa che qualcosa è in attesa di un tuo intervento.
 
 ## Anteprima di una modifica
-
-<span class="since-badge" data-since="0.26">Da 0.26</span>
 
 ```bash
 rebase cloud deploy --preview
@@ -366,11 +362,11 @@ fidi più in **Settings → Access tokens**.
 invia email) che funziona una sola volta, per 7 giorni, per un account che ha verificato quell'indirizzo;
 nessuno entra finché non accetta. Invita un admin o un membro, e rendilo
 owner dopo che è entrato. Owner e admin la vedono, la rinviano o la revocano in
-**Pending invitations**; da un terminale, <span class="since-badge" data-since="0.26">Da 0.26</span> [`rebase cloud orgs members invite`](/docs/cli/cloud/#organizations).
+**Pending invitations**; da un terminale, [`rebase cloud orgs members invite`](/docs/cli/cloud/#organizations).
 
 ## Vedere chi ha fatto cosa
 
-La pagina **Activity** della console e <span class="since-badge" data-since="0.26">Da 0.26</span> `rebase cloud activity` mostrano a
+La pagina **Activity** della console e `rebase cloud activity` mostrano a
 owner e admin dell'organizzazione chi ha distribuito, impostato o rivelato una variabile
 d'ambiente (per nome, mai per valore), modificato un dominio, ripristinato un backup,
 ridimensionato, fermato o eliminato un progetto, cambiato il ruolo di un membro o creato un
@@ -391,8 +387,6 @@ workflow di GitHub Actions e ciò che resta a uso esclusivo di un utente autenti
 [CI e agenti](/docs/deployment/cloud-agents/#ci-and-agents).
 
 ## Un backend senza account
-
-<span class="since-badge" data-since="0.26">Da 0.26</span>
 
 `rebase cloud init --claim` dà a un'app un backend attivo prima che chiunque si sia
 registrato, e stampa un URL di rivendicazione per consentire alla persona di tenerlo; un progetto che nessuno rivendica
@@ -508,7 +502,7 @@ Chiarito in modo trasparente, per evitare sorprese successive:
   `DATABASE_URL` e `JWT_SECRET`, quindi il codice distribuito da un membro può leggerli,
   anche se solo owner e admin possono rivelarli nella console. Invita
   come membro solo qualcuno di cui ti fideresti con questi valori.
-- **La service key può essere sostituita.** <span class="since-badge" data-since="0.26">Da 0.26</span> Le **Settings** del progetto
+- **La service key può essere sostituita.** Le **Settings** del progetto
   (o `rebase cloud service-key rotate`) emettono una nuova `REBASE_SERVICE_KEY`
   e riavviano l'app su di essa. La vecchia chiave funziona fino al termine del riavvio,
   e non dopo, quindi qualsiasi cosa che l'abbia copiata viene rifiutata da

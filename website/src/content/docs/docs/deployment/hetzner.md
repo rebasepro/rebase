@@ -22,7 +22,7 @@ module "rebase" {
   admin_email     = "you@example.com"
 
   bundle_url      = "https://storage.example.com/bundles/app-1.4.0.tar.gz"
-  runtime_version = "0.25.1" # required with bundle_url: `latest` is refused at plan
+  runtime_version = "0.26.0" # required with bundle_url: `latest` is refused at plan
 
   s3_bucket            = "example-uploads"
   s3_access_key_id     = var.s3_access_key_id
@@ -61,7 +61,7 @@ rsync -a dist-bundle/ root@<your-server-ip>:/opt/rebase/dist-bundle/
 
 For a real deployment, prefer one of the two shapes that do not involve copying files to a box by hand:
 
-- **Bake it into an image** — `FROM rebasepro/server:0.25.1` then `COPY dist-bundle /bundle`, and deploy by changing a tag.
+- **Bake it into an image** — `FROM rebasepro/server:0.26.0` then `COPY dist-bundle /bundle`, and deploy by changing a tag.
 - **Serve it over HTTP** — set `REBASE_BUNDLE_URL` and the runtime fetches and unpacks the bundle on every start. This is what the Terraform module above does, and the same mechanism the Helm chart uses.
 
 ## 4. Configure and run

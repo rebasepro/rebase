@@ -1,5 +1,5 @@
 ---
-sourceHash: a9c35edb64ea5e56
+sourceHash: 0fe683ac4911c694
 title: Aufteilen in mehrere Prozesse
 sidebar_label: Prozesse aufteilen
 description: Führen Sie ein Bundle als mehrere zusammenarbeitende Prozesse aus – eine API, eine Functions-Ebene, ein Worker – aus demselben veröffentlichten Runtime-Image, damit eine rechenintensive benutzerdefinierte Funktion nicht mehr mit der Daten-API konkurriert.
@@ -269,7 +269,7 @@ split: true
 functions:
   enabled: true
   image:
-    tag: "0.25.1"     # this unit only; the rest stay on the release-wide tag
+    tag: "0.26.0"     # this unit only; the rest stay on the release-wide tag
 ```
 
 Meist lohnt es sich nur, das Tag festzupinnen: Das Repository wird übernommen, es handelt sich also um

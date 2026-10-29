@@ -1,13 +1,11 @@
 ---
-sourceHash: 29363c3f0ab50d98
+sourceHash: 42da06ee7f0f6c0c
 title: Layout do Formulário
 sidebar_label: Layout do Formulário
 description: Controle como o formulário da entidade é organizado — larguras de colunas, seções e a barra lateral de metadados.
 ---
 
 ## Visão geral
-
-<span class="since-badge" data-since="0.26">A partir da versão 0.26</span>
 
 O formulário da entidade é gerado a partir das suas propriedades:
 
@@ -163,8 +161,6 @@ Defina `sidebar: []` para suprimir totalmente a barra lateral derivada e manter 
 na coluna principal.
 
 ## Referência
-
-<span class="since-badge" data-since="0.26">A partir da versão 0.26</span>
 
 | Propriedade | Tipo | Descrição |
 |-------------|------|-----------|

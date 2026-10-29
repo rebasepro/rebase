@@ -624,7 +624,7 @@ Gated — needs `schema:read`: an admin, the service key, or an API key holding 
 ```json
 {
   "schemaVersion": "a1b2c3…",
-  "runtime": { "version": "0.25.1", "contract": 1 },
+  "runtime": { "version": "0.26.0", "contract": 1 },
   "collections": [ "…serialized collections, client-safe fields only…" ],
   "collectionSlugs": ["orders", "products", "users"],
   "generatedAt": "2026-08-21T10:30:00.000Z"

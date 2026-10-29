@@ -130,7 +130,7 @@ For a real deployment, prefer baking both into an image, which also pins exactly
 what runs:
 
 ```dockerfile
-FROM rebasepro/server:0.25.1
+FROM rebasepro/server:0.26.0
 COPY dist-bundle /bundle
 ```
 
@@ -167,8 +167,6 @@ image **refuses to boot** on `push`, for the reason above.
 
 ## When only your change process may change the database
 
-<span class="since-badge" data-since="0.26">Since 0.26</span>
-
 `REBASE_MIGRATE_ON_BOOT=none` leaves your collections alone. It does not leave
 the database alone: the framework's own tables (auth, API keys, jobs, cron) are
 still created and kept current at every boot. When the database may only change
@@ -204,8 +202,6 @@ processes. [Live schema editing](/docs/backend/live-schema-editing) can still
 commit a change as source, but refuses to apply it to the database.
 
 ### The provisioning run
-
-<span class="since-badge" data-since="0.26">Since 0.26</span>
 
 The schema comes from a run your change process controls. Use the same image and
 bundle as the server, with `REBASE_PROVISION_ONLY=true`, connected as a role that
@@ -324,7 +320,7 @@ containers works. Two things to get right everywhere:
 
 ```toml
 [build]
-  dockerfile = "Dockerfile"   # FROM rebasepro/server:0.25.1 + COPY dist-bundle /bundle
+  dockerfile = "Dockerfile"   # FROM rebasepro/server:0.26.0 + COPY dist-bundle /bundle
 
 [http_service]
   internal_port = 8080
@@ -525,7 +521,7 @@ processes. See [Split processes](/docs/deployment/split-processes/).
 ## Upgrading
 
 ```yaml
-image: rebasepro/server:0.25.1
+image: rebasepro/server:0.26.0
 ```
 
 Restart. Your bundle is unchanged. Within a runtime contract major, a bundle that

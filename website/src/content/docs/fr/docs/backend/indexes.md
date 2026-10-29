@@ -1,5 +1,5 @@
 ---
-sourceHash: 0c021da7af2a852e
+sourceHash: d74cc2ea4835551d
 title: Index
 sidebar_label: Index
 description: Déclarez des index Postgres ordinaires sur une collection — btree, GIN et BRIN, partiels, composites, couvrants et uniques — et comprenez pourquoi un index écrit à la main disparaissait auparavant.
@@ -236,8 +236,6 @@ colonne, en dehors de `indexes:`, n'est donc pas vu — déclarez-le dans `index
 `index: false`, pour garder un seul index au lieu de deux.
 
 ### Ce que fait la mise à niveau sur une base de données existante
-
-<span class="since-badge" data-since="0.26">Depuis 0.26</span>
 
 Les index sont de nouveaux objets sur des tables qui contiennent déjà des données, et les deux portes
 les construisent différemment :

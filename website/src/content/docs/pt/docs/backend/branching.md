@@ -1,5 +1,5 @@
 ---
-sourceHash: 9b091b775b58ae32
+sourceHash: 297a89400496895a
 title: Branching de Banco de Dados
 sidebar_label: Branching
 description: Crie branches de banco de dados isoladas para desenvolvimento, staging e testes usando o CREATE DATABASE ... TEMPLATE do PostgreSQL — cópias instantâneas e de alta fidelidade com zero tempo de inatividade.
@@ -269,8 +269,6 @@ postgresql://user:pass@localhost:5432/rb_dev_sandbox
 ---
 
 ## Revisar e mesclar um branch
-
-<span class="since-badge" data-since="0.26">A partir da versão 0.26</span>
 
 Um branch é onde um agente, ou uma migração de que você não tem certeza, pode alterar um banco de dados sem tocar no real. Antes que qualquer coisa chegue ao banco de onde o branch foi criado, você pode ver o que mudou e mesclar pelo [Studio](/docs/studio/): abra **Branches** e escolha um.
 

@@ -1,5 +1,5 @@
 ---
-sourceHash: 9b091b775b58ae32
+sourceHash: 297a89400496895a
 title: Branches de base de données
 sidebar_label: Branches
 description: Créez des branches de base de données isolées pour le développement, le staging et les tests à l'aide de CREATE DATABASE ... TEMPLATE de PostgreSQL — des copies instantanées et parfaitement fidèles, sans temps d'arrêt.
@@ -257,8 +257,6 @@ postgresql://user:pass@localhost:5432/rb_dev_sandbox
 ---
 
 ## Examiner et fusionner une branche
-
-<span class="since-badge" data-since="0.26">Depuis 0.26</span>
 
 Une branche est l'endroit où un agent, ou une migration dont vous n'êtes pas sûr, peut modifier une base de données sans toucher à la vraie. Avant que quoi que ce soit n'atteigne la base dont la branche a été créée, vous pouvez voir ce qui a changé et le fusionner depuis [Studio](/docs/studio/) : ouvrez **Branches** et choisissez-en une.
 

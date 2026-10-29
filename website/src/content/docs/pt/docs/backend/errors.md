@@ -1,5 +1,5 @@
 ---
-sourceHash: 5ce5071347b9d6a7
+sourceHash: bfdc82eab01277a9
 title: Códigos de erro
 sidebar_label: Códigos de erro
 description: Todos os códigos de erro que um backend Rebase pode retornar, com seu status HTTP, significado e o que fazer a respeito — além do envelope de resposta, X-Request-ID e as regras de details.
@@ -350,7 +350,7 @@ visualmente o recurso em vez de exibir um erro.
 | `SCHEMA_EDIT_REQUIRES_A_PERSON` | 403 | Uma chave de API ou outro agente automatizado tentou aplicar uma alteração de schema. | Faça login como usuário humano ou defina `liveSchema.allowMachineApply`. |
 | `SCHEMA_EDITING_NO_COLLECTIONS_DIR` | 501 | A edição de schema em tempo real requer `collectionsDir` ou `liveSchema.repository`, e este servidor foi iniciado sem nenhum deles. | Configure um deles. |
 | `SCHEMA_EDITING_NO_REPOSITORY` | 503 | O planejamento funciona; não há repositório no qual commitar a alteração. | Configure `liveSchema.repository`. |
-| `SCHEMA_EDITING_PROVISIONING_OFF` | 409 | Este deployment não altera nada no seu banco de dados (`REBASE_PROVISION=false`), então uma mudança não pode ser aplicada pelo painel. <span class="since-badge" data-since="0.26">A partir da versão 0.26</span> | Faça commit apenas como código-fonte e deixe o processo que altera o banco de dados aplicá-la. |
+| `SCHEMA_EDITING_PROVISIONING_OFF` | 409 | Este deployment não altera nada no seu banco de dados (`REBASE_PROVISION=false`), então uma mudança não pode ser aplicada pelo painel. | Faça commit apenas como código-fonte e deixe o processo que altera o banco de dados aplicá-la. |
 | `SCHEMA_EDITING_UNSUPPORTED` | 503 | Este driver não pode planejar alterações de schema. | A edição em tempo real está disponível no Postgres. |
 | `SCHEMA_EDITOR_BAAS_MODE` | 501 | As collections são derivadas por introspecção do banco de dados aqui, portanto não há arquivos-fonte para editar. | Altere o schema por meio de uma migration. |
 | `SCHEMA_EDITOR_DISABLED` | 501 | O editor de schema está desativado para este servidor. Um bundle compilado sempre responde isto. | Ative-o com `schemaEditor`. Em um bundle, defina `REBASE_LIVE_SCHEMA_REPOSITORY` para editar as collections por meio de um repositório — veja [Edição de schema ao vivo](/docs/backend/live-schema-editing#from-a-built-bundle). |

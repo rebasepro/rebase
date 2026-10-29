@@ -1,5 +1,5 @@
 ---
-sourceHash: 0c021da7af2a852e
+sourceHash: d74cc2ea4835551d
 title: Indici
 sidebar_label: Indici
 description: Dichiara normali indici Postgres su una collection — btree, GIN e BRIN, parziali, compositi, covering e univoci — e perché quelli scritti a mano tendevano a scomparire.
@@ -329,8 +329,6 @@ sulla stessa colonna, al di fuori di `indexes:`, quindi non viene visto — dich
 `indexes:`, oppure imposta `index: false`, per mantenere un solo indice invece di due.
 
 ### Cosa fa l'aggiornamento a un database esistente
-
-<span class="since-badge" data-since="0.26">Da 0.26</span>
 
 Gli indici sono oggetti nuovi su tabelle che contengono già dati, e le due porte li
 costruiscono in modo diverso:

@@ -1,5 +1,5 @@
 ---
-sourceHash: 9b091b775b58ae32
+sourceHash: 297a89400496895a
 title: Database Branching
 sidebar_label: Branching
 description: Crea branch di database isolati per sviluppo, staging e testing utilizzando CREATE DATABASE ... TEMPLATE di PostgreSQL — copie istantanee a fedeltà totale senza tempi di inattività.
@@ -273,8 +273,6 @@ postgresql://user:pass@localhost:5432/rb_dev_sandbox
 ```
 
 ## Esaminare e unire un branch
-
-<span class="since-badge" data-since="0.26">Da 0.26</span>
 
 Un branch è il posto in cui un agente, o una migrazione di cui non sei sicuro, può modificare un database senza toccare quello vero. Prima che qualcosa arrivi al database da cui il branch è stato creato, puoi vedere cosa è cambiato e unirlo da [Studio](/docs/studio/): apri **Branch** e scegline uno.
 

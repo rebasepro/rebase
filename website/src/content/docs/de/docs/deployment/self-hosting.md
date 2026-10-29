@@ -1,5 +1,5 @@
 ---
-sourceHash: 8710aaf2fefe9cfe
+sourceHash: a364dc4a57852453
 title: Self-Hosting
 sidebar_label: Self-Hosting
 description: Führen Sie Rebase überall mit dem offiziellen Runtime-Image und Ihrem Projekt-Bundle aus – Docker Compose, Fly, Railway oder auf einem einfachen VPS.
@@ -81,7 +81,7 @@ Da sie bereits vorhanden sind, können Sie das Bundle schreibgeschützt (read-on
 Für ein echtes Deployment empfiehlt es sich, beides in ein Image einzubetten, was auch exakt festlegt, was ausgeführt wird:
 
 ```dockerfile
-FROM rebasepro/server:0.25.1
+FROM rebasepro/server:0.26.0
 COPY dist-bundle /bundle
 ```
 
@@ -103,8 +103,6 @@ Führen Sie den Befehl aus einem Checkout oder einem CI-Job aus, der auf die Dat
 
 ## Wenn nur Ihr Änderungsprozess die Datenbank ändern darf
 
-<span class="since-badge" data-since="0.26">Seit 0.26</span>
-
 `REBASE_MIGRATE_ON_BOOT=none` lässt Ihre Collections in Ruhe. Die Datenbank lässt es nicht in Ruhe: Die eigenen Tabellen des Frameworks (Auth, API-Schlüssel, Jobs, Cron) werden bei jedem Start weiterhin angelegt und aktuell gehalten. Darf die Datenbank nur über einen geprüften Änderungsprozess geändert werden, setzen Sie `REBASE_PROVISION=false` auf jedem Prozess, der Anfragen bedient:
 
 | Einstellung | Collection-Tabellen und Policies | Framework-Tabellen |
@@ -122,8 +120,6 @@ Mit abgeschaltetem Provisioning legt die Runtime nichts an und ändert nichts: k
 Zeilen ändern sich weiterhin, wie in jeder Datenbank: Anmeldungen, Sitzungen, Nutzung von API-Schlüsseln, Idempotenzschlüssel, Cron-Claims. Das erste Admin-Konto (`REBASE_ADMIN_EMAIL`) wird vom Provisioning-Lauf angelegt, nicht von den bedienenden Prozessen. [Live-Schemabearbeitung](/docs/backend/live-schema-editing) kann eine Änderung weiterhin als Quellcode committen, verweigert aber, sie auf die Datenbank anzuwenden.
 
 ### Der Provisioning-Lauf
-
-<span class="since-badge" data-since="0.26">Seit 0.26</span>
 
 Das Schema stammt aus einem Lauf, den Ihr Änderungsprozess steuert. Verwenden Sie dasselbe Image und Bundle wie der Server, mit `REBASE_PROVISION_ONLY=true`, verbunden als eine Rolle, die in der Datenbank anlegen darf. `REBASE_PROVISION_SQL_OUT` hält jede Schemaänderung des Laufs als SQL-Skript fest:
 
@@ -195,7 +191,7 @@ Die Runtime ist ein gewöhnlicher Container, der auf `$PORT` lauscht, sodass all
 
 ```toml
 [build]
-  dockerfile = "Dockerfile"   # FROM rebasepro/server:0.25.1 + COPY dist-bundle /bundle
+  dockerfile = "Dockerfile"   # FROM rebasepro/server:0.26.0 + COPY dist-bundle /bundle
 
 [http_service]
   internal_port = 8080
@@ -316,7 +312,7 @@ Alles oben Beschriebene ist ein einzelner Container, der das gesamte Projekt ber
 ## Upgrade
 
 ```yaml
-image: rebasepro/server:0.25.1
+image: rebasepro/server:0.26.0
 ```
 
 Neu starten. Ihr Bundle bleibt unverändert. Innerhalb einer Major-Version des Runtime-Contracts funktioniert ein zuvor validiertes Bundle weiterhin – siehe [Kompatibilität](/docs/architecture/runtime-and-bundles/#compatibility).

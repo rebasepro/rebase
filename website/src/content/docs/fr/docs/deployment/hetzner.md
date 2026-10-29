@@ -1,5 +1,5 @@
 ---
-sourceHash: abcf5a5d3cbcd742
+sourceHash: 775b8476a1e9de73
 title: Déployer Rebase sur Hetzner Cloud
 description: Déployez Rebase sur Hetzner Cloud avec Terraform ou Docker Compose, pour d'excellentes performances basées dans l'UE et la souveraineté des données.
 sidebar_label: Hetzner Cloud
@@ -23,7 +23,7 @@ module "rebase" {
   admin_email     = "you@example.com"
 
   bundle_url      = "https://storage.example.com/bundles/app-1.4.0.tar.gz"
-  runtime_version = "0.25.1" # required with bundle_url: `latest` is refused at plan
+  runtime_version = "0.26.0" # required with bundle_url: `latest` is refused at plan
 
   s3_bucket            = "example-uploads"
   s3_access_key_id     = var.s3_access_key_id
@@ -62,7 +62,7 @@ rsync -a dist-bundle/ root@<your-server-ip>:/opt/rebase/dist-bundle/
 
 Pour un véritable déploiement, privilégiez l'une des deux approches qui n'impliquent pas de copier des fichiers manuellement sur une machine :
 
-- **L'intégrer dans une image** — `FROM rebasepro/server:0.25.1` puis `COPY dist-bundle /bundle`, et déployez en changeant de tag.
+- **L'intégrer dans une image** — `FROM rebasepro/server:0.26.0` puis `COPY dist-bundle /bundle`, et déployez en changeant de tag.
 - **Le servir via HTTP** — définissez `REBASE_BUNDLE_URL` et le runtime récupère et décompresse le bundle à chaque démarrage. C'est ce que fait le module Terraform ci-dessus, et le même mécanisme qu'utilise le Helm chart.
 
 ## 4. Configurer et exécuter

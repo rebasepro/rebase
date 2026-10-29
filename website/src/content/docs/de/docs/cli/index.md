@@ -1,5 +1,5 @@
 ---
-sourceHash: c1d3d5c90320a651
+sourceHash: 2df00511c02fed53
 title: CLI-Referenz
 sidebar_label: CLI
 description: Rebase-CLI-Befehle für Projektinitialisierung, Schemagenerierung, Datenbankmigrationen und SDK-Generierung.
@@ -18,8 +18,6 @@ pnpm add -g @rebasepro/cli
 Oder führen Sie jeden Befehl aus, ohne ihn zu installieren: `pnpm dlx @rebasepro/cli <command>`.
 
 ## Maschinenlesbare Ausgabe
-
-<span class="since-badge" data-since="0.26">Seit 0.26</span>
 
 `--json` ist der Schalter, und außerhalb der `cloud`-Befehlsfamilie ist es der einzige: `rebase status`, `rebase resources`, `rebase apps list`, `rebase upgrade` und `rebase verify` geben dann genau einen JSON-Wert auf stdout aus — das Ergebnis oder eine `{"error": {"message", "code", "hint", "issues"}}`-Struktur bei einem Exit-Code ungleich null — und zwar bei **jedem** Beenden des Befehls, sodass ein Aufrufer stdout bedingungslos parsen kann. Ohne diesen Schalter schreiben sie menschenlesbaren Text und Fehler gehen nach stderr. `rebase cloud` verwendet dieselbe Struktur und ist die einzige Ausnahme von diesem Schalter: Es aktiviert JSON automatisch von selbst, wenn stdout kein TTY ist oder wenn `REBASE_JSON=1` gesetzt ist. Daher ist `rebase cloud status | cat` JSON, während `rebase status | cat` dies nicht ist — übergeben Sie in einem Skript explizit `--json`, anstatt sich auf eine der beiden Regeln zu verlassen.
 
@@ -407,8 +405,6 @@ und schlägt im Zweifelsfall fehl ("fails closed"), was es zur geeigneten Form f
 deployte Datenbank macht.
 
 ### `rebase verify`
-
-<span class="since-badge" data-since="0.26">Seit 0.26</span>
 
 ```bash
 rebase verify

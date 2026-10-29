@@ -1,5 +1,5 @@
 ---
-sourceHash: 781e0136e6dc1271
+sourceHash: b20067fcabaf42ec
 title: Servidor MCP
 sidebar_label: Servidor MCP
 description: "Conecta Claude Code, Cursor, Gemini CLI o cualquier cliente MCP a un proyecto de Rebase: las 51 herramientas que expone, la credencial con la que se autentica y la barrera de loopback que se interpone entre un agente y producción."
@@ -176,7 +176,7 @@ Qué credencial es esa, en orden de prioridad:
    `rebase dev` está en ejecución
 
 2 y 3 son la clave del backend de desarrollo de esta máquina, usada solo cuando el destino está en
-loopback. Cuando `REBASE_BASE_URL` apunta a otra parte — <span class="since-badge" data-since="0.26">Desde 0.26</span> `rebase cloud init --claim`
+loopback. Cuando `REBASE_BASE_URL` apunta a otra parte — `rebase cloud init --claim`
 escribe la dirección del proyecto de cloud, y ningún `REBASE_API_TOKEN` hasta que un despliegue
 tiene éxito — el servidor no envía ningún token y lo indica una vez por stderr.
 
@@ -310,7 +310,7 @@ forma predeterminada.
   `rebase_db_branch_list`, `rebase_db_branch_info`, `rebase_db_branch_diff`, `list_documents`,
   `get_document`, `list_users`, `list_roles`, `storage_list_objects`,
   `storage_get_download_url`, `cron_list_jobs`, `cron_get_job`, `cron_get_job_logs`,
-  `rebase_dev_logs`, y <span class="since-badge" data-since="0.26">Desde 0.26</span> las lecturas de Rebase Cloud `rebase_cloud_status`,
+  `rebase_dev_logs`, y las lecturas de Rebase Cloud `rebase_cloud_status`,
   `rebase_cloud_logs`, `rebase_cloud_env_list`, `rebase_cloud_deployments_list`.
 - **Sin restricción — escrituras de Rebase Cloud:** `rebase_cloud_provision`,
   `rebase_cloud_deploy`, `rebase_cloud_env_set`, `rebase_cloud_rollback`.
@@ -429,8 +429,6 @@ inicio que contiene credenciales de administrador para cada proyecto que hayas r
 trátalo en consecuencia.
 
 ## Rebase Cloud
-
-<span class="since-badge" data-since="0.26">Desde 0.26</span>
 
 Ocho herramientas llevan una app desde este directorio hasta un backend en vivo en
 [Rebase Cloud](/docs/deployment/cloud/) y lo mantienen en funcionamiento. Cada una lanza

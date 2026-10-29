@@ -1,5 +1,5 @@
 ---
-sourceHash: cbd1289dcc8b5347
+sourceHash: 1ed19c3d147505c2
 title: Rebase Cloud
 sidebar_label: Rebase Cloud
 description: Rebase Cloud es el mismo Rebase, operado para ti. Qué es, cómo se vincula y despliega un proyecto, y qué no incluye todavía la beta privada.
@@ -62,7 +62,7 @@ solicita confirmación antes de enviar tu correo electrónico y contraseña all�
 `--json`, lo rechaza con `unknown_control_plane`; pasa `--url <host>` (o define
 `REBASE_CLOUD_URL`) para iniciar sesión allí intencionadamente.
 
-**¿Te registraste con Google, GitHub o LinkedIn?** <span class="since-badge" data-since="0.26">Desde 0.26</span> Tu cuenta no tiene contraseña, así que
+**¿Te registraste con Google, GitHub o LinkedIn?** Tu cuenta no tiene contraseña, así que
 inicia sesión con un código:
 
 ```bash
@@ -173,8 +173,6 @@ detendrá.
 
 ### La comprobación de sintaxis antes de la subida
 
-<span class="since-badge" data-since="0.26">Desde 0.26</span>
-
 Los archivos de una aplicación estática se sirven tal cual. Cuando su `build` solo copia scripts escritos a mano en `output`, nadie los ha analizado, y un archivo con una errata se publica e impide que la página cargue. Por eso, antes de subir nada, `deploy` analiza cada archivo `.js`, `.mjs` y `.cjs` del `output` de cada aplicación estática, junto con cada `<script>` en línea de sus archivos `.html`. Esto cubre tanto una aplicación estática desplegada por separado como las aplicaciones estáticas integradas en el bundle del backend. Un error de sintaxis detiene el despliegue con el archivo, la línea y la columna:
 
 ```
@@ -199,8 +197,6 @@ plataforma está operando realmente y consultar periódicamente (polling) es lo 
 algo, ese algo te está esperando a ti.
 
 ## Previsualizar un cambio
-
-<span class="since-badge" data-since="0.26">Desde 0.26</span>
 
 ```bash
 rebase cloud deploy --preview
@@ -365,11 +361,11 @@ confíes en **Settings → Access tokens**.
 envía correo) que funciona una vez, durante 7 días, para una cuenta que haya verificado esa
 dirección; nadie se une hasta que acepta. Invita a un administrador o a un miembro, y conviértelo
 en propietario una vez que se haya unido. Los propietarios y administradores lo ven, lo reenvían o lo revocan en
-**Pending invitations**; desde una terminal, <span class="since-badge" data-since="0.26">Desde 0.26</span> [`rebase cloud orgs members invite`](/docs/cli/cloud/#organizations).
+**Pending invitations**; desde una terminal, [`rebase cloud orgs members invite`](/docs/cli/cloud/#organizations).
 
 ## Consulta quién hizo qué
 
-La página **Activity** de la consola y <span class="since-badge" data-since="0.26">Desde 0.26</span> `rebase cloud activity` muestran a los
+La página **Activity** de la consola y `rebase cloud activity` muestran a los
 propietarios y administradores de la organización quién desplegó, definió o reveló una variable de
 entorno (por nombre, nunca por valor), cambió un dominio, restauró una copia de seguridad,
 redimensionó, detuvo o eliminó un proyecto, cambió el rol de un miembro o creó un
@@ -390,8 +386,6 @@ workflow de GitHub Actions y lo que permanece en manos de una persona con sesió
 [CI y agentes](/docs/deployment/cloud-agents/#ci-and-agents).
 
 ## Un backend sin cuenta
-
-<span class="since-badge" data-since="0.26">Desde 0.26</span>
 
 `rebase cloud init --claim` da a una app un backend en vivo antes de que nadie se haya
 registrado, e imprime una URL de reclamación para que la persona se lo quede; un proyecto que nadie reclama
@@ -507,7 +501,7 @@ Dicho con total claridad, porque enterarse más tarde es peor:
   `DATABASE_URL` y `JWT_SECRET`, así que el código que despliega un miembro puede leerlos,
   aunque solo los propietarios y administradores puedan revelarlos en la consola. Invita
   como miembro solo a alguien en quien confiarías con esos valores.
-- **La clave de servicio se puede reemplazar.** <span class="since-badge" data-since="0.26">Desde 0.26</span> La página **Settings** del proyecto
+- **La clave de servicio se puede reemplazar.** La página **Settings** del proyecto
   (o `rebase cloud service-key rotate`) emite un nuevo `REBASE_SERVICE_KEY`
   y reinicia la app con él. La clave anterior funciona hasta que el reinicio ha
   terminado, y nada después, así que cualquier cosa que la copiara es rechazada

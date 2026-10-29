@@ -1,5 +1,5 @@
 ---
-sourceHash: 441bdd62f0e1b3f7
+sourceHash: e2f4e2f2165a93fe
 title: Riferimento dei tool MCP
 sidebar_label: Riferimento dei tool MCP
 description: Ogni tool registrato dal server MCP di Rebase, per gruppo — cosa richiede e cosa fa ciascuno, e quali vengono rifiutati dal loopback gate se rivolti a un progetto non locale.
@@ -125,8 +125,6 @@ progetto remoto senza attivare il blocco — semplicemente non potrà poi esegui
 distruttivi su di esso.
 
 ## Rebase Cloud (8)
-
-<span class="since-badge" data-since="0.26">Da 0.26</span>
 
 Avviano `rebase cloud … --json` nella directory del progetto attivo, sul
 progetto a cui è collegata, con la credenziale propria della CLI. Vedi
