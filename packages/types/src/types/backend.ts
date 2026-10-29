@@ -703,6 +703,20 @@ export interface SQLAdmin {
     executeSql(sql: string, options?: { database?: string; role?: string; params?: unknown[]; isolateSession?: boolean; maxResultBytes?: number }): Promise<Record<string, unknown>[]>;
 
     /**
+     * Ask the database whether it answers, on a connection of its own.
+     *
+     * For the health check. `executeSql("SELECT 1")` waits for a pooled
+     * connection, so a pool that is merely busy (every connection serving a
+     * slow request) failed a readiness probe that gives a few seconds — and an
+     * orchestrator took a working pod out of service, sending its load to the
+     * others or, with one pod, to nobody. Implementations open a connection
+     * outside the pool, run the cheapest round trip, and throw if that does not
+     * finish within `timeoutMs`. Optional: without it the health check asks
+     * through `executeSql` as before.
+     */
+    probe?(timeoutMs: number): Promise<void>;
+
+    /**
      * Run a script a person wrote — the Studio SQL console — and describe what
      * it returned.
      *

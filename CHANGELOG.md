@@ -32,6 +32,37 @@
 
 - **A cloud deploy streams the bundle from disk.** It used to read the whole
   archive into memory first.
+### Fixed
+
+#### Realtime
+
+- **Channel traffic no longer starves the database pool under load.** Channel
+  frames re-checked the sender's identity against the auth store at most once
+  a second; a socket that answers a ping every few seconds was checked on
+  nearly every frame, so a load test of 100 game rooms (800 sockets) spent
+  several hundred auth lookups a second on the shared pool. The window is now
+  five seconds, a failed check holds off the next for as long, and while the
+  auth store cannot answer (`ROLE_LOOKUP_FAILED`, a busy pool) a channel frame
+  within a minute of the last confirmed check goes through instead of being
+  dropped. A revoked session is still ended as soon as the store answers.
+- **The SDK signs a socket in again instead of staying unsigned.** A sign-in
+  that the server could not check on reconnect was logged at debug level and
+  the socket carried on unauthenticated, so every channel frame was refused
+  `UNAUTHORIZED` until the socket happened to close: two rooms in a load test
+  stayed that way for eight minutes. The sign-in is retried, a socket that
+  still cannot sign in is closed and redialled, and a channel refused
+  `UNAUTHORIZED` signs the socket in again and re-joins. A channel join the
+  server refused for a reason a retry can change (`ROLE_LOOKUP_FAILED`,
+  `DATABASE_UNAVAILABLE`, "not a member") is sent again, backing off to 30 s.
+
+#### Server
+
+- **`/health` no longer fails because the pool is busy.** It asked `SELECT 1`
+  through the pool every request shares, so a pool whose connections were all
+  serving slow requests failed a 3 s readiness probe and the orchestrator took
+  a working pod out of service. The Postgres driver now probes on a connection
+  of its own (`SQLAdmin.probe`), within 2.5 s, and a healthy auth-schema answer
+  is reused for a minute.
 
 ## [0.26.0] - 2026-10-29
 

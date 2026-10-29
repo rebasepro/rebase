@@ -153,6 +153,8 @@ interface ClientSession {
     impersonate?: string;
     /** When `user` was last confirmed against the credential, in ms. */
     checkedAt: number;
+    /** After a check the auth store could not answer: no channel frame asks again before this, in ms. */
+    recheckAfter?: number;
     /** Ends the session the instant the credential expires. */
     expiryTimer?: ReturnType<typeof setTimeout>;
     /** Sliding window message counter for rate limiting */
@@ -257,8 +259,29 @@ const IDENTITY_SWEEP_CONCURRENCY = 4;
  * high-rate traffic (see `WS_CHANNEL_RATE_LIMIT`): a database read for every
  * cursor position would make realtime presence the busiest query a backend
  * runs, for a window no wider than this.
+ *
+ * At one second a busy backend's channel traffic was its busiest query all the
+ * same: a socket that answers a ping every few seconds and sends a state now
+ * and then is checked on nearly every frame, so 800 game sockets were several
+ * hundred auth lookups a second on the shared pool, and the lookups were what
+ * starved it (a load test of 100 rooms). Five seconds keeps a revocation's reach
+ * well inside the idle sweep's 30 s while taking that traffic down fivefold.
  */
-const CHANNEL_RECHECK_MIN_MS = 1_000;
+const CHANNEL_RECHECK_MIN_MS = 5_000;
+
+/**
+ * How long a channel frame is still honoured on the strength of a successful
+ * check, in ms, while the auth store cannot answer.
+ *
+ * A lookup that fails because the database is busy (the pool's acquire
+ * timeout, a statement timeout) says nothing about the identity, yet dropping
+ * the frame lost a join or a broadcast without the client knowing to resend it,
+ * and every following frame asked again, adding to the load that made it fail.
+ * Within this window of the last confirmed check, a channel frame goes through
+ * and the next check waits {@link CHANNEL_RECHECK_MIN_MS}; past it, the frame
+ * is refused as before. Data frames get no grace: they read the database anyway.
+ */
+const CHANNEL_STALE_GRACE_MS = 60_000;
 
 /**
  * The close code for a socket whose identity ended: signed out, revoked,
@@ -1272,11 +1295,19 @@ roles: verifiedUser.roles }
                 // honoured here, not when the socket happens to reconnect.
                 {
                     const session = clientSessions.get(clientId);
+                    const channelFrame = CHANNEL_MESSAGE_TYPES.has(type);
+                    const now = Date.now();
                     if (session?.user && session.credential
-                        && Date.now() - session.checkedAt >= (CHANNEL_MESSAGE_TYPES.has(type) ? CHANNEL_RECHECK_MIN_MS : 0)) {
+                        && now - session.checkedAt >= (channelFrame ? CHANNEL_RECHECK_MIN_MS : 0)
+                        && !(channelFrame && session.recheckAfter !== undefined && now < session.recheckAfter)) {
                         const outcome = await recheckIdentityForFrame(clientId);
                         if (outcome === "ended") return;
-                        if (outcome !== "live") {
+                        if (outcome === "live") session.recheckAfter = undefined;
+                        else if (channelFrame && Date.now() - session.checkedAt < CHANNEL_STALE_GRACE_MS) {
+                            // the store is busy, not the identity in doubt: honour the last answer for now
+                            session.recheckAfter = Date.now() + CHANNEL_RECHECK_MIN_MS;
+                            wsDebug(`[WebSocket Server] Auth store unavailable (${outcome.unavailable.code}); honouring ${clientId}'s last check for a channel frame`);
+                        } else {
                             sendError("ERROR", outcome.unavailable.code, outcome.unavailable.message);
                             return;
                         }

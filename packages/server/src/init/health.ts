@@ -22,6 +22,21 @@ import { describeCauseChain, logger, redactSensitiveText } from "../utils/logger
 export const REALTIME_LISTENER_GRACE_MS = 60_000;
 
 /**
+ * How long the database probe may take, in ms: under the readiness probe's own
+ * timeout (3 s on the managed runtime), so a slow answer is reported by this
+ * check rather than by the probe giving up on the request.
+ */
+export const DATABASE_PROBE_TIMEOUT_MS = 2_500;
+
+/**
+ * How long a healthy auth-schema answer is reused, in ms. The schema changes
+ * with a deploy, not between two probes; asking on every probe put a catalogue
+ * query in the pool's queue every few seconds, behind whatever made it busy.
+ * An unhealthy answer is never reused, so a fixed schema reads healthy at once.
+ */
+export const AUTH_SCHEMA_RECHECK_MS = 60_000;
+
+/**
  * @param realtimeProviders — optional; each reports the LISTEN connections it
  *   depends on. One down past {@link REALTIME_LISTENER_GRACE_MS} makes the
  *   check unhealthy; one down for less is reported but not failed on.
@@ -31,11 +46,23 @@ export function createHealthCheck(
     authSchemaCheck?: () => Promise<AuthSchemaHealth>,
     realtimeProviders: RealtimeProvider[] = []
 ): () => Promise<HealthCheckResult> {
+    let authHealthyAt = 0;
+    let authHealthy: AuthSchemaHealth | undefined;
+    const checkAuthSchema = async (): Promise<AuthSchemaHealth | undefined> => {
+        if (!authSchemaCheck) return undefined;
+        if (authHealthy && Date.now() - authHealthyAt < AUTH_SCHEMA_RECHECK_MS) return authHealthy;
+        const answer = await authSchemaCheck();
+        if (answer.healthy) { authHealthy = answer; authHealthyAt = Date.now(); } else authHealthy = undefined;
+        return answer;
+    };
     return async (): Promise<HealthCheckResult> => {
         const start = performance.now();
         try {
             const admin = defaultDriver.admin;
-            if (isSQLAdmin(admin)) {
+            if (isSQLAdmin(admin) && admin.probe) {
+                // on a connection of its own: a busy pool is load, not a database that is down
+                await admin.probe(DATABASE_PROBE_TIMEOUT_MS);
+            } else if (isSQLAdmin(admin)) {
                 await admin.executeSql("SELECT 1");
             } else {
                 await defaultDriver.fetchCollection({
@@ -44,7 +71,7 @@ export function createHealthCheck(
                 });
             }
 
-            const auth = await authSchemaCheck?.();
+            const auth = await checkAuthSchema();
             const latencyMs = Math.round(performance.now() - start);
             if (auth && !auth.healthy) {
                 logger.error("Health check failed: auth schema mismatch", {

@@ -338,6 +338,14 @@ function isChannelMessage(message: WebSocketMessage): message is ChannelMessage 
     return typeof message.channel === "string" && CHANNEL_FRAME_TYPES.has(message.type);
 }
 
+/** The code of a channel `ERROR` frame, if it is one and carries a code. */
+export function channelErrorCode(message: ChannelMessage): string | undefined {
+    if (message.type !== "ERROR" && message.type !== "error") return undefined;
+    const raw: unknown = message.payload?.error;
+    if (raw && typeof raw === "object" && "code" in raw && typeof raw.code === "string") return raw.code;
+    return undefined;
+}
+
 export class RebaseWebSocketClient {
     private websocketUrl: string;
     private ws: WebSocket | null = null;
@@ -766,6 +774,55 @@ export class RebaseWebSocketClient {
     /**
      * Authenticate the WebSocket connection
      */
+    /**
+     * {@link authenticate}, asked again a few times when the server could not
+     * answer (its auth store busy, `ROLE_LOOKUP_FAILED`, a timeout) — not when
+     * it refused the session or the socket ceiling, which a retry cannot
+     * change. Stops as soon as `socket` is no longer this client's.
+     */
+    private async authenticateRetrying(token: string, socket: WebSocket): Promise<void> {
+        const delays = [500, 1500, 3500];
+        for (let attempt = 0; ; attempt++) {
+            try {
+                await this.authenticate(token);
+                return;
+            } catch (error) {
+                if (attempt >= delays.length || this.ws !== socket || isSocketCeilingRefusal(error) || isSessionRefusal(error)) throw error;
+                await new Promise((resolve) => setTimeout(resolve, delays[attempt]));
+                if (this.ws !== socket) throw error;
+            }
+        }
+    }
+
+    /** A sign-in again after a channel was refused for not being signed in, in flight. */
+    private channelAuthRecovery: Promise<void> | null = null;
+
+    /**
+     * A channel frame refused `UNAUTHORIZED` while this client holds a way to
+     * get a token: the socket is open but not signed in (an authentication that
+     * failed on a reconnect, a token that expired). Nothing else signs it in —
+     * channel frames expect no answer, so the refusal reaches only the channel —
+     * and every later frame is refused the same way. Sign in again, once for
+     * all the channels that noticed, and have them re-join.
+     */
+    private recoverChannelAuth(): void {
+        if (this.channelAuthRecovery || !this.getAuthToken || this.isAuthenticated) return;
+        const socket = this.ws;
+        this.channelAuthRecovery = (async () => {
+            try {
+                const token = await this.getAuthToken!();
+                if (!token || !socket || this.ws !== socket) return;
+                await this.authenticateRetrying(token, socket);
+                if (this.ws === socket) this.emit("reconnect");
+            } catch (error) {
+                this.connectionDebug("Could not sign the socket in again for a channel:", (error as Error)?.message || error);
+            } finally {
+                // a little apart, so a refusal storm is one attempt, not hundreds
+                setTimeout(() => { this.channelAuthRecovery = null; }, 2000);
+            }
+        })();
+    }
+
     async authenticate(token: string): Promise<void> {
         return new Promise((resolve, reject) => {
             // Random suffix, like every other request id here. Two auth
@@ -934,7 +991,7 @@ export class RebaseWebSocketClient {
                     try {
                         token = await this.getAuthToken();
                         if (token) {
-                            await this.authenticate(token);
+                            await this.authenticateRetrying(token, socket);
                             this.connectionDebug("WebSocket auto-authenticated");
                         }
                     } catch (error) {
@@ -953,6 +1010,16 @@ export class RebaseWebSocketClient {
                         // demand.
                         if (!(token && this.noteSessionRefused(token, error))) {
                             this.connectionDebug("WebSocket connected, not signed in yet:", (error as Error)?.message || error);
+                            // A token the server could not check (its auth store
+                            // busy, the answer timed out) is not a session that
+                            // ended: carrying on unsigned had every channel frame
+                            // refused "Authentication required" for as long as
+                            // the socket lived, with nothing to sign in again.
+                            // Close it, and the redial signs in afresh.
+                            if (token && this.ws === socket && !this.refusedSession) {
+                                socket.close(4000, "Could not authenticate; reconnecting");
+                                return;
+                            }
                         }
                     }
                 }
@@ -1416,6 +1483,7 @@ export class RebaseWebSocketClient {
         // before the subscription paths — none of which would match it, and
         // the message would otherwise fall through and be dropped silently.
         if (isChannelMessage(message)) {
+            if (channelErrorCode(message) === "UNAUTHORIZED") this.recoverChannelAuth();
             const handlers = this.channelHandlers.get(message.channel);
             if (handlers) {
                 for (const handler of [...handlers]) {
