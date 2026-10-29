@@ -115,6 +115,8 @@ export const TOKEN_CAPABILITIES: Record<TokenCapability, { label: string; scopes
             `project:read:${projectId}`,
             `project:database:${projectId}`,
             "functions:invoke:db-info",
+            // `db access`: read-only external access, which the same scope gates.
+            "functions:invoke:db-access",
             "data:read:databases"
         ]
     },
