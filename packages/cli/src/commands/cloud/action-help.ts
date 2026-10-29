@@ -515,6 +515,7 @@ export const ACTION_HELP: Record<string, ActionHelp> = {
             "Owner or admin only, as for the database password. Every change and every reveal is in `rebase cloud activity`.",
             "The `rebase` schema holds users, password hashes and session tokens: it is never granted whole, and its credential tables never at all.",
             "Managed databases on GCP capacity only for now. Each project with access on has its own network load balancer, which is billed.",
+            "The role holds up to 25 connections at once — enough for a dashboard that loads its widgets in parallel, one connection per query — and the app keeps the rest. A tool that opens more is refused the extra ones.",
             "`disable` closes the address, drops the role and deletes its password. `--yes`, the global flag listed below, skips the confirmation."
         ]
     },

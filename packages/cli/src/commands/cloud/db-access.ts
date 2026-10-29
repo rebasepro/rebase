@@ -39,6 +39,8 @@ export interface DbAccessStatus {
     database: string;
     username: string;
     sslmode: string;
+    /** Connections the role may hold at once. Absent from a control plane older than the field. */
+    connectionLimit?: number;
     caCertificate: string | null;
     pending: string | null;
 }
@@ -95,6 +97,7 @@ function printStatus(status: DbAccessStatus, projectRef: string, caPath: string 
         ["TLS", `required (${status.sslmode} with the cluster CA)`],
         ["Allowed from", status.allow.join(", ")],
         ["Reads", [...status.schemas.map((s) => `${s}.*`), ...status.tables].join(", ")],
+        ["Connections", status.connectionLimit === undefined ? undefined : `up to ${status.connectionLimit} at once`],
         ["CA written to", caPath]
     ]);
     if (status.pending) {
