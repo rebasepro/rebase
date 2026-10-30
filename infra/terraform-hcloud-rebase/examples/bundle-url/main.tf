@@ -42,7 +42,7 @@ module "rebase" {
   bundle_token = var.bundle_token
   # Required with `bundle_url`: the module refuses `latest`, the default,
   # because what a floating tag resolves to cannot be checked at plan time.
-  runtime_version = "0.25.1"
+  runtime_version = "0.26.0"
 
   cors_origins    = ["https://app.example.com"]
   ssh_public_keys = var.ssh_public_keys

@@ -14,7 +14,7 @@ module "rebase" {
   admin_email     = "you@example.com"
 
   bundle_url      = "https://storage.example.com/bundles/app-1.4.0.tar.gz"
-  runtime_version = "0.25.1"
+  runtime_version = "0.26.0"
 
   s3_bucket            = "example-uploads"
   s3_access_key_id     = var.s3_access_key_id
