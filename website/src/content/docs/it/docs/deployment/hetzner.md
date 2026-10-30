@@ -1,5 +1,5 @@
 ---
-sourceHash: 775b8476a1e9de73
+sourceHash: f5209af1861f6c4f
 title: Deploy di Rebase su Hetzner Cloud
 description: Esegui il deploy di Rebase su Hetzner Cloud con Terraform o Docker Compose, per prestazioni eccellenti basate nell'UE e sovranità dei dati.
 sidebar_label: Hetzner Cloud
@@ -143,7 +143,7 @@ S3_ACCESS_KEY_ID=...
 S3_SECRET_ACCESS_KEY=...
 ```
 
-Se il tuo progetto non gestisce alcun caricamento di file, lascia lo storage non impostato e resterà disattivato. `FORCE_LOCAL_STORAGE=true` non è una conferma: registra comunque lo storage locale, quindi impostalo solo con un volume durevole montato sopra `STORAGE_PATH` (il modulo Terraform richiede `force_local_storage = true` quando non ha un bucket). Consulta [Storage](/docs/backend/storage) per il quadro completo.
+Se il tuo progetto non gestisce alcun caricamento di file, lascia lo storage non impostato e resterà disattivato. `FORCE_LOCAL_STORAGE=true` non è una conferma: registra comunque lo storage locale, quindi impostalo solo con un volume durevole montato sopra `STORAGE_PATH` (il `force_local_storage = true` del modulo Terraform fa esattamente questo: monta il suo volume di dati su `/storage` e vi conserva i caricamenti). Consulta [Storage](/docs/backend/storage) per il quadro completo.
 
 ## Cosa comporta l'avvio per il tuo schema
 

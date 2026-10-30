@@ -1,5 +1,5 @@
 ---
-sourceHash: 6bb68aec4ebcb624
+sourceHash: 73d0334fc7800665
 title: Runtime de backend gerenciado
 sidebar_label: Runtime Gerenciado
 description: O que um backend com runtime "managed" pode e não pode fazer no Rebase Cloud — pacotes e binários, memória e CPU, timeouts e tamanhos de corpo, o sistema de arquivos, estado em memória, segredos, armazenamento para arquivos gerados e rede de saída.
@@ -36,7 +36,7 @@ Os números aqui apresentados vêm do runtime e da plataforma como estão hoje. 
 | Estado em nível de módulo (um cache com `Map`) | Sobrevive entre requisições em uma mesma instância. Perdido a cada deploy e reinicialização, e não compartilhado entre instâncias |
 | Variáveis de ambiente e segredos | `rebase cloud env set`, aplicados no próximo deploy |
 | Armazenamento de arquivos | Um bucket por projeto, servido pelo seu backend em `/api/storage/file/…` |
-| HTTP de saída | Sim, nas portas 80 e 443 (e 465, 587, 993 para e-mail). Outras portas são bloqueadas. Sem IP de saída fixo |
+| HTTP de saída | Sim, nas portas 80 e 443 (e 465, 587, 993 para e-mail). Outras portas são bloqueadas. Um IP de saída fixo: `207.175.138.15` |
 
 ## Código e pacotes
 
@@ -264,7 +264,7 @@ pelo app implantado.
 
 A plataforma não adiciona proxy nem limite de taxa de saída; os serviços que você chama possuem seus próprios limites. Passe `getSignal(c)` para o `fetch` para que uma chamada seja cancelada caso a requisição sofra timeout.
 
-**Não há endereço IP de saída fixo**. O tráfego sai por um endereço compartilhado por todos os projetos, que o provedor de nuvem atribui e pode alterar, portanto não o adicione a uma lista de permissões (allowlist) de terceiros. Em vez disso, autentique-se nesses serviços com uma chave ou token.
+Todo o tráfego de saída parte de **um único endereço IP fixo, `207.175.138.15`**. Adicione-o a uma lista de permissões (allowlist) de terceiros quando um serviço pedir uma. O endereço é compartilhado por todos os projetos no Rebase Cloud, então uma lista de permissões prova que quem chama roda no Rebase Cloud, não que seja o seu projeto: continue se autenticando também no serviço com uma chave.
 
 ## Inicialização e encerramento
 

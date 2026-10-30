@@ -1,5 +1,5 @@
 ---
-sourceHash: 6bb68aec4ebcb624
+sourceHash: 73d0334fc7800665
 title: Runtime di backend gestito
 sidebar_label: Runtime gestito
 description: Cosa può e non può fare un backend con runtime "managed" su Rebase Cloud — pacchetti e binari, memoria e CPU, timeout e dimensioni del body, filesystem, stato in memoria, secret, storage per i file generati e rete in uscita.
@@ -36,7 +36,7 @@ I numeri indicati qui si riferiscono al runtime e alla piattaforma allo stato at
 | Stato a livello di modulo (cache `Map`) | Persiste tra le richieste su una stessa istanza. Viene perso a ogni deploy e riavvio, e non è condiviso tra le istanze |
 | Variabili d'ambiente e secret | `rebase cloud env set`, applicati al deploy successivo |
 | Archiviazione file | Un bucket per progetto, servito dal tuo backend su `/api/storage/file/…` |
-| HTTP in uscita | Sì, sulle porte 80 e 443 (e 465, 587, 993 per le email). Le altre porte sono bloccate. Nessun IP in uscita fisso |
+| HTTP in uscita | Sì, sulle porte 80 e 443 (e 465, 587, 993 per le email). Le altre porte sono bloccate. Un IP in uscita fisso: `207.175.138.15` |
 
 ## Codice e pacchetti
 
@@ -264,7 +264,7 @@ L'unica eccezione è il tuo database. Se il progetto porta il proprio PostgreSQL
 
 La piattaforma non introduce proxy né limiti di frequenza (rate limit) sul traffico in uscita; si applicano unicamente i limiti imposti dai servizi contattati. Assicurati di passare `getSignal(c)` a `fetch` in modo che la chiamata si interrompa qualora la richiesta vada in timeout.
 
-**Non è previsto un indirizzo IP in uscita fisso**. Il traffico esce tramite un indirizzo condiviso tra tutti i progetti, assegnato dal provider cloud e soggetto a variazioni; non deve quindi essere aggiunto a whitelist di terze parti. Per l'autenticazione verso tali servizi, prediligi l'uso di chiavi o token API.
+Tutto il traffico in uscita parte da **un unico indirizzo IP fisso, `207.175.138.15`**. Aggiungilo a una whitelist di terze parti quando un servizio ne richiede una. L'indirizzo è condiviso da tutti i progetti su Rebase Cloud, quindi una whitelist dimostra che il chiamante gira su Rebase Cloud, non che sia il tuo progetto: continua ad autenticarti verso il servizio anche con una chiave.
 
 ## Avvio e arresto
 

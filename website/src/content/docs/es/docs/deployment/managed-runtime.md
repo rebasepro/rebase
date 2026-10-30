@@ -1,5 +1,5 @@
 ---
-sourceHash: 6bb68aec4ebcb624
+sourceHash: 73d0334fc7800665
 title: Runtime de backend administrado
 sidebar_label: Runtime administrado
 description: Lo que un backend con runtime "managed" puede y no puede hacer en Rebase Cloud — paquetes y binarios, memoria y CPU, tiempos de espera y tamaños de cuerpo, el sistema de archivos, el estado en memoria, secretos, almacenamiento para archivos generados y red de salida.
@@ -36,7 +36,7 @@ Los números aquí provienen del runtime y de la plataforma tal como son hoy. Al
 | Estado a nivel de módulo (una caché `Map`) | Sobrevive entre solicitudes en una misma instancia. Se pierde en cada despliegue y reinicio, y no se comparte entre instancias |
 | Variables de entorno y secretos | `rebase cloud env set`, aplicadas en el siguiente despliegue |
 | Almacenamiento de archivos | Un bucket por proyecto, servido por tu backend en `/api/storage/file/…` |
-| HTTP de salida | Sí, en los puertos 80 y 443 (y 465, 587, 993 para correo). Otros puertos están bloqueados. Sin IP de salida fija |
+| HTTP de salida | Sí, en los puertos 80 y 443 (y 465, 587, 993 para correo). Otros puertos están bloqueados. Una IP de salida fija: `207.175.138.15` |
 
 ## Código y paquetes
 
@@ -257,7 +257,7 @@ La única excepción es tu propia base de datos. Si el proyecto trae su propio P
 
 La plataforma no añade ningún proxy ni límite de tasa saliente; los servicios a los que llamas tienen los suyos propios. Pasa `getSignal(c)` a `fetch` para que una llamada se detenga cuando se agote el tiempo de espera de su solicitud.
 
-**No hay una dirección IP de salida fija**. El tráfico sale a través de una dirección compartida por todos los proyectos, asignada por el proveedor de la nube y sujeta a cambios, por lo que no debes añadirla a una lista de permitidos de terceros. En su lugar, autentícate ante dicho servicio con una clave.
+Todo el tráfico de salida sale desde **una única dirección IP fija, `207.175.138.15`**. Añádela a una lista de permitidos de terceros cuando un servicio te la pida. La dirección es compartida por todos los proyectos de Rebase Cloud, así que una lista de permitidos demuestra que quien llama se ejecuta en Rebase Cloud, no que sea tu proyecto: sigue autenticándote también ante el servicio con una clave.
 
 ## Inicio y apagado
 

@@ -1,5 +1,5 @@
 ---
-sourceHash: 775b8476a1e9de73
+sourceHash: f5209af1861f6c4f
 title: Rebase auf Hetzner Cloud bereitstellen
 description: Stellen Sie Rebase mit Terraform oder Docker Compose auf Hetzner Cloud bereit – für exzellente Performance und Datensouveränität in der EU.
 sidebar_label: Hetzner Cloud
@@ -135,7 +135,7 @@ S3_ACCESS_KEY_ID=...
 S3_SECRET_ACCESS_KEY=...
 ```
 
-Falls Ihr Projekt keinerlei Uploads speichert, lassen Sie den Speicher ungesetzt, und er bleibt deaktiviert. `FORCE_LOCAL_STORAGE=true` ist keine Bestätigung: Es registriert lokalen Speicher trotzdem, setzen Sie es also nur mit einem dauerhaften Volume, das über `STORAGE_PATH` eingehängt ist (das Terraform-Modul verlangt `force_local_storage = true`, wenn es kein Bucket hat). Siehe [Storage](/docs/backend/storage) für alle Details.
+Falls Ihr Projekt keinerlei Uploads speichert, lassen Sie den Speicher ungesetzt, und er bleibt deaktiviert. `FORCE_LOCAL_STORAGE=true` ist keine Bestätigung: Es registriert lokalen Speicher trotzdem, setzen Sie es also nur mit einem dauerhaften Volume, das über `STORAGE_PATH` eingehängt ist (das `force_local_storage = true` des Terraform-Moduls tut genau das: Es hängt sein Datenvolume unter `/storage` ein und hält die Uploads dort). Siehe [Storage](/docs/backend/storage) für alle Details.
 
 ## Was der Boot-Vorgang mit Ihrem Schema macht
 

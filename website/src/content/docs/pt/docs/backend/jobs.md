@@ -1,5 +1,5 @@
 ---
-sourceHash: cae2434b532cd67f
+sourceHash: 3e2e55f9b42a2a01
 title: Tarefas em Segundo Plano
 sidebar_label: Tarefas em Segundo Plano
 description: Uma fila de jobs durável, baseada em Postgres — trabalho que sobrevive a reinicializações, com novas tentativas usando backoff e falhas mantidas em vez de descartadas.
@@ -93,6 +93,7 @@ Um handler falha lançando uma exceção. Não há `return false` — um boolean
 
 - **Tentativas restantes** → volta para `pending`, com `run_at` postergado pelo backoff (1s, 5s, 25s … limitado a uma hora; sobrescreva com `backoff`).
 - **Sem tentativas restantes** → `failed`, e a linha *permanece*. Uma fila que descarta silenciosamente o que não conseguiu entregar é indistinguível de uma fila sem nada para fazer.
+- **Uma falha que nenhuma nova tentativa pode mudar** <span class="since-badge" data-since="0.27">Since 0.27</span> → lance `PermanentJobError`, de `@rebasepro/server`: o job vai para `failed` nesta tentativa, com a mensagem como seu `last_error`, em vez de gastar as tentativas restantes.
 
 ```sql
 SELECT task, attempts, last_error, updated_at
