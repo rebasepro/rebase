@@ -545,6 +545,13 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
      * per broadcast for company. See `channel-bus/ChannelBus.ts`.
      */
     private bus: ChannelBus = new MemoryChannelBus();
+    /**
+     * The other instances on an on-demand bus, and the channels each serves
+     * (`null`: it hasn't said, so assume all of them). See {@link hasRemoteMembers}.
+     */
+    private busPeers = new Map<string, { heardAt: number; channels: Set<string> | null; incoming?: Set<string> }>();
+    private busStartedAt = 0;
+    private busGossipInterval?: ReturnType<typeof setInterval>;
 
     /**
      * The shared presence roster, present only when a real bus is active.
@@ -2771,6 +2778,7 @@ roles: ["anon"] };
     joinChannel(clientId: string, channel: string): void {
         if (!this.channels.has(channel)) {
             this.channels.set(channel, new Set());
+            this.announceChannel(channel);
         }
         this.channels.get(channel)!.add(clientId);
         this.indexClientChannel(this.channelsByClient, clientId, channel);
@@ -3020,6 +3028,7 @@ roles: ["anon"] };
         }
 
         this.bus = bus;
+        this.startBusGossip();
 
         // Presence needs shared *state*, not just shared fan-out — see
         // `channel-presence.ts`. It comes up with the bus and only with it.
@@ -3062,6 +3071,8 @@ roles: ["anon"] };
      */
     private publishBroadcast(clientId: string, channel: string, event: string, payload: unknown, seq?: number): void {
         if (this.bus.kind === "memory") return;
+        // A retained message always travels: its own instance's clients get it this way.
+        if (seq === undefined && !this.hasRemoteMembers(channel)) return;
 
         const frame: ChannelBusFrame = {
             kind: "broadcast",
@@ -3145,6 +3156,11 @@ roles: ["anon"] };
      * its own `sid`.
      */
     private async handleBusFrame(frame: ChannelBusFrame): Promise<void> {
+        if (frame.sid !== this.instanceId) this.notePeer(frame.sid);
+        if (frame.kind === "channels") {
+            if (frame.sid !== this.instanceId) this.readPeerChannels(frame);
+            return;
+        }
         const retained = (frame.kind === "broadcast" || frame.kind === "broadcast_ref") && frame.seq !== undefined;
         // Our own frames were fanned out before they were published — except a
         // retained one over the Postgres bus, which reaches this instance's
@@ -3420,8 +3436,102 @@ lastSeen: Date.now() });
         joins: Record<string, Record<string, unknown>>,
         leaves: Record<string, Record<string, unknown>>
     ): void {
-        if (this.bus.kind === "memory") return;
+        if (this.bus.kind === "memory" || !this.hasRemoteMembers(channel)) return;
         void this.publishFrame({ kind: "presence_diff", sid: this.instanceId, channel, joins, leaves });
+    }
+
+    // ---------------------------------------------------------------- publishing on demand
+    //
+    // Every broadcast was a NOTIFY on the primary, even with every member of the
+    // channel on this instance and no other instance running. So instances say
+    // which channels they serve, and a frame nobody else is waiting for is not
+    // sent. A wrong skip loses a message, so every doubt publishes:
+    //  - the first minute after start, before this instance has heard everyone
+    //    (and while a rolling deploy may have instances that don't announce);
+    //  - a peer heard from that hasn't announced is assumed to serve everything;
+    //  - a lost `add` is repaired by the full lists every GOSSIP interval, which
+    //    also carry on only while there are peers: an instance alone sends nothing,
+    //    and a new instance's frames (it publishes everything at first) introduce it.
+    private static readonly BUS_GOSSIP_INTERVAL_MS = 15_000;
+    private static readonly BUS_PEER_TTL_MS = 45_000;
+    private static readonly BUS_WARMUP_MS = 60_000;
+    /** The frames' `channel`: a transport drops a frame without one. */
+    private static readonly BUS_PEERS_CHANNEL = "__peers";
+
+    /** Whether a frame on `channel` may have a reader on another instance. */
+    private hasRemoteMembers(channel: string): boolean {
+        if (!this.bus.publishesOnDemand) return true;
+        const now = Date.now();
+        if (now - this.busStartedAt < RealtimeService.BUS_WARMUP_MS) return true;
+        for (const [sid, peer] of this.busPeers) {
+            if (now - peer.heardAt > RealtimeService.BUS_PEER_TTL_MS) {
+                this.busPeers.delete(sid); // gone: it would have said something by now
+                continue;
+            }
+            if (peer.channels === null || peer.channels.has(channel)) return true;
+        }
+        return false;
+    }
+
+    /** Tell the others about a channel's first member here. */
+    private announceChannel(channel: string): void {
+        if (!this.bus.publishesOnDemand) return;
+        if (!this.busPeers.size && Date.now() - this.busStartedAt >= RealtimeService.BUS_WARMUP_MS) return;
+        void this.publishFrame({ kind: "channels", sid: this.instanceId, channel: RealtimeService.BUS_PEERS_CHANNEL, add: [channel] });
+    }
+
+    /** Every channel served here, in as many parts as the transport needs. */
+    private announceChannels(): void {
+        if (!this.bus.publishesOnDemand) return;
+        const channel = RealtimeService.BUS_PEERS_CHANNEL;
+        const limit = Math.min(this.bus.maxFrameBytes, 7000) - 200;
+        let list: string[] = [], bytes = 0;
+        for (const name of this.channels.keys()) {
+            const size = Buffer.byteLength(name, "utf8") + 3;
+            if (bytes + size > limit) {
+                void this.publishFrame({ kind: "channels", sid: this.instanceId, channel, list });
+                list = []; bytes = 0;
+            }
+            list.push(name); bytes += size;
+        }
+        void this.publishFrame({ kind: "channels", sid: this.instanceId, channel, list, done: true });
+    }
+
+    /** Any frame from another instance: it's alive, and a new one needs to hear what's served here. */
+    private notePeer(sid: string): void {
+        const peer = this.busPeers.get(sid);
+        if (peer) { peer.heardAt = Date.now(); return; }
+        this.busPeers.set(sid, { heardAt: Date.now(), channels: null });
+        this.announceChannels();
+    }
+
+    private readPeerChannels(frame: Extract<ChannelBusFrame, { kind: "channels" }>): void {
+        const peer = this.busPeers.get(frame.sid);
+        if (!peer) return;
+        if (frame.hello) this.announceChannels();
+        if (frame.add) {
+            peer.channels ??= new Set();
+            for (const channel of frame.add) peer.channels.add(channel);
+        }
+        if (frame.list) {
+            peer.incoming ??= new Set();
+            for (const channel of frame.list) peer.incoming.add(channel);
+            if (frame.done) {
+                peer.channels = peer.incoming;
+                peer.incoming = undefined;
+            }
+        }
+    }
+
+    /** Start gossiping on a bus that publishes on demand. */
+    private startBusGossip(): void {
+        if (!this.bus.publishesOnDemand) return;
+        this.busStartedAt = Date.now();
+        void this.publishFrame({ kind: "channels", sid: this.instanceId, channel: RealtimeService.BUS_PEERS_CHANNEL, hello: true });
+        this.busGossipInterval = setInterval(() => {
+            if (this.busPeers.size) this.announceChannels();
+        }, RealtimeService.BUS_GOSSIP_INTERVAL_MS);
+        unref(this.busGossipInterval); // never hold the process open for housekeeping
     }
 
     /** Run a roster write when there is a roster, and never let it throw. */
@@ -3548,6 +3658,10 @@ lastSeen: Date.now() });
         if (this.presenceSweepInterval) {
             clearInterval(this.presenceSweepInterval);
             this.presenceSweepInterval = undefined;
+        }
+        if (this.busGossipInterval) {
+            clearInterval(this.busGossipInterval);
+            this.busGossipInterval = undefined;
         }
         this.oversizedBroadcastWarned.clear();
 
