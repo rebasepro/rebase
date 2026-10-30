@@ -520,7 +520,7 @@ export interface RebaseClient<DB = unknown> {
      * call through it is refused with `403 SIMULATION_READ_ONLY`, since it
      * would run as the simulated identity rather than the administrator.
      */
-    simulate?(simulation: AccessSimulation): RebaseClient<Record<string, unknown>>;
+    simulate?(simulation: AccessSimulation): RebaseClient<DB>;
 
     /**
      * POST to an arbitrary path on the backend — the escape hatch, not the way

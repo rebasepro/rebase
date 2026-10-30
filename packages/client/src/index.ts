@@ -288,8 +288,8 @@ export type CreateRebaseClientResult<DB = Record<string, unknown>> = Omit<Rebase
      *
      * Always present here, typed by the same `Database` (it is built with the
      * same `collections` dictionary), and closable: it is a client of its own,
-     * so release it with `close()` when done. On `RebaseClient` it is optional
-     * and untyped, because a server-side client has none.
+     * so release it with `close()` when done. On `RebaseClient` it is optional,
+     * because a server-side client has none.
      */
     simulate: (simulation: AccessSimulation) => CreateRebaseClientResult<DB>;
     /**
