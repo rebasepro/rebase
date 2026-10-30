@@ -92,9 +92,9 @@ application image to build yourself. Useful flags:
 | `--no-static` | Do not fold the frontend into the backend bundle (each static app still gets its own bundle) |
 | `--skip-static-build` | Fold the frontend as already built, without running its build command |
 
-Dependencies are vendored by default so a pod restart does not pay a 35–55 second
-install. A tree that grows past 200 MB on disk is dropped instead, because the
-upload limit is 100 MB compressed — see the changelog for the reasoning.
+Dependencies are vendored by default so a new instance does not pay a 35–55
+second install. A tree that grows past 2 GB on disk is dropped instead, because
+the upload limit is 1 GB compressed.
 
 Every static app the
 bundle carries gets a brotli (`.br`) and a gzip (`.gz`) copy beside each

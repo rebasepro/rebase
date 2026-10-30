@@ -43,7 +43,7 @@ export function readBundleManifest(bundleDir: string): RebaseBundleManifest {
  * The control plane's cap on an uploaded bundle: its `MAX_BUNDLE_BYTES`, which
  * it checks before reading the body.
  */
-export const MAX_BUNDLE_UPLOAD_BYTES = 100 * 1024 * 1024;
+export const MAX_BUNDLE_UPLOAD_BYTES = 1024 * 1024 * 1024;
 
 /**
  * Tar a built bundle into a gzipped archive.
@@ -72,23 +72,16 @@ COPYFILE_DISABLE: "1" } }
 }
 
 /**
- * Pack a bundle for upload — without `node_modules`, even a vendored tree.
+ * Pack a bundle for upload, with the dependency tree the build vendored for it.
  *
- * Vendoring exists so a pod untars and boots rather than spending 35-55s of
- * every start in `npm install`, and a deploy did carry the tree for one night
- * (c36ea4637). It is left out again because of what the control plane does
- * with the archive: `GET /bundle/:projectId/:bundleId` reads the whole object
- * into memory on every pod start, and a runtime rollout restarts every tenant's
- * pods at once. Bundles it was sized against are a few hundred kB; a vendored
- * one is tens of MB, up to the 100 MB cap — N pods starting together would hold
- * N of them. A slower cold start per pod is the status quo every deploy has
- * shipped with; a control plane out of memory is every tenant's outage. The
- * platform's own rebuilds build with `--no-vendor` for the same shape of
- * reason. When the control plane streams bundles, this is the one switch to
- * flip, and `rebase cloud deploy` builds with `vendor: false` until then.
+ * Vendoring is what lets a pod untar and boot rather than spending 35-55s of
+ * every start in `npm install`, which is the bulk of a new instance's time to
+ * ready. The control plane streams an archive in both directions, so its size
+ * costs that process nothing.
  *
- * `modulesLeftOut` says a tree the build DID vendor was not uploaded — a
- * prebuilt `--bundle-dir` from a plain `rebase build`, which vendors by default.
+ * A vendored tree that takes the archive over the cap is left out rather than
+ * failing the deploy: a bundle without its dependencies still boots, only more
+ * slowly. `modulesLeftOut` says that happened.
  */
 export async function packBundleForUpload(
     bundleDir: string,
@@ -96,16 +89,28 @@ export async function packBundleForUpload(
     manifest: RebaseBundleManifest,
     maxBytes: number = MAX_BUNDLE_UPLOAD_BYTES
 ): Promise<{ bytes: number; modulesLeftOut: boolean }> {
-    const vendored = manifest.deps?.vendored === true;
+    if (manifest.deps?.vendored === true) {
+        await packBundle(bundleDir, outPath, { withModules: true });
+        const bytes = fs.statSync(outPath).size;
+        if (bytes <= maxBytes) return { bytes, modulesLeftOut: false };
+        fs.rmSync(outPath, { force: true });
+        await packBundle(bundleDir, outPath, { withModules: false });
+        return { bytes: refuseOverCap(outPath, maxBytes), modulesLeftOut: true };
+    }
     await packBundle(bundleDir, outPath, { withModules: false });
-    const bytes = fs.statSync(outPath).size;
+    return { bytes: refuseOverCap(outPath, maxBytes), modulesLeftOut: false };
+}
+
+/** The archive's size, or a refusal naming the limit: nothing can be left out of it now. */
+function refuseOverCap(archive: string, maxBytes: number): number {
+    const bytes = fs.statSync(archive).size;
     if (bytes > maxBytes) {
         throw new Error(
             `The bundle is ${(bytes / 1024 / 1024).toFixed(1)} MB without its dependencies, over the ` +
             `${Math.round(maxBytes / 1024 / 1024)} MB upload limit.`
         );
     }
-    return { bytes, modulesLeftOut: vendored };
+    return bytes;
 }
 
 /**
@@ -252,14 +257,16 @@ export async function uploadBundle(
     projectId: string,
     tarPath: string
 ): Promise<string> {
-    const bytes = fs.readFileSync(tarPath);
     const res = await fetch(
         `${url}/api/functions/deploy/bundle/upload?projectId=${encodeURIComponent(projectId)}`,
         {
             method: "POST",
             headers: { Authorization: `Bearer ${token}`,
 "Content-Type": "application/gzip" },
-            body: bytes
+            // Read from disk as it is sent: the archive can be far larger than
+            // anything worth holding in memory, and a Blob still declares its
+            // length, which the control plane checks before reading a byte.
+            body: await fs.openAsBlob(tarPath)
         }
     );
     if (!res.ok) {

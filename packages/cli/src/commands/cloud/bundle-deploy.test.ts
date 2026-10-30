@@ -98,9 +98,8 @@ message: "ship it" });
 });
 
 /**
- * A managed upload never carries `node_modules`, even one `rebase build`
- * vendored: the control plane holds each bundle in memory on every pod start,
- * so an upload stays the size it was sized against (see packBundleForUpload).
+ * A managed upload carries the tree `rebase build` vendored and no other, so a
+ * new instance untars and boots instead of installing (see packBundleForUpload).
  */
 describe("packing a bundle for upload", () => {
     function bundleWithModules(): void {
@@ -119,18 +118,28 @@ describe("packing a bundle for upload", () => {
     const out = (): string => path.join(scratch, "..", `out-${path.basename(scratch)}.tar.gz`);
     afterEach(() => fs.rmSync(out(), { force: true }));
 
-    it("leaves out even a tree the build vendored, and says so", async () => {
-        // The control plane reads each bundle into memory on every pod start;
-        // until it streams them, an upload stays the size it was sized against.
+    it("carries the tree the build vendored", async () => {
         bundleWithModules();
 
         const packed = await packBundleForUpload(scratch, out(), manifest({ deps: { declared: { pg: "^8" }, vendored: true } }));
 
-        expect(packed.modulesLeftOut).toBe(true);
+        expect(packed.modulesLeftOut).toBe(false);
         expect(packed.bytes).toBe(fs.statSync(out()).size);
         const listing = entries(out());
         expect(listing).toContain("./config/index.js");
-        expect(listing.some(entry => entry.includes("node_modules"))).toBe(false);
+        expect(listing.some(entry => entry.includes("node_modules"))).toBe(true);
+    });
+
+    it("drops a vendored tree that would take the archive over the cap, and says so", async () => {
+        bundleWithModules();
+        fs.writeFileSync(path.join(scratch, "node_modules", "blob.bin"), crypto.randomBytes(64 * 1024));
+
+        const packed = await packBundleForUpload(scratch, out(), manifest({ deps: { declared: { pg: "^8" }, vendored: true } }), 32 * 1024);
+
+        expect(packed.modulesLeftOut).toBe(true);
+        expect(packed.bytes).toBe(fs.statSync(out()).size);
+        expect(packed.bytes).toBeLessThan(32 * 1024);
+        expect(entries(out()).some(entry => entry.includes("node_modules"))).toBe(false);
     });
 
     it("leaves out a node_modules the build did not vendor, with nothing to report", async () => {

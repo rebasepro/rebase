@@ -33,6 +33,7 @@ import { LocalStorageController } from "../src/storage/LocalStorageController";
 import { S3StorageController } from "../src/storage/S3StorageController";
 import { GCSStorageController } from "../src/storage/GCSStorageController";
 import { createStorageRoutes } from "../src/storage/routes";
+import { ObjectTooLargeError } from "../src/storage/streams";
 import { RENDITION_PREFIX } from "../src/storage/rendition-cache";
 import type { StorageController } from "../src/storage/types";
 import { configureJwt } from "../src/auth/jwt";
@@ -402,6 +403,100 @@ describe.each<Kind>(["local", "s3", "gcs"])("storage controller contract — %s"
  * server's own writes (a database backup) opt out with `uploadLimits: false`;
  * every other write, and every write that names no option, is held to them.
  */
+/** Bytes as a request body hands them over: chunks, ending when the sender is done. */
+function bodyOf(...chunks: Uint8Array[]): ReadableStream<Uint8Array> {
+    return new ReadableStream<Uint8Array>({
+        pull(controller) {
+            const next = chunks.shift();
+            if (next) controller.enqueue(next);
+            else controller.close();
+        }
+    });
+}
+
+describe.each<Kind>(["local", "s3", "gcs"])("storage controller streamed writes — %s", (kind) => {
+    let h: Harness;
+    beforeEach(async () => { h = await harness(kind); });
+    afterEach(() => h.cleanup());
+
+    const readBack = async (key: string) => {
+        const file = await h.controller.getObject(key);
+        return file ? Buffer.from(await file.arrayBuffer()) : null;
+    };
+
+    it("stores what the stream carried, and says how much", async () => {
+        const result = await h.controller.putObjectStream!({
+            stream: bodyOf(Buffer.from("hello "), Buffer.from("world")),
+            key: "bundles/a.tar.gz",
+            contentType: "application/gzip"
+        });
+
+        expect(result.size).toBe(11);
+        expect((await readBack("bundles/a.tar.gz"))!.toString()).toBe("hello world");
+        const stat = await h.controller.statObject!("bundles/a.tar.gz");
+        expect(stat).toMatchObject({ size: 11, contentType: "application/gzip" });
+    });
+
+    it("stores an object longer than one multipart part", async () => {
+        const part = Buffer.alloc(3 * 1024 * 1024, 5);
+        const result = await h.controller.putObjectStream!({
+            stream: bodyOf(part, part, part, Buffer.from("tail")),
+            key: "bundles/big.tar.gz"
+        });
+
+        expect(result.size).toBe(9 * 1024 * 1024 + 4);
+        const stored = await readBack("bundles/big.tar.gz");
+        expect(stored!.byteLength).toBe(result.size);
+        expect(stored!.subarray(-4).toString()).toBe("tail");
+    });
+
+    it("stores an empty stream as an empty object", async () => {
+        const result = await h.controller.putObjectStream!({ stream: bodyOf(), key: "bundles/empty.tar.gz" });
+        expect(result.size).toBe(0);
+        expect((await readBack("bundles/empty.tar.gz"))!.byteLength).toBe(0);
+    });
+
+    it("refuses at maxBytes and leaves no object, without reading the rest of the body", async () => {
+        const pulled: number[] = [];
+        let cancelled = false;
+        const stream = new ReadableStream<Uint8Array>({
+            pull(controller) {
+                pulled.push(pulled.length);
+                controller.enqueue(Buffer.alloc(4, 1));
+            },
+            cancel() { cancelled = true; }
+        }, { highWaterMark: 0 });
+
+        await expect(h.controller.putObjectStream!({ stream, key: "bundles/huge.tar.gz", maxBytes: 10 }))
+            .rejects.toBeInstanceOf(ObjectTooLargeError);
+
+        expect(await h.controller.getObject("bundles/huge.tar.gz")).toBeNull();
+        expect(cancelled).toBe(true);
+        expect(pulled.length).toBeLessThan(5);
+    });
+
+    it("leaves no object when the sender dies partway", async () => {
+        let reads = 0;
+        const stream = new ReadableStream<Uint8Array>({
+            pull(controller) {
+                if (reads++ === 0) controller.enqueue(Buffer.from("half a bun"));
+                else controller.error(new Error("client went away"));
+            }
+        });
+
+        await expect(h.controller.putObjectStream!({ stream, key: "bundles/cut.tar.gz" })).rejects.toThrow(/client went away/);
+        expect(await h.controller.getObject("bundles/cut.tar.gz")).toBeNull();
+    });
+
+    it("is not held to the upload limits, which are for what users send", async () => {
+        const limited = kind === "local"
+            ? new LocalStorageController({ type: "local", basePath: await fs.promises.mkdtemp(path.join(os.tmpdir(), "rebase-stream-limits-")), maxFileSize: 2, allowedMimeTypes: ["image/png"] })
+            : h.controller;
+        const result = await limited.putObjectStream!({ stream: bodyOf(Buffer.from("twelve bytes")), key: "bundles/own.tar.gz", contentType: "application/gzip" });
+        expect(result.size).toBe(12);
+    });
+});
+
 describe.each<Kind>(["local", "s3", "gcs"])("storage controller upload limits — %s", (kind) => {
     let controller: StorageController;
     let cleanup: () => Promise<void> = async () => undefined;

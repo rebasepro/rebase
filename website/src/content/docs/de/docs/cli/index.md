@@ -1,5 +1,5 @@
 ---
-sourceHash: 2df00511c02fed53
+sourceHash: 67ab1823d7297527
 title: CLI-Referenz
 sidebar_label: CLI
 description: Rebase-CLI-Befehle für Projektinitialisierung, Schemagenerierung, Datenbankmigrationen und SDK-Generierung.
@@ -93,8 +93,9 @@ Anwendungs-Image selbst gebaut werden muss. Nützliche Flags:
 | `--no-static` | Das Frontend nicht ins Backend-Bundle einfalten (jede statische App bekommt trotzdem ihr eigenes Bundle) |
 | `--skip-static-build` | Das Frontend als bereits gebaut einfalten, ohne dessen Build-Befehl auszuführen |
 
-Abhängigkeiten werden standardmäßig per Vendoring eingebunden, damit ein Pod-Neustart keine
-35–55 Sekunden dauernde Installation durchführen muss. Ein Abhängigkeitsbaum, der auf der Festplatte über 200 MB anwächst, wird stattdessen verworfen, da das Upload-Limit komprimiert 100 MB beträgt — siehe Changelog für die Begründung.
+Abhängigkeiten werden standardmäßig per Vendoring eingebunden, damit eine neue Instanz
+keine Installation von 35–55 Sekunden bezahlt. Ein Baum, der auf der Festplatte über 2 GB
+wächst, wird stattdessen verworfen, weil das Upload-Limit komprimiert 1 GB beträgt.
 
 Jede statische App, die das
 Bundle enthält, erhält neben jedem inhaltsgehashten Asset ab 1 KB eine Brotli-Kopie (`.br`) und eine gzip-Kopie

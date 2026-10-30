@@ -1,5 +1,5 @@
 ---
-sourceHash: 2df00511c02fed53
+sourceHash: 67ab1823d7297527
 title: Référence de la CLI
 sidebar_label: CLI
 description: Commandes de la CLI Rebase pour l'initialisation de projet, la génération de schéma, les migrations de base de données et la génération de SDK.
@@ -82,7 +82,7 @@ Le bundle est l'artefact que vous déployez — l'image du runtime le charge, il
 | `--no-static` | Ne pas intégrer le frontend dans le bundle backend (chaque application statique obtient tout de même son propre bundle) |
 | `--skip-static-build` | Intégrer le frontend comme déjà compilé, sans exécuter sa commande de build |
 
-Les dépendances sont incluses (vendored) par défaut afin qu'un redémarrage de pod ne subisse pas une installation de 35 à 55 secondes. Une arborescence qui dépasse 200 Mo sur le disque est ignorée à la place, car la limite de téléversement est de 100 Mo compressés — consultez le changelog pour en connaître la raison.
+Les dépendances sont incluses (vendored) par défaut afin qu'une nouvelle instance ne subisse pas une installation de 35 à 55 secondes. Une arborescence qui dépasse 2 Go sur le disque est ignorée à la place, car la limite de téléversement est de 1 Go compressé.
 
 Chaque application statique que contient le bundle reçoit une copie brotli (`.br`) et une copie gzip (`.gz`) à
 côté de chaque ressource à hachage de contenu de 1 Ko ou plus — les fichiers qu'un navigateur met en cache

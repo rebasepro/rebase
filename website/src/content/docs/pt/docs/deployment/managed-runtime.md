@@ -1,5 +1,5 @@
 ---
-sourceHash: ba40edd634e01a84
+sourceHash: 6bb68aec4ebcb624
 title: Runtime de backend gerenciado
 sidebar_label: Runtime Gerenciado
 description: O que um backend com runtime "managed" pode e não pode fazer no Rebase Cloud — pacotes e binários, memória e CPU, timeouts e tamanhos de corpo, o sistema de arquivos, estado em memória, segredos, armazenamento para arquivos gerados e rede de saída.
@@ -24,7 +24,7 @@ Os números aqui apresentados vêm do runtime e da plataforma como estão hoje. 
 | Pergunta | Resposta |
 |---|---|
 | Versão do Node | Node 22, no Debian slim, `linux`/`x64` |
-| Pacotes npm | Sim, do registro público ou de um privado. Instalados quando cada instância inicia |
+| Pacotes npm | Sim, do registro público ou de um privado. Instalados no bundle quando você faz o deploy |
 | Módulos nativos (`.node`, node-gyp) | Não. O `rebase cloud deploy` recusa o bundle |
 | WebAssembly | Sim |
 | Criar um processo filho (child process) | Sim, para um binário `linux`/`x64` fornecido por um pacote npm. Consulte [Binários](#binários-e-processos-filhos) |
@@ -42,7 +42,7 @@ Os números aqui apresentados vêm do runtime e da plataforma como estão hoje. 
 
 **Node e a imagem.** A imagem do runtime é construída sobre `node:22-slim` (Debian), e seu bundle roda em `linux`/`x64` como um usuário sem privilégios de root. O seu `tsconfig` e a versão do Node na sua máquina não alteram isso.
 
-**Dependências.** O bundle lista as dependências declaradas pelos seus arquivos `package.json`. O upload não inclui a pasta `node_modules`. Cada instância instala as dependências quando inicializa, com `npm ci` (ou `npm install` caso não haja um lockfile). Disso decorrem quatro coisas:
+**Dependências.** `rebase cloud deploy` instala no bundle as dependências declaradas pelos seus arquivos `package.json`, para `linux`/`x64`, e as envia junto com ele, de modo que uma nova instância não tem nada a instalar. Um bundle que com elas ultrapassaria o limite de upload de 1 GB é enviado sem elas, e o deploy avisa: cada instância então as instala ao iniciar, com `npm ci` (ou `npm install` sem um lockfile). Da forma como são instaladas decorrem quatro pontos:
 
 - **Scripts de instalação nunca são executados.** A instalação usa `--ignore-scripts`. Um pacote que baixa um binário ou compila algo no `postinstall` será instalado sem isso.
 - **Apenas versões de registro são instaladas.** Uma dependência `file:`, `link:`, `git+…` ou `github:` causa falha na compilação, pois o runtime não tem como resolvê-la.
@@ -268,7 +268,7 @@ A plataforma não adiciona proxy nem limite de taxa de saída; os serviços que 
 
 ## Inicialização e encerramento
 
-- **Cold start.** Uma nova instância baixa o bundle e instala suas dependências antes de começar a atender. Essa instalação representa a maior parte do cold start, durando tipicamente de 40 a 60 segundos. A plataforma aguarda até 300 segundos para que uma instância fique ativa. Uma árvore de dependências grande torna cada deploy e cada aumento de escala (scale-up) mais lento.
+- **Cold start.** Uma nova instância baixa e descompacta o bundle antes de começar a atender, portanto uma árvore de dependências grande torna cada scale-up mais lento. Um bundle enviado sem suas dependências também as instala, o que adiciona de 40 a 60 segundos. A plataforma espera até 300 segundos para uma instância subir.
 - **Health check.** A plataforma verifica `/livez` (se o processo está rodando) e `/health` (se consegue alcançar o banco de dados). Ambos são servidos pelo runtime, portanto você não precisa implementá-los.
 - **Encerramento.** Em um deploy ou reinicialização, a instância para de aceitar novas requisições, aguarda 5 segundos para a transição do tráfego e recebe um `SIGTERM`. Requisições em andamento têm até 15 segundos para serem concluídas. Promises passadas para `waitUntil` recebem até 5 segundos desse tempo. Uma promise que não foi repassada para `waitUntil` é descartada. Consulte [Trabalho em Segundo Plano](/docs/backend/custom-functions/#background-work).
 

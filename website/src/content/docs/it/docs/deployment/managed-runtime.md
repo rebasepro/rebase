@@ -1,5 +1,5 @@
 ---
-sourceHash: ba40edd634e01a84
+sourceHash: 6bb68aec4ebcb624
 title: Runtime di backend gestito
 sidebar_label: Runtime gestito
 description: Cosa può e non può fare un backend con runtime "managed" su Rebase Cloud — pacchetti e binari, memoria e CPU, timeout e dimensioni del body, filesystem, stato in memoria, secret, storage per i file generati e rete in uscita.
@@ -24,7 +24,7 @@ I numeri indicati qui si riferiscono al runtime e alla piattaforma allo stato at
 | Domanda | Risposta |
 |---|---|
 | Versione di Node | Node 22, su Debian slim, `linux`/`x64` |
-| Pacchetti npm | Sì, dal registry pubblico o da uno privato. Installati all'avvio di ciascuna istanza |
+| Pacchetti npm | Sì, dal registry pubblico o da uno privato. Installati nel bundle al momento del deploy |
 | Moduli nativi (`.node`, node-gyp) | No. `rebase cloud deploy` rifiuta il bundle |
 | WebAssembly | Sì |
 | Creazione di child process | Sì, per un binario `linux`/`x64` distribuito da un pacchetto npm. Vedi [Binari](#binari-e-child-process) |
@@ -44,10 +44,12 @@ I numeri indicati qui si riferiscono al runtime e alla piattaforma allo stato at
 (Debian), e il tuo bundle viene eseguito su `linux`/`x64` come utente non root. Il
 tuo `tsconfig` e la versione di Node presente sulla tua macchina non modificano questo comportamento.
 
-**Dipendenze.** Il bundle elenca le dipendenze dichiarate nei tuoi file `package.json`.
-L'upload non include `node_modules`. Ciascuna istanza installa le dipendenze al
-proprio avvio, tramite `npm ci` (o `npm install` in assenza di un lockfile).
-Da ciò conseguono quattro aspetti:
+**Dipendenze.** `rebase cloud deploy` installa nel bundle le dipendenze dichiarate nei tuoi
+file `package.json`, per `linux`/`x64`, e le carica insieme a esso, così una nuova istanza
+non ha nulla da installare. Un bundle che con esse supererebbe il limite di caricamento di
+1 GB viene caricato senza, e il deploy lo segnala: ciascuna istanza le installa allora al
+proprio avvio, tramite `npm ci` (o `npm install` in assenza di un lockfile). Dal modo in cui
+vengono installate conseguono quattro aspetti:
 
 - **Gli script di installazione non vengono mai eseguiti.** L'installazione utilizza `--ignore-scripts`. Un pacchetto che scarica un binario o compila qualcosa in `postinstall` verrà installato senza eseguire tale operazione.
 - **Vengono installate solo versioni da registry.** Una dipendenza `file:`, `link:`, `git+…` o `github:` fa fallire la build, poiché il runtime non ha modo di risolverla.
@@ -266,7 +268,7 @@ La piattaforma non introduce proxy né limiti di frequenza (rate limit) sul traf
 
 ## Avvio e arresto
 
-- **Cold start.** Una nuova istanza scarica il bundle e installa le relative dipendenze prima di iniziare a gestire il traffico. Tale installazione costituisce la maggior parte del cold start, che in genere richiede tra i 40 e i 60 secondi. La piattaforma attende fino a 300 secondi l'avvio completo di un'istanza. Un albero delle dipendenze voluminoso rallenta sia i deploy che le operazioni di scale-up.
+- **Cold start.** Una nuova istanza scarica e decomprime il bundle prima di iniziare a gestire il traffico, quindi un albero di dipendenze voluminoso rallenta ogni scale-up. Un bundle caricato senza le sue dipendenze le installa anche, il che aggiunge da 40 a 60 secondi. La piattaforma attende fino a 300 secondi l'avvio di un'istanza.
 - **Verifiche di integrità (Health).** La piattaforma monitora `/livez` (verifica che il processo sia attivo) e `/health` (verifica la raggiungibilità del database). Entrambi gli endpoint sono gestiti direttamente dal runtime e non richiedono alcuna implementazione manuale.
 - **Arresto (Shutdown).** Durante un deploy o un riavvio, l'istanza cessa di accettare nuove richieste, attende 5 secondi affinché il traffico venga reindirizzato, e riceve quindi un segnale `SIGTERM`. Le richieste in corso hanno a disposizione fino a 15 secondi per concludersi. Le promise registrate tramite `waitUntil` possono sfruttare fino a 5 secondi di questo intervallo. Qualsiasi promise non associata a `waitUntil` verrà interrotta. Consulta [Task in background](/docs/backend/custom-functions/#background-work).
 

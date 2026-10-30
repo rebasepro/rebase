@@ -310,12 +310,12 @@ export async function buildCommand(rawArgs: string[] = []): Promise<void> {
                 if ((result.vendor.bytes ?? 0) > VENDOR_SIZE_WARN_BYTES) {
                     const mb = Math.round((result.vendor.bytes ?? 0) / (1024 * 1024));
                     /* The limit is on the *compressed* upload and this is the
-                       tree on disk, so a number above 100 does not mean the
-                       upload fails — but "201 MB, close to the 100 MB limit"
+                       tree on disk, so a number above 1024 does not mean the
+                       upload fails — but "1600 MB, close to the 1 GB limit"
                        reads as nonsense and got ignored for exactly that
                        reason. Say which quantity is which. */
                     console.log(chalk.yellow(
-                        `    ⚠ the installed tree is ${mb} MB on disk — enough to risk the control plane's 100 MB ` +
+                        `    ⚠ the installed tree is ${mb} MB on disk — enough to risk the control plane's 1 GB ` +
                         "limit on the compressed upload"));
                     console.log(chalk.dim("      Shrink the declared dependencies, or rebuild with --no-vendor."));
                 }

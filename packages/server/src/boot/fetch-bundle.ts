@@ -586,7 +586,7 @@ async function downloadWithin(
     }
     if (!response.body) throw new Error("empty response body");
 
-    // Streamed, not buffered. A bundle may be ~100 MB and the process's memory
+    // Streamed, not buffered. A bundle may be a gigabyte and the process's memory
     // limit is sized for serving requests, not for holding its own artifact —
     // `await response.arrayBuffer()` put the whole archive in RSS at the moment
     // of boot, which is the worst moment to need it.

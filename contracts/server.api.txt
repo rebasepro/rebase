@@ -12,11 +12,12 @@ class CollectionConfigError { hint }
 class CronScheduler { fetchJob, fetchJobs, getJob, getJobLogs, getJobLogsFromDb, jobIdsWhere, listJobs, listRejectedJobs, persistJobEnabled, registerJobs, rejectedJobsWhere, setClient, setJobEnabled, setStore, start, startJob, stop, triggerJob }
 class DefaultDriverRegistry { create, get, getDefault, getOrDefault, has, list, register, size }
 class DefaultStorageRegistry { create, get, getDefault, getOrDefault, has, list, register, size }
-class GCSStorageController { deleteObject, getMetadata, getObject, getObjectStream, getSignedUrl, getType, knownBuckets, listObjects, maxFileSize, putObject, statObject, storageLocation }
-class LocalStorageController { deleteObject, getAbsolutePath, getBasePath, getObject, getObjectStream, getSignedUrl, getType, isCaseInsensitive, knownBuckets, listObjects, maxFileSize, putObject, statObject, storageLocation }
+class GCSStorageController { deleteObject, getMetadata, getObject, getObjectStream, getSignedUrl, getType, knownBuckets, listObjects, maxFileSize, putObject, putObjectStream, statObject, storageLocation }
+class LocalStorageController { deleteObject, getAbsolutePath, getBasePath, getObject, getObjectStream, getSignedUrl, getType, isCaseInsensitive, knownBuckets, listObjects, maxFileSize, putObject, putObjectStream, statObject, storageLocation }
 class MetricsRegistry { incrementCounter, observe, recordRequest, render, setGauge, startedAt }
+class ObjectTooLargeError { maxBytes }
 class RawHtml { toString, value }
-class S3StorageController { deleteObject, getMetadata, getObject, getObjectStream, getSignedUrl, getType, knownBuckets, listObjects, maxFileSize, putObject, statObject, storageLocation }
+class S3StorageController { deleteObject, getMetadata, getObject, getObjectStream, getSignedUrl, getType, knownBuckets, listObjects, maxFileSize, putObject, putObjectStream, statObject, storageLocation }
 class SMTPEmailService { close, isConfigured, send, verifyConnection }
 class StoragePolicyError
 class TransformCache { buildKey, get, set }
@@ -370,6 +371,8 @@ interface PasswordValidationResult { errors, valid }
 interface PendingEmailChange { email, sentAt }
 interface ProvisionOptions { collections, realtime }
 interface PutObjectOptions { uploadLimits }
+interface PutObjectStreamProps { bucket, contentType, key, maxBytes, stream }
+interface PutObjectStreamResult { bucket, key, size, storageUrl }
 interface QueryFilter { field, operator, value }
 interface QueryOptions { count, cursor, distinct, fields, include, limit, logical, offset, orderBy, vectorSearch, where, withDeleted }
 interface QueuedWebhookDelivery { deliveryId, event, payload, webhookId }
@@ -402,7 +405,7 @@ interface SingleSubscriptionConfig { clientId, id, path }
 interface StorageAuthorizeContext { bucket, data, key, operation, storageId, user }
 interface StorageAuthorizeData { collection }
 interface StorageAuthorizeUser { email, roles, uid }
-interface StorageController { deleteObject, getMetadata, getObject, getObjectStream, getSignedUrl, getType, knownBuckets, listObjects, maxFileSize, putObject, statObject, storageLocation }
+interface StorageController { deleteObject, getMetadata, getObject, getObjectStream, getSignedUrl, getType, knownBuckets, listObjects, maxFileSize, putObject, putObjectStream, statObject, storageLocation }
 interface StoragePolicy { allow, operations, path }
 interface StoragePolicyContext { bucket, data, key, operation, params, storageId, user }
 interface StorageRegistry { get, getDefault, getOrDefault, has, list, register, size }
@@ -858,6 +861,8 @@ interface PresenceStateMessage { channel, error, payload, presences, requestId, 
 interface PropertyConditions { acceptedFiles, allowedEnumValues, canAddElements, clearOnDisabled, defaultValue, disabled, disabledMessage, enumConditions, excludedEnumValues, hidden, max, maxFileSize, min, readOnly, referenceFilter, referencePath, required, requiredMessage, sortable }
 interface PropertyValidationSchema { required, requiredMessage, unique, uniqueInArray }
 interface PublicSecurityRule { access, check, condition, mode, name, operation, operations, ownerField, pgRoles, roles, using, withCheck }
+interface PutObjectStreamProps { bucket, contentType, key, maxBytes, stream }
+interface PutObjectStreamResult { bucket, key, size, storageUrl }
 interface QueryBuilderInterface { find, include, limit, listen, offset, orderBy, search, vectorSearch, where, where }
 interface QueryFilter { field, operator, value }
 interface QueryNarrowing { filter, logical }
@@ -954,9 +959,12 @@ interface StorageAuthorizeUser { email, roles, uid }
 interface StorageListResult { items, nextPageToken, prefixes }
 interface StorageReference { bucket, contentType, fullPath, name, parent, root, size, toString, updated }
 interface StorageReferenceTarget { key, storageId }
-interface StorageSource { deleteObject, getObject, getSignedUrl, listObjects, putObject }
+interface StorageSource { deleteObject, getObject, getObjectStream, getSignedUrl, listObjects, putObject, putObjectStream, statObject }
 interface StorageSourceDefinition { account, default, engine, key, label, transport }
 interface StorageSourceRegistry { get, getDefault, getOrDefault, has, list }
+interface StoredObjectInfo { contentType, lastModified, size }
+interface StoredObjectRange { end, start }
+interface StoredObjectStream { contentType, lastModified, range, size, stream }
 interface StringProperty { access, autoValue, callbacks, columnName, columnType, conditions, databaseDefault, defaultValue, description, dynamicProps, email, enum, excludeFromApi, isId, metadata, name, propertyConfig, storage, type, url, userSelect, validation }
 interface StringPropertyValidationSchema { length, lowercase, matches, matchesMessage, max, min, required, requiredMessage, trim, unique, uniqueInArray, uppercase }
 interface StructuredSecurityRule { access, check, condition, mode, name, operation, operations, ownerField, pgRoles, roles, using, withCheck }
@@ -1230,7 +1238,7 @@ interface RowSnapshotMeta { fromCache, hasPendingWrites }
 interface SDKCollectionClient { after, aggregate, count, create, create, createMany, delete, deleteMany, distinct, fields, find, findAll, findById, get, include, iterate, limit, listen, listenById, listenCount, offset, orderBy, search, trash, update, update, updateMany, upsert, upsert, vectorSearch, where, where, where }
 interface SDKQueryBuilderInterface { after, aggregate, count, distinct, fields, find, findAll, include, iterate, limit, listen, offset, orderBy, search, vectorSearch, where, where, where }
 interface StorageReferenceTarget { key, storageId }
-interface StorageSource { deleteObject, getObject, getSignedUrl, listObjects, putObject }
+interface StorageSource { deleteObject, getObject, getObjectStream, getSignedUrl, listObjects, putObject, putObjectStream, statObject }
 interface TrashClient { count, find, purge, purgeMany, restore, restoreMany }
 interface UpdateApiKeyRequest { expires_at, name, rate_limit, roles, scopes }
 interface UpsertOptions { idempotencyKey, ifMatch, onConflict, returning }

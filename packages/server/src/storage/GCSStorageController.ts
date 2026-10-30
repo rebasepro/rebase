@@ -6,6 +6,8 @@
  * import cost or need it installed.
  */
 
+import { Readable } from "node:stream";
+import { pipeline } from "node:stream/promises";
 import type { FileMetadata } from "@google-cloud/storage";
 import {
     StorageController,
@@ -14,10 +16,12 @@ import {
     type StoredObjectInfo,
     type StoredObjectRange,
     type PutObjectOptions,
+    type PutObjectStreamProps,
+    type PutObjectStreamResult,
     type StoredObjectStream
 } from "./types";
 import { folderKey, listingPrefix } from "./keys";
-import { bufferWebStream, bytesView, webStreamFrom } from "./streams";
+import { bufferWebStream, bytesView, meteredChunks, ObjectTooLargeError, webStreamFrom } from "./streams";
 import { ApiError } from "../api/errors";
 import { validateUploadedFile } from "./upload-validation";
 import {
@@ -128,6 +132,28 @@ export class GCSStorageController implements StorageController {
             bucket: usedBucket,
             storageUrl: `gs://${usedBucket}/${key}`
         };
+    }
+
+    /**
+     * See {@link StorageController.putObjectStream}.
+     *
+     * `createWriteStream`, not the `save` above: `save` retries by opening its
+     * source again, and this source is a stream with nothing left to give, so a
+     * retry would finish an object holding only what came after the failure.
+     */
+    async putObjectStream({ stream, key, contentType, bucket, maxBytes }: PutObjectStreamProps): Promise<PutObjectStreamResult> {
+        const usedBucket = this.getBucket(bucket);
+        const client = await this.getClient();
+        const metered = meteredChunks(stream, maxBytes);
+        // A resumable session is only finalised by the end of the stream, so one
+        // that fails or is refused partway leaves no object behind.
+        await pipeline(
+            Readable.from(metered.chunks, { objectMode: false }),
+            client.bucket(usedBucket).file(key).createWriteStream({ contentType, resumable: true })
+        ).catch((error: unknown) => {
+            throw error instanceof ObjectTooLargeError ? error : misconfiguredOr(error, usedBucket);
+        });
+        return { key, bucket: usedBucket, storageUrl: `gs://${usedBucket}/${key}`, size: metered.size() };
     }
 
     /**
