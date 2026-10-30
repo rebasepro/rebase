@@ -30,7 +30,7 @@ not promised yet are collected [at the end](#not-promised-yet).
 | Question | Answer |
 |---|---|
 | Node version | Node 22, on Debian slim, `linux`/`x64` |
-| npm packages | Yes, from the public registry or a private one. Installed when each instance starts |
+| npm packages | Yes, from the public registry or a private one. Installed into the bundle when you deploy |
 | Native modules (`.node`, node-gyp) | No. `rebase cloud deploy` refuses the bundle |
 | WebAssembly | Yes |
 | Spawn a child process | Yes, for a `linux`/`x64` binary an npm package ships. See [Binaries](#binaries-and-child-processes) |
@@ -50,10 +50,12 @@ not promised yet are collected [at the end](#not-promised-yet).
 (Debian), and your bundle runs on `linux`/`x64` as a non-root user. Your
 `tsconfig` and the Node version on your machine do not change this.
 
-**Dependencies.** The bundle lists the dependencies your `package.json` files
-declare. The upload does not include `node_modules`. Each instance installs the
-dependencies when it starts, with `npm ci` (or `npm install` without a
-lockfile). Four things follow from that:
+**Dependencies.** `rebase cloud deploy` installs the dependencies your
+`package.json` files declare into the bundle, for `linux`/`x64`, and uploads
+them with it, so a new instance has nothing to install. A bundle that would pass
+the 1 GB upload limit with them is uploaded without them, and the deploy says
+so: each instance then installs them as it starts, with `npm ci` (or
+`npm install` without a lockfile). Four things follow from how they install:
 
 - **Install scripts never run.** The install uses `--ignore-scripts`. A package
   that downloads a binary or builds something in `postinstall` installs without
@@ -396,11 +398,10 @@ key instead.
 
 ## Startup and shutdown
 
-- **Cold start.** A new instance downloads the bundle and installs its
-  dependencies before it serves. That install is most of a cold start, which
-  is typically 40 to 60 seconds. The platform waits up to 300 seconds for an
-  instance to come up. A large dependency tree makes every deploy and every
-  scale-up slower.
+- **Cold start.** A new instance downloads and unpacks the bundle before it
+  serves, so a large dependency tree makes every scale-up slower. A bundle
+  uploaded without its dependencies installs them as well, which adds 40 to 60
+  seconds. The platform waits up to 300 seconds for an instance to come up.
 - **Health.** The platform checks `/livez` (the process is running) and
   `/health` (it can reach the database). Both are served by the runtime, so you
   do not write them.

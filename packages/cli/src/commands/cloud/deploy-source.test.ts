@@ -97,7 +97,8 @@ function controlPlane(sourceStatus = 200): void {
     vi.stubGlobal("fetch", vi.fn(async (url: string, init?: RequestInit) => {
         requests.push(url);
         if (url.includes("/deploy/bundle/upload")) {
-            bundleArchive = Buffer.from(init?.body as Uint8Array);
+            // A Blob read from disk, so the archive is never held to send it.
+            bundleArchive = Buffer.from(await (init?.body as Blob).arrayBuffer());
             return new Response(JSON.stringify({ bundleId: "b1" }));
         }
         if (url.includes("/deploy/upload")) {
@@ -391,13 +392,13 @@ function archiveEntries(archive: Buffer | undefined): string[] {
 }
 
 /**
- * The control plane reads each bundle into memory on every pod start, and a
- * runtime rollout restarts every tenant's pods together — so a managed upload
- * stays small: no `node_modules`, and a deploy that builds its own bundle does
- * not spend 35-55s installing a tree the upload would leave out.
+ * A managed upload carries the tree the build vendored, because that install is
+ * what a new instance would otherwise spend most of its start on. Nothing else
+ * goes in: a `node_modules` installed by hand was installed for whatever machine
+ * ran it.
  */
 describe("a vendored bundle", () => {
-    it("is uploaded without its dependency tree, and the deploy says why", async () => {
+    it("is uploaded with its dependency tree, so a new instance installs nothing", async () => {
         bundle("backend", { declared: { pg: "^8.22.0" }, vendored: true, vendorTarget: { os: "linux", cpu: "x64", node: "22" } });
         write(bundleDir, "node_modules/pg/package.json", "{\"name\":\"pg\"}");
         write(bundleDir, "node_modules/pg/node_modules/pg-types/index.js", "module.exports = {};");
@@ -405,8 +406,13 @@ describe("a vendored bundle", () => {
 
         await deploy("--no-source");
 
-        expect(archiveEntries(bundleArchive)).toEqual(["config/index.js", "manifest.json"]);
-        expect(said.join("\n")).toContain("installed dependencies are not uploaded");
+        expect(archiveEntries(bundleArchive)).toEqual(expect.arrayContaining([
+            "config/index.js",
+            "manifest.json",
+            "node_modules/pg/package.json",
+            "node_modules/pg/node_modules/pg-types/index.js"
+        ]));
+        expect(said.join("\n")).not.toContain("left out");
     });
 
     it("uploads no node_modules the build did not vendor", async () => {
@@ -474,7 +480,10 @@ describe("the build flags a deploy's remedies name", () => {
 
         await deployCommand(["node", "rebase", "cloud", "deploy", "--no-static", "--skip-schema", "--no-source", "--no-follow"], "shop");
 
-        expect(vi.mocked(buildBundle).mock.calls[0][0]).toMatchObject({ skipSchema: true, vendor: false });
+        expect(vi.mocked(buildBundle).mock.calls[0][0]).toMatchObject({ skipSchema: true });
+        // Left to the build's own default, which vendors: `false` here is the
+        // 35-55s every new instance would pay.
+        expect(vi.mocked(buildBundle).mock.calls[0][0].vendor).toBeUndefined();
         // The frontend's build fails, so the deploy only got here without it.
         expect(triggered().bundleId).toBe("b1");
     });

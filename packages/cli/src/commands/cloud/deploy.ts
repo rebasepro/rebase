@@ -401,9 +401,6 @@ app: target.app as RebaseBackendAppConfig };
                 resources: resourceGraph,
                 skipTypeCheck: opts.skipTypeCheck,
                 skipSchema: opts.skipSchema,
-                // The upload leaves `node_modules` out (see packBundleForUpload),
-                // so installing it here would be 35-55s spent on a tree nobody ships.
-                vendor: false,
                 log: (m: string) => progress(chalk.gray(m)),
                 quietStdout: isJsonMode()
             });
@@ -563,8 +560,9 @@ async function uploadAndTrigger(opts: {
             const packed = await packBundleForUpload(bundleDir, tarPath, manifest);
             if (packed.modulesLeftOut) {
                 warn(
-                    "This bundle's installed dependencies are not uploaded: a managed pod installs them when it starts.",
-                    "Build it with `rebase build --no-vendor` to skip installing a tree the upload leaves out."
+                    "This bundle's dependencies would take it past the upload limit, so they were left out: " +
+                    "each new instance installs them when it starts, which adds about a minute.",
+                    "Shrink the declared dependencies to get that minute back."
                 );
             }
             const sizeMb = (packed.bytes / 1024 / 1024).toFixed(1);

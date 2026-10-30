@@ -942,12 +942,15 @@ describe("vendorDependencies", () => {
                 const dir = path.join(cwd, "node_modules", "huge");
                 fs.mkdirSync(dir, { recursive: true });
                 fs.writeFileSync(path.join(dir, "package.json"), "{}");
-                fs.writeFileSync(path.join(dir, "blob.bin"), Buffer.alloc(VENDOR_SIZE_MAX_BYTES + 1024));
+                // Sparse: the ceiling is on the size the tree reports, and 2 GB of
+                // real zeros is not worth a unit test's disk.
+                fs.writeFileSync(path.join(dir, "blob.bin"), "");
+                fs.truncateSync(path.join(dir, "blob.bin"), VENDOR_SIZE_MAX_BYTES + 1024);
             }
         });
 
         expect(result.vendored).toBe(false);
-        expect(result.skipped).toContain("100 MB");
+        expect(result.skipped).toContain("1 GB");
         expect(fs.existsSync(path.join(scratch, "node_modules"))).toBe(false);
     });
 
@@ -963,7 +966,10 @@ describe("vendorDependencies", () => {
                 const dir = path.join(cwd, "node_modules", "huge");
                 fs.mkdirSync(dir, { recursive: true });
                 fs.writeFileSync(path.join(dir, "package.json"), "{}");
-                fs.writeFileSync(path.join(dir, "blob.bin"), Buffer.alloc(VENDOR_SIZE_MAX_BYTES + 1024));
+                // Sparse: the ceiling is on the size the tree reports, and 2 GB of
+                // real zeros is not worth a unit test's disk.
+                fs.writeFileSync(path.join(dir, "blob.bin"), "");
+                fs.truncateSync(path.join(dir, "blob.bin"), VENDOR_SIZE_MAX_BYTES + 1024);
             }
         });
 
