@@ -2619,7 +2619,7 @@ export class PostgresBackendDriver implements DataDriver {
      * `SQLAdmin.probe`: `SELECT 1` on a connection opened for it, outside the
      * pool, so a pool whose connections are all serving slow requests does not
      * read as a database that is down. Without a pg pool (PGlite) there is no
-     * queue to bypass, and the query runs as any other.
+     * queue to bypass, and the query runs like every other one.
      */
     async probe(timeoutMs: number): Promise<void> {
         const pool = "$client" in this.db ? this.db.$client : undefined;
