@@ -1,5 +1,5 @@
 ---
-sourceHash: ba40edd634e01a84
+sourceHash: 6bb68aec4ebcb624
 title: Runtime backend managé
 sidebar_label: Runtime managé
 description: Ce qu'un backend avec le runtime "managed" peut et ne peut pas faire sur Rebase Cloud — paquets et binaires, mémoire et CPU, délais d'expiration et tailles de body, système de fichiers, état en mémoire, secrets, stockage pour les fichiers générés et réseau sortant.
@@ -30,7 +30,7 @@ pas encore garantis sont regroupés [à la fin](#pas-encore-garanti).
 | Question | Réponse |
 |---|---|
 | Version de Node | Node 22, sur Debian slim, `linux`/`x64` |
-| Paquets npm | Oui, depuis le registre public ou un registre privé. Installés au démarrage de chaque instance |
+| Paquets npm | Oui, depuis le registre public ou un registre privé. Installés dans le bundle lors du déploiement |
 | Modules natifs (`.node`, node-gyp) | Non. `rebase cloud deploy` refuse le bundle |
 | WebAssembly | Oui |
 | Lancer un sous-processus | Oui, pour un binaire `linux`/`x64` fourni par un paquet npm. Voir [Binaires](#binaires-et-sous-processus) |
@@ -50,10 +50,12 @@ pas encore garantis sont regroupés [à la fin](#pas-encore-garanti).
 (Debian), et votre bundle s'exécute sur `linux`/`x64` en tant qu'utilisateur non-root. Votre
 `tsconfig` et la version de Node sur votre machine n'y changent rien.
 
-**Dépendances.** Le bundle liste les dépendances que vos fichiers `package.json`
-déclarent. Le téléversement n'inclut pas `node_modules`. Chaque instance installe les
-dépendances à son démarrage, avec `npm ci` (ou `npm install` en l'absence de
-lockfile). Quatre conséquences en découlent :
+**Dépendances.** `rebase cloud deploy` installe dans le bundle les dépendances que vos
+fichiers `package.json` déclarent, pour `linux`/`x64`, et les téléverse avec lui, de sorte
+qu'une nouvelle instance n'a rien à installer. Un bundle qui dépasserait avec elles la limite
+de téléversement de 1 Go est téléversé sans elles, et le déploiement le signale : chaque
+instance les installe alors à son démarrage, avec `npm ci` (ou `npm install` en l'absence de
+lockfile). Quatre conséquences découlent de leur mode d'installation :
 
 - **Les scripts d'installation ne s'exécutent jamais.** L'installation utilise `--ignore-scripts`. Un paquet
   qui télécharge un binaire ou compile quelque chose lors du `postinstall` s'installera sans
@@ -395,11 +397,11 @@ donc pas à une liste d'autorisation (allowlist) tierce. Authentifiez-vous plut�
 
 ## Démarrage et arrêt
 
-- **Démarrage à froid (Cold start).** Une nouvelle instance télécharge le bundle et installe ses
-  dépendances avant de pouvoir traiter des requêtes. Cette installation représente l'essentiel du démarrage à froid,
-  qui dure généralement entre 40 et 60 secondes. La plateforme attend jusqu'à 300 secondes qu'une
-  instance devienne opérationnelle. Un arbre de dépendances volumineux ralentit chaque déploiement et chaque
-  mise à l'échelle (scale-up).
+- **Démarrage à froid (Cold start).** Une nouvelle instance télécharge et décompresse le
+  bundle avant de pouvoir traiter des requêtes : un arbre de dépendances volumineux ralentit
+  donc chaque mise à l'échelle (scale-up). Un bundle téléversé sans ses dépendances les
+  installe en plus, ce qui ajoute 40 à 60 secondes. La plateforme attend jusqu'à 300 secondes
+  qu'une instance devienne opérationnelle.
 - **Santé (Health check).** La plateforme vérifie `/livez` (le processus fonctionne) et
   `/health` (il peut joindre la base de données). Ces deux endpoints sont servis par le runtime, vous
   n'avez donc pas à les implémenter.

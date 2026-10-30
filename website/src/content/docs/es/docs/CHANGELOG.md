@@ -11,6 +11,37 @@ La traducción está pendiente. El contenido siguiente está en inglés.
 
 ## [Unreleased]
 
+### Added
+
+#### Server & REST
+
+- **Streamed object writes.** `StorageController.putObjectStream` writes an
+  object from a `ReadableStream` a chunk at a time, on the local, S3 and GCS
+  controllers. Past `maxBytes` it rejects with `ObjectTooLargeError`, and on that
+  or any other failure it leaves no object at the key. `statObject`,
+  `getObjectStream` and `putObjectStream` are also on the `StorageSource` type, so
+  server code reaches them through `rebase.storage`.
+
+### Changed
+
+#### Rebase Cloud
+
+- **A new managed instance no longer installs its dependencies.** A cloud deploy
+  installs them into the bundle for `linux`/`x64` and uploads them with it, and
+  platform rebuilds do the same, so an instance untars and boots. In production
+  `npm ci` took 42 s at the median and up to 97 s on every scale-up, restart and
+  rollout. A deploy now spends that install once, on the machine running it.
+
+  The upload limit is **1 GB**, up from 100 MB. A bundle over it with its
+  dependencies is uploaded without them and the deploy says so, because a bundle
+  that installs at boot still works. A build keeps a tree of up to 2 GB on disk,
+  up from 200 MB.
+
+#### CLI
+
+- **A cloud deploy streams the bundle from disk.** It used to read the whole
+  archive into memory first.
+
 ## [0.26.0] - 2026-10-29
 
 ### Breaking

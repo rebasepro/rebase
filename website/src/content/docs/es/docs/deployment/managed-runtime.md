@@ -1,5 +1,5 @@
 ---
-sourceHash: ba40edd634e01a84
+sourceHash: 6bb68aec4ebcb624
 title: Runtime de backend administrado
 sidebar_label: Runtime administrado
 description: Lo que un backend con runtime "managed" puede y no puede hacer en Rebase Cloud — paquetes y binarios, memoria y CPU, tiempos de espera y tamaños de cuerpo, el sistema de archivos, el estado en memoria, secretos, almacenamiento para archivos generados y red de salida.
@@ -24,7 +24,7 @@ Los números aquí provienen del runtime y de la plataforma tal como son hoy. Al
 | Pregunta | Respuesta |
 |---|---|
 | Versión de Node | Node 22, en Debian slim, `linux`/`x64` |
-| Paquetes npm | Sí, desde el registro público o uno privado. Se instalan cuando cada instancia inicia |
+| Paquetes npm | Sí, desde el registro público o uno privado. Se instalan en el bundle cuando despliegas |
 | Módulos nativos (`.node`, node-gyp) | No. `rebase cloud deploy` rechaza el bundle |
 | WebAssembly | Sí |
 | Generar un proceso secundario (child process) | Sí, para un binario `linux`/`x64` que incluya un paquete npm. Consulta [Binarios](#binarios-y-procesos-secundarios) |
@@ -42,7 +42,7 @@ Los números aquí provienen del runtime y de la plataforma tal como son hoy. Al
 
 **Node y la imagen.** La imagen del runtime está construida sobre `node:22-slim` (Debian), y tu bundle se ejecuta en `linux`/`x64` como un usuario no root. Tu `tsconfig` y la versión de Node en tu máquina no cambian esto.
 
-**Dependencias.** El bundle lista las dependencias que declaran tus archivos `package.json`. La subida no incluye `node_modules`. Cada instancia instala las dependencias cuando inicia, con `npm ci` (o `npm install` sin un lockfile). De esto se derivan cuatro cosas:
+**Dependencias.** `rebase cloud deploy` instala en el bundle las dependencias que declaran tus archivos `package.json`, para `linux`/`x64`, y las sube con él, de modo que una nueva instancia no tiene nada que instalar. Un bundle que con ellas superaría el límite de subida de 1 GB se sube sin ellas, y el despliegue lo indica: cada instancia las instala entonces al iniciar, con `npm ci` (o `npm install` si no hay lockfile). De cómo se instalan se derivan cuatro cosas:
 
 - **Los scripts de instalación nunca se ejecutan.** La instalación utiliza `--ignore-scripts`. Un paquete que descarga un binario o compila algo en `postinstall` se instala sin ello.
 - **Solo se instalan versiones del registro.** Una dependencia `file:`, `link:`, `git+…` o `github:` hace que la compilación falle, porque el runtime no tiene contra qué resolverla.
@@ -261,7 +261,7 @@ La plataforma no añade ningún proxy ni límite de tasa saliente; los servicios
 
 ## Inicio y apagado
 
-- **Arranque en frío (cold start).** Una nueva instancia descarga el bundle e instala sus dependencias antes de servir tráfico. Esa instalación representa la mayor parte de un arranque en frío, que normalmente tarda de 40 a 60 segundos. La plataforma espera hasta 300 segundos a que una instancia se levante. Un árbol de dependencias grande hace que cada despliegue y cada escalado sea más lento.
+- **Arranque en frío (cold start).** Una nueva instancia descarga y desempaqueta el bundle antes de servir tráfico, por lo que un árbol de dependencias grande hace más lento cada escalado. Un bundle subido sin sus dependencias también las instala, lo que añade de 40 a 60 segundos. La plataforma espera hasta 300 segundos a que una instancia arranque.
 - **Salud (health).** La plataforma comprueba `/livez` (el proceso está en ejecución) y `/health` (puede comunicarse con la base de datos). Ambos endpoints son servidos por el runtime, por lo que no necesitas escribirlos.
 - **Apagado (shutdown).** En un despliegue o reinicio, la instancia deja de aceptar nuevas solicitudes, espera 5 segundos a que el tráfico se desvíe y luego recibe `SIGTERM`. Las solicitudes en curso tienen hasta 15 segundos para completarse. Las promesas pasadas a `waitUntil` reciben hasta 5 segundos de ese tiempo. Cualquier promesa que no hayas entregado a `waitUntil` se descarta. Consulta [Trabajo en segundo plano](/docs/backend/custom-functions/#background-work).
 

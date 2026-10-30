@@ -1,5 +1,5 @@
 ---
-sourceHash: ba40edd634e01a84
+sourceHash: 6bb68aec4ebcb624
 title: Managed-Backend-Runtime
 sidebar_label: Managed Runtime
 description: Was ein Backend mit der Runtime „managed“ auf Rebase Cloud kann und was nicht — Pakete und Binärdateien, Arbeitsspeicher und CPU, Timeouts und Body-Größen, das Dateisystem, In-Memory-Status, Secrets, Speicher für generierte Dateien und ausgehender Netzwerkverkehr.
@@ -30,7 +30,7 @@ noch nicht zugesichert sind, sind [am Ende](#noch-nicht-zugesichert) zusammengef
 | Frage | Antwort |
 |---|---|
 | Node-Version | Node 22, auf Debian slim, `linux`/`x64` |
-| npm-Pakete | Ja, aus der öffentlichen Registry oder einer privaten. Werden beim Start jeder Instanz installiert |
+| npm-Pakete | Ja, aus der öffentlichen Registry oder einer privaten. Werden beim Deploy ins Bundle installiert |
 | Native Module (`.node`, node-gyp) | Nein. `rebase cloud deploy` lehnt das Bundle ab |
 | WebAssembly | Ja |
 | Einen Child-Process starten | Ja, für eine `linux`/`x64`-Binärdatei, die ein npm-Paket mitbringt. Siehe [Binärdateien](#binärdateien-und-child-processes) |
@@ -50,10 +50,12 @@ noch nicht zugesichert sind, sind [am Ende](#noch-nicht-zugesichert) zusammengef
 (Debian), und Ihr Bundle läuft auf `linux`/`x64` als Nicht-Root-Benutzer. Ihre
 `tsconfig` und die Node-Version auf Ihrem Rechner ändern daran nichts.
 
-**Abhängigkeiten.** Das Bundle listet die Abhängigkeiten auf, die Ihre `package.json`-Dateien
-deklarieren. Der Upload enthält kein `node_modules`. Jede Instanz installiert die
-Abhängigkeiten beim Start mit `npm ci` (oder `npm install` ohne
-Lockfile). Daraus ergeben sich vier Konsequenzen:
+**Abhängigkeiten.** `rebase cloud deploy` installiert die Abhängigkeiten, die Ihre
+`package.json`-Dateien deklarieren, für `linux`/`x64` ins Bundle und lädt sie mit ihm hoch,
+sodass eine neue Instanz nichts zu installieren hat. Ein Bundle, das mit ihnen das
+Upload-Limit von 1 GB überschreiten würde, wird ohne sie hochgeladen, und der Deploy weist
+darauf hin: Jede Instanz installiert sie dann beim Start mit `npm ci` (oder `npm install`
+ohne Lockfile). Aus der Art der Installation ergeben sich vier Konsequenzen:
 
 - **Installationsskripte werden niemals ausgeführt.** Die Installation verwendet `--ignore-scripts`. Ein Paket,
   das eine Binärdatei herunterlädt oder in `postinstall` etwas baut, wird ohne
@@ -395,11 +397,11 @@ stattdessen mit einem Schlüssel.
 
 ## Start und Shutdown
 
-- **Kaltstart.** Eine neue Instanz lädt das Bundle herunter und installiert ihre
-  Abhängigkeiten, bevor sie Requests verarbeitet. Diese Installation macht den Großteil eines Kaltstarts aus,
-  der typischerweise 40 bis 60 Sekunden dauert. Die Plattform wartet bis zu 300 Sekunden darauf, dass eine
-  Instanz hochfährt. Ein großer Abhängigkeitsbaum verlangsamt jeden Deploy und jedes
-  Hochskalieren.
+- **Kaltstart.** Eine neue Instanz lädt das Bundle herunter und entpackt es, bevor sie
+  Requests verarbeitet, daher verlangsamt ein großer Abhängigkeitsbaum jedes Hochskalieren.
+  Ein ohne seine Abhängigkeiten hochgeladenes Bundle installiert sie zusätzlich, was 40 bis
+  60 Sekunden kostet. Die Plattform wartet bis zu 300 Sekunden darauf, dass eine Instanz
+  hochfährt.
 - **Health-Checks.** Die Plattform prüft `/livez` (der Prozess läuft) und
   `/health` (die Datenbank ist erreichbar). Beide Endpunkte werden von der Runtime bereitgestellt,
   Sie müssen sie also nicht selbst implementieren.

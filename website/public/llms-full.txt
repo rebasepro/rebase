@@ -4242,6 +4242,37 @@ yet, listed so that nobody reads a promise into them:
 
 ### [Unreleased]
 
+#### Added
+
+##### Server & REST
+
+- **Streamed object writes.** `StorageController.putObjectStream` writes an
+  object from a `ReadableStream` a chunk at a time, on the local, S3 and GCS
+  controllers. Past `maxBytes` it rejects with `ObjectTooLargeError`, and on that
+  or any other failure it leaves no object at the key. `statObject`,
+  `getObjectStream` and `putObjectStream` are also on the `StorageSource` type, so
+  server code reaches them through `rebase.storage`.
+
+#### Changed
+
+##### Rebase Cloud
+
+- **A new managed instance no longer installs its dependencies.** A cloud deploy
+  installs them into the bundle for `linux`/`x64` and uploads them with it, and
+  platform rebuilds do the same, so an instance untars and boots. In production
+  `npm ci` took 42 s at the median and up to 97 s on every scale-up, restart and
+  rollout. A deploy now spends that install once, on the machine running it.
+
+  The upload limit is **1 GB**, up from 100 MB. A bundle over it with its
+  dependencies is uploaded without them and the deploy says so, because a bundle
+  that installs at boot still works. A build keeps a tree of up to 2 GB on disk,
+  up from 200 MB.
+
+##### CLI
+
+- **A cloud deploy streams the bundle from disk.** It used to read the whole
+  archive into memory first.
+
 ### [0.26.0] - 2026-10-29
 
 #### Breaking
@@ -50218,9 +50249,9 @@ application image to build yourself. Useful flags:
 | `--no-static` | Do not fold the frontend into the backend bundle (each static app still gets its own bundle) |
 | `--skip-static-build` | Fold the frontend as already built, without running its build command |
 
-Dependencies are vendored by default so a pod restart does not pay a 35–55 second
-install. A tree that grows past 200 MB on disk is dropped instead, because the
-upload limit is 100 MB compressed — see the changelog for the reasoning.
+Dependencies are vendored by default so a new instance does not pay a 35–55
+second install. A tree that grows past 2 GB on disk is dropped instead, because
+the upload limit is 1 GB compressed.
 
 Every static app the
 bundle carries gets a brotli (`.br`) and a gzip (`.gz`) copy beside each
@@ -54571,7 +54602,7 @@ not promised yet are collected [at the end](#not-promised-yet).
 | Question | Answer |
 |---|---|
 | Node version | Node 22, on Debian slim, `linux`/`x64` |
-| npm packages | Yes, from the public registry or a private one. Installed when each instance starts |
+| npm packages | Yes, from the public registry or a private one. Installed into the bundle when you deploy |
 | Native modules (`.node`, node-gyp) | No. `rebase cloud deploy` refuses the bundle |
 | WebAssembly | Yes |
 | Spawn a child process | Yes, for a `linux`/`x64` binary an npm package ships. See [Binaries](#binaries-and-child-processes) |
@@ -54591,10 +54622,12 @@ not promised yet are collected [at the end](#not-promised-yet).
 (Debian), and your bundle runs on `linux`/`x64` as a non-root user. Your
 `tsconfig` and the Node version on your machine do not change this.
 
-**Dependencies.** The bundle lists the dependencies your `package.json` files
-declare. The upload does not include `node_modules`. Each instance installs the
-dependencies when it starts, with `npm ci` (or `npm install` without a
-lockfile). Four things follow from that:
+**Dependencies.** `rebase cloud deploy` installs the dependencies your
+`package.json` files declare into the bundle, for `linux`/`x64`, and uploads
+them with it, so a new instance has nothing to install. A bundle that would pass
+the 1 GB upload limit with them is uploaded without them, and the deploy says
+so: each instance then installs them as it starts, with `npm ci` (or
+`npm install` without a lockfile). Four things follow from how they install:
 
 - **Install scripts never run.** The install uses `--ignore-scripts`. A package
   that downloads a binary or builds something in `postinstall` installs without
@@ -54937,11 +54970,10 @@ key instead.
 
 ### Startup and shutdown
 
-- **Cold start.** A new instance downloads the bundle and installs its
-  dependencies before it serves. That install is most of a cold start, which
-  is typically 40 to 60 seconds. The platform waits up to 300 seconds for an
-  instance to come up. A large dependency tree makes every deploy and every
-  scale-up slower.
+- **Cold start.** A new instance downloads and unpacks the bundle before it
+  serves, so a large dependency tree makes every scale-up slower. A bundle
+  uploaded without its dependencies installs them as well, which adds 40 to 60
+  seconds. The platform waits up to 300 seconds for an instance to come up.
 - **Health.** The platform checks `/livez` (the process is running) and
   `/health` (it can reach the database). Both are served by the runtime, so you
   do not write them.
