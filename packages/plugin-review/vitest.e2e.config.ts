@@ -10,7 +10,7 @@ const source = (path: string) => fileURLToPath(new URL(`../${path}`, import.meta
  * The function's subpath entry is mapped too, or it would load the server's
  * `dist` beside the source and run two copies of it.
  */
-const PACKAGES = ["types", "utils", "common", "client", "codegen", "server", "server-postgres"];
+const PACKAGES = ["types", "cms-types", "utils", "common", "client", "codegen", "ui", "app", "server", "server-postgres"];
 
 export default defineConfig({
     test: {

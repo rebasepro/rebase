@@ -574,12 +574,13 @@
     },
     {
       "id": "ai-and-extras",
-      "title": "MCP server, AI and insights plugins, inference, rls-check",
+      "title": "MCP server, AI, insights and review plugins, inference, rls-check",
       "paths": [
         "packages/mcp/src/**",
         "packages/server/src/mcp/**",
         "packages/plugin-ai/src/**",
         "packages/plugin-insights/src/**",
+        "packages/plugin-review/src/**",
         "packages/inference/src/**",
         "packages/rls-check/src/**",
         "packages/cli/src/commands/agent-setup.ts"
