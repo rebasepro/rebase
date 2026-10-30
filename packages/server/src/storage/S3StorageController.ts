@@ -10,10 +10,12 @@ import {
     type StoredObjectInfo,
     type StoredObjectRange,
     type PutObjectOptions,
+    type PutObjectStreamProps,
+    type PutObjectStreamResult,
     type StoredObjectStream
 } from "./types";
 import { folderKey, listingPrefix } from "./keys";
-import { webStreamFrom } from "./streams";
+import { meteredChunks, ObjectTooLargeError, webStreamFrom } from "./streams";
 import { ApiError } from "../api/errors";
 import { validateUploadedFile } from "./upload-validation";
 import {
@@ -159,7 +161,7 @@ export class S3StorageController implements StorageController {
             await client.send(new s3.PutObjectCommand({ ...target, Body: Buffer.from(await file.arrayBuffer()) }))
                 .catch((error: unknown) => { throw misconfiguredOr(error, usedBucket); });
         } else {
-            await this.putMultipart(target, file);
+            await this.putMultipart(target, fileParts(file));
         }
 
         return {
@@ -169,8 +171,22 @@ export class S3StorageController implements StorageController {
         };
     }
 
+    /** See {@link StorageController.putObjectStream}. */
+    async putObjectStream({ stream, key, contentType, bucket, maxBytes }: PutObjectStreamProps): Promise<PutObjectStreamResult> {
+        const usedBucket = this.getBucket(bucket);
+        const metered = meteredChunks(stream, maxBytes);
+        // Multipart even for a small object: how long the stream is cannot be
+        // known until it has ended, and by then a `PutObject` would have had to
+        // hold all of it.
+        await this.putMultipart(
+            { Bucket: usedBucket, Key: key, ContentType: contentType ?? "application/octet-stream" },
+            streamParts(metered.chunks)
+        );
+        return { key, bucket: usedBucket, storageUrl: `s3://${usedBucket}/${key}`, size: metered.size() };
+    }
+
     /**
-     * Upload a large file in parts, one part in memory at a time.
+     * Upload a large object in parts, one part in memory at a time.
      *
      * Reading the whole file into one buffer held it twice over (the
      * `arrayBuffer()`, then the SDK's view and the multipart parser's copy
@@ -182,27 +198,26 @@ export class S3StorageController implements StorageController {
      */
     private async putMultipart(
         target: { Bucket: string; Key: string; ContentType: string; Metadata?: Record<string, string> },
-        file: Blob
+        source: AsyncIterable<Buffer>
     ): Promise<void> {
         const s3 = await loadS3();
         const client = await this.getClient();
-        // At most 10,000 parts: a part grows past 8 MiB only beyond 80 GB.
-        const partSize = Math.max(MULTIPART_PART_SIZE, Math.ceil(file.size / MAX_MULTIPART_PARTS));
         const { UploadId } = await client.send(new s3.CreateMultipartUploadCommand(target))
             .catch((error: unknown) => { throw misconfiguredOr(error, target.Bucket); });
         if (!UploadId) throw new Error(`S3 did not start a multipart upload for ${target.Key}.`);
         const { Bucket, Key } = target;
         try {
             const parts: { ETag?: string; PartNumber: number }[] = [];
-            for (let offset = 0, PartNumber = 1; offset < file.size; offset += partSize, PartNumber++) {
-                const Body = Buffer.from(await file.slice(offset, Math.min(offset + partSize, file.size)).arrayBuffer());
+            let PartNumber = 1;
+            for await (const Body of source) {
                 const { ETag } = await client.send(new s3.UploadPartCommand({ Bucket, Key, UploadId, PartNumber, Body }));
                 parts.push({ ETag, PartNumber });
+                PartNumber++;
             }
             await client.send(new s3.CompleteMultipartUploadCommand({ Bucket, Key, UploadId, MultipartUpload: { Parts: parts } }));
         } catch (error: unknown) {
             await client.send(new s3.AbortMultipartUploadCommand({ Bucket, Key, UploadId })).catch(() => undefined);
-            throw misconfiguredOr(error, Bucket);
+            throw error instanceof ObjectTooLargeError ? error : misconfiguredOr(error, Bucket);
         }
     }
 
@@ -607,4 +622,37 @@ function isS3RangeNotSatisfiable(error: unknown): boolean {
 /** A Node response body — what the SDK hands over on Node — rather than a browser one. */
 function isByteIterable(value: unknown): value is AsyncIterable<Uint8Array> {
     return typeof value === "object" && value !== null && Symbol.asyncIterator in value;
+}
+
+/** A file as multipart bodies. A slice reads only its range, from disk for a disk-backed file. */
+async function* fileParts(file: Blob): AsyncGenerator<Buffer> {
+    // At most 10,000 parts: a part grows past 8 MiB only beyond 80 GB.
+    const partSize = Math.max(MULTIPART_PART_SIZE, Math.ceil(file.size / MAX_MULTIPART_PARTS));
+    for (let offset = 0; offset < file.size; offset += partSize) {
+        yield Buffer.from(await file.slice(offset, Math.min(offset + partSize, file.size)).arrayBuffer());
+    }
+}
+
+/**
+ * A stream as multipart bodies of one part size, holding at most one part.
+ *
+ * An empty stream is still one part: S3 will not complete an upload with none,
+ * and an empty object is what was written.
+ */
+async function* streamParts(chunks: AsyncIterable<Uint8Array>): AsyncGenerator<Buffer> {
+    let held: Uint8Array[] = [];
+    let bytes = 0;
+    let yielded = false;
+    for await (const chunk of chunks) {
+        held.push(chunk);
+        bytes += chunk.byteLength;
+        while (bytes >= MULTIPART_PART_SIZE) {
+            const joined = Buffer.concat(held, bytes);
+            yield joined.subarray(0, MULTIPART_PART_SIZE);
+            yielded = true;
+            held = [joined.subarray(MULTIPART_PART_SIZE)];
+            bytes -= MULTIPART_PART_SIZE;
+        }
+    }
+    if (bytes > 0 || !yielded) yield Buffer.concat(held, bytes);
 }

@@ -52,6 +52,44 @@ export function webStreamFrom(source: ByteSource | (() => ByteSource)): Readable
     }, { highWaterMark: 0 });
 }
 
+/** A streamed write ran past the limit its caller set. See {@link meteredChunks}. */
+export class ObjectTooLargeError extends Error {
+    constructor(readonly maxBytes: number) {
+        super(`The object is larger than the ${maxBytes} bytes this write allows.`);
+        this.name = "ObjectTooLargeError";
+    }
+}
+
+/**
+ * A stream's chunks, counted as they pass, stopping at `maxBytes`.
+ *
+ * Stopping cancels the stream, so a body being refused is not read to its end
+ * first. The error surfaces at the consumer's next read, which is how a write in
+ * progress learns to abandon itself rather than finishing an object it was
+ * never allowed to keep.
+ */
+export function meteredChunks(
+    stream: ReadableStream<Uint8Array>,
+    maxBytes: number = Number.POSITIVE_INFINITY
+): { chunks: AsyncGenerator<Uint8Array>; size: () => number } {
+    let size = 0;
+    async function* read(): AsyncGenerator<Uint8Array> {
+        const reader = stream.getReader();
+        try {
+            for (;;) {
+                const { done, value } = await reader.read();
+                if (done) return;
+                size += value.byteLength;
+                if (size > maxBytes) throw new ObjectTooLargeError(maxBytes);
+                yield value;
+            }
+        } finally {
+            await reader.cancel().catch(() => undefined);
+        }
+    }
+    return { chunks: read(), size: () => size };
+}
+
 /**
  * A file on disk, or an inclusive byte range of it, as a web stream. The file
  * is opened on the first read; see {@link webStreamFrom}.

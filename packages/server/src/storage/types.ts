@@ -3,6 +3,7 @@
  */
 
 import { StorageSource, UploadFileProps, UploadFileResult, DownloadConfig, DownloadMetadata, StorageListResult, StorageReference } from "@rebasepro/types";
+import type { PutObjectStreamProps, PutObjectStreamResult, StoredObjectInfo, StoredObjectRange, StoredObjectStream } from "@rebasepro/types";
 
 /**
  * Local filesystem storage configuration
@@ -98,7 +99,12 @@ export type {
     StorageAuthorizeUser,
     StorageAuthorizeContext,
     StorageAuthorizeData,
-    StorageAuthorize
+    StorageAuthorize,
+    PutObjectStreamProps,
+    PutObjectStreamResult,
+    StoredObjectInfo,
+    StoredObjectRange,
+    StoredObjectStream
 } from "@rebasepro/types";
 
 /**
@@ -185,6 +191,20 @@ export interface StorageController {
     getObjectStream?(key: string, options?: { bucket?: string; range?: StoredObjectRange }): Promise<StoredObjectStream | null>;
 
     /**
+     * Write an object from a stream, a chunk at a time, for bytes the server
+     * has not got all of yet: a request body on its way through.
+     *
+     * Past `maxBytes` this rejects with {@link ObjectTooLargeError}, and on that
+     * or any other failure no object appears at the key. `maxFileSize` and
+     * `allowedMimeTypes` do not apply; `maxBytes` is the caller's own limit.
+     *
+     * The stream can be read only once, so unlike {@link putObject} a failed
+     * attempt cannot be retried here. A caller that must survive one keeps its
+     * own copy.
+     */
+    putObjectStream?(props: PutObjectStreamProps): Promise<PutObjectStreamResult>;
+
+    /**
      * Delete an object
      */
     deleteObject(key: string, bucket?: string): Promise<void>;
@@ -250,41 +270,6 @@ export interface StorageController {
      * that does not implement this is held to the deployment-wide limit alone.
      */
     maxFileSize?(): number;
-}
-
-/**
- * What serving an object needs to know before deciding whether to read it.
- * See {@link StorageController.statObject}.
- */
-export interface StoredObjectInfo {
-    /** The whole object's size in bytes. */
-    size: number;
-    /** The stored content type — the uploader's claim, not a sniffed one. */
-    contentType: string;
-    /**
-     * The object's own modification time, in milliseconds since the epoch.
-     * The routes build `ETag`, `Last-Modified` and the transform cache key from
-     * it, so it must be the object's version, not the time of the read.
-     */
-    lastModified: number;
-}
-
-/** An inclusive byte range, as `Range: bytes=start-end` names one. */
-export interface StoredObjectRange {
-    start: number;
-    end: number;
-}
-
-/** An object's bytes as a stream. See {@link StorageController.getObjectStream}. */
-export interface StoredObjectStream extends StoredObjectInfo {
-    /** The bytes: the range when {@link range} is set, the whole object otherwise. */
-    stream: ReadableStream<Uint8Array>;
-    /**
-     * The range {@link stream} holds — the one asked for — or absent when it
-     * holds the whole object. A controller may answer a range with the whole
-     * object, as HTTP lets a server do; the caller then serves it whole.
-     */
-    range?: StoredObjectRange;
 }
 
 /**

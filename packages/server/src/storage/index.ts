@@ -16,6 +16,7 @@ export * from "./types";
 export { LocalStorageController } from "./LocalStorageController";
 export { S3StorageController } from "./S3StorageController";
 export { GCSStorageController } from "./GCSStorageController";
+export { ObjectTooLargeError } from "./streams";
 export { createStorageRoutes } from "./routes";
 export type { StorageRoutesConfig } from "./routes";
 export * from "./storage-registry";

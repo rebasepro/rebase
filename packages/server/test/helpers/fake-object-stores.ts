@@ -33,7 +33,7 @@
  * every `@aws-sdk/client-s3` command has, so the real command classes are used
  * unmodified — only the client that sends them is replaced.
  */
-import { Readable } from "node:stream";
+import { Readable, Writable } from "node:stream";
 
 interface StoredObject {
     body: Uint8Array;
@@ -383,6 +383,27 @@ class FakeGcsFile {
             if (mid > 0) yield Buffer.from(bytes.slice(0, mid));
             yield Buffer.from(bytes.slice(mid));
         })());
+    }
+
+    /** Finalised by the end of the stream: one destroyed partway stores nothing, as a resumable session does. */
+    createWriteStream(options?: { contentType?: string }): Writable {
+        const chunks: Buffer[] = [];
+        return new Writable({
+            write: (chunk: Buffer, _encoding, done) => {
+                chunks.push(chunk);
+                done();
+            },
+            final: (done) => {
+                this.objects();
+                gcsWorld.write(this.bucketName, this.name, {
+                    body: new Uint8Array(Buffer.concat(chunks)),
+                    contentType: options?.contentType || "application/octet-stream",
+                    metadata: {},
+                    writtenAt: Date.now()
+                });
+                done();
+            }
+        });
     }
 
     async save(data: unknown, options?: { contentType?: string; metadata?: { contentType?: string; metadata?: Record<string, string> } }): Promise<void> {

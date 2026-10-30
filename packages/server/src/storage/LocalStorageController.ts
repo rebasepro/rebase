@@ -15,9 +15,11 @@ import {
     type StoredObjectInfo,
     type StoredObjectRange,
     type PutObjectOptions,
+    type PutObjectStreamProps,
+    type PutObjectStreamResult,
     type StoredObjectStream
 } from "./types";
-import { fileWebStream } from "./streams";
+import { fileWebStream, meteredChunks } from "./streams";
 import {
     UploadFileProps,
     UploadFileResult,
@@ -368,6 +370,29 @@ export class LocalStorageController implements StorageController {
     }: UploadFileProps, options?: PutObjectOptions): Promise<UploadFileResult> {
         if (options?.uploadLimits !== false) this.validateFile(file);
 
+        return this.writeObject(blobChunks(file), key, bucket, { ...(metadata || {}), contentType: file.type, size: file.size });
+    }
+
+    /** See {@link StorageController.putObjectStream}. */
+    async putObjectStream({ stream, key, contentType, bucket, maxBytes }: PutObjectStreamProps): Promise<PutObjectStreamResult> {
+        const metered = meteredChunks(stream, maxBytes);
+        const result = await this.writeObject(metered.chunks, key, bucket, () => ({
+            contentType: contentType ?? "application/octet-stream",
+            size: metered.size()
+        }));
+        return { ...result, size: metered.size() };
+    }
+
+    /**
+     * Write an object and its metadata sidecar. `metadata` is a function when
+     * the size is only known once the bytes have been written.
+     */
+    private async writeObject(
+        chunks: AsyncIterable<Uint8Array>,
+        key: string,
+        bucket: string | undefined,
+        metadata: Record<string, unknown> | (() => Record<string, unknown>)
+    ): Promise<UploadFileResult> {
         // Always use a bucket (default to 'default'). `||`, not `??`: an empty
         // bucket is "the caller named none", and it used to resolve to the
         // storage root instead of the default bucket.
@@ -384,7 +409,7 @@ export class LocalStorageController implements StorageController {
         // object (or none), never a truncated one.
         const partial = path.join(path.dirname(fullPath), `.${path.basename(fullPath)}.${randomUUID()}${PARTIAL_SUFFIX}`);
         try {
-            await pipeline(Readable.from(blobChunks(file)), fs.createWriteStream(partial));
+            await pipeline(Readable.from(chunks), fs.createWriteStream(partial));
             await fs.promises.rename(partial, fullPath);
         } catch (error: unknown) {
             await fs.promises.rm(partial, { force: true });
@@ -394,9 +419,7 @@ export class LocalStorageController implements StorageController {
         // Always save metadata file with at least contentType (required for preview)
         const metadataPath = `${fullPath}.metadata.json`;
         await writeFile(metadataPath, JSON.stringify({
-            ...(metadata || {}),
-            contentType: file.type,
-            size: file.size,
+            ...(typeof metadata === "function" ? metadata() : metadata),
             uploadedAt: new Date().toISOString()
         }, null, 2));
 

@@ -248,6 +248,75 @@ export declare interface DownloadMetadata {
 }
 
 /**
+ * What serving an object needs to know before deciding whether to read it.
+ * See {@link StorageSource.statObject}.
+ *
+ * @group Models
+ */
+export interface StoredObjectInfo {
+    /** The whole object's size in bytes. */
+    size: number;
+    /** The stored content type — the uploader's claim, not a sniffed one. */
+    contentType: string;
+    /**
+     * The object's own modification time, in milliseconds since the epoch.
+     * The routes build `ETag`, `Last-Modified` and the transform cache key from
+     * it, so it must be the object's version, not the time of the read.
+     */
+    lastModified: number;
+}
+
+/**
+ * An inclusive byte range, as `Range: bytes=start-end` names one.
+ *
+ * @group Models
+ */
+export interface StoredObjectRange {
+    start: number;
+    end: number;
+}
+
+/**
+ * An object's bytes as a stream. See {@link StorageSource.getObjectStream}.
+ *
+ * @group Models
+ */
+export interface StoredObjectStream extends StoredObjectInfo {
+    /** The bytes: the range when {@link range} is set, the whole object otherwise. */
+    stream: ReadableStream<Uint8Array>;
+    /**
+     * The range {@link stream} holds — the one asked for — or absent when it
+     * holds the whole object. A controller may answer a range with the whole
+     * object, as HTTP lets a server do; the caller then serves it whole.
+     */
+    range?: StoredObjectRange;
+}
+
+/**
+ * A write of bytes whose length is not known yet. See
+ * {@link StorageSource.putObjectStream}.
+ *
+ * @group Models
+ */
+export interface PutObjectStreamProps {
+    /** Read once, to its end. A controller cannot retry a stream it has consumed. */
+    stream: ReadableStream<Uint8Array>;
+    key: string;
+    contentType?: string;
+    bucket?: string;
+    /** Refuse the write once the stream passes this many bytes. */
+    maxBytes?: number;
+}
+
+/**
+ * @group Models
+ */
+export interface PutObjectStreamResult extends UploadFileResult {
+    /** How many bytes were written. */
+    size: number;
+}
+
+/**
  * @group Models
  */
 export interface StorageSource {
@@ -279,6 +348,32 @@ export interface StorageSource {
      * @param bucket
      */
     getObject: (key: string, bucket?: string) => Promise<File | null>;
+
+    /**
+     * Describe an object without reading its bytes, or `null` when there is no
+     * such object. Server-side storage only.
+     */
+    statObject?: (key: string, bucket?: string) => Promise<StoredObjectInfo | null>;
+
+    /**
+     * Read an object, or one byte range of it, as a stream, or `null` when
+     * there is no such object. Server-side storage only.
+     *
+     * The stream holds a file or a connection until it is read to the end or
+     * cancelled, so a caller that decides not to read it must cancel it.
+     */
+    getObjectStream?: (key: string, options?: { bucket?: string; range?: StoredObjectRange }) => Promise<StoredObjectStream | null>;
+
+    /**
+     * Write an object from a stream, holding a chunk at a time however large it
+     * is. Server-side storage only.
+     *
+     * Rejects with `ObjectTooLargeError` past `maxBytes`, and on that or any
+     * other failure leaves no object at the key. The controller's upload limits
+     * do not apply: this is how the server stores something of its own, and
+     * `maxBytes` is its limit.
+     */
+    putObjectStream?: (props: PutObjectStreamProps) => Promise<PutObjectStreamResult>;
 
     /**
      * Delete an object.
