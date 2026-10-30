@@ -1320,6 +1320,12 @@ importers:
       hono:
         specifier: '>=4.13.5 <5'
         version: 4.13.8
+      react:
+        specifier: ^19.2.7
+        version: 19.2.8
+      react-dom:
+        specifier: ^19.2.7
+        version: 19.2.8(react@19.2.8)
     devDependencies:
       '@jest/globals':
         specifier: ^30.4.1

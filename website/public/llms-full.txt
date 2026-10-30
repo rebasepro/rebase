@@ -4253,6 +4253,20 @@ yet, listed so that nobody reads a promise into them:
   `getObjectStream` and `putObjectStream` are also on the `StorageSource` type, so
   server code reaches them through `rebase.storage`.
 
+##### Plugins
+
+- **`@rebasepro/plugin-review`: agents propose, people approve.** A new plugin,
+  outside the core packages. Its server function (`@rebasepro/plugin-review/server`)
+  takes proposed inserts, updates and deletes into `rebase.staged_changes`
+  without touching the collection, and applies an approved one — or a whole
+  batch, in one transaction — under the reviewer's own row-level security. A
+  state-field review instead holds agent roles to a pending value of a row's
+  own `status`, through a restrictive policy `reviewSecurityRules()` builds
+  (`@rebasepro/plugin-review/config`). The admin half (`useReviewPlugin`) adds
+  a "Review queue (N)" button beside a reviewed collection's view switcher:
+  cell-level diffs, who proposed each change and why, and `j` / `k`, `a`, `r`
+  and Space to work through it. See [Review queue](/docs/backend/review-queue).
+
 #### Changed
 
 ##### Rebase Cloud
@@ -4272,6 +4286,102 @@ yet, listed so that nobody reads a promise into them:
 
 - **A cloud deploy streams the bundle from disk.** It used to read the whole
   archive into memory first.
+
+#### Fixed
+
+##### Realtime
+
+- **Channel traffic no longer starves the database pool under load.** Channel
+  frames re-checked the sender's identity against the auth store at most once
+  a second; a socket that answers a ping every few seconds was checked on
+  nearly every frame, so a load test of 100 game rooms (800 sockets) spent
+  several hundred auth lookups a second on the shared pool. The window is now
+  five seconds, a failed check holds off the next for as long, and while the
+  auth store cannot answer (`ROLE_LOOKUP_FAILED`, a busy pool) a channel frame
+  within a minute of the last confirmed check goes through instead of being
+  dropped. A revoked session is still ended as soon as the store answers.
+- **The SDK signs a socket in again instead of staying unsigned.** A sign-in
+  that the server could not check on reconnect was logged at debug level and
+  the socket carried on unauthenticated, so every channel frame was refused
+  `UNAUTHORIZED` until the socket happened to close: two rooms in a load test
+  stayed that way for eight minutes. The sign-in is retried, a socket that
+  still cannot sign in is closed and redialled, and a channel refused
+  `UNAUTHORIZED` signs the socket in again and re-joins. A channel join the
+  server refused for a reason a retry can change (`ROLE_LOOKUP_FAILED`,
+  `DATABASE_UNAVAILABLE`, "not a member") is sent again, backing off to 30 s.
+
+##### Server
+
+- **`/health` no longer fails because the pool is busy.** It asked `SELECT 1`
+  through the pool every request shares, so a pool whose connections were all
+  serving slow requests failed a 3 s readiness probe and the orchestrator took
+  a working pod out of service. The Postgres driver now probes on a connection
+  of its own (`SQLAdmin.probe`), within 2.5 s, and a healthy auth-schema answer
+  is reused for a minute.
+
+##### Runtime
+
+- **A cron handler's `ctx.scheduledAt` is the slot the run fires for.** It was
+  the moment the run started, so a catch-up run for a missed 06:00 slot saw
+  the boot time and a punctual one saw the slot plus a database round trip. A
+  manual trigger, which has no slot, still gets the moment it started.
+- **A cron schedule that restricts both day fields matches either, as standard
+  cron does.** `0 9 1 * 1` ran only on a Monday the 1st; it now runs on every
+  1st and every Monday. A schedule where either day field starts with `*` is
+  unchanged. Validation also reads each number whole: `5abc`, `*/5x`, `1.5` and
+  a backwards range such as `5-1` used to pass and are now refused.
+- **`PermanentJobError` is exported from `@rebasepro/server`,** so a job
+  handler can dead-letter a job on the attempt no retry can fix.
+- **`enableSwagger: false` hides the Swagger UI in development too.** It was
+  gated on `NODE_ENV` alone, and in development loaded a spec only an admin
+  could read.
+- **One image rendition per source, however `storageId` is spelled.** ` media`
+  and `media`, or a padded `(default)`, each paid a full transform.
+- **Backup retention prunes only the backups it named in a local folder.**
+  Any other `.dump` there was dated by its mtime: pruned with its
+  `.globals.sql` once old, and while new it held a `keepMinimum` slot and
+  pushed the newest real backup out.
+- **`isId: "increment"` on a non-number key, and `"uuid"` on a non-string one,
+  are refused at config load.** Both used to become a raw SQL default —
+  `DEFAULT increment` — that Postgres refused at the first `CREATE TABLE`.
+- **The Helm chart's api serves functions when there is no functions unit,
+  and a worker always takes cron.** With `split`, a worker and no functions
+  unit, the api ran `REBASE_ROLE=api` and answered every `/api/functions` call
+  with 404, and cron and the job queue ran on both the api and the worker.
+- **The Hetzner Terraform module's `force_local_storage` keeps uploads on the
+  data volume.** It set `FORCE_LOCAL_STORAGE=true` and mounted nothing, so
+  every upload went to the container filesystem and was lost on restart. The
+  README quickstart and `examples/bundle-url` also pin `runtime_version`,
+  without which the module's own precondition refused them at plan.
+
+##### CLI
+
+- **The compute listing prints the autoscale dials.** `rebase cloud compute`
+  now shows the replica ceiling and CPU target, in its table and its `--json`.
+- **A deploy given a prebuilt bundle directory ships it without `--bundle`.**
+  On a project whose `rebase.json` declares no runtime, `rebase cloud deploy
+  --bundle-dir` fell through to a container build and never read the
+  directory.
+
+##### Client SDK
+
+- **The SDK's upload takes any Blob and an optional key, as documented.**
+  `client.storage.putObject` called either way failed to compile: its
+  parameter was the server controllers' type, whose key is required and whose
+  file is a `File`.
+- **A typed client can be passed where a `RebaseClient` of the same database is
+  expected again.** `simulate` returned an untyped client, so
+  `<Rebase client={client}>` failed to compile for a client made with
+  `createRebaseClient<Database>()`.
+
+##### Admin (CMS & app)
+
+- **Studio shows no Collections card when its `tools` leave out
+  `"schema"`,** whose route is then never registered.
+- **`StudioBridgeProvider` passes a `schemaEditing` slice that changes;** it
+  stayed at the value it had on first render.
+- **`conditions.min` and `conditions.max` take a number,** as the docs write
+  them; only a JSON Logic rule compiled.
 
 ### [0.26.0] - 2026-10-29
 
@@ -19378,7 +19488,7 @@ Every hook is awaited, and a throw from any of them undoes the whole write:
 |--------|------|------|-------------|
 | `GET` | `/health` and `/api/health` | none | Liveness/readiness check |
 | `GET` | `/api/docs` | none; `schema:read` when `enableSwagger` is `false` (the runtime's default in production) | The OpenAPI 3.0 JSON specification |
-| `GET` | `/api/swagger` | none | Swagger UI. Served only outside production; `REBASE_ENABLE_SWAGGER` cannot turn it on in production |
+| `GET` | `/api/swagger` | none | Swagger UI. Served only outside production; `REBASE_ENABLE_SWAGGER` cannot turn it on in production. Not served when `enableSwagger` is `false`, in development either |
 | `GET` | `/api/meta/schema-version` | none | The schema hash this backend was built from, and the runtime version — deliberately unauthenticated, and nothing that describes the schema |
 | `GET` | `/api/meta/contract` | `schema:read`: an admin, the service key, or an API key holding it | The full collection contract, for `rebase generate-sdk --from`. Fail-closed: `404` when no auth is configured |
 | `GET` | `/metrics` | `REBASE_METRICS_TOKEN` when set | Prometheus metrics, when `REBASE_METRICS=true` |
@@ -21570,7 +21680,7 @@ locales: {
 | `storage` | `StorageConfig` | Enable file upload — see [File uploads](/docs/collections/file-uploads) |
 | `enum` | `EnumValues` | Render as select dropdown |
 | `columnType` | `"varchar" \| "text" \| "char" \| "uuid"` | The database column. Defaults to `text`, or `uuid` when `isId` says so. `text` for unbounded strings, `char` for fixed width |
-| `isId` | `boolean \| string` | Marks the property as the primary key, and says who fills it: `"manual"` (you do), `"uuid"` (`gen_random_uuid()`), or any other string, used verbatim as the column's SQL default expression — bare (`nanoid()`) or in template form (``"sql`nanoid()`"``). The function has to exist; nothing here creates it. `"increment"` is a **number** strategy and does nothing here, and `"cuid"` is refused at config load |
+| `isId` | `boolean \| string` | Marks the property as the primary key, and says who fills it: `"manual"` (you do), `"uuid"` (`gen_random_uuid()`), or any other string, used verbatim as the column's SQL default expression — bare (`nanoid()`) or in template form (``"sql`nanoid()`"``). The function has to exist; nothing here creates it. `"increment"` is a **number** strategy and, like `"cuid"`, is refused here at config load |
 | `autoValue` | `"user_on_create" \| "user_on_update"` | Stamp the column with the **uid of the acting user** — on creation only, or on every write. See [Audit columns](#audit-columns) |
 | `userSelect` | `boolean` | Render as a user picker. The value is a plain string column holding the user id — nothing resolves or checks it on the way in. **Admin form only — not enforced by the API or the database.** The picker lists users' names, emails and avatars to anyone who may write the collection, through [`GET /api/admin/users/pick`](/docs/backend/auth-endpoints/), without the `users:read` scope. A collection whose write rules are raw SQL does not count, since they cannot be judged ahead: there only `users:read` holders can pick. |
 | `admin.previewAsTag` | `boolean` | Render this string as a tag in previews |
@@ -21663,7 +21773,7 @@ Number fields render as a standard text input with numeric validation.
 | `enum` | `EnumValues` | Render as select with numeric values. Unlike a string enum this creates **no Postgres enum type** — the column stays `NUMERIC` or `INTEGER`, so the panel offers the values and the database does not enforce them |
 | `columnType` | `string` | `"integer"`, `"real"`, `"double precision"`, `"numeric"`, `"bigint"`, `"serial"`, `"bigserial"`. Defaults to `integer` where `validation.integer` or `isId` says the value is whole, `numeric` otherwise |
 | `precision` / `scale` | `number` | Total significant digits and digits after the point on a `numeric` column — `NUMERIC(10, 2)`. Money without them is an unbounded `NUMERIC` that keeps whatever the caller sent, and cannot be tightened later without rewriting the column |
-| `isId` | `boolean \| string` | Marks the property as the primary key: `"manual"`, `"increment"`, or any other string used verbatim as the column's SQL default expression. `"increment"` is always `INTEGER GENERATED BY DEFAULT AS IDENTITY` — `columnType` beside it is ignored, with a warning, because every foreign key pointing at a numeric key is `INTEGER` and a wider key would be referenced by narrower columns |
+| `isId` | `boolean \| string` | Marks the property as the primary key: `"manual"`, `"increment"`, or any other string used verbatim as the column's SQL default expression. `"increment"` is always `INTEGER GENERATED BY DEFAULT AS IDENTITY` — `columnType` beside it is ignored, with a warning, because every foreign key pointing at a numeric key is `INTEGER` and a wider key would be referenced by narrower columns. `"uuid"` is a **string** strategy and is refused here at config load |
 | `admin.clearable` | `boolean` | Add an icon to clear the value (set to null) |
 | `admin.format` | `NumberFormatOptions` | Write the number out as currency, a percentage, or with fixed decimals. Omitted, the raw value renders — a number in the database is shown as the number in the database |
 
@@ -21802,7 +21912,7 @@ client: {
 }
 ```
 
-On Postgres a `reference` is a foreign key like any other, so it follows the same `ON DELETE` rule as a `belongsTo` relation: optional is `SET NULL`, required is `RESTRICT`. See [Relations](/docs/collections/relations).
+`reference` is the link of the document databases (Firestore, MongoDB). On Postgres, link with a [`relation`](/docs/collections/relations) instead: a `PostgresCollectionConfig`'s property types refuse `reference`, the way a Firestore collection's refuse `relation`. A `reference` that reaches the schema generator anyway — a config written without those types — becomes a foreign key with the `belongsTo` `ON DELETE` rule: optional is `SET NULL`, required is `RESTRICT`.
 
 #### Reference & Relation Options
 
@@ -25732,7 +25842,7 @@ Every hook is awaited, and a throw from any of them undoes the whole write:
 |--------|------|------|-------------|
 | `GET` | `/health` and `/api/health` | none | Liveness/readiness check |
 | `GET` | `/api/docs` | none; `schema:read` when `enableSwagger` is `false` (the runtime's default in production) | The OpenAPI 3.0 JSON specification |
-| `GET` | `/api/swagger` | none | Swagger UI. Served only outside production; `REBASE_ENABLE_SWAGGER` cannot turn it on in production |
+| `GET` | `/api/swagger` | none | Swagger UI. Served only outside production; `REBASE_ENABLE_SWAGGER` cannot turn it on in production. Not served when `enableSwagger` is `false`, in development either |
 | `GET` | `/api/meta/schema-version` | none | The schema hash this backend was built from, and the runtime version — deliberately unauthenticated, and nothing that describes the schema |
 | `GET` | `/api/meta/contract` | `schema:read`: an admin, the service key, or an API key holding it | The full collection contract, for `rebase generate-sdk --from`. Fail-closed: `404` when no auth is configured |
 | `GET` | `/metrics` | `REBASE_METRICS_TOKEN` when set | Prometheus metrics, when `REBASE_METRICS=true` |
@@ -27233,7 +27343,7 @@ inventory of a deployment's custom endpoints is not public.
 | `GET` | `/livez` | none | Liveness alone: is this process running. Does not touch the database, which is why it is the probe path a container should use — `RUNTIME_LIVENESS_PATH` |
 | `GET` | `/health`, `/api/health` | none | Liveness and readiness. Reports every configured data source, not only the default |
 | `GET` | `/api/docs` | none (`schema:read` when `enableSwagger` is `false`, the runtime's default in production) | The OpenAPI 3.0 document |
-| `GET` | `/api/swagger` | none | Swagger UI. Outside production only; `REBASE_ENABLE_SWAGGER` cannot turn it on in production |
+| `GET` | `/api/swagger` | none | Swagger UI. Outside production only; `REBASE_ENABLE_SWAGGER` cannot turn it on in production. Not served when `enableSwagger` is `false`, in development either |
 | `GET` | `/api/meta/schema-version` | none | The schema hash this backend was built from and the runtime version, and nothing else |
 | `GET` | `/api/meta/contract` | `schema:read` | The full collection contract, for `rebase generate-sdk --from`. `404` when no auth is configured |
 | `GET` | `/metrics` | `REBASE_METRICS_TOKEN` when set | Prometheus metrics, when `REBASE_METRICS=true` |
@@ -32432,6 +32542,8 @@ Cron expressions use the standard **5-field format**:
 
 Step values (`*/n`), ranges (`a-b`), and lists (`a,b,c`) are all supported.
 
+When both day of month and day of week are restricted, a day that matches either one matches, as in standard cron: `0 9 1 * 1` runs on the 1st of every month and on every Monday. When either field starts with `*`, a day has to match both.
+
 A schedule is matched against the wall clock of its zone. Across a
 daylight-saving change that means a fixed-time job inside the repeated hour
 (`30 2 * * *` where clocks fall back at 03:00) runs in both passes of that hour,
@@ -32486,7 +32598,8 @@ interface CronJobContext {
     // The job's unique ID (derived from filename)
     jobId: string;
 
-    // The scheduled tick timestamp
+    // The slot this run fires for: a catch-up run gets the slot it
+    // missed, a manual trigger the moment it started
     scheduledAt: Date;
 
     // Logger — lines appear in Studio, the logs API and the server log
@@ -32637,6 +32750,7 @@ The counts are all-time; the history is the last 30 days. Each run's row in `reb
 At backend initialization, Rebase parses all registered cron schedules using a zero-dependency JS-based cron expander:
 - **Syntax Check**: Verifies that the string contains exactly 5 whitespace-separated fields (`minute`, `hour`, `day of month`, `month`, `day of week`).
 - **Range Expansion**: Deconstructs steps (`*/15`), ranges (`9-17`), and comma-separated lists (`0,30`) into explicit arrays of valid integers mapped to their respective bounds (e.g., minutes `0-59`, hours `0-23`, months `1-12`).
+- **Whole Tokens**: Every number, range bound and step must be a whole number: `5abc`, `*/5x` and `1.5` are refused, as is a range that runs backwards (`5-1`).
 - If any cron expression fails validation, Rebase rejects the definition, logs a startup error, and refuses to register the job to prevent runtime execution failures.
 
 ---
@@ -33198,6 +33312,9 @@ be what you get by default.
 - **Out of attempts** → `failed`, and the row *stays*. A queue that silently
   drops what it could not deliver is indistinguishable from one with nothing to
   do.
+- **A failure no retry can change** <span class="since-badge" data-since="0.27">Since 0.27</span> → throw `PermanentJobError`, from
+  `@rebasepro/server`: the job goes to `failed` on this attempt, with the
+  message as its `last_error`, instead of spending its remaining attempts.
 
 ```sql
 SELECT task, attempts, last_error, updated_at
@@ -34609,6 +34726,146 @@ The cap of 200 entries per entity is applied only after a write to that entity.
 
 - **[Entity Callbacks](/docs/collections/callbacks)** — Lifecycle hooks
 - **[Backend Overview](/docs/backend)** — Full backend configuration
+
+## Review Queue
+
+`@rebasepro/plugin-review` puts a person between an agent and your data. The agent proposes a change; nothing in the collection moves until someone who reviews that collection approves it in the admin panel.
+
+It is a plugin, outside the core packages, with three entry points:
+
+| Entry | Loaded by | What it holds |
+|---|---|---|
+| `@rebasepro/plugin-review/config` | collection files, the function, the panel | The configuration types, `reviewSecurityRules()`, the config checks |
+| `@rebasepro/plugin-review/server` | a function file | `reviewFunction()`: propose, list, approve, reject |
+| `@rebasepro/plugin-review` | the admin panel | `useReviewPlugin()`: the review queue |
+
+There are two ways to review a collection.
+
+- **Staged table.** A proposal is recorded in `rebase.staged_changes`, beside the table. The row is untouched until a reviewer approves, and the approval runs the write under the reviewer's own row-level security.
+- **State field.** The row carries its own review state in a string property such as `status`. An agent role may only write rows in the pending state; Postgres enforces it with a restrictive policy. A reviewer approves by setting the field to the approved value.
+
+### Declare the review once
+
+The server function and the admin plugin read the same object, so keep it in one file:
+
+```typescript
+// config/review.ts
+import type { ReviewConfig, StateFieldReview } from "@rebasepro/plugin-review/config";
+
+// Rows carry their own state.
+export const postsReview: StateFieldReview = {
+    mode: "state-field",
+    field: "status",
+    pendingValue: "draft",
+    approvedValue: "published",
+    rejectedValue: "rejected",
+    agentRoles: ["agent"],
+    reviewerRoles: ["editor"]
+};
+
+export const review: ReviewConfig = {
+    collections: {
+        // Proposals wait beside the table.
+        orders: { mode: "staged-table", agentRoles: ["agent"], reviewerRoles: ["ops"] },
+        posts: postsReview
+    }
+};
+```
+
+The `admin` role always reviews. A staged-table review's `agentRoles` are the roles that may propose besides the reviewers; leave it out and any signed-in caller may. A state-field review's `agentRoles` are the roles held to `pendingValue`; leave it out and every caller who is not a reviewer is.
+
+### Staged table: register the function
+
+```typescript
+// functions/review.ts
+import { reviewFunction } from "@rebasepro/plugin-review/server";
+import { review } from "../config/review";
+
+export default reviewFunction(review);
+```
+
+The file name is the function's name, so its routes answer under `/api/functions/review` — see [Custom Functions](/docs/backend/custom-functions) for how functions are loaded. Set `functionName` in the configuration if you register it under another name.
+
+| Route | What it does |
+|---|---|
+| `POST /changes` | Propose `{ collection, operation, recordId?, data?, reason? }`. `operation` is `insert`, `update` or `delete`. Answers `201` with the pending change. |
+| `GET /changes?collection=&status=` | The changes the caller reviews, and the caller's own proposals. |
+| `GET /changes/count?collection=&status=` | How many there are. |
+| `POST /changes/:id/approve` | Apply one change. Optional `{ note }`. |
+| `POST /changes/:id/reject` | Reject one change. Optional `{ note }`. |
+| `POST /changes/batch` | `{ action, ids, note? }`: an approval applies every change in one transaction, or none of them. |
+
+An update or a delete is checked against the row as the proposer can read it, through their own row-level security, and that snapshot is what the reviewer sees as "before".
+
+The table is created on first use, and the end-user database role holds nothing on it: proposals are read and decided through the function alone.
+
+#### Give the agent a key that can only propose
+
+Create a service key with `functions:invoke:review` and the read scopes the agent needs, and without `data:write` ([API Keys](/docs/backend/api-keys) and [Roles & Scopes](/docs/backend/roles-and-scopes) cover both). `ADMIN_TOKEN` is an administrator's access token:
+
+```bash
+REBASE_URL=http://localhost:3001
+ADMIN_TOKEN="<an administrator's access token>"
+curl -X POST "$REBASE_URL/api/admin/api-keys" \
+  -H "Authorization: Bearer $ADMIN_TOKEN" -H "Content-Type: application/json" \
+  -d '{ "name": "outreach-agent", "scopes": ["functions:invoke:review", "data:read:orders"], "roles": ["agent"] }'
+```
+
+The agent then proposes with the key it was given, and cannot write `orders` directly:
+
+```bash
+AGENT_KEY="<the rk_live_ key created above>"
+curl -X POST "$REBASE_URL/api/functions/review/changes" \
+  -H "Authorization: Bearer $AGENT_KEY" -H "Content-Type: application/json" \
+  -d '{ "collection": "orders", "operation": "update", "recordId": "42", "data": { "total": 150 }, "reason": "Upsell accepted" }'
+```
+
+An agent on MCP reaches the same route with `invoke_function` (`name: "review"`, `method: "POST"`, `path: "/changes"`).
+
+### State field: add the policy
+
+`reviewSecurityRules()` builds the restrictive policy. Spread it into the collection's [security rules](/docs/collections/security-rules), after the rules that let the agent write at all:
+
+```typescript
+// config/collections/posts.ts
+import { defineCollection } from "@rebasepro/cms-types";
+import { reviewSecurityRules } from "@rebasepro/plugin-review/config";
+import { postsReview } from "../review";
+
+export const postsCollection = defineCollection({
+    slug: "posts",
+    name: "Posts",
+    securityRules: [
+        { operations: ["select", "insert", "update"], roles: ["agent", "editor"] },
+        ...reviewSecurityRules("posts", postsReview)
+    ],
+    properties: {
+        title: { type: "string", name: "Title" },
+        status: { type: "string", name: "Status", enum: { draft: "Draft", published: "Published", rejected: "Rejected" } }
+    }
+});
+```
+
+The policy is named `posts_review_pending_only`, from the slug, so it is the same on every `db push`. It lets an agent role insert a row only as `draft`, and update a row only while it is `draft` and stays `draft`; setting `status` to `published` is refused by Postgres, through the API or any other way in under the user role. The trusted server context, the `admin` role and the reviewer roles pass untouched.
+
+### Add the queue to the admin panel
+
+```tsx
+import { useReviewPlugin } from "@rebasepro/plugin-review";
+import { review } from "../config/review";
+
+const reviewPlugin = useReviewPlugin(review);
+// <Rebase plugins={[reviewPlugin]} … />
+```
+
+Every reviewed collection gets a **Review queue (N)** button beside its view switcher. It opens the queue:
+
+- a staged change shows an INSERT, UPDATE or DELETE badge, who proposed it (a key's prefix and name, or a person's email), the reason they gave, and a field-by-field diff — the old value struck through, the new one beside it;
+- a state-field row shows its fields, and Approve and Reject set its state.
+
+`j` and `k` move, `a` approves, `r` rejects, and Space adds the focused entry to a selection that the buttons at the bottom decide in one batch. A note typed at the bottom is saved with the decision.
+
+The function checks the configuration against the backend's collections on its first request, and answers `500 REVIEW_CONFIG_INVALID` naming every problem — a field that does not exist or is not a string, or a value outside its `enum`.
 
 ## Database Branching
 
@@ -54614,7 +54871,7 @@ not promised yet are collected [at the end](#not-promised-yet).
 | Module-level state (a `Map` cache) | Survives between requests on one instance. Lost on every deploy and restart, and not shared between instances |
 | Environment variables and secrets | `rebase cloud env set`, applied at the next deploy |
 | File storage | A bucket per project, served by your backend at `/api/storage/file/…` |
-| Outbound HTTP | Yes, on ports 80 and 443 (and 465, 587, 993 for mail). Other ports are blocked. No fixed outbound IP |
+| Outbound HTTP | Yes, on ports 80 and 443 (and 465, 587, 993 for mail). Other ports are blocked. One fixed outbound IP: `207.175.138.15` |
 
 ### Code and packages
 
@@ -54963,10 +55220,11 @@ The platform adds no proxy and no outbound rate limit; the services you call
 have their own. Pass `getSignal(c)` to `fetch` so a call stops when its request
 times out.
 
-There is **no fixed outbound IP address**. Traffic leaves through an address
-shared by every project, which the cloud provider assigns and can change, so do
-not add it to a third-party allowlist. Authenticate to such a service with a
-key instead.
+All outbound traffic leaves from **one fixed IP address, `207.175.138.15`**.
+Add it to a third-party allowlist when a service asks for one. The address is
+shared by every project on Rebase Cloud, so an allowlist proves the caller runs
+on Rebase Cloud, not that it is your project: keep authenticating to the
+service with a key as well.
 
 ### Startup and shutdown
 
@@ -56499,7 +56757,7 @@ for what each role does and why you would separate them.
 What the chart adds over doing it by hand is that it **derives the settings whose
 failure mode is silence**, from the values you already gave it:
 
-- `REBASE_ROLE` per unit
+- `REBASE_ROLE` per unit — `all` on the api when there is no functions unit, so it still serves your functions
 - `REBASE_MIGRATE_ON_BOOT=none` everywhere, because the migration Job owns the schema
 - `REBASE_CRON_SCHEDULER=false` / `REBASE_JOB_WORKERS=false` on the api once a worker exists
 - `TRUSTED_PROXY_HOPS` on the functions unit
@@ -57047,7 +57305,7 @@ S3_ACCESS_KEY_ID=...
 S3_SECRET_ACCESS_KEY=...
 ```
 
-If your project stores no uploads at all, leave storage unset and it stays off. `FORCE_LOCAL_STORAGE=true` is not an acknowledgement: it registers local storage anyway, so set it only with a durable volume mounted above `STORAGE_PATH` (the Terraform module asks for `force_local_storage = true` when it has no bucket). See [Storage](/docs/backend/storage) for the full picture.
+If your project stores no uploads at all, leave storage unset and it stays off. `FORCE_LOCAL_STORAGE=true` is not an acknowledgement: it registers local storage anyway, so set it only with a durable volume mounted above `STORAGE_PATH` (the Terraform module's `force_local_storage = true` does exactly that: it mounts its data volume at `/storage` and keeps uploads there). See [Storage](/docs/backend/storage) for the full picture.
 
 ### What boot does to your schema
 
