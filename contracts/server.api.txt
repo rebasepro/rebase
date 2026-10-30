@@ -16,6 +16,7 @@ class GCSStorageController { deleteObject, getMetadata, getObject, getObjectStre
 class LocalStorageController { deleteObject, getAbsolutePath, getBasePath, getObject, getObjectStream, getSignedUrl, getType, isCaseInsensitive, knownBuckets, listObjects, maxFileSize, putObject, putObjectStream, statObject, storageLocation }
 class MetricsRegistry { incrementCounter, observe, recordRequest, render, setGauge, startedAt }
 class ObjectTooLargeError { maxBytes }
+class PermanentJobError
 class RawHtml { toString, value }
 class S3StorageController { deleteObject, getMetadata, getObject, getObjectStream, getSignedUrl, getType, knownBuckets, listObjects, maxFileSize, putObject, putObjectStream, statObject, storageLocation }
 class SMTPEmailService { close, isConfigured, send, verifyConnection }
@@ -752,6 +753,8 @@ interface ChannelHistoryEntry { at, event, payload, senderId, seq }
 interface ChannelHistoryMessage { channel, error, latestSeq, messages, payload, requestId, retained, row, rows, subscriptionId, type }
 interface ChannelRetentionRule { limit, match, ttl }
 interface ClassifiedSchemaChanges { applicable, changes, verdict }
+interface ClientStorageSource { deleteObject, getObject, getObjectStream, getSignedUrl, listObjects, putObject, putObjectStream, statObject }
+interface ClientUploadFileProps { bucket, context, file, key, metadata, public }
 interface CollectionAccessor { aggregate, count, create, createMany, delete, deleteMany, find, findById, include, limit, listen, listenById, listenCount, offset, orderBy, search, trash, update, updateMany, vectorSearch, where, where }
 interface CollectionPatchMessage { channel, error, id, payload, pks, requestId, row, rows, subscriptionId, type }
 interface CollectionRegistryInterface { getCollectionByPath, getCollections, getGlobalCallbacks, register, setGlobalCallbacks }
@@ -924,7 +927,7 @@ interface RolesOverlapPolicyExpression { kind, roles }
 interface RowPrecondition { check, lock }
 interface SDKCollectionClient { after, aggregate, count, create, create, createMany, delete, deleteMany, distinct, fields, find, findAll, findById, get, include, iterate, limit, listen, listenById, listenCount, offset, orderBy, search, trash, update, update, updateMany, upsert, upsert, vectorSearch, where, where, where }
 interface SDKQueryBuilderInterface { after, aggregate, count, distinct, fields, find, findAll, include, iterate, limit, listen, offset, orderBy, search, vectorSearch, where, where, where }
-interface SQLAdmin { executeSql, fetchApplicationRoles, fetchAvailableDatabases, fetchAvailableRoles, fetchCurrentDatabase, listen, openSqlCursor, runSqlScript }
+interface SQLAdmin { executeSql, fetchApplicationRoles, fetchAvailableDatabases, fetchAvailableRoles, fetchCurrentDatabase, listen, openSqlCursor, probe, runSqlScript }
 interface SaveManyProps { collection, onConflict, path, rows, upsert }
 interface SaveProps { collection, id, onConflict, path, precondition, previousValues, status, upsert, values }
 interface SchemaAdmin { fetchTableMetadata, fetchUnmappedTables }
@@ -1197,6 +1200,8 @@ interface ChannelHistoryEntry { at, event, payload, senderId, seq }
 interface ChannelHistoryResult { latestSeq, messages, retained }
 interface ChannelOptions { history }
 interface ChannelTransport { hasServerOptIn, onChannelMessage, onConnectionLost, onReconnect, sendMessage, socketClientId }
+interface ClientStorageSource { deleteObject, getObject, getObjectStream, getSignedUrl, listObjects, putObject, putObjectStream, statObject }
+interface ClientUploadFileProps { bucket, context, file, key, metadata, public }
 interface CollectionClient { after, aggregate, count, create, createMany, delete, deleteMany, distinct, fields, find, findAll, findById, get, include, iterate, limit, listen, listenById, listenCount, observe, observeById, offset, orderBy, search, trash, update, updateMany, upsert, vectorSearch, where }
 interface CookieStorageOptions { domain, maxAge, path, sameSite, secure }
 interface CreateAdminOptions { adminPath }
@@ -1241,6 +1246,7 @@ interface StorageReferenceTarget { key, storageId }
 interface StorageSource { deleteObject, getObject, getObjectStream, getSignedUrl, listObjects, putObject, putObjectStream, statObject }
 interface TrashClient { count, find, purge, purgeMany, restore, restoreMany }
 interface UpdateApiKeyRequest { expires_at, name, rate_limit, roles, scopes }
+interface UploadFileResult { bucket, key, storageUrl }
 interface UpsertOptions { idempotencyKey, ifMatch, onConflict, returning }
 interface WriteOptions { idempotencyKey, ifMatch, returning }
 type AggregateRow
