@@ -62,6 +62,23 @@ export type ChannelBusFrame =
         channel: string;
         joins: Record<string, Record<string, unknown>>;
         leaves: Record<string, Record<string, unknown>>;
+    }
+    /**
+     * Which channels an instance has members in, so the others can skip
+     * publishing to channels nobody else is listening on (see
+     * {@link ChannelBus.publishesOnDemand}). `add` is a channel's first local
+     * member. A full list comes as `list` parts, the last with `done`, and
+     * replaces what was known. `hello` asks everyone for theirs. `channel` is
+     * always `"__peers"`: a transport drops frames without one.
+     */
+    | {
+        kind: "channels";
+        sid: string;
+        channel: string;
+        add?: string[];
+        list?: string[];
+        done?: boolean;
+        hello?: boolean;
     };
 
 /** Receives frames published by *other* instances. */
@@ -101,6 +118,16 @@ export interface ChannelBus {
      * whether publishing is worth attempting at all.
      */
     readonly kind: string;
+
+    /**
+     * Publish only to channels another instance has members in.
+     *
+     * For a transport where each publish costs something (the Postgres bus: a
+     * query on the primary), the service gossips over the bus which channels each
+     * instance serves, and a frame nobody else is waiting for is not published
+     * at all. An instance alone publishes nothing. Unset: every frame is published.
+     */
+    readonly publishesOnDemand?: boolean;
 
     /**
      * Largest frame this transport will carry, in bytes of encoded JSON, or

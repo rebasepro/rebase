@@ -69,6 +69,7 @@ interface PendingFrame {
 export class PostgresChannelBus implements ChannelBus {
     readonly kind = "postgres" as const;
     readonly maxFrameBytes = PG_NOTIFY_MAX_PAYLOAD_BYTES;
+    readonly publishesOnDemand = true;
 
     private listener?: PgNotifyListener;
     private readonly batchWindowMs: number;
@@ -292,6 +293,16 @@ function coerceFrame(value: unknown): ChannelBusFrame | null {
                 channel,
                 from: typeof obj.from === "string" ? obj.from : undefined,
                 seq: obj.seq
+            };
+        case "channels":
+            return {
+                kind: "channels",
+                sid,
+                channel,
+                add: Array.isArray(obj.add) ? obj.add.filter((c): c is string => typeof c === "string") : undefined,
+                list: Array.isArray(obj.list) ? obj.list.filter((c): c is string => typeof c === "string") : undefined,
+                done: obj.done === true,
+                hello: obj.hello === true
             };
         case "presence_diff":
             return {
