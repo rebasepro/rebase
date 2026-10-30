@@ -89,10 +89,11 @@ test("the vitest lane runs each package on its own, with no retries", () => {
         assert.equal(command.match(/--filter/g)?.length, 1, `one package per command: ${command}`);
         assert.match(command, /--retry=0$/, `no retries: ${command}`);
     }
-    // The four suites the job is for, including the CLI's managed-database suite,
+    // The suites the job is for, including the CLI's managed-database suite,
     // which said "CI runs both" and was run by nothing.
     assert.deepEqual(vitest.suites.map(suiteName), [
         "pnpm --filter @rebasepro/server-postgres run test:e2e --retry=0",
+        "pnpm --filter @rebasepro/plugin-review run test:e2e --retry=0",
         "pnpm --filter @rebasepro/rls-check run test:e2e --retry=0",
         "pnpm --filter @rebasepro/cli run test:e2e --retry=0",
         "pnpm --filter @rebasepro/cli run test:integration --retry=0"

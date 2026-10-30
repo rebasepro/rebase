@@ -263,7 +263,7 @@ interface CronJobContext {
     /** The job's unique ID (derived from filename). */
     jobId: string;
 
-    /** The current scheduled tick timestamp. */
+    /** The slot this run fires for (a catch-up: the slot it missed; a manual trigger: when it started). */
     scheduledAt: Date;
 
     /** A simple logger scoped to this job run — output captured in the execution log and written to the server log. */
@@ -281,7 +281,7 @@ interface CronJobContext {
 | Property | Type | Description |
 |----------|------|-------------|
 | `jobId` | `string` | Derived from the filename (e.g. `cleanup-sessions`). |
-| `scheduledAt` | `Date` | The timestamp when this execution was scheduled to start. |
+| `scheduledAt` | `Date` | The slot this run fires for: a catch-up run gets the slot it missed, a manual trigger the moment it started. |
 | `log` | `(...args: unknown[]) => void` | Logger whose output is captured in `CronJobLogEntry.logs`. Use like `console.log`. |
 | `signal` | `AbortSignal` | Aborted when the run exceeds `timeoutSeconds`. The timeout stops the scheduler waiting; only this stops the work. Pass it to `fetch`. |
 | `rebase` | `RebaseServerClient` | The server singleton. `rebase.dataAsAdmin` for CRUD, `rebase.email`, `rebase.storage`, `rebase.sql`. |
@@ -342,13 +342,15 @@ Standard 5-field cron format: `minute hour day-of-month month day-of-week`
 | `N-M/S` | `0-30/5` | Every S values within range N–M |
 | `A,B,C` | `0,15,30,45` | Comma-separated list (combinable with above) |
 
+When both day-of-month and day-of-week are restricted, a day matching **either** matches, as in standard cron: `0 9 1 * 1` runs on every 1st and every Monday. When either field starts with `*` (`*/2` included), a day must match both.
+
 ### Schedule Validation
 
 Schedules are **validated on registration**. Invalid expressions are rejected with an error log and the job is **not** registered; it is listed under `rejected` on `GET /api/admin/cron`, with the reason (most often `Expected 5 fields, got 6`). Validation checks:
 
 - Exactly 5 fields (minute, hour, day-of-month, month, day-of-week)
 - All values within valid ranges: minute `0–59`, hour `0–23`, dom `1–31`, month `1–12`, dow `0–6`
-- No unparseable tokens
+- No unparseable tokens: every number, range bound and step is a whole number (`5abc`, `*/5x`, `1.5` are refused), and no range runs backwards (`5-1`)
 
 ### Minimum Schedule Interval
 

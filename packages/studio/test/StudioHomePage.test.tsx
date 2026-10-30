@@ -18,9 +18,9 @@ const devViews = [
     { slug: "api-keys", name: "API Keys", group: "Access Control", icon: "KeyRound", description: "Create and manage scoped API keys", view: null }
 ];
 
-const mockRegistry = {
-    studioConfig: { devViews } as unknown,
-    cmsConfig: { collectionEditor: {} } as unknown
+const mockRegistry: { studioConfig: unknown; cmsConfig: unknown } = {
+    studioConfig: { devViews },
+    cmsConfig: { collectionEditor: {} }
 };
 
 jest.mock("@rebasepro/app", () => ({
@@ -78,6 +78,20 @@ describe("StudioHomePage Component", () => {
 
         expect(screen.getByText("Collections")).toBeInTheDocument();
         expect(screen.getByText("Define and manage your data model and collection schemas")).toBeInTheDocument();
+    });
+
+    it("omits the collection editor card when the Studio's tools leave out \"schema\"", () => {
+        // `<RebaseStudio tools={[...]}>` without "schema" registers no
+        // collection editor route, so a card for it would lead nowhere.
+        const studioConfig = mockRegistry.studioConfig;
+        mockRegistry.studioConfig = { devViews, tools: ["sql", "js", "storage"] };
+        try {
+            render(<StudioHomePage />);
+            expect(screen.queryByText("Collections")).not.toBeInTheDocument();
+            expect(screen.getByText("SQL Console")).toBeInTheDocument();
+        } finally {
+            mockRegistry.studioConfig = studioConfig;
+        }
     });
 
     it("renders a card for a registered view that the old static list omitted", () => {

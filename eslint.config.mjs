@@ -381,7 +381,7 @@ export default [
         // The browser admin's global key listeners. See `globalKeyHandlerYields`
         // at the top of this file. Not the Firebase package: its login view is
         // an independent screen with no layers above it.
-        files: ["packages/{ui,cms,studio,app,forms,plugin-ai,plugin-insights}/src/**/*.{ts,tsx}"],
+        files: ["packages/{ui,cms,studio,app,forms,plugin-ai,plugin-insights,plugin-review}/src/**/*.{ts,tsx}"],
         rules: {
             "rebase/global-key-handler-yields": "error"
         }

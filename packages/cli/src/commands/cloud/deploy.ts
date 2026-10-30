@@ -1657,19 +1657,23 @@ export async function deployCommand(rawArgs: string[], projectRef: string): Prom
     // mean a plain `deploy` tried to build a container image and eject the
     // project — which is why the refusal further down exists.
     //
-    // `--source` and `--bundle-dir` are explicit acts and still route away from
-    // here — though on a project the platform *runs* as managed, routing away
-    // is now where `ejectRefusal` stops them without `--eject`.
+    // `--source` is an explicit act and still routes away from here — though
+    // on a project the platform *runs* as managed, routing away is now where
+    // `ejectRefusal` stops it without `--eject`. `--bundle-dir` is "deploy a
+    // bundle that is already built", so it is a bundle deploy whether or not
+    // `--bundle` is beside it: without it, a project that declares no runtime
+    // fell through to the container build and the directory was never read.
     // `rebase cloud deploy <app>` — which app of the project this repository is
     // shipping. Positional because it is the subject of the sentence, not an
     // option: a repository holding only an admin panel deploys it by name, and a
     // repository with one backend keeps saying nothing at all. Resolved by
     // `resolveDeployArgs` above, off the parsed positionals.
 
-    const declaredManaged = !args["--source"] && !args["--bundle"] && declaresManagedRuntime(appName);
-    if (args["--bundle"] || declaredManaged) {
-        if (args["--bundle"] && args["--source"]) {
-            fail("--bundle and --source cannot be combined: one is a managed bundle, the other a source build.");
+    const bundleFlag = args["--bundle"] ? "--bundle" : args["--bundle-dir"] ? "--bundle-dir" : undefined;
+    const declaredManaged = !args["--source"] && !bundleFlag && declaresManagedRuntime(appName);
+    if (bundleFlag || declaredManaged) {
+        if (bundleFlag && args["--source"]) {
+            fail(`${bundleFlag} and --source cannot be combined: one is a managed bundle, the other a source build.`);
         }
         if (declaredManaged && !isJsonMode()) {
             console.log(chalk.gray("  rebase.json declares runtime: managed — deploying a bundle."));

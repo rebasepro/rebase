@@ -1,0 +1,138 @@
+{
+  "name": "@rebasepro/plugin-review",
+  "version": "0.26.0",
+  "description": "Review queue for Rebase: agents propose inserts, updates and deletes; people approve them in the admin panel.",
+  "keywords": [
+    "rebase",
+    "plugin",
+    "review",
+    "approval",
+    "agents",
+    "cms"
+  ],
+  "homepage": "https://rebase.pro",
+  "bugs": {
+    "url": "https://github.com/rebasepro/rebase/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/rebasepro/rebase.git",
+    "directory": "packages/plugin-review"
+  },
+  "license": "MIT",
+  "engines": {
+    "node": ">=22.22.0"
+  },
+  "type": "module",
+  "main": "./dist/index.es.js",
+  "module": "./dist/index.es.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "development": "./dist/index.es.js",
+      "import": "./dist/index.es.js",
+      "default": "./dist/index.es.js"
+    },
+    "./config": {
+      "types": "./dist/config/index.d.ts",
+      "development": "./dist/config.es.js",
+      "import": "./dist/config.es.js",
+      "default": "./dist/config.es.js"
+    },
+    "./server": {
+      "types": "./dist/server/index.d.ts",
+      "development": "./dist/server.es.js",
+      "import": "./dist/server.es.js",
+      "default": "./dist/server.es.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "dependencies": {
+    "@rebasepro/app": "workspace:*",
+    "@rebasepro/cms-types": "workspace:*",
+    "@rebasepro/common": "workspace:*",
+    "@rebasepro/types": "workspace:*",
+    "@rebasepro/ui": "workspace:*",
+    "hono": ">=4.13.5 <5"
+  },
+  "peerDependencies": {
+    "@rebasepro/server": "workspace:*",
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7"
+  },
+  "peerDependenciesMeta": {
+    "@rebasepro/server": {
+      "optional": true
+    }
+  },
+  "scripts": {
+    "prepack": "node -e \"const ua=process.env.npm_config_user_agent||'';if(ua.startsWith('pnpm'))process.exit(0);const p=JSON.parse(require('fs').readFileSync('package.json','utf8'));const d=Object.assign({},p.dependencies,p.peerDependencies);const ws=Object.entries(d).filter(([,v])=>String(v).startsWith('workspace:'));if(ws.length){console.error('ERROR: workspace: protocol found — use pnpm publish, not npm publish. Deps:',JSON.stringify(ws));process.exit(1)}\"",
+    "build": "vite build && tsc --emitDeclarationOnly -p tsconfig.prod.json && node ../../tooling/scripts/add-dts-extensions.mjs dist && node ../../tooling/scripts/assert-build-output.mjs",
+    "test": "jest --passWithNoTests",
+    "test:watch": "jest --watch",
+    "test:e2e": "vitest run --config vitest.e2e.config.ts"
+  },
+  "devDependencies": {
+    "@jest/globals": "^30.4.1",
+    "@rebasepro/server": "workspace:*",
+    "@testing-library/react": "^16.3.2",
+    "@types/jest": "^30.0.0",
+    "@types/node": "^26.1.2",
+    "@types/pg": "^8.20.0",
+    "@types/react": "^19.2.17",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^6.0.4",
+    "jest": "^30.4.2",
+    "notistack": "^3.0.2",
+    "pg": "^8.22.0",
+    "ts-jest": "^29.4.12",
+    "typescript": "^6.0.3",
+    "vite": "^8.1.5",
+    "vitest": "^4.1.11"
+  },
+  "jest": {
+    "transform": {
+      "^.+\\.tsx?$": [
+        "ts-jest",
+        {
+          "diagnostics": false
+        }
+      ],
+      "^.+\\.m?jsx?$": "<rootDir>/../../tooling/scripts/jest/react-router-esm-transform.cjs"
+    },
+    "testRegex": "(/__tests__/.*|(\\.|/)(test|spec))\\.tsx?$",
+    "testPathIgnorePatterns": [
+      "/node_modules/",
+      "/test/e2e/"
+    ],
+    "moduleFileExtensions": [
+      "ts",
+      "tsx",
+      "js",
+      "mjs",
+      "jsx",
+      "json",
+      "node"
+    ],
+    "testEnvironment": "jsdom",
+    "setupFilesAfterEnv": [
+      "<rootDir>/test/setupTests.ts"
+    ],
+    "moduleNameMapper": {
+      "\\.(css|less)$": "<rootDir>/test/styleMock.js",
+      "^@rebasepro/([a-z0-9-]+)$": "<rootDir>/../$1/src/index.ts",
+      "^react$": "<rootDir>/node_modules/react",
+      "^react-dom$": "<rootDir>/node_modules/react-dom",
+      "^react/jsx-runtime$": "<rootDir>/node_modules/react/jsx-runtime"
+    },
+    "testTimeout": 30000,
+    "transformIgnorePatterns": []
+  },
+  "files": [
+    "dist"
+  ],
+  "publishConfig": {
+    "access": "public"
+  }
+}

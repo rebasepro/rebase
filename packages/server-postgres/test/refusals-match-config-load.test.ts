@@ -51,7 +51,7 @@ describe("a configuration the schema planner refuses", () => {
         // generators accept.)
         expect(() => planSchema(everything)).not.toThrow();
 
-        const reasons = /empty|composite|cuid|marked `isId`/i;
+        const reasons = /empty|composite|cuid|marked `isId`|needs a (number|string) property/i;
         const errors = findCollectionConfigProblems(everything, { unknownKeys: "ignore" })
             .filter(problem => problem.severity === "error" && reasons.test(problem.message));
         expect(errors.map(problem => `${problem.path}: ${problem.message}`)).toEqual([]);

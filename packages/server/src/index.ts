@@ -424,7 +424,7 @@ export type { OutboundUrlGuardOptions } from "./services/outbound-url-guard";
 // Jobs — the durable queue. Application code both produces (`enqueue`) and
 // consumes (`tasks`, `register`), so the whole surface is public.
 // =============================================================================
-export { createJobQueue, createJobStore, defaultBackoff } from "./jobs";
+export { createJobQueue, createJobStore, defaultBackoff, PermanentJobError } from "./jobs";
 export type {
     JobQueue,
     JobStore,

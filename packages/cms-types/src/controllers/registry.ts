@@ -118,6 +118,23 @@ export interface RebaseAuthViewConfig {
     loginView?: ReactNode;
 }
 
+/**
+ * Whether the Studio mounts its collection editor (the "schema" tool): a
+ * Studio is registered, the CMS enables a collection editor, and the Studio's
+ * `tools` include "schema" — or are omitted, which means all of them.
+ *
+ * The same rule `RebaseNavigation` applies when it injects the route. Every
+ * place that lists the tool reads it here, because a card or a drawer entry
+ * for a route that was never registered leads nowhere.
+ */
+export function studioSchemaToolEnabled(
+    registry: Pick<RebaseRegistryController, "studioConfig" | "cmsConfig">
+): boolean {
+    const { studioConfig, cmsConfig } = registry;
+    if (!studioConfig || !cmsConfig?.collectionEditor) return false;
+    return studioConfig.tools === undefined || studioConfig.tools.includes("schema");
+}
+
 export interface RebaseRegistryController {
     // Current state
     cmsConfig: RebaseCMSConfig | null;

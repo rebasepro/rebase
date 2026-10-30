@@ -186,6 +186,7 @@ export function StudioBridgeProvider({
         // eslint-disable-next-line react-hooks/exhaustive-deps
         [
             value.collectionRegistry,
+            value.schemaEditing,
             value.sidePanelController,
             value.urlController,
             value.navigationState,

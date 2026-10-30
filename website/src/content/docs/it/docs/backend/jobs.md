@@ -1,5 +1,5 @@
 ---
-sourceHash: cae2434b532cd67f
+sourceHash: 3e2e55f9b42a2a01
 title: Job in background
 sidebar_label: Job in background
 description: Una coda di job persistente basata su Postgres — lavoro che sopravvive a un riavvio, ritentato con backoff, con i fallimenti conservati anziché eliminati.
@@ -93,6 +93,7 @@ Un handler fallisce sollevando un'eccezione (throwing). Non esiste alcun `return
 
 - **Tentativi rimanenti** → torna a `pending`, con `run_at` posticipato dal backoff (1s, 5s, 25s … con un limite massimo di un'ora; sovrascrivibile con `backoff`).
 - **Tentativi esauriti** → `failed`, e la riga *rimane*. Una coda che elimina silenziosamente ciò che non è riuscita a consegnare è indistinguibile da una che non ha nulla da fare.
+- **Un fallimento che nessun nuovo tentativo può cambiare** <span class="since-badge" data-since="0.27">Since 0.27</span> → lancia `PermanentJobError`, da `@rebasepro/server`: il job passa a `failed` a questo tentativo, con il messaggio come `last_error`, invece di consumare i tentativi rimanenti.
 
 ```sql
 SELECT task, attempts, last_error, updated_at

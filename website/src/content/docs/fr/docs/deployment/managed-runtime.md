@@ -1,5 +1,5 @@
 ---
-sourceHash: 6bb68aec4ebcb624
+sourceHash: 73d0334fc7800665
 title: Runtime backend managé
 sidebar_label: Runtime managé
 description: Ce qu'un backend avec le runtime "managed" peut et ne peut pas faire sur Rebase Cloud — paquets et binaires, mémoire et CPU, délais d'expiration et tailles de body, système de fichiers, état en mémoire, secrets, stockage pour les fichiers générés et réseau sortant.
@@ -42,7 +42,7 @@ pas encore garantis sont regroupés [à la fin](#pas-encore-garanti).
 | État au niveau du module (un cache `Map`) | Persiste entre les requêtes sur une même instance. Perdu à chaque déploiement et redémarrage, et non partagé entre instances |
 | Variables d'environnement et secrets | `rebase cloud env set`, appliqués au prochain déploiement |
 | Stockage de fichiers | Un bucket par projet, servi par votre backend sur `/api/storage/file/…` |
-| HTTP sortant | Oui, sur les ports 80 et 443 (et 465, 587, 993 pour les e-mails). Les autres ports sont bloqués. Pas d'adresse IP sortante fixe |
+| HTTP sortant | Oui, sur les ports 80 et 443 (et 465, 587, 993 pour les e-mails). Les autres ports sont bloqués. Une adresse IP sortante fixe : `207.175.138.15` |
 
 ## Code et paquets
 
@@ -390,10 +390,11 @@ La plateforme n'ajoute aucun proxy ni aucune limite de débit sortant ; les serv
 disposent de leurs propres limites. Passez `getSignal(c)` à `fetch` pour qu'un appel s'arrête lorsque sa requête
 expire.
 
-Il n'y a **aucune adresse IP sortante fixe**. Le trafic sort par une adresse
-partagée par tous les projets, attribuée par le fournisseur cloud et susceptible de changer ; ne l'ajoutez
-donc pas à une liste d'autorisation (allowlist) tierce. Authentifiez-vous plutôt auprès d'un tel service
-à l'aide d'une clé.
+Tout le trafic sortant part d'**une seule adresse IP fixe, `207.175.138.15`**.
+Ajoutez-la à une liste d'autorisation (allowlist) tierce lorsqu'un service en demande une. L'adresse est
+partagée par tous les projets sur Rebase Cloud : une liste d'autorisation prouve donc que l'appelant
+s'exécute sur Rebase Cloud, pas que c'est votre projet ; continuez à vous authentifier auprès du
+service avec une clé également.
 
 ## Démarrage et arrêt
 

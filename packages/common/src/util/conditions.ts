@@ -69,11 +69,12 @@ export function registerConditionOperations(): void {
  * Evaluate a condition against the given context.
  *
  * A condition may be stated as a literal instead of a rule — `hidden: true`
- * rather than `hidden: { "==": [1, 1] }` — and a literal is already its own
- * answer, so it is returned rather than handed to the evaluator.
+ * rather than `hidden: { "==": [1, 1] }`, a bound as `min: 0` — and a literal
+ * is already its own answer, so it is returned rather than handed to the
+ * evaluator.
  */
-export function evaluateCondition(rule: ConditionRule, context: ConditionContext): unknown {
-    if (typeof rule === "boolean") return rule;
+export function evaluateCondition(rule: ConditionRule | number, context: ConditionContext): unknown {
+    if (typeof rule === "boolean" || typeof rule === "number") return rule;
     // Ensure operations are registered
     registerConditionOperations();
     return jsonLogic.apply(rule, context);

@@ -1,4 +1,5 @@
 import type { AppView, HomePageSection, PluginGenericProps } from "@rebasepro/cms-types";
+import { studioSchemaToolEnabled } from "@rebasepro/cms-types";
 import React, { useEffect, useMemo, useState } from "react";
 import { Card, cls, Container, ExpandablePanel, Typography } from "@rebasepro/ui";
 import { IconForView, useApiConfig, useNavigationGroupLabel, useRebaseContext, useRebaseRegistry, useRestoreScroll, useSlot, useTranslation } from "@rebasepro/app";
@@ -126,9 +127,9 @@ export function StudioHomePage({
     const pluginActions = useSlot("home.actions", sectionProps);
 
     // The collection editor ("schema") is not part of `devViews` — RebaseNavigation
-    // injects it when the admin enables a collection editor. Mirror that condition so
-    // the card tracks the route.
-    const schemaEnabled = Boolean(registry.studioConfig && registry.cmsConfig?.collectionEditor);
+    // injects it when the admin enables a collection editor and the Studio's
+    // tools include it. The same predicate, so the card tracks the route.
+    const schemaEnabled = studioSchemaToolEnabled(registry);
 
     const filteredSections = useMemo(() => {
         const views: StudioViewMeta[] = [];

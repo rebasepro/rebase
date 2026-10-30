@@ -23,38 +23,55 @@ import { buildScaleToZeroWarning } from "./scale-to-zero.js";
  * Supports: `*`, `N`, `N-M`, `N/S`, `N-M/S`, `*\/S`, and comma-separated combinations.
  */
 function expandCronField(field: string, min: number, max: number): number[] {
+    // Whole tokens only. `parseInt` reads a leading number and drops the
+    // rest, so `5abc` used to pass as 5 and `*/5x` as every fifth.
+    const number = (token: string): number => {
+        if (!/^\d+$/.test(token)) {
+            throw new Error(`Invalid value "${token}" in cron field "${field}"`);
+        }
+        return Number(token);
+    };
+    const range = (token: string): [number, number] => {
+        const bounds = token.split("-");
+        if (bounds.length !== 2) {
+            throw new Error(`Invalid range "${token}" in cron field "${field}"`);
+        }
+        const [a, b] = bounds.map(number);
+        if (a > b) {
+            throw new Error(`Range "${token}" in cron field "${field}" runs backwards`);
+        }
+        return [a, b];
+    };
     const results = new Set<number>();
     for (const segment of field.split(",")) {
         const trimmed = segment.trim();
         if (trimmed === "*") {
             for (let i = min; i <= max; i++) results.add(i);
         } else if (trimmed.includes("/")) {
-            const [rangeStr, stepStr] = trimmed.split("/");
-            const step = parseInt(stepStr, 10);
-            if (isNaN(step) || step <= 0) {
+            const parts = trimmed.split("/");
+            if (parts.length !== 2) {
+                throw new Error(`Invalid step expression "${trimmed}" in cron field "${field}"`);
+            }
+            const [rangeStr, stepStr] = parts;
+            if (!/^\d+$/.test(stepStr) || Number(stepStr) <= 0) {
                 throw new Error(`Invalid step value "${stepStr}" in cron field "${field}"`);
             }
+            const step = Number(stepStr);
             let start = min;
             let end = max;
             if (rangeStr !== "*") {
                 if (rangeStr.includes("-")) {
-                    const [a, b] = rangeStr.split("-").map(Number);
-                    start = a;
-                    end = b;
+                    [start, end] = range(rangeStr);
                 } else {
-                    start = parseInt(rangeStr, 10);
+                    start = number(rangeStr);
                 }
             }
             for (let i = start; i <= end; i += step) results.add(i);
         } else if (trimmed.includes("-")) {
-            const [a, b] = trimmed.split("-").map(Number);
+            const [a, b] = range(trimmed);
             for (let i = a; i <= b; i++) results.add(i);
         } else {
-            const val = parseInt(trimmed, 10);
-            if (isNaN(val)) {
-                throw new Error(`Invalid value "${trimmed}" in cron field "${field}"`);
-            }
-            results.add(val);
+            results.add(number(trimmed));
         }
     }
     return [...results].sort((a, b) => a - b);
@@ -110,6 +127,14 @@ interface CronFields {
     doms: number[];
     months: number[];
     dows: number[];
+    /**
+     * Whether a day need only match one of day of month and day of week.
+     * Standard cron's rule: when both fields are restricted — neither starts
+     * with `*` — a day matching either one matches, so `0 9 1 * 1` fires on
+     * every 1st and every Monday. When either starts with `*` (`*\/2`
+     * included, as in Vixie cron), a day must match both.
+     */
+    eitherDay: boolean;
 }
 
 /** Expand all five fields of an expression. Throws on invalid expressions. */
@@ -124,7 +149,8 @@ function parseCronFields(expression: string): CronFields {
         hours: expandCronField(hourField, 0, 23),
         doms: expandCronField(domField, 1, 31),
         months: expandCronField(monField, 1, 12),
-        dows: expandCronField(dowField, 0, 6) // 0=Sunday
+        dows: expandCronField(dowField, 0, 6), // 0=Sunday
+        eitherDay: !domField.startsWith("*") && !dowField.startsWith("*")
     };
 }
 
@@ -215,9 +241,10 @@ function offsetAt(instantMs: number, wall: WallClock): number {
 
 /** Whether a wall-clock day — month, day of month, weekday — can hold a slot. */
 function dayMatches(wall: WallClock, fields: CronFields): boolean {
-    return fields.months.includes(wall.month)
-        && fields.doms.includes(wall.dom)
-        && fields.dows.includes(wall.dow);
+    if (!fields.months.includes(wall.month)) return false;
+    const dom = fields.doms.includes(wall.dom);
+    const dow = fields.dows.includes(wall.dow);
+    return fields.eitherDay ? dom || dow : dom && dow;
 }
 
 /** Whether a wall-clock minute matches every field of the expression. */
@@ -610,6 +637,16 @@ interface FleetView {
 type LeaseOutcome =
     | { acquired: true; token?: string }
     | { acquired: false; holder?: string };
+
+/** What one run is for, beyond the job itself. */
+interface RunOptions {
+    /** The slot a scheduled or catch-up run fires for. Absent for a manual run. */
+    slot?: Date;
+    /** A first line for the run's captured log. */
+    seedLog?: string;
+    /** Called with the run's start time once its handler is about to be called. */
+    onStart?: (startedAt: string) => void;
+}
 
 /** A job the scheduler refused, with the definition it was refused from. */
 interface RefusedJob {
@@ -1081,7 +1118,7 @@ export class CronScheduler {
 
         let onStart!: (startedAt: string) => void;
         const begun = new Promise<string>((resolve) => { onStart = resolve; });
-        const run = this.executeJob(job, true, undefined, onStart);
+        const run = this.executeJob(job, true, { onStart });
         // Whichever comes first: the handler being called, or the run ending
         // without it (a skip). A run that starts settles `begun` first, since
         // `onStart` is called before the handler is awaited.
@@ -1462,7 +1499,7 @@ export class CronScheduler {
                 // Takes the run lease: a manual trigger in progress on another
                 // process — the api role's, say — turns this slot into a
                 // recorded skip rather than a second run beside it.
-                await this.executeJob(job, false);
+                await this.executeJob(job, false, { slot: nextRun });
 
                 // Schedule the next tick (only if still started + armed)
                 if (this.started && this.shouldArm(job)) {
@@ -1560,7 +1597,10 @@ export class CronScheduler {
                 const lateBy = Math.round((now.getTime() - slot.getTime()) / 1000);
                 logger.info(`[cron] Catching up missed slot ${slotIso} for "${job.id}" (${lateBy}s late)`);
 
-                await this.executeJob(job, false, `⏰ Catch-up run for missed slot ${slotIso} (${lateBy}s late)`);
+                await this.executeJob(job, false, {
+                    slot,
+                    seedLog: `⏰ Catch-up run for missed slot ${slotIso} (${lateBy}s late)`
+                });
             } catch (err) {
                 logger.error(`[cron] Catch-up failed for "${job.id}"`, { error: err });
             }
@@ -1591,8 +1631,7 @@ export class CronScheduler {
     private executeJob(
         job: RegisteredJob,
         manual: boolean,
-        seedLog?: string,
-        onStart?: (startedAt: string) => void
+        run: RunOptions = {}
     ): Promise<CronJobLogEntry> {
         // Aborted when the run is over before its handler is: the timeout
         // below, or `stop()` giving up on it. Without it the timeout only
@@ -1601,9 +1640,9 @@ export class CronScheduler {
         // request per tick while every run was already marked failed.
         const abort = new AbortController();
         this.runControllers.add(abort);
-        const run = this.runJob(job, manual, abort, seedLog, onStart);
-        this.track(run);
-        return run.finally(() => {
+        const execution = this.runJob(job, manual, abort, run);
+        this.track(execution);
+        return execution.finally(() => {
             this.runControllers.delete(abort);
         });
     }
@@ -1619,8 +1658,7 @@ export class CronScheduler {
         job: RegisteredJob,
         manual: boolean,
         abort: AbortController,
-        seedLog?: string,
-        onStart?: (startedAt: string) => void
+        { slot, seedLog, onStart }: RunOptions
     ): Promise<CronJobLogEntry> {
         // Checked here as well as by each caller, because each caller awaits
         // something (a claim, a state read) between its own check and this.
@@ -1650,7 +1688,10 @@ export class CronScheduler {
 
         const ctx: CronJobContext = {
             jobId: job.id,
-            scheduledAt: startedAt,
+            // The slot the run is for, not the moment it began: a catch-up
+            // starts long after its slot, and even a punctual run starts
+            // after the lease's round trip. A manual run has no slot.
+            scheduledAt: slot ?? startedAt,
             signal: abort.signal,
             log: (...args: unknown[]) => {
                 const line = args.map((a) =>

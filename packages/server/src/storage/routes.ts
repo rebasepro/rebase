@@ -889,7 +889,11 @@ export function createStorageRoutes(config: StorageRoutesConfig): Hono<HonoEnv> 
         // valid for the cache's full hour. Each call site appends the source's
         // validator below, so replacing the source changes the key rather than
         // shadowing it, and the superseded entry ages out on its own.
-        const transformKeyPrefix = `${storageId || "(default)"}/${bucket}/${resolvedPath}`;
+        //
+        // The source by its canonical name, for the same reason as the key:
+        // ` media` and `media`, or `` and `(default)`, resolve to one
+        // controller and must share its renditions.
+        const transformKeyPrefix = `${canonicalStorageId(storageId)}/${bucket}/${resolvedPath}`;
 
         // Whether a *shared* cache may keep this. An object under the public
         // prefix needs no credentials, so a CDN holding it is the point; any

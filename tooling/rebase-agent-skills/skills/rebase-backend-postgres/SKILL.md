@@ -520,7 +520,7 @@ In non-production mode, `loadEnv()` **auto-generates** `JWT_SECRET` and `REBASE_
 | Rule | Error Message |
 |------|---------------|
 | `CORS_ORIGINS` or `FRONTEND_URL` required | `CORS_ORIGINS or FRONTEND_URL must be set in production to secure the API.` |
-| Auto-generated secrets blocked | `JWT_SECRET, REBASE_SERVICE_KEY must be explicitly set in production.` |
+| `JWT_SECRET` set explicitly (nothing is generated in production) | `JWT_SECRET: is required` |
 | No localhost URLs (unless `ALLOW_LOCALHOST_IN_PRODUCTION=true`) | `Environment variable DATABASE_URL points at a local/loopback host...` |
 
 ## Migrations and Atlas (there is no `drizzle.config.ts`)

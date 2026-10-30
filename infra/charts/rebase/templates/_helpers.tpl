@@ -307,10 +307,11 @@ CDN or a cloud load balancer of their own raises it, because only they can know.
   value: {{ $root.Values.worker.jobWorkers | quote }}
 {{- end }}
 {{- end }}
-{{- if and (eq $role "api") $root.Values.split $root.Values.functions.enabled }}
+{{- if and (or (eq $role "api") (eq $role "all")) $root.Values.split }}
 {{/* Cron and the job queue stay on the api by default, so a two-unit split is
      complete without a worker. With a worker present they move there, and this
-     is what takes them off the request path. */}}
+     is what takes them off the request path — whether or not a functions unit
+     exists beside them. */}}
 {{- if $root.Values.worker.enabled }}
 - name: REBASE_CRON_SCHEDULER
   value: "false"

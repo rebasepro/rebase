@@ -1,5 +1,5 @@
 ---
-sourceHash: 05002dc371e1e1e7
+sourceHash: 45e44f38a758ea0d
 title: Tâches Cron
 sidebar_label: Tâches Cron
 description: Planifiez des tâches d'arrière-plan récurrentes grâce au système intégré de tâches cron de Rebase. Définissez des tâches sous forme de fichiers TypeScript, surveillez-les dans Studio et gérez-les via l'API REST.
@@ -136,6 +136,8 @@ Les expressions cron utilisent le **format standard à 5 champs** :
 
 Les pas (`*/n`), les plages (`a-b`) et les listes (`a,b,c`) sont tous pris en charge.
 
+Lorsque le jour du mois et le jour de la semaine sont tous deux restreints, un jour qui correspond à l'un ou l'autre convient, comme dans le cron standard : `0 9 1 * 1` s'exécute le 1er de chaque mois et chaque lundi. Si l'un des deux champs commence par `*`, le jour doit correspondre aux deux.
+
 Une planification est comparée à l'heure locale de son fuseau. Lors d'un changement d'heure, cela signifie qu'une tâche à heure fixe dans l'heure répétée (`30 2 * * *` là où les horloges reculent à 03:00) s'exécute lors des deux passages de cette heure, et qu'une tâche dans l'heure sautée, quand les horloges avancent, ne s'exécute pas ce jour-là.
 
 ## Référence de CronJobDefinition
@@ -186,7 +188,8 @@ interface CronJobContext {
     // The job's unique ID (derived from filename)
     jobId: string;
 
-    // The scheduled tick timestamp
+    // The slot this run fires for: a catch-up run gets the slot it
+    // missed, a manual trigger the moment it started
     scheduledAt: Date;
 
     // Logger — lines appear in Studio, the logs API and the server log
@@ -337,6 +340,7 @@ Les compteurs couvrent toute la durée de vie ; l'historique couvre les 30 derni
 Lors de l'initialisation du backend, Rebase analyse toutes les planifications cron enregistrées à l'aide d'un expandeur cron en JS sans dépendance externe :
 - **Vérification de syntaxe** : Vérifie que la chaîne contient exactement 5 champs séparés par des espaces (`minute`, `hour`, `day of month`, `month`, `day of week`).
 - **Développement des plages** : Déconstruit les pas (`*/15`), les plages (`9-17`) et les listes séparées par des virgules (`0,30`) en tableaux explicites d'entiers valides associés à leurs limites respectives (ex. minutes `0-59`, heures `0-23`, mois `1-12`).
+- **Jetons entiers** : Chaque nombre, borne de plage et pas doit être un entier complet : `5abc`, `*/5x` et `1.5` sont refusés, tout comme une plage inversée (`5-1`).
 - Si une expression cron échoue à la validation, Rebase rejette la définition, consigne une erreur au démarrage et refuse d'enregistrer la tâche afin d'éviter les échecs d'exécution au runtime.
 
 ---

@@ -141,7 +141,7 @@ S3_ACCESS_KEY_ID=...
 S3_SECRET_ACCESS_KEY=...
 ```
 
-If your project stores no uploads at all, leave storage unset and it stays off. `FORCE_LOCAL_STORAGE=true` is not an acknowledgement: it registers local storage anyway, so set it only with a durable volume mounted above `STORAGE_PATH` (the Terraform module asks for `force_local_storage = true` when it has no bucket). See [Storage](/docs/backend/storage) for the full picture.
+If your project stores no uploads at all, leave storage unset and it stays off. `FORCE_LOCAL_STORAGE=true` is not an acknowledgement: it registers local storage anyway, so set it only with a durable volume mounted above `STORAGE_PATH` (the Terraform module's `force_local_storage = true` does exactly that: it mounts its data volume at `/storage` and keeps uploads there). See [Storage](/docs/backend/storage) for the full picture.
 
 ## What boot does to your schema
 

@@ -110,6 +110,9 @@ be what you get by default.
 - **Out of attempts** → `failed`, and the row *stays*. A queue that silently
   drops what it could not deliver is indistinguishable from one with nothing to
   do.
+- **A failure no retry can change** <span class="since-badge" data-since="0.27">Since 0.27</span> → throw `PermanentJobError`, from
+  `@rebasepro/server`: the job goes to `failed` on this attempt, with the
+  message as its `last_error`, instead of spending its remaining attempts.
 
 ```sql
 SELECT task, attempts, last_error, updated_at

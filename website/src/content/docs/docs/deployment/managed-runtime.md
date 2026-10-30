@@ -42,7 +42,7 @@ not promised yet are collected [at the end](#not-promised-yet).
 | Module-level state (a `Map` cache) | Survives between requests on one instance. Lost on every deploy and restart, and not shared between instances |
 | Environment variables and secrets | `rebase cloud env set`, applied at the next deploy |
 | File storage | A bucket per project, served by your backend at `/api/storage/file/…` |
-| Outbound HTTP | Yes, on ports 80 and 443 (and 465, 587, 993 for mail). Other ports are blocked. No fixed outbound IP |
+| Outbound HTTP | Yes, on ports 80 and 443 (and 465, 587, 993 for mail). Other ports are blocked. One fixed outbound IP: `207.175.138.15` |
 
 ## Code and packages
 
@@ -391,10 +391,11 @@ The platform adds no proxy and no outbound rate limit; the services you call
 have their own. Pass `getSignal(c)` to `fetch` so a call stops when its request
 times out.
 
-There is **no fixed outbound IP address**. Traffic leaves through an address
-shared by every project, which the cloud provider assigns and can change, so do
-not add it to a third-party allowlist. Authenticate to such a service with a
-key instead.
+All outbound traffic leaves from **one fixed IP address, `207.175.138.15`**.
+Add it to a third-party allowlist when a service asks for one. The address is
+shared by every project on Rebase Cloud, so an allowlist proves the caller runs
+on Rebase Cloud, not that it is your project: keep authenticating to the
+service with a key as well.
 
 ## Startup and shutdown
 

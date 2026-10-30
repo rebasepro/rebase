@@ -1,5 +1,5 @@
 ---
-sourceHash: 5764a95deb8e4e9c
+sourceHash: 8ca6480a862b6d07
 title: Kubernetes
 sidebar_label: Kubernetes
 description: Déployez Rebase sur un cluster Kubernetes avec le chart Helm officiel — un ou plusieurs Deployments, un Job de migration qui gère le schéma, et des applications statiques sur le même hôte.
@@ -91,7 +91,7 @@ L'avantage du chart par rapport à une configuration manuelle est qu'il **dédui
 les paramètres dont le mode d'échec est silencieux**, à partir des valeurs que
 vous lui avez déjà fournies :
 
-- `REBASE_ROLE` par unité
+- `REBASE_ROLE` par unité — `all` sur l'API lorsqu'il n'y a pas d'unité functions, pour qu'elle serve toujours vos fonctions
 - `REBASE_MIGRATE_ON_BOOT=none` partout, car le Job de migration gère le schéma
 - `REBASE_CRON_SCHEDULER=false` / `REBASE_JOB_WORKERS=false` sur l'api dès qu'un worker existe
 - `TRUSTED_PROXY_HOPS` sur l'unité functions

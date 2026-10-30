@@ -65,7 +65,12 @@ locals {
     S3_ACCESS_KEY_ID     = coalesce(var.s3_access_key_id, "")
     S3_SECRET_ACCESS_KEY = coalesce(var.s3_secret_access_key, "")
     } : {
+    # Uploads on the attached data volume, mounted at /storage below. The flag
+    # tells the runtime a durable volume holds STORAGE_PATH, so it must only
+    # ever be set together with that mount: on the container's own filesystem
+    # every upload is gone at the next restart.
     FORCE_LOCAL_STORAGE = "true"
+    STORAGE_PATH        = "/storage/uploads"
   }
 
   bundle_env = local.uses_bundle_url ? merge(
@@ -168,6 +173,9 @@ locals {
           local.uses_bundle_url ? ["${local.data_root}/bundle-cache:/bundle-cache"] : [],
           # A bundle baked into the image already sits at /bundle; nothing to mount.
           [],
+          # Local storage: uploads live on the volume, beside the database, and
+          # outlive the container and the host the same way it does.
+          local.s3_enabled ? [] : ["${local.data_root}/storage:/storage"],
         )
         # No published ports. Caddy reaches this over the compose network, so
         # 8080 is never exposed and cannot be hit around the TLS terminator.
@@ -256,7 +264,7 @@ locals {
             echo "$DEVICE $ROOT ext4 discard,nofail,defaults 0 0" >> /etc/fstab
           mountpoint -q "$ROOT" || mount "$ROOT"
 
-          mkdir -p "$ROOT/postgres" "$ROOT/caddy/data" "$ROOT/caddy/config" "$ROOT/bundle-cache"
+          mkdir -p "$ROOT/postgres" "$ROOT/caddy/data" "$ROOT/caddy/config" "$ROOT/bundle-cache" "$ROOT/storage"
           cp /opt/rebase-caddyfile "$ROOT/caddy/Caddyfile"
 
           # The runtime image runs as the unprivileged `node` user (UID 1000).
@@ -264,6 +272,9 @@ locals {
           # installed dependencies — needs to be its to write, or the boot fails
           # with EACCES somewhere far from the cause.
           chown -R 1000:1000 "$ROOT/bundle-cache"
+          # Uploads, when they are kept on this volume. Only the directory: every
+          # file under it is written by the runtime and is already its own.
+          chown 1000:1000 "$ROOT/storage"
 
           systemctl enable --now docker
           docker compose -f /opt/rebase-compose.yml up -d
@@ -478,12 +489,12 @@ resource "hcloud_server" "this" {
       condition     = local.s3_enabled || var.force_local_storage
       error_message = <<-EOT
         Configure `s3_bucket` (with its endpoint and credentials), or set
-        `force_local_storage = true`.
+        `force_local_storage = true` to keep uploads on the attached data volume.
 
-        The runtime hard-fails at production boot when storage is left local,
-        because the container filesystem is destroyed on every restart and a
-        `local` backend in production is silent data loss. Failing here is the
-        same refusal, moved to where the error is still readable.
+        With neither, the runtime starts with file storage off: every upload
+        answers 501 STORAGE_NOT_CONFIGURED. That is the runtime's answer to a
+        `local` backend in production, whose container filesystem is wiped on
+        every restart. Asking here makes the choice explicit before apply.
       EOT
     }
 

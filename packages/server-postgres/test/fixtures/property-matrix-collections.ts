@@ -57,6 +57,11 @@ export const emptyEnumNumber = C({ slug: "empty_enum_num", table: "empty_enum_nu
 export const strIdTrue = C({ slug: "str_id_true", table: "str_id_true", name: "x", properties: { code: { type: "string", isId: true }, v: { type: "string" } } });
 export const strIdManual = C({ slug: "str_id_manual", table: "str_id_manual", name: "x", properties: { code: { type: "string", isId: "manual" }, v: { type: "string" } } });
 export const strIdCuid = C({ slug: "str_id_cuid", table: "str_id_cuid", name: "x", properties: { id: { type: "string", isId: "cuid" }, v: { type: "string" } } });
+// A strategy keyword on a type that cannot honour it. Both used to fall through
+// to "any other string is raw SQL": `DEFAULT increment` on a TEXT key, `DEFAULT
+// uuid` on an INTEGER one — a column reference to nothing, refused by Postgres.
+export const strIdIncrement = C({ slug: "str_id_increment", table: "str_id_increment", name: "x", properties: { id: { type: "string", isId: "increment" }, v: { type: "string" } } });
+export const numIdUuid = C({ slug: "num_id_uuid", table: "num_id_uuid", name: "x", properties: { id: { type: "number", isId: "uuid" }, v: { type: "string" } } });
 export const strIdSql = C({ slug: "str_id_sql", table: "str_id_sql", name: "x", properties: { id: { type: "string", isId: "sql`gen_id()`" }, v: { type: "string" } } });
 export const strIdSqlBare = C({ slug: "str_id_sql_bare", table: "str_id_sql_bare", name: "x", properties: { id: { type: "string", isId: "gen_random_uuid()::text" }, v: { type: "string" } } });
 export const strIdUuidReqUnique = C({ slug: "str_id_uuid_ru", table: "str_id_uuid_ru", name: "x", properties: { id: { type: "string", isId: "uuid", validation: { required: true, unique: true } }, v: { type: "string" } } });
@@ -506,7 +511,8 @@ export const groups: Record<string, CollectionConfig[]> = {
  *
  * The refused configurations are not here — they have no correct column for the
  * emitters to agree about. Each is exported on its own above:
- * {@link emptyEnum}, {@link emptyEnumNumber}, {@link strIdCuid}, {@link linkIntoComposite}.
+ * {@link emptyEnum}, {@link emptyEnumNumber}, {@link strIdCuid}, {@link strIdIncrement},
+ * {@link numIdUuid}, {@link linkIntoComposite}.
  */
 export const everything: CollectionConfig[] = Array.from(new Set(Object.values(groups).flat()));
 
@@ -515,5 +521,7 @@ export const refused: { collection: CollectionConfig; because: RegExp }[] = [
     { collection: emptyEnum, because: /empty `enum`/ },
     { collection: emptyEnumNumber, because: /empty `enum`/ },
     { collection: strIdCuid, because: /cuid/ },
+    { collection: strIdIncrement, because: /`isId: "increment"` needs a number property/ },
+    { collection: numIdUuid, because: /`isId: "uuid"` needs a string property/ },
     { collection: linkIntoComposite, because: /cannot reference a composite key/ }
 ];

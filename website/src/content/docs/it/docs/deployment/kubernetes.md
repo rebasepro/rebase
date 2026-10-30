@@ -1,5 +1,5 @@
 ---
-sourceHash: 5764a95deb8e4e9c
+sourceHash: 8ca6480a862b6d07
 title: Kubernetes
 sidebar_label: Kubernetes
 description: Distribuisci Rebase su un cluster Kubernetes con il chart Helm ufficiale — un singolo Deployment o molteplici, un Job di migrazione che gestisce lo schema e app statiche sullo stesso host.
@@ -56,7 +56,7 @@ Questo genera un tier `api`, un tier `functions` e un `worker`, tutti a partire 
 
 Ciò che il chart aggiunge rispetto a una configurazione manuale è che **deriva le impostazioni la cui modalità di errore è il fallimento silenzioso**, a partire dai valori già forniti:
 
-- `REBASE_ROLE` per unità
+- `REBASE_ROLE` per unità — `all` sull'API quando non c'è un'unità functions, così continua a servire le tue funzioni
 - `REBASE_MIGRATE_ON_BOOT=none` ovunque, poiché il Job di migrazione gestisce lo schema
 - `REBASE_CRON_SCHEDULER=false` / `REBASE_JOB_WORKERS=false` sull'api non appena esiste un worker
 - `TRUSTED_PROXY_HOPS` sull'unità functions

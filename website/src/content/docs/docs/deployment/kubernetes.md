@@ -88,7 +88,7 @@ for what each role does and why you would separate them.
 What the chart adds over doing it by hand is that it **derives the settings whose
 failure mode is silence**, from the values you already gave it:
 
-- `REBASE_ROLE` per unit
+- `REBASE_ROLE` per unit — `all` on the api when there is no functions unit, so it still serves your functions
 - `REBASE_MIGRATE_ON_BOOT=none` everywhere, because the migration Job owns the schema
 - `REBASE_CRON_SCHEDULER=false` / `REBASE_JOB_WORKERS=false` on the api once a worker exists
 - `TRUSTED_PROXY_HOPS` on the functions unit

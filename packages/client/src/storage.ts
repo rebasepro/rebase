@@ -1,4 +1,4 @@
-import { StorageSource, UploadFileProps, UploadFileResult, DownloadConfig, StorageListResult, DownloadMetadata, PUBLIC_STORAGE_PREFIX, RebaseApiError, isPublicStoragePath, storageObjectPath } from "@rebasepro/types";
+import { ClientStorageSource, ClientUploadFileProps, UploadFileResult, DownloadConfig, StorageListResult, DownloadMetadata, PUBLIC_STORAGE_PREFIX, RebaseApiError, isPublicStoragePath, storageObjectPath } from "@rebasepro/types";
 import {
     DOWNLOAD_URL_CONCURRENCY,
     RESUMABLE_UPLOAD_THRESHOLD,
@@ -61,7 +61,7 @@ function resumableMetadataOf(form: FormData): Record<string, string> {
     return entries;
 }
 
-export function createStorage(transport: Transport, storageId?: string): StorageSource {
+export function createStorage(transport: Transport, storageId?: string): ClientStorageSource {
     // Keyed by `[bucket/]keyOrUrl`; an entry lives until its download token
     // expires (public URLs: until evicted), is dropped by `deleteObject`, and
     // is bounded LRU. One per source instance, i.e. per client, and owned by
@@ -144,7 +144,7 @@ export function createStorage(transport: Transport, storageId?: string): Storage
         bucket,
         public: isPublic,
         context
-    }: UploadFileProps): Promise<UploadFileResult> {
+    }: ClientUploadFileProps): Promise<UploadFileResult> {
         const formData = new FormData();
         formData.append("file", file);
 

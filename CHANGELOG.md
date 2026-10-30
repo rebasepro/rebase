@@ -13,6 +13,20 @@
   `getObjectStream` and `putObjectStream` are also on the `StorageSource` type, so
   server code reaches them through `rebase.storage`.
 
+#### Plugins
+
+- **`@rebasepro/plugin-review`: agents propose, people approve.** A new plugin,
+  outside the core packages. Its server function (`@rebasepro/plugin-review/server`)
+  takes proposed inserts, updates and deletes into `rebase.staged_changes`
+  without touching the collection, and applies an approved one — or a whole
+  batch, in one transaction — under the reviewer's own row-level security. A
+  state-field review instead holds agent roles to a pending value of a row's
+  own `status`, through a restrictive policy `reviewSecurityRules()` builds
+  (`@rebasepro/plugin-review/config`). The admin half (`useReviewPlugin`) adds
+  a "Review queue (N)" button beside a reviewed collection's view switcher:
+  cell-level diffs, who proposed each change and why, and `j` / `k`, `a`, `r`
+  and Space to work through it. See [Review queue](/docs/backend/review-queue).
+
 ### Changed
 
 #### Rebase Cloud
@@ -64,6 +78,72 @@
   a working pod out of service. The Postgres driver now probes on a connection
   of its own (`SQLAdmin.probe`), within 2.5 s, and a healthy auth-schema answer
   is reused for a minute.
+
+
+
+#### Runtime
+
+- **A cron handler's `ctx.scheduledAt` is the slot the run fires for.** It was
+  the moment the run started, so a catch-up run for a missed 06:00 slot saw
+  the boot time and a punctual one saw the slot plus a database round trip. A
+  manual trigger, which has no slot, still gets the moment it started.
+- **A cron schedule that restricts both day fields matches either, as standard
+  cron does.** `0 9 1 * 1` ran only on a Monday the 1st; it now runs on every
+  1st and every Monday. A schedule where either day field starts with `*` is
+  unchanged. Validation also reads each number whole: `5abc`, `*/5x`, `1.5` and
+  a backwards range such as `5-1` used to pass and are now refused.
+- **`PermanentJobError` is exported from `@rebasepro/server`,** so a job
+  handler can dead-letter a job on the attempt no retry can fix.
+- **`enableSwagger: false` hides the Swagger UI in development too.** It was
+  gated on `NODE_ENV` alone, and in development loaded a spec only an admin
+  could read.
+- **One image rendition per source, however `storageId` is spelled.** ` media`
+  and `media`, or a padded `(default)`, each paid a full transform.
+- **Backup retention prunes only the backups it named in a local folder.**
+  Any other `.dump` there was dated by its mtime: pruned with its
+  `.globals.sql` once old, and while new it held a `keepMinimum` slot and
+  pushed the newest real backup out.
+- **`isId: "increment"` on a non-number key, and `"uuid"` on a non-string one,
+  are refused at config load.** Both used to become a raw SQL default —
+  `DEFAULT increment` — that Postgres refused at the first `CREATE TABLE`.
+- **The Helm chart's api serves functions when there is no functions unit,
+  and a worker always takes cron.** With `split`, a worker and no functions
+  unit, the api ran `REBASE_ROLE=api` and answered every `/api/functions` call
+  with 404, and cron and the job queue ran on both the api and the worker.
+- **The Hetzner Terraform module's `force_local_storage` keeps uploads on the
+  data volume.** It set `FORCE_LOCAL_STORAGE=true` and mounted nothing, so
+  every upload went to the container filesystem and was lost on restart. The
+  README quickstart and `examples/bundle-url` also pin `runtime_version`,
+  without which the module's own precondition refused them at plan.
+
+#### CLI
+
+- **The compute listing prints the autoscale dials.** `rebase cloud compute`
+  now shows the replica ceiling and CPU target, in its table and its `--json`.
+- **A deploy given a prebuilt bundle directory ships it without `--bundle`.**
+  On a project whose `rebase.json` declares no runtime, `rebase cloud deploy
+  --bundle-dir` fell through to a container build and never read the
+  directory.
+
+#### Client SDK
+
+- **The SDK's upload takes any Blob and an optional key, as documented.**
+  `client.storage.putObject` called either way failed to compile: its
+  parameter was the server controllers' type, whose key is required and whose
+  file is a `File`.
+- **A typed client can be passed where a `RebaseClient` of the same database is
+  expected again.** `simulate` returned an untyped client, so
+  `<Rebase client={client}>` failed to compile for a client made with
+  `createRebaseClient<Database>()`.
+
+#### Admin (CMS & app)
+
+- **Studio shows no Collections card when its `tools` leave out
+  `"schema"`,** whose route is then never registered.
+- **`StudioBridgeProvider` passes a `schemaEditing` slice that changes;** it
+  stayed at the value it had on first render.
+- **`conditions.min` and `conditions.max` take a number,** as the docs write
+  them; only a JSON Logic rule compiled.
 
 ## [0.26.0] - 2026-10-29
 

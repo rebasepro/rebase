@@ -1,5 +1,5 @@
 ---
-sourceHash: 63a92d4d1f06a612
+sourceHash: 066084445a9f39ad
 title: Indice degli endpoint
 sidebar_label: Indice degli endpoint
 description: Ogni route HTTP montata da un backend Rebase — data, auth, storage, admin, meta — con il relativo gate e la pagina che la descrive.
@@ -213,7 +213,7 @@ degli endpoint personalizzati di un deployment non è pubblico.
 | `GET` | `/livez` | none | Sola liveness: indica se questo processo è in esecuzione. Non tocca il database, motivo per cui è il percorso di probe che un container dovrebbe utilizzare — `RUNTIME_LIVENESS_PATH` |
 | `GET` | `/health`, `/api/health` | none | Liveness e readiness. Riporta ogni data source configurata, non soltanto quella predefinita |
 | `GET` | `/api/docs` | none (`schema:read` quando `enableSwagger` è `false`, il valore predefinito del runtime in produzione) | Il documento OpenAPI 3.0 |
-| `GET` | `/api/swagger` | none | Swagger UI. Solo al di fuori della produzione; `REBASE_ENABLE_SWAGGER` non può attivarla in produzione |
+| `GET` | `/api/swagger` | none | Swagger UI. Solo al di fuori della produzione; `REBASE_ENABLE_SWAGGER` non può attivarla in produzione. Non viene servita quando `enableSwagger` è `false`, nemmeno in sviluppo |
 | `GET` | `/api/meta/schema-version` | none | L'hash dello schema da cui è stato compilato questo backend e la versione del runtime, e nient'altro |
 | `GET` | `/api/meta/contract` | `schema:read` | Il contratto completo delle collection, per `rebase generate-sdk --from`. `404` se non è configurata alcuna autenticazione |
 | `GET` | `/metrics` | `REBASE_METRICS_TOKEN` se impostato | Metriche di Prometheus, quando `REBASE_METRICS=true` |

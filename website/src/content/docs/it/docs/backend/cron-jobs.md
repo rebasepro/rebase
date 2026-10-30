@@ -1,5 +1,5 @@
 ---
-sourceHash: 05002dc371e1e1e7
+sourceHash: 45e44f38a758ea0d
 title: Cron Jobs
 sidebar_label: Cron Jobs
 description: Pianifica attività ricorrenti in background con il sistema di cron job integrato di Rebase. Definisci i job come file TypeScript, monitorali in Studio e gestiscili tramite l'API REST.
@@ -134,6 +134,8 @@ Le espressioni cron utilizzano il **formato standard a 5 campi**:
 
 I valori di step (`*/n`), gli intervalli (`a-b`) e gli elenchi (`a,b,c`) sono tutti supportati.
 
+Quando sia il giorno del mese sia il giorno della settimana sono ristretti, basta che un giorno corrisponda a uno dei due, come nel cron standard: `0 9 1 * 1` viene eseguito il 1° di ogni mese e ogni lunedì. Se uno dei due campi inizia con `*`, il giorno deve corrispondere a entrambi.
+
 Una pianificazione viene confrontata con l'ora locale del suo fuso. Durante un cambio dell'ora legale, questo significa che un job a orario fisso nell'ora ripetuta (`30 2 * * *` dove gli orologi tornano indietro alle 03:00) viene eseguito in entrambi i passaggi di quell'ora, mentre uno nell'ora saltata, quando gli orologi vanno avanti, quel giorno non viene eseguito.
 
 ## Riferimento a CronJobDefinition
@@ -183,7 +185,8 @@ interface CronJobContext {
     // The job's unique ID (derived from filename)
     jobId: string;
 
-    // The scheduled tick timestamp
+    // The slot this run fires for: a catch-up run gets the slot it
+    // missed, a manual trigger the moment it started
     scheduledAt: Date;
 
     // Logger — lines appear in Studio, the logs API and the server log
@@ -317,6 +320,7 @@ I conteggi sono complessivi; la cronologia è quella degli ultimi 30 giorni. La 
 All'inizializzazione del backend, Rebase analizza tutte le pianificazioni cron registrate utilizzando un espansore cron basato su JS privo di dipendenze:
 - **Controllo della sintassi**: verifica che la stringa contenga esattamente 5 campi separati da spazi (`minute`, `hour`, `day of month`, `month`, `day of week`).
 - **Espansione degli intervalli**: scompone passi (`*/15`), intervalli (`9-17`) ed elenchi separati da virgole (`0,30`) in array espliciti di interi validi mappati sui rispettivi limiti (ad es. minuti `0-59`, ore `0-23`, mesi `1-12`).
+- **Token interi**: ogni numero, estremo di intervallo e passo deve essere un intero completo: `5abc`, `*/5x` e `1.5` vengono rifiutati, così come un intervallo che va all'indietro (`5-1`).
 - Se un'espressione cron non supera la validazione, Rebase rifiuta la definizione, registra un errore all'avvio e rifiuta di registrare il job per prevenire errori di esecuzione a runtime.
 
 ---

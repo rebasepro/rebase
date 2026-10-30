@@ -1,5 +1,5 @@
 ---
-sourceHash: cae2434b532cd67f
+sourceHash: 3e2e55f9b42a2a01
 title: Hintergrund-Jobs
 sidebar_label: Hintergrund-Jobs
 description: Eine dauerhafte, Postgres-gestützte Job-Warteschlange – Aufgaben, die einen Neustart überstehen, mit Backoff wiederholt werden und bei denen Fehler aufbewahrt statt verworfen werden.
@@ -79,6 +79,7 @@ Ein Handler schlägt fehl, indem er eine Exception wirft. Es gibt kein `return f
 
 - **Verbleibende Versuche** → zurück auf `pending`, wobei `run_at` durch den Backoff nach hinten verschoben wird (1s, 5s, 25s … gedeckelt auf eine Stunde; überschreibbar mit `backoff`).
 - **Keine Versuche mehr** → `failed`, und die Zeile *bleibt bestehen*. Eine Warteschlange, die nicht zustellbare Aufgaben stillschweigend verwirft, ist nicht von einer zu unterscheiden, die nichts zu tun hat.
+- **Ein Fehler, den kein Retry ändern kann** <span class="since-badge" data-since="0.27">Since 0.27</span> → werfen Sie `PermanentJobError` aus `@rebasepro/server`: Der Job geht in diesem Versuch auf `failed`, mit der Meldung als `last_error`, statt seine übrigen Versuche aufzubrauchen.
 
 ```sql
 SELECT task, attempts, last_error, updated_at

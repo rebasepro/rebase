@@ -79,6 +79,14 @@ and tears down its own Postgres via Docker on a random host port, and the
 config sets \`fileParallelism: false\`, so one container is live at a time.`
             },
             {
+                pkg: "@rebasepro/plugin-review", script: "test:e2e", args: ["--retry=0"],
+                why: `The review plugin's promises, against a real backend and Postgres: an
+agent key that may only propose leaves the live row untouched and cannot write
+it directly; an approval applies the change, and a batch applies all of its
+changes or none; and Postgres itself refuses an agent role that moves a
+state-field row out of its pending state.`
+            },
+            {
                 pkg: "@rebasepro/rls-check", script: "test:e2e", args: ["--retry=0"],
                 env: () => ({ RLS_CHECK_REQUIRE_DOCKER: "1" }),
                 why: `Its fixture asserts that each of the fourteen checks fires on the object

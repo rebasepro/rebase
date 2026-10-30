@@ -1,5 +1,5 @@
 ---
-sourceHash: 05002dc371e1e1e7
+sourceHash: 45e44f38a758ea0d
 title: Cron-Jobs
 sidebar_label: Cron-Jobs
 description: Planen Sie wiederkehrende Hintergrundaufgaben mit dem integrierten Cron-Job-System von Rebase. Definieren Sie Jobs als TypeScript-Dateien, überwachen Sie sie in Studio und verwalten Sie sie über die REST-API.
@@ -134,6 +134,8 @@ Cron-Ausdrücke verwenden das standardmäßige **5-Felder-Format**:
 
 Schrittwerte (`*/n`), Bereiche (`a-b`) und Listen (`a,b,c`) werden vollständig unterstützt.
 
+Sind Tag des Monats und Wochentag beide eingeschränkt, passt ein Tag, der eines von beiden erfüllt – wie bei Standard-Cron: `0 9 1 * 1` läuft am 1. jedes Monats und an jedem Montag. Beginnt eines der beiden Felder mit `*`, muss ein Tag beide erfüllen.
+
 Ein Zeitplan wird mit der Uhrzeit seiner Zeitzone abgeglichen. Bei einer Zeitumstellung bedeutet das: Ein Job mit fester Uhrzeit in der wiederholten Stunde (`30 2 * * *`, wo die Uhren um 03:00 zurückgestellt werden) läuft in beiden Durchgängen dieser Stunde, und einer in der übersprungenen Stunde, wenn die Uhren vorgestellt werden, läuft an diesem Tag nicht.
 
 ## CronJobDefinition-Referenz
@@ -183,7 +185,8 @@ interface CronJobContext {
     // The job's unique ID (derived from filename)
     jobId: string;
 
-    // The scheduled tick timestamp
+    // The slot this run fires for: a catch-up run gets the slot it
+    // missed, a manual trigger the moment it started
     scheduledAt: Date;
 
     // Logger — lines appear in Studio, the logs API and the server log
@@ -318,6 +321,7 @@ Die Zähler gelten für alle Zeiten; der Verlauf umfasst die letzten 30 Tage. Di
 Bei der Backend-Initialisierung parst Rebase alle registrierten Cron-Zeitpläne mithilfe eines abhängigkeitsfreien JS-basierten Cron-Expanders:
 - **Syntaxprüfung**: Überprüft, ob der String genau 5 durch Leerzeichen getrennte Felder enthält (`minute`, `hour`, `day of month`, `month`, `day of week`).
 - **Bereichsexpansion**: Löst Schritte (`*/15`), Bereiche (`9-17`) und kommagetrennte Listen (`0,30`) in explizite Arrays gültiger Ganzzahlen auf, die ihren jeweiligen Grenzen zugeordnet sind (z. B. Minuten `0-59`, Stunden `0-23`, Monate `1-12`).
+- **Ganze Tokens**: Jede Zahl, jede Bereichsgrenze und jeder Schritt muss eine ganze Zahl sein: `5abc`, `*/5x` und `1.5` werden abgelehnt, ebenso ein rückwärts laufender Bereich (`5-1`).
 - Wenn ein Cron-Ausdruck die Validierung nicht besteht, lehnt Rebase die Definition ab, protokolliert einen Startfehler und verweigert die Registrierung des Jobs, um Ausführungsfehler zur Laufzeit zu verhindern.
 
 ---

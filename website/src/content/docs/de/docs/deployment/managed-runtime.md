@@ -1,5 +1,5 @@
 ---
-sourceHash: 6bb68aec4ebcb624
+sourceHash: 73d0334fc7800665
 title: Managed-Backend-Runtime
 sidebar_label: Managed Runtime
 description: Was ein Backend mit der Runtime „managed“ auf Rebase Cloud kann und was nicht — Pakete und Binärdateien, Arbeitsspeicher und CPU, Timeouts und Body-Größen, das Dateisystem, In-Memory-Status, Secrets, Speicher für generierte Dateien und ausgehender Netzwerkverkehr.
@@ -42,7 +42,7 @@ noch nicht zugesichert sind, sind [am Ende](#noch-nicht-zugesichert) zusammengef
 | Status auf Modulebene (ein `Map`-Cache) | Bleibt zwischen Requests auf einer Instanz erhalten. Geht bei jedem Deploy und Neustart verloren und wird nicht zwischen Instanzen geteilt |
 | Umgebungsvariablen und Secrets | `rebase cloud env set`, werden beim nächsten Deploy angewendet |
 | Dateispeicher | Ein Bucket pro Projekt, bereitgestellt von Ihrem Backend unter `/api/storage/file/…` |
-| Ausgehendes HTTP | Ja, auf den Ports 80 und 443 (sowie 465, 587, 993 für E-Mail). Andere Ports sind blockiert. Keine feste ausgehende IP |
+| Ausgehendes HTTP | Ja, auf den Ports 80 und 443 (sowie 465, 587, 993 für E-Mail). Andere Ports sind blockiert. Eine feste ausgehende IP: `207.175.138.15` |
 
 ## Code und Pakete
 
@@ -390,10 +390,11 @@ Die Plattform fügt keinen Proxy und kein ausgehendes Rate-Limit hinzu; die von 
 haben ihre eigenen Limits. Übergeben Sie `getSignal(c)` an `fetch`, damit ein Aufruf stoppt,
 wenn der zugehörige Request ein Timeout erreicht.
 
-Es gibt **keine feste ausgehende IP-Adresse**. Der Datenverkehr wird über eine Adresse geleitet,
-die von allen Projekten geteilt wird, vom Cloud-Provider zugewiesen wird und sich ändern kann. Fügen Sie diese
-daher nicht zu einer Allowlist von Drittanbietern hinzu. Authentifizieren Sie sich bei solchen Diensten
-stattdessen mit einem Schlüssel.
+Der gesamte ausgehende Datenverkehr verlässt das System über **eine feste IP-Adresse,
+`207.175.138.15`**. Tragen Sie sie in eine Allowlist von Drittanbietern ein, wenn ein Dienst danach
+verlangt. Die Adresse wird von allen Projekten auf Rebase Cloud geteilt, eine Allowlist belegt also, dass
+der Aufrufer auf Rebase Cloud läuft, nicht dass es Ihr Projekt ist: Authentifizieren Sie sich bei dem
+Dienst weiterhin zusätzlich mit einem Schlüssel.
 
 ## Start und Shutdown
 

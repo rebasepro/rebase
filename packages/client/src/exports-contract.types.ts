@@ -28,6 +28,9 @@ import type {
     RestoreOptions,
     RowOf,
     StorageSource,
+    ClientStorageSource,
+    ClientUploadFileProps,
+    UploadFileResult,
     TrashClient,
     UpdateOf,
     WhereConditionFor,
@@ -42,7 +45,7 @@ export type ConsumerCanName = [
     FieldPath, FilterCondition, FilterValues<string>, IncludeOptions, IncludeSpec,
     InsertOf<Record<string, unknown>>, LogicalCondition, OrderBySpec,
     FilterConditionFor<Record<string, unknown>>, LogicalConditionFor<Record<string, unknown>>, QueryComputedFields,
-    RowOf<Record<string, unknown>>, StorageSource, UpdateOf<Record<string, unknown>>,
+    RowOf<Record<string, unknown>>, StorageSource, ClientStorageSource, ClientUploadFileProps, UploadFileResult, UpdateOf<Record<string, unknown>>,
     WhereConditionFor<string>, WhereFilterOp, WhereFor<Record<string, unknown>>,
     WhereValueFor<"==", string>, WriteOptions,
     RestoreOptions, TrashClient

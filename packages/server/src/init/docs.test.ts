@@ -81,4 +81,20 @@ describe("mountOpenApiDocs", () => {
             process.env.NODE_ENV = prev;
         }
     });
+
+    it("does not serve the Swagger UI when swagger is off, in development too", async () => {
+        // `enableSwagger: false` hides the API explorer everywhere. The UI was
+        // gated on NODE_ENV alone, so in development it still loaded — and
+        // fetched a spec that, with swagger off, only an admin may read.
+        const prev = process.env.NODE_ENV;
+        process.env.NODE_ENV = "development";
+        try {
+            const off = await app(false);
+            expect((await off.request("/api/swagger")).status).toBe(404);
+            const on = await app(true);
+            expect((await on.request("/api/swagger")).status).toBe(200);
+        } finally {
+            process.env.NODE_ENV = prev;
+        }
+    });
 });

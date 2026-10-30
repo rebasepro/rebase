@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, jest } from "@jest/globals";
-import { CronScheduler, validateCronExpression, findMostRecentSlot } from "./cron-scheduler";
+import { CronScheduler, validateCronExpression, findMostRecentSlot, parseCronExpression } from "./cron-scheduler";
 import { createCronStore } from "./cron-store";
 import type { CronJobPersistedState, CronJobRunSummary, CronRunLease, CronStore } from "./cron-store";
 import type { CronJobDefinition, CronJobLogEntry, DataDriver } from "@rebasepro/types";
@@ -155,6 +155,39 @@ describe("CronScheduler", () => {
 
         it("rejects non-numeric garbage", () => {
             expect(validateCronExpression("abc * * * *").valid).toBe(false);
+        });
+
+        it.each([
+            "5abc * * * *", "1-5x * * * *", "*/5x * * * *", "1.5 * * * *",
+            "0 9 1-5x * *", "1- * * * *", "-1 * * * *", "0-30/ * * * *", "5-1 * * * *"
+        ])("rejects a malformed token: %s", (expr) => {
+            // `parseInt` reads a leading number and drops the rest, so these
+            // used to pass as the number they start with.
+            expect(validateCronExpression(expr).valid).toBe(false);
+        });
+    });
+
+    // ── Day of month and day of week ─────────────────────────────────
+
+    describe("day of month and day of week together", () => {
+        // 2026-10-25 is a Sunday.
+        const SUNDAY = new Date("2026-10-25T12:00:00Z");
+        const next = (expr: string, after: Date = SUNDAY) => parseCronExpression(expr, after, "UTC").toISOString();
+
+        it("fires on either when both are restricted, as standard cron does", () => {
+            // Every 1st of the month and every Monday — not only a Monday the 1st.
+            expect(next("0 9 1 * 1")).toBe("2026-10-26T09:00:00.000Z");
+            expect(next("0 9 1 * 1", new Date("2026-10-27T00:00:00Z"))).toBe("2026-11-01T09:00:00.000Z");
+            expect(findMostRecentSlot("0 9 1 * 1", new Date("2026-10-19T00:00:00Z"), SUNDAY, "UTC")?.toISOString())
+                .toBe("2026-10-19T09:00:00.000Z");
+        });
+
+        it("needs both when either field starts with *", () => {
+            expect(next("0 9 * * 1")).toBe("2026-10-26T09:00:00.000Z");
+            expect(next("0 9 1 * *")).toBe("2026-11-01T09:00:00.000Z");
+            expect(next("0 9 1 * */7")).toBe("2026-11-01T09:00:00.000Z");
+            // `*/2` starts with `*`, so the days must be odd Mondays.
+            expect(next("0 9 */2 * 1")).toBe("2026-11-09T09:00:00.000Z");
         });
     });
 
@@ -1445,6 +1478,41 @@ catchUpWindowSeconds: 3600,
             expect(executed).toBe(true);
             expect(store.tryClaimRun).toHaveBeenCalledWith("late", MISSED_SLOT);
             expect(scheduler.getJob("late")?.totalRuns).toBe(1);
+        });
+
+        it("hands a scheduled run its slot as scheduledAt, however late the handler starts", async () => {
+            const { store } = makeFleetStore();
+            // The lease is a database round trip; here it takes two seconds.
+            const acquire = store.tryAcquireRunLease.getMockImplementation()!;
+            store.tryAcquireRunLease.mockImplementation(async (jobId: string, holder: string, ttl: number) => {
+                await new Promise(resolve => setTimeout(resolve, 2000));
+                return acquire(jobId, holder, ttl);
+            });
+            let seen: Date | undefined;
+            scheduler.setStore(store);
+            scheduler.registerJobs([makeJob("on-the-hour", {
+                schedule: "0 7 * * *",
+                handler: async (ctx) => { seen = ctx.scheduledAt; }
+            })]);
+            scheduler.start();
+            await jest.advanceTimersByTimeAsync(60 * 60 * 1000);
+
+            expect(seen?.toISOString()).toBe(new Date(2026, 6, 29, 7, 0).toISOString());
+        });
+
+        it("hands the handler the missed slot as scheduledAt, not the boot time", async () => {
+            // A catch-up exists to recover a slot; a handler that processes
+            // "the window ending at scheduledAt" has to see that slot.
+            const store = makeClaimStore(true);
+            let seen: Date | undefined;
+            scheduler.setStore(store);
+            scheduler.registerJobs([makeCatchUpJob("late-slot", {
+                handler: async (ctx) => { seen = ctx.scheduledAt; }
+            })]);
+            scheduler.start();
+            await settle();
+
+            expect(seen?.toISOString()).toBe(MISSED_SLOT);
         });
 
         it("skips the slot another instance already ran", async () => {

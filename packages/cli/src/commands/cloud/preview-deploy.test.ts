@@ -577,3 +577,31 @@ describe("previewFrom", () => {
         expect(previewFrom({ name: "x", url: "https://a", backend: "staging" })?.backend).toBeNull();
     });
 });
+
+describe("a --bundle-dir deploy", () => {
+    it("ships that bundle on a project that does not declare the managed runtime", async () => {
+        // `--bundle-dir` is "deploy a bundle that is already built". Without
+        // `--bundle` beside it, a project whose rebase.json declares no
+        // runtime fell through to the container build, and the directory was
+        // never read.
+        write(project, "rebase.json", JSON.stringify({
+            rebase: "^1",
+            apps: { backend: { type: "backend" } }
+        }));
+        bundle("backend");
+
+        await deploy("--no-follow");
+
+        expect(requests.some(url => url.includes("/deploy/bundle/upload"))).toBe(true);
+        const deploys = invoke.mock.calls.filter(([name]) => name === "deploy");
+        expect(deploys.length).toBe(1);
+        expect(deploys[0][1]).toMatchObject({ projectId: "proj_1", bundleId: "b1" });
+    });
+
+    it("refuses --source beside it, as --bundle does", async () => {
+        bundle("backend");
+
+        await expect(deploy("--source", "git", "--no-follow")).rejects.toBeInstanceOf(Exited);
+        expect(invoke).not.toHaveBeenCalled();
+    });
+});

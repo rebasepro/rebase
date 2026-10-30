@@ -1,5 +1,5 @@
 ---
-sourceHash: cae2434b532cd67f
+sourceHash: 3e2e55f9b42a2a01
 title: Tâches en arrière-plan
 sidebar_label: Tâches en arrière-plan
 description: Une file d'attente de tâches durable, basée sur Postgres — des traitements qui survivent à un redémarrage, réessayés avec un backoff, avec conservation des échecs plutôt que leur abandon.
@@ -90,6 +90,7 @@ Un gestionnaire échoue en levant une exception. Il n'y a pas de `return false` 
 
 - **Tentatives restantes** → retour à `pending`, avec `run_at` repoussé par le backoff (1s, 5s, 25s … plafonné à une heure ; surchargeable avec `backoff`).
 - **Plus de tentatives** → `failed`, et la ligne *reste*. Une file d'attente qui supprime silencieusement ce qu'elle n'a pas pu traiter est indiscernable d'une file sans aucune tâche à accomplir.
+- **Un échec qu'aucune nouvelle tentative ne peut changer** <span class="since-badge" data-since="0.27">Since 0.27</span> → lancez `PermanentJobError`, depuis `@rebasepro/server` : le job passe à `failed` dès cette tentative, avec le message comme `last_error`, au lieu de consommer ses tentatives restantes.
 
 ```sql
 SELECT task, attempts, last_error, updated_at
