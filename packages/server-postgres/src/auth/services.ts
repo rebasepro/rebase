@@ -1,4 +1,4 @@
-import { eq, getTableName, sql } from "drizzle-orm";
+import { eq, getTableName, sql, type SQL } from "drizzle-orm";
 import { NodePgDatabase } from "drizzle-orm/node-postgres";
 import { getTableConfig, type AnyPgColumn } from "drizzle-orm/pg-core";
 import { asRebasePgTable, type RebasePgTable } from "../types";
@@ -17,6 +17,8 @@ import {
     UserIdentityData,
     ListUsersOptions,
     PaginatedUsersResult,
+    ListGuestsOptions,
+    PaginatedGuestsResult,
     MfaFactor,
     MfaChallengeInfo,
     AccountAccessState,
@@ -490,6 +492,74 @@ export class UserService implements UserRepository {
             total,
             limit,
             offset };
+    }
+
+    /**
+     * @see UserRepository.listGuests — what a guest is, as SQL. The list and the
+     * delete both read this, so nothing can be listed for deletion that the
+     * delete would not call a guest. A column name falls back to its physical
+     * name and never to no condition: a table without the column fails the
+     * statement rather than widening it.
+     */
+    private isGuest(): SQL {
+        const users = sql.raw(this.getQualifiedUsersTableName());
+        const column = (key: string, physical: string) => sql.identifier(getColumn(this.usersTable, key, physical)?.name ?? physical);
+        const identities = sql.raw(qualifiedTableName(this.userIdentitiesTable));
+        return sql`${users}.${column("isAnonymous", "is_anonymous")} = TRUE
+            AND ${users}.${column("passwordHash", "password_hash")} IS NULL
+            AND NOT EXISTS (SELECT 1 FROM ${identities} ui WHERE ui.uid = ${users}.${column("id", "id")})`;
+    }
+
+    /** @see UserRepository.listGuests */
+    async listGuests(options?: ListGuestsOptions): Promise<PaginatedGuestsResult> {
+        const limit = options?.limit ?? 25;
+        const offset = options?.offset ?? 0;
+        const users = sql.raw(this.getQualifiedUsersTableName());
+        const idColumn = sql.identifier(getColumn(this.usersTable, "id")?.name ?? "id");
+        const createdAt = sql`${users}.${sql.identifier(getColumn(this.usersTable, "createdAt", "created_at")?.name ?? "created_at")}`;
+        const tokens = sql.raw(qualifiedTableName(this.refreshTokensTable));
+        // GREATEST skips the NULL of a guest with no token left.
+        const lastSeenAt = sql`GREATEST(${createdAt}, (SELECT MAX(rt.created_at) FROM ${tokens} rt WHERE rt.uid = ${users}.${idColumn}))`;
+
+        const where = options?.lastSeenBefore
+            ? sql`${this.isGuest()} AND ${lastSeenAt} < ${options.lastSeenBefore.toISOString()}::timestamptz`
+            : this.isGuest();
+
+        const counted = await this.db.execute(sql`SELECT count(*)::int AS total FROM ${users} WHERE ${where}`);
+        const listed = await this.db.execute(sql`
+            SELECT ${users}.${idColumn} AS id, ${createdAt} AS created_at, ${lastSeenAt} AS last_seen_at
+            FROM ${users}
+            WHERE ${where}
+            ORDER BY last_seen_at ASC, id ASC
+            LIMIT ${limit} OFFSET ${offset}
+        `);
+        return {
+            guests: (listed.rows as Array<{ id: string; created_at: string | Date; last_seen_at: string | Date }>).map(row => ({
+                id: row.id,
+                createdAt: new Date(row.created_at),
+                lastSeenAt: new Date(row.last_seen_at)
+            })),
+            total: (counted.rows[0] as { total: number }).total
+        };
+    }
+
+    /** @see UserRepository.deleteGuest */
+    async deleteGuest(id: string): Promise<boolean> {
+        const users = sql.raw(this.getQualifiedUsersTableName());
+        const idColumn = sql.identifier(getColumn(this.usersTable, "id")?.name ?? "id");
+        try {
+            const deleted = await this.withServerContext(db => db.execute(sql`
+                DELETE FROM ${users} WHERE ${users}.${idColumn} = ${id} AND ${this.isGuest()} RETURNING 1
+            `));
+            return deleted.rows.length > 0;
+        } catch (error) {
+            // 23503 for NO ACTION, and for RESTRICT before Postgres 18; 23001 for RESTRICT from it on.
+            const code = extractPgError(error)?.code;
+            if (code === "23503" || code === "23001") {
+                throw ApiError.conflict("A row of this project's own requires this guest, so it was not deleted.", "GUEST_REFERENCED");
+            }
+            throw error;
+        }
     }
 
     /**
@@ -1468,6 +1538,14 @@ export class PostgresAuthRepository implements AuthRepository {
 
     async listUsersPaginated(options?: ListUsersOptions): Promise<PaginatedUsersResult> {
         return this.userService.listUsersPaginated(options);
+    }
+
+    async listGuests(options?: ListGuestsOptions): Promise<PaginatedGuestsResult> {
+        return this.userService.listGuests(options);
+    }
+
+    async deleteGuest(id: string): Promise<boolean> {
+        return this.userService.deleteGuest(id);
     }
 
     async firstUserIds(limit: number): Promise<string[]> {

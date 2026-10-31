@@ -4285,6 +4285,19 @@ yet, listed so that nobody reads a promise into them:
   channels, and the frames it sent to the channel bus or held back, in `--json`
   as `realtime`. A control plane that does not report them leaves the table out.
 
+##### Rebase Cloud
+
+- **`rebase cloud guests` counts and removes a project's guest users.** Every
+  `signInAnonymously()` in a test, a bot or an abandoned visit leaves a row, and
+  the console removes them one at a time. `rebase cloud guests` lists them with
+  when each was last seen, `guests delete <id>` removes one, and
+  `guests prune --older-than 30d` is a dry run that deletes only with `--yes`.
+  Only a guest can go: a row with `is_anonymous` set, no password and no linked
+  identity, checked in the statement that deletes it. It needs a runtime with the
+  new `GET` and `DELETE /api/admin/guests` routes, and an older one is told so.
+  The SDK has them as `admin.listGuests`, `admin.deleteGuest` and
+  `admin.deleteGuests`. See [Guests](/docs/cli/cloud/#guests).
+
 ##### Plugins
 
 - **`@rebasepro/plugin-review`: agents propose, people approve.** A new plugin,
@@ -26906,6 +26919,7 @@ the ID you got. Read the response header.
 | `SIMULATION_TARGET_NOT_FOUND` | 404 | The simulation names no active user (a user id sent without a role) or no live API key. | Check the id, or send a role with the uid to simulate a uid that has no account. |
 | `SIMULATION_UNAVAILABLE` | 501 | This backend cannot simulate access: its `AuthAdapter` has no `resolveUser` to confirm an administrator, or a key was named on a backend with no API keys. | Implement `resolveUser`, or leave the headers out. |
 | `SIMULATION_UNSUPPORTED` | 400 | An `x-rebase-simulate-*` header was sent to a route that cannot run with simulated access. Only the data API and custom functions honour them. | Send the request without the headers. |
+| `GUEST_REFERENCED` | 409 | A guest could not be deleted because a row of the project's own requires it, through a foreign key with `ON DELETE RESTRICT` or `NO ACTION`. `DELETE /api/admin/guests` reports it per guest in `skipped` and carries on. | Delete the row, or leave the guest. |
 | `INVALID_ACCOUNT` | 400 | The account is in a state this operation cannot act on. | See the message. |
 | `INVALID_CHALLENGE` | 400 | The MFA challenge is unknown or expired. | Start a new one. |
 | `INVALID_CODE` | 400 / 401 | The OTP or MFA code is wrong: 400 from the email-code sign-in (`/auth/otp/verify`), 401 from an MFA enrolment or challenge. | Retry with the current code. |
@@ -26919,7 +26933,7 @@ the ID you got. Read the response header.
 | `LAST_ADMIN` | 403 | The change would leave the project with no admin. | Promote someone else first. |
 | `MFA_REQUIRED` | 401 | The password was right and the account has a verified second factor, so sign-in is only half done. `details` carries a short-lived token scoped to the MFA challenge — it is not a session. | Open a challenge and answer it; the challenge response issues the session. |
 | `NO_SESSION` | 401 | No session cookie or refresh token was presented. Normal on a first page load. | Sign in. |
-| `NOT_ANONYMOUS` | 400 | An upgrade-from-anonymous route was called by a real account. | Nothing to upgrade. |
+| `NOT_ANONYMOUS` | 400 | An upgrade-from-anonymous route was called by a real account, or `DELETE /api/admin/guests/:uid` named one. | Nothing to upgrade. To delete an account, use `DELETE /api/admin/users/:uid`. |
 | `OAUTH_ERROR` | 401 | The OAuth provider refused, or returned an error. | Retry the flow; the message carries the provider's reason. |
 | `PERSONAL_KEYS_DISABLED` | 403 | Personal API keys are off on this backend. | Set `personalKeys: true` in the users collection's `auth` block. |
 | `PERSONAL_KEY_NEEDS_ACCOUNT` | 403 | The service key or a guest session tried to use the personal-key routes. Neither has an account for a key to act as. | Sign in to an account, or create a service key under `/api/admin/api-keys`. |
@@ -27318,6 +27332,9 @@ a collection reaches none of this. See [Roles and scopes](/docs/backend/roles-an
 | `DELETE` | `/api/admin/users/:uid` | `users:write` | Refused for an account that holds more than the caller |
 | `POST` | `/api/admin/users/:uid/reset-password` | `users:write` | Issues a temporary password |
 | `DELETE` | `/api/admin/users/:uid/mfa` | `users:write` | Removes the account's second factors and recovery codes, ends its sessions |
+| `GET` | `/api/admin/guests` | `users:read` | <span class="since-badge" data-since="0.27">Since 0.27</span> Guests, last seen longest ago first. `?lastSeenBefore=` narrows them to what the delete below would take, and `total` counts them |
+| `DELETE` | `/api/admin/guests` | `users:write` | <span class="since-badge" data-since="0.27">Since 0.27</span> Deletes one batch of the guests last seen before `?lastSeenBefore=`, which is required. Answers `{ deleted, skipped, remaining }`. Repeat while `remaining` is not 0, with `?offset=` set to how many have been skipped. Accounts cannot be reached |
+| `DELETE` | `/api/admin/guests/:uid` | `users:write` | <span class="since-badge" data-since="0.27">Since 0.27</span> Deletes one guest. An account is refused with `NOT_ANONYMOUS` |
 | `GET` | `/api/admin/roles` | `users:read` | `admin` and the roles the project declares, with their scopes |
 | `GET` | `/api/admin/api-keys` | `keys:read` | [API keys](/docs/backend/api-keys/). Never an API key |
 | `POST` | `/api/admin/api-keys` | `keys:write` | The plaintext key is returned once, on creation |
@@ -47729,7 +47746,15 @@ await client.auth.linkAnonymous("user@example.com", "correct-horse-battery");
 | `ANONYMOUS_AUTH_DISABLED` (403) | The backend has not enabled anonymous auth, or turned it off since this guest signed in: a guest becomes an account only while `allowAnonymous` is on |
 | `REGISTRATION_DISABLED` (403) | Registration is closed on the backend, and becoming an account is registration |
 | `NOT_ANONYMOUS` (400) | The current session belongs to an ordinary account |
+
 | `EMAIL_EXISTS` (409) | The address already has an account — sign in to that one instead |
+
+<span class="since-badge" data-since="0.27">Since 0.27</span> A guest that never comes back stays as a row. An administrator clears
+them with `client.admin.listGuests()`, `client.admin.deleteGuest(uid)` and
+`client.admin.deleteGuests({ lastSeenBefore })`, or on Rebase Cloud with
+[`rebase cloud guests`](/docs/cli/cloud/#guests). These only ever touch guests,
+and `deleteGuests` works in batches: repeat it while `remaining` is not 0, with
+`offset` set to how many it has skipped so far.
 
 ### Linking a Provider to an Existing Account
 
@@ -51646,6 +51671,52 @@ rebase cloud db pitr status | restore | cutover | discard
 `db connect` opens a local port that *is* the managed database (no public
 endpoint) until Ctrl-C; `--reveal` adds the password. Owner or admin only.
 
+### Guests
+
+<span class="since-badge" data-since="0.27">Since 0.27</span>
+
+Every `signInAnonymously()` in a test, a bot or an abandoned visit leaves a row
+in the project's users. These commands count those rows and remove them, so
+nobody has to click through them one by one.
+
+```bash
+rebase cloud guests                              # how many, and the ones last seen longest ago
+rebase cloud guests --older-than 30d --limit 100 # the ones not seen for 30 days
+rebase cloud guests delete <id>                  # one guest; asks first
+rebase cloud guests prune --older-than 30d       # dry run: how many would go
+rebase cloud guests prune --older-than 30d --yes # deletes them
+```
+
+`prune` takes an age with a unit: `45m`, `12h`, `30d` or `2w`. Without `--yes` it
+counts and deletes nothing. It works through a project of any size in small
+batches.
+
+Only guests can go. A guest is a row with `is_anonymous` set, no password and no
+linked identity, and the app applies that rule in the statement that deletes the
+row, so the command cannot reach an account, even one that signed up a moment
+after it was listed. `delete` refuses an account with `NOT_ANONYMOUS`.
+
+**Last seen** is when the guest's session was last issued or refreshed, or when
+the guest was created if it has no refresh token left. A guest who keeps coming
+back is not old, however long ago it was created. A deleted guest's refresh
+tokens and any other auth rows go with it.
+
+Rows in your own tables follow their foreign key:
+
+| The column | What happens to the row |
+|---|---|
+| Optional link (`ON DELETE SET NULL`, the default) | Kept, with the link emptied |
+| Required link (`ON DELETE RESTRICT`, the default) | Kept, and the guest with it: the guest is reported as skipped, with `GUEST_REFERENCED` |
+| `onDelete: "cascade"` | Deleted with the guest |
+| No foreign key (a `userSelect` field, a plain id) | Kept, holding an id that no longer exists |
+
+Check which of your links cascade before you pass `--yes`: it cannot be undone.
+
+The command reads `REBASE_SERVICE_KEY` the way `env reveal` does, so it takes an
+owner or admin (or a token with the `env` capability that belongs to one). The
+key stays in memory and goes only to the project's own address. A project on an
+older runtime is told it needs a newer one.
+
 ### Resources
 
 What the platform holds for the project, against what its code declares.
@@ -54614,6 +54685,7 @@ except one that restarts the database, which waits for a maintenance window.
 | `service-key` | `REBASE_SERVICE_KEY`, admin on the app's own API: when it was last rotated; `rotate` gives the app a new one. Owners and admins |
 | `domains` | Custom domains, the DNS records to add, and verification. A project can answer on several, each verified on its own; `verify` and `remove` take the domain to act on, which may be left out only when there is one (for `verify`, one still pending). `list --json` returns `{ projectId, tenantHost, domains: [...] }` |
 | `db` | Attach or create a database, connect to it from your machine, backups, restore, and point-in-time recovery |
+| `guests` | <span class="since-badge" data-since="0.27">Since 0.27</span> The guest users anonymous sign-in left behind: count them, delete one, prune the ones not seen for an age. See [Guests](/docs/cli/cloud/#guests). Owners and admins |
 | `extensions` | The Postgres extension allowlist |
 | `storage` | The project's bucket |
 | `resources` | Which databases and buckets the platform holds, against what the code declares |

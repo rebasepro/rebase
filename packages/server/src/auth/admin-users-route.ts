@@ -9,14 +9,17 @@
  *   PUT /users/:uid
  *   DELETE /users/:uid
  *   DELETE /users/:uid/mfa
+ *   GET /guests
+ *   DELETE /guests
+ *   DELETE /guests/:uid
  *   POST /bootstrap
  */
 
-import { Hono } from "hono";
+import { Hono, type Context } from "hono";
 import { isAnonymousUid } from "@rebasepro/types";
 import { isBootstrapWindowOpen, SETUP_REQUIRED_MESSAGE } from "./registration-policy";
 import { normalizeEmail } from "@rebasepro/common";
-import { ApiError, errorHandler } from "../api/errors";
+import { ApiError, declaredErrorAnswer, errorHandler } from "../api/errors";
 import type { AuthRepository } from "./interfaces";
 import { createRequireAuth } from "./middleware";
 import { assertMayGrantRoles, assertMayManageAccount, callerIsAdmin, readRoleNames, requireScope } from "./access";
@@ -35,7 +38,7 @@ import {
 import { replaceUserPassword, revokeAllSessions } from "./token-revocation";
 import type { EmailService, EmailConfig } from "../email";
 import type { HonoEnv } from "../api/types";
-import type { AdminUser, AuthCollectionConfig, PickedUser } from "@rebasepro/types";
+import type { AdminGuest, AdminUser, AuthCollectionConfig, DeleteGuestsResult, PickedUser } from "@rebasepro/types";
 import { resolveListLimitParam } from "../api/rest/query-parser";
 import { logger } from "../utils/logger";
 
@@ -50,6 +53,37 @@ export interface AdminUsersRouteConfig {
 
 /** Upper bound for `GET /users?ids=…`, so one request can't fan out unbounded. */
 const MAX_USER_IDS_PER_LOOKUP = 100;
+
+/**
+ * How many guests one `DELETE /guests` takes, so a project with a million of
+ * them is cleaned over many short requests. Each guest is a few statements.
+ */
+const GUESTS_PER_DELETE = 200;
+
+/** A repository without the guest operations cannot answer these routes. */
+function requireGuestStore(
+    repo: AuthRepository
+): asserts repo is AuthRepository & Required<Pick<AuthRepository, "listGuests" | "deleteGuest">> {
+    if (typeof repo.listGuests !== "function" || typeof repo.deleteGuest !== "function") {
+        throw new ApiError(501, "NOT_SUPPORTED", "This backend's auth repository cannot list or delete guests.");
+    }
+}
+
+/** `?lastSeenBefore=`, which reaches the guests' deletion: a date in the past, or a refusal. */
+function readLastSeenBefore(c: Context<HonoEnv>): Date | undefined {
+    const value = c.req.query("lastSeenBefore");
+    if (value === undefined) return undefined;
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime()) || date.getTime() > Date.now()) {
+        throw ApiError.badRequest("`lastSeenBefore` must be a date in the past", "INVALID_INPUT");
+    }
+    return date;
+}
+
+/** `?offset=`, as `GET /users` reads it. */
+function readOffset(c: Context<HonoEnv>): number {
+    return Math.max(0, parseInt(c.req.query("offset") ?? "0", 10) || 0);
+}
 
 export function createAdminUsersRoute(config: AdminUsersRouteConfig): Hono<HonoEnv> {
     const router = new Hono<HonoEnv>();
@@ -524,6 +558,112 @@ values: prepResult.values },
             removedFactors: factors.length
         });
         return c.json({ success: true, removedFactors: factors.length });
+    });
+
+    /**
+     * Delete one guest under the rules and hooks of `DELETE /users/:uid`, and
+     * say whether it went. It does not go when it is not a guest any more:
+     * `deleteGuest` decides that in the statement that deletes. The sessions
+     * end after it, not before as there: a guest who became an account a moment
+     * ago keeps the ones it has.
+     */
+    async function removeGuest(
+        c: Context<HonoEnv>,
+        repo: Pick<Required<AuthRepository>, "deleteGuest">,
+        uid: string
+    ): Promise<boolean> {
+        assertMayManageAccount(c, await authRepo.getUserRoleIds(uid));
+        await assertUserDeletionsAllowed(authRepo, [uid]);
+        if (ops.beforeUserDelete) {
+            await ops.beforeUserDelete(uid);
+        }
+        if (!await repo.deleteGuest(uid)) return false;
+        await authRepo.deleteAllRefreshTokensForUser(uid);
+        runAfterUserDelete(ops, uid);
+        return true;
+    }
+
+    /**
+     * The guests anonymous sign-in left behind, the ones last seen longest ago
+     * first, with how many there are. `?lastSeenBefore=` narrows them to the
+     * ones `DELETE /guests` would take, which makes `total` its dry run.
+     *
+     * A route of its own, not a filter on `GET /users`: a runtime that does not
+     * know a filter ignores it and answers with every account.
+     */
+    router.get("/guests", requireScope("users:read"), async (c) => {
+        requireGuestStore(authRepo);
+        const limit = resolveListLimitParam(c.req.query("limit"), { defaultLimit: 25 });
+        const offset = readOffset(c);
+        const { guests, total } = await authRepo.listGuests({ limit, offset, lastSeenBefore: readLastSeenBefore(c) });
+        const listed: AdminGuest[] = guests.map(guest => ({
+            uid: guest.id,
+            createdAt: guest.createdAt.toISOString(),
+            lastSeenAt: guest.lastSeenAt.toISOString()
+        }));
+        return c.json({ guests: listed, total, limit, offset });
+    });
+
+    /**
+     * Delete one batch of the guests last seen before `?lastSeenBefore=`, which
+     * is required: nothing here means "all of them". Every id comes from
+     * `listGuests` and goes through `deleteGuest`, so no account can be reached.
+     *
+     * One guest that cannot go does not stop the rest: it is reported in
+     * `skipped` and stays at the front of the order, which is why the caller
+     * passes how many it has skipped as `?offset=`.
+     */
+    router.delete("/guests", requireScope("users:write"), async (c) => {
+        requireGuestStore(authRepo);
+        const lastSeenBefore = readLastSeenBefore(c);
+        if (!lastSeenBefore) {
+            throw ApiError.badRequest("`lastSeenBefore` is required", "INVALID_INPUT");
+        }
+        const offset = readOffset(c);
+        const { guests, total } = await authRepo.listGuests({ limit: GUESTS_PER_DELETE, offset, lastSeenBefore });
+
+        const result: DeleteGuestsResult = {
+            deleted: 0,
+            skipped: [],
+            remaining: Math.max(0, total - offset - guests.length)
+        };
+        for (const { id } of guests) {
+            try {
+                if (await removeGuest(c, authRepo, id)) result.deleted++;
+            } catch (err) {
+                const answer = declaredErrorAnswer(err);
+                if (!answer) {
+                    logger.error("Could not delete a guest", { uid: id, error: err instanceof Error ? err.message : err });
+                }
+                result.skipped.push({
+                    uid: id,
+                    code: answer?.code ?? "INTERNAL_ERROR",
+                    message: answer?.message ?? "Could not delete this guest. See the server log."
+                });
+            }
+        }
+
+        logger.info("[Security Audit] Guests deleted by an administrator", {
+            eventType: "auth.guests.deleted",
+            by: (c.get("user") as { uid?: string } | undefined)?.uid,
+            lastSeenBefore: lastSeenBefore.toISOString(),
+            deleted: result.deleted,
+            skipped: result.skipped.length
+        });
+        return c.json(result);
+    });
+
+    router.delete("/guests/:uid", requireScope("users:write"), async (c) => {
+        requireGuestStore(authRepo);
+        const uid = c.req.param("uid");
+        const existing = await authRepo.getUserById(uid);
+        if (!existing) {
+            throw ApiError.notFound("User not found");
+        }
+        const refuse = () => ApiError.badRequest("This user is an account, not a guest.", "NOT_ANONYMOUS");
+        if (existing.isAnonymous !== true) throw refuse();
+        if (!await removeGuest(c, authRepo, uid)) throw refuse();
+        return c.json({ success: true });
     });
 
     router.delete("/users/:uid", requireScope("users:write"), async (c) => {

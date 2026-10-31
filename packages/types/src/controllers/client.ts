@@ -181,6 +181,36 @@ export interface PickedUser {
 }
 
 /**
+ * A guest as `GET /admin/guests` lists one: a row anonymous sign-in made, that
+ * has not become an account.
+ *
+ * @group Admin
+ */
+export interface AdminGuest {
+    uid: string;
+    createdAt: string;
+    /**
+     * The last time this guest's session was issued or refreshed: `createdAt`
+     * for one that has no refresh token left.
+     */
+    lastSeenAt: string;
+}
+
+/**
+ * One batch of `DELETE /admin/guests`. Repeat the call while `remaining` is not
+ * 0, passing how many have been skipped so far as `offset`.
+ *
+ * @group Admin
+ */
+export interface DeleteGuestsResult {
+    deleted: number;
+    /** The guests left in place, and why: a `beforeUserDelete` veto, a row of the project's own that requires them. */
+    skipped: Array<{ uid: string; code: string; message: string }>;
+    /** How many matching guests this batch did not reach. */
+    remaining: number;
+}
+
+/**
  * Client-side Admin API interface.
  * Provides user management operations.
  * @group Admin

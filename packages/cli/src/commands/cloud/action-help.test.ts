@@ -33,6 +33,7 @@ import { PREVIEWS_LIST_FLAGS, PREVIEWS_DELETE_FLAGS } from "./previews";
 import { USAGE_FLAGS, USAGE_ACTIONS } from "./usage";
 import { APP_KEY_FLAGS, APP_KEY_ACTIONS } from "./app-key";
 import { SERVICE_KEY_FLAGS, SERVICE_KEY_ACTIONS } from "./service-key";
+import { GUESTS_ACTIONS, GUESTS_FLAGS } from "./guests";
 import { ACTIVITY_FLAGS } from "./activity";
 import { NOTIFICATIONS_ADD_FLAGS } from "./notifications";
 
@@ -82,6 +83,7 @@ const SPECS: Record<string, Record<string, unknown> | null> = {
     usage: USAGE_FLAGS,
     "app-key": APP_KEY_FLAGS,
     "service-key": SERVICE_KEY_FLAGS,
+    guests: GUESTS_FLAGS,
     activity: ACTIVITY_FLAGS,
     logs: LOGS_FLAGS,
     status: null,
@@ -529,6 +531,7 @@ describe("ACTION_HELP", () => {
         ["usage", USAGE_ACTIONS],
         ["app-key", APP_KEY_ACTIONS],
         ["service-key", SERVICE_KEY_ACTIONS],
+        ["guests", GUESTS_ACTIONS],
         ["clusters", CLUSTERS_ACTIONS]
     ])("%s's usage line names the actions it dispatches", (key, dispatched) => {
         expect(actionWordsIn(ACTION_HELP[key].usage).sort()).toEqual([...dispatched].sort());

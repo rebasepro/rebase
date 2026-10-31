@@ -27,6 +27,41 @@ describe("createAdmin", () => {
     });
 
     // -----------------------------------------------------------------------
+    // Guests
+    // -----------------------------------------------------------------------
+    describe("guests", () => {
+        const before = new Date("2026-10-01T00:00:00.000Z");
+        const encoded = encodeURIComponent(before.toISOString());
+
+        it("lists them with a window and a date", async () => {
+            const admin = createAdmin(transport);
+            mockRequest.mockResolvedValueOnce({ guests: [], total: 0, limit: 5, offset: 0 });
+
+            await admin.listGuests({ limit: 5, lastSeenBefore: before });
+
+            expect(mockRequest).toHaveBeenCalledWith(`/admin/guests?limit=5&lastSeenBefore=${encoded}`, { method: "GET" });
+        });
+
+        it("deletes one by id", async () => {
+            const admin = createAdmin(transport);
+            mockRequest.mockResolvedValueOnce({ success: true });
+
+            await admin.deleteGuest("a/b");
+
+            expect(mockRequest).toHaveBeenCalledWith("/admin/guests/a%2Fb", { method: "DELETE" });
+        });
+
+        it("deletes a batch past the ones already skipped", async () => {
+            const admin = createAdmin(transport);
+            mockRequest.mockResolvedValueOnce({ deleted: 0, skipped: [], remaining: 0 });
+
+            await admin.deleteGuests({ lastSeenBefore: before, offset: 3 });
+
+            expect(mockRequest).toHaveBeenCalledWith(`/admin/guests?lastSeenBefore=${encoded}&offset=3`, { method: "DELETE" });
+        });
+    });
+
+    // -----------------------------------------------------------------------
     // Bootstrap
     // -----------------------------------------------------------------------
     describe("bootstrap", () => {

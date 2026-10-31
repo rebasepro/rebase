@@ -44,6 +44,19 @@
   channels, and the frames it sent to the channel bus or held back, in `--json`
   as `realtime`. A control plane that does not report them leaves the table out.
 
+#### Rebase Cloud
+
+- **`rebase cloud guests` counts and removes a project's guest users.** Every
+  `signInAnonymously()` in a test, a bot or an abandoned visit leaves a row, and
+  the console removes them one at a time. `rebase cloud guests` lists them with
+  when each was last seen, `guests delete <id>` removes one, and
+  `guests prune --older-than 30d` is a dry run that deletes only with `--yes`.
+  Only a guest can go: a row with `is_anonymous` set, no password and no linked
+  identity, checked in the statement that deletes it. It needs a runtime with the
+  new `GET` and `DELETE /api/admin/guests` routes, and an older one is told so.
+  The SDK has them as `admin.listGuests`, `admin.deleteGuest` and
+  `admin.deleteGuests`. See [Guests](/docs/cli/cloud/#guests).
+
 #### Plugins
 
 - **`@rebasepro/plugin-review`: agents propose, people approve.** A new plugin,
