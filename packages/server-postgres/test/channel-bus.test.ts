@@ -531,6 +531,47 @@ describe("Channel bus — publishing on demand", () => {
         expect(sentMessages(remote).filter(m => m.type === "broadcast")).toHaveLength(1);
     });
 
+    it("counts what it publishes and what it holds back, and names no channel in doing so", async () => {
+        await bothUp();
+        connect(b, "b1", "doc:1");
+        connect(a, "a1", "doc:1");
+        connect(a, "a2", "doc:only-here");
+        await flush();
+        pastWarmup(a);
+
+        const before = a.counts();
+        expect(before.sockets).toBe(2);
+        expect(before.channels).toBe(2);
+
+        a.broadcastToChannel("a1", "doc:1", "op", { x: 1 });
+        a.broadcastToChannel("a2", "doc:only-here", "op", { x: 2 });
+        a.trackPresence("a2", "doc:only-here", { n: 1 });
+        await flush();
+
+        const after = a.counts();
+        expect(after.busFramesPublished.broadcast).toBe((before.busFramesPublished.broadcast ?? 0) + 1);
+        expect(after.busFramesSkipped).toBe(before.busFramesSkipped + 2);
+        expect(JSON.stringify(after)).not.toContain("doc:");
+    });
+
+    it("doesn't count a frame the bus refused as published", async () => {
+        await a.configureChannelBus(new OnDemandBus(wire));
+        connect(a, "a1", "doc:1");
+        wire[0].failNextPublish = true;
+        a.broadcastToChannel("a1", "doc:1", "op", {});
+        await flush();
+        expect(a.counts().busFramesPublished.broadcast).toBeUndefined();
+    });
+
+    it("counts no skip on a bus that doesn't publish on demand", async () => {
+        await a.configureChannelBus(new FakeBus(wire));
+        connect(a, "a1", "doc:1");
+        a.broadcastToChannel("a1", "doc:1", "op", {});
+        await flush();
+        expect(a.counts().busFramesSkipped).toBe(0);
+        expect(a.counts().busFramesPublished.broadcast).toBe(1);
+    });
+
     it("assumes a peer that hasn't announced serves everything (an older version, mid rollout)", async () => {
         await a.configureChannelBus(new OnDemandBus(wire));
         pastWarmup(a);

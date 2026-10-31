@@ -197,16 +197,33 @@ const OUTAGE_REPORT_AFTER_MS = 14_000;
 const SOCKET_OPT_IN_PARAM = "rebase_caps";
 const SOCKET_OPT_INS = ["heartbeat", "channel_seq", "cancel_sql"];
 
+/**
+ * The query parameter naming the group a socket belongs to. A platform that
+ * routes on it sends sockets with the same value to the same instance; the
+ * server itself never reads it.
+ */
+const SOCKET_AFFINITY_PARAM = "affinity";
+
 /** Slack on top of two heartbeat intervals before a silent socket is given up on. */
 const HEARTBEAT_GRACE_MS = 5_000;
 
 /**
- * `url` with the opt-ins named on it. Appended rather than rebuilt through
- * `URL`, which would rewrite the address the caller gave (a bare origin gains
- * a `/`).
+ * `url` with the opt-ins named on it, and `affinity` when there is one.
+ * Appended rather than rebuilt through `URL`, which would rewrite the address
+ * the caller gave (a bare origin gains a `/`).
+ *
+ * `affinity` replaces one already in `url`: a router takes one value, and it
+ * may not be the last.
  */
-function withOptIns(url: string): string {
-    return `${url}${url.includes("?") ? "&" : "?"}${SOCKET_OPT_IN_PARAM}=${SOCKET_OPT_INS.join(",")}`;
+function withOptIns(url: string, affinity?: string): string {
+    const queryAt = url.indexOf("?");
+    const address = queryAt === -1 ? url : url.slice(0, queryAt);
+    const params = queryAt === -1 ? [] : url.slice(queryAt + 1).split("&");
+    return `${address}?${[
+        ...(affinity ? params.filter((param) => !param.startsWith(`${SOCKET_AFFINITY_PARAM}=`)) : params),
+        ...(affinity ? [`${SOCKET_AFFINITY_PARAM}=${encodeURIComponent(affinity)}`] : []),
+        `${SOCKET_OPT_IN_PARAM}=${SOCKET_OPT_INS.join(",")}`
+    ].join("&")}`;
 }
 
 /** A frame waiting in `messageQueue`, carrying the handlers of the promise its caller holds. */
@@ -217,6 +234,8 @@ type QueuedFrame = Record<string, unknown> & {
 
 export interface RebaseWebSocketConfig {
     websocketUrl: string;
+    /** The group this socket belongs to — see `RealtimeClientOptions.affinity`. */
+    affinity?: string;
     /**
      * Where the token the socket authenticates with comes from, asked each
      * time it authenticates. A falsy answer leaves it anonymous.
@@ -348,6 +367,7 @@ export function channelErrorCode(message: ChannelMessage): string | undefined {
 
 export class RebaseWebSocketClient {
     private websocketUrl: string;
+    private affinity?: string;
     private ws: WebSocket | null = null;
     /**
      * Where the socket's token comes from. A client built by
@@ -628,6 +648,7 @@ export class RebaseWebSocketClient {
 
     constructor(config: RebaseWebSocketConfig) {
         this.websocketUrl = config.websocketUrl;
+        this.affinity = config.affinity;
         this.getAuthToken = config.getAuthToken;
         this.onUnauthorized = config.onUnauthorized;
         this.impersonate = config.impersonate;
@@ -644,6 +665,14 @@ export class RebaseWebSocketClient {
         //
         // The environment warning is also deferred: an app that never
         // subscribes should say nothing at all. See `ensureConnected`.
+    }
+
+    /**
+     * Name the group this socket belongs to, or clear it with `null`. Read at
+     * each dial, so a socket already open stays where it is until it redials.
+     */
+    public setAffinity(key: string | null): void {
+        this.affinity = key ?? undefined;
     }
 
     /**
@@ -970,7 +999,7 @@ export class RebaseWebSocketClient {
         try {
             // Captured so each handler can tell "my socket" from a later one:
             // a close arriving after a redial must not clear the new socket.
-            const socket = new this.WebSocketConstructor(withOptIns(this.websocketUrl));
+            const socket = new this.WebSocketConstructor(withOptIns(this.websocketUrl, this.affinity));
             this.ws = socket;
 
             this.ws!.onopen = async () => {

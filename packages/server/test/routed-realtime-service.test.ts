@@ -32,6 +32,25 @@ describe("createRoutedRealtimeService", () => {
         });
     });
 
+    it("counts a socket once, however many sources hold it, and adds up what each source carries", () => {
+        const counting = createRoutedRealtimeService({
+            providers: {
+                "(default)": { ...pg, counts: () => ({ sockets: 4, channels: 2, busFramesPublished: { broadcast: 5, channels: 1 }, busFramesSkipped: 9 }) } as unknown as RealtimeProvider,
+                second: { ...mongo, counts: () => ({ sockets: 4, channels: 1, busFramesPublished: { broadcast: 2 }, busFramesSkipped: 1 }) } as unknown as RealtimeProvider,
+                uncounted: mongo as unknown as RealtimeProvider
+            },
+            defaultKey: "(default)",
+            resolveKey: () => "(default)"
+        });
+
+        expect(counting.counts?.()).toEqual({
+            sockets: 4,
+            channels: 3,
+            busFramesPublished: { broadcast: 7, channels: 1 },
+            busFramesSkipped: 10
+        });
+    });
+
     it("routes subscribe_collection to the provider owning the collection", async () => {
         await routed.handleClientMessage("c1", { type: "subscribe_collection", payload: { path: "events", subscriptionId: "s1" } });
         expect(mongo.handleClientMessage).toHaveBeenCalledTimes(1);

@@ -14,7 +14,7 @@ class DefaultDriverRegistry { create, get, getDefault, getOrDefault, has, list, 
 class DefaultStorageRegistry { create, get, getDefault, getOrDefault, has, list, register, size }
 class GCSStorageController { deleteObject, getMetadata, getObject, getObjectStream, getSignedUrl, getType, knownBuckets, listObjects, maxFileSize, putObject, putObjectStream, statObject, storageLocation }
 class LocalStorageController { deleteObject, getAbsolutePath, getBasePath, getObject, getObjectStream, getSignedUrl, getType, isCaseInsensitive, knownBuckets, listObjects, maxFileSize, putObject, putObjectStream, statObject, storageLocation }
-class MetricsRegistry { incrementCounter, observe, recordRequest, render, setGauge, startedAt }
+class MetricsRegistry { incrementCounter, observe, onRender, recordRequest, render, setCounter, setGauge, startedAt }
 class ObjectTooLargeError { maxBytes }
 class PermanentJobError
 class RawHtml { toString, value }
@@ -377,7 +377,7 @@ interface PutObjectStreamResult { bucket, key, size, storageUrl }
 interface QueryFilter { field, operator, value }
 interface QueryOptions { count, cursor, distinct, fields, include, limit, logical, offset, orderBy, vectorSearch, where, withDeleted }
 interface QueuedWebhookDelivery { deliveryId, event, payload, webhookId }
-interface RealtimeProvider { destroy, health, notifyUpdate, onServerReady, setScopeRunner, stopListening, subscribeToCollection, subscribeToOne, unsubscribe }
+interface RealtimeProvider { counts, destroy, health, notifyUpdate, onServerReady, setScopeRunner, stopListening, subscribeToCollection, subscribeToOne, unsubscribe }
 interface RebaseApiError { code, details, statusCode }
 interface RebaseAuthConfig { accessExpiresIn, activeKid, allowAnonymous, allowRegistration, allowUserLookup, allowedRedirectUris, apple, bitbucket, captcha, collection, cookieAuth, defaultRole, disableSelfRegistration, discord, email, emailOtp, facebook, github, gitlab, google, hooks, jwtSecret, linkedin, magicLink, magicLinkCreatesUsers, microsoft, providers, refreshExpiresIn, refreshTokenReuse, refreshTokenReuseIntervalSeconds, requireAuth, requireEmailVerification, serviceKey, signingKeys, slack, spotify, twitter }
 interface RebaseBackend { attachRealtime, auth, collectionRegistry, cronScheduler, driver, driverRegistry, fetch, healthCheck, history, jobQueue, metricsHistory, mount, realtimeService, realtimeServices, rebase, routes, services, setCollectionCallbacks, shutdown, start, storageController, storageRegistry, verifyCredential }
@@ -747,7 +747,7 @@ interface BtreeIndex { include, on, reason, unique, using, where }
 interface BucketOptions { account, default, engine, label, prefix, publicRead, transport }
 interface ByIdReadOptions { include }
 interface CallerCredential { id, kind, name }
-interface ChannelBus { kind, maxFrameBytes, publish, start, stop }
+interface ChannelBus { kind, maxFrameBytes, publish, publishesOnDemand, start, stop }
 interface ChannelErrorMessage { channel, error, payload, requestId, row, rows, subscriptionId, type }
 interface ChannelHistoryEntry { at, event, payload, senderId, seq }
 interface ChannelHistoryMessage { channel, error, latestSeq, messages, payload, requestId, retained, row, rows, subscriptionId, type }
@@ -879,8 +879,9 @@ interface RawSQLCheckOnlySecurityRule { access, check, condition, mode, name, op
 interface RawSQLSecurityRule { access, check, condition, mode, name, operation, operations, ownerField, pgRoles, roles, using, withCheck }
 interface ReadQuery { fields, filter, limit, logical, offset, orderBy, relatedTo, searchString }
 interface RealtimeChannelsConfig { bus, cdc, channels, maxSocketsPerUser, maxSubscriptionsPerSocket, path, recountIntervalMs, recountMinRows, refetchMaxWaitMs }
+interface RealtimeCounts { busFramesPublished, busFramesSkipped, channels, sockets }
 interface RealtimeListenerHealth { connected, downSince, name }
-interface RealtimeProvider { destroy, health, notifyUpdate, onServerReady, setScopeRunner, stopListening, subscribeToCollection, subscribeToOne, unsubscribe }
+interface RealtimeProvider { counts, destroy, health, notifyUpdate, onServerReady, setScopeRunner, stopListening, subscribeToCollection, subscribeToOne, unsubscribe }
 interface RealtimeSocketOptions { accessModel, dataRateLimit, heartbeatIntervalMs, identityRecheckIntervalMs, maxPayload, maxSocketsPerUser, path, resolveApiKey, runInScope, verifyAccessToken }
 interface RebaseBackendAppConfig { config, context, crons, dockerfile, functions, port, registerDatabase, runtime, schema, type, usersCollection }
 interface RebaseBundleEntrypoints { collections, config, crons, functions, schema, static, usersCollection }
@@ -1166,7 +1167,7 @@ class RebaseApiError { code, details, requestId, retryAfterSeconds, status }
 class RebaseClientError { code, details, requestId, retryAfterSeconds, status }
 class RebasePaginationError { code }
 class RebaseRealtimeChannel { broadcast, enableHistory, history, join, leave, name, onBroadcast, onBroadcast, onError, onPresence, sequence, track, untrack }
-class RebaseWebSocketClient { authenticate, checkUniqueField, count, createBranch, delete, deleteBranch, disconnect, ensureConnected, executeSql, fetchApplicationRoles, fetchAvailableDatabases, fetchAvailableRoles, fetchCollection, fetchCurrentDatabase, fetchOne, fetchTableMetadata, fetchUnmappedTables, getAuthToken, hasServerOptIn, hasSocket, listBranches, listenCollection, listenOne, on, onChannelMessage, onConnectionLost, onReconnect, onStateChange, onUnauthorized, reauthenticate, runSqlScript, save, sendMessage, setAuthTokenGetter, socketClientId, state }
+class RebaseWebSocketClient { authenticate, checkUniqueField, count, createBranch, delete, deleteBranch, disconnect, ensureConnected, executeSql, fetchApplicationRoles, fetchAvailableDatabases, fetchAvailableRoles, fetchCollection, fetchCurrentDatabase, fetchOne, fetchTableMetadata, fetchUnmappedTables, getAuthToken, hasServerOptIn, hasSocket, listBranches, listenCollection, listenOne, on, onChannelMessage, onConnectionLost, onReconnect, onStateChange, onUnauthorized, reauthenticate, runSqlScript, save, sendMessage, setAffinity, setAuthTokenGetter, socketClientId, state }
 const STORAGE_REFERENCE_SCHEME
 function and { conditions, type }
 function cond { column, operator, value }
@@ -1236,6 +1237,7 @@ interface PageWalkOptions { cursor, maxPages, pageSize }
 interface PaginationMeta { hasMore, limit, nextCursor, offset, total }
 interface PendingMutation { attempts, collection, data, generatedId, id, ids, ifMatch, lastError, mutationId, parts, queuedAt, rollback, schemaVersion, sent, type, updates, upsert }
 interface PresenceDiff { joins, leaves }
+interface RealtimeClientOptions { affinity }
 interface RebaseClientConfig { anonymous, apiPath, baseUrl, fetch, headers, impersonate, onUnauthorized, realtime, schemaVersion, storageUrlOrigin, token, websocketUrl }
 interface RebaseSession { accessToken, expiresAt, refreshToken, user }
 interface RestoreOptions { field, idempotencyKey, ifMatch, returning }

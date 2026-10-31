@@ -460,6 +460,13 @@ export interface RealtimeProvider {
     health?(): RealtimeListenerHealth[];
 
     /**
+     * This process's realtime counts, for `/metrics`. Read at each scrape, so
+     * it must be cheap. Absent on a provider with nothing to count, and the
+     * series are then not emitted rather than reported as zeros.
+     */
+    counts?(): RealtimeCounts;
+
+    /**
      * Run the provider's own background reads — the refetches a change
      * schedules, whatever announced it (a write here, change capture, another
      * instance) — through `run`. The server passes one that enters the backend
@@ -480,6 +487,22 @@ export interface RealtimeListenerHealth {
     connected: boolean;
     /** When (epoch ms) it went down, while it is down. */
     downSince?: number;
+}
+
+/**
+ * What one realtime process is carrying. Counts only: a channel's name is
+ * customer data and never leaves in a metric.
+ * @group Backend
+ */
+export interface RealtimeCounts {
+    /** Open sockets on this process. */
+    sockets: number;
+    /** Channels with a member on this process. */
+    channels: number;
+    /** Frames this process published to the channel bus, by frame kind. */
+    busFramesPublished: Record<string, number>;
+    /** Broadcasts and presence changes not published because no other instance had members. */
+    busFramesSkipped: number;
 }
 
 // =============================================================================

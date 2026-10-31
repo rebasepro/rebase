@@ -4253,6 +4253,29 @@ yet, listed so that nobody reads a promise into them:
   `getObjectStream` and `putObjectStream` are also on the `StorageSource` type, so
   server code reaches them through `rebase.storage`.
 
+- **Realtime counts per instance.** With `REBASE_METRICS=true`, `/metrics` reports
+  `rebase_realtime_sockets`, `rebase_realtime_channels`,
+  `rebase_realtime_bus_frames_published_total` (by frame `kind`) and
+  `rebase_realtime_bus_frames_skipped_total`, the frames not sent because no other
+  instance had members. Counts only, behind `REBASE_METRICS_TOKEN` like the rest of
+  the route. `RealtimeProvider` gains an optional `counts()`. See
+  [Seeing what the bus does](/docs/backend/realtime-transports/#seeing-what-the-bus-does).
+
+##### Client SDK
+
+- **`realtime: { affinity }` names the group a socket belongs to.**
+  `createRebaseClient({ realtime: { affinity: roomCode } })`, or
+  `client.realtime.setAffinity(roomCode)` before the socket opens, adds
+  `?affinity=` to the socket's address, so a platform that routes on it sends the
+  group to one instance. It does nothing elsewhere. See
+  [Keeping a group on one instance](/docs/sdk/realtime#keeping-a-group-on-one-instance).
+
+##### CLI
+
+- **`rebase cloud metrics` shows realtime per instance**: each instance's sockets,
+  channels, and the frames it sent to the channel bus or held back, in `--json`
+  as `realtime`. A control plane that does not report them leaves the table out.
+
 ##### Plugins
 
 - **`@rebasepro/plugin-review`: agents propose, people approve.** A new plugin,
@@ -20075,7 +20098,7 @@ const client = createRebaseClient({
 | `apiPath` | `string` | API prefix (default: `"/api"`) |
 | `fetch` | `typeof fetch` | Custom fetch implementation (e.g. for SSR) |
 | `onUnauthorized` | `() => Promise<boolean>` | Custom 401 handler — return `true` to retry |
-| `realtime` | `boolean` | Open the WebSocket (default `true`) — set `false` in one-shot scripts |
+| `realtime` | `boolean \| RealtimeClientOptions` | Open the WebSocket (default `true`) — set `false` in one-shot scripts. `{ affinity }` [names the group the socket belongs to](/docs/sdk/realtime#keeping-a-group-on-one-instance) |
 | `collections` | `Record<string, string>` | Maps accessor names to collection slugs |
 | `offline` | `boolean \| OfflineConfig` | [Local-first sync](/docs/sdk/offline) — off by default |
 | `impersonate` | `string` | Run every request as this user, by uid, to check what one user can see. Only an administrator's session may: the data API, functions and realtime run as that user, and every other route refuses |
@@ -31440,7 +31463,22 @@ Per client, the socket accepts up to **7,200 channel frames a minute** (120/s �
 
 The refusal arrives on `channel.onError()`, not as a rejected `broadcast()` — see [When a channel frame is refused](/docs/backend/realtime#when-a-channel-frame-is-refused).
 
-If you are still pushing it after that, throttle cursor-grade events on the client (last-write-wins state does not need 60 updates a second), and consider routing a document's collaborators to the same instance — sticky routing drops cross-instance traffic to nearly nothing regardless of user count. Only past that is another transport worth it, and then the answer is a transport package, not a fork. See [Writing your own transport](#writing-your-own-transport).
+If you are still pushing it after that, throttle cursor-grade events on the client (last-write-wins state does not need 60 updates a second), and consider routing a document's collaborators to the same instance with [`affinity`](/docs/sdk/realtime#keeping-a-group-on-one-instance) — sticky routing drops cross-instance traffic to nearly nothing regardless of user count. Only past that is another transport worth it, and then the answer is a transport package, not a fork. See [Writing your own transport](#writing-your-own-transport).
+
+#### Seeing what the bus does
+
+With `REBASE_METRICS=true`, each instance reports what it is carrying at `/metrics`:
+
+| Metric | Type | Meaning |
+|--------|------|---------|
+| `rebase_realtime_sockets` | gauge | Open sockets on this instance |
+| `rebase_realtime_channels` | gauge | Channels with a member on this instance |
+| `rebase_realtime_bus_frames_published_total` | counter | Frames this instance sent to the bus, by `kind`: `broadcast`, `broadcast_ref`, `presence_diff`, and `channels`, the instances telling each other what they serve |
+| `rebase_realtime_bus_frames_skipped_total` | counter | Broadcasts and presence changes not sent because no other instance had members in the channel |
+
+Counters start from zero when an instance does, and count frames, of which the bus may join several into one notification. Retained messages always travel, so they are never skipped. On the default `memory` bus both stay at zero.
+
+Scrape each instance rather than a load balancer in front of them: the numbers are per process. A group that stays on one instance shows up as `skipped` climbing while `broadcast` and `presence_diff` stay flat, and sockets spread across the instances. Broadcasts that climb on every instance mean the channels span them. On Rebase Cloud, `rebase cloud metrics` shows the same counts per instance.
 
 #### Coalescing
 
@@ -45615,7 +45653,7 @@ const client = createRebaseClient({
 | `apiPath` | `string` | API prefix (default: `"/api"`) |
 | `fetch` | `typeof fetch` | Custom fetch implementation (e.g. for SSR) |
 | `onUnauthorized` | `() => Promise<boolean>` | Custom 401 handler — return `true` to retry |
-| `realtime` | `boolean` | Open the WebSocket (default `true`) — set `false` in one-shot scripts |
+| `realtime` | `boolean \| RealtimeClientOptions` | Open the WebSocket (default `true`) — set `false` in one-shot scripts. `{ affinity }` [names the group the socket belongs to](/docs/sdk/realtime#keeping-a-group-on-one-instance) |
 | `collections` | `Record<string, string>` | Maps accessor names to collection slugs |
 | `offline` | `boolean \| OfflineConfig` | [Local-first sync](/docs/sdk/offline) — off by default |
 | `impersonate` | `string` | Run every request as this user, by uid, to check what one user can see. Only an administrator's session may: the data API, functions and realtime run as that user, and every other route refuses |
@@ -48495,6 +48533,34 @@ Two related behaviours:
 
 - `realtime: false` remains a hard opt-out: no socket ever, and `client.realtime.channel()` throws. So do `listen()` and `listenById()` — they are always there to call, and on a client with no socket they throw a `RebaseClientError` naming the option that would enable them. `observe()` does not: it degrades to a single fetch.
 - `client.close()` is final. It releases the socket and its reconnect timer, and nothing queued afterwards will redial. In Node, an open socket keeps the event loop alive, so a script that never calls it will not exit on its own.
+
+#### Keeping a group on one instance
+
+With more than one server instance, members of a channel can land on different instances, and every message between them then [crosses the channel bus](/docs/backend/realtime-transports/#channels-and-presence-across-instances). `affinity` names the group a socket belongs to, such as a room or a document, so a platform can send the whole group to the same instance:
+
+```typescript
+const client = createRebaseClient({
+    baseUrl,
+    realtime: { affinity: roomCode }
+});
+```
+
+When the key is only known later, set it before the socket opens:
+
+```typescript
+const client = createRebaseClient({ baseUrl });
+
+client.realtime.setAffinity(roomCode);          // no socket yet
+await client.realtime.channel(roomCode).join(); // opens with the key
+```
+
+The key goes on the socket's address as `?affinity=`, and it replaces one already on a `websocketUrl` you set. `setAffinity(null)` clears it.
+
+- **It's an optimisation.** Rebase Cloud routes on it when a project runs more than one instance. Self-hosted, or behind a proxy that doesn't hash on it, it does nothing, and channels work the same: the bus still carries whatever spans instances, a group that is split by a scale-up included.
+- **It takes effect when the socket connects.** A socket already open stays where it is, and uses the new key the next time it connects. To move a client that is connected, make a new one, or set the key before its first `join()` or `listen()`.
+- **It decides where a socket lands, not what it may join.** Access to a channel doesn't depend on it, and the address ends up in access logs, so use a code rather than a secret or anything personal.
+
+To see whether it works, compare what each instance publishes and skips: see [Seeing what the bus does](/docs/backend/realtime-transports/#seeing-what-the-bus-does).
 
 ### Broadcast Channels
 
@@ -51385,7 +51451,7 @@ rebase cloud rollback [id] [-y]          # back to a successful deploy
 rebase cloud cancel [-y]                 # cancel the in-flight build
 rebase cloud start | stop | restart [-y] # stop and restart need -y
 rebase cloud status                      # one-glance project status
-rebase cloud metrics                     # live CPU / memory / disk
+rebase cloud metrics                     # live CPU / memory / disk, realtime per instance
 rebase cloud debug [health|logs|…]       # diagnose a deployment, read-only
 ```
 
@@ -55758,6 +55824,10 @@ healthy pool keeps it near zero. A tail that
 grows with traffic means requests are queueing for connections — most often
 held by write callbacks that await something slow; see
 [A callback holds a connection](/docs/collections/context-data-api/#a-callback-holds-a-connection).
+
+`rebase_realtime_*` reports each instance's open sockets, channels and the frames
+it sent to the channel bus or held back: see
+[Seeing what the bus does](/docs/backend/realtime-transports/#seeing-what-the-bus-does).
 
 ### Security headers
 

@@ -332,6 +332,34 @@ Two related behaviours:
 - `realtime: false` remains a hard opt-out: no socket ever, and `client.realtime.channel()` throws. So do `listen()` and `listenById()` — they are always there to call, and on a client with no socket they throw a `RebaseClientError` naming the option that would enable them. `observe()` does not: it degrades to a single fetch.
 - `client.close()` is final. It releases the socket and its reconnect timer, and nothing queued afterwards will redial. In Node, an open socket keeps the event loop alive, so a script that never calls it will not exit on its own.
 
+### Keeping a group on one instance
+
+With more than one server instance, members of a channel can land on different instances, and every message between them then [crosses the channel bus](/docs/backend/realtime-transports/#channels-and-presence-across-instances). `affinity` names the group a socket belongs to, such as a room or a document, so a platform can send the whole group to the same instance:
+
+```typescript
+const client = createRebaseClient({
+    baseUrl,
+    realtime: { affinity: roomCode }
+});
+```
+
+When the key is only known later, set it before the socket opens:
+
+```typescript
+const client = createRebaseClient({ baseUrl });
+
+client.realtime.setAffinity(roomCode);          // no socket yet
+await client.realtime.channel(roomCode).join(); // opens with the key
+```
+
+The key goes on the socket's address as `?affinity=`, and it replaces one already on a `websocketUrl` you set. `setAffinity(null)` clears it.
+
+- **It's an optimisation.** Rebase Cloud routes on it when a project runs more than one instance. Self-hosted, or behind a proxy that doesn't hash on it, it does nothing, and channels work the same: the bus still carries whatever spans instances, a group that is split by a scale-up included.
+- **It takes effect when the socket connects.** A socket already open stays where it is, and uses the new key the next time it connects. To move a client that is connected, make a new one, or set the key before its first `join()` or `listen()`.
+- **It decides where a socket lands, not what it may join.** Access to a channel doesn't depend on it, and the address ends up in access logs, so use a code rather than a secret or anything personal.
+
+To see whether it works, compare what each instance publishes and skips: see [Seeing what the bus does](/docs/backend/realtime-transports/#seeing-what-the-bus-does).
+
 ## Broadcast Channels
 
 Broadcast channels let you send arbitrary messages between connected clients — ideal for chat, notifications, or collaborative features:

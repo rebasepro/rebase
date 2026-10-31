@@ -9,6 +9,22 @@ export { RebaseApiError } from "@rebasepro/types";
 export type { RebaseErrorInit } from "@rebasepro/types";
 import { RebaseClientError } from "@rebasepro/types";
 
+/** Options for the realtime socket: `createRebaseClient({ realtime: { ... } })`. */
+export interface RealtimeClientOptions {
+    /**
+     * The group this client's socket belongs to, such as a room code.
+     *
+     * Named on the socket's address as `?affinity=`, so a platform that routes
+     * on it can send a group's sockets to the same instance and keep their
+     * messages off the channel bus. Elsewhere it does nothing. It decides where
+     * a socket lands, not what it may join, and an address ends up in access
+     * logs: use a code, not a secret or anything personal.
+     *
+     * When it is only known later, use `client.realtime.setAffinity()`.
+     */
+    affinity?: string;
+}
+
 export interface RebaseClientConfig {
     /**
      * Origin of the Rebase server — scheme, host and port **only**.
@@ -67,8 +83,10 @@ export interface RebaseClientConfig {
      *
      * Long-lived processes that do want realtime can instead call
      * `client.close()` when shutting down.
+     *
+     * An object leaves realtime on and configures it.
      */
-    realtime?: boolean;
+    realtime?: boolean | RealtimeClientOptions;
     /**
      * "Yes, I meant to be anonymous."
      *

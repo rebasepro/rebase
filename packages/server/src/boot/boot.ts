@@ -61,6 +61,7 @@ import { findProjectRoot } from "../schema-edit/project-root";
 import { resolveAuthOptions, resolveLiveSchemaOptions } from "./options";
 import { createMetricsRoutes, createMetricsMiddleware } from "../metrics";
 import { recordPoolWaits } from "../metrics/pool-wait";
+import { recordRealtimeCounts } from "../metrics/realtime";
 import { fetchBundle, shouldFetchBundle, usableBundleFallback, dedupeRuntimePackages, imageModulesDir, BUNDLE_URL_ENV, BUNDLE_TOKEN_ENV, BUNDLE_FETCH_DIR_ENV } from "./fetch-bundle.js";
 import { describeDriverSkew, readRuntimeVersion, schemaRecoveryGuidance } from "./version-skew";
 import { describeDatabase, recordSchemaChanges, renderSchemaChangeScript, type SchemaChangeRecorder } from "./schema-change-recorder";
@@ -580,6 +581,7 @@ export async function bootFromBundle(options: BootOptions = {}): Promise<BootedR
                 "who can reach this port. Set a token, or keep the port on a private network."
             );
         }
+        recordRealtimeCounts(metrics.registry, backend.realtimeService);
         app.route("/metrics", createMetricsRoutes(
             metrics.registry,
             env.REBASE_METRICS_TOKEN,

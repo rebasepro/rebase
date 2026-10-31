@@ -417,6 +417,38 @@ interface TenantMetrics {
     condition?: { reason?: string; message?: string } | null;
 }
 
+/** What `/api/functions/metrics/:projectId/realtime` returns. Mirrors saas metrics.ts. */
+interface TenantRealtime {
+    /** `null` when the instances could not be listed. */
+    instances?: {
+        name?: string;
+        /** `null` when this instance could not be asked, or its runtime does not report these. */
+        realtime?: {
+            sockets?: number;
+            channels?: number;
+            busFramesPublished?: number;
+            busFramesSkipped?: number;
+        } | null;
+    }[] | null;
+}
+
+/**
+ * One row per instance, under a header, for `cloud metrics`.
+ *
+ * Per instance because that is the question: where the sockets landed. A group
+ * that stays on one instance shows as `skipped` climbing while `to bus` stays
+ * flat, and both count from when that instance started.
+ */
+export function realtimeTable(instances: NonNullable<TenantRealtime["instances"]>): string[] {
+    const row = (name: string, cells: (number | string | undefined)[]) =>
+        `${name.padEnd(34)} ${cells.map((cell, i) => String(cell ?? "—").padStart(i < 2 ? 8 : 9)).join("  ")}`;
+    return [
+        row("", ["sockets", "channels", "to bus", "skipped"]),
+        ...instances.map(({ name, realtime: r }) =>
+            row(name ?? "?", [r?.sockets, r?.channels, r?.busFramesPublished, r?.busFramesSkipped]))
+    ];
+}
+
 /**
  * CPU with the ceiling it is a percentage of.
  *
@@ -447,9 +479,14 @@ maxPositionals: 0 });
     const { client } = await requireClient(rawArgs);
     const projectId = await requireProject(rawArgs, client);
     try {
-        const m = await client.functions.invoke<TenantMetrics>(
-            "metrics", undefined, { method: "GET", path: projectId }
-        );
+        const [m, realtime] = await Promise.all([
+            client.functions.invoke<TenantMetrics>("metrics", undefined, { method: "GET", path: projectId }),
+            // On its own and not fatal: it asks every instance, and the figures
+            // above are still true when one of them, or an older control plane,
+            // does not answer.
+            client.functions.invoke<TenantRealtime>("metrics", undefined, { method: "GET", path: `${projectId}/realtime` })
+                .catch(() => null)
+        ]);
 
         // What the numbers are OF. The endpoint has reported this since it
         // learned to, and this command threw it away — printing bare
@@ -518,6 +555,12 @@ maxPositionals: 0 });
                         if (i.waitingReason) note(chalk.gray(`      waiting: ${i.waitingReason}`));
                     }
                 }
+
+                if (realtime?.instances?.length) {
+                    console.log("");
+                    note("  Realtime, since each instance started");
+                    for (const line of realtimeTable(realtime.instances)) note(`    ${line}`);
+                }
                 console.log("");
             },
             {
@@ -533,7 +576,8 @@ maxPositionals: 0 });
                 subject: m.subject ?? null,
                 allocation: m.allocation ?? null,
                 instances: m.instances ?? null,
-                condition: m.condition ?? null
+                condition: m.condition ?? null,
+                realtime: realtime?.instances ?? null
             }
         );
     } catch (e) {
