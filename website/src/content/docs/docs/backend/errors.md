@@ -111,6 +111,7 @@ the ID you got. Read the response header.
 | `SIMULATION_TARGET_NOT_FOUND` | 404 | The simulation names no active user (a user id sent without a role) or no live API key. | Check the id, or send a role with the uid to simulate a uid that has no account. |
 | `SIMULATION_UNAVAILABLE` | 501 | This backend cannot simulate access: its `AuthAdapter` has no `resolveUser` to confirm an administrator, or a key was named on a backend with no API keys. | Implement `resolveUser`, or leave the headers out. |
 | `SIMULATION_UNSUPPORTED` | 400 | An `x-rebase-simulate-*` header was sent to a route that cannot run with simulated access. Only the data API and custom functions honour them. | Send the request without the headers. |
+| `GUEST_REFERENCED` | 409 | A guest could not be deleted because a row of the project's own requires it, through a foreign key with `ON DELETE RESTRICT` or `NO ACTION`. `DELETE /api/admin/guests` reports it per guest in `skipped` and carries on. | Delete the row, or leave the guest. |
 | `INVALID_ACCOUNT` | 400 | The account is in a state this operation cannot act on. | See the message. |
 | `INVALID_CHALLENGE` | 400 | The MFA challenge is unknown or expired. | Start a new one. |
 | `INVALID_CODE` | 400 / 401 | The OTP or MFA code is wrong: 400 from the email-code sign-in (`/auth/otp/verify`), 401 from an MFA enrolment or challenge. | Retry with the current code. |
@@ -124,7 +125,7 @@ the ID you got. Read the response header.
 | `LAST_ADMIN` | 403 | The change would leave the project with no admin. | Promote someone else first. |
 | `MFA_REQUIRED` | 401 | The password was right and the account has a verified second factor, so sign-in is only half done. `details` carries a short-lived token scoped to the MFA challenge — it is not a session. | Open a challenge and answer it; the challenge response issues the session. |
 | `NO_SESSION` | 401 | No session cookie or refresh token was presented. Normal on a first page load. | Sign in. |
-| `NOT_ANONYMOUS` | 400 | An upgrade-from-anonymous route was called by a real account. | Nothing to upgrade. |
+| `NOT_ANONYMOUS` | 400 | An upgrade-from-anonymous route was called by a real account, or `DELETE /api/admin/guests/:uid` named one. | Nothing to upgrade. To delete an account, use `DELETE /api/admin/users/:uid`. |
 | `OAUTH_ERROR` | 401 | The OAuth provider refused, or returned an error. | Retry the flow; the message carries the provider's reason. |
 | `PERSONAL_KEYS_DISABLED` | 403 | Personal API keys are off on this backend. | Set `personalKeys: true` in the users collection's `auth` block. |
 | `PERSONAL_KEY_NEEDS_ACCOUNT` | 403 | The service key or a guest session tried to use the personal-key routes. Neither has an account for a key to act as. | Sign in to an account, or create a service key under `/api/admin/api-keys`. |

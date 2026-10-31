@@ -125,6 +125,9 @@ a collection reaches none of this. See [Roles and scopes](/docs/backend/roles-an
 | `DELETE` | `/api/admin/users/:uid` | `users:write` | Refused for an account that holds more than the caller |
 | `POST` | `/api/admin/users/:uid/reset-password` | `users:write` | Issues a temporary password |
 | `DELETE` | `/api/admin/users/:uid/mfa` | `users:write` | Removes the account's second factors and recovery codes, ends its sessions |
+| `GET` | `/api/admin/guests` | `users:read` | <span class="since-badge" data-since="0.27">Since 0.27</span> Guests, last seen longest ago first. `?lastSeenBefore=` narrows them to what the delete below would take, and `total` counts them |
+| `DELETE` | `/api/admin/guests` | `users:write` | <span class="since-badge" data-since="0.27">Since 0.27</span> Deletes one batch of the guests last seen before `?lastSeenBefore=`, which is required. Answers `{ deleted, skipped, remaining }`. Repeat while `remaining` is not 0, with `?offset=` set to how many have been skipped. Accounts cannot be reached |
+| `DELETE` | `/api/admin/guests/:uid` | `users:write` | <span class="since-badge" data-since="0.27">Since 0.27</span> Deletes one guest. An account is refused with `NOT_ANONYMOUS` |
 | `GET` | `/api/admin/roles` | `users:read` | `admin` and the roles the project declares, with their scopes |
 | `GET` | `/api/admin/api-keys` | `keys:read` | [API keys](/docs/backend/api-keys/). Never an API key |
 | `POST` | `/api/admin/api-keys` | `keys:write` | The plaintext key is returned once, on creation |

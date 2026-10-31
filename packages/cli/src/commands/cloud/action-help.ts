@@ -783,6 +783,34 @@ export const ACTION_HELP: Record<string, ActionHelp> = {
             "It runs with your login: no access-token capability grants it, so REBASE_TOKEN is refused."
         ]
     },
+    guests: {
+        command: "cloud guests",
+        usage: "cloud guests [delete|prune] [<id>] [--older-than <age>] [--limit <n>]",
+        summary:
+            "The guest users anonymous sign-in left behind on the project. Without an action, counts them and lists "
+            + "the ones last seen longest ago. `delete` removes one. `prune` removes the ones not seen for an age: "
+            + "a dry run that prints how many would go, deleting only with --yes. Only guests can go: an account, "
+            + "or a guest that has become one, is refused by the app itself. Owners and admins.",
+        flags: [
+            ["--older-than <age>", "With `prune`, or to count the list: not seen for this long, as 30d, 12h, 2w or 45m"],
+            ["--limit <n>", "How many the list shows. Default: 25"]
+        ],
+        examples: [
+            "rebase cloud guests",
+            "rebase cloud guests --older-than 30d --json",
+            "rebase cloud guests delete 3f0c9a7e-1f3b-4c55-9d1e-7a2f4d6b8c10 --yes",
+            "rebase cloud guests prune --older-than 30d",
+            "rebase cloud guests prune --older-than 30d --yes --json"
+        ],
+        notes: [
+            "Last seen is when the guest's session was last issued or refreshed, so a guest who keeps coming back is not old.",
+            "A row of the project's own that references a guest follows its foreign key: `ON DELETE CASCADE` deletes "
+            + "it, `SET NULL` empties it, and a required link (`RESTRICT`) keeps both the row and the guest, reported as skipped. "
+            + "A column without a foreign key keeps the id it holds.",
+            "It reads REBASE_SERVICE_KEY the way `cloud env reveal` does, for this command only. A project on an older "
+            + "runtime is told it needs a newer one."
+        ]
+    },
     usage: {
         command: "cloud usage",
         usage: "cloud usage [org] [--month YYYY-MM]",

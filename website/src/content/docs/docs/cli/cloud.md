@@ -257,6 +257,52 @@ rebase cloud db pitr status | restore | cutover | discard
 `db connect` opens a local port that *is* the managed database (no public
 endpoint) until Ctrl-C; `--reveal` adds the password. Owner or admin only.
 
+## Guests
+
+<span class="since-badge" data-since="0.27">Since 0.27</span>
+
+Every `signInAnonymously()` in a test, a bot or an abandoned visit leaves a row
+in the project's users. These commands count those rows and remove them, so
+nobody has to click through them one by one.
+
+```bash
+rebase cloud guests                              # how many, and the ones last seen longest ago
+rebase cloud guests --older-than 30d --limit 100 # the ones not seen for 30 days
+rebase cloud guests delete <id>                  # one guest; asks first
+rebase cloud guests prune --older-than 30d       # dry run: how many would go
+rebase cloud guests prune --older-than 30d --yes # deletes them
+```
+
+`prune` takes an age with a unit: `45m`, `12h`, `30d` or `2w`. Without `--yes` it
+counts and deletes nothing. It works through a project of any size in small
+batches.
+
+Only guests can go. A guest is a row with `is_anonymous` set, no password and no
+linked identity, and the app applies that rule in the statement that deletes the
+row, so the command cannot reach an account, even one that signed up a moment
+after it was listed. `delete` refuses an account with `NOT_ANONYMOUS`.
+
+**Last seen** is when the guest's session was last issued or refreshed, or when
+the guest was created if it has no refresh token left. A guest who keeps coming
+back is not old, however long ago it was created. A deleted guest's refresh
+tokens and any other auth rows go with it.
+
+Rows in your own tables follow their foreign key:
+
+| The column | What happens to the row |
+|---|---|
+| Optional link (`ON DELETE SET NULL`, the default) | Kept, with the link emptied |
+| Required link (`ON DELETE RESTRICT`, the default) | Kept, and the guest with it: the guest is reported as skipped, with `GUEST_REFERENCED` |
+| `onDelete: "cascade"` | Deleted with the guest |
+| No foreign key (a `userSelect` field, a plain id) | Kept, holding an id that no longer exists |
+
+Check which of your links cascade before you pass `--yes`: it cannot be undone.
+
+The command reads `REBASE_SERVICE_KEY` the way `env reveal` does, so it takes an
+owner or admin (or a token with the `env` capability that belongs to one). The
+key stays in memory and goes only to the project's own address. A project on an
+older runtime is told it needs a newer one.
+
 ## Resources
 
 What the platform holds for the project, against what its code declares.

@@ -29,6 +29,7 @@ import { previewsCommand } from "./previews";
 import { usageCommand } from "./usage";
 import { appKeyCommand } from "./app-key";
 import { serviceKeyCommand } from "./service-key";
+import { guestsCommand } from "./guests";
 import { activityCommand } from "./activity";
 import { notificationsCommand } from "./notifications";
 import {
@@ -111,6 +112,7 @@ export const CLOUD_VALUE_FLAGS = {
     "--message": String,
     "--month": String,
     "--name": String,
+    "--older-than": String,
     "--org": String,
     "--output": String,
     "--password": String,
@@ -445,6 +447,9 @@ export async function cloudCommand(subcommand: string | undefined, rawArgs: stri
         case "service-key":
             await serviceKeyCommand(rawArgs);
             break;
+        case "guests":
+            await guestsCommand(rawArgs);
+            break;
         case "activity":
             await activityCommand(rawArgs);
             break;
@@ -565,6 +570,7 @@ export const CLOUD_GROUPS: HelpAction[] = [
 
     { action: "db", section: "Data", description: "Attach a database, back it up, restore, point-in-time recovery" },
     { action: "storage", section: "Data", description: "The project's object storage" },
+    { action: "guests", section: "Data", args: "[delete|prune]", description: "The guest users anonymous sign-in left behind: count them, delete one, delete the old ones. Owners and admins" },
 
     { action: "notifications", section: "Deploy & observe", description: "Send deploy, backup, billing and usage events to Slack, Discord or any URL" },
     { action: "webhooks", section: "Other resources", description: "Retired: use `notifications`, or a WebhookDispatcher in your app's code" },

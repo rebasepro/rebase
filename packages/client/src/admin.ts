@@ -1,5 +1,5 @@
 import type { Transport } from "./transport";
-import type { AdminUser, RoleSummary } from "@rebasepro/types";
+import type { AdminGuest, AdminUser, DeleteGuestsResult, RoleSummary } from "@rebasepro/types";
 
 export type { AdminUser };
 
@@ -24,6 +24,16 @@ export interface ListUsersOptions {
      */
     ids?: readonly string[];
 }
+
+/** The window and filter `GET /admin/guests` takes. */
+export interface ListGuestsOptions {
+    limit?: number;
+    offset?: number;
+    /** Only the guests last seen before this date. */
+    lastSeenBefore?: Date | string;
+}
+
+const isoDate = (date: Date | string): string => date instanceof Date ? date.toISOString() : date;
 
 export function createAdmin(transport: Transport, options?: CreateAdminOptions) {
     const opts = options || {};
@@ -104,6 +114,36 @@ export function createAdmin(transport: Transport, options?: CreateAdminOptions) 
         );
     }
 
+    /** One page of guests, the ones last seen longest ago first, with the `total` matching. */
+    async function listGuests(options?: ListGuestsOptions) {
+        const params = new URLSearchParams();
+        if (options?.limit !== undefined) params.set("limit", String(options.limit));
+        if (options?.offset !== undefined) params.set("offset", String(options.offset));
+        if (options?.lastSeenBefore !== undefined) params.set("lastSeenBefore", isoDate(options.lastSeenBefore));
+        const qs = params.toString();
+        return transport.request<{ guests: AdminGuest[]; total: number; limit: number; offset: number }>(
+            adminPath + "/guests" + (qs ? "?" + qs : ""), { method: "GET" }
+        );
+    }
+
+    /** Delete one guest. An account is refused with `NOT_ANONYMOUS`; {@link deleteUser} deletes those. */
+    async function deleteGuest(userId: string) {
+        return transport.request<{ success: boolean }>(adminPath + "/guests/" + encodeURIComponent(userId), {
+            method: "DELETE"
+        });
+    }
+
+    /**
+     * Delete one batch of the guests last seen before a date. It can only ever
+     * touch guests. Repeat it while `remaining` is not 0, passing how many have
+     * been skipped so far as `offset`.
+     */
+    async function deleteGuests(options: { lastSeenBefore: Date | string; offset?: number }) {
+        const params = new URLSearchParams({ lastSeenBefore: isoDate(options.lastSeenBefore) });
+        if (options.offset) params.set("offset", String(options.offset));
+        return transport.request<DeleteGuestsResult>(adminPath + "/guests?" + params.toString(), { method: "DELETE" });
+    }
+
     async function resetPassword(userId: string, options?: { password?: string }) {
         return transport.request<{ user: AdminUser; temporaryPassword?: string; invitationSent?: boolean; emailDeliveryFailed?: boolean }>(
             adminPath + "/users/" + encodeURIComponent(userId) + "/reset-password",
@@ -135,6 +175,9 @@ export function createAdmin(transport: Transport, options?: CreateAdminOptions) 
         updateUser,
         deleteUser,
         resetMfa,
+        listGuests,
+        deleteGuest,
+        deleteGuests,
         resetPassword,
         listRoles,
         bootstrap

@@ -477,6 +477,7 @@ except one that restarts the database, which waits for a maintenance window.
 | `service-key` | `REBASE_SERVICE_KEY`, admin on the app's own API: when it was last rotated; `rotate` gives the app a new one. Owners and admins |
 | `domains` | Custom domains, the DNS records to add, and verification. A project can answer on several, each verified on its own; `verify` and `remove` take the domain to act on, which may be left out only when there is one (for `verify`, one still pending). `list --json` returns `{ projectId, tenantHost, domains: [...] }` |
 | `db` | Attach or create a database, connect to it from your machine, backups, restore, and point-in-time recovery |
+| `guests` | <span class="since-badge" data-since="0.27">Since 0.27</span> The guest users anonymous sign-in left behind: count them, delete one, prune the ones not seen for an age. See [Guests](/docs/cli/cloud/#guests). Owners and admins |
 | `extensions` | The Postgres extension allowlist |
 | `storage` | The project's bucket |
 | `resources` | Which databases and buckets the platform holds, against what the code declares |

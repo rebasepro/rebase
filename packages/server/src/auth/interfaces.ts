@@ -278,6 +278,35 @@ export interface PaginatedUsersResult {
     offset: number;
 }
 
+/** The window and filter of {@link UserRepository.listGuests}. */
+export interface ListGuestsOptions {
+    /** Max results per page (default 25) */
+    limit?: number;
+    /** Number of results to skip (default 0) */
+    offset?: number;
+    /** Only the guests last seen before this instant. */
+    lastSeenBefore?: Date;
+}
+
+/** A row anonymous sign-in made, that has not become an account. */
+export interface GuestData {
+    id: string;
+    createdAt: Date;
+    /**
+     * When its newest refresh token was issued: a session refreshing rotates
+     * its token, so this moves while a guest keeps coming back. `createdAt`
+     * when no token is left.
+     */
+    lastSeenAt: Date;
+}
+
+/** Result of {@link UserRepository.listGuests}. */
+export interface PaginatedGuestsResult {
+    guests: GuestData[];
+    /** How many guests match, ignoring limit and offset. */
+    total: number;
+}
+
 /**
  * Abstract user repository interface.
  * Handles all user-related database operations.
@@ -366,6 +395,29 @@ export interface UserRepository {
      * instead (`isUserTableEmpty` / `isOnlyUser` in `registration-policy.ts`).
      */
     firstUserIds?(limit: number): Promise<string[]>;
+
+    /**
+     * The guests, the ones last seen longest ago first — a stable order, for
+     * the same `lastSeenBefore` and offset.
+     *
+     * A guest is `isAnonymous` with no way to sign back in: no password and no
+     * linked identity. The flag alone is not enough, because a row can carry it
+     * and still belong to someone who signs in.
+     *
+     * Optional, with {@link deleteGuest}: the admin guest routes answer 501 on
+     * a repository without them.
+     */
+    listGuests?(options?: ListGuestsOptions): Promise<PaginatedGuestsResult>;
+
+    /**
+     * Delete this user if it is a guest, as {@link listGuests} means it, and
+     * say whether it did. The statement that deletes is what decides, so an
+     * account can never go through here, whatever the caller read a moment ago.
+     *
+     * A row of the project's own that requires the guest (`ON DELETE RESTRICT`)
+     * is a 409 `GUEST_REFERENCED`.
+     */
+    deleteGuest?(id: string): Promise<boolean>;
 
     /**
      * Update user's password hash. `null` removes the password: the account
