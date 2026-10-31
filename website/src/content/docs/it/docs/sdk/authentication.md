@@ -1,26 +1,20 @@
 ---
-sourceHash: aba79f55ccca539b
+sourceHash: e886a47c056f9c06
 title: Autenticazione
 sidebar_label: Autenticazione
-description: Autenticazione lato client con l'SDK di Rebase — accesso con email/password, provider OAuth, gestione delle sessioni e listener dello stato di autenticazione.
+description: Autenticazione lato client con l'SDK Rebase — accesso tramite email/password, provider OAuth, gestione della sessione e listener dello stato di autenticazione.
 ---
 
 ## Panoramica
 
-Il modulo `client.auth` gestisce l'autenticazione degli utenti, la gestione dei token e la persistenza delle sessioni. Una volta che un utente ha effettuato l'accesso, tutte le richieste di dati successive includono automaticamente il JWT.
+Il modulo `client.auth` gestisce l'autenticazione degli utenti, la gestione dei token e la persistenza della sessione. Una volta effettuato l'accesso, tutte le successive richieste di dati includono automaticamente il JWT.
 
 L'SDK rende persistenti le sessioni in `localStorage` per impostazione predefinita e aggiorna automaticamente i token prima della loro scadenza.
 
-:::note[Ogni metodo di accesso restituisce una sessione appiattita]
-`signInWithEmail`, `signUp` e ogni metodo `signInWith*` restituiscono
-**`{ user, accessToken, refreshToken }`** — l'SDK ha già scartato l'involucro
-per te.
+:::note[Ogni metodo di accesso si risolve in una sessione appiattita]
+`signInWithEmail`, `signUp` e ogni metodo `signInWith*` restituiscono **`{ user, accessToken, refreshToken }`**: l'SDK ha già spacchettato il contenitore per te.
 
-L'API REST sottostante restituisce invece il token nidificato, come
-`{ user, tokens: { accessToken, … } }`. Questa differenza ha importanza solo se
-chiami direttamente anche `/api/auth/*` con `fetch`, dove `body.accessToken` è `undefined`
-e il token si trova in `body.tokens.accessToken`. Consulta
-[il wire format](/docs/backend/auth-endpoints/#response-format).
+L'API REST sottostante restituisce invece il token annidato, come `{ user, tokens: { accessToken, … } }`. Questa differenza è rilevante solo se chiami direttamente `/api/auth/*` con `fetch`, dove `body.accessToken` è `undefined` e il token si trova in `body.tokens.accessToken`. Consulta [il formato di trasmissione](/docs/backend/auth-endpoints/#response-format).
 :::
 
 ## Email / Password
@@ -45,20 +39,16 @@ const { user, confirmationRequired } = await client.auth.signUp(
 );
 ```
 
-Con [`requireEmailVerification`](/docs/backend/email-verification/) attivo,
-non esiste alcuna sessione finché l'indirizzo non viene confermato:
-`confirmationRequired` è `true` e `user` è `null`, quindi avvisa la persona di
-aprire l'email. Altrimenti `confirmationRequired` è `false` e `user` è
-l'account autenticato. Sulla 0.23 `signUp` risolve
-`{ user, accessToken, refreshToken }` ed effettua sempre l'accesso.
+Con [`requireEmailVerification`](/docs/backend/email-verification/) abilitato,
+non c'è alcuna sessione finché l'indirizzo non viene confermato: `confirmationRequired` è `true` e `user` è `null`, quindi invita l'utente ad aprire l'email. In caso contrario, `confirmationRequired` è `false` e `user` è l'account autenticato. Nella versione 0.23 `signUp` restituisce `{ user, accessToken, refreshToken }` ed effettua sempre l'accesso.
 
 ## Provider OAuth
 
-L'SDK include metodi dedicati per i provider OAuth più diffusi, oltre a un metodo generico `signInWithOAuth()` per qualsiasi provider personalizzato.
+L'SDK include metodi dedicati per i provider OAuth più diffusi, oltre a un generico `signInWithOAuth()` per qualsiasi provider personalizzato.
 
 ### Google
 
-Supporta tre stili di invocazione:
+Supporta tre modalità di chiamata:
 
 ```typescript
 // ID-token flow (One Tap / Sign In With Google button)
@@ -73,7 +63,7 @@ await client.auth.signInWithGoogle({ code: authCode, redirectUri: "https://..." 
 
 ### Altri provider
 
-Ogni provider segue il flusso del codice di autorizzazione con `(code, redirectUri)`:
+Ciascun provider segue il flusso con codice di autorizzazione con `(code, redirectUri)`:
 
 ```typescript
 await client.auth.signInWithGitHub(code, redirectUri);
@@ -102,7 +92,7 @@ await client.auth.signInWithTwitter(code, redirectUri, codeVerifier);
 
 ### OAuth generico
 
-Per qualsiasi provider registrato sul backend:
+Per qualsiasi provider registrato nel backend:
 
 ```typescript
 await client.auth.signInWithOAuth("custom-provider", {
@@ -111,16 +101,9 @@ await client.auth.signInWithOAuth("custom-provider", {
 });
 ```
 
-## Magic Link
+## Magic link
 
-Un link di accesso con un clic inviato via email. Il link è sempre
-`<base>/auth/magic-link?token=…`, dove `<base>` è `email.magicLinkUrl` del
-backend, oppure la sua base per il reset della password (`FRONTEND_URL` sul
-runtime) quando quella non è impostata. Non esiste un `redirectTo` per singola
-richiesta. Servi quel percorso nel tuo frontend, e restituisci il token per
-scambiarlo con una sessione. Il CMS lo serve, effettuando l'accesso (tramite il
-passaggio del codice quando è presente un secondo fattore); altri frontend
-hanno bisogno di una pagina di destinazione propria.
+Un link di accesso in un solo clic inviato via email. Il link è sempre `<base>/auth/magic-link?token=…`, dove `<base>` corrisponde a `email.magicLinkUrl` del backend, oppure alla sua base per il ripristino password (`FRONTEND_URL` nel runtime) quando non è impostata. Non esiste un parametro `redirectTo` per singola richiesta. Gestisci quel percorso nel tuo frontend e reinvia il token per scambiarlo con una sessione. Il CMS lo gestisce automaticamente, effettuando l'accesso (attraverso il passaggio del codice quando è presente un secondo fattore); gli altri frontend necessitano di una landing page.
 
 ```typescript
 // 1. Ask for the link.
@@ -131,13 +114,13 @@ const token = new URLSearchParams(location.search).get("token")!;
 const { user } = await client.auth.verifyMagicLink(token);
 ```
 
-`sendMagicLink` risponde allo stesso modo indipendentemente dal fatto che l'indirizzo abbia o meno un account. Questo è intenzionale: un endpoint che rispondesse "nessun utente trovato" costituirebbe un oracolo per l'enumerazione degli account, quindi non usare il risultato per comunicare a una persona se è registrata o meno — non è possibile saperlo.
+`sendMagicLink` risponde allo stesso modo indipendentemente dal fatto che l'indirizzo abbia o meno un account. Questo è intenzionale: un endpoint che rispondesse "utente non trovato" sarebbe un oracolo per l'enumerazione degli account, quindi non utilizzare il risultato per comunicare a una persona se è registrata: non è possibile saperlo.
 
-Per inviarne uno serve un servizio email configurato sul backend, altrimenti `sendMagicLink` risponde 503 `EMAIL_NOT_CONFIGURED`.
+L'invio richiede un servizio email configurato nel backend, altrimenti `sendMagicLink` risponde con 503 `EMAIL_NOT_CONFIGURED`.
 
-## Codici monouso
+## Codici monouso (OTP)
 
-Un codice a sei cifre inviato via email, ideale per i casi in cui l'uso di un link risulta disagevole — un'app nativa, un secondo dispositivo, un browser che altera i link.
+Un codice a sei cifre inviato via email, utile per lo stesso scopo nei casi in cui un link risulti scomodo: un'app nativa, un secondo dispositivo o un browser che altera i link.
 
 ```typescript
 const { expiresInSeconds } = await client.auth.sendEmailOtp("user@example.com");
@@ -146,55 +129,56 @@ const { expiresInSeconds } = await client.auth.sendEmailOtp("user@example.com");
 const { user } = await client.auth.verifyEmailOtp("user@example.com", "418293");
 ```
 
-L'invio dell'indirizzo insieme al codice è ciò che limita il tentativo di indovinare le sei cifre a *un solo* account, anziché a tutti gli account contemporaneamente.
+L'invio dell'indirizzo insieme al codice è ciò che limita i tentativi di indovinare le sei cifre a *un solo* account, anziché a tutti gli account contemporaneamente.
 
 ## Sessioni anonime
 
-Consente a un visitatore di accedere senza credenziali, così da poter iniziare a utilizzare l'app prima ancora di avere un motivo per registrarsi:
+Consenti a un visitatore di accedere senza alcuna credenziale, in modo che possa iniziare a usare l'app prima ancora di avere un motivo per registrarsi:
 
 ```typescript
 const { user } = await client.auth.signInAnonymously();
 user.isAnonymous;   // true
 ```
 
-L'account è reale: possiede un ID, ruoli e una sessione, quindi la sicurezza a livello di riga (row-level security) limita l'accesso alle sue righe esattamente come farebbe per un utente registrato. Ciò che non possiede è un modo per tornare indietro — nessuno può accedere nuovamente *con quell'identità*, quindi tutto ciò che possiede va perso con la sessione.
+L'account è reale: ha un id, ruoli e una sessione, quindi la sicurezza a livello di riga (row-level security) ne delimita le righe esattamente come farebbe per un utente registrato. Ciò che non ha è una via di ritorno: nessuno può effettuare di nuovo l'accesso *come* quell'utente, quindi tutto ciò che possiede va perso insieme alla sessione.
 
-`linkAnonymous` è il modo per non renderlo usa e getta. L'utente **mantiene il proprio ID**, quindi tutto ciò che ha creato da anonimo rimane di sua proprietà:
+`linkAnonymous` è il modo per evitare che l'account sia usa e getta. L'utente **mantiene il proprio id**, così tutto ciò che ha creato da anonimo rimane suo:
 
 ```typescript
 await client.auth.linkAnonymous("user@example.com", "correct-horse-battery");
 ```
 
 | Errore | Significato |
-|--------|-------------|
-| `ANONYMOUS_AUTH_DISABLED` (403) | Il backend non ha abilitato l'autenticazione anonima, oppure l'ha disattivata dopo l'accesso di questo guest: un guest diventa un account solo finché `allowAnonymous` è attivo |
-| `REGISTRATION_DISABLED` (403) | La registrazione è chiusa sul backend, e diventare un account è una registrazione |
+|---------|-------|
+| `ANONYMOUS_AUTH_DISABLED` (403) | Il backend non ha abilitato l'autenticazione anonima o l'ha disattivata dopo l'accesso di questo ospite: un ospite diventa un account solo quando `allowAnonymous` è attivo |
+| `REGISTRATION_DISABLED` (403) | Le registrazioni sono chiuse sul backend, e la conversione in account equivale a una registrazione |
 | `NOT_ANONYMOUS` (400) | La sessione corrente appartiene a un account ordinario |
-| `EMAIL_EXISTS` (409) | L'indirizzo ha già un account — accedi invece a quello |
+| `EMAIL_EXISTS` (409) | L'indirizzo ha già un account associato: accedi a quello |
 
-## Collegamento di un provider a un account esistente
+<span class="since-badge" data-since="0.27">Dalla versione 0.27</span> Un ospite che non torna più rimane salvato come riga. Un amministratore può eliminarli con `client.admin.listGuests()`, `client.admin.deleteGuest(uid)` e `client.admin.deleteGuests({ lastSeenBefore })`, oppure su Rebase Cloud con [`rebase cloud guests`](/docs/cli/cloud/#guests). Questi comandi agiscono esclusivamente sugli ospiti e `deleteGuests` opera in batch: ripetilo finché `remaining` non è 0, impostando `offset` sul numero di record saltati finora.
 
-`signInWithGoogle` e metodi simili fanno *accedere* un utente. `linkProvider` associa un'identità del provider all'account attualmente connesso, in modo che la stessa persona possa rientrare da entrambi gli accessi:
+## Collegare un provider a un account esistente
+
+`signInWithGoogle` e simili effettuano l'*accesso* di un utente. `linkProvider` associa l'identità di un provider all'account che ha già effettuato l'accesso, consentendo alla stessa persona di rientrare da entrambi gli accessi:
 
 ```typescript
 await client.auth.linkProvider("google", { idToken });
 ```
 
-La sessione dimostra già la proprietà dell'account, quindi, a differenza dell'accesso, questo non richiede che il provider abbia verificato l'email e i due indirizzi non devono necessariamente coincidere. Ha successo in modo idempotente (`alreadyLinked: true`) quando quell'identità è già associata a questo account, e rifiuta con `IDENTITY_ALREADY_LINKED` (409) quando appartiene a un account diverso.
+La sessione prova già la proprietà dell'account, quindi, a differenza dell'accesso, non richiede che il provider abbia verificato l'email, e i due indirizzi non devono necessariamente coincidere. Ha successo in modo idempotente (`alreadyLinked: true`) se quell'identità è già associata a questo account, e rifiuta con `IDENTITY_ALREADY_LINKED` (409) se appartiene a un altro account.
 
-## Ricerca di un utente tramite email
+## Cercare un utente tramite email
 
 ```typescript
 const profile = await client.auth.findUserByEmail("user@example.com");
 // { uid, displayName, photoURL } | null
 ```
 
-Tre campi non sensibili e nient'altro — sufficienti per mostrare "stai invitando Jane" prima che venga inviato un invito. Opt-in: solo per un chiamante autenticato, e un 404
-a meno che il backend imposti `AUTH_ALLOW_USER_LOOKUP=true` (`auth.allowUserLookup`).
+Tre campi non sensibili e null'altro: sufficienti per mostrare "stai invitando Jane" prima che l'invito venga inviato. Funzionalità opt-in: consentita solo a chiamanti autenticati, e restituisce un 404 a meno che il backend non imposti `AUTH_ALLOW_USER_LOOKUP=true` (`auth.allowUserLookup`).
 
 ## Autenticazione a più fattori (MFA)
 
-Registrare un fattore, il secondo passo dell'accesso, i codici di recupero e la rimozione di un fattore: [Autenticazione a più fattori](/docs/sdk/multi-factor-authentication/).
+Registrazione di un fattore, secondo passaggio di un accesso, codici di recupero e rimozione di un fattore: [Autenticazione a più fattori](/docs/sdk/multi-factor-authentication/).
 
 ## Disconnessione
 
@@ -237,9 +221,7 @@ L'aggiornamento del token avviene automaticamente, ma puoi avviarlo manualmente:
 const session = await client.auth.refreshSession();
 ```
 
-Una richiesta non parte mai con un token che il client sa essere scaduto: le richieste condividono un
-unico refresh e vengono inviate una sola volta, con il nuovo token. Un token che il server rifiuta in
-anticipo ottiene comunque un refresh, poi un solo nuovo tentativo per richiesta.
+Una richiesta non parte mai con un token che il client sa essere scaduto: le richieste condividono un unico refresh e vengono inviate una sola volta, con il nuovo token. Un token che il server rifiuta anticipatamente ottiene comunque un refresh, seguito da un nuovo tentativo per richiesta.
 
 ## Dove risiede la sessione: `authFlowMode`
 
@@ -251,17 +233,17 @@ const client = createRebaseClient({
 ```
 
 | Modalità | Dove si trova il refresh token | Quando usarla |
-|----------|--------------------------------|---------------|
-| `"json"` *(predefinito)* | Restituito nel corpo della risposta, conservato in `localStorage` | Un'app nativa, uno script, qualsiasi contesto privo del gestore di cookie di un browser |
-| `"cookie"` | Un cookie **HttpOnly** impostato dal backend | Un'applicazione browser. Lo script in esecuzione sulla pagina non può leggerlo, il che lo rende sicuro contro gli attacchi XSS |
+|------|----------------------------|----------------|
+| `"json"` *(predefinita)* | Restituito nel corpo della risposta, conservato in `localStorage` | Un'app nativa, uno script, qualsiasi contesto privo del gestore di cookie del browser |
+| `"cookie"` | Un cookie **HttpOnly** impostato dal backend | Un'app per browser. Gli script in esecuzione sulla pagina non possono leggerlo, rendendolo sicuro contro attacchi XSS |
 
-La modalità cookie richiede `auth.cookieAuth` sul backend ed è quella utilizzata dal template frontend generato.
+La modalità cookie richiede `auth.cookieAuth` nel backend ed è quella utilizzata dal template frontend generato.
 
-## Attesa del ripristino della sessione
+## Attendere il ripristino della sessione
 
-**Una sessione ripristinata non è disponibile al primo rendering.** `getSession()` è sincrono, quindi al caricamento della pagina restituisce `null` mentre il ripristino è ancora in corso — e in modalità cookie un ripristino è *sempre* in corso, poiché il refresh token si trova in un cookie che la pagina non può leggere, costringendo il client a richiedere al server un nuovo access token.
+**Una sessione ripristinata non è disponibile al primo render.** `getSession()` è sincrono, quindi al caricamento della pagina restituisce `null` mentre il ripristino è ancora in corso — e in modalità cookie un ripristino è *sempre* in corso, poiché il refresh token si trova in un cookie non leggibile dalla pagina, costringendo il client a richiedere al server un nuovo access token.
 
-Leggerlo in modo sincrono è ciò che produce un flash di stato disconnesso a ogni ricaricamento:
+Leggerlo in modo sincrono è ciò che produce un lampeggio di stato disconnesso (logged-out flash) a ogni ricaricamento:
 
 ```typescript no-verify
 // Wrong: renders the signed-out view for one round trip, every reload.
@@ -269,7 +251,7 @@ const session = client.auth.getSession();
 if (!session) return <SignIn />;
 ```
 
-`isInitialized()` si risolve una volta che il client ha completato il tentativo — sia che abbia trovato una sessione o meno:
+`isInitialized()` si risolve una volta che il client ha terminato il tentativo, indipendentemente dal fatto che abbia trovato una sessione o meno:
 
 ```typescript
 async function currentUser() {
@@ -278,7 +260,7 @@ async function currentUser() {
 }
 ```
 
-In React, questo corrisponde a un singolo effetto:
+In React, corrisponde a un singolo effetto:
 
 ```tsx
 import { useEffect, useState } from "react";
@@ -301,15 +283,11 @@ function useCurrentUser() {
 }
 ```
 
-`useRebaseAuthController` in `@rebasepro/app` esegue già questa operazione, quindi un'applicazione creata sul template generato ne dispone automaticamente. Le richieste di dati non devono attendere: una effettuata durante il ripristino viene inviata non appena questo si assesta — come utente ripristinato, oppure in forma anonima — così un primo render non legge mai un elenco pubblico al posto di quello dell'utente.
+`useRebaseAuthController` in `@rebasepro/app` esegue già questa operazione, quindi un'app creata sul template generato la ottiene automaticamente. Le richieste di dati non devono attendere: una richiesta effettuata a metà ripristino viene inviata non appena questo si stabilizza — come utente ripristinato o in modo anonimo — così il primo render non legge mai un elenco pubblico al posto dei dati riservati dell'utente.
 
-Un ripristino che esegue un refresh (un token memorizzato scaduto, o la modalità cookie) raggiunge `onAuthStateChange` come `TOKEN_REFRESHED`; un token memorizzato ancora valido viene adottato in silenzio. Quindi un listener non può indicare che il ripristino è terminato: un avvio che non emette nulla è indistinguibile da uno ancora in corso. Attendi `isInitialized()` per verificare questo stato e usa il listener per le modifiche successive.
+Un ripristino che effettua un refresh (un token memorizzato scaduto, o la modalità cookie) arriva a `onAuthStateChange` come `TOKEN_REFRESHED`; un token memorizzato ancora valido viene adottato in modo trasparente. Pertanto, un listener non può segnalare la fine del ripristino: un avvio che non emette nulla è indistinguibile da uno ancora in corso. Attendi `isInitialized()` per questa verifica e usa il listener per i cambiamenti successivi.
 
-`restoreOutcome()` dice come si è conclusa la ripresa, una volta che `isInitialized()` si è
-risolta: `"restored"`, `"none"` (nulla da ripristinare), `"refused"` (il server ha
-rifiutato la sessione), oppure `"unreachable"` (il server non era raggiungibile, quindi
-la sessione non è stata né confermata né rifiutata). In modalità cookie, `"unreachable"`
-senza sessione è l'unico caso in cui non si sa con certezza che l'utente sia disconnesso:
+`restoreOutcome()` indica l'esito del ripristino una volta risolto `isInitialized()`: `"restored"`, `"none"` (nulla da ripristinare), `"refused"` (il server ha rifiutato la sessione) o `"unreachable"` (il server non è raggiungibile, quindi la sessione non è stata né confermata né rifiutata). In modalità cookie, `"unreachable"` in assenza di sessione è l'unico caso in cui non si ha la certezza che l'utente sia disconnesso:
 
 ```typescript
 await client.auth.isInitialized();
@@ -320,7 +298,7 @@ if (!client.auth.getSession() && client.auth.restoreOutcome() === "unreachable")
 
 ## Listener dello stato di autenticazione
 
-Reagisci ai cambiamenti di autenticazione all'interno dell'applicazione:
+Reagisci ai cambiamenti di autenticazione in tutta l'applicazione:
 
 ```typescript
 const unsubscribe = client.auth.onAuthStateChange((event, session) => {
@@ -334,11 +312,11 @@ unsubscribe();
 ```
 
 | Evento | Quando |
-|--------|--------|
+|-------|------|
 | `SIGNED_IN` | Un accesso o una registrazione sono stati completati |
-| `TOKEN_REFRESHED` | L'access token è stato rinnovato — compreso il rinnovo silenzioso che ripristina una sessione al caricamento della pagina |
-| `USER_UPDATED` | `updateUser()` ha modificato il profilo, `linkAnonymous()` ha trasformato un ospite in un account, `changeEmail()` ha avviato un cambio di indirizzo, oppure `confirmEmailChange()` ha spostato questo account sul suo nuovo indirizzo |
-| `SIGNED_OUT` | Una disconnessione, `revokeAllSessions()`, o un aggiornamento del token fallito definitivamente |
+| `TOKEN_REFRESHED` | L'access token è stato rinnovato, incluso il rinnovo trasparente che ripristina la sessione al caricamento della pagina |
+| `USER_UPDATED` | `updateUser()` ha modificato il profilo, `linkAnonymous()` ha trasformato un ospite in un account, `changeEmail()` ha avviato un cambio di indirizzo oppure `confirmEmailChange()` ha trasferito questo account al nuovo indirizzo |
+| `SIGNED_OUT` | Una disconnessione, `revokeAllSessions()` o un refresh fallito definitivamente |
 
 ## Gestione delle password
 
@@ -350,7 +328,7 @@ const { success, message } = await client.auth.resetPasswordForEmail(
 );
 ```
 
-### Reimpostazione della password (con token)
+### Reimpostare la password (con token)
 
 ```typescript
 const { success, message } = await client.auth.resetPassword(
@@ -359,7 +337,7 @@ const { success, message } = await client.auth.resetPassword(
 );
 ```
 
-### Modifica della password (autenticato)
+### Modificare la password (autenticato)
 
 ```typescript
 const { success, message } = await client.auth.changePassword(
@@ -368,15 +346,11 @@ const { success, message } = await client.auth.changePassword(
 );
 ```
 
-Ogni altra sessione dell'account termina: chiunque altro la possedesse deve
-accedere di nuovo con la nuova password. Questo dispositivo resta autenticato.
-Il server risponde con una sessione nuova, e il client la adotta (emettendo
-`TOKEN_REFRESHED`).
+Tutte le altre sessioni dell'account vengono terminate: chiunque ne possedesse una dovrà accedere nuovamente con la nuova password. Questo dispositivo rimane connesso. Il server risponde con una nuova sessione e il client la acquisisce (emettendo `TOKEN_REFRESHED`).
 
 ## Verifica dell'email
 
-La registrazione invia al nuovo account il suo link di verifica quando l'email
-è configurata. `sendVerificationEmail()` lo invia di nuovo.
+La registrazione invia al nuovo account un link di verifica se il servizio email è configurato. `sendVerificationEmail()` lo invia nuovamente.
 
 ```typescript
 // Send verification email to the current user
@@ -399,18 +373,13 @@ try {
 }
 ```
 
-Il link dimostra la casella di posta, non chi ha registrato l'indirizzo, quindi
-una password che né la sessione né la chiamata dimostrano viene rimossa invece
-che mantenuta — vedi [Verifica email](/docs/backend/email-verification/).
+Il link dimostra il possesso della casella di posta, non chi ha registrato l'indirizzo, pertanto una password non confermata né dalla sessione né dalla chiamata viene rimossa anziché mantenuta — consulta [Verifica dell'email](/docs/backend/email-verification/).
 
-Su un backend con `requireEmailVerification`, `signUp()` risolve con
-`{ confirmationRequired: true, user: null }` e nessuna sessione: l'account
-accede una volta che il link viene seguito con la sua password.
+Su un backend con `requireEmailVerification`, `signUp()` si risolve con `{ confirmationRequired: true, user: null }` e nessuna sessione: l'accesso dell'account avviene solo dopo aver aperto il link e inserito la password.
 
-## Cambiare l'indirizzo email
+## Modificare l'indirizzo email
 
-Un utente autenticato sposta il proprio account su un altro indirizzo.
-Nulla cambia finché il nuovo indirizzo non risponde:
+Un utente autenticato trasferisce il proprio account a un altro indirizzo. Nulla cambia finché il nuovo indirizzo non risponde:
 
 ```typescript
 // Mails a link to the new address, and a notice to the current one
@@ -420,13 +389,9 @@ const { pendingEmail, expiresAt } = await client.auth.changeEmail("jane@new.exam
 const { email, removedProviders } = await client.auth.confirmEmailChange(token);
 ```
 
-Il link vive 24 ore; `getUser()` segnala l'indirizzo in attesa come
-`pendingEmail`. La conferma non richiede alcuna sessione, e un client
-autenticato come quell'account adotta il nuovo indirizzo ed emette
-`USER_UPDATED`. I rifiuti sono elencati in
-[Cambiare un indirizzo email](/docs/backend/auth-endpoints/#changing-an-email-address).
+Il link è valido per 24 ore; `getUser()` segnala l'indirizzo in attesa come `pendingEmail`. La conferma non richiede alcuna sessione e un client autenticato con quell'account adotta il nuovo indirizzo ed emette `USER_UPDATED`. I possibili motivi di rifiuto sono elencati in [Modifica di un indirizzo email](/docs/backend/auth-endpoints/#changing-an-email-address).
 
-## Gestione delle sessioni (multi-dispositivo)
+## Gestione della sessione (multidispositivo)
 
 ```typescript
 // List all active sessions, one per sign-in
@@ -440,13 +405,7 @@ await client.auth.revokeSession(sessionId);
 await client.auth.revokeAllSessions();
 ```
 
-Ogni access token indica a quale accesso appartiene, quindi esattamente una
-voce ha `isCurrentSession: true`: il dispositivo che chiede. Revocare una
-sessione termina insieme il refresh token e l'access token di quel
-dispositivo, dalla richiesta successiva, sia via HTTP sia su un socket
-realtime aperto. Il logout (`signOut()`) fa lo stesso per il dispositivo che
-si disconnette. Un access token emesso prima di questa release non indica
-alcuna sessione; continua a funzionare finché non scade, entro l'ora.
+Ogni access token identifica l'accesso a cui appartiene, quindi esattamente una voce presenta `isCurrentSession: true`: il dispositivo che effettua la richiesta. La revoca di una sessione termina sia il refresh token sia l'access token di quel dispositivo, a partire dalla richiesta successiva, sia via HTTP che su una connessione socket realtime aperta. La disconnessione (`signOut()`) fa lo stesso per il dispositivo che si disconnette. Un access token emesso prima di questa versione non identifica alcuna sessione; continuerà a funzionare fino alla sua scadenza, entro un'ora.
 
 ## Configurazione dell'autenticazione
 
@@ -469,7 +428,7 @@ const config = await client.auth.getAuthConfig();
 // }
 ```
 
-## Storage personalizzato della sessione
+## Storage di sessione personalizzato
 
 Per impostazione predefinita, le sessioni sono memorizzate in `localStorage`. Puoi personalizzare questo comportamento con l'opzione `auth`:
 
@@ -491,17 +450,11 @@ const client = createRebaseClient({
 });
 ```
 
-## Usare il tuo provider di autenticazione
+## Utilizzare un provider di autenticazione personalizzato
 
-Su 0.24 un getter del
-token autentica solo le richieste HTTP, e il socket realtime resta
-anonimo.
+Nella versione 0.24 un getter del token autentica solo le richieste HTTP, mentre il socket realtime rimane anonimo.
 
-Quando gli utenti accedono con un provider tuo (Clerk, Firebase Auth, o una
-sessione che la tua app ha già), `client.auth` non è coinvolto. Dai invece al client un
-getter per il token del provider. Viene interrogato ogni volta che serve un token:
-a ogni richiesta HTTP, e ogni volta che il socket realtime si
-autentica.
+Quando gli utenti effettuano l'accesso tramite un provider personalizzato (Clerk, Firebase Auth o una sessione già presente nell'app), `client.auth` non viene coinvolto. Fornisci invece al client un getter per il token del provider. Questo verrà chiamato ogni volta che serve un token: per ogni richiesta HTTP e ogni volta che il socket realtime esegue l'autenticazione.
 
 ```typescript
 import { createRebaseClient } from "@rebasepro/client";
@@ -520,19 +473,11 @@ client.setOnUnauthorized(async () => {
 client.data.posts.listen({}, (response) => render(response.data));
 ```
 
-- Il getter prevale sulla sessione propria del client. Quando risponde `null` o
-  lancia un errore, il client invia il token che possiede, se ne ha uno: quello della sua
-  sessione, uno impostato con `client.setToken()`, o l'opzione `token`.
-- L'opzione `token` viene letta ogni volta che serve un token, finché `setToken()` o
-  un accesso non la sostituiscono, quindi può essere dichiarata come getter
-  (`get token() { return currentToken; }`).
-- `setOnUnauthorized` copre un 401 via HTTP e un errore di autenticazione sul socket,
-  e sostituisce il refresh della sessione proprio del client.
+- Il getter ha la priorità sulla sessione del client. Quando restituisce `null` o genera un'eccezione, il client invia il token in suo possesso, se presente: quello della sua sessione, uno impostato con `client.setToken()` o quello dell'opzione `token`.
+- L'opzione `token` viene letta ogni volta che un token è necessario, finché `setToken()` o un accesso non la sostituiscono; può quindi essere dichiarata come un getter (`get token() { return currentToken; }`).
+- `setOnUnauthorized` gestisce gli errori 401 su HTTP e gli errori di autenticazione sul socket, sostituendo il refresh di sessione interno del client.
 
-Il backend deve verificare il token del provider: vedi
-[Adapter di autenticazione personalizzati](/docs/backend/auth-adapters). Nel pannello di
-amministrazione, imposta il getter sul client che passi a `<Rebase client>`
-([Il tuo provider di autenticazione](/docs/frontend/authentication#your-own-auth-provider)).
+Il backend deve verificare il token del provider: consulta [Adapter di autenticazione personalizzati](/docs/backend/auth-adapters). Nel pannello di amministrazione, imposta il getter sul client che passi a `<Rebase client>` ([Il tuo provider di autenticazione](/docs/frontend/authentication#your-own-auth-provider)).
 
 ## Struttura dell'oggetto User
 
@@ -554,6 +499,6 @@ interface User {
 
 ## Passaggi successivi
 
-- **[Interrogazione dei dati](/docs/sdk/querying)** — Operazioni CRUD e query builder
+- **[Interrogare i dati](/docs/sdk/querying)** — Operazioni CRUD e query builder
 - **[Sottoscrizioni in tempo reale](/docs/sdk/realtime)** — Dati in tempo reale con WebSocket
 - **[Backend di autenticazione](/docs/backend/authentication)** — Configurazione dell'autenticazione lato server

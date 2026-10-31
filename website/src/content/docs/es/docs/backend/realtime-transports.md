@@ -1,23 +1,23 @@
 ---
-sourceHash: 2f29788275d0b4db
+sourceHash: 18c4ff1205a910b2
 title: Tiempo real entre instancias
 sidebar_label: Tiempo real entre instancias
-description: "Cómo los canales de difusión (broadcast) y la presencia sobreviven a más de un proceso de servidor: el bus LISTEN/NOTIFY, qué posee cada instancia y cómo escribir tu propio transporte."
+description:"\"Cómo los canales de broadcast y la presencia sobreviven a más de un proceso de servidor: el bus LISTEN/NOTIFY, qué posee cada instancia y cómo escribir tu propio transporte.\""
 ---
 
 ## Difusión entre instancias y arquitectura LISTEN/NOTIFY
 
-Para entornos de clúster con múltiples instancias (por ejemplo, ejecutándose dentro de Kubernetes o contenedores Docker detrás de un balanceador de carga), Rebase se apoya en `LISTEN/NOTIFY` de PostgreSQL para sincronizar los **cambios en las filas** entre instancias. Por lo tanto, las suscripciones a colecciones y entidades abarcan varias instancias sin necesidad de configuración adicional; eso es lo que describe esta sección.
+Para entornos de clúster con múltiples instancias (p. ej., ejecutándose dentro de contenedores Kubernetes o Docker detrás de un balanceador de carga), Rebase se basa en `LISTEN/NOTIFY` de PostgreSQL para sincronizar los **cambios en las filas** entre instancias. Por lo tanto, las suscripciones a colecciones y entidades abarcan varias instancias sin necesidad de configuración; eso es lo que describe esta sección.
 
-**Los canales de difusión (broadcast) y la presencia son independientes**, y funcionan por instancia hasta que activas un bus de canales. Consulta [Canales y presencia entre instancias](#canales-y-presencia-entre-instancias) más abajo.
+**Los canales de broadcast y la presencia son independientes** y funcionan por instancia hasta que activas un bus de canales. Consulta [Canales y presencia entre instancias](#canales-y-presencia-entre-instancias) a continuación.
 
-### Omitir los pools de pgBouncer
+### Omisión de los pools de pgBouncer
 
-Dado que los agrupadores de conexiones como **pgBouncer** no admiten el modelo de conexión persistente requerido para sesiones SQL `LISTEN` de larga duración, el supervisor de tiempo real abre un cliente Postgres dedicado y sin pool (`PgClient`) directamente a la base de datos. Esta conexión directa utiliza la variable de entorno `DATABASE_DIRECT_URL` si está configurada, lo que garantiza la estabilidad y evita el agotamiento del pool o desconexiones abruptas.
+Dado que los agrupadores de conexiones (connection poolers) como **pgBouncer** no admiten el modelo de conexión persistente requerido para sesiones SQL `LISTEN` de larga duración, el supervisor en tiempo real abre un cliente Postgres dedicado y no agrupado (`PgClient`) directamente a la base de datos. Esta conexión directa utiliza la variable de entorno `DATABASE_DIRECT_URL` si está configurada, lo que garantiza la estabilidad y evita el agotamiento del pool o desconexiones abruptas.
 
 ### Mecánica de notificaciones y estructura del payload
 
-Con la [captura de cambios de la base de datos](/docs/backend/realtime-cdc/) activa —el valor predeterminado siempre que el rol de la base de datos pueda crear triggers—, cada instancia oye cada commit en el canal `rebase_cdc`, y no se envía nada de lo que sigue. Sin ella, cuando se modifica un registro en la Instancia A, esta transmite una notificación en el canal `rebase_entity_changes`. Para minimizar la sobrecarga en la base de datos y el ancho de banda de la red, el payload de la notificación se mantiene extremadamente compacto:
+Con la [captura de cambios en la base de datos](/docs/backend/realtime-cdc/) activa —el valor predeterminado siempre que el rol de la base de datos pueda crear triggers—, cada instancia escucha cada commit en el canal `rebase_cdc`, y no se envía nada de lo que se describe a continuación. Sin ella, cuando se modifica un registro en la Instancia A, esta transmite una notificación en el canal `rebase_entity_changes`. Para minimizar la sobrecarga de la base de datos y el ancho de banda de red, el payload de la notificación se mantiene extremadamente compacto:
 
 ```json
 {
@@ -28,9 +28,9 @@ Con la [captura de cambios de la base de datos](/docs/backend/realtime-cdc/) act
 }
 ```
 
-*Nota: `sid` representa el ID de instancia aleatorio y único del servidor generado al iniciar, `p` es el slug de la colección (ruta) y `eid` es el ID de la entidad de destino.*
+*Nota: `sid` representa el ID de instancia aleatorio y único del servidor generado al iniciar, `p` es el slug (ruta) de la colección y `eid` es el ID de la entidad de destino.*
 
-Los cambios hechos en el mismo instante — un guardado masivo anuncia cada fila que escribió — salen juntos, en tan pocas notificaciones como quepan bajo el límite de 8000 bytes del NOTIFY de Postgres, cada una con sus cambios como tripletas `[p, eid, db]`:
+Los cambios realizados en el mismo momento —un guardado por lotes (bulk save) anuncia cada fila que escribió— se envían juntos, en la menor cantidad de notificaciones posible dentro del límite de 8000 bytes de NOTIFY de Postgres, listando cada uno sus cambios como tuplas de tres elementos `[p, eid, db]` :
 
 ```json
 {
@@ -39,20 +39,20 @@ Los cambios hechos en el mismo instante — un guardado masivo anuncia cada fila
 }
 ```
 
-Un cambio individual conserva la forma de arriba, de modo que una instancia más antigua sigue leyéndolo durante un despliegue progresivo (rolling deploy).
+Un cambio individual conserva la misma estructura anterior, de modo que una instancia más antigua aún pueda leerlo durante un despliegue continuo (rolling deploy).
 
 - **Autofiltrado**: Al recibir un mensaje, cada instancia lee el `sid`. Si coincide con su propio ID de instancia, el servidor descarta la notificación para evitar bucles infinitos de enrutamiento.
-- **Retransmisión y distribución (Fan-out)**: Si la notificación proviene de otra instancia, el servidor programa una nueva consulta con debounce para los suscriptores conectados localmente a cada cambio. No lee nada al recibirla: cada trama es una nueva consulta bajo el alcance de su propio suscriptor.
-- **Bucle de reconexión del supervisor**: Si la conexión con la base de datos se interrumpe, un supervisor de conexión en segundo plano monitorea el estado y activa una secuencia de reconexión automática tras un retraso fijo de **3 segundos**, restaurando el bucle `LISTEN` sin afectar el ciclo de vida de la aplicación Hono principal. Después se vuelve a consultar cada suscripción activa de la instancia, porque lo que se publicó mientras la conexión estaba caída no llegó a nadie. Si la base de datos no está disponible al arrancar, la conexión se reintenta de la misma forma.
-- **Latido (heartbeat)**: Una conexión `LISTEN` está inactiva por naturaleza, y el tiempo de espera por inactividad de un balanceador de carga o de un NAT puede cortarla sin error en ninguno de los dos extremos (una conexión semiabierta). Por eso funciona con TCP keepalive y debe responder a un `SELECT 1` cada 30 segundos en menos de 10 segundos. La que no responde se reemplaza como se describe arriba. Mientras la conexión está caída, `/health` la incluye como `cross-instance`, y cuando lleva 60 segundos caída la comprobación falla.
+- **Retransmisión y distribución (fan-out)**: Si la notificación provino de otra instancia, el servidor programa una nueva consulta debounced para sus suscriptores conectados localmente sobre cada cambio. No lee nada al recibirlo: cada frame desencadena una nueva consulta bajo el propio ámbito de su suscriptor.
+- **Bucle de reconexión del supervisor**: Si la conexión con la base de datos se cae, un supervisor de conexiones en segundo plano monitorea el estado y activa una secuencia de reconexión automática tras un retraso fijo de **3 segundos**, restaurando el bucle `LISTEN` sin afectar el ciclo de vida principal de la aplicación Hono. Luego se vuelve a consultar cada suscripción activa en la instancia, ya que lo que se publicó mientras la conexión estuvo caída no llegó a nadie. Si no se puede contactar a la base de datos durante el inicio, la conexión se reintenta de la misma manera.
+- **Heartbeat**: Una conexión `LISTEN` está inactiva por naturaleza, y un tiempo de espera de inactividad en un balanceador de carga o un NAT puede cortarla sin ningún error en ninguno de los extremos (una conexión semiabierta o half-open). Por lo tanto, se ejecuta con TCP keepalive y debe responder a un `SELECT 1` cada 30 segundos en un plazo de 10 segundos. Si no responde a tiempo, se reemplaza como se indicó anteriormente. Mientras la conexión esté caída, `/health` la lista como `cross-instance`, y una vez que haya estado caída durante 60 segundos, la verificación falla.
 
 ## Canales y presencia entre instancias
 
-Los cambios en las filas cruzan entre instancias de forma nativa (explicado arriba). Los canales de difusión y la presencia **no**: de forma predeterminada, solo se distribuyen a los clientes conectados a la instancia que los recibió.
+Los cambios en las filas cruzan entre instancias por sí solos (como se explicó anteriormente). Los canales de broadcast y la presencia **no** lo hacen: por defecto, solo se distribuyen a los clientes conectados a la instancia que los recibió.
 
-En una sola instancia, esto es exactamente lo adecuado y no tiene costo adicional. Detrás de un balanceador de carga, es un error que no verás durante el desarrollo: dos colaboradores aterrizan en réplicas diferentes, se unen al mismo canal y ven una sala vacía mientras transmiten entre sí a la perfección. No se produce ningún error explícito.
+En una sola instancia esto es exactamente lo correcto y no tiene costo alguno. Detrás de un balanceador de carga, es un error que no verás en desarrollo: dos colaboradores caen en réplicas diferentes, se unen al mismo canal y ven una sala vacía mientras transmiten entre sí a la perfección. No se genera ningún error.
 
-La solución es un **bus de canales** (channel bus): un transporte opcional que lleva las tramas de los canales y la presencia entre instancias:
+La solución es un **channel bus** (bus de canales): un transporte opcional que lleva los frames del canal y la presencia entre instancias:
 
 ```typescript
 database: createPostgresAdapter({
@@ -66,46 +66,61 @@ database: createPostgresAdapter({
 
 | Bus          | Cuándo usarlo                                                                                          |
 |--------------|--------------------------------------------------------------------------------------------------------|
-| `memory`     | **Predeterminado.** Una sola instancia. Sin entrega entre instancias, sin sobrecarga.                 |
-| `postgres`   | Dos o más instancias. Usa `LISTEN/NOTIFY` en la base de datos que ya tienes — sin desplegar servicios nuevos. |
+| `memory`     | **Por defecto.** Instancia única. Sin entrega entre instancias, sin sobrecarga.                       |
+| `postgres`   | Dos o más instancias. Utiliza `LISTEN/NOTIFY` en la base de datos que ya tienes; sin necesidad de desplegar un nuevo servicio. |
 
-El transporte también se puede definir por despliegue con
-`REALTIME_CHANNEL_BUS=memory|postgres`, de modo que pueda cambiarse sin necesidad de recompilar.
-Sobrescribe un transporte integrado **con nombre** (`bus: { type: "memory" }`), y se
-**ignora** deliberadamente cuando a `realtime.bus` se le pasa una *instancia* ya construida
+El transporte también se puede configurar por despliegue con
+`REALTIME_CHANNEL_BUS=memory|postgres`, de modo que se puede cambiar sin necesidad de recompilar.
+Sobrescribe un valor integrado con **nombre** (`bus: { type: "memory" }`), y se
+**ignora** deliberadamente cuando a `realtime.bus` se le pasó una *instancia* ya construida
 de `ChannelBus`; la variable solo puede nombrar transportes que este paquete
 sabe cómo construir, por lo que respetarla en ese caso significaría descartar silenciosamente el
-objeto provisto por la aplicación. En ese caso, se registra una advertencia mencionando ambos, y un
-valor no reconocido recurre a lo que estuviera configurado en lugar de pasar a memoria.
+objeto proporcionado por la aplicación. En ese caso se registra una advertencia mencionando ambos, y un
+valor no reconocido recurre a lo que estuviera configurado en lugar de a memory.
 
-### Por qué no se incluye una opción con Redis de serie
+### Por qué no se incluye una opción con Redis de fábrica
 
-Rebase se despliega como Postgres + backend + frontend. Un bus que necesitara un intermediario de mensajería añadiría un segundo servicio con estado en cada `docker-compose.yml` que genera la CLI, para una funcionalidad que la mayoría de las aplicaciones nunca utiliza; por lo tanto, el criterio para añadir uno es que la base de datos genuinamente no pueda soportar la carga.
+Rebase se despliega como Postgres + backend + frontend. Un bus que requiriera un intermediario de mensajes (message broker) añadiría un segundo servicio con estado en cada `docker-compose.yml` generado por la CLI, para una funcionalidad que la mayoría de las aplicaciones nunca utiliza; por lo tanto, el criterio para añadir uno es que la base de datos realmente no pueda soportar la carga.
 
-Y puede soportarla. Medido a través de dos instancias de backend contra un único contenedor de Postgres, el bus de Postgres entregó **~10,000 mensajes entre instancias por segundo sin pérdidas**, y se mantuvo estable hasta alcanzar **ocho instancias** (14,000 entregas, sin pérdidas). Veinte personas moviendo cursores a 60 fps generan alrededor de 1,200 mensajes por segundo, aproximadamente un octavo de esa cifra.
+Sí puede. Medido en dos instancias de backend contra un único contenedor de Postgres, el bus de Postgres entregó **~10.000 mensajes entre instancias por segundo sin pérdidas**, y se mantuvo estable hasta **ocho instancias** (14.000 entregas, sin pérdidas). Veinte personas moviendo cursores a 60 fps generan alrededor de 1.200 mensajes por segundo: aproximadamente un octavo de eso.
 
-El límite que vale la pena vigilar no es la capacidad, sino que cada notificación es una consulta contra tu base de datos principal, compitiendo con las consultas reales de tu aplicación. Por lo tanto, el bus de Postgres **fusiona (coalesces)** las tramas salientes (ver más abajo), lo que mantiene ese costo proporcional al tiempo transcurrido en lugar de a la cantidad de mensajes.
+El límite que vale la pena vigilar no es la capacidad, sino que cada notificación es una consulta contra tu base de datos principal, compitiendo con las consultas reales de tu aplicación. Por ello, el bus de Postgres **fusiona (coalesces)** los frames salientes (ver más abajo), lo que mantiene ese costo proporcional al tiempo transcurrido en lugar de a la cantidad de mensajes.
 
-Por cada cliente, el socket acepta hasta **7,200 tramas de canal por minuto** (120/s: 60 fps de difusiones de cursor más la actualización de presencia que cada una transporta), contabilizadas por separado del presupuesto que comparten las consultas y suscripciones. Las tramas que superen ese límite se rechazan con un error `RATE_LIMITED` en lugar de encolarse.
+Por cliente, el socket acepta hasta **7.200 frames de canal por minuto** (120/s: 60 fps de emisiones de cursor más la actualización de presencia que lleva cada una), contabilizados por separado de la cuota que comparten las consultas y las suscripciones. Los frames que superen ese límite se rechazan con un error `RATE_LIMITED` en lugar de ponerse en cola.
 
-El rechazo llega a `channel.onError()`, no como un `broadcast()` denegado; consulta [Cuándo se rechaza una trama de canal](/docs/backend/realtime#when-a-channel-frame-is-refused).
+El rechazo llega a `channel.onError()`, no como un `broadcast()` rechazado; consulta [Cuándo se rechaza un frame de canal](/docs/backend/realtime#when-a-channel-frame-is-refused).
 
-Si aún necesitas más rendimiento después de eso, limita (throttle) los eventos de tipo cursor en el cliente (el estado donde la última escritura gana no necesita 60 actualizaciones por segundo) y considera enrutar a los colaboradores de un mismo documento a la misma instancia: el enrutamiento persistente (sticky routing) reduce el tráfico entre instancias a casi nada, independientemente del número de usuarios. Solo más allá de ese punto vale la pena considerar otro transporte, y entonces la solución es un paquete de transporte, no un fork. Consulta [Cómo escribir tu propio transporte](#cómo-escribir-tu-propio-transporte).
+Si aún estás forzando el límite después de eso, limita la frecuencia (throttle) de los eventos tipo cursor en el cliente (el estado de tipo último-en-escribir-gana no necesita 60 actualizaciones por segundo) y considera enrutar a los colaboradores de un documento a la misma instancia con [`affinity`](/docs/sdk/realtime#keeping-a-group-on-one-instance); el enrutamiento persistente (sticky routing) reduce el tráfico entre instancias a prácticamente nada, sin importar la cantidad de usuarios. Solo más allá de ese punto vale la pena otro transporte, y entonces la respuesta es un paquete de transporte, no un fork. Consulta [Cómo escribir tu propio transporte](#cómo-escribir-tu-propio-transporte).
 
-### Fusión de mensajes (Coalescing)
+### Ver qué está haciendo el bus
 
-Las tramas publicadas mientras una ventana breve está abierta se envían juntas en una sola notificación. La ventana es de **flanco inicial (leading-edge)**: una trama que llega cuando no hay ninguna ventana abierta se envía de inmediato, de modo que un canal inactivo no paga latencia adicional y solo se procesan por lotes los flujos sostenidos.
+Con `REBASE_METRICS=true`, cada instancia informa sobre lo que está procesando en `/metrics`:
 
-Medido a través de dos instancias, 3,000 difusiones, todas entregadas en todos los casos:
+| Métrica | Tipo | Significado |
+|---|---|---|
+| `rebase_realtime_sockets` | gauge | Sockets abiertos en esta instancia |
+| `rebase_realtime_channels` | gauge | Canales con algún miembro en esta instancia |
+| `rebase_realtime_bus_frames_published_total` | counter | Frames que esta instancia envió al bus, por `kind`: `broadcast`, `broadcast_ref`, `presence_diff`, y `channels`, las instancias comunicándose entre sí lo que sirven |
+| `rebase_realtime_bus_frames_skipped_total` | counter | Broadcasts y cambios de presencia no enviados porque ninguna otra instancia tenía miembros en el canal |
 
-| Patrón de tráfico | Fusión desactivada | Fusión activada | Reducción |
+Los contadores inician en cero al arrancar la instancia y cuentan frames, de los cuales el bus puede unir varios en una sola notificación. Los mensajes retenidos siempre viajan, por lo que nunca se omiten. En el bus `memory` predeterminado, ambos permanecen en cero.
+
+Recolecta métricas (scrape) de cada instancia individualmente en lugar de hacerlo desde un balanceador de carga frente a ellas: los números son por proceso. Un grupo que permanece en una sola instancia se refleja en un aumento de `skipped` mientras que `broadcast` y `presence_diff` se mantienen planos, y los sockets se distribuyen entre las instancias. Si los broadcasts aumentan en todas las instancias, significa que los canales las abarcan. En Rebase Cloud, `rebase cloud metrics` muestra los mismos conteos por instancia.
+
+### Agrupación (Coalescing)
+
+Los frames publicados mientras una ventana breve está abierta salen juntos en una única notificación. La ventana es de **borde delantero (leading-edge)**: un frame que llega cuando no hay ninguna ventana abierta se envía inmediatamente, por lo que un canal inactivo no sufre latencia adicional y solo se procesa por lotes un flujo continuo sostenido.
+
+Medido a través de dos instancias, 3.000 broadcasts, todos entregados en cada caso:
+
+| Patrón de tráfico | Coalescing desactivado | Coalescing activado | Reducción |
 |---|---|---|---|
-| Ráfaga (lo más rápido posible) | 3,000 consultas | 68 consultas | **44×** |
-| Espaciado (~500 msg/s, distribuido) | 3,000 consultas | 240 consultas | **12.5×** |
+| Ráfaga (lo más rápido posible) | 3.000 consultas | 68 consultas | **44×** |
+| Ritmo constante (~500 msg/s, distribuido) | 3.000 consultas | 240 consultas | **12,5×** |
 
-El caso de ráfaga también finalizó ~11 veces más rápido en tiempo real transcurrido, debido a que los viajes de ida y vuelta a la base de datos eran el cuello de botella y no el trabajo en sí.
+El caso en ráfaga también finalizó ~11× más rápido en tiempo real (wall-clock), porque los viajes de ida y vuelta a la base de datos eran el cuello de botella más que el trabajo en sí.
 
-La ventana está configurada por defecto en 10 ms y no es un ajuste crítico: 5 ms, 10 ms y 20 ms produjeron recuentos de consultas idénticos en ambos patrones, debido a que un lote está limitado por el techo de payload de 8 KB o por la naturaleza misma del tráfico mucho antes de que el temporizador importe. Cámbialo solo si tienes un motivo:
+La ventana tiene un valor predeterminado de 10 ms y no es una configuración delicada: 5 ms, 10 ms y 20 ms produjeron conteos de consultas idénticos en ambos patrones, porque un lote está limitado por el tope de payload de 8 KB o por el comportamiento natural del tráfico mucho antes de que el temporizador sea relevante. Cámbialo solo si tienes una razón:
 
 ```typescript
 realtime: {
@@ -113,11 +128,11 @@ realtime: {
 }
 ```
 
-Una nota sobre el despliegue: un lote viaja con un formato de red diferente al de una sola trama, y una instancia que ejecute una versión anterior no lo comprenderá. Las tramas individuales siempre se envían sin empaquetar, por lo que un despliegue progresivo (rolling deploy) solo corre el riesgo de perder tramas si el clúster está bajo una carga constante *durante* el reinicio; aun así, los canales retenidos se reparan por sí mismos mediante la reproducción del historial.
+Una nota sobre el despliegue: un lote viaja en un formato de transmisión diferente al de un frame individual, y una instancia que ejecute una versión anterior no lo comprenderá. Los frames individuales siempre se envían sin empaquetar, por lo que un despliegue continuo solo corre el riesgo de perder frames si el clúster está bajo carga sostenida *durante* el reinicio; y, de todos modos, los canales retenidos se reparan solos mediante la reproducción del historial (history replay).
 
 ## Cómo escribir tu propio transporte
 
-`realtime.bus` acepta cualquier objeto que implemente la interfaz `ChannelBus`, por lo que un transporte puede distribuirse como su propio paquete: `@rebasepro/types` declara el contrato y no se requiere nada más para implementarlo:
+`realtime.bus` acepta cualquier objeto que implemente la interfaz `ChannelBus`, por lo que un transporte puede distribuirse como su propio paquete; `@rebasepro/types` declara el contrato y no se requiere nada más para implementarlo:
 
 ```typescript
 import type { ChannelBus, ChannelBusFrame, ChannelBusHandler } from "@rebasepro/types";
@@ -152,44 +167,44 @@ database: createPostgresAdapter({
 })
 ```
 
-**Lo que tu implementación debe garantizar:** `start()` rechaza cuando el transporte no se puede utilizar; `publish()` alcanza a todas las demás instancias o rechaza; `stop()` es idempotente; y un mensaje mal formado se descarta y se registra en los registros en lugar de lanzar una excepción, de modo que una trama corrupta no pueda derribar al listener.
+**Lo que tu implementación debe garantizar:** `start()` rechaza la promesa cuando el transporte no se puede usar; `publish()` llega a todas las demás instancias o rechaza; `stop()` es idempotente; y un mensaje mal formado se descarta y se registra en logs en lugar de lanzar una excepción, de modo que un frame defectuoso no pueda tumbar el listener.
 
-**Lo que no es necesario garantizar:** el orden (los canales retenidos incluyen `seq` y el SDK los ordena en función de este), la durabilidad (una trama perdida es una actualización en vivo omitida, reparada mediante la reproducción del historial del cliente) o la entrega exactamente una vez (las tramas retenidas se desduplican mediante `seq`; las diferencias de presencia son idempotentes).
+**Lo que no tiene que garantizar:** orden (los canales retenidos incluyen `seq` y el SDK ordena según este), durabilidad (un frame perdido es una actualización en vivo que no se recibió, reparada por la reproducción de historial del cliente) o entrega exactamente una vez (los frames retenidos se deduplican mediante `seq`; las diferencias de presencia son idempotentes).
 
-`maxFrameBytes` es la forma en que el framework sabe si debe enviar un mensaje retenido grande en línea o como un puntero. Devuelve `Infinity` cuando tu transporte no tenga un límite significativo, de modo que la ruta del puntero nunca se tome innecesariamente.
+`maxFrameBytes` es la forma en que el framework sabe si debe enviar un mensaje retenido grande de forma integrada (inline) o como un puntero. Devuelve `Infinity` cuando tu transporte no tenga un límite significativo, para que la ruta de punteros nunca se tome innecesariamente.
 
-La entrega a los clientes locales no es tu responsabilidad: el servicio en tiempo real es el encargado de decidir qué suscriptores reciben una trama. Un transporte solo traslada tramas entre instancias.
+La entrega a los clientes locales no es tu responsabilidad: el servicio de tiempo real determina qué suscriptores reciben un frame. Un transporte solo mueve frames entre instancias.
 
 ### El límite de 8 KB en el bus de Postgres
 
-`pg_notify` rechaza cargas útiles de 8000 bytes o más. Los cursores y la presencia caben con espacio de sobra; una instantánea (snapshot) de un documento no. Rebase gestiona esto del mismo modo que gestiona cambios grandes en entidades: enviando una dirección en lugar de un cuerpo:
+`pg_notify` rechaza un payload de 8000 bytes o más. Los cursores y la presencia caben con espacio de sobra; una instantánea (snapshot) de un documento no. Rebase gestiona esto de la misma forma que maneja los cambios de entidad grandes: enviando una dirección en lugar del cuerpo:
 
-- **En un canal retenido** (ver [Retención de canales](/docs/backend/realtime#channel-retention)) el mensaje ya está almacenado con un número de secuencia, por lo que la notificación solo incluye `(channel, seq)` y cada instancia receptora vuelve a leer el cuerpo. No hay ningún límite de tamaño en absoluto. Esto vale para todo mensaje retenido, pequeño o grande: cualquier inicio de sesión en la base de datos puede hacer `LISTEN`, así que el cuerpo nunca viaja en la notificación. Cuesta una lectura por clave primaria por mensaje en cada instancia con un miembro en el canal.
-- **Las difusiones efímeras y la presencia** sí viajan en la propia notificación, así que cualquier inicio de sesión en la base de datos puede leerlas. Pon en un canal retenido todo lo que no deba poder leerse de ese modo.
-- **En un canal efímero** no hay nada a lo que apuntar. La difusión se entrega localmente, el remitente recibe un error `CHANNEL_BUS_PAYLOAD_TOO_LARGE` en `channel.onError()`, y una advertencia especifica el nombre del canal, en lugar de que el mensaje llegue silenciosamente solo a la mitad del clúster.
+- **En un canal retenido** (consulta [Retención de canales](/docs/backend/realtime#channel-retention)), el mensaje ya está almacenado con un número de secuencia, por lo que la notificación solo contiene `(channel, seq)` y cada instancia receptora vuelve a leer el cuerpo. No existe ningún límite de tamaño. Esto se aplica a todos los mensajes retenidos, pequeños o grandes: cualquier usuario con acceso a la base de datos puede ejecutar `LISTEN`, por lo que el cuerpo nunca viaja en la notificación. Cuesta una lectura por clave primaria por mensaje en cada instancia que tenga un miembro en el canal.
+- **Las difusiones efímeras (broadcasts) y la presencia** aún viajan en la notificación misma, por lo que cualquier inicio de sesión en la base de datos puede leerlas. Coloca cualquier cosa que no deba ser legible de esa manera en un canal retenido.
+- **En un canal efímero** no hay nada a lo que apuntar. La difusión se entrega localmente, el remitente recibe un error `CHANNEL_BUS_PAYLOAD_TOO_LARGE` en `channel.onError()`, y una advertencia nombra el canal, en lugar de que el mensaje llegue silenciosamente solo a la mitad del clúster.
 
-Si vas a transmitir mensajes grandes, añade una regla de retención a ese canal. Esa es toda la solución.
+Si transmites mensajes grandes, asigna a ese canal una regla de retención. Esa es toda la solución.
 
-### La presencia es un estado compartido, no solo distribución
+### La presencia es estado compartido, no solo distribución (fan-out)
 
-`presence_state` debe responder "quién está en este canal" para todo el clúster, algo que la memoria por instancia no puede hacer. Cuando un bus está activo, Rebase mantiene la lista en `rebase.channel_presence` (creada automáticamente) y responde a las solicitudes de listas desde allí.
+`presence_state` tiene que responder "¿quién está en este canal?" para todo el clúster, algo que la memoria por instancia no puede hacer. Cuando un bus está activo, Rebase mantiene el listado (roster) en `rebase.channel_presence` (creado automáticamente) y responde a las solicitudes de miembros a partir de este.
 
 | Columna       | Contenido                                      |
 |---------------|------------------------------------------------|
 | `channel`     | Nombre del canal                               |
-| `client_id`   | El cliente monitoreado                         |
+| `client_id`   | El cliente rastreado                           |
 | `instance_id` | A qué instancia del backend está conectado     |
 | `state`       | El estado de presencia del cliente             |
 | `last_seen`   | Actualizado por el heartbeat de presencia del SDK |
 
-El SDK envía un heartbeat de presencia aproximadamente cada 20 segundos frente a un tiempo de espera de 30 segundos. Las filas que dejan de actualizarse se eliminan, y las salidas se anuncian a todas las instancias, lo que también sirve como recuperación ante fallos: un pod que se interrumpe deja filas atrás que, tras una ventana de tiempo de espera, se ven exactamente como cualquier otro cliente que quedó inactivo. Un apagado ordenado borra sus propias filas de inmediato, por lo que un despliegue progresivo no muestra una ventana de elementos fantasma.
+El SDK envía heartbeats de presencia cada ~20 segundos frente a un tiempo de espera de 30 segundos. Las filas que dejan de actualizarse se eliminan (reaped) y las desconexiones se anuncian a todas las instancias, lo que también sirve como recuperación ante fallos: un pod que se cae deja atrás filas que, tras una ventana de tiempo de espera, se ven exactamente como las de cualquier otro cliente que quedó inactivo. Un apagado ordenado (graceful shutdown) limpia sus propias filas de inmediato, por lo que un despliegue continuo no muestra una ventana con registros fantasma.
 
-:::caution[La conexión LISTEN debe omitir tu agrupador de conexiones (pooler)]
-`LISTEN` es un estado de sesión, por lo que el bus de Postgres necesita una conexión directa, no pgBouncer ni ningún agrupador en modo transacción. Rebase utiliza `DATABASE_DIRECT_URL` cuando está definida; detrás de un agrupador de conexiones, apúntala al servicio de base de datos en sí. Sin una URL directa que sea válida, el bus registra una advertencia y permanece en modo memoria.
+:::caution[La conexión LISTEN debe omitir el pooler]
+`LISTEN` es un estado de sesión, por lo que el bus de Postgres necesita una conexión directa, no pgBouncer ni ningún pooler en modo transacción. Rebase utiliza `DATABASE_DIRECT_URL` cuando está configurada; detrás de un pooler, apúntala directamente al servicio de base de datos. Sin una URL directa utilizable, el bus registra una advertencia y permanece en modo memory.
 :::
 
 ## Siguientes pasos
 
-- [Tiempo real y WebSocket](/docs/backend/realtime/) — suscripciones, canales y presencia en una sola instancia
-- [Procesos divididos](/docs/deployment/split-processes/) — el modelo de despliegue donde esto resulta relevante
-- [Autohospedaje](/docs/deployment/self-hosting/) — cómo ejecutar el entorno de ejecución por tu cuenta
+- [Tiempo real y WebSockets](/docs/backend/realtime/) — suscripciones, canales y presencia en una sola instancia
+- [Procesos divididos](/docs/deployment/split-processes/) — el modelo de despliegue donde esto es relevante
+- [Autohospedaje](/docs/deployment/self-hosting/) — ejecutar el runtime por tu cuenta

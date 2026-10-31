@@ -1,14 +1,14 @@
 ---
-sourceHash: bfdc82eab01277a9
+sourceHash: 983cce6efed81a1a
 title: Códigos de erro
 sidebar_label: Códigos de erro
-description: Todos os códigos de erro que um backend Rebase pode retornar, com seu status HTTP, significado e o que fazer a respeito — além do envelope de resposta, X-Request-ID e as regras de details.
+description: Todos os códigos de erro que um backend Rebase pode retornar, com seu status HTTP, o que significa e o que fazer a respeito — além do envelope de resposta, X-Request-ID e as regras de details.
 ---
 
 Cada falha retornada por um backend Rebase usa um único envelope e contém um
-`code` estável. O código é o elemento sobre o qual tomar decisões condicionais:
-a mensagem é escrita para humanos e pode ser reformulada, o status é
-compartilhado por dezenas de problemas diferentes, e o código não é nenhum dos dois.
+`code` estável. O código é o elemento a ser verificado em condicionais: a mensagem
+é escrita para pessoas e pode ser reformulada, o status é compartilhado por dezenas
+de problemas diferentes, e o código não é nenhum dos dois.
 
 ## O envelope
 
@@ -23,384 +23,382 @@ compartilhado por dezenas de problemas diferentes, e o código não é nenhum do
 }
 ```
 
-- **`message`** — legível por humanos. Para um `4xx`, é a mensagem do próprio
-  servidor; para um `5xx`, é deliberadamente genérica, pois o texto subjacente
-  pode citar um host, uma role ou o nome de uma coluna.
-- **`code`** — um dos valores abaixo. Estável entre versões menores.
+- **`message`** — legível por humanos. Para um `4xx`, é a mensagem do próprio servidor;
+  para um `5xx`, é deliberadamente genérica, pois o texto subjacente pode citar um host,
+  uma role ou o nome de uma coluna.
+- **`code`** — um dos valores abaixo. Estável entre versões menores (minor versions).
 - **`details`** — opcional e nunca garantido. Veja as regras abaixo.
-- **`requestId`** — presente sempre que a requisição tiver passado pelo
-  middleware de request-ID, o que inclui todas as rotas sob `basePath`.
+- **`requestId`** — presente sempre que a requisição passou pelo middleware de request-ID,
+  o que abrange todas as rotas sob `basePath`.
 
 ### `X-Request-ID`
 
-Toda requisição sob `basePath` recebe um ID: o cabeçalho `X-Request-ID` do
-chamador quando for um UUID, ou um novo caso contrário. Ele é
-retornado na resposta como `X-Request-ID`, incluído no envelope de erro como
-`requestId` e anexado à linha de log do servidor referente àquela requisição.
+Toda requisição sob `basePath` recebe um ID: o cabeçalho `X-Request-ID` do chamador
+quando este for um UUID; caso contrário, um novo é gerado. Ele é retornado na
+resposta como `X-Request-ID`, incluído no envelope de erro como `requestId` e
+anexado à linha de log do servidor referente àquela requisição.
 
-Essa é a chave de correlação. Ao informá-la em um relatório de bug, um operador
-pode encontrar a linha de log exata que explica a falha, trazendo o motivo que
-nunca foi exibido ao cliente.
+Essa é a chave de correlação (join key). Cite-a em um relatório de bug e um operador poderá
+encontrar a linha exata do log que explica a falha, trazendo o motivo que nunca foi
+exibido ao cliente.
 
-Enviar o seu próprio ID é como um rastreamento sobrevive a um salto (hop): um
-gateway ou um job runner que encaminha o cabeçalho obtém um único ID em todos
-os serviços que processaram a requisição. Um valor inválido é ignorado em vez
-de rejeitado — não vale a pena falhar uma requisição por causa de um cabeçalho
-malformado enviado pelo chamador —, portanto, não presuma que o ID enviado foi o
-ID recebido. Leia o cabeçalho de resposta.
+Enviar o seu próprio identificador é como um rastreamento (trace) sobrevive a um salto (hop):
+um gateway ou executor de jobs que repassa o cabeçalho obtém um único ID em todos os
+serviços que processaram a requisição. Um valor inválido é ignorado em vez de rejeitado —
+não vale a pena falhar uma requisição por causa de um cabeçalho malformado enviado pelo
+chamador —, portanto, não assuma que o ID enviado é o ID recebido. Leia o cabeçalho da resposta.
 
 ### O que há em `details`
 
 `details` tem finalidade diagnóstica, não contratual. Três regras o regem:
 
-1. **Tudo o que uma rota define explicitamente é sempre retornado.** Esses são
-   os próprios erros do chamador descritos com precisão: qual campo de filtro
-   era desconhecido, qual relação não permite escrita, qual valor não
-   correspondia ao seu tipo.
-2. **Os diagnósticos do banco de dados são simplificados em produção.** Quando
-   a falha vem do Postgres, `details.dbCode` — o SQLSTATE — está sempre
-   presente: ele nomeia a classe do problema e não revela nada sobre os dados.
-   `dbMessage`, `detail` e `hint` são adicionados apenas quando `NODE_ENV` não
-   for `production`, pois o Postgres inclui o conteúdo das linhas neles.
-   `23505` relata `Key (email)=(a@b.c) already exists.`, o que responderia "essa
-   pessoa está registrada?" para qualquer endereço que alguém resolvesse testar.
-3. **Nunca ramifique a lógica com base em `details`.** Faça condicionais usando
-   `code`. O que está sob `details` é apenas o que foi útil para uma pessoa
-   naquele ponto de chamada e pode mudar.
+1. **Tudo o que uma rota define explicitamente é sempre retornado.** São os próprios
+   erros do chamador descritos com precisão: qual campo de filtro era desconhecido,
+   qual relação não permite escrita, qual valor não corresponde ao seu tipo.
+2. **Diagnósticos do banco de dados são omitidos em produção.** Quando a falha tem origem
+   no Postgres, `details.dbCode` — o SQLSTATE — está sempre presente: ele identifica a
+   classe do problema sem revelar nada sobre os dados. `dbMessage`, `detail` e `hint`
+   são adicionados apenas quando `NODE_ENV` não for `production`, pois o Postgres inclui
+   o conteúdo das linhas neles. O erro `23505` informa `Key (email)=(a@b.c) already exists.`,
+   o que responderia "esta pessoa está cadastrada?" para qualquer endereço que alguém tentasse testar.
+3. **Nunca crie condicionais com base em `details`.** Use o `code`. O conteúdo sob
+   `details` é apenas o que foi útil para uma pessoa naquele ponto de chamada, e ele muda.
 
 ## Lendo um status
 
-| Status | O que ele diz sobre a requisição |
+| Status | O que diz sobre a requisição |
 | --- | --- |
 | `400` | Malformada ou solicitando algo que não existe no schema. Corrija a requisição. |
-| `401` | Não autenticado ou a credencial expirou. Faça login ou atualize o token. |
-| `403` | Autenticado, mas não permitido. Tentar novamente com a mesma identidade não ajudará. |
-| `404` | Rota, collection ou linha inexistente — ou uma linha oculta pela segurança em nível de linha (RLS). |
-| `409` | Um conflito com o estado existente: duplicata ou gravação concorrente. |
-| `413` `415` `422` | O corpo é grande demais, o tipo de mídia é incorreto ou a requisição foi rejeitada semanticamente. |
-| `429` | Limite de taxa excedido (Rate limited). Aguarde; a mensagem informa por quanto tempo. |
+| `401` | Não autenticado ou a credencial expirou. Faça login ou renove o token. |
+| `403` | Autenticado, mas sem permissão. Tentar novamente com a mesma identidade não ajudará. |
+| `404` | Rota, coleção ou linha inexistente — ou uma linha oculta por segurança em nível de linha (RLS). |
+| `409` | Um conflito com o estado existente: duplicata ou escrita concorrente. |
+| `413` `415` `422` | O corpo é grande demais, o tipo de mídia está errado ou foi rejeitado semanticamente. |
+| `429` | Limite de taxa atingido (rate limited). Aguarde; a mensagem informa por quanto tempo. |
 | `500` | O erro está no servidor ou em seu banco de dados, não no chamador. Verifique os logs. |
-| `501` | A rota existe, mas este deploy não pode atendê-la — um recurso que está desativado ou não configurado. |
+| `501` | A rota existe, mas esta implantação não pode atendê-la — um recurso desativado ou não configurado. |
 | `502` `503` `504` | Uma dependência estava inacessível, não configurada ou muito lenta. |
 
 ## Autenticação e contas
 
 | Código | Status | Significado | O que fazer |
 | --- | --- | --- | --- |
-| `AAL2_REQUIRED` | 403 | A rota requer um segundo fator e a sessão possui apenas um. | Complete o desafio de MFA e tente novamente. |
+| `AAL2_REQUIRED` | 403 | A rota requer um segundo fator e a sessão possui apenas um. | Conclua o desafio de MFA e tente novamente. |
 | `ALREADY_VERIFIED` | 400 | O endereço ou fator já foi verificado. | Nada — o estado desejado já é verdadeiro. |
-| `ACCOUNT_OUTRANKS_CALLER` | 403 | A conta sendo editada, redefinida ou excluída tem uma role ou escopo que o chamador não tem. `details.beyond` os nomeia. | Peça a alguém que os tenha para fazer a alteração. |
-| `ANONYMOUS_AUTH_DISABLED` | 403 | O login anônimo está desativado neste servidor. | Ative-o ou faça login com uma identidade real. |
-| `API_KEY_SELF_MANAGEMENT_FORBIDDEN` | 403 | Uma chave de API tentou listar, criar, alterar ou revogar chaves de API, sejam do seu próprio tipo ou pessoais. | Gerencie as chaves como uma pessoa que tem `keys:write`, ou com a chave de serviço. |
-| `AUTH_MIDDLEWARE_MISSING` | 500 | Uma rota protegida foi executada sem o middleware de autenticação do Rebase antes dela, portanto a credencial do chamador nunca foi avaliada. | Monte o aplicativo por meio do roteador de funções em vez de diretamente no seu próprio servidor. |
-| `BOOTSTRAP_ANONYMOUS` | 403 | O bootstrap do primeiro administrador foi tentado por um chamador anônimo. | Faça login primeiro. |
-| `BOOTSTRAP_COMPLETED` | 403 | O primeiro administrador já existe. | Solicite que um administrador existente conceda a role. |
-| `BOOTSTRAP_NOT_FIRST_USER` | 403 | O bootstrap é apenas para o primeiro usuário absoluto, e este não é o caso. | Solicite que um administrador existente conceda a role. |
+| `ACCOUNT_OUTRANKS_CALLER` | 403 | A conta sendo editada, redefinida ou excluída possui uma role ou escopo que o chamador não possui. `details.beyond` lista quais são. | Peça para alguém que possua esses privilégios realizar a alteração. |
+| `ANONYMOUS_AUTH_DISABLED` | 403 | O login anônimo está desativado neste servidor. | Ative-o ou autentique-se com uma identidade real. |
+| `API_KEY_SELF_MANAGEMENT_FORBIDDEN` | 403 | Uma chave de API tentou listar, criar, alterar ou revogar chaves de API, sejam do seu próprio tipo ou pessoais. | Gerencie chaves como uma pessoa com a permissão `keys:write` ou usando a chave de serviço. |
+| `AUTH_MIDDLEWARE_MISSING` | 500 | Uma rota protegida foi executada sem nenhum middleware de autenticação do Rebase antes dela, portanto a credencial do chamador nunca foi inspecionada. | Monte a aplicação através do roteador de funções em vez de diretamente no seu próprio servidor. |
+| `BOOTSTRAP_ANONYMOUS` | 403 | A inicialização (bootstrap) do primeiro administrador foi tentada por um chamador anônimo. | Faça login primeiro. |
+| `BOOTSTRAP_COMPLETED` | 403 | O primeiro administrador já existe. | Peça a um administrador existente para conceder a role. |
+| `BOOTSTRAP_NOT_FIRST_USER` | 403 | O bootstrap é exclusivo para o primeiríssimo usuário, e este não é o caso. | Peça a um administrador existente para conceder a role. |
 | `CAPTCHA_FAILED` | 400 | O provedor rejeitou o token de CAPTCHA. | Resolva um novo desafio. |
-| `CAPTCHA_REQUIRED` | 400 | A rota requer um token de CAPTCHA e nenhum foi enviado. | Inclua o token. |
-| `CHALLENGE_EXHAUSTED` | 401 | Muitas tentativas incorretas para um mesmo desafio de MFA. | Inicie um novo desafio. |
-| `EMAIL_EXISTS` | 409 | Já existe uma conta com esse endereço — no registro, em uma alteração de endereço, e ao seguir um link de alteração de endereço quando outra conta tomou o endereço enquanto ele esperava. | Faça login, ou inicie uma redefinição de senha; para uma alteração de endereço, escolha outro endereço. |
-| `EMAIL_NOT_CONFIGURED` | 503 | Magic links ou OTP foram solicitados e o servidor não possui transporte de e-mail. | Configure o SMTP ou use outro método de autenticação. |
-| `EMAIL_NOT_VERIFIED` | 403 | Um login por OAuth encontrou uma conta com o mesmo endereço, e o provedor não verificou esse endereço, então ela não é vinculada. | Entre com o método existente e depois use `POST /auth/link/<provider>`. |
-| `FACTOR_NOT_VERIFIED` | 400 | O fator de MFA foi cadastrado, mas nunca confirmado. | Confirme o fator. |
-| `IDENTITY_ALREADY_LINKED` | 409 | Essa identidade OAuth pertence a outra conta. | Faça login com ela ou desvincule-a de lá primeiro. |
-| `IMPERSONATION_FORBIDDEN` | 403 | Uma requisição enviou `x-rebase-impersonate` e quem a fez não pode executar uma requisição como outro usuário. Só a sessão do próprio administrador conectado pode, nunca uma chave de API nem a chave de serviço. | Envie-a com a sessão de um administrador, ou remova o cabeçalho. |
-| `IMPERSONATION_INVALID` | 400 | `x-rebase-impersonate` foi enviado vazio. | Envie o uid do usuário em nome de quem agir, ou remova o cabeçalho. |
-| `IMPERSONATION_TARGET_NOT_FOUND` | 404 | `x-rebase-impersonate` não nomeia nenhum usuário ativo: nenhuma conta tem esse uid, ou ela está desativada. | Verifique o uid. |
-| `IMPERSONATION_UNAVAILABLE` | 501 | A autenticação deste backend não consegue executar uma requisição como outro usuário, porque seu `AuthAdapter` não tem `resolveUser`. | Implemente `resolveUser` no adaptador, ou remova o cabeçalho. |
-| `IMPERSONATION_UNSUPPORTED` | 400 | `x-rebase-impersonate` foi enviado a uma rota que não pode rodar como outro usuário. Só a API de dados e as funções personalizadas o respeitam, e o socket em tempo real respeita `impersonate` no `AUTHENTICATE`. | Envie a requisição sem o cabeçalho. |
-| `SIMULATION_FORBIDDEN` | 403 | Um pedido enviou um cabeçalho `x-rebase-simulate-*` (o simulador de RLS), ou chamou `/api/admin/rls-simulator`, e quem chama não pode simular acesso. Só pode a sessão própria de um administrador com sessão iniciada, nunca uma chave de API nem a chave de serviço. | Envie-o com a sessão de um administrador, ou retire os cabeçalhos. |
-| `SIMULATION_INVALID` | 400 | A simulação estava mal formada: um cabeçalho enviado vazio, `x-rebase-simulate-api-key-id` junto com uma função ou um id de utilizador, ou simulação junto com `x-rebase-impersonate`. | Indique uma função (com um uid opcional), um id de utilizador ou um id de chave de API. |
-| `SIMULATION_READ_ONLY` | 403 | Uma escrita, exclusão, `_batch`, reversão de histórico, ou uma função personalizada chamada por qualquer verbo que não seja `GET`/`HEAD`/`OPTIONS`, levou um cabeçalho `x-rebase-simulate-*`. O acesso simulado é somente leitura: a escrita rodaria como a identidade simulada, não como o administrador. As leituras, incluindo `POST …/query` e `…/count`, continuam rodando. Na 0.25 a escrita rodava como a identidade simulada. | Pare de simular para fazer alterações. |
-| `SIMULATION_TARGET_NOT_FOUND` | 404 | A simulação não indica nenhum utilizador ativo (um id de utilizador sem função) nem nenhuma chave de API válida. | Verifique o id, ou envie uma função com o uid para simular um uid sem conta. |
-| `SIMULATION_UNAVAILABLE` | 501 | Este backend não pode simular acesso: o seu `AuthAdapter` não tem `resolveUser` para confirmar um administrador, ou foi indicada uma chave num backend sem chaves de API. | Implemente `resolveUser`, ou retire os cabeçalhos. |
-| `SIMULATION_UNSUPPORTED` | 400 | Foi enviado um cabeçalho `x-rebase-simulate-*` a uma rota que não pode ser executada com acesso simulado. Só a API de dados e as funções personalizadas os respeitam. | Envie o pedido sem os cabeçalhos. |
-| `INVALID_ACCOUNT` | 400 | A conta está em um estado sobre o qual esta operação não pode atuar. | Veja a mensagem. |
+| `CAPTCHA_REQUIRED` | 400 | A rota exige um token de CAPTCHA e nenhum foi enviado. | Inclua o token. |
+| `CHALLENGE_EXHAUSTED` | 401 | Tentativas incorretas em excesso para um mesmo desafio de MFA. | Inicie um novo desafio. |
+| `EMAIL_EXISTS` | 409 | Já existe uma conta com esse endereço — no cadastro, na alteração de endereço ou ao acessar um link de alteração de endereço quando outra conta assumiu o endereço durante a espera. | Faça login ou inicie a redefinição de senha; para alteração de endereço, escolha outro e-mail. |
+| `EMAIL_NOT_CONFIGURED` | 503 | Magic links ou OTP foram solicitados, mas o servidor não tem transporte de e-mail configurado. | Configure o SMTP ou use outro método de autenticação. |
+| `EMAIL_NOT_VERIFIED` | 403 | O login via OAuth encontrou uma conta com o mesmo endereço, mas o provedor não verificou esse endereço, portanto ela não foi vinculada. | Faça login usando o método existente e execute `POST /auth/link/<provider>`. |
+| `FACTOR_NOT_VERIFIED` | 400 | O fator de MFA foi registrado, mas nunca confirmado. | Confirme o fator. |
+| `IDENTITY_ALREADY_LINKED` | 409 | Essa identidade OAuth pertence a outra conta. | Faça login com ela ou desvincule-a da outra conta primeiro. |
+| `IMPERSONATION_FORBIDDEN` | 403 | Uma requisição enviou `x-rebase-impersonate` e seu chamador não tem permissão para atuar como outro usuário. Apenas a sessão de um administrador autenticado pode fazer isso, nunca uma chave de API ou a chave de serviço. | Envie a requisição com a sessão de um administrador ou remova o cabeçalho. |
+| `IMPERSONATION_INVALID` | 400 | `x-rebase-impersonate` foi enviado vazio. | Envie o uid do usuário que deseja personificar ou remova o cabeçalho. |
+| `IMPERSONATION_TARGET_NOT_FOUND` | 404 | `x-rebase-impersonate` especifica nenhum usuário ativo: nenhuma conta tem esse uid ou ela está desativada. | Verifique o uid. |
+| `IMPERSONATION_UNAVAILABLE` | 501 | A autenticação deste backend não suporta personificação de usuário porque seu `AuthAdapter` não implementa `resolveUser`. | Implemente `resolveUser` no adaptador ou remova o cabeçalho. |
+| `IMPERSONATION_UNSUPPORTED` | 400 | `x-rebase-impersonate` foi enviado para uma rota que não oferece suporte a personificação. Apenas a API de dados e funções customizadas aceitam esse cabeçalho, e o socket de tempo real aceita `impersonate` em `AUTHENTICATE`. | Envie a requisição sem o cabeçalho. |
+| `SIMULATION_FORBIDDEN` | 403 | Uma requisição enviou um cabeçalho `x-rebase-simulate-*` (simulador de RLS) ou chamou `/api/admin/rls-simulator`, e o chamador não pode simular acessos. Apenas a sessão de um administrador autenticado pode, nunca uma chave de API ou a chave de serviço. | Envie a requisição com a sessão de um administrador ou remova os cabeçalhos. |
+| `SIMULATION_INVALID` | 400 | A simulação estava malformada: um cabeçalho enviado vazio, `x-rebase-simulate-api-key-id` combinado com uma role ou user id, ou simulação combinada com `x-rebase-impersonate`. | Especifique uma role (opcionalmente com um uid), um user id ou um id de chave de API. |
+| `SIMULATION_READ_ONLY` | 403 | Uma operação de escrita, exclusão, `_batch`, reversão de histórico ou função customizada chamada por qualquer verbo diferente de `GET`/`HEAD`/`OPTIONS` continha um cabeçalho `x-rebase-simulate-*`. O acesso simulado é somente leitura: a escrita seria executada como a identidade simulada, não como o administrador. Leituras, incluindo `POST …/query` e `…/count`, ainda funcionam. Na versão 0.25, a escrita era executada como a identidade simulada. | Interrompa a simulação para realizar alterações. |
+| `SIMULATION_TARGET_NOT_FOUND` | 404 | A simulação indica nenhum usuário ativo (um user id enviado sem role) ou nenhuma chave de API ativa. | Verifique o id ou envie uma role junto com o uid para simular um uid que não possui conta. |
+| `SIMULATION_UNAVAILABLE` | 501 | Este backend não pode simular acessos: seu `AuthAdapter` não possui `resolveUser` para confirmar um administrador, ou uma chave foi informada em um backend sem chaves de API. | Implemente `resolveUser` ou remova os cabeçalhos. |
+| `SIMULATION_UNSUPPORTED` | 400 | Um cabeçalho `x-rebase-simulate-*` foi enviado para uma rota que não suporta acesso simulado. Apenas a API de dados e funções customizadas oferecem suporte. | Envie a requisição sem os cabeçalhos. |
+| `GUEST_REFERENCED` | 409 | Um convidado (guest) não pôde ser excluído porque uma linha do próprio projeto o referencia através de uma chave estrangeira com `ON DELETE RESTRICT` ou `NO ACTION`. `DELETE /api/admin/guests` reporta isso por convidado em `skipped` e continua a execução. | Exclua a linha ou mantenha o convidado. |
+| `INVALID_ACCOUNT` | 400 | A conta está em um estado no qual esta operação não pode atuar. | Veja a mensagem. |
 | `INVALID_CHALLENGE` | 400 | O desafio de MFA é desconhecido ou expirou. | Inicie um novo. |
-| `INVALID_CODE` | 400 / 401 | O código OTP ou MFA está incorreto: 400 no login por código de e-mail (`/auth/otp/verify`), 401 em um cadastro ou desafio de MFA. | Tente novamente com o código atual. |
-| `INVALID_CREDENTIALS` | 401 | E-mail ou senha incorretos — deliberadamente sem especificar qual. | Tente novamente ou redefina a senha. |
-| `INVALID_PLATFORM_TOKEN` | 401 | Um token de plataforma `rpt_` foi recusado: assinatura errada, audiência errada, expirado ou um tempo de vida acima do limite. A mensagem diz qual. | Faça a plataforma emitir um novo — no Rebase Cloud, execute o comando de novo. |
-| `INVALID_SCOPES` | 400 | Foi pedido para uma chave algo que não é um escopo: malformado, desconhecido ou com um alvo que o escopo não aceita. `details.problems` diz qual e por quê; `details.validScopes` lista os escopos que uma chave pode ter. Ela deixa de fora `keys:read` e `keys:write`, que nenhuma chave pode ter; na 0.24 ela os lista. | Use um nome da lista. Consulte [Papéis e escopos](/docs/backend/roles-and-scopes/). |
-| `INVALID_TOKEN` | 400 / 401 | Um token de verificação, redefinição, magic link ou alteração de endereço está malformado, é desconhecido, já foi usado ou expirou (400). Uma credencial de provedor OAuth ou um refresh token que não se verifica resulta em 401. | Solicite um novo link, ou entre novamente. |
-| `INVALID_ROLE` | 400 | O nome de um papel que está sendo gravado não é uma string, está vazio ou contém `,` `{` `}` `"` `\` ou um caractere de controle. Esses caracteres seriam lidos de volta como outros papéis: um papel viaja em um `text[]` do Postgres e na lista separada por vírgulas que as políticas de RLS dividem, então `"support,admin"` voltaria como `admin`. Na 0.25 um nome assim era armazenado. `details.problems` nomeia cada um. | Renomeie o papel. Qualquer outro nome é aceito. |
-| `KEY_MANAGEMENT_SCOPE` | 400 | Foi pedido `keys:read` ou `keys:write` para uma chave. Nenhuma chave pode gerenciar chaves. `details.scopes` os nomeia. | Deixe-os de fora. |
-| `KEY_OUTRANKS_CALLER` | 403 | Quem tem `keys:write` tentou alterar ou revogar uma chave de serviço que tem um papel ou escopo que essa pessoa não tem. Só um administrador gerencia qualquer chave. `details.roles` e `details.scopes` nomeiam o que a chave tem além de quem chama. Na 0.25 a alteração passava. | Peça a um administrador, ou a alguém que os tenha, que altere a chave. |
-| `LAST_ADMIN` | 403 | A alteração deixaria o projeto sem nenhum administrador. | Promova outra pessoa primeiro. |
-| `MFA_REQUIRED` | 401 | A senha estava correta e a conta possui um segundo fator verificado, portanto o login foi concluído apenas pela metade. `details` traz um token de curta duração com escopo para o desafio de MFA — não é uma sessão. | Abra um desafio e responda-o; a resposta do desafio emitirá a sessão. |
-| `NO_SESSION` | 401 | Nenhum cookie de sessão ou refresh token foi apresentado. Normal no primeiro carregamento de página. | Faça login. |
-| `NOT_ANONYMOUS` | 400 | Uma rota de upgrade a partir de anônimo foi chamada por uma conta real. | Nada para atualizar. |
-| `OAUTH_ERROR` | 401 | O provedor de OAuth recusou ou retornou um erro. | Tente o fluxo novamente; a mensagem contém o motivo do provedor. |
-| `PERSONAL_KEYS_DISABLED` | 403 | As chaves de API pessoais estão desativadas neste backend. | Defina `personalKeys: true` no bloco `auth` da coleção de usuários. |
-| `PERSONAL_KEY_NEEDS_ACCOUNT` | 403 | A chave de serviço ou uma sessão de convidado tentou usar as rotas de chaves pessoais. Nenhuma das duas tem uma conta como a qual uma chave possa agir. | Entre em uma conta, ou crie uma chave de serviço em `/api/admin/api-keys`. |
-| `PLATFORM_TOKENS_OFF` | 401 | Um token de plataforma `rpt_` chegou a um servidor que não os aceita: `REBASE_PLATFORM_TOKEN_KEY` e `REBASE_PLATFORM_TOKEN_AUDIENCE` não estão definidas. | A plataforma que hospeda o app define ambas no deploy; faça o deploy de novo ou entre no app de outra forma. |
-| `RATE_LIMITED` | 429 | Muitas tentativas deste chamador. | Aguarde; a mensagem diz por quanto tempo. |
-| `REDIRECT_URI_NOT_ALLOWED` | 400 | O destino do redirecionamento não está na lista de permissões. | Adicione-o à configuração do provedor. |
-| `REGISTRATION_DISABLED` | 403 | O cadastro de autoatendimento está desativado. | Peça a um administrador para criar a conta. |
-| `ROLE_EXCEEDS_CALLER` | 403 | As roles sendo concedidas têm um escopo, ou `admin`, que o chamador não tem. `details.beyond` os nomeia. | Peça a alguém que os tenha para conceder a role. |
-| `ROLE_EXCEEDS_CREATOR` | 403 | Uma chave de serviço recebeu uma role de RLS que seu criador não tem. Apenas um administrador pode dar qualquer role. `details.roles` as nomeia. | Remova a role, ou peça a um administrador para criar a chave. |
+| `INVALID_CODE` | 400 / 401 | O código OTP ou MFA está incorreto: 400 no login por código de e-mail (`/auth/otp/verify`), 401 no registro ou desafio de MFA. | Tente novamente com o código atual. |
+| `INVALID_CREDENTIALS` | 401 | E-mail ou senha incorretos — deliberadamente sem especificar qual deles. | Tente novamente ou redefina a senha. |
+| `INVALID_PLATFORM_TOKEN` | 401 | Um token de plataforma `rpt_` foi recusado: assinatura inválida, audience incorreto, expirado ou tempo de vida acima do limite máximo. A mensagem informa o motivo. | Solicite à plataforma a emissão de um novo — no Rebase Cloud, execute o comando novamente. |
+| `INVALID_SCOPES` | 400 | Foi solicitado para uma chave algo que não é um escopo: malformado, desconhecido ou com um destino não aceito pelo escopo. `details.problems` informa quais e por quê; `details.validScopes` lista os escopos permitidos para chaves. Escopos como `keys:read` e `keys:write` são omitidos, pois nenhuma chave pode contê-los; na versão 0.24, eles eram listados. | Use um nome da lista. Veja [Roles e escopos](/docs/backend/roles-and-scopes/). |
+| `INVALID_TOKEN` | 400 / 401 | Um token de verificação, redefinição, magic link ou alteração de e-mail é inválido, desconhecido, já utilizado ou expirado (400). Uma credencial de provedor OAuth ou refresh token não verificado resulta em 401. | Solicite um novo link ou faça login novamente. |
+| `INVALID_ROLE` | 400 | O nome de role sendo gravado não é uma string, está vazio ou contém `,` `{` `}` `"` `\` ou caracteres de controle. Esses caracteres seriam lidos de volta como outras roles: uma role trafega em um `text[]` do Postgres e na lista separada por vírgulas dividida pelas políticas de RLS; assim, `"support,admin"` seria interpretado como `admin`. Na versão 0.25, esse tipo de nome era aceito. `details.problems` lista cada ocorrência. | Renomeie a role. Qualquer outro nome é aceito. |
+| `KEY_MANAGEMENT_SCOPE` | 400 | Foi solicitada a permissão `keys:read` ou `keys:write` para uma chave. Nenhuma chave pode gerenciar chaves. `details.scopes` lista os escopos problemáticos. | Remova-os da solicitação. |
+| `KEY_OUTRANKS_CALLER` | 403 | Um detentor de `keys:write` tentou alterar ou revogar uma chave de serviço que possui uma role ou escopo que ele não possui. Apenas administradores gerenciam qualquer chave. `details.roles` e `details.scopes` listam o que a chave possui além do chamador. Na versão 0.25, a alteração era permitida. | Peça a um administrador ou a alguém com os privilégios necessários para alterar a chave. |
+| `LAST_ADMIN` | 403 | A alteração deixaria o projeto sem nenhum administrador. | Promova outro usuário primeiro. |
+| `MFA_REQUIRED` | 401 | A senha estava correta e a conta possui um segundo fator verificado; logo, o login foi realizado apenas parcialmente. `details` traz um token de curta duração restrito ao desafio de MFA — não é uma sessão. | Abra um desafio e responda a ele; a resposta do desafio emitirá a sessão. |
+| `NO_SESSION` | 401 | Nenhum cookie de sessão ou refresh token foi apresentado. Comum no primeiro carregamento de página. | Faça login. |
+| `NOT_ANONYMOUS` | 400 | Uma rota de upgrade a partir de anônimo foi chamada por uma conta real, ou `DELETE /api/admin/guests/:uid` especificou uma conta real. | Nada para atualizar. Para excluir uma conta, use `DELETE /api/admin/users/:uid`. |
+| `OAUTH_ERROR` | 401 | O provedor OAuth recusou a solicitação ou retornou um erro. | Tente o fluxo novamente; a mensagem contém o motivo informado pelo provedor. |
+| `PERSONAL_KEYS_DISABLED` | 403 | Chaves de API pessoais estão desativadas neste backend. | Defina `personalKeys: true` no bloco `auth` da coleção de usuários. |
+| `PERSONAL_KEY_NEEDS_ACCOUNT` | 403 | A chave de serviço ou uma sessão de convidado tentou acessar rotas de chaves pessoais. Nenhuma delas possui uma conta para a chave atuar em nome. | Faça login em uma conta ou crie uma chave de serviço em `/api/admin/api-keys`. |
+| `PLATFORM_TOKENS_OFF` | 401 | Um token de plataforma `rpt_` chegou a um servidor que não os aceita: `REBASE_PLATFORM_TOKEN_KEY` e `REBASE_PLATFORM_TOKEN_AUDIENCE` não estão definidos. | A plataforma que hospeda o aplicativo define ambos no deploy; faça um novo deploy ou entre na aplicação de outra forma. |
+| `RATE_LIMITED` | 429 | Excesso de tentativas vindas deste chamador. | Aguarde; a mensagem diz por quanto tempo. |
+| `REDIRECT_URI_NOT_ALLOWED` | 400 | O destino do redirecionamento não está na lista de permissões (allow-list). | Adicione-o à configuração do provedor. |
+| `REGISTRATION_DISABLED` | 403 | O autocadastro está desativado. | Solicite a um administrador para criar a conta. |
+| `ROLE_EXCEEDS_CALLER` | 403 | As roles sendo concedidas possuem um escopo, ou `admin`, que o chamador não possui. `details.beyond` especifica quais. | Peça a alguém que possua esses privilégios para conceder a role. |
+| `ROLE_EXCEEDS_CREATOR` | 403 | Uma chave de serviço recebeu uma role de RLS que seu criador não possui. Apenas um admin pode conceder qualquer role. `details.roles` especifica quais. | Remova a role ou peça a um admin para criar a chave. |
 | `ROLE_EXISTS` | 409 | Esse nome de role já está em uso. | Escolha outro nome. |
-| `ROLE_LOOKUP_FAILED` | 503 | Não foi possível ler as roles do chamador — em uma rota de administração, ou em uma requisição de dados em um backend com `config.auth`. Falha de forma segura em vez de confiar nas roles do token. Um token cujo uid não corresponde a nenhuma conta, inclusive um uid que a tabela de usuários não consegue guardar, é um 401, não este (na 0.24 um uid que a tabela não consegue guardar é este 503). Um banco de dados inacessível é `DATABASE_UNAVAILABLE`, não este (na 0.24 é este 503). | Tente novamente; verifique o banco de dados. |
-| `SCOPE_EXCEEDS_CREATOR` | 403 | Foi pedido para uma chave um escopo que seu criador não tem. Uma chave nunca tem mais do que a conta que a cria. `details.scopes` os nomeia. | Remova-os, ou peça a alguém que os tenha para criar a chave. |
-| `SCOPE_MISSING` | 403 | A credencial não tem o escopo de que esta rota, coleção, fonte de storage ou função precisa. `details.requiredScope` o nomeia, alvo incluído. | Para uma pessoa, uma role que declare o escopo. Para uma chave, uma chave que o tenha. Consulte [Papéis e escopos](/docs/backend/roles-and-scopes/). |
-| `SCOPE_NOT_DECLARED` | 500 | Uma rota protegida com `requireScope` nomeia um escopo de app que este backend não declara, então ninguém o tem, nem mesmo um administrador. Um nome que não é escopo nenhum, ou um escopo embutido com erro de digitação como `data:raed`, nunca chega até aqui: o `requireScope` lança um erro onde a rota é registrada. Na 0.24 ambos respondem `403 SCOPE_MISSING` a todo chamador. | Declare o escopo em `auth.scopes` na coleção de usuários, ou corrija o nome. Consulte [Papéis e escopos](/docs/backend/roles-and-scopes/). |
+| `ROLE_LOOKUP_FAILED` | 503 | Não foi possível consultar as roles do chamador — em uma rota de admin ou em uma requisição de dados em um backend com `config.auth`. Falha de forma segura (fails closed) em vez de confiar nas roles contidas no token. Um token cujo uid não corresponda a nenhuma conta (inclusive um uid que a tabela de usuários não suporte) retorna 401, não este erro (na versão 0.24, um uid não suportado gerava este 503). Um banco inacessível resulta em `DATABASE_UNAVAILABLE`, não este erro (na 0.24, resultava neste 503). | Tente novamente; verifique o banco de dados. |
+| `SCOPE_EXCEEDS_CREATOR` | 403 | Foi solicitado para uma chave um escopo que seu criador não possui. Uma chave nunca pode ter mais privilégios do que a conta que a cria. `details.scopes` lista os escopos. | Remova-os ou peça a alguém com essas permissões para criar a chave. |
+| `SCOPE_MISSING` | 403 | A credencial não possui o escopo necessário para esta rota, coleção, fonte de armazenamento ou função. `details.requiredScope` informa qual é, incluindo o alvo. | Para usuários, obtenha uma role que declare o escopo. Para chaves, utilize uma chave que o contenha. Veja [Roles e escopos](/docs/backend/roles-and-scopes/). |
+| `SCOPE_NOT_DECLARED` | 500 | Uma rota protegida com `requireScope` especifica um escopo de aplicação não declarado neste backend; portanto, ninguém o possui, nem mesmo um administrador. Nomes que não representem um escopo ou erros de digitação em escopos internos como `data:raed` não chegam a este ponto: `requireScope` lança um erro no momento do registro da rota. Na versão 0.24, ambos retornavam `403 SCOPE_MISSING`. | Declare o escopo sob `auth.scopes` na coleção de usuários ou corrija o nome. Veja [Roles e escopos](/docs/backend/roles-and-scopes/). |
 | `SELF_DELETE` | 400 | Um administrador tentou excluir a própria conta. | Peça a outro administrador para fazê-lo. |
-| `SESSION_REVOKED` | 401 | A sessão foi encerrada em outro lugar, ou todas as sessões foram revogadas, ou a conta foi excluída. Toda porta que aceita uma sessão responde isso a um token de acesso assim: a API de dados, o storage, as funções personalizadas e as rotas de administração (na 0.24 as três primeiras respondem `UNAUTHORIZED` "Invalid or expired token"). O socket de tempo real recusa o seu `AUTHENTICATE` com um frame `AUTH_ERROR` que traz o mesmo código. O SDK faz o refresh, o refresh é recusado, e ele encerra a sessão. | Faça login novamente. |
-| `ACCOUNT_DISABLED` | 401/403 | Um administrador desligou a conta: login (403), refresh e todo token que ela possui (401) são recusados, em toda porta que aceita uma sessão (na 0.24 a API de dados, o storage e as funções personalizadas respondem `UNAUTHORIZED`). O socket de tempo real recusa o seu `AUTHENTICATE` com um frame `AUTH_ERROR` que traz o mesmo código. | Peça a um administrador. |
-| `EMAIL_NOT_CONFIRMED` | 403 | `requireEmailVerification` está ativo e o endereço ainda não foi verificado. Respondido apenas para uma senha correta; um novo link é enviado por e-mail. | Siga o link no e-mail. |
-| `PROOF_REQUIRED` | 409 | `POST /auth/verify-email`: a conta possui uma senha ou identidade que ninguém provou, e a requisição não prova nenhuma das duas. O token não é consumido. | Envie `password` para mantê-la, ou `removeUnproven: true` para verificar sem ela. |
-| `UNDELIVERABLE_ADDRESS` | 400 / 409 | Um e-mail de verificação foi solicitado para um endereço que o e-mail não consegue alcançar — o de um convidado, ou o placeholder de X (400) — ou uma conta pediu para mudar para tal endereço (409, `POST /auth/change-email`). | Defina um endereço real primeiro. |
-| `EMAIL_UNCHANGED` | 400 | `POST /auth/change-email` nomeou o endereço atual da conta. | Nada a alterar. |
-| `ANONYMOUS_USER` | 403 | Um convidado pediu para alterar seu endereço de e-mail; um convidado não tem nenhum. | Transforme-o em uma conta primeiro (`POST /auth/anonymous/link`). |
-| `MFA_NOT_ENROLLED` | 400 | Códigos de recuperação foram solicitados para uma conta sem segundo fator verificado. | Cadastre um fator primeiro. |
-| `HOOK_REJECTED` | 400 | Um hook `beforeUserCreate`, `beforeLogin`, `beforeUserDelete` ou `beforeEmailChange` lançou um erro. A mensagem é a do hook; um hook que escolheu um status 4xx responde com ele. | Veja a mensagem. |
-| `INVALID_JSON` | 400 | O corpo da requisição não é JSON. | Envie um corpo JSON. |
+| `SESSION_REVOKED` | 401 | A sessão foi encerrada em outro lugar, todas as sessões foram revogadas ou a conta foi excluída. Todos os pontos de entrada que aceitam sessão retornam isso para esse token de acesso: API de dados, storage, funções customizadas e rotas de administração (na 0.24, os três primeiros respondiam `UNAUTHORIZED` "Invalid or expired token"). O socket em tempo real rejeita o `AUTHENTICATE` com um frame `AUTH_ERROR` contendo o mesmo código. O SDK tenta renovar, a renovação é recusada e o logout ocorre. | Faça login novamente. |
+| `ACCOUNT_DISABLED` | 401/403 | Um administrador desativou a conta: login (403), renovação e todos os tokens associados (401) são recusados em todos os pontos que aceitam sessão (na 0.24, API de dados, storage e funções respondiam `UNAUTHORIZED`). O socket de tempo real rejeita o `AUTHENTICATE` com um frame `AUTH_ERROR` trazendo o mesmo código. | Contate um administrador. |
+| `EMAIL_NOT_CONFIRMED` | 403 | `requireEmailVerification` está ativado e o endereço ainda não foi verificado. Retornado apenas mediante envio da senha correta; um novo link é enviado por e-mail. | Acesse o link enviado no e-mail. |
+| `PROOF_REQUIRED` | 409 | `POST /auth/verify-email`: a conta contém uma senha ou identidade que ninguém confirmou, e a requisição não comprova nenhuma das duas. O token não é invalidado. | Envie `password` para mantê-la ou `removeUnproven: true` para verificar sem ela. |
+| `UNDELIVERABLE_ADDRESS` | 400 / 409 | Foi solicitado um e-mail de verificação para um endereço inacessível — endereço de convidado ou placeholder do X (400) — ou uma conta solicitou alteração para esse tipo de endereço (409, `POST /auth/change-email`). | Defina um endereço real primeiro. |
+| `EMAIL_UNCHANGED` | 400 | `POST /auth/change-email` especificou o endereço de e-mail atual da conta. | Nada para alterar. |
+| `ANONYMOUS_USER` | 403 | Um convidado tentou alterar o endereço de e-mail; convidados não possuem endereço próprio. | Converta-o em uma conta antes (`POST /auth/anonymous/link`). |
+| `MFA_NOT_ENROLLED` | 400 | Códigos de recuperação foram solicitados para uma conta sem um segundo fator verificado. | Registre um fator primeiro. |
+| `HOOK_REJECTED` | 400 | Um hook `beforeUserCreate`, `beforeLogin`, `beforeUserDelete` ou `beforeEmailChange` disparou um erro. A mensagem é a do próprio hook; um hook que definiu um status 4xx responde com ele. | Veja a mensagem. |
+| `INVALID_JSON` | 400 | O corpo da requisição não é um JSON válido. | Envie um corpo no formato JSON. |
 | `SELF_DISABLE` | 400 | Um administrador tentou desativar a própria conta. | Peça a outro administrador. |
-| `NOT_SUPPORTED` | 501 | O repositório de autenticação deste backend não pode fazer o que foi pedido (desativar contas, alterar um endereço). | Reinicie o servidor para que a coluna seja adicionada, ou use um repositório que ofereça suporte a isso. |
-| `UNKNOWN_SCOPE_TARGET` | 400 | O alvo de um escopo nomeia uma coleção, fonte de storage ou função que este backend não serve. `details` lista as que ele serve. | Corrija o alvo. |
-| `UNVERIFIED_IDENTITIES` | 409 | Um magic link, código por e-mail ou redefinição de senha comprovou o endereço de uma conta não verificada, e a conta tem uma identidade de login cujo provedor nunca verificou esse endereço. O repositório de autenticação não consegue removê-la (não tem `unlinkUserIdentity`), então a prova é recusada em vez de deixar essa forma de acesso em uma conta verificada. | Implemente `unlinkUserIdentity` no repositório de autenticação próprio, ou peça a um administrador que revise a conta. |
-| `SETUP_REQUIRED` | 403 | O projeto ainda não possui nenhum administrador, portanto esta rota não está disponível. | Conclua a configuração do primeiro administrador. |
-| `TOKEN_ALREADY_USED` | 401 | Um token de uso único foi reutilizado, ou um refresh token que foi rotacionado há mais de `refreshTokenReuseIntervalSeconds`. | Solicite um novo, ou faça login novamente. |
-| `TOKEN_EXPIRED` | 401 | O token ultrapassou seu tempo de vida. | Solicite um novo. |
-| `USER_NOT_FOUND` | 404 | Nenhuma conta com esse id. | Verifique o id. |
-| `WEAK_PASSWORD` | 400 | A senha não atende à [política de senhas](/docs/backend/auth-endpoints/#password-policy) (por padrão, 8 ou mais caracteres com uma letra maiúscula, uma minúscula e um dígito) — no cadastro, em uma redefinição ou troca, e na senha escolhida por um administrador: `POST /api/admin/users`, uma criação na coleção de usuários pela API de dados, `PUT /api/admin/users/:id` ou `POST /api/admin/users/:id/reset-password`. | Escolha uma senha mais forte. Um administrador que importa contas pode enviar `skipPasswordPolicy: true` em uma criação. |
+| `NOT_SUPPORTED` | 501 | O repositório de autenticação deste backend não suporta a ação solicitada (desativar contas, alterar e-mail). | Reinicie o servidor para que a coluna seja adicionada ou use um repositório compatível. |
+| `UNKNOWN_SCOPE_TARGET` | 400 | O alvo de um escopo define uma coleção, fonte de armazenamento ou função não atendida por este backend. `details` lista as opções disponíveis. | Corrija o alvo do escopo. |
+| `UNVERIFIED_IDENTITIES` | 409 | Um magic link, código por e-mail ou redefinição de senha confirmou o endereço de uma conta não verificada, mas a conta possui uma identidade cujo provedor nunca validou esse endereço. O repositório de autenticação não consegue removê-la (falta `unlinkUserIdentity`), então a confirmação é recusada para evitar manter essa vulnerabilidade em uma conta verificada. | Implemente `unlinkUserIdentity` no repositório de autenticação personalizado ou solicite a revisão da conta por um admin. |
+| `SETUP_REQUIRED` | 403 | O projeto ainda não possui um administrador, portanto esta rota não está disponível. | Conclua a configuração do primeiro administrador. |
+| `TOKEN_ALREADY_USED` | 401 | Um token de uso único foi reutilizado, ou um refresh token rotacionado há mais de `refreshTokenReuseIntervalSeconds` foi apresentado. | Solicite um novo ou faça login novamente. |
+| `TOKEN_EXPIRED` | 401 | O tempo de vida útil do token expirou. | Solicite um novo token. |
+| `USER_NOT_FOUND` | 404 | Nenhuma conta encontrada com este id. | Verifique o id. |
+| `WEAK_PASSWORD` | 400 | A senha não atende à [política de senhas](/docs/backend/auth-endpoints/#password-policy) (por padrão, 8+ caracteres com letras maiúsculas, minúsculas e dígitos) — no cadastro, redefinição, alteração e ao definir senhas via admin: `POST /api/admin/users`, criação na coleção de usuários via API de dados, `PUT /api/admin/users/:id` ou `POST /api/admin/users/:id/reset-password`. | Escolha uma senha mais forte. Administradores importando contas podem enviar `skipPasswordPolicy: true` na criação. |
 
 ## Dados, consultas e escritas
 
 | Código | Status | Significado | O que fazer |
 | --- | --- | --- | --- |
-| `AGGREGATE_NOT_SUPPORTED` | 501 | Este driver não pode computar a agregação solicitada. | Use um driver compatível ou calcule-a no cliente. |
-| `BRANCHING_UNSUPPORTED` | — | Uma ramificação (branch) do banco de dados foi solicitada via websocket do Studio no banco de dados de desenvolvimento gerenciado (PGlite), onde uma branch *é* o pai e nada seria isolado. A recusa é a mesma que `rebase db branch` exibe. | Aponte `DATABASE_URL` para um Postgres próprio (`rebase dev --docker` inicia um) e crie ramificações lá. |
-| `BATCH_TOO_LARGE` | 400 | `POST /api/data/_batch` contém mais operações do que o limite por lote (1000 por padrão). Um lote é uma única transação e mantém seus bloqueios durante todo o processo. | Envie em partes menores; a mensagem informa o limite e a sua contagem. |
-| `BATCH_UNSUPPORTED` | 400 | O driver deste backend não pode gravar em várias collections de forma atômica, e um loop de escritas individuais não seria atômico nem executado em uma única ida e volta. | Envie as gravações como requisições separadas ou como chamadas `/bulk` por collection. |
-| `BULK_TOO_LARGE` | 400 | O corpo da operação em massa excede o limite de itens configurado. | Divida a requisição. |
-| `BULK_UNSUPPORTED` | 400 | Esta collection ou driver não oferece suporte a gravações em massa. | Grave as linhas uma de cada vez. |
-| `CALLBACK_REJECTED` | 400 / 403 | Um callback da collection recusou a escrita. Um `throw` a partir de `beforeSave`/`beforeDelete`/`after*` é um 400 contendo a própria mensagem do autor; um `beforeDelete` que retorna `false` é um 403. `details.stage` informa qual callback, `details.path` a collection. | Leia a mensagem — ela foi escrita por este projeto, não pelo Rebase. |
-| `CALLBACK_RECURSION` | 500 | Gravações iniciadas por hooks aninhadas em mais de 16 níveis: a gravação de `context.data` de um hook executa os hooks daquela coleção de novo, e nada na cadeia a interrompe — geralmente um `afterSave` que atualiza sua própria linha incondicionalmente. Toda a gravação sofreu rollback. A mensagem nomeia o hook e a coleção; `details.chain` lista cada etapa hook → gravação. | Torne a gravação do hook condicional: aja apenas quando `status === "new"`, ou pule-a quando `values` já contiver o que ela escreveria. |
-| `CURSOR_WITH_OFFSET` | 400 | `?after=` foi combinado com `?offset=` ou `?page=`. Um cursor já indica onde a página começa; portanto, um deslocamento além dele pula silenciosamente aquela quantidade de linhas após o cursor — uma lacuna que o chamador não consegue ver na resposta. | Use um ou outro. |
-| `DISTINCT_NOT_APPLICABLE` | 400 | `?distinct=true` foi combinado com uma consulta de busca ou vetorial. Ambas atribuem uma pontuação por linha, de modo que duas linhas nunca são iguais e o `DISTINCT` não agruparia nada — pareceria ter funcionado, mas não mudaria nada. | Remova um dos dois. |
-| `DISTINCT_ORDER_BY_NOT_SELECTED` | 400 | Uma leitura `distinct` é ordenada por uma coluna que ela não retorna. Um `SELECT DISTINCT` só pode ser ordenado por colunas contidas em sua lista de seleção, caso contrário as linhas que ele agrupa não têm uma ordem definida. `details.fields` indica quais são. | Adicione esses campos a `?fields=` ou remova-os de `?orderBy=`. |
-| `DATABASE_UNAVAILABLE` | 503 | Não foi possível alcançar o banco de dados: a conexão foi recusada ou interrompida, o host não foi resolvido, o servidor está sendo encerrado ou iniciado, ou o banco de dados está fechado para novas conexões (`ALLOW_CONNECTIONS false`, que um `rebase db branch create --force` interrompido no meio deixa na sua origem; o log do servidor nomeia o banco de dados, e o `rebase db branch list` o abre de novo). Todas as portas respondem isso, inclusive o login, as rotas de administração e o socket de tempo real (um frame `ERROR`). Enviado com `Retry-After: 5`. Na 0.24 a mesma indisponibilidade responde `ROLE_LOOKUP_FAILED`, `INTERNAL_ERROR` ou um 500 com o código `ECONNREFUSED`. | Tente novamente; o SDK faz isso. Verifique se o banco de dados está em execução e acessível a partir do servidor. |
-| `DB_CONNECT_TIMEOUT` | 503 | Abrir uma nova conexão de banco de dados levou mais tempo que `DB_POOL_CONNECT_TIMEOUT`: o banco de dados está lento para aceitar conexões, ou está longe. Enviado com `Retry-After`. | Tente novamente; o SDK faz isso. Verifique a carga do banco de dados e a rede até ele. |
-| `DB_PERMISSION_DENIED` | 500 | O Postgres recusou a instrução (`42501`): seja por uma política de segurança em nível de linha (RLS) negando esta role ou por um `GRANT` ausente. | Consulte [Troubleshooting](/docs/troubleshooting/). |
-| `DB_POOL_EXHAUSTED` | 503 | Toda conexão de banco de dados no pool ficou ocupada por `DB_POOL_CONNECT_TIMEOUT`, então esta requisição nunca alcançou o banco de dados. Carga, não uma falha; enviado com `Retry-After`. O servidor registra a solução uma vez por minuto. | Tente novamente; o SDK faz isso. Aumente `DB_POOL_MAX`, ou encontre as queries lentas ou transações longas que estão retendo conexões. |
-| `FIELD_NOT_READABLE` | 400 | Um filtro, `orderBy`, `fields`, `select` agregado ou `groupBy` referencia um campo que as roles deste chamador não podem ler (`access.read`), um caminho aninhado ou uma ordenação agregada referencia uma relação que elas não podem ler — ou uma operação de campo (`$inc`, `$push`, …) tem um deles como alvo, caso em que um limite recusado revelaria o valor armazenado. Um campo que nenhuma resposta pode conter deve ser um que nenhuma consulta possa interrogar, caso contrário o valor poderia ser lido predicado por predicado. Um filtro que passa por uma relação (`author.salary`) e uma ordenação agregada sobre o campo de uma relação (`max(staff.salary)`) são julgados pela regra do destino. `details.violations` indica cada campo. Um campo oculto com `excludeFromApi` responde como se não existisse: um filtro, `orderBy`, `fields`, `include`, `select` agregado ou `groupBy`, ou `vector_search` que cite um recebe exatamente a resposta que um nome com erro de digitação recebe (`UNKNOWN_FILTER_FIELD`, `UNKNOWN_ORDER_BY_FIELD`, `UNKNOWN_FIELD`, `UNKNOWN_RELATION`, `UNKNOWN_AGGREGATE_FIELD` ou `UNKNOWN_VECTOR_PROPERTY`), e nenhuma resposta de campo desconhecido lista um. | Remova o campo da consulta ou obtenha a role necessária. Consulte [Acesso a campos](/docs/collections/field-access/). |
-| `FIELD_NOT_WRITABLE` | 400 | O corpo define um campo que as roles deste chamador não podem gravar (`access.write`). Recusado em vez de ignorado: uma escrita que descarta um campo reportaria sucesso para uma edição que não ocorreu. O mesmo código recusa uma escrita através de um pai que define uma relação que o chamador não pode gravar, e uma atualização que define um campo `softDelete` com um valor — só uma exclusão o marca. `details.violations` indica cada campo. | Remova o campo ou obtenha a role necessária. Um campo que ninguém pode gravar retorna `VALIDATION_EXCLUDED_FIELDS` em vez disso. |
-| `HISTORY_UNAVAILABLE` | 503 | Uma escrita em uma coleção com `history: true` foi recusada porque sua entrada de histórico não pôde ser registrada: o banco de dados não tem a tabela `rebase.entity_history` ou, para o `openRebase` e o `rebase console`, a função `rebase.record_history`. Nenhum backend com histórico foi iniciado neste banco de dados. Nada rodou, callbacks inclusive, e as leituras não são afetadas. Lançado pelo `openRebase` e retornado por um backend criado com `provision: false`. | Inicie o backend uma vez com o histórico ativado e `provision: true` (o `rebase dev` faz isso) e tente novamente. |
-| `IDEMPOTENCY_KEY_IN_PROGRESS` | 409 | Uma requisição anterior com a mesma `Idempotency-Key` ainda está em execução. | Tente novamente assim que ela terminar. |
-| `IDEMPOTENCY_KEY_REUSED` | 422 | A mesma `Idempotency-Key` foi enviada em uma requisição diferente: outro método, caminho, query string ou corpo. | Use uma nova chave ou envie a requisição original. |
-| `INVALID_AGGREGATE_FUNCTION` | 400 | `?select=` especificou uma função que não é `count`, `sum`, `avg`, `min` ou `max`. | Use uma dessas opções; a mensagem lista todas elas. |
-| `INVALID_AGGREGATE_SELECT` | 400 | Uma entrada de `?select=` não está no formato `fn(field)` ou uma função diferente de `count()` foi passada sem um campo. | Escreva `sum(total)`, `count()`, `avg(score)`. |
-| `INVALID_AGGREGATE_WINDOW` | 400 | `offset`, `page` ou `orderBy` em uma agregação sem `groupBy`, ou um cursor em qualquer agregação. Uma agregação sem agrupamento é uma linha, e um grupo não é uma linha após a qual um cursor possa continuar. | Adicione `groupBy`, ou remova-os; pagine os grupos com `offset` ou `page`. Veja [Agregações](/docs/sdk/aggregates-and-search/#aggregates). |
-| `INVALID_BATCH_BODY` | 400 | Uma operação de `/_batch` não possui `op`, `collection`, `values` ou `id`, especifica uma collection não atendida por este backend ou reutiliza um nome de `ref`. | Veja a mensagem; ela identifica a operação pelo índice. |
-| `INVALID_BATCH_REF` | 400 | Um `{ "$ref": "<name>.<field>" }` não referencia nenhuma operação anterior, aponta para a frente ou solicita um campo que a linha referenciada não possui. Apenas referências retroativas são resolvidas. | Nomeie a operação com `ref` *antes* de referenciá-la. |
-| `INVALID_BULK_BODY` | 400 | O corpo da operação em massa não está no formato esperado. | Envie o array que a rota espera: `{ "rows": [...] }` para `POST /bulk`, `{ "updates": [{ "id", "data" }] }` para `PATCH /bulk`, `{ "ids": [...] }` para `POST /bulk/delete`. |
-| `INVALID_CONFLICT_TARGET` | 400 | O `on_conflict` / `onConflict` de um upsert referencia colunas sem garantia de unicidade, as referencia sem `upsert: true`, ou é enviado em uma criação aninhada, onde uma linha encontrada passaria para o novo pai. Caso contrário, o Postgres retornaria 42P10 de dentro de uma transação que já realizou operações. Também qualquer upsert na coleção de usuários (auth), onde uma criação e uma atualização seguem regras diferentes. | Declare `validation: { unique: true }` ou um índice `unique`; a mensagem lista os alvos que realmente existem. Na coleção de usuários, envie um `POST` para criar e um `PATCH` para atualizar. |
-| `INVALID_COUNT` | 400 | `?count=` não é `exact` nem `none`. Recusado em vez de lido como o padrão: um `?count=nnone` digitado errado pagaria pela contagem que ele foi escrito para dispensar. | Envie `exact` (o padrão) ou `none`. Veja [Ignorando a contagem](/docs/backend/api/#skipping-the-count). |
-| `INVALID_CURSOR` | 400 | O cursor `after` não pode ser lido, ou indica um id de linha que não corresponde às colunas-chave da collection: foi truncado, recodificado ou construído à mão. Um cursor legível enviado com um `orderBy` diferente daquele sob o qual foi emitido é `CURSOR_ORDER_MISMATCH`, também um 400. | Devolva o `meta.nextCursor` da página anterior sem alterações, com o mesmo `orderBy` ou nenhum. Veja [Paginação](/docs/sdk/pagination/). |
-| `INVALID_DELETED_PARAM` | 400 | `?deleted=` não é `include` nem `only`. Recusado em vez de ignorado: um erro de digitação `?deleted=true` que ocultasse silenciosamente todas as linhas excluídas pareceria funcionar, mas responderia à pergunta oposta. | Envie `include` (ativas e excluídas) ou `only` (apenas excluídas). Omita-o para obter somente linhas ativas. |
-| `INVALID_DISTINCT` | 400 | `?distinct=` não é `true` nem `false`. | Envie um desses valores; `1` e `0` também são aceitos. |
-| `INVALID_FIELD_OPERATION` | 400 | Um `$inc` / `$push` / `$pull` / `$merge` foi usado em um tipo de propriedade para o qual não está definido, com um operando de formato incorreto, com dois operadores no mesmo campo, com erro de digitação ou em uma operação de criação — onde não há valor armazenado para operar. | Consulte [Gravações via REST](/docs/backend/writes/#field-operations); a mensagem indica o campo. |
-| `INVALID_FILTER_FIELD` | 400 | O filtro especifica uma propriedade que esta collection não possui. | Verifique a ortografia em relação à collection. |
-| `INVALID_FILTER_OPERATOR` | 400 | O operador não é suportado por este tipo de propriedade — por exemplo `like` em um número ou em uma data. | Consulte [Consultando dados](/docs/sdk/querying/). |
-| `INVALID_FILTER_VALUE` | 400 | Um valor de filtro não pode ser interpretado como o tipo da coluna com a qual foi comparado: `?id=eq.abc` em uma chave inteira, um rótulo que não está no enum, um timestamp inválido, um número fora do intervalo do tipo. `details.dbCode` contém o SQLSTATE. | Envie um valor compatível com o tipo da coluna. |
-| `INVALID_HARD_PARAM` | 400 | `?hard=` não é `true` nem `false`. Qualquer outro valor é recusado em vez de interpretado como "não" — um erro de digitação que faça exclusão lógica quando o chamador pediu para purgar faz com que ele acredite que os dados foram removidos definitivamente. | Envie `true` ou `false`. |
-| `INVALID_INCLUDE` | 400 | `?include=` está malformado: não é uma lista de caminhos válida, ou é um objeto de opções por relação com o formato errado. Um caminho aninhado além de três saltos é `INCLUDE_TOO_DEEP`, também um 400. Tratado no limite da requisição em vez de escapar do driver como um erro 500. | Veja a mensagem; ela informa o caminho problemático. |
-| `INVALID_INPUT` | 400 | O corpo da requisição falhou na validação. | Veja a mensagem. |
-| `INVALID_LIMIT` | 400 | `?limit=` não é um número inteiro de 1 até o máximo (1000 por padrão); um valor maior é recusado, não reduzido. Uma assinatura em tempo real que solicita um limite fora desse intervalo recebe o mesmo código como um frame de `ERROR` no WebSocket. | Diminua o limite e percorra o restante por páginas. |
-| `INVALID_LOGICAL_GROUP` | 400 | Um grupo `?or=` / `?and=` / `?not=` está malformado ou aninhado além da profundidade permitida. | Veja a mensagem; ela ilustra a regra de nivelamento. |
-| `INVALID_OFFSET` | 400 | `?offset=` não é um número inteiro maior ou igual a 0. | Envie um número inteiro não negativo. |
-| `INVALID_ORDER_BY` | 400 | `?orderBy=` não é `field`, `field:desc`, `field:desc:last` ou um array JSON de `{ field, direction, nulls }` — ou indica uma direção diferente de `asc`/`desc`, ou um posicionamento de NULL diferente de `first`/`last`. | Veja a mensagem; ela mostra todas as formas aceitas. |
-| `INVALID_PAGE` | 400 | `?page=` não é um número inteiro maior ou igual a 1. As páginas são baseadas em 1, portanto `?page=0` é um erro e não a primeira página. | Envie `1` ou mais, ou use `?offset=`. |
-| `INVALID_PARAM` | 400 | Um parâmetro de consulta está malformado. | Veja a mensagem. |
-| `INVALID_QUERY_BODY` | 400 | O corpo de um `POST …/query` contém um valor que a URL não poderia carregar: uma lista para um parâmetro que a URL lê uma vez (`fields`, `limit`, …), um objeto para um filtro, ou qualquer parâmetro que também esteja na URL — um `POST …/query` lê todos os parâmetros do corpo. | Escreva cada valor como a URL o faz — uma string, ou uma lista para um filtro repetido; `where`, `include`, `orderBy` e `vector` aceitam JSON. Veja [Consultas longas demais para uma URL](/docs/backend/vector-search/#queries-too-long-for-a-url). |
-| `INVALID_VECTOR` | 400 | `?vector=` não é um array JSON de números. | Envie `[0.1,0.2,0.3]`. |
-| `INVALID_VECTOR_DISTANCE` | 400 | `?vector_distance=` não é `cosine`, `l2` ou `inner_product`. | Use uma dessas três opções. |
-| `INVALID_VECTOR_THRESHOLD` | 400 | `?vector_threshold=` não é um número. | Envie um número. |
-| `INVALID_WHERE` | 400 | `?where=` não é um objeto JSON mapeando campos a condições. | Envie `{"status":["==","active"]}`. |
-| `KEY_IMMUTABLE` | 400 | Uma atualização nomeia a chave da linha com um valor diferente daquele pelo qual ela é endereçada — no corpo, ou escrito por um `beforeSave`. Uma linha não pode se mover para outra chave: tudo depois da escrita (a releitura, `afterSave`, histórico, tempo real) a endereça pela chave que ela tinha. Recusado antes de qualquer hook rodar, com nada escrito, em toda porta de entrada. `details.violations` nomeia o campo. | Crie a linha sob a nova chave e exclua esta. Enviar a chave que a linha já tem é permitido. |
-| `MISSING_AGGREGATE_SELECT` | 400 | A rota de agregação foi chamada sem `?select=`. | Adicione um, ex.: `?select=count()`. |
-| `NO_COLLECTIONS` | 404 | O projeto não disponibiliza nenhuma collection: nenhuma declarada em código e nenhuma tabela a partir da qual derivá-las. Quando existem tabelas, mas a segurança em nível de linha está desativada nelas, a mensagem as nomeia, com o SQL para ativá-la, e `details.unprotectedTables` as lista; na 0.24 ela diz que não há tabelas. | Crie tabelas — por meio de migration, SQL ou um arquivo de collection com `rebase db push` — e reinicie. |
-| `NOT_FOUND` | 404 | Nenhuma linha com esse id nessa collection — ou uma linha oculta para este chamador pelas regras de segurança em nível de linha (RLS). | Verifique o id e, em seguida, as `securityRules` da collection. |
-| `UNKNOWN_RELATION` | 400 / 404 | `?include=` especifica algo que não é uma relação na collection. O mesmo código responde com **404** quando um *caminho de URL* aninhado referencia uma relação, ex.: `/api/data/authors/1/posts` onde `authors` não declara nenhuma — nesse caso a URL não aponta para nada, sendo um recurso não encontrado e não uma requisição malformada. | Verifique o nome da relação — a mensagem lista as que a collection possui. Uma referência reversa precisa ser declarada no pai para ser percorrível. |
-| `ORDER_BY_FIELD_NOT_SORTABLE` | 400 | A ordenação referencia uma propriedade que não permite ordenação. | Ordene por uma propriedade vinculada a uma coluna. |
-| `PAGE_WITH_OFFSET` | 400 | `?page=` foi combinado com `?offset=` — ou `page` com `offset` em um `find()`, que o SDK cliente, o `rebase.data` em processo e o cliente offline recusam com o mesmo código antes de qualquer requisição. Eles descrevem a mesma janela, e `page` costumava prevalecer silenciosamente sobre um `offset` que o chamador nunca via aplicado. | Envie apenas um deles. |
-| `PAYLOAD_TOO_LARGE` | 413 | O corpo excede o limite configurado. | Envie menos dados ou aumente o limite. |
-| `READ_ONLY_TRANSACTION` | 409 | Um callback `afterRead` tentou realizar uma escrita. Uma leitura com escopo de requisição roda em uma transação `READ ONLY`, portanto nem o callback nem nada chamado por ele pode realizar escritas. | Mova a escrita para fora da leitura: um background job ou `rebase.dataAsAdmin` a partir de um cron job ou função personalizada. |
-| `RELATION_HAS_NO_PIVOT` | 400 | A escrita continha dados de vinculação, mas o caminho não alcança seu destino através de um `manyToMany` que declare `through.properties` — logo, não há tabela intermediária onde gravá-los. | Declare `through.properties` na relação ou remova os dados da escrita. Consulte [Relações](/docs/collections/relations/). |
-| `RELATION_MISCONFIGURED` | 500 | Uma relação não pode ser resolvida em relação ao schema registrado. A operação é recusada em vez de ignorada: descartá-la reportaria sucesso para uma escrita que nunca ocorreu, ou ausência de dados para linhas existentes. | Execute `rebase schema generate` se o schema gerado for mais antigo que o banco de dados. |
-| `RELATION_NOT_UNLINKABLE` | 400 | A relação não pode ser desvinculada a partir deste lado. | Realize a escrita a partir do lado proprietário. |
-| `RELATION_NOT_WRITABLE` | 400 | O caminho aninhado não é uma relação gravável, ou uma criação ou atualização nomeia uma relação `via` de vários saltos — só as relações `via` de um único salto são graváveis. `details.fields` lista as chaves `via`. Nada foi gravado. | Grave diretamente as linhas que a cadeia une. Consulte [Relações](/docs/collections/relations/#via--an-explicit-join-chain). |
-| `RELATION_PIVOT_UNSUPPORTED` | 400 | A relação declara colunas na tabela de junção, mas esta fonte de dados não suporta escrevê-las. | O vínculo em si ainda funciona; apenas os dados adicionais não. Verifique as capacidades do driver. |
-| `RELATION_SOURCE_KEY_EMPTY` | 400 | Uma escrita de relação não possuía uma chave de origem para associar o vínculo. | Salve a linha pai primeiro. |
-| `RESULT_TOO_LARGE` | — | Uma instrução enviada pelo `EXECUTE_SQL` do socket de realtime — `admin.executeSql` a partir de um cliente, as leituras de catálogo do painel de admin — devolveu mais de 128 MB de linhas, então nenhuma foi enviada. Entregue como um frame `ERROR` do WebSocket. As execuções do próprio console SQL não são recusadas: elas mostram as primeiras linhas. | Adicione um `LIMIT`, ou selecione menos colunas, e leia o resultado em partes. |
-| `ROW_IN_TRASH` | 409 | A chave de um upsert pertence a uma linha na lixeira (uma linha com soft delete ainda mantém sua chave). Um upsert não escreve em uma linha excluída, em nenhuma porta de entrada: upserts REST `?on_conflict=`, `/bulk` e `/_batch`, o SDK e o socket de tempo real. Nada foi escrito. | Restaure a linha primeiro (uma atualização definindo o campo de soft-delete como `null`), ou a expurgue com `?hard=true` e faça o upsert novamente. Consulte [Soft delete](/docs/collections/soft-delete/). |
-| `SCHEMA_DRIFT` | 500 | Uma tabela ou coluna esperada pelo código não existe no banco de dados. | Execute `rebase db push` em desenvolvimento; faça um novo deploy em um ambiente gerenciado. |
-| `SCORE_CURSOR_UNSUPPORTED` | 400 | `startAfter` foi combinado com `orderBy: "_score"`. A relevância é computada por consulta em vez de armazenada, portanto não pode servir como chave de cursor. | Pagine a relevância com `limit`/`offset` ou ordene por uma coluna. |
-| `SQL_ERROR` | 400 | O banco de dados recusou um SQL que uma pessoa escreveu. Pelo `EXECUTE_SQL` do socket de realtime, é um frame `ERROR` com a mensagem do banco de dados. `POST /api/admin/sql/csv` o responde antes de enviar qualquer parte do arquivo: um erro de sintaxe, uma escrita (o download roda somente leitura), mais de uma instrução, ou uma role que a conexão não pode assumir. | Corrija o SQL. Um download aceita um único `SELECT`, `WITH … SELECT`, `TABLE` ou `VALUES`. |
-| `TENANT_IMMUTABLE` | 400 | Uma escrita moveria uma linha de um tenant para outro. Uma linha não pode mudar de tenant. `details.violations` informa o campo. | Crie a linha no outro tenant e exclua esta, ou realize a escrita com uma role em `tenant.bypassRoles`. |
-| `TENANT_MISMATCH` | 400 | A escrita especifica um tenant ao qual este chamador não pertence; o banco de dados também a recusaria. | Grave em um tenant ao qual o chamador pertença ou autentique-se como um usuário desse tenant. |
-| `TENANT_REQUIRED` | 400 | A collection tem escopo por tenant e o tenant não pode ser inferido: a requisição não contém nenhum ou o chamador pertence a vários. | Envie o campo do tenant explicitamente ou autentique-se como um chamador que pertença a exatamente um. |
-| `TRANSACTION_ABORTED` | 500 | Uma instrução na transação da escrita falhou e um callback capturou o erro. O Postgres já havia abortado a transação, então a escrita foi revertida e nada foi armazenado. Só um create, update ou delete de `context.data` que o banco de dados recusou é desfeito por conta própria e pode ser capturado com segurança. | Deixe a falha ser lançada, ou verifique antes de executar a instrução. Consulte [Semântica de Transações](/docs/collections/context-data-api/#transaction-semantics). |
-| `UNKNOWN_FIELD` | 400 | `?fields=` especifica um campo que a collection não possui. | Verifique a ortografia; a mensagem lista os campos válidos. |
-| `UNKNOWN_AGGREGATE_FIELD` | 400 | Uma agregação ou `groupBy` especifica um campo que a collection não possui. | Verifique a ortografia; a mensagem lista os campos válidos. |
-| `UNKNOWN_FILTER_FIELD` | 400 | O filtro especifica um campo que esta collection — ou o destino de uma relação — não possui, ou um oculto com `excludeFromApi`. | Verifique a ortografia; a mensagem lista os campos válidos. |
-| `UNKNOWN_FILTER_OPERATOR` | 400 | O filtro especifica um operador inexistente. | A mensagem lista todos os operadores. |
-| `UNKNOWN_MESSAGE_TYPE` | 400 | Um frame do socket de realtime tem um `type` que o servidor não trata. Respondido como um frame `ERROR` com o `requestId` da requisição, para que ela se resolva em vez de expirar. | Verifique o `type` do frame; a mensagem o indica. |
-| `UNKNOWN_ORDER_BY_FIELD` | 400 | A ordenação especifica um campo que esta collection não possui. | Verifique a ortografia; a mensagem lista os campos válidos. |
-| `PRECONDITION_FAILED` | 412 | Um cabeçalho `If-Match` especificou uma versão da linha que não é mais a atual: alguém a modificou entre a leitura e esta escrita. Nada foi gravado. | Leia a linha novamente, reaplique a alteração e envie o novo `ETag`. |
-| `UNKNOWN_RESPONSE_FIELD` | 400 | `?fields=` solicita um campo que a collection não possui. | Verifique a ortografia; a mensagem lista os campos conhecidos. |
-| `UNKNOWN_VECTOR_PROPERTY` | 400 | Uma busca vetorial especificou uma propriedade que não é do tipo `vector` nesta collection. | A mensagem lista as propriedades vetoriais da collection. |
-| `UNSUPPORTED_MEDIA_TYPE` | 415 | O cabeçalho `Content-Type` não é aceito por esta rota. | Envie o tipo documentado para a rota. |
-| `UNSUPPORTED_OPTION` | — | Lançado, não respondido: uma escrita pelo acessor em processo (`context.data` em um callback, `rebase.data` em uma função ou cron) recebeu `ifMatch` ou `idempotencyKey`. Essa porta de entrada não tem verificação de precondição nem armazenamento de idempotência, então a opção é recusada antes que algo seja escrito, em vez de ser ignorada. | Remova a opção ali, ou faça a escrita pelo cliente HTTP, que respeita ambas. |
-| `UNSUPPORTED_RELATION_FILTER` | 400 | O filtro atravessa uma relação `via`, cujo caminho de junção é unidirecional, não havendo como correlacionar uma subconsulta de volta. | Filtre a partir do lado proprietário. |
-| `UNSUPPORTED_RELATION_FILTER_OPERATOR` | 400 | O operador não está definido para esse campo: uma relação sem coluna nesta linha é filtrada por pertinência, e a correspondência de padrão (`like`, `ilike` e suas negações) só se aplica a texto. | Veja a mensagem; ela lista o que o campo aceita. |
-| `VALIDATION_CONSTRAINT` | 400 | Um valor violou uma regra de `validation` declarada pela propriedade — comprimento, intervalo, padrão ou campo obrigatório. | Veja a mensagem; ela identifica cada violação. |
-| `VALIDATION_EXCLUDED_FIELDS` | 400 | O corpo tenta gravar em uma coluna marcada como `excludeFromApi` ou `access: { write: [] }` — a mesma regra, duas formas de escrita. Essas propriedades são reservadas para o servidor: hash de senha, token de verificação. Ao contrário de `FIELD_NOT_WRITABLE`, essa resposta é idêntica para todos os chamadores, incluindo `admin`. | Remova o campo. Consulte [Acesso a campos](/docs/collections/field-access/). |
-| `VALIDATION_INVALID_VALUE` | 400 | Um valor não é compatível com o tipo de sua propriedade. | Veja a mensagem; ela identifica a propriedade. |
-| `VALIDATION_UNKNOWN_FIELDS` | 400 | O corpo referencia um campo que a collection não possui — incluindo um argumento `id` em uma collection cuja chave é outra propriedade. | Verifique a ortografia; a mensagem lista os campos conhecidos. |
-| `VECTOR_CURSOR_UNSUPPORTED` | 400 | Um cursor (`after` / `startAfter`) foi combinado com uma busca vetorial. As linhas são ordenadas por uma distância calculada por consulta, que não pode servir de cursor, então uma listagem vetorial não traz `nextCursor`. | Pagine as linhas mais próximas com `limit`/`offset`. |
-| `WRITE_DENIED` | 403 | Uma regra de segurança ou política de segurança em nível de linha (RLS) recusou a escrita. | Verifique as `securityRules` da collection. |
+| `AGGREGATE_NOT_SUPPORTED` | 501 | O driver atual não suporta o cálculo da agregação solicitada. | Use um driver compatível ou calcule no cliente. |
+| `BRANCHING_UNSUPPORTED` | — | Foi solicitada uma branch de banco de dados via WebSocket do Studio no banco de desenvolvimento gerenciado (PGlite), onde a branch *é* o próprio pai e nada seria isolado. A recusa é a mesma exibida por `rebase db branch`. | Aponte `DATABASE_URL` para uma instância própria do Postgres (`rebase dev --docker` inicia uma) e crie branches nela. |
+| `BATCH_TOO_LARGE` | 400 | `POST /api/data/_batch` contém mais operações que o limite por lote (padrão de 1000). Um batch opera em uma única transação e mantém seus locks durante toda a execução. | Envie em partes menores; a mensagem informa o limite e a quantidade enviada. |
+| `BATCH_UNSUPPORTED` | 400 | O driver deste backend não oferece suporte a escritas atômicas entre coleções diferentes, e iterar escritas individuais não seria atômico nem executado em uma única ida e volta. | Envie as alterações em requisições separadas ou use chamadas `/bulk` específicas por coleção. |
+| `BULK_TOO_LARGE` | 400 | O corpo da operação em massa excede o limite configurado de itens. | Divida a requisição. |
+| `BULK_UNSUPPORTED` | 400 | Esta coleção ou driver não oferece suporte a escritas em massa (bulk). | Grave as linhas individualmente. |
+| `CALLBACK_REJECTED` | 400 / 403 | Um callback de coleção rejeitou a escrita. Um `throw` originado em `beforeSave`/`beforeDelete`/`after*` resulta em 400 contendo a mensagem do desenvolvedor; um `beforeDelete` que retorna `false` resulta em 403. `details.stage` informa qual callback e `details.path` indica a coleção. | Leia a mensagem — ela foi definida pelo próprio projeto, não pelo Rebase. |
+| `CALLBACK_RECURSION` | 500 | Escritas iniciadas por hooks atingiram uma profundidade maior que 16 níveis: uma escrita via `context.data` dentro de um hook dispara novamente os hooks daquela coleção sem condição de parada — geralmente um `afterSave` atualizando incondicionalmente a própria linha. Toda a escrita foi revertida (rollback). A mensagem indica o hook e a coleção; `details.chain` lista cada etapa hook → escrita. | Torne a escrita do hook condicional: atue apenas em `status === "new"` ou ignore caso `values` já contenha os dados que seriam gravados. |
+| `CURSOR_WITH_OFFSET` | 400 | `?after=` foi combinado com `?offset=` ou `?page=`. Um cursor já especifica onde a página inicia; usar um deslocamento sobre ele ignora silenciosamente linhas após o cursor — gerando uma lacuna invisível na resposta. | Utilize apenas um ou outro. |
+| `DISTINCT_NOT_APPLICABLE` | 400 | `?distinct=true` foi combinado com uma busca textual ou vetorial. Ambas atribuem uma pontuação (score) por linha, de modo que duas linhas nunca serão iguais e o `DISTINCT` não agrupará nada — pareceria ter funcionado sem alterar nada. | Remova um dos dois parâmetros. |
+| `DISTINCT_ORDER_BY_NOT_SELECTED` | 400 | Uma leitura com `distinct` está ordenada por uma coluna não retornada. Um `SELECT DISTINCT` só pode ser ordenado por colunas contidas em sua lista de seleção; caso contrário, as linhas agregadas não possuem ordem definida. `details.fields` lista quais são. | Adicione esses campos a `?fields=` ou remova-os de `?orderBy=`. |
+| `DATABASE_UNAVAILABLE` | 503 | Não foi possível conectar ao banco de dados: conexão recusada ou perdida, falha na resolução de DNS do host, servidor iniciando/desligando, ou banco bloqueado para novas conexões (`ALLOW_CONNECTIONS false`, deixado ativo em uma fonte após interrupção de `rebase db branch create --force`; o log informa o banco e `rebase db branch list` o reabre). Retornado por todos os acessos, incluindo login, rotas de admin e socket em tempo real (frame `ERROR`). Enviado com `Retry-After: 5`. Na 0.24, essa indisponibilidade retornava `ROLE_LOOKUP_FAILED`, `INTERNAL_ERROR` ou 500 com código `ECONNREFUSED`. | Tente novamente; o SDK gerencia isso. Verifique se o banco está em execução e acessível. |
+| `DB_CONNECT_TIMEOUT` | 503 | O estabelecimento de uma nova conexão levou mais tempo que `DB_POOL_CONNECT_TIMEOUT`: banco sobrecarregado ou distante geograficamente. Enviado com `Retry-After`. | Tente novamente; o SDK gerencia isso. Avalie a carga e a rede até o banco. |
+| `DB_PERMISSION_DENIED` | 500 | O Postgres recusou o comando (`42501`): violação de política de RLS ou ausência de `GRANT`. | Consulte a seção de [Solução de problemas](/docs/troubleshooting/). |
+| `DB_POOL_EXHAUSTED` | 503 | Todas as conexões do pool permaneceram ocupadas por mais de `DB_POOL_CONNECT_TIMEOUT`; a requisição não alcançou o banco. Trata-se de sobrecarga, não de falha interna; enviado com `Retry-After`. O servidor loga a recomendação uma vez por minuto. | Tente novamente; o SDK gerencia isso. Aumente `DB_POOL_MAX` ou investigue consultas lentas e transações longas que estejam retendo conexões. |
+| `FIELD_NOT_READABLE` | 400 | Um filtro, `orderBy`, `fields`, `select` de agregação ou `groupBy` referencia um campo que as roles do chamador não podem ler (`access.read`), ou um caminho aninhado/ordenação agregada cita uma relação inacessível — ou ainda uma operação de campo (`$inc`, `$push`, …) tem como alvo um campo inacessível, onde a recusa revelaria o valor armazenado. Qualquer campo oculto na resposta deve ser inacessível para consultas, sob pena de vazar valores através de predicados sucessivos. Filtros por relação (`author.salary`) e ordenações agregadas (`max(staff.salary)`) seguem as permissões do alvo. `details.violations` cita cada campo. Campos ocultos com `excludeFromApi` agem como inexistentes: ao serem referenciados, retornam a mesma resposta que nomes com erros de digitação (`UNKNOWN_FILTER_FIELD`, etc.). | Remova o campo da consulta ou obtenha a role apropriada. Veja [Acesso a campos](/docs/collections/field-access/). |
+| `FIELD_NOT_WRITABLE` | 400 | O corpo tenta definir um campo que as roles do chamador não podem gravar (`access.write`). Ocorre recusa em vez de descarte silencioso: ignorar o campo confirmaria erroneamente uma alteração não efetuada. Também ocorre ao tentar gravar via registro pai uma relação inacessível, ou tentar atualizar um campo de `softDelete` — este só pode ser alterado por exclusão. `details.violations` lista os campos. | Remova o campo ou obtenha a role requerida. Campos com escrita proibida para todos retornam `VALIDATION_EXCLUDED_FIELDS`. |
+| `HISTORY_UNAVAILABLE` | 503 | Uma escrita em coleção com `history: true` foi rejeitada porque o histórico não pôde ser gravado: a tabela `rebase.entity_history` não existe ou, no caso de `openRebase` e `rebase console`, falta a função `rebase.record_history`. Ocorre quando nenhum backend com histórico ativo foi inicializado neste banco. Nenhuma alteração foi realizada (incluindo callbacks); leituras continuam funcionando. Lançado por `openRebase` e retornado em instâncias com `provision: false`. | Inicialize o backend ao menos uma vez com histórico ativado e `provision: true` (feito pelo `rebase dev`) e tente novamente. |
+| `IDEMPOTENCY_KEY_IN_PROGRESS` | 409 | Uma requisição anterior com o mesmo `Idempotency-Key` ainda está em execução. | Aguarde a conclusão da requisição original e tente novamente. |
+| `IDEMPOTENCY_KEY_REUSED` | 422 | O mesmo `Idempotency-Key` foi reenviado com parâmetros diferentes: método, caminho, query string ou corpo distintos. | Gere uma nova chave ou repita a requisição original de forma idêntica. |
+| `INVALID_AGGREGATE_FUNCTION` | 400 | O parâmetro `?select=` utilizou uma função diferente de `count`, `sum`, `avg`, `min` ou `max`. | Utilize uma das opções suportadas listadas na mensagem de erro. |
+| `INVALID_AGGREGATE_SELECT` | 400 | Um item em `?select=` não segue o formato `fn(field)` ou uma função que não seja `count()` foi chamada sem indicar o campo. | Utilize o formato correto, ex.: `sum(total)`, `count()`, `avg(score)`. |
+| `INVALID_AGGREGATE_WINDOW` | 400 | Uso de `offset`, `page` ou `orderBy` em agregações sem `groupBy`, ou uso de cursores em qualquer agregação. Agregações sem agrupamento retornam uma única linha, e um grupo não se comporta como uma linha contínua para cursores. | Inclua `groupBy` ou remova os parâmetros; pagine grupos via `offset` ou `page`. Veja [Agregações](/docs/sdk/aggregates-and-search/#aggregates). |
+| `INVALID_BATCH_BODY` | 400 | Uma operação em `/_batch` não possui `op`, `collection`, `values` ou `id`, referencia uma coleção inexistente neste backend, ou reutiliza um identificador `ref`. | Consulte a mensagem; ela indica o índice da operação inválida. |
+| `INVALID_BATCH_REF` | 400 | Um item `{ "$ref": "<name>.<field>" }` aponta para uma operação futura, inexistente ou solicita um campo ausente na linha de referência. Referências devem ser estritamente retrospectivas. | Defina a operação com `ref` *antes* de referenciá-la. |
+| `INVALID_BULK_BODY` | 400 | O corpo da requisição em massa não corresponde ao formato esperado. | Envie a estrutura esperada pela rota: `{ "rows": [...] }` para `POST /bulk`, `{ "updates": [{ "id", "data" }] }` para `PATCH /bulk`, `{ "ids": [...] }` para `POST /bulk/delete`. |
+| `INVALID_CONFLICT_TARGET` | 400 | Os campos em `on_conflict` / `onConflict` de um upsert não possuem garantia de unicidade, não foram enviados com `upsert: true`, ou foram enviados em uma criação aninhada. O Postgres retornaria 42P10 no meio de uma transação em andamento. Aplica-se também a upserts na coleção de usuários (auth), onde criação e atualização seguem fluxos distintos. | Declare `validation: { unique: true }` ou crie um índice `unique`. Na coleção de usuários, envie `POST` para criar e `PATCH` para atualizar. |
+| `INVALID_COUNT` | 400 | O parâmetro `?count=` recebeu valor diferente de `exact` ou `none`. Rejeitado para evitar custos acidentais de contagem decorrentes de erros de digitação (ex.: `?count=nnone`). | Envie `exact` (padrão) ou `none`. Veja [Ignorando a contagem](/docs/backend/api/#skipping-the-count). |
+| `INVALID_CURSOR` | 400 | O cursor `after` é inválido ou contém um id incompatível com as colunas chave da coleção: foi truncado, alterado ou criado manualmente. Enviar um cursor com `orderBy` diferente do original retorna `CURSOR_ORDER_MISMATCH` (também 400). | Repasse o valor exato de `meta.nextCursor` obtido na página anterior, com a mesma ordenação. Veja [Paginação](/docs/sdk/pagination/). |
+| `INVALID_DELETED_PARAM` | 400 | `?deleted=` contém valor diferente de `include` ou `only`. É rejeitado em vez de ignorado para evitar que erros de digitação como `?deleted=true` mascarem dados. | Envie `include` (ativos e excluídos) ou `only` (apenas excluídos). Omita o parâmetro para buscar apenas registros ativos. |
+| `INVALID_DISTINCT` | 400 | `?distinct=` contém valor diferente de `true` ou `false`. | Envie um valor booleano válido (`1` e `0` também são aceitos). |
+| `INVALID_FIELD_OPERATION` | 400 | Um operador como `$inc`, `$push`, `$pull` ou `$merge` foi aplicado a um tipo incompatível, com operando malformado, múltiplos operadores no mesmo campo, nome incorreto ou em uma operação de criação (onde não há valor prévio). | Veja [Escrita via REST](/docs/backend/writes/#field-operations); a mensagem indica o campo problemático. |
+| `INVALID_FILTER_FIELD` | 400 | O filtro referencia uma propriedade inexistente na coleção. | Verifique a grafia do campo de acordo com o schema da coleção. |
+| `INVALID_FILTER_OPERATOR` | 400 | O operador não é compatível com o tipo da propriedade — por exemplo, aplicar `like` a números ou datas. | Veja [Consultando dados](/docs/sdk/querying/). |
+| `INVALID_FILTER_VALUE` | 400 | O valor do filtro é incompatível com o tipo da coluna correspondente: ex. `?id=eq.abc` em chave numérica, valor fora do enum, data malformada. `details.dbCode` traz o SQLSTATE. | Envie um valor correspondente ao tipo da coluna. |
+| `INVALID_HARD_PARAM` | 400 | `?hard=` recebeu valor diferente de `true` ou `false`. Qualquer outro valor é rejeitado para evitar que um erro de digitação resulte em soft-delete acidental quando o objetivo era purgar. | Envie `true` ou `false`. |
+| `INVALID_INCLUDE` | 400 | `?include=` está malformado: lista de caminhos inválida ou objeto de opções incorreto. Relações com mais de três níveis de profundidade geram `INCLUDE_TOO_DEEP` (400). Rejeitado na borda da aplicação para prevenir erro 500 no driver. | Verifique a mensagem; ela indica o caminho incorreto. |
+| `INVALID_INPUT` | 400 | O corpo da requisição falhou na validação de schema. | Veja a mensagem de erro detalhada. |
+| `INVALID_LIMIT` | 400 | `?limit=` não é um número inteiro entre 1 e o máximo configurado (padrão de 1000); valores maiores são rejeitados (não são truncados). Subscrições em tempo real fora dessa faixa recebem o mesmo código via frame `ERROR`. | Reduza o limite e utilize paginação para os registros restantes. |
+| `INVALID_LOGICAL_GROUP` | 400 | Um agrupamento lógico `?or=`, `?and=` ou `?not=` está malformado ou excede a profundidade máxima permitida. | Consulte a mensagem para entender as regras de simplificação de grupos. |
+| `INVALID_OFFSET` | 400 | `?offset=` não é um inteiro maior ou igual a 0. | Envie um número inteiro não negativo. |
+| `INVALID_ORDER_BY` | 400 | `?orderBy=` não corresponde a `field`, `field:desc`, `field:desc:last`, ou a um array JSON no formato `{ field, direction, nulls }` — ou especifica direção/posicionamento nulo inválidos. | Consulte a mensagem; ela lista as sintaxes suportadas. |
+| `INVALID_PAGE` | 400 | `?page=` não é um inteiro maior ou igual a 1 (paginação baseada em índice 1; `?page=0` é considerado erro). | Envie `1` ou superior, ou utilize `?offset=`. |
+| `INVALID_PARAM` | 400 | Um parâmetro da query string está malformado. | Veja a mensagem de erro. |
+| `INVALID_QUERY_BODY` | 400 | O corpo de `POST …/query` contém valores incompatíveis com os equivalentes da URL: array em parâmetros univalorados (`fields`, `limit`), objeto em filtros, ou redundância entre URL e corpo (o endpoint lê tudo do corpo). | Estruture os valores conforme a URL — string ou lista para repetições; `where`, `include`, `orderBy` e `vector` aceitam JSON. Veja [Consultas longas via corpo](/docs/backend/vector-search/#queries-too-long-for-a-url). |
+| `INVALID_VECTOR` | 400 | `?vector=` não é um array JSON de números. | Envie no formato `[0.1,0.2,0.3]`. |
+| `INVALID_VECTOR_DISTANCE` | 400 | `?vector_distance=` recebeu valor diferente de `cosine`, `l2` ou `inner_product`. | Utilize uma dessas três opções métricas. |
+| `INVALID_VECTOR_THRESHOLD` | 400 | `?vector_threshold=` não é numérico. | Envie um número válido. |
+| `INVALID_WHERE` | 400 | `?where=` não é um objeto JSON mapeando campos a condições. | Envie no formato `{"status":["==","active"]}`. |
+| `KEY_IMMUTABLE` | 400 | Uma atualização tentou alterar a chave primária da linha para um valor diferente do atual — seja no corpo ou via `beforeSave`. Linhas não podem mudar de identificador primário. Rejeitado antes da execução de hooks, sem gravar nada. `details.violations` cita o campo. | Crie um novo registro com a nova chave e exclua o antigo. Enviar a mesma chave já existente é permitido. |
+| `MISSING_AGGREGATE_SELECT` | 400 | Rota de agregação executada sem o parâmetro obrigatório `?select=`. | Adicione a seleção, ex.: `?select=count()`. |
+| `NO_COLLECTIONS` | 404 | O projeto não expõe nenhuma coleção: nenhuma declarada no código e nenhuma tabela correspondente no banco. Se tabelas existirem sem RLS habilitado, a mensagem indica o SQL necessário e `details.unprotectedTables` as lista (na 0.24, informava ausência de tabelas). | Crie as tabelas — via migration, SQL ou arquivo de coleção com `rebase db push` — e reinicie o servidor. |
+| `NOT_FOUND` | 404 | Nenhum registro encontrado com esse id nesta coleção — ou registro oculto por regras de RLS para este usuário. | Verifique o id informado e as regras de `securityRules` da coleção. |
+| `UNKNOWN_RELATION` | 400 / 404 | `?include=` referencia algo que não é uma relação na coleção. Retorna **404** caso ocorra diretamente no *caminho da URL* (ex.: `/api/data/authors/1/posts` se `authors` não declarar essa relação), pois a rota deixa de existir. | Verifique a relação declarada na coleção. Relações inversas precisam ser explicitamente configuradas no pai para navegação. |
+| `ORDER_BY_FIELD_NOT_SORTABLE` | 400 | A propriedade indicada para ordenação não permite ordenação. | Ordene por uma propriedade vinculada a uma coluna física. |
+| `PAGE_WITH_OFFSET` | 400 | `?page=` foi usado com `?offset=` — ou combinação de `page` e `offset` em `find()`. Como ambos definem a janela de busca, o cliente SDK rejeita previamente para evitar sobreposições invisíveis. | Utilize apenas um dos dois parâmetros. |
+| `PAYLOAD_TOO_LARGE` | 413 | O corpo da requisição excede o limite configurado. | Reduza o volume de dados enviados ou eleve o limite no servidor. |
+| `READ_ONLY_TRANSACTION` | 409 | Um callback `afterRead` tentou realizar escrita. Consultas de leitura rodam em transações `READ ONLY`, bloqueando escritas no callback ou em chamadas aninhadas. | Mova a escrita para fora da leitura: use jobs assíncronos em segundo plano ou `rebase.dataAsAdmin` em cron jobs ou funções customizadas. |
+| `RELATION_HAS_NO_PIVOT` | 400 | A escrita continha dados adicionais para a ligação, mas o caminho não passa por um `manyToMany` com `through.properties` configurado — logo, não há tabela intermediária para armazená-los. | Declare `through.properties` na relação ou remova os dados da junção na escrita. Veja [Relações](/docs/collections/relations/). |
+| `RELATION_MISCONFIGURED` | 500 | Uma relação não pôde ser resolvida no schema registrado. A operação é rejeitada para evitar falsos sucessos em gravações ou retornos vazios para dados existentes. | Execute `rebase schema generate` se o schema gerado estiver defasado em relação ao banco. |
+| `RELATION_NOT_UNLINKABLE` | 400 | Esta relação não permite desvinculação a partir desta ponta. | Execute a desvinculação a partir do lado proprietário da relação. |
+| `RELATION_NOT_WRITABLE` | 400 | O caminho aninhado não é uma relação gravável, ou a escrita tenta passar por relações `via` com múltiplos saltos (apenas saltos únicos são graváveis). `details.fields` traz as chaves `via`. Nada foi salvo. | Escreva diretamente nas coleções que compõem a cadeia. Veja [Relações](/docs/collections/relations/#via--an-explicit-join-chain). |
+| `RELATION_PIVOT_UNSUPPORTED` | 400 | A relação possui colunas na tabela de junção, mas a fonte de dados atual não suporta gravação nelas. | O vínculo em si é criado, mas os dados complementares são ignorados. Valide os recursos do driver. |
+| `RELATION_SOURCE_KEY_EMPTY` | 400 | A escrita da relação não possuía chave de origem para vincular a associação. | Salve o registro pai antes de criar a associação. |
+| `RESULT_TOO_LARGE` | — | Um comando enviado via `EXECUTE_SQL` do socket em tempo real (`admin.executeSql`, catálogos do painel) gerou mais de 128 MB de dados e foi cancelado. Retornado via frame `ERROR` do WebSocket. Execuções do console SQL não sofrem essa recusa e exibem os primeiros resultados. | Inclua um `LIMIT`, reduza as colunas selecionadas e pagine o resultado. |
+| `ROW_IN_TRASH` | 409 | A chave do upsert pertence a um registro na lixeira (soft-deleted). Upserts não sobrescrevem registros logicamente excluídos em nenhum ponto de entrada (REST `?on_conflict=`, `/bulk`, `/_batch`, SDK ou socket). Nada foi modificado. | Restaure o registro previamente (definindo o campo de exclusão para `null`) ou purgue-o usando `?hard=true` antes do upsert. Veja [Soft delete](/docs/collections/soft-delete/). |
+| `SCHEMA_DRIFT` | 500 | Uma tabela ou coluna esperada pelo código não existe no banco de dados físico. | Execute `rebase db push` em desenvolvimento; faça novo deploy em tenants gerenciados. |
+| `SCORE_CURSOR_UNSUPPORTED` | 400 | `startAfter` foi utilizado com `orderBy: "_score"`. Relevância é calculada sob demanda e varia a cada busca, não servindo como chave fixa de cursor. | Pagine os resultados usando `limit`/`offset` ou ordene por colunas físicas. |
+| `SQL_ERROR` | 400 | O banco recusou uma instrução SQL personalizada. No socket de tempo real via `EXECUTE_SQL`, emite um frame `ERROR` com a resposta do banco. Em `POST /api/admin/sql/csv`, o erro é retornado antes do envio do arquivo: erro de sintaxe, tentativa de escrita (o download é estritamente de leitura), múltiplos comandos ou roles não autorizadas. | Corrija o SQL. Exportações aceitam um único `SELECT`, `WITH … SELECT`, `TABLE` ou `VALUES`. |
+| `TENANT_IMMUTABLE` | 400 | A escrita transferiria um registro para outro tenant. Registros não podem mudar de tenant. `details.violations` cita o campo. | Crie um novo registro no tenant de destino e remova o original, ou execute com uma role presente em `tenant.bypassRoles`. |
+| `TENANT_MISMATCH` | 400 | A escrita referencia um tenant ao qual o chamador não pertence; a operação também seria barrada pelo banco. | Escreva em um tenant ao qual você possui acesso ou autentique-se com credenciais pertencentes a ele. |
+| `TENANT_REQUIRED` | 400 | A coleção é particionada por tenant e não foi possível deduzir o tenant: a requisição não informa nenhum ou o chamador pertence a vários. | Informe o campo de tenant explicitamente ou autentique-se sob o escopo de um único tenant. |
+| `TRANSACTION_ABORTED` | 500 | Uma instrução da transação falhou e o erro foi capturado por um callback. O Postgres já havia abortado a transação, ocasionando rollback de toda a operação. Apenas erros de criação, edição ou exclusão disparados via `context.data` que o banco rejeitou são desfeitos de forma isolada e seguros para captura em try/catch. | Permita que o erro seja lançado ou valide os dados antes de rodar o comando. Veja [Semântica de transações](/docs/collections/context-data-api/#transaction-semantics). |
+| `UNKNOWN_FIELD` | 400 | `?fields=` solicita um campo inexistente na coleção. | Verifique a grafia; a mensagem lista os campos aceitos. |
+| `UNKNOWN_AGGREGATE_FIELD` | 400 | A agregação ou `groupBy` indica um campo inexistente na coleção. | Verifique a grafia; a mensagem lista os campos aceitos. |
+| `UNKNOWN_FILTER_FIELD` | 400 | O filtro faz referência a um campo inexistente na coleção (ou no alvo da relação), ou a um campo protegido com `excludeFromApi`. | Verifique a grafia; a mensagem lista os campos válidos. |
+| `UNKNOWN_FILTER_OPERATOR` | 400 | O operador de filtro informado não existe. | A mensagem lista todos os operadores disponíveis. |
+| `UNKNOWN_MESSAGE_TYPE` | 400 | Um frame de WebSocket contém um `type` desconhecido pelo servidor. Respondido com frame `ERROR` contendo o `requestId` para evitar timeouts no cliente. | Valide o campo `type` do frame; a mensagem traz o tipo recebido. |
+| `UNKNOWN_ORDER_BY_FIELD` | 400 | A ordenação selecionou um campo inexistente na coleção. | Verifique a grafia; a mensagem lista os campos aceitos. |
+| `PRECONDITION_FAILED` | 412 | O cabeçalho `If-Match` informou uma versão desatualizada da linha: alterações concorrentes ocorreram entre a leitura e a escrita atual. Nenhuma alteração foi realizada. | Leia a linha novamente, aplique as modificações necessárias e reenvie com o novo `ETag`. |
+| `UNKNOWN_RESPONSE_FIELD` | 400 | `?fields=` pede um campo que a coleção não possui. | Verifique a grafia; a mensagem lista os campos conhecidos. |
+| `UNKNOWN_VECTOR_PROPERTY` | 400 | A busca vetorial indicou uma propriedade que não é do tipo `vector` na coleção. | A mensagem traz a lista de propriedades vetoriais válidas na coleção. |
+| `UNSUPPORTED_MEDIA_TYPE` | 415 | O cabeçalho `Content-Type` não é aceito por esta rota. | Envie os dados no formato documentado pela rota. |
+| `UNSUPPORTED_OPTION` | — | Lançado internamente (não retornado via HTTP): chamadas diretas no processo (`context.data` em hooks, `rebase.data` em funções/cron) receberam `ifMatch` ou `idempotencyKey`. O acesso direto não possui validação de pré-condições nem controle de idempotência; por isso, a chamada é recusada imediatamente em vez de ignorar as opções silenciosamente. | Remova essas opções no acesso em memória ou faça a escrita via cliente HTTP, que suporta ambas. |
+| `UNSUPPORTED_RELATION_FILTER` | 400 | O filtro tenta cruzar uma relação `via`, cuja junção é configurada em sentido único, impedindo a correlação reversa na subconsulta. | Aplique o filtro partindo da ponta proprietária da relação. |
+| `UNSUPPORTED_RELATION_FILTER_OPERATOR` | 400 | O operador é incompatível com o campo: relações sem coluna direta na linha filtram por pertencimento, e operadores de texto (`like`, `ilike`) exigem strings. | Consulte a mensagem; ela traz os formatos aceitos pelo campo. |
+| `VALIDATION_CONSTRAINT` | 400 | Um valor violou uma regra de `validation` da propriedade — comprimento, faixa numérica, regex ou campo obrigatório. | Consulte a mensagem; ela detalha cada violação encontrada. |
+| `VALIDATION_EXCLUDED_FIELDS` | 400 | A escrita tentou alterar uma coluna com `excludeFromApi` ou `access: { write: [] }`. Essas propriedades são de controle exclusivo do servidor (ex.: hash de senha, token de validação). Ao contrário de `FIELD_NOT_WRITABLE`, essa regra se aplica a todos os chamadores, inclusive `admin`. | Remova o campo da requisição. Veja [Acesso a campos](/docs/collections/field-access/). |
+| `VALIDATION_INVALID_VALUE` | 400 | O valor informado é incompatível com a definição de tipo da propriedade. | Veja a mensagem; ela especifica a propriedade afetada. |
+| `VALIDATION_UNKNOWN_FIELDS` | 400 | O corpo da escrita lista campos não mapeados na coleção — inclusive o envio de `id` em coleções que utilizam outra chave primária. | Verifique a grafia; a mensagem lista os campos registrados. |
+| `VECTOR_CURSOR_UNSUPPORTED` | 400 | Um cursor (`after` / `startAfter`) foi associado a uma busca vetorial. A ordenação é feita pela distância calculada em tempo real para cada busca, inviabilizando cursores estáticos; buscas vetoriais não retornam `nextCursor`. | Pagine os resultados mais próximos através de `limit`/`offset`. |
+| `WRITE_DENIED` | 403 | Uma regra de segurança ou política de RLS bloqueou a operação de escrita. | Revise as definições de `securityRules` da coleção. |
 
-## `PG_<SQLSTATE>` — uma restrição recusada pelo banco de dados
+## `PG_<SQLSTATE>` — uma constraint recusada pelo banco de dados
 
-Uma escrita que o Postgres rejeita por um motivo relacionado aos *dados do
-chamador* responde com o SQLSTATE no próprio código: `PG_23505`, `PG_23503` e
-assim por diante. Trata-se de uma família, não de uma lista fixa — o Postgres
-define centenas de SQLSTATEs —, mas apenas duas classes chegam a ser expostas,
-pois somente essas duas decorrem de erro do chamador:
+Uma escrita recusada pelo Postgres devido aos *dados enviados pelo chamador*
+retorna com o SQLSTATE embutido no código: `PG_23505`, `PG_23503`, e assim por diante.
+Trata-se de uma família dinâmica, não de uma lista estática — o Postgres possui
+centenas de SQLSTATEs —, mas apenas duas classes são expostas dessa forma, pois
+somente elas decorrem de ações diretas do chamador:
 
-- **classe 23**, violação de restrição de integridade: uma duplicata, uma chave
-  estrangeira que aponta para o vazio, uma coluna NOT NULL deixada em branco;
-- **classe 22**, exceção de dados: um valor que o tipo da coluna não suporta.
+- **classe 23**, violação de restrição de integridade: duplicatas, chave estrangeira
+  apontando para registro inexistente, coluna `NOT NULL` vazia;
+- **classe 22**, exceção de dados: valor incompatível com os limites do tipo da coluna.
 
-Tudo o mais — uma conexão perdida, uma coluna ausente, um problema de
-privilégios — é de responsabilidade do servidor e permanece como `500`. Portanto,
-`code.startsWith("PG_")` é um teste seguro para "a linha enviada estava errada",
-e os quatro abaixo são os que um cliente realmente encontra. `details.dbCode`
-traz o mesmo SQLSTATE para todos eles, e a mensagem informa a restrição violada.
-
-| Código | Status | Significado | O que fazer |
-| --- | --- | --- | --- |
-| `PG_22P02` | 400 | Não foi possível interpretar o valor como o tipo da coluna — o equivalente no lado da escrita a `INVALID_FILTER_VALUE`. | Envie um valor compatível com o tipo da coluna. |
-| `PG_23502` | 400 | Uma coluna `NOT NULL` foi deixada em branco. | Envie o campo ou defina um valor padrão para a coluna. |
-| `PG_23503` | 400 / 409 | Em um salvamento, uma chave estrangeira aponta para uma linha que não existe (400). Em uma exclusão, outras linhas ainda referenciam esta (409; uma chave `RESTRICT` gera `PG_23001`, também 409). | Crie a linha de destino primeiro ou corrija o id; em uma exclusão, remova ou reaponte antes as linhas que a referenciam. |
-| `PG_23505` | 409 | Uma restrição de unicidade (unique constraint) foi violada. A mensagem informa o nome da restrição. | Use um valor diferente ou atualize a linha existente. |
-
-## Armazenamento (Storage)
+Todas as demais — conexões caídas, colunas inexistentes, falhas de permissão — são
+erros do servidor e mantêm o status `500`. Dessa forma, `code.startsWith("PG_")` é
+uma verificação segura para "os dados enviados estavam incorretos", sendo os quatro
+casos abaixo os mais frequentes no cliente. `details.dbCode` contém o SQLSTATE
+correspondente em todos eles, e a mensagem indica a constraint violada.
 
 | Código | Status | Significado | O que fazer |
 | --- | --- | --- | --- |
-| `INVALID_LIST_OPTIONS` | 400 | O `maxResults` de uma listagem de armazenamento não é um número inteiro de pelo menos 1, ou o seu `pageToken` não foi emitido pela fonte. Um tamanho de página menor que um retornava uma página vazia com o mesmo token, então um laço `while (pageToken)` nunca terminava. | Envie um `maxResults` positivo e devolva `nextPageToken` sem alterações. |
-| `INVALID_STORAGE_BUCKET` | 400 | O nome do bucket está malformado. | Verifique o nome. |
-| `INVALID_STORAGE_KEY` | 400 | A chave do objeto está malformada, escapa do seu prefixo ou está sob um prefixo reservado (`_rebase/renditions/`, `_rebase/maintenance/`). | Verifique a chave. |
-| `INVALID_TRANSFORM_OPTIONS` | 400 | Os parâmetros de transformação de imagem estão fora do intervalo ou são contraditórios. | Consulte [Storage](/docs/backend/storage/). |
-| `STORAGE_FILE_TOO_LARGE` | 413 | O upload excede o `maxSize` declarado pela propriedade de destino. Aplicado no servidor, não apenas no navegador. `details` informa a propriedade, o limite e o tamanho real. | Envie um arquivo menor ou aumente o `maxSize` na propriedade. |
-| `STORAGE_FILE_TYPE_REFUSED` | 400 | O tipo do arquivo enviado não está no `acceptedFiles` da propriedade, ou não está no `allowedMimeTypes` da própria fonte de armazenamento. `details` informa a propriedade (ou a lista da fonte), a lista aceita e o tipo de conteúdo enviado. | Envie um tipo aceito ou amplie `acceptedFiles` / `allowedMimeTypes`. |
-| `STORAGE_MISCONFIGURED` | 502 | O bucket S3 ou GCS com que esta fonte está configurada não existe, ou o provedor recusou as credenciais deste deploy para ele. A mensagem indica o bucket; `details.reason` é `NoSuchBucket` ou a recusa do provedor. Um bucket ausente costumava aparecer como "arquivo não encontrado" em todos os arquivos. | Corrija o nome do bucket (`S3_BUCKET` / `GCS_BUCKET`, `__<KEY>` para uma fonte nomeada) ou as permissões das credenciais. |
-| `STORAGE_NOT_CONFIGURED` | 501 / 503 | Nenhum backend de armazenamento está configurado neste servidor, ou nenhum é o padrão e a requisição não nomeia nenhuma fonte; a mensagem indica as fontes servidas (501). Um upload retomável cuja fonte desapareceu antes de terminar resulta em 503. | Configure S3, GCS ou armazenamento local, ou nomeie uma fonte com `?storageId=`. |
-| `STORAGE_SAME_LOCATION` | 400 | `POST /api/admin/storage/move` com `deleteSource` (`rebase storage move --delete-source`) entre duas fontes que armazenam no mesmo bucket ou diretório. Todo arquivo contaria como já presente no destino, por ser o mesmo arquivo, e excluir a cópia da fonte excluiria a única que existe. Nada foi movido nem excluído. | Aponte a propriedade para a outra fonte; os arquivos dela já estão lá. |
-| `STORAGE_SCAN_INCOMPLETE` | 409 | `DELETE /api/admin/storage/orphans` (`rebase storage orphans --delete`) não conseguiu ler todas as collections, então um arquivo que uma delas nomeia pareceria sem uso. Com `?scan=`, a varredura que ele nomeia é a que não conseguiu ler todas as collections. Nada foi excluído; `details.unscanned` indica cada collection e por que não pôde ser lida. | Corrija o que impede a leitura dessas collections e execute de novo. |
-| `STORAGE_SCAN_NOT_FOUND` | 404 | `GET /api/admin/storage/orphans/scans/:id` ou `DELETE /api/admin/storage/orphans?scan=:id` nomeia uma varredura que a fonte não tem. As varreduras ficam guardadas por 7 dias, na fonte que elas varreram, então um `storageId` diferente do da varredura também não encontra nenhuma. | Passe o `storageId` da varredura, ou inicie outra. |
-| `STORAGE_SCAN_NOT_COMPLETE` | 409 | `DELETE /api/admin/storage/orphans?scan=:id` nomeia uma varredura que ainda está `queued` ou `running`, ou que deu `failed`. Nada foi excluído; `details.status` diz qual. | Espere a varredura terminar, ou inicie outra. |
-| `STORAGE_SCAN_EXPIRED` | 409 | `DELETE /api/admin/storage/orphans?scan=:id` nomeia uma varredura que terminou há mais de 15 minutos. Nada foi excluído. | Inicie outra varredura e exclua a partir dela. |
-| `STORAGE_SCAN_DELETION_STARTED` | 409 | `DELETE /api/admin/storage/orphans?scan=:id` nomeia uma varredura cujos órfãos já estão sendo excluídos. | Leia o `deletion` da varredura com `GET /api/admin/storage/orphans/scans/:id`. |
-| `STORAGE_SOURCE_NOT_CONFIGURED` | 501 | A fonte de armazenamento está declarada, mas não possui credenciais aqui. | Defina as variáveis de ambiente dessa fonte. |
-| `STORAGE_WRITE_FAILED` | 502 | O backend de armazenamento recusou ou interrompeu a gravação. | Verifique os logs e as credenciais do próprio serviço. |
-| `TRANSFORM_OVERLOADED` | 503 | Muitas transformações de imagem em andamento simultaneamente. | Tente novamente; considere colocar uma CDN à frente. |
-| `UNKNOWN_STORAGE_SOURCE` | 400 / 404 | A requisição indicou uma fonte de armazenamento (`?storageId=`) que este projeto não declara. Um `bucket` que este deploy não atende retorna o mesmo código com **404** (em uma listagem, e em um upload, pasta ou upload retomável para S3 ou GCS) — o repositório é o que está ausente, e `details` informa os buckets e as fontes que realmente existem. Ambos costumavam retornar como "arquivo não encontrado", idêntico a uma chave simplesmente inexistente. | Declare a fonte em `config/resources.ts` ou consulte `GET /api/storage/sources`. |
-| `UPLOAD_LOCKED` | 423 | O `PATCH` de um upload retomável chegou enquanto outro chunk do mesmo upload ainda estava sendo recebido — quase sempre um cliente reenviando o chunk em trânsito. É recusado em vez de enfileirado, como o tusd faz. | Peça o offset com `HEAD /api/storage/tus/:id` e retome a partir dali; o tus-js-client recua e tenta novamente por conta própria. Consulte [Uploads retomáveis (TUS)](/docs/backend/storage-resumable-uploads/). |
+| `PG_22P02` | 400 | Um valor não pôde ser interpretado pelo tipo da coluna — equivalente de escrita para `INVALID_FILTER_VALUE`. | Envie um valor compatível com o tipo da coluna. |
+| `PG_23502` | 400 | Uma coluna com restrição `NOT NULL` ficou vazia. | Forneça o campo ou configure um valor padrão (default) na coluna. |
+| `PG_23503` | 400 / 409 | Na escrita: chave estrangeira referencia linha inexistente (400). Na exclusão: outras linhas referenciam este registro (409; chaves com `RESTRICT` disparam `PG_23001`, também 409). | Crie a linha de destino antes ou corrija o id; na exclusão, remova ou desvincule antes as linhas dependentes. |
+| `PG_23505` | 409 | Violação de constraint de unicidade (unique constraint). A mensagem identifica a restrição. | Utilize um valor diferente ou atualize o registro já existente. |
+
+## Storage
+
+| Código | Status | Significado | O que fazer |
+| --- | --- | --- | --- |
+| `INVALID_LIST_OPTIONS` | 400 | O parâmetro `maxResults` de listagem não é um inteiro maior ou igual a 1, ou `pageToken` é inválido para esta fonte. Anteriormente, limites menores que 1 retornavam páginas vazias com o mesmo token, travando loops `while (pageToken)`. | Defina um `maxResults` positivo e repasse `nextPageToken` inalterado. |
+| `INVALID_STORAGE_BUCKET` | 400 | O nome do bucket é inválido. | Verifique o nome do bucket. |
+| `INVALID_STORAGE_KEY` | 400 | A chave do arquivo está malformada, ultrapassa seu prefixo ou usa prefixos reservados (`_rebase/renditions/`, `_rebase/maintenance/`). | Verifique a chave do arquivo. |
+| `INVALID_TRANSFORM_OPTIONS` | 400 | Os parâmetros de transformação de imagem estão fora dos limites aceitos ou são conflitantes. | Veja [Storage](/docs/backend/storage/). |
+| `STORAGE_FILE_TOO_LARGE` | 413 | O arquivo enviado ultrapassa o `maxSize` estabelecido na propriedade de destino. Validado no servidor, não apenas no navegador. `details` traz a propriedade, o limite e o tamanho real recebido. | Envie um arquivo menor ou aumente o `maxSize` na propriedade. |
+| `STORAGE_FILE_TYPE_REFUSED` | 400 | O tipo MIME do arquivo não consta no `acceptedFiles` da propriedade ou viola os `allowedMimeTypes` da fonte de armazenamento. `details` cita a propriedade/fonte, a lista permitida e o Content-Type enviado. | Envie um tipo permitido ou amplie a lista em `acceptedFiles` / `allowedMimeTypes`. |
+| `STORAGE_MISCONFIGURED` | 502 | O bucket S3 ou GCS configurado não existe, ou as credenciais desta implantação foram recusadas pelo provedor. A mensagem cita o bucket; `details.reason` reporta `NoSuchBucket` ou a resposta do provedor. Buckets inexistentes eram mascarados anteriormente como "file not found". | Corrija o nome do bucket (`S3_BUCKET` / `GCS_BUCKET`, `__<KEY>` em fontes nomeadas) ou ajuste as permissões das credenciais. |
+| `STORAGE_NOT_CONFIGURED` | 501 / 503 | Nenhum backend de storage foi configurado no servidor, ou nenhum é padrão e a chamada não especificou a fonte; a mensagem lista as fontes ativas (501). Se a fonte desaparecer durante um upload retomável (resumable), retorna 503. | Configure S3, GCS ou armazenamento local, ou identifique a fonte via `?storageId=`. |
+| `STORAGE_SAME_LOCATION` | 400 | Chamada a `POST /api/admin/storage/move` com `deleteSource` (`rebase storage move --delete-source`) entre fontes que usam o mesmo bucket ou diretório. Os arquivos seriam detectados como já existentes e a exclusão da fonte apagaria a única cópia. Nenhuma ação foi realizada. | Aponte a propriedade para a outra fonte diretamente; os arquivos já residem no local. |
+| `STORAGE_SCAN_INCOMPLETE` | 409 | `DELETE /api/admin/storage/orphans` (`rebase storage orphans --delete`) falhou na leitura de certas coleções, o que poderia marcar como órfãos arquivos legítimos. Usando `?scan=`, indica que a verificação informada não cobriu todas as coleções. Nada foi excluído; `details.unscanned` cita cada coleção e o motivo da falha. | Solucione o erro de acesso às coleções e execute a varredura novamente. |
+| `STORAGE_SCAN_NOT_FOUND` | 404 | `GET /api/admin/storage/orphans/scans/:id` ou `DELETE /api/admin/storage/orphans?scan=:id` especifica uma varredura inexistente na fonte. Varreduras são mantidas por 7 dias na fonte em que foram geradas; usar um `storageId` diferente impede a localização. | Forneça o `storageId` correspondente ao scan ou inicialize uma nova varredura. |
+| `STORAGE_SCAN_NOT_COMPLETE` | 409 | `DELETE /api/admin/storage/orphans?scan=:id` referencia um scan ainda nos estados `queued` ou `running`, ou com falha (`failed`). Nada foi excluído; `details.status` traz o estado atual. | Aguarde o término da varredura ou dispare uma nova. |
+| `STORAGE_SCAN_EXPIRED` | 409 | `DELETE /api/admin/storage/orphans?scan=:id` cita uma varredura finalizada há mais de 15 minutos. Nada foi excluído. | Execute uma nova varredura e proceda à limpeza a partir dela. |
+| `STORAGE_SCAN_DELETION_STARTED` | 409 | `DELETE /api/admin/storage/orphans?scan=:id` referencia um scan cujos órfãos já estão em processo de remoção. | Acompanhe a remoção (`deletion`) com `GET /api/admin/storage/orphans/scans/:id`. |
+| `STORAGE_SOURCE_NOT_CONFIGURED` | 501 | A fonte de armazenamento está declarada no código, mas não possui credenciais configuradas neste ambiente. | Configure as variáveis de ambiente referentes a essa fonte. |
+| `STORAGE_WRITE_FAILED` | 502 | O serviço de armazenamento recusou ou interrompeu a gravação. | Verifique as credenciais e os logs do provedor de storage. |
+| `TRANSFORM_OVERLOADED` | 503 | Limite de transformações simultâneas de imagem atingido. | Tente novamente em instantes; recomenda-se a adoção de um CDN à frente. |
+| `UNKNOWN_STORAGE_SOURCE` | 400 / 404 | A requisição informou uma fonte (`?storageId=`) não declarada no projeto. Um `bucket` não atendido retorna este código com status **404** (em listagens, uploads normais, diretórios ou uploads retomáveis para S3/GCS) — o storage em si está ausente; `details` lista os buckets e fontes existentes. Anteriormente, retornavam "file not found", parecendo ausência do arquivo. | Declare a fonte em `config/resources.ts` ou consulte `GET /api/storage/sources`. |
+| `UPLOAD_LOCKED` | 423 | O `PATCH` de um upload retomável chegou enquanto o fragmento anterior ainda estava em processamento — frequentemente causado por retentativas prematuras do cliente. Ocorre recusa em vez de enfileiramento, similar ao comportamento do tusd. | Consulte o offset atual com `HEAD /api/storage/tus/:id` e continue desse ponto; o tus-js-client lida com isso automaticamente via backoff. Veja [Uploads retomáveis (TUS)](/docs/backend/storage-resumable-uploads/). |
 
 ## Funções personalizadas
 
 | Código | Status | Significado | O que fazer |
 | --- | --- | --- | --- |
-| `FUNCTION_NOT_FOUND` | 404 | Nenhuma função com esse nome está disponível — ou ela existe, mas suas rotas internas não cobrem o caminho solicitado. Um chamador autenticado também é informado sobre o que *está* disponível; um chamador anônimo não recebe essa informação, pois essa lista é um inventário de todos os endpoints customizados. Quando um arquivo com esse nome falha ao carregar, a mensagem informa isso a um chamador autenticado, nomeando o arquivo: essa é a diferença entre um erro de digitação e um deploy quebrado. Um chamador anônimo recebe a resposta simples de nome desconhecido, como para um nome que não corresponde a nada. | Compare o nome com `GET /api/functions` ou verifique o log de inicialização em busca de um arquivo que não pôde ser carregado. |
-| `FUNCTION_TIMEOUT` | 504 | O handler excedeu seu tempo limite. Ele continua em execução; não pode ser cancelado a partir daqui. | Passe um `AbortSignal` para chamadas externas ou aumente `REBASE_FUNCTIONS_TIMEOUT_MS`. |
-| `FUNCTIONS_UPSTREAM_UNREACHABLE` | 502 | Este processo faz proxy de funções para outro, que não respondeu. | Verifique se a unidade de funções está em execução. |
+| `FUNCTION_NOT_FOUND` | 404 | Nenhuma função atende por esse nome — ou a função existe, mas não possui rotas para o caminho solicitado. Usuários autenticados recebem a lista do que *está* disponível; chamadores anônimos não, preservando o inventário dos endpoints. Se o arquivo da função falhou ao carregar, a mensagem alerta o usuário autenticado citando o arquivo, distinguindo erro de digitação de falha no deploy. Chamadores anônimos recebem resposta padrão de rota desconhecida. | Compare o nome com `GET /api/functions` ou consulte os logs de boot para identificar eventuais falhas de carregamento. |
+| `FUNCTION_TIMEOUT` | 504 | A execução da função excedeu o tempo limite máximo configurado. Ela continua em processamento no runtime; não pode ser cancelada daqui. | Defina um `AbortSignal` em requisições de saída ou aumente `REBASE_FUNCTIONS_TIMEOUT_MS`. |
+| `FUNCTIONS_UPSTREAM_UNREACHABLE` | 502 | Este processo atua como proxy de funções para outra instância, mas não obteve resposta dela. | Verifique se a instância dedicada de funções está ativa e saudável. |
 
-## Cron jobs
-
-| Código | Status | Significado | O que fazer |
-| --- | --- | --- | --- |
-| `CRON_JOB_ALREADY_EXECUTING` | 409 | Um disparo manual de um cron job que já está em execução — no processo que respondeu, ou em outro que detém o lease de execução do job, como o worker por trás de um processo `api`. Nada foi executado. O descarte fica no histórico do job, e `details.log` é essa entrada; sua linha nomeia o processo que executa o job. | Tente novamente quando essa execução terminar. Veja [Cron jobs](/docs/backend/cron-across-instances/#concurrency-guarding). |
-
-## Superfícies de administração e edição de schema
-
-Estes códigos indicam que um recurso está desativado ou não configurado, e não
-que a requisição estava incorreta. Cada um deles também é informado na rota
-`/status` correspondente com status `200`, permitindo que um painel desabilite
-visualmente o recurso em vez de exibir um erro.
+## Tarefas cron
 
 | Código | Status | Significado | O que fazer |
 | --- | --- | --- | --- |
-| `ADMIN_SURFACE_UNAVAILABLE` | 501 | Uma interface exclusiva para administradores foi chamada em um servidor sem autenticação configurada, impossibilitando distinguir um administrador de qualquer outro usuário. | Defina `auth.jwtSecret` ou forneça um `AuthAdapter`. |
-| `BRANCH_DIFF_STALE` | 409 | `POST /api/admin/branches/:name/merge` recebeu o fingerprint de um diff que já não é verdadeiro: o branch ou o pai mudaram desde então. Nada foi gravado. | Leia o diff de novo, revise-o e mescle com o novo `fingerprint`. |
-| `BRANCH_DIFF_UNSUPPORTED` | 501 | A fonte de dados não consegue comparar branches: não tem SQL, ou não tem branching (sem conexão de administração). | Use um backend Postgres com `adminConnectionString` definido. |
-| `BRANCH_MERGE_BLOCKED` | 409 | Uma tabela que difere não pode ser mesclada — adicionada ou removida pelo branch, colunas ou chave primária diferentes, sem chave primária, linhas demais para parear, ou reescrita desde que o branch foi criado (`TABLE_REWRITTEN`). Uma tabela cujas linhas não puderam ser pareadas bloqueia mesmo quando as contagens mostram 0: elas são desconhecidas, não zero. `details.tables` nomeia cada uma, com o motivo. Nada foi gravado. | Aplique antes o esquema com suas migrações, ou mescle com `skipBlocked: true` para deixar essas tabelas de lado. |
-| `BRANCH_MERGE_CONFLICT` | 409 | Há linhas alteradas tanto no branch quanto no pai, e `onConflict` era `"abort"` (o padrão); ou o pai recusou parte da mesclagem — uma linha mudou nesse meio-tempo, um trigger a pulou, uma política a ocultou. Nada foi gravado. | Escolha qual lado vence com `onConflict: "branch"` ou `"target"`, ou leia o diff de novo. |
-| `BRANCH_MERGE_FAILED` | 409 | O pai recusou as linhas do branch dentro da instrução de mesclagem — uma restrição, um rótulo de enum ou uma chave estrangeira que ele tem e que as linhas do branch violam, em geral porque os dois esquemas diferem. `details` traz `sqlState`, `table`, `constraint` e `detail`. Nada foi gravado. | Leia as mudanças de esquema do diff, alinhe o esquema do pai com suas migrações, ou corrija as linhas do branch, e mescle de novo. |
-| `BRANCH_NOT_FOUND` | 404 | Nenhum branch tem esse nome no registro. | `rebase db branch list`, ou o painel Branches, lista os que existem. |
-| `CONTRACT_UNAVAILABLE` | 404 | O contrato do projeto é servido apenas quando a autenticação está configurada — ele descreve todas as tabelas e relações. | Configure a autenticação. `/meta/schema-version` é sempre servido. |
-| `DEV_MAILBOX_UNAVAILABLE` | 501 | Nenhuma caixa de correio de desenvolvimento está ativa. As mensagens só são capturadas quando `SMTP_HOST` não está definido e `NODE_ENV` não é production. | Remova `SMTP_HOST` em desenvolvimento ou consulte a caixa de entrada real. |
-| `INVALID_CHANGE` | 400 | A alteração de schema proposta não está bem formatada. | Veja a mensagem. |
-| `SCHEMA_CHANGE_FAILED` | 400 | A aplicação de uma alteração planejada de schema falhou por um motivo não coberto por códigos mais específicos. | Veja a mensagem; ela reproduz a falha subjacente na íntegra. |
-| `SCHEMA_CHANGE_UNAPPLICABLE` | 400 | A alteração é válida, mas não pode ser aplicada ao schema no estado atual. | Veja a mensagem. |
-| `SCHEMA_EDIT_DIRTY_TREE` | 409 | O repositório possui alterações não commitadas, portanto a edição não pôde ser aplicada com segurança. | Faça commit ou stash e tente novamente. |
-| `SCHEMA_EDIT_REFUSED` | 400 | O editor de schema recusou a alteração. | Veja a mensagem; trata-se da própria recusa emitida pelo editor. |
-| `SCHEMA_EDIT_REQUIRES_A_PERSON` | 403 | Uma chave de API ou outro agente automatizado tentou aplicar uma alteração de schema. | Faça login como usuário humano ou defina `liveSchema.allowMachineApply`. |
-| `SCHEMA_EDITING_NO_COLLECTIONS_DIR` | 501 | A edição de schema em tempo real requer `collectionsDir` ou `liveSchema.repository`, e este servidor foi iniciado sem nenhum deles. | Configure um deles. |
-| `SCHEMA_EDITING_NO_REPOSITORY` | 503 | O planejamento funciona; não há repositório no qual commitar a alteração. | Configure `liveSchema.repository`. |
-| `SCHEMA_EDITING_PROVISIONING_OFF` | 409 | Este deployment não altera nada no seu banco de dados (`REBASE_PROVISION=false`), então uma mudança não pode ser aplicada pelo painel. | Faça commit apenas como código-fonte e deixe o processo que altera o banco de dados aplicá-la. |
-| `SCHEMA_EDITING_UNSUPPORTED` | 503 | Este driver não pode planejar alterações de schema. | A edição em tempo real está disponível no Postgres. |
-| `SCHEMA_EDITOR_BAAS_MODE` | 501 | As collections são derivadas por introspecção do banco de dados aqui, portanto não há arquivos-fonte para editar. | Altere o schema por meio de uma migration. |
-| `SCHEMA_EDITOR_DISABLED` | 501 | O editor de schema está desativado para este servidor. Um bundle compilado sempre responde isto. | Ative-o com `schemaEditor`. Em um bundle, defina `REBASE_LIVE_SCHEMA_REPOSITORY` para editar as collections por meio de um repositório — veja [Edição de schema ao vivo](/docs/backend/live-schema-editing#from-a-built-bundle). |
-| `SCHEMA_EDITOR_MISSING_DEPENDENCY` | 501 | O editor de schema requer o `ts-morph`, que não está instalado. | Instale-o no pacote que executa o backend e depois reinicie-o: `pnpm --dir backend add -D ts-morph@28.0.0` a partir da raiz de um projeto gerado pelo scaffold, ou `pnpm add -D ts-morph@28.0.0` onde o backend é o próprio projeto. A mensagem nomeia o comando para o seu projeto. |
-| `SCHEMA_EDITOR_NO_COLLECTIONS_DIR` | 501 | O servidor não possui `collectionsDir`, portanto o editor não tem onde gravar. | Defina `collectionsDir`. |
-| `SCHEMA_EDITOR_PRODUCTION` | 501 | O editor fica desativado sob `NODE_ENV=production`: os arquivos de um servidor em produção são reconstruídos a partir do seu repositório a cada deploy, logo uma edição aqui seria descartada. | Edite as collections em desenvolvimento e faça o deploy, ou configure `liveSchema.repository` para fazer o commit delas lá. |
-| `SQL_EXPORT_UNSUPPORTED` | 501 | `POST /api/admin/sql/csv` não consegue transmitir um resultado aqui: o banco de dados de desenvolvimento em processo (PGlite) tem uma única conexão, e um cursor mantido durante um download seguraria todas as outras consultas atrás dele; ou a fonte de dados não tem cursor SQL. | Aponte `DATABASE_URL` para um Postgres seu (`rebase dev --docker` inicia um), ou adicione um `LIMIT` e exporte as linhas da tela. |
+| `CRON_JOB_ALREADY_EXECUTING` | 409 | Disparo manual de uma tarefa cron que já se encontra em execução — neste mesmo processo ou em outro que detenha o lease de execução (como um worker vinculado a um processo `api`). Nenhuma nova execução foi iniciada. O cancelamento fica registrado no histórico; `details.log` traz essa entrada, citando o processo responsável pela execução em curso. | Aguarde a conclusão da execução atual. Veja [Tarefas cron](/docs/backend/cron-across-instances/#concurrency-guarding). |
 
-### Por que a tabela de um branch não pode ser mesclada
+## Interfaces administrativas e edição de schema
 
-`BRANCH_MERGE_BLOCKED` nomeia cada tabela recusada em `details.tables`, com um destes códigos. O mesmo código está no `blocked` da tabela no próprio diff, para que o Studio possa dizê-lo antes que alguém clique em **Mesclar**. Nenhum é uma resposta por si só.
+Esses códigos indicam recursos desativados ou pendentes de configuração, não
+erros na requisição. Todos são reportados na respectiva rota `/status` com código `200`,
+permitindo que painéis desabilitem visualmente as opções em vez de exibir erros.
 
 | Código | Status | Significado | O que fazer |
 | --- | --- | --- | --- |
-| `COLUMNS_DIFFER` | — | As colunas da tabela diferem entre o branch e o pai. As linhas são comparadas nas colunas em comum. | Adicione ao pai as colunas que faltam com suas migrações (`rebase db push`) e depois mescle. Uma migração que reescreve a tabela — a mudança do tipo de uma coluna — a transforma em `TABLE_REWRITTEN`: mescle antes dessa mudança, ou crie o branch de novo depois dela. |
-| `NO_PRIMARY_KEY` | — | A tabela não tem chave primária, então as linhas não podem ser pareadas uma a uma; o diff dá só as contagens de linhas. | Dê à tabela uma chave primária, ou mova as linhas à mão. |
-| `PRIMARY_KEY_DIFFERS` | — | As colunas da chave primária, ou seus tipos, diferem entre os dois. | Aplique antes o esquema ao pai. |
-| `TABLE_ADDED` | — | O branch criou a tabela. Uma mesclagem nunca cria uma. | Crie-a no pai com suas migrações e depois mescle as linhas. |
-| `TABLE_DROPPED` | — | O branch removeu a tabela. Uma mesclagem nunca remove uma. | Remova-a com suas migrações. |
-| `TABLE_REWRITTEN` | — | Um dos lados reescreveu todas as linhas da tabela depois que o branch foi criado — uma mudança do tipo de uma coluna, um `ADD COLUMN` com um valor padrão volátil, `VACUUM FULL`, `CLUSTER` — então toda linha consta como escrita desde então e já não dá para dizer qual lado mudou qual linha. | Mescle o branch antes dessa migração, ou crie o branch de novo a partir do pai depois dela. |
-| `TOO_LARGE` | — | A tabela tem num dos lados mais linhas do que um diff pareia uma a uma (100.000 por padrão, `maxRowsPerTable`). | Aumente `maxRowsPerTable` tanto no diff quanto na mesclagem, ou mova as linhas de outra forma. |
+| `ADMIN_SURFACE_UNAVAILABLE` | 501 | Painel ou rota administrativa acessada em servidor sem autenticação configurada; não há como diferenciar administradores de anônimos. | Configure `auth.jwtSecret` ou forneça um `AuthAdapter`. |
+| `BRANCH_DIFF_STALE` | 409 | `POST /api/admin/branches/:name/merge` recebeu a assinatura (fingerprint) de um diff desatualizado: a branch ou a base sofreram alterações posteriores. Nada foi mesclado. | Gere o diff novamente, revise as diferenças e proceda ao merge usando o novo `fingerprint`. |
+| `BRANCH_DIFF_UNSUPPORTED` | 501 | A fonte de dados atual não suporta comparação de branches: sem suporte a SQL ou sem conexão administrativa para branching. | Utilize um backend Postgres configurando `adminConnectionString`. |
+| `BRANCH_MERGE_BLOCKED` | 409 | Uma tabela divergente não pode ser mesclada — tabela criada ou removida na branch, colunas ou primary keys divergentes, ausência de primary key, volume de dados acima da capacidade de correspondência ou tabela reescrita desde a criação da branch (`TABLE_REWRITTEN`). Tabelas sem correspondência de linhas bloqueiam o processo mesmo que as contagens marquem 0: trata-se de valor desconhecido, não zero. `details.tables` lista cada tabela e a justificativa. Nada foi modificado. | Atualize o schema na base via migrations previamente, ou realize o merge com `skipBlocked: true` para ignorar tais tabelas. |
+| `BRANCH_MERGE_CONFLICT` | 409 | Linhas foram modificadas simultaneamente na branch e na base, com `onConflict` definido como `"abort"` (padrão); ou a base rejeitou parte do merge — linha alterada durante o processo, ação bloqueada por trigger ou linha oculta por RLS. Nada foi modificado. | Defina a precedência de resolução via `onConflict: "branch"` ou `"target"`, ou inspecione o diff novamente. |
+| `BRANCH_MERGE_FAILED` | 409 | A base recusou as linhas da branch durante a instrução de merge — quebra de constraint, valor inválido de enum ou chave estrangeira não satisfeita, frequentemente por divergência entre schemas. `details` inclui `sqlState`, `table`, `constraint` e `detail`. Nada foi salvo. | Avalie as mudanças de schema no diff, alinhe o banco principal com suas migrations ou corrija os dados na branch antes de mesclar novamente. |
+| `BRANCH_NOT_FOUND` | 404 | Nenhuma branch encontrada com esse nome no registro. | Consulte as branches existentes via `rebase db branch list` ou na aba Branches. |
+| `CONTRACT_UNAVAILABLE` | 404 | O contrato do projeto só é servido quando a autenticação está ativa — ele descreve integralmente tabelas e relações. | Ative a autenticação. A rota `/meta/schema-version` é sempre pública. |
+| `DEV_MAILBOX_UNAVAILABLE` | 501 | Caixa postal de desenvolvimento inativa. Captura de e-mails em memória só opera se `SMTP_HOST` não estiver definido e `NODE_ENV` for diferente de production. | Desative `SMTP_HOST` no ambiente de desenvolvimento ou consulte a caixa postal real configurada. |
+| `INVALID_CHANGE` | 400 | A alteração de schema solicitada não está bem-formada. | Veja a mensagem de erro. |
+| `SCHEMA_CHANGE_FAILED` | 400 | A aplicação da modificação de schema falhou por um motivo não coberto por códigos específicos. | Veja a mensagem; ela traz o erro original na íntegra. |
+| `SCHEMA_CHANGE_UNAPPLICABLE` | 400 | A mudança é válida, mas incompatível com o estado atual do schema. | Veja a mensagem de erro. |
+| `SCHEMA_EDIT_DIRTY_TREE` | 409 | O repositório contém alterações locais não commitadas, impedindo a modificação segura dos schemas. | Faça commit ou stash das alterações e tente novamente. |
+| `SCHEMA_EDIT_REFUSED` | 400 | O editor de schema recusou a operação solicitada. | Veja a mensagem; trata-se da resposta emitida pelo próprio editor. |
+| `SCHEMA_EDIT_REQUIRES_A_PERSON` | 403 | Uma chave de API ou agente automatizado tentou aplicar alterações no schema. | Autentique-se como usuário humano ou habilite `liveSchema.allowMachineApply`. |
+| `SCHEMA_EDITING_NO_COLLECTIONS_DIR` | 501 | A edição de schema em tempo real exige `collectionsDir` ou `liveSchema.repository`, e o servidor iniciou sem ambos. | Configure ao menos uma dessas opções. |
+| `SCHEMA_EDITING_NO_REPOSITORY` | 503 | O planejamento de schema funciona, mas não há repositório configurado para commitar a alteração. | Configure `liveSchema.repository`. |
+| `SCHEMA_EDITING_PROVISIONING_OFF` | 409 | Este ambiente não aplica mudanças estruturais no banco (`REBASE_PROVISION=false`), bloqueando a execução direta pelo painel. | Salve as alterações apenas como código e deixe a aplicação do banco a cargo do processo responsável pelo provisionamento. |
+| `SCHEMA_EDITING_UNSUPPORTED` | 503 | O driver em uso não tem capacidade de planejar alterações de schema. | A edição dinâmica de schema requer backend Postgres. |
+| `SCHEMA_EDITOR_BAAS_MODE` | 501 | As coleções são introspectadas diretamente do banco de dados neste modo; não há arquivos físicos para editar. | Altere o schema através de migrations. |
+| `SCHEMA_EDITOR_DISABLED` | 501 | O editor de schema está desativado para este servidor. Aplicações empacotadas (bundles) sempre retornam isso. | Habilite através de `schemaEditor`. Em bundles, defina `REBASE_LIVE_SCHEMA_REPOSITORY` para editar coleções via repositório — veja [Edição de schema em produção](/docs/backend/live-schema-editing#from-a-built-bundle). |
+| `SCHEMA_EDITOR_MISSING_DEPENDENCY` | 501 | O editor de schema depende do pacote `ts-morph`, que não está instalado. | Adicione a dependência no pacote que executa o backend e reinicie: execute `pnpm --dir backend add -D ts-morph@28.0.0` da raiz do projeto, ou `pnpm add -D ts-morph@28.0.0` caso o backend seja o projeto principal. A mensagem traz o comando exato. |
+| `SCHEMA_EDITOR_NO_COLLECTIONS_DIR` | 501 | O servidor não possui `collectionsDir` definido, impossibilitando a escrita das coleções pelo editor. | Defina a variável/propriedade `collectionsDir`. |
+| `SCHEMA_EDITOR_PRODUCTION` | 501 | O editor permanece inativo com `NODE_ENV=production`: arquivos em produção são reconstruídos a partir do repositório a cada deploy, descartando edições feitas em disco. | Edite coleções no ambiente de desenvolvimento e faça deploy, ou configure `liveSchema.repository` para versionar diretamente por lá. |
+| `SQL_EXPORT_UNSUPPORTED` | 501 | `POST /api/admin/sql/csv` não consegue transmitir dados em streaming neste ambiente: o banco em memória (PGlite) possui conexão única, e manter um cursor durante o download bloquearia todas as outras consultas; ou a fonte de dados não suporta cursores SQL. | Configure `DATABASE_URL` apontando para seu Postgres (`rebase dev --docker` inicia um) ou use `LIMIT` e exporte visualmente pela interface. |
+
+### Por que a tabela de uma branch não pode ser mesclada
+
+O erro `BRANCH_MERGE_BLOCKED` detalha em `details.tables` cada tabela rejeitada
+utilizando um dos códigos abaixo. O mesmo código é apontado no campo `blocked`
+da tabela no próprio diff, permitindo ao Studio avisar com antecedência antes
+do clique em **Merge**. Nenhum desses códigos é emitido isoladamente como resposta HTTP.
+
+| Código | Status | Significado | O que fazer |
+| --- | --- | --- | --- |
+| `COLUMNS_DIFFER` | — | As colunas da tabela diferem entre a branch e a base. Linhas só podem ser comparadas com base nas colunas compartilhadas. | Adicione as colunas faltantes na base usando migrations (`rebase db push`) e repita o merge. Migrations que reescrevem a tabela (mudança de tipo) convertem o estado para `TABLE_REWRITTEN`: faça o merge antes dessas alterações ou recrie a branch após a migração. |
+| `NO_PRIMARY_KEY` | — | A tabela não tem chave primária, impedindo a correlação de registros linha a linha; o diff computa apenas a contagem bruta. | Defina uma chave primária na tabela ou faça a transferência dos dados manualmente. |
+| `PRIMARY_KEY_DIFFERS` | — | As colunas da chave primária, ou os tipos delas, diferem entre as branches. | Sincronize o schema na base primeiro. |
+| `TABLE_ADDED` | — | A tabela foi criada exclusivamente na branch. O merge não cria tabelas novas. | Crie a tabela na base via migrations e depois mescle seus dados. |
+| `TABLE_DROPPED` | — | A tabela foi apagada na branch. O merge nunca exclui tabelas da base. | Remova-a na base através de migrations. |
+| `TABLE_REWRITTEN` | — | Uma das branches reescreveu todas as linhas da tabela após a bifurcação — alteração de tipo de coluna, `ADD COLUMN` com default volátil, `VACUUM FULL`, `CLUSTER` — fazendo com que todas as linhas pareçam novas e impossibilitando determinar a autoria das alterações. | Faça o merge da branch antes de migrations desse tipo, ou crie uma nova branch a partir da base após a migração. |
+| `TOO_LARGE` | — | A tabela contém mais linhas em uma das pontas do que o limite de comparação linha a linha (padrão de 100.000, `maxRowsPerTable`). | Aumente `maxRowsPerTable` no diff e no merge, ou sincronize essas tabelas por outros meios. |
 
 ## Códigos genéricos
 
-Uma rota usa um destes códigos quando nenhum outro mais específico se aplica.
+Uma rota recorre a um destes códigos quando nenhuma outra falha mais específica se aplica.
 
 | Código | Status | Significado | O que fazer |
 | --- | --- | --- | --- |
-| `BAD_REQUEST` | 400 | Malformada, e nada mais específico se aplica. | Veja a mensagem. |
-| `UNAUTHORIZED` | 401 | Não autenticado ou a credencial foi rejeitada. | Faça login ou renove as credenciais. |
-| `FORBIDDEN` | 403 | Autenticado, mas não permitido. | Tentar novamente com a mesma identidade não resolverá. |
-| `CONFLICT` | 409 | Um conflito com o estado existente. | Veja a mensagem. |
-| `INTERNAL_ERROR` | 500 | Algo falhou no servidor. A mensagem é deliberadamente genérica. | Informe o `requestId`; o motivo detalhado está nos logs. |
-| `NOT_CONFIGURED` | 503 | Uma dependência que esta rota requer não está configurada neste servidor. | Veja a mensagem. |
-| `SERVICE_UNAVAILABLE` | 503 | Um serviço de que a requisição depende estava inacessível: um bucket S3 ou MinIO, ou um host que uma função chama com `fetch()` e que recusa a conexão ou não é resolvido. O log do servidor nomeia o host; a resposta não. Um banco de dados inacessível é `DATABASE_UNAVAILABLE`. Uma conexão que falha com tal serviço responde com este código; na 0.24 ela responde um `500` cujo código é o erro do socket (`ECONNREFUSED`), ou `INTERNAL_ERROR`. | Tente novamente; verifique os logs. |
+| `BAD_REQUEST` | 400 | Requisição malformada, sem erro mais específico disponível. | Consulte a mensagem de erro. |
+| `UNAUTHORIZED` | 401 | Chamador não autenticado ou credencial inválida. | Faça login ou renove suas credenciais. |
+| `FORBIDDEN` | 403 | Autenticado, porém sem autorização para este recurso. | Repetir a requisição com o mesmo usuário não surtirá efeito. |
+| `CONFLICT` | 409 | Conflito com o estado atual do recurso. | Consulte a mensagem de erro. |
+| `INTERNAL_ERROR` | 500 | Falha interna no servidor. A mensagem é intencionalmente genérica. | Use o `requestId` informado para checar o erro nos logs do servidor. |
+| `NOT_CONFIGURED` | 503 | Uma dependência essencial para esta rota não foi configurada no servidor. | Consulte a mensagem de erro. |
+| `SERVICE_UNAVAILABLE` | 503 | Um serviço externo do qual a rota depende está inacessível: bucket S3/MinIO fora do ar, ou host externo chamado via `fetch()` em funções que recusa conexão ou não resolve DNS. O log do servidor identifica o host; a resposta HTTP oculta essa informação. Bancos inacessíveis geram `DATABASE_UNAVAILABLE`. Quedas de conexão com esses serviços geram este código; na 0.24, retornavam `500` com erro de socket (`ECONNREFUSED`) ou `INTERNAL_ERROR`. | Tente novamente; analise os logs. |
 
 ## Mantendo esta página precisa
 
-O comando `pnpm verify:docs` falha quando um código que o servidor pode emitir
-está ausente nestas tabelas, quando uma tabela lista um código que nada pode
-gerar, quando os status de uma linha não são exatamente aqueles com que o código-fonte emite o código, ou quando uma
-família de códigos como `PG_<SQLSTATE>` não possui linha para um SQLSTATE
-encontrado pelos chamadores. O script correspondente é
-`tooling/scripts/docs-verify/check-error-codes.mjs`.
+O comando `pnpm verify:docs` falha se qualquer código emitido pelo servidor estiver
+ausente nestas tabelas, se uma tabela listar um código que o servidor não dispara,
+se os status HTTP de uma linha divergirem dos emitidos no código-fonte, ou se uma
+família como `PG_<SQLSTATE>` não cobrir um SQLSTATE real enfrentado pelos clientes.
+O script responsável é `tooling/scripts/docs-verify/check-error-codes.mjs`.
 
-Ele valida a si próprio primeiro. A varredura extrai os códigos diretamente do
-TypeScript em vez de consultar um servidor em execução, de modo que seus pontos
-cegos são silenciosos por concepção: no passado, ele não conseguia identificar
-um código passado por um wrapper de linha única ou escrito após uma mensagem
-contendo `)`, relatando falsamente que "todos os códigos emitidos pelo servidor
-estão documentados" em uma página que omitia dezessete deles. Por isso, a rotina
-executa um teste com essas estruturas exatas antes de ler esta página e se
-recusa a gerar qualquer relatório caso não consiga detectá-las.
+O validador se testa antes de validar a documentação. A varredura extrai códigos
+diretamente do TypeScript em vez de inspecionar um servidor em execução, de modo que
+pontos cegos seriam silenciosos por natureza: anteriormente, o analisador ignorava
+códigos passados por wrappers de uma única linha ou escritos após mensagens que
+continham um `)`, informando falsamente que "todos os códigos do servidor estão
+documentados" em uma página que deixava de listar dezessete deles. Por isso, a
+etapa executa um teste com exatamente essas estruturas sintáticas antes de ler esta
+página, recusando-se a validar se não conseguir detectá-las corretamente.
