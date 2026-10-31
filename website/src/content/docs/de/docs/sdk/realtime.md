@@ -1,5 +1,5 @@
 ---
-sourceHash: 189ee23f6992c2e4
+sourceHash: b9f712f58936dac9
 title: Realtime-Abonnements
 sidebar_label: Realtime
 description: Abonnieren Sie Live-Datenänderungen mit dem typisierten SDK von Rebase über WebSocket-basierte Realtime-Listener.
@@ -301,6 +301,34 @@ Zwei damit verbundene Verhaltensweisen:
 
 - `realtime: false` bleibt ein striktes Opt-out: es wird niemals ein Socket geöffnet, und `client.realtime.channel()` wirft einen Fehler. Dasselbe gilt für `listen()` und `listenById()` – sie stehen stets als Aufruf bereit und werfen bei einem Client ohne Socket einen `RebaseClientError`, der die Option nennt, mit der sie aktiviert werden können. `observe()` tut dies nicht: Es fällt auf einen einzelnen Fetch-Aufruf zurück.
 - `client.close()` ist endgültig. Es gibt den Socket und seinen Reconnect-Timer frei, und keine danach eingereihte Operation wird die Verbindung erneut aufbauen. Unter Node hält ein offener Socket die Event-Loop aktiv, sodass ein Skript, das diese Methode nie aufruft, sich nicht von selbst beendet.
+
+### Eine Gruppe auf einer Instanz halten
+
+Bei mehr als einer Server-Instanz können Mitglieder eines Channels auf verschiedenen Instanzen landen, und jede Nachricht zwischen ihnen [läuft dann über den Channel-Bus](/docs/backend/realtime-transports/#channels-and-presence-across-instances). `affinity` benennt die Gruppe, zu der ein Socket gehört, etwa einen Raum oder ein Dokument, damit eine Plattform die ganze Gruppe an dieselbe Instanz leiten kann:
+
+```typescript
+const client = createRebaseClient({
+    baseUrl,
+    realtime: { affinity: roomCode }
+});
+```
+
+Wenn der Schlüssel erst später bekannt ist, setzen Sie ihn, bevor der Socket geöffnet wird:
+
+```typescript
+const client = createRebaseClient({ baseUrl });
+
+client.realtime.setAffinity(roomCode);          // no socket yet
+await client.realtime.channel(roomCode).join(); // opens with the key
+```
+
+Der Schlüssel steht als `?affinity=` in der Adresse des Sockets und ersetzt einen, der bereits in einer von Ihnen gesetzten `websocketUrl` steht. `setAffinity(null)` löscht ihn.
+
+- **Es ist eine Optimierung.** Rebase Cloud routet danach, wenn ein Projekt mehr als eine Instanz betreibt. Selbst gehostet oder hinter einem Proxy, der nicht darauf hasht, bewirkt es nichts, und Channels funktionieren gleich: Der Bus trägt weiterhin alles, was Instanzen überspannt, auch eine Gruppe, die durch ein Scale-up geteilt wurde.
+- **Es wirkt, wenn der Socket sich verbindet.** Ein bereits offener Socket bleibt, wo er ist, und verwendet den neuen Schlüssel beim nächsten Verbindungsaufbau. Um einen verbundenen Client zu verschieben, erstellen Sie einen neuen oder setzen Sie den Schlüssel vor seinem ersten `join()` oder `listen()`.
+- **Es bestimmt, wo ein Socket landet, nicht, was er betreten darf.** Der Zugriff auf einen Channel hängt nicht davon ab, und die Adresse landet in Zugriffslogs, verwenden Sie also einen Code statt eines Geheimnisses oder etwas Persönlichem.
+
+Um zu prüfen, ob es funktioniert, vergleichen Sie, was jede Instanz veröffentlicht und überspringt: siehe [Beobachten, was der Bus tut](/docs/backend/realtime-transports/#seeing-what-the-bus-does).
 
 ## Broadcast-Channels
 

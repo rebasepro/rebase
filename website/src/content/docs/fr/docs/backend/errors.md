@@ -1,5 +1,5 @@
 ---
-sourceHash: bfdc82eab01277a9
+sourceHash: 983cce6efed81a1a
 title: Codes d'erreur
 sidebar_label: Codes d'erreur
 description: Tous les codes d'erreur qu'un backend Rebase peut renvoyer, avec leur statut HTTP, leur signification et la marche à suivre — ainsi que l'enveloppe de réponse, X-Request-ID et les règles applicables aux détails.
@@ -88,6 +88,7 @@ Envoyer le vôtre permet à une trace de traverser les sauts réseau : une passe
 | `SIMULATION_TARGET_NOT_FOUND` | 404 | La simulation ne désigne aucun utilisateur actif (un identifiant d'utilisateur sans rôle) ni aucune clé d'API valide. | Vérifiez l'identifiant, ou envoyez un rôle avec l'uid pour simuler un uid sans compte. |
 | `SIMULATION_UNAVAILABLE` | 501 | Ce backend ne peut pas simuler d'accès : son `AuthAdapter` n'a pas de `resolveUser` pour confirmer un administrateur, ou une clé a été désignée sur un backend sans clés d'API. | Implémentez `resolveUser`, ou retirez les en-têtes. |
 | `SIMULATION_UNSUPPORTED` | 400 | Un en-tête `x-rebase-simulate-*` a été envoyé à une route qui ne peut pas s'exécuter avec un accès simulé. Seules l'API de données et les fonctions personnalisées les respectent. | Envoyez la requête sans les en-têtes. |
+| `GUEST_REFERENCED` | 409 | Un invité n'a pas pu être supprimé parce qu'une ligne propre au projet en a besoin, par une clé étrangère `ON DELETE RESTRICT` ou `NO ACTION`. `DELETE /api/admin/guests` le signale invité par invité dans `skipped` et poursuit. | Supprimez la ligne, ou laissez l'invité. |
 | `INVALID_ACCOUNT` | 400 | Le compte est dans un état qui ne permet pas cette opération. | Voir le message d'erreur. |
 | `INVALID_CHALLENGE` | 400 | Le challenge MFA est inconnu ou expiré. | Démarrez-en un nouveau. |
 | `INVALID_CODE` | 400 / 401 | Le code OTP ou MFA est incorrect : 400 pour la connexion par code e-mail (`/auth/otp/verify`), 401 pour un enrôlement ou un challenge MFA. | Réessayez avec le code actuel. |
@@ -101,7 +102,7 @@ Envoyer le vôtre permet à une trace de traverser les sauts réseau : une passe
 | `LAST_ADMIN` | 403 | Cette modification laisserait le projet sans aucun administrateur. | Désignez un autre administrateur au préalable. |
 | `MFA_REQUIRED` | 401 | Le mot de passe était correct et le compte dispose d'un second facteur vérifié ; la connexion n'est donc qu'à moitié terminée. `details` contient un jeton éphémère limité au challenge MFA — il ne s'agit pas d'une session. | Ouvrez un challenge et répondez-y ; la réponse au challenge délivre la session. |
 | `NO_SESSION` | 401 | Aucun cookie de session ni jeton de rafraîchissement n'a été fourni. Normal lors du premier chargement de page. | Connectez-vous. |
-| `NOT_ANONYMOUS` | 400 | Une route de conversion de compte anonyme a été appelée par un vrai compte. | Rien à convertir. |
+| `NOT_ANONYMOUS` | 400 | Une route de conversion de compte anonyme a été appelée par un vrai compte, ou `DELETE /api/admin/guests/:uid` en a désigné un. | Rien à convertir. Pour supprimer un compte, utilisez `DELETE /api/admin/users/:uid`. |
 | `OAUTH_ERROR` | 401 | Le fournisseur OAuth a refusé la demande ou a renvoyé une erreur. | Réessayez le flux ; le message contient la raison fournie par le fournisseur. |
 | `PERSONAL_KEYS_DISABLED` | 403 | Les clés API personnelles sont désactivées sur ce backend. | Définissez `personalKeys: true` dans le bloc `auth` de la collection des utilisateurs. |
 | `PERSONAL_KEY_NEEDS_ACCOUNT` | 403 | La clé de service ou une session invité a tenté d'utiliser les routes des clés personnelles. Aucune des deux n'a de compte au nom duquel une clé pourrait agir. | Connectez-vous à un compte, ou créez une clé de service sous `/api/admin/api-keys`. |

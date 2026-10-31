@@ -1,5 +1,5 @@
 ---
-sourceHash: aba79f55ccca539b
+sourceHash: 3ad9e3791b2e3174
 title: Authentification
 sidebar_label: Authentification
 description: Authentification côté client avec le SDK Rebase — connexion par e-mail/mot de passe, fournisseurs OAuth, gestion des sessions et écouteurs d'état d'authentification.
@@ -173,6 +173,13 @@ await client.auth.linkAnonymous("user@example.com", "correct-horse-battery");
 | `REGISTRATION_DISABLED` (403) | L'inscription est fermée sur le backend, et devenir un compte est une inscription |
 | `NOT_ANONYMOUS` (400) | La session actuelle appartient à un compte ordinaire |
 | `EMAIL_EXISTS` (409) | L'adresse possède déjà un compte — connectez-vous plutôt à celui-ci |
+
+<span class="since-badge" data-since="0.27">Depuis 0.27</span> Un invité qui ne revient jamais reste dans la base sous forme de ligne. Un administrateur
+les supprime avec `client.admin.listGuests()`, `client.admin.deleteGuest(uid)` et
+`client.admin.deleteGuests({ lastSeenBefore })`, ou sur Rebase Cloud avec
+[`rebase cloud guests`](/docs/cli/cloud/#guests). Ces appels ne touchent jamais que
+des invités, et `deleteGuests` travaille par lots : répétez-le tant que `remaining`
+n'est pas 0, avec `offset` fixé au nombre d'invités ignorés jusqu'ici.
 
 ## Associer un fournisseur à un compte existant
 

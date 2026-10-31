@@ -1,5 +1,5 @@
 ---
-sourceHash: a364dc4a57852453
+sourceHash: caa4e79614f7401e
 title: Auto-hébergement
 sidebar_label: Auto-hébergement
 description: Exécutez Rebase n'importe où avec l'image runtime officielle et le bundle de votre projet — Docker Compose, Fly, Railway ou un simple VPS.
@@ -297,6 +297,10 @@ REBASE_METRICS_TOKEN=<random string>
 Expose les métriques Prometheus sur `/metrics` : nombre de requêtes et histogrammes de latence ventilés par surface d'API (data, auth, storage, functions) et par collection, ainsi que des jauges de processus. Sans token, le point de terminaison est accessible en lecture par toute personne pouvant joindre le port ; définissez-en donc un à moins qu'il ne se trouve sur un réseau privé.
 
 `rebase_db_pool_wait_ms` est un histogramme du temps d'attente de chaque requête pour obtenir une connexion du pool de base de données, ouverture de connexion comprise, étiqueté par clé de source de données (`source="(default)"` dans un projet qui ne déclare aucune source de données). Un pool sain maintient cette valeur proche de zéro. Une queue de distribution qui s'allonge avec le trafic signifie que les requêtes font la queue pour obtenir des connexions — le plus souvent retenues par des callbacks d'écriture qui attendent une opération lente ; voir [Un callback retient une connexion](/docs/collections/context-data-api/#a-callback-holds-a-connection).
+
+`rebase_realtime_*` indique pour chaque instance ses sockets ouverts, ses canaux et les trames
+qu'elle a envoyées au bus de canaux ou retenues : voir
+[Voir ce que fait le bus](/docs/backend/realtime-transports/#seeing-what-the-bus-does).
 
 ## En-têtes de sécurité
 

@@ -1,5 +1,5 @@
 ---
-sourceHash: aba79f55ccca539b
+sourceHash: 3ad9e3791b2e3174
 title: Autenticação
 sidebar_label: Autenticação
 description: Autenticação no lado do cliente com o SDK Rebase — login com e-mail/senha, provedores OAuth, gerenciamento de sessão e listeners de estado de autenticação.
@@ -179,6 +179,13 @@ await client.auth.linkAnonymous("user@example.com", "correct-horse-battery");
 | `REGISTRATION_DISABLED` (403) | O registro está fechado no backend, e virar uma conta é um registro |
 | `NOT_ANONYMOUS` (400) | A sessão atual pertence a uma conta comum |
 | `EMAIL_EXISTS` (409) | O endereço já possui uma conta — faça login nela |
+
+<span class="since-badge" data-since="0.27">A partir da versão 0.27</span> Um convidado que nunca volta permanece como uma linha. Um administrador os limpa
+com `client.admin.listGuests()`, `client.admin.deleteGuest(uid)` e
+`client.admin.deleteGuests({ lastSeenBefore })`, ou, no Rebase Cloud, com
+[`rebase cloud guests`](/docs/cli/cloud/#guests). Eles só tocam em convidados,
+e `deleteGuests` trabalha em lotes: repita enquanto `remaining` não for 0, com
+`offset` igual a quantos ele ignorou até agora.
 
 ## Vinculando um Provedor a uma Conta Existente
 

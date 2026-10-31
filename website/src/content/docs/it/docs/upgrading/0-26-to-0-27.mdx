@@ -1,0 +1,105 @@
+---
+sourceHash: 7d3afbea48195098
+slug: it/docs/upgrading/0-26-to-0-27
+title: Aggiornamento da 0.26 a 0.27
+sidebar_label: 0.26 → 0.27
+description: I breaking change introdotti da 0.27 per un'app su 0.26 — le schedule cron che restringono entrambi i campi del giorno, i numeri cron malformati, una strategia di chiave che il suo tipo non può rispettare e i deploy gestiti che si fermano su un file non caricato.
+---
+
+# Aggiornamento 0.26 → 0.27
+
+Queste sono le voci `### Breaking` che la versione 0.27 introduce per un'applicazione su 0.26.
+
+Le due modifiche ai cron sono da leggere per prime, perché nessuna delle due
+impedisce l'avvio: un job comincia a girare più spesso, e l'altro smette di girare
+del tutto. La terza riguarda solo una tabella che esisteva già. L'ultima riguarda
+Rebase Cloud, e la incontri al prossimo deploy.
+
+---
+
+## 97. Una schedule cron che restringe entrambi i campi del giorno corrisponde all'uno o all'altro
+
+`0 9 1 * 1` girava solo di lunedì che cade il 1° del mese. Ora gira ogni 1° e
+ogni lunedì, come fa il cron standard. Vale quando nessuno dei due campi del
+giorno inizia con `*`. Una schedule con `*` o `*/n` in uno dei due significa ciò
+che significava prima.
+
+La schedule che questa modifica cambia di più è l'idioma del "primo lunedì del
+mese": `0 9 1-7 * 1` scattava una volta al mese, e ora scatta in ognuno dei primi
+sette giorni e in ogni lunedì.
+
+**Cosa modificare:** trova le schedule con un numero in entrambi i campi del giorno:
+
+```bash
+grep -rnE "schedule:.*[\"'\`][^ ]+ +[^ ]+ +[0-9][^ ]* +[^ ]+ +[0-9]" backend/
+```
+
+Se intendevi l'uno o l'altro giorno, lasciala così. Se intendevi entrambi, pianifica
+un solo campo del giorno e verifica l'altro nell'handler:
+
+```typescript
+// backend/crons/first-monday.ts
+import { defineCron } from "@rebasepro/server";
+
+export default defineCron({
+    schedule: "0 9 * * 1",
+    timezone: "UTC",
+
+    async handler(ctx) {
+        if (ctx.scheduledAt.getUTCDate() > 7) return;
+        ctx.log("First Monday of the month");
+    },
+});
+```
+
+Vedi [Sintassi della schedule](/docs/backend/cron-jobs/#schedule-syntax).
+
+## 98. Una schedule cron con un numero malformato viene rifiutata
+
+`5abc`, `*/5x`, `1.5` e un intervallo che va all'indietro, come `5-1`, passavano
+la validazione. Un numero veniva letto fino al primo carattere che non era una
+cifra, quindi `5abc` girava come `5`, e un intervallo all'indietro non contribuiva
+a nulla. Ognuno viene ora rifiutato, con il campo e il motivo.
+
+Un job rifiutato non viene registrato e non gira, mentre il resto del backend si
+avvia. Nient'altro te lo segnala: un deploy va online, perché il file in sé è
+stato caricato.
+
+**Cosa modificare:** dopo l'aggiornamento, cerca `[cron] Rejecting job` nel log del
+server, oppure leggi `rejected` su `GET /api/admin/cron`, che mostra anche lo
+strumento Cron Jobs di Studio. Correggi il numero e il job viene registrato al
+prossimo avvio. Vedi
+[Jobs that are not there](/docs/backend/cron-jobs-api/#jobs-that-are-not-there).
+
+## 99. Una chiave la cui strategia il suo tipo non può rispettare blocca l'avvio
+
+`isId: "increment"` su una chiave che non è un `number`, e `isId: "uuid"` su una
+che non è una `string`, vengono rifiutati al caricamento della configurazione con
+un messaggio che nomina la proprietà. Entrambi venivano letti come un default SQL
+grezzo. Postgres rifiutava `DEFAULT increment` al primo `CREATE TABLE`, quindi
+questo raggiunge solo una tabella che esisteva già, dove nessuno ha eseguito
+quell'istruzione.
+
+**Cosa modificare:** dichiara la chiave per ciò che è la colonna. Una chiave
+numerica prende `type: "number"` con `"increment"`, e una chiave stringa prende
+`"uuid"`, oppure `true` quando è il chiamante a fornire il valore. Vedi
+[Opzioni delle stringhe](/docs/collections/properties/#string-options).
+
+## 100. Un deploy o una preview gestiti falliscono quando un file di funzione o di cron non viene caricato
+
+Un file di funzione o di cron che lanciava un'eccezione o non veniva analizzato
+durante l'importazione veniva saltato, quindi un deploy riportava `✓ Live` e
+superava le sue probe mentre ogni route di quel file rispondeva 404. I pod su
+Rebase Cloud ora girano con `REBASE_REQUIRE_FILES_LOADED`, su un runtime che lo
+prevede, quindi la nuova versione non diventa mai ready, la vecchia continua a
+servire e il deploy termina indicando il file e il motivo.
+
+Un progetto che serviva con un file del genere se ne accorge al prossimo deploy.
+I rollout e i rollback dell'intera flotta non sono soggetti a questo vincolo. Un
+file che si importa senza errori e non esporta alcuna funzione o job, come un
+helper, viene comunque saltato.
+
+**Cosa modificare:** esegui il deploy, poi correggi o elimina il file che il
+deploy nomina. Fuori da Rebase Cloud non cambia nulla, a meno che tu non imposti
+da te `REBASE_REQUIRE_FILES_LOADED=true`. Vedi
+[Ambiente e configurazione](/docs/getting-started/configuration/).

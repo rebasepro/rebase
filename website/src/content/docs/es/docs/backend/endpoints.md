@@ -1,5 +1,5 @@
 ---
-sourceHash: 066084445a9f39ad
+sourceHash: 169899c54121eb6e
 title: Índice de endpoints
 sidebar_label: Índice de endpoints
 description: Cada ruta HTTP que monta un backend de Rebase — datos, autenticación, almacenamiento, administración, meta — con el control de acceso de cada una y la página que la explica.
@@ -129,6 +129,9 @@ puede acceder a nada de esto. Consulte [Roles y alcances](/docs/backend/roles-an
 | `DELETE` | `/api/admin/users/:uid` | `users:write` | Se rechaza para una cuenta que tiene más que el emisor |
 | `POST` | `/api/admin/users/:uid/reset-password` | `users:write` | Emite una contraseña temporal |
 | `DELETE` | `/api/admin/users/:uid/mfa` | `users:write` | Elimina los segundos factores y los códigos de recuperación de la cuenta, termina sus sesiones |
+| `GET` | `/api/admin/guests` | `users:read` | <span class="since-badge" data-since="0.27">Desde 0.27</span> Invitados, primero el visto por última vez hace más tiempo. `?lastSeenBefore=` los reduce a lo que borraría el DELETE siguiente, y `total` los cuenta |
+| `DELETE` | `/api/admin/guests` | `users:write` | <span class="since-badge" data-since="0.27">Desde 0.27</span> Elimina un lote de los invitados vistos por última vez antes de `?lastSeenBefore=`, que es obligatorio. Responde `{ deleted, skipped, remaining }`. Repite mientras `remaining` no sea 0, con `?offset=` igual al número de invitados omitidos. No alcanza a las cuentas |
+| `DELETE` | `/api/admin/guests/:uid` | `users:write` | <span class="since-badge" data-since="0.27">Desde 0.27</span> Elimina un invitado. Una cuenta se rechaza con `NOT_ANONYMOUS` |
 | `GET` | `/api/admin/roles` | `users:read` | `admin` y los roles que declara el proyecto, con sus alcances |
 | `GET` | `/api/admin/api-keys` | `keys:read` | [Claves de API](/docs/backend/api-keys/). Nunca una clave de API |
 | `POST` | `/api/admin/api-keys` | `keys:write` | La clave en texto plano se devuelve una sola vez, al crearla |

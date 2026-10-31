@@ -88,7 +88,7 @@ Un handler falla al lanzar una excepción (throw). No existe un `return false`: 
 
 - **Intentos restantes** → vuelve a `pending`, con `run_at` pospuesto por el retroceso (1s, 5s, 25s … con un límite de una hora; modifíquelo con `backoff`).
 - **Sin intentos restantes** → `failed`, y la fila *permanece*. Una cola que descarta silenciosamente lo que no pudo entregar es indistinguible de una que no tiene nada que hacer.
-- **Un fallo que ningún reintento puede cambiar** <span class="since-badge" data-since="0.27">Since 0.27</span> → lanza `PermanentJobError`, desde `@rebasepro/server`: el trabajo pasa a `failed` en este intento, con el mensaje como su `last_error`, en lugar de gastar los intentos que le quedan.
+- **Un fallo que ningún reintento puede cambiar** <span class="since-badge" data-since="0.27">Desde 0.27</span> → lanza `PermanentJobError`, desde `@rebasepro/server`: el trabajo pasa a `failed` en este intento, con el mensaje como su `last_error`, en lugar de gastar los intentos que le quedan.
 
 ```sql
 SELECT task, attempts, last_error, updated_at

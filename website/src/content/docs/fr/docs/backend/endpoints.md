@@ -1,5 +1,5 @@
 ---
-sourceHash: 066084445a9f39ad
+sourceHash: 169899c54121eb6e
 title: Index des points de terminaison
 sidebar_label: Index des points de terminaison
 description: Chaque route HTTP montée par un backend Rebase — données, auth, stockage, admin, méta — avec son contrôle d'accès et la page qui l'explique.
@@ -126,6 +126,9 @@ une collection ne peut accéder à rien de tout cela. Voir [Rôles et portées](
 | `DELETE` | `/api/admin/users/:uid` | `users:write` | Refusé pour un compte qui détient plus que l'appelant |
 | `POST` | `/api/admin/users/:uid/reset-password` | `users:write` | Délivre un mot de passe temporaire |
 | `DELETE` | `/api/admin/users/:uid/mfa` | `users:write` | Supprime les seconds facteurs et les codes de récupération du compte, met fin à ses sessions |
+| `GET` | `/api/admin/guests` | `users:read` | <span class="since-badge" data-since="0.27">Depuis 0.27</span> Les invités, ceux vus il y a le plus longtemps en premier. `?lastSeenBefore=` les restreint à ceux que la suppression ci-dessous emporterait, et `total` les compte |
+| `DELETE` | `/api/admin/guests` | `users:write` | <span class="since-badge" data-since="0.27">Depuis 0.27</span> Supprime un lot d'invités vus pour la dernière fois avant `?lastSeenBefore=`, obligatoire. Répond `{ deleted, skipped, remaining }`. À répéter tant que `remaining` n'est pas 0, avec `?offset=` fixé au nombre d'invités ignorés. Les comptes sont hors d'atteinte |
+| `DELETE` | `/api/admin/guests/:uid` | `users:write` | <span class="since-badge" data-since="0.27">Depuis 0.27</span> Supprime un invité. Un compte est refusé avec `NOT_ANONYMOUS` |
 | `GET` | `/api/admin/roles` | `users:read` | `admin` et les rôles déclarés par le projet, avec leurs portées |
 | `GET` | `/api/admin/api-keys` | `keys:read` | [Clés d'API](/docs/backend/api-keys/). Jamais une clé d'API |
 | `POST` | `/api/admin/api-keys` | `keys:write` | La clé en texte brut n'est renvoyée qu'une seule fois, à sa création |

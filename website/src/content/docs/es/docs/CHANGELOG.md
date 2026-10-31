@@ -11,6 +11,32 @@ La traducción está pendiente. El contenido siguiente está en inglés.
 
 ## [Unreleased]
 
+### Breaking
+
+#### Runtime
+
+- **A cron schedule that restricts both day fields matches either, as standard
+  cron does.** `0 9 1 * 1` ran only on a Monday the 1st; it now runs on every
+  1st and every Monday, so such a job runs more often after the upgrade. A
+  schedule where either day field starts with `*` is unchanged.
+- **A cron schedule with a malformed number is refused.** Validation now reads
+  each number whole: `5abc`, `*/5x`, `1.5` and a backwards range such as `5-1`
+  used to pass. The job is not registered and does not run, and the rest of the
+  backend boots.
+- **A key whose strategy its type cannot honour stops the boot.**
+  `isId: "increment"` on a non-number key, and `"uuid"` on a non-string one, are
+  refused at config load. Both used to become a raw SQL default —
+  `DEFAULT increment` — that Postgres refused at the first `CREATE TABLE`, so
+  only a table that already existed got this far.
+
+#### Rebase Cloud
+
+- **A managed deploy or preview fails when a function or cron file does not
+  load.** Its pods now run with `REBASE_REQUIRE_FILES_LOADED`, on a runtime that
+  has it, so the old version keeps serving and the deploy ends on the file and the
+  reason, not on `✓ Live`. A project that has been serving with such a file meets
+  this on its next deploy. Fleet rollouts and rollbacks are not held to it.
+
 ### Added
 
 #### Server & REST
@@ -94,11 +120,6 @@ La traducción está pendiente. El contenido siguiente está en inglés.
   dependencies is uploaded without them and the deploy says so, because a bundle
   that installs at boot still works. A build keeps a tree of up to 2 GB on disk,
   up from 200 MB.
-- **A managed deploy or preview fails when a function or cron file does not
-  load.** Its pods now run with `REBASE_REQUIRE_FILES_LOADED`, on a runtime that
-  has it, so the old version keeps serving and the deploy ends on the file and the
-  reason, not on `✓ Live`. A project that has been serving with such a file meets
-  this on its next deploy. Fleet rollouts and rollbacks are not held to it.
 
 #### CLI
 
@@ -156,11 +177,6 @@ La traducción está pendiente. El contenido siguiente está en inglés.
   the moment the run started, so a catch-up run for a missed 06:00 slot saw
   the boot time and a punctual one saw the slot plus a database round trip. A
   manual trigger, which has no slot, still gets the moment it started.
-- **A cron schedule that restricts both day fields matches either, as standard
-  cron does.** `0 9 1 * 1` ran only on a Monday the 1st; it now runs on every
-  1st and every Monday. A schedule where either day field starts with `*` is
-  unchanged. Validation also reads each number whole: `5abc`, `*/5x`, `1.5` and
-  a backwards range such as `5-1` used to pass and are now refused.
 - **`PermanentJobError` is exported from `@rebasepro/server`,** so a job
   handler can dead-letter a job on the attempt no retry can fix.
 - **`enableSwagger: false` hides the Swagger UI in development too.** It was
@@ -172,9 +188,6 @@ La traducción está pendiente. El contenido siguiente está en inglés.
   Any other `.dump` there was dated by its mtime: pruned with its
   `.globals.sql` once old, and while new it held a `keepMinimum` slot and
   pushed the newest real backup out.
-- **`isId: "increment"` on a non-number key, and `"uuid"` on a non-string one,
-  are refused at config load.** Both used to become a raw SQL default —
-  `DEFAULT increment` — that Postgres refused at the first `CREATE TABLE`.
 - **The Helm chart's api serves functions when there is no functions unit,
   and a worker always takes cron.** With `split`, a worker and no functions
   unit, the api ran `REBASE_ROLE=api` and answered every `/api/functions` call

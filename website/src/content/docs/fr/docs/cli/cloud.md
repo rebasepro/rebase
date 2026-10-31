@@ -1,5 +1,5 @@
 ---
-sourceHash: d4f01e8b2b1972c4
+sourceHash: 4b7b199f1aa18e8d
 title: rebase cloud
 sidebar_label: rebase cloud
 description: Les groupes de commandes pour Rebase Cloud dans la CLI — auth, liaison de projet, déploiements, notifications, config, organisations, bases de données, ressources, compute, stockage, clusters, facturation et utilisation.
@@ -87,7 +87,7 @@ rebase cloud rollback [id] [-y]          # back to a successful deploy
 rebase cloud cancel [-y]                 # cancel the in-flight build
 rebase cloud start | stop | restart [-y] # stop and restart need -y
 rebase cloud status                      # one-glance project status
-rebase cloud metrics                     # live CPU / memory / disk
+rebase cloud metrics                     # live CPU / memory / disk, realtime per instance
 rebase cloud debug [health|logs|…]       # diagnose a deployment, read-only
 ```
 
@@ -226,6 +226,55 @@ rebase cloud db pitr status | restore | cutover | discard
 
 `db connect` ouvre un port local qui *est* la base de données gérée (aucun point
 d'accès public) jusqu'à Ctrl-C ; `--reveal` ajoute le mot de passe. Propriétaire ou administrateur uniquement.
+
+## Invités
+
+<span class="since-badge" data-since="0.27">Depuis 0.27</span>
+
+Chaque `signInAnonymously()` dans un test, un bot ou une visite abandonnée laisse une ligne
+dans les utilisateurs du projet. Ces commandes comptent ces lignes et les suppriment, pour
+que personne n'ait à les parcourir une par une.
+
+```bash
+rebase cloud guests                              # how many, and the ones last seen longest ago
+rebase cloud guests --older-than 30d --limit 100 # the ones not seen for 30 days
+rebase cloud guests delete <id>                  # one guest; asks first
+rebase cloud guests prune --older-than 30d       # dry run: how many would go
+rebase cloud guests prune --older-than 30d --yes # deletes them
+```
+
+`prune` prend un âge avec une unité : `45m`, `12h`, `30d` ou `2w`. Sans `--yes`, il
+compte et ne supprime rien. Il traite un projet de n'importe quelle taille par petits
+lots.
+
+Seuls les invités peuvent disparaître. Un invité est une ligne dont `is_anonymous` est
+défini, sans mot de passe ni identité liée, et l'application applique cette règle dans
+l'instruction qui supprime la ligne : la commande ne peut donc atteindre aucun compte,
+même un compte créé juste après l'établissement de la liste. `delete` refuse un compte
+avec `NOT_ANONYMOUS`.
+
+**Vu pour la dernière fois** désigne le moment où la session de l'invité a été émise ou
+renouvelée pour la dernière fois, ou celui où l'invité a été créé s'il ne lui reste
+aucun jeton de rafraîchissement. Un invité qui revient régulièrement n'est pas ancien,
+quelle que soit sa date de création. Les jetons de rafraîchissement d'un invité supprimé
+et toutes les autres lignes d'authentification partent avec lui.
+
+Les lignes de vos propres tables suivent leur clé étrangère :
+
+| La colonne | Ce qui arrive à la ligne |
+|---|---|
+| Lien facultatif (`ON DELETE SET NULL`, la valeur par défaut) | Conservée, avec le lien vidé |
+| Lien obligatoire (`ON DELETE RESTRICT`, la valeur par défaut) | Conservée, et l'invité avec elle : l'invité est signalé comme ignoré, avec `GUEST_REFERENCED` |
+| `onDelete: "cascade"` | Supprimée avec l'invité |
+| Aucune clé étrangère (un champ `userSelect`, un identifiant simple) | Conservée, avec un identifiant qui n'existe plus |
+
+Vérifiez lesquels de vos liens sont en cascade avant de passer `--yes` : l'opération est irréversible.
+
+La commande lit `REBASE_SERVICE_KEY` comme le fait `env reveal`, elle accepte donc un
+propriétaire ou un administrateur (ou un jeton disposant de la capacité `env` qui
+appartient à l'un d'eux). La clé reste en mémoire et n'est envoyée qu'à l'adresse
+propre au projet. Un projet sur un runtime plus ancien se voit signaler qu'il lui en
+faut un plus récent.
 
 ## Ressources
 

@@ -1,5 +1,5 @@
 ---
-sourceHash: 1ed19c3d147505c2
+sourceHash: 3f0338ecb589f00b
 title: Rebase Cloud
 sidebar_label: Rebase Cloud
 description: Rebase Cloud es el mismo Rebase, operado para ti. Qué es, cómo se vincula y despliega un proyecto, y qué no incluye todavía la beta privada.
@@ -443,6 +443,7 @@ excepto aquel que reinicie la base de datos, el cual esperará a una ventana de 
 | `service-key` | `REBASE_SERVICE_KEY`, administrador en la propia API de la app: cuándo se rotó por última vez; `rotate` le da a la app una nueva. Propietarios y administradores |
 | `domains` | Dominios personalizados, los registros DNS que se deben añadir y su verificación. Un proyecto puede responder en varios, cada uno verificado de forma independiente; `verify` y `remove` aceptan el dominio sobre el que actuar, el cual solo puede omitirse si solo existe uno (para `verify`, uno aún pendiente). `list --json` devuelve `{ projectId, tenantHost, domains: [...] }` |
 | `db` | Asociar o crear una base de datos, conectarse a ella desde tu equipo, copias de seguridad, restauración y recuperación a un punto en el tiempo (point-in-time recovery) |
+| `guests` | <span class="since-badge" data-since="0.27">Desde 0.27</span> Los usuarios invitados que dejó el inicio de sesión anónimo: cuéntalos, elimina uno, depura los que no se han visto durante una antigüedad. Consulta [Guests](/docs/cli/cloud/#guests). Propietarios y administradores |
 | `extensions` | Lista de extensiones de Postgres permitidas (allowlist) |
 | `storage` | El bucket del proyecto |
 | `resources` | Qué bases de datos y buckets mantiene la plataforma frente a lo que declara el código |

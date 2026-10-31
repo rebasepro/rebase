@@ -1,5 +1,5 @@
 ---
-sourceHash: d4f01e8b2b1972c4
+sourceHash: 4b7b199f1aa18e8d
 title: rebase cloud
 sidebar_label: rebase cloud
 description: Die Befehlsgruppen für Rebase Cloud im CLI – Auth, Projektverknüpfung, Deployments, Benachrichtigungen, Konfiguration, Organisationen, Datenbanken, Ressourcen, Compute, Storage, Cluster, Abrechnung und Nutzung.
@@ -89,7 +89,7 @@ rebase cloud rollback [id] [-y]          # back to a successful deploy
 rebase cloud cancel [-y]                 # cancel the in-flight build
 rebase cloud start | stop | restart [-y] # stop and restart need -y
 rebase cloud status                      # one-glance project status
-rebase cloud metrics                     # live CPU / memory / disk
+rebase cloud metrics                     # live CPU / memory / disk, realtime per instance
 rebase cloud debug [health|logs|…]       # diagnose a deployment, read-only
 ```
 
@@ -228,6 +228,54 @@ rebase cloud db pitr status | restore | cutover | discard
 `db connect` öffnet einen lokalen Port, der die verwaltete Datenbank *ist* (kein
 öffentlicher Endpunkt), bis Strg+C gedrückt wird; `--reveal` zeigt das Passwort an. Nur für
 Owner oder Admins.
+
+## Gäste
+
+<span class="since-badge" data-since="0.27">Seit 0.27</span>
+
+Jedes `signInAnonymously()` in einem Test, einem Bot oder bei einem abgebrochenen Besuch
+hinterlässt eine Zeile in den Benutzern des Projekts. Diese Befehle zählen die Zeilen und
+entfernen sie, sodass niemand sie einzeln durchklicken muss.
+
+```bash
+rebase cloud guests                              # how many, and the ones last seen longest ago
+rebase cloud guests --older-than 30d --limit 100 # the ones not seen for 30 days
+rebase cloud guests delete <id>                  # one guest; asks first
+rebase cloud guests prune --older-than 30d       # dry run: how many would go
+rebase cloud guests prune --older-than 30d --yes # deletes them
+```
+
+`prune` nimmt ein Alter mit Einheit entgegen: `45m`, `12h`, `30d` oder `2w`. Ohne `--yes`
+zählt es nur und löscht nichts. Es arbeitet ein Projekt beliebiger Größe in kleinen
+Batches ab.
+
+Nur Gäste können entfernt werden. Ein Gast ist eine Zeile mit gesetztem `is_anonymous`, ohne
+Passwort und ohne verknüpfte Identität, und die App wendet diese Regel in der Anweisung an,
+die die Zeile löscht, sodass der Befehl kein Konto erreichen kann, auch keines, das sich
+einen Augenblick nach der Auflistung registriert hat. `delete` lehnt ein Konto mit
+`NOT_ANONYMOUS` ab.
+
+**Zuletzt gesehen** ist der Zeitpunkt, zu dem die Sitzung des Gasts zuletzt ausgestellt oder
+erneuert wurde, oder zu dem der Gast erstellt wurde, wenn er kein Refresh-Token mehr hat. Ein
+Gast, der immer wieder zurückkehrt, ist nicht alt, egal wie lange seine Erstellung zurückliegt.
+Die Refresh-Tokens eines gelöschten Gasts und alle anderen Auth-Zeilen werden mit ihm entfernt.
+
+Zeilen in Ihren eigenen Tabellen folgen ihrem Fremdschlüssel:
+
+| Die Spalte | Was mit der Zeile geschieht |
+|---|---|
+| Optionale Verknüpfung (`ON DELETE SET NULL`, der Standard) | Bleibt erhalten, die Verknüpfung wird geleert |
+| Erforderliche Verknüpfung (`ON DELETE RESTRICT`, der Standard) | Bleibt erhalten, und der Gast mit ihr: Der Gast wird als übersprungen gemeldet, mit `GUEST_REFERENCED` |
+| `onDelete: "cascade"` | Wird mit dem Gast gelöscht |
+| Kein Fremdschlüssel (ein `userSelect`-Feld, eine einfache ID) | Bleibt erhalten und hält eine ID, die nicht mehr existiert |
+
+Prüfen Sie, welche Ihrer Verknüpfungen kaskadieren, bevor Sie `--yes` übergeben: Das lässt
+sich nicht rückgängig machen.
+
+Der Befehl liest `REBASE_SERVICE_KEY` so wie `env reveal`, braucht also einen Owner oder
+Admin (oder ein Token mit der Fähigkeit `env`, das zu einem von ihnen gehört). Der Schlüssel
+bleibt im Speicher und geht nur an die eigene Adresse des Projekts. Einem Projekt auf einer
+älteren Runtime wird gesagt, dass es eine neuere braucht.
 
 ## Ressourcen
 

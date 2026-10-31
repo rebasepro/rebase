@@ -1,5 +1,5 @@
 ---
-sourceHash: bfdc82eab01277a9
+sourceHash: 983cce6efed81a1a
 title: Fehlercodes
 sidebar_label: Fehlercodes
 description: Jeder Fehlercode, den ein Rebase-Backend zurückgeben kann, mit seinem HTTP-Status, seiner Bedeutung und Lösungsansätzen – plus Response-Envelope, X-Request-ID und den Details-Regeln.
@@ -88,6 +88,7 @@ Einen eigenen Header zu senden stellt sicher, dass ein Trace über Hops hinweg e
 | `SIMULATION_TARGET_NOT_FOUND` | 404 | Die Simulation nennt keinen aktiven Benutzer (eine Benutzer-ID ohne Rolle) und keinen gültigen API-Schlüssel. | Die ID prüfen, oder eine Rolle mit der uid senden, um eine uid ohne Konto zu simulieren. |
 | `SIMULATION_UNAVAILABLE` | 501 | Dieses Backend kann keinen Zugriff simulieren: Sein `AuthAdapter` hat kein `resolveUser`, um einen Administrator zu bestätigen, oder ein Schlüssel wurde auf einem Backend ohne API-Schlüssel genannt. | `resolveUser` implementieren oder die Header weglassen. |
 | `SIMULATION_UNSUPPORTED` | 400 | Ein `x-rebase-simulate-*`-Header wurde an eine Route gesendet, die nicht mit simuliertem Zugriff laufen kann. Nur die Daten-API und eigene Funktionen beachten sie. | Die Anfrage ohne die Header senden. |
+| `GUEST_REFERENCED` | 409 | Ein Gast konnte nicht gelöscht werden, weil eine Zeile des Projekts selbst ihn braucht, über einen Fremdschlüssel mit `ON DELETE RESTRICT` oder `NO ACTION`. `DELETE /api/admin/guests` meldet es pro Gast in `skipped` und macht weiter. | Löschen Sie die Zeile, oder lassen Sie den Gast bestehen. |
 | `INVALID_ACCOUNT` | 400 | Das Konto befindet sich in einem Zustand, auf den diese Operation nicht angewendet werden kann. | Siehe Nachricht. |
 | `INVALID_CHALLENGE` | 400 | Die MFA-Abfrage ist unbekannt oder abgelaufen. | Starten Sie eine neue Abfrage. |
 | `INVALID_CODE` | 400 / 401 | Der OTP- oder MFA-Code ist falsch: 400 bei der Anmeldung per E-Mail-Code (`/auth/otp/verify`), 401 bei einer MFA-Einrichtung oder -Challenge. | Versuchen Sie es mit dem aktuellen Code erneut. |
@@ -101,7 +102,7 @@ Einen eigenen Header zu senden stellt sicher, dass ein Trace über Hops hinweg e
 | `LAST_ADMIN` | 403 | Die Änderung würde dazu führen, dass das Projekt keinen Administrator mehr hat. | Befördern Sie zuerst eine andere Person. |
 | `MFA_REQUIRED` | 401 | Das Passwort war korrekt und das Konto verfügt über einen verifizierten zweiten Faktor, sodass die Anmeldung erst zur Hälfte abgeschlossen ist. `details` enthält ein kurzlebiges Token, das auf die MFA-Abfrage beschränkt ist – es handelt sich nicht um eine Session. | Starten Sie eine Abfrage und beantworten Sie diese; die Abfrage-Response stellt die Session aus. |
 | `NO_SESSION` | 401 | Es wurde kein Session-Cookie oder Refresh-Token übergeben. Normal beim ersten Laden der Seite. | Melden Sie sich an. |
-| `NOT_ANONYMOUS` | 400 | Eine Route zum Upgrade eines anonymen Kontos wurde von einem regulären Konto aufgerufen. | Es gibt nichts zu upgraden. |
+| `NOT_ANONYMOUS` | 400 | Eine Route zum Upgrade eines anonymen Kontos wurde von einem regulären Konto aufgerufen, oder `DELETE /api/admin/guests/:uid` hat eines benannt. | Es gibt nichts zu upgraden. Um ein Konto zu löschen, verwenden Sie `DELETE /api/admin/users/:uid`. |
 | `OAUTH_ERROR` | 401 | Der OAuth-Anbieter hat abgelehnt oder einen Fehler zurückgegeben. | Wiederholen Sie den Vorgang; die Nachricht enthält die Begründung des Anbieters. |
 | `PERSONAL_KEYS_DISABLED` | 403 | Persönliche API-Schlüssel sind auf diesem Backend deaktiviert. | Setzen Sie `personalKeys: true` im `auth`-Block der Users-Collection. |
 | `PERSONAL_KEY_NEEDS_ACCOUNT` | 403 | Der Service-Key oder eine Gast-Sitzung hat versucht, die Routen für persönliche Schlüssel zu verwenden. Keiner von beiden hat ein Konto, als das ein Schlüssel handeln könnte. | Melden Sie sich bei einem Konto an, oder erstellen Sie einen Service-Schlüssel unter `/api/admin/api-keys`. |

@@ -1,5 +1,5 @@
 ---
-sourceHash: 066084445a9f39ad
+sourceHash: 169899c54121eb6e
 title: Índice de endpoints
 sidebar_label: Índice de endpoints
 description: Cada rota HTTP montada por um backend Rebase — dados, autenticação, armazenamento, administração, meta — com a restrição de acesso (gate) de cada uma e a página que a explica.
@@ -126,6 +126,9 @@ uma coleção não acessa nada disso. Consulte [Papéis e escopos](/docs/backend
 | `DELETE` | `/api/admin/users/:uid` | `users:write` | Recusado para uma conta que tem mais do que o chamador |
 | `POST` | `/api/admin/users/:uid/reset-password` | `users:write` | Emite uma senha temporária |
 | `DELETE` | `/api/admin/users/:uid/mfa` | `users:write` | Remove os segundos fatores e os códigos de recuperação da conta, encerra suas sessões |
+| `GET` | `/api/admin/guests` | `users:read` | <span class="since-badge" data-since="0.27">A partir da versão 0.27</span> Convidados, do visto há mais tempo para o mais recente. `?lastSeenBefore=` os restringe ao que o delete abaixo levaria, e `total` os conta |
+| `DELETE` | `/api/admin/guests` | `users:write` | <span class="since-badge" data-since="0.27">A partir da versão 0.27</span> Exclui um lote dos convidados vistos pela última vez antes de `?lastSeenBefore=`, que é obrigatório. Responde `{ deleted, skipped, remaining }`. Repita enquanto `remaining` não for 0, com `?offset=` igual a quantos foram ignorados. Contas não podem ser alcançadas |
+| `DELETE` | `/api/admin/guests/:uid` | `users:write` | <span class="since-badge" data-since="0.27">A partir da versão 0.27</span> Exclui um convidado. Uma conta é recusada com `NOT_ANONYMOUS` |
 | `GET` | `/api/admin/roles` | `users:read` | `admin` e as roles que o projeto declara, com seus escopos |
 | `GET` | `/api/admin/api-keys` | `keys:read` | [API keys](/docs/backend/api-keys/). Nunca uma chave de API |
 | `POST` | `/api/admin/api-keys` | `keys:write` | A chave em texto simples é retornada uma vez, na criação |

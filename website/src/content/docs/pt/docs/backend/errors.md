@@ -1,5 +1,5 @@
 ---
-sourceHash: bfdc82eab01277a9
+sourceHash: 983cce6efed81a1a
 title: Códigos de erro
 sidebar_label: Códigos de erro
 description: Todos os códigos de erro que um backend Rebase pode retornar, com seu status HTTP, significado e o que fazer a respeito — além do envelope de resposta, X-Request-ID e as regras de details.
@@ -115,6 +115,7 @@ ID recebido. Leia o cabeçalho de resposta.
 | `SIMULATION_TARGET_NOT_FOUND` | 404 | A simulação não indica nenhum utilizador ativo (um id de utilizador sem função) nem nenhuma chave de API válida. | Verifique o id, ou envie uma função com o uid para simular um uid sem conta. |
 | `SIMULATION_UNAVAILABLE` | 501 | Este backend não pode simular acesso: o seu `AuthAdapter` não tem `resolveUser` para confirmar um administrador, ou foi indicada uma chave num backend sem chaves de API. | Implemente `resolveUser`, ou retire os cabeçalhos. |
 | `SIMULATION_UNSUPPORTED` | 400 | Foi enviado um cabeçalho `x-rebase-simulate-*` a uma rota que não pode ser executada com acesso simulado. Só a API de dados e as funções personalizadas os respeitam. | Envie o pedido sem os cabeçalhos. |
+| `GUEST_REFERENCED` | 409 | Um convidado não pôde ser excluído porque uma linha do próprio projeto precisa dele, por uma chave estrangeira com `ON DELETE RESTRICT` ou `NO ACTION`. `DELETE /api/admin/guests` o informa por convidado em `skipped` e segue em frente. | Exclua a linha, ou deixe o convidado. |
 | `INVALID_ACCOUNT` | 400 | A conta está em um estado sobre o qual esta operação não pode atuar. | Veja a mensagem. |
 | `INVALID_CHALLENGE` | 400 | O desafio de MFA é desconhecido ou expirou. | Inicie um novo. |
 | `INVALID_CODE` | 400 / 401 | O código OTP ou MFA está incorreto: 400 no login por código de e-mail (`/auth/otp/verify`), 401 em um cadastro ou desafio de MFA. | Tente novamente com o código atual. |
@@ -128,7 +129,7 @@ ID recebido. Leia o cabeçalho de resposta.
 | `LAST_ADMIN` | 403 | A alteração deixaria o projeto sem nenhum administrador. | Promova outra pessoa primeiro. |
 | `MFA_REQUIRED` | 401 | A senha estava correta e a conta possui um segundo fator verificado, portanto o login foi concluído apenas pela metade. `details` traz um token de curta duração com escopo para o desafio de MFA — não é uma sessão. | Abra um desafio e responda-o; a resposta do desafio emitirá a sessão. |
 | `NO_SESSION` | 401 | Nenhum cookie de sessão ou refresh token foi apresentado. Normal no primeiro carregamento de página. | Faça login. |
-| `NOT_ANONYMOUS` | 400 | Uma rota de upgrade a partir de anônimo foi chamada por uma conta real. | Nada para atualizar. |
+| `NOT_ANONYMOUS` | 400 | Uma rota de upgrade a partir de anônimo foi chamada por uma conta real, ou `DELETE /api/admin/guests/:uid` nomeou uma. | Nada para atualizar. Para excluir uma conta, use `DELETE /api/admin/users/:uid`. |
 | `OAUTH_ERROR` | 401 | O provedor de OAuth recusou ou retornou um erro. | Tente o fluxo novamente; a mensagem contém o motivo do provedor. |
 | `PERSONAL_KEYS_DISABLED` | 403 | As chaves de API pessoais estão desativadas neste backend. | Defina `personalKeys: true` no bloco `auth` da coleção de usuários. |
 | `PERSONAL_KEY_NEEDS_ACCOUNT` | 403 | A chave de serviço ou uma sessão de convidado tentou usar as rotas de chaves pessoais. Nenhuma das duas tem uma conta como a qual uma chave possa agir. | Entre em uma conta, ou crie uma chave de serviço em `/api/admin/api-keys`. |

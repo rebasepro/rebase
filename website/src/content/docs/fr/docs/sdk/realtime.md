@@ -1,5 +1,5 @@
 ---
-sourceHash: 189ee23f6992c2e4
+sourceHash: b9f712f58936dac9
 title: Abonnements en temps réel
 sidebar_label: Temps réel
 description: Abonnez-vous aux modifications de données en direct avec le SDK typé de Rebase à l'aide d'écouteurs en temps réel basés sur WebSocket.
@@ -323,6 +323,34 @@ Deux comportements associés :
 
 - `realtime: false` reste une désactivation explicite : aucun socket ne sera jamais ouvert, et `client.realtime.channel()` lèvera une erreur. Il en va de même pour `listen()` et `listenById()` — ils sont toujours accessibles à l'appel, et sur un client sans socket, ils lèvent une exception `RebaseClientError` indiquant l'option qui permettrait de les activer. `observe()` ne le fait pas : il se dégrade en une simple requête de récupération (fetch).
 - `client.close()` est définitif. Il libère le socket et son minuteur de reconnexion, et rien de mis en file d'attente par la suite ne relancera la connexion. Dans Node, un socket ouvert maintient la boucle d'événements active ; ainsi, un script qui ne l'appelle jamais ne se terminera pas de lui-même.
+
+### Garder un groupe sur une même instance
+
+Avec plus d'une instance de serveur, les membres d'un canal peuvent atterrir sur des instances différentes, et chaque message entre elles [traverse alors le bus de canaux](/docs/backend/realtime-transports/#channels-and-presence-across-instances). `affinity` nomme le groupe auquel appartient un socket, par exemple une salle ou un document, afin qu'une plateforme puisse envoyer tout le groupe vers la même instance :
+
+```typescript
+const client = createRebaseClient({
+    baseUrl,
+    realtime: { affinity: roomCode }
+});
+```
+
+Lorsque la clé n'est connue que plus tard, définissez-la avant l'ouverture du socket :
+
+```typescript
+const client = createRebaseClient({ baseUrl });
+
+client.realtime.setAffinity(roomCode);          // no socket yet
+await client.realtime.channel(roomCode).join(); // opens with the key
+```
+
+La clé figure dans l'adresse du socket sous la forme `?affinity=`, et elle remplace celle d'une `websocketUrl` que vous avez définie. `setAffinity(null)` l'efface.
+
+- **C'est une optimisation.** Rebase Cloud route selon cette clé lorsqu'un projet exécute plus d'une instance. En auto-hébergement, ou derrière un proxy qui ne hache pas dessus, elle ne fait rien et les canaux fonctionnent de la même façon : le bus transporte toujours ce qui s'étend sur plusieurs instances, y compris un groupe scindé par un passage à l'échelle.
+- **Elle prend effet à la connexion du socket.** Un socket déjà ouvert reste où il est, et utilise la nouvelle clé à sa prochaine connexion. Pour déplacer un client connecté, créez-en un nouveau, ou définissez la clé avant son premier `join()` ou `listen()`.
+- **Elle décide de l'endroit où un socket atterrit, pas de ce qu'il peut rejoindre.** L'accès à un canal n'en dépend pas, et l'adresse se retrouve dans les journaux d'accès : utilisez donc un code plutôt qu'un secret ou quoi que ce soit de personnel.
+
+Pour vérifier qu'elle fonctionne, comparez ce que chaque instance publie et ignore : voir [Voir ce que fait le bus](/docs/backend/realtime-transports/#seeing-what-the-bus-does).
 
 ## Canaux de diffusion (Broadcast Channels)
 

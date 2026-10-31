@@ -1,5 +1,5 @@
 ---
-sourceHash: a364dc4a57852453
+sourceHash: caa4e79614f7401e
 title: Autoalojamiento (Self-Hosting)
 sidebar_label: Autoalojamiento
 description: Ejecuta Rebase en cualquier lugar con la imagen oficial de runtime y el bundle de tu proyecto — Docker Compose, Fly, Railway o un VPS convencional.
@@ -444,6 +444,10 @@ pool saludable mantiene este valor cerca de cero. Un incremento pronunciado en l
 a medida que aumenta el tráfico significa que las solicitudes están haciendo cola para obtener conexiones — a menudo
 retenidas por callbacks de escritura que esperan operaciones lentas; consulta
 [Un callback retiene una conexión](/docs/collections/context-data-api/#a-callback-holds-a-connection).
+
+`rebase_realtime_*` informa de los sockets y canales abiertos de cada instancia y de las tramas
+que envió al bus de canales o retuvo: consulta
+[Ver qué hace el bus](/docs/backend/realtime-transports/#seeing-what-the-bus-does).
 
 ## Cabeceras de seguridad
 

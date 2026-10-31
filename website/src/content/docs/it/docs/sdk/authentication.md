@@ -1,5 +1,5 @@
 ---
-sourceHash: aba79f55ccca539b
+sourceHash: 3ad9e3791b2e3174
 title: Autenticazione
 sidebar_label: Autenticazione
 description: Autenticazione lato client con l'SDK di Rebase — accesso con email/password, provider OAuth, gestione delle sessioni e listener dello stato di autenticazione.
@@ -171,6 +171,13 @@ await client.auth.linkAnonymous("user@example.com", "correct-horse-battery");
 | `REGISTRATION_DISABLED` (403) | La registrazione è chiusa sul backend, e diventare un account è una registrazione |
 | `NOT_ANONYMOUS` (400) | La sessione corrente appartiene a un account ordinario |
 | `EMAIL_EXISTS` (409) | L'indirizzo ha già un account — accedi invece a quello |
+
+<span class="since-badge" data-since="0.27">Da 0.27</span> Un guest che non torna più resta come riga. Un amministratore li elimina
+con `client.admin.listGuests()`, `client.admin.deleteGuest(uid)` e
+`client.admin.deleteGuests({ lastSeenBefore })`, oppure su Rebase Cloud con
+[`rebase cloud guests`](/docs/cli/cloud/#guests). Questi toccano sempre e solo i guest,
+e `deleteGuests` lavora a lotti: ripetilo finché `remaining` non è 0, con
+`offset` impostato al numero di quelli che ha saltato finora.
 
 ## Collegamento di un provider a un account esistente
 

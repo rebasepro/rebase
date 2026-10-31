@@ -1,5 +1,5 @@
 ---
-sourceHash: 1ed19c3d147505c2
+sourceHash: 3f0338ecb589f00b
 title: Rebase Cloud
 sidebar_label: Rebase Cloud
 description: Rebase Cloud è lo stesso Rebase, gestito per te. Di cosa si tratta, come collegare e distribuire un progetto, e cosa la beta privata non include ancora.
@@ -444,6 +444,7 @@ da oggi, ad eccezione di quelle che comportano il riavvio del database, che atte
 | `service-key` | `REBASE_SERVICE_KEY`, admin sull'API dell'app stessa: quando è stata ruotata l'ultima volta; `rotate` assegna all'app una nuova chiave. Owner e admin |
 | `domains` | Domini personalizzati, record DNS da configurare e verifica. Un progetto può rispondere su più domini, ciascuno verificato singolarmente; `verify` e `remove` richiedono il dominio su cui operare, che può essere omesso solo se ne è presente uno solo (per `verify`, solo se ancora in sospeso). `list --json` restituisce `{ projectId, tenantHost, domains: [...] }` |
 | `db` | Collegamento o creazione di un database, connessione locale, backup, ripristino e point-in-time recovery |
+| `guests` | <span class="since-badge" data-since="0.27">Da 0.27</span> Gli utenti ospite lasciati dall'accesso anonimo: contarli, eliminarne uno, rimuovere quelli non visti da una certa età. Vedi [Guests](/docs/cli/cloud/#guests). Owner e admin |
 | `extensions` | Allowlist delle estensioni Postgres |
 | `storage` | Il bucket del progetto |
 | `resources` | Database e bucket gestiti dalla piattaforma, a fronte di quanto dichiarato nel codice |

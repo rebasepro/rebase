@@ -1,5 +1,5 @@
 ---
-sourceHash: a364dc4a57852453
+sourceHash: caa4e79614f7401e
 title: Self-Hosting
 sidebar_label: Self-Hosting
 description: Führen Sie Rebase überall mit dem offiziellen Runtime-Image und Ihrem Projekt-Bundle aus – Docker Compose, Fly, Railway oder auf einem einfachen VPS.
@@ -291,6 +291,10 @@ REBASE_METRICS_TOKEN=<random string>
 Stellt Prometheus-Metriken unter `/metrics` bereit: Anzahl der Anfragen und Latenz-Histogramme aufgeschlüsselt nach API-Bereich (data, auth, storage, functions) und Collection, plus Prozess-Gauges. Ohne Token ist der Endpunkt für jeden lesbar, der den Port erreichen kann; setzen Sie also ein Token, es sei denn, er befindet sich in einem privaten Netzwerk.
 
 `rebase_db_pool_wait_ms` ist ein Histogramm darüber, wie lange jede Abfrage auf eine Verbindung aus dem Datenbank-Pool gewartet hat (das Öffnen einer Verbindung inbegriffen), gelabelt nach Datenquellen-Schlüssel (`source="(default)"` in einem Projekt, das keine Datenquellen deklariert). Ein gesunder Pool hält diesen Wert nahe null. Ein Tail, der mit dem Datenverkehr wächst, bedeutet, dass sich Anfragen in einer Warteschlange für Verbindungen stauen – meist gehalten von Schreib-Callbacks, die auf etwas Langsames warten; siehe [A callback holds a connection](/docs/collections/context-data-api/#a-callback-holds-a-connection).
+
+`rebase_realtime_*` meldet pro Instanz die offenen Sockets, die Channels und die Frames,
+die sie an den Channel-Bus gesendet oder zurückgehalten hat: siehe
+[Beobachten, was der Bus tut](/docs/backend/realtime-transports/#seeing-what-the-bus-does).
 
 ## Sicherheits-Header
 

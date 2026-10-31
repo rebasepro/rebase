@@ -1,5 +1,5 @@
 ---
-sourceHash: 916ecd6bde4adb6f
+sourceHash: a1afbafa7c27ef28
 title: SDK tipizzato — Primi passi
 sidebar_label: Primi Passi
 description: Installa e configura l'SDK tipizzato di Rebase per interagire con il tuo backend da qualsiasi applicazione JavaScript o TypeScript.
@@ -54,7 +54,7 @@ const client = createRebaseClient({
 | `apiPath` | `string` | Prefisso delle API (predefinito: `"/api"`) |
 | `fetch` | `typeof fetch` | Implementazione fetch personalizzata (es. per SSR) |
 | `onUnauthorized` | `() => Promise<boolean>` | Gestore personalizzato per l'errore 401 — restituisci `true` per riprovare |
-| `realtime` | `boolean` | Apre il WebSocket (predefinito `true`) — imposta su `false` in script one-shot |
+| `realtime` | `boolean \| RealtimeClientOptions` | Apre il WebSocket (predefinito `true`) — imposta su `false` in script one-shot. `{ affinity }` [nomina il gruppo a cui appartiene il socket](/docs/sdk/realtime#keeping-a-group-on-one-instance) |
 | `collections` | `Record<string, string>` | Mappa i nomi degli accessor agli slug delle collection |
 | `offline` | `boolean \| OfflineConfig` | [Sincronizzazione local-first](/docs/sdk/offline) — disattivata per impostazione predefinita |
 | `impersonate` | `string` | Esegue ogni richiesta come questo utente (per uid), per verificare cosa vede un utente. Solo con la sessione di un amministratore: API dati, funzioni e realtime vengono eseguiti come quell'utente, ogni altra route rifiuta |

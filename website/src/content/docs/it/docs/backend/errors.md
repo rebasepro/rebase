@@ -1,5 +1,5 @@
 ---
-sourceHash: bfdc82eab01277a9
+sourceHash: 983cce6efed81a1a
 title: Codici di errore
 sidebar_label: Codici di errore
 description: Tutti i codici di errore che un backend Rebase può restituire, con il rispettivo stato HTTP, il significato e come gestirli — oltre all'envelope di risposta, X-Request-ID e le regole di details.
@@ -113,6 +113,7 @@ non dare per scontato che l'ID inviato sia quello ottenuto. Leggi l'header della
 | `SIMULATION_TARGET_NOT_FOUND` | 404 | La simulazione non indica alcun utente attivo (un id utente senza ruolo) né alcuna chiave API valida. | Controlla l'id, o invia un ruolo con l'uid per simulare un uid senza account. |
 | `SIMULATION_UNAVAILABLE` | 501 | Questo backend non può simulare l'accesso: il suo `AuthAdapter` non ha `resolveUser` per confermare un amministratore, oppure è stata indicata una chiave su un backend senza chiavi API. | Implementa `resolveUser`, o togli le intestazioni. |
 | `SIMULATION_UNSUPPORTED` | 400 | Un'intestazione `x-rebase-simulate-*` è stata inviata a una route che non può essere eseguita con accesso simulato. Solo l'API dei dati e le funzioni personalizzate le rispettano. | Invia la richiesta senza le intestazioni. |
+| `GUEST_REFERENCED` | 409 | Un ospite non ha potuto essere eliminato perché una riga del progetto stesso lo richiede, tramite una chiave esterna con `ON DELETE RESTRICT` o `NO ACTION`. `DELETE /api/admin/guests` lo segnala per ogni ospite in `skipped` e prosegue. | Elimina la riga, oppure lascia l'ospite. |
 | `INVALID_ACCOUNT` | 400 | L'account si trova in uno stato su cui questa operazione non può agire. | Consulta il messaggio. |
 | `INVALID_CHALLENGE` | 400 | La verifica MFA è sconosciuta o scaduta. | Avviane una nuova. |
 | `INVALID_CODE` | 400 / 401 | Il codice OTP o MFA non è corretto: 400 dall'accesso con codice email (`/auth/otp/verify`), 401 da una registrazione o da un challenge MFA. | Riprova con il codice attuale. |
@@ -126,7 +127,7 @@ non dare per scontato che l'ID inviato sia quello ottenuto. Leggi l'header della
 | `LAST_ADMIN` | 403 | La modifica lascerebbe il progetto senza alcun amministratore. | Promuovi prima qualcun altro. |
 | `MFA_REQUIRED` | 401 | La password era corretta e l'account ha un secondo fattore verificato, quindi l'accesso è completato solo a metà. `details` contiene un token temporaneo limitato alla verifica MFA — non è una sessione. | Apri una verifica e rispondi; la risposta alla verifica rilascia la sessione. |
 | `NO_SESSION` | 401 | Non è stato fornito alcun cookie di sessione o refresh token. Normale al primo caricamento della pagina. | Accedi. |
-| `NOT_ANONYMOUS` | 400 | Una route di passaggio da account anonimo è stata chiamata da un account reale. | Nulla da aggiornare. |
+| `NOT_ANONYMOUS` | 400 | Una route di passaggio da account anonimo è stata chiamata da un account reale, oppure `DELETE /api/admin/guests/:uid` ne ha nominato uno. | Nulla da aggiornare. Per eliminare un account, usa `DELETE /api/admin/users/:uid`. |
 | `OAUTH_ERROR` | 401 | Il provider OAuth ha rifiutato la richiesta o ha restituito un errore. | Riprova il flusso; il messaggio riporta la motivazione del provider. |
 | `PERSONAL_KEYS_DISABLED` | 403 | Le chiavi API personali sono disattivate su questo backend. | Imposta `personalKeys: true` nel blocco `auth` della collezione users. |
 | `PERSONAL_KEY_NEEDS_ACCOUNT` | 403 | La service key o una sessione ospite ha tentato di usare le route delle chiavi personali. Nessuna delle due ha un account con cui una chiave possa agire. | Accedi a un account, oppure crea una chiave di servizio sotto `/api/admin/api-keys`. |

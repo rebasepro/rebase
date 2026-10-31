@@ -1373,11 +1373,12 @@ and the fix.
 
 ## Upgrading an existing app
 
-Nine hops, newest first. Start at the one above the version you are on and work
+Ten hops, newest first. Start at the one above the version you are on and work
 downwards — or, if you are coming from 0.12, start at the bottom and work up.
 
 | You are on | Read | What it does to you |
 |---|---|---|
+| **0.26** | [0.26 → 0.27](/docs/upgrading/0-26-to-0-27/) | A cron schedule that restricts both day fields runs on either one, so it runs more often, and a schedule with a malformed number is refused, so that job stops running. A key whose `isId` strategy its type cannot honour stops the boot. On Rebase Cloud, a deploy or preview fails when a function or cron file does not load. |
 | **0.25** | [0.25 → 0.26](/docs/upgrading/0-25-to-0-26/) | A write naming a multi-hop `via` relation, a role name that is not one role, a local storage page token from before the upgrade and a functions upstream that cannot work are refused. OAuth sign-in settles an unverified account instead of answering `local-account-unverified`, the MCP server no longer sends `REBASE_TOKEN` to the app, and generated types drop the key of an `excludeFromApi` belongsTo. On Rebase Cloud, `rebase cloud webhooks` and `--scale-to-zero true` are retired, and older tokens may need creating again. |
 | **0.24** | [0.24 → 0.25](/docs/upgrading/0-24-to-0-25/) | `?count=` on a REST list becomes the switch for the count behind `meta.total`, so a filter on a column named `count` goes inside `?where=`; the remote MCP's `list_collections` sends its listing only in the text block, without `structuredContent`; and `@rebasepro/app` no longer exports the Spanish translation table `es`. A plain `OPTIONS` to a route with no handler, colliding table names at boot, an upsert on the users collection, `page` with `offset`, an empty string on a required field and an administrator's password that fails the password policy are refused. Sessions last 30 days of inactivity by default, `client.cron` calls `/api/admin/cron`, offline reads that cannot be answered in full fail with `OFFLINE`, and a few internal exports and unused props are gone. |
 | **0.23** | [0.23 → 0.24](/docs/upgrading/0-23-to-0-24/) | The SQL `db push` and `db generate` render moves out of `drizzle/` into the uncommitted `.rebase/sql/`, the `--generate` flag of `rebase dev` is gone because `dev` always regenerates the SDK types, and a live schema edit commits no SQL. Permissions become scopes: admin surfaces ask for a scope rather than the admin role, API keys hold scopes instead of a permission list and an `admin` flag, and `schema-admin` is no longer an administrator. A relative `--collections` is read from where the command runs, an upsert into a trashed row and an update that changes a key are refused, the remote MCP endpoint takes the SDK's arguments, and open realtime sockets, email-verification links, `signUp` and MFA recovery codes change how they treat a session. |
@@ -1452,6 +1453,100 @@ packages nor the type system will tell you: the change lives in the database, an
 - [Changelog](/docs/changelog/) — the release notes each of these sections summarises
 - [Compatibility](/docs/compatibility/) — the six contracts, and which ones a version can break
 - [CLI Commands](/docs/cli/) — `rebase doctor` and the commands the checklists run
+
+## Upgrading 0.26 to 0.27
+
+## Upgrading 0.26 → 0.27
+
+These are the `#### Breaking` entries 0.27 carries for an app on 0.26.
+
+The two cron changes are the ones to read first, because neither stops anything
+from booting: one job starts running more often, and the other stops running at
+all. The third reaches only a table that already existed. The last is Rebase
+Cloud, and you meet it on your next deploy.
+
+---
+
+### 97. A cron schedule that restricts both day fields matches either
+
+`0 9 1 * 1` used to run only on a Monday the 1st. It now runs on every 1st and on
+every Monday, as standard cron does. This applies when neither day field starts
+with `*`. A schedule with `*` or `*/n` in either one means what it did.
+
+The schedule this changes most is the "first Monday of the month" idiom:
+`0 9 1-7 * 1` used to fire once a month, and now fires on each of the first seven
+days and on every Monday.
+
+**What to change:** find the schedules with a number in both day fields:
+
+```bash
+grep -rnE "schedule:.*[\"'\`][^ ]+ +[^ ]+ +[0-9][^ ]* +[^ ]+ +[0-9]" backend/
+```
+
+If you meant either day, leave it. If you meant both, schedule one day field and
+test the other in the handler:
+
+```typescript
+// backend/crons/first-monday.ts
+import { defineCron } from "@rebasepro/server";
+
+export default defineCron({
+    schedule: "0 9 * * 1",
+    timezone: "UTC",
+
+    async handler(ctx) {
+        if (ctx.scheduledAt.getUTCDate() > 7) return;
+        ctx.log("First Monday of the month");
+    },
+});
+```
+
+See [Schedule Syntax](/docs/backend/cron-jobs/#schedule-syntax).
+
+### 98. A cron schedule with a malformed number is refused
+
+`5abc`, `*/5x`, `1.5` and a range that runs backwards, such as `5-1`, used to pass
+validation. A number was read up to the first character that was not a digit, so
+`5abc` ran as `5`, and a backwards range contributed nothing. Each is now refused
+with the field and the reason.
+
+A refused job is not registered and does not run, and the rest of the backend
+boots. Nothing else tells you: a deploy goes live, because the file itself
+loaded.
+
+**What to change:** after upgrading, look for `[cron] Rejecting job` in the server
+log, or read `rejected` on `GET /api/admin/cron`, which the Studio's Cron Jobs tool
+also shows. Correct the number and the job is registered on the next boot. See
+[Jobs that are not there](/docs/backend/cron-jobs-api/#jobs-that-are-not-there).
+
+### 99. A key whose strategy its type cannot honour stops the boot
+
+`isId: "increment"` on a key that is not a `number`, and `isId: "uuid"` on one that
+is not a `string`, are refused at config load with a message naming the property.
+Both used to be read as a raw SQL default. Postgres refused `DEFAULT increment` at
+the first `CREATE TABLE`, so this only reaches a table that already existed, where
+nothing ran that statement.
+
+**What to change:** declare the key as what the column is. A number key takes
+`type: "number"` with `"increment"`, and a string key takes `"uuid"`, or `true` when
+the caller supplies the value. See [String Options](/docs/collections/properties/#string-options).
+
+### 100. A managed deploy or preview fails when a function or cron file does not load
+
+A function or cron file that threw or did not parse while importing used to be
+skipped, so a deploy reported `✓ Live` and passed its probes while every route of
+that file answered 404. Pods on Rebase Cloud now run with
+`REBASE_REQUIRE_FILES_LOADED`, on a runtime that has it, so the new version never
+goes ready, the old one keeps serving, and the deploy ends on the file and the
+reason.
+
+A project that has been serving with such a file meets this on its next deploy.
+Fleet rollouts and rollbacks are not held to it. A file that imports cleanly and
+exports no function or job, such as a helper, is still skipped.
+
+**What to change:** deploy, then fix or delete the file the deploy names. Off
+Rebase Cloud nothing changes unless you set `REBASE_REQUIRE_FILES_LOADED=true`
+yourself. See [Environment & Configuration](/docs/getting-started/configuration/).
 
 ## Upgrading 0.25 to 0.26
 
@@ -4243,6 +4338,32 @@ yet, listed so that nobody reads a promise into them:
 
 ### [Unreleased]
 
+#### Breaking
+
+##### Runtime
+
+- **A cron schedule that restricts both day fields matches either, as standard
+  cron does.** `0 9 1 * 1` ran only on a Monday the 1st; it now runs on every
+  1st and every Monday, so such a job runs more often after the upgrade. A
+  schedule where either day field starts with `*` is unchanged.
+- **A cron schedule with a malformed number is refused.** Validation now reads
+  each number whole: `5abc`, `*/5x`, `1.5` and a backwards range such as `5-1`
+  used to pass. The job is not registered and does not run, and the rest of the
+  backend boots.
+- **A key whose strategy its type cannot honour stops the boot.**
+  `isId: "increment"` on a non-number key, and `"uuid"` on a non-string one, are
+  refused at config load. Both used to become a raw SQL default —
+  `DEFAULT increment` — that Postgres refused at the first `CREATE TABLE`, so
+  only a table that already existed got this far.
+
+##### Rebase Cloud
+
+- **A managed deploy or preview fails when a function or cron file does not
+  load.** Its pods now run with `REBASE_REQUIRE_FILES_LOADED`, on a runtime that
+  has it, so the old version keeps serving and the deploy ends on the file and the
+  reason, not on `✓ Live`. A project that has been serving with such a file meets
+  this on its next deploy. Fleet rollouts and rollbacks are not held to it.
+
 #### Added
 
 ##### Server & REST
@@ -4326,11 +4447,6 @@ yet, listed so that nobody reads a promise into them:
   dependencies is uploaded without them and the deploy says so, because a bundle
   that installs at boot still works. A build keeps a tree of up to 2 GB on disk,
   up from 200 MB.
-- **A managed deploy or preview fails when a function or cron file does not
-  load.** Its pods now run with `REBASE_REQUIRE_FILES_LOADED`, on a runtime that
-  has it, so the old version keeps serving and the deploy ends on the file and the
-  reason, not on `✓ Live`. A project that has been serving with such a file meets
-  this on its next deploy. Fleet rollouts and rollbacks are not held to it.
 
 ##### CLI
 
@@ -4388,11 +4504,6 @@ yet, listed so that nobody reads a promise into them:
   the moment the run started, so a catch-up run for a missed 06:00 slot saw
   the boot time and a punctual one saw the slot plus a database round trip. A
   manual trigger, which has no slot, still gets the moment it started.
-- **A cron schedule that restricts both day fields matches either, as standard
-  cron does.** `0 9 1 * 1` ran only on a Monday the 1st; it now runs on every
-  1st and every Monday. A schedule where either day field starts with `*` is
-  unchanged. Validation also reads each number whole: `5abc`, `*/5x`, `1.5` and
-  a backwards range such as `5-1` used to pass and are now refused.
 - **`PermanentJobError` is exported from `@rebasepro/server`,** so a job
   handler can dead-letter a job on the attempt no retry can fix.
 - **`enableSwagger: false` hides the Swagger UI in development too.** It was
@@ -4404,9 +4515,6 @@ yet, listed so that nobody reads a promise into them:
   Any other `.dump` there was dated by its mtime: pruned with its
   `.globals.sql` once old, and while new it held a `keepMinimum` slot and
   pushed the newest real backup out.
-- **`isId: "increment"` on a non-number key, and `"uuid"` on a non-string one,
-  are refused at config load.** Both used to become a raw SQL default —
-  `DEFAULT increment` — that Postgres refused at the first `CREATE TABLE`.
 - **The Helm chart's api serves functions when there is no functions unit,
   and a worker always takes cron.** With `split`, a worker and no functions
   unit, the api ran `REBASE_ROLE=api` and answered every `/api/functions` call
@@ -47746,7 +47854,6 @@ await client.auth.linkAnonymous("user@example.com", "correct-horse-battery");
 | `ANONYMOUS_AUTH_DISABLED` (403) | The backend has not enabled anonymous auth, or turned it off since this guest signed in: a guest becomes an account only while `allowAnonymous` is on |
 | `REGISTRATION_DISABLED` (403) | Registration is closed on the backend, and becoming an account is registration |
 | `NOT_ANONYMOUS` (400) | The current session belongs to an ordinary account |
-
 | `EMAIL_EXISTS` (409) | The address already has an account — sign in to that one instead |
 
 <span class="since-badge" data-since="0.27">Since 0.27</span> A guest that never comes back stays as a row. An administrator clears

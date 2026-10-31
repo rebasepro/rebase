@@ -1,5 +1,5 @@
 ---
-sourceHash: 2f29788275d0b4db
+sourceHash: 18c4ff1205a910b2
 title: Realtime su più istanze
 sidebar_label: Realtime su più istanze
 description: "Come i canali di broadcast e la presence sopravvivono a più di un processo server: il bus LISTEN/NOTIFY, cosa appartiene a ciascuna istanza e come scrivere un transport personalizzato."
@@ -90,7 +90,22 @@ Per ogni client, il socket accetta fino a **7.200 frame di canale al minuto** (1
 
 Il rifiuto arriva su `channel.onError()`, non come una `broadcast()` respinta — vedi [Quando un frame di canale viene rifiutato](/docs/backend/realtime#when-a-channel-frame-is-refused).
 
-Se dopo questo continui a spingere sui limiti, applica il throttling agli eventi di tipo cursore sul client (uno stato last-write-wins non necessita di 60 aggiornamenti al secondo) e prendi in considerazione l'instradamento dei collaboratori di un documento verso la stessa istanza — lo sticky routing riduce il traffico tra istanze quasi a zero, indipendentemente dal numero di utenti. Solo oltre tale soglia ha senso adottare un altro transport, e in quel caso la soluzione è un pacchetto transport, non un fork. Vedi [Scrivere un transport personalizzato](#scrivere-un-transport-personalizzato).
+Se dopo questo continui a spingere sui limiti, applica il throttling agli eventi di tipo cursore sul client (uno stato last-write-wins non necessita di 60 aggiornamenti al secondo) e prendi in considerazione l'instradamento dei collaboratori di un documento verso la stessa istanza con [`affinity`](/docs/sdk/realtime#keeping-a-group-on-one-instance) — lo sticky routing riduce il traffico tra istanze quasi a zero, indipendentemente dal numero di utenti. Solo oltre tale soglia ha senso adottare un altro transport, e in quel caso la soluzione è un pacchetto transport, non un fork. Vedi [Scrivere un transport personalizzato](#scrivere-un-transport-personalizzato).
+
+### Vedere cosa fa il bus
+
+Con `REBASE_METRICS=true`, ogni istanza riporta su `/metrics` ciò che sta trasportando:
+
+| Metrica | Tipo | Significato |
+|--------|------|---------|
+| `rebase_realtime_sockets` | gauge | Socket aperti su questa istanza |
+| `rebase_realtime_channels` | gauge | Canali con un membro su questa istanza |
+| `rebase_realtime_bus_frames_published_total` | counter | Frame che questa istanza ha inviato al bus, per `kind`: `broadcast`, `broadcast_ref`, `presence_diff` e `channels`, le istanze che si dicono a vicenda cosa servono |
+| `rebase_realtime_bus_frames_skipped_total` | counter | Broadcast e cambi di presence non inviati perché nessun'altra istanza aveva membri nel canale |
+
+I contatori ripartono da zero quando riparte l'istanza e contano frame, di cui il bus può unirne diversi in una sola notifica. I messaggi trattenuti viaggiano sempre, quindi non vengono mai saltati. Sul bus `memory` predefinito entrambi restano a zero.
+
+Interroga ogni istanza anziché un load balancer posto davanti a esse: i numeri sono per processo. Un gruppo che resta su un'istanza si vede da `skipped` che sale mentre `broadcast` e `presence_diff` restano fermi, e dai socket distribuiti tra le istanze. Broadcast che salgono su ogni istanza significano che i canali si estendono tra di esse. Su Rebase Cloud, `rebase cloud metrics` mostra gli stessi conteggi per istanza.
 
 ### Coalescing
 

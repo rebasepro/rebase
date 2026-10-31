@@ -1,5 +1,5 @@
 ---
-sourceHash: 916ecd6bde4adb6f
+sourceHash: a1afbafa7c27ef28
 title: SDK typé — Prise en main
 sidebar_label: Prise en main
 description: Installez et configurez le SDK typé de Rebase pour interagir avec votre backend depuis n'importe quelle application JavaScript ou TypeScript.
@@ -54,7 +54,7 @@ const client = createRebaseClient({
 | `apiPath` | `string` | Préfixe de l'API (par défaut : `"/api"`) |
 | `fetch` | `typeof fetch` | Implémentation fetch personnalisée (ex. pour le SSR) |
 | `onUnauthorized` | `() => Promise<boolean>` | Gestionnaire personnalisé pour les erreurs 401 — retournez `true` pour réessayer |
-| `realtime` | `boolean` | Ouvre la WebSocket (par défaut `true`) — définissez sur `false` dans les scripts ponctuels |
+| `realtime` | `boolean \| RealtimeClientOptions` | Ouvre la WebSocket (par défaut `true`) — définissez sur `false` dans les scripts ponctuels. `{ affinity }` [nomme le groupe auquel appartient le socket](/docs/sdk/realtime#keeping-a-group-on-one-instance) |
 | `collections` | `Record<string, string>` | Associe les noms d'accesseurs aux slugs des collections |
 | `offline` | `boolean \| OfflineConfig` | [Synchronisation local-first](/docs/sdk/offline) — désactivée par défaut |
 | `impersonate` | `string` | Exécute chaque requête en tant que cet utilisateur (par uid), pour vérifier ce qu'un utilisateur voit. Uniquement avec la session d'un administrateur : l'API de données, les fonctions et le temps réel s'exécutent en son nom, toute autre route refuse |

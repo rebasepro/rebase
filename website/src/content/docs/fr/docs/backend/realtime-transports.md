@@ -1,5 +1,5 @@
 ---
-sourceHash: 2f29788275d0b4db
+sourceHash: 18c4ff1205a910b2
 title: Temps réel entre plusieurs instances
 sidebar_label: Temps réel entre plusieurs instances
 description: "Comment les canaux de diffusion et la présence fonctionnent sur plusieurs processus serveur : le bus LISTEN/NOTIFY, la gestion par instance et l'écriture de votre propre transport."
@@ -90,7 +90,22 @@ Par client, le socket accepte jusqu'à **7 200 trames de canaux par minute** (12
 
 Le refus survient sur `channel.onError()`, et non sous la forme d'un `broadcast()` rejeté — voir [Lorsqu'une trame de canal est refusée](/docs/backend/realtime#when-a-channel-frame-is-refused).
 
-Si vous dépassez encore cette limite après cela, limitez le débit (throttle) des événements de type curseur côté client (un état de type « last-write-wins » n'a pas besoin de 60 mises à jour par seconde), et envisagez de router les collaborateurs d'un même document vers la même instance — le routage persistant (sticky routing) réduit le trafic inter-instances à presque rien, quel que soit le nombre d'utilisateurs. Ce n'est qu'au-delà qu'un autre transport devient pertinent, et la solution réside alors dans un package de transport, et non dans un fork. Voir [Écrire votre propre transport](#écrire-votre-propre-transport).
+Si vous dépassez encore cette limite après cela, limitez le débit (throttle) des événements de type curseur côté client (un état de type « last-write-wins » n'a pas besoin de 60 mises à jour par seconde), et envisagez de router les collaborateurs d'un même document vers la même instance avec [`affinity`](/docs/sdk/realtime#keeping-a-group-on-one-instance) — le routage persistant (sticky routing) réduit le trafic inter-instances à presque rien, quel que soit le nombre d'utilisateurs. Ce n'est qu'au-delà qu'un autre transport devient pertinent, et la solution réside alors dans un package de transport, et non dans un fork. Voir [Écrire votre propre transport](#écrire-votre-propre-transport).
+
+### Voir ce que fait le bus
+
+Avec `REBASE_METRICS=true`, chaque instance indique ce qu'elle transporte à `/metrics` :
+
+| Métrique | Type | Signification |
+|--------|------|---------|
+| `rebase_realtime_sockets` | gauge | Sockets ouverts sur cette instance |
+| `rebase_realtime_channels` | gauge | Canaux ayant un membre sur cette instance |
+| `rebase_realtime_bus_frames_published_total` | counter | Trames que cette instance a envoyées au bus, par `kind` : `broadcast`, `broadcast_ref`, `presence_diff`, et `channels`, par lequel les instances se disent ce qu'elles servent |
+| `rebase_realtime_bus_frames_skipped_total` | counter | Diffusions et changements de présence non envoyés parce qu'aucune autre instance n'avait de membres dans le canal |
+
+Les compteurs repartent de zéro avec l'instance et comptent des trames, que le bus peut regrouper en une seule notification. Les messages retenus voyagent toujours, ils ne sont donc jamais ignorés. Sur le bus `memory` par défaut, les deux restent à zéro.
+
+Interrogez chaque instance plutôt qu'un équilibreur de charge placé devant elles : les chiffres sont propres à chaque processus. Un groupe qui reste sur une seule instance se voit à `skipped` qui monte pendant que `broadcast` et `presence_diff` restent stables, et à des sockets répartis entre les instances. Des diffusions qui montent sur chaque instance signifient que les canaux les chevauchent. Sur Rebase Cloud, `rebase cloud metrics` affiche les mêmes comptes par instance.
 
 ### Regroupement (Coalescing)
 

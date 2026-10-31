@@ -1,5 +1,5 @@
 ---
-sourceHash: 2f29788275d0b4db
+sourceHash: 18c4ff1205a910b2
 title: Tempo real entre instâncias
 sidebar_label: Tempo real entre instâncias
 description: "Como canais de broadcast e presença sobrevivem a mais de um processo de servidor: o barramento LISTEN/NOTIFY, o que pertence a cada instância e como escrever seu próprio transporte."
@@ -90,7 +90,22 @@ Por cliente, o socket aceita até **7.200 frames de canal por minuto** (120/s �
 
 A recusa chega em `channel.onError()`, e não como um `broadcast()` rejeitado — consulte [Quando um frame de canal é recusado](/docs/backend/realtime#when-a-channel-frame-is-refused).
 
-Se ainda assim você estiver atingindo o limite, aplique throttle nos eventos do tipo cursor no cliente (o estado last-write-wins não precisa de 60 atualizações por segundo) e considere rotear os colaboradores de um documento para a mesma instância — o roteamento persistente (sticky routing) reduz o tráfego entre instâncias a quase nada, independentemente da contagem de usuários. Somente além desse ponto outro transporte passa a valer a pena, e então a resposta é um pacote de transporte, não um fork. Consulte [Escrevendo seu próprio transporte](#escrevendo-seu-próprio-transporte).
+Se ainda assim você estiver atingindo o limite, aplique throttle nos eventos do tipo cursor no cliente (o estado last-write-wins não precisa de 60 atualizações por segundo) e considere rotear os colaboradores de um documento para a mesma instância com [`affinity`](/docs/sdk/realtime#keeping-a-group-on-one-instance) — o roteamento persistente (sticky routing) reduz o tráfego entre instâncias a quase nada, independentemente da contagem de usuários. Somente além desse ponto outro transporte passa a valer a pena, e então a resposta é um pacote de transporte, não um fork. Consulte [Escrevendo seu próprio transporte](#escrevendo-seu-próprio-transporte).
+
+### Vendo o que o barramento faz
+
+Com `REBASE_METRICS=true`, cada instância informa em `/metrics` o que está carregando:
+
+| Métrica | Tipo | Significado |
+|--------|------|---------|
+| `rebase_realtime_sockets` | gauge | Sockets abertos nesta instância |
+| `rebase_realtime_channels` | gauge | Canais com um membro nesta instância |
+| `rebase_realtime_bus_frames_published_total` | counter | Frames que esta instância enviou ao barramento, por `kind`: `broadcast`, `broadcast_ref`, `presence_diff` e `channels`, as instâncias dizendo umas às outras o que atendem |
+| `rebase_realtime_bus_frames_skipped_total` | counter | Broadcasts e mudanças de presença não enviados porque nenhuma outra instância tinha membros no canal |
+
+Os contadores começam do zero quando a instância começa, e contam frames, dos quais o barramento pode juntar vários em uma única notificação. Mensagens retidas sempre viajam, portanto nunca são ignoradas. No barramento `memory` padrão, ambos ficam em zero.
+
+Faça o scrape de cada instância, e não de um balanceador de carga à frente delas: os números são por processo. Um grupo que fica em uma instância aparece como `skipped` subindo enquanto `broadcast` e `presence_diff` ficam estáveis, e os sockets se espalham pelas instâncias. Broadcasts que sobem em todas as instâncias significam que os canais passam por elas. No Rebase Cloud, `rebase cloud metrics` mostra as mesmas contagens por instância.
 
 ### Coalescência
 

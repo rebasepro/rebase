@@ -1,0 +1,98 @@
+---
+slug: docs/upgrading/0-26-to-0-27
+title: Upgrading 0.26 to 0.27
+sidebar_label: 0.26 → 0.27
+description: The breaking changes 0.27 carries for an app on 0.26 — cron schedules that restrict both day fields, malformed cron numbers, a key strategy its type cannot honour, and managed deploys that stop on a file that did not load.
+---
+
+# Upgrading 0.26 → 0.27
+
+These are the `### Breaking` entries 0.27 carries for an app on 0.26.
+
+The two cron changes are the ones to read first, because neither stops anything
+from booting: one job starts running more often, and the other stops running at
+all. The third reaches only a table that already existed. The last is Rebase
+Cloud, and you meet it on your next deploy.
+
+---
+
+## 97. A cron schedule that restricts both day fields matches either
+
+`0 9 1 * 1` used to run only on a Monday the 1st. It now runs on every 1st and on
+every Monday, as standard cron does. This applies when neither day field starts
+with `*`. A schedule with `*` or `*/n` in either one means what it did.
+
+The schedule this changes most is the "first Monday of the month" idiom:
+`0 9 1-7 * 1` used to fire once a month, and now fires on each of the first seven
+days and on every Monday.
+
+**What to change:** find the schedules with a number in both day fields:
+
+```bash
+grep -rnE "schedule:.*[\"'\`][^ ]+ +[^ ]+ +[0-9][^ ]* +[^ ]+ +[0-9]" backend/
+```
+
+If you meant either day, leave it. If you meant both, schedule one day field and
+test the other in the handler:
+
+```typescript
+// backend/crons/first-monday.ts
+import { defineCron } from "@rebasepro/server";
+
+export default defineCron({
+    schedule: "0 9 * * 1",
+    timezone: "UTC",
+
+    async handler(ctx) {
+        if (ctx.scheduledAt.getUTCDate() > 7) return;
+        ctx.log("First Monday of the month");
+    },
+});
+```
+
+See [Schedule Syntax](/docs/backend/cron-jobs/#schedule-syntax).
+
+## 98. A cron schedule with a malformed number is refused
+
+`5abc`, `*/5x`, `1.5` and a range that runs backwards, such as `5-1`, used to pass
+validation. A number was read up to the first character that was not a digit, so
+`5abc` ran as `5`, and a backwards range contributed nothing. Each is now refused
+with the field and the reason.
+
+A refused job is not registered and does not run, and the rest of the backend
+boots. Nothing else tells you: a deploy goes live, because the file itself
+loaded.
+
+**What to change:** after upgrading, look for `[cron] Rejecting job` in the server
+log, or read `rejected` on `GET /api/admin/cron`, which the Studio's Cron Jobs tool
+also shows. Correct the number and the job is registered on the next boot. See
+[Jobs that are not there](/docs/backend/cron-jobs-api/#jobs-that-are-not-there).
+
+## 99. A key whose strategy its type cannot honour stops the boot
+
+`isId: "increment"` on a key that is not a `number`, and `isId: "uuid"` on one that
+is not a `string`, are refused at config load with a message naming the property.
+Both used to be read as a raw SQL default. Postgres refused `DEFAULT increment` at
+the first `CREATE TABLE`, so this only reaches a table that already existed, where
+nothing ran that statement.
+
+**What to change:** declare the key as what the column is. A number key takes
+`type: "number"` with `"increment"`, and a string key takes `"uuid"`, or `true` when
+the caller supplies the value. See [String Options](/docs/collections/properties/#string-options).
+
+## 100. A managed deploy or preview fails when a function or cron file does not load
+
+A function or cron file that threw or did not parse while importing used to be
+skipped, so a deploy reported `✓ Live` and passed its probes while every route of
+that file answered 404. Pods on Rebase Cloud now run with
+`REBASE_REQUIRE_FILES_LOADED`, on a runtime that has it, so the new version never
+goes ready, the old one keeps serving, and the deploy ends on the file and the
+reason.
+
+A project that has been serving with such a file meets this on its next deploy.
+Fleet rollouts and rollbacks are not held to it. A file that imports cleanly and
+exports no function or job, such as a helper, is still skipped.
+
+**What to change:** deploy, then fix or delete the file the deploy names. Off
+Rebase Cloud nothing changes unless you set `REBASE_REQUIRE_FILES_LOADED=true`
+yourself. See [Environment & Configuration](/docs/getting-started/configuration/).

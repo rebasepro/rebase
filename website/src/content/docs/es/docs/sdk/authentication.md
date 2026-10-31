@@ -1,5 +1,5 @@
 ---
-sourceHash: aba79f55ccca539b
+sourceHash: 3ad9e3791b2e3174
 title: Autenticación
 sidebar_label: Autenticación
 description: Autenticación del lado del cliente con el SDK de Rebase — inicio de sesión con correo electrónico/contraseña, proveedores OAuth, gestión de sesiones y escuchadores de estado de autenticación.
@@ -170,6 +170,13 @@ await client.auth.linkAnonymous("user@example.com", "correct-horse-battery");
 | `REGISTRATION_DISABLED` (403) | El registro está cerrado en el backend, y convertirse en cuenta es registrarse |
 | `NOT_ANONYMOUS` (400) | La sesión actual pertenece a una cuenta ordinaria |
 | `EMAIL_EXISTS` (409) | La dirección ya tiene una cuenta — inicia sesión en esa en su lugar |
+
+<span class="since-badge" data-since="0.27">Desde 0.27</span> Un invitado que nunca vuelve se queda como una fila. Un administrador los elimina
+con `client.admin.listGuests()`, `client.admin.deleteGuest(uid)` y
+`client.admin.deleteGuests({ lastSeenBefore })`, o en Rebase Cloud con
+[`rebase cloud guests`](/docs/cli/cloud/#guests). Estos solo tocan a invitados,
+y `deleteGuests` trabaja por lotes: repítelo mientras `remaining` no sea 0, con
+`offset` igual al número de invitados que ha omitido hasta ahora.
 
 ## Vincular un proveedor a una cuenta existente
 

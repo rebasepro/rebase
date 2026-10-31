@@ -1,5 +1,5 @@
 ---
-sourceHash: 2f29788275d0b4db
+sourceHash: 18c4ff1205a910b2
 title: Echtzeit über mehrere Instanzen
 sidebar_label: Echtzeit über mehrere Instanzen
 description: "Wie Broadcast-Channels und Presence mehr als einen Server-Prozess überstehen: der LISTEN/NOTIFY-Bus, was jede Instanz besitzt, und das Schreiben eines eigenen Transports."
@@ -83,7 +83,22 @@ Pro Client akzeptiert der Socket bis zu **7.200 Channel-Frames pro Minute** (120
 
 Die Ablehnung erfolgt über `channel.onError()`, nicht als abgelehnter `broadcast()`-Aufruf – siehe [Wenn ein Channel-Frame abgelehnt wird](/docs/backend/realtime#when-a-channel-frame-is-refused).
 
-Wenn Sie danach immer noch an Grenzen stoßen, drosseln Sie Cursor-Ereignisse auf dem Client (ein Last-Write-Wins-Status benötigt keine 60 Updates pro Sekunde) und erwägen Sie, Beteiligte desselben Dokuments an dieselbe Instanz weiterzuleiten – Sticky Routing reduziert den instanzübergreifenden Datenverkehr unabhängig von der Benutzeranzahl auf nahezu null. Erst darüber hinaus lohnt sich ein anderer Transport, und die Antwort darauf ist ein Transport-Paket, kein Fork. Siehe [Einen eigenen Transport schreiben](#einen-eigenen-transport-schreiben).
+Wenn Sie danach immer noch an Grenzen stoßen, drosseln Sie Cursor-Ereignisse auf dem Client (ein Last-Write-Wins-Status benötigt keine 60 Updates pro Sekunde) und erwägen Sie, Beteiligte desselben Dokuments an dieselbe Instanz weiterzuleiten, mit [`affinity`](/docs/sdk/realtime#keeping-a-group-on-one-instance) – Sticky Routing reduziert den instanzübergreifenden Datenverkehr unabhängig von der Benutzeranzahl auf nahezu null. Erst darüber hinaus lohnt sich ein anderer Transport, und die Antwort darauf ist ein Transport-Paket, kein Fork. Siehe [Einen eigenen Transport schreiben](#einen-eigenen-transport-schreiben).
+
+### Beobachten, was der Bus tut
+
+Mit `REBASE_METRICS=true` meldet jede Instanz unter `/metrics`, was sie gerade trägt:
+
+| Metrik | Typ | Bedeutung |
+|--------|------|-----------|
+| `rebase_realtime_sockets` | gauge | Offene Sockets auf dieser Instanz |
+| `rebase_realtime_channels` | gauge | Channels mit einem Mitglied auf dieser Instanz |
+| `rebase_realtime_bus_frames_published_total` | counter | Frames, die diese Instanz an den Bus gesendet hat, nach `kind`: `broadcast`, `broadcast_ref`, `presence_diff` und `channels`, womit die Instanzen einander mitteilen, was sie bedienen |
+| `rebase_realtime_bus_frames_skipped_total` | counter | Broadcasts und Presence-Änderungen, die nicht gesendet wurden, weil keine andere Instanz Mitglieder im Channel hatte |
+
+Counter beginnen bei null, wenn eine Instanz startet, und zählen Frames, von denen der Bus mehrere zu einer Benachrichtigung zusammenfassen kann. Retained Messages werden immer übertragen und daher nie übersprungen. Auf dem Standard-Bus `memory` bleiben beide bei null.
+
+Scrapen Sie jede Instanz einzeln statt eines Load Balancers davor: Die Zahlen gelten pro Prozess. Eine Gruppe, die auf einer Instanz bleibt, zeigt sich daran, dass `skipped` steigt, während `broadcast` und `presence_diff` konstant bleiben und sich die Sockets auf die Instanzen verteilen. Steigen die Broadcasts auf jeder Instanz, erstrecken sich die Channels über mehrere Instanzen. In Rebase Cloud zeigt `rebase cloud metrics` dieselben Zahlen pro Instanz.
 
 ### Coalescing
 

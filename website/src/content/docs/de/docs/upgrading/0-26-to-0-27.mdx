@@ -1,0 +1,100 @@
+---
+sourceHash: 7d3afbea48195098
+slug: de/docs/upgrading/0-26-to-0-27
+title: Upgrade von 0.26 auf 0.27
+sidebar_label: 0.26 → 0.27
+description: Die Breaking Changes in 0.27 für eine App auf 0.26 – Cron-Zeitpläne, die beide Tagesfelder einschränken, fehlerhafte Cron-Zahlen, eine Schlüsselstrategie, die ihr Typ nicht erfüllen kann, und Managed Deploys, die an einer Datei anhalten, die nicht geladen wurde.
+---
+
+# Upgrade von 0.26 → 0.27
+
+Dies sind die `### Breaking`-Einträge, die 0.27 für eine App auf Version 0.26 mit sich bringt.
+
+Die beiden Cron-Änderungen lesen Sie zuerst, denn keine von ihnen verhindert den Start: Ein Job
+läuft künftig häufiger, der andere läuft gar nicht mehr. Die dritte betrifft nur eine Tabelle,
+die bereits existierte. Die letzte betrifft Rebase Cloud, und Sie begegnen ihr bei Ihrem
+nächsten Deploy.
+
+---
+
+## 97. Ein Cron-Zeitplan, der beide Tagesfelder einschränkt, trifft auf eines von beiden zu
+
+`0 9 1 * 1` lief früher nur an einem Montag, der zugleich der 1. ist. Nun läuft er an jedem 1.
+und an jedem Montag, wie es bei Standard-Cron der Fall ist. Das gilt, wenn keines der beiden
+Tagesfelder mit `*` beginnt. Ein Zeitplan mit `*` oder `*/n` in einem von ihnen bedeutet weiterhin
+das, was er bisher bedeutet hat.
+
+Am stärksten ändert sich dadurch das Idiom „erster Montag im Monat“: `0 9 1-7 * 1` löste früher
+einmal im Monat aus und löst nun an jedem der ersten sieben Tage und an jedem Montag aus.
+
+**Was zu ändern ist:** Suchen Sie die Zeitpläne mit einer Zahl in beiden Tagesfeldern:
+
+```bash
+grep -rnE "schedule:.*[\"'\`][^ ]+ +[^ ]+ +[0-9][^ ]* +[^ ]+ +[0-9]" backend/
+```
+
+Wenn Sie einen der beiden Tage meinten, lassen Sie es so. Wenn Sie beide meinten, planen Sie
+über ein Tagesfeld und prüfen Sie das andere im Handler:
+
+```typescript
+// backend/crons/first-monday.ts
+import { defineCron } from "@rebasepro/server";
+
+export default defineCron({
+    schedule: "0 9 * * 1",
+    timezone: "UTC",
+
+    async handler(ctx) {
+        if (ctx.scheduledAt.getUTCDate() > 7) return;
+        ctx.log("First Monday of the month");
+    },
+});
+```
+
+Siehe [Zeitplan-Syntax](/docs/backend/cron-jobs/#schedule-syntax).
+
+## 98. Ein Cron-Zeitplan mit einer fehlerhaften Zahl wird abgelehnt
+
+`5abc`, `*/5x`, `1.5` und ein Bereich, der rückwärts läuft, wie `5-1`, bestanden früher die
+Validierung. Eine Zahl wurde bis zum ersten Zeichen gelesen, das keine Ziffer war, sodass `5abc`
+als `5` lief und ein rückwärts laufender Bereich nichts beitrug. Jeder dieser Fälle wird nun mit
+Angabe des Felds und des Grundes abgelehnt.
+
+Ein abgelehnter Job wird nicht registriert und läuft nicht, und der Rest des Backends startet.
+Nichts sonst weist Sie darauf hin: Ein Deploy geht live, weil die Datei selbst geladen wurde.
+
+**Was zu ändern ist:** Suchen Sie nach dem Upgrade im Server-Log nach `[cron] Rejecting job`
+oder lesen Sie `rejected` auf `GET /api/admin/cron`, was auch das Werkzeug „Cron Jobs“ in Studio
+anzeigt. Korrigieren Sie die Zahl, und der Job wird beim nächsten Start registriert. Siehe
+[Jobs, die nicht da sind](/docs/backend/cron-jobs-api/#jobs-that-are-not-there).
+
+## 99. Ein Schlüssel, dessen Strategie sein Typ nicht erfüllen kann, stoppt den Start
+
+`isId: "increment"` auf einem Schlüssel, der kein `number` ist, und `isId: "uuid"` auf einem,
+der kein `string` ist, werden beim Laden der Konfiguration mit einer Meldung abgelehnt, die die
+Property benennt. Beide wurden früher als roher SQL-Default gelesen. Postgres lehnte
+`DEFAULT increment` beim ersten `CREATE TABLE` ab, sodass dies nur eine Tabelle betrifft, die
+bereits existierte und in der diese Anweisung nie ausgeführt wurde.
+
+**Was zu ändern ist:** Deklarieren Sie den Schlüssel als das, was die Spalte ist. Ein
+Zahlenschlüssel verwendet `type: "number"` mit `"increment"`, und ein String-Schlüssel verwendet
+`"uuid"`, oder `true`, wenn der Aufrufer den Wert liefert. Siehe
+[String-Optionen](/docs/collections/properties/#string-options).
+
+## 100. Ein Managed Deploy oder eine Preview schlägt fehl, wenn eine Function- oder Cron-Datei nicht geladen wird
+
+Eine Function- oder Cron-Datei, die beim Import einen Fehler warf oder nicht geparst werden
+konnte, wurde früher übersprungen, sodass ein Deploy `✓ Live` meldete und seine Probes bestand,
+während jede Route dieser Datei mit 404 antwortete. Pods in Rebase Cloud laufen nun mit
+`REBASE_REQUIRE_FILES_LOADED`, auf einer Runtime, die es kennt, sodass die neue Version nie
+bereit wird, die alte weiter ausliefert und der Deploy mit der Datei und dem Grund endet.
+
+Ein Projekt, das mit einer solchen Datei ausgeliefert wurde, begegnet dem bei seinem nächsten
+Deploy. Fleet-Rollouts und Rollbacks unterliegen dieser Regel nicht. Eine Datei, die sauber
+importiert wird und keine Function und keinen Job exportiert, etwa ein Helper, wird weiterhin
+übersprungen.
+
+**Was zu ändern ist:** Deployen Sie, und beheben oder löschen Sie dann die Datei, die der Deploy
+nennt. Außerhalb von Rebase Cloud ändert sich nichts, solange Sie nicht selbst
+`REBASE_REQUIRE_FILES_LOADED=true` setzen. Siehe
+[Umgebung & Konfiguration](/docs/getting-started/configuration/).

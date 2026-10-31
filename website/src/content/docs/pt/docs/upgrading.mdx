@@ -1,5 +1,5 @@
 ---
-sourceHash: d0b2fe838240a68d
+sourceHash: ca93d664d999ec76
 slug: pt/docs/upgrading
 title: Atualização
 description: O que quebra ao migrar um aplicativo existente para a versão atual e o que fazer em cada caso.
@@ -7,10 +7,11 @@ description: O que quebra ao migrar um aplicativo existente para a versão atual
 
 # Atualizando um aplicativo existente
 
-Nove etapas, da mais recente para a mais antiga. Comece na etapa logo acima da versão em que você está e desça — ou, se você estiver vindo da 0.12, comece de baixo e suba.
+Dez etapas, da mais recente para a mais antiga. Comece na etapa logo acima da versão em que você está e desça — ou, se você estiver vindo da 0.12, comece de baixo e suba.
 
 | Você está na versão | Leia | O que isso impacta |
 |---|---|---|
+| **0.26** | [0.26 → 0.27](/docs/upgrading/0-26-to-0-27/) | Um cron schedule que restringe os dois campos de dia roda em qualquer um deles, então roda com mais frequência, e um schedule com um número malformado é recusado, então esse job deixa de rodar. Uma chave cuja estratégia `isId` o seu tipo não pode honrar interrompe a inicialização. No Rebase Cloud, um deploy ou preview falha quando um arquivo de função ou de cron não carrega. |
 | **0.25** | [0.25 → 0.26](/docs/upgrading/0-25-to-0-26/) | São recusados uma escrita que nomeia uma relação `via` de vários saltos, um nome de papel que não é um único papel, um token de página do armazenamento local anterior à atualização e um upstream de funções que não pode funcionar. O login por OAuth resolve uma conta não verificada em vez de responder `local-account-unverified`, o servidor MCP deixa de enviar `REBASE_TOKEN` à aplicação, e os tipos gerados deixam de ter a chave de um belongsTo com `excludeFromApi`. No Rebase Cloud, `rebase cloud webhooks` e `--scale-to-zero true` são aposentados, e tokens mais antigos podem precisar ser criados de novo. |
 | **0.24** | [0.24 → 0.25](/docs/upgrading/0-24-to-0-25/) | `?count=` numa listagem REST passa a ser o interruptor da contagem por trás de `meta.total`, então um filtro numa coluna chamada `count` vai dentro de `?where=`; o `list_collections` do MCP remoto envia a listagem só no bloco de texto, sem `structuredContent`; e `@rebasepro/app` deixa de exportar a tabela de tradução em espanhol `es`. São recusados um `OPTIONS` simples para uma rota sem handler, nomes de tabela que colidem na inicialização, um upsert na coleção de usuários, `page` junto com `offset`, uma string vazia num campo obrigatório e uma senha escolhida por um administrador que não cumpre a política de senhas. As sessões duram por padrão 30 dias de inatividade, `client.cron` chama `/api/admin/cron`, leituras offline que não podem ser respondidas por completo falham com `OFFLINE`, e algumas exportações internas e props não usadas deixam de existir. |
 | **0.23** | [0.23 → 0.24](/docs/upgrading/0-23-to-0-24/) | O SQL que `db push` e `db generate` geram sai de `drizzle/` para o `.rebase/sql/`, que não é comitado, a opção `--generate` do `rebase dev` deixa de existir porque o `dev` sempre regenera os tipos do SDK, e uma edição de schema ao vivo não comita SQL. As permissões passam a ser escopos: as superfícies de administração pedem um escopo em vez do papel de administrador, as chaves de API têm escopos em vez de uma lista de permissões e de uma flag `admin`, e `schema-admin` deixa de ser administrador. Um `--collections` relativo é lido a partir de onde o comando é executado, um upsert em uma linha na lixeira e uma atualização que altera uma chave são recusados, o endpoint MCP remoto passa a receber os argumentos do SDK, e sockets de tempo real abertos, links de verificação de e-mail, `signUp` e os códigos de recuperação de MFA mudam a forma como tratam uma sessão. |

@@ -1,0 +1,98 @@
+---
+sourceHash: 7d3afbea48195098
+slug: pt/docs/upgrading/0-26-to-0-27
+title: Atualizando da versão 0.26 para a 0.27
+sidebar_label: 0.26 → 0.27
+description: As mudanças drásticas que a versão 0.27 traz para uma aplicação na versão 0.26 — cron schedules que restringem os dois campos de dia, números malformados em cron, uma estratégia de chave que o seu tipo não pode honrar e deploys gerenciados que param em um arquivo que não carregou.
+---
+
+# Atualizando da versão 0.26 → 0.27
+
+Estas são as entradas `### Breaking` que a versão 0.27 traz para uma aplicação na versão 0.26.
+
+As duas mudanças de cron são as que você deve ler primeiro, porque nenhuma delas impede
+nada de inicializar: um job passa a rodar com mais frequência, e o outro deixa de rodar
+por completo. A terceira atinge apenas uma tabela que já existia. A última é do Rebase
+Cloud, e você a encontra no seu próximo deploy.
+
+---
+
+## 97. Um cron schedule que restringe os dois campos de dia corresponde a qualquer um deles
+
+`0 9 1 * 1` costumava rodar apenas em uma segunda-feira que fosse dia 1. Agora ele roda em
+todo dia 1 e em toda segunda-feira, como o cron padrão faz. Isso vale quando nenhum dos
+campos de dia começa com `*`. Um schedule com `*` ou `*/n` em qualquer um deles significa o
+que significava antes.
+
+O schedule que mais muda com isso é o idioma da "primeira segunda-feira do mês":
+`0 9 1-7 * 1` costumava disparar uma vez por mês, e agora dispara em cada um dos sete
+primeiros dias e em toda segunda-feira.
+
+**O que mudar:** encontre os schedules com um número nos dois campos de dia:
+
+```bash
+grep -rnE "schedule:.*[\"'\`][^ ]+ +[^ ]+ +[0-9][^ ]* +[^ ]+ +[0-9]" backend/
+```
+
+Se você queria qualquer um dos dois dias, deixe como está. Se você queria os dois, agende um
+campo de dia e teste o outro no handler:
+
+```typescript
+// backend/crons/first-monday.ts
+import { defineCron } from "@rebasepro/server";
+
+export default defineCron({
+    schedule: "0 9 * * 1",
+    timezone: "UTC",
+
+    async handler(ctx) {
+        if (ctx.scheduledAt.getUTCDate() > 7) return;
+        ctx.log("First Monday of the month");
+    },
+});
+```
+
+Consulte [Schedule Syntax](/docs/backend/cron-jobs/#schedule-syntax).
+
+## 98. Um cron schedule com um número malformado é recusado
+
+`5abc`, `*/5x`, `1.5` e um intervalo que anda para trás, como `5-1`, costumavam passar na
+validação. Um número era lido até o primeiro caractere que não fosse um dígito, então
+`5abc` rodava como `5`, e um intervalo para trás não contribuía com nada. Cada um agora é
+recusado com o campo e o motivo.
+
+Um job recusado não é registrado e não roda, e o resto do backend inicializa. Nada mais
+avisa você: um deploy entra no ar, porque o arquivo em si carregou.
+
+**O que mudar:** depois de atualizar, procure `[cron] Rejecting job` no log do servidor, ou
+leia `rejected` em `GET /api/admin/cron`, que a ferramenta Cron Jobs do Studio também
+mostra. Corrija o número e o job é registrado na próxima inicialização. Consulte
+[Jobs that are not there](/docs/backend/cron-jobs-api/#jobs-that-are-not-there).
+
+## 99. Uma chave cuja estratégia o seu tipo não pode honrar interrompe a inicialização
+
+`isId: "increment"` em uma chave que não é `number`, e `isId: "uuid"` em uma que não é
+`string`, são recusados no carregamento da configuração, com uma mensagem que nomeia a
+propriedade. Ambos costumavam ser lidos como um default de SQL bruto. O Postgres recusava
+`DEFAULT increment` no primeiro `CREATE TABLE`, então isso só atinge uma tabela que já
+existia, na qual nada executou essa instrução.
+
+**O que mudar:** declare a chave como aquilo que a coluna é. Uma chave numérica recebe
+`type: "number"` com `"increment"`, e uma chave de string recebe `"uuid"`, ou `true` quando
+quem chama fornece o valor. Consulte [String Options](/docs/collections/properties/#string-options).
+
+## 100. Um deploy ou preview gerenciado falha quando um arquivo de função ou de cron não carrega
+
+Um arquivo de função ou de cron que lançava um erro ou não era analisado ao ser importado
+costumava ser ignorado, de modo que um deploy informava `✓ Live` e passava nas suas sondas
+enquanto toda rota desse arquivo respondia 404. Os pods no Rebase Cloud agora rodam com
+`REBASE_REQUIRE_FILES_LOADED`, em um runtime que o tem, de modo que a nova versão nunca fica
+pronta, a antiga continua atendendo, e o deploy termina apontando o arquivo e o motivo.
+
+Um projeto que vinha atendendo com um arquivo assim encontra isso no próximo deploy. Os
+rollouts e rollbacks da frota não se submetem a isso. Um arquivo que é importado sem
+problemas e não exporta nenhuma função ou job, como um helper, continua sendo ignorado.
+
+**O que mudar:** faça o deploy e depois corrija ou exclua o arquivo que o deploy nomear.
+Fora do Rebase Cloud nada muda, a menos que você mesmo defina `REBASE_REQUIRE_FILES_LOADED=true`.
+Consulte [Environment & Configuration](/docs/getting-started/configuration/).

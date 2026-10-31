@@ -90,7 +90,7 @@ Un gestionnaire échoue en levant une exception. Il n'y a pas de `return false` 
 
 - **Tentatives restantes** → retour à `pending`, avec `run_at` repoussé par le backoff (1s, 5s, 25s … plafonné à une heure ; surchargeable avec `backoff`).
 - **Plus de tentatives** → `failed`, et la ligne *reste*. Une file d'attente qui supprime silencieusement ce qu'elle n'a pas pu traiter est indiscernable d'une file sans aucune tâche à accomplir.
-- **Un échec qu'aucune nouvelle tentative ne peut changer** <span class="since-badge" data-since="0.27">Since 0.27</span> → lancez `PermanentJobError`, depuis `@rebasepro/server` : le job passe à `failed` dès cette tentative, avec le message comme `last_error`, au lieu de consommer ses tentatives restantes.
+- **Un échec qu'aucune nouvelle tentative ne peut changer** <span class="since-badge" data-since="0.27">Depuis 0.27</span> → lancez `PermanentJobError`, depuis `@rebasepro/server` : le job passe à `failed` dès cette tentative, avec le message comme `last_error`, au lieu de consommer ses tentatives restantes.
 
 ```sql
 SELECT task, attempts, last_error, updated_at

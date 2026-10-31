@@ -1,5 +1,5 @@
 ---
-sourceHash: 189ee23f6992c2e4
+sourceHash: b9f712f58936dac9
 title: Subscrições em Tempo Real
 sidebar_label: Realtime
 description: Inscreva-se em alterações de dados em tempo real com o SDK tipado do Rebase usando listeners em tempo real baseados em WebSocket.
@@ -301,6 +301,34 @@ Dois comportamentos relacionados:
 
 - `realtime: false` permanece uma desativação estrita: nenhum socket é aberto, e `client.realtime.channel()` lança um erro. O mesmo vale para `listen()` e `listenById()` — eles estão sempre disponíveis para chamada, e em um cliente sem socket lançam um `RebaseClientError` nomeando a opção que os habilitaria. O `observe()` não lança erro: ele se degrada para um único fetch.
 - `client.close()` é definitivo. Ele libera o socket e seu timer de reconexão, e nada enfileirado posteriormente tentará discar novamente. No Node, um socket aberto mantém o event loop ativo, portanto um script que nunca o chama não será encerrado por conta própria.
+
+### Mantendo um grupo em uma instância
+
+Com mais de uma instância de servidor, os membros de um canal podem cair em instâncias diferentes, e cada mensagem entre eles passa então [pelo barramento de canais](/docs/backend/realtime-transports/#channels-and-presence-across-instances). `affinity` nomeia o grupo ao qual um socket pertence, como uma sala ou um documento, para que uma plataforma possa enviar o grupo inteiro à mesma instância:
+
+```typescript
+const client = createRebaseClient({
+    baseUrl,
+    realtime: { affinity: roomCode }
+});
+```
+
+Quando a chave só é conhecida depois, defina-a antes de o socket abrir:
+
+```typescript
+const client = createRebaseClient({ baseUrl });
+
+client.realtime.setAffinity(roomCode);          // no socket yet
+await client.realtime.channel(roomCode).join(); // opens with the key
+```
+
+A chave vai no endereço do socket como `?affinity=`, e substitui uma que já esteja em um `websocketUrl` que você definiu. `setAffinity(null)` a limpa.
+
+- **É uma otimização.** O Rebase Cloud roteia por ela quando um projeto executa mais de uma instância. Em self-hosting, ou atrás de um proxy que não faz hash por ela, ela não faz nada, e os canais funcionam do mesmo jeito: o barramento ainda carrega o que passa por várias instâncias, inclusive um grupo dividido por um scale-up.
+- **Ela vale quando o socket conecta.** Um socket já aberto fica onde está, e usa a nova chave na próxima vez que conectar. Para mover um cliente que está conectado, crie um novo, ou defina a chave antes do seu primeiro `join()` ou `listen()`.
+- **Ela decide onde um socket cai, não no que ele pode entrar.** O acesso a um canal não depende dela, e o endereço vai parar nos logs de acesso, portanto use um código em vez de um segredo ou de qualquer coisa pessoal.
+
+Para ver se funciona, compare o que cada instância publica e ignora: consulte [Seeing what the bus does](/docs/backend/realtime-transports/#seeing-what-the-bus-does).
 
 ## Canais de Broadcast
 

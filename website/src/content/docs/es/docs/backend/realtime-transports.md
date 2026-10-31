@@ -1,5 +1,5 @@
 ---
-sourceHash: 2f29788275d0b4db
+sourceHash: 18c4ff1205a910b2
 title: Tiempo real entre instancias
 sidebar_label: Tiempo real entre instancias
 description: "Cómo los canales de difusión (broadcast) y la presencia sobreviven a más de un proceso de servidor: el bus LISTEN/NOTIFY, qué posee cada instancia y cómo escribir tu propio transporte."
@@ -90,7 +90,22 @@ Por cada cliente, el socket acepta hasta **7,200 tramas de canal por minuto** (1
 
 El rechazo llega a `channel.onError()`, no como un `broadcast()` denegado; consulta [Cuándo se rechaza una trama de canal](/docs/backend/realtime#when-a-channel-frame-is-refused).
 
-Si aún necesitas más rendimiento después de eso, limita (throttle) los eventos de tipo cursor en el cliente (el estado donde la última escritura gana no necesita 60 actualizaciones por segundo) y considera enrutar a los colaboradores de un mismo documento a la misma instancia: el enrutamiento persistente (sticky routing) reduce el tráfico entre instancias a casi nada, independientemente del número de usuarios. Solo más allá de ese punto vale la pena considerar otro transporte, y entonces la solución es un paquete de transporte, no un fork. Consulta [Cómo escribir tu propio transporte](#cómo-escribir-tu-propio-transporte).
+Si aún necesitas más rendimiento después de eso, limita (throttle) los eventos de tipo cursor en el cliente (el estado donde la última escritura gana no necesita 60 actualizaciones por segundo) y considera enrutar a los colaboradores de un mismo documento a la misma instancia con [`affinity`](/docs/sdk/realtime#keeping-a-group-on-one-instance): el enrutamiento persistente (sticky routing) reduce el tráfico entre instancias a casi nada, independientemente del número de usuarios. Solo más allá de ese punto vale la pena considerar otro transporte, y entonces la solución es un paquete de transporte, no un fork. Consulta [Cómo escribir tu propio transporte](#cómo-escribir-tu-propio-transporte).
+
+### Ver qué hace el bus
+
+Con `REBASE_METRICS=true`, cada instancia informa en `/metrics` de lo que está llevando:
+
+| Métrica | Tipo | Significado |
+|--------|------|---------|
+| `rebase_realtime_sockets` | gauge | Sockets abiertos en esta instancia |
+| `rebase_realtime_channels` | gauge | Canales con algún miembro en esta instancia |
+| `rebase_realtime_bus_frames_published_total` | counter | Tramas que esta instancia envió al bus, por `kind`: `broadcast`, `broadcast_ref`, `presence_diff` y `channels`, las instancias contándose entre sí lo que sirven |
+| `rebase_realtime_bus_frames_skipped_total` | counter | Difusiones y cambios de presencia que no se enviaron porque ninguna otra instancia tenía miembros en el canal |
+
+Los contadores empiezan desde cero cuando lo hace la instancia, y cuentan tramas, de las cuales el bus puede unir varias en una sola notificación. Los mensajes retenidos siempre viajan, así que nunca se omiten. En el bus `memory` por defecto, ambos se quedan en cero.
+
+Consulta cada instancia por separado en lugar de un balanceador de carga delante de ellas: las cifras son por proceso. Un grupo que se queda en una instancia se nota en que `skipped` crece mientras `broadcast` y `presence_diff` se mantienen planos, y en que los sockets se reparten entre las instancias. Si las difusiones crecen en todas las instancias, los canales las abarcan. En Rebase Cloud, `rebase cloud metrics` muestra los mismos recuentos por instancia.
 
 ### Fusión de mensajes (Coalescing)
 

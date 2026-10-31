@@ -1,5 +1,5 @@
 ---
-sourceHash: a364dc4a57852453
+sourceHash: caa4e79614f7401e
 title: Auto-hospedagem
 sidebar_label: Auto-hospedagem
 description: Execute o Rebase em qualquer lugar com a imagem oficial de runtime e o bundle do seu projeto — Docker Compose, Fly, Railway ou uma VPS simples.
@@ -444,6 +444,10 @@ pool saudável mantém esse valor próximo de zero. Uma cauda que
 aumenta com o tráfego indica requisições enfileiradas aguardando conexões — frequentemente
 retidas por callbacks de escrita que aguardam por operações lentas; consulte
 [Um callback retém uma conexão](/docs/collections/context-data-api/#a-callback-holds-a-connection).
+
+`rebase_realtime_*` informa os sockets abertos e os canais de cada instância e os frames
+que ela enviou ao barramento de canais ou reteve: consulte
+[Seeing what the bus does](/docs/backend/realtime-transports/#seeing-what-the-bus-does).
 
 ## Cabeçalhos de segurança
 

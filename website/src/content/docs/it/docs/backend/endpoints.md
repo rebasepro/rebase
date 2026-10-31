@@ -1,5 +1,5 @@
 ---
-sourceHash: 066084445a9f39ad
+sourceHash: 169899c54121eb6e
 title: Indice degli endpoint
 sidebar_label: Indice degli endpoint
 description: Ogni route HTTP montata da un backend Rebase — data, auth, storage, admin, meta — con il relativo gate e la pagina che la descrive.
@@ -126,6 +126,9 @@ una collection non può accedere a nulla di tutto questo. Vedi [Ruoli e scope](/
 | `DELETE` | `/api/admin/users/:uid` | `users:write` | Rifiutato per un account che possiede più del chiamante |
 | `POST` | `/api/admin/users/:uid/reset-password` | `users:write` | Rilascia una password temporanea |
 | `DELETE` | `/api/admin/users/:uid/mfa` | `users:write` | Rimuove i secondi fattori e i codici di recupero dell'account, termina le sue sessioni |
+| `GET` | `/api/admin/guests` | `users:read` | <span class="since-badge" data-since="0.27">Da 0.27</span> Gli ospiti, dall'ultimo accesso più remoto. `?lastSeenBefore=` li restringe a ciò che la cancellazione qui sotto eliminerebbe, e `total` li conta |
+| `DELETE` | `/api/admin/guests` | `users:write` | <span class="since-badge" data-since="0.27">Da 0.27</span> Elimina un lotto degli ospiti visti l'ultima volta prima di `?lastSeenBefore=`, che è obbligatorio. Risponde `{ deleted, skipped, remaining }`. Ripeti finché `remaining` non è 0, con `?offset=` impostato al numero di quelli saltati. Gli account non sono raggiungibili |
+| `DELETE` | `/api/admin/guests/:uid` | `users:write` | <span class="since-badge" data-since="0.27">Da 0.27</span> Elimina un ospite. Un account viene rifiutato con `NOT_ANONYMOUS` |
 | `GET` | `/api/admin/roles` | `users:read` | `admin` e i ruoli dichiarati dal progetto, con i loro scope |
 | `GET` | `/api/admin/api-keys` | `keys:read` | [Chiavi API](/docs/backend/api-keys/). Mai una chiave API |
 | `POST` | `/api/admin/api-keys` | `keys:write` | La chiave in testo non crittografato viene restituita una sola volta, al momento della creazione |

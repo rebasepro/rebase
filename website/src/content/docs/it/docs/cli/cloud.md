@@ -1,5 +1,5 @@
 ---
-sourceHash: d4f01e8b2b1972c4
+sourceHash: 4b7b199f1aa18e8d
 title: rebase cloud
 sidebar_label: rebase cloud
 description: I gruppi di comandi per Rebase Cloud nella CLI — autenticazione, collegamento del progetto, deploy, notifiche, configurazione, organizzazioni, database, risorse, calcolo, storage, cluster, fatturazione e utilizzo.
@@ -87,7 +87,7 @@ rebase cloud rollback [id] [-y]          # back to a successful deploy
 rebase cloud cancel [-y]                 # cancel the in-flight build
 rebase cloud start | stop | restart [-y] # stop and restart need -y
 rebase cloud status                      # one-glance project status
-rebase cloud metrics                     # live CPU / memory / disk
+rebase cloud metrics                     # live CPU / memory / disk, realtime per instance
 rebase cloud debug [health|logs|…]       # diagnose a deployment, read-only
 ```
 
@@ -227,6 +227,51 @@ rebase cloud db pitr status | restore | cutover | discard
 
 `db connect` apre una porta locale che *è* il database gestito (nessun endpoint
 pubblico) fino a Ctrl-C; `--reveal` aggiunge la password. Riservato solo a owner o admin.
+
+## Ospiti
+
+<span class="since-badge" data-since="0.27">Da 0.27</span>
+
+Ogni `signInAnonymously()` in un test, in un bot o in una visita abbandonata lascia una riga
+tra gli utenti del progetto. Questi comandi contano quelle righe e le rimuovono, così
+nessuno deve passarle una per una.
+
+```bash
+rebase cloud guests                              # how many, and the ones last seen longest ago
+rebase cloud guests --older-than 30d --limit 100 # the ones not seen for 30 days
+rebase cloud guests delete <id>                  # one guest; asks first
+rebase cloud guests prune --older-than 30d       # dry run: how many would go
+rebase cloud guests prune --older-than 30d --yes # deletes them
+```
+
+`prune` accetta un'età con un'unità: `45m`, `12h`, `30d` o `2w`. Senza `--yes` conta
+e non elimina nulla. Lavora su un progetto di qualsiasi dimensione a piccoli lotti.
+
+Possono andarsene solo gli ospiti. Un ospite è una riga con `is_anonymous` impostato, senza password e senza
+identità collegata, e l'app applica questa regola nell'istruzione che elimina la
+riga, quindi il comando non può raggiungere un account, nemmeno uno che si è
+registrato un attimo dopo l'elenco. `delete` rifiuta un account con `NOT_ANONYMOUS`.
+
+**Ultimo accesso** è il momento in cui la sessione dell'ospite è stata emessa o rinnovata l'ultima volta, oppure
+il momento in cui l'ospite è stato creato se non gli resta alcun refresh token. Un ospite che continua a
+tornare non è vecchio, per quanto tempo fa sia stato creato. I refresh
+token di un ospite eliminato e ogni altra riga di autenticazione se ne vanno con lui.
+
+Le righe nelle tue tabelle seguono la loro chiave esterna:
+
+| La colonna | Cosa succede alla riga |
+|---|---|
+| Collegamento opzionale (`ON DELETE SET NULL`, il predefinito) | Conservata, con il collegamento svuotato |
+| Collegamento obbligatorio (`ON DELETE RESTRICT`, il predefinito) | Conservata, e con essa l'ospite: l'ospite viene segnalato come saltato, con `GUEST_REFERENCED` |
+| `onDelete: "cascade"` | Eliminata insieme all'ospite |
+| Nessuna chiave esterna (un campo `userSelect`, un id semplice) | Conservata, con un id che non esiste più |
+
+Controlla quali dei tuoi collegamenti si propagano a cascata prima di passare `--yes`: non si può annullare.
+
+Il comando legge `REBASE_SERVICE_KEY` come fa `env reveal`, quindi accetta un
+owner o un admin (o un token con la capability `env` che appartiene a uno di loro). La chiave
+resta in memoria e va solo all'indirizzo del progetto stesso. A un progetto con un
+runtime più vecchio viene detto che ne serve uno più recente.
 
 ## Risorse
 

@@ -1,5 +1,5 @@
 ---
-sourceHash: d4f01e8b2b1972c4
+sourceHash: 4b7b199f1aa18e8d
 title: rebase cloud
 sidebar_label: rebase cloud
 description: Los grupos de comandos para Rebase Cloud en la CLI — autenticación, vinculación de proyectos, despliegues, notificaciones, configuración, organizaciones, bases de datos, recursos, cómputo, almacenamiento, clústeres, facturación y uso.
@@ -87,7 +87,7 @@ rebase cloud rollback [id] [-y]          # back to a successful deploy
 rebase cloud cancel [-y]                 # cancel the in-flight build
 rebase cloud start | stop | restart [-y] # stop and restart need -y
 rebase cloud status                      # one-glance project status
-rebase cloud metrics                     # live CPU / memory / disk
+rebase cloud metrics                     # live CPU / memory / disk, realtime per instance
 rebase cloud debug [health|logs|…]       # diagnose a deployment, read-only
 ```
 
@@ -243,6 +243,52 @@ rebase cloud db pitr status | restore | cutover | discard
 
 `db connect` abre un puerto local que *es* la base de datos administrada (sin
 endpoint público) hasta presionar Ctrl-C; `--reveal` añade la contraseña. Solo propietario o administrador.
+
+## Guests
+
+<span class="since-badge" data-since="0.27">Desde 0.27</span>
+
+Cada `signInAnonymously()` en una prueba, un bot o una visita abandonada deja una fila
+entre los usuarios del proyecto. Estos comandos cuentan esas filas y las eliminan, para
+que nadie tenga que revisarlas una por una con clics.
+
+```bash
+rebase cloud guests                              # how many, and the ones last seen longest ago
+rebase cloud guests --older-than 30d --limit 100 # the ones not seen for 30 days
+rebase cloud guests delete <id>                  # one guest; asks first
+rebase cloud guests prune --older-than 30d       # dry run: how many would go
+rebase cloud guests prune --older-than 30d --yes # deletes them
+```
+
+`prune` toma una antigüedad con unidad: `45m`, `12h`, `30d` o `2w`. Sin `--yes` cuenta y
+no elimina nada. Recorre un proyecto de cualquier tamaño en lotes pequeños.
+
+Solo pueden eliminarse invitados. Un invitado es una fila con `is_anonymous` activado, sin
+contraseña y sin identidad vinculada, y la app aplica esa regla en la sentencia que elimina
+la fila, así que el comando no puede alcanzar una cuenta, ni siquiera una que se registró un
+instante después de que se listara. `delete` rechaza una cuenta con `NOT_ANONYMOUS`.
+
+**Last seen** (visto por última vez) es el momento en que se emitió o renovó por última vez
+la sesión del invitado, o el momento en que se creó el invitado si ya no le queda ningún
+refresh token. Un invitado que sigue volviendo no es antiguo, por mucho tiempo que haga que
+se creó. Los refresh tokens de un invitado eliminado y cualquier otra fila de autenticación
+se van con él.
+
+Las filas de tus propias tablas siguen su clave foránea:
+
+| La columna | Qué ocurre con la fila |
+|---|---|
+| Vínculo opcional (`ON DELETE SET NULL`, el valor por defecto) | Se conserva, con el vínculo vaciado |
+| Vínculo obligatorio (`ON DELETE RESTRICT`, el valor por defecto) | Se conserva, y el invitado con ella: el invitado se informa como omitido, con `GUEST_REFERENCED` |
+| `onDelete: "cascade"` | Se elimina junto con el invitado |
+| Sin clave foránea (un campo `userSelect`, un id simple) | Se conserva, con un id que ya no existe |
+
+Comprueba cuáles de tus vínculos son en cascada antes de pasar `--yes`: no se puede deshacer.
+
+El comando lee `REBASE_SERVICE_KEY` igual que `env reveal`, así que lo puede ejecutar un
+propietario o administrador (o un token con la capacidad `env` que pertenezca a uno). La
+clave se queda en memoria y solo va a la dirección propia del proyecto. A un proyecto con
+un runtime más antiguo se le indica que necesita uno más reciente.
 
 ## Resources
 

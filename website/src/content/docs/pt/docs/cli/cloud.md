@@ -1,5 +1,5 @@
 ---
-sourceHash: d4f01e8b2b1972c4
+sourceHash: 4b7b199f1aa18e8d
 title: rebase cloud
 sidebar_label: rebase cloud
 description: Os grupos de comandos para o Rebase Cloud na CLI — autenticação, vínculo de projetos, deploys, notificações, configuração, organizações, bancos de dados, recursos, computação, armazenamento, clusters, faturamento e uso.
@@ -87,7 +87,7 @@ rebase cloud rollback [id] [-y]          # back to a successful deploy
 rebase cloud cancel [-y]                 # cancel the in-flight build
 rebase cloud start | stop | restart [-y] # stop and restart need -y
 rebase cloud status                      # one-glance project status
-rebase cloud metrics                     # live CPU / memory / disk
+rebase cloud metrics                     # live CPU / memory / disk, realtime per instance
 rebase cloud debug [health|logs|…]       # diagnose a deployment, read-only
 ```
 
@@ -243,6 +243,52 @@ rebase cloud db pitr status | restore | cutover | discard
 
 `db connect` abre uma porta local que *é* o banco de dados gerenciado (sem
 endpoint público) até Ctrl-C; `--reveal` adiciona a senha. Apenas para proprietário ou admin.
+
+## Convidados
+
+<span class="since-badge" data-since="0.27">A partir da versão 0.27</span>
+
+Cada `signInAnonymously()` em um teste, em um bot ou em uma visita abandonada deixa uma linha
+nos usuários do projeto. Estes comandos contam essas linhas e as removem, para que ninguém
+precise passar por elas uma a uma.
+
+```bash
+rebase cloud guests                              # how many, and the ones last seen longest ago
+rebase cloud guests --older-than 30d --limit 100 # the ones not seen for 30 days
+rebase cloud guests delete <id>                  # one guest; asks first
+rebase cloud guests prune --older-than 30d       # dry run: how many would go
+rebase cloud guests prune --older-than 30d --yes # deletes them
+```
+
+`prune` recebe uma idade com unidade: `45m`, `12h`, `30d` ou `2w`. Sem `--yes` ele
+conta e não exclui nada. Ele percorre um projeto de qualquer tamanho em lotes
+pequenos.
+
+Só convidados podem ser removidos. Um convidado é uma linha com `is_anonymous` definido, sem senha e sem
+identidade vinculada, e a aplicação aplica essa regra na instrução que exclui a
+linha, de modo que o comando não consegue alcançar uma conta, nem mesmo uma que se
+cadastrou um instante depois de a listagem ser feita. `delete` recusa uma conta com `NOT_ANONYMOUS`.
+
+**Visto pela última vez** é quando a sessão do convidado foi emitida ou renovada pela última vez, ou quando
+o convidado foi criado, se ele não tem mais nenhum refresh token. Um convidado que continua
+voltando não é antigo, por mais tempo que faça desde que foi criado. Os refresh
+tokens de um convidado excluído e quaisquer outras linhas de autenticação vão com ele.
+
+As linhas das suas próprias tabelas seguem a chave estrangeira:
+
+| A coluna | O que acontece com a linha |
+|---|---|
+| Vínculo opcional (`ON DELETE SET NULL`, o padrão) | Mantida, com o vínculo esvaziado |
+| Vínculo obrigatório (`ON DELETE RESTRICT`, o padrão) | Mantida, e o convidado com ela: o convidado é informado como ignorado, com `GUEST_REFERENCED` |
+| `onDelete: "cascade"` | Excluída junto com o convidado |
+| Sem chave estrangeira (um campo `userSelect`, um id simples) | Mantida, com um id que não existe mais |
+
+Verifique quais dos seus vínculos fazem cascata antes de passar `--yes`: não dá para desfazer.
+
+O comando lê `REBASE_SERVICE_KEY` como `env reveal` faz, portanto aceita um
+proprietário ou admin (ou um token com a capacidade `env` que pertença a um). A
+chave fica na memória e vai apenas para o endereço do próprio projeto. Um projeto em um
+runtime mais antigo é informado de que precisa de um mais novo.
 
 ## Recursos
 

@@ -1,5 +1,5 @@
 ---
-sourceHash: aba79f55ccca539b
+sourceHash: 3ad9e3791b2e3174
 title: Authentifizierung
 sidebar_label: Authentifizierung
 description: Clientseitige Authentifizierung mit dem Rebase SDK — E-Mail/Passwort-Anmeldung, OAuth-Anbieter, Sitzungsverwaltung und Auth-Status-Listener.
@@ -168,6 +168,13 @@ await client.auth.linkAnonymous("user@example.com", "correct-horse-battery");
 | `REGISTRATION_DISABLED` (403) | Die Registrierung ist im Backend geschlossen, und ein Konto zu werden ist eine Registrierung |
 | `NOT_ANONYMOUS` (400) | Die aktuelle Sitzung gehört zu einem regulären Konto |
 | `EMAIL_EXISTS` (409) | Für die Adresse existiert bereits ein Konto — melden Sie sich stattdessen bei diesem an |
+
+<span class="since-badge" data-since="0.27">Seit 0.27</span> Ein Gast, der nie zurückkommt, bleibt als Zeile bestehen. Ein Administrator räumt
+sie mit `client.admin.listGuests()`, `client.admin.deleteGuest(uid)` und
+`client.admin.deleteGuests({ lastSeenBefore })` auf, oder in Rebase Cloud mit
+[`rebase cloud guests`](/docs/cli/cloud/#guests). Diese berühren immer nur Gäste,
+und `deleteGuests` arbeitet in Batches: Wiederholen Sie den Aufruf, solange `remaining`
+nicht 0 ist, mit `offset` auf die Anzahl der bisher übersprungenen Gäste gesetzt.
 
 ## Einen Anbieter mit einem bestehenden Konto verknüpfen
 

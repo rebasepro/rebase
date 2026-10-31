@@ -1,5 +1,5 @@
 ---
-sourceHash: 066084445a9f39ad
+sourceHash: 169899c54121eb6e
 title: Endpunkt-Index
 sidebar_label: Endpunkt-Index
 description: Jede HTTP-Route, die ein Rebase-Backend mountet – Daten, Authentifizierung, Speicher, Admin, Meta – mit dem jeweiligen Gate und der Seite, die sie erklärt.
@@ -126,6 +126,9 @@ der auf eine Collection beschränkt ist, erreicht nichts davon. Siehe [Rollen un
 | `DELETE` | `/api/admin/users/:uid` | `users:write` | Abgelehnt für ein Konto, das mehr hält als der Aufrufer |
 | `POST` | `/api/admin/users/:uid/reset-password` | `users:write` | Gibt ein temporäres Passwort aus |
 | `DELETE` | `/api/admin/users/:uid/mfa` | `users:write` | Entfernt die zweiten Faktoren und Wiederherstellungscodes des Kontos, beendet seine Sitzungen |
+| `GET` | `/api/admin/guests` | `users:read` | <span class="since-badge" data-since="0.27">Seit 0.27</span> Gäste, zuerst die am längsten nicht gesehenen. `?lastSeenBefore=` grenzt sie auf das ein, was das folgende Delete erfassen würde, und `total` zählt sie |
+| `DELETE` | `/api/admin/guests` | `users:write` | <span class="since-badge" data-since="0.27">Seit 0.27</span> Löscht einen Batch der Gäste, die vor `?lastSeenBefore=` zuletzt gesehen wurden; der Parameter ist erforderlich. Antwortet mit `{ deleted, skipped, remaining }`. Wiederholen, solange `remaining` nicht 0 ist, mit `?offset=` auf die Anzahl der bisher übersprungenen Gäste gesetzt. Konten sind nicht erreichbar |
+| `DELETE` | `/api/admin/guests/:uid` | `users:write` | <span class="since-badge" data-since="0.27">Seit 0.27</span> Löscht einen Gast. Ein Konto wird mit `NOT_ANONYMOUS` abgelehnt |
 | `GET` | `/api/admin/roles` | `users:read` | `admin` und die Rollen, die das Projekt deklariert, mit ihren Scopes |
 | `GET` | `/api/admin/api-keys` | `keys:read` | [API-Schlüssel](/docs/backend/api-keys/). Nie ein API-Schlüssel |
 | `POST` | `/api/admin/api-keys` | `keys:write` | Der Klartext-Schlüssel wird nur einmalig bei der Erstellung zurückgegeben |
