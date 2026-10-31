@@ -461,6 +461,135 @@ describe("Channel bus — cross-instance broadcast & presence", () => {
     });
 });
 
+/**
+ * A NOTIFY per broadcast was the busiest statement of a realtime load test, with
+ * most channels' members all on one instance. Instances now say which channels
+ * they serve, and a frame nobody else is waiting for isn't sent. A wrong skip
+ * loses a message, so these pin that every doubt publishes.
+ */
+describe("Channel bus — publishing on demand", () => {
+    class OnDemandBus extends FakeBus {
+        readonly publishesOnDemand = true;
+    }
+    type Peers = Map<string, { heardAt: number; channels: Set<string> | null }>;
+    let state: FakeDbState;
+    let wire: FakeBus[];
+    let a: RealtimeService;
+    let b: RealtimeService;
+    const pastWarmup = (s: RealtimeService) => { (s as unknown as { busStartedAt: number }).busStartedAt = Date.now() - 120_000; };
+    const peers = (s: RealtimeService) => (s as unknown as { busPeers: Peers }).busPeers;
+    const broadcasts = (bus: FakeBus) => bus.published.filter(f => f.kind === "broadcast");
+
+    beforeEach(async () => {
+        state = { presence: new Map(), messages: new Map() };
+        wire = [];
+        ({ service: a } = createService(state));
+        ({ service: b } = createService(state));
+    });
+
+    afterEach(async () => {
+        await a.destroy();
+        await b.destroy();
+    });
+
+    const bothUp = async () => {
+        await a.configureChannelBus(new OnDemandBus(wire));
+        await b.configureChannelBus(new OnDemandBus(wire));
+        await flush();
+    };
+
+    it("publishes nothing when alone, once past the first minute", async () => {
+        await a.configureChannelBus(new OnDemandBus(wire));
+        pastWarmup(a);
+        connect(a, "a1", "doc:1");
+        wire[0].published.length = 0;
+        a.broadcastToChannel("a1", "doc:1", "op", {});
+        a.trackPresence("a1", "doc:1", { n: 1 });
+        await flush();
+        expect(wire[0].published).toEqual([]);
+    });
+
+    it("publishes everything in the first minute, before it can know who else is there", async () => {
+        await a.configureChannelBus(new OnDemandBus(wire));
+        connect(a, "a1", "doc:1");
+        a.broadcastToChannel("a1", "doc:1", "op", {});
+        await flush();
+        expect(broadcasts(wire[0])).toHaveLength(1);
+    });
+
+    it("reaches a channel another instance serves, and skips one nobody else does", async () => {
+        await bothUp();
+        const remote = connect(b, "b1", "doc:1");
+        connect(a, "a1", "doc:1");
+        connect(a, "a2", "doc:only-here");
+        await flush();
+        pastWarmup(a);
+        a.broadcastToChannel("a1", "doc:1", "op", { x: 1 });
+        a.broadcastToChannel("a2", "doc:only-here", "op", { x: 2 });
+        await flush();
+        expect(broadcasts(wire[0]).map(f => f.channel)).toEqual(["doc:1"]);
+        expect(sentMessages(remote).filter(m => m.type === "broadcast")).toHaveLength(1);
+    });
+
+    it("assumes a peer that hasn't announced serves everything (an older version, mid rollout)", async () => {
+        await a.configureChannelBus(new OnDemandBus(wire));
+        pastWarmup(a);
+        connect(a, "a1", "doc:1");
+        await wire[0].handler?.({ kind: "broadcast", sid: "older", channel: "doc:9", event: "x", payload: {} });
+        wire[0].published.length = 0;
+        a.broadcastToChannel("a1", "doc:1", "op", {});
+        await flush();
+        expect(broadcasts(wire[0])).toHaveLength(1);
+    });
+
+    it("stops publishing for a peer that went quiet", async () => {
+        await bothUp();
+        connect(b, "b1", "doc:1");
+        connect(a, "a1", "doc:1");
+        await flush();
+        pastWarmup(a);
+        for (const peer of peers(a).values()) peer.heardAt = Date.now() - 60_000;
+        wire[0].published.length = 0;
+        a.broadcastToChannel("a1", "doc:1", "op", {});
+        await flush();
+        expect(broadcasts(wire[0])).toEqual([]);
+        expect(peers(a).size).toBe(0);
+    });
+
+    it("a full list repairs a lost announcement, and drops a channel the peer left", async () => {
+        await bothUp();
+        connect(a, "a1", "doc:lost");
+        connect(a, "a2", "doc:left");
+        pastWarmup(a);
+        const sid = [...peers(a).keys()][0];
+        await wire[0].handler?.({ kind: "channels", sid, channel: "__peers", add: ["doc:left"] });
+        await wire[0].handler?.({ kind: "channels", sid, channel: "__peers", list: ["doc:lost"], done: true });
+        wire[0].published.length = 0;
+        a.broadcastToChannel("a1", "doc:lost", "op", {});
+        a.broadcastToChannel("a2", "doc:left", "op", {});
+        await flush();
+        expect(broadcasts(wire[0]).map(f => f.channel)).toEqual(["doc:lost"]);
+    });
+
+    it("always publishes a retained message: its own clients get it that way", async () => {
+        await a.configureChannelBus(new OnDemandBus(wire));
+        pastWarmup(a);
+        connect(a, "a1", "doc:1");
+        (a as unknown as { publishBroadcast: (c: string, ch: string, e: string, p: unknown, seq?: number) => void })
+            .publishBroadcast("a1", "doc:1", "snap", {}, 7);
+        await flush();
+        expect(broadcasts(wire[0])).toHaveLength(1);
+    });
+
+    it("leaves a bus that doesn't ask for it alone: every frame is published, no gossip", async () => {
+        await a.configureChannelBus(new FakeBus(wire));
+        connect(a, "a1", "doc:1");
+        a.broadcastToChannel("a1", "doc:1", "op", {});
+        await flush();
+        expect(wire[0].published.map(f => f.kind)).toEqual(["broadcast"]);
+    });
+});
+
 describe("Channel bus — configuration", () => {
     const originalEnv = { ...process.env };
 

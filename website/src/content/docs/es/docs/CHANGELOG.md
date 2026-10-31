@@ -60,6 +60,14 @@ La traducción está pendiente. El contenido siguiente está en inglés.
 
 #### Realtime
 
+- **The Postgres channel bus only publishes what another instance is waiting
+  for.** Every broadcast and presence change was a `NOTIFY` on the primary, with
+  every member of the channel on one instance or no other instance running.
+  Instances now say over the bus which channels they serve, and a frame nobody
+  else has members for isn't sent: an instance alone sends none. Anything in
+  doubt publishes: the first minute after a start, a peer that hasn't announced
+  (an older version mid-rollout), and retained channels always. A custom
+  `ChannelBus` opts in with `publishesOnDemand`.
 - **Channel traffic no longer starves the database pool under load.** Channel
   frames re-checked the sender's identity against the auth store at most once
   a second; a socket that answers a ping every few seconds was checked on
