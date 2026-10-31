@@ -55,7 +55,7 @@ export { RebaseClientError } from "./errors";
 export type { RebaseErrorCode } from "@rebasepro/types";
 
 // Query + collection types (annotate SDK results; construct via the fluent API).
-export type { RebaseClientConfig, FindParams, FindResponse } from "./transport";
+export type { RebaseClientConfig, RealtimeClientOptions, FindParams, FindResponse } from "./transport";
 export type { CollectionClient, RestoreOptions, TrashClient } from "./collection";
 export type { FindResult, SDKCollectionClient, SDKQueryBuilderInterface, PaginationMeta } from "@rebasepro/types";
 
@@ -351,6 +351,14 @@ export type CreateRebaseClientResult<DB = Record<string, unknown>> = Omit<Rebase
          * join and on every reconnect, for channels the server retains.
          */
         channel: (name: string, options?: ChannelOptions) => RebaseRealtimeChannel;
+        /**
+         * Name the group this client's socket belongs to, or clear it with
+         * `null` — {@link RealtimeClientOptions.affinity}, for a key that is
+         * only known after the client is created. Call it before the first
+         * `join()` or `listen()`: a socket already open stays where it is
+         * until it next connects. Does nothing with `realtime: false`.
+         */
+        setAffinity: (key: string | null) => void;
     };
     /**
      * Release everything this client holds that can keep a process alive: the
@@ -589,6 +597,7 @@ export function createRebaseClient<DB = Record<string, unknown>>(options: Create
     if (resolvedWsUrl) {
         ws = new RebaseWebSocketClient({
             websocketUrl: resolvedWsUrl,
+            affinity: options.realtime && options.realtime !== true ? options.realtime.affinity : undefined,
             // The socket's token is the one an HTTP request would carry now,
             // resolved by the same function: a token getter installed with
             // `setAuthTokenGetter()`, otherwise the token held — the session's,
@@ -916,7 +925,8 @@ export function createRebaseClient<DB = Record<string, unknown>>(options: Create
                     existing.enableHistory();
                 }
                 return existing;
-            }
+            },
+            setAffinity: (key: string | null) => ws?.setAffinity(key)
         },
         /**
          * Release every handle that can keep a process alive — see the

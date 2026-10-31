@@ -1,4 +1,4 @@
-import { RealtimeProvider } from "@rebasepro/types";
+import type { RealtimeCounts, RealtimeProvider } from "@rebasepro/types";
 import { logger } from "../utils/logger";
 
 /**
@@ -213,6 +213,23 @@ export function createRoutedRealtimeService(opts: RoutedRealtimeOptions): WsReal
         health() {
             return Object.entries(providers).flatMap(([key, p]) =>
                 (p.health?.() ?? []).map((listener) => ({ ...listener, name: `${key}:${listener.name}` })));
+        },
+
+        // Every source holds every socket, so sockets are the largest count
+        // and not a sum. Channels and bus frames are held by one source each.
+        counts() {
+            const counts: RealtimeCounts = { sockets: 0, channels: 0, busFramesPublished: {}, busFramesSkipped: 0 };
+            for (const p of all()) {
+                const source = p.counts?.();
+                if (!source) continue;
+                counts.sockets = Math.max(counts.sockets, source.sockets);
+                counts.channels += source.channels;
+                counts.busFramesSkipped += source.busFramesSkipped;
+                for (const [kind, frames] of Object.entries(source.busFramesPublished)) {
+                    counts.busFramesPublished[kind] = (counts.busFramesPublished[kind] ?? 0) + frames;
+                }
+            }
+            return counts;
         }
     };
 }

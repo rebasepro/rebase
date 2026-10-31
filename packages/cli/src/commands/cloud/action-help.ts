@@ -1196,7 +1196,7 @@ export const ACTION_HELP: Record<string, ActionHelp> = {
     metrics: {
         command: "cloud metrics",
         usage: "cloud metrics",
-        summary: "Live CPU, memory and disk for the project's running units, as the control plane reports them.",
+        summary: "Live CPU, memory and disk for the project's running units, and each instance's realtime counts, as the control plane reports them.",
         flags: [],
         examples: ["rebase cloud metrics", "rebase cloud metrics --json"]
     }

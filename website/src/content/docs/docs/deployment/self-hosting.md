@@ -473,6 +473,10 @@ grows with traffic means requests are queueing for connections — most often
 held by write callbacks that await something slow; see
 [A callback holds a connection](/docs/collections/context-data-api/#a-callback-holds-a-connection).
 
+`rebase_realtime_*` reports each instance's open sockets, channels and the frames
+it sent to the channel bus or held back: see
+[Seeing what the bus does](/docs/backend/realtime-transports/#seeing-what-the-bus-does).
+
 ## Security headers
 
 Every response carries `X-Frame-Options: SAMEORIGIN`, `X-Content-Type-Options:

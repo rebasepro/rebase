@@ -25,7 +25,7 @@ import { isNestedPath } from "./nested-path";
 import { ChannelHistoryStore, type ResolvedRetention } from "./channel-history";
 import { ChannelPresenceStore } from "./channel-presence";
 import { CHANNEL_BUS_NOTIFY_CHANNEL, ChannelBus, ChannelBusFrame, MemoryChannelBus, PostgresChannelBus, frameByteLength } from "./channel-bus";
-import type { ChannelHistoryEntry, ChannelRetentionRule, RealtimeListenerHealth, User } from "@rebasepro/types";
+import type { ChannelHistoryEntry, ChannelRetentionRule, RealtimeCounts, RealtimeListenerHealth, User } from "@rebasepro/types";
 import { unref } from "@rebasepro/utils";
 
 /** Channel name used for Postgres LISTEN/NOTIFY cross-instance realtime. */
@@ -550,6 +550,10 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
      * (`null`: it hasn't said, so assume all of them). See {@link hasRemoteMembers}.
      */
     private busPeers = new Map<string, { heardAt: number; channels: Set<string> | null; incoming?: Set<string> }>();
+    /** Frames the bus took, by kind. See {@link counts}. */
+    private busFramesPublished = new Map<string, number>();
+    /** Frames not sent because no other instance had members. See {@link counts}. */
+    private busFramesSkipped = 0;
     private busStartedAt = 0;
     private busGossipInterval?: ReturnType<typeof setInterval>;
 
@@ -3072,7 +3076,10 @@ roles: ["anon"] };
     private publishBroadcast(clientId: string, channel: string, event: string, payload: unknown, seq?: number): void {
         if (this.bus.kind === "memory") return;
         // A retained message always travels: its own instance's clients get it this way.
-        if (seq === undefined && !this.hasRemoteMembers(channel)) return;
+        if (seq === undefined && !this.hasRemoteMembers(channel)) {
+            this.busFramesSkipped++;
+            return;
+        }
 
         const frame: ChannelBusFrame = {
             kind: "broadcast",
@@ -3109,6 +3116,7 @@ roles: ["anon"] };
     private async publishFrame(frame: ChannelBusFrame): Promise<void> {
         try {
             await this.bus.publish(frame);
+            this.busFramesPublished.set(frame.kind, (this.busFramesPublished.get(frame.kind) ?? 0) + 1);
         } catch (error) {
             logger.error("❌ [ChannelBus] Failed to publish frame — other instances did not receive it", {
                 detail: `${frame.kind} on "${frame.channel}"`,
@@ -3436,7 +3444,11 @@ lastSeen: Date.now() });
         joins: Record<string, Record<string, unknown>>,
         leaves: Record<string, Record<string, unknown>>
     ): void {
-        if (this.bus.kind === "memory" || !this.hasRemoteMembers(channel)) return;
+        if (this.bus.kind === "memory") return;
+        if (!this.hasRemoteMembers(channel)) {
+            this.busFramesSkipped++;
+            return;
+        }
         void this.publishFrame({ kind: "presence_diff", sid: this.instanceId, channel, joins, leaves });
     }
 
@@ -3715,6 +3727,16 @@ lastSeen: Date.now() });
     /** See `RealtimeProvider.setScopeRunner`. */
     setScopeRunner(run: <T>(fn: () => T) => T): void {
         this.runInScope = run;
+    }
+
+    /** What this instance is carrying — see `RealtimeProvider.counts`. */
+    counts(): RealtimeCounts {
+        return {
+            sockets: this.clients.size,
+            channels: this.channels.size,
+            busFramesPublished: Object.fromEntries(this.busFramesPublished),
+            busFramesSkipped: this.busFramesSkipped
+        };
     }
 
     /** The LISTEN connections this service depends on — see `RealtimeProvider.health`. */

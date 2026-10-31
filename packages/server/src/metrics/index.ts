@@ -120,6 +120,7 @@ export class MetricsRegistry {
     private gauges = new Map<string, number>();
     private counters = new Map<string, number>();
     private histograms = new Map<string, NamedHistogramState>();
+    private renderHooks: (() => void)[] = [];
     readonly startedAt = Date.now();
 
     private static labelKey(labels: Record<string, string>): string {
@@ -195,6 +196,13 @@ total: 0 };
         this.counters.set(key, (this.counters.get(key) ?? 0) + by);
     }
 
+    /** Set a counter whose running total is kept elsewhere. See {@link onRender}. */
+    setCounter(name: string, value: number, labels: Record<string, string> = {}): void {
+        const key = MetricsRegistry.namedKey(name, labels);
+        if (!this.counters.has(key) && this.counters.size >= MAX_SERIES) return;
+        this.counters.set(key, value);
+    }
+
     setGauge(name: string, value: number, labels: Record<string, string> = {}): void {
         const key = MetricsRegistry.namedKey(name, labels);
         if (!this.gauges.has(key) && this.gauges.size >= MAX_SERIES) return;
@@ -218,6 +226,14 @@ total: 0 };
         let bucket = hist.buckets.findIndex(upper => value <= upper);
         if (bucket === -1) bucket = hist.buckets.length;
         hist.counts[bucket] += 1;
+    }
+
+    /**
+     * Run `read` before each render, to set numbers another part of the process
+     * keeps. Nothing is paid between scrapes.
+     */
+    onRender(read: () => void): void {
+        this.renderHooks.push(read);
     }
 
     /** Prometheus escaping: backslash, quote and newline, in that order. */
@@ -245,6 +261,8 @@ total: 0 };
     }
 
     render(): string {
+        for (const read of this.renderHooks) read();
+
         const lines: string[] = [];
 
         lines.push("# HELP rebase_uptime_seconds Seconds since this runtime started.");

@@ -89,7 +89,22 @@ Per client, the socket accepts up to **7,200 channel frames a minute** (120/s �
 
 The refusal arrives on `channel.onError()`, not as a rejected `broadcast()` — see [When a channel frame is refused](/docs/backend/realtime#when-a-channel-frame-is-refused).
 
-If you are still pushing it after that, throttle cursor-grade events on the client (last-write-wins state does not need 60 updates a second), and consider routing a document's collaborators to the same instance — sticky routing drops cross-instance traffic to nearly nothing regardless of user count. Only past that is another transport worth it, and then the answer is a transport package, not a fork. See [Writing your own transport](#writing-your-own-transport).
+If you are still pushing it after that, throttle cursor-grade events on the client (last-write-wins state does not need 60 updates a second), and consider routing a document's collaborators to the same instance with [`affinity`](/docs/sdk/realtime#keeping-a-group-on-one-instance) — sticky routing drops cross-instance traffic to nearly nothing regardless of user count. Only past that is another transport worth it, and then the answer is a transport package, not a fork. See [Writing your own transport](#writing-your-own-transport).
+
+### Seeing what the bus does
+
+With `REBASE_METRICS=true`, each instance reports what it is carrying at `/metrics`:
+
+| Metric | Type | Meaning |
+|--------|------|---------|
+| `rebase_realtime_sockets` | gauge | Open sockets on this instance |
+| `rebase_realtime_channels` | gauge | Channels with a member on this instance |
+| `rebase_realtime_bus_frames_published_total` | counter | Frames this instance sent to the bus, by `kind`: `broadcast`, `broadcast_ref`, `presence_diff`, and `channels`, the instances telling each other what they serve |
+| `rebase_realtime_bus_frames_skipped_total` | counter | Broadcasts and presence changes not sent because no other instance had members in the channel |
+
+Counters start from zero when an instance does, and count frames, of which the bus may join several into one notification. Retained messages always travel, so they are never skipped. On the default `memory` bus both stay at zero.
+
+Scrape each instance rather than a load balancer in front of them: the numbers are per process. A group that stays on one instance shows up as `skipped` climbing while `broadcast` and `presence_diff` stay flat, and sockets spread across the instances. Broadcasts that climb on every instance mean the channels span them. On Rebase Cloud, `rebase cloud metrics` shows the same counts per instance.
 
 ### Coalescing
 

@@ -18,6 +18,29 @@ description: Every released change to Rebase — new features, fixes, and the br
   `getObjectStream` and `putObjectStream` are also on the `StorageSource` type, so
   server code reaches them through `rebase.storage`.
 
+- **Realtime counts per instance.** With `REBASE_METRICS=true`, `/metrics` reports
+  `rebase_realtime_sockets`, `rebase_realtime_channels`,
+  `rebase_realtime_bus_frames_published_total` (by frame `kind`) and
+  `rebase_realtime_bus_frames_skipped_total`, the frames not sent because no other
+  instance had members. Counts only, behind `REBASE_METRICS_TOKEN` like the rest of
+  the route. `RealtimeProvider` gains an optional `counts()`. See
+  [Seeing what the bus does](/docs/backend/realtime-transports/#seeing-what-the-bus-does).
+
+#### Client SDK
+
+- **`realtime: { affinity }` names the group a socket belongs to.**
+  `createRebaseClient({ realtime: { affinity: roomCode } })`, or
+  `client.realtime.setAffinity(roomCode)` before the socket opens, adds
+  `?affinity=` to the socket's address, so a platform that routes on it sends the
+  group to one instance. It does nothing elsewhere. See
+  [Keeping a group on one instance](/docs/sdk/realtime#keeping-a-group-on-one-instance).
+
+#### CLI
+
+- **`rebase cloud metrics` shows realtime per instance**: each instance's sockets,
+  channels, and the frames it sent to the channel bus or held back, in `--json`
+  as `realtime`. A control plane that does not report them leaves the table out.
+
 #### Plugins
 
 - **`@rebasepro/plugin-review`: agents propose, people approve.** A new plugin,

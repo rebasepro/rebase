@@ -56,7 +56,7 @@ const client = createRebaseClient({
 | `apiPath` | `string` | API prefix (default: `"/api"`) |
 | `fetch` | `typeof fetch` | Custom fetch implementation (e.g. for SSR) |
 | `onUnauthorized` | `() => Promise<boolean>` | Custom 401 handler — return `true` to retry |
-| `realtime` | `boolean` | Open the WebSocket (default `true`) — set `false` in one-shot scripts |
+| `realtime` | `boolean \| RealtimeClientOptions` | Open the WebSocket (default `true`) — set `false` in one-shot scripts. `{ affinity }` [names the group the socket belongs to](/docs/sdk/realtime#keeping-a-group-on-one-instance) |
 | `collections` | `Record<string, string>` | Maps accessor names to collection slugs |
 | `offline` | `boolean \| OfflineConfig` | [Local-first sync](/docs/sdk/offline) — off by default |
 | `impersonate` | `string` | Run every request as this user, by uid, to check what one user can see. Only an administrator's session may: the data API, functions and realtime run as that user, and every other route refuses |
