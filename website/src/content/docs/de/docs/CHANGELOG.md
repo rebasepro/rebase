@@ -139,6 +139,10 @@ Die Übersetzung steht noch aus. Der Inhalt unten ist auf Englisch.
   On a project whose `rebase.json` declares no runtime, `rebase cloud deploy
   --bundle-dir` fell through to a container build and never read the
   directory.
+- **A cloud deploy says when it could not bundle the dependencies, and why.**
+  Only a build printed this, so a deploy that fell back to installing at boot
+  went live healthy, with every new instance a minute slower and nothing saying
+  so.
 
 #### Client SDK
 

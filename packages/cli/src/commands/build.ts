@@ -36,6 +36,8 @@ import {
     buildStaticBundle,
     detectFrameworkDepDrift,
     DEFAULT_BUNDLE_DIR,
+    UNVENDORED_COST,
+    unvendoredReason,
     VENDOR_SIZE_WARN_BYTES
 } from "../bundle";
 import { assertBuiltForPath, foldFrontendIntoBundle, staticBuildEnv } from "../fold-static";
@@ -305,6 +307,7 @@ export async function buildCommand(rawArgs: string[] = []): Promise<void> {
                node failure, an OOM, a runtime rollout. That is not a build
                detail, it is what each of those events costs in downtime, and it
                is invisible until an incident unless it is said here. */
+            const unvendored = unvendoredReason(result);
             if (result.vendor.vendored) {
                 console.log(chalk.dim(`    dependencies installed into the bundle (${result.vendor.target?.os}/${result.vendor.target?.cpu})`));
                 if ((result.vendor.bytes ?? 0) > VENDOR_SIZE_WARN_BYTES) {
@@ -319,14 +322,11 @@ export async function buildCommand(rawArgs: string[] = []): Promise<void> {
                         "limit on the compressed upload"));
                     console.log(chalk.dim("      Shrink the declared dependencies, or rebuild with --no-vendor."));
                 }
-            } else if (Object.keys(result.manifest.deps.declared).length === 0) {
-                // Nothing to install is not a degraded state — this bundle
-                // already starts as fast as a vendored one. Warning here would
-                // train people to ignore the warning that matters.
-                console.log(chalk.dim("    no dependencies to install — nothing to bundle"));
+            } else if (unvendored) {
+                console.log(chalk.yellow(`    ⚠ dependencies not bundled: ${unvendored}`));
+                console.log(chalk.dim(`      ${UNVENDORED_COST}`));
             } else {
-                console.log(chalk.yellow(`    ⚠ dependencies not bundled: ${result.vendor.skipped}`));
-                console.log(chalk.dim("      They install on every pod start instead, which is ~40-60s of cold start."));
+                console.log(chalk.dim("    no dependencies to install — nothing to bundle"));
             }
 
             if (result.manifest.hooks.native) {

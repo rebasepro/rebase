@@ -51,7 +51,7 @@ vi.mock("./bundle-deploy", async (importOriginal) => {
 import * as context from "./context";
 import { deployCommand } from "./deploy";
 import { uploadBundle } from "./bundle-deploy";
-import { buildBundle } from "../../bundle";
+import { buildBundle, UNVENDORED_COST, type BuildBundleResult } from "../../bundle";
 import { deriveResourceGraph } from "../../resources/derive";
 import { recordEvent } from "../../telemetry";
 
@@ -446,6 +446,75 @@ describe("a deploy that builds its own bundle", () => {
         expect(said.join("\n")).toMatch(/no single version satisfies[\s\S]*dotenv/);
         expect(requests).toEqual([]);
         expect(invoke).not.toHaveBeenCalled();
+    });
+
+    /**
+     * A bundle that was not vendored deploys as cleanly as one that was, and
+     * only `rebase build` said so: a deploy went live, healthy, with every later
+     * pod start a minute slower and nothing anywhere saying why.
+     */
+    describe("says when its dependencies were not bundled", () => {
+        function built(deps: Record<string, unknown>, vendor: BuildBundleResult["vendor"]): void {
+            bundle("backend", deps);
+            vi.mocked(buildBundle).mockImplementationOnce(async () => ({
+                outDir: bundleDir,
+                manifest: JSON.parse(fs.readFileSync(path.join(bundleDir, "manifest.json"), "utf8")),
+                collectionCount: 0,
+                vendor
+            }));
+            controlPlane();
+        }
+
+        const buildingDeploy = () => deployCommand(["node", "rebase", "cloud", "deploy", "--no-static", "--no-source", "--no-follow"], "shop");
+
+        it("naming the reason and the cost, and still deploys", async () => {
+            built({ declared: { pg: "^8.22.0" } }, { vendored: false, skipped: "npm install failed: ECONNRESET" });
+
+            await buildingDeploy();
+
+            expect(said.join("\n")).toContain("Dependencies not bundled: npm install failed: ECONNRESET");
+            expect(said.join("\n")).toContain(UNVENDORED_COST);
+            expect(triggered().bundleId).toBe("b1");
+        });
+
+        it("before the upload it applies to, not after", async () => {
+            built({ declared: { pg: "^8.22.0" } }, { vendored: false, skipped: "npm install failed: ECONNRESET" });
+
+            await buildingDeploy();
+
+            const warned = said.findIndex((line) => line.includes("Dependencies not bundled"));
+            const uploading = said.findIndex((line) => line.includes("Uploading bundle"));
+            expect(warned).toBeGreaterThanOrEqual(0);
+            expect(warned).toBeLessThan(uploading);
+        });
+
+        it("and not when there was nothing to install", async () => {
+            built({ declared: {} }, { vendored: false, skipped: "the bundle declares no dependencies" });
+
+            await buildingDeploy();
+
+            expect(said.join("\n")).not.toContain("not bundled");
+        });
+
+        it("and not when they were", async () => {
+            built({ declared: { pg: "^8.22.0" }, vendored: true }, { vendored: true, target: { os: "linux", cpu: "x64", node: "22" } });
+
+            await buildingDeploy();
+
+            expect(said.join("\n")).not.toContain("not bundled");
+        });
+
+        it("on stderr in JSON mode, so stdout stays the result", async () => {
+            built({ declared: { pg: "^8.22.0" } }, { vendored: false, skipped: "npm install failed: ECONNRESET" });
+            const stderr = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+            context.setJsonModeForTest(true);
+
+            await buildingDeploy();
+
+            const written = stderr.mock.calls.map(([chunk]) => String(chunk)).join("");
+            expect(written).toContain("warning: Dependencies not bundled: npm install failed: ECONNRESET");
+            expect(said.join("\n")).not.toContain("not bundled");
+        });
     });
 });
 

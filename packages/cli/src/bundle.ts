@@ -1641,6 +1641,23 @@ export interface VendorResult {
     bytes?: number;
 }
 
+/** What a bundle that installs at boot costs, for whoever says why it does. */
+export const UNVENDORED_COST = "They install on every pod start instead, which is ~40-60s of cold start.";
+
+/**
+ * Why a built bundle's dependencies will install at boot, if they will.
+ *
+ * Both commands that build a bundle read this, because a deploy that skipped
+ * vendoring looks exactly like one that did not: it goes live, it is healthy, and
+ * only every later pod start is a minute slower. A bundle with nothing to install
+ * answers `undefined`: it already starts as fast as a vendored one, and warning
+ * about it would train people to ignore the warning that matters.
+ */
+export function unvendoredReason(result: Pick<BuildBundleResult, "manifest" | "vendor">): string | undefined {
+    if (Object.keys(result.manifest.deps.declared).length === 0) return undefined;
+    return result.vendor.skipped;
+}
+
 /**
  * Where a vendored bundle starts being too big to upload.
  *

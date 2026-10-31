@@ -95,7 +95,7 @@ import {
     type RuntimeLogsPage,
     type RuntimeLogsQuery
 } from "./runtime-logs";
-import { buildBundle } from "../../bundle";
+import { buildBundle, UNVENDORED_COST, unvendoredReason } from "../../bundle";
 import { buildAssetApp } from "../build";
 import { foldableApps, foldFrontendIntoBundle } from "../../fold-static";
 import { checkStaticSyntax, formatSyntaxErrors, type StaticSyntaxError } from "../../static-syntax-check";
@@ -437,6 +437,11 @@ app: target.app as RebaseBackendAppConfig };
             }
             if (opts.verify) verifyStaticOutput(projectRoot, foldableApps(loaded.manifest).apps);
         }
+
+        // After the frontend's build, whose output would scroll it away. This
+        // bundle deploys as cleanly as a vendored one, so nothing later says it.
+        const unvendored = unvendoredReason(result);
+        if (unvendored) warn(`Dependencies not bundled: ${unvendored}`, UNVENDORED_COST);
     }
 
     await uploadAndTrigger({ ...opts,
