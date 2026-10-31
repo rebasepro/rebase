@@ -24,6 +24,22 @@ export function describeLoadFailure(file: string, err: unknown): string {
     return `${file} (threw: ${message})`;
 }
 
+/**
+ * The boot stopped because a file did not load, under `requireFilesLoaded`.
+ *
+ * One line, with the files first, because a deployer reads this out of a pod's
+ * log and quotes it as the reason a deploy failed.
+ */
+export class FilesFailedToLoadError extends Error {
+    constructor(failures: string[]) {
+        super(
+            `Failed to load ${failures.join("; ")}. ` +
+            "requireFilesLoaded (REBASE_REQUIRE_FILES_LOADED) stops the boot rather than serve without them."
+        );
+        this.name = "FilesFailedToLoadError";
+    }
+}
+
 /** The advice for {@link describeLoadFailure}'s syntax-error entries. */
 export const SYNTAX_ERROR_ADVICE =
     "  A file with a syntax error never ran: fix the syntax at the line shown " +

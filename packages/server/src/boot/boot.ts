@@ -44,6 +44,7 @@ import { resolveProvisionOnly } from "./provision-only";
 // `check:chart` can ask it about a rendered unit without loading the boot.
 export { resolveProvisionOnly };
 import { FunctionSelectionError } from "../functions/selection";
+import { FilesFailedToLoadError } from "../utils/load-failure";
 import { CollectionConfigError } from "../collections/validate-config";
 import {
     BundleError,
@@ -431,6 +432,7 @@ export async function bootFromBundle(options: BootOptions = {}): Promise<BootedR
         collectionsDir: bundle.collectionsDir,
         functionsDir: bundle.functionsDir,
         cronsDir: bundle.cronsDir,
+        requireFilesLoaded: env.REBASE_REQUIRE_FILES_LOADED,
         surfaces: runtimeRole.surfaces,
         ownership: runtimeRole.ownership,
         functionsSelection: runtimeRole.functionsSelection,
@@ -956,7 +958,7 @@ export type BootFailureLog = Pick<Logger, "error" | "debug">;
 /**
  * A configuration problem the project can fix, as opposed to a bug.
  *
- * These four have a message that IS the answer — it names the file, the key and
+ * These have a message that IS the answer — it names the file, the key and
  * the fix — so the fatal path prints it and nothing else. The reader is looking
  * at a process that will not start; a stack through the framework's own frames
  * is noise when the answer is "two of your collections claim the same slug".
@@ -965,7 +967,8 @@ function isConfigurationFailure(err: unknown): err is Error & { hint?: string } 
     return err instanceof BundleError
         || err instanceof RoleConfigurationError
         || err instanceof FunctionSelectionError
-        || err instanceof CollectionConfigError;
+        || err instanceof CollectionConfigError
+        || err instanceof FilesFailedToLoadError;
 }
 
 /**

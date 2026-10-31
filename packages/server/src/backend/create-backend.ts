@@ -85,6 +85,7 @@ import { recordMountPath } from "../api/mount-path";
 import type { HonoEnv } from "../api/types";
 import { logger, setLogLevel } from "../utils/logger";
 import { createBootAnnouncements, type BootAnnouncements } from "./boot-announcements";
+import { FilesFailedToLoadError } from "../utils/load-failure";
 import { formatByteSize } from "../utils/byte-size";
 import { tsMorphInstallSentence } from "../utils/dev-dependency-command";
 import { configureMiddlewares } from "../init/middlewares";
@@ -2899,6 +2900,8 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
     // The functions group: this process's own functions, or the forwarder to
     // the process that serves them.
     let functionsSurface: Hono<HonoEnv> | undefined;
+    /** Function and cron files that failed to import, for `requireFilesLoaded`. */
+    const loadFailures: string[] = [];
     // Gated on the surface before the loader runs, not after: importing a
     // project's function modules has side effects the author chose (a client
     // constructed at module scope, a connection opened), and a process that will
@@ -2910,9 +2913,10 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
 
         // Values, or a directory read into exactly those values. Only the
         // directory can have files that failed to load.
-        const { functions: functionRecord, problems } = config.functions
-            ? { functions: config.functions, problems: [] }
+        const { functions: functionRecord, problems, failed } = config.functions
+            ? { functions: config.functions, problems: [], failed: [] }
             : await readFunctionsDirectory(config.functionsDir!);
+        loadFailures.push(...failed);
         const allFunctions = functionList(functionRecord);
 
         // A subset, when this process was told to serve one. Applied after the
@@ -3079,11 +3083,12 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
         const { createCronRoutes } = await import("../cron/cron-routes");
         const { createCronStore } = await import("../cron/cron-store");
 
-        const { crons: cronRecord, problems: cronProblems } = config.crons
-            ? { crons: config.crons, problems: [] }
+        const { crons: cronRecord, problems: cronProblems, failed: cronFailures } = config.crons
+            ? { crons: config.crons, problems: [], failed: [] }
             : config.cronsDir
                 ? await readCronsDirectory(config.cronsDir)
-                : { crons: {}, problems: [] };
+                : { crons: {}, problems: [], failed: [] };
+        loadFailures.push(...cronFailures);
         // Each run in this backend's scope, so a handler that imports `rebase`
         // gets this backend's client — the one `ctx.rebase` is.
         const loadedCronJobs = cronJobsFrom(cronRecord).map(job => ({
@@ -3157,6 +3162,11 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
             // project, and it is the common one on a fresh scaffold.
             logger.debug("Cron routes are served. This project has no cron jobs, so the list is empty.");
         }
+    }
+
+    // After both loaders, so one failed function does not hide a failed cron.
+    if (config.requireFilesLoaded && loadFailures.length > 0) {
+        throw new FilesFailedToLoadError(loadFailures);
     }
 
     // 6a. The durable job queue.
