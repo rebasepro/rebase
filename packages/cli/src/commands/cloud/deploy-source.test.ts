@@ -460,7 +460,8 @@ describe("a deploy that builds its own bundle", () => {
                 outDir: bundleDir,
                 manifest: JSON.parse(fs.readFileSync(path.join(bundleDir, "manifest.json"), "utf8")),
                 collectionCount: 0,
-                vendor
+                vendor,
+                release: () => {}
             }));
             controlPlane();
         }
@@ -543,7 +544,8 @@ describe("the build flags a deploy's remedies name", () => {
             outDir: bundleDir,
             manifest: JSON.parse(fs.readFileSync(path.join(bundleDir, "manifest.json"), "utf8")),
             collectionCount: 0,
-            vendor: { vendored: false, skipped: "the bundle declares no dependencies" }
+            vendor: { vendored: false, skipped: "the bundle declares no dependencies" },
+            release: () => {}
         }));
         controlPlane();
 
@@ -1197,7 +1199,8 @@ describe("the syntax check before a static deploy", () => {
             outDir: bundleDir,
             manifest: JSON.parse(fs.readFileSync(path.join(bundleDir, "manifest.json"), "utf8")),
             collectionCount: 0,
-            vendor: { vendored: false, skipped: "the bundle declares no dependencies" }
+            vendor: { vendored: false, skipped: "the bundle declares no dependencies" },
+            release: () => {}
         }));
         controlPlane();
 
