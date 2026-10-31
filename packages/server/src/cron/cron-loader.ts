@@ -182,18 +182,22 @@ async function legacyLoad(directory: string, importModule: ModuleImporter): Prom
  * Never throws, for the same reason the function loader does not: one
  * malformed file must not take the server down, and the other jobs in the
  * directory are still worth scheduling.
+ *
+ * `failed` is the part of `problems` that threw or did not parse: the rest are
+ * files with no job in them, as `readFunctionsDirectory` has it.
  */
 export async function readCronsDirectory(
     directory: string,
     importModule: ModuleImporter = nativeDynamicImport
-): Promise<{ crons: CronsRecord; problems: string[] }> {
+): Promise<{ crons: CronsRecord; problems: string[]; failed: string[] }> {
     const crons: CronsRecord = {};
     // Aggregated so a broken job surfaces as one loud summary rather than a
     // warning buried per-file among the boot noise.
     const problems: string[] = [];
+    const failed: string[] = [];
 
     if (!fs.existsSync(directory)) {
-        return { crons, problems };
+        return { crons, problems, failed };
     }
 
     const files = fs.readdirSync(directory);
@@ -239,7 +243,9 @@ export async function readCronsDirectory(
             } catch (err: unknown) {
                 const message =
                     err instanceof Error ? err.message : String(err);
-                problems.push(describeLoadFailure(file, err));
+                const failure = describeLoadFailure(file, err);
+                problems.push(failure);
+                failed.push(failure);
                 // At `debug`: the aggregate warning below lists every problem
                 // by file, so this line was the same text a second time — and
                 // when the throw is a Zod error, that text is ten lines of
@@ -265,7 +271,7 @@ export async function readCronsDirectory(
         );
     }
 
-    return { crons, problems };
+    return { crons, problems, failed };
 }
 
 /**

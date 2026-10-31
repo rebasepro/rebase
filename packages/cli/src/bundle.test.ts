@@ -109,6 +109,57 @@ describe("normalizeEsmSpecifiers", () => {
         expect(result.unresolved[0]).toContain("./nope");
     });
 
+    /**
+     * tsx imports JSON however it is written; Node refuses one that does not
+     * say it is JSON. So a function that ran under `rebase dev` was skipped at
+     * boot on the runtime, with the file sitting right there in the bundle.
+     */
+    it("says a relative JSON import is JSON, which Node requires and tsx does not", () => {
+        write("lines.json", "{}");
+        const file = write("a.js", 'import lines from "./lines.json";\nimport "./lines.json";\n');
+
+        const result = normalizeEsmSpecifiers(scratch);
+
+        expect(fs.readFileSync(file, "utf8")).toBe(
+            'import lines from "./lines.json" with { type: "json" };\nimport "./lines.json" with { type: "json" };\n'
+        );
+        expect(result.rewritten).toBe(2);
+        expect(result.unresolved).toEqual([]);
+    });
+
+    it("says a dynamic JSON import is JSON too", () => {
+        write("lines.json", "{}");
+        const file = write("a.js", 'const lines = await import("./lines.json");\n');
+
+        normalizeEsmSpecifiers(scratch);
+
+        expect(fs.readFileSync(file, "utf8")).toBe('const lines = await import("./lines.json", { with: { type: "json" } });\n');
+    });
+
+    it("leaves a JSON import alone that already says so", () => {
+        write("lines.json", "{}");
+        const source = 'import a from "./lines.json" with { type: "json" };\nconst b = await import("./lines.json", { with: { type: "json" } });\n';
+        const file = write("a.js", source);
+
+        const result = normalizeEsmSpecifiers(scratch);
+
+        expect(fs.readFileSync(file, "utf8")).toBe(source);
+        expect(result.rewritten).toBe(0);
+    });
+
+    /**
+     * An extension on a specifier says nothing about the file being there, and
+     * these imports were waved through as "already resolvable": a bundle missing
+     * a file one of its modules imports built without a word.
+     */
+    it("reports an import with an extension whose file is not in the output", () => {
+        write("a.js", 'import lines from "./lines.json" with { type: "json" };\nimport dep from "./dep.js";\n');
+
+        const result = normalizeEsmSpecifiers(scratch);
+
+        expect(result.unresolved).toEqual(["a.js → ./lines.json", "a.js → ./dep.js"]);
+    });
+
     it("rewrites an explicit .ts specifier to the emitted .js", () => {
         write("dep.js", "export default {};");
         const file = write("a.js", 'import dep from "./dep.ts";\n');

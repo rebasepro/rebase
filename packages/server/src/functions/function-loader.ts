@@ -143,19 +143,24 @@ export async function loadFunctionsWithDiagnostics(
  * Never throws: a single malformed function must not crash server boot. The
  * backend mounts the router regardless and surfaces the count of skipped files
  * on the listing endpoint.
+ *
+ * `failed` is the part of `problems` that threw or did not parse. The rest are
+ * files the loader has no use for, and a helper beside the functions is one of
+ * those: it exports no app, and nothing is wrong with the project.
  */
 export async function readFunctionsDirectory(
     directory: string,
     importModule: ModuleImporter = nativeDynamicImport
-): Promise<{ functions: FunctionsRecord; problems: string[] }> {
+): Promise<{ functions: FunctionsRecord; problems: string[]; failed: string[] }> {
     const functions: FunctionsRecord = {};
     // Aggregate problem files so a broken function surfaces as one loud
     // summary line, not just a warning buried per-file. We still don't throw:
     // a single malformed function must not crash server boot.
     const problems: string[] = [];
+    const failed: string[] = [];
 
     if (!fs.existsSync(directory)) {
-        return { functions, problems };
+        return { functions, problems, failed };
     }
 
     // `withFileTypes` so a directory entry is a *reported* skip rather than a
@@ -255,7 +260,9 @@ export async function readFunctionsDirectory(
                 const message =
                     err instanceof Error ? err.message : String(err);
                 logger.error(`[functions] Failed to load ${file}: ${message}`);
-                problems.push(describeLoadFailure(file, err));
+                const failure = describeLoadFailure(file, err);
+                problems.push(failure);
+                failed.push(failure);
             }
         }
     }
@@ -299,6 +306,6 @@ export async function readFunctionsDirectory(
         );
     }
 
-    return { functions, problems };
+    return { functions, problems, failed };
 }
 

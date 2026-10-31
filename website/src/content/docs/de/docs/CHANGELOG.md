@@ -21,6 +21,14 @@ Die Übersetzung steht noch aus. Der Inhalt unten ist auf Englisch.
   or any other failure it leaves no object at the key. `statObject`,
   `getObjectStream` and `putObjectStream` are also on the `StorageSource` type, so
   server code reaches them through `rebase.storage`.
+- **`requireFilesLoaded` stops a boot on a file that failed to load.** A function
+  or cron file that throws or does not parse while importing is skipped, and the
+  rest of the backend comes up, which is what let a deploy pass its probes while
+  every route of that file answered 404. With `requireFilesLoaded: true`
+  (`REBASE_REQUIRE_FILES_LOADED=true` on a bundle boot) the process exits instead,
+  naming each file and why, so a rolling deploy leaves the old version serving. A
+  restart is held to it too. Off by default. A file that imports cleanly and
+  exports no function or job, such as a helper, is still skipped.
 
 - **Realtime counts per instance.** With `REBASE_METRICS=true`, `/metrics` reports
   `rebase_realtime_sockets`, `rebase_realtime_channels`,
@@ -73,9 +81,19 @@ Die Übersetzung steht noch aus. Der Inhalt unten ist auf Englisch.
   dependencies is uploaded without them and the deploy says so, because a bundle
   that installs at boot still works. A build keeps a tree of up to 2 GB on disk,
   up from 200 MB.
+- **A managed deploy or preview fails when a function or cron file does not
+  load.** Its pods now run with `REBASE_REQUIRE_FILES_LOADED`, on a runtime that
+  has it, so the old version keeps serving and the deploy ends on the file and the
+  reason, not on `✓ Live`. A project that has been serving with such a file meets
+  this on its next deploy. Fleet rollouts and rollbacks are not held to it.
 
 #### CLI
 
+- **Only one build of a project's bundle runs at a time.** `rebase build` and
+  `rebase cloud deploy` from the same project now refuse to overlap, naming the
+  process that holds the build. Two runs shared `dist-bundle/`, and the second one's
+  clean-up deleted files the first had already emitted, so the first shipped a
+  bundle with a file missing and reported success.
 - **A cloud deploy streams the bundle from disk.** It used to read the whole
   archive into memory first.
 
@@ -156,6 +174,13 @@ Die Übersetzung steht noch aus. Der Inhalt unten ist auf Englisch.
 
 #### CLI
 
+- **A JSON import works in a bundle.** `import data from "./data.json"` runs under
+  `rebase dev` and failed on Node with `ERR_IMPORT_ATTRIBUTE_MISSING`, which took
+  the whole function file with it. `rebase build` and `rebase normalize-imports`
+  now add `with { type: "json" }` to a relative JSON import that has none.
+- **An import of a file that is not in the bundle is reported.** A relative import
+  with an extension was taken as resolvable without looking, so `./data.json`
+  missing from the output built silently and failed at boot.
 - **The compute listing prints the autoscale dials.** `rebase cloud compute`
   now shows the replica ceiling and CPU target, in its table and its `--json`.
 - **A deploy given a prebuilt bundle directory ships it without `--bundle`.**

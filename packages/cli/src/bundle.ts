@@ -36,6 +36,7 @@ import { cliVersion } from "./utils/version";
 import { toolStdio } from "./utils/tool-stdio";
 import { analyseFunctionsDirectory, summarisePortability } from "./function-portability";
 import { precompressStaticAssets } from "./precompress";
+import { lockBundleBuild } from "./utils/bundle-lock";
 import {
     getActiveBackendPlugin,
     resolveLocalBin,
@@ -100,6 +101,12 @@ export interface BuildBundleResult {
      * not discover during an incident.
      */
     vendor: VendorResult;
+    /**
+     * Lets another build of this project start. Until then this run holds
+     * `outDir`, and only a caller still reading it needs to call this: the lock
+     * goes with the process. See `lockBundleBuild`.
+     */
+    release: () => void;
 }
 
 /** Packages whose presence means the bundle cannot run on a stock runtime image. */
@@ -1119,10 +1126,29 @@ export function normalizeEsmSpecifiers(
             // Prose, not code. Neither rewritten nor reported — see commentSpans.
             if (inComment(offset)) return match;
 
-            // Already resolvable: has a real extension.
-            if (/\.(js|mjs|cjs|json|node)$/.test(specifier)) return match;
-
             const target = path.resolve(dir, specifier);
+
+            // Complete already. Whether it is there is a separate question: tsc
+            // emits what the program reached, and a file that did not reach the
+            // output fails on this import at boot, on the runtime.
+            if (/\.(js|mjs|cjs|json|node)$/.test(specifier)) {
+                if (!fs.existsSync(target)) {
+                    unresolved.push(`${path.basename(file)} → ${specifier}`);
+                    return match;
+                }
+                if (!specifier.endsWith(".json")) return match;
+
+                // Node refuses a JSON module that does not say it is one
+                // (ERR_IMPORT_ATTRIBUTE_MISSING), while tsx and every bundler
+                // accept it, so this form runs under `rebase dev` and dies on
+                // the runtime. Static or dynamic, the attribute goes where the
+                // form puts it.
+                const after = original.slice(offset + match.length);
+                const dynamic = prefix.includes("(");
+                if (dynamic ? /^\s*,/.test(after) : /^\s*(with|assert)\b/.test(after)) return match;
+                rewritten++;
+                return dynamic ? `${match}, { with: { type: "json" } }` : `${match} with { type: "json" }`;
+            }
 
             if (fs.existsSync(`${target}.js`)) {
                 rewritten++;
@@ -1355,6 +1381,10 @@ export async function buildBundle(options: BuildBundleOptions): Promise<BuildBun
        build` refused. */
     const conflicts = detectDeclaredDepConflicts(projectRoot);
     if (conflicts.length > 0) throw new Error(describeDepConflicts(conflicts));
+
+    // Before the first thing this writes, and in here rather than in a command
+    // for the same reason as the refusal above.
+    const release = lockBundleBuild(projectRoot);
 
     const paths = resolveBackendPaths(app, projectRoot);
     const outDir = path.resolve(projectRoot, options.outDir ?? DEFAULT_BUNDLE_DIR);
@@ -1625,7 +1655,8 @@ stdio: toolStdio(options.quietStdout) });
     return { outDir,
 manifest,
 collectionCount: collections.length,
-vendor };
+vendor,
+release };
 }
 
 /** Default install target: what the published runtime image runs. */

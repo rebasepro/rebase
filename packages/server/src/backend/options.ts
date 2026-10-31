@@ -797,6 +797,22 @@ export interface RebaseBackendOptions {
      */
     cronsDir?: string;
     /**
+     * Stop the boot when a file in {@link functionsDir} or {@link cronsDir}
+     * failed while importing, with a message naming each file and why.
+     *
+     * Off by default: one bad file does not take the rest of the backend down.
+     * For a deployment that replaces a running version, where the process
+     * coming up without a route is worse than not coming up. The pod does not
+     * become ready, and the rollout leaves the old version serving. The cost is
+     * that a restart is held to it too: a file that fails on every start stops
+     * the whole backend, not one route.
+     *
+     * A file that imports cleanly and exports no function or job is still
+     * skipped, not refused, since a helper beside the functions is ordinary.
+     * `REBASE_REQUIRE_FILES_LOADED=true` sets this on a bundle boot.
+     */
+    requireFilesLoaded?: boolean;
+    /**
      * Enable/disable database persistence for cron job execution logs.
      * When set to false, cron jobs will run but logs will not be persisted to the database.
      * Default: true.

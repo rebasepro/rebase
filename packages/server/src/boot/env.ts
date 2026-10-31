@@ -94,6 +94,12 @@ export const bootEnvExtension = z.object({
      * serve. Turn it on when every subdomain of the domain is HTTPS-only.
      */
     REBASE_HSTS_INCLUDE_SUBDOMAINS: z.enum(["true", "false", ""]).default("false").transform(v => v === "true"),
+    /**
+     * `true`: stop the boot when a function or cron file failed while importing,
+     * rather than serve without it. Off by default: see `requireFilesLoaded` on
+     * `createRebaseBackend`.
+     */
+    REBASE_REQUIRE_FILES_LOADED: z.enum(["true", "false", ""]).default("false").transform(v => v === "true"),
     /** Expose Prometheus metrics at `/metrics`. Off unless asked for. */
     REBASE_METRICS: z.enum(["true", "false", ""]).default("false").transform(v => v === "true"),
     /**
