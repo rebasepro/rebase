@@ -489,6 +489,37 @@ export const ACTION_HELP: Record<string, ActionHelp> = {
         ]
     },
 
+    "db access": {
+        command: "cloud db access",
+        usage: "cloud db access [status|enable|disable|reveal] [--allow <ip|cidr>]... [--schemas <name>]... [--tables <schema.table>]... [--ca-out <file>] [--yes]",
+        summary:
+            "Let a tool that cannot run a tunnel — a hosted BI dashboard, a notebook, a warehouse loader — "
+            + "read the managed database from its own address. `enable` creates a read-only role, a load "
+            + "balancer that admits only the addresses you name, and requires TLS; the role reads the "
+            + "schemas and tables you choose and nothing else. `enable` takes the whole desired state, so "
+            + "running it again with other addresses replaces them. `reveal` prints the role's password "
+            + "and a connection URL. `status` is the default.",
+        flags: [
+            ["--allow <ip|cidr>", "An IPv4 address or range the database may be reached from (at most a /16). Repeatable, or comma-separated"],
+            ["--schemas <name>", "Schemas the role reads whole, tables created later included. Default: public"],
+            ["--tables <schema.table>", "Single tables the role reads as well, e.g. rebase.cron_logs. Repeatable"],
+            ["--ca-out <file>", "Write the cluster's CA certificate here, to verify the server with sslmode=verify-ca"]
+        ],
+        examples: [
+            "rebase cloud db access enable --allow 34.89.253.13",
+            "rebase cloud db access enable --allow 34.89.253.13 --tables rebase.metric_samples,rebase.cron_logs",
+            "rebase cloud db access reveal --ca-out db-ca.pem",
+            "rebase cloud db access disable --yes"
+        ],
+        notes: [
+            "Owner or admin only, as for the database password. Every change and every reveal is in `rebase cloud activity`.",
+            "The `rebase` schema holds users, password hashes and session tokens: it is never granted whole, and its credential tables never at all.",
+            "Managed databases on GCP capacity only for now. Each project with access on has its own network load balancer, which is billed.",
+            "The role holds up to 25 connections at once — enough for a dashboard that loads its widgets in parallel, one connection per query — and the app keeps the rest. A tool that opens more is refused the extra ones.",
+            "`disable` closes the address, drops the role and deletes its password. `--yes`, the global flag listed below, skips the confirmation."
+        ]
+    },
+
     "db pitr": {
         command: "cloud db pitr",
         usage: "cloud db pitr <status|restore|cutover|discard> [--target <timestamp>] [--yes]",

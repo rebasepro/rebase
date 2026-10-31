@@ -6,6 +6,7 @@
  *   db info                Where the database is, and what it is called
  *   db connect             A local port that IS the project's database
  *   db test                Test connectivity to the project's database
+ *   db access              Read-only access from named addresses outside the platform
  *   db backup list|create|restore
  */
 import arg from "arg";
@@ -34,6 +35,7 @@ import {
     requireCloudRow
 } from "./context";
 import { dbConnect } from "./db-connect";
+import { dbAccessCommand } from "./db-access";
 
 interface DatabaseRow {
     id: string | number;
@@ -87,6 +89,9 @@ export async function dbCommand(subcommand: string | undefined, rawArgs: string[
             break;
         case "connect":
             await dbConnect(rawArgs);
+            break;
+        case "access":
+            await dbAccessCommand(rawArgs);
             break;
         case "test":
             await testDatabase(rawArgs);
@@ -878,6 +883,17 @@ description: "List databases attached to the project" },
             { action: "test",
 section: "Database",
 description: "Test database connectivity" },
+            {
+                action: "access",
+                section: "Database",
+                description: "Read-only access from named addresses, for a BI or analytics tool (status|enable|disable|reveal)",
+                flags: [
+                    ["--allow <ip|cidr>", "With enable: an address the database may be reached from. Repeatable"],
+                    ["--schemas <name>", "With enable: schemas to read whole. Default: public"],
+                    ["--tables <schema.table>", "With enable: single tables to read as well. Repeatable"],
+                    ["--ca-out <file>", "Write the cluster's CA certificate, for sslmode=verify-ca"]
+                ]
+            },
 
             { action: "backup list",
 section: "Backups",
