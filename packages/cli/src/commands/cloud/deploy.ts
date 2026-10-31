@@ -300,6 +300,7 @@ async function deployBundle(opts: {
     let bundleDir = opts.bundleDir
         ? path.resolve(process.cwd(), opts.bundleDir)
         : path.join(projectRoot, "dist-bundle");
+    let releaseBuild: (() => void) | undefined;
 
     // Build the bundle unless the caller pointed at a prebuilt one.
     if (!opts.bundleDir) {
@@ -408,6 +409,7 @@ app: target.app as RebaseBackendAppConfig };
             fail(err instanceof Error ? err.message : String(err), undefined, "build_failed");
         }
         bundleDir = result.outDir;
+        releaseBuild = result.release;
 
         /* Fold the frontend in, exactly as `rebase build` does. This path builds
            its own bundle, so without the same step a deploy shipped a bundle with
@@ -446,7 +448,8 @@ app: target.app as RebaseBackendAppConfig };
 
     await uploadAndTrigger({ ...opts,
 projectRoot,
-bundleDir });
+bundleDir,
+onPacked: releaseBuild });
 }
 
 /** Printed under a successful deploy: the way back, where it is needed. */
@@ -527,6 +530,8 @@ async function uploadAndTrigger(opts: {
     startedAt: number;
     /** `--preview`: serve this build on a preview address instead of production. */
     preview?: PreviewRequest;
+    /** Called once the archive is written, and the build's directory is free to be rebuilt. */
+    onPacked?: () => void;
 }): Promise<void> {
     const { client, url, projectId, projectRef, projectRoot, bundleDir } = opts;
     let manifest: ReturnType<typeof readBundleManifest>;
@@ -563,6 +568,7 @@ async function uploadAndTrigger(opts: {
     try {
         bundleId = await withTempArchive("rebase-bundle", async (tarPath) => {
             const packed = await packBundleForUpload(bundleDir, tarPath, manifest);
+            opts.onPacked?.();
             if (packed.modulesLeftOut) {
                 warn(
                     "This bundle's dependencies would take it past the upload limit, so they were left out: " +
