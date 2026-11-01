@@ -204,7 +204,6 @@ export default defineConfig({
                         { label: "Typed server-side data", slug: "docs/backend/typed-server-data" },
                         { label: "Global Hooks", slug: "docs/backend/hooks" },
                         { label: "Entity History", slug: "docs/backend/history" },
-                        { label: "Review Queue", slug: "docs/backend/review-queue" },
                         { label: "Database Branching", slug: "docs/backend/branching" },
                         { label: "Custom Server Integration", slug: "docs/backend/custom-server" },
                         { label: "Embedding the Postgres Driver", slug: "docs/backend/embedding-postgres-driver" },

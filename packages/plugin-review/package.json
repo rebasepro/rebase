@@ -1,6 +1,7 @@
 {
   "name": "@rebasepro/plugin-review",
   "version": "0.26.0",
+  "private": true,
   "description": "Review queue for Rebase: agents propose inserts, updates and deletes; people approve them in the admin panel.",
   "keywords": [
     "rebase",
