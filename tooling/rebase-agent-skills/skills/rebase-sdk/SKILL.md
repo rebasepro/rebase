@@ -813,9 +813,11 @@ const { items, nextPageToken } = await rebase.storage.listObjects('prefix/', {
 On the frontend, register direct storage sources via the `storageSources` prop on `<Rebase>`:
 
 ```tsx
-import { getStorage } from "firebase/storage";
+import { useFirebaseStorageSource } from "@rebasepro/firebase";
 
-const firebaseStorageSource = getStorage(firebaseApp);
+// Inside a component. `source` must implement `StorageSource`; a bare
+// `getStorage()` handle has none of its methods, and the first upload throws.
+const firebaseStorageSource = useFirebaseStorageSource({ firebaseApp });
 
 <Rebase
     client={rebaseClient}
