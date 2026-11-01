@@ -212,12 +212,17 @@ the run made, as a SQL script:
 docker run --rm \
   -e DATABASE_URL="postgres://admin:…@scratch-db:5432/app" \
   -e JWT_SECRET="…" \
+  -e CORS_ORIGINS="https://app.example.com" \
   -e REBASE_PROVISION_ONLY=true \
   -e REBASE_PROVISION_SQL_OUT=/out/rebase.sql \
   -v "$PWD/out:/out" \
   -v "$PWD/dist-bundle:/bundle" \
   "rebasepro/server:$REBASE_VERSION"
 ```
+
+The image runs with `NODE_ENV=production`, so this run is held to the same
+environment checks as the server, `CORS_ORIGINS` or `FRONTEND_URL` included, even
+though it serves nothing.
 
 The script is a record, not a plan: every statement in it ran, in order, and
 succeeded. Recorded against an empty database, it is the whole schema the release
