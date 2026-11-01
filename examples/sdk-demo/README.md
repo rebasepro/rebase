@@ -52,7 +52,7 @@ Open [http://localhost:5173](http://localhost:5173) in your browser.
 
 ## Default Credentials
 
-The demo pre-fills `admin@demo.com` / `admin123`. These must exist in your backend's auth database.
+The demo pre-fills `admin@demo.com` / `Demo-admin-123`. No seed creates that account: switch to Register and create it the first time.
 
 ## How It Works
 
