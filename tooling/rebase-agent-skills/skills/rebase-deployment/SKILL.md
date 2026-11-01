@@ -799,7 +799,8 @@ passes and every request 404s. Do not guess it.
 
 **Realtime broadcast and presence do not cross processes** on the default
 in-memory bus. With more than one API replica, set
-`realtime: { bus: { type: "postgres" } }` in the project config. Ordinary
+`REALTIME_CHANNEL_BUS=postgres` (or `realtime.bus` on `createPostgresAdapter`
+in an ejected server). Ordinary
 collection subscriptions are unaffected — those travel through Postgres CDC.
 
 ---
