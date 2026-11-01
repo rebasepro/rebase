@@ -39,7 +39,7 @@ REBASE_ROLE=all        # the default: everything, one process
 | Runs the cron scheduler | ✅ | ✅ | — | ✅ |
 | Runs job-queue workers | ✅ | ✅ | — | ✅ |
 
-Health and metrics are on every role without exception. A process an
+Health and metrics are on every role without exception; `/metrics` answers only with `REBASE_METRICS=true`. A process an
 orchestrator cannot probe is a process it cannot roll.
 
 `GET /api/auth/config`,

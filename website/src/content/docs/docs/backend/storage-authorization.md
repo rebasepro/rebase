@@ -57,6 +57,7 @@ per-object equivalent in the bucket, so this hook *is* the model — and
 storage is configured and none of these is set:
 
 - `storageAuthorize` — a hook, per object. Recommended.
+- `storagePolicies` — the declared rules above.
 - `storagePublicRead: true` — the bucket genuinely is a public read-only CDN.
 - `storageInsecureAllowAnyAuthenticated: true` — a single-tenant app where every
   signed-in user is trusted with every file. Named to be read twice.

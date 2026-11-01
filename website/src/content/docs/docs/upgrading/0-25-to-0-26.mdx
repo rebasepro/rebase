@@ -53,7 +53,7 @@ name before upgrading, and rename it:
 SELECT id, roles FROM rebase.users
 WHERE EXISTS (
   SELECT 1 FROM unnest(roles) r
-  WHERE r = '' OR r ~ '[,{}"\\]' OR r ~ '[[:cntrl:]]'
+  WHERE btrim(r) = '' OR r ~ '[,{}"\\]' OR r ~ '[[:cntrl:]]'
 );
 ```
 
@@ -98,7 +98,8 @@ refusal reasons `local-account-unverified` and
 
 A provider that does not assert `email_verified` still gets
 `403 EMAIL_NOT_VERIFIED` (`provider-email-unverified`). A custom user store
-without `unlinkUserIdentity` answers `409 UNVERIFIED_IDENTITIES` and changes
+without `unlinkUserIdentity`, on an account holding an identity whose provider
+did not vouch for the address, answers `409 UNVERIFIED_IDENTITIES` and changes
 nothing.
 
 **What to change:** remove any client branch that told the user to verify their

@@ -515,8 +515,9 @@ sources store in the same bucket or directory. Once the move is done, the CLI
 lists the source again with a fresh walk and names every file the move did not
 move: with `--delete-source`, any file still in the source; without it, any file
 the target holds no copy of the same size of. It exits 1 when there is one, and
-running the same move again picks it up. `--json` prints them as `notMoved`. Both need `database:read`, and
-deleting or moving `database:write`, which the service key holds.
+running the same move again picks it up. `--json` prints them as `notMoved`. Reading a scan's
+report needs `database:read`. Starting a scan, deleting and moving need
+`database:write`, which the service key holds.
 
 ### `rebase skills install`
 
