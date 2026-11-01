@@ -108,7 +108,7 @@ CRUD over a collection through `@rebasepro/client`.
 
 | Tool | Required | Description |
 |---|---|---|
-| `invoke_function` ⚠ | `name` | Invoke a custom backend Hono function (located in api/functions/:name) |
+| `invoke_function` ⚠ | `name` | Invoke a custom backend Hono function (in backend/functions/<name>.ts, served at /api/functions/<name>) |
 
 ### Project registry (6)
 
