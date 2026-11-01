@@ -1551,11 +1551,12 @@ export function createStorageRoutes(config: StorageRoutesConfig): Hono<HonoEnv> 
         // first place. `storageId` used to be read from `c.req.query()` while
         // `finalize` used the `Upload-Metadata` header, so a request could name
         // the permissive source in the URL and the private one in the header.
-        authorize
-            ? async (c, key, bucket, storageId) => {
-                await checkAuthorized(c as never, "write", key, bucket, storageId);
-            }
-            : undefined,
+        //
+        // Unconditional: with no hook or policies this still asks the scope
+        // question, which only here can be asked of the source being written.
+        async (c, key, bucket, storageId) => {
+            await checkAuthorized(c as never, "write", key, bucket, storageId);
+        },
         fireTrigger
             ? async (event) => {
                 await fireTrigger({

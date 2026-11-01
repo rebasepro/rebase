@@ -147,6 +147,13 @@
   a working pod out of service. The Postgres driver now probes on a connection
   of its own (`SQLAdmin.probe`), within 2.5 s, and a healthy auth-schema answer
   is reused for a minute.
+- **A resumable upload needs `storage:write`, with or without a storage hook.**
+  `POST /api/storage/tus` asked for the scope only when `storageAuthorize` or
+  `storagePolicies` was set. Without either (`storageInsecureAllowAnyAuthenticated`
+  in production, any project without a hook in development), an API key holding
+  no storage scope, or one for another source, could create an upload; a key with
+  `storage:write` on any source could finish it. It now answers
+  `403 SCOPE_MISSING`, as `POST /upload` does.
 
 #### Runtime
 

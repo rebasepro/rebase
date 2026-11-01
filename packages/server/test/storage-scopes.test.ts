@@ -74,4 +74,37 @@ describe("storage scopes", () => {
         expect((await get(mount(["storage:read", "storage:write"]), "/file/docs/a.txt", "DELETE")).status).toBe(403);
         expect((await get(mount(["storage:delete"]), "/file/docs/a.txt", "DELETE")).status).toBe(200);
     });
+
+    describe("creating a resumable upload, with no hook or policy configured", () => {
+        const createUpload = (app: Hono<HonoEnv>) => app.fetch(new Request(
+            "http://localhost/api/storage/tus",
+            {
+                method: "POST",
+                headers: {
+                    "Tus-Resumable": "1.0.0",
+                    "Upload-Length": "5",
+                    "Upload-Metadata": `key ${Buffer.from("docs/new.txt").toString("base64")}`
+                }
+            }
+        ));
+
+        it("needs storage:write, as POST /upload does", async () => {
+            const res = await createUpload(mount(["data:read"]));
+            expect(res.status).toBe(403);
+            const body = await res.json() as { error: { code: string } };
+            expect(body.error.code).toBe("SCOPE_MISSING");
+        });
+
+        it("needs it on the source being written, not on any source", async () => {
+            const res = await createUpload(mount(["storage:write:avatars"]));
+            expect(res.status).toBe(403);
+            const body = await res.json() as { error: { details: { requiredScope: string } } };
+            expect(body.error.details.requiredScope).toBe("storage:write:(default)");
+        });
+
+        it("still lets a key holding it, and a person, start one", async () => {
+            expect((await createUpload(mount(["storage:write:(default)"]))).status).toBe(201);
+            expect((await createUpload(mount(null))).status).toBe(201);
+        });
+    });
 });
