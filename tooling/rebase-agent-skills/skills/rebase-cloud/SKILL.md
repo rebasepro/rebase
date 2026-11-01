@@ -581,7 +581,7 @@ a command it has not used before.
 ## CI and agents: `REBASE_TOKEN`
 
 A token acts as the account that created it, narrowed to a few capabilities on
-one project. Create it from a signed-in terminal, then give it to CI as
+one project (or, for `billing`, `audit` and `notifications`, one organization). Create it from a signed-in terminal, then give it to CI as
 `REBASE_TOKEN`:
 
 ```bash
@@ -596,6 +596,9 @@ rebase cloud tokens create --project shop --can deploy,logs --expires-in 90
   scopes narrowed to that project (`project:deploy:<id>`, …) plus the data and
   function scopes the commands call. The token is a personal API key on the
   control plane: it never holds more than its account does when used.
+- `--can` also takes `billing`, `audit` and `notifications`, which act on one
+  organization: `--org <id>`, else the project's organization, else the selected
+  one. Reading the audit log needs `--can audit`.
 - A token cannot `tokens list` / `create` / `revoke` — those need the signed-in
   session (`session_required`). No capability grants a backup restore or a PITR
   `restore` / `cutover`: those stay with a signed-in owner or admin.
