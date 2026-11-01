@@ -50,8 +50,9 @@ A `database.types.ts` file (written beside `schema.meta.ts`, which exports the `
 | `Update` | Partial update type | Not settable | All optional |
 
 A property marked `excludeFromApi` is absent from all three — the API surface
-does not mention it, in either direction. The server still accepts one on a
-write; the generated types simply never name it.
+does not mention it, in either direction. A write naming one is refused for
+every caller, with `VALIDATION_EXCLUDED_FIELDS`; server code sets it through
+`context.data` in a callback or `rebase.dataAsAdmin`.
 
 **A field's wire name is its property key, and the API is camelCase throughout.**
 A `createdAt` property stored in a `created_at` column is `row.createdAt`; a
