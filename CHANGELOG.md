@@ -154,6 +154,12 @@
   no storage scope, or one for another source, could create an upload; a key with
   `storage:write` on any source could finish it. It now answers
   `403 SCOPE_MISSING`, as `POST /upload` does.
+- **`storageAuthorize` no longer overrides a policy that matched and denied.** The
+  docs and the module said the hook is asked only when no policy matched; it was
+  asked whenever no policy granted, so an owner-only policy plus a permissive hook
+  let anyone read the owner's keys. A key a policy matched for that operation is
+  now settled by the policies. A project that relied on the hook granting such a
+  key needs a policy that grants it, or a pattern that does not match it.
 
 #### Runtime
 

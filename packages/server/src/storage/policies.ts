@@ -31,7 +31,7 @@
  * Ownership frequently lives in a row rather than in a key, which no pattern can
  * express. So when policies match nothing, an explicit `storageAuthorize` is
  * consulted before the request is refused. Present, it can widen; absent, the
- * answer is no. Policies never *narrow* what the hook allowed and the hook never
+ * answer is no. A policy that matched and did not grant is a denial, not silence. Policies never *narrow* what the hook allowed and the hook never
  * overrides a policy denial — each can only say yes, which keeps "who allowed
  * this?" answerable by reading either one alone.
  */
@@ -154,11 +154,13 @@ export function compileStoragePolicies(
     const compiled = policies.map(compile);
 
     return async (ctx: StorageAuthorizeContext): Promise<boolean> => {
+        let matched = false;
         for (const policy of compiled) {
             if (!policy.operations.has(ctx.operation)) continue;
 
             const params = matchStoragePattern(policy.pattern, ctx.key);
             if (!params) continue;
+            matched = true;
 
             if (policy.allow === "public") return true;
             if (policy.allow === "authenticated") {
@@ -171,7 +173,11 @@ export function compileStoragePolicies(
             if (await policy.allow({ ...ctx, params })) return true;
         }
 
-        // Nothing granted it. The hook may still, which is what makes
+        // A policy spoke about this key and none granted it: that is a denial,
+        // and the hook does not override one.
+        if (matched) return false;
+
+        // No policy covers it. The hook may still grant it, which is what makes
         // row-owned objects expressible; without one, the answer is no.
         if (fallback) return await fallback(ctx);
         return false;

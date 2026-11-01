@@ -159,6 +159,39 @@ describe("the hook as an escape hatch", () => {
         expect(hook).toHaveBeenCalledTimes(1);
     });
 
+    it("is not asked about a key a policy matched and denied", async () => {
+        const hook = jest.fn(async () => true);
+        const authorize = compileStoragePolicies(
+            [{ path: "users/:uid/**", allow: ({ params, user }) => user?.uid === params.uid }],
+            hook as never
+        );
+
+        await expect(authorize(ctx({ key: "users/alice/a", user: { uid: "bob" } }))).resolves.toBe(false);
+        expect(hook).not.toHaveBeenCalled();
+    });
+
+    it("is not asked when a matched `authenticated` policy has no user", async () => {
+        const hook = jest.fn(async () => true);
+        const authorize = compileStoragePolicies(
+            [{ path: "files/**", allow: "authenticated" }],
+            hook as never
+        );
+
+        await expect(authorize(ctx({ key: "files/a", user: null }))).resolves.toBe(false);
+        expect(hook).not.toHaveBeenCalled();
+    });
+
+    it("is asked about an operation the matching policy does not cover", async () => {
+        const hook = jest.fn(async () => true);
+        const authorize = compileStoragePolicies(
+            [{ path: "files/**", operations: ["read"], allow: "authenticated" }],
+            hook as never
+        );
+
+        await expect(authorize(ctx({ key: "files/a", operation: "write" }))).resolves.toBe(true);
+        expect(hook).toHaveBeenCalledTimes(1);
+    });
+
     it("cannot narrow what a policy already granted", async () => {
         const authorize = compileStoragePolicies(
             [{ path: "public/**", allow: "public" }],

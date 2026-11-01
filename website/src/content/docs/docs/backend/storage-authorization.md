@@ -19,7 +19,7 @@ storagePolicies: [
 ]
 ```
 
-**A key matched by no policy is refused**, unless a `storageAuthorize` hook allows it: the hook is asked only when no policy matched, and neither can narrow the other. Every widening is an explicit line, and a mistake denies rather than grants.
+**A key matched by no policy is refused**, unless a `storageAuthorize` hook allows it: the hook is asked only when no policy matched the key for that operation, and neither can narrow the other. A policy that matched and did not grant is final. Every widening is an explicit line, and a mistake denies rather than grants.
 
 Patterns match **by segment, never by substring** — `public/**` does not match
 `publicity/secret.png`:
