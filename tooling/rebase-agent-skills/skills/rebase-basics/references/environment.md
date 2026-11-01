@@ -7,7 +7,7 @@ Rebase provides `loadEnv()` from `@rebasepro/server` to validate and load enviro
 ### Behavior
 
 - **Auto-generates** `JWT_SECRET` and `REBASE_SERVICE_KEY` in non-production mode so developers can start without manual setup, cached in `.rebase-dev-secrets.json` so a restart keeps them
-- **Blocks** auto-generated secrets in production (fails validation)
+- **Generates nothing** in production: an unset `JWT_SECRET` fails validation (`JWT_SECRET: is required`)
 - Returns a fully typed, validated env object
 
 ### Signature
@@ -107,7 +107,7 @@ Everything `rebaseEnvSchema` declares — what an **ejected** project's own
 `loadEnv()` enforces these rules when `NODE_ENV=production`:
 
 1. `CORS_ORIGINS` or `FRONTEND_URL` **must** be set
-2. `JWT_SECRET` and `REBASE_SERVICE_KEY` **must** be explicitly set (auto-generation disabled)
+2. `JWT_SECRET` **must** be set (nothing is generated). `REBASE_SERVICE_KEY` is optional: unset, the backend boots with no service key
 3. No environment variable may contain a localhost/loopback URL (unless `ALLOW_LOCALHOST_IN_PRODUCTION=true`)
 
 ### Auto-Generated Dev Secrets
