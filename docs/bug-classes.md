@@ -4306,3 +4306,23 @@ The sibling in the same file: `compileStoragePolicies` read "nothing granted" as
 
 **Sweep:** for every optional hook, list what else the function it guards checks.
 The guard is `packages/server/test/storage-scopes.test.ts`, which mounts no hook.
+
+## 74. A name of ours that is someone else's on the registry
+
+A package manager resolves a plain range across every place it knows. A local
+package on `"*"` is only local until someone publishes that name higher.
+
+Found 2026-11-01 by following the quickstart literally: `my-app-config` exists on
+npm at 1.1.2, so `pnpm install` took it over the workspace's 1.0.0 and ran its
+install script, which the scaffold had allowlisted. `workspace:*` would close it
+for pnpm and break npm, which the template supports on purpose.
+
+| place | result |
+|---|---|
+| `template/pnpm-workspace.yaml`, `overlays/baas/pnpm-workspace.yaml` | **BUG** — `preferWorkspacePackages: true`. |
+| `allowBuilds` naming `{{PROJECT_NAME}}-config` | **BUG** — removed. |
+| `collectDeclaredDependencies` | **BUG** — it trusted the symlink, so the registry package reached the bundle. |
+| npm workspaces | not reproduced: a run on a name that exists was not finished. |
+
+**Sweep:** for every dependency a template writes without a scope, ask who owns the
+name. The guard is `packages/cli/src/scaffold-workspace-resolution.test.ts`.

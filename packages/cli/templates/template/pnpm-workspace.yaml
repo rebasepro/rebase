@@ -3,6 +3,10 @@ packages:
   - "backend"
   - "config"
 linkWorkspacePackages: true
+# Without this, pnpm takes a higher version from the registry over a workspace
+# package on a "*" range, and this project's own package names are free for
+# anyone to publish.
+preferWorkspacePackages: true
 blockExoticSubdeps: false
 minimumReleaseAge: 0
 # Both of these used to live in `.npmrc` as `verify-deps-before-run` and
@@ -26,5 +30,4 @@ allowBuilds:
   esbuild: true
   sharp: true
   "@ariga/atlas": true
-  "{{PROJECT_NAME}}-config": true
 

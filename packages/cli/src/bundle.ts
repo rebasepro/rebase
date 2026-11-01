@@ -723,6 +723,20 @@ function nonRegistrySpecifier(version: string): string | null {
     return null;
 }
 
+/** The names this project's own `config`, `backend` and `frontend` packages go by. */
+function localPackageNames(projectRoot: string): Set<string> {
+    const names = new Set<string>();
+    for (const dir of ["config", "backend", "frontend"]) {
+        try {
+            const { name } = JSON.parse(fs.readFileSync(path.join(projectRoot, dir, "package.json"), "utf8")) as { name?: string };
+            if (name) names.add(name);
+        } catch {
+            // No such package here, or unparseable: it names nothing.
+        }
+    }
+    return names;
+}
+
 /**
  * Collect the runtime dependencies a bundle needs installed beside it.
  *
@@ -757,6 +771,8 @@ export function collectDeclaredDependencies(projectRoot: string): Record<string,
         );
     }
 
+    const localPackages = localPackageNames(projectRoot);
+
     for (const relative of BUNDLE_DEP_MANIFESTS) {
         const file = path.join(projectRoot, relative);
         if (!fs.existsSync(file)) continue;
@@ -775,6 +791,10 @@ export function collectDeclaredDependencies(projectRoot: string): Record<string,
             // package (e.g. `"config": "*"` symlinked to `../../config`) —
             // the runtime cannot install it from the registry.
             if (resolvesToWorkspacePackage(projectRoot, name)) continue;
+            // Named like one of this project's own packages but resolved
+            // elsewhere: a registry package with the same name, which must not
+            // reach production however the local install picked it.
+            if (localPackages.has(name)) continue;
             const protocol = typeof version === "string" ? nonRegistrySpecifier(version) : null;
             // The registry-install e2e stands packed tarballs in for versions
             // that were never published, as `file:` ranges the scaffold and its

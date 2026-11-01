@@ -207,6 +207,18 @@
   Only a build printed this, so a deploy that fell back to installing at boot
   went live healthy, with every new instance a minute slower and nothing saying
   so.
+- **A scaffold no longer installs a stranger's package named after your project.**
+  A project's shared package is `<name>-config` on a `"*"` range, and pnpm took a
+  higher version from npm over the local 1.0.0, then ran its install script,
+  because the scaffold allowlisted it. `my-app-config`, the quickstart's own name,
+  is a real package published by someone else. New scaffolds set
+  `preferWorkspacePackages: true` and allow no script for that name, and `rebase
+  build` never declares a package of the project's own workspace.
+
+  **Check a project you already have:** run `pnpm why <name>-config`. If it does
+  not point at `config/`, add `preferWorkspacePackages: true` to
+  `pnpm-workspace.yaml`, delete `"<name>-config": true` from `allowBuilds`, and run
+  `pnpm install`.
 
 #### Client SDK
 

@@ -250,6 +250,19 @@ describe("normalizeEsmSpecifiers", () => {
 });
 
 describe("collectDeclaredDependencies", () => {
+    it("never declares a package of this project's own workspace, however it resolved", () => {
+        // Resolved to the registry's package of the same name, which is what
+        // pnpm did for a scaffold: the bundle would have installed it.
+        write("config/package.json", JSON.stringify({ name: "my-app-config", version: "1.0.0" }));
+        write("backend/package.json", JSON.stringify({
+            name: "my-app-backend",
+            dependencies: { "my-app-config": "*", pg: "^8.0.0" }
+        }));
+        write("backend/node_modules/my-app-config/package.json", JSON.stringify({ version: "1.1.2" }));
+
+        expect(collectDeclaredDependencies(scratch)).toEqual({ pg: "^8.0.0" });
+    });
+
     it("gathers dependencies from the project's packages", () => {
         // Not zod: the image supplies that one, and a bundle carrying a second
         // copy makes `loadEnv({ extend })` reject every defaulted field. See
