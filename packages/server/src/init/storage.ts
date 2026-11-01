@@ -192,6 +192,7 @@ const STORAGE_NO_ACCESS_CONTROL_MESSAGE =
     "list every key (GET /storage/list?prefix=) and then read, overwrite or delete " +
     "any other user's files. Fix one of:\n" +
     "  • add a `storageAuthorize` hook that scopes access per user/tenant (recommended), or\n" +
+    "  • declare `storagePolicies`, path patterns saying who may do what, or\n" +
     "  • set `storagePublicRead: true` if this bucket is genuinely a public read-only CDN, or\n" +
     "  • set `storageInsecureAllowAnyAuthenticated: true` to keep the legacy shared-namespace\n" +
     "    behaviour on purpose (single-tenant apps where every signed-in user is trusted).";
