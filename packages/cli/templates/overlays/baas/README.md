@@ -4,8 +4,8 @@ A headless Rebase backend: a REST API, auth, storage, realtime and backups over
 your PostgreSQL database.
 
 There are no collection files. The server reads your database schema at boot and
-serves your tables, so the API follows your migrations — change the schema and
-the endpoints change with it.
+serves your tables, so the API follows your migrations — change the schema,
+restart the backend, and the endpoints change with it.
 
 ## Serving a table
 

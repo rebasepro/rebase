@@ -113,7 +113,7 @@ pnpm dlx @rebasepro/cli init my-api --headless
 That scaffolds a headless backend: REST, auth, storage, realtime and backups over
 your database, with **no collection files and no UI**. Tables are served
 automatically, derived from your schema at boot — change the schema with a
-migration and the API follows. No React anywhere in the dependency tree.
+migration, restart, and the API follows. No React anywhere in the dependency tree.
 
 A fresh headless project has no tables yet, so `/api/data/*` answers
 `404 NO_COLLECTIONS` until you create some. Point it at a database that already
