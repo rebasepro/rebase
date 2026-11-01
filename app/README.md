@@ -53,9 +53,8 @@ Run from this directory.
 | `pnpm run generate:sdk` | Regenerate the typed client SDK |
 | `pnpm run deploy` | Deploy the demo (maintainers) |
 
-`db:push` needs a real Postgres — it plans with Atlas, which needs a second
-empty database to compare against, and the managed development database serves
-exactly one. `.env.example` points at the compose database in
+`db:push` works on the managed development database or a real Postgres.
+`.env.example` points at the compose database in
 `backend/docker-compose.yml`, which is what the root CONTRIBUTING starts.
 
 ## Requirements
