@@ -788,6 +788,7 @@ process:
 | `REBASE_RATE_LIMIT_STORE=sql` | An in-memory limit counts per process, so N processes grant N× the limit |
 | `REBASE_RLS_AUDIT=false` on all but one | The scheduled RLS audit is not claimed, so every process that owns it scans on its own timer |
 | `TRUSTED_PROXY_HOPS` on the functions tier | It sits behind another hop |
+| `REBASE_FUNCTIONS_UPSTREAM` on `api` and `worker`, with one `REBASE_SERVICE_KEY` everywhere | Without it `api` answers 404 on `/api/functions/*`. With it and no service key, the process refuses to boot |
 
 Cron and the job queue are **not** on that list: each cron slot is claimed in
 the database and jobs are claimed with `FOR UPDATE SKIP LOCKED`, so both already
