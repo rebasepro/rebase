@@ -172,7 +172,7 @@ const productsCollection = defineCollection({
 export default productsCollection;
 ```
 
-Then add it to the `collections` array in `config/collections/index.ts`. That array is a sort order, not a registry: every collection file in the directory is loaded — by the backend, the admin panel and the SDK generator — whether the array lists it or not, and the array decides where it appears in the navigation. To remove a collection, delete its file:
+Then add it to the `collections` array in `config/collections/index.ts`. That array is a sort order, not a registry: every collection file in the directory is loaded — by the backend, the admin panel and the SDK generator — whether the array lists it or not, and the array decides where it appears in the navigation. To remove a collection, delete its file and its import and entry in `index.ts`; a file the index still imports stops the backend from loading:
 
 ```typescript title="config/collections/index.ts" {2,5}
 // ...existing imports
