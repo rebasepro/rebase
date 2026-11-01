@@ -33,8 +33,14 @@ Patterns match **by segment, never by substring** — `public/**` does not match
 `**` is only legal as the final segment. `:name` captures one segment and never
 spans a `/`; captures arrive as `params` on the predicate.
 
-`allow` is `"public"` (anyone), `"authenticated"` (any caller with a uid), or a
-predicate receiving the captured params, the user, the operation and the bucket.
+`allow` is `"public"` (anyone the route lets in), `"authenticated"` (any caller
+with a uid), or a predicate receiving the captured params, the user, the
+operation and the bucket.
+
+A policy runs after the route's authentication, so `"public"` alone does not open
+a path to anonymous callers. With `requireAuth` on, they reach reads of `public/`
+keys only, or every read with `storagePublicRead`; `/upload`, `/list`, deletes and
+resumable uploads always need a caller. Elsewhere the answer is `401`.
 `operations` defaults to all four — `read`, `write`, `delete`, `list`.
 
 Policies satisfy the production boot guard on their own, and a malformed pattern
