@@ -85,7 +85,7 @@ so: each instance then installs them as it starts, with `npm ci` (or
   rebase cloud env set NPM_TOKEN=ghp_… --secret
   ```
 
-The bundle upload is capped at 100 MB, compressed, without dependencies.
+The bundle upload is capped at 1 GB, compressed.
 
 **Native modules are refused.** A package that ships a compiled `.node` binary
 cannot load on the managed runtime. `rebase build` warns about it, and
