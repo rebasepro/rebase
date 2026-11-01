@@ -60,7 +60,7 @@ Implements the Rebase `DatabaseAdapter` / `BackendBootstrapper` interfaces for P
 | `RealtimeService` | Postgres LISTEN/NOTIFY-based `RealtimeProvider`. |
 | `DatabasePoolManager` | Per-branch/per-tenant dynamic pool management (used with `ADMIN_CONNECTION_STRING`). |
 | `PostgresCollectionRegistry` | Collection → Drizzle table registry with enum and relation tracking. |
-| `BranchService` | Database branching (schema-level isolation). |
+| `BranchService` | Database branching (one database per branch, copied from a template). |
 | `generateSchema(collections, options?)` | Generates Drizzle schema code from collection definitions. |
 | `createAuthSchema(schemaName?)` | Drizzle tables for the auth system, in schema `rebase` by default: `users` (with `roles` as a `text[]` column), `refresh_tokens`, `password_reset_tokens`, `user_identities`, `mfa_factors`, `mfa_challenges`, `recovery_codes`, `magic_link_tokens`, `app_config`. |
 

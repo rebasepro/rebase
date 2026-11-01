@@ -33,7 +33,7 @@ my-app/
 ├── tsconfig.json           # Typechecks scripts/; each workspace typechecks on its own
 ├── docker-compose.yml      # Self-hosting: Postgres + the published runtime image
 ├── scripts/
-│   └── example.ts          # The SDK end to end against the running backend: `pnpm example`
+│   └── example.ts          # A health check and an SDK call to uncomment: `pnpm example`
 │
 ├── config/                 # Shared by the backend and the admin panel
 │   ├── index.ts            # Re-exports `collections`; the runtime reads `storageAuthorize` from here

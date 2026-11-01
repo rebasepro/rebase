@@ -23,7 +23,7 @@ of it resolves too: Node has supported `require(esm)` since 22.12.
 - **Hooks** — data fetching (`useData`, `useCollection`, `useFetch`), data mutation (`saveEntityWithCallbacks`, `deleteEntityWithCallbacks`), auth (`useAuthController`), storage, permissions, i18n, and more
 - **UI components** — `LoginView`, `RebaseAuth`, `ConfirmationDialog`, `ErrorView`, `UserSettingsView`, etc.
 - **Utilities** — icon system, entity draft cache, storage upload controller, enums, constants
-- **i18n** — built-in English and Spanish locales via `react-i18next`
+- **i18n** — built-in locales (de, en, es, fr, hi, it, pt) via `react-i18next`
 - **Studio Bridge** — shared context for optional CMS↔Studio integration
 
 This package is **framework-agnostic** in the sense that it doesn't depend on any specific data backend — it works with any `DataDriver` implementation (PostgreSQL, Firebase, MongoDB, etc.).

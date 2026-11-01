@@ -40,6 +40,7 @@ Don't run `cp .env.example .env`. `.env.example` is a reference for the availabl
 ## Start the Dev Servers
 
 ```bash
+cd my-app
 pnpm install
 pnpm run dev
 ```

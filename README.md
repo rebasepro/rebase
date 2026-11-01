@@ -345,8 +345,8 @@ Every project scaffolded with `rebase init` carries its agent rules in `ai-instr
 {
   "mcpServers": {
     "rebase": {
-      "command": "npx",
-      "args": ["-y", "@rebasepro/mcp"],
+      "command": "pnpm",
+      "args": ["exec", "rebase-mcp"],
       "env": {
         "REBASE_PROJECT_DIR": "."
       }
