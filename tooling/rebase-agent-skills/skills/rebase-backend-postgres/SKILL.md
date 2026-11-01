@@ -92,7 +92,7 @@ rebase db migrate
 >
 > `rebase db push` refuses a destructive change on a non-TTY (dropped column, dropped
 > table, a column type change that can lose values, such as `timestamptz` → `date` or
-> `numeric` → `integer`, or a primary key change, which gives every row a new id). In CI or from an agent, pass `--allow-destructive` (or `--yes`)
+> `numeric` → `integer`, or a primary key change, which gives every row a new id). In CI or from an agent, pass `--allow-destructive`
 > once you have confirmed the data loss is intended. From 0.25 the same check stops the drop
 > of a CHECK or EXCLUDE constraint the database holds, and `db push` leaves those
 > constraints out of its plan, so it only fires when one was missed.
