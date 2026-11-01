@@ -21,6 +21,7 @@
     },
     "devDependencies": {
         "@rebasepro/cli": "workspace:*",
+        "@rebasepro/mcp": "workspace:*",
         "@rebasepro/types": "workspace:*",
         "@types/node": "^22.19.4",
         "tsx": "^4.20.6",

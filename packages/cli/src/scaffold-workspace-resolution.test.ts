@@ -14,6 +14,18 @@ import { describe, expect, it } from "vitest";
 const templates = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../templates");
 
 describe.each([
+    ["the default scaffold", "template/package.json"],
+    ["the headless scaffold", "overlays/baas/package.json"]
+])("%s's package.json", (_name, file) => {
+    it("installs the MCP server its .mcp.json runs", () => {
+        const manifest = JSON.parse(fs.readFileSync(path.join(templates, file), "utf8")) as {
+            devDependencies: Record<string, string>;
+        };
+        expect(manifest.devDependencies).toHaveProperty(["@rebasepro/mcp"]);
+    });
+});
+
+describe.each([
     ["the default scaffold", "template/pnpm-workspace.yaml"],
     ["the headless scaffold", "overlays/baas/pnpm-workspace.yaml"]
 ])("%s's pnpm-workspace.yaml", (_name, file) => {

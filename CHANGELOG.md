@@ -219,6 +219,8 @@
   not point at `config/`, add `preferWorkspacePackages: true` to
   `pnpm-workspace.yaml`, delete `"<name>-config": true` from `allowBuilds`, and run
   `pnpm install`.
+- **A headless scaffold installs the MCP server its `.mcp.json` runs.** `rebase-mcp`
+  was missing from the overlay, so the server the scaffold wires up did not start.
 
 #### Client SDK
 
