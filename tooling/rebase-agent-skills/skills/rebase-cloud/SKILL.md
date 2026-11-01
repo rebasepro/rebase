@@ -611,6 +611,7 @@ rebase cloud tokens create --project shop --can deploy,logs --expires-in 90
 | `rebase cloud use` | Select the active organization |
 | `rebase cloud link` / `unlink` / `open` | Link this directory to a project |
 | `rebase cloud init --claim` | A live backend with no account, and a link to claim it within 72 hours |
+| `rebase cloud claim` | That link again, and how long is left |
 | `rebase cloud projects list` / `create` / `info` / `delete` | Projects |
 | `rebase cloud db list` / `create` / `info` / `connect` / `test` | Databases (`connect` tunnels a local port to it; owner or admin) |
 | `rebase cloud db backup list` / `create` / `restore` / `status` / `download` | Backups |
@@ -627,10 +628,17 @@ rebase cloud tokens create --project shop --can deploy,logs --expires-in 90
 | `rebase cloud compute` / `compute set` | What it reserves, and what it costs |
 | `rebase cloud resources` / `resources prune database <key>` | What the platform holds against what the code declares |
 | `rebase cloud storage` / `storage create` / `storage attach` | Object storage |
-| `rebase cloud webhooks list` / `create` / `delete` | Deploy hooks |
+| `rebase cloud notifications` / `add <url>` / `test <id>` / `remove <id>` | Deploy, backup, billing and usage events to Slack, Discord or any URL |
 | `rebase cloud orgs list` / `create` / `members` | Organizations |
 | `rebase cloud billing` / `billing setup` / `billing checkout` | Card on file |
+| `rebase cloud usage` / `usage org` | Requests used this month against the allowance, and the overage so far |
+| `rebase cloud activity` | The organization's audit log, newest first |
+| `rebase cloud app-key` / `app-key rotate` | The app key `init --claim` wrote; owners and admins |
+| `rebase cloud service-key` / `service-key rotate` | `REBASE_SERVICE_KEY`; owners and admins |
 | `rebase cloud clusters` / `clusters add` / `clusters verify` | Platform admin |
+
+`rebase cloud webhooks` is retired: it exits 1 with `command_retired`. For a POST
+when rows of your own tables change, use a `WebhookDispatcher` in app code.
 
 Global flags on every one of them: `--project, -p <slug>`, `--json`,
 `--url <origin>`, `--yes, -y`, `--debug`.
