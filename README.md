@@ -196,7 +196,7 @@ Opt in with `offline: true` and the client SDK keeps a local database of rows in
 
 ### ⚡ Extensible API & Edge Functions
 
-Drop custom Hono routes or scheduled tasks into the `functions/` and `crons/` directories. Rebase auto-loads them with database access and JWT authentication middleware injected automatically.
+Drop custom Hono routes or scheduled tasks into `backend/functions/` and `backend/crons/`. Rebase auto-loads them with database access. A function is public until you check the caller: authentication is not applied for you.
 
 ### 🧬 SDK Generator
 
