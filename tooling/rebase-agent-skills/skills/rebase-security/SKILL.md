@@ -154,7 +154,7 @@ export async function scopeDataDriver(
 | Service Key | `"service"` | `["admin"]` | **RLS is enforced**, against the `admin` role |
 | Service API key | `"api-key:{id}"` | `["service", ...key.roles]` | **RLS is enforced**, against `service` (and `admin` when the key was given `roles: ["admin"]`), *and* the key's scopes |
 | Personal API key | the owner's uid | the owner's current roles | **RLS is enforced** as the owner, *and* the key's scopes ∩ the owner's |
-| Anonymous (`requireAuth: false`) | `"anon"` | `["anon"]` | RLS with anonymous identity |
+| Anonymous (`requireAuth: false`) | `"anonymous"` | `["anon"]` | RLS with anonymous identity |
 | No token + `requireAuth: true` | — | — | **Rejected (401)** |
 
 > **IMPORTANT FOR AGENTS: none of these identities bypasses RLS.** Every one of
@@ -178,7 +178,7 @@ export async function scopeDataDriver(
 
 > **IMPORTANT FOR AGENTS:** These are **reserved system identity values** that the middleware injects automatically. When writing callbacks, developers should use these identities to gate behavior:
 > - `uid: "service"` + `roles: ["admin"]` — server-side `rebase.dataAsAdmin` calls (cron jobs, custom functions, webhooks). The driver is scoped with this identity once, at boot.
-> - `uid: "anon"` + `roles: ["anon"]` — Unauthenticated requests when `requireAuth: false`. **Note:** for anonymous REST requests, `context.user` in Collection Callbacks may be `undefined`; only the DataDriver is scoped with the anon identity. For WebSocket connections, a full `User` object with `uid: "anon"` is provided.
+> - `uid: "anonymous"` + `roles: ["anon"]` — Unauthenticated requests when `requireAuth: false`. Gate on the role (`context.user?.roles?.includes("anon")`): `"anon"` is the role, never the uid, so comparing `uid` with `"anon"` never matches. The identity is on the request's driver and so in `context.user` in callbacks; `c.get("user")` stays unset, which `rebase-custom-functions` covers.
 > - `uid: "api-key:{id}"` + `roles: ["service", ...key.roles]` — service API key requests. A personal key carries its owner's uid and roles instead.
 > - Real user IDs and roles for JWT-authenticated requests.
 >
@@ -715,6 +715,6 @@ Use this checklist when setting up security for a Rebase project:
 - **REST API Generator**: `packages/server/src/api/rest/api-generator.ts` — request/response path
 - **Callback Types**: `packages/types/src/types/entity_callbacks.ts` — `CollectionCallbacks`, `AfterReadProps`, `BeforeSaveProps`
 - **Backend Options**: `packages/server/src/backend/options.ts` — `RebaseBackendOptions.callbacks`, the global callbacks
-- **Reserved Identity Values**: See Identity Types table above — `"service"`, `"anon"`, `"api-key:{id}"` are system-assigned identities in `context.user`
+- **Reserved Identity Values**: See Identity Types table above — `"service"`, `"anonymous"`, `"api-key:{id}"` are system-assigned identities in `context.user`
 - **Collection Callbacks**: See `rebase-collections` skill → Collection Callbacks section
 - **Auth Configuration**: See `rebase-auth` skill → Server-Side Configuration section
