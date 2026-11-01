@@ -45,7 +45,7 @@ privileged plane has exactly one name. It is not there at runtime either:
 
 | Property | Type | Description |
 |----------|------|-------------|
-| `rebase.dataAsAdmin` | `RebaseData` | Admin-level data access — scoped as `{ uid: "service", roles: ["admin"] }`, so RLS is **evaluated against that identity, not bypassed**. Use `rebase.dataAsAdmin.<slug>.find()`, `.findOne()`, `.create()`, `.update()`, `.delete()` |
+| `rebase.dataAsAdmin` | `RebaseData` | Admin-level data access — scoped as `{ uid: "service", roles: ["admin"] }`, so RLS is **evaluated against that identity, not bypassed**. Use `rebase.dataAsAdmin.<slug>.find()`, `.findById(id)`, `.create()`, `.update()`, `.delete()` |
 | `rebase.auth` | `AuthClient` | Authentication operations |
 | `rebase.storage` | `StorageSource \| undefined` | File storage operations (the default source) |
 | `rebase.bucket(source)` | `StorageSource` | The storage source a bucket handle (or key) names. **Always present** — with no storage configured it refuses with a message naming what to set |
