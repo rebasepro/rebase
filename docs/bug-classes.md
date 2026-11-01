@@ -4282,3 +4282,27 @@ realistic: a table keyed the way the generator keys it (camelCase property,
 snake_case column), reached by a step written the way `JoinStep` documents it.
 The guard is in `packages/server-postgres/test/e2e/nested-path-writes.test.ts`
 (`bylines`), red on the old code for reads, listings and one-step foreign keys.
+
+## 73. A mandatory check passed along inside an optional one
+
+Two questions share a function: "may this credential do this at all?" and "does
+this project's hook allow this object?". The second is optional and the first is
+not. A caller that wires the function in only when the hook exists drops both, and
+every test of the first question had a hook configured, or went through a door
+that wired it unconditionally.
+
+Found 2026-11-01 by reading `backend/storage-authorization.md` against the routes:
+`POST /api/storage/tus` passed `authorizeUpload` only when `authorize` was set, so
+with no hook a key with no storage scope created an upload.
+
+| door | question it reached | result |
+|---|---|---|
+| `POST /tus` | scope only behind `authorize ? … : undefined` | **BUG** — always passed now. |
+| `POST /upload`, `/folder`, `/file/*`, `/metadata`, `/list` | `checkAuthorized` directly | clean. |
+| `/tus/:id` | `createTusScopeGuard`, any source: the create checked the source | clean once the create asks. |
+
+The sibling in the same file: `compileStoragePolicies` read "nothing granted" as
+"nothing matched", so the hook could override a denial its header says it cannot.
+
+**Sweep:** for every optional hook, list what else the function it guards checks.
+The guard is `packages/server/test/storage-scopes.test.ts`, which mounts no hook.
