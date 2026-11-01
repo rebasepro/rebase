@@ -318,7 +318,7 @@ no usable credential refuses to boot. See
 | Variable | Description | Default |
 |----------|-------------|---------|
 | `BACKUP_SCHEDULE` | Cron expression for scheduled backups. Unset means scheduled backups are off. | — |
-| `BACKUP_DESTINATION` | Local path, or an `s3://bucket/prefix` / `gs://bucket/prefix` URL. | `./backups` |
+| `BACKUP_DESTINATION` | Local path, or an `s3://bucket/prefix` / `gs://bucket/prefix` URL. Required with `BACKUP_SCHEDULE`, which refuses to run without it. `rebase db backup` falls back to `./backups` where it was run. | — |
 | `BACKUP_RETENTION_DAYS` | Delete backups older than N days. Unset or `0` keeps everything. | — |
 | `BACKUP_KEEP_MINIMUM` | Always retain at least N of the most recent backups, whatever retention says. | — |
 | `PG_DUMP_PATH` | Override the `pg_dump` binary — it must be the server's major version or newer. | — |
