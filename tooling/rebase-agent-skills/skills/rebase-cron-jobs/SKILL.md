@@ -286,7 +286,7 @@ interface CronJobContext {
 | `signal` | `AbortSignal` | Aborted when the run exceeds `timeoutSeconds`. The timeout stops the scheduler waiting; only this stops the work. Pass it to `fetch`. |
 | `rebase` | `RebaseServerClient` | The server singleton. `rebase.dataAsAdmin` for CRUD, `rebase.email`, `rebase.storage`, `rebase.sql`. |
 
-> **IMPORTANT FOR AGENTS:** `ctx.rebase.dataAsAdmin` is scoped as the **service identity** (`uid: "service"`, `roles: ["admin"]`). Callbacks live in the driver, not in the route layer, so DataHooks and Collection Callbacks still run on this path even though the HTTP loop is skipped. This means:
+> **IMPORTANT FOR AGENTS:** `ctx.rebase.dataAsAdmin` is scoped as the **service identity** (`uid: "service"`, `roles: ["admin"]`). Callbacks live in the driver, not in the route layer, so global and collection callbacks still run on this path even though the HTTP loop is skipped. This means:
 > - Collection Callbacks will see `context.user.uid === "service"` and `context.user.roles` containing `"admin"`
 > - If your callbacks implement PII masking or role-based filtering, they should check for admin/service roles and skip masking for server-internal reads
 > - The service identity does **not** bypass RLS policies. The driver is scoped with `withAuth({ uid: "service", roles: ["admin"] })`, so statements run as the restricted `rebase_user` role and your policies are evaluated against that identity — it clears the default policies through their `rolesOverlap(['admin'])` arm, and `policy.serverContext()` (`rebase.uid() IS NULL`) is **false** for it. `rebase.sql()` is the real bypass: owner connection, no policies.

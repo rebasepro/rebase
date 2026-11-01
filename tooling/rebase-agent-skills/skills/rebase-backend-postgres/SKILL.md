@@ -682,7 +682,7 @@ The `shutdown(timeoutMs?: number, options?: { server })` method (default timeout
 
 ### 1. SQL Editor Permission Denied (`permission denied for table <name>`)
 - **Symptoms:** You can view data in the collection/CMS spreadsheet view, but running custom SQL queries (like `SELECT * FROM table;`) in the Rebase Studio SQL Editor throws `cause: error: permission denied for table <table_name>`.
-- **Cause:** Rebase tries to switch database roles to match the active user's role (e.g., `SET LOCAL ROLE "admin"`). If you are using custom auth (roles defined only in the database `rebase.roles` table rather than actual PostgreSQL roles), or if the database-level role doesn't have `SELECT` privileges, the query fails. The collection views do not switch to a role named after yours: they go through the data API, which runs every request as `rebase_user` under the collections' RLS policies, so they keep working.
+- **Cause:** Rebase tries to switch database roles to match the active user's role (e.g., `SET LOCAL ROLE "admin"`). If you are using custom auth (roles that exist only in Rebase, in the users' `roles` column, rather than as actual PostgreSQL roles), or if the database-level role doesn't have `SELECT` privileges, the query fails. The collection views do not switch to a role named after yours: they go through the data API, which runs every request as `rebase_user` under the collections' RLS policies, so they keep working.
 - **Solution:** Add `DISABLE_DB_ROLE_SWITCHING=true` to your backend `.env` configuration. This skips role switching, executing queries under the connection owner user.
 
 ### 2. SQL Editor/Studio Schema Fetch Failed (`Cross-database execution requires adminConnectionString`)

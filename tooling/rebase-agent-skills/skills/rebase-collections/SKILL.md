@@ -161,7 +161,7 @@ export default productsCollection;
 | `dataSource` | `string \| DatabaseHandle` | `"(default)"` | Routes the collection to a database declared with `database("<key>")` in `config/resources.ts`. Pass the handle (`import { analytics } from "../resources"`, `dataSource: analytics`) — `defineCollection` records its key — or the key as a string. See **Data sources & multiple backends** below. |
 | `engine` | `string` | resolved from `dataSource` | The engine behind the collection (`"postgres"`/`"firestore"`/`"mongodb"`). Stamped during normalization; set it only to override. There is no collection-level `driver` field |
 | `databaseId` | `string` | — | Physical DB/schema/Firestore-database within the engine |
-| `history` | `boolean` | `false` | Enable entity audit trail (requires history plugin) |
+| `history` | `boolean` | `false` | Enable entity audit trail (needs the backend `history` option or `REBASE_HISTORY`) |
 | `admin.defaultViewMode` | `ViewMode` | `"list"` | Default view: `"list"`, `"table"`, `"cards"`, `"kanban"`, or a custom view's `key` |
 | `admin.enabledViews` | `ViewMode[]` | the four built-ins plus every custom view | Enabled view modes (`kanban` only when an `enum` property exists) |
 | `admin.customViews` | `(string \| CollectionCustomView)[]` | — | Extra renderings of the same query, offered in the view switcher |
@@ -1137,8 +1137,8 @@ content: {
 Every property supports a `validation` object with these common options.
 
 **Where it runs:** the server checks `validation` on REST, realtime-socket and MCP
-writes — what a caller sent. In-process writes (`rebase.data` /
-`rebase.dataAsAdmin` in functions and cron jobs, `context.data` in callbacks,
+writes — what a caller sent. In-process writes (`rebase.dataAsAdmin`
+in functions and cron jobs, `context.data` in callbacks,
 seed scripts) are trusted and NOT checked: there only the database's constraints
 hold (`required` → NOT NULL, `unique` → unique index, enum type, `varchar`/`char`
 width). Validate in your own code what server code writes.
@@ -1430,6 +1430,7 @@ All callbacks receive a `context` property of type `RebaseCallContext<USER>`. Th
 | `context.data` | `RebaseSdkData` | The query accessor in a callback — `context.data.products.create(...)`. Runs with the privilege of whatever triggered the callback, on the write's own transaction |
 | `context.storageSource` | `StorageSource` | File storage operations |
 | `context.user` | `USER \| undefined` | Authenticated user (set by backend in server-side callbacks) |
+| `context.credential` | `CallerCredential \| undefined` | The API key a write was made with, since 0.26. Unset for a session |
 
 ### Reserved `context.user` Values
 

@@ -334,9 +334,8 @@ GOOGLE_APPLICATION_CREDENTIALS=/path/to/service-account.json
 > adapter layer, and breaks the local↔s3↔gcs swap. The backend is a **config
 > choice** (`STORAGE_TYPE`), not something you wire up per feature.
 
-`rebase.storage` is the same `StorageController` interface documented above
-(`putObject`, `getObject`, `getSignedUrl`, `deleteObject`, `listObjects`,
-`getType`). It is `undefined` only if no `storage` is configured — guard for that.
+`rebase.storage` is the `StorageSource` part of the controller documented above
+(`putObject`, `getObject`, `getSignedUrl`, `deleteObject`, `listObjects`). It is `undefined` only if no `storage` is configured — guard for that.
 
 ```typescript
 import { rebase } from "@rebasepro/server";
@@ -414,7 +413,7 @@ GET /api/storage/list?prefix=images/&storageId=media
 | `POST` | `/api/storage/folder` | Write | Create a new folder |
 | `GET` | `/api/storage/sources` | None | The storage sources this backend serves (key, engine, transport, label) — never a file |
 
-> **IMPORTANT FOR AGENTS:** `GET /api/storage/file/*` **refuses an ordinary access JWT** (`401 Unauthorized: Access JWT not allowed on file routes`). It takes the short-lived path-scoped download token that `GET /metadata/*` (and `client.storage.getSignedUrl()`) mints, as `?token=` or a `Bearer`, or nothing for a `public/` key. Every other route takes the access JWT as usual. Every route except `/file/*` answers the `/api/data` envelope: the payload under `data`, a failure as `{ "error": { message, code, requestId } }`.
+> **IMPORTANT FOR AGENTS:** `GET /api/storage/file/*` **refuses an ordinary access JWT** (`401 Unauthorized: Access JWT not allowed on file routes`). It takes the short-lived path-scoped download token that `GET /metadata/*` (and `client.storage.getSignedUrl()`) mints, as `?token=` or a `Bearer`, or nothing for a `public/` key. Every other route takes the access JWT as usual. Every route except `/file/*`, `DELETE /file/*` and `POST /folder` included as a bare `{ "message": … }`, answers the `/api/data` envelope: the payload under `data`, a failure as `{ "error": { message, code, requestId } }`.
 
 ### TUS Resumable Upload Endpoints
 
@@ -527,7 +526,7 @@ List files and folders in a given prefix.
     "prefixes": [
       { "bucket": "default", "fullPath": "images/thumbnails", "name": "thumbnails" }
     ],
-    "nextPageToken": "25"
+    "nextPageToken": "n.dGh1bWJuYWlscw"
   }
 }
 ```

@@ -140,7 +140,7 @@ const rebase = createRebaseClient<Database>({
 ### Access Patterns
 
 ```typescript
-// 1. Property-style access (camelCase — auto-converted to snake_case slug)
+// 1. Property-style access (the `collections` dictionary resolves each accessor to its slug)
 const { data: posts } = await rebase.data.posts.find();
 
 // 2. Collection method (explicit slug)
