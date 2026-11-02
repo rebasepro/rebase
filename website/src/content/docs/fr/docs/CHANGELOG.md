@@ -63,15 +63,33 @@ La traduction est à venir. Le contenu ci-dessous est en anglais.
   instance had members. Counts only, behind `REBASE_METRICS_TOKEN` like the rest of
   the route. `RealtimeProvider` gains an optional `counts()`. See
   [Seeing what the bus does](/docs/backend/realtime-transports/#seeing-what-the-bus-does).
+- **Sign in with Apple from native apps.** `APPLE_BUNDLE_IDS` (or
+  `auth.apple.bundleIds`) lists the iOS and macOS apps whose codes are
+  accepted. A native code is exchanged as the app's bundle id with no redirect
+  URI. `APPLE_CLIENT_ID` is now optional when bundle ids are set. `GET
+  /auth/config` publishes the Services ID as `providerClientIds.apple`, since it
+  is public. See [OAuth providers](/docs/backend/authentication/#the-environment-spellings).
 
 #### Client SDK
 
+- **`client.auth.signInWithApplePopup()`** signs in with Apple in the browser.
+  It opens Apple's popup, checks `state`, and spends the code. A closed popup
+  rejects with `APPLE_SIGN_IN_CANCELLED`. `signInWithApple({ code, bundleId })`
+  signs in a native app. `preloadAppleSignIn()` and
+  `requestAppleAuthorization()` are exported for a login screen that runs its
+  own flow. See [Apple](/docs/sdk/authentication/#apple).
 - **`realtime: { affinity }` names the group a socket belongs to.**
   `createRebaseClient({ realtime: { affinity: roomCode } })`, or
   `client.realtime.setAffinity(roomCode)` before the socket opens, adds
   `?affinity=` to the socket's address, so a platform that routes on it sends the
   group to one instance. It does nothing elsewhere. See
   [Keeping a group on one instance](/docs/sdk/realtime#keeping-a-group-on-one-instance).
+
+#### Admin (CMS & app)
+
+- **The login screen has a Sign in with Apple button.** It appears when the
+  backend has Apple configured with a Services ID, with no frontend variable.
+  `appleClientId` and `appleRedirectUri` on `LoginView` override the defaults.
 
 #### CLI
 
@@ -93,6 +111,17 @@ La traduction est à venir. Le contenu ci-dessous est en anglais.
   `admin.deleteGuests`. See [Guests](/docs/cli/cloud/#guests).
 
 ### Changed
+
+#### Server & REST
+
+- **A join table with row-level security off is named at boot.** A project that
+  declares no collections excluded a table with RLS off and said so, but passed
+  over a join table in silence. None was ever served, because a join table never
+  becomes a collection. One with RLS off now gets its own boot warning and is
+  left out of the schema relations are built from, so that is no longer the only
+  thing keeping it from a caller. `rebase_user` keeps its grants on it: a policy
+  that reads a join table runs as the caller, and without them every read that
+  policy guards fails with `permission denied`.
 
 #### Rebase Cloud
 
@@ -13379,6 +13408,8 @@ Nothing below was deprecated in the usual sense of "still works, please stop". E
 
   The larger find is the documentation. The callbacks guide stated, in all six locales, that `context.data` bypasses RLS and has "full database access regardless of the triggering user's permissions". It does not: authenticated writes run through `withTransaction`, which builds a fresh base driver bound to the RLS-scoped transaction after the role has been downgraded, so a callback on a user request is user-scoped for reads *and* writes; only server-context work (`dataAsAdmin`, cron) bypasses. Wrong in the unsafe direction, and nothing tested it either way, which is how it stayed wrong.
 
+  *Corrected since release:* this entry calls `dataAsAdmin` the RLS-bypassing plane and says it bypasses. It does not. It runs as `rebase_user` with uid `service` and the `admin` role, so policies are evaluated and one that does not admit an admin hides rows from it. `rebase.sql` is the accessor on the owner connection. Cron hands out the same accessor.
+
 - **A `hasMany` was declared once and rendered twice.** A many-cardinality relation becomes an entity tab, which is the whole treatment for a list of child rows. It was *also* still a member of `properties` — the only place a relation can be declared — so the form rendered it a second time as a relation picker: a dropdown offering to select a collection's own children, one card per child row. Nothing marked the relation as already consumed, so every `hasMany` and `manyToMany` property in every project grew a stray field.
 
   `getChildViewRelationPropertyKeys` is the missing half of `getEntityChildViews`: given a collection, it names the property keys the entity view has already taken, and the form's field list (`getFormFieldKeys`, which both the editable form and the read-only entity view build from) drops them. The match is on the resolved `relationName` rather than on the key, so a relation declared in `relations` and pointed at by a differently-named property is recognised too. A relation nested inside a `map` gets no tab, so it keeps its picker; a `belongsTo`/`hasOne` is a foreign key the author edits, and never had a tab to be redundant with.
@@ -13518,6 +13549,8 @@ Nothing below was deprecated in the usual sense of "still works, please stop". E
   `RebaseServerClient` now extends `Omit<RebaseClient, "data">`, so this is a compile error rather than a silent privilege. **The property still exists at runtime**, aliasing `dataAsAdmin`, so an untyped JavaScript caller keeps working instead of failing on `undefined` mid-upgrade — the type is the contract, and it is the type that changed.
 
   *Corrected since release:* this paragraph listed `context.client.data` in entity callbacks and `client.data` in a cron handler as unaffected and user-scoped. Neither was. Both are this same server singleton, so both were this same admin-scoped alias, and both went with it. In a callback, query through `context.data`, which runs with the privilege of whatever triggered the callback; in a cron handler, use `rebase.dataAsAdmin` from its context. Unaffected: `rebase.data` in a **generated SDK** or browser app, which is a different object entirely.
+
+  *Corrected since release:* this entry calls the accessor RLS-bypassing. It is not. It runs as `rebase_user` with uid `service` and the `admin` role, so policies are evaluated and one that does not admit an admin hides rows from it. `rebase.sql` is the accessor on the owner connection.
 
   For user-scoped queries inside a request handler, neither name is right: use the request-scoped driver (`c.var.driver`), which carries the caller's identity so RLS applies.
 
@@ -14143,6 +14176,8 @@ Nothing below was deprecated in the usual sense of "still works, please stop". E
 
 - **RLS is the whole authorization model — reads are bound too** — enforcement used to split by operation: writes ran through app-layer callbacks while reads leaned on RLS `SELECT` policies. But a privileged connection — superuser, `BYPASSRLS`, or the table owner — bypasses RLS unconditionally, so on any such connection (the common case) tenant read isolation was silently dead. Authenticated, user-context requests now run as a restricted, non-owner `rebase_user` role, so Postgres RLS binds *every* statement: `SELECT`, `INSERT`, `UPDATE`, `DELETE`. A collection's `securityRules` are now the entire authorization model; callbacks (`beforeSave` and friends) are validation and side-effects, not a security boundary. The server context — auth flows, migrations, `dataAsAdmin` — stays the trusted owner plane and bypasses RLS by design. Default policies are locked-by-default for every collection (a permissive server-or-admin read/write baseline; auth collections also get a self-read and keep the restrictive admin write gate), so RLS-on does not default-deny everything; `FORCE ROW LEVEL SECURITY` is gone, since the user role is already a non-owner. The opt-out is `disableDefaultPolicies`. Isolation is provisioned at boot and on `db push` / `migrate`; a privileged connection that cannot be isolated fails boot with the exact setup SQL, and connecting as superuser or `BYPASSRLS` warns loudly — the auth-collection write gates do not bind those.
 
+  *Corrected since release:* this entry lists `dataAsAdmin` in the server context that bypasses RLS. It is not in it. It runs as `rebase_user` with uid `service` and the `admin` role, so policies are evaluated and one that does not admit an admin hides rows from it. `rebase.sql` is the accessor on the owner connection.
+
 - **22 retired package names deprecated on npm** — the names the repo no longer publishes now carry a deprecation notice pointing at their replacement, so an install of an old name says so instead of silently resolving to an abandoned version.
 
 - **Package renames** — packages are now named for their role, not their position. `core` was frontend-only React while `server-core` was the actual core of the product; they shared a word and were otherwise unrelated. `client-firebase` depended on `admin`/`core`/`ui`, so it was a UI integration wearing a client-SDK name. Import paths are the only change — no behavior moved with them.
@@ -14407,6 +14442,8 @@ Nothing below was deprecated in the usual sense of "still works, please stop". E
   | `sideEntityController` (on `StudioBridge`) | `sidePanelController` |
 
 - **Client split into server/browser variants** — `RebaseClient` is now split so the RLS-bypassing accessor is explicit: use `rebase.dataAsAdmin` (server-only) for admin-scoped, RLS-bypassing access, and `rebase.data` for user-scoped access. The public API surface was curated to hide internal plumbing.
+
+  *Corrected since release:* this entry calls `rebase.dataAsAdmin` RLS-bypassing. It is not. It runs as `rebase_user` with uid `service` and the `admin` role, so policies are evaluated and one that does not admit an admin hides rows from it. `rebase.sql` is the accessor on the owner connection.
 
 - **`update`/`delete` throw on not-found** — SDK `update()` and `delete()` now throw when the target row does not exist, instead of silently returning `undefined`.
 
