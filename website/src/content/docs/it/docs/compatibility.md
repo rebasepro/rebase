@@ -1,124 +1,124 @@
 ---
-sourceHash: a8656ede47530810
+sourceHash: 63db41eff259cc37
 slug: it/docs/compatibility
 title: Compatibilità
-description: Cosa promette Rebase tra una versione e l'altra e cosa no — i sei contratti con versione, come ciascuno fallisce e cosa può ancora cambiare in una minor.
+description: Cosa promette Rebase tra le diverse versioni e cosa no — i sei contratti con versione, come fallisce ciascuno di essi e cosa potrebbe ancora cambiare in una minor release.
 ---
 
-Cosa promette Rebase tra una versione e l'altra, e cosa no.
+Cosa promette Rebase tra le diverse versioni, e cosa no.
 
 Questo è il documento da leggere prima di modificare qualsiasi elemento da cui dipende già un
-progetto distribuito o un tenant Rebase Cloud attivo. È anche la risposta onesta alla
-domanda: "se sviluppo oggi su Rebase, cosa si romperà in seguito?"
+progetto distribuito o un tenant Rebase Cloud attivo. È anche la risposta sincera alla
+domanda: "se sviluppo su Rebase oggi, cosa si romperà in seguito?"
 
-## Cosa significa "beta" qui
+## Cosa significa "beta" in questo contesto
 
-Rebase è in beta pubblica. La maggior parte dei progetti usa questa parola per indicare che "qualsiasi
-cosa potrebbe rompersi", il che non fornisce al lettore alcuna informazione utile per pianificare; ecco
-quindi la linea che questo progetto traccia concretamente:
+Rebase è in beta pubblica. La maggior parte dei progetti usa questa parola per indicare che "tutto
+potrebbe rompersi", il che non fornisce a chi legge alcuna indicazione utile per pianificare. Ecco quindi
+il limite concreto tracciato da questo progetto:
 
 > **L'API su cui scrivi codice può cambiare in una minor, con una voce nel changelog.
-> I tuoi dati non possono corrompersi silenziosamente.**
+> I tuoi dati non possono rompersi silenziosamente.**
 
-La prima metà è il consueto comportamento delle versioni `0.x` ed è descritta di seguito. La seconda
-metà è la parte che merita attenzione, perché riguarda meccanismi concreti anziché
-intenzioni: i contratti versionati nella sezione successiva sono ciascuno impresso
-in un artefatto o in un database, ciascuno viene verificato all'avvio o all'acquisizione, e ciascuno
-**fallisce in modo evidente e specifico** anziché degradare silenziosamente. Un push dello schema che
+La prima metà è il consueto comportamento di una versione `0.x` ed è descritto di seguito. La seconda
+metà è la parte che vale la pena esaminare, perché riguarda i meccanismi effettivi piuttosto
+che le intenzioni: i contratti con versione illustrati nella sezione successiva sono ciascuno impressi
+in un artefatto o in un database, ciascuno viene verificato all'avvio o in fase di acquisizione, e ciascuno
+**fallisce in modo esplicito e specifico** anziché degradarsi. Un push dello schema che
 comporterebbe l'eliminazione di una colonna viene rifiutato da un gate distruttivo
 (`packages/server-postgres/test/e2e/db-push-safety.test.ts`), e il percorso di aggiornamento
-stesso è un test: `upgrade-e2e.test.ts` ripristina i database nello stato in cui
-le release precedenti li avevano lasciati, esegue il percorso di migrazione corrente su ciascuno di essi
-e verifica che le righe sopravvivano — non semplicemente che l'avvio sia riuscito.
+stesso è un test: `upgrade-e2e.test.ts` ripristina i database esattamente come li avevano lasciati
+le release precedenti, esegue l'attuale percorso di migrazione su ciascuno di essi e verifica
+che le righe sopravvivano — non semplicemente che l'avvio sia andato a buon fine.
 
-Cosa significa invece beta: mancano ancora delle funzionalità, alcuni sottosistemi sono più recenti di
-altri e la natura delle imperfezioni sta nel fatto che qualcosa è assente o poco pratico,
-non nel fatto che corrompa qualcosa in modo silenzioso. Lo stato di ciascun sottosistema viene pubblicato
-e datato anziché lasciato alla scoperta dell'utente — la tabella sottostante è tale
-pubblicazione.
+Cosa significa davvero beta: mancano ancora delle funzionalità, alcuni sottosistemi sono più recenti di
+altri, e la forma delle imperfezioni è che qualcosa è assente o poco pratico,
+non che corrompa silenziosamente i dati. Quali siano questi sottosistemi viene reso pubblico
+e datato anziché lasciato alla scoperta casuale — la tabella sottostante rappresenta
+tale pubblicazione.
 
-## Livello di maturità per sottosistema
+## Prontezza per sottosistema
 
-**Ultima revisione 14 settembre 2026, rispetto a 0.21.0.** Rileggila a ogni minor; una
-valutazione che non è cambiata in tre release è o consolidata o dimenticata, e
-questa nota è qui affinché tale differenza venga verificata.
+**Ultima revisione: 14 settembre 2026, relativa a 0.21.0.** Rileggila a ogni minor; una
+valutazione che non è cambiata in tre release è ormai consolidata o dimenticata, e
+questa nota è qui affinché la differenza venga verificata.
 
-I tre livelli di valutazione significano:
+Le tre valutazioni indicano:
 
-- **Stable** — la struttura è consolidata e protetta da un gate in CI. Può ancora
-  acquisire nuove funzionalità; non verrà riprogettata all'improvviso all'interno della 0.x, e una modifica
-  che possa causare rotture sarà annunciata nel changelog.
-- **Beta** — funziona ed è utilizzato in produzione, ma presenta aspetti ancora grezzi
-  noti: un limite raggiungibile, un caso limite scomodo, una decisione di design
-  non ancora presa. La parte grezza è esplicitata nelle note, perché "beta" da sola
-  non dice nulla su cui poter pianificare.
-- **Experimental** — rilasciato per poter essere utilizzato e testato. Aspettati di incappare
-  nelle parti che nessuno ha ancora esplorato.
+- **Stabile** — la struttura è consolidata e protetta da un gate in CI. Può ancora
+  ricevere nuove funzionalità; non verrà riprogettata all'improvviso all'interno della 0.x, e una modifica
+  incompatibile verrà annunciata nel changelog.
+- **Beta** — funziona ed è utilizzato in produzione, ma presenta aspetti ancora acerbi
+  noti: un limite raggiungibile, un caso limite scomodo, una decisione di design non
+  ancora presa. La parte acerba viene indicata esplicitamente nelle note, perché la dicitura "beta" da sola
+  non dice nulla su cui pianificare.
+- **Sperimentale** — rilasciato per poter essere utilizzato e testato. Aspettati di imbatterti
+  negli aspetti che nessuno ha ancora affrontato.
 
 | Sottosistema | Valutazione | Su cosa si basa la valutazione |
 |---|---|---|
-| REST API + SDK generato | Stable | Il contratto wire è versionato e controllato da gate; `client-sdk-e2e` esegue registrazione → accesso → letture con ambito RLS → refresh → storage → realtime end-to-end |
-| Auth — email/password, OAuth, OIDC, magic link, codice monouso | Stable | Vengono forniti dodici provider OAuth. Lo schema di autenticazione è un contratto versionato, impresso e verificato all'avvio |
-| Auth — MFA (TOTP) | Beta | Registrazione, verifica e recupero funzionano e sono testati. La rotazione delle chiavi è implementata per la chiave di crittografia; non esiste un'interfaccia di amministrazione per reimpostare il fattore di un utente bloccato |
-| Row-level security | Stable | Il fulcro del prodotto. `pnpm rls:check` esegue un audit su un database attivo rispetto a quindici controlli, e la suite e2e di RLS viene eseguita a ogni push |
-| Storage | Stable | Locale, S3 e GCS. Rifiuto predefinito (default-deny) in produzione dalla 0.17.0, e lo scaffold include un hook authorize |
-| Realtime | **Beta** | Le sottoscrizioni vengono associate solo in base al percorso della collection, quindi N sottoscrittori su una singola collection costano N refetch con ambito RLS per ogni scrittura. Questo limita un deployment a poche centinaia di sottoscrittori concorrenti. Corretto a qualsiasi scala; costoso oltre tale soglia |
-| Ricerca vettoriale (pgvector) | Beta | Ogni colonna vettoriale riceve per impostazione predefinita un indice HNSW per la distanza del coseno, configurabile per proprietà tramite `VectorIndexConfig` (metodo, distanze, parametri di build) o disattivabile, lasciando una scansione esatta. pgvector non può indicizzare colonne con più di 2.000 dimensioni, pertanto queste rimangono non indicizzate ed eseguono una scansione |
-| Sincronizzazione offline | Beta | Le mutazioni includono chiavi di idempotenza rispettate dal server, e i difetti di perdita dati riscontrati nell'audit di luglio sono stati corretti. Il modello di risoluzione dei conflitti è last-write-wins senza merge campo per campo |
-| Cronologia entità | Stable | Basata su snapshot, protetta dalla propria suite di test |
-| Funzioni e cron | Stable | L'entry point portabile (`@rebasepro/server/functions`) è un contratto versionato con una propria sezione di superficie API |
-| Server MCP + skill per agenti | Beta | `@rebasepro/mcp` viene eseguito su stdio: cinquantuno tool, autenticazione bearer per progetto, i tool distruttivi rifiutano target non locali a meno che non sia esplicitamente richiesto. Dalla 0.21 il server può anche montare un endpoint `/mcp` remoto — OAuth 2.1, otto data tool, ogni chiamata protetta dalle RLS dell'utente autenticato — disattivato a meno che non sia impostato `REBASE_MCP_ENABLED=true`, e solo per Postgres |
-| Studio (SQL, schema, RLS, API explorer) | Beta | Utilizzato quotidianamente su progetti reali. Il branching è presente nel pacchetto OSS e volutamente non esposto in Rebase Cloud, poiché non esiste ancora una gestione per spostare una distribuzione attiva su un branch |
-| CMS + pannello di amministrazione | Beta | Completo per CRUD, relazioni, campi di archiviazione e ruoli. **La tabella dati non ha semantica grid** — nessun `role`, nessun `aria-rowindex`, `tabIndex` rimosso — quindi gli utenti da tastiera e con screen reader non possono utilizzare la vista principale. Nessuna bozza, nessun contenuto localizzato per lingua, nessun rich text a blocchi |
-| Database di sviluppo gestito PGlite | Beta | `rebase dev` a configurazione zero senza Docker. Una sessione alla volta, quindi le richieste vengono serializzate e la concorrenza non può essere riprodotta; i comandi basati su Atlas (`db push`, `generate`, `migrate`) pianificano su un secondo PGlite temporaneo avviato per il comando (su 0.24 rifiutano il database gestito); `db branch` non funziona lì e lo segnala esplicitamente |
-| Helm chart | Beta | Esegue il rendering della topologia a processi separati e viene pubblicato nel registro OCI a ogni release. L'impostazione predefinita rimane un singolo container |
-| `@rebasepro/server-mongo` | **Experimental** | Un driver funzionante con realtime basato su change-stream e cronologia basata su snapshot. **Nessuna row-level security** — l'intero modello di isolamento sopra descritto non si applica ad esso — e nessuna relazione. I change stream richiedono un replica set: su un'istanza `mongod` standalone non c'è nulla che li sostituisca, quindi una sottoscrizione vede solo le scritture effettuate tramite quel processo Rebase e perde tutte le altre. Nessuna MFA: la registrazione risponde 501 e i controlli rispondono "nessun fattore", quindi l'accesso non ne richiede mai uno. L'aggregazione admin non può avere come target una collection — legge il nome da uno stage `$from` che MongoDB non possiede — quindi non restituisce nulla |
-| `@rebasepro/firebase` | Experimental | Esegue il pannello di amministrazione e l'SDK su Firestore. Nessuna RLS, nessuna interfaccia SQL; il set di funzionalità di Postgres non viene trasferito. Il driver Firestore ignora i gruppi di filtri `or(...)`/`and(...)`, quindi una query che ne utilizza uno legge ogni riga consentita dai suoi filtri semplici |
-| Rebase Cloud | **Private beta** | Attivo, ospita tenant reali, rilasciato a scaglioni. Non self-service |
+| REST API + generated SDK | Stabile | Il wire contract ha una versione ed è protetto da gate; `client-sdk-e2e` gestisce registrazione → accesso → letture con ambito RLS → aggiornamento token → storage → realtime end-to-end |
+| Auth — email/password, OAuth, OIDC, magic link, one-time code | Stabile | Include dodici provider OAuth. Lo schema di autenticazione è un contratto con versione, impresso e verificato all'avvio |
+| Auth — MFA (TOTP) | Beta | Registrazione, verifica e recupero funzionano e sono testati. La rotazione della chiave è implementata per la chiave di crittografia; non esiste un'interfaccia di amministrazione per reimpostare il fattore di un utente bloccato |
+| Row-level security | Stabile | Il cardine del prodotto. `pnpm rls:check` esegue l'audit di un database live a fronte di quindici controlli, e la suite e2e di RLS viene eseguita a ogni push |
+| Storage | Stabile | Locale, S3 e GCS. Default-deny in produzione a partire da 0.17.0, e lo scaffold fornisce un hook di autorizzazione |
+| Realtime | **Beta** | Le sottoscrizioni corrispondono solo per percorso della collection, quindi N sottoscrittori su una collection costano N re-fetch con ambito RLS per ogni scrittura. Questo limita un deployment a qualche centinaio di sottoscrittori concorrenti. Corretto a qualsiasi scala; costoso oltre tale limite |
+| Vector search (pgvector) | Beta | Ogni colonna vettoriale ottiene di default un indice HNSW per distanza del coseno, configurabile per proprietà tramite `VectorIndexConfig` (metodo, distanze, parametri di build) o disattivabile, lasciando una scansione esatta. pgvector non può indicizzare colonne con più di 2.000 dimensioni, pertanto queste rimangono non indicizzate e vengono scansionate |
+| Offline sync | Beta | Le mutazioni includono chiavi di idempotenza rispettate dal server, e i difetti di perdita di dati rilevati durante l'audit di luglio sono stati risolti. Il modello di conflitto è last-write-wins senza merge per singolo campo |
+| Entity history | Stabile | Basata su snapshot, protetta da una propria suite di test |
+| Functions and crons | Stabile | L'entry point portabile (`@rebasepro/server/functions`) è un contratto con versione dotato di una propria sezione dedicata alla superficie API |
+| MCP server + agent skills | Beta | `@rebasepro/mcp` viene eseguito tramite stdio: cinquantatré strumenti, autenticazione bearer per progetto, gli strumenti distruttivi rifiutano target non locali a meno di un opt-in esplicito. Dalla versione 0.21 il server può anche montare un endpoint remoto `/mcp` — OAuth 2.1, otto strumenti dati, ogni chiamata sotto la RLS dell'utente autenticato — disattivato a meno che `REBASE_MCP_ENABLED=true`, e solo per Postgres |
+| Studio (SQL, schema, RLS, API explorer) | Beta | Utilizzato quotidianamente su progetti reali. Il branching è presente nel pacchetto OSS e deliberatamente non esposto in Rebase Cloud, poiché il passaggio di una distribuzione attiva a un branch non è ancora supportato |
+| CMS + admin panel | Beta | Completo per CRUD, relazioni, campi storage e ruoli. **La tabella dati non ha semantica di griglia** — nessun `role`, nessun `aria-rowindex`, `tabIndex` rimosso — quindi gli utenti che usano tastiera o screen-reader non possono interagire con la vista principale. Nessuna bozza, nessun contenuto per lingua (locale), nessun testo formattato a blocchi |
+| PGlite managed dev database | Beta | `rebase dev` a configurazione zero senza Docker. Una sola sessione alla volta, quindi le richieste vengono serializzate e non è possibile riprodurre la concorrenza; i comandi basati su Atlas (`db push`, `generate`, `migrate`) eseguono il piano a fronte di una seconda istanza PGlite usa-e-getta avviata per il comando (nella 0.24 rifiutano il database gestito); `db branch` non funziona lì e lo segnala |
+| Helm chart | Beta | Esegue il rendering della topologia a processi separati e viene pubblicato nel registro OCI a ogni release. Il default rimane un singolo container |
+| `@rebasepro/server-mongo` | **Sperimentale** | Un driver funzionante con realtime basato su change-stream e cronologia a snapshot. **Nessuna row-level security** — l'intero modello di isolamento sopra descritto non si applica — e nessuna relazione. I change stream richiedono un replica set: su un `mongod` standalone nulla li sostituisce, quindi una sottoscrizione vede solo le scritture effettuate tramite quel processo Rebase e perde tutte le altre. Nessun MFA: la registrazione risponde 501 e i controlli rispondono "nessun fattore", quindi il login non ne richiede mai uno. L'aggregazione admin non può avere come target una collection — legge il nome da uno stage `$from` che MongoDB non possiede — quindi non restituisce nulla |
+| `@rebasepro/firebase` | Sperimentale | Esegue il pannello admin e l'SDK su Firestore. Nessun RLS, nessuna superficie SQL; il set di funzionalità di Postgres non viene trasferito. Il driver Firestore ignora i gruppi di filtri `or(...)`/`and(...)`, quindi una query che ne utilizza uno legge ogni riga consentita dai suoi filtri semplici |
+| Rebase Cloud | **Private beta** | Attivo, con tenant reali, aperto a scaglioni. Non self-service |
 
-Due voci sopra riportate rappresentano il prezzo in termini di trasparenza nel pubblicare questa tabella:
-il refetch del realtime e l'accessibilità della tabella dati sono difetti noti e aperti, non
-voci di roadmap, ed entrambi sono elencati anziché lasciati alla scoperta del lettore.
+Due voci sopra riportate rappresentano il prezzo in termini di trasparenza del pubblicare questa tabella:
+il refetch del realtime e l'accessibilità della tabella dati sono difetti aperti, non elementi
+della roadmap, ed entrambi sono elencati anziché lasciati alla scoperta dell'utente.
 
-Questa tabella mostra ciò che esiste. Ciò che ancora non esiste si trova nella
-[roadmap](https://rebase.pro/roadmap), una voce per issue di GitHub, con il
-sottoinsieme richiesto per la 1.0 contrassegnato.
+Questa tabella rappresenta ciò che esiste. Ciò che ancora non c'è si trova nella
+[roadmap](https://rebase.pro/roadmap), con una voce per ogni issue di GitHub e con
+contrassegnato il sottoinsieme necessario per la 1.0.
 
-## La promessa della 0.x
+## La promessa dello 0.x
 
-Rebase è nella versione `0.x`. Questa sezione è scritta per essere valida per ogni release 0.x anziché
-per una specifica, in modo da non diventare obsoleta a ogni rilascio. **Le breaking change
-all'API TypeScript esposta agli sviluppatori sono ancora consentite in una minor**, e il changelog è
+Rebase è nella fase `0.x`. Questa sezione è scritta per essere valida per ogni release 0.x anziché
+per una sola di esse, in modo da non diventare obsoleta a ogni taglio di versione. **Le modifiche che interrompono la compatibilità (breaking change) all'API TypeScript scritta dallo sviluppatore sono ancora consentite in una minor**, e il changelog è
 il luogo in cui vengono annunciate. Ciò che
-*non* è consentito rompere silenziosamente è l'insieme dei contratti versionati riportati di seguito: ciascuno
-di essi è impresso in un artefatto o in un database, ciascuno viene controllato all'avvio o all'acquisizione,
-e ciascuno fallisce **in modo evidente e specifico** anziché degradare.
+*non* può rompersi silenziosamente è l'insieme dei contratti con versione riportati di seguito: ciascuno
+di essi è impresso in un artefatto o in un database, ciascuno viene controllato all'avvio o in fase di
+acquisizione, e ciascuno fallisce **in modo esplicito e specifico** anziché degradarsi.
 
-Questa distinzione rappresenta l'intera promessa. Un export rinominato comporta un errore di compilazione
-e cinque minuti di tempo. Un bundle che si avvia su un runtime errato e serve
-dati impercettibilmente errati comporta un incidente di produzione, e i contratti esistono affinché la
-seconda categoria non possa verificarsi silenziosamente.
+Questa distinzione racchiude l'intera promessa. Un export rinominato costa un errore
+di compilazione e cinque minuti. Un bundle che si avvia a fronte del runtime sbagliato e restituisce
+dati sottilmente errati costa un incidente, e i contratti esistono affinché la
+seconda categoria non possa mai verificarsi silenziosamente.
 
-Rebase Cloud consuma esattamente questi contratti e nient'altro. Tutto ciò che non è
-elencato qui è un dettaglio implementativo da cui la piattaforma non dipende.
+Rebase Cloud fa affidamento esattamente su questi contratti e su nient'altro. Tutto ciò che non è
+elencato qui è un dettaglio di implementazione da cui la piattaforma non dipende.
 
 ### Badge di versione e canary
 
-La documentazione viene pubblicata da `main`, quindi una pagina può descrivere qualcosa
-che nessuna release stabile ha ancora. Un badge *Da* nomina la prima release stabile che
-lo include, e il testo accanto dice che cosa fa la release precedente.
+La documentazione viene pubblicata dal branch `main`, quindi una pagina può descrivere qualcosa che nessuna
+release stabile possiede ancora. Un badge *Since* indica la prima release stabile che include quella funzionalità,
+e il testo accanto spiega il comportamento della versione precedente.
 
-Un canary è una build di `main` numerata come la release verso cui è diretta:
-`0.25.0-canary.g<commit>` è `main` a quel commit, dopo la 0.24.0 e prima della 0.25.0, e
-`rebase upgrade --to canary` installa il più recente. Include tutto ciò che era arrivato
-su `main` quando è stato compilato, quindi un badge che nomina la sua versione (Da 0.25)
-vale per te, e la nota sulla release precedente (su 0.24) descrive la release stabile da
-cui provieni. I canary precedenti alla 0.25.0 erano numerati dopo l'ultima release:
-anche `0.24.1-canary.g<commit>` è un'anteprima della 0.25.
+Una versione canary è una build di `main` numerata in base alla release verso cui è diretta:
+`0.25.0-canary.g<commit>` rappresenta `main` a quel commit, dopo la 0.24.0 e prima
+della 0.25.0, e `rebase upgrade --to canary` installa la più recente. Include
+tutto ciò che era confluito in `main` al momento della compilazione, quindi un badge che indica la sua
+versione (Since 0.25) è applicabile al tuo caso, e la nota sulla release precedente (on
+0.24) descrive la release stabile da cui provieni. Le canary precedenti alla 0.25.0 erano
+invece numerate a partire dall'ultima release: anche `0.24.1-canary.g<commit>` è un'anteprima
+della 0.25.
 
-## I contratti versionati
+## I contratti con versione
 
-I valori seguenti sono letti dal codice sorgente; considera i riferimenti ai file come la verità
+I valori seguenti vengono letti direttamente dal codice sorgente; considera i riferimenti ai file come la fonte di verità
 e questa tabella come la mappa.
 
 ```bash
@@ -128,64 +128,65 @@ grep -n "AUTH_SCHEMA_VERSION =" packages/server-postgres/src/auth/schema-version
 
 | # | Contratto | Dichiarato in | Verificato in | Direzione di compatibilità |
 |---|---|---|---|---|
-| 1 | Intervallo `rebase` in `rebase.json` | il progetto dell'utente | CLI in fase di build | il progetto dichiara quali runtime accetta |
+| 1 | Intervallo `rebase` in `rebase.json` | il progetto dell'utente | CLI in fase di build | il progetto specifica quali runtime accetta |
 | 2 | `BUNDLE_FORMAT_VERSION` | `packages/types/src/types/project_manifest.ts` | `packages/server/src/boot/bundle.ts` | **retrocompatibile** — il nuovo runtime legge i vecchi bundle |
 | 3 | `RUNTIME_CONTRACT_VERSION` | stesso file | stesso file | **corrispondenza esatta, in entrambe le direzioni** |
-| 4 | `AUTH_SCHEMA_VERSION` | `packages/server-postgres/src/auth/schema-version.ts` | all'avvio, rispetto a `rebase.schema_meta` | **solo in avanti** — il nuovo runtime migra i vecchi database |
-| 5 | `manifest.schemaVersion` | emesso da `rebase build` | inviato dall'SDK come `x-rebase-schema` se configurato | consultivo — identifica lo schema rispetto a cui il client è stato compilato |
+| 4 | `AUTH_SCHEMA_VERSION` | `packages/server-postgres/src/auth/schema-version.ts` | all'avvio, a fronte di `rebase.schema_meta` | **solo in avanti** — il nuovo runtime migra i vecchi database |
+| 5 | `manifest.schemaVersion` | emesso da `rebase build` | inviato dall'SDK come `x-rebase-schema` quando configurato | indicativo — identifica lo schema su cui è stato compilato il client |
 | 6 | Identificatori derivati del database | `contracts/derived-names.txt` | `pnpm check:derived-names` | **congelato** — un nome emesso da una release non viene mai ricalcolato |
 
 ### 1 — `rebase` in `rebase.json`
 
 Un intervallo semver, interpretato come `engines` in un `package.json`: indica quali versioni del runtime
 questo progetto accetta. Chiamato deliberatamente `rebase` anziché `runtime`, poiché
-su un'app `runtime` indica già *chi gestisce il processo* (`managed` | `custom`).
+`runtime` indica già *chi possiede il processo* (`managed` | `custom`) su un'app.
 
 ### 2 — `BUNDLE_FORMAT_VERSION` (attualmente 2)
 
-Il layout su disco di un bundle compilato. Un runtime accetta qualsiasi bundle il cui formato sia
-**minore o uguale** al proprio, il che consente al livello gestito di migrare un
+Il layout su disco di un bundle compilato. Un runtime accetta qualsiasi bundle il cui formato
+sia **minore o uguale** al proprio, ed è questo che consente al livello gestito di spostare un
 tenant su una nuova immagine senza che nessuno debba ricompilare il proprio progetto.
 
-- **1** — `mode: "cms" | "baas" | "static"`, `entry.static` come directory singola,
-  `entry.admin` per un pannello di amministrazione integrato.
-- **2** — `kind: "backend" | "static"`, `entry.static` come elenco, `entry.admin`
+- **1** — `mode: "cms" | "baas" | "static"`, `entry.static` una singola directory,
+  `entry.admin` per un pannello admin integrato.
+- **2** — `kind: "backend" | "static"`, `entry.static` un elenco, `entry.admin`
   rimosso. Il formato 1 viene ancora letto, tramite `upgradeLegacyManifest`.
 
-**Incrementalo quando** il layout cambia in modo tale che un runtime precedente interpreterebbe in modo errato un
-bundle più recente. L'incremento è ciò che trasforma "si avvia e non serve nulla" in un
-netto rifiuto di avviarsi.
+**Incrementalo quando** il layout cambia in modo tale che un runtime precedente interpreterebbe in modo errato
+un bundle più recente. L'incremento è ciò che trasforma una situazione del tipo "si avvia ma non serve nulla" in un
+rifiuto esplicito dell'avvio.
 
 ### 3 — `RUNTIME_CONTRACT_VERSION` (attualmente 1)
 
 La versione major del contratto bundle↔runtime. Distinta dalla versione del pacchetto `@rebasepro/server`,
-che può rilasciare qualsiasi numero di minor e patch mentre questa rimane invariata.
+che può rilasciare qualsiasi numero di versioni minor e patch mentre questa rimane invariata.
 
-**Leggilo prima di modificarlo.** Il controllo è `!==`, non `>`:
+**Leggi questo prima di toccarlo.** Il controllo è `!==`, non `>`:
 
-> un bundle che ha come target il contratto *N* viene eseguito **solo** su un runtime che implementa *N*
+> un bundle destinato al contratto *N* viene eseguito **solo** su un runtime che implementa *N*
 
-quindi incrementarlo invalida **qualsiasi bundle mai compilato**, contemporaneamente, finché ciascuno
-non viene ricompilato. Questa è la severità voluta — è la leva del tipo "nulla di vecchio può girare qui" — ma
-significa che un incremento costituisce una migrazione dell'intera flotta, non una semplice nota di rilascio. Per
-il livello gestito deve essere coordinato con una ricompilazione del bundle di ciascun tenant.
+quindi incrementarlo invalida **ogni bundle mai compilato**, tutti insieme, finché ciascuno
+non viene ricompilato. Questa è la severità prevista — è la leva del tipo "niente di vecchio può essere eseguito qui"
+— ma significa che un incremento costituisce una migrazione a livello dell'intero parco istanze, non una semplice nota di rilascio. Per
+il livello gestito deve essere coordinato con una ricompilazione del bundle di ogni tenant.
 
-Se una modifica è *additiva* e i vecchi bundle rimarrebbero corretti, richiede
-`BUNDLE_FORMAT_VERSION` (o nulla del tutto), non questo.
+Se una modifica è *additiva* e i vecchi bundle rimarrebbero comunque corretti, essa richiede
+`BUNDLE_FORMAT_VERSION` (o niente del tutto), non questo.
 
 ### 4 — `AUTH_SCHEMA_VERSION` (attualmente 2)
 
 Impresso in `rebase.schema_meta` e confrontato all'avvio. Un runtime **si rifiuta di
-avviarsi** su un database migrato da una versione del framework più recente, anziché
-operare su una struttura che non comprende — durante un rolling deploy, questa è la differenza tra metà della flotta che restituisce un errore e metà della flotta che corrompe i dati.
+avviarsi** a fronte di un database migrato da una versione più recente del framework, piuttosto che
+operare su una struttura che non comprende — durante un rolling deploy, questa è
+la differenza tra metà del parco istanze che restituisce un errore e metà che corrompe i dati.
 
-La migrazione in avanti è automatica: `ensureAuthTablesExist` aggiorna un database più
-vecchio. Nota che questo blocco di migrazione è deliberatamente racchiuso in un `try/catch` e
-genera log anziché lanciare eccezioni — un avvio zoppicante è preferibile a un crash loop — quindi **"si è
-avviato" non prova nulla**. Ogni asserzione nella suite di upgrade legge invece il
+La migrazione in avanti è automatica: `ensureAuthTablesExist` aggiorna un database
+più vecchio. Si noti che questo blocco di migrazione è deliberatamente racchiuso in un `try/catch` ed
+esegue il log invece di sollevare un'eccezione — un avvio zoppicante è meglio di un crash loop — quindi **"si è
+avviato" non dimostra nulla**. Ogni asserzione nella suite di upgrade legge invece il
 catalogo o i dati.
 
-**Incrementalo quando** una migrazione non deve essere ignorata da un runtime precedente. Non
+**Incrementalo quando** una migrazione non deve essere saltata da un runtime precedente. Non
 incrementarlo per una colonna additiva e retrocompatibile; c'è un esempio pratico di questa
 valutazione in `packages/server-postgres/src/auth/ensure-tables.ts`.
 
@@ -193,8 +194,8 @@ valutazione in `packages/server-postgres/src/auth/ensure-tables.ts`.
 
 Un hash delle definizioni compilate delle collection, emesso nel manifest del bundle
 e replicato da un SDK generato nell'header `x-rebase-schema`
-(`SCHEMA_VERSION_HEADER`). Esiste affinché la piattaforma possa indicare "questa app è stata creata
-su uno schema precedente" invece di fallire misteriosamente alla prima richiesta.
+(`SCHEMA_VERSION_HEADER`). Esiste affinché la piattaforma possa segnalare che "questa app è stata creata
+a fronte di uno schema precedente" anziché fallire misteriosamente alla prima richiesta.
 
 `rebase generate-sdk` scrive il valore in `schema.meta.ts`; passalo al
 client per inviarlo:
@@ -209,10 +210,10 @@ const rebase = createRebaseClient<Database>({
 });
 ```
 
-Il backend legge tale header su ogni richiesta di dati. Il disallineamento (drift) non rifiuta mai una
+Il backend legge tale header a ogni richiesta di dati. Il disallineamento (drift) non rifiuta mai una
 chiamata — un SDK indietro di uno schema è solitamente ancora compatibile, e distribuire il
 backend prima del frontend è il normale ordine di deployment — ma quando una richiesta
-fallisce con un errore 400 o 404, l'errore riporta il drift come causa:
+fallisce con un 400 o un 404, l'errore riporta il drift come causa:
 
 ```json
 {
@@ -229,171 +230,175 @@ fallisce con un errore 400 o 404, l'errore riporta il drift come causa:
 }
 ```
 
-In questo modo, una colonna rinominata viene segnalata come "il tuo SDK è obsoleto, rigeneralo" anziché come
-un campo che i tuoi stessi tipi insistono esistere. Una richiesta andata a buon fine non riceve mai questa notifica.
+In questo modo, una colonna rinominata viene segnalata come "il tuo SDK non è aggiornato, rigeneralo" anziché come
+un campo che i tuoi tipi insistono debba esistere. A una richiesta andata a buon fine questo non viene mai notificato.
 
 Copre **solo le collection**. La modifica di un hook o di una funzione non altera il
-contratto del client e non deve invalidare ogni SDK generato.
+contratto di un client e non deve invalidare ogni SDK generato.
 
 ### Chi sta effettuando la chiamata
 
-Altri due segnali identificativi, nessuno dei quali funge da gate da solo:
+Altri due segnali identificativi, nessuno dei quali blocca nulla di per sé:
 
-- **`GET /api/meta/schema-version`** non è autenticato e risponde con `schemaVersion`
-  *e* `runtime` (`version` e `contract`) del progetto. Un
-  job CI che confronta il proprio SDK generato con un progetto attivo non necessita di
-  credenziali, così come un client che chiede con quale runtime sta comunicando.
-- **`User-Agent: rebase-cli/<version>`** è presente su ogni richiesta a `rebase cloud`.
-  Il formato wire del control plane si evolve più velocemente rispetto a quanto pubblicato su npm, quindi deve
-  essere in grado di rispondere a un client obsoleto con `CLI_TOO_OLD` e la versione
-  minima — cosa che può fare solo per un chiamante che dichiara la propria identità.
+- **`GET /api/meta/schema-version`** non richiede autenticazione e risponde con lo
+  `schemaVersion` del progetto *e* con il suo `runtime` (`version` e `contract`). Un
+  job di CI che confronta il proprio SDK generato con un progetto live non necessita di
+  credenziali, così come un client che chiede con quale runtime stia comunicando.
+- **`User-Agent: rebase-cli/<version>`** viene incluso in ogni richiesta verso `rebase cloud`.
+  Il formato di rete (wire format) del control plane evolve più rapidamente di quanto pubblicato su npm, quindi
+  deve poter rispondere a un client obsoleto con `CLI_TOO_OLD` e la versione minima —
+  operazione possibile solo se il chiamante dichiara la propria identità.
 
 ### 6 — Identificatori derivati del database
 
-Ogni nome che questo framework ricava autonomamente anziché esserne informato: una colonna
-di foreign key, un vincolo di foreign key, una tabella di giunzione e le sue due colonne chiave, un
-tipo enum, il nome di una policy, la colonna in `snake_case` di una proprietà in `camelCase`.
+Qualsiasi nome che questo framework ricava autonomamente anziché ricevere esplicitamente: una colonna
+di chiave esterna, un vincolo di chiave esterna, una tabella di giunzione e le sue due colonne chiave, un
+tipo enum, il nome di una policy, la colonna in `snake_case` di una proprietà definita in `camelCase`.
 
 > **Un identificatore derivato è congelato dal momento esatto in cui una release lo emette.**
 
-Non "congelato fino alla prossima major" — congelato. La motivazione è diversa dagli
-altri cinque contratti, ed è più stringente. Quelli sono versionati, quindi una discrepanza può essere
-*rilevata* e rifiutata. Questo no: il nome viene scritto nel database di un cliente
-il giorno in cui effettua il deploy, e non c'è alcun indicatore di versione su una colonna. Ogni
-database configurato da qualunque release mai rilasciata porta con sé qualunque cosa abbia derivato, e
-nessun codice in questo repository può intervenire a rinominarli tutti.
+Non "congelato fino alla prossima major release" — congelato. La motivazione è diversa da quella degli
+altri cinque contratti, ed è più vincolante. Quelli hanno una versione, quindi un disallineamento può essere
+*rilevato* e rifiutato. Questo no: il nome viene scritto nel database di un cliente
+il giorno in cui effettua il deployment, e non vi è alcuna indicazione di versione su una colonna. Ogni
+database sottoposto a provisioning da qualsiasi release mai rilasciata contiene qualsiasi cosa sia stata derivata,
+e nessun codice in questo repository può intervenire per rinominarli tutti.
 
-La versione 0.13 ne è l'esempio pratico. `generateForeignKeyName` ha imparato a rendere correttamente al singolare i nomi —
-`categorie_id` → `category_id`, `addres_id` → `address_id` — il che è
-inequivocabilmente una derivazione migliore, e ha rotto ogni database esistente che conteneva un
-plurale irregolare. Boot-ensure ha migrato la colonna, quindi i dati sono sopravvissuti; il file
-`schema.generated.ts` sottoposto a commit nel progetto non lo ha fatto, e l'avvio è fallito su una colonna
-che esisteva. Tre commit, un nuovo seam test e una voce permanente nelle note di aggiornamento,
-in cambio di un nome di colonna più gradevole alla vista che nessuno aveva richiesto.
+La 0.13 ne è l'esempio pratico. `generateForeignKeyName` ha imparato a rendere correttamente al
+singolare i nomi — `categorie_id` → `category_id`, `addres_id` → `address_id` — che è
+senza dubbio una derivazione migliore, e ha rotto ogni database preesistente che contenesse un
+plurale irregolare. Il boot-ensure ha migrato la colonna, quindi i dati sono sopravvissuti; il
+file `schema.generated.ts` salvato nel repository del progetto no, e l'avvio è fallito a causa di una colonna
+che esisteva. Tre commit, un nuovo seam test e una nota permanente nelle note
+di aggiornamento, in cambio di un nome di colonna esteticamente più gradevole che nessuno aveva richiesto.
 
-**Se una derivazione è realmente errata**, viene modificata per le collection create
+**Se una derivazione è realmente errata**, viene modificata solo per le collection create
 *successivamente*, dietro una naming strategy registrata nel progetto — mai
-retroattivamente, e mai come effetto collaterale del miglioramento della funzione sottostante.
+retroattivamente e mai come effetto collaterale del miglioramento della funzione sottostante.
 
-**L'unica eccezione legittima** è una modifica che allinea il codice a un nome che
-il database *ha già*. L'esempio pratico è il troncamento degli identificatori: Postgres
-taglia silenziosamente un identificatore a 63 byte, quindi un nome di vincolo derivato più lungo non è
-mai stato presente nel catalogo con quel nome — la derivazione descriveva un oggetto che
-non esisteva con quella grafia, e boot-ensure eseguiva nuovamente `ADD CONSTRAINT` a
-ogni singolo avvio perché il confronto non poteva mai coincidere. Il troncamento in fase di
-costruzione modifica ciò che questo repository *deriva* e non cambia nulla di ciò che un
-qualsiasi database distribuito *contiene*. Questo è il criterio da applicare: non "il nuovo nome è
+**L'unica eccezione legittima** è una modifica che allinea il codice a un nome che il database
+*ha già*. L'esempio pratico è il troncamento degli identificatori: Postgres
+tronca silenziosamente un identificatore a 63 byte, quindi un nome di vincolo derivato più lungo non
+è mai stato presente con quel nome nel catalogo — la derivazione descriveva un oggetto che
+non esisteva con quella dicitura, e il boot-ensure rieseguiva `ADD CONSTRAINT` su
+ogni singolo avvio perché il confronto non poteva mai corrispondere. Il troncamento in fase di
+costruzione modifica ciò che questo repository *deriva* e non cambia nulla di ciò che qualsiasi
+database distribuito *contiene*. Questo è il criterio da applicare: non "il nuovo nome è
 migliore?", ma "qualche database esistente deve cambiare?".
 
-L'altro caso in cui un nome può cambiare è un insieme di nomi che non potrebbero mai esistere tutti
-insieme. Una regola che copre più operazioni su una tabella di 42 byte o più derivava
-`<table>_default_admin_write_insert`, `_update` e `_delete`, e tutti e tre venivano troncati agli
-stessi 63 byte. Postgres memorizzava una sola policy, DELETE, e rifiutava ogni INSERT
-e UPDATE dell'admin. Solo quando i nomi di una regola collidono così vengono derivati
-con il suffisso per primo, come `<head>_<hash8>_<op>`. Ogni nome che funziona oggi mantiene
-la sua grafia. Il prossimo avvio o push elimina l'unica policy troncata e crea una
+L'altro caso in cui un nome può cambiare è un insieme di nomi che non potrebbero mai coesistere tutti.
+Una regola che copriva diverse operazioni su una tabella di 42 o più byte derivava
+`<table>_default_admin_write_insert`, `_update` e `_delete`, e tutti e tre venivano troncati
+agli stessi 63 byte. Postgres memorizzava una sola policy, DELETE, e rifiutava ogni
+INSERT e UPDATE dell'amministratore. Solo quando i nomi di una regola entrano in conflitto in questo modo
+vengono derivati con il suffisso prioritario, come `<head>_<hash8>_<op>`. Ogni nome che funziona
+oggi mantiene la sua dicitura. L'avvio o push successivo elimina l'unica policy troncata e crea una
 policy per ciascuna operazione.
 
-L'unica cosa sempre sicura è *riconoscere* un vecchio nome per migrarlo:
-`legacyForeignKeyName` esiste per essere rilevato, mai per essere generato,
-e la baseline blocca anche tali rilevamenti. Rimuoverne uno de-migra silenziosamente
-ogni database che presenta ancora quella grafia.
+L'unica cosa che è sempre sicura è *riconoscere* un vecchio nome per poterlo migrare:
+`legacyForeignKeyName` esiste per essere rilevato, mai per essere generato, e la baseline
+fissa anche tali rilevamenti. Rimuoverne uno annulla silenziosamente la migrazione di
+ogni database che ha ancora quella dicitura.
 
 **Il gate.** `tooling/scripts/derived-names.mts` esegue una fixture di stress sui nomi — plurali
-irregolari, una desinenza in `ss`, un acronimo, una giunzione da uno slug plurale, override
-espliciti, uno slug sufficientemente lungo da essere troncato — attraverso entrambi i generatori di DDL dello schema,
-ed esegue il rendering di ogni identificatore nominato da ciascuno di essi:
+irregolari, terminazioni in `ss`, acronimi, tabelle di giunzione generate da slug plurali, override
+espliciti, slug sufficientemente lunghi da essere troncati — attraverso entrambi i generatori di DDL dello schema,
+e visualizza ogni identificatore prodotto da ciascuno di essi:
 
 ```bash
 pnpm check:derived-names
 ```
 
-Una riga modificata o rimossa fallisce come violazione del contratto, mostrando la vecchia e la nuova grafia
-affiancate. Anche una modifica puramente additiva fallisce, ma con il messaggio "regenerate" — così che la
-baseline non possa deviare all'insaputa di nessuno.
+Una riga modificata o rimossa fallisce come violazione del contratto, mostrando la vecchia e la nuova dicitura
+affiancate. Anche una modifica puramente additiva fallisce, ma con l'indicazione "regenerate" — in modo che
+la baseline non possa subire variazioni all'insaputa di nessuno.
 
 Fissa inoltre che `rebase db push` e il boot-ensure del runtime gestito derivino gli
-*stessi* nomi, il che rappresenta un secondo contratto nascosto nel primo: compilano
-le stesse collection attraverso codice differente, e un progetto sottoposto a push una volta e avviato
-in seguito non deve ritrovarsi con due schemi.
+*stessi* nomi, il che rappresenta un secondo contratto nascosto all'interno del primo: compilano
+le stesse collection attraverso codice diverso, e un progetto caricato con push e avviato
+in seguito non deve ritrovarsi con due schemi diversi.
 
 ## Cosa *non* è congelato
 
-Detto chiaramente, affinché nessuno deduca una promessa mai fatta:
+Detto chiaramente, affinché nessuno presuma promesse mai fatte:
 
-- L'API TypeScript esposta agli sviluppatori — configurazione delle collection, opzioni di
-  `initializeRebaseBackend`, props dell'admin, nomi dei metodi dell'SDK. Le breaking change
-  vengono introdotte nelle minor e sono annunciate nel changelog.
+- L'API TypeScript scritta dallo sviluppatore — configurazione delle collection, opzioni di `initializeRebaseBackend`,
+  proprietà admin, nomi dei metodi dell'SDK. Le breaking change avvengono nelle minor e
+  vengono annunciate nel changelog.
 - `@rebasepro/studio`, `@rebasepro/mcp`, `@rebasepro/inference`,
-  `@rebasepro/plugin-*` — si evolvono più rapidamente e hanno il minor numero di utilizzatori.
-- Qualsiasi elemento presente in `src/` di un pacchetto che non sia riesportato dal suo barrel file.
-  `packages/client/src/index.ts` contiene una nota che spiega che il suo elenco di export
-  è curato proprio per evitare che un export interno diventi pubblico per errore.
-- Lo schema del database delle *tue* collection. Quello appartiene a te; Rebase gestisce unicamente lo
-  schema `rebase` (e, su un database predisposto prima della 0.13, il vecchio schema `auth`
-  finché l'avvio non lo ritira).
+  `@rebasepro/plugin-*` — questi pacchetti si evolvono più rapidamente e hanno il minor numero di utilizzatori.
+- Tutto ciò che si trova sotto `src/` di un pacchetto e non viene riesportato dal relativo file barrel.
+  `packages/client/src/index.ts` include una nota che spiega che il suo elenco di export
+  è curato appositamente affinché un export interno non possa diventare pubblico per errore.
+- Lo schema del database delle *tue* collection. Quello appartiene a te; Rebase gestisce solo lo
+  schema `rebase` (e, su un database creato prima della versione 0.13, il vecchio schema `auth`
+  finché l'avvio non lo dismette).
 
-## I gate che li proteggono
+## I gate a presidio di queste garanzie
 
-Nulla di quanto sopra è una semplice convenzione — ognuno dispone di un test che fallisce in caso di rottura:
+Nulla di quanto sopra è una semplice convenzione: ognuno ha un test che fallisce in caso di violazione:
 
-| Gate | Cosa blocca |
+| Gate | Cosa presidia |
 |---|---|
-| `pnpm verify:corpus` | ogni formato di bundle mai rilasciato, avviato sul runtime attuale. Le fixture in `tests/fixtures/bundles/` sono **scritte a mano e congelate** — una fixture rigenerata dal builder cambia ogni volta che il builder cambia |
-| `pnpm verify:selfhost` | un bundle reale compilato, impacchettato, avviato e interrogato come farebbe un browser |
-| `upgrade-e2e.test.ts` | vecchi schemi di database (`schema-snapshots/`) gestiti dal runtime corrente |
-| `tests/e2e/tests/cli-init-e2e.ts` | un progetto di scaffold installato da **tarball reali**, non da collegamenti di workspace |
-| `tests/e2e/tests/client-sdk-e2e.ts` | il percorso dell'utente finale: registrazione → accesso → letture con ambito RLS → refresh → storage → realtime |
-| `pnpm check:derived-names` | ogni colonna, vincolo, giunzione, enum e nome di policy che il framework deriva — e che boot e `db push` li derivino in modo identico |
+| `pnpm verify:corpus` | ogni forma di bundle mai rilasciata, avviata sul runtime odierno. Le fixture in `tests/fixtures/bundles/` sono **scritte a mano e congelate** — una fixture rigenerata dal builder cambia ogni volta che cambia il builder |
+| `pnpm verify:selfhost` | un vero bundle compilato, compresso, avviato e interrogato esattamente come farebbe un browser |
+| `upgrade-e2e.test.ts` | i vecchi schemi di database (`schema-snapshots/`) gestiti dal runtime attuale |
+| `tests/e2e/tests/cli-init-e2e.ts` | un progetto generato via scaffold installato da **veri tarball**, non da collegamenti del workspace |
+| `tests/e2e/tests/client-sdk-e2e.ts` | il percorso dell'utente finale: registrazione → accesso → letture con ambito RLS → aggiornamento token → storage → realtime |
+| `pnpm check:derived-names` | ogni nome di colonna, vincolo, tabella di giunzione, enum e policy derivato dal framework — e che l'avvio e `db push` li derivino in modo identico |
 | `pnpm rls:check` | le policy dello schema generato |
-| `pnpm check:api-surface` | ogni export, e i relativi membri, dei cinque pacchetti forniti dall'immagine — `@rebasepro/server`, `types`, `client`, `common`, `utils` — più l'entry point `@rebasepro/server/functions`, rispetto alle sei sezioni di `contracts/server.api.txt`. Questi sono i pacchetti che `infra/docker/entrypoint.mjs` collega tramite symlink sulle copie del bundle distribuito, quindi la rimozione di un export da uno di essi non è un errore di compilazione per nessuno — è un errore di avvio per l'intera flotta, durante un rollout che nessuno ha richiesto |
-| `pnpm test:gates` | i test stessi dei gate, eseguiti sulle fixture — quarantasette file, tra cui `check:api-surface` e il controllo di bump della release riportato di seguito — cosicché un gate che smette di rilevare ciò che protegge fallisce qui. `check:api-surface` ha trascorso la sua intera esistenza incapace di rilevare la scomparsa di un membro da `const rebase` |
-| `node tooling/scripts/check-release-bump.mjs` | che il livello di bump con cui viene rilasciata una release corrisponda a ciò che la release ha modificato nelle baseline sopra citate — eseguito da `publish.yml` prima che il changelog venga sigillato |
-| saas CI | il control plane compilato rispetto al ramo `main` di questo repository, sui propri push e nelle build notturne (nightly) |
+| `pnpm check:api-surface` | ogni export e i relativi membri dei cinque pacchetti forniti dall'immagine — `@rebasepro/server`, `types`, `client`, `common`, `utils` — oltre all'entry point `@rebasepro/server/functions`, a fronte delle sei sezioni di `contracts/server.api.txt`. Questi sono i pacchetti che `infra/docker/entrypoint.mjs` collega tramite symlink sopra le copie del bundle distribuito, quindi la rimozione di un export da uno di essi non è un errore di compilazione per gli utenti — è un errore di avvio nell'intero parco istanze, durante un rollout che nessuno ha richiesto |
+| `pnpm test:gates` | i test dei gate stessi, eseguiti sulle fixture — quarantasette file, tra cui `check:api-surface` e il controllo del bump di release descritto sotto — in modo che un gate che smette di rilevare ciò che dovrebbe proteggere fallisca qui. `check:api-surface` ha trascorso la sua intera esistenza senza essere in grado di rilevare la scomparsa di un membro da `const rebase` |
+| `node tooling/scripts/check-release-bump.mjs` | che il livello di incremento (bump) con cui viene rilasciata una versione corrisponda a ciò che la release ha modificato nelle baseline di cui sopra — eseguito da `publish.yml` prima che il changelog venga impresso |
+| saas CI | il control plane compilato a fronte del branch `main` di questo repository, sui propri push e a frequenza notturna |
 
-**Registra una fixture di bundle e uno snapshot dello schema una volta per release.** Il valore di
-entrambi i corpus risiede interamente in quanto indietro nel tempo risalga il più vecchio di essi, e nessuno dei due può
-essere integrato retroattivamente.
+**Registra una fixture del bundle e uno snapshot dello schema una volta per ogni release.** Il valore di
+entrambi i corpora risiede interamente in quanto indietro nel tempo risale il più vecchio, e nessuno dei due può essere
+ricostruito a posteriori.
 
-### Non ancora protetti da gate
+### Non ancora protetto da gate
 
-La tabella sopra riportata indica ciò che è garantito. Queste sono le parti della policy per le quali
-non vi è ancora alcuna garanzia formale, elencate affinché nessuno vi legga promesse implicite:
+La tabella sopra rappresenta ciò che è garantito. Queste sono le parti della policy per le quali non esiste
+ancora una protezione automatica, elencate affinché nessuno vi legga una promessa:
 
-- **Nessuna finestra di deprecazione o supporto.** Finché Rebase è in versione `0.x`, non esiste una regola
-  scritta su quanto a lungo sopravviva un export deprecato prima della rimozione, o per quanto tempo un'edizione
-  minor precedente riceva correzioni. Le correzioni di sicurezza vengono rilasciate unicamente sull'ultima minor.
-- **Il formato wire HTTP non ha alcun gate.** Nessuno script `check:*` confronta le strutture di richiesta e
-  risposta rispetto a una baseline nel modo in cui `check:api-surface` confronta gli export; una
-  modifica nella struttura della risposta viene intercettata solo se una suite e2e si trova a leggerla.
-- **I flag della CLI non hanno una baseline di compatibilità.** Il verificatore della documentazione fallisce quando
-  scompare un flag utilizzato dalle skill, dagli esempi o dal sito web; nient'altro si accorge della rimozione di altri flag o del cambiamento del significato di un flag.
-- **Una release da CI non registra alcun corpus.** Il workflow di pubblicazione non registra alcuna fixture di bundle
-  né alcuno snapshot dello schema; solo lo script di release locale ci prova, e avverte invece di bloccarsi quando non ci riesce. Dalla 0.18 alla 0.21 non è stato registrato alcuno snapshot del progetto.
-- **La superficie degli export è un gate, non un contratto.** La decisione se gli export pubblici dei pacchetti
-  forniti dal runtime debbano diventare un settimo contratto numerato — dichiarato come baseline di `check:api-surface`,
-  compatibile in modo additivo all'interno di una major del contratto — è ancora aperta.
+- **Nessuna finestra di deprecazione o supporto.** Finché Rebase è in versione `0.x` non esiste alcuna
+  regola scritta su quanto a lungo un export deprecato rimanga prima di essere rimosso, o per quanto tempo un'older
+  minor release riceva correzioni. Le correzioni di sicurezza vengono applicate solo alla minor release più recente.
+- **Il formato di rete HTTP (wire format) non ha un gate.** Nessuno script `check:*` confronta la struttura
+  di richieste e risposte con una baseline come fa `check:api-surface` per gli export; una
+  modifica nella struttura della risposta viene rilevata solo da una suite e2e che casualmente la legge.
+- **I flag della CLI non hanno una baseline di compatibilità.** Lo strumento di verifica della documentazione fallisce quando
+  un flag utilizzato dalle skill, dagli esempi o dal sito di marketing scompare; nulla
+  si accorge della rimozione di qualsiasi altro flag o del cambio di significato di un flag.
+- **Un rilascio via CI non registra alcun corpus.** Il workflow di pubblicazione non registra alcuna fixture
+  di bundle né alcuno snapshot di schema; solo lo script di rilascio locale ci prova, e
+  segnala un avviso anziché bloccarsi quando non ci riesce. Dalla 0.18 alla 0.21 non è presente alcuno
+  snapshot di progetto registrato.
+- **La superficie degli export è un gate, non un contratto.** Se gli export pubblici dei pacchetti forniti dal
+  runtime diventeranno un settimo contratto numerato — dichiarato come la baseline di `check:api-surface`,
+  compatibile in modo additivo all'interno di una major del contratto — è una decisione ancora aperta.
 
 ## Modificare un contratto
 
-1. Determina a quale dei sei appartiene. La maggior parte delle modifiche non rientra in nessuno di essi — ma
-   "nessuno dei sei" non significa "privo di conseguenze". Rimuovere o rinominare un export
-   di `@rebasepro/server`, o un suo membro, non fa parte dei sei ed è la modifica più pericolosa
-   in assoluto nell'intero repository, poiché il codice che va a rompere è già compilato
-   e non verrà ricompilato. `pnpm check:api-surface` è ciò che difende tale confine; se debba diventare un settimo contratto numerato è una decisione aperta (vedere
-   *Non ancora protetti da gate*, sopra).
-2. Aggiungi prima una fixture o uno snapshot per la **vecchia** struttura e verifica che il test passi.
+1. Determina a quale dei sei appartiene. La maggior parte delle modifiche non rientra in nessuno di essi — ma "nessuno
+   dei sei" non significa "privo di rischi". Rimuovere o rinominare un export di
+   `@rebasepro/server`, o un suo membro, non fa parte dei sei ed è la modifica in assoluto
+   più pericolosa nel repository, perché il codice che viene interrotto è già compilato
+   e non verrà ricompilato. `pnpm check:api-surface` è ciò che presidia questo confine; se
+   diventerà un settimo contratto numerato è una decisione ancora aperta (vedi
+   *Non ancora protetto da gate*, sopra).
+2. Aggiungi prima una fixture o uno snapshot per la **vecchia** struttura, e verifica che il test passi.
 3. Applica la modifica e incrementa la costante.
-4. Verifica che la vecchia fixture passi ancora, o che ora fallisca *con il messaggio
-   di cui l'utente avrebbe bisogno*. Entrambi sono esiti validi; il silenzio non lo è.
+4. Conferma che la vecchia fixture continui a passare, oppure che ora fallisca *con il messaggio
+   necessario all'utente*. Entrambi sono esiti validi; il silenzio non lo è.
 5. Per il contratto 3, pianifica la ricompilazione di ogni bundle distribuito prima del merge.
-6. Il contratto 6 fa eccezione ai passaggi 3 e 4: non c'è alcuna costante da incrementare e
-   nessuna versione su cui opporre un rifiuto, poiché una colonna non reca alcun contrassegno di versione. Il passaggio
-   che li sostituisce consiste nel decidere di non apportare la modifica — vedere la sezione precedente
-   per scoprire quale sia l'alternativa.
+6. Il contratto 6 fa eccezione ai punti 3 e 4: non c'è alcuna costante da incrementare e
+   nessuna versione su cui opporre un rifiuto, poiché una colonna non reca alcuna indicazione di versione. Il passaggio
+   che li sostituisce consiste nel decidere di non apportare la modifica — consulta la sezione precedente
+   per vedere quale sia l'alternativa.
 
 ## Risorse correlate
 
-- [Upgrading](/docs/upgrading/) — cosa si è effettivamente rotto, release per release
+- [Aggiornamento](/docs/upgrading/) — cosa si è effettivamente rotto, release per release
 - [Changelog](/docs/changelog/) — ogni modifica, comprese quelle che non hanno rotto nulla
-- [Runtime & Bundles](/docs/architecture/runtime-and-bundles/) — contratto 3 — il formato del bundle rispetto al quale un progetto distribuito è già compilato
+- [Runtime e Bundle](/docs/architecture/runtime-and-bundles/) — contratto 3 — il formato di bundle su cui un progetto distribuito è già compilato

@@ -1,42 +1,40 @@
 ---
-sourceHash: b20067fcabaf42ec
-title: MCP Server
-sidebar_label: MCP Server
-description: Verbinden Sie Claude Code, Cursor, Gemini CLI oder beliebige MCP-Clients mit einem Rebase-Projekt – die 51 bereitgestellten Tools, die Anmeldedaten zur Authentifizierung und das Loopback-Gate, das zwischen einem Agenten und der Produktion steht.
+sourceHash: 59966953b83890cf
+title: MCP-Server
+sidebar_label: MCP-Server
+description: Verbinden Sie Claude Code, Cursor, Gemini CLI oder einen beliebigen MCP-Client mit einem Rebase-Projekt – die 53 bereitgestellten Tools, die Anmeldedaten für die Authentifizierung und das Loopback-Gate, das zwischen einem Agenten und der Produktion steht.
 ---
 
 `@rebasepro/mcp` ist ein [Model Context Protocol](https://modelcontextprotocol.io)-Server,
-der einem KI-Assistenten echte Tools für ein Rebase-Projekt bereitstellt: Zeilen
-lesen und schreiben, Benutzer verwalten, Migrationen ausführen, Funktionen
-aufrufen und den Dev-Server steuern.
+der einem KI-Assistenten echte Werkzeuge für ein Rebase-Projekt an die Hand gibt: Zeilen
+lesen und schreiben, Benutzer verwalten, Migrationen ausführen, Funktionen aufrufen
+und den Dev-Server steuern.
 
-Er kommuniziert über MCP **ausschließlich via stdio**. Es gibt keinen Port und
-keinen Listener – der Prozess genießt exakt dasselbe Vertrauen wie derjenige, der
-ihn gestartet hat, und es gibt keinen Remote-Aufrufer, der authentifiziert werden
-müsste. Das ist der sichere Teil. Die interessanten Fragen drehen sich darum, was
-er tut, *sobald* er läuft – und diese Seite beantwortet sie, bevor sie Ihnen den
-Konfigurationsblock zeigt.
+Er spricht MCP **ausschließlich über stdio**. Es gibt keinen Port und keinen Listener – der
+Prozess genießt exakt dasselbe Vertrauen wie die Instanz, die ihn gestartet hat, und es
+gibt keinen Remote-Aufrufer, der authentifiziert werden müsste. Das ist der sichere Teil.
+Die interessanten Fragen drehen sich alle darum, was er tut, *sobald* er läuft, und diese
+Seite beantwortet sie, bevor sie den Konfigurationsblock zeigt.
 
-Ein bereitgestelltes Backend kann MCP auch selbst über HTTP für die Benutzer Ihrer
-Anwendung bereitstellen. Das ist ein anderer Anwendungsfall mit einem anderen
-Modell für Zugangsdaten: siehe [Der Remote-MCP-Endpunkt](/docs/ai/remote-mcp/).
+Ein bereitgestelltes Backend kann MCP auch selbst über HTTP für die Personen bereitstellen,
+die Ihre Anwendung nutzen. Das ist ein anderes Szenario mit einem anderen Berechtigungsmodell:
+siehe [Der Remote-MCP-Endpunkt](/docs/ai/remote-mcp/).
 
-## Verbinden eines Clients
+## Einen Client verbinden
 
-Der Server läuft aus Ihrem Projekt heraus: `@rebasepro/mcp` ist eine devDependency,
-die jedes `rebase init`-Scaffold mit der CLI fixiert, und jeder der folgenden
-Blöcke – die gesamte Integration – startet diese Kopie (`pnpm exec rebase-mcp`
-oder `npx --no rebase-mcp` in einem npm-Projekt), nie eine neuere aus npm. Ein
-älteres Projekt fügt ihn einmalig hinzu, mit `rebase skills install --mcp` oder
-`pnpm add -D @rebasepro/mcp`.
+Der Server wird aus Ihrem Projekt heraus ausgeführt: `@rebasepro/mcp` ist eine devDependency,
+die jedes `rebase init`-Scaffold mit der CLI festlegt, und jeder unten stehende Block – die
+gesamte Integration – startet genau diese Kopie (`pnpm exec rebase-mcp` oder `npx --no rebase-mcp`
+in einem npm-Projekt), niemals eine neuere Version aus npm. Ein älteres Projekt fügt sie
+einmalig mit `rebase skills install --mcp` oder `pnpm add -D @rebasepro/mcp` hinzu.
 
-`rebase init` schreibt den Block für jeden von Ihnen ausgewählten Agenten, wenn es
-[Ihre KI-Coding-Agenten einrichtet](/docs/ai/skills#set-up-by-rebase-init), wobei
-alle anderen bereits in der Datei vorhandenen Server erhalten bleiben.
-`rebase init --agent cursor,codex` erledigt dasselbe ohne Nachfrage.
+`rebase init` schreibt den Block für jeden Agenten, den Sie auswählen, wenn es
+[Ihre KI-Coding-Agenten einrichtet](/docs/ai/skills#set-up-by-rebase-init), wobei alle
+bereits in der Datei vorhandenen Server beibehalten werden. `rebase init --agent cursor,codex`
+erledigt dasselbe ohne Nachfrage.
 
-**Claude Code** — `.mcp.json` im Stammverzeichnis Ihres Projekts. `rebase init`
-schreibt diese Datei für Sie:
+**Claude Code** – `.mcp.json` im Stammverzeichnis Ihres Projekts. `rebase init` schreibt diese
+Datei für Sie:
 
 ```json title=".mcp.json"
 {
@@ -52,8 +50,8 @@ schreibt diese Datei für Sie:
 }
 ```
 
-**Cursor** — dieselbe Struktur, in `.cursor/mcp.json`. Cursor löst
-`${workspaceFolder}` zum Projekt-Stammverzeichnis auf:
+**Cursor** – die gleiche Struktur in `.cursor/mcp.json`. Cursor expandiert
+`${workspaceFolder}` zum Projektstammverzeichnis:
 
 ```json title=".cursor/mcp.json"
 {
@@ -69,7 +67,7 @@ schreibt diese Datei für Sie:
 }
 ```
 
-**Gemini CLI** — `.gemini/settings.json`, unter demselben Schlüssel:
+**Gemini CLI** – `.gemini/settings.json`, unter demselben Schlüssel:
 
 ```json title=".gemini/settings.json"
 {
@@ -85,8 +83,8 @@ schreibt diese Datei für Sie:
 }
 ```
 
-**Codex CLI** — TOML statt JSON in `.codex/config.toml` des Projekts. Codex
-liest eine Projektkonfiguration erst, wenn Sie dem Projekt vertraut haben:
+**Codex CLI** – TOML statt JSON, in der `.codex/config.toml` des Projekts.
+Codex liest eine Projektkonfiguration erst, wenn Sie dem Projekt vertraut haben:
 
 ```toml title=".codex/config.toml"
 [mcp_servers.rebase]
@@ -97,7 +95,7 @@ args = ["exec", "rebase-mcp"]
 REBASE_PROJECT_DIR = "."
 ```
 
-**Kiro** — `.kiro/settings/mcp.json`:
+**Kiro** – `.kiro/settings/mcp.json`:
 
 ```json title=".kiro/settings/mcp.json"
 {
@@ -113,8 +111,8 @@ REBASE_PROJECT_DIR = "."
 }
 ```
 
-**GitHub Copilot in VS Code** — `.vscode/mcp.json`, unter `servers` und mit
-explizitem Transport:
+**GitHub Copilot in VS Code** – `.vscode/mcp.json`, unter `servers` und mit
+einem expliziten Transport:
 
 ```json title=".vscode/mcp.json"
 {
@@ -131,92 +129,90 @@ explizitem Transport:
 }
 ```
 
-**Windsurf** liest MCP-Server ausschließlich aus seiner Konfiguration auf
-Benutzerebene, daher gibt es keine Projektdatei zu schreiben. Fügen Sie den
-Server in dessen MCP-Einstellungen hinzu, als `"command": "pnpm"`,
-`"args": ["--dir", "/absolute/path/to/your/project", "exec", "rebase-mcp"]`, mit diesem Pfad als `REBASE_PROJECT_DIR`.
+**Windsurf** liest MCP-Server ausschließlich aus seiner Konfiguration auf Benutzerebene,
+sodass keine Projektdatei geschrieben werden muss. Fügen Sie den Server in den MCP-Einstellungen
+als `"command": "pnpm"`, `"args": ["--dir", "/absoluter/pfad/zu/ihrem/projekt", "exec", "rebase-mcp"]`
+hinzu, mit diesem Pfad als `REBASE_PROJECT_DIR`.
 
-Jeder MCP-Client, der einen stdio-Server starten kann, wird unterstützt; das
-Schema ist stets dasselbe.
+Jeder MCP-Client, der einen stdio-Server starten kann, funktioniert; der Aufbau ist derselbe.
 
-### Auf welches Verzeichnis zugegriffen wird
+### Auf welches Verzeichnis er sich auswirkt
 
-`REBASE_PROJECT_DIR` ist das Verzeichnis, das die `rebase.json` enthält. Es gibt
-**eine einzige** Rangfolge, und sie ist in jedem Client identisch:
+`REBASE_PROJECT_DIR` ist das Verzeichnis, das `rebase.json` enthält. Es gibt **eine**
+Rangfolge, und sie ist in jedem Client identisch:
 
-1. **Der Umgebungsblock** — `REBASE_PROJECT_DIR`, `REBASE_BASE_URL`,
+1. **Der Umgebungsblock** – `REBASE_PROJECT_DIR`, `REBASE_BASE_URL`,
    `REBASE_API_TOKEN`. Wenn einer dieser Werte gesetzt ist, wird das `default`-Projekt
-   bei jedem Start daraus neu erstellt.
-2. **Das Arbeitsverzeichnis des Servers**, wenn es eine `rebase.json` enthält. Ein
-   Projekt, in dem Sie sich aktuell befinden, hat Vorrang vor allem, was in
-   `~/.rebase/projects.json` gespeichert ist.
-3. **Das persistierte `default`** in `~/.rebase/projects.json`, wenn weder Punkt 1
-   noch Punkt 2 zutreffen.
+   bei jedem Start daraus neu aufgebaut.
+2. **Das Arbeitsverzeichnis des Servers**, wenn es eine `rebase.json` enthält. Ein Projekt,
+   in dem Sie sich aktuell befinden, hat Vorrang vor allem, was in `~/.rebase/projects.json`
+   gespeichert ist.
+3. **Der gespeicherte `default`-Eintrag** in `~/.rebase/projects.json`, wenn keines der
+   ersten beiden Kriterien zutrifft.
 
-Die automatische Erkennung (Auto-Discovery) über `.rebase/state.json` füllt in
-allen drei Fällen Lücken und überschreibt niemals einen Wert, der von einer der
-Quellen bereitgestellt wurde.
+Die automatische Erkennung aus `.rebase/state.json` füllt in allen drei Fällen Lücken und
+überschreibt niemals einen Wert, der von einem von ihnen bereitgestellt wurde.
 
-Die Blöcke auf Projektebene benennen das Projekt – `"."`, das Arbeitsverzeichnis
-des Clients oder `${workspaceFolder}` des Editors –, da Regel 3 eine Datei liest,
-die von allen Projekten auf dem Rechner gemeinsam genutzt wird. Eine Konfiguration
-auf Benutzerebene, wie die von Windsurf, gibt stattdessen einen absoluten Pfad an.
+Die Blöcke auf Projektebene benennen das Projekt – `"."`, das Arbeitsverzeichnis des Clients
+oder `${workspaceFolder}` des Editors –, da Regel 3 eine Datei liest, die von jedem Projekt
+auf dem Rechner geteilt wird. Eine Konfiguration auf Benutzerebene, wie die von Windsurf,
+gibt stattdessen einen absoluten Pfad an.
 
-## Worauf der Server zugreifen kann
+## Was der Server erreichen kann
 
-Diesen Abschnitt sollten Sie lesen, bevor Sie einen Assistenten auf eine Datenbank
-ansetzen, die Ihnen wichtig ist.
+Diesen Abschnitt sollten Sie lesen, bevor Sie einen Assistenten auf eine Datenbank ansetzen,
+die Ihnen wichtig ist.
 
-Der Server verwendet **ein einziges, prozessweites Anmeldedatum (ambient credential)**.
-Es gibt keine Identität pro Tool und keinen Read-Only-Modus; jedes Tool nutzt
-dasselbe Token, und der einzige Schalter im Paket erweitert die Reichweite (*opt-in*),
-anstatt sie einzuschränken.
+Der Server führt **ein einziges übergreifendes Anmeldedatum (Ambient Credential) für den
+gesamten Prozess** mit sich. Es gibt keine Identität pro Tool und keinen Read-Only-Modus; jedes
+Tool verwendet dasselbe Token, und der einzige Schalter im Paket schaltet zusätzlichen
+Zugriff frei (*Opt-in*), anstatt ihn einzuschränken.
 
-Welche Zugangsdaten verwendet werden (nach Priorität geordnet):
+Welches Anmeldedatum das ist, in der Reihenfolge der Priorität:
 
 1. `REBASE_API_TOKEN` aus der Umgebung. `REBASE_TOKEN` wird hier nicht gelesen:
-   Es ist das Control-Plane-Token der CLI und wird nie an die App gesendet (der
-   Server sagt das einmal auf stderr, wenn es das einzige gesetzte ist). Die Cloud-Tools
-   reichen es dennoch an die CLI weiter, die sie starten, und diese sendet es an die Control Plane.
-2. `REBASE_SERVICE_KEY`, ausgelesen aus der `.env`-Datei des Projekts
-3. Der automatisch ermittelte Service-Key aus `.rebase/state.json`, während
-   `rebase dev` läuft
+   Es ist das Control-Plane-Token der CLI und wird niemals an die App gesendet (der
+   Server gibt dies einmal auf stderr aus, wenn es das einzige gesetzte Token ist). Die
+   Cloud-Tools übergeben es weiterhin an die CLI, die sie starten, welche es an die
+   Control-Plane sendet.
+2. `REBASE_SERVICE_KEY`, ausgelesen aus der `.env`-Datei des Projekts.
+3. Der Service-Key, der während der Ausführung von `rebase dev` automatisch aus
+   `.rebase/state.json` ermittelt wird.
 
-2 und 3 sind der Schlüssel des Dev-Backends dieses Rechners und werden nur verwendet, wenn das Ziel auf
-Loopback liegt. Zeigt `REBASE_BASE_URL` woandershin – `rebase cloud init --claim`
-schreibt die Adresse des Cloud-Projekts, aber kein `REBASE_API_TOKEN`, bis ein Deployment
-gelingt –, sendet der Server kein Token und sagt das einmal auf stderr.
+2 und 3 sind der Schlüssel des Entwicklungs-Backends dieses Rechners, der nur verwendet wird,
+wenn sich das Ziel auf dem Loopback-Interface befindet. Wenn `REBASE_BASE_URL` auf ein anderes
+Ziel verweist – `rebase cloud init --claim` schreibt die Adresse des Cloud-Projekts und bis
+zu einem erfolgreichen Deploy kein `REBASE_API_TOKEN` –, sendet der Server kein Token und
+weist einmal auf stderr darauf hin.
 
-Ein Token, das Sie für ein Projekt registrieren, **hat Vorrang vor der automatischen
+Ein Token, das Sie für ein Projekt registrieren, **gewinnt immer gegenüber der automatischen
 Erkennung**. Die Erkennung füllt lediglich Lücken.
 
-:::danger[Der Zero-Config-Pfad verwendet Admin-Zugangsdaten]
-Optionen 2 und 3 sind der **Service-Key** – ein uneingeschränktes Admin-Geheimnis.
-Das Backend löst diesen zu `uid: "service"`, `roles: ["admin"]`, `isAdmin: true`
-auf. Diese Identität hält jeden [Scope](/docs/backend/roles-and-scopes/) und
-erfüllt die `_default_admin_read`- / `_default_admin_write`-Richtlinien, die Rebase
-in jede Collection injiziert, bei der nicht `disableDefaultPolicies` gesetzt ist.
+:::danger[Der Zero-Config-Pfad verwendet ein Admin-Credential]
+Die Optionen 2 und 3 verwenden den **Service-Key** – ein uneingeschränktes Admin-Secret. Das Backend
+löst ihn zu `uid: "service"`, `roles: ["admin"]`, `isAdmin: true` auf. Diese
+Identität besitzt jeden [Scope](/docs/backend/roles-and-scopes/) und erfüllt die
+`_default_admin_read`- / `_default_admin_write`-Richtlinien, die Rebase in jede Collection
+injiziert, bei der `disableDefaultPolicies` nicht gesetzt ist.
 
-Die ehrliche Antwort auf die Frage „Wird er immer noch durch RLS eingeschränkt?“
-lautet daher: RLS *wird ausgeführt* – der Treiber stuft die Berechtigung auf die
-Rolle `rebase_user` herab – und anschließend gewährt eine von Rebase selbst
-geschriebene Richtlinie dieser Identität vollen Zugriff. Das Lesen jeder Zeile
-jeder Collection ist das **beabsichtigte Verhalten der Standardkonfiguration**,
-keine Umgehung.
+Die ehrliche Antwort auf die Frage „Wird er immer noch durch RLS eingeschränkt?“ lautet also:
+RLS *wird ausgeführt* – der Treiber führt tatsächlich ein Downgrade auf die Rolle `rebase_user`
+durch – und anschließend gewährt eine von Rebase selbst geschriebene Richtlinie dieser Identität
+vollen Zugriff. Das Lesen jeder Zeile jeder Collection ist das **beabsichtigte Verhalten der
+Standardkonfiguration**, keine Umgehung.
 
-Mit dem Zero-Config-Setup kann ein Agent, der diese Tools besitzt, jede Zeile
-jeder Collection lesen und schreiben, alle Benutzer auflisten, beliebige Passwörter
-zurücksetzen, jede Backend-Funktion aufrufen und DDL-Befehle auf der `DATABASE_URL`
-ausführen, zu der das Projekt aufgelöst wird.
+Mit dem Zero-Config-Setup kann ein Agent, der über diese Tools verfügt, jede Zeile jeder Collection
+lesen und schreiben, alle Benutzer auflisten, jedes Passwort zurücksetzen, jede Backend-Funktion
+aufrufen und DDL auf der vom Projekt aufgelösten `DATABASE_URL` ausführen.
 :::
 
-### Stattdessen eingeschränkte Anmeldedaten verwenden
+### Stattdessen ein eingeschränktes Credential zuweisen
 
-Registrieren Sie einen eingeschränkten [API-Key](/docs/backend/api-keys),
-und das Zwei-Stufen-Modell greift tatsächlich. Ein Service-Key läuft mit den
-Rollen `["service"]`, die von den injizierten Admin-Richtlinien **nicht** genannt
-werden – RLS gewährt ihm also keinerlei Zugriff, sofern keine Ihrer eigenen
-Richtlinien etwas anderes besagt, und seine Scopes schränken ihn weiter ein:
+Registrieren Sie einen berechtigungseingeschränkten [API-Schlüssel](/docs/backend/api-keys),
+und das Zwei-Gate-Modell greift tatsächlich. Ein Service-Key läuft mit den Rollen `["service"]`,
+die die injizierten Admin-Richtlinien **nicht** benennen – RLS gewährt ihm also nichts, es sei
+denn, eine Ihrer eigenen Richtlinien besagt etwas anderes, und seine Scopes schränken ihn
+weiter ein:
 
 ```bash
 rebase api-keys create -n "claude-code" \
@@ -224,8 +220,8 @@ rebase api-keys create -n "claude-code" \
   --expires-in 30
 ```
 
-Übergeben Sie dann den resultierenden `rk_live_…`-Key an den Server, anstatt ihn
-automatisch einen Service-Key erkennen zu lassen:
+Übergeben Sie dann den resultierenden `rk_live_…`-Schlüssel an den Server, anstatt ihn einen
+Service-Key erkennen zu lassen:
 
 ```json title=".mcp.json"
 {
@@ -234,7 +230,7 @@ automatisch einen Service-Key erkennen zu lassen:
       "command": "pnpm",
       "args": ["exec", "rebase-mcp"],
       "env": {
-        "REBASE_PROJECT_DIR": "/absolute/path/to/your/project",
+        "REBASE_PROJECT_DIR": "/absoluter/pfad/zu/ihrem/projekt",
         "REBASE_API_TOKEN": "rk_live_..."
       }
     }
@@ -242,39 +238,37 @@ automatisch einen Service-Key erkennen zu lassen:
 }
 ```
 
-Zwei Dinge, die dadurch **nicht** bewirkt werden, aber wichtig zu wissen sind,
-bevor Sie sich darauf verlassen:
+Zwei Dinge, die dies **nicht** tut und die man wissen sollte, bevor man sich darauf verlässt:
 
 - **Es schränkt die CLI-Tools nicht ein.** `rebase_db_push`, `rebase_db_migrate`,
-  `rebase_doctor` und die Branch-Tools starten die Rebase-CLI, die sich direkt über
-  `DATABASE_URL` verbindet und Ihr Token überhaupt nicht sieht. Das nachfolgende
-  Loopback-Gate ist die einzige Schutzbarriere vor diesen Befehlen.
-- **Ein Key erreicht ein Admin-Tool nur mit dem Scope dieses Tools.** `list_users` und
-  `list_roles` brauchen `users:read`; `create_user`, `update_user`, `delete_user` und
-  `rebase_auth_reset_password` brauchen `users:write`; die Storage- und Cron-Tools
-  brauchen den passenden `storage:*`- oder `cron:*`-Scope; `invoke_function` braucht
-  `functions:invoke`. Ohne ihn antwortet der Aufruf mit `403 SCOPE_MISSING`. Selbst mit
-  `users:write` kann ein Key das Konto eines Admins nicht ändern: Ein Admin hält
-  `keys:read` und `keys:write`, die kein Key halten kann, und niemand darf ein Konto
-  verwalten, das mehr hält als er selbst.
+  `rebase_doctor` und die Branch-Tools starten die Rebase-CLI, die sich über `DATABASE_URL`
+  verbindet und Ihr Token überhaupt nicht sieht. Das unten beschriebene Loopback-Gate ist
+  das Einzige, was davor steht.
+- **Ein Schlüssel erreicht ein Admin-Tool nur mit dem entsprechenden Scope dieses Tools.**
+  `list_users` und `list_roles` erfordern `users:read`; `create_user`, `update_user`,
+  `delete_user` und `rebase_auth_reset_password` erfordern `users:write`; die Storage- und
+  Cron-Tools erfordern den passenden `storage:*`- oder `cron:*`-Scope; `invoke_function`
+  erfordert `functions:invoke`. Ohne diesen Scope antwortet der Aufruf mit `403 SCOPE_MISSING`.
+  Selbst mit `users:write` kann ein Schlüssel das Konto eines Administrators nicht ändern:
+  Ein Administrator besitzt `keys:read` und `keys:write`, was kein Schlüssel besitzen kann,
+  und niemand darf ein Konto verwalten, das über mehr Rechte verfügt als man selbst.
 
-Ein mit `--roles admin` erstellter Key ist eine andere Sache: Er besitzt die Rollen
-`["service", "admin"]`, womit dieselben Standard-Admin-Richtlinien greifen wie
-beim Service-Key. Geben Sie ihm zusätzlich `--full-access`, und seine Reichweite
-entspricht der des Service-Keys, abzüglich der Schlüsselverwaltung. Der Vorteil
-besteht darin, dass er **pro Key widerrufen werden kann, abläuft und
-ratenlimitiert ist** – all das gilt für den Service-Key nicht; dessen Rotation
-erfordert die Bearbeitung der `.env` und einen Neustart des Servers.
+Ein mit `--roles admin` erstellter Schlüssel ist eine andere Sache: Er trägt die Rollen
+`["service", "admin"]`, was dieselben Standard-Admin-Richtlinien freischaltet wie der
+Service-Key. Weist man ihm zusätzlich `--full-access` zu, entspricht seine Reichweite der
+des Service-Keys, abzüglich der Schlüsselverwaltung. Sein Vorteil ist, dass er **pro Schlüssel
+widerrufbar, ablauffähig und ratenlimitiert** ist, was auf den Service-Key alles nicht zutrifft –
+dessen Rotation erfordert das Bearbeiten von `.env` und den Neustart des Servers.
 
-Ausführliche Hinweise zur Berechtigungsbeschränkung von Keys finden Sie unter
-[Agenten und MCP-Server](/docs/backend/api-keys#agents-and-mcp-servers).
+Siehe [Agenten und MCP-Server](/docs/backend/api-keys#agents-and-mcp-servers) für die
+vollständige Anleitung zum Scoping von Schlüsseln.
 
-### Eine Collection vollständig unerreichbar machen
+### Eine Collection komplett unerreichbar machen
 
-Der Grund, warum ein Admin-Anmeldedatum alles lesen kann, ist die Basis-Richtlinie,
-die Rebase in jede Collection injiziert und die dem vertrauenswürdigen Serverkontext
-sowie der Rolle `admin` vollen Zugriff gewährt. Eine Collection kann diese Basis-Richtlinie
-deaktivieren und die volle Verantwortung für ihr eigenes RLS übernehmen:
+Der Grund, warum ein Admin-Credential alles lesen kann, ist die Basisrichtlinie, die Rebase in
+jede Collection injiziert und die dem vertrauenswürdigen Serverkontext sowie der Rolle `admin`
+Zugriff gewährt. Eine Collection kann diese Baseline deaktivieren und die volle Verantwortung
+für ihr eigenes RLS übernehmen:
 
 ```typescript
 import { defineCollection } from "@rebasepro/cms-types";
@@ -287,8 +281,8 @@ export const medicalRecordsCollection = defineCollection({
         patient_id: { name: "Patient", type: "string" },
         notes: { name: "Notes", type: "string" }
     },
-    // Remove the injected admin/server baseline — nothing is readable
-    // except what the rules below allow.
+    // Die injizierte Admin-/Server-Baseline entfernen — nichts ist lesbar,
+    // außer dem, was die nachfolgenden Regeln erlauben.
     disableDefaultPolicies: true,
     securityRules: [
         { operations: ["select", "update"], ownerField: "patient_id" }
@@ -296,58 +290,55 @@ export const medicalRecordsCollection = defineCollection({
 });
 ```
 
-Der einzige Weg für einen Zugriff besteht nun darin, mit `patient_id` übereinzustimmen.
-Die UID des Service-Keys ist der Literal-String `service`, sodass eine Owner-Regel
-niemals darauf zutrifft – Lesezugriffe liefern null Zeilen zurück und Schreibzugriffe
-werden von Postgres abgelehnt. Dies ist die einzige Kontrollmöglichkeit, die das
-Standard-Anmeldedatum des MCP-Servers einschränkt, anstatt dessen Vollzugriff
-vorauszusetzen.
+Jetzt besteht die einzige Zugriffsmöglichkeit darin, mit `patient_id` übereinzustimmen. Die
+UID des Service-Keys ist die literale Zeichenkette `service`, sodass eine Owner-Regel niemals
+auf ihn zutrifft – Lesevorgänge geben null Zeilen zurück und Schreibvorgänge werden von
+Postgres abgewiesen. Dies ist die einzige Kontrolle, die das Standard-Credential des
+MCP-Servers einschränkt, anstatt es als gegeben vorauszusetzen.
 
-Beachten Sie, dass dies eine echte RLS-Änderung ist und keine bloße Dokumentation:
-Sie wird erst wirksam, wenn `rebase schema generate` und eine Migration die
-Richtlinien angewendet haben. Siehe [Sicherheitsregeln (RLS)](/docs/collections/security-rules).
+Denken Sie daran, dass dies eine echte RLS-Änderung ist und keine bloße Dokumentation: Sie wird
+erst wirksam, wenn `rebase schema generate` und eine Migration die Richtlinien angewendet haben.
+Siehe [Sicherheitsregeln (RLS)](/docs/collections/security-rules).
 
 ## Das Loopback-Gate
 
-`rebase_project_add` akzeptiert jede beliebige `baseUrl`, und die CLI-Tools
-verbinden sich mit der `DATABASE_URL`, die das Projekt angibt. Dieselbe Tool-Liste,
-die eine Scratch-Datenbank auf Ihrem Laptop bearbeitet, kann daher Zeilen in der
-Produktion löschen – ohne eine Hürde dazwischen, abgesehen von der Einschätzung
-des Assistenten, welches Projekt gerade aktiv ist.
+`rebase_project_add` akzeptiert jede `baseUrl`, und die CLI-Tools verbinden sich mit jeder
+vom Projekt deklarierten `DATABASE_URL`. Dieselbe Tool-Liste, die eine Scratch-Datenbank auf
+Ihrem Laptop bearbeitet, kann daher Zeilen in der Produktion löschen – ohne dass etwas
+dazwischensteht, außer dem Urteilsvermögen des Assistenten darüber, welches Projekt aktiv ist.
 
-**Jedes Tool, das die Zielumgebung verändert, wird verweigert, es sei denn, dieses
-Ziel befindet sich auf dem Loopback-Interface.** Das Gate ist als Liste derjenigen
-Tools definiert, die *nicht* beschränkt sind. Neu hinzukommende Tools sind somit
-standardmäßig geschützt.
+**Jedes Tool, das die Zielumgebung verändert, wird verweigert, es sei denn, dieses Ziel
+befindet sich auf der Loopback-Schnittstelle.** Das Gate ist als Liste der Aktionen definiert,
+die *nicht* reglementiert sind, sodass ein später hinzugefügtes Tool standardmäßig geschützt ist.
 
-- **Nicht beschränkt – Lesevorgänge:** `rebase_schema_plan`, `rebase_doctor`,
+- **Nicht reglementiert – Lesevorgänge:** `rebase_schema_plan`, `rebase_doctor`,
   `rebase_db_branch_list`, `rebase_db_branch_info`, `rebase_db_branch_diff`, `list_documents`,
   `get_document`, `list_users`, `list_roles`, `storage_list_objects`,
   `storage_get_download_url`, `cron_list_jobs`, `cron_get_job`, `cron_get_job_logs`,
-  `rebase_dev_logs` und die Rebase-Cloud-Lesetools `rebase_cloud_status`,
+  `rebase_dev_logs` sowie die Rebase-Cloud-Leseoperationen `rebase_cloud_status`,
   `rebase_cloud_logs`, `rebase_cloud_env_list`, `rebase_cloud_deployments_list`.
-- **Nicht beschränkt – Rebase-Cloud-Schreibtools:** `rebase_cloud_provision`,
+- **Nicht reglementiert – Rebase-Cloud-Schreibvorgänge:** `rebase_cloud_provision`,
   `rebase_cloud_deploy`, `rebase_cloud_env_set`, `rebase_cloud_rollback`.
-  Das Provisionieren erstellt ein Projekt; die anderen ändern ein Produktionsprojekt. Keines
-  davon läuft über `baseUrl` oder `DATABASE_URL`, und nur diese kann das Gate
-  prüfen. Was davor steht, finden Sie unter [Rebase Cloud](#rebase-cloud).
-- **Nicht beschränkt – nur lokal:** `rebase_schema_introspect`, `rebase_db_branch_switch`, `rebase_schema_generate`, `rebase_db_generate`,
-  `rebase_generate_sdk`, die Dev-Server-Tools und die Projekt-Registry-Tools.
-  Diese schreiben lokale Dateien oder lokalen Status und haben kein Remote-Ziel,
-  das überprüft werden müsste.
-- **Gegen `DATABASE_URL` geschützt:** die verbleibenden CLI-Tools – `rebase_db_push`,
+  Das Bereitstellen (Provisioning) erstellt ein Projekt; die anderen verändern ein
+  Produktionsprojekt. Keines davon läuft über `baseUrl` oder `DATABASE_URL`, was alles ist,
+  was das Gate prüfen kann. Siehe [Rebase Cloud](#rebase-cloud) bezüglich der Schutzmechanismen davor.
+- **Nicht reglementiert – nur lokal:** `rebase_schema_introspect`, `rebase_db_branch_switch`,
+  `rebase_schema_generate`, `rebase_db_generate`, `rebase_generate_sdk`, die Dev-Server-Tools
+  und die Projekt-Registry-Tools. Diese schreiben lokale Dateien oder lokalen Status und haben
+  kein Remote-Ziel zu prüfen.
+- **Reglementiert gegenüber `DATABASE_URL`:** die verbleibenden CLI-Tools – `rebase_db_push`,
   `rebase_db_migrate`, `rebase_db_branch_create`, `rebase_db_branch_delete`.
-- **Gegen die Projekt-`baseUrl` geschützt:** die verbleibenden SDK-Tools –
+- **Reglementiert gegenüber der Projekt-`baseUrl`:** die verbleibenden SDK-Tools –
   `create_document`, `update_document`, `delete_document`, `create_user`,
   `update_user`, `delete_user`, `rebase_auth_reset_password`,
-  `storage_delete_object`, `cron_trigger_job`, `cron_toggle_job`,
+  `storage_delete_object`, `cron_trigger_job`, `cron_toggle_job`
   und `invoke_function`.
 
-Die beiden Ziele sind nicht austauschbar. CLI-Tools sehen `baseUrl` niemals. Wenn
-also ein Localhost-Backend neben einer produktiven `DATABASE_URL` liegt, wird die
-Prüfung gegen die Datenbank ausgeführt, nicht gegen das Backend.
+Die beiden Ziele sind nicht austauschbar. CLI-Tools sehen `baseUrl` niemals; daher wird ein
+Localhost-Backend, das neben einer produktiven `DATABASE_URL` läuft, gegen die Datenbank
+geprüft, nicht gegen das Backend.
 
-Eine Verweigerung sieht wie folgt aus:
+Eine Verweigerung sieht folgendermaßen aus:
 
 ```text
 Error: Refusing to run "delete_document": project "default" points at
@@ -355,11 +346,11 @@ https://api.example.com/, which is not local. Set REBASE_MCP_ALLOW_REMOTE_WRITES
 to allow destructive tools against remote environments.
 ```
 
-**Kann überhaupt kein Connection-String aufgelöst werden, werden die geschützten
-DB-Tools verweigert.** Ohne `DATABASE_URL` nutzt die CLI die verwaltete
-Entwicklungsdatenbank, den Standard für ein neues Projekt, und das Gate verweigert dort
-seine vier Datenbank-Tools. Die Ablehnung sagt, warum, und nennt, was stattdessen
-funktioniert. Sie schlägt das Opt-out nicht vor:
+**Wenn überhaupt kein Verbindungs-String aufgelöst werden kann, werden die reglementierten DB-Tools verweigert.**
+Ohne `DATABASE_URL` verwendet die CLI die verwaltete Entwicklungsdatenbank, was der Standard
+für ein neues Projekt ist, und das Gate verweigert dort seine vier Datenbank-Tools. Die
+Verweigerung erklärt den Grund und nennt funktionierende Alternativen. Sie schlägt die
+Deaktivierung nicht vor:
 
 ```text
 Error: Refusing to run "rebase_db_push": project "default" sets no DATABASE_URL, so the
@@ -369,26 +360,23 @@ database at boot, additively. After changing a collection, restart it with
 rebase_dev_stop and rebase_dev_start. …
 ```
 
-Aus einem Terminal laufen
-`rebase db push` und `rebase db migrate` auf dieser Datenbank; nur die MCP-Tools
-werden verweigert. Unter 0.24 verweigert die CLI sie dort ebenfalls.
+Über ein Terminal werden `rebase db push` und `rebase db migrate` auf dieser Datenbank ausgeführt;
+lediglich die MCP-Tools werden verweigert. Ab Version 0.24 verweigert die CLI sie dort ebenfalls.
 
-Nur Loopback zählt als lokal: `localhost`, `*.localhost`, `127.0.0.0/8`, `::1`
+Nur Loopback gilt als lokal: `localhost`, `*.localhost`, `127.0.0.0/8`, `::1`
 (und `0.0.0.0`).
-Private IP-Bereiche wie `10.x` und `192.168.x` zählen **nicht** dazu – diese könnten
-genauso gut ein gemeinsam genutzter Staging-Cluster wie ein Laptop sein. Sie als lokal
-zu behandeln, würde genau den versehentlichen Zugriff durchwinken, den das Gate
-verhindern soll.
+Private IP-Bereiche wie `10.x` und `192.168.x` zählen **nicht** dazu – diese stellen mit
+gleicher Wahrscheinlichkeit ein geteiltes Staging-Cluster wie einen Laptop dar, und sie als
+lokal zu behandeln, würde genau die Unfälle durchwinken, für deren Verhinderung das Gate existiert.
 
-Setzen Sie `REBASE_MCP_ALLOW_REMOTE_WRITES=true`, um diesen Schutz zu deaktivieren.
-Wenn Sie dies global in der Konfiguration Ihres MCP-Clients setzen, wird das Gate
-für jedes Projekt entfernt, das der Server erreichen kann, nicht nur für dasjenige,
-an das Sie gerade gedacht haben.
+Setzen Sie `REBASE_MCP_ALLOW_REMOTE_WRITES=true`, um das Gate zu deaktivieren. Wenn Sie dies
+global in Ihrer MCP-Client-Konfiguration festlegen, wird das Gate für jedes Projekt entfernt,
+das der Server erreichen kann – nicht nur für dasjenige, an das Sie gerade gedacht haben.
 
 ## Kennzeichnung nicht vertrauenswürdiger Daten
 
-Zeilen, Benutzerdatensätze, Storage-Auflistungen, Cron-Jobs, Funktionsantworten
-und CLI-Ausgaben werden in einem expliziten Envelope zurückgegeben:
+Zeilen, Benutzerdatensätze, Storage-Listen, Cron-Jobs, Funktionsantworten und CLI-Ausgaben
+werden in einem expliziten Umschlag zurückgegeben:
 
 ```text
 <<<UNTRUSTED_DATA source="list_documents" id="9b2f4c1e-…">>>
@@ -396,152 +384,163 @@ und CLI-Ausgaben werden in einem expliziten Envelope zurückgegeben:
 <<<END_UNTRUSTED_DATA id="9b2f4c1e-…">>>
 ```
 
-Alle in Ihrer Datenbank gespeicherten Daten wurden von irgendjemandem geschrieben,
-und sie erreichen den Assistenten über denselben Kanal wie die Tool-Aufrufe, denen
-er folgt. Der Envelope weist das Modell an, diese Daten als reinen Dateninhalt und
-nicht als Instruktionen zu behandeln.
+Alles, was in Ihrer Datenbank gespeichert ist, wurde von irgendjemandem geschrieben und trifft
+über denselben Kanal ein wie der Tool-Vertrag, dem der Assistent folgt. Der Umschlag weist
+das Modell an, den Inhalt als inerte Daten und nicht als Anweisungen zu behandeln.
 
-Die `id` wird für jede Antwort neu generiert, nachdem die Daten geschrieben wurden,
-und nur der Endmarker mit dieser ID schließt den Block ab. Text innerhalb der Daten,
-der wie ein Marker formatiert ist, wird durch ein breitenloses Leerzeichen unterbrochen,
-sodass eine Zeile, die `<<<END_UNTRUSTED_DATA>>>` ausgibt, den Envelope nicht
-vorzeitig beenden und den nachfolgenden Text nach außen verlagern kann.
+Die `id` wird für jede Antwort neu generiert, nachdem die Daten geschrieben wurden, und nur
+der End-Marker, der diese ID trägt, schließt den Block. Text innerhalb der Daten, der wie ein
+Marker aufgebaut ist, wird durch ein Nullbreite-Leerzeichen unterbrochen, sodass eine Zeile, die
+`<<<END_UNTRUSTED_DATA>>>` ausgibt, den Umschlag nicht vorzeitig beenden und nachfolgende
+Inhalte nach außen verlagern kann.
 
-Der [Remote-Endpunkt](/docs/ai/remote-mcp/) umschließt seine Tool-Ergebnisse auf
-dieselbe Weise und teilt dies dem Client mit; dessen `structuredContent` enthält
-das reine Ergebnis.
-`list_collections` und
-`describe_collection` sind die Ausnahmen: Nur ein Modell liest sie, daher werden sie
-einmal gesendet, im Text. Vor 0.24 trug die Auflistung zusätzlich eine Kopie in
-`structuredContent`.
+Der [Remote-Endpunkt](/docs/ai/remote-mcp/) schirmt seine Tool-Ergebnisse auf die gleiche Weise
+ab und teilt dies dem Client mit; sein `structuredContent` enthält das reine Ergebnis.
+`list_collections` und `describe_collection` bilden die Ausnahme: Nur ein Modell liest sie,
+daher werden sie einmalig im Text gesendet. Vor 0.24 enthielt die Auflistung auch eine
+Kopie im `structuredContent`.
 
-Es handelt sich um eine Kennzeichnung, nicht um eine Sandbox. Ein Assistent mit
-diesen Tools ist nur so sicher wie die Inhalte, die Sie ihn lesen lassen.
+Es handelt sich um eine Kennzeichnung, nicht um eine Sandbox. Ein Assistent mit Zugriff auf
+diese Tools ist nur so sicher wie der Inhalt, den Sie ihn lesen lassen.
 
 ## Mehrere Projekte
 
-Projektkonfigurationen werden in `~/.rebase/projects.json` gespeichert, und der
-Server kann mehrere gleichzeitig verwalten – nützlich, wenn Sie über lokale und
-entfernte Umgebungen hinweg arbeiten. Während `rebase dev` läuft, liest der Server
-den aktiven Port und den Service-Key aus `.rebase/state.json` im Projektverzeichnis
-aus, was den lokalen Fall zu einer Zero-Config-Lösung macht.
+Projektkonfigurationen werden in `~/.rebase/projects.json` gespeichert, und der Server kann
+mehrere gleichzeitig verwalten – nützlich, wenn Sie zwischen lokalen und Remote-Umgebungen
+wechseln. Während `rebase dev` läuft, liest der Server den aktiven Port und den Service-Key
+aus `.rebase/state.json` im Projektverzeichnis, was den lokalen Fall konfigurationsfrei macht.
 
-:::note[Die Registry hat das letzte Wort, nicht das erste]
-Es gilt die oben genannte Rangfolge: Umgebungsblock, dann das Arbeitsverzeichnis,
-sofern es eine `rebase.json` enthält, und schließlich das persistierte `default`.
+:::note[Die Registry ist das letzte Wort, nicht das erste]
+Die Rangfolge entspricht der oben beschriebenen: Umgebungsblock, dann das Arbeitsverzeichnis,
+wenn es eine `rebase.json` enthält, und schließlich der gespeicherte `default`-Eintrag.
 
 `REBASE_PROJECT_DIR`, `REBASE_BASE_URL` und `REBASE_API_TOKEN` bauen das `default`-Projekt
-**bei jedem Start** neu auf, nicht nur beim ersten. Dieser Neuaufbau betrifft den
-gesamten Eintrag: Ein Token, das für das alte `projectDir` registriert war, wird
-verworfen und nicht in ein Verzeichnis übernommen, für das es nie ausgestellt wurde.
-Ein auf diese Weise – oder aus dem Arbeitsverzeichnis – abgeleitetes `default` wird
-niemals zurück in `~/.rebase/projects.json` geschrieben, sodass der Dev-Service-Key
-eines Projekts nicht fälschlicherweise für ein anderes verwendet werden kann.
+**bei jedem Start** neu auf, nicht nur beim ersten Mal. Dieser Neuaufbau betrifft den gesamten
+Eintrag: Ein für das alte `projectDir` registriertes Token wird verworfen, anstatt in ein
+Verzeichnis übernommen zu werden, für das es nie ausgestellt wurde. Ein auf diese Weise – oder
+aus dem Arbeitsverzeichnis – abgeleiteter `default`-Eintrag wird niemals nach
+`~/.rebase/projects.json` zurückgeschrieben, sodass der Entwicklungs-Service-Key eines Projekts
+nicht zu dem eines anderen werden kann.
 
-`activeProject` ist persistent (sticky). Wenn also eine vorherige Sitzung
-`rebase_project_switch` aufgerufen hat, richten sich die Tools nach diesem Projekt
-und der Server gibt dies auf stderr aus – es sei denn, dieses Projekt ist unter einem
-*anderen* Verzeichnis registriert als dem, in dem dieser Server läuft; in diesem Fall
-fällt er auf `default` zurück und meldet dies. Wenn ein Assistent die falsche
-Datenbank zu lesen scheint, rufen Sie zuerst `rebase_project_current` auf.
+`activeProject` ist persistent („sticky“). Wenn also eine frühere Sitzung `rebase_project_switch`
+aufgerufen hat, zielen Tools auf dieses Projekt ab und der Server gibt dies auf stderr aus – es sei
+denn, dieses Projekt ist unter einem *anderen* Verzeichnis registriert als dem, in dem dieser
+Server läuft; in diesem Fall fällt er auf `default` zurück und meldet dies. Wenn ein Assistent
+die falsche Datenbank zu lesen scheint, rufen Sie zuerst `rebase_project_current` auf.
 :::
 
-Tokens werden in dieser Registry **im Klartext** gespeichert. Es handelt sich um eine
-Datei in Ihrem Home-Verzeichnis, die Admin-Zugangsdaten für jedes registrierte Projekt
-enthält; behandeln Sie sie entsprechend sorgfältig.
+Token werden in dieser Registry **im Klartext** gespeichert. Es handelt sich um eine Datei in
+Ihrem Home-Verzeichnis, die Admin-Credentials für jedes von Ihnen registrierte Projekt enthält;
+behandeln Sie sie entsprechend sorgfältig.
 
 ## Rebase Cloud
 
-Acht Tools bringen eine App aus diesem Verzeichnis zu einem Live-Backend auf
-[Rebase Cloud](/docs/deployment/cloud/) und halten es am Laufen. Jedes startet
-`rebase cloud <command> --json` im aktiven Projektverzeichnis: denselben
-Befehl, den eine Person ausführt, sodass es keine zweite Implementierung gibt, die davon abweichen könnte.
+Acht Tools bringen eine App aus diesem Verzeichnis auf ein Live-Backend in
+[Rebase Cloud](/docs/deployment/cloud/) und halten sie am Laufen. Jedes davon startet
+`rebase cloud <command> --json` im aktiven Projektverzeichnis: derselbe Befehl, den auch
+ein Mensch ausführt, sodass es keine abweichende Zweitimplementierung gibt.
 
 | Tool | Führt aus | Ändert das Projekt |
 |---|---|---|
-| `rebase_cloud_provision` | `rebase cloud init --claim` | Erstellt eines, ohne Konto |
+| `rebase_cloud_provision` | `rebase cloud init --claim` | Erstellt eines, ohne Account |
 | `rebase_cloud_status` | `rebase cloud status` | Nein |
 | `rebase_cloud_deploy` | `rebase cloud deploy` | Ja |
 | `rebase_cloud_logs` | `rebase cloud logs [--runtime]` | Nein |
 | `rebase_cloud_env_list` | `rebase cloud env list` | Nein |
-| `rebase_cloud_env_set` | `rebase cloud env set KEY --stdin` | Ja, ab dem nächsten Deployment |
+| `rebase_cloud_env_set` | `rebase cloud env set KEY --stdin` | Ja, ab dem nächsten Deploy |
 | `rebase_cloud_deployments_list` | `rebase cloud deployments list` | Nein |
 | `rebase_cloud_rollback` | `rebase cloud rollback --yes` | Ja |
+| `rebase_cloud_projects_list` | `rebase cloud projects list --all-orgs` | Nein |
 
-Der übliche Ablauf eines Agenten: `rebase_cloud_provision`, dann dem Benutzer die
-Claim-URL geben; `rebase_cloud_status`, um das Projekt zu sehen (solange es nicht übernommen ist,
-enthält `unclaimed` die Claim-URL und wann es gelöscht wird); `rebase_cloud_deploy`
-nach einer Änderung; `rebase_cloud_logs`, wenn etwas nicht wie erwartet läuft; und
-`rebase_cloud_rollback`, wenn die Produktion kaputt ist.
+Der typische Agenten-Workflow lautet: `rebase_cloud_provision`, dann dem Benutzer die Claim-URL
+übergeben; `rebase_cloud_status`, um das Projekt zu prüfen (solange es nicht beansprucht wurde,
+enthält `unclaimed` die Claim-URL und den Zeitpunkt der Löschung); `rebase_cloud_deploy`
+nach einer Änderung; `rebase_cloud_logs`, wenn etwas fehlschlägt; und `rebase_cloud_rollback`,
+wenn die Produktion beschädigt ist.
 
-**Worauf sie wirken.** Auf das Projekt, mit dem das aktive Verzeichnis in
-`.rebase/cloud.json` verknüpft ist. Keines davon nimmt eine Projekt-ID oder ein Verzeichnis entgegen, sodass ein
-Assistent sie nicht auf ein anderes Projekt richten kann als das, mit dem das Verzeichnis
-verknüpft ist. Wer das aktive Projekt mit `rebase_project_switch` wechselt, wechselt
-das Verzeichnis, in dem sie laufen.
+**Worauf sie wirken.** Auf das Projekt, mit dem das aktive Verzeichnis in `.rebase/cloud.json`
+verknüpft ist. Keines von ihnen akzeptiert eine Projekt-ID oder ein Verzeichnis, sodass ein
+Assistent sie nicht auf ein anderes Projekt ausrichten kann als das, mit dem das Verzeichnis
+verknüpft ist. Das Wechseln des aktiven Projekts mit `rebase_project_switch` wechselt das
+Verzeichnis, in dem sie ausgeführt werden.
 
-**Mit wessen Autorität.** Mit dem, was die CLI in diesem Verzeichnis auflöst: `REBASE_TOKEN`,
-wenn es gesetzt ist, dann das Token, das `rebase cloud init --claim` für ein
-nicht übernommenes Projekt gespeichert hat, dann die `rebase cloud login`-Sitzung. Im Verzeichnis dieses
-nicht übernommenen Projekts wird ein `REBASE_TOKEN`, das für das Projekt keinen Scope hält, zugunsten
-des eigenen Tokens des Projekts beiseitegelegt. Die Control Plane
-prüft jeden Aufruf wie bei der CLI, sodass ein Assistent mit einem Token, das mit
-`rebase cloud tokens create --can logs` erstellt wurde, Logs lesen kann, die
-Control Plane seine Deployments, Variablen und Rollbacks aber ablehnt. Fehlt das Credential oder wird es abgelehnt, kommt ein Fehler zurück, der sagt, was der
-Benutzer tun muss (`rebase cloud login` oder das Projekt übernehmen).
+**Wessen Berechtigung.** Was auch immer die CLI in diesem Verzeichnis auflöst: `REBASE_TOKEN`,
+sofern gesetzt, dann das Token, das `rebase cloud init --claim` für ein nicht beanspruchtes
+Projekt gespeichert hat, und schließlich die `rebase cloud login`-Sitzung. Im Verzeichnis dieses
+nicht beanspruchten Projekts wird ein `REBASE_TOKEN`, das keinen Scope für das Projekt besitzt,
+zugunsten des projekteigenen Tokens zurückgestellt. Die Control-Plane prüft jeden Aufruf wie
+den der CLI; mit einem über `rebase cloud tokens create --can logs` erstellten Token kann ein
+Assistent also Protokolle lesen, während die Control-Plane seine Deployments, Variablen und
+Rollbacks verweigert. Fehlende oder abgelehnte Anmeldedaten werden als Fehler zurückgegeben, der
+erklärt, was der Benutzer tun muss (`rebase cloud login` oder das Beanspruchen des Projekts).
 
-**Warum das Loopback-Gate nicht greift.** Das Gate prüft die `baseUrl` der App und
-die `DATABASE_URL` der CLI; diese Tools verwenden keine von beiden. Nach `rebase_cloud_provision`
-zeigt `REBASE_BASE_URL` auf das neue Cloud-Projekt, sodass ein Gate darauf genau das
-Deployment verweigern würde, das der Ablauf braucht. Das Provisionieren selbst erstellt nur: Es berührt
-keine bestehende App und keine bestehende Datenbank, und die CLI verweigert es in einem Verzeichnis, das
-bereits verknüpft ist. Ein Deployment, eine Variable und ein Rollback ändern jeweils
-die Produktion. Davor stehen das oben genannte Credential und
-die Tool-Freigabe Ihres MCP-Clients. Damit ein Assistent ein Cloud-Projekt nicht ändern kann,
-setzen Sie `REBASE_TOKEN` in der Umgebung des Servers auf ein Token ohne die
-Capabilities `deploy` und `env`.
+**Warum das Loopback-Gate nicht greift.** Das Gate prüft die `baseUrl` der App und die
+`DATABASE_URL` der CLI; diese Tools verwenden keines von beiden. Nach `rebase_cloud_provision`
+zeigt `REBASE_BASE_URL` auf das neue Cloud-Projekt. Eine Reglementierung darüber würde genau
+das Deployment verweigern, das für den Workflow benötigt wird. Die Bereitstellung selbst
+erstellt lediglich etwas: Sie berührt weder bestehende Apps noch Datenbanken, und die CLI
+verweigert sie ohnehin in einem Verzeichnis, das bereits verknüpft ist. Ein Deploy, eine
+Variable und ein Rollback ändern jeweils die Produktion. Was vor ihnen schützt, sind die oben
+genannten Anmeldedaten und die Tool-Genehmigung Ihres MCP-Clients. Um einen Assistenten daran
+zu hindern, ein Cloud-Projekt zu ändern, setzen Sie `REBASE_TOKEN` in der Serverumgebung auf
+ein Token ohne die Fähigkeiten `deploy` und `env`.
 
-Jedes Tool ist eine Momentaufnahme:
+**Lesen beliebiger eigener Projekte.** Die oben genannten Tools wirken auf das verknüpfte
+Projekt. Um die Daten eines anderen Projekts zu lesen – jedes Projekt in jeder Organisation,
+zu der das angemeldete Konto gehört, unabhängig davon, ob es hier verknüpft ist oder nicht –,
+listet `rebase_cloud_projects_list` diese auf, und `rebase_project_use_cloud` (mit ID, Slug
+oder Name) richtet die Daten- und Admin-Tools darauf aus: `list_documents`, `get_document`,
+`list_users`, `list_roles`, `cron_list_jobs`, `storage_list_objects`. Diese Aufrufe laufen über
+den Studio-Proxy der Konsole unter Verwendung der CLI-eigenen Anmeldedaten (`rebase cloud access-token`,
+das pro Aufruf gelesen und nie gespeichert wird); die Control-Plane prüft die Zugriffsberechtigung
+der Person und hängt den Service-Key des Projekts auf ihrer Seite an, sodass kein Schlüssel
+den Rechner erreicht. Ein Projekt mit deaktiviertem Studio wird abgewiesen, und die Option weist
+darauf hin. Es ist ein Remote-Ziel wie jedes andere, sodass Tools zur Datenänderung dort verweigert
+bleiben, es sei denn, `REBASE_MCP_ALLOW_REMOTE_WRITES` ist gesetzt; `rebase_project_switch`
+kehrt zurück.
 
-- `rebase_cloud_logs` folgt nie. Sein Ergebnis enthält `nextSinceTime`; übergeben Sie es
-  als `since` zurück, um zu lesen, was danach kam. Es liefert die letzten 200 Zeilen, sofern
-  `tail` nichts anderes sagt. `source: "build"` liefert stattdessen das neueste Build-Log.
-- `rebase_cloud_deploy` verfolgt das Deployment bis zum Ende und prüft, ob die neue
-  Version antwortet. `wait: false` kehrt zurück, sobald das Deployment ausgelöst ist.
-  Es löst ein Projekt nie aus der verwalteten Runtime heraus (eject), deployt kein älteres Framework-
-  Release und überspringt nicht die Build-Prüfungen: Das sind Entscheidungen des Benutzers, und eine
-  Ablehnung, die eine davon braucht, sagt das.
-- `rebase_cloud_rollback` übergibt `--yes`. Der Tool-Aufruf ist die Bestätigung, da es
-  kein Terminal gibt, an dem gefragt werden könnte.
+Jedes Tool liefert eine Momentaufnahme:
 
-`rebase_cloud_env_set` schreibt den Wert auf die Standardeingabe der CLI, sodass er
-nie in einer Befehlszeile steht, wo `ps` ihn zeigen würde, und der Wert wird aus
-allem herausgeschnitten, was das Tool zurückgibt. Sein Ergebnis sagt, was gespeichert wurde (der Schlüssel, ob er
-geheim ist, ob ein Redeploy aussteht), nie den Wert. `rebase_cloud_env_list`
-listet nur Schlüssel auf. Eine CLI, die älter ist als `env set --stdin`, wird mit der Aufforderung
-zum Upgrade abgelehnt; der Wert wird nicht auf anderem Weg gesendet.
+- `rebase_cloud_logs` folgt Ausgaben nie fortlaufend. Das Ergebnis enthält `nextSinceTime`;
+  übergeben Sie diesen Wert als `since`, um nachfolgende Einträge zu lesen. Es gibt standardmäßig
+  die letzten 200 Zeilen zurück, sofern `tail` nichts anderes angibt. `source: "build"` gibt
+  stattdessen das neueste Build-Protokoll zurück.
+- `rebase_cloud_deploy` verfolgt das Deployment bis zum Ende und prüft, ob die neue Version
+  antwortet. `wait: false` kehrt zurück, sobald das Deployment ausgelöst wurde. Es stößt ein
+  Projekt niemals eigenmächtig aus der verwalteten Runtime aus, deployt keine ältere
+  Framework-Version und überspringt keine Build-Checks: Dies sind Entscheidungen des Benutzers,
+  und eine Verweigerung, die eine solche erfordert, weist darauf hin.
+- `rebase_cloud_rollback` übergibt `--yes`. Der Tool-Aufruf gilt als Bestätigung, da kein
+  Terminal für Rückfragen zur Verfügung steht.
 
-Ergebnisse kommen im [Envelope für nicht vertrauenswürdige Daten](#kennzeichnung-nicht-vertrauenswürdiger-daten)
-zurück, hinter einer Zeile des Servers dazu, was als Nächstes zu tun ist. Eine Ablehnung ist ein Tool-Fehler,
-der den Code der CLI trägt, etwa `no_project`, `token_rejected`,
-`managed_project` oder `deploy_failed`. Erkennt der Server den Code, ergänzt er
-den nächsten Schritt, dann die eigene Meldung der CLI. Jedes Tool prüft seine Argumente
-gegen das Schema, das es bekannt gibt, bevor irgendetwas gestartet wird, und lehnt ein
-Argument ab, das es nicht deklariert.
+`rebase_cloud_env_set` schreibt den Wert in die Standardeingabe der CLI, sodass er niemals auf
+einer Befehlszeile erscheint, auf der `ps` ihn anzeigen könnte, und der Wert wird aus allen
+Rückgaben des Tools herausgefiltert. Sein Ergebnis gibt an, was gespeichert wurde (der Schlüssel,
+ob er geheim ist, ob ein erneutes Deployment aussteht), niemals den Wert selbst.
+`rebase_cloud_env_list` listet ausschließlich Schlüssel auf. Eine CLI, die älter als
+`env set --stdin` ist, wird mit dem Hinweis abgelehnt, sie zu aktualisieren; der Wert wird
+nicht über einen anderen Weg übermittelt.
+
+Die Ergebnisse werden im [Umschlag für nicht vertrauenswürdige Daten](#kennzeichnung-nicht-vertrauenswürdiger-daten)
+zurückgegeben, gefolgt von einer Zeile des Servers mit Hinweisen zum nächsten Schritt. Eine
+Ablehnung ist ein Tool-Fehler, der den Code der CLI enthält, wie `no_project`,
+`token_rejected`, `managed_project` oder `deploy_failed`. Erkennt der Server den Code,
+fügt er den nächsten Schritt und anschließend die Meldung der CLI selbst hinzu. Jedes Tool
+prüft seine Argumente gegen das von ihm deklarierte Schema, bevor ein Prozess gestartet wird,
+und weist nicht deklarierte Argumente ab.
 
 ## Tool-Referenz
 
-51 Tools in zehn Gruppen: Schema & Datenbank, Schema-Planung, Dokumente, Benutzer
-& Rollen, Storage, Cron, Funktionen, der Dev-Server, die Projekt-Registry und
+53 Tools in zehn Gruppen: Schema und Datenbank, Schema-Planung, Dokumente, Benutzer
+und Rollen, Storage, Cron, Funktionen, der Dev-Server, die Projekt-Registry und
 Rebase Cloud.
-Jedes einzelne – mit dem, was es benötigt, und ob das Gate es bei einem nicht
-lokalen Ziel abweist – finden Sie in der
-[MCP-Tool-Referenz](/docs/ai/mcp-tool-reference).
+Jedes einzelne, inklusive seiner Anforderungen und der Information, ob das Gate es bei
+einem nicht-lokalen Ziel verweigert, finden Sie in der [MCP-Tool-Referenz](/docs/ai/mcp-tool-reference).
 
 ## Ressourcen
 
-Neben Tools stellt der Server auch MCP-Ressourcen bereit, sodass ein Client
-Projektkontext abrufen kann, ohne einen Tool-Aufruf zu verbrauchen:
+Neben Tools stellt der Server auch MCP-Ressourcen bereit, sodass ein Client Kontext über das
+Projekt abrufen kann, ohne einen Tool-Aufruf zu verbrauchen:
 
 | URI | Beschreibung |
 |---|---|
@@ -549,31 +548,29 @@ Projektkontext abrufen kann, ohne einen Tool-Aufruf zu verbrauchen:
 | `rebase://schema` | Das generierte Drizzle-Schema (`schema.generated.ts`) |
 
 Collections werden unter `app/config/collections/`, `config/collections/` oder
-`collections/` im aktiven Projektverzeichnis erkannt – je nachdem, was existiert.
+`collections/` im aktiven Projektverzeichnis erkannt – je nachdem, welches existiert.
 
 `rebase://schema` wird **nur dann** aufgeführt, wenn das generierte Schema existiert.
-`findBackendDir` sucht unter dem aktiven Projektverzeichnis nach `backend/` und dann
-nach `app/backend/` und liest `src/schema.generated.ts` aus dem Verzeichnis, das es
-zuerst findet – somit funktionieren sowohl die standardmäßig generierte Struktur als
-auch die dieses Monorepos. Bei einem Projekt mit abweichender Struktur oder einem, bei
-dem `rebase schema generate` noch nicht ausgeführt wurde, wird die Ressource schlicht
-nicht angeboten.
+`findBackendDir` sucht nach `backend/` und danach nach `app/backend/` unterhalb des aktiven
+Projektverzeichnisses und liest `src/schema.generated.ts` aus dem Verzeichnis, das es findet –
+sodass sowohl das Scaffold-Layout als auch das dieses Monorepos funktionieren. Ein Projekt
+mit einer abweichenden Struktur oder eines, bei dem `rebase schema generate` noch nicht
+ausgeführt wurde, bekommt die Ressource schlicht nicht angeboten.
 
 ## Der Remote-Endpunkt
 
 Ein bereitgestelltes Backend kann MCP auch selbst unter `/mcp` für die Personen bereitstellen,
-die Ihre Anwendung nutzen, wobei sich jede als sie selbst verbindet, unter ihrer eigenen Row-Level
-Security. Dafür gibt es eine eigene Seite:
+die Ihre Anwendung nutzen – wobei sich jede Person als sie selbst unter ihrer eigenen
+Row-Level Security verbindet. Dies wird auf einer eigenen Seite beschrieben:
 [Der Remote-MCP-Endpunkt](/docs/ai/remote-mcp/).
 
-## Empfohlenes Setup
+## Empfohlene Konfiguration
 
 - Richten Sie den Server auf ein **lokales** Projekt aus und lassen Sie
-  `REBASE_MCP_ALLOW_REMOTE_WRITES` ungesetzt. Das Gate ist das wertvollste
-  Sicherheitsfeature im Paket.
-- Registrieren Sie für alle Remote-Umgebungen einen **eingeschränkten `rk_`-API-Key**,
-  anstatt der automatischen Erkennung die Übergabe eines Service-Keys zu überlassen.
-- Überprüfen Sie `rebase_project_current`, wenn die Ausgaben unerwartet aussehen.
-  Das aktive Projekt ist sitzungsübergreifend gespeichert (sticky) und liegt außerhalb
-  Ihres Repositories.
-- Behandeln Sie `~/.rebase/projects.json` wie eine Datei für vertrauliche Zugangsdaten.
+  `REBASE_MCP_ALLOW_REMOTE_WRITES` ungesetzt. Das Gate ist das wertvollste Sicherheitsfeature
+  des Pakets.
+- Registrieren Sie für alle Remote-Umgebungen einen **eingeschränkten `rk_`-API-Schlüssel**,
+  anstatt die Erkennung einen Service-Key übergeben zu lassen.
+- Prüfen Sie `rebase_project_current`, wenn eine Ausgabe unerwartet erscheint. Das aktive Projekt
+  ist persistent („sticky“) und liegt außerhalb Ihres Repositories.
+- Behandeln Sie `~/.rebase/projects.json` wie eine Datei für vertrauliche Zugangsdaten (Secrets).
