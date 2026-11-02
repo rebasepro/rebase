@@ -341,6 +341,8 @@ For most projects the distinction never surfaces, because the default policies R
 
 If you genuinely need an unconditional bypass, `rebase.sql()` is it: raw SQL on the owner connection, no policies, every row. It is the most privileged thing in a function's context — more so than the accessor with "admin" in its name.
 
+It is not for making tables. A table is a [collection](/docs/collections/), declared in `config/collections/` and created by boot; one made with `CREATE TABLE` in a function has no validation, callbacks, security rules, admin view or SDK type. `rebase.sql()` runs such a statement, and logs a warning naming the collection to declare instead.
+
 ```typescript
 import { defineFunction, requireAuth, requireAdmin } from "@rebasepro/server/functions";
 

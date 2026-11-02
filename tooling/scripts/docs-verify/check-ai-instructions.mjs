@@ -195,6 +195,7 @@ export function checkAiInstructions(root) {
 
     checkScaffold(root, findings);
     checkPointerAgents(root, findings);
+    checkPointerRules(root, findings);
     checkQuotedPointer(root, findings);
     return { findings, scanned };
 }
@@ -433,6 +434,44 @@ function checkScaffold(root, findings) {
  * which is what makes this checkable rather than a hardcoded table: the mapping
  * lives in the file it describes, and the keys are read out of `AGENTS`.
  */
+/**
+ * Every pointer file carries the same "Before you write any code" block.
+ *
+ * The block is in all five because an assistant does not reliably follow the
+ * link to `ai-instructions.md`: an agent building a game on Rebase made twelve
+ * tables with `CREATE TABLE` in a function, and the rule against it was one
+ * link away the whole time. Five copies of one block drift, so they are held
+ * to the `CLAUDE.md` one here.
+ */
+function checkPointerRules(root, findings) {
+    const HEADING = "## Before you write any code";
+    const files = ["CLAUDE.md", "AGENTS.md", ".cursorrules", ".windsurfrules", ".github/copilot-instructions.md"]
+        .map((name) => `${SCAFFOLD}/${name}`);
+    const blockOf = (rel) => {
+        const text = readFileSync(path.join(root, rel), "utf8");
+        const at = text.indexOf(HEADING);
+        return at === -1 ? null : text.slice(at).trim();
+    };
+    let reference;
+    for (const rel of files) {
+        let block;
+        try {
+            block = blockOf(rel);
+        } catch {
+            findings.push({ file: rel, line: 0, message: "could not read this pointer file." });
+            continue;
+        }
+        if (block === null) {
+            findings.push({ file: rel, line: 0, message: `no \`${HEADING}\` block: the rules an assistant must see first are missing here.` });
+            continue;
+        }
+        if (reference === undefined) reference = block;
+        else if (block !== reference) {
+            findings.push({ file: rel, line: 0, message: `the \`${HEADING}\` block differs from ${files[0]}'s: the five copies must be the same.` });
+        }
+    }
+}
+
 function checkPointerAgents(root, findings) {
     let source;
     try {

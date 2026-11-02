@@ -22,12 +22,12 @@
 
 ## Never
 
+- **Never create or change a table in code, and never write raw SQL or Drizzle queries against application tables** — `rebase.sql()` included. A table is a collection (core rule 1), and one that already exists gets its collection from `pnpm schema:introspect`. Raw SQL skips validation, hooks and row-level security, and `rebase.sql()` logs a warning naming the fix when it is used to create, alter, drop or index a table.
 - **Never deploy.** `pnpm deploy`, `rebase cloud deploy`, `firebase deploy`, `gcloud run deploy` — print the command and let the human run it, even when the task list ends in "deploy" and the tests are green.
 - **Never edit `.env`.** It holds generated secrets and the connection string. Add a variable by asking, and document it in `.env.example`.
 - **Never edit `backend/src/schema.generated.ts`.** It is overwritten by `pnpm schema:generate`; the collection file is the source.
 - **Never edit `rebase.resources.json`.** It is generated from `config/resources.ts` — declare there, then `rebase resources --write`.
 - **Never pass `--allow-destructive`** to anything pointed at a database that is not the local development one. It drops columns and tables.
-- **Never write raw SQL or Drizzle queries against application tables.** That path skips validation, hooks and row-level security.
 
 ## Core rules
 

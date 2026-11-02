@@ -27,6 +27,7 @@ export * from "./string-column-length";
 export * from "./internal-tables";
 export * from "./sql-rows";
 export * from "./sql-redaction";
+export * from "./table-ddl-warning";
 export * from "./copy";
 export * from "./untrusted-envelope";
 export * from "./deprecation";

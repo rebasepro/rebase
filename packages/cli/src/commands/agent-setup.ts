@@ -435,7 +435,7 @@ export interface HookWriteResult {
 }
 
 /** The CLI package's own directory, from wherever this module was bundled to. */
-function cliPackageRoot(): string {
+export function cliPackageRoot(): string {
     let dir = path.dirname(fileURLToPath(import.meta.url));
     while (dir !== path.dirname(dir)) {
         const manifest = path.join(dir, "package.json");

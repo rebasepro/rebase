@@ -43,7 +43,7 @@ import {
     type CollectionCallbacks,
     type RebaseServerClient
 } from "@rebasepro/types";
-import { createDataSourceRegistry, resolveDataSource, buildSdkData, buildRoutedRebaseData, createAccessorSlugResolver, getEffectiveSecurityRules, assertBeforeQueryIsPostgresOnly } from "@rebasepro/common";
+import { createDataSourceRegistry, resolveDataSource, buildSdkData, buildRoutedRebaseData, createAccessorSlugResolver, getEffectiveSecurityRules, assertBeforeQueryIsPostgresOnly, warnOnTableDdl } from "@rebasepro/common";
 import { randomBytes } from "node:crypto";
 import type { Server } from "node:http";
 import nodePath from "node:path";
@@ -2871,6 +2871,8 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
         };
         Object.assign(serverClient, {
             sql: async (query: string, sqlOptions?: { database?: import("@rebasepro/types").ResourceRef; role?: string; params?: unknown[] }) => {
+                // Application tables are collections: a table made here has no rules, callbacks or admin view (see warnOnTableDdl).
+                warnOnTableDdl(query, message => logger.warn(message));
                 const admin = sqlOptions?.database !== undefined ? sqlAdminFor(resourceKeyOf(sqlOptions.database)) : driverAdmin;
                 return admin.executeSql(query, sqlOptions && { role: sqlOptions.role, params: sqlOptions.params });
             }

@@ -31,6 +31,16 @@ Chaque fichier pointeur fait trois lignes :
 # Rebase AI Rules
 Please refer to and follow the instructions defined in [ai-instructions.md](./ai-instructions.md).
 The Rebase skills for this assistant live in `.claude/skills/`. If they are not there yet, install them, with the Rebase MCP server: `rebase skills install --agent claude --mcp`.
+
+## Before you write any code
+
+These hold before you have opened ai-instructions.md, and in every session:
+
+- **A table is a collection.** Declare it in `config/collections/<name>.ts` with `defineCollection`, and `pnpm dev` creates it. Never `CREATE TABLE`, `ALTER TABLE` or `CREATE INDEX` in code, and never raw SQL or Drizzle against an application table, `rebase.sql()` included: it skips validation, callbacks, security rules, the admin view and the SDK types. A table that already exists gets its collection from `pnpm schema:introspect`.
+- **Data goes through the SDK:** `rebase.dataAsAdmin.<slug>` in functions and crons, `getDriver(c)` to act as the caller.
+- **A route in `backend/functions/` is public until you guard it** with `requireAuth` or `requireAdmin` from `@rebasepro/server/functions`.
+- **Never deploy, never edit `.env`, never edit generated files** (`backend/src/schema.generated.ts`, `rebase.resources.json`).
+- **When Rebase cannot do what the task needs, tell the human** what is missing instead of working around it.
 ```
 
 Sur la version 0.23, la troisième ligne indique seulement à l'assistant d'exécuter

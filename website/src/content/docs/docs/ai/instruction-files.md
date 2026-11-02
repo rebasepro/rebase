@@ -1,7 +1,7 @@
 ---
 title: AI Instruction Files
 sidebar_label: AI Instruction Files
-description: Every scaffolded Rebase project ships ai-instructions.md plus three-line pointer files for Claude, Cursor, Windsurf, Copilot and AGENTS.md — one source of truth, many filenames.
+description: Every scaffolded Rebase project ships ai-instructions.md plus pointer files for Claude, Cursor, Windsurf, Copilot and AGENTS.md that carry the five rules assistants break most — one source of truth, many filenames.
 ---
 
 Every assistant wants its rules in a different file. Claude Code reads
@@ -24,12 +24,22 @@ your-project/
     └── copilot-instructions.md   ← pointer
 ```
 
-Each pointer file is three lines:
+Each pointer file names the real one, says where the skills live, and carries the five rules an assistant must not break even if it never opens anything else:
 
 ```markdown title="CLAUDE.md"
 # Rebase AI Rules
 Please refer to and follow the instructions defined in [ai-instructions.md](./ai-instructions.md).
 The Rebase skills for this assistant live in `.claude/skills/`. If they are not there yet, install them, with the Rebase MCP server: `rebase skills install --agent claude --mcp`.
+
+## Before you write any code
+
+These hold before you have opened ai-instructions.md, and in every session:
+
+- **A table is a collection.** Declare it in `config/collections/<name>.ts` with `defineCollection`, and `pnpm dev` creates it. Never `CREATE TABLE`, `ALTER TABLE` or `CREATE INDEX` in code, and never raw SQL or Drizzle against an application table, `rebase.sql()` included: it skips validation, callbacks, security rules, the admin view and the SDK types. A table that already exists gets its collection from `pnpm schema:introspect`.
+- **Data goes through the SDK:** `rebase.dataAsAdmin.<slug>` in functions and crons, `getDriver(c)` to act as the caller.
+- **A route in `backend/functions/` is public until you guard it** with `requireAuth` or `requireAdmin` from `@rebasepro/server/functions`.
+- **Never deploy, never edit `.env`, never edit generated files** (`backend/src/schema.generated.ts`, `rebase.resources.json`).
+- **When Rebase cannot do what the task needs, tell the human** what is missing instead of working around it.
 ```
 
 On 0.23 the third line only tells the assistant to run
@@ -74,16 +84,24 @@ whatever the last project on that machine persisted. See
 
 ## Why a pointer rather than a copy
 
-The pointer files are deliberately content-free. Assistants follow relative
-Markdown links, so a three-line file that names the real one gets the same result
-as a copy — and it has properties a copy does not:
+The pointer files hold almost nothing. A file that names the real one keeps the
+conventions in one place, and it has properties a copy does not:
 
 - **One file to edit.** Rules cannot drift between assistants, because there is
   only one set of rules.
 - **One diff to review.** A change to project conventions is a change to one
   file, not five identical ones a reviewer must compare.
-- **Adding an assistant is three lines.** A new tool with a new filename gets a
-  pointer, not a sixth copy of your conventions.
+- **Adding an assistant is one small file.** A new tool with a new filename gets
+  a pointer, not a sixth copy of your conventions.
+
+The one exception is the **Before you write any code** block. An assistant does
+not reliably follow a link: one that is busy with a task writes the code first,
+and one started at the root of a repository whose Rebase project sits in a
+subfolder never loads these files at all. So the five rules whose breaking does
+the most damage (a table made in code instead of a collection, data read and
+written around the SDK, an unguarded route, a deploy, an edited generated file)
+are written into every pointer, identically. A check in CI keeps the five
+copies the same.
 
 The pattern is worth keeping if you fork the scaffold, and worth adopting in
 repos that are not Rebase projects at all.

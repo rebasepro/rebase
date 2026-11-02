@@ -1393,6 +1393,7 @@ function evaluatePolicy
 function fieldKeyForColumn
 function findAnonymousGrants
 function findRelation
+function findTableDdl
 function firstSqlRow
 function fullPathToCollectionSegments
 function getArrayResolvedProperties
@@ -1488,6 +1489,7 @@ function sortProperties
 function sqlRows
 function sqlToPolicy
 function stripCollectionPath
+function tableDdlMessage
 function tenantBypassRoles
 function tenantPolicyName
 function tenantScopeExpression
@@ -1514,6 +1516,7 @@ function updateUserAutoValues
 function uploadResumable
 function vectorPropertyNames
 function warnDeprecated
+function warnOnTableDdl
 function withETag
 function withRelationReferencesOnly
 function wrapAsEntityData
@@ -1545,6 +1548,7 @@ interface ResumableUploadOptions { chunkSize, file, metadata, retryDelaysMs, sen
 interface ResumableUploadResponse { error, header, status }
 interface RoutedRebaseDataParams { defaultData, resolveAccessor, resolveKey, sources }
 interface RuleConditions { usingExpr, withCheckExpr }
+interface TableDdl { schema, statement, table }
 interface TenantWriteInput { bypass, callerTenants, callerTenantsComplete, previousValues, slug, status, tenant, values }
 interface TenantWriteRefusal { code, field, message }
 interface UnknownFieldAnswer { code, details, message }
