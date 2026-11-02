@@ -156,6 +156,19 @@ La traducción está pendiente. El contenido siguiente está en inglés.
   a working pod out of service. The Postgres driver now probes on a connection
   of its own (`SQLAdmin.probe`), within 2.5 s, and a healthy auth-schema answer
   is reused for a minute.
+- **A resumable upload needs `storage:write`, with or without a storage hook.**
+  `POST /api/storage/tus` asked for the scope only when `storageAuthorize` or
+  `storagePolicies` was set. Without either (`storageInsecureAllowAnyAuthenticated`
+  in production, any project without a hook in development), an API key holding
+  no storage scope, or one for another source, could create an upload; a key with
+  `storage:write` on any source could finish it. It now answers
+  `403 SCOPE_MISSING`, as `POST /upload` does.
+- **`storageAuthorize` no longer overrides a policy that matched and denied.** The
+  docs and the module said the hook is asked only when no policy matched; it was
+  asked whenever no policy granted, so an owner-only policy plus a permissive hook
+  let anyone read the owner's keys. A key a policy matched for that operation is
+  now settled by the policies. A project that relied on the hook granting such a
+  key needs a policy that grants it, or a pattern that does not match it.
 
 #### Runtime
 
@@ -203,6 +216,20 @@ La traducción está pendiente. El contenido siguiente está en inglés.
   Only a build printed this, so a deploy that fell back to installing at boot
   went live healthy, with every new instance a minute slower and nothing saying
   so.
+- **A scaffold no longer installs a stranger's package named after your project.**
+  A project's shared package is `<name>-config` on a `"*"` range, and pnpm took a
+  higher version from npm over the local 1.0.0, then ran its install script,
+  because the scaffold allowlisted it. `my-app-config`, the quickstart's own name,
+  is a real package published by someone else. New scaffolds set
+  `preferWorkspacePackages: true` and allow no script for that name, and `rebase
+  build` never declares a package of the project's own workspace.
+
+  **Check a project you already have:** run `pnpm why <name>-config`. If it does
+  not point at `config/`, add `preferWorkspacePackages: true` to
+  `pnpm-workspace.yaml`, delete `"<name>-config": true` from `allowBuilds`, and run
+  `pnpm install`.
+- **A headless scaffold installs the MCP server its `.mcp.json` runs.** `rebase-mcp`
+  was missing from the overlay, so the server the scaffold wires up did not start.
 
 #### Client SDK
 

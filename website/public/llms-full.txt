@@ -165,6 +165,7 @@ Don't run `cp .env.example .env`. `.env.example` is a reference for the availabl
 ### Start the Dev Servers
 
 ```bash
+cd my-app
 pnpm install
 pnpm run dev
 ```
@@ -297,7 +298,7 @@ const productsCollection = defineCollection({
 export default productsCollection;
 ```
 
-Then add it to the `collections` array in `config/collections/index.ts`. That array is a sort order, not a registry: every collection file in the directory is loaded — by the backend, the admin panel and the SDK generator — whether the array lists it or not, and the array decides where it appears in the navigation. To remove a collection, delete its file:
+Then add it to the `collections` array in `config/collections/index.ts`. That array is a sort order, not a registry: every collection file in the directory is loaded — by the backend, the admin panel and the SDK generator — whether the array lists it or not, and the array decides where it appears in the navigation. To remove a collection, delete its file and its import and entry in `index.ts`; a file the index still imports stops the backend from loading:
 
 ```typescript title="config/collections/index.ts" {2,5}
 // ...existing imports
@@ -382,7 +383,7 @@ my-app/
 ├── tsconfig.json           # Typechecks scripts/; each workspace typechecks on its own
 ├── docker-compose.yml      # Self-hosting: Postgres + the published runtime image
 ├── scripts/
-│   └── example.ts          # The SDK end to end against the running backend: `pnpm example`
+│   └── example.ts          # A health check and an SDK call to uncomment: `pnpm example`
 │
 ├── config/                 # Shared by the backend and the admin panel
 │   ├── index.ts            # Re-exports `collections`; the runtime reads `storageAuthorize` from here
@@ -822,7 +823,7 @@ image. A project that has ejected owns these decisions in its own code instead.
 | `REBASE_LIVE_SCHEMA_ALLOW_MACHINE_APPLY` | `true` lets a machine — an agent, a CI job — *apply* a schema change through `/api/admin/schema`, not only plan one. Off unless asked for: the credential that would make such a change is the one most likely to be sitting in a CI variable. | `false` |
 | `REBASE_FUNCTIONS_TIMEOUT_MS` | How long a custom function may run before its request is aborted. Same knob as the `functionsTimeoutMs` option. `0` turns it off. | `30000` |
 | `REBASE_EXIT_ON_UNHANDLED_REJECTION` | `true` makes an unhandled promise rejection terminate the process instead of logging it. On under an orchestrator that will restart you; off where a restart is worse than a leak. | `false` |
-| `REBASE_CRON_ALWAYS_ON` | Keeps the cron scheduler running on a platform the runtime otherwise detects as scale-to-zero, where a timer that fires in an idle instance fires in no instance. | — |
+| `REBASE_CRON_ALWAYS_ON` | Silences the boot warning on a platform the runtime detects as scale-to-zero, where a timer that fires in an idle instance fires in no instance. It changes nothing else: set it when you keep at least one instance running. | — |
 | `TRUSTED_PROXY_HOPS` | How many proxies sit in front of this server, so the rate limiter can read the real client address out of `X-Forwarded-For`. Fail-safe default `0`: with no proxy, trusting the header would let any caller forge an identity. | `0` |
 
 :::note[Boot provisioning is additive, and is not a migration tool]
@@ -895,7 +896,7 @@ no usable credential refuses to boot. See
 | Variable | Description | Default |
 |----------|-------------|---------|
 | `BACKUP_SCHEDULE` | Cron expression for scheduled backups. Unset means scheduled backups are off. | — |
-| `BACKUP_DESTINATION` | Local path, or an `s3://bucket/prefix` / `gs://bucket/prefix` URL. | `./backups` |
+| `BACKUP_DESTINATION` | Local path, or an `s3://bucket/prefix` / `gs://bucket/prefix` URL. Required with `BACKUP_SCHEDULE`, which refuses to run without it. `rebase db backup` falls back to `./backups` where it was run. | — |
 | `BACKUP_RETENTION_DAYS` | Delete backups older than N days. Unset or `0` keeps everything. | — |
 | `BACKUP_KEEP_MINIMUM` | Always retain at least N of the most recent backups, whatever retention says. | — |
 | `PG_DUMP_PATH` | Override the `pg_dump` binary — it must be the server's major version or newer. | — |
@@ -1598,7 +1599,7 @@ name before upgrading, and rename it:
 SELECT id, roles FROM rebase.users
 WHERE EXISTS (
   SELECT 1 FROM unnest(roles) r
-  WHERE r = '' OR r ~ '[,{}"\\]' OR r ~ '[[:cntrl:]]'
+  WHERE btrim(r) = '' OR r ~ '[,{}"\\]' OR r ~ '[[:cntrl:]]'
 );
 ```
 
@@ -1643,7 +1644,8 @@ refusal reasons `local-account-unverified` and
 
 A provider that does not assert `email_verified` still gets
 `403 EMAIL_NOT_VERIFIED` (`provider-email-unverified`). A custom user store
-without `unlinkUserIdentity` answers `409 UNVERIFIED_IDENTITIES` and changes
+without `unlinkUserIdentity`, on an account holding an identity whose provider
+did not vouch for the address, answers `409 UNVERIFIED_IDENTITIES` and changes
 nothing.
 
 **What to change:** remove any client branch that told the user to verify their
@@ -4483,6 +4485,19 @@ yet, listed so that nobody reads a promise into them:
   a working pod out of service. The Postgres driver now probes on a connection
   of its own (`SQLAdmin.probe`), within 2.5 s, and a healthy auth-schema answer
   is reused for a minute.
+- **A resumable upload needs `storage:write`, with or without a storage hook.**
+  `POST /api/storage/tus` asked for the scope only when `storageAuthorize` or
+  `storagePolicies` was set. Without either (`storageInsecureAllowAnyAuthenticated`
+  in production, any project without a hook in development), an API key holding
+  no storage scope, or one for another source, could create an upload; a key with
+  `storage:write` on any source could finish it. It now answers
+  `403 SCOPE_MISSING`, as `POST /upload` does.
+- **`storageAuthorize` no longer overrides a policy that matched and denied.** The
+  docs and the module said the hook is asked only when no policy matched; it was
+  asked whenever no policy granted, so an owner-only policy plus a permissive hook
+  let anyone read the owner's keys. A key a policy matched for that operation is
+  now settled by the policies. A project that relied on the hook granting such a
+  key needs a policy that grants it, or a pattern that does not match it.
 
 ##### Runtime
 
@@ -4530,6 +4545,20 @@ yet, listed so that nobody reads a promise into them:
   Only a build printed this, so a deploy that fell back to installing at boot
   went live healthy, with every new instance a minute slower and nothing saying
   so.
+- **A scaffold no longer installs a stranger's package named after your project.**
+  A project's shared package is `<name>-config` on a `"*"` range, and pnpm took a
+  higher version from npm over the local 1.0.0, then ran its install script,
+  because the scaffold allowlisted it. `my-app-config`, the quickstart's own name,
+  is a real package published by someone else. New scaffolds set
+  `preferWorkspacePackages: true` and allow no script for that name, and `rebase
+  build` never declares a package of the project's own workspace.
+
+  **Check a project you already have:** run `pnpm why <name>-config`. If it does
+  not point at `config/`, add `preferWorkspacePackages: true` to
+  `pnpm-workspace.yaml`, delete `"<name>-config": true` from `allowBuilds`, and run
+  `pnpm install`.
+- **A headless scaffold installs the MCP server its `.mcp.json` runs.** `rebase-mcp`
+  was missing from the overlay, so the server the scaffold wires up did not start.
 
 ##### Client SDK
 
@@ -30224,7 +30253,7 @@ storagePolicies: [
 ]
 ```
 
-**A key matched by no policy is refused**, unless a `storageAuthorize` hook allows it: the hook is asked only when no policy matched, and neither can narrow the other. Every widening is an explicit line, and a mistake denies rather than grants.
+**A key matched by no policy is refused**, unless a `storageAuthorize` hook allows it: the hook is asked only when no policy matched the key for that operation, and neither can narrow the other. A policy that matched and did not grant is final. Every widening is an explicit line, and a mistake denies rather than grants.
 
 Patterns match **by segment, never by substring** — `public/**` does not match
 `publicity/secret.png`:
@@ -30238,8 +30267,15 @@ Patterns match **by segment, never by substring** — `public/**` does not match
 `**` is only legal as the final segment. `:name` captures one segment and never
 spans a `/`; captures arrive as `params` on the predicate.
 
-`allow` is `"public"` (anyone), `"authenticated"` (any caller with a uid), or a
-predicate receiving the captured params, the user, the operation and the bucket.
+`allow` is `"public"` (anyone the route lets in), `"authenticated"` (any caller
+with a uid), or a predicate receiving the captured params, the user, the
+operation and the bucket.
+
+A policy runs after the route's authentication, so `"public"` alone does not open
+a path to anonymous callers. With `requireAuth` on, they reach reads of `public/`
+keys only, or every read with `storagePublicRead`; `/upload`, `/list`, deletes and
+resumable uploads always need a caller. Elsewhere the answer is `401`.
+
 `operations` defaults to all four — `read`, `write`, `delete`, `list`.
 
 Policies satisfy the production boot guard on their own, and a malformed pattern
@@ -30256,6 +30292,7 @@ per-object equivalent in the bucket, so this hook *is* the model — and
 storage is configured and none of these is set:
 
 - `storageAuthorize` — a hook, per object. Recommended.
+- `storagePolicies` — the declared rules above.
 - `storagePublicRead: true` — the bucket genuinely is a public read-only CDN.
 - `storageInsecureAllowAnyAuthenticated: true` — a single-tenant app where every
   signed-in user is trusted with every file. Named to be read twice.
@@ -51011,8 +51048,9 @@ sources store in the same bucket or directory. Once the move is done, the CLI
 lists the source again with a fresh walk and names every file the move did not
 move: with `--delete-source`, any file still in the source; without it, any file
 the target holds no copy of the same size of. It exits 1 when there is one, and
-running the same move again picks it up. `--json` prints them as `notMoved`. Both need `database:read`, and
-deleting or moving `database:write`, which the service key holds.
+running the same move again picks it up. `--json` prints them as `notMoved`. Reading a scan's
+report needs `database:read`. Starting a scan, deleting and moving need
+`database:write`, which the service key holds.
 
 #### `rebase skills install`
 
@@ -55043,7 +55081,7 @@ so: each instance then installs them as it starts, with `npm ci` (or
   rebase cloud env set NPM_TOKEN=ghp_… --secret
   ```
 
-The bundle upload is capped at 100 MB, compressed, without dependencies.
+The bundle upload is capped at 1 GB, compressed.
 
 **Native modules are refused.** A package that ships a compiled `.node` binary
 cannot load on the managed runtime. `rebase build` warns about it, and
@@ -55615,12 +55653,17 @@ the run made, as a SQL script:
 docker run --rm \
   -e DATABASE_URL="postgres://admin:…@scratch-db:5432/app" \
   -e JWT_SECRET="…" \
+  -e CORS_ORIGINS="https://app.example.com" \
   -e REBASE_PROVISION_ONLY=true \
   -e REBASE_PROVISION_SQL_OUT=/out/rebase.sql \
   -v "$PWD/out:/out" \
   -v "$PWD/dist-bundle:/bundle" \
   "rebasepro/server:$REBASE_VERSION"
 ```
+
+The image runs with `NODE_ENV=production`, so this run is held to the same
+environment checks as the server, `CORS_ORIGINS` or `FRONTEND_URL` included, even
+though it serves nothing.
 
 The script is a record, not a plan: every statement in it ran, in order, and
 succeeded. Recorded against an empty database, it is the whole schema the release
@@ -55972,7 +56015,7 @@ REBASE_ROLE=all        # the default: everything, one process
 | Runs the cron scheduler | ✅ | ✅ | — | ✅ |
 | Runs job-queue workers | ✅ | ✅ | — | ✅ |
 
-Health and metrics are on every role without exception. A process an
+Health and metrics are on every role without exception; `/metrics` answers only with `REBASE_METRICS=true`. A process an
 orchestrator cannot probe is a process it cannot roll.
 
 `GET /api/auth/config`,
