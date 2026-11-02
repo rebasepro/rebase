@@ -1,5 +1,5 @@
 ---
-sourceHash: 0199b2905455975d
+sourceHash: 8b62231973eb6798
 title: Démarrage rapide
 sidebar_label: Démarrage rapide
 description: Créez un nouveau projet Rebase et lancez-le localement en moins de 2 minutes.
@@ -41,6 +41,7 @@ N'exécutez pas `cp .env.example .env`. `.env.example` est une référence pour 
 ## Démarrer les serveurs de développement
 
 ```bash
+cd my-app
 pnpm install
 pnpm run dev
 ```
@@ -171,7 +172,7 @@ const productsCollection = defineCollection({
 export default productsCollection;
 ```
 
-Ajoutez-la ensuite au tableau `collections` dans `config/collections/index.ts`. Ce tableau est un ordre de tri, pas un registre : chaque fichier de collection du répertoire est chargé — par le backend, le panneau d'administration et le générateur de SDK — qu'il figure ou non dans le tableau, et le tableau décide seulement de sa place dans la navigation. Pour supprimer une collection, supprimez son fichier :
+Ajoutez-la ensuite au tableau `collections` dans `config/collections/index.ts`. Ce tableau est un ordre de tri, pas un registre : chaque fichier de collection du répertoire est chargé — par le backend, le panneau d'administration et le générateur de SDK — qu'il figure ou non dans le tableau, et le tableau décide seulement de sa place dans la navigation. Pour supprimer une collection, supprimez son fichier ainsi que son import et son entrée dans `index.ts` ; un fichier que l'index importe encore empêche le backend de se charger :
 
 ```typescript title="config/collections/index.ts" {2,5}
 // ...existing imports

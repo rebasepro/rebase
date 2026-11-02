@@ -1,5 +1,5 @@
 ---
-sourceHash: 73d0334fc7800665
+sourceHash: 1f571eeb0f768141
 title: Runtime de backend gerenciado
 sidebar_label: Runtime Gerenciado
 description: O que um backend com runtime "managed" pode e não pode fazer no Rebase Cloud — pacotes e binários, memória e CPU, timeouts e tamanhos de corpo, o sistema de arquivos, estado em memória, segredos, armazenamento para arquivos gerados e rede de saída.
@@ -58,7 +58,7 @@ Os números aqui apresentados vêm do runtime e da plataforma como estão hoje. 
   rebase cloud env set NPM_TOKEN=ghp_… --secret
   ```
 
-O upload do bundle é limitado a 100 MB, compactado, sem dependências.
+O upload do bundle é limitado a 1 GB, compactado.
 
 **Módulos nativos são recusados.** Um pacote que inclui um binário `.node` compilado não pode ser carregado no runtime gerenciado. O `rebase build` emite um aviso sobre isso, e o `rebase cloud deploy` interrompe antes do upload:
 

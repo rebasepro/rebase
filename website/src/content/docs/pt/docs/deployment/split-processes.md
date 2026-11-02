@@ -1,5 +1,5 @@
 ---
-sourceHash: 0fe683ac4911c694
+sourceHash: 02909417fc2180c5
 title: Divisão em vários processos
 sidebar_label: Processos Divididos
 description: Execute um bundle como vários processos cooperantes — uma API, uma camada de funções, um worker — a partir da mesma imagem de runtime publicada, para que uma função customizada pesada deixe de concorrer com a API de dados.
@@ -34,7 +34,7 @@ REBASE_ROLE=all        # the default: everything, one process
 | Executa o agendador do cron | ✅ | ✅ | — | ✅ |
 | Executa os workers da fila de jobs | ✅ | ✅ | — | ✅ |
 
-Health e métricas estão em todas as roles, sem exceção. Um processo que um orquestrador não consegue sondar é um processo que ele não consegue atualizar.
+Health e métricas estão em todas as roles, sem exceção; `/metrics` responde apenas com `REBASE_METRICS=true`. Um processo que um orquestrador não consegue sondar é um processo que ele não consegue atualizar.
 
 O `GET /api/auth/config`,
 o que a tela de login lê, segue o resto de `/api/auth`: apenas `api` e

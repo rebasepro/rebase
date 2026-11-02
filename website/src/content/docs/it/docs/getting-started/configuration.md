@@ -1,5 +1,5 @@
 ---
-sourceHash: ec6f07e74d4a291d
+sourceHash: d6db615c2565caf1
 title: Ambiente e configurazione
 sidebar_label: Configurazione
 description: Tutte le variabili d'ambiente e le opzioni di configurazione per i progetti Rebase.
@@ -238,7 +238,7 @@ del server pubblicata. Un progetto sottoposto a eject gestisce queste logiche al
 | `REBASE_LIVE_SCHEMA_ALLOW_MACHINE_APPLY` | Se impostata su `true`, consente a processi automatici (agenti, job di CI) di *applicare* modifiche allo schema tramite `/api/admin/schema`, anziché limitarsi alla sola pianificazione. Disattivata salvo esplicita configurazione: le credenziali con privilegi per queste operazioni sono tipicamente definite come variabili nei sistemi di CI. | `false` |
 | `REBASE_FUNCTIONS_TIMEOUT_MS` | Durata massima consentita per l'esecuzione di una funzione personalizzata prima dell'annullamento della richiesta. Equivale all'opzione `functionsTimeoutMs`. `0` disattiva il timeout. | `30000` |
 | `REBASE_EXIT_ON_UNHANDLED_REJECTION` | `true` forza l'arresto immediato del processo in caso di unhandled promise rejection anziché limitarsi alla sola registrazione nei log. Consigliata con orchestratori in grado di riavviare l'istanza; sconsigliata se l'interruzione del servizio ha un impatto peggiore di una perdita di memoria. | `false` |
-| `REBASE_CRON_ALWAYS_ON` | Mantiene attivo lo scheduler cron su piattaforme gestite che il runtime identifica altrimenti con scalabilità a zero (scale-to-zero), dove un timer eseguito su un'istanza inattiva non verrebbe azionato su nessuna macchina. | — |
+| `REBASE_CRON_ALWAYS_ON` | Silenzia l'avviso di avvio su una piattaforma che il runtime rileva come scale-to-zero, dove un timer che scatta in un'istanza inattiva non scatta in nessuna. Non cambia nient'altro: impostala quando tieni in esecuzione almeno un'istanza. | — |
 | `TRUSTED_PROXY_HOPS` | Numero di reverse proxy posizionati a monte del server, necessario per consentire al rate limiter di identificare il reale indirizzo del client leggendo `X-Forwarded-For`. Predefinito a `0` per sicurezza: senza proxy interposti, dare credito a questo header consentirebbe a qualsiasi client di contraffare la propria identità di rete. | `0` |
 
 :::note[Il provisioning all'avvio è puramente additivo e non sostituisce uno strumento di migrazione completo]
@@ -309,7 +309,7 @@ repository senza credenziali valide impedirà l'avvio. Consultare
 | Variabile | Descrizione | Predefinito |
 |-----------|-------------|-------------|
 | `BACKUP_SCHEDULE` | Espressione cron per pianificare i backup periodici. Se omessa, i backup automatici sono disabilitati. | — |
-| `BACKUP_DESTINATION` | Percorso su disco locale, o URL `s3://bucket/prefix` / `gs://bucket/prefix`. | `./backups` |
+| `BACKUP_DESTINATION` | Percorso su disco locale, o URL `s3://bucket/prefix` / `gs://bucket/prefix`. Obbligatorio con `BACKUP_SCHEDULE`, che senza di esso rifiuta di partire. `rebase db backup` ripiega su `./backups` dove è stato eseguito. | — |
 | `BACKUP_RETENTION_DAYS` | Numero di giorni di conservazione prima dell'eliminazione. Se non impostata o `0`, mantiene indefinitamente tutti i backup. | — |
 | `BACKUP_KEEP_MINIMUM` | Numero minimo di backup recenti da preservare sempre, a prescindere dal criterio temporale di retention. | — |
 | `PG_DUMP_PATH` | Percorso alternativo del binario `pg_dump` — deve corrispondere alla major version del server o a una versione più recente. | — |

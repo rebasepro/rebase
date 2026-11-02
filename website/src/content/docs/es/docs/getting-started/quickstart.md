@@ -1,5 +1,5 @@
 ---
-sourceHash: 0199b2905455975d
+sourceHash: 8b62231973eb6798
 title: Inicio rápido
 sidebar_label: Inicio rápido
 description: Crea un nuevo proyecto de Rebase y ponlo en marcha localmente en menos de 2 minutos.
@@ -39,6 +39,7 @@ No ejecutes `cp .env.example .env`. `.env.example` es una referencia de las vari
 ## Inicia los servidores de desarrollo
 
 ```bash
+cd my-app
 pnpm install
 pnpm run dev
 ```
@@ -153,7 +154,7 @@ const productsCollection = defineCollection({
 export default productsCollection;
 ```
 
-Luego añádela al array `collections` de `config/collections/index.ts`. Ese array es un orden de clasificación, no un registro: cada archivo de colección en el directorio se carga —por el backend, el panel de administración y el generador del SDK— tanto si el array lo lista como si no, y el array decide dónde aparece en la navegación. Para eliminar una colección, borra su archivo:
+Luego añádela al array `collections` de `config/collections/index.ts`. Ese array es un orden de clasificación, no un registro: cada archivo de colección en el directorio se carga —por el backend, el panel de administración y el generador del SDK— tanto si el array lo lista como si no, y el array decide dónde aparece en la navegación. Para eliminar una colección, borra su archivo y su import y entrada en `index.ts`; un archivo que el índice aún importa impide que el backend cargue:
 
 ```typescript title="config/collections/index.ts" {2,5}
 // ...existing imports

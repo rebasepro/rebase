@@ -1,5 +1,5 @@
 ---
-sourceHash: 7408bfbaa0aac9ec
+sourceHash: aebdec7c52c6f579
 slug: fr/docs/upgrading/0-25-to-0-26
 title: Mise à niveau de 0.25 à 0.26
 sidebar_label: 0.25 → 0.26
@@ -33,7 +33,7 @@ Les utilisateurs, la collection des utilisateurs et les clés de service répond
 SELECT id, roles FROM rebase.users
 WHERE EXISTS (
   SELECT 1 FROM unnest(roles) r
-  WHERE r = '' OR r ~ '[,{}"\\]' OR r ~ '[[:cntrl:]]'
+  WHERE btrim(r) = '' OR r ~ '[,{}"\\]' OR r ~ '[[:cntrl:]]'
 );
 ```
 
@@ -63,7 +63,7 @@ Un processus qui sert lui-même les fonctions ne définit aucun amont. Consultez
 
 Lorsqu'un fournisseur a vérifié l'e-mail, s'y connecter vérifie désormais le compte non vérifié correspondant au lieu de le refuser. Avant de lier les comptes, la connexion supprime le mot de passe du compte, toute identité dont le fournisseur ne s'est pas porté garant pour l'adresse, ainsi que toutes les sessions, comme le faisaient déjà un lien magique ou un code par e-mail. Les motifs de refus `local-account-unverified` et `local-account-unverified-passwordless` ne sont plus renvoyés.
 
-Un fournisseur qui n'affirme pas `email_verified` reçoit toujours `403 EMAIL_NOT_VERIFIED` (`provider-email-unverified`). Un dépôt d'utilisateurs personnalisé sans `unlinkUserIdentity` répond `409 UNVERIFIED_IDENTITIES` et ne modifie rien.
+Un fournisseur qui n'affirme pas `email_verified` reçoit toujours `403 EMAIL_NOT_VERIFIED` (`provider-email-unverified`). Un dépôt d'utilisateurs personnalisé sans `unlinkUserIdentity`, sur un compte détenant une identité dont le fournisseur n'a pas garanti l'adresse, répond `409 UNVERIFIED_IDENTITIES` et ne modifie rien.
 
 **Ce qu'il faut changer :** supprimez toute branche côté client qui invitait l'utilisateur à vérifier d'abord son e-mail sur ces deux motifs ; la connexion réussit désormais. Un utilisateur qui n'a jamais vérifié son mot de passe le perd lors de sa première connexion via le fournisseur, et se connecte ensuite avec le fournisseur, ou réinitialise son mot de passe. Consultez
 [Account linking across sign-in methods](/docs/backend/authentication/#account-linking-across-sign-in-methods).

@@ -1,5 +1,5 @@
 ---
-sourceHash: 0fe683ac4911c694
+sourceHash: 02909417fc2180c5
 title: División en varios procesos
 sidebar_label: Procesos divididos
 description: Ejecute un bundle como varios procesos cooperativos —una API, una capa de funciones, un worker— desde la misma imagen de runtime publicada, para que una función personalizada pesada deje de competir con la API de datos.
@@ -40,7 +40,7 @@ REBASE_ROLE=all        # the default: everything, one process
 | Ejecuta el programador de cron | ✅ | ✅ | — | ✅ |
 | Ejecuta workers de la cola de tareas | ✅ | ✅ | — | ✅ |
 
-El estado de salud (health) y las métricas están en cada rol sin excepción. Un proceso que un
+El estado de salud (health) y las métricas están en cada rol sin excepción; `/metrics` responde solo con `REBASE_METRICS=true`. Un proceso que un
 orquestador no puede sondear es un proceso que no puede actualizar progresivamente (roll).
 
 `GET /api/auth/config`,

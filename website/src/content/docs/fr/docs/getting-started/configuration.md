@@ -1,5 +1,5 @@
 ---
-sourceHash: ec6f07e74d4a291d
+sourceHash: d6db615c2565caf1
 title: Environnement & Configuration
 sidebar_label: Configuration
 description: Toutes les variables d'environnement et options de configuration pour les projets Rebase.
@@ -246,7 +246,7 @@ Un projet ayant été éjecté gère ces décisions dans son propre code à la p
 | `REBASE_LIVE_SCHEMA_ALLOW_MACHINE_APPLY` | `true` permet à une machine — un agent, un job CI — d'*appliquer* un changement de schéma via `/api/admin/schema`, et pas seulement d'en planifier un. Désactivé sauf si demandé : l'identifiant qui permettrait un tel changement est celui le plus susceptible de se trouver dans une variable de CI. | `false` |
 | `REBASE_FUNCTIONS_TIMEOUT_MS` | Durée maximale pendant laquelle une fonction personnalisée peut s'exécuter avant que sa requête ne soit interrompue. Même paramètre que l'option `functionsTimeoutMs`. `0` le désactive. | `30000` |
 | `REBASE_EXIT_ON_UNHANDLED_REJECTION` | `true` fait en sorte qu'un rejet de promesse non géré termine le processus au lieu de simplement le consigner. À activer sous un orchestrateur qui vous redémarrera ; à désactiver lorsqu'un redémarrage est pire qu'une fuite. | `false` |
-| `REBASE_CRON_ALWAYS_ON` | Maintient le planificateur cron actif sur une plateforme que le runtime détecte sinon comme réduisant à zéro (scale-to-zero), où un minuteur qui se déclenche dans une instance inactive ne se déclenche dans aucune instance. | — |
+| `REBASE_CRON_ALWAYS_ON` | Fait taire l'avertissement de démarrage sur une plateforme que le runtime détecte comme réduisant à zéro (scale-to-zero), où un minuteur qui se déclenche dans une instance inactive ne se déclenche dans aucune. Cela ne change rien d'autre : définissez-la quand vous gardez au moins une instance active. | — |
 | `TRUSTED_PROXY_HOPS` | Nombre de proxys situés devant ce serveur, pour que le limiteur de débit puisse lire la véritable adresse client dans `X-Forwarded-For`. Valeur par défaut sécurisée à `0` : sans proxy, faire confiance à l'en-tête permettrait à n'importe quel appelant d'usurper une identité. | `0` |
 
 :::note[Le provisionnement au démarrage est additif, ce n'est pas un outil de migration]
@@ -319,7 +319,7 @@ identifiant utilisable refuse de démarrer. Voir
 | Variable | Description | Valeur par défaut |
 |----------|-------------|-------------------|
 | `BACKUP_SCHEDULE` | Expression cron pour les sauvegardes planifiées. Non défini signifie que les sauvegardes planifiées sont désactivées. | — |
-| `BACKUP_DESTINATION` | Chemin local, ou une URL `s3://bucket/prefix` / `gs://bucket/prefix`. | `./backups` |
+| `BACKUP_DESTINATION` | Chemin local, ou une URL `s3://bucket/prefix` / `gs://bucket/prefix`. Requis avec `BACKUP_SCHEDULE`, qui refuse de s'exécuter sans lui. `rebase db backup` se rabat sur `./backups` là où il a été lancé. | — |
 | `BACKUP_RETENTION_DAYS` | Supprimer les sauvegardes datant de plus de N jours. Non défini ou `0` conserve tout. | — |
 | `BACKUP_KEEP_MINIMUM` | Toujours conserver au moins N sauvegardes les plus récentes, quelle que soit la règle de rétention. | — |
 | `PG_DUMP_PATH` | Remplacer le binaire `pg_dump` — il doit correspondre à la version majeure du serveur ou être plus récent. | — |

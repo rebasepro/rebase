@@ -1,5 +1,5 @@
 ---
-sourceHash: 0fe683ac4911c694
+sourceHash: 02909417fc2180c5
 title: Séparation en plusieurs processus
 sidebar_label: Processus séparés
 description: Exécutez un seul bundle sous forme de plusieurs processus coopérants — une API, un niveau de fonctions, un worker — à partir de la même image d'exécution publiée, afin qu'une fonction personnalisée lourde ne vienne plus concurrencer l'API de données.
@@ -40,7 +40,7 @@ REBASE_ROLE=all        # the default: everything, one process
 | Exécute le planificateur cron | ✅ | ✅ | — | ✅ |
 | Exécute les workers de la file d'attente de tâches | ✅ | ✅ | — | ✅ |
 
-Les endpoints de santé (health) et de métriques sont présents sur chaque rôle sans exception. Un processus qu'un
+Les endpoints de santé (health) et de métriques sont présents sur chaque rôle sans exception ; `/metrics` ne répond qu'avec `REBASE_METRICS=true`. Un processus qu'un
 orchestrateur ne peut pas sonder est un processus qu'il ne peut pas mettre à jour de manière progressive (rolling update).
 
 `GET /api/auth/config`,

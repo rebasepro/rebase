@@ -1,5 +1,5 @@
 ---
-sourceHash: caa4e79614f7401e
+sourceHash: 13a551230cf39acd
 title: Self-Hosting
 sidebar_label: Self-Hosting
 description: Esegui Rebase ovunque con l'immagine di runtime ufficiale e il bundle del tuo progetto — Docker Compose, Fly, Railway o un semplice VPS.
@@ -129,12 +129,17 @@ Lo schema proviene da un'esecuzione controllata dal vostro processo di modifica.
 docker run --rm \
   -e DATABASE_URL="postgres://admin:…@scratch-db:5432/app" \
   -e JWT_SECRET="…" \
+  -e CORS_ORIGINS="https://app.example.com" \
   -e REBASE_PROVISION_ONLY=true \
   -e REBASE_PROVISION_SQL_OUT=/out/rebase.sql \
   -v "$PWD/out:/out" \
   -v "$PWD/dist-bundle:/bundle" \
   "rebasepro/server:$REBASE_VERSION"
 ```
+
+L'immagine viene eseguita con `NODE_ENV=production`, quindi questa esecuzione è soggetta agli
+stessi controlli d'ambiente del server, `CORS_ORIGINS` o `FRONTEND_URL` compresi, anche se
+non serve nulla.
 
 Lo script è una registrazione, non un piano: ogni istruzione che contiene è stata eseguita, in ordine, ed è andata a buon fine. Registrato su un database vuoto, è l'intero schema di cui la release ha bisogno. Registrato su una copia ripristinata della produzione, è esattamente l'aggiornamento. Le righe scritte dall'esecuzione non sono incluse. Rivedetelo, poi applicatelo al database reale:
 

@@ -1,5 +1,5 @@
 ---
-sourceHash: 73d0334fc7800665
+sourceHash: 1f571eeb0f768141
 title: Runtime backend managé
 sidebar_label: Runtime managé
 description: Ce qu'un backend avec le runtime "managed" peut et ne peut pas faire sur Rebase Cloud — paquets et binaires, mémoire et CPU, délais d'expiration et tailles de body, système de fichiers, état en mémoire, secrets, stockage pour les fichiers générés et réseau sortant.
@@ -84,7 +84,7 @@ lockfile). Quatre conséquences découlent de leur mode d'installation :
   rebase cloud env set NPM_TOKEN=ghp_… --secret
   ```
 
-Le téléversement du bundle est limité à 100 Mo, compressé, sans les dépendances.
+Le téléversement du bundle est plafonné à 1 Go, compressé.
 
 **Les modules natifs sont refusés.** Un paquet qui fournit un binaire `.node` compilé
 ne peut pas se charger sur le runtime managé. `rebase build` émet un avertissement, et

@@ -1,5 +1,5 @@
 ---
-sourceHash: ec6f07e74d4a291d
+sourceHash: d6db615c2565caf1
 title: Ambiente e Configuração
 sidebar_label: Configuração
 description: Todas as variáveis de ambiente e opções de configuração para projetos Rebase.
@@ -246,7 +246,7 @@ Um projeto que passou por eject possui essas decisões no seu próprio código.
 | `REBASE_LIVE_SCHEMA_ALLOW_MACHINE_APPLY` | `true` permite que uma máquina — um agente, um job de CI — *aplique* uma alteração de schema através de `/api/admin/schema`, e não apenas a planeje. Desativado a menos que explicitamente solicitado: a credencial que realizaria tal alteração é a mais propensa a estar armazenada em uma variável de CI. | `false` |
 | `REBASE_FUNCTIONS_TIMEOUT_MS` | Quanto tempo uma função personalizada pode rodar antes que sua requisição seja abortada. O mesmo ajuste que a opção `functionsTimeoutMs`. `0` desativa o timeout. | `30000` |
 | `REBASE_EXIT_ON_UNHANDLED_REJECTION` | `true` faz com que uma rejeição de promise não tratada termine o processo em vez de apenas registrá-la em log. Ativado sob um orquestrador que reiniciará o contêiner; desativado onde um reinício for pior que um vazamento. | `false` |
-| `REBASE_CRON_ALWAYS_ON` | Mantém o agendador de cron rodando em uma plataforma que o runtime normalmente detectaria como scale-to-zero, onde um timer acionado em uma instância ociosa não dispararia em instância alguma. | — |
+| `REBASE_CRON_ALWAYS_ON` | Silencia o aviso de inicialização em uma plataforma que o runtime detecta como scale-to-zero, onde um timer acionado em uma instância ociosa não dispara em instância alguma. Não muda mais nada: defina-a quando mantiver pelo menos uma instância rodando. | — |
 | `TRUSTED_PROXY_HOPS` | Quantos proxies estão à frente deste servidor, permitindo que o rate limiter leia o endereço IP real do cliente a partir de `X-Forwarded-For`. Padrão seguro contra falhas `0`: sem proxy, confiar no cabeçalho permitiria que qualquer chamador forjasse uma identidade. | `0` |
 
 :::note[O provisionamento na inicialização é aditivo e não é uma ferramenta de migração]
@@ -319,7 +319,7 @@ sem nenhuma credencial utilizável recusa a inicialização. Veja
 | Variável | Descrição | Padrão |
 |----------|-----------|--------|
 | `BACKUP_SCHEDULE` | Expressão cron para backups agendados. Indefinido significa que os backups agendados estão desativados. | — |
-| `BACKUP_DESTINATION` | Caminho local ou uma URL `s3://bucket/prefix` / `gs://bucket/prefix`. | `./backups` |
+| `BACKUP_DESTINATION` | Caminho local ou uma URL `s3://bucket/prefix` / `gs://bucket/prefix`. Obrigatório com `BACKUP_SCHEDULE`, que se recusa a rodar sem ele. `rebase db backup` usa `./backups` onde foi executado. | — |
 | `BACKUP_RETENTION_DAYS` | Excluir backups com mais de N dias. Indefinido ou `0` mantém tudo. | — |
 | `BACKUP_KEEP_MINIMUM` | Sempre reter pelo menos N backups mais recentes, independentemente da retenção. | — |
 | `PG_DUMP_PATH` | Sobrescreve o binário `pg_dump` — deve ser da versão principal do servidor ou mais recente. | — |

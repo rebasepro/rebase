@@ -1,5 +1,5 @@
 ---
-sourceHash: caa4e79614f7401e
+sourceHash: 13a551230cf39acd
 title: Autoalojamiento (Self-Hosting)
 sidebar_label: Autoalojamiento
 description: Ejecuta Rebase en cualquier lugar con la imagen oficial de runtime y el bundle de tu proyecto — Docker Compose, Fly, Railway o un VPS convencional.
@@ -191,12 +191,17 @@ El esquema proviene de una ejecución que controla su proceso de cambios. Use la
 docker run --rm \
   -e DATABASE_URL="postgres://admin:…@scratch-db:5432/app" \
   -e JWT_SECRET="…" \
+  -e CORS_ORIGINS="https://app.example.com" \
   -e REBASE_PROVISION_ONLY=true \
   -e REBASE_PROVISION_SQL_OUT=/out/rebase.sql \
   -v "$PWD/out:/out" \
   -v "$PWD/dist-bundle:/bundle" \
   "rebasepro/server:$REBASE_VERSION"
 ```
+
+La imagen se ejecuta con `NODE_ENV=production`, así que esta ejecución pasa las mismas
+comprobaciones de entorno que el servidor, incluido `CORS_ORIGINS` o `FRONTEND_URL`,
+aunque no sirva nada.
 
 El script es un registro, no un plan: cada sentencia que contiene se ejecutó, en orden, y tuvo éxito. Registrado contra una base de datos vacía, es todo el esquema que necesita la versión. Registrado contra una copia restaurada de producción, es exactamente la actualización. Las filas que escribió la ejecución no están en él. Revíselo y luego aplíquelo a la base de datos real:
 

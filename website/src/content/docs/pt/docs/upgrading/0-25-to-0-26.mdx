@@ -1,5 +1,5 @@
 ---
-sourceHash: 7408bfbaa0aac9ec
+sourceHash: aebdec7c52c6f579
 slug: pt/docs/upgrading/0-25-to-0-26
 title: Atualizando da versão 0.25 para a 0.26
 sidebar_label: 0.25 → 0.26
@@ -53,7 +53,7 @@ antes de atualizar e renomeie-o:
 SELECT id, roles FROM rebase.users
 WHERE EXISTS (
   SELECT 1 FROM unnest(roles) r
-  WHERE r = '' OR r ~ '[,{}"\\]' OR r ~ '[[:cntrl:]]'
+  WHERE btrim(r) = '' OR r ~ '[,{}"\\]' OR r ~ '[[:cntrl:]]'
 );
 ```
 
@@ -96,8 +96,8 @@ já faziam. Os motivos de recusa `local-account-unverified` e
 `local-account-unverified-passwordless` não são mais retornados.
 
 Um provedor que não declara `email_verified` continua recebendo `403 EMAIL_NOT_VERIFIED`
-(`provider-email-unverified`). Um repositório de usuários próprio sem `unlinkUserIdentity`
-responde `409 UNVERIFIED_IDENTITIES` e não altera nada.
+(`provider-email-unverified`). Um repositório de usuários próprio sem `unlinkUserIdentity`,
+em uma conta com uma identidade cujo provedor não garantiu o endereço, responde `409 UNVERIFIED_IDENTITIES` e não altera nada.
 
 **O que mudar:** remova qualquer ramificação do cliente que pedia ao usuário que verificasse o
 e-mail primeiro nesses dois motivos; o login agora é bem-sucedido. Um usuário que nunca

@@ -1,5 +1,5 @@
 ---
-sourceHash: 7408bfbaa0aac9ec
+sourceHash: aebdec7c52c6f579
 slug: es/docs/upgrading/0-25-to-0-26
 title: Actualización de 0.25 a 0.26
 sidebar_label: 0.25 → 0.26
@@ -54,7 +54,7 @@ nombre antes de actualizar y renómbralo:
 SELECT id, roles FROM rebase.users
 WHERE EXISTS (
   SELECT 1 FROM unnest(roles) r
-  WHERE r = '' OR r ~ '[,{}"\\]' OR r ~ '[[:cntrl:]]'
+  WHERE btrim(r) = '' OR r ~ '[,{}"\\]' OR r ~ '[[:cntrl:]]'
 );
 ```
 
@@ -99,7 +99,7 @@ Los motivos de rechazo `local-account-unverified` y
 
 Un proveedor que no afirma `email_verified` sigue recibiendo
 `403 EMAIL_NOT_VERIFIED` (`provider-email-unverified`). Un almacén de usuarios
-personalizado sin `unlinkUserIdentity` responde `409 UNVERIFIED_IDENTITIES` y no cambia
+personalizado sin `unlinkUserIdentity`, en una cuenta con una identidad cuyo proveedor no avaló la dirección, responde `409 UNVERIFIED_IDENTITIES` y no cambia
 nada.
 
 **Qué cambiar:** elimina cualquier rama del cliente que, ante esos dos motivos, indicara

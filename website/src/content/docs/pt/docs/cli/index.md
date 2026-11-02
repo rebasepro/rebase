@@ -1,5 +1,5 @@
 ---
-sourceHash: 67ab1823d7297527
+sourceHash: 64127f882b1e4804
 title: Referência da CLI
 sidebar_label: CLI
 description: Comandos da CLI do Rebase para inicialização de projetos, geração de schemas, migrações de banco de dados e geração de SDK.
@@ -470,8 +470,8 @@ fontes armazenam no mesmo bucket ou diretório. Quando a movimentação termina,
 lista a fonte de novo com uma varredura nova e nomeia cada arquivo que a movimentação não
 moveu: com `--delete-source`, qualquer arquivo ainda na origem; sem ele, qualquer arquivo
 de que o destino não guarda uma cópia do mesmo tamanho. Ela sai com 1 quando há algum, e
-executar a mesma movimentação de novo o retoma. `--json` os imprime como `notMoved`. Ambos exigem `database:read`, e
-excluir ou mover exige `database:write`, que a chave de serviço possui.
+executar a mesma movimentação de novo o retoma. `--json` os imprime como `notMoved`. Ler o relatório de uma varredura exige `database:read`. Iniciar uma varredura, excluir e
+mover exigem `database:write`, que a chave de serviço possui.
 
 ### `rebase skills install`
 

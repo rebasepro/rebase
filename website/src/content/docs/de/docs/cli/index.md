@@ -1,5 +1,5 @@
 ---
-sourceHash: 67ab1823d7297527
+sourceHash: 64127f882b1e4804
 title: CLI-Referenz
 sidebar_label: CLI
 description: Rebase-CLI-Befehle für Projektinitialisierung, Schemagenerierung, Datenbankmigrationen und SDK-Generierung.
@@ -506,8 +506,8 @@ Quellen im selben Bucket oder Verzeichnis speichern. Nach dem Verschieben
 listet die CLI die Quelle erneut mit einem frischen Durchlauf auf und nennt jede Datei, die das Verschieben nicht
 verschoben hat: mit `--delete-source` jede Datei, die noch in der Quelle liegt; ohne es jede Datei,
 von der das Ziel keine Kopie derselben Größe hält. Sie endet mit Exit-Code 1, wenn es eine gibt, und
-dasselbe Verschieben erneut auszuführen holt sie nach. `--json` gibt sie als `notMoved` aus. Beide brauchen `database:read`, und
-Löschen oder Verschieben `database:write`, was der Service-Key hält.
+dasselbe Verschieben erneut auszuführen holt sie nach. `--json` gibt sie als `notMoved` aus. Den Bericht eines Scans zu lesen braucht `database:read`. Einen Scan zu starten, Löschen und
+Verschieben brauchen `database:write`, was der Service-Key hält.
 
 ### `rebase skills install`
 

@@ -1,5 +1,5 @@
 ---
-sourceHash: caa4e79614f7401e
+sourceHash: 13a551230cf39acd
 title: Auto-hébergement
 sidebar_label: Auto-hébergement
 description: Exécutez Rebase n'importe où avec l'image runtime officielle et le bundle de votre projet — Docker Compose, Fly, Railway ou un simple VPS.
@@ -132,12 +132,17 @@ Le schéma vient d'une exécution que contrôle votre processus de changement. U
 docker run --rm \
   -e DATABASE_URL="postgres://admin:…@scratch-db:5432/app" \
   -e JWT_SECRET="…" \
+  -e CORS_ORIGINS="https://app.example.com" \
   -e REBASE_PROVISION_ONLY=true \
   -e REBASE_PROVISION_SQL_OUT=/out/rebase.sql \
   -v "$PWD/out:/out" \
   -v "$PWD/dist-bundle:/bundle" \
   "rebasepro/server:$REBASE_VERSION"
 ```
+
+L'image s'exécute avec `NODE_ENV=production`, donc cette exécution est soumise aux mêmes
+vérifications d'environnement que le serveur, `CORS_ORIGINS` ou `FRONTEND_URL` compris,
+même si elle ne sert rien.
 
 Le script est un enregistrement, pas un plan : chaque instruction qu'il contient a été exécutée, dans l'ordre, et a réussi. Enregistré sur une base de données vide, c'est tout le schéma dont la version a besoin. Enregistré sur une copie restaurée de la production, c'est exactement la mise à niveau. Les lignes écrites par l'exécution n'y figurent pas. Relisez-le, puis appliquez-le à la vraie base de données :
 

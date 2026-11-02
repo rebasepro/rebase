@@ -41,6 +41,7 @@ A policy runs after the route's authentication, so `"public"` alone does not ope
 a path to anonymous callers. With `requireAuth` on, they reach reads of `public/`
 keys only, or every read with `storagePublicRead`; `/upload`, `/list`, deletes and
 resumable uploads always need a caller. Elsewhere the answer is `401`.
+
 `operations` defaults to all four — `read`, `write`, `delete`, `list`.
 
 Policies satisfy the production boot guard on their own, and a malformed pattern

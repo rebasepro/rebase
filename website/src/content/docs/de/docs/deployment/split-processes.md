@@ -1,5 +1,5 @@
 ---
-sourceHash: 0fe683ac4911c694
+sourceHash: 02909417fc2180c5
 title: Aufteilen in mehrere Prozesse
 sidebar_label: Prozesse aufteilen
 description: Führen Sie ein Bundle als mehrere zusammenarbeitende Prozesse aus – eine API, eine Functions-Ebene, ein Worker – aus demselben veröffentlichten Runtime-Image, damit eine rechenintensive benutzerdefinierte Funktion nicht mehr mit der Daten-API konkurriert.
@@ -39,7 +39,7 @@ REBASE_ROLE=all        # the default: everything, one process
 | Führt den Cron-Scheduler aus | ✅ | ✅ | — | ✅ |
 | Führt Job-Queue-Worker aus | ✅ | ✅ | — | ✅ |
 
-Health und Metriken sind ausnahmslos in jeder Rolle enthalten. Ein Prozess, den ein
+Health und Metriken sind ausnahmslos in jeder Rolle enthalten; `/metrics` antwortet nur mit `REBASE_METRICS=true`. Ein Prozess, den ein
 Orchestrator nicht abfragen kann, ist ein Prozess, den er nicht rollierend aktualisieren kann.
 
 `GET /api/auth/config`,

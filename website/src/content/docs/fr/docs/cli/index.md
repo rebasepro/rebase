@@ -1,5 +1,5 @@
 ---
-sourceHash: 67ab1823d7297527
+sourceHash: 64127f882b1e4804
 title: Référence de la CLI
 sidebar_label: CLI
 description: Commandes de la CLI Rebase pour l'initialisation de projet, la génération de schéma, les migrations de base de données et la génération de SDK.
@@ -437,8 +437,8 @@ sources stockent dans le même bucket ou répertoire. Une fois le déplacement t
 liste de nouveau la source par un parcours neuf et nomme chaque fichier que le déplacement n'a pas
 déplacé : avec `--delete-source`, tout fichier encore dans la source ; sans, tout fichier
 dont la cible ne détient aucune copie de même taille. Il se termine avec le code 1 s'il y en a un, et
-relancer le même déplacement le reprend. `--json` les affiche comme `notMoved`. Les deux exigent `database:read`, et
-la suppression ou le déplacement `database:write`, que détient la clé de service.
+relancer le même déplacement le reprend. `--json` les affiche comme `notMoved`. Lire le rapport d'une analyse exige `database:read`. Lancer une analyse, supprimer et
+déplacer exigent `database:write`, que détient la clé de service.
 
 ### `rebase skills install`
 

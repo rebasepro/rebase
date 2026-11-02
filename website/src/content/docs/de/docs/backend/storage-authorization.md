@@ -1,5 +1,5 @@
 ---
-sourceHash: b5b66e5876dc7d9c
+sourceHash: 4b2c2516afc9fad6
 title: Speicher-Autorisierung
 sidebar_label: Speicher-Autorisierung
 description: Entscheiden Sie mit storagePolicies und dem Hook storageAuthorize, wer jedes Speicherobjekt lesen, schreiben, löschen oder auflisten darf, und welche Speicher-Scopes ein API-Schlüssel braucht.
@@ -20,7 +20,7 @@ storagePolicies: [
 ]
 ```
 
-**Ein Schlüssel, auf den keine Richtlinie zutrifft, wird abgelehnt**, es sei denn, ein `storageAuthorize`-Hook erlaubt ihn: Der Hook wird nur gefragt, wenn keine Richtlinie zugetroffen hat, und keines von beiden kann das andere einschränken. Jede Erweiterung ist eine ausdrückliche Zeile, und ein Fehler verweigert, statt zu gewähren.
+**Ein Schlüssel, auf den keine Richtlinie zutrifft, wird abgelehnt**, es sei denn, ein `storageAuthorize`-Hook erlaubt ihn: Der Hook wird nur gefragt, wenn keine Richtlinie für diese Operation auf den Schlüssel zugetroffen hat, und keines von beiden kann das andere einschränken. Eine Richtlinie, die zutraf und nicht gewährte, ist endgültig. Jede Erweiterung ist eine ausdrückliche Zeile, und ein Fehler verweigert, statt zu gewähren.
 
 Muster treffen **segmentweise zu, niemals als Teilstring** – `public/**` trifft nicht auf
 `publicity/secret.png` zu:
@@ -34,8 +34,11 @@ Muster treffen **segmentweise zu, niemals als Teilstring** – `public/**` triff
 `**` ist nur als letztes Segment zulässig. `:name` erfasst ein Segment und überspannt nie
 ein `/`; die erfassten Werte kommen als `params` im Prädikat an.
 
-`allow` ist `"public"` (jeder), `"authenticated"` (jeder Aufrufer mit einer uid) oder ein
+`allow` ist `"public"` (jeder, den die Route durchlässt), `"authenticated"` (jeder Aufrufer mit einer uid) oder ein
 Prädikat, das die erfassten Parameter, den Benutzer, die Operation und das Bucket erhält.
+
+Eine Richtlinie läuft nach der Authentifizierung der Route, daher öffnet `"public"` allein keinen Pfad für anonyme Aufrufer. Mit aktivem `requireAuth` erreichen sie nur Lesezugriffe auf `public/`-Schlüssel, oder mit `storagePublicRead` alle Lesezugriffe; `/upload`, `/list`, Löschvorgänge und fortsetzbare Uploads brauchen immer einen Aufrufer. Sonst lautet die Antwort `401`.
+
 `operations` ist standardmäßig alle vier – `read`, `write`, `delete`, `list`.
 
 Richtlinien erfüllen den Boot-Guard der Produktion von selbst, und ein fehlerhaftes Muster
@@ -52,6 +55,7 @@ kein Gegenstück pro Objekt, daher *ist* dieser Hook das Modell – und
 Speicher konfiguriert ist und keines davon gesetzt ist:
 
 - `storageAuthorize` – ein Hook, pro Objekt. Empfohlen.
+- `storagePolicies` – die oben deklarierten Regeln.
 - `storagePublicRead: true` – das Bucket ist tatsächlich ein öffentliches, schreibgeschütztes CDN.
 - `storageInsecureAllowAnyAuthenticated: true` – eine Single-Tenant-App, in der jedem
   angemeldeten Benutzer jede Datei anvertraut wird. So benannt, dass man es zweimal liest.

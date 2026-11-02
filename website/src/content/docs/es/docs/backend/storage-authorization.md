@@ -1,5 +1,5 @@
 ---
-sourceHash: b5b66e5876dc7d9c
+sourceHash: 4b2c2516afc9fad6
 title: Autorización del almacenamiento
 sidebar_label: Autorización del almacenamiento
 description: Decide quién puede leer, escribir, eliminar o listar cada objeto de almacenamiento con storagePolicies y el hook storageAuthorize, y qué alcances de almacenamiento necesita una clave de API.
@@ -20,7 +20,7 @@ storagePolicies: [
 ]
 ```
 
-**Una clave que no coincide con ninguna política se rechaza**, a menos que un hook `storageAuthorize` la permita: al hook solo se le pregunta cuando ninguna política coincidió, y ninguno de los dos puede restringir al otro. Toda ampliación es una línea explícita, y un error deniega en lugar de conceder.
+**Una clave que no coincide con ninguna política se rechaza**, a menos que un hook `storageAuthorize` la permita: al hook solo se le pregunta cuando ninguna política coincidió con la clave para esa operación, y ninguno de los dos puede restringir al otro. Una política que coincidió y no concedió es definitiva. Toda ampliación es una línea explícita, y un error deniega en lugar de conceder.
 
 Los patrones coinciden **por segmento, nunca por subcadena** — `public/**` no coincide con
 `publicity/secret.png`:
@@ -34,8 +34,11 @@ Los patrones coinciden **por segmento, nunca por subcadena** — `public/**` no 
 `**` solo es válido como último segmento. `:name` captura un segmento y nunca
 cruza una `/`; las capturas llegan como `params` en el predicado.
 
-`allow` es `"public"` (cualquiera), `"authenticated"` (cualquier llamante con un uid), o un
+`allow` es `"public"` (cualquiera que la ruta deje pasar), `"authenticated"` (cualquier llamante con un uid), o un
 predicado que recibe los parámetros capturados, el usuario, la operación y el bucket.
+
+Una política se ejecuta después de la autenticación de la ruta, así que `"public"` por sí solo no abre una ruta a llamantes anónimos. Con `requireAuth` activo, solo alcanzan lecturas de claves `public/`, o todas las lecturas con `storagePublicRead`; `/upload`, `/list`, los borrados y las subidas reanudables siempre necesitan un llamante. En otro caso la respuesta es `401`.
+
 `operations` por defecto son las cuatro — `read`, `write`, `delete`, `list`.
 
 Las políticas satisfacen por sí solas la protección de arranque en producción, y un patrón
@@ -52,6 +55,7 @@ un equivalente por objeto en el bucket, así que este hook *es* el modelo — e
 el almacenamiento está configurado y no se ha definido ninguno de estos:
 
 - `storageAuthorize` — un hook, por objeto. Recomendado.
+- `storagePolicies` — las reglas declaradas arriba.
 - `storagePublicRead: true` — el bucket es de verdad un CDN público de solo lectura.
 - `storageInsecureAllowAnyAuthenticated: true` — una aplicación de un solo tenant donde se confía
   en que cada usuario con sesión iniciada acceda a todos los archivos. Nombrado para leerse dos veces.

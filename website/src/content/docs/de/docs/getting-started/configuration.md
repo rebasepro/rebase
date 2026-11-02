@@ -1,5 +1,5 @@
 ---
-sourceHash: ec6f07e74d4a291d
+sourceHash: d6db615c2565caf1
 title: Umgebung & Konfiguration
 sidebar_label: Konfiguration
 description: Alle Umgebungsvariablen und Konfigurationsoptionen für Rebase-Projekte.
@@ -245,7 +245,7 @@ Ein Projekt, das ein Eject durchgeführt hat, steuert diese Entscheidungen statt
 | `REBASE_LIVE_SCHEMA_ALLOW_MACHINE_APPLY` | `true` erlaubt es einer Maschine – einem Agenten, einem CI-Job –, eine Schemaänderung über `/api/admin/schema` nicht nur zu planen, sondern auch *anzuwenden*. Deaktiviert, sofern nicht explizit angefordert: Die Anmeldedaten, die eine solche Änderung durchführen könnten, liegen am ehesten in einer CI-Variable. | `false` |
 | `REBASE_FUNCTIONS_TIMEOUT_MS` | Wie lange eine benutzerdefinierte Funktion laufen darf, bevor ihre Anfrage abgebrochen wird. Derselbe Parameter wie die Option `functionsTimeoutMs`. `0` deaktiviert das Timeout. | `30000` |
 | `REBASE_EXIT_ON_UNHANDLED_REJECTION` | `true` bewirkt, dass eine unbehandelte Promise-Rejection den Prozess beendet, anstatt sie nur zu protokollieren. Aktivieren unter einem Orchestrator, der den Container neu startet; deaktivieren, wo ein Neustart schlimmer als ein Speicherleck ist. | `false` |
-| `REBASE_CRON_ALWAYS_ON` | Hält den Cron-Scheduler auf einer Plattform aktiv, die die Runtime andernfalls als Scale-to-Zero einstuft, wo ein Timer, der in einer inaktiven Instanz auslöst, in gar keiner Instanz ausgelöst werden würde. | — |
+| `REBASE_CRON_ALWAYS_ON` | Unterdrückt die Boot-Warnung auf einer Plattform, die die Runtime als Scale-to-Zero erkennt, wo ein Timer, der in einer inaktiven Instanz auslöst, in gar keiner Instanz auslöst. Sonst ändert es nichts: Setzen Sie es, wenn Sie mindestens eine Instanz laufen lassen. | — |
 | `TRUSTED_PROXY_HOPS` | Wie viele Proxys diesem Server vorgeschaltet sind, damit der Rate-Limiter die echte Client-Adresse aus `X-Forwarded-For` ermitteln kann. Ausfallsicherer Standardwert `0`: Ohne Proxy würde das Vertrauen in den Header jedem Aufrufer ermöglichen, eine Identität vorzutäuschen. | `0` |
 
 :::note[Boot-Provisioning ist additiv und kein Migrationswerkzeug]
@@ -317,7 +317,7 @@ Wird ein Repository ohne verwendbare Anmeldedaten angegeben, verweigert der Serv
 | Variable | Beschreibung | Standard |
 |----------|-------------|---------|
 | `BACKUP_SCHEDULE` | Cron-Ausdruck für geplante Backups. Nicht gesetzt bedeutet, dass geplante Backups deaktiviert sind. | — |
-| `BACKUP_DESTINATION` | Lokaler Pfad oder eine `s3://bucket/prefix`- bzw. `gs://bucket/prefix`-URL. | `./backups` |
+| `BACKUP_DESTINATION` | Lokaler Pfad oder eine `s3://bucket/prefix`- bzw. `gs://bucket/prefix`-URL. Erforderlich mit `BACKUP_SCHEDULE`, das ohne sie nicht läuft. `rebase db backup` verwendet ersatzweise `./backups` im Aufrufverzeichnis. | — |
 | `BACKUP_RETENTION_DAYS` | Backups löschen, die älter als N Tage sind. Nicht gesetzt oder `0` behält alles. | — |
 | `BACKUP_KEEP_MINIMUM` | Immer mindestens N der neuesten Backups aufbewahren, ungeachtet der Retention-Vorgabe. | — |
 | `PG_DUMP_PATH` | Überschreibt die `pg_dump`-Binärdatei – sie muss der Hauptversion des Servers entsprechen oder neuer sein. | — |

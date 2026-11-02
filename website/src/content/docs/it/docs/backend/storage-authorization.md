@@ -1,5 +1,5 @@
 ---
-sourceHash: b5b66e5876dc7d9c
+sourceHash: 4b2c2516afc9fad6
 title: Autorizzazione dello storage
 sidebar_label: Autorizzazione dello storage
 description: Decidi chi può leggere, scrivere, eliminare o elencare ogni oggetto di storage con storagePolicies e l'hook storageAuthorize, e di quali scope di storage ha bisogno una chiave API.
@@ -20,7 +20,7 @@ storagePolicies: [
 ]
 ```
 
-**Una chiave che nessuna policy riconosce viene rifiutata**, a meno che un hook `storageAuthorize` non la consenta: l'hook viene interpellato solo quando nessuna policy ha trovato corrispondenza, e nessuno dei due può restringere l'altro. Ogni ampliamento è una riga esplicita, e un errore nega anziché concedere.
+**Una chiave che nessuna policy riconosce viene rifiutata**, a meno che un hook `storageAuthorize` non la consenta: l'hook viene interpellato solo quando nessuna policy ha trovato corrispondenza per quella chiave e operazione, e nessuno dei due può restringere l'altro. Una policy che ha trovato corrispondenza e non ha concesso è definitiva. Ogni ampliamento è una riga esplicita, e un errore nega anziché concedere.
 
 I pattern corrispondono **per segmento, mai per sottostringa** — `public/**` non corrisponde a
 `publicity/secret.png`:
@@ -34,8 +34,11 @@ I pattern corrispondono **per segmento, mai per sottostringa** — `public/**` n
 `**` è ammesso solo come ultimo segmento. `:name` cattura un segmento e non
 attraversa mai un `/`; le catture arrivano come `params` al predicato.
 
-`allow` è `"public"` (chiunque), `"authenticated"` (qualsiasi chiamante con un uid) oppure un
+`allow` è `"public"` (chiunque la route lasci passare), `"authenticated"` (qualsiasi chiamante con un uid) oppure un
 predicato che riceve i parametri catturati, l'utente, l'operazione e il bucket.
+
+Una policy viene eseguita dopo l'autenticazione della route, quindi `"public"` da solo non apre un percorso ai chiamanti anonimi. Con `requireAuth` attivo raggiungono solo le letture di chiavi `public/`, o tutte le letture con `storagePublicRead`; `/upload`, `/list`, le eliminazioni e gli upload riprendibili richiedono sempre un chiamante. Altrove la risposta è `401`.
+
 `operations` per impostazione predefinita le comprende tutte e quattro — `read`, `write`, `delete`, `list`.
 
 Le policy soddisfano da sole la protezione all'avvio in produzione, e un pattern malformato
@@ -52,6 +55,7 @@ un equivalente per singolo oggetto, quindi questo hook *è* il modello — e
 lo storage è configurato e nessuna di queste impostazioni è presente:
 
 - `storageAuthorize` — un hook, per singolo oggetto. Consigliato.
+- `storagePolicies` — le regole dichiarate sopra.
 - `storagePublicRead: true` — il bucket è davvero una CDN pubblica in sola lettura.
 - `storageInsecureAllowAnyAuthenticated: true` — un'app single-tenant in cui ogni
   utente autenticato è considerato attendibile per ogni file. Il nome è scelto perché lo si legga due volte.

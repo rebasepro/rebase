@@ -1,5 +1,5 @@
 ---
-sourceHash: 0fe683ac4911c694
+sourceHash: 02909417fc2180c5
 title: Suddivisione in più processi
 sidebar_label: Processi separati
 description: Esegui un unico bundle suddiviso in vari processi cooperanti — un'API, un livello per le funzioni, un worker — a partire dalla stessa immagine di runtime pubblicata, evitando che una funzione custom pesante competa con l'API dati.
@@ -40,7 +40,7 @@ REBASE_ROLE=all        # the default: everything, one process
 | Esegue lo scheduler del cron | ✅ | ✅ | — | ✅ |
 | Esegue i worker della coda dei job | ✅ | ✅ | — | ✅ |
 
-Health e metriche sono presenti su ciascun ruolo senza eccezioni. Un processo che un
+Health e metriche sono presenti su ciascun ruolo senza eccezioni; `/metrics` risponde solo con `REBASE_METRICS=true`. Un processo che un
 orchestratore non può sottoporre a probe è un processo di cui non può effettuare il rollout.
 
 `GET /api/auth/config`,

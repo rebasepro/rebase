@@ -1,5 +1,5 @@
 ---
-sourceHash: 73d0334fc7800665
+sourceHash: 1f571eeb0f768141
 title: Managed-Backend-Runtime
 sidebar_label: Managed Runtime
 description: Was ein Backend mit der Runtime „managed“ auf Rebase Cloud kann und was nicht — Pakete und Binärdateien, Arbeitsspeicher und CPU, Timeouts und Body-Größen, das Dateisystem, In-Memory-Status, Secrets, Speicher für generierte Dateien und ausgehender Netzwerkverkehr.
@@ -84,7 +84,7 @@ ohne Lockfile). Aus der Art der Installation ergeben sich vier Konsequenzen:
   rebase cloud env set NPM_TOKEN=ghp_… --secret
   ```
 
-Der Bundle-Upload ist auf 100 MB komprimiert ohne Abhängigkeiten begrenzt.
+Der Bundle-Upload ist auf 1 GB komprimiert begrenzt.
 
 **Native Module werden abgelehnt.** Ein Paket, das eine kompilierte `.node`-Binärdatei
 mitbringt, kann auf der Managed Runtime nicht geladen werden. `rebase build` warnt davor, und

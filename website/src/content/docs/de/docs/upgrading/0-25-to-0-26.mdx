@@ -1,5 +1,5 @@
 ---
-sourceHash: 7408bfbaa0aac9ec
+sourceHash: aebdec7c52c6f579
 slug: de/docs/upgrading/0-25-to-0-26
 title: Upgrade von 0.25 auf 0.26
 sidebar_label: 0.25 → 0.26
@@ -54,7 +54,7 @@ Upgrade nach jedem anderen Namen und benennen Sie ihn um:
 SELECT id, roles FROM rebase.users
 WHERE EXISTS (
   SELECT 1 FROM unnest(roles) r
-  WHERE r = '' OR r ~ '[,{}"\\]' OR r ~ '[[:cntrl:]]'
+  WHERE btrim(r) = '' OR r ~ '[,{}"\\]' OR r ~ '[[:cntrl:]]'
 );
 ```
 
@@ -99,7 +99,7 @@ zurückgegeben.
 
 Ein Provider, der `email_verified` nicht bestätigt, erhält weiterhin
 `403 EMAIL_NOT_VERIFIED` (`provider-email-unverified`). Ein benutzerdefinierter User-Store ohne
-`unlinkUserIdentity` antwortet mit `409 UNVERIFIED_IDENTITIES` und ändert nichts.
+`unlinkUserIdentity` antwortet bei einem Konto mit einer Identität, deren Provider die Adresse nicht bestätigt hat, mit `409 UNVERIFIED_IDENTITIES` und ändert nichts.
 
 **Was zu ändern ist:** Entfernen Sie jeden Client-Zweig, der den Benutzer bei diesen beiden
 Gründen aufforderte, zuerst seine E-Mail-Adresse zu verifizieren; die Anmeldung gelingt nun.

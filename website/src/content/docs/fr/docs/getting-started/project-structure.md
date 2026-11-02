@@ -1,5 +1,5 @@
 ---
-sourceHash: 470becc68c91b1eb
+sourceHash: 9094c45d117425f1
 title: Structure du projet
 sidebar_label: Structure du projet
 description: Comprenez la structure d'un projet Rebase — configuration du frontend, du backend et des collections.
@@ -33,7 +33,7 @@ my-app/
 ├── tsconfig.json           # Typechecks scripts/; each workspace typechecks on its own
 ├── docker-compose.yml      # Self-hosting: Postgres + the published runtime image
 ├── scripts/
-│   └── example.ts          # The SDK end to end against the running backend: `pnpm example`
+│   └── example.ts          # A health check and an SDK call to uncomment: `pnpm example`
 │
 ├── config/                 # Shared by the backend and the admin panel
 │   ├── index.ts            # Re-exports `collections`; the runtime reads `storageAuthorize` from here

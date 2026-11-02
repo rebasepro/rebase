@@ -1,5 +1,5 @@
 ---
-sourceHash: ec6f07e74d4a291d
+sourceHash: d6db615c2565caf1
 title: Entorno y configuración
 sidebar_label: Configuración
 description: Todas las variables de entorno y opciones de configuración para proyectos Rebase.
@@ -246,7 +246,7 @@ código en su lugar.
 | `REBASE_LIVE_SCHEMA_ALLOW_MACHINE_APPLY` | `true` permite que una máquina —un agente, un job de CI— *aplique* un cambio de esquema a través de `/api/admin/schema`, y no solo planificarlo. Desactivado a menos que se solicite: la credencial que realizaría dicho cambio es la que más probabilidades tiene de estar en una variable de CI. | `false` |
 | `REBASE_FUNCTIONS_TIMEOUT_MS` | Cuánto tiempo puede ejecutarse una función personalizada antes de que se aborte su solicitud. El mismo control que la opción `functionsTimeoutMs`. `0` lo desactiva. | `30000` |
 | `REBASE_EXIT_ON_UNHANDLED_REJECTION` | `true` hace que un rechazo de promesa no controlado termine el proceso en lugar de registrarlo. Activo bajo un orquestador que lo reiniciará; inactivo donde un reinicio sea peor que una fuga de memoria. | `false` |
-| `REBASE_CRON_ALWAYS_ON` | Mantiene el programador cron en ejecución en una plataforma que el runtime de otro modo detecta como de escala a cero (scale-to-zero), donde un temporizador que se dispara en una instancia inactiva no se dispararía en ninguna instancia. | — |
+| `REBASE_CRON_ALWAYS_ON` | Silencia el aviso de arranque en una plataforma que el runtime detecta como de escala a cero (scale-to-zero), donde un temporizador que se dispara en una instancia inactiva no se dispara en ninguna. No cambia nada más: defínelo cuando mantengas al menos una instancia en marcha. | — |
 | `TRUSTED_PROXY_HOPS` | Cuántos proxies se encuentran delante de este servidor, para que el limitador de tasa pueda leer la dirección real del cliente desde `X-Forwarded-For`. Valor predeterminado a prueba de fallos `0`: sin proxy, confiar en el encabezado permitiría a cualquier emisor falsificar una identidad. | `0` |
 
 :::note[El aprovisionamiento en el arranque es aditivo y no es una herramienta de migración]
@@ -321,7 +321,7 @@ repositorio configurado sin una credencial utilizable se niega a arrancar. Consu
 | Variable | Descripción | Predeterminado |
 |----------|-------------|----------------|
 | `BACKUP_SCHEDULE` | Expresión cron para copias de seguridad programadas. Si no se define, las copias de seguridad programadas están desactivadas. | — |
-| `BACKUP_DESTINATION` | Ruta local, o una URL `s3://bucket/prefix` / `gs://bucket/prefix`. | `./backups` |
+| `BACKUP_DESTINATION` | Ruta local, o una URL `s3://bucket/prefix` / `gs://bucket/prefix`. Obligatorio con `BACKUP_SCHEDULE`, que se niega a ejecutarse sin él. `rebase db backup` usa `./backups` donde se ejecutó. | — |
 | `BACKUP_RETENTION_DAYS` | Elimina copias de seguridad con más de N días. Sin definir o `0` conserva todo. | — |
 | `BACKUP_KEEP_MINIMUM` | Conserva siempre al menos N copias de seguridad más recientes, sin importar lo que indique la retención. | — |
 | `PG_DUMP_PATH` | Sobrescribe el binario `pg_dump`: debe ser de la versión principal del servidor o más reciente. | — |

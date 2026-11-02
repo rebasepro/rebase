@@ -1,5 +1,5 @@
 ---
-sourceHash: caa4e79614f7401e
+sourceHash: 13a551230cf39acd
 title: Auto-hospedagem
 sidebar_label: Auto-hospedagem
 description: Execute o Rebase em qualquer lugar com a imagem oficial de runtime e o bundle do seu projeto — Docker Compose, Fly, Railway ou uma VPS simples.
@@ -191,12 +191,16 @@ O schema vem de uma execução que o seu processo de mudanças controla. Use a m
 docker run --rm \
   -e DATABASE_URL="postgres://admin:…@scratch-db:5432/app" \
   -e JWT_SECRET="…" \
+  -e CORS_ORIGINS="https://app.example.com" \
   -e REBASE_PROVISION_ONLY=true \
   -e REBASE_PROVISION_SQL_OUT=/out/rebase.sql \
   -v "$PWD/out:/out" \
   -v "$PWD/dist-bundle:/bundle" \
   "rebasepro/server:$REBASE_VERSION"
 ```
+
+A imagem roda com `NODE_ENV=production`, então esta execução passa pelas mesmas verificações
+de ambiente que o servidor, incluindo `CORS_ORIGINS` ou `FRONTEND_URL`, mesmo sem servir nada.
 
 O script é um registro, não um plano: cada instrução nele foi executada, em ordem, e teve sucesso. Gravado contra um banco de dados vazio, é o schema inteiro de que a versão precisa. Gravado contra uma cópia restaurada da produção, é exatamente a atualização. As linhas que a execução escreveu não estão nele. Revise-o e depois aplique-o ao banco de dados real:
 
