@@ -33,6 +33,19 @@ description: Every released change to Rebase — new features, fixes, and the br
   reason, not on `✓ Live`. A project that has been serving with such a file meets
   this on its next deploy. Fleet rollouts and rollbacks are not held to it.
 
+#### Client SDK
+
+- **A browser client defaults to cookie auth.** With no `auth.authFlowMode`,
+  `createRebaseClient` now uses `"cookie"` in a browser and `"json"` elsewhere,
+  or when you pass your own `auth.storage`. A backend run by the Rebase runtime
+  always keeps the refresh token in a cookie, so a browser client on the old
+  `"json"` default was handed none, and signed out silently about an hour
+  after sign-in. Such a client now keeps its session. A browser app whose
+  backend has no `auth.cookieAuth` must now pass `authFlowMode: "json"`: the
+  client logs an error saying so at the first sign-in. In cookie mode the
+  session is not kept in `localStorage`; a reload restores it with one
+  `/auth/refresh` request, which `auth.isInitialized()` waits for.
+
 ### Added
 
 #### Server & REST
@@ -80,6 +93,16 @@ description: Every released change to Rebase — new features, fixes, and the br
   `?affinity=` to the socket's address, so a platform that routes on it sends the
   group to one instance. It does nothing elsewhere. See
   [Keeping a group on one instance](/docs/sdk/realtime#keeping-a-group-on-one-instance).
+- **`client.auth.getAccessToken()`** answers the access token to send on a
+  request of your own, renewed first when it has expired or is about to, or
+  `null` when no one is signed in. `getSession()` is a snapshot that every
+  renewal replaces, so a token kept from it is refused once it expires. A
+  function needs neither: `client.functions.invoke` renews and retries on its
+  own. See [Send the token to your own routes](/docs/sdk/authentication/#send-the-token-to-your-own-routes).
+- **A sign-in the client cannot renew is reported when it happens.** When the
+  server's answer shows the client and server disagree on where the refresh
+  token lives, the client logs an error naming the `authFlowMode` to use,
+  instead of the session ending without a word an hour later.
 
 #### Admin (CMS & app)
 

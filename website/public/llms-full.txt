@@ -1464,8 +1464,9 @@ These are the `#### Breaking` entries 0.27 carries for an app on 0.26.
 
 The two cron changes are the ones to read first, because neither stops anything
 from booting: one job starts running more often, and the other stops running at
-all. The third reaches only a table that already existed. The last is Rebase
-Cloud, and you meet it on your next deploy.
+all. The third reaches only a table that already existed. The fourth is Rebase
+Cloud, and you meet it on your next deploy. The last is the client SDK in a
+browser.
 
 ---
 
@@ -1549,6 +1550,24 @@ exports no function or job, such as a helper, is still skipped.
 **What to change:** deploy, then fix or delete the file the deploy names. Off
 Rebase Cloud nothing changes unless you set `REBASE_REQUIRE_FILES_LOADED=true`
 yourself. See [Environment & Configuration](/docs/getting-started/configuration/).
+
+### 101. A browser client defaults to cookie auth
+
+`createRebaseClient` with no `auth.authFlowMode` used json mode everywhere. A
+backend run by the Rebase runtime always keeps the refresh token in an HttpOnly
+cookie and answers the response body's with `""`, so a browser client on that
+default held nothing to renew with, and was signed out without a word about an
+hour after sign-in. In a browser the default is now cookie mode. Off the
+browser, and in a browser client given its own `auth.storage`, it is still json.
+
+**What to change:** nothing, when your backend runs on the Rebase runtime or
+sets `auth.cookieAuth`: a browser app that was being signed out after an hour
+stays signed in. A backend without `auth.cookieAuth` needs
+`auth: { authFlowMode: "json" }` on its browser client. The client logs an error
+naming the mode to use at the first sign-in where the two disagree. In cookie
+mode the session is no longer kept in `localStorage`; a reload restores it with
+one `/auth/refresh` request, so read the session after `auth.isInitialized()`.
+See [Where the Session Lives](/docs/sdk/authentication/#where-the-session-lives-authflowmode).
 
 ## Upgrading 0.25 to 0.26
 
@@ -4367,6 +4386,19 @@ yet, listed so that nobody reads a promise into them:
   reason, not on `✓ Live`. A project that has been serving with such a file meets
   this on its next deploy. Fleet rollouts and rollbacks are not held to it.
 
+##### Client SDK
+
+- **A browser client defaults to cookie auth.** With no `auth.authFlowMode`,
+  `createRebaseClient` now uses `"cookie"` in a browser and `"json"` elsewhere,
+  or when you pass your own `auth.storage`. A backend run by the Rebase runtime
+  always keeps the refresh token in a cookie, so a browser client on the old
+  `"json"` default was handed none, and signed out silently about an hour
+  after sign-in. Such a client now keeps its session. A browser app whose
+  backend has no `auth.cookieAuth` must now pass `authFlowMode: "json"`: the
+  client logs an error saying so at the first sign-in. In cookie mode the
+  session is not kept in `localStorage`; a reload restores it with one
+  `/auth/refresh` request, which `auth.isInitialized()` waits for.
+
 #### Added
 
 ##### Server & REST
@@ -4414,6 +4446,16 @@ yet, listed so that nobody reads a promise into them:
   `?affinity=` to the socket's address, so a platform that routes on it sends the
   group to one instance. It does nothing elsewhere. See
   [Keeping a group on one instance](/docs/sdk/realtime#keeping-a-group-on-one-instance).
+- **`client.auth.getAccessToken()`** answers the access token to send on a
+  request of your own, renewed first when it has expired or is about to, or
+  `null` when no one is signed in. `getSession()` is a snapshot that every
+  renewal replaces, so a token kept from it is refused once it expires. A
+  function needs neither: `client.functions.invoke` renews and retries on its
+  own. See [Send the token to your own routes](/docs/sdk/authentication/#send-the-token-to-your-own-routes).
+- **A sign-in the client cannot renew is reported when it happens.** When the
+  server's answer shows the client and server disagree on where the refresh
+  token lives, the client logs an error naming the `authFlowMode` to use,
+  instead of the session ending without a word an hour later.
 
 ##### Admin (CMS & app)
 
@@ -29718,7 +29760,7 @@ With Firebase Auth the getter is
 asks it for every HTTP request and every time the realtime socket
 authenticates, so live queries run as the same user as REST calls. In the
 admin panel, set it on the client you pass to `<Rebase client>`. See
-[Using your own auth provider](/docs/sdk/authentication#using-your-own-auth-provider).
+[Your Own Auth Provider](/docs/sdk/your-own-auth-provider/).
 
 ---
 
@@ -37721,7 +37763,7 @@ The `authController` beside it then reports your provider's signed-in user
 (an `AuthController` from `@rebasepro/cms-types`) instead of wrapping
 `client.auth`. The backend has to accept the token too: see
 [Custom auth adapters](/docs/backend/auth-adapters), and
-[Using your own auth provider](/docs/sdk/authentication#using-your-own-auth-provider)
+[Your Own Auth Provider](/docs/sdk/your-own-auth-provider/)
 for the client side in full.
 
 ### Login View
@@ -47862,6 +47904,35 @@ const session = client.auth.getSession();
 // { accessToken, refreshToken, expiresAt, user } | null
 ```
 
+**Never keep the session object.** `getSession()` is a snapshot. Every renewal
+of the access token, about once an hour, replaces the session with a new
+object, so a session kept from page load carries a token the server refuses
+once it expires, and the app looks signed out. Read the session when you need
+it.
+
+#### Send the Token to Your Own Routes
+
+Calling a function in `backend/functions/` needs no token handling:
+`client.functions.invoke` renews the token before sending and retries once on
+a 401.
+
+```typescript
+const saved = await client.functions.invoke("progress", { level: 3 }, { path: "save" });
+```
+
+For any other request, ask for the token each time with `getAccessToken()`.
+It renews a token that has expired or is about to, waits for the session
+restored on load, and answers `null` when no one is signed in.
+
+```typescript
+const token = await client.auth.getAccessToken();
+await fetch("https://other.example.com/upload", {
+    method: "POST",
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+    body: file
+});
+```
+
 #### Get Current User (Server-Verified)
 
 ```typescript
@@ -47899,13 +47970,21 @@ const client = createRebaseClient({
 });
 ```
 
-| Mode | Where the refresh token is | When to use it |
-|------|----------------------------|----------------|
-| `"json"` *(default)* | Returned in the response body, kept in `localStorage` | A native app, a script, anything without a browser's cookie jar |
-| `"cookie"` | An **HttpOnly** cookie the backend sets | A browser app. Script running on your page cannot read it, which is what makes it XSS-safe |
+| Mode | Where the refresh token is | Default |
+|------|----------------------------|---------|
+| `"cookie"` | An **HttpOnly** cookie the backend sets. Script running on your page cannot read it, which is what makes it XSS-safe | In a browser |
+| `"json"` | Returned in the response body, kept in `storage` (`localStorage` by default) | Off the browser (Node, workers, React Native), and in a browser when you pass your own `storage` |
 
-Cookie mode needs `auth.cookieAuth` on the backend, and it is what the generated
-frontend template uses.
+The two sides have to agree. Cookie mode needs `auth.cookieAuth` on the
+backend, and the Rebase runtime, which Rebase Cloud runs, always turns it on.
+Json mode needs a backend without it: against a `cookieAuth` backend a json
+client is handed no refresh token, and its session ends when the access token
+expires, about an hour after sign-in. When the answer to a sign-in shows the
+modes disagree, the client logs an error saying which mode to use.
+
+Passing your own `storage` keeps a browser client in json mode. That is for a
+second client on the page that keeps its own sign-in apart from the page's
+cookie: in cookie mode nothing would be kept in that storage.
 
 ### Waiting for the Session to Be Restored
 
@@ -48153,46 +48232,8 @@ const client = createRebaseClient({
 
 ### Using your own auth provider
 
-On 0.24 a token
-getter authenticates HTTP requests only, and the realtime socket stays
-anonymous.
-
-When users sign in with a provider of your own (Clerk, Firebase Auth, or a
-session your app already has), `client.auth` is not involved. Give the client a
-getter for the provider's token instead. It is asked each time a token is
-needed: for every HTTP request, and every time the realtime socket
-authenticates.
-
-```typescript
-import { createRebaseClient } from "@rebasepro/client";
-
-const client = createRebaseClient({ baseUrl: import.meta.env.VITE_API_URL });
-
-client.setAuthTokenGetter(() => clerk.session?.getToken() ?? Promise.resolve(null));
-
-// Optional: let Clerk recover a refused token, on HTTP and the socket alike.
-client.setOnUnauthorized(async () => {
-    await clerk.session?.reload();
-    return true;
-});
-
-// The socket authenticates as the Clerk user.
-client.data.posts.listen({}, (response) => render(response.data));
-```
-
-- The getter wins over the client's own session. When it answers `null` or
-  throws, the client sends the token it holds, if any: its session's, one set
-  with `client.setToken()`, or the `token` option.
-- The `token` option is read each time a token is needed, until `setToken()` or
-  a sign-in replaces it, so it may be declared as a getter
-  (`get token() { return currentToken; }`).
-- `setOnUnauthorized` covers a 401 over HTTP and an auth error on the socket,
-  and replaces the client's own session refresh.
-
-The backend has to verify the provider's token: see
-[Custom auth adapters](/docs/backend/auth-adapters). In the admin panel, set
-the getter on the client you pass to `<Rebase client>`
-([Your Own Auth Provider](/docs/frontend/authentication#your-own-auth-provider)).
+Clerk, Firebase Auth or a session your app already has, with a token getter
+instead of `client.auth`: [Your Own Auth Provider](/docs/sdk/your-own-auth-provider/).
 
 ### User Object Shape
 
@@ -48313,6 +48354,49 @@ session. Removing the last verified factor also discards the recovery codes.
 
 - **[Authentication](/docs/sdk/authentication/)** — Sign-in, sessions and the rest of `client.auth`
 - **[Auth endpoints](/docs/backend/auth-endpoints/#multi-factor-authentication-totp)** — The HTTP routes behind enrolment and the challenge
+
+## Your Own Auth Provider
+
+On 0.24 a token
+getter authenticates HTTP requests only, and the realtime socket stays
+anonymous.
+
+When users sign in with a provider of your own (Clerk, Firebase Auth, or a
+session your app already has), `client.auth` is not involved. Give the client a
+getter for the provider's token instead. It is asked each time a token is
+needed: for every HTTP request, and every time the realtime socket
+authenticates.
+
+```typescript
+import { createRebaseClient } from "@rebasepro/client";
+
+const client = createRebaseClient({ baseUrl: import.meta.env.VITE_API_URL });
+
+client.setAuthTokenGetter(() => clerk.session?.getToken() ?? Promise.resolve(null));
+
+// Optional: let Clerk recover a refused token, on HTTP and the socket alike.
+client.setOnUnauthorized(async () => {
+    await clerk.session?.reload();
+    return true;
+});
+
+// The socket authenticates as the Clerk user.
+client.data.posts.listen({}, (response) => render(response.data));
+```
+
+- The getter wins over the client's own session. When it answers `null` or
+  throws, the client sends the token it holds, if any: its session's, one set
+  with `client.setToken()`, or the `token` option.
+- The `token` option is read each time a token is needed, until `setToken()` or
+  a sign-in replaces it, so it may be declared as a getter
+  (`get token() { return currentToken; }`).
+- `setOnUnauthorized` covers a 401 over HTTP and an auth error on the socket,
+  and replaces the client's own session refresh.
+
+The backend has to verify the provider's token: see
+[Custom auth adapters](/docs/backend/auth-adapters). In the admin panel, set
+the getter on the client you pass to `<Rebase client>`
+([Your Own Auth Provider](/docs/frontend/authentication#your-own-auth-provider)).
 
 ## Realtime Subscriptions
 
@@ -48625,7 +48709,7 @@ client.setOnUnauthorized(async () => {
 - `client.ws.setAuthTokenGetter()` is deprecated. It still works, replacing
   only the socket's getter, and warns once. Use `client.setAuthTokenGetter()`.
 
-See [Using your own auth provider](/docs/sdk/authentication#using-your-own-auth-provider).
+See [Your Own Auth Provider](/docs/sdk/your-own-auth-provider/).
 
 #### The connection is lazy
 

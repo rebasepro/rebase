@@ -49,7 +49,8 @@ function authWithFetch() {
         ok: true,
         status: 200,
         statusText: "OK",
-        json: async () => SESSION
+        // `unknown`: a test hands back other bodies, such as /auth/config's.
+        json: async (): Promise<unknown> => SESSION
     }));
     const transport = {
         request: jest.fn(),

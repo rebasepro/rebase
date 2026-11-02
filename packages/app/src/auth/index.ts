@@ -24,3 +24,5 @@ export { useRebaseAuthController } from "./useRebaseAuthController";
 // API utilities
 export { fetchAuthConfig, clearAuthConfigCache, createAuthConfigCache } from "./api";
 export type { AuthConfigResponse, AuthConfigCache } from "./api";
+// Sign in with Apple in the admin: building blocks of the LoginView, for a copy of it
+export { isAppleCancellation, preloadAppleSdk } from "./apple-sign-in";
