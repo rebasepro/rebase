@@ -22,7 +22,7 @@
  * modal, announced as nothing, and fired again by the next Enter.
  */
 import { expect, test, type Locator, type Page } from "@playwright/test";
-import { AUTH_STATE } from "../auth";
+import { AUTH_STATE, freshSession } from "../auth";
 
 async function openNewUser(page: Page): Promise<Locator> {
     await page.goto("/c/users");
@@ -34,6 +34,7 @@ async function openNewUser(page: Page): Promise<Locator> {
 
 test.describe("entity dialog", () => {
     test.use({ storageState: AUTH_STATE });
+    test.beforeEach(({ context }) => freshSession(context));
 
     test("Tab and Shift+Tab move field to field when something unmounts on the way", async ({ page }) => {
         const dialog = await openNewUser(page);

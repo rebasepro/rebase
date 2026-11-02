@@ -97,6 +97,11 @@ relations },
                 : undefined,
             defaultRole: "viewer",
             allowRegistration: env.ALLOW_REGISTRATION,
+            // The refresh token in an HttpOnly cookie, which is where a browser
+            // client keeps it by default (`authFlowMode: "cookie"`). Without it
+            // the demo app, a browser client, held no session across a reload.
+            // CORS above sends `credentials: true`.
+            cookieAuth: { sameSite: "Lax" },
             serviceKey: env.REBASE_SERVICE_KEY,
             email: env.SMTP_HOST
                 ? {

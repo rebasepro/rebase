@@ -1,5 +1,5 @@
 import { expect, test, type Route } from "@playwright/test";
-import { AUTH_STATE } from "../auth";
+import { AUTH_STATE, freshSession } from "../auth";
 
 /**
  * A tab that outlived a deploy.
@@ -18,6 +18,7 @@ import { AUTH_STATE } from "../auth";
  * .../RouterCollectionsStudioView-<hash>.js" on opening the schema view.
  */
 test.use({ storageState: AUTH_STATE });
+test.beforeEach(({ context }) => freshSession(context));
 
 const STUDIO_CHUNK = /CollectionsStudioView/;
 

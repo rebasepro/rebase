@@ -27,7 +27,7 @@
  * form puts in a column, measured against a text field on the same form.
  */
 import { expect, test, type Page } from "@playwright/test";
-import { AUTH_STATE } from "../auth";
+import { AUTH_STATE, freshSession } from "../auth";
 
 /** A property key on the form, and the kind of control it renders. */
 type Fields = Record<string, string>;
@@ -114,6 +114,7 @@ function expectOneHeight(measured: Measured[], fields: Fields, referenceKey: str
 
 test.describe("entity form controls", () => {
     test.use({ storageState: AUTH_STATE });
+    test.beforeEach(({ context }) => freshSession(context));
 
     test("every single-line control is one height, and a read-only value is input-sized", async ({ page }) => {
         await openCreateForm(page, /Orders/i, /\/c\/orders/, ORDER_FIELDS);

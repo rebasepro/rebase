@@ -20,7 +20,11 @@ test("Full E2E: Sign in and view dashboard", async ({ page }) => {
       console.log(`[API RESPONSE] ${req.method()} ${response.url()} -> Status ${response.status()}`);
       console.log(`[API REQUEST HEADERS]`, JSON.stringify(headers));
 
-      if (response.status() >= 400) {
+      // A signed-out page asks once, on load, for a session from the refresh
+      // cookie (the client's cookie auth), and is told there is none: that 401
+      // is the answer, not a failure.
+      const restoreRefused = response.status() === 401 && response.url().endsWith("/api/auth/refresh");
+      if (response.status() >= 400 && !restoreRefused) {
         throw new Error(`API Request failed: ${response.url()} returned status ${response.status()}`);
       }
     }

@@ -11,10 +11,11 @@
  * failure here is the write path rather than a form widget.
  */
 import { test, expect, type Page } from "@playwright/test";
-import { AUTH_STATE } from "../auth";
+import { AUTH_STATE, freshSession } from "../auth";
 import { failOnPageErrors } from "./test-helpers";
 
 test.use({ storageState: AUTH_STATE });
+test.beforeEach(({ context }) => freshSession(context));
 
 /**
  * The table's row element.
