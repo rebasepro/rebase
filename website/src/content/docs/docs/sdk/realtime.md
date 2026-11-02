@@ -313,7 +313,7 @@ client.setOnUnauthorized(async () => {
 - `client.ws.setAuthTokenGetter()` is deprecated. It still works, replacing
   only the socket's getter, and warns once. Use `client.setAuthTokenGetter()`.
 
-See [Using your own auth provider](/docs/sdk/authentication#using-your-own-auth-provider).
+See [Your Own Auth Provider](/docs/sdk/your-own-auth-provider/).
 
 ### The connection is lazy
 

@@ -221,7 +221,7 @@ With Firebase Auth the getter is
 asks it for every HTTP request and every time the realtime socket
 authenticates, so live queries run as the same user as REST calls. In the
 admin panel, set it on the client you pass to `<Rebase client>`. See
-[Using your own auth provider](/docs/sdk/authentication#using-your-own-auth-provider).
+[Your Own Auth Provider](/docs/sdk/your-own-auth-provider/).
 
 ---
 

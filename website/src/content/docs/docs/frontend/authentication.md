@@ -55,7 +55,7 @@ The `authController` beside it then reports your provider's signed-in user
 (an `AuthController` from `@rebasepro/cms-types`) instead of wrapping
 `client.auth`. The backend has to accept the token too: see
 [Custom auth adapters](/docs/backend/auth-adapters), and
-[Using your own auth provider](/docs/sdk/authentication#using-your-own-auth-provider)
+[Your Own Auth Provider](/docs/sdk/your-own-auth-provider/)
 for the client side in full.
 
 ## Login View

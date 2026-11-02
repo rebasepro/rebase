@@ -786,7 +786,7 @@ The client SDK's `auth` module is created via `createAuth(transport, options?)`.
 | `authPath` | `string` | `"/auth"` | Base path for auth endpoints. |
 | `autoRefresh` | `boolean` | `true` | Auto-refresh access tokens 2 minutes before expiry. |
 | `persistSession` | `boolean` | `true` | Persist session to storage between page loads. |
-| `authFlowMode` | `"json" \| "cookie"` | `"json"` | `"cookie"`: the refresh token travels in an httpOnly cookie and the session's `refreshToken` is `""`. |
+| `authFlowMode` | `"json" \| "cookie"` | `"cookie"` in a browser without your own `storage`, else `"json"` | `"cookie"`: the refresh token travels in an httpOnly cookie and the session's `refreshToken` is `""`. Must match the server: the Rebase runtime always uses `cookieAuth`, and a json client there cannot renew, so its session ends about an hour after sign-in. |
 
 ### Client SDK Methods
 
@@ -821,7 +821,9 @@ await auth.signInWithOAuth(providerId, payload); // Generic
 // Session
 await auth.signOut();
 await auth.refreshSession();
-auth.getSession();                    // Returns RebaseSession | null (sync)
+auth.getSession();                    // RebaseSession | null (sync). A snapshot: renewal replaces it, so never keep it
+await auth.getAccessToken();          // string | null, renewed when spent: the token for a request of your own
+// A function in backend/functions/ needs neither: functions.invoke() renews and retries on a 401.
 
 // Profile
 await auth.getUser();                 // GET /auth/me

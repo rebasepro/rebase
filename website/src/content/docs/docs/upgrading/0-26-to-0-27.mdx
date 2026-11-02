@@ -2,7 +2,7 @@
 slug: docs/upgrading/0-26-to-0-27
 title: Upgrading 0.26 to 0.27
 sidebar_label: 0.26 → 0.27
-description: The breaking changes 0.27 carries for an app on 0.26 — cron schedules that restrict both day fields, malformed cron numbers, a key strategy its type cannot honour, and managed deploys that stop on a file that did not load.
+description: The breaking changes 0.27 carries for an app on 0.26 — cron schedules that restrict both day fields, malformed cron numbers, a key strategy its type cannot honour, managed deploys that stop on a file that did not load, and browser clients that default to cookie auth.
 ---
 
 # Upgrading 0.26 → 0.27
@@ -11,8 +11,9 @@ These are the `### Breaking` entries 0.27 carries for an app on 0.26.
 
 The two cron changes are the ones to read first, because neither stops anything
 from booting: one job starts running more often, and the other stops running at
-all. The third reaches only a table that already existed. The last is Rebase
-Cloud, and you meet it on your next deploy.
+all. The third reaches only a table that already existed. The fourth is Rebase
+Cloud, and you meet it on your next deploy. The last is the client SDK in a
+browser.
 
 ---
 
@@ -96,3 +97,21 @@ exports no function or job, such as a helper, is still skipped.
 **What to change:** deploy, then fix or delete the file the deploy names. Off
 Rebase Cloud nothing changes unless you set `REBASE_REQUIRE_FILES_LOADED=true`
 yourself. See [Environment & Configuration](/docs/getting-started/configuration/).
+
+## 101. A browser client defaults to cookie auth
+
+`createRebaseClient` with no `auth.authFlowMode` used json mode everywhere. A
+backend run by the Rebase runtime always keeps the refresh token in an HttpOnly
+cookie and answers the response body's with `""`, so a browser client on that
+default held nothing to renew with, and was signed out without a word about an
+hour after sign-in. In a browser the default is now cookie mode. Off the
+browser, and in a browser client given its own `auth.storage`, it is still json.
+
+**What to change:** nothing, when your backend runs on the Rebase runtime or
+sets `auth.cookieAuth`: a browser app that was being signed out after an hour
+stays signed in. A backend without `auth.cookieAuth` needs
+`auth: { authFlowMode: "json" }` on its browser client. The client logs an error
+naming the mode to use at the first sign-in where the two disagree. In cookie
+mode the session is no longer kept in `localStorage`; a reload restores it with
+one `/auth/refresh` request, so read the session after `auth.isInitialized()`.
+See [Where the Session Lives](/docs/sdk/authentication/#where-the-session-lives-authflowmode).

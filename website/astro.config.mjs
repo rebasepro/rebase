@@ -269,6 +269,7 @@ export default defineConfig({
                         { label: "Relations", slug: "docs/sdk/relations" },
                         { label: "Authentication", slug: "docs/sdk/authentication" },
                         { label: "Multi-Factor Authentication", slug: "docs/sdk/multi-factor-authentication" },
+                        { label: "Your Own Auth Provider", slug: "docs/sdk/your-own-auth-provider" },
                         { label: "Realtime Subscriptions", slug: "docs/sdk/realtime" },
                         { label: "Offline & Local-First", slug: "docs/sdk/offline" },
                         { label: "Storage & Files", slug: "docs/sdk/storage" }

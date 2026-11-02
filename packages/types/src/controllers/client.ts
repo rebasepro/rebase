@@ -77,9 +77,23 @@ export interface AuthClient {
     getUser(): Promise<User | null>;
 
     /**
-     * Get the currently active session
+     * The session as it is now, or `null`.
+     *
+     * A snapshot: renewing the access token (about hourly) replaces the
+     * session with a new object, so one kept from an earlier call carries a
+     * token the server refuses once it expires. Read it when you need it, and
+     * use {@link getAccessToken} for a token to send.
      */
     getSession(): RebaseSession | null;
+
+    /**
+     * The access token to send on a request of your own, renewed first when
+     * it has expired or is about to; `null` when no one is signed in.
+     *
+     * Optional so that alternative {@link AuthClient} implementations need not
+     * supply it.
+     */
+    getAccessToken?: () => Promise<string | null>;
 
     /**
      * Get the current user's active sessions

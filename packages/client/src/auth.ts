@@ -91,11 +91,35 @@ export interface CreateAuthOptions {
     autoRefresh?: boolean;
     persistSession?: boolean;
     /**
-     * Authentication flow mode.
-     * - 'json' (default): Tokens are sent/received in JSON bodies. Refresh token is stored in local storage.
-     * - 'cookie': Refresh token is sent/received via httpOnly cookies. Access token remains in memory.
+     * Where the refresh token lives.
+     * - `"cookie"`: in an HttpOnly cookie the server sets (its `auth.cookieAuth`),
+     *   out of reach of script on the page. The access token stays in memory.
+     * - `"json"`: in the response body, kept in `storage`. For a client with no
+     *   cookie jar, against a server that does not use `cookieAuth`.
+     *
+     * Defaults to `"cookie"` in a browser and `"json"` anywhere else, or when
+     * `storage` is passed: see {@link resolveAuthFlowMode}.
      */
     authFlowMode?: "json" | "cookie";
+}
+
+/**
+ * The flow mode a client uses when `authFlowMode` is not set.
+ *
+ * Cookie in a browser. A backend run by the Rebase runtime always keeps the
+ * refresh token in a cookie and answers the body's with `""`, so a browser
+ * client defaulting to json held nothing to renew with, and was signed out
+ * without a word once its access token expired, about an hour after sign-in.
+ *
+ * Json off the browser (Node, a worker, React Native), where there is no
+ * cookie jar to keep it in — and in a browser that passes its own `storage`,
+ * which says where the session is to be kept: a second client on the page
+ * that keeps its own sign-in apart from the page's cookie. In cookie mode
+ * nothing would be kept there, and every reload would lose that sign-in.
+ */
+export function resolveAuthFlowMode(options?: CreateAuthOptions): "json" | "cookie" {
+    if (options?.authFlowMode) return options.authFlowMode;
+    return typeof document !== "undefined" && !options?.storage ? "cookie" : "json";
 }
 
 /**
@@ -116,7 +140,7 @@ export function createAuth(transport: Transport, options?: CreateAuthOptions) {
     const authPath = opts.authPath || "/auth";
     const autoRefresh = opts.autoRefresh !== false;
     const persistSession = opts.persistSession !== false;
-    const authFlowMode = opts.authFlowMode || "json";
+    const authFlowMode = resolveAuthFlowMode(opts);
 
     const STORAGE_KEY = "rebase_auth";
     const REFRESH_BUFFER_MS = 120000;
@@ -199,6 +223,36 @@ export function createAuth(transport: Transport, options?: CreateAuthOptions) {
     function heldRefreshToken(received: string | undefined): string {
         if (authFlowMode === "cookie") return "";
         return received || currentSession?.refreshToken || "";
+    }
+
+    let flowMismatchReported = false;
+    /**
+     * Say so at sign-in, once, when the server's answer shows this client
+     * cannot renew the session it is starting.
+     *
+     * A server with `cookieAuth` answers `refreshToken: ""` and puts the token
+     * in the cookie; one without it puts the token in the body. A client in
+     * the other mode holds nothing it can renew with, and finds out when the
+     * access token expires — in json mode by dropping the session without a
+     * word. The answer to the sign-in is the first moment it is known.
+     */
+    function reportFlowMismatch(received: string | undefined, expiresAt: number) {
+        // An answer without the field says nothing about where the token is.
+        if (flowMismatchReported || received === undefined) return;
+        const serverUsesCookie = received === "";
+        if (serverUsesCookie === (authFlowMode === "cookie")) return;
+        flowMismatchReported = true;
+        const ends = Number.isFinite(expiresAt)
+            ? `in about ${Math.max(1, Math.round((expiresAt - Date.now()) / 60000))} minutes`
+            : "when its access token expires";
+        console.error(serverUsesCookie
+            ? "[rebase] This server keeps the refresh token in an HttpOnly cookie (its `auth.cookieAuth`), " +
+              "but this client is in json mode and was handed none, so the session it just started cannot be " +
+              `renewed and ends ${ends}. Create the client with \`auth: { authFlowMode: "cookie" }\`.`
+            : "[rebase] This server returned the refresh token in the response body, so it does not use " +
+              "`auth.cookieAuth`, and this client, in cookie mode, cannot renew the session it just started: " +
+              `it ends ${ends}. Turn on \`auth.cookieAuth\` on the server, or create the client with ` +
+              "`auth: { authFlowMode: \"json\" }`.");
     }
 
     /**
@@ -384,6 +438,18 @@ export function createAuth(transport: Transport, options?: CreateAuthOptions) {
     const SPENT_TOKEN_MARGIN_MS = 10_000;
 
     /**
+     * Whether a request about to carry this session's token should first get a
+     * fresh one: the token has expired or is about to, and can be renewed.
+     */
+    function needsFreshToken(session: RebaseSession): boolean {
+        // An expiry nobody stated is not one that has passed (see
+        // `scheduleRefresh`): read as spent, it refreshed before every request.
+        if (!Number.isFinite(session.expiresAt)) return false;
+        if (session.expiresAt > Date.now() + SPENT_TOKEN_MARGIN_MS) return false;
+        return authFlowMode === "cookie" || !!session.refreshToken;
+    }
+
+    /**
      * The transport's {@link TokenRefresher}: whether a request should wait for
      * a fresher token than the one held, and which token to send when it does.
      *
@@ -416,11 +482,7 @@ export function createAuth(transport: Transport, options?: CreateAuthOptions) {
         // answer and then carries whatever token the transport holds: the
         // restored session's, or none when there was nothing to restore.
         if (!session) return cookieRestore?.then(() => undefined);
-        // An expiry nobody stated is not one that has passed (see
-        // `scheduleRefresh`): read as spent, it refreshed before every request.
-        if (!Number.isFinite(session.expiresAt)) return undefined;
-        if (session.expiresAt > Date.now() + SPENT_TOKEN_MARGIN_MS) return undefined;
-        if (authFlowMode !== "cookie" && !session.refreshToken) return undefined;
+        if (!needsFreshToken(session)) return undefined;
         const epoch = sessionEpoch;
         return refreshSession().then(
             (fresh) => (epoch === sessionEpoch ? fresh.accessToken : undefined),
@@ -530,6 +592,7 @@ export function createAuth(transport: Transport, options?: CreateAuthOptions) {
 
     function handleAuthResponse(data: { tokens: AuthTokens, user: Record<string, unknown> }, event?: AuthChangeEvent): RebaseSession {
         sessionEpoch++;
+        reportFlowMismatch(data.tokens.refreshToken, data.tokens.accessTokenExpiresAt);
         const user: User = mapRawUser(data.user);
         const session: RebaseSession = {
             accessToken: data.tokens.accessToken,
@@ -1514,8 +1577,51 @@ refreshToken: session.refreshToken };
         return body as AuthConfig;
     }
 
+    /**
+     * The session as it is now, or `null`.
+     *
+     * A snapshot: every renewal of the access token (about hourly) replaces
+     * the session with a new object, so one kept from an earlier call carries
+     * a token the server refuses once it expires. Read it when you need it.
+     * For a token to send, use {@link getAccessToken}.
+     */
     function getSession() {
         return currentSession;
+    }
+
+    /**
+     * The access token to put on a request of your own — a route outside
+     * Rebase, a header for an upload — renewed first when it has expired or
+     * is about to. `null` when no one is signed in.
+     *
+     * Ask for it for each request rather than keeping it: every renewal
+     * replaces it. A Rebase function needs none of this, since
+     * `functions.invoke` renews before sending and retries once on a 401.
+     *
+     * Waits for the session restored on load, and calls made together share
+     * one renewal. A renewal the server refuses ends the session, as a refused
+     * request does, and answers `null`. One that cannot reach the server
+     * answers the token held, for the server to judge.
+     */
+    async function getAccessToken(): Promise<string | null> {
+        await isInitialized;
+        const session = currentSession;
+        if (!session) return null;
+        if (!needsFreshToken(session)) return session.accessToken;
+        const epoch = sessionEpoch;
+        try {
+            const fresh = await refreshSession();
+            return epoch === sessionEpoch ? fresh.accessToken : currentSession?.accessToken ?? null;
+        } catch (err) {
+            // Signed out, or someone else signed in, while it ran: answer for
+            // the session there is now.
+            if (epoch !== sessionEpoch) return currentSession?.accessToken ?? null;
+            if (isFatalRefreshError(err)) {
+                abandonSessionLocally();
+                return null;
+            }
+            return session.accessToken;
+        }
     }
 
     function onAuthStateChange(callback: (event: AuthChangeEvent, session: RebaseSession | null) => void) {
@@ -1636,6 +1742,7 @@ refreshToken: session.refreshToken };
         revokeAllSessions,
         getAuthConfig,
         getSession,
+        getAccessToken,
         onAuthStateChange,
         // A client that neither persists sessions nor uses cookie auth has
         // nowhere to restore one from, so "no session in memory" is the final

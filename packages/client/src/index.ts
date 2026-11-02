@@ -1,6 +1,6 @@
 import { createTransport, RebaseApiError, RebaseClientConfig } from "./transport";
 import { RebaseClientError } from "./errors";
-import { createAuth, CreateAuthOptions, createMemoryStorage } from "./auth";
+import { createAuth, CreateAuthOptions, createMemoryStorage, resolveAuthFlowMode } from "./auth";
 import { createAdmin, CreateAdminOptions } from "./admin";
 import { createCron, CreateCronOptions } from "./cron";
 import { createBackups } from "./backups";
@@ -505,7 +505,7 @@ export function createRebaseClient<DB = Record<string, unknown>>(options: Create
     // `credentialOutOfBand`: in cookie auth mode the credential is an httpOnly
     // cookie, so a tokenless transport is not an anonymous client and must not
     // trip the server-side anonymous guard (see `RebaseClientConfig.anonymous`).
-    const transport = createTransport(options, { credentialOutOfBand: options.auth?.authFlowMode === "cookie" });
+    const transport = createTransport(options, { credentialOutOfBand: resolveAuthFlowMode(options.auth) === "cookie" });
     const auth = createAuth(transport, options.auth);
     const admin = createAdmin(transport, options.admin);
     const cron = createCron(transport, options.cron);

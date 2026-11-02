@@ -38,6 +38,7 @@ This is a **headless** Rebase project: a REST API, auth, storage and realtime ov
 6. **In `backend/functions/`, always import from `@rebasepro/server/functions`** — never from `@rebasepro/server`. Both work today; the subpath is the portable one, and it also gives you the typed context accessors (`getUser`, `getDriver`, `requireDriver`) instead of casting `c.get("user")`. The package root is for a server entrypoint, not for route handlers.
 7. **Never read `process.env` at the top of a function file.** A module-scope read that comes back undefined throws at import time, and the loader reports that as a *skipped function* — the route simply 404s with no error attached to it. Read configuration inside the handler with `requireEnv(c, "NAME")`, or build a client once with `lazyResource(env => new Client(env.KEY))`.
 8. **Work that outlives the response goes in `waitUntil(c, promise)`**, not a floating promise. A floating promise is dropped when the process shuts down mid-deploy; `waitUntil` is what a graceful shutdown waits for.
+9. **Call your own routes from the browser with the client's `functions.invoke`**, never `fetch` with a token taken from `client.auth.getSession()`. The session is a snapshot that every renewal replaces, about hourly, so a kept token is refused once it expires and the app looks signed out. `invoke` renews before sending and retries once on a 401. For a request that is not to a function, ask for the token each time with `await client.auth.getAccessToken()`.
 
 ## Backend runtime (`runtime: "managed"` on Rebase Cloud)
 

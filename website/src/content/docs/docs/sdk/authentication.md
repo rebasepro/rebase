@@ -242,6 +242,35 @@ const session = client.auth.getSession();
 // { accessToken, refreshToken, expiresAt, user } | null
 ```
 
+**Never keep the session object.** `getSession()` is a snapshot. Every renewal
+of the access token, about once an hour, replaces the session with a new
+object, so a session kept from page load carries a token the server refuses
+once it expires, and the app looks signed out. Read the session when you need
+it.
+
+### Send the Token to Your Own Routes
+
+Calling a function in `backend/functions/` needs no token handling:
+`client.functions.invoke` renews the token before sending and retries once on
+a 401.
+
+```typescript
+const saved = await client.functions.invoke("progress", { level: 3 }, { path: "save" });
+```
+
+For any other request, ask for the token each time with `getAccessToken()`.
+It renews a token that has expired or is about to, waits for the session
+restored on load, and answers `null` when no one is signed in.
+
+```typescript
+const token = await client.auth.getAccessToken();
+await fetch("https://other.example.com/upload", {
+    method: "POST",
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+    body: file
+});
+```
+
 ### Get Current User (Server-Verified)
 
 ```typescript
@@ -279,13 +308,21 @@ const client = createRebaseClient({
 });
 ```
 
-| Mode | Where the refresh token is | When to use it |
-|------|----------------------------|----------------|
-| `"json"` *(default)* | Returned in the response body, kept in `localStorage` | A native app, a script, anything without a browser's cookie jar |
-| `"cookie"` | An **HttpOnly** cookie the backend sets | A browser app. Script running on your page cannot read it, which is what makes it XSS-safe |
+| Mode | Where the refresh token is | Default |
+|------|----------------------------|---------|
+| `"cookie"` | An **HttpOnly** cookie the backend sets. Script running on your page cannot read it, which is what makes it XSS-safe | In a browser |
+| `"json"` | Returned in the response body, kept in `storage` (`localStorage` by default) | Off the browser (Node, workers, React Native), and in a browser when you pass your own `storage` |
 
-Cookie mode needs `auth.cookieAuth` on the backend, and it is what the generated
-frontend template uses.
+The two sides have to agree. Cookie mode needs `auth.cookieAuth` on the
+backend, and the Rebase runtime, which Rebase Cloud runs, always turns it on.
+Json mode needs a backend without it: against a `cookieAuth` backend a json
+client is handed no refresh token, and its session ends when the access token
+expires, about an hour after sign-in. When the answer to a sign-in shows the
+modes disagree, the client logs an error saying which mode to use.
+
+Passing your own `storage` keeps a browser client in json mode. That is for a
+second client on the page that keeps its own sign-in apart from the page's
+cookie: in cookie mode nothing would be kept in that storage.
 
 ## Waiting for the Session to Be Restored
 
@@ -533,46 +570,8 @@ const client = createRebaseClient({
 
 ## Using your own auth provider
 
-On 0.24 a token
-getter authenticates HTTP requests only, and the realtime socket stays
-anonymous.
-
-When users sign in with a provider of your own (Clerk, Firebase Auth, or a
-session your app already has), `client.auth` is not involved. Give the client a
-getter for the provider's token instead. It is asked each time a token is
-needed: for every HTTP request, and every time the realtime socket
-authenticates.
-
-```typescript
-import { createRebaseClient } from "@rebasepro/client";
-
-const client = createRebaseClient({ baseUrl: import.meta.env.VITE_API_URL });
-
-client.setAuthTokenGetter(() => clerk.session?.getToken() ?? Promise.resolve(null));
-
-// Optional: let Clerk recover a refused token, on HTTP and the socket alike.
-client.setOnUnauthorized(async () => {
-    await clerk.session?.reload();
-    return true;
-});
-
-// The socket authenticates as the Clerk user.
-client.data.posts.listen({}, (response) => render(response.data));
-```
-
-- The getter wins over the client's own session. When it answers `null` or
-  throws, the client sends the token it holds, if any: its session's, one set
-  with `client.setToken()`, or the `token` option.
-- The `token` option is read each time a token is needed, until `setToken()` or
-  a sign-in replaces it, so it may be declared as a getter
-  (`get token() { return currentToken; }`).
-- `setOnUnauthorized` covers a 401 over HTTP and an auth error on the socket,
-  and replaces the client's own session refresh.
-
-The backend has to verify the provider's token: see
-[Custom auth adapters](/docs/backend/auth-adapters). In the admin panel, set
-the getter on the client you pass to `<Rebase client>`
-([Your Own Auth Provider](/docs/frontend/authentication#your-own-auth-provider)).
+Clerk, Firebase Auth or a session your app already has, with a token getter
+instead of `client.auth`: [Your Own Auth Provider](/docs/sdk/your-own-auth-provider/).
 
 ## User Object Shape
 
