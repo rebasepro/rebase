@@ -5,6 +5,7 @@ import type { User, AuthChangeEvent, RebaseSession } from "@rebasepro/types";
 import type { AuthConfigResponse } from "./api";
 import { RebaseAuthController, RebaseAuthControllerProps } from "./types";
 import { bindSessionCachesToUser, clearSessionCaches } from "./session_caches";
+import { isAppleCancellation } from "./apple-sign-in";
 
 /**
  * Auth controller hook for JWT-based authentication.
@@ -283,6 +284,25 @@ export function useRebaseAuthController(
         }
     }, [auth]);
 
+    const appleLogin = useCallback(async (options?: { clientId?: string; redirectUri?: string }) => {
+        if (!auth?.signInWithApplePopup) throw new Error("Rebase client with auth is required");
+        setAuthLoading(true);
+        setAuthProviderError(null);
+        try {
+            // Called straight from the click, with nothing awaited before it:
+            // Apple's popup has to open in the task the click started.
+            await auth.signInWithApplePopup(options);
+        } catch (error: unknown) {
+            // Closing Apple's popup is an answer, not a failure.
+            if (!isAppleCancellation(error)) {
+                setAuthProviderError(error instanceof Error ? error : new Error(String(error)));
+            }
+            throw error;
+        } finally {
+            setAuthLoading(false);
+        }
+    }, [auth]);
+
     /**
      * Open the challenge that finishes a sign-in refused with `MFA_REQUIRED`.
      *
@@ -467,6 +487,8 @@ export function useRebaseAuthController(
         register,
         googleLogin,
         oauthLogin,
+        // Offered only when the client can open Apple's popup.
+        appleLogin: auth?.signInWithApplePopup ? appleLogin : undefined,
         skipLogin,
         forgotPassword,
         resetPassword,
@@ -510,12 +532,13 @@ export function useRebaseAuthController(
             sessionManagement: true,
             profileUpdate: true,
             emailVerification: authConfig?.emailVerification ?? false,
-            enabledProviders: authConfig?.enabledProviders ?? []
+            enabledProviders: authConfig?.enabledProviders ?? [],
+            providerClientIds: authConfig?.providerClientIds ?? {}
         }
     }), [
         user, authLoading, initialLoading, authError, authProviderError, loginSkipped,
         authConfig, authConfigFailed, heldScopes, extra, auth, googleClientId,
-        getAuthToken, getApiUrl, signOut, emailPasswordLogin, register, googleLogin, oauthLogin,
+        getAuthToken, getApiUrl, signOut, emailPasswordLogin, register, googleLogin, oauthLogin, appleLogin,
         skipLogin, forgotPassword, resetPassword, verifyEmail, changePassword, changeEmail,
         magicLinkLogin, confirmEmailChange, updateProfile, fetchSessions, revokeSession,
         revokeAllSessions, clearError, startMfaChallenge, verifyMfaChallenge

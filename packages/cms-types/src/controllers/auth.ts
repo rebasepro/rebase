@@ -23,6 +23,11 @@ export interface AuthCapabilities {
     emailVerification?: boolean;
     /** List of enabled OAuth provider IDs (e.g. ["google", "github", "discord"]) */
     enabledProviders?: string[];
+    /**
+     * Public client ids the backend publishes, by provider id — Apple's
+     * Services ID, so its button needs no second copy in the frontend.
+     */
+    providerClientIds?: Record<string, string>;
 }
 
 /**
@@ -133,6 +138,12 @@ export interface AuthControllerExtended<USER extends User = User, ExtraData = un
     googleLogin?: (payload: { idToken: string } | { accessToken: string } | { code: string; redirectUri: string }) => Promise<void>;
     /** Generic OAuth login — works with any provider. Posts payload to /auth/{providerId}. */
     oauthLogin?: (providerId: string, payload: Record<string, unknown>) => Promise<void>;
+    /**
+     * Sign in with Apple through Apple's popup, then spend the code. Call it
+     * from a click. Rejects with code `APPLE_SIGN_IN_CANCELLED` when the
+     * visitor backs out, which is not recorded as an error.
+     */
+    appleLogin?: (options?: { clientId?: string; redirectUri?: string }) => Promise<void>;
     /** Register a new user */
     /**
      * `confirmationRequired` when the backend registers confirm-first: the

@@ -329,6 +329,11 @@ export interface AuthAdapterCapabilities {
     anonymousLogin: boolean;
     /** List of enabled OAuth provider IDs (e.g. `["google", "github"]`). */
     enabledProviders: string[];
+    /**
+     * Public client ids, by provider id, for the providers whose sign-in a
+     * browser starts with one (Apple's Services ID). Absent when none does.
+     */
+    providerClientIds?: Record<string, string>;
 
     /**
      * For external auth (Clerk, Auth0, etc.): the URL where the user should

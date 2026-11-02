@@ -54,15 +54,33 @@
   instance had members. Counts only, behind `REBASE_METRICS_TOKEN` like the rest of
   the route. `RealtimeProvider` gains an optional `counts()`. See
   [Seeing what the bus does](/docs/backend/realtime-transports/#seeing-what-the-bus-does).
+- **Sign in with Apple from native apps.** `APPLE_BUNDLE_IDS` (or
+  `auth.apple.bundleIds`) lists the iOS and macOS apps whose codes are
+  accepted. A native code is exchanged as the app's bundle id with no redirect
+  URI. `APPLE_CLIENT_ID` is now optional when bundle ids are set. `GET
+  /auth/config` publishes the Services ID as `providerClientIds.apple`, since it
+  is public. See [OAuth providers](/docs/backend/authentication/#the-environment-spellings).
 
 #### Client SDK
 
+- **`client.auth.signInWithApplePopup()`** signs in with Apple in the browser.
+  It opens Apple's popup, checks `state`, and spends the code. A closed popup
+  rejects with `APPLE_SIGN_IN_CANCELLED`. `signInWithApple({ code, bundleId })`
+  signs in a native app. `preloadAppleSignIn()` and
+  `requestAppleAuthorization()` are exported for a login screen that runs its
+  own flow. See [Apple](/docs/sdk/authentication/#apple).
 - **`realtime: { affinity }` names the group a socket belongs to.**
   `createRebaseClient({ realtime: { affinity: roomCode } })`, or
   `client.realtime.setAffinity(roomCode)` before the socket opens, adds
   `?affinity=` to the socket's address, so a platform that routes on it sends the
   group to one instance. It does nothing elsewhere. See
   [Keeping a group on one instance](/docs/sdk/realtime#keeping-a-group-on-one-instance).
+
+#### Admin (CMS & app)
+
+- **The login screen has a Sign in with Apple button.** It appears when the
+  backend has Apple configured with a Services ID, with no frontend variable.
+  `appleClientId` and `appleRedirectUri` on `LoginView` override the defaults.
 
 #### CLI
 

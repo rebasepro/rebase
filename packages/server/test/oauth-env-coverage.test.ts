@@ -125,6 +125,20 @@ describe("every shipped OAuth provider has an environment route", () => {
         expect(auth.apple).toBeUndefined();
     });
 
+    it("configures native-only Apple from APPLE_BUNDLE_IDS without a Services ID", () => {
+        const auth = resolveAuthOptions(
+            env({
+                APPLE_BUNDLE_IDS: " com.example.ios , com.example.mac ,",
+                APPLE_TEAM_ID: "T",
+                APPLE_KEY_ID: "K",
+                APPLE_PRIVATE_KEY: "-----BEGIN PRIVATE KEY-----\nnot-a-real-key\n-----END PRIVATE KEY-----"
+            } as Partial<RebaseBootEnv>),
+            undefined
+        );
+        expect(auth.apple?.clientId).toBeUndefined();
+        expect(auth.apple?.bundleIds).toEqual(["com.example.ios", "com.example.mac"]);
+    });
+
     it("names each provider in the boot env schema, so an unknown key is not silently dropped", () => {
         const schemas = [
             readFileSync(path.join(__dirname, "../src/boot/env.ts"), "utf8"),

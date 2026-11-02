@@ -1,5 +1,5 @@
 ---
-sourceHash: bb2bf60cbaed04eb
+sourceHash: 703a9d0f2371a6c0
 title: Autenticação
 sidebar_label: Autenticação
 description: Configure a autenticação JWT, provedores OAuth, e-mail SMTP, proteção contra bots e a coleção de usuários no backend do Rebase.
@@ -378,7 +378,7 @@ auth: {
     linkedin:  { clientId: "...", clientSecret: "..." },
     github:    { clientId: "...", clientSecret: "..." },
     microsoft: { clientId: "...", clientSecret: "...", tenantId: "..." },
-    apple:     { clientId: "...", teamId: "...", keyId: "...", privateKey: "..." },
+    apple:     { clientId: "...", bundleIds: ["..."], teamId: "...", keyId: "...", privateKey: "..." },
     facebook:  { clientId: "...", clientSecret: "..." },
     twitter:   { clientId: "...", clientSecret: "..." },
     discord:   { clientId: "...", clientSecret: "..." },
@@ -408,11 +408,12 @@ O endpoint `GET /api/auth/config` lista então `discord` em `enabledProviders`, 
 
 O Google é configurado apenas por `GOOGLE_CLIENT_ID`: seu fluxo de ID token não precisa de segredo, então `GOOGLE_CLIENT_SECRET` é opcional.
 
-A Apple é a exceção: ela não possui um client secret estático, porque o Rebase
-assina um JWT ES256 de curta duração para cada troca de token. Ela requer todas as
-quatro variáveis: `APPLE_CLIENT_ID`, `APPLE_TEAM_ID`, `APPLE_KEY_ID` e
-`APPLE_PRIVATE_KEY` — o conteúdo do arquivo `.p8`, incluindo quebras de linha e
-tudo mais.
+A Apple não tem client secret: o Rebase assina um JWT ES256 a cada troca. Ela requer `APPLE_TEAM_ID`,
+`APPLE_KEY_ID` e `APPLE_PRIVATE_KEY` (o conteúdo do arquivo `.p8`, incluindo quebras
+de linha), mais `APPLE_CLIENT_ID` (o Services ID, para a web), `APPLE_BUNDLE_IDS`
+(os IDs dos seus apps nativos de iOS e macOS, separados por vírgula) ou ambos. O Services ID
+é público, então `/auth/config` o publica e o login do admin mostra **Sign in
+with Apple** sem nenhuma variável no frontend.
 
 Duas opções não possuem correspondência em variáveis de ambiente e exigem o bloco
 `auth` (ou seja, um backend ejetado ou configurado via código):

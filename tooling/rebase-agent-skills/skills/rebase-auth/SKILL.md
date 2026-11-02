@@ -805,7 +805,9 @@ await auth.signInWithGoogle({ accessToken });
 await auth.signInWithGoogle({ code, redirectUri });
 await auth.signInWithGitHub(code, redirectUri);
 await auth.signInWithMicrosoft(code, redirectUri);
-await auth.signInWithApple(code, redirectUri, user /* optional */);
+await auth.signInWithApple(code, redirectUri, user /* optional */);   // web code
+await auth.signInWithApple({ code, bundleId, user });                // native app (APPLE_BUNDLE_IDS)
+await auth.signInWithApplePopup({ clientId });                       // browser: popup + sign-in
 await auth.signInWithFacebook(code, redirectUri);
 await auth.signInWithTwitter(code, redirectUri, codeVerifier);
 await auth.signInWithDiscord(code, redirectUri);

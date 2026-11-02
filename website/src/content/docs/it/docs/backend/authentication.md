@@ -1,5 +1,5 @@
 ---
-sourceHash: bb2bf60cbaed04eb
+sourceHash: 703a9d0f2371a6c0
 title: Autenticazione
 sidebar_label: Autenticazione
 description: Configura l'autenticazione JWT, i provider OAuth, le email SMTP, la protezione dai bot e la collection users sul backend Rebase.
@@ -292,7 +292,7 @@ auth: {
     linkedin:  { clientId: "...", clientSecret: "..." },
     github:    { clientId: "...", clientSecret: "..." },
     microsoft: { clientId: "...", clientSecret: "...", tenantId: "..." },
-    apple:     { clientId: "...", teamId: "...", keyId: "...", privateKey: "..." },
+    apple:     { clientId: "...", bundleIds: ["..."], teamId: "...", keyId: "...", privateKey: "..." },
     facebook:  { clientId: "...", clientSecret: "..." },
     twitter:   { clientId: "...", clientSecret: "..." },
     discord:   { clientId: "...", clientSecret: "..." },
@@ -318,7 +318,7 @@ DISCORD_CLIENT_SECRET=…
 
 Google è configurato con il solo `GOOGLE_CLIENT_ID`: il suo flusso con ID token non richiede alcun secret, quindi `GOOGLE_CLIENT_SECRET` è facoltativo.
 
-Apple fa eccezione: non dispone di un client secret statico, poiché Rebase firma un JWT ES256 a breve durata per ogni scambio di token. Richiede tutte e quattro le variabili: `APPLE_CLIENT_ID`, `APPLE_TEAM_ID`, `APPLE_KEY_ID` e `APPLE_PRIVATE_KEY` — ovvero l'intero contenuto del file `.p8`, inclusi i ritorni a capo.
+Apple non ha un client secret: Rebase firma un JWT ES256 a ogni scambio. Richiede `APPLE_TEAM_ID`, `APPLE_KEY_ID` e `APPLE_PRIVATE_KEY` (il contenuto del file `.p8`, inclusi i ritorni a capo), più `APPLE_CLIENT_ID` (il Services ID, per il web), `APPLE_BUNDLE_IDS` (gli ID delle tue app native iOS e macOS, separati da virgole) o entrambi. Il Services ID è pubblico, quindi `/auth/config` lo pubblica e il login dell'admin mostra **Sign in with Apple** senza alcuna variabile nel frontend.
 
 Due opzioni non dispongono di una variabile d'ambiente equivalente e richiedono il blocco `auth` (quindi un backend ejected o configurato da codice): `microsoft.tenantId`, che altrimenti ha come valore predefinito `common` e accetta ogni tenant Entra (con qualsiasi tenant, un indirizzo conta come verificato solo quando la registrazione dell'app emette il claim `xms_edov`), e `gitlab.baseUrl`, per un'istanza self-hosted.
 

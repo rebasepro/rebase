@@ -17,6 +17,8 @@ export type RebaseAuthController = AuthController & {
     googleLogin: (payload: { idToken: string } | { accessToken: string } | { code: string; redirectUri: string }) => Promise<void>;
     /** Generic OAuth login — works with any provider. Posts payload to /auth/{providerId}. */
     oauthLogin: (providerId: string, payload: Record<string, unknown>) => Promise<void>;
+    /** Sign in with Apple's popup. Absent when the client cannot. */
+    appleLogin?: (options?: { clientId?: string; redirectUri?: string }) => Promise<void>;
     /** Login with email and password */
     emailPasswordLogin: (email: string, password: string) => Promise<void>;
     /** Register a new user */
@@ -99,6 +101,8 @@ export interface ClientAuth {
     signUp(email: string, password: string, displayName?: string): Promise<unknown>;
     signInWithGoogle(payload: { idToken: string } | { accessToken: string } | { code: string; redirectUri: string }): Promise<unknown>;
     signInWithOAuth(providerId: string, payload: Record<string, unknown>): Promise<unknown>;
+    /** Optional so a hand-built auth client need not implement it. */
+    signInWithApplePopup?(options?: { clientId?: string; redirectUri?: string }): Promise<unknown>;
     resetPasswordForEmail(email: string): Promise<unknown>;
     resetPassword(token: string, password: string): Promise<unknown>;
     /** Optional so a hand-built auth client need not implement it. */

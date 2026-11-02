@@ -236,6 +236,71 @@ enabledProviders: ["github"] }
         });
     });
 
+    describe("Sign in with Apple", () => {
+        const SERVICES_ID = "com.example.service";
+
+        function withApple(overrides: Record<string, unknown> = {}) {
+            mockAuthController.capabilities.enabledProviders = ["apple"];
+            mockAuthController.capabilities.providerClientIds = { apple: SERVICES_ID };
+            mockAuthController.appleLogin = jest.fn().mockResolvedValue(undefined);
+            Object.assign(mockAuthController, overrides);
+        }
+
+        it("appears from the backend's configuration alone", () => {
+            withApple();
+            render(<LoginView authController={mockAuthController}/>);
+            expect(screen.getByRole("button", { name: /Sign in with Apple/i })).toBeInTheDocument();
+        });
+
+        it("opens Apple's popup with the published Services ID", () => {
+            withApple();
+            render(<LoginView authController={mockAuthController}/>);
+            fireEvent.click(screen.getByRole("button", { name: /Sign in with Apple/i }));
+            expect(mockAuthController.appleLogin).toHaveBeenCalledWith({ clientId: SERVICES_ID });
+        });
+
+        it("prefers the Services ID and Return URL the view was given", () => {
+            withApple();
+            render(<LoginView authController={mockAuthController}
+                appleClientId="com.override.service"
+                appleRedirectUri="https://admin.example.com/login"/>);
+            fireEvent.click(screen.getByRole("button", { name: /Sign in with Apple/i }));
+            expect(mockAuthController.appleLogin).toHaveBeenCalledWith({
+                clientId: "com.override.service",
+                redirectUri: "https://admin.example.com/login"
+            });
+        });
+
+        it("is hidden for a native-only backend that publishes no Services ID", () => {
+            withApple();
+            mockAuthController.capabilities.providerClientIds = {};
+            render(<LoginView authController={mockAuthController}/>);
+            expect(screen.queryByRole("button", { name: /Sign in with Apple/i })).not.toBeInTheDocument();
+        });
+
+        it("is hidden when the client cannot open Apple's popup", () => {
+            withApple({ appleLogin: undefined });
+            render(<LoginView authController={mockAuthController}/>);
+            expect(screen.queryByRole("button", { name: /Sign in with Apple/i })).not.toBeInTheDocument();
+        });
+
+        it("says nothing when the visitor closes the popup", async () => {
+            const error = jest.spyOn(console, "error").mockImplementation(() => {});
+            try {
+                withApple({
+                    appleLogin: jest.fn().mockRejectedValue(Object.assign(new Error("cancelled"), { code: "APPLE_SIGN_IN_CANCELLED" }))
+                });
+                render(<LoginView authController={mockAuthController}/>);
+                await act(async () => {
+                    fireEvent.click(screen.getByRole("button", { name: /Sign in with Apple/i }));
+                });
+                expect(error).not.toHaveBeenCalled();
+            } finally {
+                error.mockRestore();
+            }
+        });
+    });
+
     it("does not render additionalComponent or noUserComponent in bootstrap mode", () => {
         const additionalText = "Custom Additional Component Content";
         const noUserText = "Custom No User Component Content";

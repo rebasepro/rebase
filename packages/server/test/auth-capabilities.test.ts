@@ -89,6 +89,15 @@ describe("buildBuiltinAuthCapabilities", () => {
         }).enabledProviders).toEqual(["google", "github"]);
     });
 
+    it("publishes provider client ids only when a provider has one", () => {
+        expect(buildBuiltinAuthCapabilities({
+            ...base, enabledProviders: ["apple"], providerClientIds: { apple: "com.example.service" }
+        }).providerClientIds).toEqual({ apple: "com.example.service" });
+        expect("providerClientIds" in buildBuiltinAuthCapabilities({
+            ...base, enabledProviders: ["github"], providerClientIds: {}
+        })).toBe(false);
+    });
+
     it("answers with exactly these keys", () => {
         // The wire contract. A client reads these names; renaming or dropping
         // one is a breaking change and has to fail here first. `AuthConfig` in

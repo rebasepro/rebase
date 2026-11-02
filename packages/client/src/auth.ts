@@ -1,5 +1,6 @@
 import { RebaseApiError, Transport } from "./transport";
 import { RebaseClientError } from "@rebasepro/types";
+import { requestAppleAuthorization } from "./apple-sign-in";
 import type { AuthConfigDocument, AuthChangeEvent, RebaseSession, AuthTokens, DeviceSession, User } from "@rebasepro/types";
 
 // Re-export canonical types so `import { RebaseSession } from "@rebasepro/client"` keeps working
@@ -42,6 +43,21 @@ const EMPTY_USER: User = { uid: "", email: null, displayName: null, photoURL: nu
  * every backend does send.
  */
 export type AuthConfig = AuthConfigDocument;
+
+/** The body of an Apple sign-in. See `signInWithApple`. */
+export interface AppleSignInPayload {
+    /** The authorization code Apple returned. */
+    code: string;
+    /** Web: the redirect URI the browser authorization used. */
+    redirectUri?: string;
+    /** Native: the bundle id of the app that obtained the code. */
+    bundleId?: string;
+    /**
+     * The name Apple reports on the first authorization only. An `email`
+     * here is ignored — the backend reads the address from Apple's id_token.
+     */
+    user?: { name?: { firstName?: string; lastName?: string }; email?: string };
+}
 
 export interface AuthStorage {
     getItem: (key: string) => string | null;
@@ -649,10 +665,62 @@ redirectUri });
 redirectUri });
     }
 
-    async function signInWithApple(code: string, redirectUri: string, user?: { name?: { firstName?: string; lastName?: string }; email?: string }) {
-        return signInWithOAuth("apple", { code,
-redirectUri,
-user });
+    /**
+     * Sign in with an Apple authorization code.
+     *
+     * - Web: `signInWithApple({ code, redirectUri, user })` — or let
+     *   {@link signInWithApplePopup} obtain the code for you.
+     * - Native (iOS, iPadOS, macOS): `signInWithApple({ code, bundleId, user })`
+     *   with the `authorizationCode` from `ASAuthorizationController`. The
+     *   bundle id must be in the backend's `APPLE_BUNDLE_IDS`.
+     *
+     * `user` carries the name Apple reports on the first authorization only.
+     * The positional `(code, redirectUri, user)` form is the web call, kept for
+     * existing callers.
+     */
+    async function signInWithApple(
+        payloadOrCode: AppleSignInPayload | string,
+        redirectUri?: string,
+        user?: AppleSignInPayload["user"]
+    ) {
+        const payload: AppleSignInPayload = typeof payloadOrCode === "string"
+            ? { code: payloadOrCode, redirectUri, user }
+            : payloadOrCode;
+        return signInWithOAuth("apple", {
+            code: payload.code,
+            ...(payload.redirectUri !== undefined ? { redirectUri: payload.redirectUri } : {}),
+            ...(payload.bundleId !== undefined ? { bundleId: payload.bundleId } : {}),
+            // Only the name: the backend takes the address from Apple's
+            // id_token and nowhere else.
+            ...(payload.user?.name ? { user: { name: payload.user.name } } : {})
+        });
+    }
+
+    /**
+     * Sign in with Apple in a browser: opens Apple's popup, then spends the
+     * code it returns. Call it from a click handler, since browsers block a
+     * popup that no gesture opened.
+     *
+     * `clientId` defaults to the Services ID the backend publishes in
+     * `GET /auth/config` — but pass it when you can: fetching it first delays
+     * the popup past the click, which Safari blocks. Call
+     * `preloadAppleSignIn()` on mount for the same reason. `redirectUri`
+     * defaults to this page's origin plus `/`; either way it must be a Return
+     * URL registered on the Services ID.
+     *
+     * A closed popup rejects with a `RebaseClientError` whose `code` is
+     * `APPLE_SIGN_IN_CANCELLED` — an answer, not a failure.
+     */
+    async function signInWithApplePopup(options: { clientId?: string; redirectUri?: string } = {}) {
+        const clientId = options.clientId ?? (await getAuthConfig()).providerClientIds?.apple;
+        if (!clientId) {
+            throw new RebaseClientError(
+                "Sign in with Apple needs a Services ID: set APPLE_CLIENT_ID on the backend, or pass clientId.",
+                { code: "APPLE_SIGN_IN_UNAVAILABLE" }
+            );
+        }
+        const authorization = await requestAppleAuthorization({ clientId, redirectUri: options.redirectUri });
+        return signInWithApple(authorization);
     }
 
     async function signInWithFacebook(code: string, redirectUri: string) {
@@ -1533,6 +1601,7 @@ refreshToken: session.refreshToken };
         signInWithGitHub,
         signInWithMicrosoft,
         signInWithApple,
+        signInWithApplePopup,
         signInWithFacebook,
         signInWithTwitter,
         signInWithDiscord,

@@ -1,5 +1,5 @@
 ---
-sourceHash: 3ad9e3791b2e3174
+sourceHash: 1c817fafda58e4bb
 title: Authentifizierung
 sidebar_label: Authentifizierung
 description: Clientseitige Authentifizierung mit dem Rebase SDK — E-Mail/Passwort-Anmeldung, OAuth-Anbieter, Sitzungsverwaltung und Auth-Status-Listener.
@@ -88,15 +88,39 @@ await client.auth.signInWithSpotify(code, redirectUri);
 
 Apple und Twitter erfordern zusätzliche Parameter:
 
-```typescript
-// Apple — optional user info from first sign-in
-await client.auth.signInWithApple(code, redirectUri, {
-    name: { firstName: "Jane", lastName: "Doe" },
-    email: "jane@example.com"
-});
+Twitter erfordert zusätzlich den PKCE-Code-Verifier:
 
-// Twitter — requires PKCE code verifier
+```typescript
 await client.auth.signInWithTwitter(code, redirectUri, codeVerifier);
+```
+
+### Apple
+
+Im Browser öffnet `signInWithApplePopup()` Apples Popup, prüft `state` und
+meldet mit dem Code an. Rufen Sie es aus einem Klick-Handler auf. Rufen Sie `preloadAppleSignIn()`
+beim Mounten auf, denn Safari blockiert ein Popup, das auf den Download eines Skripts wartet:
+
+```typescript
+import { preloadAppleSignIn } from "@rebasepro/client";
+
+void preloadAppleSignIn();                                          // on mount
+await client.auth.signInWithApplePopup({ clientId: "com.example.web" }); // on click
+```
+
+Ohne `clientId` liest das SDK die Services-ID aus `/auth/config`, was das Popup
+verzögert. Die Redirect-URI ist standardmäßig der Origin der Seite plus `/` und muss
+eine Return URL der Services-ID sein (HTTPS, niemals `localhost`). Ein geschlossenes
+Popup lehnt mit dem Code `APPLE_SIGN_IN_CANCELLED` ab.
+
+Eine native iOS- oder macOS-App sendet den Autorisierungscode aus Apples nativer
+Anmeldung zusammen mit ihrer Bundle-ID. Die Bundle-ID muss in `APPLE_BUNDLE_IDS` stehen:
+
+```typescript
+await client.auth.signInWithApple({
+    code: credential.authorizationCode,
+    bundleId: "com.example.ios",
+    user: { name: { firstName: "Jane" } } // sent by Apple on the first sign-in only
+});
 ```
 
 ### Generisches OAuth
@@ -466,6 +490,7 @@ const config = await client.auth.getAuthConfig();
 //   emailVerification: boolean,
 //   magicLink: boolean, emailOtp?: boolean,
 //   anonymousLogin: boolean, enabledProviders: string[],
+//   providerClientIds?: Record<string, string>,   // public ids, e.g. { apple: Services ID }
 //   externalLoginUrl?: string, needsSetup?: boolean, storage?: boolean
 // }
 ```

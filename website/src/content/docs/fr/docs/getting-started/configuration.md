@@ -1,5 +1,5 @@
 ---
-sourceHash: d6db615c2565caf1
+sourceHash: 3e0d0bbe7857b6b0
 title: Environnement & Configuration
 sidebar_label: Configuration
 description: Toutes les variables d'environnement et options de configuration pour les projets Rebase.
@@ -139,7 +139,8 @@ réponses.
 | `SLACK_CLIENT_SECRET` | Secret client Slack OAuth | — |
 | `SPOTIFY_CLIENT_ID` | Identifiant client Spotify OAuth | — |
 | `SPOTIFY_CLIENT_SECRET` | Secret client Spotify OAuth | — |
-| `APPLE_CLIENT_ID` | Apple Services ID. Apple n'a pas de secret client statique — Rebase signe un JWT ES256 à courte durée de vie par échange de jeton — elle nécessite donc les quatre valeurs `APPLE_*`, et ne configure rien sans elles. | — |
+| `APPLE_CLIENT_ID` | Apple Services ID, pour la connexion web. Il est public et publié dans `GET /auth/config`. Apple n'a pas de secret client statique, car Rebase signe un JWT ES256 à courte durée de vie par échange de jeton. Apple nécessite donc `APPLE_TEAM_ID`, `APPLE_KEY_ID` et `APPLE_PRIVATE_KEY`, plus cette valeur ou `APPLE_BUNDLE_IDS`, et ne configure rien sans elles. | — |
+| `APPLE_BUNDLE_IDS` | Bundle ids, séparés par des virgules, des apps natives iOS/macOS dont les codes Sign in with Apple sont acceptés. | — |
 | `APPLE_TEAM_ID` | Apple Developer Team ID, l'émetteur du JWT. | — |
 | `APPLE_KEY_ID` | Identifiant de clé de la clé privée enregistrée auprès d'Apple. | — |
 | `APPLE_PRIVATE_KEY` | Contenu du fichier de clé privée `.p8`, sauts de ligne inclus (les séquences d'échappement `\n` sont acceptées). | — |

@@ -8,14 +8,49 @@ import { tryVerifyOidcIdToken } from "./oidc-id-token";
 const APPLE_ISSUER = "https://appleid.apple.com";
 const APPLE_JWKS_URI = "https://appleid.apple.com/auth/keys";
 
-/** Extra field Apple's client sends that no other provider has. */
-export interface AppleCodeFlowPayload extends OAuthCodeFlowPayload {
+/**
+ * The request body `POST /auth/apple` accepts.
+ *
+ * Apple mints a code for one of two kinds of client, and the token exchange
+ * has to name the same one:
+ * - **Web** — the code was issued to the Services ID through a browser
+ *   authorization, so it carries the `redirectUri` that authorization used.
+ * - **Native** — the code came from `ASAuthorizationController` in an iOS,
+ *   iPadOS or macOS app. It was issued to the app's bundle id and there was no
+ *   redirect, so the client names the `bundleId` instead.
+ *
+ * Exactly one of the two is sent.
+ */
+export interface AppleCodeFlowPayload extends Omit<OAuthCodeFlowPayload, "redirectUri"> {
+    /** Web sign-in: the redirect URI the browser authorization used. */
+    redirectUri?: string;
+    /** Native sign-in: the bundle id of the app that obtained the code. */
+    bundleId?: string;
     /**
      * Apple sends the user's *name* only on the first authorization, so the
      * frontend has to forward it. It is display data and nothing else — the
      * identity email comes from the id_token, never from the request body.
      */
     user?: { name?: { firstName?: string; lastName?: string } };
+}
+
+export interface AppleProviderConfig {
+    /**
+     * The Services ID that web sign-in authorizes against. Optional when
+     * `bundleIds` is set: an app that only signs in from iOS has no Services ID.
+     */
+    clientId?: string;
+    /**
+     * Bundle ids of the native apps (iOS, iPadOS, macOS) whose codes this
+     * backend accepts. A native code is issued to the app, not to the Services
+     * ID, so each app is a client of its own. Apple's `sub` is per team, so the
+     * same person signing in on the web and in the app is one identity.
+     */
+    bundleIds?: string[];
+    teamId: string;
+    keyId: string;
+    /** The raw PEM contents of the .p8 private key file */
+    privateKey: string;
 }
 
 /**
@@ -25,36 +60,54 @@ export interface AppleCodeFlowPayload extends OAuthCodeFlowPayload {
  * token exchange (valid up to 6 months). This provider handles that automatically.
  *
  * Required Apple Developer configuration:
- * - Services ID (clientId)
+ * - Services ID (clientId) for web sign-in, and/or the bundle ids of the
+ *   native apps (bundleIds)
  * - Key ID from the private key registered with Apple
  * - Team ID from Apple Developer account
  * - Private key (.p8 file contents) downloaded from Apple Developer portal
  */
-export function createAppleProvider(config: {
-    clientId: string;
-    teamId: string;
-    keyId: string;
-    /** The raw PEM contents of the .p8 private key file */
-    privateKey: string;
-}): OAuthProvider<AppleCodeFlowPayload> {
+export function createAppleProvider(config: AppleProviderConfig): OAuthProvider<AppleCodeFlowPayload> {
+    const bundleIds = (config.bundleIds ?? []).map((id) => id.trim()).filter(Boolean);
+    if (!config.clientId && bundleIds.length === 0) {
+        // Every code is refused without one — fail at boot, not at the first sign-in.
+        throw new Error("Apple sign-in needs a Services ID (clientId), at least one app bundle id (bundleIds), or both.");
+    }
+
     /**
      * Generate a client_secret JWT signed with the Apple private key.
-     * Apple requires this instead of a static client_secret.
+     * Apple requires this instead of a static client_secret, and its `sub`
+     * names the client the code was issued to.
      */
-    async function generateClientSecret(): Promise<string> {
+    async function generateClientSecret(clientId: string): Promise<string> {
         return jwt.sign({}, config.privateKey, {
             algorithm: "ES256",
             keyid: config.keyId,
             issuer: config.teamId,
             expiresIn: "180d",
             audience: "https://appleid.apple.com",
-            subject: config.clientId
+            subject: clientId
         });
+    }
+
+    /**
+     * The client the code was issued to, or null when this backend does not
+     * know it. The bundle id is the caller's claim, so it is only ever taken
+     * from the configured list — and Apple refuses the exchange anyway if the
+     * code was issued to a different client than the one named.
+     */
+    function resolveClient(payload: AppleCodeFlowPayload): { clientId: string; redirectUri?: string } | null {
+        if (payload.bundleId !== undefined) {
+            return bundleIds.includes(payload.bundleId) ? { clientId: payload.bundleId } : null;
+        }
+        return config.clientId ? { clientId: config.clientId, redirectUri: payload.redirectUri } : null;
     }
 
     return {
         id: "apple",
+        publicClientId: config.clientId,
         schema: oauthCodeFlowSchema().extend({
+            redirectUri: z.string().url("Valid redirect URI is required").optional(),
+            bundleId: z.string().min(1).optional(),
             /**
              * Apple sends user info only on first authorization; the frontend
              * must forward it. Only the *name* is accepted — an `email` here
@@ -69,21 +122,33 @@ export function createAppleProvider(config: {
                     lastName: z.string().optional()
                 }).optional()
             }).optional()
-        }),
+        }).refine(
+            (payload) => (payload.redirectUri === undefined) !== (payload.bundleId === undefined),
+            { message: "Send redirectUri for web sign-in or bundleId for a native app, not both" }
+        ),
         verify: async (payload: AppleCodeFlowPayload): Promise<OAuthProviderProfile | null> => {
+            const client = resolveClient(payload);
+            if (!client) {
+                logger.error(payload.bundleId !== undefined
+                    ? "Apple sign-in from an app bundle id this backend does not list in bundleIds"
+                    : "Apple web sign-in needs a Services ID (clientId), and none is configured");
+                return null;
+            }
             try {
-                const clientSecret = await generateClientSecret();
+                const clientSecret = await generateClientSecret(client.clientId);
 
                 // Exchange code for tokens
                 const tokenResponse = await fetch("https://appleid.apple.com/auth/token", {
                     method: "POST",
                     headers: { "Content-Type": "application/x-www-form-urlencoded" },
                     body: new URLSearchParams({
-                        client_id: config.clientId,
+                        client_id: client.clientId,
                         client_secret: clientSecret,
                         code: payload.code,
                         grant_type: "authorization_code",
-                        redirect_uri: payload.redirectUri,
+                        // A native code was issued without a redirect, and
+                        // Apple refuses an exchange that names one.
+                        ...(client.redirectUri ? { redirect_uri: client.redirectUri } : {}),
                         ...pkceTokenParams(payload.codeVerifier)
                     })
                 });
@@ -97,7 +162,7 @@ export function createAppleProvider(config: {
 
                 // Verify the id_token against Apple's JWKS rather than
                 // base64-decoding it. The signature is the least of it: `aud`
-                // is what confirms the token was minted for *this* Services ID
+                // is what confirms the token was minted for *this* client (Services ID or app)
                 // and not another one under the same Apple team, and `exp`
                 // stops a captured token being replayed.
                 const decoded = tokenData.id_token
@@ -105,7 +170,7 @@ export function createAppleProvider(config: {
                         idToken: tokenData.id_token,
                         jwksUri: APPLE_JWKS_URI,
                         issuer: APPLE_ISSUER,
-                        audience: config.clientId
+                        audience: client.clientId
                     })
                     : null;
 

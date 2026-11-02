@@ -597,6 +597,105 @@ describe("OIDC providers — the id_token is verified, not decoded", () => {
     });
 });
 
+describe("Apple — web and native clients", () => {
+    const APPLE_CONFIG = {
+        clientId: "com.example.service",
+        bundleIds: ["com.example.ios"],
+        teamId: "TEAM123",
+        keyId: "KEY123",
+        privateKey: APPLE_CLIENT_SECRET_KEY
+    };
+
+    function appleRoutes(aud: string): Route[] {
+        return [
+            { match: "auth/keys", body: jwks() },
+            {
+                match: "auth/token",
+                body: {
+                    id_token: signIdToken({
+                        sub: "apple-sub-1", iss: "https://appleid.apple.com",
+                        aud, email: EMAIL, email_verified: "true"
+                    })
+                }
+            }
+        ];
+    }
+
+    async function verifyApple(config: Parameters<typeof createAppleProvider>[0], routes: Route[], payload: Record<string, unknown>) {
+        installFetch(routes);
+        const provider = createAppleProvider(config);
+        return provider.verify(provider.schema.parse(payload));
+    }
+
+    function tokenParams(): URLSearchParams {
+        return new URLSearchParams(tokenRequestBody("auth/token"));
+    }
+
+    it("exchanges a native code as the app's bundle id, with no redirect_uri", async () => {
+        const profile = await verifyApple(APPLE_CONFIG, appleRoutes("com.example.ios"), {
+            code: "c", bundleId: "com.example.ios"
+        });
+        expect(profile?.providerId).toBe("apple-sub-1");
+        const params = tokenParams();
+        expect(params.get("client_id")).toBe("com.example.ios");
+        expect(params.has("redirect_uri")).toBe(false);
+        // The client secret names the client the code was issued to.
+        const secret = jwt.decode(params.get("client_secret")!) as { sub: string; iss: string };
+        expect(secret.sub).toBe("com.example.ios");
+        expect(secret.iss).toBe("TEAM123");
+    });
+
+    it("exchanges a web code as the Services ID, echoing the redirect URI", async () => {
+        await verifyApple(APPLE_CONFIG, appleRoutes("com.example.service"), { code: "c", redirectUri: REDIRECT });
+        const params = tokenParams();
+        expect(params.get("client_id")).toBe("com.example.service");
+        expect(params.get("redirect_uri")).toBe(REDIRECT);
+    });
+
+    it("refuses a bundle id it does not list, without calling Apple", async () => {
+        const profile = await verifyApple(APPLE_CONFIG, appleRoutes("com.attacker.app"), {
+            code: "c", bundleId: "com.attacker.app"
+        });
+        expect(profile).toBeNull();
+        expect(fetchCalls).toHaveLength(0);
+    });
+
+    it("refuses a native id_token whose audience is the Services ID", async () => {
+        const profile = await verifyApple(APPLE_CONFIG, appleRoutes("com.example.service"), {
+            code: "c", bundleId: "com.example.ios"
+        });
+        expect(profile).toBeNull();
+    });
+
+    it("refuses web sign-in when only bundle ids are configured", async () => {
+        const { clientId: _webClient, ...nativeOnly } = APPLE_CONFIG;
+        const profile = await verifyApple(nativeOnly, appleRoutes("com.example.service"), {
+            code: "c", redirectUri: REDIRECT
+        });
+        expect(profile).toBeNull();
+        expect(fetchCalls).toHaveLength(0);
+    });
+
+    it("takes a redirectUri or a bundleId, never both and never neither", () => {
+        const schema = createAppleProvider(APPLE_CONFIG).schema;
+        expect(schema.safeParse({ code: "c" }).success).toBe(false);
+        expect(schema.safeParse({ code: "c", redirectUri: REDIRECT, bundleId: "com.example.ios" }).success).toBe(false);
+        expect(schema.safeParse({ code: "c", redirectUri: REDIRECT }).success).toBe(true);
+        expect(schema.safeParse({ code: "c", bundleId: "com.example.ios" }).success).toBe(true);
+    });
+
+    it("refuses to build with no client at all", () => {
+        expect(() => createAppleProvider({ teamId: "T", keyId: "K", privateKey: APPLE_CLIENT_SECRET_KEY }))
+            .toThrow(/Services ID/);
+    });
+
+    it("publishes the Services ID, which is public, and nothing else", () => {
+        expect(createAppleProvider(APPLE_CONFIG).publicClientId).toBe("com.example.service");
+        const { clientId: _webClient, ...nativeOnly } = APPLE_CONFIG;
+        expect(createAppleProvider(nativeOnly).publicClientId).toBeUndefined();
+    });
+});
+
 describe("OAuth provider coverage gate", () => {
     it("every create*Provider exported from src/auth is in the table above", () => {
         const exported = Object.keys(authIndex)

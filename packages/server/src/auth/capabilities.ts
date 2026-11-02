@@ -43,6 +43,8 @@ export interface BuiltinAuthCapabilityInputs {
     emailConfigured: boolean;
     /** OAuth provider ids the backend has wired, e.g. `["google", "github"]`. */
     enabledProviders: string[];
+    /** Public client ids by provider id, for the providers that publish one. */
+    providerClientIds?: Record<string, string>;
 }
 
 /**
@@ -63,7 +65,8 @@ export function buildBuiltinAuthCapabilities(
         enableMagicLink,
         enableEmailOtp,
         emailConfigured,
-        enabledProviders
+        enabledProviders,
+        providerClientIds
     } = inputs;
 
     return {
@@ -88,6 +91,7 @@ export function buildBuiltinAuthCapabilities(
         // client ends up calling a route it cannot discover is off.
         anonymousLogin: isAnonymousAuthOpen({ allowAnonymous, disableSelfRegistration }),
         enabledProviders,
+        ...(providerClientIds && Object.keys(providerClientIds).length > 0 ? { providerClientIds } : {}),
         needsSetup
     };
 }

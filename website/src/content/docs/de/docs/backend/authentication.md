@@ -1,5 +1,5 @@
 ---
-sourceHash: bb2bf60cbaed04eb
+sourceHash: 703a9d0f2371a6c0
 title: Authentifizierung
 sidebar_label: Authentifizierung
 description: Konfigurieren Sie JWT-Authentifizierung, OAuth-Provider, SMTP-E-Mail, Bot-Schutz und die Users-Collection im Rebase-Backend.
@@ -364,7 +364,7 @@ auth: {
     linkedin:  { clientId: "...", clientSecret: "..." },
     github:    { clientId: "...", clientSecret: "..." },
     microsoft: { clientId: "...", clientSecret: "...", tenantId: "..." },
-    apple:     { clientId: "...", teamId: "...", keyId: "...", privateKey: "..." },
+    apple:     { clientId: "...", bundleIds: ["..."], teamId: "...", keyId: "...", privateKey: "..." },
     facebook:  { clientId: "...", clientSecret: "..." },
     twitter:   { clientId: "...", clientSecret: "..." },
     discord:   { clientId: "...", clientSecret: "..." },
@@ -394,10 +394,12 @@ DISCORD_CLIENT_SECRET=…
 
 Google wird allein durch `GOOGLE_CLIENT_ID` konfiguriert: Sein ID-Token-Flow benötigt kein Secret, daher ist `GOOGLE_CLIENT_SECRET` optional.
 
-Apple ist die Ausnahme: Hier gibt es kein statisches Client Secret, da Rebase für jeden Token-Austausch
-ein kurzlebiges ES256-JWT signiert. Es werden alle vier Variablen benötigt:
-`APPLE_CLIENT_ID`, `APPLE_TEAM_ID`, `APPLE_KEY_ID` und `APPLE_PRIVATE_KEY` — der
-Inhalt der `.p8`-Datei inklusive Zeilenumbrüchen.
+Apple hat kein Client Secret: Rebase signiert pro Austausch ein ES256-JWT. Benötigt werden `APPLE_TEAM_ID`,
+`APPLE_KEY_ID` und `APPLE_PRIVATE_KEY` (der Inhalt der `.p8`-Datei inklusive
+Zeilenumbrüchen), dazu `APPLE_CLIENT_ID` (die Services-ID, für das Web), `APPLE_BUNDLE_IDS`
+(kommagetrennte IDs Ihrer nativen iOS- und macOS-Apps) oder beides. Die Services-ID
+ist öffentlich, daher veröffentlicht `/auth/config` sie, und der Admin-Login zeigt **Sign in
+with Apple** ohne Frontend-Variable.
 
 Zwei Optionen haben keine Entsprechung in Umgebungsvariablen und erfordern den `auth`-Block (also
 ein Ejected- oder code-konfiguriertes Backend): `microsoft.tenantId` (welches sonst

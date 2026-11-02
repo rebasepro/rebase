@@ -105,6 +105,15 @@ export interface OAuthProvider<T = unknown> {
     schema: z.ZodSchema<T>;
 
     /**
+     * The client id a browser needs to *start* this provider's sign-in, when
+     * it is public. Published in `GET /auth/config` as
+     * `providerClientIds[id]`, so a login screen can offer the button from
+     * the backend's configuration alone rather than from a second copy of the
+     * id in the frontend's environment. Never set it to anything secret.
+     */
+    publicClientId?: string;
+
+    /**
      * Verify external tokens/codes and return a standardized user profile.
      *
      * NOTE: Declared as method syntax (not arrow property) intentionally.

@@ -138,7 +138,8 @@ answers.
 | `SLACK_CLIENT_SECRET` | Slack OAuth client secret | — |
 | `SPOTIFY_CLIENT_ID` | Spotify OAuth client ID | — |
 | `SPOTIFY_CLIENT_SECRET` | Spotify OAuth client secret | — |
-| `APPLE_CLIENT_ID` | Apple Services ID. Apple has no static client secret — Rebase signs a short-lived ES256 JWT per token exchange — so it needs all four `APPLE_*` values, and configures nothing without them. | — |
+| `APPLE_CLIENT_ID` | Apple Services ID, for web sign-in. It is public and is published in `GET /auth/config`. Apple has no static client secret, because Rebase signs a short-lived ES256 JWT for each token exchange. So Apple needs `APPLE_TEAM_ID`, `APPLE_KEY_ID` and `APPLE_PRIVATE_KEY`, plus this or `APPLE_BUNDLE_IDS`, and configures nothing without them. | — |
+| `APPLE_BUNDLE_IDS` | Comma-separated bundle ids of the native iOS/macOS apps whose Sign in with Apple codes are accepted. | — |
 | `APPLE_TEAM_ID` | Apple Developer Team ID, the JWT's issuer. | — |
 | `APPLE_KEY_ID` | Key ID of the private key registered with Apple. | — |
 | `APPLE_PRIVATE_KEY` | Contents of the `.p8` private key file, newlines and all (`\n` escapes are accepted). | — |

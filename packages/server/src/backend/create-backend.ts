@@ -1477,7 +1477,8 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
                 { key: "linkedin", factory: "createLinkedinProvider", requiredFields: ["clientId", "clientSecret"] },
                 { key: "github", factory: "createGitHubProvider", requiredFields: ["clientId", "clientSecret"] },
                 { key: "microsoft", factory: "createMicrosoftProvider", requiredFields: ["clientId", "clientSecret"] },
-                { key: "apple", factory: "createAppleProvider", requiredFields: ["clientId", "teamId", "keyId", "privateKey"] },
+                // `clientId` or `bundleIds` — `createAppleProvider` refuses neither.
+                { key: "apple", factory: "createAppleProvider", requiredFields: ["teamId", "keyId", "privateKey"] },
                 { key: "facebook", factory: "createFacebookProvider", requiredFields: ["clientId", "clientSecret"] },
                 { key: "twitter", factory: "createTwitterProvider", requiredFields: ["clientId", "clientSecret"] },
                 { key: "discord", factory: "createDiscordProvider", requiredFields: ["clientId", "clientSecret"] },

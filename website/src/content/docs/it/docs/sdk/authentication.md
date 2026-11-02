@@ -1,5 +1,5 @@
 ---
-sourceHash: 3ad9e3791b2e3174
+sourceHash: 1c817fafda58e4bb
 title: Autenticazione
 sidebar_label: Autenticazione
 description: Autenticazione lato client con l'SDK di Rebase — accesso con email/password, provider OAuth, gestione delle sessioni e listener dello stato di autenticazione.
@@ -89,15 +89,39 @@ await client.auth.signInWithSpotify(code, redirectUri);
 
 Apple e Twitter richiedono parametri aggiuntivi:
 
-```typescript
-// Apple — optional user info from first sign-in
-await client.auth.signInWithApple(code, redirectUri, {
-    name: { firstName: "Jane", lastName: "Doe" },
-    email: "jane@example.com"
-});
+Twitter richiede anche il code verifier PKCE:
 
-// Twitter — requires PKCE code verifier
+```typescript
 await client.auth.signInWithTwitter(code, redirectUri, codeVerifier);
+```
+
+### Apple
+
+Nel browser, `signInWithApplePopup()` apre il popup di Apple, verifica `state` ed
+effettua l'accesso con il codice. Chiamalo da un gestore di clic. Chiama `preloadAppleSignIn()`
+al montaggio, perché Safari blocca un popup che attende il download di uno script:
+
+```typescript
+import { preloadAppleSignIn } from "@rebasepro/client";
+
+void preloadAppleSignIn();                                          // on mount
+await client.auth.signInWithApplePopup({ clientId: "com.example.web" }); // on click
+```
+
+Senza `clientId`, l'SDK legge il Services ID da `/auth/config`, il che ritarda il
+popup. L'URI di reindirizzamento è per impostazione predefinita l'origine della pagina più `/`, e deve
+essere una Return URL del Services ID (HTTPS, mai `localhost`). Un popup chiuso
+rifiuta con il codice `APPLE_SIGN_IN_CANCELLED`.
+
+Un'app nativa iOS o macOS invia il codice di autorizzazione dell'accesso nativo di Apple
+insieme al suo bundle id. Il bundle id deve essere elencato in `APPLE_BUNDLE_IDS`:
+
+```typescript
+await client.auth.signInWithApple({
+    code: credential.authorizationCode,
+    bundleId: "com.example.ios",
+    user: { name: { firstName: "Jane" } } // sent by Apple on the first sign-in only
+});
 ```
 
 ### OAuth generico
@@ -472,6 +496,7 @@ const config = await client.auth.getAuthConfig();
 //   emailVerification: boolean,
 //   magicLink: boolean, emailOtp?: boolean,
 //   anonymousLogin: boolean, enabledProviders: string[],
+//   providerClientIds?: Record<string, string>,   // public ids, e.g. { apple: Services ID }
 //   externalLoginUrl?: string, needsSetup?: boolean, storage?: boolean
 // }
 ```

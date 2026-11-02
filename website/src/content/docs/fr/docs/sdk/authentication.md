@@ -1,5 +1,5 @@
 ---
-sourceHash: 3ad9e3791b2e3174
+sourceHash: 1c817fafda58e4bb
 title: Authentification
 sidebar_label: Authentification
 description: Authentification côté client avec le SDK Rebase — connexion par e-mail/mot de passe, fournisseurs OAuth, gestion des sessions et écouteurs d'état d'authentification.
@@ -87,15 +87,39 @@ await client.auth.signInWithSpotify(code, redirectUri);
 
 Apple et Twitter nécessitent des paramètres supplémentaires :
 
-```typescript
-// Apple — optional user info from first sign-in
-await client.auth.signInWithApple(code, redirectUri, {
-    name: { firstName: "Jane", lastName: "Doe" },
-    email: "jane@example.com"
-});
+Twitter exige en plus le vérificateur de code PKCE :
 
-// Twitter — requires PKCE code verifier
+```typescript
 await client.auth.signInWithTwitter(code, redirectUri, codeVerifier);
+```
+
+### Apple
+
+Dans un navigateur, `signInWithApplePopup()` ouvre la fenêtre pop-up d'Apple, vérifie `state` et
+connecte l'utilisateur avec le code. Appelez-la depuis un gestionnaire de clic. Appelez `preloadAppleSignIn()`
+au montage, car Safari bloque une pop-up qui attend le téléchargement d'un script :
+
+```typescript
+import { preloadAppleSignIn } from "@rebasepro/client";
+
+void preloadAppleSignIn();                                          // on mount
+await client.auth.signInWithApplePopup({ clientId: "com.example.web" }); // on click
+```
+
+Sans `clientId`, le SDK lit le Services ID depuis `/auth/config`, ce qui retarde la
+pop-up. L'URI de redirection est par défaut l'origine de la page suivie de `/`, et elle doit
+être une Return URL du Services ID (HTTPS, jamais `localhost`). Une pop-up fermée
+rejette avec le code `APPLE_SIGN_IN_CANCELLED`.
+
+Une app native iOS ou macOS envoie le code d'autorisation de la connexion native d'Apple
+avec son bundle id. Ce bundle id doit figurer dans `APPLE_BUNDLE_IDS` :
+
+```typescript
+await client.auth.signInWithApple({
+    code: credential.authorizationCode,
+    bundleId: "com.example.ios",
+    user: { name: { firstName: "Jane" } } // sent by Apple on the first sign-in only
+});
 ```
 
 ### OAuth générique
@@ -466,6 +490,7 @@ const config = await client.auth.getAuthConfig();
 //   emailVerification: boolean,
 //   magicLink: boolean, emailOtp?: boolean,
 //   anonymousLogin: boolean, enabledProviders: string[],
+//   providerClientIds?: Record<string, string>,   // public ids, e.g. { apple: Services ID }
 //   externalLoginUrl?: string, needsSetup?: boolean, storage?: boolean
 // }
 ```

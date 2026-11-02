@@ -76,17 +76,39 @@ await client.auth.signInWithSlack(code, redirectUri);
 await client.auth.signInWithSpotify(code, redirectUri);
 ```
 
-Apple and Twitter require additional parameters:
+Twitter requires the PKCE code verifier as well:
 
 ```typescript
-// Apple — optional user info from first sign-in
-await client.auth.signInWithApple(code, redirectUri, {
-    name: { firstName: "Jane", lastName: "Doe" },
-    email: "jane@example.com"
-});
-
-// Twitter — requires PKCE code verifier
 await client.auth.signInWithTwitter(code, redirectUri, codeVerifier);
+```
+
+### Apple
+
+In a browser, `signInWithApplePopup()` opens Apple's popup, checks `state` and
+signs in with the code. Call it from a click handler. Call `preloadAppleSignIn()`
+on mount, because Safari blocks a popup that waits for a script to download:
+
+```typescript
+import { preloadAppleSignIn } from "@rebasepro/client";
+
+void preloadAppleSignIn();                                          // on mount
+await client.auth.signInWithApplePopup({ clientId: "com.example.web" }); // on click
+```
+
+Without `clientId`, the SDK reads the Services ID from `/auth/config`, which
+delays the popup. The redirect URI defaults to the page's origin plus `/`, and it
+must be a Return URL on the Services ID (HTTPS, never `localhost`). A closed
+popup rejects with code `APPLE_SIGN_IN_CANCELLED`.
+
+A native iOS or macOS app sends the authorization code from Apple's native
+sign-in with its bundle id. The bundle id must be listed in `APPLE_BUNDLE_IDS`:
+
+```typescript
+await client.auth.signInWithApple({
+    code: credential.authorizationCode,
+    bundleId: "com.example.ios",
+    user: { name: { firstName: "Jane" } } // sent by Apple on the first sign-in only
+});
 ```
 
 ### Generic OAuth
@@ -482,6 +504,7 @@ const config = await client.auth.getAuthConfig();
 //   emailVerification: boolean,
 //   magicLink: boolean, emailOtp?: boolean,
 //   anonymousLogin: boolean, enabledProviders: string[],
+//   providerClientIds?: Record<string, string>,   // public ids, e.g. { apple: Services ID }
 //   externalLoginUrl?: string, needsSetup?: boolean, storage?: boolean
 // }
 ```

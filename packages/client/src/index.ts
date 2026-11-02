@@ -86,7 +86,11 @@ export type { StorageReferenceTarget, StorageReferenceResolver } from "@rebasepr
 
 // Auth: session/token types, config, and the pluggable storage strategies.
 export { createCookieStorage, createMemoryStorage } from "./auth";
-export type { AuthConfig, AuthStorage, CookieStorageOptions, CreateAuthOptions, SessionRestoreOutcome } from "./auth";
+export type { AppleSignInPayload, AuthConfig, AuthStorage, CookieStorageOptions, CreateAuthOptions, SessionRestoreOutcome } from "./auth";
+// Sign in with Apple's browser half, for a login screen that spends the code
+// itself (`client.auth.signInWithApplePopup()` does both steps).
+export { requestAppleAuthorization, preloadAppleSignIn, APPLE_JS_SDK_URL } from "./apple-sign-in";
+export type { AppleAuthorization, AppleAuthorizationRequest } from "./apple-sign-in";
 // `User` is re-exported alongside the session types because `client.auth` hands
 // one back and a browser app installs `@rebasepro/client` only — `@rebasepro/types`
 // is a transitive dependency there, not something a consumer can import from.

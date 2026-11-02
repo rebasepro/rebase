@@ -1,5 +1,5 @@
 ---
-sourceHash: 3ad9e3791b2e3174
+sourceHash: 1c817fafda58e4bb
 title: Autenticación
 sidebar_label: Autenticación
 description: Autenticación del lado del cliente con el SDK de Rebase — inicio de sesión con correo electrónico/contraseña, proveedores OAuth, gestión de sesiones y escuchadores de estado de autenticación.
@@ -88,15 +88,39 @@ await client.auth.signInWithSpotify(code, redirectUri);
 
 Apple y Twitter requieren parámetros adicionales:
 
-```typescript
-// Apple — optional user info from first sign-in
-await client.auth.signInWithApple(code, redirectUri, {
-    name: { firstName: "Jane", lastName: "Doe" },
-    email: "jane@example.com"
-});
+Twitter requiere además el verificador de código PKCE:
 
-// Twitter — requires PKCE code verifier
+```typescript
 await client.auth.signInWithTwitter(code, redirectUri, codeVerifier);
+```
+
+### Apple
+
+En el navegador, `signInWithApplePopup()` abre la ventana emergente de Apple, comprueba `state` e
+inicia sesión con el código. Llámalo desde un manejador de clic. Llama a `preloadAppleSignIn()`
+al montar el componente, porque Safari bloquea una ventana emergente que espera a que se descargue un script:
+
+```typescript
+import { preloadAppleSignIn } from "@rebasepro/client";
+
+void preloadAppleSignIn();                                          // on mount
+await client.auth.signInWithApplePopup({ clientId: "com.example.web" }); // on click
+```
+
+Sin `clientId`, el SDK lee el Services ID de `/auth/config`, lo que retrasa la
+ventana emergente. La URI de redirección es por defecto el origen de la página más `/`, y debe
+ser una Return URL del Services ID (HTTPS, nunca `localhost`). Si se cierra la ventana
+emergente, la llamada se rechaza con el código `APPLE_SIGN_IN_CANCELLED`.
+
+Una app nativa de iOS o macOS envía el código de autorización del inicio de sesión nativo
+de Apple junto con su bundle id. El bundle id debe figurar en `APPLE_BUNDLE_IDS`:
+
+```typescript
+await client.auth.signInWithApple({
+    code: credential.authorizationCode,
+    bundleId: "com.example.ios",
+    user: { name: { firstName: "Jane" } } // sent by Apple on the first sign-in only
+});
 ```
 
 ### OAuth genérico
@@ -479,6 +503,7 @@ const config = await client.auth.getAuthConfig();
 //   emailVerification: boolean,
 //   magicLink: boolean, emailOtp?: boolean,
 //   anonymousLogin: boolean, enabledProviders: string[],
+//   providerClientIds?: Record<string, string>,   // public ids, e.g. { apple: Services ID }
 //   externalLoginUrl?: string, needsSetup?: boolean, storage?: boolean
 // }
 ```

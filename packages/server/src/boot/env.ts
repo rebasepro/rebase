@@ -229,12 +229,18 @@ export const bootEnvExtension = z.object({
     SPOTIFY_CLIENT_SECRET: z.string().optional(),
     /**
      * Apple is the one provider with no static client secret: Apple wants a
-     * short-lived ES256 JWT, which `createAppleProvider` signs from these three.
-     * So `APPLE_CLIENT_SECRET` does not exist, and all four keys are required
-     * together — three of them is a provider that cannot mint a secret, which is
-     * why `resolveAuthOptions` configures Apple only when it has all of them.
+     * short-lived ES256 JWT, which `createAppleProvider` signs from the team id,
+     * key id and private key. So `APPLE_CLIENT_SECRET` does not exist, and
+     * those three are required together — two of them is a provider that
+     * cannot mint a secret, which is why `resolveAuthOptions` configures Apple
+     * only when it has all three.
+     *
+     * Beside them, Apple needs at least one client: `APPLE_CLIENT_ID` (the
+     * Services ID, for web sign-in) and/or `APPLE_BUNDLE_IDS` (comma-separated
+     * bundle ids of the iOS/macOS apps whose native codes are accepted).
      */
     APPLE_CLIENT_ID: z.string().optional(),
+    APPLE_BUNDLE_IDS: z.string().optional(),
     APPLE_TEAM_ID: z.string().optional(),
     APPLE_KEY_ID: z.string().optional(),
     APPLE_PRIVATE_KEY: z.string().optional(),

@@ -1,5 +1,5 @@
 ---
-sourceHash: bb2bf60cbaed04eb
+sourceHash: 703a9d0f2371a6c0
 title: Autenticación
 sidebar_label: Autenticación
 description: Configura la autenticación JWT, proveedores OAuth, correo SMTP, protección contra bots y la colección de usuarios en el backend de Rebase.
@@ -287,7 +287,7 @@ auth: {
     linkedin:  { clientId: "...", clientSecret: "..." },
     github:    { clientId: "...", clientSecret: "..." },
     microsoft: { clientId: "...", clientSecret: "...", tenantId: "..." },
-    apple:     { clientId: "...", teamId: "...", keyId: "...", privateKey: "..." },
+    apple:     { clientId: "...", bundleIds: ["..."], teamId: "...", keyId: "...", privateKey: "..." },
     facebook:  { clientId: "...", clientSecret: "..." },
     twitter:   { clientId: "...", clientSecret: "..." },
     discord:   { clientId: "...", clientSecret: "..." },
@@ -313,7 +313,7 @@ DISCORD_CLIENT_SECRET=…
 
 Google se configura solo con `GOOGLE_CLIENT_ID`: su flujo de ID token no necesita ningún secreto, así que `GOOGLE_CLIENT_SECRET` es opcional.
 
-Apple es la excepción: no tiene un client secret estático, ya que Rebase firma un JWT ES256 de corta duración para cada intercambio de tokens. Requiere los cuatro valores: `APPLE_CLIENT_ID`, `APPLE_TEAM_ID`, `APPLE_KEY_ID` y `APPLE_PRIVATE_KEY` — el contenido del archivo `.p8`, con saltos de línea incluidos.
+Apple no tiene client secret: Rebase firma un JWT ES256 en cada intercambio. Requiere `APPLE_TEAM_ID`, `APPLE_KEY_ID` y `APPLE_PRIVATE_KEY` (el contenido del archivo `.p8`, con saltos de línea incluidos), más `APPLE_CLIENT_ID` (el Services ID, para la web), `APPLE_BUNDLE_IDS` (los IDs de tus apps nativas de iOS y macOS, separados por comas) o ambos. El Services ID es público, así que `/auth/config` lo publica y el inicio de sesión del panel de administración muestra **Sign in with Apple** sin ninguna variable en el frontend.
 
 Dos opciones no tienen equivalente en variables de entorno y requieren el bloque `auth` (es decir, un backend ejected o configurado por código): `microsoft.tenantId`, que de lo contrario utiliza por defecto `common` y acepta todos los tenants de Entra (con cualquier tenant, una dirección cuenta como verificada solo cuando el registro de la aplicación emite el claim `xms_edov`), y `gitlab.baseUrl`, para una instancia autoalojada.
 

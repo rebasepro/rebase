@@ -360,7 +360,7 @@ auth: {
     linkedin:  { clientId: "...", clientSecret: "..." },
     github:    { clientId: "...", clientSecret: "..." },
     microsoft: { clientId: "...", clientSecret: "...", tenantId: "..." },
-    apple:     { clientId: "...", teamId: "...", keyId: "...", privateKey: "..." },
+    apple:     { clientId: "...", bundleIds: ["..."], teamId: "...", keyId: "...", privateKey: "..." },
     facebook:  { clientId: "...", clientSecret: "..." },
     twitter:   { clientId: "...", clientSecret: "..." },
     discord:   { clientId: "...", clientSecret: "..." },
@@ -390,10 +390,11 @@ to check that a pair arrived.
 
 Google is configured by `GOOGLE_CLIENT_ID` alone: its ID-token flow needs no secret, so `GOOGLE_CLIENT_SECRET` is optional.
 
-Apple is the exception: it has no static client secret, because Rebase signs a
-short-lived ES256 JWT for each token exchange. It needs all four of
-`APPLE_CLIENT_ID`, `APPLE_TEAM_ID`, `APPLE_KEY_ID` and `APPLE_PRIVATE_KEY` — the
-`.p8` file's contents, newlines and all.
+Apple has no client secret: Rebase signs an ES256 JWT per exchange. It needs `APPLE_TEAM_ID`,
+`APPLE_KEY_ID` and `APPLE_PRIVATE_KEY` (the `.p8` file's contents, newlines and
+all), plus `APPLE_CLIENT_ID` (the Services ID, for the web), `APPLE_BUNDLE_IDS`
+(comma-separated ids of your native iOS and macOS apps), or both. The Services ID
+is public, so `/auth/config` publishes it for the admin's **Sign in with Apple**.
 
 Two options have no environment spelling and need the `auth` block (so, an
 ejected or code-configured backend): `microsoft.tenantId`, which otherwise

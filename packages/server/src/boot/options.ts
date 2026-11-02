@@ -223,12 +223,19 @@ export function resolveAuthOptions(
     }
 
     // Apple has no static secret to pair with the id: `createAppleProvider`
-    // signs a short-lived ES256 JWT per token exchange. All four or nothing —
-    // a partial set would build a provider that fails at the first sign-in
-    // rather than at boot.
-    if (env.APPLE_CLIENT_ID && env.APPLE_TEAM_ID && env.APPLE_KEY_ID && env.APPLE_PRIVATE_KEY) {
+    // signs a short-lived ES256 JWT per token exchange. The three signing keys
+    // and at least one client (the web Services ID, native bundle ids, or
+    // both) or nothing — a partial set would build a provider that fails at
+    // the first sign-in rather than at boot.
+    const appleBundleIds = (env.APPLE_BUNDLE_IDS ?? "")
+        .split(",")
+        .map((id) => id.trim())
+        .filter(Boolean);
+    if ((env.APPLE_CLIENT_ID || appleBundleIds.length > 0)
+        && env.APPLE_TEAM_ID && env.APPLE_KEY_ID && env.APPLE_PRIVATE_KEY) {
         auth.apple = {
-            clientId: env.APPLE_CLIENT_ID,
+            ...(env.APPLE_CLIENT_ID ? { clientId: env.APPLE_CLIENT_ID } : {}),
+            ...(appleBundleIds.length > 0 ? { bundleIds: appleBundleIds } : {}),
             teamId: env.APPLE_TEAM_ID,
             keyId: env.APPLE_KEY_ID,
             privateKey: normalizePemFromEnv(env.APPLE_PRIVATE_KEY)

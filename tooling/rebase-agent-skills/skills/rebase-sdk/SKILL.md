@@ -529,6 +529,8 @@ await rebase.auth.signInWithGoogle({ code, redirectUri });
 await rebase.auth.signInWithGitHub(code, redirectUri);
 await rebase.auth.signInWithMicrosoft(code, redirectUri);
 await rebase.auth.signInWithApple(code, redirectUri);
+// Apple also has a browser popup and a native-app form:
+//   signInWithApplePopup({ clientId }), signInWithApple({ code, bundleId })
 // ... same pattern for all providers, except Twitter, which also takes the
 // PKCE verifier: signInWithTwitter(code, redirectUri, codeVerifier)
 

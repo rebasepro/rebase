@@ -491,7 +491,9 @@ export function createBuiltinAuthAdapter(config: BuiltinAuthAdapterConfig): Auth
                 enableMagicLink,
                 enableEmailOtp,
                 emailConfigured: !!emailService?.isConfigured(),
-                enabledProviders: oauthProviders.map((p) => p.id)
+                enabledProviders: oauthProviders.map((p) => p.id),
+                providerClientIds: Object.fromEntries(oauthProviders
+                    .flatMap((p) => p.publicClientId ? [[p.id, p.publicClientId] as const] : []))
             });
         }
     };

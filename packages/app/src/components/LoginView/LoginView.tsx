@@ -51,6 +51,7 @@ import { authErrorMessage } from "./auth-error-message";
 import { appAddressOfEmailLink, readEmailLinkAction } from "./email-link";
 import { emailChangeErrorMessage } from "../email-change-message";
 import { canAnswerMfa, classifyMfaRefusal, PendingMfaSignIn, readMfaRequired } from "./mfa-required";
+import { isAppleCancellation, preloadAppleSdk } from "../../auth/apple-sign-in";
 
 /**
  * Props for the generic LoginView.
@@ -120,6 +121,20 @@ export interface LoginViewProps {
      * LinkedIn client ID for LinkedIn OAuth.
      */
     linkedinClientId?: string;
+
+    /**
+     * Apple Services ID for Sign in with Apple. Defaults to the one the
+     * backend publishes in `GET /auth/config` (its `APPLE_CLIENT_ID`), so the
+     * button appears once the backend is configured and needs nothing here.
+     */
+    appleClientId?: string;
+
+    /**
+     * The Return URL registered on the Apple Services ID. Defaults to this
+     * page's origin plus `/` (`https://admin.example.com/`). Apple accepts
+     * only HTTPS URLs on a real domain — not `localhost`.
+     */
+    appleRedirectUri?: string;
 
     /**
      * Optional custom title shown above options
@@ -199,10 +214,14 @@ function warnAboutHalfConfiguredOAuth(
     warnedProviders.add(provider);
 
     const envVar = `${provider.toUpperCase()}_CLIENT_ID`;
+    // Apple signs its own client secret from a key, so it has no `_SECRET`.
+    const companions = provider === "apple"
+        ? "APPLE_TEAM_ID, APPLE_KEY_ID and APPLE_PRIVATE_KEY"
+        : `${provider.toUpperCase()}_CLIENT_SECRET`;
     console.warn(
         clientId
             ? `[Rebase] ${provider} login is hidden: the login view has a client id, but the backend reports no "${provider}" provider. `
-              + `Set ${envVar} (and ${provider.toUpperCase()}_CLIENT_SECRET) on the server and restart it.`
+              + `Set ${envVar} (and ${companions}) on the server and restart it.`
             : `[Rebase] ${provider} login is hidden: the backend has a "${provider}" provider, but the login view was given no client id. `
               + `Pass it to the login view (e.g. VITE_${envVar}) and restart the frontend so the new env var is picked up.`
     );
@@ -252,6 +271,8 @@ export function LoginView({
     googleClientId,
     githubClientId,
     linkedinClientId,
+    appleClientId,
+    appleRedirectUri,
     title,
     subtitle,
     needsSetup,
@@ -356,6 +377,12 @@ export function LoginView({
     const hasGoogleLogin = Boolean(googleClientId) && backendProviders.includes("google");
     const hasGitHubLogin = githubClientId && backendProviders.includes("github");
     const hasLinkedinLogin = linkedinClientId && backendProviders.includes("linkedin");
+    // Apple's Services ID is public, so the backend publishes it: unlike the
+    // three above, the button needs no client id in the frontend's env.
+    const resolvedAppleClientId = appleClientId ?? caps.providerClientIds?.apple;
+    const hasAppleLogin = Boolean(resolvedAppleClientId)
+        && backendProviders.includes("apple")
+        && Boolean(authController.appleLogin);
 
     useEffect(() => {
         // `enabledProviders` is empty until /auth/config lands, which looks
@@ -366,9 +393,12 @@ export function LoginView({
             warnAboutHalfConfiguredOAuth("google", googleClientId, backendProviders);
             warnAboutHalfConfiguredOAuth("github", githubClientId, backendProviders);
             warnAboutHalfConfiguredOAuth("linkedin", linkedinClientId, backendProviders);
+            // Only an explicit id can be half a configuration: a backend with
+            // Apple and no Services ID is a native-only setup, not a mistake.
+            if (appleClientId) warnAboutHalfConfiguredOAuth("apple", appleClientId, backendProviders);
         }, 3000);
         return () => clearTimeout(timer);
-    }, [googleClientId, githubClientId, linkedinClientId, backendProviders.join(",")]);
+    }, [googleClientId, githubClientId, linkedinClientId, appleClientId, backendProviders.join(",")]);
     const hasPasswordReset = caps.passwordReset ?? !!authController.forgotPassword;
 
     const showRegistration = !disableSignupScreen && canRegister;
@@ -604,6 +634,16 @@ export function LoginView({
                                         <GoogleLoginButton
                                             disabled={disabled}
                                             googleClientId={googleClientId}
+                                            authController={authController}
+                                            onSignedIn={() => subscribeIfOptedIn(authControllerRef.current.user?.email)}
+                                            onError={setProviderError}
+                                        />
+                                    )}
+                                    {hasAppleLogin && resolvedAppleClientId && (
+                                        <AppleLoginButton
+                                            disabled={disabled}
+                                            appleClientId={resolvedAppleClientId}
+                                            appleRedirectUri={appleRedirectUri}
                                             authController={authController}
                                             onSignedIn={() => subscribeIfOptedIn(authControllerRef.current.user?.email)}
                                             onError={setProviderError}
@@ -858,6 +898,62 @@ function GoogleLoginButton({
             disabled={disabled}
             text="Sign in with Google"
             icon={<GoogleIcon/>}
+            onClick={handleClick}
+        />
+    );
+}
+
+const AppleIcon = () => (
+    <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
+        <path d="M16.365 1.43c0 1.14-.493 2.27-1.177 3.08-.744.9-1.99 1.57-2.987 1.57-.12 0-.23-.02-.3-.03-.01-.06-.04-.22-.04-.39 0-1.15.572-2.27 1.206-2.98.804-.94 2.142-1.64 3.248-1.68.03.13.05.28.05.43zm4.565 15.71c-.03.07-.463 1.58-1.518 3.12-.945 1.34-1.94 2.71-3.43 2.71-1.517 0-1.9-.88-3.63-.88-1.698 0-2.302.91-3.67.91-1.377 0-2.332-1.26-3.428-2.8-1.287-1.82-2.323-4.63-2.323-7.28 0-4.28 2.797-6.55 5.552-6.55 1.448 0 2.675.95 3.6.95.865 0 2.222-1.01 3.902-1.01.613 0 2.886.06 4.374 2.19-.13.09-2.383 1.37-2.383 4.19 0 3.26 2.854 4.42 2.955 4.45z"/>
+    </svg>
+);
+
+function AppleLoginButton({
+    disabled,
+    appleClientId,
+    appleRedirectUri,
+    authController,
+    onSignedIn,
+    onError
+}: {
+    disabled?: boolean,
+    appleClientId: string,
+    appleRedirectUri?: string,
+    authController: AuthControllerExtended,
+    /** Called once the controller has accepted Apple's code. */
+    onSignedIn?: () => void,
+    /** Clears a message left by another provider; the controller records Apple's own failures. */
+    onError?: (message: string | null) => void
+}) {
+    // On mount, not on click: the popup has to open in the click's own task,
+    // and a script still downloading at that point makes it open too late.
+    useEffect(() => {
+        preloadAppleSdk();
+    }, []);
+
+    const handleClick = () => {
+        if (!authController.appleLogin) return;
+        onError?.(null);
+        authController.appleLogin({
+            clientId: appleClientId,
+            ...(appleRedirectUri ? { redirectUri: appleRedirectUri } : {})
+        }).then(() => {
+            // Only on the resolution path: a newsletter tick must not
+            // subscribe an address whose sign-in was refused.
+            onSignedIn?.();
+        }).catch((err: unknown) => {
+            // A closed popup is an answer; anything else is already in
+            // `authProviderError`, which the screen renders.
+            if (!isAppleCancellation(err)) console.error("Apple login error:", err);
+        });
+    };
+
+    return (
+        <LoginButton
+            disabled={disabled}
+            text="Sign in with Apple"
+            icon={<AppleIcon/>}
             onClick={handleClick}
         />
     );

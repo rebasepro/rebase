@@ -1,5 +1,5 @@
 ---
-sourceHash: 3ad9e3791b2e3174
+sourceHash: 1c817fafda58e4bb
 title: Autenticação
 sidebar_label: Autenticação
 description: Autenticação no lado do cliente com o SDK Rebase — login com e-mail/senha, provedores OAuth, gerenciamento de sessão e listeners de estado de autenticação.
@@ -88,15 +88,39 @@ await client.auth.signInWithSpotify(code, redirectUri);
 
 A Apple e o Twitter exigem parâmetros adicionais:
 
-```typescript
-// Apple — optional user info from first sign-in
-await client.auth.signInWithApple(code, redirectUri, {
-    name: { firstName: "Jane", lastName: "Doe" },
-    email: "jane@example.com"
-});
+O Twitter também exige o code verifier PKCE:
 
-// Twitter — requires PKCE code verifier
+```typescript
 await client.auth.signInWithTwitter(code, redirectUri, codeVerifier);
+```
+
+### Apple
+
+No navegador, `signInWithApplePopup()` abre o popup da Apple, verifica `state` e
+faz login com o código. Chame-o a partir de um handler de clique. Chame `preloadAppleSignIn()`
+ao montar, porque o Safari bloqueia um popup que espera o download de um script:
+
+```typescript
+import { preloadAppleSignIn } from "@rebasepro/client";
+
+void preloadAppleSignIn();                                          // on mount
+await client.auth.signInWithApplePopup({ clientId: "com.example.web" }); // on click
+```
+
+Sem `clientId`, o SDK lê o Services ID de `/auth/config`, o que atrasa o
+popup. A URI de redirecionamento é, por padrão, a origem da página mais `/`, e ela precisa
+ser uma Return URL do Services ID (HTTPS, nunca `localhost`). Um popup fechado
+rejeita com o código `APPLE_SIGN_IN_CANCELLED`.
+
+Um app nativo de iOS ou macOS envia o código de autorização do login nativo da Apple
+junto com o seu bundle id. O bundle id precisa estar listado em `APPLE_BUNDLE_IDS`:
+
+```typescript
+await client.auth.signInWithApple({
+    code: credential.authorizationCode,
+    bundleId: "com.example.ios",
+    user: { name: { firstName: "Jane" } } // sent by Apple on the first sign-in only
+});
 ```
 
 ### OAuth Genérico
@@ -496,6 +520,7 @@ const config = await client.auth.getAuthConfig();
 //   emailVerification: boolean,
 //   magicLink: boolean, emailOtp?: boolean,
 //   anonymousLogin: boolean, enabledProviders: string[],
+//   providerClientIds?: Record<string, string>,   // public ids, e.g. { apple: Services ID }
 //   externalLoginUrl?: string, needsSetup?: boolean, storage?: boolean
 // }
 ```

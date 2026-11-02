@@ -178,7 +178,11 @@ export interface RebaseAuthConfig {
     linkedin?: { clientId: string; clientSecret: string };
     github?: { clientId: string; clientSecret: string };
     microsoft?: { clientId: string; clientSecret: string; tenantId?: string };
-    apple?: { clientId: string; teamId: string; keyId: string; privateKey: string };
+    /**
+     * `clientId` is the Services ID web sign-in uses; `bundleIds` are the
+     * native apps whose codes are accepted. At least one of the two.
+     */
+    apple?: { clientId?: string; bundleIds?: string[]; teamId: string; keyId: string; privateKey: string };
     facebook?: { clientId: string; clientSecret: string };
     twitter?: { clientId: string; clientSecret: string };
     discord?: { clientId: string; clientSecret: string };
@@ -340,6 +344,13 @@ export interface BaasOptions {
      *   of the driver, which fails a boot rather than serve unenforced requests.
      * - `"serve"` — serve it anyway. Only sensible when every caller is already
      *   trusted, e.g. an internal service behind its own authorization.
+     *
+     * A join table is not served under either value: it never becomes a
+     * collection. One with RLS disabled is named at boot.
+     *
+     * The tables are read once, at boot. Disabling RLS on a served table after
+     * that is not noticed until the next boot, which excludes it. `rlsAudit`
+     * reports it in the meantime, on its schedule.
      */
     unprotectedTables?: "exclude" | "serve";
 }
