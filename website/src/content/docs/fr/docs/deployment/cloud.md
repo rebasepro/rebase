@@ -1,5 +1,5 @@
 ---
-sourceHash: a16a04b6835f0384
+sourceHash: 42c888cb0d0b2a71
 title: Rebase Cloud
 sidebar_label: Rebase Cloud
 description: Rebase Cloud est le même Rebase, opéré pour vous. Ce que c'est, comment lier et déployer un projet, et ce que la bêta privée n'inclut pas encore.
@@ -477,7 +477,7 @@ le montant en €/mois avant et après ; une modification s'applique immédiatem
 | `service-key` | `REBASE_SERVICE_KEY`, administrateur sur l'API propre de l'application : date de sa dernière rotation ; `rotate` en fournit une nouvelle à l'application. Propriétaires et administrateurs |
 | `domains` | Domaines personnalisés, enregistrements DNS à ajouter et vérification. Un projet peut répondre sur plusieurs domaines, chacun vérifié individuellement ; `verify` et `remove` prennent le domaine sur lequel agir, qui ne peut être omis que lorsqu'il n'y en a qu'un seul (pour `verify`, un seul encore en attente). `list --json` renvoie `{ projectId, tenantHost, domains: [...] }` |
 | `db` | Associer ou créer une base de données, s'y connecter depuis votre machine, sauvegardes, restauration et récupération à un point dans le temps (PITR) |
-| `guests` | <span class="since-badge" data-since="0.27">Depuis 0.27</span> Les utilisateurs invités laissés par les connexions anonymes : les compter, en supprimer un, purger ceux qui n'ont pas été vus depuis longtemps. Voir [Guests](/docs/cli/cloud/#guests). Propriétaires et administrateurs |
+| `guests` | Les utilisateurs invités laissés par les connexions anonymes : les compter, en supprimer un, purger ceux qui n'ont pas été vus depuis longtemps. Voir [Guests](/docs/cli/cloud/#guests). Propriétaires et administrateurs |
 | `extensions` | La liste d'autorisation (allowlist) des extensions Postgres |
 | `storage` | Le bucket du projet |
 | `resources` | Les bases de données et buckets détenus par la plateforme, par rapport à ce que déclare le code |

@@ -11,6 +11,8 @@ La traduction est à venir. Le contenu ci-dessous est en anglais.
 
 ## [Unreleased]
 
+## [0.27.0] - 2026-11-02
+
 ### Breaking
 
 #### Runtime

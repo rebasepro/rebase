@@ -187,7 +187,7 @@ await client.auth.linkAnonymous("user@example.com", "correct-horse-battery");
 | `NOT_ANONYMOUS` (400) | The current session belongs to an ordinary account |
 | `EMAIL_EXISTS` (409) | The address already has an account — sign in to that one instead |
 
-<span class="since-badge" data-since="0.27">Since 0.27</span> A guest that never comes back stays as a row. An administrator clears
+A guest that never comes back stays as a row. An administrator clears
 them with `client.admin.listGuests()`, `client.admin.deleteGuest(uid)` and
 `client.admin.deleteGuests({ lastSeenBefore })`, or on Rebase Cloud with
 [`rebase cloud guests`](/docs/cli/cloud/#guests). These only ever touch guests,

@@ -4360,6 +4360,8 @@ yet, listed so that nobody reads a promise into them:
 
 ### [Unreleased]
 
+### [0.27.0] - 2026-11-02
+
 #### Breaking
 
 ##### Runtime
@@ -27552,9 +27554,9 @@ a collection reaches none of this. See [Roles and scopes](/docs/backend/roles-an
 | `DELETE` | `/api/admin/users/:uid` | `users:write` | Refused for an account that holds more than the caller |
 | `POST` | `/api/admin/users/:uid/reset-password` | `users:write` | Issues a temporary password |
 | `DELETE` | `/api/admin/users/:uid/mfa` | `users:write` | Removes the account's second factors and recovery codes, ends its sessions |
-| `GET` | `/api/admin/guests` | `users:read` | <span class="since-badge" data-since="0.27">Since 0.27</span> Guests, last seen longest ago first. `?lastSeenBefore=` narrows them to what the delete below would take, and `total` counts them |
-| `DELETE` | `/api/admin/guests` | `users:write` | <span class="since-badge" data-since="0.27">Since 0.27</span> Deletes one batch of the guests last seen before `?lastSeenBefore=`, which is required. Answers `{ deleted, skipped, remaining }`. Repeat while `remaining` is not 0, with `?offset=` set to how many have been skipped. Accounts cannot be reached |
-| `DELETE` | `/api/admin/guests/:uid` | `users:write` | <span class="since-badge" data-since="0.27">Since 0.27</span> Deletes one guest. An account is refused with `NOT_ANONYMOUS` |
+| `GET` | `/api/admin/guests` | `users:read` | Guests, last seen longest ago first. `?lastSeenBefore=` narrows them to what the delete below would take, and `total` counts them |
+| `DELETE` | `/api/admin/guests` | `users:write` | Deletes one batch of the guests last seen before `?lastSeenBefore=`, which is required. Answers `{ deleted, skipped, remaining }`. Repeat while `remaining` is not 0, with `?offset=` set to how many have been skipped. Accounts cannot be reached |
+| `DELETE` | `/api/admin/guests/:uid` | `users:write` | Deletes one guest. An account is refused with `NOT_ANONYMOUS` |
 | `GET` | `/api/admin/roles` | `users:read` | `admin` and the roles the project declares, with their scopes |
 | `GET` | `/api/admin/api-keys` | `keys:read` | [API keys](/docs/backend/api-keys/). Never an API key |
 | `POST` | `/api/admin/api-keys` | `keys:write` | The plaintext key is returned once, on creation |
@@ -33634,7 +33636,7 @@ be what you get by default.
 - **Out of attempts** → `failed`, and the row *stays*. A queue that silently
   drops what it could not deliver is indistinguishable from one with nothing to
   do.
-- **A failure no retry can change** <span class="since-badge" data-since="0.27">Since 0.27</span> → throw `PermanentJobError`, from
+- **A failure no retry can change** → throw `PermanentJobError`, from
   `@rebasepro/server`: the job goes to `failed` on this attempt, with the
   message as its `last_error`, instead of spending its remaining attempts.
 
@@ -47859,7 +47861,7 @@ await client.auth.linkAnonymous("user@example.com", "correct-horse-battery");
 | `NOT_ANONYMOUS` (400) | The current session belongs to an ordinary account |
 | `EMAIL_EXISTS` (409) | The address already has an account — sign in to that one instead |
 
-<span class="since-badge" data-since="0.27">Since 0.27</span> A guest that never comes back stays as a row. An administrator clears
+A guest that never comes back stays as a row. An administrator clears
 them with `client.admin.listGuests()`, `client.admin.deleteGuest(uid)` and
 `client.admin.deleteGuests({ lastSeenBefore })`, or on Rebase Cloud with
 [`rebase cloud guests`](/docs/cli/cloud/#guests). These only ever touch guests,
@@ -51848,8 +51850,6 @@ endpoint) until Ctrl-C; `--reveal` adds the password. Owner or admin only.
 
 ### Guests
 
-<span class="since-badge" data-since="0.27">Since 0.27</span>
-
 Every `signInAnonymously()` in a test, a bot or an abandoned visit leaves a row
 in the project's users. These commands count those rows and remove them, so
 nobody has to click through them one by one.
@@ -53454,7 +53454,7 @@ before it agrees to boot:
 ```jsonc
 {
   "bundleFormat": 2,
-  "runtime": { "range": "^1", "builtAgainst": "0.26.0", "contract": 1 },
+  "runtime": { "range": "^1", "builtAgainst": "0.27.0", "contract": 1 },
   "schemaVersion": "v1:c5d97d0f96b7f87a",
   "kind": "backend",
   "entry": {
@@ -53505,7 +53505,7 @@ different one rather than start and misbehave later.
 This is why upgrading Rebase in a self-hosted deployment is a tag change:
 
 ```yaml
-image: rebasepro/server:0.26.0   # a newer tag — your bundle is untouched
+image: rebasepro/server:0.27.0   # a newer tag — your bundle is untouched
 ```
 
 ### Development uses the same path
@@ -53918,7 +53918,7 @@ version stamp reveals nothing about the schema it stands for:
 
 ```bash
 curl -s https://api.example.com/api/meta/schema-version
-# {"schemaVersion":"v1:c5d97d0f96b7f87a","runtime":{"version":"0.26.0","contract":1}}
+# {"schemaVersion":"v1:c5d97d0f96b7f87a","runtime":{"version":"0.27.0","contract":1}}
 ```
 
 Comparing the two in CI turns a silent mismatch into a failed check. The stamp
@@ -54860,7 +54860,7 @@ except one that restarts the database, which waits for a maintenance window.
 | `service-key` | `REBASE_SERVICE_KEY`, admin on the app's own API: when it was last rotated; `rotate` gives the app a new one. Owners and admins |
 | `domains` | Custom domains, the DNS records to add, and verification. A project can answer on several, each verified on its own; `verify` and `remove` take the domain to act on, which may be left out only when there is one (for `verify`, one still pending). `list --json` returns `{ projectId, tenantHost, domains: [...] }` |
 | `db` | Attach or create a database, connect to it from your machine, backups, restore, and point-in-time recovery |
-| `guests` | <span class="since-badge" data-since="0.27">Since 0.27</span> The guest users anonymous sign-in left behind: count them, delete one, prune the ones not seen for an age. See [Guests](/docs/cli/cloud/#guests). Owners and admins |
+| `guests` | The guest users anonymous sign-in left behind: count them, delete one, prune the ones not seen for an age. See [Guests](/docs/cli/cloud/#guests). Owners and admins |
 | `extensions` | The Postgres extension allowlist |
 | `storage` | The project's bucket |
 | `resources` | Which databases and buckets the platform holds, against what the code declares |
@@ -55755,7 +55755,7 @@ For a real deployment, prefer baking both into an image, which also pins exactly
 what runs:
 
 ```dockerfile
-FROM rebasepro/server:0.26.0
+FROM rebasepro/server:0.27.0
 COPY dist-bundle /bundle
 ```
 
@@ -55950,7 +55950,7 @@ containers works. Two things to get right everywhere:
 
 ```toml
 [build]
-  dockerfile = "Dockerfile"   # FROM rebasepro/server:0.26.0 + COPY dist-bundle /bundle
+  dockerfile = "Dockerfile"   # FROM rebasepro/server:0.27.0 + COPY dist-bundle /bundle
 
 [http_service]
   internal_port = 8080
@@ -56155,7 +56155,7 @@ processes. See [Split processes](/docs/deployment/split-processes/).
 ### Upgrading
 
 ```yaml
-image: rebasepro/server:0.26.0
+image: rebasepro/server:0.27.0
 ```
 
 Restart. Your bundle is unchanged. Within a runtime contract major, a bundle that
@@ -56432,7 +56432,7 @@ split: true
 functions:
   enabled: true
   image:
-    tag: "0.26.0"     # this unit only; the rest stay on the release-wide tag
+    tag: "0.27.0"     # this unit only; the rest stay on the release-wide tag
 ```
 
 Only the tag is usually worth pinning: the repository is inherited, so this is
@@ -57252,7 +57252,7 @@ rebase build
 For App Runner, which pulls from a registry, bake the bundle into a derived image. That is three lines and it pins exactly what runs:
 
 ```dockerfile title="Dockerfile"
-FROM rebasepro/server:0.26.0
+FROM rebasepro/server:0.27.0
 COPY dist-bundle /bundle
 ```
 
@@ -57352,7 +57352,7 @@ rebase build
 Cloud Run pulls from a registry, so bake the bundle into a derived image. Three lines, and it pins exactly what runs:
 
 ```dockerfile title="Dockerfile"
-FROM rebasepro/server:0.26.0
+FROM rebasepro/server:0.27.0
 COPY dist-bundle /bundle
 ```
 
@@ -57456,7 +57456,7 @@ rebase build
 Container Apps pulls from a registry, so bake the bundle into a derived image. Three lines, and it pins exactly what runs:
 
 ```dockerfile title="Dockerfile"
-FROM rebasepro/server:0.26.0
+FROM rebasepro/server:0.27.0
 COPY dist-bundle /bundle
 ```
 
@@ -57546,7 +57546,7 @@ module "rebase" {
   admin_email     = "you@example.com"
 
   bundle_url      = "https://storage.example.com/bundles/app-1.4.0.tar.gz"
-  runtime_version = "0.26.0" # required with bundle_url: `latest` is refused at plan
+  runtime_version = "0.27.0" # required with bundle_url: `latest` is refused at plan
 
   s3_bucket            = "example-uploads"
   s3_access_key_id     = var.s3_access_key_id
@@ -57585,7 +57585,7 @@ rsync -a dist-bundle/ root@<your-server-ip>:/opt/rebase/dist-bundle/
 
 For a real deployment, prefer one of the two shapes that do not involve copying files to a box by hand:
 
-- **Bake it into an image** — `FROM rebasepro/server:0.26.0` then `COPY dist-bundle /bundle`, and deploy by changing a tag.
+- **Bake it into an image** — `FROM rebasepro/server:0.27.0` then `COPY dist-bundle /bundle`, and deploy by changing a tag.
 - **Serve it over HTTP** — set `REBASE_BUNDLE_URL` and the runtime fetches and unpacks the bundle on every start. This is what the Terraform module above does, and the same mechanism the Helm chart uses.
 
 ### 4. Configure and run
@@ -57726,7 +57726,7 @@ rebase build
 Serverless Containers pulls from a registry, so bake the bundle into a derived image. Three lines, and it pins exactly what runs:
 
 ```dockerfile title="Dockerfile"
-FROM rebasepro/server:0.26.0
+FROM rebasepro/server:0.27.0
 COPY dist-bundle /bundle
 ```
 
@@ -57837,7 +57837,7 @@ rebase build
 Commit a three-line `Dockerfile` at the repository root, so Railway's build step is a copy rather than a compilation:
 
 ```dockerfile title="Dockerfile"
-FROM rebasepro/server:0.26.0
+FROM rebasepro/server:0.27.0
 COPY dist-bundle /bundle
 ```
 
@@ -57930,7 +57930,7 @@ rebase build
 Commit a three-line `Dockerfile` at the project root:
 
 ```dockerfile title="Dockerfile"
-FROM rebasepro/server:0.26.0
+FROM rebasepro/server:0.27.0
 COPY dist-bundle /bundle
 ```
 
