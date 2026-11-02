@@ -54,14 +54,21 @@ interface ProjectRow {
 
 /* ─── list ─────────────────────────────────────────────────────── */
 
+/** Documented in `action-help.ts`, and paired with it by `action-help.test.ts`. */
+export const LIST_PROJECTS_FLAGS = {
+    "--all-orgs": Boolean
+} as const;
+
 export async function listProjects(rawArgs: string[]): Promise<void> {
-    parseCloudArgs({ spec: {},
+    const { flags: args } = parseCloudArgs({ spec: LIST_PROJECTS_FLAGS,
 rawArgs,
 commandWords: 3,
 command: "cloud projects",
 maxPositionals: 0 });
     const { client, url } = await requireClient(rawArgs);
-    const org = getContextOrg(url);
+    // Every organization the caller belongs to: the control plane's row rules
+    // already narrow `projects` to those, so leaving the filter off is the list.
+    const org = args["--all-orgs"] ? undefined : getContextOrg(url);
     try {
         const [projects, baseDomain] = await Promise.all([
             client.data.collection("projects").find({

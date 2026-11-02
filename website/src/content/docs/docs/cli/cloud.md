@@ -23,6 +23,7 @@ rebase cloud login      # sign in to the control plane
 rebase cloud login --code   # with an emailed 6-digit code: accounts made with Google, GitHub or LinkedIn
 rebase cloud logout     # sign out
 rebase cloud whoami     # the current session, or what REBASE_TOKEN may do
+rebase cloud access-token   # the bearer the CLI would send now, refreshed first; for scripts and the MCP server
 rebase cloud tokens create --can deploy,logs   # a token for CI, shown once
 rebase cloud tokens create --can billing --org <id>   # a token for an organization's billing
 ```
@@ -59,6 +60,7 @@ rebase cloud open         # open the dashboard in a browser
 rebase cloud init --claim [--name <name>]   # a live backend with no account, and a link to claim it within 72 hours
 rebase cloud claim [--open]                 # that link again, and how long is left
 rebase cloud projects list
+rebase cloud projects list --all-orgs   # every organization you belong to
 rebase cloud projects create [--link]
 rebase cloud projects info [id]
 rebase cloud projects delete [id]

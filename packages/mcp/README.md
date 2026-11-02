@@ -92,7 +92,7 @@ Rows, user records, storage listings, cron jobs, function responses and CLI outp
 
 <!-- generated: mcp tool tables — pnpm generate:mcp-readme -->
 
-51 tools, in 10 groups. Tools marked ⚠ are refused against a non-local
+53 tools, in 10 groups. Tools marked ⚠ are refused against a non-local
 target unless `REBASE_MCP_ALLOW_REMOTE_WRITES=true` — see the gate above.
 
 ### Schema & database (13)
@@ -178,24 +178,26 @@ CRUD over a collection through `@rebasepro/client`.
 |---|---|---|
 | `invoke_function` ⚠ | `name` | Invoke a custom backend Hono function (in backend/functions/<name>.ts, served at /api/functions/<name>) |
 
-### Project registry (6)
+### Project registry (7)
 
 | Tool | Required | Description |
 |---|---|---|
 | `rebase_project_list` | — | List all registered Rebase projects and show which one is active |
 | `rebase_project_switch` | `name` | Switch the active Rebase project by name |
+| `rebase_project_use_cloud` | `project` | Point the data and admin tools (list_documents, get_document, list_users, list_roles, cron_list_jobs, storage_list_objects…) at a Rebase Cloud project's production backend, by its id, slug or name — any project the signed-in account can reach, linked here or not |
 | `rebase_project_add` | `name` | Register a new Rebase project |
 | `rebase_project_remove` | `name` | Remove a registered project from the project registry |
 | `rebase_project_current` | — | Show details about the currently active Rebase project, including resolved URL and auth status |
 | `rebase_project_status` | — | Health-check the active project's backend by calling GET /health |
 
-### Rebase Cloud (8)
+### Rebase Cloud (9)
 
 Spawn `rebase cloud … --json` in the active project directory, against the project it is linked to, with the CLI's own credential. Provisioning creates a project; deploy, env set and rollback change the linked one. The loopback gate does not apply to them, because they never use `baseUrl` or `DATABASE_URL`.
 
 | Tool | Required | Description |
 |---|---|---|
 | `rebase_cloud_provision` | — | Give the active project a live backend on Rebase Cloud with no account or signup: provisions a project, sets REBASE_BASE_URL in .env, links the directory and deploys the local collections to it (`rebase cloud init --claim`), then sets REBASE_API_TOKEN in .env: a key the deployed app accepts, for reading and writing data through its row-level security, expiring with the claim window |
+| `rebase_cloud_projects_list` | — | List every Rebase Cloud project the signed-in account can reach, across all its organizations (`rebase cloud projects list --all-orgs`): id, name, slug, host and status |
 | `rebase_cloud_status` | — | Show the Rebase Cloud project this directory is linked to (`rebase cloud status`) |
 | `rebase_cloud_deploy` | — | Deploy this directory to its linked Rebase Cloud project (`rebase cloud deploy`) |
 | `rebase_cloud_logs` | — | Read the linked Rebase Cloud project's log once, the running app's or the latest build's (`rebase cloud logs`) |

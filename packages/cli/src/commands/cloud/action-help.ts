@@ -93,9 +93,10 @@ export const ACTION_HELP: Record<string, ActionHelp> = {
         command: "cloud projects",
         usage: "cloud projects <list|create|info|delete> [options]",
         summary: "List, create, inspect and delete projects in the selected organization.",
-        flags: [],
+        flags: [["--all-orgs", "list: every organization you belong to, not only the selected one"]],
         examples: [
             "rebase cloud projects list",
+            "rebase cloud projects list --all-orgs --json",
             "rebase cloud projects create --help",
             "rebase cloud projects info shop",
             "rebase cloud projects delete shop --yes"
@@ -1006,6 +1007,21 @@ export const ACTION_HELP: Record<string, ActionHelp> = {
             + "With REBASE_TOKEN set, what the token may do instead.",
         flags: [],
         examples: ["rebase cloud whoami", "rebase cloud whoami --json"]
+    },
+
+    "access-token": {
+        command: "cloud access-token",
+        usage: "cloud access-token",
+        summary:
+            "Print the bearer this CLI would send right now — REBASE_TOKEN, a linked project's claim token, "
+            + "or the login, refreshed first when it is close to expiry. Bare on stdout, so "
+            + "`$(rebase cloud access-token)` works; `--json` adds the host and when it expires.",
+        flags: [],
+        examples: ["rebase cloud access-token", "rebase cloud access-token --json"],
+        notes: [
+            "It is a credential: whoever holds it acts as you until it expires (about an hour for a login).",
+            "The Rebase MCP server uses it to read any of your projects' data through the console's Studio proxy."
+        ]
     },
 
     tokens: {

@@ -113,6 +113,16 @@
 
 #### Rebase Cloud
 
+- **An agent signed in to Rebase Cloud can read every project you can.** The
+  MCP server's `rebase_cloud_projects_list` lists the projects of every
+  organization the account belongs to, and `rebase_project_use_cloud` points
+  `list_documents`, `get_document`, `list_users` and the other data and admin
+  tools at one of them in production, by id, slug or name. Calls go through the
+  console's Studio proxy with the CLI's own login, so no service key is needed
+  or shown; writes there stay behind `REBASE_MCP_ALLOW_REMOTE_WRITES`. The CLI
+  gains `rebase cloud access-token`, which prints the bearer it would send now,
+  refreshed first, and `rebase cloud projects list --all-orgs`. See
+  [MCP server](/docs/ai/mcp/).
 - **`rebase cloud guests` counts and removes a project's guest users.** Every
   `signInAnonymously()` in a test, a bot or an abandoned visit leaves a row, and
   the console removes them one at a time. `rebase cloud guests` lists them with

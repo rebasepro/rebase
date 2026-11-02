@@ -1,7 +1,7 @@
 ---
 title: MCP Server
 sidebar_label: MCP Server
-description: Connect Claude Code, Cursor, Gemini CLI or any MCP client to a Rebase project — the 51 tools it exposes, the credential it authenticates with, and the loopback gate that stands between an agent and production.
+description: Connect Claude Code, Cursor, Gemini CLI or any MCP client to a Rebase project — the 53 tools it exposes, the credential it authenticates with, and the loopback gate that stands between an agent and production.
 ---
 
 `@rebasepro/mcp` is a [Model Context Protocol](https://modelcontextprotocol.io)
@@ -445,6 +445,7 @@ command a person runs, so there is no second implementation to drift from it.
 | `rebase_cloud_env_set` | `rebase cloud env set KEY --stdin` | Yes, from the next deploy |
 | `rebase_cloud_deployments_list` | `rebase cloud deployments list` | No |
 | `rebase_cloud_rollback` | `rebase cloud rollback --yes` | Yes |
+| `rebase_cloud_projects_list` | `rebase cloud projects list --all-orgs` | No |
 
 The usual agent journey is: `rebase_cloud_provision`, then give the user the
 claim URL; `rebase_cloud_status` to see the project (while it is unclaimed,
@@ -479,6 +480,20 @@ your MCP client's tool approval. To keep an assistant from changing a cloud
 project, set `REBASE_TOKEN` in the server's environment to a token without the
 `deploy` and `env` capabilities.
 
+**Reading any of your projects.** The tools above act on the linked project.
+To read another one's data — any project in any organization the signed-in
+account belongs to, linked here or not — `rebase_cloud_projects_list` lists them
+and `rebase_project_use_cloud` (with an id, slug or name) points the data and
+admin tools at it: `list_documents`, `get_document`, `list_users`, `list_roles`,
+`cron_list_jobs`, `storage_list_objects`. Those calls go through the console's
+Studio proxy, bearing the CLI's own credential (`rebase cloud access-token`, read
+per call and never stored); the control plane checks the person's access and
+attaches the project's service key on its side, so no key reaches the machine.
+A project with Studio switched off is refused, and the switch says so. It is a
+remote target like any other, so tools that change data stay refused there
+unless `REBASE_MCP_ALLOW_REMOTE_WRITES` is set; `rebase_project_switch` goes
+back.
+
 Each tool is a snapshot:
 
 - `rebase_cloud_logs` never follows. Its result carries `nextSinceTime`; pass it
@@ -509,7 +524,7 @@ argument it does not declare.
 
 ## Tool reference
 
-51 tools, in ten groups: schema and database, schema planning, documents, users
+53 tools, in ten groups: schema and database, schema planning, documents, users
 and roles, storage, cron, functions, the dev server, the project registry and
 Rebase Cloud.
 Each one, with what it needs and whether the gate refuses it against a non-local

@@ -462,7 +462,7 @@ except one that restarts the database, which waits for a maintenance window.
 
 | Command group | What it covers |
 |---|---|
-| `login`, `logout`, `whoami` | Your session |
+| `login`, `logout`, `whoami`, `access-token` | Your session; `access-token` prints the bearer the CLI would send now, for scripts and the MCP server |
 | `tokens` | Tokens for CI and agents, each narrowed to one project. See [CI and agents](/docs/deployment/cloud-agents/#ci-and-agents) |
 | `link`, `unlink`, `use`, `open` | Binding this directory to a project, selecting an organization, opening the console |
 | `init`, `claim` | With `--claim`: a live backend with no account, and a link to claim it; `claim` prints that link again. See [A backend with no account](/docs/deployment/cloud-agents/#a-backend-with-no-account) |

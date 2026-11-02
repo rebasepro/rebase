@@ -8,7 +8,7 @@
  */
 import arg from "arg";
 import chalk from "chalk";
-import { loginCommand, logoutCommand, whoamiCommand } from "./auth";
+import { accessTokenCommand, loginCommand, logoutCommand, whoamiCommand } from "./auth";
 import { tokensCommand } from "./tokens";
 import { linkCommand, unlinkCommand, selectOrgCommand, openCommand } from "./link";
 import { listProjects, createProject, projectInfo, deleteProject, resolveProjectArg } from "./projects";
@@ -311,6 +311,9 @@ export async function cloudCommand(subcommand: string | undefined, rawArgs: stri
         case "whoami":
             await whoamiCommand(rawArgs);
             break;
+        case "access-token":
+            await accessTokenCommand(rawArgs);
+            break;
         case "tokens":
             await tokensCommand(action, rawArgs);
             break;
@@ -533,6 +536,7 @@ export const CLOUD_GROUPS: HelpAction[] = [
     { action: "login", section: "Auth", description: "Sign in to the control plane" },
     { action: "logout", section: "Auth", description: "Sign out" },
     { action: "whoami", section: "Auth", description: "Show the current session, or what REBASE_TOKEN may do" },
+    { action: "access-token", section: "Auth", description: "Print the bearer this CLI would send now, refreshed if close to expiry" },
     { action: "tokens", section: "Auth", description: "Tokens for CI and agents, each narrowed to one project" },
 
     { action: "link", section: "Project link", args: "[url]", description: "Bind this directory to a cloud project, or straight to a backend URL" },

@@ -32,6 +32,7 @@ import {
     appKeyExpiryNote,
     projectDotenvSetsAppKey,
     TOKEN_ENV,
+    freshAccessToken,
     type CloudClient,
     type EphemeralGrant
 } from "./context";
@@ -430,5 +431,39 @@ async function whoamiToken(client: CloudClient, url: string): Promise<void> {
                 ? { id: link.projectId, name: link.projectName ?? null, slug: link.slug ?? null }
                 : null
         }
+    );
+}
+
+/**
+ * `rebase cloud access-token` — the bearer this CLI would send right now.
+ *
+ * For tools that reach the control plane on a person's behalf without a second
+ * login: the MCP server reads a project's data through the console's Studio
+ * proxy with it, so whoever is signed in to Rebase Cloud reaches every project
+ * their organizations hold, and no service key leaves the control plane. It is
+ * the same credential `requireClient` resolves — `REBASE_TOKEN`, the token
+ * `init --claim` stored for a linked project, or the login, refreshed first when
+ * it is close to expiry — so the control plane checks it exactly as it checks
+ * this CLI. The token is printed bare, so `$(rebase cloud access-token)` works.
+ */
+export async function accessTokenCommand(rawArgs: string[]): Promise<void> {
+    parseCloudArgs({ spec: {},
+rawArgs,
+commandWords: 2,
+command: "cloud access-token",
+maxPositionals: 0 });
+    const { client, url } = await requireClient(rawArgs);
+    let token: string;
+    try {
+        token = await freshAccessToken(client);
+    } catch {
+        fail("The session could not be refreshed.", "Run `rebase cloud login` again.", "session_invalid");
+    }
+    // A session's token lapses; `REBASE_TOKEN` and a claim token are returned as they are.
+    const session = client.auth.getSession();
+    const expiresAt = session?.accessToken === token ? session.expiresAt : null;
+    emit(
+        () => console.log(token),
+        { host: url, accessToken: token, expiresAt: expiresAt ? new Date(expiresAt).toISOString() : null }
     );
 }
