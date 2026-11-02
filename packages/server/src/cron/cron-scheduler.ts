@@ -1715,7 +1715,7 @@ export class CronScheduler {
             // `rebase`, and only `rebase`: it matches the singleton import and
             // `defineFunction`'s context. The old `client` alias re-exposed
             // `client.data`, the name `RebaseServerClient` deliberately omits so
-            // that the RLS-bypassing plane is spelled `dataAsAdmin` everywhere.
+            // that the admin-scoped plane is spelled `dataAsAdmin` everywhere.
             rebase: this.client!
         };
 
