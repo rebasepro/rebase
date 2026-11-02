@@ -8,7 +8,7 @@ The tools [`@rebasepro/mcp`](/docs/ai/mcp) offers an assistant. How it connects,
 which credential it holds and how the [loopback gate](/docs/ai/mcp#the-loopback-gate)
 decides what ⚠ means are on the [MCP server](/docs/ai/mcp) page.
 
-51 tools, in ten groups. Tools marked ⚠ are refused against non-local targets
+53 tools, in ten groups. Tools marked ⚠ are refused against non-local targets
 unless you opt out.
 
 ## Schema & database (13)
@@ -107,7 +107,7 @@ chose. Its blast radius is whatever your functions do.
 | `rebase_dev_logs` | — | Read recent output (default 50 lines, 500-line buffer) |
 | `rebase_dev_stop` | — | Stop the dev server |
 
-## Project registry (6)
+## Project registry (7)
 
 | Tool | Required | Description |
 |---|---|---|
@@ -117,13 +117,16 @@ chose. Its blast radius is whatever your functions do.
 | `rebase_project_remove` | `name` | Remove a project (the default project cannot be removed) |
 | `rebase_project_current` | — | Show the active project and its auth status |
 | `rebase_project_status` | — | Health-check the active backend |
+| `rebase_project_use_cloud` | `project` | Target a Rebase Cloud project of the signed-in account by id, slug or name, through the console's Studio proxy |
 
 `rebase_project_switch` is not gated, because it retargets everything else
 rather than acting on a target itself. An assistant can therefore switch to a
 remote project without tripping the gate — it just cannot then run a destructive
-tool there.
+tool there. `rebase_project_use_cloud` is the same kind of switch: it points the
+data and admin tools at a production project, where reads work and the gate
+refuses writes.
 
-## Rebase Cloud (8)
+## Rebase Cloud (9)
 
 Spawn `rebase cloud … --json` in the active project directory, against the
 project it is linked to, with the CLI's own credential. See
@@ -139,6 +142,7 @@ them is gated.
 | `rebase_cloud_env_list` | — | Variable keys, never values (`preview`) |
 | `rebase_cloud_env_set` | `key`, `value` | Set one variable; the value goes through stdin and is never returned (`secret`, `preview`) |
 | `rebase_cloud_deployments_list` | — | Recent deployments, and which ones can be rolled back to (`limit`) |
+| `rebase_cloud_projects_list` | — | Every project the signed-in account can reach, across all its organizations |
 | `rebase_cloud_rollback` | — | Put a previous successful deployment back into service (`deploymentId`) |
 
 `rebase_cloud_provision` creates a project and links this directory. It never

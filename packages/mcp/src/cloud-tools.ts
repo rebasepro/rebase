@@ -117,7 +117,8 @@ export const CLOUD_COMMAND_TOOLS = [
     "rebase_cloud_env_list",
     "rebase_cloud_env_set",
     "rebase_cloud_deployments_list",
-    "rebase_cloud_rollback"
+    "rebase_cloud_rollback",
+    "rebase_cloud_projects_list"
 ] as const;
 
 export type CloudCommandTool = (typeof CLOUD_COMMAND_TOOLS)[number];
@@ -156,6 +157,14 @@ export function cloudToolCall(name: CloudCommandTool, schema: ToolInputSchema, r
     switch (name) {
         case "rebase_cloud_status":
             return { argv: ["cloud", "status", "--json"], secrets: [], command: "rebase cloud status", tailLines: CLOUD_LOGS_DEFAULT_TAIL };
+
+        case "rebase_cloud_projects_list":
+            return {
+                argv: ["cloud", "projects", "list", "--all-orgs", "--json"],
+                secrets: [],
+                command: "rebase cloud projects list --all-orgs",
+                tailLines: CLOUD_LOGS_DEFAULT_TAIL
+            };
 
         case "rebase_cloud_deploy": {
             const argv = ["cloud", "deploy"];
@@ -397,6 +406,10 @@ export function cloudSuccessNext(tool: CloudCommandTool, call: CloudCall): strin
             return "`rollbackable: true` marks the deployments rebase_cloud_rollback can return to.";
         case "rebase_cloud_rollback":
             return "The rollback is a new deployment. rebase_cloud_status shows when it is live; rebase_cloud_logs with `source: \"build\"` shows its progress.";
+        case "rebase_cloud_projects_list":
+            return "Every project in every organization the signed-in account belongs to. rebase_project_use_cloud with a project's " +
+                "`id` or `slug` points the data and admin tools (list_documents, get_document, list_users, cron_list_jobs…) at its " +
+                "production backend, through the console's Studio proxy with the same login: no service key is needed or shown.";
     }
 }
 

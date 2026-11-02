@@ -59,7 +59,8 @@ const SAMPLES: Record<string, Array<Record<string, unknown>>> = {
     rebase_cloud_env_list: [{ preview: true }],
     rebase_cloud_env_set: [{ key: "STRIPE_KEY", value: "sk_live_abc123", secret: true, preview: true }],
     rebase_cloud_deployments_list: [{ limit: 5 }],
-    rebase_cloud_rollback: [{ deploymentId: "dep_42" }]
+    rebase_cloud_rollback: [{ deploymentId: "dep_42" }],
+    rebase_cloud_projects_list: [{}]
 };
 
 function schemaOf(name: string): Schema {

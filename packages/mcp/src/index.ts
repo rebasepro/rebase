@@ -170,6 +170,14 @@ export interface ProjectConfig {
     baseUrl: string;
     /** Auth token — a service key, API key, or JWT. */
     token: string;
+    /**
+     * A Rebase Cloud project reached through the console's Studio proxy, set by
+     * `rebase_project_use_cloud`. Its `baseUrl` is the proxy, and its bearer is
+     * the CLI's own credential (`rebase cloud access-token`), read when a call
+     * is made and never stored: the control plane swaps in the project's
+     * service key on its side, so the key never reaches this machine.
+     */
+    cloud?: { host: string; projectId: string };
     /** ISO timestamp when the project was registered. */
     addedAt: string;
 }
@@ -735,6 +743,63 @@ function getActiveProject(): ProjectConfig {
     return discovered.baseUrl ? discovered : { ...discovered, baseUrl: DEFAULT_BASE_URL };
 }
 
+/** Where the console's Studio proxy serves a project's own API: the SDK appends `/api/...`. */
+export function studioProxyBaseUrl(host: string, projectId: string): string {
+    return `${host.replace(/\/+$/, "")}/api/functions/studio/${encodeURIComponent(projectId)}/proxy`;
+}
+
+/** Two minutes of head-room, as the CLI keeps, before a token counts as expired. */
+const CLOUD_TOKEN_BUFFER_MS = 120_000;
+let cloudToken: { accessToken: string; host: string; expiresAt: number | null } | null = null;
+
+/**
+ * The bearer the CLI would send to the control plane now: `rebase cloud
+ * access-token --json`, spawned like every other cloud tool, so the login,
+ * `REBASE_TOKEN` and the refresh are the CLI's alone. Kept in memory until it
+ * is close to expiry, and never written to the registry.
+ */
+async function cloudAccessToken(): Promise<{ accessToken: string; host: string }> {
+    if (cloudToken && (cloudToken.expiresAt === null || cloudToken.expiresAt > Date.now() + CLOUD_TOKEN_BUFFER_MS)) {
+        return cloudToken;
+    }
+    const { stdout, combined, spawnError } = await spawnRebase(["cloud", "access-token", "--json"]);
+    if (spawnError) throw new Error(`Could not run \`rebase cloud access-token\`: ${spawnError}`);
+    const value = parseCliJson(stdout);
+    const refusal = cliRefusal(value);
+    const record = typeof value === "object" && value !== null ? (value as Record<string, unknown>) : {};
+    if (refusal || typeof record.accessToken !== "string" || typeof record.host !== "string") {
+        const why = refusal ? `${refusal.code}: ${refusal.message}` : combined.trim().slice(0, 300) || "no output";
+        throw new Error(
+            "The rebase CLI here holds no usable Rebase Cloud credential (" + why + "). Ask the user to run " +
+            "`rebase cloud login`, or set REBASE_TOKEN; a CLI older than `rebase cloud access-token` needs upgrading."
+        );
+    }
+    const expiresAt = typeof record.expiresAt === "string" ? Date.parse(record.expiresAt) : NaN;
+    cloudToken = { accessToken: record.accessToken, host: record.host, expiresAt: Number.isFinite(expiresAt) ? expiresAt : null };
+    return cloudToken;
+}
+
+/** One row of `rebase cloud projects list --json`. */
+interface CloudProjectRow { id: string; name: string | null; slug: string | null; host: string | null; status: string | null }
+
+/** A project of the signed-in account by id, slug or name, from every organization it belongs to. */
+async function findCloudProject(ref: string): Promise<{ match: CloudProjectRow | null; all: CloudProjectRow[] }> {
+    const { stdout, combined, spawnError } = await spawnRebase(["cloud", "projects", "list", "--all-orgs", "--json"]);
+    if (spawnError) throw new Error(`Could not run \`rebase cloud projects list\`: ${spawnError}`);
+    const value = parseCliJson(stdout);
+    const refusal = cliRefusal(value);
+    if (refusal) throw new Error(`\`rebase cloud projects list\` was refused (${refusal.code}): ${refusal.message}`);
+    const rows = (value as { projects?: CloudProjectRow[] } | undefined)?.projects;
+    if (!Array.isArray(rows)) throw new Error(`\`rebase cloud projects list\` printed no project list: ${combined.trim().slice(0, 300)}`);
+    const wanted = ref.trim().toLowerCase();
+    const match =
+        rows.find((p) => p.id === ref.trim()) ??
+        rows.find((p) => p.slug?.toLowerCase() === wanted) ??
+        rows.find((p) => p.name?.toLowerCase() === wanted) ??
+        null;
+    return { match, all: rows };
+}
+
 /** Get the project directory for the active project. */
 function getProjectDir(): string {
     const project = getActiveProject();
@@ -742,7 +807,8 @@ function getProjectDir(): string {
 }
 
 async function getClient(): Promise<RebaseClient> {
-    const project = getActiveProject();
+    const active = getActiveProject();
+    const project = active.cloud ? { ...active, token: (await cloudAccessToken()).accessToken } : active;
     const cacheKey = `${project.name}::${project.baseUrl}::${project.token}`;
 
     const cached = clientCache.get(cacheKey);
@@ -815,7 +881,8 @@ export const READ_ONLY_TOOLS = new Set<string>([
     "rebase_cloud_status",
     "rebase_cloud_logs",
     "rebase_cloud_env_list",
-    "rebase_cloud_deployments_list"
+    "rebase_cloud_deployments_list",
+    "rebase_cloud_projects_list"
 ]);
 
 /**
@@ -877,7 +944,10 @@ export const LOCAL_ONLY_TOOLS = new Set<string>([
     "rebase_project_add",
     "rebase_project_remove",
     "rebase_project_current",
-    "rebase_project_status"
+    "rebase_project_status",
+    // Retargets the data tools at a cloud project, as `rebase_project_switch`
+    // retargets them at a registered one; it acts on no target itself.
+    "rebase_project_use_cloud"
 ]);
 
 /**
@@ -1692,6 +1762,24 @@ const PROJECT_TOOLS: ToolDef[] = [
         }
     },
     {
+        name: "rebase_project_use_cloud",
+        description:
+            "Point the data and admin tools (list_documents, get_document, list_users, list_roles, cron_list_jobs, " +
+            "storage_list_objects…) at a Rebase Cloud project's production backend, by its id, slug or name — any project " +
+            "the signed-in account can reach, linked here or not. Calls go through the console's Studio proxy with the CLI's " +
+            "own login (`rebase cloud access-token`); the control plane checks the person's access and attaches the project's " +
+            "service key on its side, so no key is needed or shown. Reads work; tools that change data stay refused against " +
+            "it unless REBASE_MCP_ALLOW_REMOTE_WRITES is set. rebase_project_switch goes back to another project.",
+        inputSchema: {
+            type: "object",
+            properties: {
+                project: { type: "string", minLength: 1, maxLength: 200, description: "The project's id, slug or name, from rebase_cloud_projects_list" }
+            },
+            required: ["project"],
+            additionalProperties: false
+        }
+    },
+    {
         name: "rebase_project_add",
         description: "Register a new Rebase project. For local projects, provide projectDir (auto-discovers URL and service key). For remote projects, provide baseUrl and token.",
         inputSchema: {
@@ -1754,6 +1842,14 @@ const CLOUD_TOOLS: ToolDef[] = [
             },
             additionalProperties: false
         }
+    },
+    {
+        name: "rebase_cloud_projects_list",
+        description:
+            "List every Rebase Cloud project the signed-in account can reach, across all its organizations " +
+            "(`rebase cloud projects list --all-orgs`): id, name, slug, host and status. " +
+            "Then rebase_project_use_cloud targets one of them.",
+        inputSchema: { type: "object", properties: {}, additionalProperties: false }
     },
     {
         name: "rebase_cloud_status",
@@ -2428,7 +2524,59 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         case "rebase_cloud_env_set":
         case "rebase_cloud_deployments_list":
         case "rebase_cloud_rollback":
+        case "rebase_cloud_projects_list":
             return runCloudTool(name, args);
+
+        case "rebase_project_use_cloud": {
+            let ref: string;
+            try {
+                ref = String(validateToolArgs(name, PROJECT_TOOLS.find((t) => t.name === name)!.inputSchema, args).project);
+            } catch (err) {
+                return { ...textResult(err instanceof Error ? err.message : String(err)), isError: true };
+            }
+            const { host, accessToken } = await cloudAccessToken();
+            const { match, all } = await findCloudProject(ref);
+            if (!match) {
+                return {
+                    ...textResult(
+                        `No project "${ref}" among the ${all.length} this account can reach. ` +
+                        `rebase_cloud_projects_list shows them: ${all.map((p) => p.slug ?? p.id).join(", ") || "(none)"}.`
+                    ),
+                    isError: true
+                };
+            }
+            // Whether the proxy will serve it: Studio can be switched off per project.
+            let studio: unknown = null;
+            try {
+                const r = await fetch(`${host.replace(/\/+$/, "")}/api/functions/studio/${encodeURIComponent(match.id)}/capabilities`, {
+                    headers: { Authorization: `Bearer ${accessToken}` }
+                });
+                studio = r.ok ? await r.json() : { state: "refused", status: r.status };
+            } catch (err) {
+                studio = { state: "unreachable", reason: err instanceof Error ? err.message : String(err) };
+            }
+            const entryName = `cloud:${match.slug ?? match.id}`;
+            registry.projects[entryName] = {
+                name: entryName,
+                // The CLI that mints the token is the one in this directory.
+                projectDir: getProjectDir(),
+                baseUrl: studioProxyBaseUrl(host, match.id),
+                token: "",
+                cloud: { host, projectId: match.id },
+                addedAt: new Date().toISOString()
+            };
+            registry.activeProject = entryName;
+            clearClientCache();
+            saveRegistry();
+            const state = (studio as { state?: string } | null)?.state;
+            return jsonResult({
+                message: state === "ok"
+                    ? `The data and admin tools now read "${match.name ?? match.slug ?? match.id}" in production, as the signed-in account.`
+                    : `Switched to "${match.name ?? match.slug ?? match.id}", but the console's Studio proxy cannot serve it now; calls will fail until it can.`,
+                project: { name: entryName, id: match.id, slug: match.slug, host: match.host },
+                studio
+            });
+        }
 
         case "rebase_schema_plan": {
             const argsObj = args as { collectionId: string; collection: Record<string, unknown> };
@@ -2473,7 +2621,8 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
                 name: p.name,
                 projectDir: p.projectDir || null,
                 baseUrl: p.baseUrl,
-                hasToken: !!p.token,
+                hasToken: !!p.token || !!p.cloud,
+                cloudProjectId: p.cloud?.projectId ?? null,
                 active: p.name === registry.activeProject,
                 addedAt: p.addedAt
             }));
