@@ -123,8 +123,37 @@ async function waitForApi(url: string, timeoutMs = 90_000): Promise<boolean> {
  */
 const clients: ReturnType<typeof CreateRebaseClient>[] = [];
 
+/**
+ * A cookie jar of the client's own, as each browser keeps one.
+ *
+ * The demo backend keeps the refresh token in an HttpOnly cookie
+ * (`cookieAuth`), and answers the body's with `""`. A client renews only by
+ * presenting that cookie, and Node's `fetch` keeps none: this one holds what
+ * the server sets and sends it back, so the client runs in cookie mode as a
+ * browser would. That is how a client off the browser renews against a
+ * cookie-auth backend; in json mode step 7 had nothing to refresh with.
+ */
+const withCookieJar = (): typeof fetch => {
+    const jar = new Map<string, string>();
+    return (async (input: RequestInfo | URL, init?: RequestInit) => {
+        const headers = new Headers(init?.headers);
+        if (jar.size) headers.set("Cookie", [...jar].map(([name, value]) => `${name}=${value}`).join("; "));
+        const res = await fetch(input, { ...init, headers });
+        for (const header of res.headers.getSetCookie()) {
+            const [pair, ...attributes] = header.split(";");
+            const at = pair.indexOf("=");
+            const name = pair.slice(0, at).trim();
+            const value = pair.slice(at + 1).trim();
+            // The server clears the cookie with an empty value and `Max-Age=0`.
+            if (!value || attributes.some((a) => /^\s*max-age\s*=\s*0\s*$/i.test(a))) jar.delete(name);
+            else jar.set(name, value);
+        }
+        return res;
+    }) as typeof fetch;
+};
+
 const newClient = () => {
-    const client = createRebaseClient({ baseUrl: base });
+    const client = createRebaseClient({ baseUrl: base, fetch: withCookieJar(), auth: { authFlowMode: "cookie" } });
     clients.push(client);
     return client;
 };
