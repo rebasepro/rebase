@@ -4017,7 +4017,7 @@ The three ratings mean:
 | Offline sync | Beta | Mutations carry idempotency keys the server honours, and the data-loss defects found in the July audit are fixed. The conflict model is last-write-wins with no per-field merge |
 | Entity history | Stable | Snapshot-based, gated by its own suite |
 | Functions and crons | Stable | The portable entry point (`@rebasepro/server/functions`) is a versioned contract with its own API-surface section |
-| MCP server + agent skills | Beta | `@rebasepro/mcp` runs over stdio: fifty-one tools, bearer auth per project, destructive tools refuse non-local targets unless opted in. Since 0.21 the server can also mount a remote `/mcp` endpoint — OAuth 2.1, eight data tools, every call under the signed-in person's own RLS — off unless `REBASE_MCP_ENABLED=true`, and Postgres only |
+| MCP server + agent skills | Beta | `@rebasepro/mcp` runs over stdio: fifty-three tools, bearer auth per project, destructive tools refuse non-local targets unless opted in. Since 0.21 the server can also mount a remote `/mcp` endpoint — OAuth 2.1, eight data tools, every call under the signed-in person's own RLS — off unless `REBASE_MCP_ENABLED=true`, and Postgres only |
 | Studio (SQL, schema, RLS, API explorer) | Beta | Used daily against real projects. Branching is present in the OSS package and deliberately not exposed in Rebase Cloud, because moving a running deployment onto a branch has no story yet |
 | CMS + admin panel | Beta | Complete for CRUD, relations, storage fields and roles. **The data table has no grid semantics** — no `role`, no `aria-rowindex`, `tabIndex` stripped — so keyboard and screen-reader users cannot operate the main view. No drafts, no per-locale content, no block rich-text |
 | PGlite managed dev database | Beta | Zero-setup `rebase dev` with no Docker. One session at a time, so requests serialize and concurrency cannot be reproduced against it; Atlas-backed commands (`db push`, `generate`, `migrate`) plan against a throwaway second PGlite started for the command (on 0.24 they refuse the managed database); `db branch` does not work there and says so |
@@ -4471,6 +4471,16 @@ yet, listed so that nobody reads a promise into them:
 
 ##### Rebase Cloud
 
+- **An agent signed in to Rebase Cloud can read every project you can.** The
+  MCP server's `rebase_cloud_projects_list` lists the projects of every
+  organization the account belongs to, and `rebase_project_use_cloud` points
+  `list_documents`, `get_document`, `list_users` and the other data and admin
+  tools at one of them in production, by id, slug or name. Calls go through the
+  console's Studio proxy with the CLI's own login, so no service key is needed
+  or shown; writes there stay behind `REBASE_MCP_ALLOW_REMOTE_WRITES`. The CLI
+  gains `rebase cloud access-token`, which prints the bearer it would send now,
+  refreshed first, and `rebase cloud projects list --all-orgs`. See
+  [MCP server](/docs/ai/mcp/).
 - **`rebase cloud guests` counts and removes a project's guest users.** Every
   `signInAnonymously()` in a test, a bot or an abandoned visit leaves a row, and
   the console removes them one at a time. `rebase cloud guests` lists them with
@@ -49484,7 +49494,7 @@ problems. It is worth knowing which one you are reaching for:
 
 | | What it is | Who consumes it |
 |---|---|---|
-| [**MCP server**](/docs/ai/mcp) | A stdio Model Context Protocol server with 51 tools over your schema, data, users, storage, cron, dev server and Rebase Cloud project | An assistant, at runtime |
+| [**MCP server**](/docs/ai/mcp) | A stdio Model Context Protocol server with 53 tools over your schema, data, users, storage, cron, dev server and Rebase Cloud project | An assistant, at runtime |
 | [**Agent skills**](/docs/ai/skills) | 23 Markdown skill files written into your repo by `rebase skills install` | An assistant, as reference material |
 | [**Instruction files**](/docs/ai/instruction-files) | `ai-instructions.md` plus per-assistant pointer files, written by `rebase init` | An assistant, as always-on rules |
 | [**API keys**](/docs/backend/api-keys) | Machine credentials holding [scopes](/docs/backend/roles-and-scopes), per collection and per operation | Anything calling the HTTP API |
@@ -50014,6 +50024,7 @@ command a person runs, so there is no second implementation to drift from it.
 | `rebase_cloud_env_set` | `rebase cloud env set KEY --stdin` | Yes, from the next deploy |
 | `rebase_cloud_deployments_list` | `rebase cloud deployments list` | No |
 | `rebase_cloud_rollback` | `rebase cloud rollback --yes` | Yes |
+| `rebase_cloud_projects_list` | `rebase cloud projects list --all-orgs` | No |
 
 The usual agent journey is: `rebase_cloud_provision`, then give the user the
 claim URL; `rebase_cloud_status` to see the project (while it is unclaimed,
@@ -50048,6 +50059,20 @@ your MCP client's tool approval. To keep an assistant from changing a cloud
 project, set `REBASE_TOKEN` in the server's environment to a token without the
 `deploy` and `env` capabilities.
 
+**Reading any of your projects.** The tools above act on the linked project.
+To read another one's data — any project in any organization the signed-in
+account belongs to, linked here or not — `rebase_cloud_projects_list` lists them
+and `rebase_project_use_cloud` (with an id, slug or name) points the data and
+admin tools at it: `list_documents`, `get_document`, `list_users`, `list_roles`,
+`cron_list_jobs`, `storage_list_objects`. Those calls go through the console's
+Studio proxy, bearing the CLI's own credential (`rebase cloud access-token`, read
+per call and never stored); the control plane checks the person's access and
+attaches the project's service key on its side, so no key reaches the machine.
+A project with Studio switched off is refused, and the switch says so. It is a
+remote target like any other, so tools that change data stay refused there
+unless `REBASE_MCP_ALLOW_REMOTE_WRITES` is set; `rebase_project_switch` goes
+back.
+
 Each tool is a snapshot:
 
 - `rebase_cloud_logs` never follows. Its result carries `nextSinceTime`; pass it
@@ -50078,7 +50103,7 @@ argument it does not declare.
 
 ### Tool reference
 
-51 tools, in ten groups: schema and database, schema planning, documents, users
+53 tools, in ten groups: schema and database, schema planning, documents, users
 and roles, storage, cron, functions, the dev server, the project registry and
 Rebase Cloud.
 Each one, with what it needs and whether the gate refuses it against a non-local
@@ -50128,7 +50153,7 @@ The tools [`@rebasepro/mcp`](/docs/ai/mcp) offers an assistant. How it connects,
 which credential it holds and how the [loopback gate](/docs/ai/mcp#the-loopback-gate)
 decides what ⚠ means are on the [MCP server](/docs/ai/mcp) page.
 
-51 tools, in ten groups. Tools marked ⚠ are refused against non-local targets
+53 tools, in ten groups. Tools marked ⚠ are refused against non-local targets
 unless you opt out.
 
 ### Schema & database (13)
@@ -50227,7 +50252,7 @@ chose. Its blast radius is whatever your functions do.
 | `rebase_dev_logs` | — | Read recent output (default 50 lines, 500-line buffer) |
 | `rebase_dev_stop` | — | Stop the dev server |
 
-### Project registry (6)
+### Project registry (7)
 
 | Tool | Required | Description |
 |---|---|---|
@@ -50237,13 +50262,16 @@ chose. Its blast radius is whatever your functions do.
 | `rebase_project_remove` | `name` | Remove a project (the default project cannot be removed) |
 | `rebase_project_current` | — | Show the active project and its auth status |
 | `rebase_project_status` | — | Health-check the active backend |
+| `rebase_project_use_cloud` | `project` | Target a Rebase Cloud project of the signed-in account by id, slug or name, through the console's Studio proxy |
 
 `rebase_project_switch` is not gated, because it retargets everything else
 rather than acting on a target itself. An assistant can therefore switch to a
 remote project without tripping the gate — it just cannot then run a destructive
-tool there.
+tool there. `rebase_project_use_cloud` is the same kind of switch: it points the
+data and admin tools at a production project, where reads work and the gate
+refuses writes.
 
-### Rebase Cloud (8)
+### Rebase Cloud (9)
 
 Spawn `rebase cloud … --json` in the active project directory, against the
 project it is linked to, with the CLI's own credential. See
@@ -50259,6 +50287,7 @@ them is gated.
 | `rebase_cloud_env_list` | — | Variable keys, never values (`preview`) |
 | `rebase_cloud_env_set` | `key`, `value` | Set one variable; the value goes through stdin and is never returned (`secret`, `preview`) |
 | `rebase_cloud_deployments_list` | — | Recent deployments, and which ones can be rolled back to (`limit`) |
+| `rebase_cloud_projects_list` | — | Every project the signed-in account can reach, across all its organizations |
 | `rebase_cloud_rollback` | — | Put a previous successful deployment back into service (`deploymentId`) |
 
 `rebase_cloud_provision` creates a project and links this directory. It never
@@ -51581,6 +51610,7 @@ rebase cloud login      # sign in to the control plane
 rebase cloud login --code   # with an emailed 6-digit code: accounts made with Google, GitHub or LinkedIn
 rebase cloud logout     # sign out
 rebase cloud whoami     # the current session, or what REBASE_TOKEN may do
+rebase cloud access-token   # the bearer the CLI would send now, refreshed first; for scripts and the MCP server
 rebase cloud tokens create --can deploy,logs   # a token for CI, shown once
 rebase cloud tokens create --can billing --org <id>   # a token for an organization's billing
 ```
@@ -51617,6 +51647,7 @@ rebase cloud open         # open the dashboard in a browser
 rebase cloud init --claim [--name <name>]   # a live backend with no account, and a link to claim it within 72 hours
 rebase cloud claim [--open]                 # that link again, and how long is left
 rebase cloud projects list
+rebase cloud projects list --all-orgs   # every organization you belong to
 rebase cloud projects create [--link]
 rebase cloud projects info [id]
 rebase cloud projects delete [id]
@@ -54814,7 +54845,7 @@ except one that restarts the database, which waits for a maintenance window.
 
 | Command group | What it covers |
 |---|---|
-| `login`, `logout`, `whoami` | Your session |
+| `login`, `logout`, `whoami`, `access-token` | Your session; `access-token` prints the bearer the CLI would send now, for scripts and the MCP server |
 | `tokens` | Tokens for CI and agents, each narrowed to one project. See [CI and agents](/docs/deployment/cloud-agents/#ci-and-agents) |
 | `link`, `unlink`, `use`, `open` | Binding this directory to a project, selecting an organization, opening the console |
 | `init`, `claim` | With `--claim`: a live backend with no account, and a link to claim it; `claim` prints that link again. See [A backend with no account](/docs/deployment/cloud-agents/#a-backend-with-no-account) |
