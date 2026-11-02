@@ -25,7 +25,7 @@
  * sits in every state.
  */
 import { expect, test } from "@playwright/test";
-import { AUTH_STATE } from "../auth";
+import { AUTH_STATE, freshSession } from "../auth";
 import {
     describeClippedFocusRings,
     describeInvisibleFocus,
@@ -36,6 +36,7 @@ import {
 
 test.describe("focus rings", () => {
     test.use({ storageState: AUTH_STATE });
+    test.beforeEach(({ context }) => freshSession(context));
 
     test("the drawer rail draws whole rings", async ({ page }) => {
         await page.goto("/");

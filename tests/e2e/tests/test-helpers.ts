@@ -27,6 +27,8 @@ interface StoredAuthState {
 
 interface LoginResponseBody {
     readonly accessToken?: string;
+    /** Where the raw `/api/auth/login` answer carries it; the SDK flattens it. */
+    readonly tokens?: { readonly accessToken?: string };
 }
 
 function tokenFromStorageState(): string | undefined {
@@ -73,7 +75,9 @@ export async function getAuthToken(): Promise<string> {
         throw new Error(`Signing in at ${url} returned HTTP ${res.status}. ${await res.text()}`);
     }
 
-    const { accessToken } = (await res.json()) as LoginResponseBody;
+    // In cookie mode the stored state holds no token, so this is the usual path.
+    const answer = (await res.json()) as LoginResponseBody;
+    const accessToken = answer.tokens?.accessToken ?? answer.accessToken;
     if (!accessToken) {
         throw new Error(`Sign-in at ${url} succeeded but returned no accessToken.`);
     }

@@ -23,7 +23,7 @@
  * one-line tidy-up.
  */
 import { expect, test } from "@playwright/test";
-import { AUTH_STATE } from "../auth";
+import { AUTH_STATE, freshSession } from "../auth";
 import {
     describeNamelessControls,
     findNamelessControls,
@@ -78,6 +78,7 @@ for (const { name, viewport } of WIDTHS) {
                 viewport,
                 storageState: AUTH_STATE
             });
+            test.beforeEach(({ context }) => freshSession(context));
 
             test("the collection list names every field and control", async ({ page }) => {
                 await page.goto("/");

@@ -1,10 +1,11 @@
 import { expect, test } from "@playwright/test";
-import { AUTH_STATE } from "../auth";
+import { AUTH_STATE, freshSession } from "../auth";
 import * as fs from "fs";
 import * as path from "path";
 
 // Signed in by globalSetup, once for the suite. See e2e/auth.ts.
 test.use({ storageState: AUTH_STATE });
+test.beforeEach(({ context }) => freshSession(context));
 
 test.describe("Rebase Studio Features E2E", () => {
   test.afterAll(async () => {

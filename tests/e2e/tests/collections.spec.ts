@@ -1,9 +1,10 @@
 import { test, expect } from "@playwright/test";
-import { AUTH_STATE } from "../auth";
+import { AUTH_STATE, freshSession } from "../auth";
 import { failOnPageErrors } from "./test-helpers";
 
 // Signed in by globalSetup, once for the suite. See e2e/auth.ts.
 test.use({ storageState: AUTH_STATE });
+test.beforeEach(({ context }) => freshSession(context));
 
 test.describe("Collections Navigation", () => {
   test.beforeEach(async ({ page }) => {
