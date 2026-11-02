@@ -1,40 +1,32 @@
 ---
-sourceHash: 7d3afbea48195098
+sourceHash: c5c4b8a603134528
 slug: de/docs/upgrading/0-26-to-0-27
 title: Upgrade von 0.26 auf 0.27
 sidebar_label: 0.26 → 0.27
-description: Die Breaking Changes in 0.27 für eine App auf 0.26 – Cron-Zeitpläne, die beide Tagesfelder einschränken, fehlerhafte Cron-Zahlen, eine Schlüsselstrategie, die ihr Typ nicht erfüllen kann, und Managed Deploys, die an einer Datei anhalten, die nicht geladen wurde.
+description: Die Breaking Changes, die Version 0.27 für eine App auf 0.26 mitbringt – Cron-Schedules, die beide Tagesfelder einschränken, fehlerhafte Cron-Zahlen, eine Schlüsselstrategie, die ihr Typ nicht einhalten kann, verwaltete Deployments, die bei einer nicht geladenen Datei stoppen, und Browser-Clients, die standardmäßig Cookie-Authentifizierung verwenden.
 ---
 
 # Upgrade von 0.26 → 0.27
 
 Dies sind die `### Breaking`-Einträge, die 0.27 für eine App auf Version 0.26 mit sich bringt.
 
-Die beiden Cron-Änderungen lesen Sie zuerst, denn keine von ihnen verhindert den Start: Ein Job
-läuft künftig häufiger, der andere läuft gar nicht mehr. Die dritte betrifft nur eine Tabelle,
-die bereits existierte. Die letzte betrifft Rebase Cloud, und Sie begegnen ihr bei Ihrem
-nächsten Deploy.
+Die beiden Cron-Änderungen sollten zuerst gelesen werden, da keine von ihnen den Start verhindert: Ein Job wird nun häufiger ausgeführt, und der andere stoppt vollständig. Die dritte betrifft nur eine Tabelle, die bereits existierte. Die vierte betrifft Rebase Cloud und begegnet Ihnen beim nächsten Deployment. Die letzte betrifft das Client-SDK im Browser.
 
 ---
 
-## 97. Ein Cron-Zeitplan, der beide Tagesfelder einschränkt, trifft auf eines von beiden zu
+## 97. Ein Cron-Schedule, der beide Tagesfelder einschränkt, greift bei jedem der beiden
 
-`0 9 1 * 1` lief früher nur an einem Montag, der zugleich der 1. ist. Nun läuft er an jedem 1.
-und an jedem Montag, wie es bei Standard-Cron der Fall ist. Das gilt, wenn keines der beiden
-Tagesfelder mit `*` beginnt. Ein Zeitplan mit `*` oder `*/n` in einem von ihnen bedeutet weiterhin
-das, was er bisher bedeutet hat.
+`0 9 1 * 1` wurde früher nur an einem Montag ausgeführt, der gleichzeitig der 1. des Monats war. Jetzt läuft er an jedem 1. und an jedem Montag, wie bei Standard-Cron üblich. Dies gilt, wenn keines der beiden Tagesfelder mit `*` beginnt. Ein Schedule mit `*` oder `*/n` in einem der beiden Felder behält seine bisherige Bedeutung.
 
-Am stärksten ändert sich dadurch das Idiom „erster Montag im Monat“: `0 9 1-7 * 1` löste früher
-einmal im Monat aus und löst nun an jedem der ersten sieben Tage und an jedem Montag aus.
+Der Schedule, den dies am stärksten verändert, ist das Idiom für den „ersten Montag des Monats“: `0 9 1-7 * 1` wurde früher einmal im Monat ausgelöst und wird nun an jedem der ersten sieben Tage sowie an jedem Montag ausgelöst.
 
-**Was zu ändern ist:** Suchen Sie die Zeitpläne mit einer Zahl in beiden Tagesfeldern:
+**Was zu ändern ist:** Finden Sie die Schedules mit einer Zahl in beiden Tagesfeldern:
 
 ```bash
 grep -rnE "schedule:.*[\"'\`][^ ]+ +[^ ]+ +[0-9][^ ]* +[^ ]+ +[0-9]" backend/
 ```
 
-Wenn Sie einen der beiden Tage meinten, lassen Sie es so. Wenn Sie beide meinten, planen Sie
-über ein Tagesfeld und prüfen Sie das andere im Handler:
+Wenn Sie einen beliebigen der beiden Tage meinten (ODER), belassen Sie es so. Wenn Sie beide meinten (UND), definieren Sie ein Tagesfeld im Schedule und prüfen Sie das andere im Handler:
 
 ```typescript
 // backend/crons/first-monday.ts
@@ -51,50 +43,32 @@ export default defineCron({
 });
 ```
 
-Siehe [Zeitplan-Syntax](/docs/backend/cron-jobs/#schedule-syntax).
+Siehe [Schedule-Syntax](/docs/backend/cron-jobs/#schedule-syntax).
 
-## 98. Ein Cron-Zeitplan mit einer fehlerhaften Zahl wird abgelehnt
+## 98. Ein Cron-Schedule mit einer fehlerhaften Zahl wird abgelehnt
 
-`5abc`, `*/5x`, `1.5` und ein Bereich, der rückwärts läuft, wie `5-1`, bestanden früher die
-Validierung. Eine Zahl wurde bis zum ersten Zeichen gelesen, das keine Ziffer war, sodass `5abc`
-als `5` lief und ein rückwärts laufender Bereich nichts beitrug. Jeder dieser Fälle wird nun mit
-Angabe des Felds und des Grundes abgelehnt.
+`5abc`, `*/5x`, `1.5` und ein rückwärts verlaufender Bereich wie `5-1` haben früher die Validierung bestanden. Eine Zahl wurde bis zum ersten Zeichen gelesen, das keine Ziffer war, sodass `5abc` als `5` ausgeführt wurde und ein Rückwärtsbereich nichts beitrug. Jeder dieser Fälle wird nun unter Angabe des Felds und des Grundes abgelehnt.
 
-Ein abgelehnter Job wird nicht registriert und läuft nicht, und der Rest des Backends startet.
-Nichts sonst weist Sie darauf hin: Ein Deploy geht live, weil die Datei selbst geladen wurde.
+Ein abgelehnter Job wird nicht registriert und nicht ausgeführt, während der Rest des Backends startet. Es gibt keinen weiteren Hinweis: Ein Deployment geht live, da die Datei selbst geladen wurde.
 
-**Was zu ändern ist:** Suchen Sie nach dem Upgrade im Server-Log nach `[cron] Rejecting job`
-oder lesen Sie `rejected` auf `GET /api/admin/cron`, was auch das Werkzeug „Cron Jobs“ in Studio
-anzeigt. Korrigieren Sie die Zahl, und der Job wird beim nächsten Start registriert. Siehe
-[Jobs, die nicht da sind](/docs/backend/cron-jobs-api/#jobs-that-are-not-there).
+**Was zu ändern ist:** Suchen Sie nach dem Upgrade in den Server-Logs nach `[cron] Rejecting job` oder lesen Sie `rejected` bei `GET /api/admin/cron` aus, was auch das Cron-Jobs-Tool des Studios anzeigt. Korrigieren Sie die Zahl, und der Job wird beim nächsten Start registriert. Siehe [Jobs, die nicht vorhanden sind](/docs/backend/cron-jobs-api/#jobs-that-are-not-there).
 
-## 99. Ein Schlüssel, dessen Strategie sein Typ nicht erfüllen kann, stoppt den Start
+## 99. Ein Schlüssel, dessen Strategie von seinem Typ nicht erfüllt werden kann, stoppt den Start
 
-`isId: "increment"` auf einem Schlüssel, der kein `number` ist, und `isId: "uuid"` auf einem,
-der kein `string` ist, werden beim Laden der Konfiguration mit einer Meldung abgelehnt, die die
-Property benennt. Beide wurden früher als roher SQL-Default gelesen. Postgres lehnte
-`DEFAULT increment` beim ersten `CREATE TABLE` ab, sodass dies nur eine Tabelle betrifft, die
-bereits existierte und in der diese Anweisung nie ausgeführt wurde.
+`isId: "increment"` bei einem Schlüssel, der keine `number` ist, und `isId: "uuid"` bei einem, der kein `string` ist, werden beim Laden der Konfiguration mit einer Meldung abgelehnt, die die Eigenschaft benennt. Beide wurden früher als roher SQL-Standardwert (`DEFAULT`) interpretiert. Postgres verweigerte `DEFAULT increment` beim ersten `CREATE TABLE`, daher betrifft dies nur bereits existierende Tabellen, bei denen diese Anweisung nicht ausgeführt wurde.
 
-**Was zu ändern ist:** Deklarieren Sie den Schlüssel als das, was die Spalte ist. Ein
-Zahlenschlüssel verwendet `type: "number"` mit `"increment"`, und ein String-Schlüssel verwendet
-`"uuid"`, oder `true`, wenn der Aufrufer den Wert liefert. Siehe
-[String-Optionen](/docs/collections/properties/#string-options).
+**Was zu ändern ist:** Deklarieren Sie den Schlüssel entsprechend dem tatsächlichen Spaltentyp. Ein numerischer Schlüssel verwendet `type: "number"` mit `"increment"`, und ein Zeichenfolgenschlüssel verwendet `"uuid"`, oder `true`, wenn der Aufrufer den Wert übergibt. Siehe [String-Optionen](/docs/collections/properties/#string-options).
 
-## 100. Ein Managed Deploy oder eine Preview schlägt fehl, wenn eine Function- oder Cron-Datei nicht geladen wird
+## 100. Ein verwaltetes Deployment oder eine Preview schlägt fehl, wenn eine Funktions- oder Cron-Datei nicht geladen werden kann
 
-Eine Function- oder Cron-Datei, die beim Import einen Fehler warf oder nicht geparst werden
-konnte, wurde früher übersprungen, sodass ein Deploy `✓ Live` meldete und seine Probes bestand,
-während jede Route dieser Datei mit 404 antwortete. Pods in Rebase Cloud laufen nun mit
-`REBASE_REQUIRE_FILES_LOADED`, auf einer Runtime, die es kennt, sodass die neue Version nie
-bereit wird, die alte weiter ausliefert und der Deploy mit der Datei und dem Grund endet.
+Eine Funktions- oder Cron-Datei, die beim Importieren einen Fehler auslöste oder nicht geparst werden konnte, wurde früher übersprungen, sodass ein Deployment `✓ Live` meldete und seine Probes bestand, während jede Route dieser Datei mit 404 antwortete. Pods in Rebase Cloud laufen jetzt mit `REBASE_REQUIRE_FILES_LOADED` (auf einer Runtime, die dies unterstützt), sodass die neue Version niemals den Status „ready“ erreicht, die alte Version weiterhin Anfragen bedient und das Deployment mit der Datei und dem Grund abbricht.
 
-Ein Projekt, das mit einer solchen Datei ausgeliefert wurde, begegnet dem bei seinem nächsten
-Deploy. Fleet-Rollouts und Rollbacks unterliegen dieser Regel nicht. Eine Datei, die sauber
-importiert wird und keine Function und keinen Job exportiert, etwa ein Helper, wird weiterhin
-übersprungen.
+Ein Projekt, das bisher mit einer solchen Datei in Betrieb war, wird beim nächsten Deployment darauf stoßen. Fleet-Rollouts und Rollbacks sind davon nicht betroffen. Eine Datei, die fehlerfrei importiert wird und keine Funktion oder keinen Job exportiert (wie z. B. ein Helper), wird weiterhin übersprungen.
 
-**Was zu ändern ist:** Deployen Sie, und beheben oder löschen Sie dann die Datei, die der Deploy
-nennt. Außerhalb von Rebase Cloud ändert sich nichts, solange Sie nicht selbst
-`REBASE_REQUIRE_FILES_LOADED=true` setzen. Siehe
-[Umgebung & Konfiguration](/docs/getting-started/configuration/).
+**Was zu ändern ist:** Führen Sie das Deployment durch und korrigieren oder löschen Sie dann die vom Deployment gemeldete Datei. Außerhalb von Rebase Cloud ändert sich nichts, es sei denn, Sie setzen `REBASE_REQUIRE_FILES_LOADED=true` selbst. Siehe [Umgebung & Konfiguration](/docs/getting-started/configuration/).
+
+## 101. Ein Browser-Client verwendet standardmäßig Cookie-Authentifizierung
+
+`createRebaseClient` ohne `auth.authFlowMode` verwendete überall den JSON-Modus. Ein von der Rebase-Runtime betriebenes Backend speichert das Refresh-Token immer in einem HttpOnly-Cookie und antwortet im Response-Body mit `""`. Ein Browser-Client mit diesem Standardwert hatte somit nichts, womit er das Token erneuern konnte, und wurde etwa eine Stunde nach der Anmeldung wortlos abgemeldet. In einem Browser ist der Standard jetzt der Cookie-Modus. Außerhalb des Browsers sowie bei einem Browser-Client mit eigenem `auth.storage` bleibt es weiterhin JSON.
+
+**Was zu ändern ist:** Nichts, wenn Ihr Backend auf der Rebase-Runtime läuft oder `auth.cookieAuth` setzt: Eine Browser-App, die nach einer Stunde abgemeldet wurde, bleibt nun angemeldet. Ein Backend ohne `auth.cookieAuth` benötigt `auth: { authFlowMode: "json" }` auf seinem Browser-Client. Der Client protokolliert beim ersten Login, bei dem beide Seiten nicht übereinstimmen, einen Fehler mit dem zu verwendenden Modus. Im Cookie-Modus wird die Sitzung nicht mehr in `localStorage` gespeichert; ein Neuladen stellt sie mit einer einzigen `/auth/refresh`-Anfrage wieder her, lesen Sie die Session daher nach `auth.isInitialized()`. Siehe [Wo sich die Session befindet](/docs/sdk/authentication/#where-the-session-lives-authflowmode).

@@ -1,20 +1,20 @@
 ---
-sourceHash: 51ddecad0855d078
+sourceHash: a43be9786395a654
 title: Solo backend (headless)
 sidebar_label: Solo backend
-description: Esegui Rebase come Backend-as-a-Service headless sul tuo database PostgreSQL — un'API REST, autenticazione, storage e realtime, senza pannello di amministrazione né file di collezione.
+description: Esegui Rebase come Backend-as-a-Service headless sul tuo database PostgreSQL esistente — API REST, autenticazione, storage e realtime, senza pannello di amministrazione e senza file di collezioni.
 ---
 
-Rebase ha due forme, e questa pagina riguarda quella che non apre mai un browser:
+Rebase ha due forme, e questa pagina è quella che non apre mai un browser:
 un'API REST, autenticazione, storage, realtime e backup su un database PostgreSQL
 già esistente. Nessun pannello di amministrazione, nessun file di collezione. Se stavi
-pensando di usare Supabase o PostgREST, questa è l'alternativa equivalente.
+valutando Supabase o PostgREST, questa è la soluzione equivalente.
 
-Tutto ciò che si trova in questa pagina funziona anche nel progetto completo: il
-server è lo stesso. Ciò che `--headless` rimuove è il pacchetto frontend e i file
-delle collezioni, non una funzionalità.
+Tutto ciò che si trova in questa pagina funziona anche nel progetto completo — il server
+è lo stesso. Ciò che `--headless` rimuove è il pacchetto frontend e i file delle
+collezioni, non una funzionalità.
 
-## Esegui lo scaffold
+## Genera lo scaffolding
 
 ```bash
 pnpm dlx @rebasepro/cli init my-api --headless --yes
@@ -23,30 +23,30 @@ cd my-api
 
 Due workspace, nessun `frontend/`:
 
-| Cartella | Cosa contiene |
-|----------|---------------|
-| `backend/` | Le tue funzioni personalizzate e i cron. Non c'è alcun file server: il runtime pubblicato avvia il progetto |
-| `config/` | `storageAuthorize` e qualsiasi collezione generata da `--introspect` |
+| Cartella | Contenuto |
+|----------|-----------|
+| `backend/` | Le tue funzioni personalizzate e i cron job. Non c'è alcun file server — il runtime pubblicato avvia il progetto |
+| `config/` | `storageAuthorize` ed eventuali collezioni generate da `--introspect` |
 
-`--template` non ha effetto qui: un preset genera file di collezione, mentre questa
-variante non ne ha alcuno. Node 22.22+, lo stesso requisito minimo del progetto
-completo: il `package.json` dell'overlay headless dichiara `"node": ">=22.22.0"`
-e sostituisce quello sottostante.
+`--template` non ha alcun effetto qui: un preset genera file di collezione di partenza,
+e questa variante non ne ha. Node 22.22+, lo stesso requisito minimo del progetto completo —
+il `package.json` dell'overlay headless dichiara `"node": ">=22.22.0"` e sostituisce quello
+sottostante.
 
 ## Collegalo al tuo database
 
-`init` genera un file `.env` pronto all'uso. Per usare un database già attivo, passa
-il suo URL durante lo scaffold:
+`init` genera un file `.env` pronto all'uso. Per utilizzare un database che hai già in
+esecuzione, passa il suo URL durante lo scaffolding:
 
 ```bash
 pnpm dlx @rebasepro/cli init my-api --headless --database-url "postgres://user:pass@host:5432/db" --yes
 ```
 
-Oppure imposta `DATABASE_URL` nel file `.env` in seguito: è la stessa cosa. Senza
-`DATABASE_URL`, `rebase dev` avvia un'istanza PostgreSQL gestita (PGlite) nella directory
-del progetto, utile per provare l'API ma non pensata per lo scopo di questa variante.
+Oppure imposta `DATABASE_URL` in `.env` successivamente — è la stessa cosa. Senza
+`DATABASE_URL`, `rebase dev` avvia un PostgreSQL gestito (PGlite) nella directory
+del progetto, utile per provare l'API ma non per lo scopo di questa variante.
 
-Quindi:
+Poi:
 
 ```bash
 pnpm install
@@ -54,18 +54,18 @@ pnpm run dev
 ```
 
 **Leggi l'URL dall'output.** `rebase dev` ricava una porta libera dal percorso del
-progetto invece di usarne una fissa, quindi differisce da un progetto all'altro e
-tra macchine diverse.
+progetto anziché usarne una fissa, quindi varia da un progetto all'altro e tra
+macchine diverse.
 
 ## Da dove provengono le collezioni
 
-Nel codice non ce n'è nessuna. Il server legge lo schema del database all'avvio
-ed espone le tabelle che trova, quindi l'API segue le tue migrazioni: modificando
-lo schema, cambieranno anche gli endpoint.
+Non ce n'è nessuna nel codice. Il server legge lo schema del tuo database all'avvio
+ed espone le tabelle che trova, quindi l'API segue le tue migrazioni: modifica lo
+schema e gli endpoint cambieranno di conseguenza.
 
-Una tabella viene esposta una volta abilitata su di essa la row-level security. Senza
-alcuna policy viene esposta e non restituisce righe, e l'avvio lo segnala; una policy
-la apre:
+Una tabella viene esposta una volta abilitata la Row-Level Security (RLS) su di essa.
+Senza alcuna policy viene esposta ma non restituisce alcuna riga, e l'avvio mostrerà
+un avviso; una policy ne consente l'accesso:
 
 ```sql
 ALTER TABLE your_table ENABLE ROW LEVEL SECURITY;
@@ -74,34 +74,36 @@ CREATE POLICY your_table_owner ON your_table
     FOR ALL USING (user_id::text = rebase.uid());
 ```
 
-`rebase.uid()`, `rebase.roles()` e `rebase.jwt()` vengono installate da Rebase e
-leggono l'identità della richiesta autenticata. Consulta
+`rebase.uid()`, `rebase.roles()` e `rebase.jwt()` sono installati da Rebase e
+leggono l'identità della richiesta autenticata. Consulta le
 [Regole di sicurezza](/docs/collections/security-rules/) per il vocabolario delle policy
-e [rls-check](/docs/rls-check/) per un audit su cosa permettono effettivamente le tue policy.
+e [rls-check](/docs/rls-check/) per un controllo di ciò che le tue policy consentono
+effettivamente.
 
 Una tabella senza RLS viene **ignorata**, deliberatamente: ogni richiesta autenticata
-viene eseguita come `rebase_user`, quindi esporre una tabella che la row-level security
-non protegge consegnerebbe ogni riga a qualsiasi utente autenticato. Ogni tabella
-ignorata viene indicata all'avvio insieme al codice SQL necessario per proteggerla.
+viene eseguita come `rebase_user`, quindi esporre una tabella non protetta dalla
+row-level security consegnerebbe ogni riga a qualsiasi chiamante autenticato. Ogni
+tabella ignorata viene indicata all'avvio insieme all'SQL necessario per proteggerla.
 
-Una tabella di join non viene esposta in nessun caso, perché non diventa mai una
-collection. Se ha RLS disattivata, viene indicata anch'essa all'avvio.
+Una tabella di join non viene comunque esposta, poiché non diventa mai una collezione.
+Anche quelle con RLS disabilitata vengono indicate all'avvio.
 
-Il controllo avviene all'avvio. Se in seguito RLS viene disattivata su una tabella
-esposta, questa resta esposta finché l'avvio successivo non la ignora. L'[audit
-pianificato](/docs/rls-check/) lo segnala prima ed è disattivato per impostazione predefinita.
+Il controllo viene eseguito all'avvio. Se la RLS viene disabilitata successivamente
+su una tabella esposta, questa rimarrà esposta finché il riavvio successivo non la
+ignorerà. L'[audit programmato](/docs/rls-check/) la segnala prima, ed è disabilitato
+per impostazione predefinita.
 
 :::note
-`baas: { unprotectedTables: "serve" }` le espone comunque. Si tratta di un'opzione di
-`initializeRebaseBackend`, quindi è accessibile solo dopo `rebase eject`: il runtime
-gestito non la legge da `config/index.ts` né dall'ambiente. Ha senso solo se ogni
-chiamante è già fidato.
+`baas: { unprotectedTables: "serve" }` le espone comunque. È un'opzione di
+`initializeRebaseBackend`, quindi accessibile solo dopo aver eseguito `rebase eject` —
+il runtime gestito non la legge da `config/index.ts` o dall'ambiente. Ha senso
+solo quando ogni chiamante è già fidato.
 :::
 
 ### Generare invece i file di collezione
 
-Se preferisci avere le tabelle scritte in TypeScript — per i tipi, per i callback,
-per la revisione — esegui l'introspezione:
+Se preferisci avere le tabelle definite in TypeScript — per i tipi, i callback
+o la revisione del codice — eseguine l'introspezione:
 
 ```bash
 pnpm dlx @rebasepro/cli init my-api --headless --database-url "postgres://…" --introspect --install
@@ -114,13 +116,14 @@ eseguito tramite la CLI installata. In un progetto esistente il comando equivale
 pnpm rebase schema introspect
 ```
 
-I file vengono salvati in `config/collections/`. Da quel momento il progetto include le
-collezioni nel codice e l'introspezione all'avvio smette di definire l'API.
+I file vengono salvati in `config/collections/`. Da quel momento in poi, il progetto
+ha collezioni definite nel codice e l'introspezione all'avvio smette di essere ciò
+che definisce l'API.
 
-Lo scaffold headless
-installa Atlas in `backend/`, così `rebase db push`, `rebase db generate` e
-`pnpm run db:migrate` funzionano su quelle collezioni come in qualsiasi progetto. Su 0.24
-ciascuno di essi si ferma con "The atlas binary is missing"; aggiungilo al backend con
+Lo scaffolding headless installa Atlas in `backend/`, quindi `rebase db push`,
+`rebase db generate` e `pnpm run db:migrate` funzionano su quelle collezioni come in
+qualsiasi progetto. Nella versione 0.24 ciascuno di essi si interrompe con
+"The atlas binary is missing"; aggiungilo al backend con
 `pnpm --dir backend add @ariga/atlas`.
 
 ## Utilizzo
@@ -131,8 +134,7 @@ Tramite HTTP:
 curl "$REBASE_URL/api/data/posts?limit=10"
 ```
 
-Oppure tramite il client type-safe, che fa già parte delle dipendenze dello scaffold
-headless:
+Oppure con il client type-safe, che è già una dipendenza dello scaffolding headless:
 
 ```typescript title="scripts/example.ts"
 import { createRebaseClient } from "@rebasepro/client";
@@ -147,16 +149,16 @@ const { data: posts } = await rebase.data.collection("posts").find({
 });
 ```
 
-- [API REST](/docs/backend/api/) — struttura degli endpoint, filtri ed errori
+- [API REST](/docs/backend/api/) — la struttura degli endpoint, filtri ed errori
 - [SDK tipizzato](/docs/sdk/) — query, autenticazione, realtime, storage
-- `/api/docs` e `/api/swagger` — il documento OpenAPI e il rispettivo visualizzatore,
+- `/api/docs` e `/api/swagger` — il documento OpenAPI e il relativo viewer,
   serviti dal backend in esecuzione una volta presente una collezione. Un progetto
-  che non ne ha non fornisce nessuno dei due: il documento viene generato dalle collezioni,
+  che non ne ha non espone nessuno dei due: il documento viene generato dalle collezioni,
   quindi non c'è nulla da descrivere finché la sezione precedente non è stata eseguita
 
 ## `404 NO_COLLECTIONS`
 
-Se ogni richiesta di dati risponde in questo modo:
+Se ogni richiesta di dati risponde con questo:
 
 ```json
 {
@@ -168,32 +170,33 @@ Se ogni richiesta di dati risponde in questo modo:
 ```
 
 significa che il progetto non dichiara alcuna collezione nel codice *e* il database
-non ha fornito elementi da cui ricavarle. È la prima risposta attesa da un progetto
-headless puntato a un database vuoto, ed è un 404 anziché un 500 perché non c'è nulla
-di rotto: semplicemente non c'è ancora nulla da esporre.
+non ha fornito nulla da cui ricavarle. È la normale prima risposta di un progetto
+headless collegato a un database vuoto, ed è un errore 404 anziché un 500 perché
+non c'è nulla di rotto — semplicemente non c'è ancora nulla da servire.
 
-Tre fattori possono risolverlo, nell'ordine in cui vale la pena verificarli:
+Tre passaggi per risolverlo, nell'ordine consigliato di verifica:
 
-1. **Il database non ha tabelle.** Creale — tramite una migrazione, SQL puro, o un file
-   di collezione insieme a `rebase db push` — e riavvia.
-2. **Le tabelle non hanno la row-level security abilitata**, quindi l'avvio le ha
-   ignorate. Il log di avvio elenca ciascuna di esse, con l'SQL. Abilitala e aggiungi
-   una policy, come mostrato sopra.
-   Lo dice anche la risposta: il suo messaggio nomina le tabelle e fornisce
-   l'`ALTER TABLE … ENABLE ROW LEVEL SECURITY` per esse, e
-   `details.unprotectedTables` le elenca. Su 0.24 dice che il database non ha tabelle.
-3. **`DATABASE_URL` punta a una destinazione diversa** da quella prevista. `rebase status`
-   stampa i tre file che determinano a cosa si connette il backend.
+1. **Il database non ha tabelle.** Creale — tramite una migrazione, semplice SQL
+   o un file di collezione insieme a `rebase db push` — e riavvia.
+2. **Le tabelle non hanno la Row-Level Security abilitata**, quindi l'avvio le ha
+   ignorate. Il log di avvio ne indica ciascuna, insieme all'SQL. Abilitala e aggiungi
+   una policy, come mostrato sopra. Anche la risposta lo segnala: il messaggio indica
+   le tabelle e fornisce per esse l'`ALTER TABLE … ENABLE ROW LEVEL SECURITY`, e
+   `details.unprotectedTables` le elenca. Nella versione 0.24 indica semplicemente
+   che il database non ha tabelle.
+3. **`DATABASE_URL` punta altrove** rispetto a quanto pensi. `rebase status`
+   stampa i tre file che determinano ciò a cui il backend si collega.
 
 ## Aggiungere un pannello di amministrazione in seguito
 
 Nulla qui ti impedisce di farlo. Aggiungi una directory `config/collections/` —
-manualmente o con `rebase schema introspect` — e un frontend che le visualizzi; il
-backend non cambia. Si comincia da [Configurazione del frontend](/docs/frontend/).
+manualmente o con `rebase schema introspect` — e un frontend che le visualizzi;
+il backend non cambia. La guida [Configurazione Frontend](/docs/frontend/) è il
+punto di partenza.
 
 ## Prossimi passi
 
 - [Autenticazione](/docs/backend/authentication/) — provider, token, chiavi API
 - [Regole di sicurezza (RLS)](/docs/collections/security-rules/) — il modello di accesso
 - [Funzioni personalizzate](/docs/backend/custom-functions/) — le tue route
-- [Deployment](/docs/getting-started/deployment/) — portare l'applicazione in produzione
+- [Distribuzione](/docs/getting-started/deployment/) — portare il progetto in produzione

@@ -1,19 +1,19 @@
 ---
-sourceHash: 6c5dd4cfdd97df7c
+sourceHash: 2b7f07e56442a382
 title: Benutzerdefinierte Auth-Adapter
 sidebar_label: Benutzerdefinierte Auth-Adapter
-description: Ersetzen Sie die integrierte Authentifizierung von Rebase durch Clerk, Firebase Auth oder Ihren eigenen Identity-Provider, indem Sie den AuthAdapter-Vertrag implementieren.
+description: Ersetzen Sie die integrierte Authentifizierung von Rebase durch Clerk, Firebase Auth oder Ihren eigenen Identitätsanbieter, indem Sie den AuthAdapter-Vertrag implementieren.
 ---
 
-Rebase bringt eine eigene Authentifizierung mit – [konfigurieren Sie sie hier](/docs/backend/authentication/). Diese Seite behandelt den anderen Fall: einen Identity-Provider, den Sie bereits betreiben oder für den Sie bereits bezahlen.
+Rebase bringt eine eigene Authentifizierung mit – [konfigurieren Sie sie hier](/docs/backend/authentication/). Diese Seite behandelt den anderen Fall: einen Identitätsanbieter, den Sie bereits betreiben oder für den Sie bereits bezahlen.
 
 ## Benutzerdefinierte Auth-Adapter
 
-Rebase ermöglicht den vollständigen Austausch des integrierten Authentifizierungssystems über eine modulare Authentifizierungsarchitektur. Dies entkoppelt die Authentifizierungsprüfung von der Datenbank sowie den REST/WebSocket-Schichten und ermöglicht eine nahtlose Integration mit externen Anbietern wie **Clerk**, **Auth0**, **Firebase Auth** oder benutzerdefinierten JWT-Identitätsdiensten.
+Rebase ermöglicht den vollständigen Austausch des integrierten Authentifizierungssystems über eine modulare Authentifizierungsarchitektur. Dadurch wird die Authentifizierungsprüfung von der Datenbank sowie den REST/WebSocket-Schichten entkoppelt, was eine nahtlose Integration mit externen Anbietern wie **Clerk**, **Auth0**, **Firebase Auth** oder benutzerdefinierten JWT-Identitätsdiensten ermöglicht.
 
 ### Der AuthAdapter-Vertrag
 
-Sie können das `AuthAdapter`-Interface für vollständige Kontrolle direkt implementieren. Das Interface, gekürzt (die vollständige Definition, mit den optionalen Hooks zur Benutzerverwaltung und `transformAuthResponse`, ist `AuthAdapter` in `@rebasepro/types`):
+Sie können die `AuthAdapter`-Schnittstelle direkt implementieren, um die vollständige Kontrolle zu haben. Die Schnittstelle, gekürzt (die vollständige Definition mit der optionalen Benutzerverwaltung und den `transformAuthResponse`-Hooks ist `AuthAdapter` in `@rebasepro/types`):
 
 ```typescript
 import { Hono } from "hono";
@@ -74,9 +74,9 @@ export interface AuthAdapter {
 }
 ```
 
-### Der AuthenticatedUser-Payload
+### Die Payload des authentifizierten Benutzers
 
-Unabhängig vom gewählten externen Authentifizierungsanbieter muss Ihr Adapter erfolgreiche Token-Verifizierungen in ein einheitliches `AuthenticatedUser`-Objekt auflösen. Der Rebase RLS Scope Injector bildet diese Werte innerhalb von Transaktionen direkt auf PostgreSQL-Sitzungsvariablen ab:
+Unabhängig vom gewählten externen Authentifizierungsanbieter muss Ihr Adapter erfolgreiche Token-Überprüfungen in ein einheitliches `AuthenticatedUser`-Objekt auflösen. Der Rebase RLS Scope Injector mappt diese Werte innerhalb von Transaktionen direkt auf PostgreSQL-Sitzungsvariablen:
 
 ```typescript
 export interface AuthenticatedUser {
@@ -97,11 +97,11 @@ export interface AuthenticatedUser {
 
 ### Schnelle Integration über `createCustomAuthAdapter`
 
-Für Standardszenarien (wie die Validierung von JWTs eines Drittanbieterdienstes) können Sie das Hilfsprogramm `createCustomAuthAdapter` verwenden. Dieses Utility übernimmt Standardwerte für Capabilities und implementiert die WebSocket-Token-Validierung standardmäßig (out-of-the-box), indem es Ihre `verifyRequest`-Implementierung umschließt.
+Für Standardszenarien (wie die Validierung von JWTs eines Drittanbieterdienstes) können Sie das Hilfsprogramm `createCustomAuthAdapter` verwenden. Dieses Dienstprogramm übernimmt Standardwerte für Capabilities und implementiert die WebSocket-Token-Validierung vorkonfiguriert, indem es Ihre `verifyRequest`-Implementierung umschließt.
 
 #### Beispiel: Integration mit Clerk
 
-Um ein Rebase-Backend mit **Clerk** zu verbinden, können Sie Clerk-JWT-Tokens mithilfe des JSON Web Key Sets (JWKS) von Clerk verifizieren:
+Um ein Rebase-Backend mit **Clerk** zu verbinden, können Sie Clerk-JWT-Token mithilfe des JSON Web Key Set (JWKS) von Clerk verifizieren:
 
 ```typescript no-verify
 import { initializeRebaseBackend } from "@rebasepro/server";
@@ -157,7 +157,7 @@ const backend = await initializeRebaseBackend({
 
 #### Beispiel: Integration mit Firebase Auth
 
-So verifizieren Sie Firebase Auth-Tokens mit den öffentlichen Zertifikaten von Firebase:
+So verifizieren Sie Firebase Auth-Token mithilfe der öffentlichen Zertifikate von Firebase:
 
 ```typescript no-verify
 import { initializeRebaseBackend } from "@rebasepro/server";
@@ -205,30 +205,23 @@ const backend = await initializeRebaseBackend({
 });
 ```
 
-#### Die Client-Seite
+#### Der clientseitige Teil
 
-Vor 0.25 authentifizierte der Getter
-nur HTTP-Anfragen, und der Realtime-Socket blieb anonym.
+Vor Version 0.25 authentifizierte der Getter nur HTTP-Anfragen, und der Realtime-Socket blieb anonym.
 
-Der Adapter verifiziert das Token des Providers; der Client muss es senden. Geben Sie dem
-Rebase-Client einmalig einen Getter dafür:
+Der Adapter verifiziert das Token des Anbieters; der Client muss es senden. Übergeben Sie dem Rebase-Client einmalig einen Getter dafür:
 
 ```typescript
 client.setAuthTokenGetter(() => clerk.session?.getToken() ?? Promise.resolve(null));
 ```
 
-Bei Firebase Auth lautet der Getter
-`() => auth.currentUser?.getIdToken() ?? Promise.resolve(null)`. Der Client
-ruft ihn bei jeder HTTP-Anfrage und bei jeder Authentifizierung des Realtime-Sockets auf,
-sodass Live-Abfragen als derselbe Benutzer laufen wie REST-Aufrufe. Setzen Sie ihn im
-Admin-Panel auf dem Client, den Sie an `<Rebase client>` übergeben. Siehe
-[Einen eigenen Auth-Provider verwenden](/docs/sdk/authentication#using-your-own-auth-provider).
+Bei Firebase Auth lautet der Getter `() => auth.currentUser?.getIdToken() ?? Promise.resolve(null)`. Der Client ruft ihn bei jeder HTTP-Anfrage und jedes Mal ab, wenn sich der Realtime-Socket authentifiziert, sodass Live-Queries unter demselben Benutzer wie REST-Aufrufe ausgeführt werden. Legen Sie ihn im Admin-Panel auf dem Client fest, den Sie an `<Rebase client>` übergeben. Siehe [Ihr eigener Auth-Anbieter](/docs/sdk/your-own-auth-provider/).
 
 ---
 
-### Einbinden von Auth-Routen und Panel-Aktionen
+### Auth-Routen und Panel-Aktionen einbinden
 
-Wenn Ihr benutzerdefinierter Auth-Provider das Einbinden von Weiterleitungsendpunkten erfordert (wie OAuth-Callback-Routen oder SAML-Login-Schleifen), implementieren Sie die Methode `createAuthRoutes` in Ihrem Adapter:
+Wenn Ihr benutzerdefinierter Auth-Anbieter das Einbinden von Weiterleitungsendpunkten erfordert (wie OAuth-Callback-Routen oder SAML-Login-Schleifen), implementieren Sie die `createAuthRoutes`-Methode in Ihrem Adapter:
 
 ```typescript
 const myOauthAdapter: AuthAdapter = {
@@ -272,6 +265,6 @@ Wenn Sie CRUD-Operationen für Benutzer direkt im Panel ermöglichen möchten, i
 
 ## Nächste Schritte
 
-- **[Authentifizierung](/docs/backend/authentication/)** — die Konfiguration des integrierten Providers
-- **[Endpunkte und Tokens](/docs/backend/auth-endpoints/)** — die Routen, die ein Adapter erfüllen muss
-- **[Sicherheitsregeln (RLS)](/docs/collections/security-rules/)** — wofür die Claims verwendet werden, die ein Adapter zurückgibt
+- **[Authentifizierung](/docs/backend/authentication/)** — die Konfiguration des integrierten Anbieters
+- **[Endpunkte und Token](/docs/backend/auth-endpoints/)** — die Routen, die ein Adapter bedienen muss
+- **[Sicherheitsregeln (RLS)](/docs/collections/security-rules/)** — wofür die von einem Adapter zurückgegebenen Claims verwendet werden

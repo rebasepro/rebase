@@ -1,19 +1,19 @@
 ---
-sourceHash: 6c5dd4cfdd97df7c
+sourceHash: 2b7f07e56442a382
 title: Adaptateurs d'authentification personnalisés
 sidebar_label: Adaptateurs d'authentification personnalisés
 description: Remplacez l'authentification intégrée de Rebase par Clerk, Firebase Auth ou votre propre fournisseur d'identité en implémentant le contrat AuthAdapter.
 ---
 
-Rebase intègre sa propre authentification — [configurez-la ici](/docs/backend/authentication/). Cette page traite de l'autre cas de figure : un fournisseur d'identité que vous utilisez déjà, ou pour lequel vous payez déjà.
+Rebase intègre son propre système d'authentification — [configurez-le ici](/docs/backend/authentication/). Cette page traite de l'autre cas : un fournisseur d'identité que vous utilisez ou payez déjà.
 
 ## Adaptateurs d'authentification personnalisés
 
-Rebase permet le remplacement complet du système d'authentification intégré via une architecture d'authentification modulable. Cela découple la vérification de l'authentification de la base de données et des couches REST/WebSocket, permettant une intégration fluide avec des fournisseurs externes tels que **Clerk**, **Auth0**, **Firebase Auth** ou des services d'identité JWT personnalisés.
+Rebase permet le remplacement complet du système d'authentification intégré via une architecture d'authentification enfichable. Cela découple la vérification de l'authentification de la base de données et des couches REST/WebSocket, permettant une intégration transparente avec des fournisseurs externes tels que **Clerk**, **Auth0**, **Firebase Auth** ou des services d'identité JWT personnalisés.
 
 ### Le contrat AuthAdapter
 
-Vous pouvez implémenter directement l'interface `AuthAdapter` pour un contrôle total. L'interface, abrégée (la définition complète, avec les hooks facultatifs d'administration des utilisateurs et `transformAuthResponse`, est `AuthAdapter` dans `@rebasepro/types`) :
+Vous pouvez implémenter directement l'interface `AuthAdapter` pour un contrôle total. L'interface, abrégée (la définition complète, avec les hooks optionnels d'administration des utilisateurs et `transformAuthResponse`, correspond à `AuthAdapter` dans `@rebasepro/types`) :
 
 ```typescript
 import { Hono } from "hono";
@@ -76,7 +76,7 @@ export interface AuthAdapter {
 
 ### Le payload de l'utilisateur authentifié
 
-Quel que soit le fournisseur d'authentification externe choisi, votre adaptateur doit résoudre les vérifications de jeton réussies en un objet `AuthenticatedUser` uniforme. L'injecteur de portée RLS (RLS Scope Injector) de Rebase mappe directement ces valeurs vers des variables de session PostgreSQL au sein des transactions :
+Quel que soit le fournisseur d'authentification externe choisi, votre adaptateur doit résoudre les vérifications de jetons réussies en un objet `AuthenticatedUser` uniforme. Le Rebase RLS Scope Injector mappe directement ces valeurs vers des variables de session PostgreSQL au sein des transactions :
 
 ```typescript
 export interface AuthenticatedUser {
@@ -97,11 +97,11 @@ export interface AuthenticatedUser {
 
 ### Intégration rapide via `createCustomAuthAdapter`
 
-Pour les scénarios standards (tels que la validation de JWT provenant d'un service tiers), vous pouvez utiliser l'utilitaire `createCustomAuthAdapter`. Cet utilitaire gère les valeurs par défaut des fonctionnalités (`capabilities`) et implémente la validation des jetons WebSocket clé en main en encapsulant votre implémentation de `verifyRequest`.
+Pour les scénarios standards (tels que la validation de JWT provenant d'un service tiers), vous pouvez utiliser l'utilitaire `createCustomAuthAdapter`. Cet utilitaire gère les valeurs par défaut des fonctionnalités (capabilities) et implémente la validation des jetons WebSocket clé en main en enveloppant votre implémentation de `verifyRequest`.
 
 #### Exemple : Intégration avec Clerk
 
-Pour connecter un backend Rebase avec **Clerk**, vous pouvez vérifier les jetons JWT Clerk à l'aide du JSON Web Key Set (JWKS) de Clerk :
+Pour connecter un backend Rebase avec **Clerk**, vous pouvez vérifier les jetons JWT de Clerk en utilisant le JWKS (JSON Web Key Set) de Clerk :
 
 ```typescript no-verify
 import { initializeRebaseBackend } from "@rebasepro/server";
@@ -205,31 +205,23 @@ const backend = await initializeRebaseBackend({
 });
 ```
 
-#### La moitié côté client
+#### La partie client
 
-Avant la 0.25, le getter
-n'authentifiait que les requêtes HTTP, et le socket temps réel restait anonyme.
+Avant la version 0.25, le getter authentifiait uniquement les requêtes HTTP, et le socket temps réel restait anonyme.
 
-L'adaptateur vérifie le jeton du fournisseur ; c'est au client de l'envoyer. Donnez
-une bonne fois au client Rebase un getter pour ce jeton :
+L'adaptateur vérifie le jeton du fournisseur ; le client doit l'envoyer. Fournissez une seule fois au client Rebase un getter pour ce dernier :
 
 ```typescript
 client.setAuthTokenGetter(() => clerk.session?.getToken() ?? Promise.resolve(null));
 ```
 
-Avec Firebase Auth, le getter est
-`() => auth.currentUser?.getIdToken() ?? Promise.resolve(null)`. Le client le
-sollicite pour chaque requête HTTP et chaque fois que le socket temps réel
-s'authentifie : les requêtes en direct s'exécutent donc sous le même utilisateur que
-les appels REST. Dans le panneau d'administration, définissez-le sur le client que
-vous passez à `<Rebase client>`. Voir
-[Utiliser votre propre fournisseur d'authentification](/docs/sdk/authentication#using-your-own-auth-provider).
+Avec Firebase Auth, le getter est `() => auth.currentUser?.getIdToken() ?? Promise.resolve(null)`. Le client l'appelle pour chaque requête HTTP et chaque fois que le socket temps réel s'authentifie, afin que les requêtes en direct (live queries) s'exécutent sous la même identité utilisateur que les appels REST. Dans le panneau d'administration, définissez-le sur le client que vous passez à `<Rebase client>`. Consultez [Votre propre fournisseur d'authentification](/docs/sdk/your-own-auth-provider/).
 
 ---
 
 ### Montage des routes d'authentification et actions du panneau
 
-Si votre fournisseur d'authentification personnalisé nécessite le montage de points de terminaison de redirection (comme des routes de callback OAuth ou des boucles de connexion SAML), implémentez la méthode `createAuthRoutes` sur votre adaptateur :
+Si votre fournisseur d'authentification personnalisé nécessite de monter des points de terminaison de redirection (comme des routes de rappel OAuth ou des boucles de connexion SAML), implémentez la méthode `createAuthRoutes` sur votre adaptateur :
 
 ```typescript
 const myOauthAdapter: AuthAdapter = {
@@ -269,10 +261,10 @@ const myOauthAdapter: AuthAdapter = {
 };
 ```
 
-Si vous souhaitez autoriser les opérations CRUD sur les utilisateurs directement depuis le panneau d'administration, implémentez l'assistant `userManagement` au sein des options de l'adaptateur, qui fournit des hooks pour `listUsers`, `getUserById`, `createUser`, `updateUser`, `deleteUser`, `getUserRoles` et `setUserRoles`.
+Si vous souhaitez autoriser les opérations CRUD d'utilisateurs directement depuis le panneau, implémentez l'utilitaire `userManagement` dans les options de l'adaptateur, qui fournit des hooks pour `listUsers`, `getUserById`, `createUser`, `updateUser`, `deleteUser`, `getUserRoles` et `setUserRoles`.
 
 ## Prochaines étapes
 
-- **[Authentification](/docs/backend/authentication/)** — la configuration du fournisseur intégré
-- **[Endpoints et tokens](/docs/backend/auth-endpoints/)** — les routes qu'un adaptateur doit satisfaire
-- **[Règles de sécurité (RLS)](/docs/collections/security-rules/)** — l'usage fait des revendications (claims) renvoyées par un adaptateur
+- **[Authentification](/docs/backend/authentication/)** — configuration du fournisseur intégré
+- **[Points de terminaison et jetons](/docs/backend/auth-endpoints/)** — les routes qu'un adaptateur doit satisfaire
+- **[Règles de sécurité (RLS)](/docs/collections/security-rules/)** — l'utilisation qui est faite des revendications (claims) renvoyées par un adaptateur

@@ -1,19 +1,19 @@
 ---
-sourceHash: b9f712f58936dac9
+sourceHash: 901c6998adce627e
 title: Realtime-Abonnements
 sidebar_label: Realtime
-description: Abonnieren Sie Live-Datenänderungen mit dem typisierten SDK von Rebase über WebSocket-basierte Realtime-Listener.
+description: Abonnieren Sie Live-Datenänderungen mit dem typsicheren Rebase-SDK über WebSocket-basierte Realtime-Listener.
 ---
 
 ## Übersicht
 
-Das typisierte SDK von Rebase bietet Echtzeit-Datenabonnements über WebSocket. Wenn sich Datensätze auf dem Server ändern, werden Ihre abonnierten Callbacks sofort mit den aktualisierten Daten ausgelöst.
+Das typsichere Rebase-SDK bietet Echtzeit-Datenabonnements über WebSocket. Wenn sich Datensätze auf dem Server ändern, werden Ihre abonnierten Callbacks sofort mit den aktualisierten Daten ausgelöst.
 
-Die WebSocket-Verbindung wird automatisch aufgebaut, sobald eine `websocketUrl` verfügbar ist (standardmäßig von `baseUrl` abgeleitet). Die Wiederverbindung und die Token-Aktualisierung werden für Sie übernommen. Ein Ausfall, der länger als etwa 15 Sekunden dauert, wird einmalig an das `onError` jedes Abonnements gemeldet, als `CONNECTION_LOST` — siehe [Authentifizierung und Wiederverbindung](#authentifizierung-und-wiederverbindung).
+Die WebSocket-Verbindung wird automatisch hergestellt, sobald eine `websocketUrl` verfügbar ist (standardmäßig abgeleitet von `baseUrl`). Wiederverbindungsversuche und Token-Aktualisierungen werden automatisch für Sie verwaltet. Ein Ausfall, der länger als etwa 15 Sekunden dauert, wird einmalig an das `onError` jedes Abonnements als `CONNECTION_LOST` gemeldet – siehe [Authentifizierung und Wiederverbindung](#authentifizierung-und-wiederverbindung).
 
-## Abonnieren einer Collection
+## Eine Collection abonnieren
 
-Verwenden Sie `listen()`, um eine Collection-Abfrage zu abonnieren. Der Callback wird ausgelöst, sobald sich die übereinstimmende Datenmenge ändert:
+Verwenden Sie `listen()`, um eine Collection-Abfrage zu abonnieren. Der Callback wird ausgelöst, sobald sich der übereinstimmende Datensatz ändert:
 
 ```typescript
 const unsubscribe = client.data.products.listen(
@@ -56,11 +56,11 @@ listen(
 ): () => void   // returns unsubscribe function
 ```
 
-`FindResult<M>` hat dieselbe Struktur, die auch `find()` zurückgibt: flache Zeilen in `data` und `{ total, limit, offset, hasMore, nextCursor }` in `meta`.
+`FindResult<M>` hat dieselbe Struktur, die `find()` zurückgibt: flache Zeilen in `data` und `{ total, limit, offset, hasMore, nextCursor }` in `meta`.
 
 ### `listen()` akzeptiert das Gleiche wie `find()`
 
-`params` ist ein vollständiges `FindParams`-Objekt. Ein Abonnement ist dieselbe Abfrage wie das dazugehörige `find()`, daher akzeptiert es dieselben Einschränkungen – `where`, `logical`, `orderBy`, `limit`, `offset`/`page`, `searchString`, **`include`** und **`fields`**:
+`params` ist ein vollständiges `FindParams`. Ein Abonnement entspricht derselben Abfrage wie das zugehörige `find()`, akzeptiert also dieselben Einschränkungen – `where`, `logical`, `orderBy`, `limit`, `offset`/`page`, `searchString`, **`include`** und **`fields`**:
 
 ```typescript
 client.data.posts.listen(
@@ -69,20 +69,20 @@ client.data.posts.listen(
 );
 ```
 
-Das ist wichtiger, als es klingt. Früher wurden `include` und `fields` hier stillschweigend verworfen, sodass dieselbe Abfrage über `find()` in einer Struktur und über `listen()` in einer anderen beantwortet wurde – und eine Komponente, die beides renderte, sah, wie sich die Form ihrer Zeilen in dem Moment änderte, in dem ein Schreibvorgang eintraf. Nun durchlaufen sie die identische Lese-Pipeline, sodass `find({ q })` und `listen({ q })` Zeilen zurückgeben, die Feld für Feld übereinstimmen.
+Das ist wichtiger, als es klingt. `include` und `fields` wurden hier früher stillschweigend verworfen, sodass dieselbe Abfrage über `find()` in einer anderen Struktur beantwortet wurde als über `listen()` – und eine Komponente, die beides renderte, sah ihre Zeilenstruktur in dem Moment wechseln, in dem ein Schreibvorgang eintraf. Sie durchlaufen nun die identische Read-Pipeline, sodass `find({ q })` und `listen({ q })` Zeilen zurückgeben, die Feld für Feld identisch sind.
 
-Die Ausnahme ist `vectorSearch`, was **abgelehnt** statt verworfen wird: Ein Abonnement wird bei jedem passenden Schreibvorgang erneut ausgeführt, und dabei werden keine Distanzen berechnet. Verwenden Sie `.vectorSearch(…).find()` für die Abfrage und abonnieren Sie ohne diese Option.
+Die Ausnahme ist `vectorSearch`, was **abgelehnt** statt verworfen wird: Ein Abonnement wird bei jedem passenden Schreibvorgang erneut ausgeführt und dort berechnet nichts Distanzen. Verwenden Sie `.vectorSearch(…).find()` für die Abfrage und abonnieren Sie ohne diese Angabe.
 
-### Eine Auslieferung pro Änderung
+### Eine Emission pro Änderung
 
-Jeder Server-Push ruft Ihren Callback **einmal** auf, mit Metadaten, die die dazugehörigen Zeilen beschreiben. Es gibt keine separate First-Paint-Auslieferung und kein Flag, das geprüft werden müsste.
+Jeder Server-Push ruft Ihren Callback **einmal** auf, zusammen mit Metadaten, die die dazugehörigen Zeilen beschreiben. Es gibt keine separate First-Paint-Emission und kein Flag, das geprüft werden muss.
 
-Die Metadaten treffen **im selben Frame wie die Zeilen** ein: Der Server zählt die Abfrage innerhalb derselben Row-Level-Security-gebundenen Transaktion, die sie gelesen hat, sodass `meta.total`, `meta.hasMore` und `meta.nextCursor` exakt die Zeilen daneben beschreiben. (Früher folgte auf jeden Push ein `GET /count` vom Client – ein zusätzlicher Roundtrip pro Schreibvorgang und Abonnent, und ein Zeitfenster, in dem die Anzahl und die Zeilen unterschiedliche Zustände der Collection beschrieben.)
+Die Metadaten treffen **im selben Frame wie die Zeilen** ein: Der Server zählt die Abfrage innerhalb derselben Transaktion mit Row-Level Security, die sie gelesen hat, sodass `meta.total`, `meta.hasMore` und `meta.nextCursor` exakt die Zeilen neben ihnen beschreiben. (Früher folgte auf jeden Push ein `GET /count` vom Client – ein zusätzlicher Roundtrip pro Schreibvorgang und Abonnent sowie ein Zeitfenster, in dem die Anzahl und die Zeilen unterschiedliche Zustände der Collection beschrieben.)
 
-Zwei Fallbacks, von denen keiner ein Abonnementfehler ist und keiner `onError` aufruft:
+Zwei Fallbacks, von denen keiner ein Abonnement-Fehler ist und keiner `onError` aufruft:
 
-- Wenn das **Zählen auf dem Server fehlgeschlagen ist**, enthält der Frame keine Gesamtzahl und der zuletzt eingetroffene Wert wird wiederverwendet. Ein fehlgeschlagener Zählvorgang sagt nichts darüber aus, wie groß die Collection ist, daher darf er keine echte Antwort überschreiben.
-- Wenn für dieses Abonnement noch nie eine Gesamtzahl eingetroffen ist – etwa bei einem älteren Server, der überhaupt keine Metadaten sendet –, fragt der Client einmalig beim ersten Push nach. Wenn auch das fehlschlägt, ist `meta.total` eine **untere Grenze**: die Zeilen auf dieser Seite plus die Zeilen, an denen vorbeigeblättert wurde, um sie zu erreichen.
+- Wenn der **Count des Servers fehlgeschlagen ist**, enthält der Frame keine Gesamtzahl und die zuletzt empfangene wird wiederverwendet. Eine fehlgeschlagene Zählung sagt nichts darüber aus, wie groß die Collection ist, daher darf sie keine echte Antwort überschreiben.
+- Wenn für dieses Abonnement noch nie eine Gesamtzahl empfangen wurde – etwa bei einem älteren Server, der überhaupt keine Metadaten sendet –, fragt der Client beim ersten Push einmal nach. Schlägt auch dies fehl, ist `meta.total` eine **untere Grenze**: die Zeilen auf dieser Seite plus jene, die zuvor durchblättert wurden, um sie zu erreichen.
 
 ```typescript
 client.data.products.listen(
@@ -94,7 +94,7 @@ client.data.products.listen(
 );
 ```
 
-## Abonnieren einer einzelnen Entität
+## Eine einzelne Entität abonnieren
 
 Verwenden Sie `listenById()`, um einen bestimmten Datensatz anhand seiner ID zu beobachten:
 
@@ -130,9 +130,7 @@ listenById(
 
 Der Callback empfängt eine flache Zeile – keine `Entity`, es gibt also kein `.values` – und `undefined`, wenn der Datensatz gelöscht wird.
 
-Jeder Frame trägt die Relationen, die `options.include` nennt, geladen so, wie `find({ include })`
-sie in jede Zeile einer Liste lädt. Eine To-many-Relation, die dort nicht genannt wird, fehlt in
-der Zeile, sie ist nicht leer:
+Jeder Frame enthält die Relationen, die in `options.include` benannt sind, so wie `find({ include })` sie in jede Zeile einer Liste lädt. Eine To-many-Relation, die dort nicht aufgeführt ist, fehlt in der Zeile (ist also nicht leer vorhanden):
 
 ```typescript
 client.data.posts.listenById(1, (post) => {
@@ -140,16 +138,11 @@ client.data.posts.listenById(1, (post) => {
 }, undefined, { include: ["tags"] });
 ```
 
-**Grenzen.** Ein Frame wird gesendet, wenn sich die Zeile selbst ändert, und jeder Frame lädt seine eingebundenen
-Relationen neu. Eine Änderung nur an einer verknüpften Zeile sendet keinen Frame: Das Bearbeiten des Namens eines Tags
-aktualisiert einen mit `include: ["tags"]` beobachteten Post erst, wenn sich auch der Post ändert. Um
-den verknüpften Zeilen zu folgen, beobachten Sie zusätzlich deren Collection.
+**Einschränkungen.** Ein Frame wird gesendet, wenn sich die Zeile selbst ändert, und jeder Frame lädt seine inkludierten Relationen neu. Eine Änderung an einer verknüpften Zeile allein sendet keinen Frame: Die Bearbeitung des Namens eines Tags aktualisiert einen mit `include: ["tags"]` abonnierten Beitrag erst, wenn sich auch der Beitrag ändert. Um verknüpfte Zeilen zu verfolgen, abonnieren Sie auch deren Collection.
 
 ## Eine Anzahl beobachten
 
-`listenCount()` hält eine Anzahl aktuell: die Gesamtzahl dessen, was der Filter einer Liste trifft, für
-eine Toolbar oder ein „Alle N auswählen“-Angebot, das nicht veralten soll, während andere Zeilen hinzufügen und entfernen.
-Der Callback läuft mit der Gesamtzahl, sobald sie bekannt ist, und erneut, wann immer ein Schreibvorgang sie ändert.
+`listenCount()` hält eine Anzahl aktuell: die Gesamtzahl dessen, worauf der Filter einer Liste zutrifft, beispielsweise für eine Toolbar oder eine „Alle N auswählen“-Option, die nicht veralten soll, während andere Personen Zeilen hinzufügen und entfernen. Der Callback wird mit der Gesamtzahl ausgeführt, sobald diese bekannt ist, und erneut, wann immer ein Schreibvorgang sie ändert.
 
 ```typescript
 const stop = client.data.orders.listenCount(
@@ -159,16 +152,11 @@ const stop = client.data.orders.listenCount(
 );
 ```
 
-Nur der Filter zählt — `where`, `logical` und `searchString`; ein `limit`, ein `offset` oder eine Sortierung wird
-ignoriert. Der Server liest dafür keine Zeilen, nur die Anzahl, unter der Identität des Abonnenten wie bei jedem
-anderen Frame. Ein Server älter als 0.25 kennt die Anfrage nicht; er beantwortet sie mit einer Zeile und derselben
-Gesamtzahl, und das SDK liest die Gesamtzahl daraus. Bei einem Client ohne Socket ist `listenCount()` ein
-Stub, der einen Fehler wirft, wie `listen()`. Ist [Offline-Unterstützung](/docs/sdk/offline/) aktiv, ist die Anzahl die
-des Servers: Warteschlangen-Schreibvorgänge sind darin erst enthalten, wenn sie wiedergegeben werden.
+Nur der Filter zählt – `where`, `logical` und `searchString`; ein `limit`, ein `offset` oder eine Sortierung werden ignoriert. Der Server liest dafür keine Zeilen, sondern nur die Anzahl, unter der Identität des Abonnenten wie bei jedem anderen Frame. Ein Server älter als 0.25 kennt diese Anfrage nicht; sie wird mit einer Zeile und derselben Gesamtzahl beantwortet, und das SDK liest die Gesamtzahl daraus aus. Bei einem Client ohne Socket ist `listenCount()` ein Stub, der wie `listen()` einen Fehler auslöst. Bei aktivierter [Offline-Unterstützung](/docs/sdk/offline/) stammt die Anzahl vom Server: Schreibvorgänge in der Warteschlange sind darin nicht enthalten, bis sie erneut wiedergegeben (replayed) wurden.
 
 ## Fluent Query Builder
 
-Sie können ein Abonnement auch über den Fluent Query Builder erstellen. Dies entspricht dem Aufruf von `listen()` mit Parametern, ermöglicht es Ihnen jedoch, Methoden wie `.where()`, `.orderBy()` usw. zu verketten:
+Sie können auch über den Fluent Query Builder abonnieren. Dies entspricht dem Aufruf von `listen()` mit Parametern, ermöglicht Ihnen jedoch das Verketten von `.where()`, `.orderBy()` usw.:
 
 ```typescript
 const unsubscribe = client.data.products
@@ -181,13 +169,13 @@ const unsubscribe = client.data.products
     );
 ```
 
-Ein Abonnement unterstützt wie jede andere Abfrage eine Sortierung über mehrere Spalten – entweder `orderBy: [["category", "asc"], ["createdAt", "desc"]]` in den Parametern oder einen zweiten `.orderBy()`-Aufruf, der ein weiteres Sortierkriterium (Tie-Breaker) hinzufügt, statt das erste zu ersetzen. Siehe [Sortierung](/docs/sdk/querying#sorting).
+Ein Abonnement akzeptiert wie jede andere Abfrage eine mehrspaltige Sortierung – entweder `orderBy: [["category", "asc"], ["createdAt", "desc"]]` in den Parametern oder einen zweiten `.orderBy()`-Aufruf, der ein Tie-Breaker-Kriterium hinzufügt, anstatt das erste zu ersetzen. Siehe [Sortierung](/docs/sdk/querying#sorting).
 
-Der Server prüft die *Struktur* des `orderBy` eines Abonnements beim Eintreffen und lehnt ein fehlerhaftes Format mit einem Fehler-Frame ab, anstatt das Abonnement einzurichten. Eine Sortierung, die er nicht lesen konnte, würde sonst Zeilen völlig ungeordnet streamen, ohne einen Fehler zu melden – und ein `collection_update`-Frame überträgt lediglich Zeilen und nichts weiter, sodass ein Abonnent keine Möglichkeit hätte, dies zu bemerken.
+Der Server überprüft beim Eintreffen die *Struktur* des `orderBy` eines Abonnements und lehnt ein fehlerhaftes mit einem Error-Frame ab, anstatt das Abonnement einzurichten. Eine Sortierung, die er nicht lesen konnte, würde andernfalls Zeilen völlig ungeordnet streamen, ohne einen Fehler zu melden – und ein `collection_update`-Frame überträgt Zeilen und sonst nichts, sodass ein Abonnent dies nicht bemerken könnte.
 
-## Abonnements beenden
+## Abonnement beenden
 
-Jedes Abonnement gibt eine `unsubscribe`-Funktion zurück. Rufen Sie diese auf, um keine Aktualisierungen mehr zu erhalten und den WebSocket-Listener zu bereinigen:
+Jedes Abonnement gibt eine `unsubscribe`-Funktion zurück. Rufen Sie diese auf, um den Empfang von Updates zu beenden und den WebSocket-Listener zu bereinigen:
 
 ```typescript
 const unsubscribe = client.data.products.listen(
@@ -199,7 +187,7 @@ const unsubscribe = client.data.products.listen(
 unsubscribe();
 ```
 
-Verwenden Sie in React die Bereinigungsfunktion von `useEffect`:
+Verwenden Sie in React das Cleanup von `useEffect`:
 
 ```tsx
 useEffect(() => {
@@ -215,18 +203,15 @@ useEffect(() => {
 
 Der WebSocket-Client übernimmt die Authentifizierung automatisch:
 
-- Bei der **Anmeldung** oder beim **Token-Refresh** übernimmt ein bereits geöffneter Socket die neue Anmeldeinformation. Ein Refresh oder eine Anmeldung als das Konto, das er bereits hält, sendet das Token in einer `authenticate`-Nachricht; eine Anmeldung als ein anderes Konto — auch die eines Besuchers — baut den Socket neu auf, der sich als dieses Konto authentifiziert und jedes aktive Abonnement und jeden Channel erneut sendet. Ist keiner geöffnet, geschieht nichts – das Anmelden ist keine Anforderung für Realtime, und ein später geöffneter Socket authentifiziert sich selbst.
-- Bei der **Abmeldung** wird die WebSocket-Verbindung getrennt. Der Client bleibt nutzbar; ein späteres Abonnement stellt die Verbindung anonym wieder her.
-- Wenn die Verbindung abbricht, **verbindet sich der Client automatisch wieder** und richtet alle aktiven Abonnements neu ein. Er hört nie auf, es zu versuchen, solange ein Abonnement oder ein beigetretener Channel existiert; die Verzögerung zwischen den Versuchen wächst auf höchstens 30 Sekunden.
-- Beendet der Server die Sitzung des Sockets — die Person hat sich überall abgemeldet, diese Sitzung wurde widerrufen, das Konto wurde gelöscht, oder das Token ist abgelaufen, bevor ein Refresh den Socket erreichte —, schließt er den Socket mit dem Code `4001`. Der Client verbindet sich wieder wie nach jedem anderen Abbruch und authentifiziert sich mit der Sitzung, die er dann hält (aktualisiert, falls möglich), oder anonym, wenn keine vorhanden ist. Eine entzogene Rolle schließt den Socket nicht: Sie gilt ab dem nächsten Frame. Siehe [Authentifizierung & RLS](/docs/backend/realtime/#authentication--rls).
-- Bleibt die Verbindung länger als etwa 15 Sekunden unterbrochen, wird das `onError` jedes Abonnements (und das `onError` jedes beigetretenen Channels) **einmal** mit einem `RebaseApiError` aufgerufen, dessen `code` `CONNECTION_LOST` ist. Das Abonnement wird dabei nicht beendet: Zeigen Sie weiterhin, was Sie haben, markieren Sie es als möglicherweise veraltet, und warten Sie. Sobald der Socket zurück ist, trägt das nächste `onUpdate` des Abonnements alles, was in der Zwischenzeit geschrieben wurde.
-- `client.ws.state` ist der Zustand der Verbindung — `idle`, `connecting`, `connected`, `reconnecting`, `disconnected` oder `closed` — und `client.ws.onStateChange(listener)` wird über jede Änderung informiert. `disconnected` ist der Zustand, in dem `CONNECTION_LOST` gemeldet wurde.
-- Über den Socket gesendete Anfragen sind **at-most-once**. Eine, die gesendet wurde, als die Verbindung abbrach, scheitert mit `CONNECTION_LOST` und wird nie erneut gesendet, da der Server sie möglicherweise schon ausgeführt hat. Eine, die nach 30 Sekunden noch auf einen Socket wartet, scheitert mit `REQUEST_TIMEOUT`, ohne gesendet worden zu sein.
+- Bei **Anmeldung** oder **Token-Aktualisierung** übernimmt ein bereits geöffneter Socket die neuen Anmeldedaten. Ein Refresh oder eine Anmeldung unter demselben Account, den er bereits hält, sendet das Token in einer `authenticate`-Nachricht; eine Anmeldung unter einem anderen Account – einschließlich eines Besuchers, der sich anmeldet – baut den Socket neu auf, der sich als dieser Account authentifiziert und jedes aktive Abonnement sowie jeden Kanal erneut sendet. Ist keiner geöffnet, geschieht nichts – eine Anmeldung ist keine Anforderung für Echtzeit, und ein später geöffneter Socket authentifiziert sich selbst.
+- Bei **Abmeldung** wird die WebSocket-Verbindung getrennt. Der Client bleibt nutzbar; ein späteres Abonnement stellt die Verbindung anonym wieder her.
+- Wenn die Verbindung abbricht, **verbindet sich der Client automatisch wieder** und stellt alle aktiven Abonnements wieder her. Er bricht die Versuche nie ab, solange ein Abonnement oder ein beigetretener Kanal existiert; die Verzögerung zwischen den Versuchen steigt auf maximal 30 Sekunden an.
+- Wenn der Server die Sitzung des Sockets beendet – der Benutzer hat sich überall abgemeldet, diese Sitzung wurde widerrufen, das Konto wurde gelöscht oder das Token ist abgelaufen, bevor ein Refresh den Socket erreichte –, schließt er den Socket mit dem Code `4001`. Der Client verbindet sich wie nach jedem Verbindungsabbruch wieder und authentifiziert sich mit der Sitzung, die er zu diesem Zeitpunkt hält (aktualisiert, falls möglich), oder anonym, wenn keine vorhanden ist. Der Entzug einer Rolle schließt den Socket nicht: Er greift ab dem nächsten Frame. Siehe [Authentifizierung & RLS](/docs/backend/realtime/#authentication--rls).
+- Bleibt die Verbindung länger als etwa 15 Sekunden unterbrochen, wird `onError` jedes Abonnements (und `onError` jedes beigetretenen Kanals) **einmal** mit einem `RebaseApiError` aufgerufen, dessen `code` `CONNECTION_LOST` lautet. Das Abonnement wird nicht beendet: Zeigen Sie weiterhin die vorhandenen Daten an, markieren Sie sie möglicherweise als veraltet (stale) und warten Sie ab. Sobald der Socket wieder verbunden ist, überträgt das nächste `onUpdate` des Abonnements alle in der Zwischenzeit geschriebenen Daten.
+- `client.ws.state` ist der Status der Verbindung – `idle`, `connecting`, `connected`, `reconnecting`, `disconnected` oder `closed` – und `client.ws.onStateChange(listener)` wird über jede Änderung benachrichtigt. `disconnected` ist der Zustand, in dem `CONNECTION_LOST` gemeldet wurde.
+- Über den Socket gesendete Anfragen erfolgen nach dem **At-most-once**-Prinzip. Eine Anfrage, die gesendet wurde, als die Verbindung abbrach, schlägt mit `CONNECTION_LOST` fehl und wird nie erneut gesendet, da der Server sie möglicherweise bereits ausgeführt hat. Eine Anfrage, die nach 30 Sekunden immer noch auf einen Socket wartet, schlägt mit `REQUEST_TIMEOUT` fehl, ohne gesendet worden zu sein.
 
-Alles in der Liste nach der Abmeldung kam mit 0.24. Unter 0.23 gibt der Client nach
-fünf gescheiterten Wiederverbindungsversuchen auf, reiht Anfragen, die während der Trennung
-gestellt wurden, ein und sendet sie bei der Wiederverbindung, hat kein `client.ws.state`, und der
-Server schließt nie einen Socket, dessen Sitzung beendet wurde.
+Alles in der Liste nach dem Punkt zur Abmeldung wurde in Version 0.24 eingeführt. Unter 0.23 gibt der Client nach fünf fehlgeschlagenen Wiederverbindungsversuchen auf, stellt während der Trennung gestellte Anfragen in eine Warteschlange und sendet sie bei erneuter Verbindung, besitzt kein `client.ws.state`, und der Server schließt nie einen Socket, dessen Sitzung beendet wurde.
 
 ```typescript
 import { RebaseApiError } from "@rebasepro/client";
@@ -249,19 +234,11 @@ const unsubscribe = client.data.orders.listen(
 
 ### Welches Token der Socket sendet
 
-Unter 0.24 verwendet der Socket
-nur die eigene Session des Clients und die Option `token`: Ein mit
-`client.setAuthTokenGetter()` installierter Getter erreicht ihn nie, sodass ein Host, der
-einen eigenen Auth-Provider verwendet, einen anonymen Socket bekommt.
+In 0.24 verwendet der Socket nur die eigene Sitzung des Clients und die `token`-Option: Ein mit `client.setAuthTokenGetter()` installierter Getter erreicht ihn nie, sodass ein Host, der einen eigenen Auth-Provider verwendet, einen anonymen Socket erhält.
 
-Der Socket authentifiziert sich mit demselben Token, das eine HTTP-Anfrage tragen würde. Das ist
-zuerst der mit `client.setAuthTokenGetter()` installierte Getter; gibt es keinen, oder antwortet er
-mit `null` oder wirft einen Fehler, ist es das Token, das der Client hält: das seiner
-Session, eines, das mit `client.setToken()` gesetzt wurde, oder die Option `token`. Mit dem
-integrierten `client.auth` ist nichts zu verdrahten.
+Der Socket authentifiziert sich mit demselben Token, das auch ein HTTP-Request tragen würde. Dies ist in erster Linie der über `client.setAuthTokenGetter()` installierte Getter; wenn keiner vorhanden ist, er `null` zurückgibt oder einen Fehler auslöst, ist es das Token, das der Client hält: das seiner Sitzung, ein über `client.setToken()` festgelegtes oder die Option `token`. Mit dem integrierten `client.auth` muss nichts zusätzlich verdrahtet werden.
 
-Für einen externen Auth-Provider (Clerk, Firebase Auth, eine eigene Session)
-installieren Sie den Getter einmal. Er deckt HTTP und den Socket ab:
+Für einen externen Auth-Provider (Clerk, Firebase Auth, eine eigene Session) installieren Sie den Getter einmalig. Er deckt sowohl HTTP als auch den Socket ab:
 
 ```typescript
 client.setAuthTokenGetter(() => provider.getToken());
@@ -273,21 +250,15 @@ client.setOnUnauthorized(async () => {
 });
 ```
 
-- `client.setOnUnauthorized(handler)` beantwortet ein abgelehntes Token auf beiden: ein 401
-  über HTTP und einen Auth-Fehler auf dem Socket. Lösen Sie mit `true` auf, um mit dem erneut
-  aufgelösten Token zu wiederholen. Es ersetzt die eigene Session-Aktualisierung des Clients.
-- Das Installieren eines Getters oder der Aufruf von `client.setToken()` baut einen offenen Socket neu auf:
-  Der neue authentifiziert sich mit der neuen Anmeldeinformation und sendet jedes aktive
-  Abonnement und jeden Channel als diese erneut, und nichts, was die vorherige Identität hielt,
-  wird übernommen. Ist kein Socket offen, authentifiziert sich der nächste selbst.
-- `client.ws.setAuthTokenGetter()` ist veraltet (deprecated). Es funktioniert weiterhin, ersetzt
-  nur den Getter des Sockets und warnt einmalig. Verwenden Sie `client.setAuthTokenGetter()`.
+- `client.setOnUnauthorized(handler)` reagiert auf ein abgewiesenes Token auf beiden Wegen: ein 401 über HTTP und ein Auth-Fehler auf dem Socket. Geben Sie `true` zurück, um den Versuch mit erneut aufgelöstem Token zu wiederholen. Dies ersetzt den client-eigenen Session-Refresh.
+- Das Installieren eines Getters oder der Aufruf von `client.setToken()` baut einen geöffneten Socket neu auf: Der neue Socket authentifiziert sich mit den neuen Anmeldedaten und sendet jedes aktive Abonnement und jeden Kanal unter dieser Identität erneut, wobei nichts von der vorherigen Identität übernommen wird. Wenn kein Socket geöffnet ist, authentifiziert sich der nächste von selbst.
+- `client.ws.setAuthTokenGetter()` ist veraltet (deprecated). Es funktioniert weiterhin, ersetzt aber nur den Getter des Sockets und gibt eine einmalige Warnung aus. Verwenden Sie `client.setAuthTokenGetter()`.
 
-Siehe [Einen eigenen Auth-Provider verwenden](/docs/sdk/authentication#using-your-own-auth-provider).
+Siehe [Eigener Auth-Provider](/docs/sdk/your-own-auth-provider/).
 
-### Verbindungsaufbau nach Bedarf (Lazy)
+### Die Verbindung wird verzögert aufgebaut (Lazy)
 
-Beim Erstellen eines Clients wird **kein** WebSocket geöffnet. Die Verbindung wird erst bei der ersten Operation aufgebaut, die tatsächlich eine benötigt – ein `listen()`- / `listenById()`-Abonnement oder eine Channel-Operation wie `join()`, `track()` oder `broadcast()`. Das Anfordern einer Channel-Instanz bedeutet noch keine Nutzung.
+Das Erstellen eines Clients öffnet **keinen** WebSocket. Die Verbindung wird erst bei der ersten Operation aufgebaut, die tatsächlich einen benötigt – ein `listen()`- / `listenById()`-Abonnement oder eine Kanal-Operation wie `join()`, `track()` oder `broadcast()`. Das Anfordern einer Kanal-Instanz gilt noch nicht als Nutzung.
 
 ```typescript
 const client = createRebaseClient({ baseUrl });   // no socket
@@ -295,16 +266,16 @@ const channel = client.realtime.channel("doc:1"); // still no socket
 await channel.join();                             // socket opens here
 ```
 
-Dies ist wichtig für Anwendungen mit nennenswertem Traffic von abgemeldeten Benutzern – Marketing-Seiten, öffentliche schreibgeschützte Ansichten, Anonymous-First-Tools –, die zuvor bei jedem Seitenaufruf eine Verbindung aufbauen mussten, nur um Realtime zur Verfügung zu haben.
+Dies ist wichtig für Anwendungen mit beträchtlichem Datenverkehr von nicht angemeldeten Nutzern – Marketingseiten, öffentliche schreibgeschützte Ansichten, anonym nutzbare Tools –, die zuvor bei jedem Seitenaufruf eine Verbindung aufbauen mussten, nur um Realtime bereitzuhalten.
 
-Zwei damit verbundene Verhaltensweisen:
+Zwei zusammenhängende Verhaltensweisen:
 
-- `realtime: false` bleibt ein striktes Opt-out: es wird niemals ein Socket geöffnet, und `client.realtime.channel()` wirft einen Fehler. Dasselbe gilt für `listen()` und `listenById()` – sie stehen stets als Aufruf bereit und werfen bei einem Client ohne Socket einen `RebaseClientError`, der die Option nennt, mit der sie aktiviert werden können. `observe()` tut dies nicht: Es fällt auf einen einzelnen Fetch-Aufruf zurück.
-- `client.close()` ist endgültig. Es gibt den Socket und seinen Reconnect-Timer frei, und keine danach eingereihte Operation wird die Verbindung erneut aufbauen. Unter Node hält ein offener Socket die Event-Loop aktiv, sodass ein Skript, das diese Methode nie aufruft, sich nicht von selbst beendet.
+- `realtime: false` bleibt ein striktes Deaktivieren: Es wird niemals ein Socket geöffnet, und `client.realtime.channel()` löst einen Fehler aus. Dasselbe gilt für `listen()` und `listenById()` – sie stehen stets als Aufruf bereit, lösen jedoch bei einem Client ohne Socket einen `RebaseClientError` aus, der die Option benennt, die sie aktivieren würde. `observe()` tut dies nicht: Es fällt auf einen einzelnen Fetch zurück.
+- `client.close()` ist endgültig. Es gibt den Socket sowie dessen Reconnect-Timer frei, und nichts, was danach in die Warteschlange gestellt wird, wählt sich erneut ein. In Node hält ein offener Socket die Event-Loop aktiv, sodass ein Skript, das dies nie aufruft, sich nicht von selbst beendet.
 
 ### Eine Gruppe auf einer Instanz halten
 
-Bei mehr als einer Server-Instanz können Mitglieder eines Channels auf verschiedenen Instanzen landen, und jede Nachricht zwischen ihnen [läuft dann über den Channel-Bus](/docs/backend/realtime-transports/#channels-and-presence-across-instances). `affinity` benennt die Gruppe, zu der ein Socket gehört, etwa einen Raum oder ein Dokument, damit eine Plattform die ganze Gruppe an dieselbe Instanz leiten kann:
+Bei mehr als einer Server-Instanz können Mitglieder eines Kanals auf verschiedenen Instanzen landen, und jede Nachricht zwischen ihnen durchläuft dann den [Channel-Bus](/docs/backend/realtime-transports/#channels-and-presence-across-instances). `affinity` benennt die Gruppe, zu der ein Socket gehört, wie etwa einen Raum oder ein Dokument, sodass eine Plattform die gesamte Gruppe an dieselbe Instanz leiten kann:
 
 ```typescript
 const client = createRebaseClient({
@@ -322,17 +293,17 @@ client.realtime.setAffinity(roomCode);          // no socket yet
 await client.realtime.channel(roomCode).join(); // opens with the key
 ```
 
-Der Schlüssel steht als `?affinity=` in der Adresse des Sockets und ersetzt einen, der bereits in einer von Ihnen gesetzten `websocketUrl` steht. `setAffinity(null)` löscht ihn.
+Der Schlüssel wird der Socket-Adresse als `?affinity=` angehängt und ersetzt einen bereits vorhandenen Wert in einer gesetzten `websocketUrl`. `setAffinity(null)` löscht ihn.
 
-- **Es ist eine Optimierung.** Rebase Cloud routet danach, wenn ein Projekt mehr als eine Instanz betreibt. Selbst gehostet oder hinter einem Proxy, der nicht darauf hasht, bewirkt es nichts, und Channels funktionieren gleich: Der Bus trägt weiterhin alles, was Instanzen überspannt, auch eine Gruppe, die durch ein Scale-up geteilt wurde.
-- **Es wirkt, wenn der Socket sich verbindet.** Ein bereits offener Socket bleibt, wo er ist, und verwendet den neuen Schlüssel beim nächsten Verbindungsaufbau. Um einen verbundenen Client zu verschieben, erstellen Sie einen neuen oder setzen Sie den Schlüssel vor seinem ersten `join()` oder `listen()`.
-- **Es bestimmt, wo ein Socket landet, nicht, was er betreten darf.** Der Zugriff auf einen Channel hängt nicht davon ab, und die Adresse landet in Zugriffslogs, verwenden Sie also einen Code statt eines Geheimnisses oder etwas Persönlichem.
+- **Es ist eine Optimierung.** Rebase Cloud nutzt dies für das Routing, wenn ein Projekt auf mehr als einer Instanz läuft. Self-hosted oder hinter einem Proxy, der nicht darauf hasht, bewirkt dies nichts und Kanäle funktionieren identisch: Der Bus überträgt weiterhin alles instanzübergreifend, einschließlich einer Gruppe, die durch ein Scale-up aufgeteilt wurde.
+- **Es wird wirksam, wenn der Socket eine Verbindung herstellt.** Ein bereits geöffneter Socket bleibt dort, wo er ist, und verwendet den neuen Schlüssel bei der nächsten Verbindung. Um einen bereits verbundenen Client zu verschieben, erstellen Sie einen neuen oder setzen Sie den Schlüssel vor dessen erstem `join()` oder `listen()`.
+- **Es bestimmt, wo ein Socket landet, nicht, worauf er zugreifen darf.** Der Zugriff auf einen Kanal hängt nicht davon ab, und die Adresse landet in den Zugriffsprotokollen (Access Logs). Verwenden Sie daher einen Code statt eines Secrets oder persönlicher Daten.
 
-Um zu prüfen, ob es funktioniert, vergleichen Sie, was jede Instanz veröffentlicht und überspringt: siehe [Beobachten, was der Bus tut](/docs/backend/realtime-transports/#seeing-what-the-bus-does).
+Um zu überprüfen, ob es funktioniert, vergleichen Sie, was jede Instanz veröffentlicht und überspringt: siehe [Prüfen, was der Bus tut](/docs/backend/realtime-transports/#seeing-what-the-bus-does).
 
-## Broadcast-Channels
+## Broadcast-Kanäle
 
-Broadcast-Channels ermöglichen es Ihnen, beliebige Nachrichten zwischen verbundenen Clients zu senden – ideal für Chats, Benachrichtigungen oder kollaborative Funktionen:
+Über Broadcast-Kanäle können Sie beliebige Nachrichten zwischen verbundenen Clients senden – ideal für Chats, Benachrichtigungen oder kollaborative Funktionen:
 
 ```typescript
 // Obtain a channel. This alone opens no connection.
@@ -353,25 +324,25 @@ await channel.broadcast("message", {
 await channel.leave();
 ```
 
-Channels sind leichtgewichtig und flüchtig (ephemer) – sie existieren so lange, wie mindestens ein Client abonniert ist. Wiederholte `channel()`-Aufrufe mit demselben Namen geben dasselbe (**same**) Objekt zurück, sodass zwei Komponenten Handler unabhängig voneinander registrieren können, ohne dass eine die andere durch das Verlassen des Channels abschneidet.
+Kanäle sind leichtgewichtig und flüchtig (ephemeral) – sie existieren, solange mindestens ein Client abonniert ist. Wiederholte `channel()`-Aufrufe mit demselben Namen geben **dasselbe** Objekt zurück, sodass zwei Komponenten Handler unabhängig voneinander anhängen können, ohne dass eine Komponente die andere durch ein `leave()` trennt.
 
-Channel- und Presence-Frames erfordern kein Konto: Anonyme Besucher können öffentlichen Channels beitreten.
+Kanal- und Präsenz-Frames erfordern kein Konto: Anonyme Besucher können öffentlichen Kanälen beitreten.
 
-:::caution[Channels haben noch keine Zugriffsregeln]
-Die einzige Überprüfung, die der Server vornimmt, ist die **Mitgliedschaft**: Um in einen Channel zu broadcasten, dessen Presence-Liste zu lesen oder dessen Historie abzuspielen, muss ein Client diesem Channel zuerst beigetreten sein. Der Beitritt selbst steht jedem offen – jeder Client, der den Namen eines Channels kennt, kann ihm beitreten, unabhängig davon, ob er angemeldet ist oder nicht.
+:::caution[Kanäle haben noch keine Zugriffsregeln]
+Die einzige Prüfung, die der Server durchführt, ist die **Mitgliedschaft**: Um in einen Kanal zu senden (broadcast), seine Anwesenheitsliste (Presence Roster) zu lesen oder seinen Verlauf abzuspielen, muss ein Client diesem Kanal zuvor beigetreten sein. Der Beitritt selbst steht jedem offen – jeder Client, der den Namen eines Kanals kennt, kann ihm beitreten, unabhängig davon, ob er angemeldet ist oder nicht.
 
-Ein Channel-Name ist daher weder ein Geheimnis noch eine Berechtigung. Hinterlegen Sie nichts in einem Channel (einschließlich gespeicherter Historie und Presence-Status), das nicht jeder Benutzer Ihrer Anwendung sehen darf, und leiten Sie Channel-Namen nicht aus Daten ab, die Sie nicht preisgeben würden. Autorisierungsregeln pro Channel sind noch nicht implementiert; wenn Sie diese derzeit benötigen, wickeln Sie den sensiblen Teil der Kommunikation über `client.data` ab, wo Row-Level Security greift.
+Ein Kanalname ist daher weder ein Geheimnis noch eine Berechtigung. Hinterlegen Sie nichts in einem Kanal (einschließlich gespeicherter Historie und Präsenzstatus), das nicht jeder Nutzer Ihrer App sehen darf, und leiten Sie Kanalnamen nicht von Daten ab, die Sie nicht preisgeben würden. Autorisierungsregeln pro Kanal sind derzeit nicht implementiert; wenn Sie diese heute benötigen, wickeln Sie den sensiblen Teil des Austauschs über `client.data` ab, wo Row-Level Security greift.
 :::
 
-> **Standardmäßig werden Broadcasts nicht erneut abgespielt (Replay).** Sie erreichen nur aktuell verbundene Mitglieder. Dies ist das gewünschte Verhalten für Benachrichtigungen, die sich selbst korrigieren – ein Hinweis wie „jemand hat gespeichert“ wird durch den nächsten Speichervorgang abgelöst – und verursacht keinen Mehraufwand. Für einen Operations-Stream, bei dem eine unbemerkte Lücke zu Abweichungen führt, aktivieren Sie die [Nachrichtenhistorie](#nachrichtenhistorie-und-catch-up) für den Channel.
+> **Standardmäßig werden Broadcasts nicht erneut abgespielt.** Sie erreichen nur aktuell verbundene Mitglieder. Dies ist das gewünschte Verhalten für Benachrichtigungen, die sich selbst korrigieren – ein Hinweis „Jemand hat gespeichert“ wird durch den nächsten Speichervorgang abgelöst – und verursacht keine Kosten. Aktivieren Sie für einen Operations-Stream, bei dem eine unbemerkte Lücke zu Divergenzen führt, den [Nachrichtenverlauf](#nachrichtenverlauf-und-aufholen-catch-up) auf dem Kanal.
 
-## Nachrichtenhistorie und Catch-up
+## Nachrichtenverlauf und Aufholen (Catch-Up)
 
-Ein Channel kann so konfiguriert werden, dass er seine Broadcasts speichert, sodass ein Client bei einer Wiederverbindung verpasste Nachrichten nachholen kann (Catch-up), anstatt sich von Grund auf neu synchronisieren zu müssen. Dadurch lassen sich Channels als Transportschicht für kollaboratives Bearbeiten nutzen.
+Ein Kanal kann so konfiguriert werden, dass er seine Broadcasts behält, sodass ein Client bei einer Wiederverbindung verpasste Nachrichten aufholt, anstatt sich von Grund auf neu zu synchronisieren. Dadurch eignen sich Kanäle als Transportschicht für kollaboratives Editieren.
 
-Die Aufbewahrungsdauer (Retention) wird **auf dem Server** pro Channel-Muster konfiguriert – siehe [Realtime-Backend](/docs/backend/realtime#channel-retention). Ein Client kann dies nicht für sich selbst aktivieren, da ein Channel von jedem erstellt werden kann, der ihn benennt, und eine vom Client gewählte Historientiefe es jedem Besucher ermöglichen würde, Ihr Backend mit unbegrenztem Speicherbedarf zu belasten.
+Die Aufbewahrung (Retention) wird **auf dem Server** pro Kanalmuster konfiguriert – siehe [Realtime-Backend](/docs/backend/realtime#channel-retention). Ein Client kann dies nicht für sich selbst aktivieren, da ein Kanal von jedem erstellt wird, der ihn benennt, und eine vom Client gewählte Verlaufstiefe es jedem Besucher ermöglichen würde, Ihr Backend mit unbegrenztem Speicherbedarf zu belasten.
 
-Übergeben Sie bei einem Channel mit Historie `{ history: true }`, und das SDK kümmert sich um den Rest:
+Übergeben Sie bei einem gespeicherten Kanal `{ history: true }`, und das SDK erledigt den Rest:
 
 ```typescript
 const channel = client.realtime.channel("doc:42", { history: true });
@@ -384,11 +355,11 @@ channel.onBroadcast("op", (payload) => {
 await channel.join();
 ```
 
-Beim `join()` und nach jeder Wiederverbindung fragt das SDK beim Server alles ab, was nach der zuletzt gesehenen Sequenznummer liegt, und liefert das Ergebnis über dieselben Handler aus. Es muss kein zweiter Codepfad geschrieben werden: Ein Handler, der eine Operation live korrekt anwendet, wendet sie auch beim Catch-up korrekt an.
+Beim `join()` und nach jedem Reconnect fordert das SDK vom Server alle Einträge nach der letzten gesehenen Sequenznummer an und übermittelt das Ergebnis über dieselben Handler. Es muss kein zweiter Codepfad geschrieben werden: Ein Handler, der eine Operation im Live-Betrieb korrekt anwendet, tut dies auch beim Aufholen (Catch-Up).
 
 ### Sequenznummern
 
-Jeder Broadcast in einem Channel mit Historie enthält eine `seq` – channelspezifisch, lückenlos und fortlaufend aufsteigend. Sie dient als Wiederaufsetzpunkt für den Client.
+Jeder Broadcast auf einem persistenten Kanal trägt ein `seq` – pro Kanal, lückenlos und fortlaufend ansteigend. Dies ist der Wiederaufsetzpunkt des Clients.
 
 ```typescript
 channel.onBroadcast((event) => {
@@ -399,9 +370,9 @@ channel.onBroadcast((event) => {
 console.log(channel.sequence); // highest seq delivered so far
 ```
 
-Speichern Sie `channel.sequence` persistent, wenn das Catch-up sowohl einen Seiten-Reload als auch eine Wiederverbindung überstehen soll, und übergeben Sie den Wert über `history({ sinceSeq })` zurück.
+Speichern Sie `channel.sequence` persistent, wenn das Aufholen sowohl ein Neuladen der Seite als auch einen Reconnect überstehen soll, und übergeben Sie es über `history({ sinceSeq })` zurück.
 
-### Historie explizit abrufen
+### Verlauf explizit abrufen
 
 ```typescript
 const { messages, retained, latestSeq } = await channel.history({
@@ -410,19 +381,19 @@ const { messages, retained, latestSeq } = await channel.history({
 });
 ```
 
-`retained: false` bedeutet, dass der Channel keine Historie speichert und dies auch nie tun wird – eine explizite Antwort, damit Sie „Sie haben nichts verpasst“ von „dieser Channel hat keine Aufbewahrungsregel“ unterscheiden können. Im zweiten Fall muss ein Client, der einen konsistenten Zustand benötigt, auf eine vollständige Neusynchronisation zurückgreifen.
+`retained: false` bedeutet, dass der Kanal keinen Verlauf behält und dies auch nie tun wird – eine explizite Antwort, damit Sie „Sie haben nichts verpasst“ von „dieser Kanal hat keine Aufbewahrungsregel“ unterscheiden können. Im zweiten Fall muss ein Client, der konvergieren muss, auf eine vollständige Neusynchronisation zurückgreifen.
 
-`latestSeq` ist die höchste Sequenznummer, die der Server vorhält, unabhängig davon, ob dieser Batch sie erreicht hat. Liegt sie weit über Ihrer zuletzt ausgelieferten `seq`, sind Sie mehr als eine Seite im Rückstand, und eine Neusynchronisation ist möglicherweise ressourcenschonender als das seitenweise Abrufen (Paging).
+`latestSeq` ist die höchste Sequenz, die der Server vorhält, unabhängig davon, ob dieser Batch sie erreicht hat. Liegt sie weit über Ihrem zuletzt empfangenen `seq`, hinken Sie mehr als eine Seite hinterher, und eine Neusynchronisation ist möglicherweise effizienter als das seitenweise Abrufen (Paging).
 
-:::note[Replays können sich überschneiden, und das ist in Ordnung]
-Der Server kann nicht genau wissen, welche Nachrichten Sie erreicht haben, bevor die Socket-Verbindung abbrach. Daher kann ein Catch-up-Bereich Nachrichten enthalten, die Sie bereits angewendet haben. Das SDK verwirft alles, was auf oder unter der Sequenz liegt, die es bereits ausgeliefert hat, sodass Handler eine Nachricht niemals doppelt empfangen.
+:::note[Wiedergaben können sich überschneiden, und das ist in Ordnung]
+Der Server kann nicht genau wissen, welche Nachrichten Sie erreicht haben, bevor der Socket abbrach; daher kann ein Catch-Up-Bereich Nachrichten enthalten, die Sie bereits angewendet haben. Das SDK verwirft alles, was auf oder unter der bereits gelieferten Sequenz liegt, sodass Handler eine Nachricht nie doppelt sehen.
 
-Ihre eigenen Nachrichten werden bei einem Replay herausgefiltert, wie live, auch solche, die gesendet wurden, bevor eine Wiederverbindung dem Socket eine neue Client-ID gab: Der Channel merkt sich die IDs, von denen er gesendet hat. Ein neues Channel-Objekt — etwa nach einem Neuladen der Seite — merkt sich keine, sodass ein Catch-up dort Ihre früheren Nachrichten wie die aller anderen zustellt, was nötig ist, um Zustand aus der History neu aufzubauen.
+Ihre eigenen Nachrichten werden bei einer Wiedergabe wie im Live-Betrieb herausgefiltert, einschließlich jener, die gesendet wurden, bevor ein Reconnect dem Socket eine neue Client-ID zugewiesen hat: Der Kanal merkt sich die IDs, von denen aus er gesendet hat. Ein neues Kanalobjekt – beispielsweise nach einem Neuladen der Seite – hat keine dieser IDs gespeichert, sodass ein Catch-Up dort Ihre früheren Nachrichten wie die aller anderen liefert, was für den Wiederaufbau des Zustands aus der Historie erforderlich ist.
 :::
 
-## Presence-Tracking
+## Präsenz-Tracking
 
-Mit Presence können Sie nachverfolgen, welche Benutzer online sind, und geteilte Zustände über alle Teilnehmer hinweg synchronisieren:
+Über die Präsenzfunktion können Sie nachverfolgen, welche Benutzer online sind, und den gemeinsamen Zustand über alle Teilnehmer hinweg synchronisieren:
 
 ```typescript
 const channel = client.realtime.channel("editors");
@@ -452,36 +423,36 @@ await channel.track({ userId: currentUser.id, status: "idle" });
 await channel.untrack();
 ```
 
-Das SDK verwaltet die Teilnehmerliste (Roster) für Sie, sodass `presences` immer vollständig ist und Sie sie niemals aus Diffs neu zusammensetzen müssen.
+Das SDK verwaltet die Teilnehmerliste (Roster) für Sie, sodass `presences` immer vollständig ist und Sie sie nie manuell aus Diffs zusammenbauen müssen.
 
-Es kümmert sich außerdem um zwei Protokolldetails, bei denen bei der direkten Arbeit mit dem reinen WebSocket leicht Fehler passieren:
+Es übernimmt zudem zwei Protokolldetails, bei denen bei der direkten Arbeit mit dem Raw-WebSocket leicht Fehler passieren:
 
-- **Die Teilnehmerliste wird beim Beitritt nicht automatisch gepusht.** Das erste `presence_diff` eines beitretenden Clients enthält nur ihn selbst; die bestehende Teilnehmerliste muss explizit angefordert werden. `join()` übernimmt das für Sie.
-- **Presence läuft nach 30 Sekunden ab.** `track()` ist keine dauerhafte Registrierung – ohne periodisches erneutes Senden verschwinden Sie stillschweigend aus der Liste aller anderen, obwohl Sie noch verbunden und auf der Seite sind. Das SDK sendet alle 20 Sekunden einen Heartbeat und stoppt diesen bei `untrack()` / `leave()`.
+- **Die Teilnehmerliste wird beim Beitritt nicht automatisch gepusht.** Das erste `presence_diff` eines beitretenden Clients enthält nur ihn selbst; die bestehende Liste muss explizit angefordert werden. `join()` übernimmt das für Sie.
+- **Die Präsenz läuft nach 30 Sekunden ab.** `track()` ist keine dauerhafte Registrierung – ohne regelmäßiges erneutes Senden verschwinden Sie unbemerkt aus der Liste aller anderen, obwohl Sie weiterhin verbunden und auf der Seite sind. Das SDK sendet alle 20 Sekunden einen Heartbeat und stoppt bei `untrack()` / `leave()`.
 
-Eine Wiederverbindung verwirft zudem die serverseitige Channel-Mitgliedschaft und Presence; das SDK tritt automatisch wieder bei, fordert die Teilnehmerliste erneut an und aktiviert das Tracking wieder.
+Ein Reconnect setzt auch die serverseitige Kanalmitgliedschaft und Präsenz zurück; das SDK tritt automatisch erneut bei, fordert die Liste neu an und startet das Tracking wieder.
 
 ## Wann Realtime verwendet werden sollte
 
 | Anwendungsfall | Methode |
-|---|---|
+|----------------|---------|
 | Dashboard mit Live-Daten | `listen()` mit Filtern |
 | Chat oder Messaging | `channel.broadcast()` |
-| Kollaboratives Bearbeiten / Operations-Streams | `channel(name, { history: true })` |
+| Kollaboratives Editieren / Operations-Streams | `channel(name, { history: true })` |
 | Tipp-Indikatoren / Online-Status | `channel.track()` + `channel.onPresence()` |
 | Detailseite mit Live-Updates | `listenById()` |
-| Monitoring im Admin-Panel | `listen()` mit `orderBy` und `limit` |
-| Eine Liste, die einen Verbindungsabbruch überstehen muss | `observe()` mit aktiviertem [Offline](/docs/sdk/offline) |
+| Admin-Panel-Überwachung | `listen()` mit `orderBy` und `limit` |
+| Eine Liste, die Verbindungsabbrüche überstehen muss | `observe()` mit aktiviertem [Offline-Modus](/docs/sdk/offline) |
 
 > **Tipp:** Verwenden Sie für einmalige Datenabrufe stattdessen `find()` oder `findById()`. Abonnements eignen sich am besten für Daten, die sich häufig ändern und sofort in der Benutzeroberfläche widergespiegelt werden müssen.
 
-## `listen()` vs. `observe()`
+## `listen()` vs `observe()`
 
-Beide halten eine Abfrage aktuell und beide geben eine Unsubscribe-Funktion zurück – aber sie beantworten unterschiedliche Anforderungen.
+Beide halten eine Abfrage aktuell und beide geben eine Unsubscribe-Funktion zurück – sie beantworten jedoch unterschiedliche Anforderungen.
 
 `listen()` ist der Socket: Es liefert, was der Server pusht, und liefert nichts, wenn der Socket getrennt ist.
 
-`observe()` ist die Abfrage: Bei aktiviertem [Offline](/docs/sdk/offline)-Modus liefert es Daten zuerst aus der lokalen Datenbank aus – noch vor jeder Netzwerkanfrage – und emittiert erneut bei lokalen Schreibvorgängen, wenn eingereihte Schreibvorgänge den Server erreichen, bei Rollbacks sowie bei Realtime-Events, die es selbst abonniert, sofern Sie nicht `{ realtime: false }` übergeben. Jedes Ergebnis gibt Auskunft darüber, ob es aus dem Cache stammt und ob es Schreibvorgänge enthält, die der Server noch nicht bestätigt hat.
+`observe()` ist die Abfrage: Bei aktivierter [Offline-Unterstützung](/docs/sdk/offline) liest es zuerst aus der lokalen Datenbank – noch vor jeder Anfrage – und emittiert erneut bei lokalen Schreibvorgängen, wenn Schreibvorgänge aus der Warteschlange den Server erreichen, bei Rollbacks sowie bei Realtime-Events, die es selbst abonniert, sofern Sie nicht `{ realtime: false }` übergeben. Jedes Ergebnis gibt an, ob es aus dem Cache stammt und ob es Schreibvorgänge enthält, die der Server noch nicht bestätigt hat.
 
 ```typescript
 const unsubscribe = client.data.products.observe(
@@ -493,11 +464,11 @@ const unsubscribe = client.data.products.observe(
 );
 ```
 
-Ohne aktivierten Offline-Modus ist `observe()` eine Kombination aus `find()` und `listen()` in einem einzigen Aufruf, wobei diese Flags immer `false` sind.
+Ohne aktivierte Offline-Unterstützung ist `observe()` die Kombination aus `find()` und `listen()` in einem einzigen Aufruf, wobei diese Flags immer `false` sind.
 
 ## Nächste Schritte
 
 - **[Daten abfragen](/docs/sdk/querying)** — CRUD-Operationen und Query Builder
-- **[Offline- & Local-First-Synchronisation](/docs/sdk/offline)** — Live-Abfragen, die einen Verbindungsabbruch überstehen
+- **[Offline & Local-First Sync](/docs/sdk/offline)** — Live-Abfragen, die Verbindungsabbrüche überstehen
 - **[Authentifizierung](/docs/sdk/authentication)** — Anmeldung und Sitzungsverwaltung
 - **[Realtime-Backend](/docs/backend/realtime)** — Serverseitige WebSocket-Konfiguration

@@ -1,21 +1,20 @@
 ---
-sourceHash: 51ddecad0855d078
+sourceHash: a43be9786395a654
 title: Solo backend (headless)
 sidebar_label: Solo backend
 description: Ejecuta Rebase como un Backend-as-a-Service headless sobre tu propio PostgreSQL — una API REST, autenticación, almacenamiento y tiempo real, sin panel de administración ni archivos de colecciones.
 ---
 
-Rebase tiene dos formas, y esta página corresponde a la que nunca abre un
-navegador: una API REST, autenticación, almacenamiento, tiempo real y copias de
-seguridad sobre una base de datos PostgreSQL que ya tengas. Sin panel de
-administración, sin archivos de colecciones. Si estabas considerando Supabase o
-PostgREST, esto es lo comparable.
+Rebase tiene dos formas, y esta página corresponde a la que nunca abre un navegador: una
+API REST, autenticación, almacenamiento, tiempo real y copias de seguridad sobre una base de datos PostgreSQL que
+ya tengas. Sin panel de administración, sin archivos de colecciones. Si estabas
+considerando Supabase o PostgREST, esto es lo equivalente.
 
-Todo lo que aparece en esta página también funciona en el proyecto completo — es
-el mismo servidor. Lo que `--headless` elimina es el paquete de frontend y los
-archivos de colecciones, no una funcionalidad.
+Todo lo que aparece en esta página también funciona en el proyecto completo: es el mismo servidor.
+Lo que elimina `--headless` es el paquete de frontend y los archivos de colecciones, no
+una funcionalidad.
 
-## Crear el scaffold
+## Crear la estructura inicial
 
 ```bash
 pnpm dlx @rebasepro/cli init my-api --headless --yes
@@ -26,27 +25,27 @@ Dos espacios de trabajo, sin `frontend/`:
 
 | Carpeta | Qué contiene |
 |---------|--------------|
-| `backend/` | Tus funciones personalizadas y tareas cron. No hay archivo de servidor — el runtime publicado inicia el proyecto |
-| `config/` | `storageAuthorize`, y cualquier colección que genere `--introspect` |
+| `backend/` | Tus funciones personalizadas y tareas cron. No hay archivo de servidor: el runtime publicado arranca el proyecto |
+| `config/` | `storageAuthorize` y cualquier colección que `--introspect` genere |
 
-`--template` no tiene efecto aquí: un preset genera archivos de colecciones, y esta
-variante no tiene ninguno. Node 22.22+, el mismo requisito mínimo que el proyecto
-completo — el `package.json` del overlay headless declara `"node": ">=22.22.0"` y
-reemplaza al que está debajo.
+`--template` no tiene efecto aquí: un preset genera archivos de colecciones iniciales, y esta
+variante no tiene ninguno. Node 22.22+, el mismo requisito mínimo que el proyecto completo: el
+`package.json` del overlay headless declara `"node": ">=22.22.0"` y reemplaza al que
+está debajo.
 
-## Apúntalo a tu base de datos
+## Apuntarlo a tu base de datos
 
-`init` genera un `.env` listo para ejecutarse. Para usar una base de datos que ya
-tengas en funcionamiento, pasa su URL en el momento del scaffold:
+`init` genera un archivo `.env` listo para ejecutar. Para usar una base de datos que ya tengas en ejecución, pasa
+su URL en el momento de la inicialización:
 
 ```bash
 pnpm dlx @rebasepro/cli init my-api --headless --database-url "postgres://user:pass@host:5432/db" --yes
 ```
 
-O define `DATABASE_URL` en `.env` posteriormente — es lo mismo. Sin
-`DATABASE_URL`, `rebase dev` inicia un PostgreSQL administrado (PGlite) en el
-directorio del proyecto, lo cual es útil para probar la API, pero no es el
-propósito de esta variante.
+O define `DATABASE_URL` en `.env` posteriormente; es lo mismo. Sin
+`DATABASE_URL`, `rebase dev` inicia un PostgreSQL administrado (PGlite) en el directorio
+del proyecto, lo cual es útil para probar la API pero no es para lo que está pensada
+esta variante.
 
 Luego:
 
@@ -55,19 +54,18 @@ pnpm install
 pnpm run dev
 ```
 
-**Lee la URL de la salida.** `rebase dev` obtiene un puerto libre a partir de la
-ruta del proyecto en lugar de usar uno fijo, por lo que difiere entre proyectos y
+**Lee la URL en la salida.** `rebase dev` obtiene un puerto libre a partir de la
+ruta del proyecto en lugar de usar uno fijo, por lo que variará entre proyectos y
 entre máquinas.
 
 ## De dónde provienen las colecciones
 
-No hay ninguna en el código. El servidor lee el esquema de tu base de datos al
-arrancar y sirve las tablas que encuentra, de modo que la API sigue tus
-migraciones: cambia el esquema y los endpoints cambiarán con él.
+No hay ninguna en el código. El servidor lee el esquema de tu base de datos durante el arranque y expone
+las tablas que encuentra, de modo que la API sigue tus migraciones: cambia el esquema y
+los endpoints cambiarán con él.
 
-Una tabla se sirve una vez que la seguridad a nivel de fila está habilitada en ella.
-Sin ninguna política se sirve y no devuelve filas, y el arranque lo advierte; una
-política la abre:
+Una tabla se expone una vez que se habilita la seguridad a nivel de fila (RLS) en ella. Sin ninguna directiva,
+se expone pero no devuelve filas, y el arranque advierte sobre ello; una directiva le da acceso:
 
 ```sql
 ALTER TABLE your_table ENABLE ROW LEVEL SECURITY;
@@ -76,67 +74,66 @@ CREATE POLICY your_table_owner ON your_table
     FOR ALL USING (user_id::text = rebase.uid());
 ```
 
-`rebase.uid()`, `rebase.roles()` y `rebase.jwt()` son instalados por Rebase y
+`rebase.uid()`, `rebase.roles()` y `rebase.jwt()` son instaladas por Rebase y
 leen la identidad de la solicitud autenticada. Consulta
-[Security Rules](/docs/collections/security-rules/) para conocer el vocabulario
-de políticas, y [rls-check](/docs/rls-check/) para auditar lo que tus políticas
-realmente permiten.
+[Reglas de seguridad](/docs/collections/security-rules/) para conocer el vocabulario de las directivas,
+y [rls-check](/docs/rls-check/) para una auditoría de lo que tus directivas realmente
+permiten.
 
-Una tabla sin RLS se **omite**, deliberadamente: cada solicitud autenticada se
-ejecuta como `rebase_user`, por lo que servir una tabla que la seguridad a nivel de fila
-no protege entregaría cada fila a cualquier usuario que haya iniciado sesión. Cada tabla omitida se
-menciona durante el arranque junto con el SQL que la protegería.
+Una tabla sin RLS se **omite**, deliberadamente: cada solicitud autenticada
+se ejecuta como `rebase_user`, por lo que exponer una tabla que la seguridad a nivel de fila no proteja
+entregaría cada fila a cualquier llamador autenticado. Cada tabla omitida se menciona en el arranque junto con el SQL
+que la protegería.
 
-Una tabla de unión no se sirve en ningún caso, porque nunca se convierte en una
-colección. Si tiene RLS desactivado, también se menciona durante el arranque.
+Una tabla de unión no se expone de ninguna manera, ya que nunca se convierte en una colección.
+Si tiene RLS desactivado, también se menciona en el arranque.
 
-La comprobación se hace al arrancar. Si más tarde se desactiva RLS en una tabla
-servida, se sigue sirviendo hasta que el siguiente arranque la omita. La
-[auditoría programada](/docs/rls-check/) lo detecta antes y está desactivada por defecto.
+La verificación se ejecuta en el arranque. Si más adelante se deshabilita RLS en una tabla expuesta, seguirá
+expuesta hasta que el siguiente arranque la omita. La [auditoría programada](/docs/rls-check/)
+lo reporta antes y está desactivada por defecto.
 
 :::note
-`baas: { unprotectedTables: "serve" }` las sirve de todos modos. Es una opción
-de `initializeRebaseBackend`, por lo que solo es accesible después de `rebase eject` —
-el runtime administrado no la lee desde `config/index.ts` ni desde el entorno.
-Solo tiene sentido cuando ya se confía plenamente en todos los emisores de solicitudes.
+`baas: { unprotectedTables: "serve" }` las expone de todos modos. Es una
+opción de `initializeRebaseBackend`, por lo que solo es accesible después de `rebase eject`:
+el runtime administrado no la lee desde `config/index.ts` ni desde el
+entorno. Solo tiene sentido cuando ya se confía en todos los llamadores.
 :::
 
-### Generar archivos de colecciones en su lugar
+### Generar archivos de colección en su lugar
 
-Si prefieres tener las tablas definidas en TypeScript — para tipos, para
-callbacks, para revisión —, realiza una introspección de las mismas:
+Si prefieres tener las tablas definidas como TypeScript —para tipos,
+callbacks o revisión—, realiza una introspección:
 
 ```bash
 pnpm dlx @rebasepro/cli init my-api --headless --database-url "postgres://…" --introspect --install
 ```
 
-`--introspect` implica `--template blank` y requiere `--install`, ya que se
-ejecuta contra la CLI instalada. En un proyecto existente, el equivalente es:
+`--introspect` implica `--template blank` y requiere `--install`, ya que se ejecuta
+contra la CLI instalada. En un proyecto existente, lo equivalente es:
 
 ```bash
 pnpm rebase schema introspect
 ```
 
-Los archivos se generan en `config/collections/`. A partir de ese momento, el
-proyecto tiene colecciones en el código y la introspección en tiempo de arranque
-deja de ser lo que define la API.
+Los archivos se guardan en `config/collections/`. A partir de ese momento, el proyecto tiene colecciones
+en el código y la introspección en tiempo de arranque deja de ser lo que define la API.
 
-El scaffold headless
-instala Atlas en `backend/`, así que `rebase db push`, `rebase db generate` y
-`pnpm run db:migrate` funcionan sobre esas colecciones como en cualquier proyecto.
-En la 0.24 cada uno de ellos se detiene con "The atlas binary is missing"; añádelo
-al backend con `pnpm --dir backend add @ariga/atlas`.
+La estructura inicial
+headless instala Atlas en `backend/`, por lo que `rebase db push`, `rebase db generate`
+y `pnpm run db:migrate` funcionan en esas colecciones como en cualquier proyecto. En la versión 0.24,
+cada uno de ellos se detiene con "The atlas binary is missing"; agrégalo al backend con
+`pnpm --dir backend add @ariga/atlas`.
 
-## Uso
+## Cómo usarlo
 
-Mediante HTTP:
+A través de HTTP:
 
 ```bash
 curl "$REBASE_URL/api/data/posts?limit=10"
 ```
 
-O con el cliente con seguridad de tipos (type-safe), que ya es una dependencia
-de la estructura inicial headless:
+O con el cliente con seguridad de tipos, que ya es una dependencia de la
+estructura headless:
 
 ```typescript title="scripts/example.ts"
 import { createRebaseClient } from "@rebasepro/client";
@@ -151,13 +148,12 @@ const { data: posts } = await rebase.data.collection("posts").find({
 });
 ```
 
-- [REST API](/docs/backend/api/) — la estructura de los endpoints, filtros y errores
+- [API REST](/docs/backend/api/) — la estructura de los endpoints, filtros y errores
 - [SDK tipado](/docs/sdk/) — consultas, autenticación, tiempo real, almacenamiento
-- `/api/docs` y `/api/swagger` — el documento OpenAPI y su visualizador, servidos
-  por el backend en ejecución una vez que tiene una colección. Un proyecto sin
-  ninguna no servirá ninguno de los dos: el documento se genera a partir de las
-  colecciones, por lo que no hay nada que describir hasta que se haya ejecutado
-  la sección anterior
+- `/api/docs` y `/api/swagger` — el documento OpenAPI y su visor, servidos
+  por el backend en ejecución una vez que tiene una colección. Un proyecto sin ninguna no sirve
+  ninguno de los dos: el documento se genera a partir de las colecciones, por lo que no hay nada
+  que describir hasta que se haya ejecutado la sección anterior
 
 ## `404 NO_COLLECTIONS`
 
@@ -172,36 +168,34 @@ Si cada solicitud de datos responde con esto:
 }
 ```
 
-entonces el proyecto no declara colecciones en el código *y* la base de datos no
-le proporcionó nada a partir de lo cual derivarlas. Es la primera respuesta
-esperada de un proyecto headless apuntado a una base de datos vacía, y es un 404
-en lugar de un 500 porque no hay nada roto — simplemente no hay nada que servir
-todavía.
+significa que el proyecto no declara colecciones en el código *y* la base de datos no le dio
+nada a partir de lo cual derivarlas. Es la primera respuesta esperada de un proyecto headless
+apuntado a una base de datos vacía, y es un 404 en lugar de un 500 porque
+no hay nada roto: simplemente no hay nada que servir todavía.
 
-Tres cosas lo resuelven, en el orden en que conviene verificarlas:
+Tres cosas lo resuelven, en el orden en que conviene comprobarlas:
 
-1. **La base de datos no tiene tablas.** Créalas — una migración, SQL simple o
-   un archivo de colección más `rebase db push` — y reinicia.
-2. **Las tablas no tienen la seguridad a nivel de fila habilitada**, por lo que el
-   arranque las omitió. El registro de arranque menciona cada una, con el SQL.
-   Habilítala y añade una política, como se indicó anteriormente.
-   La respuesta también
-   lo dice: su mensaje nombra las tablas y da el
+1. **La base de datos no tiene tablas.** Créalas —una migración, SQL directo o un
+   archivo de colección más `rebase db push`— y reinicia.
+2. **Las tablas no tienen habilitada la seguridad a nivel de fila**, por lo que el arranque las
+   omitió. El registro de arranque nombra cada una, junto con el SQL. Habilítala y añade una directiva,
+   como se indicó anteriormente. La respuesta
+   también lo indica: su mensaje nombra las tablas y proporciona el
    `ALTER TABLE … ENABLE ROW LEVEL SECURITY` para ellas, y
-   `details.unprotectedTables` las enumera. En la 0.24 dice que la base de datos no
-   tiene tablas.
-3. **`DATABASE_URL` apunta a un lugar diferente** al que crees. `rebase status`
-   imprime los tres archivos que determinan a qué accede el backend.
+   `details.unprotectedTables` las lista. En la versión 0.24 indica que la base de datos no tiene
+   tablas.
+3. **`DATABASE_URL` apunta a un lugar diferente** del que crees. `rebase status`
+   imprime los tres archivos que determinan a qué se conecta el backend.
 
-## Añadir un panel de administración más adelante
+## Agregar un panel de administración más adelante
 
-Nada aquí te impide hacerlo. Añade un directorio `config/collections/` —
-manualmente o con `rebase schema introspect` — y un frontend que las renderice;
-el backend no cambia. [Frontend Setup](/docs/frontend/) es el punto de partida.
+Nada aquí te impide hacerlo. Añade un directorio `config/collections/` —a
+mano o con `rebase schema introspect`— y un frontend que las renderice; el
+backend no cambia. [Configuración del frontend](/docs/frontend/) es donde comienza ese proceso.
 
-## Próximos pasos
+## Siguientes pasos
 
-- [Authentication](/docs/backend/authentication/) — proveedores, tokens, claves de API
-- [Security Rules (RLS)](/docs/collections/security-rules/) — el modelo de acceso
-- [Custom Functions](/docs/backend/custom-functions/) — tus propias rutas
-- [Deployment](/docs/getting-started/deployment/) — llevarlo a producción
+- [Autenticación](/docs/backend/authentication/) — proveedores, tokens, claves de API
+- [Reglas de seguridad (RLS)](/docs/collections/security-rules/) — el modelo de acceso
+- [Funciones personalizadas](/docs/backend/custom-functions/) — tus propias rutas
+- [Despliegue](/docs/getting-started/deployment/) — llevarlo a producción
