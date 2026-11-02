@@ -87,6 +87,13 @@ s'exécute en tant que `rebase_user`, de sorte qu'exposer une table que la sécu
 donnerait accès à chaque ligne à tous les utilisateurs connectés. Chaque table
 ignorée est mentionnée au démarrage, accompagnée du SQL permettant de la protéger.
 
+Une table de jointure n'est exposée dans aucun cas, car elle ne devient jamais une
+collection. Si son RLS est désactivée, elle est aussi mentionnée au démarrage.
+
+La vérification a lieu au démarrage. Si RLS est désactivée plus tard sur une table
+exposée, celle-ci le reste jusqu'à ce que le démarrage suivant l'ignore. L'[audit
+planifié](/docs/rls-check/) le signale plus tôt ; il est désactivé par défaut.
+
 :::note
 `baas: { unprotectedTables: "serve" }` les expose malgré tout. C'est une
 option d'`initializeRebaseBackend`, elle n'est donc accessible qu'après un

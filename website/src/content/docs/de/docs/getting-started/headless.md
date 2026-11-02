@@ -88,6 +88,13 @@ Row-Level Security nicht schützt, würde somit jede Zeile an jeden angemeldeten
 Aufrufer übergeben. Jede übersprungene Tabelle wird beim Start zusammen mit dem SQL benannt, das sie
 schützen würde.
 
+Eine Verknüpfungstabelle wird in keinem Fall bereitgestellt, weil sie nie zu einer
+Collection wird. Eine ohne RLS wird beim Start ebenfalls benannt.
+
+Die Prüfung läuft beim Start. Wird RLS später für eine bereitgestellte Tabelle
+deaktiviert, bleibt sie bereitgestellt, bis der nächste Start sie überspringt. Das
+[geplante Audit](/docs/rls-check/) meldet das früher und ist standardmäßig deaktiviert.
+
 :::note
 `baas: { unprotectedTables: "serve" }` stellt sie trotzdem bereit. Dies ist eine
 Option von `initializeRebaseBackend`, die erst nach `rebase eject` erreichbar

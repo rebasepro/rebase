@@ -636,6 +636,9 @@ export async function openPostgresDriver(
         const policyless = [...schema.tablesMap.keys()].filter(
             (t) => !schema.joinTables.has(t) && rlsStatus.get(t)?.rlsEnabled && rlsStatus.get(t)?.policyCount === 0
         );
+        // Outside the filter above because enabling RLS would not serve one:
+        // a join table never becomes a collection, either way.
+        const unprotectedJoinTables = [...schema.joinTables].filter((t) => !rlsStatus.get(t)?.rlsEnabled);
 
         if (unprotected.length > 0) {
             if (unprotectedTables === "serve") {
@@ -656,6 +659,19 @@ export async function openPostgresDriver(
                 for (const t of unprotected) schema.tablesMap.delete(t);
                 skippedUnprotected = unprotected.map((table) => ({ schema: pgSchemaName, table }));
             }
+        }
+        if (unprotectedJoinTables.length > 0) {
+            // Dropped so that the skip in `buildCollectionsFromSchema` is not
+            // the only thing keeping these from a caller. The grants stay: a
+            // policy on a served table commonly reads a join table in a
+            // subquery, which runs as the caller, so revoking would turn every
+            // such read into "permission denied".
+            logger.warn(
+                `🔒 [rls] ${unprotectedJoinTables.length} join table(s) have row-level security disabled: ` +
+                `${unprotectedJoinTables.join(", ")}. The API does not serve a join table, with RLS or without, ` +
+                `but ${REBASE_USER_ROLE} keeps its grants on these, so SQL your own code runs as a caller reaches every row.`
+            );
+            for (const t of unprotectedJoinTables) schema.tablesMap.delete(t);
         }
         if (policyless.length > 0) {
             // Legal, and silently returns nothing — worth saying out loud,

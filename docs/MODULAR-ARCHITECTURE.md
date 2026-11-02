@@ -87,6 +87,15 @@ Two escape hatches, both explicit:
   legal Postgres and indistinguishable from an empty table, so it is called out at
   boot rather than left to look like missing data.
 
+A join table is not served either way, because it never becomes a collection. One
+with RLS off is named at boot and left out of the schema relations are built from.
+`rebase_user` keeps its grants on it: a policy that reads a join table runs as the
+caller, so taking them back would break every read that policy guards.
+
+The tables are read once, at boot. If RLS is disabled on a served table later, it
+stays served until the next boot excludes it. The scheduled RLS audit reports it
+sooner, and is off by default.
+
 Internal tables are never introspected: the `rebase` and `auth` schemas sit outside
 `introspectionSchema` (default `public`), and `rebase_*` / `drizzle_*` names are
 filtered out.

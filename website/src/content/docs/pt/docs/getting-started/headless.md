@@ -85,6 +85,13 @@ Uma tabela sem RLS é **ignorada**, deliberadamente: toda requisição autentica
 todas as linhas para qualquer chamador autenticado. Cada tabela ignorada é listada
 na inicialização, junto com o SQL necessário para protegê-la.
 
+Uma tabela de junção não é exposta em nenhum caso, porque nunca se torna uma
+coleção. Se tiver RLS desativado, ela também é listada na inicialização.
+
+A verificação acontece na inicialização. Se o RLS for desativado depois em uma tabela
+exposta, ela continua exposta até a próxima inicialização a ignorar. A [auditoria
+agendada](/docs/rls-check/) detecta isso antes e fica desativada por padrão.
+
 :::note
 `baas: { unprotectedTables: "serve" }` as disponibiliza mesmo assim. É uma opção de
 `initializeRebaseBackend`, portanto só pode ser acessada após o `rebase eject` —

@@ -103,6 +103,17 @@
 
 ### Changed
 
+#### Server & REST
+
+- **A join table with row-level security off is named at boot.** A project that
+  declares no collections excluded a table with RLS off and said so, but passed
+  over a join table in silence. None was ever served, because a join table never
+  becomes a collection. One with RLS off now gets its own boot warning and is
+  left out of the schema relations are built from, so that is no longer the only
+  thing keeping it from a caller. `rebase_user` keeps its grants on it: a policy
+  that reads a join table runs as the caller, and without them every read that
+  policy guards fails with `permission denied`.
+
 #### Rebase Cloud
 
 - **A new managed instance no longer installs its dependencies.** A cloud deploy

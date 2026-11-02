@@ -84,6 +84,13 @@ runs as `rebase_user`, so serving a table that row-level security does not guard
 would hand every row to every signed-in caller. Each skipped table is named at boot along with the SQL
 that would protect it.
 
+A join table is not served either way, because it never becomes a collection.
+One with RLS off is named at boot too.
+
+The check runs at boot. If RLS is disabled on a served table later, it stays
+served until the next boot skips it. The [scheduled audit](/docs/rls-check/)
+reports it sooner, and is off by default.
+
 :::note
 `baas: { unprotectedTables: "serve" }` serves them anyway. It is an
 `initializeRebaseBackend` option, so it is reachable only after `rebase eject` —

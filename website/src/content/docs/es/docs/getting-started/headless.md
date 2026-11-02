@@ -87,6 +87,13 @@ ejecuta como `rebase_user`, por lo que servir una tabla que la seguridad a nivel
 no protege entregaría cada fila a cualquier usuario que haya iniciado sesión. Cada tabla omitida se
 menciona durante el arranque junto con el SQL que la protegería.
 
+Una tabla de unión no se sirve en ningún caso, porque nunca se convierte en una
+colección. Si tiene RLS desactivado, también se menciona durante el arranque.
+
+La comprobación se hace al arrancar. Si más tarde se desactiva RLS en una tabla
+servida, se sigue sirviendo hasta que el siguiente arranque la omita. La
+[auditoría programada](/docs/rls-check/) lo detecta antes y está desactivada por defecto.
+
 :::note
 `baas: { unprotectedTables: "serve" }` las sirve de todos modos. Es una opción
 de `initializeRebaseBackend`, por lo que solo es accesible después de `rebase eject` —

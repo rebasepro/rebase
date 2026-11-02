@@ -84,6 +84,13 @@ viene eseguita come `rebase_user`, quindi esporre una tabella che la row-level s
 non protegge consegnerebbe ogni riga a qualsiasi utente autenticato. Ogni tabella
 ignorata viene indicata all'avvio insieme al codice SQL necessario per proteggerla.
 
+Una tabella di join non viene esposta in nessun caso, perché non diventa mai una
+collection. Se ha RLS disattivata, viene indicata anch'essa all'avvio.
+
+Il controllo avviene all'avvio. Se in seguito RLS viene disattivata su una tabella
+esposta, questa resta esposta finché l'avvio successivo non la ignora. L'[audit
+pianificato](/docs/rls-check/) lo segnala prima ed è disattivato per impostazione predefinita.
+
 :::note
 `baas: { unprotectedTables: "serve" }` le espone comunque. Si tratta di un'opzione di
 `initializeRebaseBackend`, quindi è accessibile solo dopo `rebase eject`: il runtime
