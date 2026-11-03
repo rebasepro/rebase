@@ -1,6 +1,6 @@
 import { describe, expect, test } from "@jest/globals";
 import { Properties } from "@rebasepro/types";
-import { guessIdColumn } from "../../src/data_import/utils/id_column";
+import { guessIdColumn, remapImportColumn } from "../../src/data_import/utils/id_column";
 
 /**
  * The column the import picks as the row id before the user touches the
@@ -63,5 +63,31 @@ describe("guessIdColumn", () => {
 
     test("no headers, no id", () => {
         expect(guessIdColumn([], {}, properties)).toBeUndefined();
+    });
+});
+
+describe("remapImportColumn", () => {
+    const headersMapping = { id: "id", title: "title", name: "name" };
+
+    test("takes the id away from a column mapped to a property", () => {
+        const result = remapImportColumn({ headersMapping, idColumn: "id", column: "id", targetKey: "code" });
+        expect(result.idColumn).toBeUndefined();
+        expect(result.headersMapping).toEqual({ id: "code", title: "title", name: "name" });
+    });
+
+    test("takes the id away from a column set not to import", () => {
+        expect(remapImportColumn({ headersMapping, idColumn: "id", column: "id", targetKey: null }).idColumn).toBeUndefined();
+    });
+
+    test("leaves the id column alone when another column is remapped", () => {
+        const result = remapImportColumn({ headersMapping, idColumn: "id", column: "title", targetKey: "name" });
+        expect(result.idColumn).toBe("id");
+        // A property holds one column: `name` lets go of it.
+        expect(result.headersMapping).toEqual({ id: "id", title: "name", name: null });
+    });
+
+    test("keeps a column on the property it is picked for again", () => {
+        expect(remapImportColumn({ headersMapping, idColumn: undefined, column: "title", targetKey: "title" }).headersMapping)
+            .toEqual(headersMapping);
     });
 });

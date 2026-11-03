@@ -28,3 +28,36 @@ export function guessIdColumn(headers: string[],
 
     return undefined;
 }
+
+/**
+ * The mapping and id column after the person importing picks where one column
+ * goes, in that column's row of the mapping step: a property (`targetKey`), or
+ * nothing (`null`, "Do not import this property").
+ *
+ * A property holds one column, so a column that held `targetKey` before lets
+ * it go. And a column picked for a property, or for nothing, is no longer the
+ * id: the row's select shows "Use this column as ID" while it is, and the
+ * conversion takes the id column out of the values, so the pick was dropped.
+ */
+export function remapImportColumn({
+    headersMapping,
+    idColumn,
+    column,
+    targetKey
+}: {
+    headersMapping: Record<string, string | null>;
+    idColumn: string | undefined;
+    column: string;
+    targetKey: string | null;
+}): { headersMapping: Record<string, string | null>; idColumn: string | undefined } {
+    const remapped: Record<string, string | null> = {};
+    for (const [currentColumn, currentKey] of Object.entries(headersMapping)) {
+        remapped[currentColumn] = currentColumn === column
+            ? targetKey
+            : targetKey !== null && currentKey === targetKey ? null : currentKey;
+    }
+    return {
+        headersMapping: remapped,
+        idColumn: idColumn === column ? undefined : idColumn
+    };
+}
