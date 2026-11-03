@@ -1018,13 +1018,27 @@ function isLoopbackIPv4(host: string): boolean {
  *
  * A non-empty value that won't parse counts as remote: we have a target we
  * cannot verify, and the safe reading of "unknown" is "not your laptop".
+ *
+ * A Postgres connection string can name its server in the query as well:
+ * `?host=` and `?hostaddr=` take precedence over the host before the path, in
+ * libpq and in `pg-connection-string` alike, so
+ * `postgres://u:p@localhost/app?host=db.prod.example.com` connects to
+ * production. Each one a Postgres URL carries has to be local too. A value
+ * starting with `/` is a Unix-socket directory on this machine, as local as
+ * `localhost`.
  */
 export function isLocalTarget(url: string): boolean {
+    let parsed: URL;
     try {
-        return isLoopbackHost(new URL(url).hostname);
+        parsed = new URL(url);
     } catch {
         return false;
     }
+    if (!isLoopbackHost(parsed.hostname)) return false;
+    if (parsed.protocol !== "postgres:" && parsed.protocol !== "postgresql:") return true;
+    const named = [...parsed.searchParams.getAll("host"), ...parsed.searchParams.getAll("hostaddr")]
+        .flatMap((value) => value.split(","));
+    return named.every((host) => host.startsWith("/") || isLoopbackHost(host.trim()));
 }
 
 /** Strip credentials from a URL before it goes into an error message. */
