@@ -217,7 +217,7 @@ export function createBackupCron(config: BackupCronConfig): CronJobDefinition {
             if (config.retentionDays && config.retentionDays > 0) {
                 pruned = await pruneBackups(
                     destination,
-                    { retentionDays: config.retentionDays, keepMinimum: config.keepMinimum },
+                    { retentionDays: config.retentionDays, keepMinimum: config.keepMinimum, database: dbName },
                     config.storage
                 );
                 if (pruned.length > 0) {

@@ -122,8 +122,23 @@ export function checkToolServerCompatibility(
 export function buildBackupFilename(dbName: string, date: Date = new Date()): string {
     const iso = date.toISOString(); // 2026-07-14T09:12:03.123Z
     const stamp = iso.replace(/\.\d+Z$/, "Z").replace(/[-:]/g, "");
-    const safeDb = dbName.replace(/[^a-zA-Z0-9_-]/g, "_");
-    return `rebase-${safeDb}-${stamp}.dump`;
+    return `rebase-${backupFileDatabase(dbName)}-${stamp}.dump`;
+}
+
+/** The database's name as {@link buildBackupFilename} writes it into a file name. */
+function backupFileDatabase(dbName: string): string {
+    return dbName.replace(/[^a-zA-Z0-9_-]/g, "_");
+}
+
+/**
+ * Whether a key or path names a backup {@link buildBackupFilename} made of
+ * `dbName` — exactly that database, so `app` does not claim `my-app`'s
+ * backups, nor `my` those of `my-app`.
+ */
+export function isBackupOfDatabase(fileName: string, dbName: string): boolean {
+    const base = fileName.split("/").pop() ?? fileName;
+    const prefix = `rebase-${backupFileDatabase(dbName)}-`;
+    return base.startsWith(prefix) && /^\d{8}T\d{6}Z\.dump$/.test(base.slice(prefix.length));
 }
 
 /**
@@ -492,27 +507,57 @@ export function globalsFileForDump(dumpPath: string): string {
  * Used when replaying globals on restore so each `CREATE ROLE` / `GRANT`
  * can run independently and a benign "role already exists" on one doesn't
  * abort the rest. Drops `--` comment lines and blank statements.
+ *
+ * A `;` inside a quoted literal or identifier does not end a statement:
+ * `COMMENT ON ROLE analyst IS 'read-only; used by BI'` and `ALTER ROLE x SET
+ * search_path TO 'a;b'` are one statement each, and a line inside such a
+ * literal that happens to start with `--` or `\` is part of it. Both quotes
+ * escape themselves by doubling (`''`, `""`), which is the only escape
+ * `pg_dumpall` writes — in an `E''` literal it doubles the backslashes too, so
+ * a backslash never stands in front of a quote.
  */
 export function splitGlobalsStatements(sql: string): string[] {
-    const withoutComments = sql
-        .split("\n")
-        // `--` comments, and psql meta-commands. pg_dumpall 15+ wraps its output
-        // in `\restrict <token>` / `\unrestrict <token>`, which are instructions
-        // to psql, not SQL. This replay sends statements over a connection
-        // instead, so they arrived at the server as `\restrict …` and came back
-        // as `syntax error at or near "\"` — reported to the user as two skipped
-        // globals per restore, which reads like roles failed to apply when
-        // nothing did. They carry no state worth replaying: dropping them is
-        // exactly what a SQL-level consumer should do.
-        .filter((line) => {
+    const statements: string[] = [];
+    let current = "";
+    let quote: "'" | "\"" | null = null;
+    for (const line of sql.split("\n")) {
+        if (quote === null) {
+            // `--` comments, and psql meta-commands. pg_dumpall 15+ wraps its
+            // output in `\restrict <token>` / `\unrestrict <token>`, which are
+            // instructions to psql, not SQL. This replay sends statements over a
+            // connection instead, so they would arrive at the server as
+            // `\restrict …` and come back as `syntax error at or near "\"` —
+            // reported to the user as two skipped globals per restore, which
+            // reads like roles failed to apply when nothing did. They carry no
+            // state worth replaying: dropping them is exactly what a SQL-level
+            // consumer should do.
             const trimmed = line.trim();
-            return !trimmed.startsWith("--") && !trimmed.startsWith("\\");
-        })
-        .join("\n");
-    return withoutComments
-        .split(";")
-        .map((s) => s.trim())
-        .filter((s) => s.length > 0);
+            if (trimmed.startsWith("--") || trimmed.startsWith("\\")) continue;
+        }
+        for (let index = 0; index < line.length; index += 1) {
+            const char = line[index];
+            if (quote !== null) {
+                current += char;
+                if (char === quote) {
+                    if (line[index + 1] === quote) {
+                        current += quote;
+                        index += 1;
+                    } else {
+                        quote = null;
+                    }
+                }
+            } else if (char === ";") {
+                statements.push(current);
+                current = "";
+            } else {
+                if (char === "'" || char === "\"") quote = char;
+                current += char;
+            }
+        }
+        current += "\n";
+    }
+    statements.push(current);
+    return statements.map((s) => s.trim()).filter((s) => s.length > 0);
 }
 
 /**
