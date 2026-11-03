@@ -75,6 +75,22 @@ user_id: 2 });
         expect(() => parseIdValues("not-a-number", numericId)).toThrow(/Invalid numeric ID/);
     });
 
+    it("throws on an id that only starts with a number, rather than address that number's row", () => {
+        expect(() => parseIdValues("12abc", numericId)).toThrow(/Invalid numeric ID/);
+        expect(() => parseIdValues("12.9", numericId)).toThrow(/Invalid numeric ID/);
+        expect(() => parseIdValues("1e3", numericId)).toThrow(/Invalid numeric ID/);
+        expect(() => parseIdValues("1:::2x", composite)).toThrow(/Invalid numeric ID component/);
+        expect(parseIdValues("-7", numericId)).toEqual({ id: -7 });
+    });
+
+    it("keeps an integer a double cannot hold exactly as its digits", () => {
+        // As a number, 9007199254740993 rounds to …992: another row.
+        expect(parseIdValues("9007199254740993", numericId)).toEqual({ id: "9007199254740993" });
+        expect(parseIdValues("9007199254740993:::1", composite))
+            .toEqual({ tenant_id: "9007199254740993", user_id: 1 });
+        expect(parseIdValues("9007199254740991", numericId)).toEqual({ id: 9007199254740991 });
+    });
+
     it("passes a non-UUID through rather than judge a config's claim", () => {
         // `isUUID` here comes from `isId: "uuid"`, which is a declaration about
         // a key and not the column's type. Callers that want to refuse the
@@ -109,6 +125,8 @@ describe("isAddressableId", () => {
         expect(isAddressableId("not-a-number", numericId)).toBe(false);
         expect(isAddressableId("1", composite)).toBe(false);
         expect(isAddressableId("x:::2", composite)).toBe(false);
+        expect(isAddressableId("12abc", numericId)).toBe(false);
+        expect(isAddressableId("1:::2.5", composite)).toBe(false);
     });
 
     it("rejects everything for a collection with no key", () => {

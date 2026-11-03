@@ -32,14 +32,31 @@ export const COMPOSITE_ID_SEPARATOR = ":::";
 /** The eight-four-four-four-twelve shape of a UUID, any version. */
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
+/** An integer as an address spells it: an optional minus and digits, nothing else. */
+const INTEGER_PATTERN = /^-?\d+$/;
+
+/**
+ * The value of one numeric key part, or `undefined` when the text is not an
+ * integer.
+ *
+ * Whole-string, not `parseInt`: `parseInt` reads the leading digits and stops,
+ * so it reads `"12abc"` and `"12.9"` as 12, an address of a row the caller did
+ * not name. An integer past what a double holds exactly stays the digits it
+ * was written with, because as a number it rounds to a neighbour
+ * (`9007199254740993` becomes …992), which is another row; Postgres reads the
+ * text into the `bigint` column exactly.
+ */
+function numericKeyPart(part: string | number): string | number | undefined {
+    if (typeof part === "number") return Number.isFinite(part) ? part : undefined;
+    if (!INTEGER_PATTERN.test(part)) return undefined;
+    const value = Number(part);
+    return Number.isSafeInteger(value) ? value : part;
+}
+
 /** Whether one address part can be a value of the column it addresses. */
 function partIsAddressable(part: string | number, pk: PrimaryKeyInfo): boolean {
     if (pk.isUUID) return UUID_PATTERN.test(String(part));
-    if (pk.type === "number") {
-        return typeof part === "number"
-            ? Number.isFinite(part)
-            : !isNaN(parseInt(String(part), 10));
-    }
+    if (pk.type === "number") return numericKeyPart(part) !== undefined;
     return true;
 }
 
@@ -100,8 +117,8 @@ export function parseIdValues(idValue: string | number, primaryKeys: PrimaryKeyI
     if (primaryKeys.length === 1) {
         const pk = primaryKeys[0];
         if (pk.type === "number" && !pk.isUUID) {
-            const parsed = typeof idValue === "number" ? idValue : parseInt(String(idValue), 10);
-            if (isNaN(parsed)) {
+            const parsed = numericKeyPart(idValue);
+            if (parsed === undefined) {
                 throw new Error(`Invalid numeric ID: ${idValue}`);
             }
             result[pk.fieldName] = parsed;
@@ -121,8 +138,8 @@ export function parseIdValues(idValue: string | number, primaryKeys: PrimaryKeyI
         const pk = primaryKeys[i];
         const val = parts[i];
         if (pk.type === "number" && !pk.isUUID) {
-            const parsed = parseInt(val, 10);
-            if (isNaN(parsed)) {
+            const parsed = numericKeyPart(val);
+            if (parsed === undefined) {
                 throw new Error(`Invalid numeric ID component: ${val}`);
             }
             result[pk.fieldName] = parsed;
