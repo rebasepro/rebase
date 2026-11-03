@@ -412,6 +412,8 @@ function generateOfflineStringId(): string {
  *
  * Module-scoped and strictly decreasing: two temporary ids in the same session
  * must not collide, and neither must one minted a millisecond after another.
+ * Another tab has a module of its own, which the random part of
+ * {@link nextOfflineNumericId} covers.
  */
 let lastOfflineNumericId = 0;
 
@@ -428,11 +430,23 @@ let lastOfflineNumericId = 0;
  * reconciled it — and the SDK's own types said it could not happen.
  */
 function generateOfflineNumericId(): number {
-    const candidate = -Date.now();
-    lastOfflineNumericId = lastOfflineNumericId === 0
-        ? candidate
-        : Math.min(candidate, lastOfflineNumericId - 1);
+    lastOfflineNumericId = nextOfflineNumericId(lastOfflineNumericId, Date.now(), Math.random());
     return lastOfflineNumericId;
+}
+
+/**
+ * The temporary numeric id after `last` (0 for none yet), at `now` with the
+ * random draw `random` in [0, 1).
+ *
+ * The millisecond, scaled by 1000, with three random digits under it. Tabs of
+ * one origin share the offline database but not the module that remembers
+ * `last`, so two that create in the same millisecond minted the same id from
+ * the millisecond alone, and one row took the other's place in the store.
+ * Scaled, the value stays a safe integer for another two centuries.
+ */
+export function nextOfflineNumericId(last: number, now: number, random: number): number {
+    const candidate = -(now * 1000 + Math.floor(random * 1000));
+    return last === 0 ? candidate : Math.min(candidate, last - 1);
 }
 
 type AnyRow = Record<string, unknown>;

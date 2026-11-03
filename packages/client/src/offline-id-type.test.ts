@@ -1,5 +1,6 @@
 import { createRebaseClient, RebaseApiError } from "./index";
 import { MemoryOfflineStore } from "./offline-store";
+import { nextOfflineNumericId } from "./offline";
 
 /**
  * A temporary id has the type the collection's ids have.
@@ -107,5 +108,28 @@ describe("the id an offline write mints", () => {
 
         const draft = await client.data.collection("posts").create({ title: "cold" }) as { id: unknown };
         expect(typeof draft.id).toBe("string");
+    });
+});
+
+describe("the temporary numeric id", () => {
+    const now = 1_800_000_000_000;
+
+    it("differs between two tabs that mint one in the same millisecond", () => {
+        // Each tab remembers its own last id; they share only the store.
+        const firstTab = nextOfflineNumericId(0, now, 0.1);
+        const secondTab = nextOfflineNumericId(0, now, 0.7);
+        expect(firstTab).not.toBe(secondTab);
+    });
+
+    it("is a negative safe integer that only goes down within a tab", () => {
+        const first = nextOfflineNumericId(0, now, 0.999);
+        const second = nextOfflineNumericId(first, now, 0);
+        const later = nextOfflineNumericId(second, now + 1, 0.5);
+        for (const id of [first, second, later]) {
+            expect(Number.isSafeInteger(id)).toBe(true);
+            expect(id).toBeLessThan(0);
+        }
+        expect(second).toBeLessThan(first);
+        expect(later).toBeLessThan(second);
     });
 });
