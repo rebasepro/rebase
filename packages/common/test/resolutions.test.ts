@@ -3,7 +3,7 @@ import {
     resolveEnumValues,
     getSubcollections
 } from "../src/util/resolutions";
-import { CollectionConfig, NumberProperty, StringProperty, EnumValueConfig } from "@rebasepro/types";
+import { CollectionConfig, NumberProperty, StringProperty, EnumValueConfig, EnumValues } from "@rebasepro/types";
 
 // ─────────────────────────────────────────────────────────────
 // resolvePropertyEnum
@@ -127,6 +127,25 @@ color: "red" }
         // When value is not a string, it spreads the value and adds id
         expect(result?.[0].id).toBe("x");
         expect(result?.[0].label).toBe("X");
+    });
+
+    it("adds the key as the id of a config that does not repeat it", () => {
+        // A collection stored as JSON writes a map entry's id once, as its key.
+        const stored: EnumValues = JSON.parse("{\"x\": {\"label\": \"X\", \"color\": \"red\"}}");
+        expect(resolveEnumValues(stored)).toEqual([{ id: "x", label: "X", color: "red" }]);
+    });
+
+    it("reads an array of plain values by value, not by position", () => {
+        expect(resolveEnumValues(["draft", "published"])).toEqual([
+            { id: "draft", label: "draft" },
+            { id: "published", label: "published" }
+        ]);
+        expect(resolveEnumValues([{ id: "a", label: "A" }])).toEqual([{ id: "a", label: "A" }]);
+    });
+
+    it("returns undefined for null", () => {
+        const stored: EnumValues = JSON.parse("null");
+        expect(resolveEnumValues(stored)).toBeUndefined();
     });
 
     it("returns undefined for non-object/non-array input", () => {
