@@ -14,6 +14,7 @@ import type { ChannelMessage } from "@rebasepro/types";
  */
 function fakeSocket() {
     const sockets: FakeWS[] = [];
+    const sent: Record<string, unknown>[] = [];
 
     class FakeWS {
         static readonly OPEN = 1;
@@ -28,7 +29,7 @@ function fakeSocket() {
             setTimeout(() => this.onopen?.(), 0);
         }
 
-        send() { /* nothing here needs the outgoing frames */ }
+        send(data: string) { sent.push(JSON.parse(data) as Record<string, unknown>); }
         close() { /* noop */ }
     }
 
@@ -36,6 +37,7 @@ function fakeSocket() {
 
     return {
         FakeWS: FakeWS as unknown as typeof WebSocket,
+        sent,
         deliver: (frame: unknown) => instance()?.onmessage?.({ data: JSON.stringify(frame) })
     };
 }
@@ -64,6 +66,31 @@ describe("unmatched realtime error frames", () => {
         await jest.advanceTimersByTimeAsync(1);
         return { client, deliver };
     };
+
+    it("tells every listener of a refused subscription, even past one whose handler throws", async () => {
+        const { RebaseWebSocketClient } = await import("./websocket");
+        const { FakeWS, deliver, sent } = fakeSocket();
+        const client = new RebaseWebSocketClient({ websocketUrl: "ws://localhost:3000", WebSocket: FakeWS });
+        client.ensureConnected();
+        await jest.advanceTimersByTimeAsync(1);
+        const errorSpy = jest.spyOn(console, "error").mockImplementation(() => undefined);
+
+        const second = jest.fn();
+        client.listenCollection({ path: "posts" }, () => undefined, () => { throw new Error("handler bug"); });
+        client.listenCollection({ path: "posts" }, () => undefined, second);
+        const subscribe = sent.find((frame) => frame.type === "subscribe_collection");
+        const subscriptionId = (subscribe?.payload as { subscriptionId: string }).subscriptionId;
+
+        deliver({
+            type: "ERROR",
+            subscriptionId,
+            payload: { error: { message: "Forbidden", code: "FORBIDDEN" } }
+        });
+
+        expect(second).toHaveBeenCalledTimes(1);
+        expect((second.mock.calls[0][0] as Error).message).toBe("Forbidden");
+        errorSpy.mockRestore();
+    });
 
     it("surfaces a channel rate-limit refusal that matches no waiter", async () => {
         const { deliver } = await connect();
