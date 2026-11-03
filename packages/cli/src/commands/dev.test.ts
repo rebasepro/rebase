@@ -18,8 +18,10 @@ import net from "net";
 import os from "os";
 import path from "path";
 
+import { execa } from "execa";
+
 import { getProjectPort } from "../utils/dev-server";
-import { appBannerLines, DEV_FLAGS, DEV_PORT_FILENAME, databaseBannerValue, devCommand, devRestartTrigger, devStaticShape, devWatchArgs, devWatchIncludes, envFileHiddenFromTsx, needsStaleSchemaPreflight, pinnedPortRefusal, readEnvValue, resolveStartPort, portMovedNotice, SCAFFOLD_DEFAULT_PORT, schemaPushArgv, START_PORT_SOURCE_LABELS } from "./dev";
+import { appBannerLines, backendWatchCommand, DEV_FLAGS, DEV_PORT_FILENAME, databaseBannerValue, devCommand, devRestartTrigger, devStaticShape, devWatchArgs, devWatchIncludes, envFileHiddenFromTsx, needsStaleSchemaPreflight, pinnedPortRefusal, readEnvValue, resolveStartPort, portMovedNotice, SCAFFOLD_DEFAULT_PORT, schemaPushArgv, START_PORT_SOURCE_LABELS } from "./dev";
 import type { PreparedDatabase } from "../dev-db/prepare";
 import { validateManifest } from "../manifest";
 
@@ -294,6 +296,34 @@ describe("devWatchArgs", () => {
  * stale", for ~0.6 s of every start. It still runs when there was nothing to
  * regenerate or the regeneration failed: then it is the only safety net.
  */
+/**
+ * The backend is spawned through a shell, which reads the line it is given as
+ * it stands — so the tsx binary, which lives under the project directory, is
+ * quoted as its arguments are.
+ */
+describe.skipIf(process.platform === "win32")("backendWatchCommand", () => {
+    let root: string;
+    beforeEach(() => {
+        root = fs.mkdtempSync(path.join(os.tmpdir(), "rebase-dev-quote-"));
+    });
+    afterEach(() => {
+        fs.rmSync(root, { recursive: true, force: true });
+    });
+
+    it("runs a tsx under a directory with a space, a quote and a $( ) in its name", async () => {
+        const binDir = path.join(root, "My Projects", "it's $(touch pwned)", "node_modules", ".bin");
+        fs.mkdirSync(binDir, { recursive: true });
+        const tsx = path.join(binDir, "tsx");
+        fs.writeFileSync(tsx, "#!/bin/sh\nfor a in \"$@\"; do printf '%s\\n' \"$a\"; done\n", { mode: 0o755 });
+
+        const command = backendWatchCommand(tsx, ["watch", "--include", path.join(root, "my config"), "entry.mjs"]);
+        const { stdout } = await execa(command.file, command.args, { shell: true, cwd: root });
+
+        expect(stdout.split("\n")).toEqual(["watch", "--include", path.join(root, "my config"), "entry.mjs"]);
+        expect(fs.existsSync(path.join(root, "pwned"))).toBe(false);
+    });
+});
+
 describe("needsStaleSchemaPreflight", () => {
     it("is skipped after a regeneration that succeeded", () => {
         expect(needsStaleSchemaPreflight("generated")).toBe(false);
