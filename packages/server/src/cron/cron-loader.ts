@@ -101,7 +101,7 @@ export function cronJobsFrom(crons: CronsRecord): LoadedCronJob[] {
         }
         return {
             id,
-            definition: {
+            definition: withHiddenPropertiesOf(def, {
                 ...def,
                 schedule: def.schedule,
                 name: def.name || id,
@@ -113,9 +113,30 @@ export function cronJobsFrom(crons: CronsRecord): LoadedCronJob[] {
                 // healthy. `Infinity` is "none".
                 timeoutSeconds: def.timeoutSeconds ?? 300,
                 handler: def.handler
-            }
+            })
         };
     });
+}
+
+/**
+ * `copy`, with the non-enumerable own properties of `source` that it does not
+ * set itself defined on it as they were.
+ *
+ * A spread copies enumerable properties only, and a definition can carry a
+ * mark a surface finds it by: `createBackupCron` puts
+ * `Symbol.for("rebase.backupCron")` on its job, non-enumerable so a JSON dump
+ * of it is unchanged. Every copy on the way to the scheduler goes through
+ * this, or the Backups panel finds no scheduled backup on a deployment that
+ * runs one.
+ */
+export function withHiddenPropertiesOf<T extends object>(source: object, copy: T): T {
+    const hidden: PropertyDescriptorMap = {};
+    for (const key of Reflect.ownKeys(source)) {
+        if (Object.prototype.hasOwnProperty.call(copy, key)) continue;
+        const descriptor = Object.getOwnPropertyDescriptor(source, key);
+        if (descriptor && !descriptor.enumerable) hidden[key] = descriptor;
+    }
+    return Object.defineProperties(copy, hidden);
 }
 
 /**
