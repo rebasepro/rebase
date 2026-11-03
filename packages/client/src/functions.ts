@@ -93,9 +93,12 @@ export function createFunctionsClient(transport: Transport): FunctionsClient {
             // this method does not describe (and an agent tool built on it
             // offers). A function's own routes never need one, so a dot
             // segment — as the name, or anywhere in the path before its query
-            // — is refused, spelled plainly or percent-encoded.
-            const pathPart = (options?.path ?? "").split(/[?#]/)[0];
-            if (isDotSegment(name) || pathPart.split("/").some(isDotSegment)) {
+            // — is refused, spelled plainly or percent-encoded. The path is
+            // read as the URL parser will read it: without tabs and newlines,
+            // which it drops, and with `\` as a separator, which it is in an
+            // http(s) URL — `..\..\admin` leaves the function as surely.
+            const pathPart = (options?.path ?? "").replace(/[\t\n\r]/g, "").split(/[?#]/)[0];
+            if (isDotSegment(name) || pathPart.split(/[/\\]/).some(isDotSegment)) {
                 throw new RebaseClientError(
                     `Invalid function route "${name}${options?.path ? ` + ${options.path}` : ""}": ` +
                     "a `.` or `..` segment would leave /functions/" + name + ".",
