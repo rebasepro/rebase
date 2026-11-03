@@ -565,6 +565,10 @@ export class MongoTokenRepository implements TokenRepository {
         );
         return result.modifiedCount > 0;
     }
+
+    async deleteAllMagicLinkTokensForUser(uid: string): Promise<void> {
+        await this.db.collection("magic_link_tokens").deleteMany({ uid });
+    }
 }
 
 export class MongoAuthRepository implements AuthRepository {
@@ -724,6 +728,10 @@ export class MongoAuthRepository implements AuthRepository {
 
     async markMagicLinkTokenUsed(tokenHash: string): Promise<boolean> {
         return this.tokenRepository.markMagicLinkTokenUsed(tokenHash);
+    }
+
+    async deleteAllMagicLinkTokensForUser(uid: string): Promise<void> {
+        await this.tokenRepository.deleteAllMagicLinkTokensForUser(uid);
     }
 
     // ── MFA: not implemented on this engine ──────────────────────────────

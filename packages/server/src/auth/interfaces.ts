@@ -671,6 +671,15 @@ export interface TokenRepository {
      * same token valid, only the one whose mark took it may sign in.
      */
     markMagicLinkTokenUsed(tokenHash: string): Promise<boolean | void>;
+
+    /**
+     * Delete every magic link and email code issued to a user, used or not.
+     *
+     * Called when the account's address changes: a link or a code still in the
+     * old inbox would otherwise sign in for the rest of its lifetime. Optional;
+     * a repository without it keeps those until they expire.
+     */
+    deleteAllMagicLinkTokensForUser?(uid: string): Promise<void>;
 }
 
 // =============================================================================

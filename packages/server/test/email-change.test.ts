@@ -113,6 +113,21 @@ describe("POST /auth/change-email, then /auth/confirm-email-change", () => {
         expect((await w.call("POST", "/auth/confirm-email-change", { token })).json.error.code).toBe("INVALID_TOKEN");
     });
 
+    it("ends the magic links and email codes mailed to the old address", async () => {
+        const w = world({ enableMagicLink: true });
+        const member = await w.register("old@corp.com");
+        // A link still sitting in the old inbox, as /magic-link/send leaves one.
+        await w.store.repo().createMagicLinkToken(member.user.uid, hashToken("old-inbox-link"), new Date(Date.now() + 15 * 60 * 1000));
+
+        await w.call("POST", "/auth/change-email", { newEmail: "new@corp.com" }, member.tokens.accessToken);
+        const confirmed = await w.call("POST", "/auth/confirm-email-change", { token: await w.linkMailedTo("new@corp.com") });
+        expect(confirmed.status).toBe(200);
+
+        const followed = await w.call("POST", "/auth/magic-link/verify", { token: "old-inbox-link" });
+        expect(followed.status).toBe(400);
+        expect(followed.json.error.code).toBe("INVALID_TOKEN");
+    });
+
     it("refuses an address another account holds, one no mail reaches, and the account's own", async () => {
         const w = world();
         const member = await w.register("me@corp.com");

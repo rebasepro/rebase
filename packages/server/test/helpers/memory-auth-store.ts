@@ -295,6 +295,11 @@ export class MemoryAuthStore {
                 token.used = true;
                 return true;
             },
+            deleteAllMagicLinkTokensForUser: async (uid) => {
+                for (const [hash, token] of this.magicLinkTokens) {
+                    if (token.uid === uid) this.magicLinkTokens.delete(hash);
+                }
+            },
 
             // ── MFA ──
             createMfaFactor: async (uid, factorType, secretEncrypted, friendlyName) => {

@@ -205,8 +205,10 @@ export function mountEmailChangeRoutes(opts: EmailChangeRoutesConfig): void {
             await authRepo.unlinkUserIdentity?.(user.id, identity.provider, identity.providerId);
         }
         // A reset link still in the old inbox would set the password for the
-        // rest of its hour.
+        // rest of its hour, and a magic link or an email code sent there would
+        // sign in for the rest of theirs.
         await authRepo.deleteAllPasswordResetTokensForUser(user.id);
+        await authRepo.deleteAllMagicLinkTokensForUser?.(user.id);
 
         logger.info("[Security Audit] Email address changed", {
             eventType: "auth.email_change.confirmed",

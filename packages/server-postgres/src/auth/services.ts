@@ -1368,6 +1368,11 @@ export class MagicLinkTokenService {
         };
     }
 
+    /** Every link and email code issued to a user, used or not. */
+    async deleteAllForUser(uid: string): Promise<void> {
+        await this.db.delete(this.magicLinkTokensTable).where(eq(this.magicLinkTokensTable.uid, uid));
+    }
+
     /** Links and email codes past their expiry, used or not. */
     async deleteExpired(): Promise<void> {
         const tableName = this.getQualifiedTableName();
@@ -1500,6 +1505,10 @@ export class PostgresTokenRepository implements TokenRepository {
 
     async markMagicLinkTokenUsed(tokenHash: string): Promise<boolean> {
         return this.magicLinkTokenService.markAsUsed(tokenHash);
+    }
+
+    async deleteAllMagicLinkTokensForUser(uid: string): Promise<void> {
+        await this.magicLinkTokenService.deleteAllForUser(uid);
     }
 }
 
@@ -1713,6 +1722,10 @@ export class PostgresAuthRepository implements AuthRepository {
 
     async markMagicLinkTokenUsed(tokenHash: string): Promise<boolean> {
         return this.tokenRepository.markMagicLinkTokenUsed(tokenHash);
+    }
+
+    async deleteAllMagicLinkTokensForUser(uid: string): Promise<void> {
+        await this.tokenRepository.deleteAllMagicLinkTokensForUser(uid);
     }
 
     // MFA operations (delegate to MfaService)
