@@ -281,7 +281,15 @@ function substituteRawPlaceholders(sql: string, replace: (column: string) => str
             end = skipQuoted(sql, i, "\"", false);
         } else if (c === "-" && sql[i + 1] === "-") {
             const newline = sql.indexOf("\n", i);
-            end = newline === -1 ? sql.length : newline;
+            if (newline === -1) {
+                // A line comment ends at a newline and nowhere else, and this
+                // text is spliced into `USING (…)` and between the operands of
+                // an AND / OR: unterminated, the comment swallows the closing
+                // paren and whatever follows it, and `CREATE POLICY` fails.
+                out += `${sql.slice(i)}\n`;
+                break;
+            }
+            end = newline;
         } else if (c === "/" && sql[i + 1] === "*") {
             end = skipBlockComment(sql, i);
         } else if (c === "$") {
@@ -741,5 +749,10 @@ function quoteLiteral(value: string | number | boolean | null): string {
  * name built to do it — SQL of its own in the clause.
  */
 function rolesArraySql(roles: readonly string[]): string {
+    // An empty `ARRAY[]` has no element type, and Postgres refuses it ("cannot
+    // determine type of empty array"): the whole `CREATE POLICY` fails, taking
+    // the rest of the rule's condition with it. Typed, it means what the
+    // evaluator says — overlapping no role is false, containing none is true.
+    if (roles.length === 0) return "ARRAY[]::text[]";
     return `ARRAY[${[...roles].sort().map(quoteLiteral).join(",")}]`;
 }
