@@ -193,6 +193,7 @@ export const en: RebaseTranslations = {
     add_on_top: "Add on top",
     add_below: "Add below",
     add_to_field: "Add to {{fieldName}}",
+    enum_id_duplicate: "Another enum value already uses the ID \"{{id}}\"",
     value: "Value",
     key: "Key",
     drag_drop_multiple: "Drag 'n' drop some files here, or click to select files. Drag to reorder.",

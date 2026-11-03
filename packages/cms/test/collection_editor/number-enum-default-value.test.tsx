@@ -34,7 +34,7 @@ jest.mock("@rebasepro/app", () => {
 });
 
 import { EnumPropertyField } from "../../src/collection_editor/ui/collection_editor/properties/EnumPropertyField";
-import { hasEnumId } from "../../src/collection_editor/ui/collection_editor/EnumForm";
+import { enumValueErrors, hasEnumId } from "../../src/collection_editor/ui/collection_editor/EnumForm";
 
 beforeAll(() => {
     Object.assign(Element.prototype, {
@@ -95,5 +95,25 @@ describe("number select in the collection editor", () => {
         });
         expect(controller!.values.defaultValue).toBe("1");
         expect(mockSnackbar.open).not.toHaveBeenCalled();
+    });
+});
+
+describe("enum value ids in the collection editor", () => {
+    const t = (key: string, options?: Record<string, string>) => `${key}:${options?.id ?? ""}`;
+
+    it("flags an id an earlier value already has, compared as text", () => {
+        const errors = enumValueErrors([
+            { id: "red", label: "Red" },
+            { id: "blue", label: "Blue" },
+            { id: "red", label: "Crimson" },
+            { id: 1, label: "One" },
+            { id: "1", label: "Also one" }
+        ], t);
+        expect(errors.map(error => error.id)).toEqual([undefined, undefined, "enum_id_duplicate:red", undefined, "enum_id_duplicate:1"]);
+    });
+
+    it("leaves distinct ids, 0 among them, alone", () => {
+        const errors = enumValueErrors([{ id: 0, label: "None" }, { id: 1, label: "Low" }], t);
+        expect(errors).toEqual([{}, {}]);
     });
 });

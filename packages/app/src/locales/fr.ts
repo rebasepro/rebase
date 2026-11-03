@@ -185,6 +185,7 @@ export const fr: RebaseTranslations = {
     add_on_top: "Ajouter en haut",
     add_below: "Ajouter en dessous",
     add_to_field: "Ajouter à {{fieldName}}",
+    enum_id_duplicate: "Une autre valeur de l'enum utilise déjà l'ID \"{{id}}\"",
     value: "Valeur",
     key: "Clé",
     drag_drop_multiple: "Faites glisser et déposez des fichiers ici, ou cliquez pour sélectionner des fichiers. Faites glisser pour réorganiser.",

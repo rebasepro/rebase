@@ -158,6 +158,8 @@ export interface RebaseTranslations {
     add_below: string;
     /** Label when a fieldName is provided — "Add to {fieldName}" */
     add_to_field: string;
+    /** Collection editor: an enum value whose id another value already has — "{id}" */
+    enum_id_duplicate: string;
     /** Placeholder for the 'value' input in a KeyValue field */
     value: string;
     /** Placeholder for the 'key' input in a KeyValue field */
