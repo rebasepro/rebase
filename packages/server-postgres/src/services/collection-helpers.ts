@@ -402,6 +402,25 @@ export function primaryKeyColumns(
 }
 
 /**
+ * The column a table holds under the property key `key`, or `undefined`.
+ *
+ * A Drizzle table is an object whose own properties are its columns — and
+ * also everything any object answers to. `key in table` is true of
+ * `constructor`, `toString` and `hasOwnProperty`, inherited from the
+ * prototype, and of `enableRLS`, a method Drizzle sets on the table itself;
+ * reading one of those as a column put a function into the statement as a
+ * bound parameter. A filter on `constructor` then compiled to a comparison
+ * between two parameters — "a filter that names nothing" without the 400 —
+ * and `__proto__` crashed the builder into a 500. Only an own, object-valued
+ * property is a column.
+ */
+export function columnAtKey(table: PgTable<any>, key: string): AnyPgColumn | undefined {
+    if (!Object.prototype.hasOwnProperty.call(table, key)) return undefined;
+    const value: unknown = table[key as keyof typeof table];
+    return typeof value === "object" && value !== null ? value as AnyPgColumn : undefined;
+}
+
+/**
  * The column a `joinPath` step names, on a table that may key it either way.
  *
  * A `JoinStep` is written in database terms — `on: { from: "author_id" }` —

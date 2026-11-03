@@ -37,7 +37,7 @@ import { buildSearchColumnSpec, SEARCH_UNACCENT_FN, type SearchColumnSpec } from
 import { PostgresCollectionRegistry } from "../collections/PostgresCollectionRegistry";
 import { ConditionBuilderStatic } from "../interfaces";
 import { ApiError, logger } from "@rebasepro/server";
-import { columnNamed, getColumnMeta } from "../services/collection-helpers";
+import { columnAtKey, columnNamed, getColumnMeta } from "../services/collection-helpers";
 
 /**
  * What to do with a filter field that resolves to no column at all.
@@ -147,7 +147,7 @@ const relationColumn = (
     column: string
 ): AnyPgColumn | undefined => {
     const key = fieldKeyForColumn(collection, column);
-    return (key in table ? table[key as keyof typeof table] as AnyPgColumn : undefined) || undefined;
+    return columnAtKey(table, key);
 };
 
 /**
@@ -420,6 +420,24 @@ function toMembershipList(value: unknown): unknown[] {
     return Array.isArray(value) ? value : [value];
 }
 
+/**
+ * "The jsonb array holds at least one of `values`", as one containment test per
+ * value: `(col @> '[3]' OR col @> '[7]')`.
+ *
+ * Containment compares elements by JSON type and value, which is the question
+ * `array-contains` asks of a single value — so the two operators agree, and a
+ * number array is searchable by numbers. `?|` is not that question: it asks
+ * whether any of a list of *strings* is a top-level key or string element, so
+ * `[1, 2, 3] ?| array['3']` is false and a filter for "any of [3]" on a number
+ * array matched nothing.
+ *
+ * An OR of `@>` rather than `@> ANY(...)`: a GIN index serves each `@>` arm and
+ * combines them, and does not serve an array comparison at all.
+ */
+function jsonArrayContainsAny(operand: SQL | AnyPgColumn, values: unknown[]): SQL {
+    return sql`(${sql.join(values.map(v => sql`${operand} @> ${JSON.stringify([v])}`), sql` OR `)})`;
+}
+
 /** Drizzle dynamic query builder — accepts innerJoin + where chaining */
 
 export interface DrizzleDynamicQuery {
@@ -680,8 +698,7 @@ export class DrizzleConditionBuilder {
     ): FilterTarget | undefined {
         const { collection, registry, sourceIdColumn } = options;
 
-        const columnAt = (key: string): AnyPgColumn | undefined =>
-            (key in table ? table[key as keyof typeof table] as AnyPgColumn : undefined) || undefined;
+        const columnAt = (key: string): AnyPgColumn | undefined => columnAtKey(table, key);
 
         const direct = columnAt(field);
         if (direct) return { kind: "column", column: direct };
@@ -755,14 +772,22 @@ export class DrizzleConditionBuilder {
         // `userProfileId`). The snake forms stay in the list because a project
         // may have authored the property under its column name, which is still
         // its wire name.
-        for (const guess of [
-            `${field}Id`,
-            toWireKey(generateForeignKeyName(field)),
-            `${field}_id`,
-            generateForeignKeyName(field)
-        ]) {
-            const foreignKey = columnAt(guess);
-            if (foreignKey) return { kind: "column", column: foreignKey };
+        //
+        // Only then. With a collection, a declared relation has resolved
+        // above, and a guess past it reaches a column under a name that is not
+        // the property's: the field-access check at the door judges the name
+        // it was sent, so `manager` filtered on a `managerId` its caller may
+        // not read, one predicate at a time.
+        if (!collection) {
+            for (const guess of [
+                `${field}Id`,
+                toWireKey(generateForeignKeyName(field)),
+                `${field}_id`,
+                generateForeignKeyName(field)
+            ]) {
+                const foreignKey = columnAt(guess);
+                if (foreignKey) return { kind: "column", column: foreignKey };
+            }
         }
 
         return this.unknownFilterField(table, field, collectionPath, mode, collection);
@@ -841,9 +866,7 @@ export class DrizzleConditionBuilder {
         }
 
         const targetColumn = relationColumn(targetTable, targetCollection, path.fieldKey)
-            ?? (path.fieldKey in targetTable
-                ? targetTable[path.fieldKey as keyof typeof targetTable] as AnyPgColumn
-                : undefined);
+            ?? columnAtKey(targetTable, path.fieldKey);
         if (!targetColumn) {
             const answer = unknownRelationTargetField(
                 { field, relationKey: path.relationKey, fieldKey: path.fieldKey },
@@ -1446,7 +1469,7 @@ export class DrizzleConditionBuilder {
                 if (Array.isArray(value) && value.length > 0) {
                     return isNativeArray
                         ? sql`${ref} && ARRAY[${sql.join(value.map(v => sql`${v}`), sql`, `)}]`
-                        : sql`${ref} ?| array[${sql.join(value.map(v => sql`${String(v)}`), sql`, `)}]`;
+                        : jsonArrayContainsAny(ref, value);
                 }
             }
             return isNativeArray
@@ -1588,9 +1611,7 @@ export class DrizzleConditionBuilder {
             const column = namesHiddenFromCaller(targetCollection).has(spec.field)
                 ? undefined
                 : relationColumn(targetTable, targetCollection, spec.field)
-                    ?? (spec.field in targetTable
-                        ? targetTable[spec.field as keyof typeof targetTable] as AnyPgColumn
-                        : undefined);
+                    ?? columnAtKey(targetTable, spec.field);
             if (!column) {
                 const validFields = listedColumnKeys(targetTable, targetCollection);
                 throw ApiError.badRequest(
@@ -1774,9 +1795,7 @@ export class DrizzleConditionBuilder {
                     if (isNativeArray) {
                         return sql`${column} && ARRAY[${sql.join(value.map(v => sql`${v}`), sql`, `)}]`;
                     } else {
-                        // Use the ?| operator for JSONB overlap with text array
-                        const textValues = value.map(v => String(v));
-                        return sql`${column} ?| array[${sql.join(textValues.map(v => sql`${v}`), sql`, `)}]`;
+                        return jsonArrayContainsAny(column, value);
                     }
                 }
                 // Single value fallback: treat as array-contains
