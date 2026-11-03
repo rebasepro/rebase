@@ -750,7 +750,14 @@ export function studioProxyBaseUrl(host: string, projectId: string): string {
 
 /** Two minutes of head-room, as the CLI keeps, before a token counts as expired. */
 const CLOUD_TOKEN_BUFFER_MS = 120_000;
-let cloudToken: { accessToken: string; host: string; expiresAt: number | null } | null = null;
+
+/**
+ * The CLI's bearer, kept per directory it was minted in. The CLI decides the
+ * control plane from that directory (its link, `REBASE_CLOUD_URL`, its stored
+ * context), so two projects in two directories can be two control planes, and
+ * one directory's token is not another's.
+ */
+const cloudTokens = new Map<string, { accessToken: string; host: string; expiresAt: number | null }>();
 
 /**
  * The bearer the CLI would send to the control plane now: `rebase cloud
@@ -759,6 +766,8 @@ let cloudToken: { accessToken: string; host: string; expiresAt: number | null } 
  * is close to expiry, and never written to the registry.
  */
 async function cloudAccessToken(): Promise<{ accessToken: string; host: string }> {
+    const projectDir = getProjectDir();
+    const cloudToken = cloudTokens.get(projectDir);
     if (cloudToken && (cloudToken.expiresAt === null || cloudToken.expiresAt > Date.now() + CLOUD_TOKEN_BUFFER_MS)) {
         return cloudToken;
     }
@@ -775,8 +784,36 @@ async function cloudAccessToken(): Promise<{ accessToken: string; host: string }
         );
     }
     const expiresAt = typeof record.expiresAt === "string" ? Date.parse(record.expiresAt) : NaN;
-    cloudToken = { accessToken: record.accessToken, host: record.host, expiresAt: Number.isFinite(expiresAt) ? expiresAt : null };
-    return cloudToken;
+    const minted = { accessToken: record.accessToken, host: record.host, expiresAt: Number.isFinite(expiresAt) ? expiresAt : null };
+    cloudTokens.set(projectDir, minted);
+    return minted;
+}
+
+/** A control-plane origin, for comparing two spellings of one host. */
+function controlPlaneOrigin(host: string): string {
+    try {
+        return new URL(host).origin;
+    } catch {
+        return host.replace(/\/+$/, "");
+    }
+}
+
+/**
+ * The CLI's bearer for a cloud project, only when it was issued by the control
+ * plane the project is registered on. The proxy the client calls is on that
+ * host, so a token from any other one would be handed to a server that never
+ * issued it.
+ */
+async function cloudBearerFor(cloud: { host: string; projectId: string }): Promise<string> {
+    const { accessToken, host } = await cloudAccessToken();
+    if (controlPlaneOrigin(host) !== controlPlaneOrigin(cloud.host)) {
+        throw new Error(
+            `This project is on the control plane ${cloud.host}, and the rebase CLI in ${getProjectDir()} holds a ` +
+            `credential for ${host}, which is not sent there. Switch to a project whose rebase CLI targets ${cloud.host} ` +
+            "and call rebase_project_use_cloud from it."
+        );
+    }
+    return accessToken;
 }
 
 /** One row of `rebase cloud projects list --json`. */
@@ -808,7 +845,7 @@ function getProjectDir(): string {
 
 async function getClient(): Promise<RebaseClient> {
     const active = getActiveProject();
-    const project = active.cloud ? { ...active, token: (await cloudAccessToken()).accessToken } : active;
+    const project = active.cloud ? { ...active, token: await cloudBearerFor(active.cloud) } : active;
     const cacheKey = `${project.name}::${project.baseUrl}::${project.token}`;
 
     const cached = clientCache.get(cacheKey);
@@ -2595,11 +2632,14 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         case "rebase_schema_plan": {
             const argsObj = args as { collectionId: string; collection: Record<string, unknown> };
             const project = getActiveProject();
+            // A cloud project carries no stored token: its bearer is the CLI's,
+            // read at call time, as `getClient` reads it for the other tools.
+            const bearer = project.cloud ? await cloudBearerFor(project.cloud) : project.token;
             const res = await fetch(`${project.baseUrl}/api/admin/schema/plan`, {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",
-                    ...(project.token ? { Authorization: `Bearer ${project.token}` } : {})
+                    ...(bearer ? { Authorization: `Bearer ${bearer}` } : {})
                 },
                 body: JSON.stringify({
                     collectionId: argsObj.collectionId,
