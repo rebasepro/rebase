@@ -3213,6 +3213,21 @@ data: u.data as AnyRow })),
                     }
                     dirty = true;
                 }
+                // A bulk write names its rows in a list of its own. Left on
+                // the temporary id, a queued `updateMany` was refused as
+                // naming a row that does not exist and rolled back, and a
+                // queued `deleteMany` found nothing to delete, counted the
+                // row as already gone, and left the server's copy in place.
+                if (queued.updates?.some((u) => String(u.id) === oldKey)) {
+                    queued.updates = queued.updates.map((u) => String(u.id) === oldKey ? { id: serverId, data: u.data } : u);
+                    this.queueChangedInPlace();
+                    dirty = true;
+                }
+                if (queued.ids?.some((id) => String(id) === oldKey)) {
+                    queued.ids = queued.ids.map((id) => String(id) === oldKey ? serverId : id);
+                    this.queueChangedInPlace();
+                    dirty = true;
+                }
                 // The rollback map is keyed by row id too, and restoring it
                 // under a name the server never had would resurrect a ghost.
                 const rollbackRows = queued.rollback?.rows;

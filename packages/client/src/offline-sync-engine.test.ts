@@ -89,6 +89,21 @@ function createFakeServer() {
                 table(slug).set(String(id), row);
                 return row;
             },
+            async updateMany(updates: { id: string | number; data: Row }[]) {
+                guard(slug, "updateMany");
+                // One transaction, as the real route is: a missing row refuses the batch.
+                if (updates.some((u) => !table(slug).has(String(u.id)))) throw new RebaseApiError("Not found", { status: 404 });
+                return updates.map((u) => {
+                    const row = { ...table(slug).get(String(u.id)), ...u.data, id: u.id };
+                    table(slug).set(String(u.id), row);
+                    return row;
+                });
+            },
+            async deleteMany(ids: (string | number)[]) {
+                guard(slug, "deleteMany");
+                if (ids.some((id) => !table(slug).has(String(id)))) throw new RebaseApiError("Not found", { status: 404 });
+                for (const id of ids) table(slug).delete(String(id));
+            },
             async delete(id: string | number) {
                 guard(slug, "delete", id);
                 // As the real route does: a missing row is a 404, not a no-op.
@@ -484,6 +499,46 @@ describe("replay", () => {
 
         // The update was queued against an id that never existed server-side.
         expect(server.table("posts").get("srv-7")).toMatchObject({ title: "second" });
+        expect(await manager.api.pending()).toHaveLength(0);
+    });
+
+    it("re-points a queued bulk update at the id the server chose", async () => {
+        const server = createFakeServer();
+        const onSyncError = jest.fn();
+        const { manager, wrap } = createManager(server, { onSyncError });
+        const posts = wrap("posts");
+        await posts.find();
+
+        server.state.online = false;
+        const local = await posts.create({ title: "first" });
+        await posts.updateMany([{ id: local.id as string, data: { title: "second" } }]);
+        server.idRewrites.set(String(local.id), "srv-7");
+
+        server.state.online = true;
+        await manager.sync();
+
+        expect(onSyncError).not.toHaveBeenCalled();
+        expect(server.table("posts").get("srv-7")).toMatchObject({ title: "second" });
+        expect(await manager.api.pending()).toHaveLength(0);
+    });
+
+    it("re-points a queued bulk delete at the id the server chose", async () => {
+        const server = createFakeServer();
+        const { manager, wrap } = createManager(server);
+        const posts = wrap("posts");
+        await posts.find();
+
+        server.state.online = false;
+        const local = await posts.create({ title: "doomed" });
+        await posts.deleteMany([local.id as string]);
+        server.idRewrites.set(String(local.id), "srv-8");
+
+        server.state.online = true;
+        await manager.sync();
+
+        // Sent under the temporary id, the delete found nothing, counted the
+        // row as already gone, and left the server's copy in place.
+        expect(server.table("posts").has("srv-8")).toBe(false);
         expect(await manager.api.pending()).toHaveLength(0);
     });
 
