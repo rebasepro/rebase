@@ -58,6 +58,27 @@ function likePatternToRegExp(pattern: string, caseInsensitive: boolean): RegExp 
 }
 
 /**
+ * Refuse a filter column that Mongo would read as an operator.
+ *
+ * The column is the key of the condition this builder emits, so a column of
+ * `$expr` turns `[">", ["$salary", 100000]]` into
+ * `{ $expr: { $gt: ["$salary", 100000] } }` — an aggregation expression over
+ * any field of the document, the withheld ones included, and through
+ * `$function` a way to run JavaScript on the database. No document field a
+ * collection declares is spelled with a `$`, on any segment of its path.
+ */
+function assertFieldPath(field: unknown): void {
+    if (typeof field === "string" && field !== "" && !field.split(".").some(segment => segment.startsWith("$"))) {
+        return;
+    }
+    throw ApiError.badRequest(
+        `${JSON.stringify(field)} is not a field a filter can name on the MongoDB driver.`,
+        "UNKNOWN_FILTER_FIELD",
+        { field }
+    );
+}
+
+/**
  * MongoDB Condition Builder
  *
  * Provides static methods to translate Rebase filter conditions
@@ -118,6 +139,7 @@ export class MongoConditionBuilder {
         value: any,
         negated = false
     ): Filter<Document> {
+        assertFieldPath(field);
         // Null-testing operators ignore their value.
         if (op === "is-null" || op === "is-not-null") {
             const isNull = (op === "is-null") !== negated;
