@@ -630,7 +630,11 @@ export function createRebaseClient<DB = Record<string, unknown>>(options: Create
                 // should reconnect anonymously. It also drops what the socket
                 // cached, so none of it is replayed to whoever comes next.
                 ws.disconnect();
-            } else if (event === "SIGNED_IN" || event === "TOKEN_REFRESHED") {
+            } else if (event === "SIGNED_IN" || event === "TOKEN_REFRESHED" || event === "USER_UPDATED") {
+                // `USER_UPDATED` included: a guest that becomes an account
+                // keeps its uid and gets a token without the guest claim, and
+                // a socket left on the guest's would be read as a guest by RLS
+                // until the next refresh.
                 const uid = session?.user?.uid ?? null;
                 if (uid !== realtimeUid) {
                     // A different account — signed in over a session (which
