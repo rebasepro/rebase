@@ -2117,6 +2117,16 @@ export class PostgresBackendDriver implements DataDriver {
                         ? resolveBatchRefs(operation.id, named)
                         : undefined;
                     const id = rawId === undefined || rawId === null ? undefined : String(rawId);
+                    // The envelope check saw an id here, but a `$ref` is only
+                    // resolved now, and one naming a NULL field resolves to
+                    // nothing. An update without an id is an INSERT to the
+                    // layers below, so it is refused rather than handed on.
+                    if ((operation.op === "update" || operation.op === "delete") && (id === undefined || id === "")) {
+                        throw ApiError.badRequest(
+                            `This ${operation.op} has no id: its \`id\` resolved to ${rawId === "" ? "an empty string" : String(rawId)}.`,
+                            "INVALID_BATCH_REF"
+                        );
+                    }
 
                     let row: Record<string, unknown> | null = null;
                     switch (operation.op) {
@@ -2264,6 +2274,13 @@ export class PostgresBackendDriver implements DataDriver {
         // `id` field for tables that have no such column. A copy, so a callback
         // that edits it does not edit what history records.
         const targetRow: Record<string, unknown> = { ...stored };
+        // The row's address, derived from the row as a save's is — what its
+        // history entry and its realtime event are keyed by. Not `row.id`, the
+        // caller's spelling: `010` finds row 10, and an entry keyed `010` is
+        // one `GET /docs/10/history` never shows.
+        const address = (resolvedCollection
+            ? deriveRowAddress(stored, resolvedCollection as CollectionConfig, this.registry)
+            : "") || row.id.toString();
 
         const contextForCallback = this.buildCallContext();
 
@@ -2408,7 +2425,7 @@ export class PostgresBackendDriver implements DataDriver {
             await this.historyService.recordHistory({
                 // Keyed like the save's entry: the slug, whatever the path.
                 tableName: resolvedCollection.slug,
-                id: row.id.toString(),
+                id: address,
                 action: "delete",
                 values: stored,
                 updatedBy: this.user?.uid
@@ -2419,14 +2436,14 @@ export class PostgresBackendDriver implements DataDriver {
         if (this._deferNotifications) {
             this._pendingNotifications.push({
                 path: targetPath,
-                id: row.id.toString(),
+                id: address,
                 row: null,
                 databaseId: resolvedCollection?.databaseId
             });
         } else {
             await this.realtimeService.notifyUpdate(
                 targetPath,
-                row.id.toString(),
+                address,
                 null,
                 resolvedCollection?.databaseId
             );
