@@ -576,6 +576,9 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
      */
     private presenceTrackers = new Set<string>();
 
+    /** Each client's roster writes still running, chained in order — see {@link presenceStoreOp}. */
+    private presenceStoreQueues = new Map<string, Promise<void>>();
+
     /**
      * Channels whose oversized ephemeral broadcasts have already been reported,
      * so a hot channel logs the problem once rather than once per message.
@@ -1366,7 +1369,7 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
         // a query, and so is it for a client that never tracked presence here:
         // it has no rows.
         if (this.presenceTrackers.delete(clientId)) {
-            await this.presenceStoreOp(() => this.presenceStore!.removeClient(clientId), "client removal");
+            await this.presenceStoreOp(clientId, (store) => store.removeClient(clientId), "client removal");
         }
 
         // Remove from the broadcast channels it joined
@@ -1784,22 +1787,27 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
             if (!subscription) continue;
             const subscriptionId = subscription.subscriptionId;
 
-            if (subscription.type === "collection" && subscription.collectionRequest) {
+            // Everything the subscribe frame was judged on, judged again: a
+            // list's filter, sort, projection and `include`, and a row's
+            // `include`. An `include` that filters or sorts its target on a
+            // field the new roles may not read still answers that predicate
+            // in every frame — which related rows come back is the answer.
+            const request = subscription.type === "collection" ? subscription.collectionRequest : undefined;
+            const judged = request
+                ? {
+                    // Stored from the subscription's own request, which carried it as one.
+                    filter: request.filter as FilterValues<string>,
+                    logical: request.logical,
+                    orderBy: request.orderBy,
+                    fields: request.fields,
+                    include: request.include
+                }
+                : subscription.type === "single" ? { include: subscription.include } : undefined;
+            if (judged) {
                 const collection = this.registry.getCollectionByPath(subscription.path);
-                const request = subscription.collectionRequest;
                 try {
                     if (collection) {
-                        assertReadRequestReadable(
-                            {
-                                // Stored from the subscription's own request, which carried it as one.
-                                filter: request.filter as FilterValues<string>,
-                                logical: request.logical,
-                                orderBy: request.orderBy,
-                                fields: request.fields
-                            },
-                            collection,
-                            { roles: authContext.roles ?? ["anon"] }
-                        );
+                        assertReadRequestReadable(judged, collection, { roles: authContext.roles ?? ["anon"] });
                     }
                 } catch (e) {
                     if (!(e instanceof ApiError)) throw e;
@@ -3347,7 +3355,7 @@ lastSeen: Date.now() });
 
         // Refresh the shared roster on every heartbeat — that timestamp is what
         // tells other instances this client is still here.
-        void this.presenceStoreOp(() => this.presenceStore!.track(channel, clientId, state), "track");
+        void this.presenceStoreOp(clientId, (store) => store.track(channel, clientId, state), "track");
 
         // Announce a join or a state change, here and to the other instances —
         // and nothing else. An unchanged heartbeat used to be delivered to
@@ -3380,7 +3388,7 @@ lastSeen: Date.now() });
             this.deliverPresenceDiff(channel, {}, { [clientId]: entry.state });
             this.publishPresenceDiff(channel, {}, { [clientId]: entry.state });
             if (!options?.skipStore) {
-                void this.presenceStoreOp(() => this.presenceStore!.remove(channel, clientId), "remove");
+                void this.presenceStoreOp(clientId, (store) => store.remove(channel, clientId), "remove");
             }
         }
 
@@ -3569,14 +3577,34 @@ lastSeen: Date.now() });
         unref(this.busGossipInterval); // never hold the process open for housekeeping
     }
 
-    /** Run a roster write when there is a roster, and never let it throw. */
-    private async presenceStoreOp(op: () => Promise<void>, label: string): Promise<void> {
-        if (!this.presenceStore) return;
-        try {
-            await op();
-        } catch (error) {
-            logger.warn(`⚠️ [Presence] Shared roster ${label} failed`, { error });
-        }
+    /**
+     * Run one of `clientId`'s roster writes when there is a roster, after the
+     * ones it made before, and never let it throw.
+     *
+     * In order, because each is its own statement on the pool: a removal sent
+     * while the client's upsert was still on its way could run first, and the
+     * upsert then put the row back. That row is this instance's, so the
+     * stale-roster sweep leaves it alone, and the in-process sweep no longer
+     * knows the client — the departed client stayed in every roster for as
+     * long as the instance ran.
+     */
+    private presenceStoreOp(clientId: string, op: (store: ChannelPresenceStore) => Promise<void>, label: string): Promise<void> {
+        if (!this.presenceStore) return Promise.resolve();
+        const previous = this.presenceStoreQueues.get(clientId) ?? Promise.resolve();
+        const next = previous.then(async () => {
+            const store = this.presenceStore;
+            if (!store) return;
+            try {
+                await op(store);
+            } catch (error) {
+                logger.warn(`⚠️ [Presence] Shared roster ${label} failed`, { error });
+            }
+        });
+        this.presenceStoreQueues.set(clientId, next);
+        void next.finally(() => {
+            if (this.presenceStoreQueues.get(clientId) === next) this.presenceStoreQueues.delete(clientId);
+        });
+        return next;
     }
 
     /** Periodic cleanup for stale presences */
@@ -3704,6 +3732,9 @@ lastSeen: Date.now() });
         // replica to wait out a TTL window on ghosts — a rolling deploy would
         // otherwise show 30s of departed users on every restart.
         if (this.presenceStore) {
+            // After the writes still on their way, or one of them puts a row back.
+            await Promise.allSettled([...this.presenceStoreQueues.values()]);
+            this.presenceStoreQueues.clear();
             try {
                 await this.presenceStore.removeInstance();
             } catch (error) {
