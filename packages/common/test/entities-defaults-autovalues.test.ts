@@ -1,5 +1,5 @@
 import { Properties } from "@rebasepro/types";
-import { applyDefaultValuesOnCreate, updateUserAutoValues } from "../src/util/entities";
+import { applyDefaultValuesOnCreate, updateDateAutoValues, updateUserAutoValues } from "../src/util/entities";
 
 describe("applyDefaultValuesOnCreate", () => {
     const properties: Properties = {
@@ -149,5 +149,40 @@ describe("updateUserAutoValues", () => {
     it("ignores a date autoValue — that is updateDateAutoValues' job", () => {
         const dates: Properties = { createdAt: { type: "date", autoValue: "on_create" } };
         expect(updateUserAutoValues({ inputValues: {}, properties: dates, status: "new", uid: "u1" })).toEqual({});
+    });
+});
+
+describe("updateDateAutoValues on a tuple array", () => {
+    // `of` as an array is a tuple: each position has its own property. The
+    // driver runs this on every save, so whatever it does to a value is what
+    // gets stored.
+    const properties: Properties = {
+        pair: {
+            type: "array",
+            of: [
+                { type: "number" },
+                { type: "string" },
+                { type: "date", autoValue: "on_update" }
+            ]
+        }
+    };
+    const now = new Date("2026-01-01T00:00:00.000Z");
+    const save = (pair: unknown[]) => updateDateAutoValues({
+        inputValues: { pair },
+        properties,
+        status: "existing",
+        timestampNowValue: now
+    }).pair;
+
+    it("keeps a falsy element in its slot", () => {
+        expect(save([0, "", null])).toEqual([0, "", now]);
+    });
+
+    it("keeps a null element in its slot, so the elements after it do not shift", () => {
+        expect(save([null, "b", null])).toEqual([null, "b", now]);
+    });
+
+    it("keeps an element past the declared positions as it is", () => {
+        expect(save([1, "a", null, "extra"])).toEqual([1, "a", now, "extra"]);
     });
 });

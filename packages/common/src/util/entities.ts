@@ -390,11 +390,13 @@ export function traverseValueProperty(inputValue: unknown,
         if (of && Array.isArray(inputValue) && !Array.isArray(of)) {
             value = inputValue.map((e) => traverseValueProperty(e, of, operation));
         } else if (of && Array.isArray(inputValue) && Array.isArray(of)) {
-            value = inputValue.map((e, i) => {
-                if (i < of.length)
-                    return traverseValueProperty(e, of[i], operation);
-                return null
-            }).filter(Boolean);
+            // A tuple is positional: every element keeps its slot, a `0`, a
+            // `false` or a `null` included, and an element past the declared
+            // positions has no property to apply and is kept as it is. The
+            // driver runs this on every save, so dropping an element here
+            // would move every later one into the wrong slot in storage.
+            value = inputValue.map((e, i) =>
+                i < of.length ? traverseValueProperty(e, of[i], operation) : e);
         } else if (property.oneOf && Array.isArray(inputValue)) {
             const typeField = property.oneOf?.typeField ?? DEFAULT_ONE_OF_TYPE;
             const valueField = property.oneOf?.valueField ?? DEFAULT_ONE_OF_VALUE;
