@@ -134,6 +134,11 @@ describe("assertBuiltForPath", () => {
             .not.toThrow();
     });
 
+    it("ignores a protocol-relative reference, which names another host", () => {
+        expect(() => assertBuiltForPath(withAssets("//cdn.example.com/lib/x.js"), "/admin", "admin"))
+            .not.toThrow();
+    });
+
     it("does not flag author-written anchors — only script/link references", () => {
         const html = '<!doctype html><html><body><a href="/">home</a></body></html>';
         expect(() => assertBuiltForPath(html, "/admin", "admin")).not.toThrow();

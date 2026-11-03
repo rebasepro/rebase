@@ -150,7 +150,9 @@ export function assertBuiltForPath(
     const pattern = /<(?:script|link)\b[^>]*?\b(?:src|href)\s*=\s*["']([^"']+)["']/gi;
     for (const match of indexHtml.matchAll(pattern)) {
         const ref = match[1];
-        if (!ref.startsWith("/")) continue;
+        // Relative, or on another host: `//cdn.example.com/x.js` starts with a
+        // slash and is no more rooted at this app's path than `https://` is.
+        if (!ref.startsWith("/") || ref.startsWith("//")) continue;
         if (ref === `${basePath}` || ref.startsWith(`${basePath}/`)) continue;
         offenders.push(ref);
     }
