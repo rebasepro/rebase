@@ -1323,10 +1323,29 @@ message: "Password has been reset successfully" });
     });
 
     /**
+     * Per-account throttle on `/change-password`.
+     *
+     * The current password is what stands between a stolen access token and
+     * the account: it is the one thing a token holder does not have, and
+     * changing the password signs every other device out. Unthrottled, the
+     * route would answer whether a guess is right as fast as the hash allows,
+     * for as long as the token lives. Keyed on the account, not the address,
+     * because the token is the attacker's to replay from anywhere. The same
+     * numbers as `mfaVerificationLimiter`, which guards the other factor.
+     */
+    const passwordChangeLimiter = limiters.named({
+        name: "auth-change-password",
+        windowMs: 15 * 60 * 1000,
+        limit: 10,
+        keyGenerator: (c) => `change-password:${(c.get("user") as { uid?: string } | undefined)?.uid ?? requestClientAddress(c)}`,
+        message: "Too many password change attempts for this account, please try again later."
+    });
+
+    /**
      * POST /auth/change-password
      * Change password for authenticated user
      */
-    router.post("/change-password", requireLiveSession, async (c) => {
+    router.post("/change-password", requireLiveSession, passwordChangeLimiter, async (c) => {
         const userCtx = c.get("user") as { uid: string; roles?: string[]; aal?: "aal1" | "aal2" } | undefined;
         if (!userCtx) {
             throw ApiError.unauthorized("Not authenticated");
