@@ -465,13 +465,14 @@ export function createAuth(transport: Transport, options?: CreateAuthOptions) {
      * round trip of latency each.
      *
      * The refresh is {@link refreshSession}, so a burst of requests shares one
-     * (the one started at load included). A refresh that fails hands back the
-     * token the request would have carried anyway: the 401 path then does
-     * exactly what it always did. One whose session ended while it ran hands
-     * back nothing, so the transport sends what it holds now — no token after
-     * a sign-out, the new account's after a sign-in — and never the token of
-     * the account that has gone. The realtime socket authenticates through
-     * this same path.
+     * (the one started at load included). A refresh that fails without the
+     * refresh token being refused hands back the token the request would have
+     * carried anyway: the 401 path then does exactly what it always did. One
+     * refused, or one whose session ended while it ran, hands back nothing, so
+     * the transport sends what it holds now — no token after a sign-out or a
+     * refused restore, the new account's after a sign-in — and never the
+     * token of the account that has gone. The realtime socket authenticates
+     * through this same path.
      */
     function tokenForRequest(): Promise<string | undefined> | undefined {
         if (refreshOwnRequests > 0) return undefined;
@@ -486,7 +487,10 @@ export function createAuth(transport: Transport, options?: CreateAuthOptions) {
         const epoch = sessionEpoch;
         return refreshSession().then(
             (fresh) => (epoch === sessionEpoch ? fresh.accessToken : undefined),
-            () => (epoch === sessionEpoch ? session.accessToken : undefined)
+            // A refused refresh token ends the session, so the request goes
+            // out with what the transport holds — nothing, for a session
+            // being restored on load — rather than the ended session's token.
+            (err: unknown) => (epoch === sessionEpoch && !isFatalRefreshError(err) ? session.accessToken : undefined)
         );
     }
     transport.setTokenRefresher?.(tokenForRequest);
@@ -1164,12 +1168,15 @@ password })
      * Throws `IDENTITY_ALREADY_LINKED` (409) if that provider identity is
      * attached to a different user. Succeeds idempotently (`alreadyLinked:
      * true`) if it is already attached to the current one.
+     *
+     * From an anonymous session the link makes the guest an account: the
+     * account's session replaces the guest's and `USER_UPDATED` is emitted.
      */
     async function linkProvider(
         providerId: string,
         payload: Record<string, unknown>
     ) {
-        return transport.request<{
+        const result = await transport.request<{
             success: boolean;
             provider: string;
             alreadyLinked: boolean;
@@ -1178,13 +1185,25 @@ password })
              * URL with an expiry, so copy the bytes rather than storing this.
              */
             photoURL?: string | null;
+            tokens?: AuthTokens;
+            user?: Record<string, unknown>;
         }>(
             authPath + "/link/" + providerId,
             {
                 method: "POST",
-                body: JSON.stringify(payload)
+                body: JSON.stringify(payload),
+                // A guest's link answers with its new session's refresh cookie.
+                credentials: authFlowMode === "cookie" ? "include" : undefined
             }
         );
+        // A guest that links a provider becomes an account, and the server
+        // answers with that account's session, as it does `linkAnonymous`.
+        // It replaces the guest's: otherwise the client goes on as a guest,
+        // its token carrying the guest claim RLS reads, until a refresh.
+        if (result.tokens && result.user) {
+            handleAuthResponse({ tokens: result.tokens, user: result.user }, "USER_UPDATED");
+        }
+        return result;
     }
 
     async function sendVerificationEmail() {
@@ -1400,7 +1419,9 @@ refreshToken: session.refreshToken };
             authPath + "/anonymous/link",
             {
                 method: "POST",
-                body: JSON.stringify({ email, password })
+                body: JSON.stringify({ email, password }),
+                // The answer sets the account's refresh cookie in cookie mode.
+                credentials: authFlowMode === "cookie" ? "include" : undefined
             }
         );
         const session = handleAuthResponse(body, "USER_UPDATED");
@@ -1511,7 +1532,12 @@ refreshToken: session.refreshToken };
             const payload = JSON.stringify({ challengeId, code });
             const body = options?.mfaToken
                 ? await withPendingToken<Minted>("/mfa/challenge/verify", payload, options.mfaToken)
-                : await transport.request<Minted>(authPath + "/mfa/challenge/verify", { method: "POST", body: payload });
+                : await transport.request<Minted>(authPath + "/mfa/challenge/verify", {
+                    method: "POST",
+                    body: payload,
+                    // The aal2 session's refresh cookie comes with the answer.
+                    credentials: authFlowMode === "cookie" ? "include" : undefined
+                });
             const session = handleAuthResponse(body, "SIGNED_IN");
             return { user: session.user,
 accessToken: session.accessToken,
@@ -1744,11 +1770,12 @@ refreshToken: session.refreshToken };
         getSession,
         getAccessToken,
         onAuthStateChange,
-        // A client that neither persists sessions nor uses cookie auth has
-        // nowhere to restore one from, so "no session in memory" is the final
-        // answer rather than a reason to ask the server. See the docblock on
+        // A client that does not persist sessions restores none on load — not
+        // from storage, and in cookie mode not from the cookie either (see the
+        // restore above) — so "no session in memory" is the final answer
+        // rather than a reason to ask the server. See the docblock on
         // `AuthClient.canRestoreSession`.
-        canRestoreSession: () => persistSession || authFlowMode === "cookie",
+        canRestoreSession: () => persistSession,
         isInitialized: () => isInitialized,
         /**
          * How restoring the session on load ended — see
