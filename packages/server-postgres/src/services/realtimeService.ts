@@ -2682,7 +2682,17 @@ roles: ["anon"] };
         payload: Record<string, unknown> | undefined,
         authContext?: SubscriptionAuthContext
     ): void | Promise<void> {
-        const channel = payload?.channel as string;
+        // A channel is named by a non-empty string. Anything else is refused
+        // before membership or the authorizer see it: a number `1` is another
+        // key in memory than `"1"` but the same rows in the shared presence
+        // and history tables, so the authorizer would be asked about one
+        // channel and the rows of another read; and a prefix retention rule
+        // calls string methods on the name.
+        const channel = payload?.channel;
+        if (typeof channel !== "string" || channel === "") {
+            this.sendError(clientId, "A channel frame needs `channel`, a non-empty string.", undefined, "INVALID_CHANNEL");
+            return;
+        }
 
         // Leaving and untracking only ever remove the caller's own state, so
         // they need no permission — refusing them could only strand a client.
