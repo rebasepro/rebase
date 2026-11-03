@@ -161,12 +161,30 @@ describe("logger redaction", () => {
         });
 
         it("redacts every occurrence, not just the first", () => {
-            const doubled = `Failed query: select 1\nparams: a\nwrapped by\nFailed query: select 2\nparams: b\ntail`;
+            const doubled = "Failed query: select 1\nparams: a\n    at first (/app/a.ts:1:1)\n" +
+                "Caused by: Failed query: select 2\nparams: b\n    at second (/app/b.ts:2:2)";
             const out = redactSensitiveText(doubled);
             expect(out).not.toContain("select 1");
             expect(out).not.toContain("select 2");
-            expect(out).toContain("wrapped by");
-            expect(out).toContain("tail");
+            expect(out).toContain("Caused by:");
+            expect(out).toContain("/app/a.ts");
+            expect(out).toContain("/app/b.ts");
+        });
+
+        it("redacts a bound value that spans lines, and every value after it", () => {
+            // Drizzle joins the params as they are, so a value with a newline
+            // in it carries the rest of the params onto the next lines.
+            const err = new DrizzleQueryError(
+                'insert into "posts" ("body", "author_email") values ($1, $2)',
+                ["first line\nsecond line of the post", "alice@acme.com"],
+                new Error("check constraint violated")
+            );
+            for (const text of [err.message, err.stack ?? ""]) {
+                const out = redactSensitiveText(text);
+                expect(out).not.toContain("second line of the post");
+                expect(out).not.toContain("alice@acme.com");
+            }
+            expect(redactSensitiveText(err.stack ?? "")).toContain("logger-redaction.test");
         });
 
         it("is idempotent — a second pass keeps the stack frames", () => {

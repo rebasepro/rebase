@@ -181,6 +181,9 @@ const REDACTED_QUERY =
     "Failed query: [redacted — set REBASE_LOG_RAW_QUERIES=true in development to see it]";
 const REDACTED_VALUE = "[redacted]";
 
+/** The start of a V8 stack frame line: what follows a redacted span in a `.stack`. */
+const STACK_FRAME = /\n[ \t]+at /g;
+
 /**
  * Key fragments whose values are never safe to publish. Compared against the
  * key with separators and case removed, so `api_key`, `apiKey` and `API-KEY`
@@ -230,10 +233,15 @@ export function rawQueryLoggingEnabled(): boolean {
 
 /**
  * Strip every `Failed query: … / params: …` span out of a message or stack,
- * keeping the surrounding text (including stack frames, which carry no user
- * data). When no `params:` line follows the marker the rest of the string is
- * dropped: a statement of unknown extent is treated as sensitive rather than
- * guessed at.
+ * keeping the stack frames behind it, which carry no user data. When no
+ * `params:` line follows the marker the rest of the string is dropped: a
+ * statement of unknown extent is treated as sensitive rather than guessed at.
+ *
+ * The params end at the next stack frame or at the end of the string, not at
+ * the end of their line. Drizzle writes them as `${params}` — the values
+ * joined by commas, as they are — so a value holding a newline (a post body,
+ * an address) carries the rest of itself, and every value after it, onto the
+ * following lines.
  *
  * Idempotent, and it has to be: an already-redacted span still starts with the
  * marker but has no `params:` line, so a second pass over it would fall into
@@ -252,12 +260,11 @@ export function redactSensitiveText(text: string): string {
             continue;
         }
         const paramsIdx = out.indexOf("\nparams:", idx);
-        let end: number;
-        if (paramsIdx === -1) {
-            end = out.length;
-        } else {
-            const eol = out.indexOf("\n", paramsIdx + 1);
-            end = eol === -1 ? out.length : eol;
+        let end = out.length;
+        if (paramsIdx !== -1) {
+            STACK_FRAME.lastIndex = paramsIdx + 1;
+            const frame = STACK_FRAME.exec(out);
+            if (frame) end = frame.index;
         }
         out = out.slice(0, idx) + REDACTED_QUERY + out.slice(end);
         idx = out.indexOf(FAILED_QUERY_MARKER, idx + REDACTED_QUERY.length);
