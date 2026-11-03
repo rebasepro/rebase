@@ -412,16 +412,24 @@ name: null }]);
 name: "Safe" };
             db.limit.mockResolvedValue([mockEntity]);
 
-            await dataService.fetchOne("test", maliciousId);
+            // A numeric key is addressed by a whole integer and nothing else.
+            // This one is not, so it names no row: no statement is composed
+            // at all, and the lookup finds nothing — rather than reading the
+            // leading `1` and answering with row 1.
+            await expect(dataService.fetchOne("test", maliciousId)).resolves.toBeUndefined();
+            expect(db.where).not.toHaveBeenCalled();
+        });
+
+        it("carries a whole numeric id as a bound value", async () => {
+            db.limit.mockResolvedValue([{ id: 1, name: "Safe" }]);
+
+            await dataService.fetchOne("test", "1");
 
             // Nothing is executed here, so "it did not throw" is not evidence
             // of anything. The condition the lookup composed is: the id is
             // carried as data, and the only SQL text is the comparison itself.
             const condition = db.where.mock.calls[0][0];
             expect(sqlTextOf(condition)).toBe("id = ");
-            // A numeric key parses the address before comparing it, so what is
-            // bound is the number 1 — the trailing statement never even
-            // survives as data, let alone as SQL.
             expect(boundValuesOf(condition)).toEqual([1]);
         });
 
