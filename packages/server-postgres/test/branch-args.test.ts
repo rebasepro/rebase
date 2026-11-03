@@ -6,7 +6,7 @@
  * quiet and wrong, and the branch name is the thing you type later to switch,
  * delete, or point a deploy at.
  */
-import { unexpectedBranchArgs } from "../src/branch-argv";
+import { branchNameIn, branchSourceIn, unexpectedBranchArgs } from "../src/branch-argv";
 
 describe("unexpectedBranchArgs", () => {
     it("accepts an action and a name", () => {
@@ -124,5 +124,42 @@ describe("a flag the branch action does not take", () => {
 
     it("judges the --flag=value form by its flag", () => {
         expect(refusal(["create", "x", "--frm=main"])).toContain("did you mean --from?");
+    });
+
+    it("reads the word after --from=value as what it is", () => {
+        // The `=` form carries its value, so the next word is not its argument.
+        expect(unexpectedBranchArgs(["create", "staging", "--from=production", "extra"])).toEqual(["extra"]);
+        expect(unexpectedBranchArgs(["create", "--from=production", "staging", "extra"])).toEqual(["extra"]);
+    });
+});
+
+describe("branchNameIn", () => {
+    it("is the first bare word after the action", () => {
+        expect(branchNameIn(["create", "feat"])).toBe("feat");
+        expect(branchNameIn(["list"])).toBeUndefined();
+    });
+
+    it("is not a flag written before the name", () => {
+        // A hyphen is legal in a branch name, so `--force` in slot 1 was
+        // created as a branch called `--force`, and `feat` never was.
+        expect(branchNameIn(["create", "--force", "feat"])).toBe("feat");
+        expect(branchNameIn(["delete", "-y", "feat"])).toBe("feat");
+        expect(branchNameIn(["create", "--from", "production", "feat"])).toBe("feat");
+        expect(branchNameIn(["create", "--from=production", "feat"])).toBe("feat");
+        expect(branchNameIn(["diff", "--sample-limit", "5", "feat", "--json"])).toBe("feat");
+    });
+});
+
+describe("branchSourceIn", () => {
+    it("reads --from <source> and --from=<source>", () => {
+        expect(branchSourceIn(["create", "staging", "--from", "production"])).toBe("production");
+        // Missed by an indexOf("--from"), which copied the main database instead.
+        expect(branchSourceIn(["create", "staging", "--from=production"])).toBe("production");
+    });
+
+    it("is undefined when no source is named", () => {
+        expect(branchSourceIn(["create", "staging"])).toBeUndefined();
+        expect(branchSourceIn(["create", "staging", "--from"])).toBeUndefined();
+        expect(branchSourceIn(["create", "staging", "--from="])).toBeUndefined();
     });
 });

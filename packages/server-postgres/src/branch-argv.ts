@@ -87,29 +87,63 @@ export function resolveBranchSwitches(rawArgs: readonly string[]): string[] {
  */
 export function unexpectedBranchArgs(words: readonly string[]): string[] {
     if (words[0]) assertKnownBranchFlags(words[0], words.slice(1));
+    return readBranchWords(words).extras;
+}
 
+/**
+ * The branch a `db branch` line names: the first bare word after the action,
+ * wherever the flags sit.
+ *
+ * Not the word in slot 1: in `create --force feat` that is `--force`, which
+ * is a legal branch name (hyphens are allowed), so a positional read creates a
+ * branch called `--force` and never creates `feat`.
+ *
+ * @param words The command's own arguments: action, name, then the rest.
+ */
+export function branchNameIn(words: readonly string[]): string | undefined {
+    return readBranchWords(words).name;
+}
+
+/**
+ * The source `branch create --from <source>` (or `--from=<source>`) names, if
+ * it names one. Both spellings are read: `unexpectedBranchArgs` accepts the
+ * `=` form, and a lookup of the bare `--from` word misses it and copies the
+ * main database instead of the source asked for.
+ *
+ * @param words The command's own arguments: action, name, then the rest.
+ */
+export function branchSourceIn(words: readonly string[]): string | undefined {
+    return readBranchWords(words).from || undefined;
+}
+
+/**
+ * One left-to-right reading of a `db branch` line: the name, `--from`'s value,
+ * and every bare word past the name.
+ *
+ * 0 is the action ("create"); the first bare word after it is the name, found
+ * by scanning rather than by position: in `["list", "--database-url",
+ * "postgres://…"]` slot 1 holds a flag, and its URL is no stray word. The word after a flag that takes a value is that flag's
+ * argument, not a stray word; a `--flag=value` carries its value in the same
+ * word, so the word after it is read as what it is.
+ */
+function readBranchWords(words: readonly string[]): { name: string | undefined; from: string | undefined; extras: string[] } {
+    let name: string | undefined;
+    let from: string | undefined;
     const extras: string[] = [];
-
-    // 0 is the action ("create"); the first bare word after it is the name.
-    //
-    // Found by scanning rather than by position, which is the fix: `["list",
-    // "--database-url", "postgres://…"]` put a flag in slot 1, so the scan
-    // started past it and read the URL as a stray word.
-    let seenName = false;
     for (let index = 1; index < words.length; index += 1) {
         const word = words[index];
         if (word.startsWith("-")) {
-            if (TAKES_A_VALUE.has(word.split("=")[0])) index += 1;
+            const equals = word.indexOf("=");
+            const flag = equals === -1 ? word : word.slice(0, equals);
+            const value = equals === -1 ? words[index + 1] : word.slice(equals + 1);
+            if (equals === -1 && TAKES_A_VALUE.has(flag)) index += 1;
+            if (flag === "--from") from = value;
             continue;
         }
-        if (!seenName) {
-            seenName = true;
-            continue;
-        }
-        extras.push(word);
+        if (name === undefined) name = word;
+        else extras.push(word);
     }
-
-    return extras;
+    return { name, from, extras };
 }
 
 /**
