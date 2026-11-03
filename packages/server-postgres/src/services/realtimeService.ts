@@ -1435,6 +1435,22 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
     }
 
     /**
+     * Whether `clientId` is a socket this service still holds.
+     *
+     * A frame reaches this service after the socket door has awaited — the
+     * identity recheck, the data rate limiter — and a channel frame may await
+     * again for its authorizer. A client that closed inside one of those awaits
+     * was already removed by `removeClient`, which runs on `close`, so whatever
+     * its frame registers now is never cleaned up: a subscription that keeps
+     * its group and its refetches for the life of the process, or a membership
+     * that keeps a channel alive with nobody in it. Checked synchronously
+     * before the registration, so nothing can close the socket in between.
+     */
+    private socketIsOpen(clientId: string): boolean {
+        return this.clients.has(clientId);
+    }
+
+    /**
      * Refuse a new subscription past the socket's ceiling, and say so.
      *
      * Every collection subscription is a refetch on every write to its
@@ -1461,6 +1477,8 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
         // Out here so the `catch` can check it. It is claimed before the fetch
         // starts, so a failed fetch always has one.
         let canDeliver: DeliveryCheck | undefined;
+
+        if (!this.socketIsOpen(clientId)) return;
 
         try {
             // Early validation: ensure the requested collection exists in the registry
@@ -1634,6 +1652,8 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
         const key = this.subscriptionKey(clientId, subscriptionId);
         // As in the collection case: claimed before the fetch, checked in the `catch`.
         let canDeliver: DeliveryCheck | undefined;
+
+        if (!this.socketIsOpen(clientId)) return;
 
         try {
             // Early validation: ensure the requested collection exists in the registry
@@ -2683,6 +2703,9 @@ roles: ["anon"] };
         channel: string,
         payload: Record<string, unknown> | undefined
     ): void | Promise<void> {
+        // An authorizer that answers asynchronously can answer after the
+        // socket closed — see `socketIsOpen`.
+        if (!this.socketIsOpen(clientId)) return;
         switch (type) {
             case "join_channel":
                 this.joinChannel(clientId, channel);
