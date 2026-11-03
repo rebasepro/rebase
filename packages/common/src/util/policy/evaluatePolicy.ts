@@ -159,7 +159,13 @@ function evaluateCompare(
     const a = l.value;
     const b = r.value;
 
-    if (a === null || b === null) {
+    // An absent value is NULL too. A document that never had the field — a
+    // MongoDB row, a create that did not mention it — reads `undefined` here,
+    // and the column it stands for is NULL. Both spellings of "no value" get
+    // the same answer, so `owner != uid` grants a row with no owner neither
+    // when the owner is null nor when it is missing, and two missing fields
+    // never compare equal.
+    if (a === null || a === undefined || b === null || b === undefined) {
         // SQL answers NULL for *every* comparison against NULL, and a policy
         // that answers NULL does not grant the row. So the only question here
         // is which JavaScript answer reproduces that outcome.

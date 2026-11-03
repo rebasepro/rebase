@@ -122,6 +122,29 @@ describe("comparisons that cannot be ordered", () => {
         }
     });
 
+    it("is `unknown` when the row does not have the field, as when it is null", () => {
+        // A MongoDB document that never had `owner`, or a create that did not
+        // mention it: the column it stands for is NULL, and the answer is the
+        // one the same row with `owner: null` gets.
+        const missing = (op: PolicyCompareOperator) => evaluatePolicy(
+            policy.compare(policy.field("owner"), op, policy.authUid()),
+            ctx({})
+        );
+        for (const op of ["gt", "gte", "lt", "lte", "eq", "neq"] as const) {
+            expect({ op, result: missing(op) }).toEqual({ op, result: "unknown" });
+        }
+        // Two missing fields are not equal to each other either.
+        expect(evaluatePolicy(
+            policy.compare(policy.field("tenant"), "eq", policy.field("team")),
+            ctx({})
+        )).toBe("unknown");
+        // And the negation does not turn it into a grant.
+        expect(evaluatePolicy(
+            policy.not(policy.compare(policy.field("archived"), "eq", policy.literal(true))),
+            ctx({})
+        )).toBe("unknown");
+    });
+
     it("is `unknown` when the row is absent, whatever the operator", () => {
         const noRow = { user: { uid: "u1", roles: [] }, entity: null } as never;
 
