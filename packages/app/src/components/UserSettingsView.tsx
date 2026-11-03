@@ -73,7 +73,9 @@ export function UserSettingsView() {
     const [sessions, setSessions] = useState<SessionInfo[]>([]);
     const [loadingSessions, setLoadingSessions] = useState(false);
     const [sessionsError, setSessionsError] = useState<string | null>(null);
-    const [revokingSessionId, setRevokingSessionId] = useState<string | null>(null);
+    // Every session whose revoke is in flight: each row's button is its own,
+    // so a second revoke can start before the first has finished.
+    const [revokingSessionIds, setRevokingSessionIds] = useState<ReadonlySet<string>>(new Set());
     const [revokingAll, setRevokingAll] = useState(false);
 
     useEffect(() => {
@@ -169,11 +171,13 @@ export function UserSettingsView() {
     };
 
     const handleRevokeSession = async (id: string, isCurrentSession?: boolean) => {
-        setRevokingSessionId(id);
+        setRevokingSessionIds(previous => new Set(previous).add(id));
         try {
             if (authController.revokeSession) {
                 await authController.revokeSession(id);
-                setSessions(sessions.filter(s => s.id !== id));
+                // From the list as it is now, not as it was when this revoke
+                // started: another one may have removed its row meanwhile.
+                setSessions(previous => previous.filter(s => s.id !== id));
                 if (isCurrentSession) {
                     await authController.signOut();
                 }
@@ -183,7 +187,11 @@ export function UserSettingsView() {
         } catch (e: unknown) {
             setSessionsError(e instanceof Error ? e.message : String(e));
         } finally {
-            setRevokingSessionId(null);
+            setRevokingSessionIds(previous => {
+                const next = new Set(previous);
+                next.delete(id);
+                return next;
+            });
         }
     };
 
@@ -362,7 +370,7 @@ export function UserSettingsView() {
                                         </Typography>
                                     </div>
                                     <div className="ml-4">
-                                        {revokingSessionId === session.id ? (
+                                        {revokingSessionIds.has(session.id) ? (
                                             <CircularProgress size="small"/>
                                         ) : (
                                             <IconButton onClick={() => handleRevokeSession(session.id, session.isCurrentSession)} aria-label={t("revoke_session")}>

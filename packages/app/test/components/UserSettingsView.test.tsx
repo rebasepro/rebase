@@ -182,3 +182,59 @@ describe("UserSettingsView sessions", () => {
         expect(screen.getByRole("button", { name: "revoke_session" })).toBeInTheDocument();
     });
 });
+
+/**
+ * Revoking two sessions one after the other, the second clicked while the
+ * first is still in flight. Each revoke removed its row from the list as it
+ * stood when it was clicked, so the second to finish put back the row the
+ * first had removed — a session already ended, listed as active.
+ */
+describe("UserSettingsView session revoke", () => {
+    function SessionsHost({ revokeSession }: { revokeSession: (id: string) => Promise<void> }) {
+        const authController = {
+            user: { uid: "u1", email: "me@corp.com" },
+            initialLoading: false,
+            authLoading: false,
+            loginSkipped: false,
+            extra: null,
+            setExtra: () => undefined,
+            getAuthToken: async () => "t",
+            signOut: async () => undefined,
+            fetchSessions: async () => [
+                { id: "s1", userAgent: "Laptop", createdAt: "2026-01-03T00:00:00Z" },
+                { id: "s2", userAgent: "Phone", createdAt: "2026-01-02T00:00:00Z" },
+                { id: "s3", userAgent: "Tablet", createdAt: "2026-01-01T00:00:00Z" }
+            ],
+            revokeSession
+        };
+        return (
+            <AuthControllerContext.Provider value={authController as never}>
+                <UserSettingsView/>
+            </AuthControllerContext.Provider>
+        );
+    }
+
+    it("keeps a session revoked while another revoke is in flight", async () => {
+        const pending = new Map<string, () => void>();
+        const revokeSession = (id: string) => new Promise<void>(resolve => { pending.set(id, resolve); });
+        render(<SessionsHost revokeSession={revokeSession}/>);
+
+        await act(async () => {
+            fireEvent.mouseDown(screen.getByRole("tab", { name: "sessions" }));
+        });
+        expect(await screen.findByText("Phone")).toBeInTheDocument();
+
+        const revokeButtons = () => screen.getAllByRole("button", { name: "revoke_session" });
+        // Laptop's and Phone's rows, newest first.
+        fireEvent.click(revokeButtons()[0]);
+        fireEvent.click(revokeButtons()[0]);
+        expect(pending.size).toBe(2);
+
+        await act(async () => { pending.get("s1")!(); });
+        await act(async () => { pending.get("s2")!(); });
+
+        expect(screen.queryByText("Laptop")).not.toBeInTheDocument();
+        expect(screen.queryByText("Phone")).not.toBeInTheDocument();
+        expect(screen.getByText("Tablet")).toBeInTheDocument();
+    });
+});
