@@ -342,6 +342,24 @@ describe("serveSPA cache headers", () => {
         expect(await cacheControl(hashedBuild(), "/o/acme/projects")).toBe("no-cache");
     });
 
+    it("never pins the SPA fallback at a deep link that looks like a hashed file", async () => {
+        // An id with a dash and eight capitals and digits before a dot has the
+        // shape of a hashed chunk. `.pdf` is not a build extension, so the
+        // fallback answers it with index.html, which must not be held a year.
+        const app = hashedBuild();
+        const res = await app.request("http://localhost/invoices/INV-2024ABCD.pdf");
+        expect(await res.text()).toBe("SITE_INDEX");
+        expect(res.headers.get("cache-control")).toBe("no-cache");
+
+        const etag = res.headers.get("etag");
+        expect(etag).toBeTruthy();
+        const again = await app.request("http://localhost/invoices/INV-2024ABCD.pdf", {
+            headers: { "If-None-Match": etag ?? "" }
+        });
+        expect(again.status).toBe(304);
+        expect(again.headers.get("cache-control")).toBe("no-cache");
+    });
+
     it("revalidates a file whose name carries no hash, rather than guessing", async () => {
         // Being under /assets/ is a Vite convention, not evidence. Erring this
         // way costs a 304; erring the other way pins a wrong file for a year
