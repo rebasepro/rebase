@@ -501,7 +501,11 @@ function processValueForExport(inputValue: unknown,
         const toId = (item: unknown) => relationIdForExport(item) ?? item;
         value = Array.isArray(inputValue) ? inputValue.map(toId) : toId(inputValue);
     } else if (property.type === "map" && property.properties) {
-        value = processValuesForExport(inputValue as Record<string, unknown>, property.properties as Properties, exportType, dateExportType);
+        // A map with no value is exported as none: read through, a `null` map
+        // came out as an object of `null` fields.
+        value = inputValue !== null && typeof inputValue === "object" && !Array.isArray(inputValue)
+            ? processValuesForExport(inputValue as Record<string, unknown>, property.properties as Properties, exportType, dateExportType)
+            : inputValue;
     } else if (property.type === "array") {
         if (property.of && Array.isArray(inputValue)) {
             if (Array.isArray(property.of)) {
@@ -602,9 +606,11 @@ const BLOB_URL_LIFETIME_MS = 10_000;
 export function downloadDataAsCsv(data: object[], name: string) {
     if (data.length === 0) return;
 
-    const headers = Object.keys(data[0]);
+    // Every key any row holds, in the order they are first met; the header
+    // row is written through the same cell escaping as the values.
+    const headers = [...new Set(data.flatMap(row => Object.keys(row)))];
     const csvContent = [
-        headers.join(","),
+        headers.map(toCSVCell).join(","),
         ...data.map(row => headers.map(header => toCSVCell((row as Record<string, unknown>)[header])).join(","))
     ].join("\r\n");
 

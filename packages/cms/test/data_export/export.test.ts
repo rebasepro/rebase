@@ -383,3 +383,34 @@ describe("export processing scales with the property count", () => {
         expect(row).toEqual({ id: "1", a: "x", b: "y", c: 3 });
     });
 });
+
+/**
+ * A map with no value is exported as no value. Read through as if it were an
+ * object, a `null` address came out of a JSON export as
+ * `{ street: null, city: null }` and a missing one as `{}` — objects the
+ * import then wrote back where the record held nothing.
+ */
+describe("an empty map in a JSON export", () => {
+    const properties: Properties = {
+        address: {
+            type: "map",
+            properties: {
+                street: { type: "string" },
+                since: { type: "date" }
+            }
+        }
+    };
+
+    test("a null map stays null, and a missing one stays missing", () => {
+        const rows: Entity<any>[] = [
+            { id: "1", path: "people", values: { address: null } },
+            { id: "2", path: "people", values: {} },
+            { id: "3", path: "people", values: { address: { street: "Main", since: "2020-01-02T00:00:00.000Z" } } }
+        ];
+        expect(JSON.parse(JSON.stringify(getEntityJsonExportableData(rows, undefined, properties, "timestamp")))).toEqual([
+            { id: "1", address: null },
+            { id: "2" },
+            { id: "3", address: { street: "Main", since: Date.UTC(2020, 0, 2) } }
+        ]);
+    });
+});
