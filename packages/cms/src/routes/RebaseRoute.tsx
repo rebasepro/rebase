@@ -24,6 +24,7 @@ import { useUrlController } from "../hooks/navigation/contexts/UrlContext";
 import { useBreadcrumbsController } from "../hooks/useBreadcrumbsController";
 import { useNavigationStateController } from "../hooks/navigation/contexts/NavigationStateContext";
 import { NavigationLoadingErrorView } from "../components/NavigationLoadingErrorView";
+import { decodeUrlPath, encodeUrlPathSegment, getPathAfterRecord } from "../hooks/navigation/url_segments";
 
 export function RebaseRoute() {
     return <Suspense fallback={<CircularProgressCenter/>}>
@@ -194,14 +195,9 @@ function RebaseRouteContent() {
             // Fallback: check for unregistered tabs (e.g. __json, __rebase_history)
             // that aren't parsed as navigation entries
             if (!selectedTab && (navigationEntries.length === 2) && lastEntityEntry) {
-                const entityIdStr = String(lastEntityEntry.entityId);
-                const entityIdIdx = pathname.lastIndexOf(`/${entityIdStr}`);
-                if (entityIdIdx >= 0) {
-                    const afterEntity = pathname.substring(entityIdIdx + 1 + entityIdStr.length);
-                    const trailingSegment = afterEntity.startsWith("/") ? afterEntity.substring(1) : afterEntity;
-                    if (trailingSegment.length > 0) {
-                        selectedTab = trailingSegment;
-                    }
+                const trailingSegment = getPathAfterRecord(pathname, urlController.buildUrlCollectionPath(lastEntityEntry.path));
+                if (trailingSegment) {
+                    selectedTab = trailingSegment;
                 }
             }
             return <ResolvedCollectionView
@@ -279,21 +275,26 @@ function EntityFullScreenRoute({
 
     const entityId = lastEntityEntry && "entityId" in lastEntityEntry ? lastEntityEntry.entityId : undefined;
 
+    // The record's own URL, and the URL of the collection that holds it. Built
+    // from the data path, so the id in them is percent-encoded once, however
+    // the pathname spells it.
+    const recordUrl = lastEntityEntry && entityId !== undefined && !isNew
+        ? urlController.buildUrlCollectionPath(lastEntityEntry.path)
+        : undefined;
+    const basePath = lastEntityEntry && recordUrl !== undefined
+        ? urlController.buildUrlCollectionPath(lastEntityEntry.slug)
+        : pathname;
+
     // Derive tab from navigation entries (works for registered custom views)
     let urlTab = getSelectedTabFromUrl(isNew, lastCustomView);
 
     // Fallback: internal tabs like __json or __rebase_history aren't registered as
     // entity views, so the navigation parser ignores them. Check the raw pathname
     // for a trailing segment after the entity ID to catch those cases.
-    if (!urlTab && entityId && !isNew) {
-        const entityIdStr = String(entityId);
-        const entityIdIdx = pathname.lastIndexOf(`/${entityIdStr}`);
-        if (entityIdIdx >= 0) {
-            const afterEntity = pathname.substring(entityIdIdx + 1 + entityIdStr.length);
-            const trailingSegment = afterEntity.startsWith("/") ? afterEntity.substring(1) : afterEntity;
-            if (trailingSegment.length > 0 && trailingSegment !== "edit") {
-                urlTab = trailingSegment;
-            }
+    if (!urlTab && recordUrl !== undefined) {
+        const trailingSegment = getPathAfterRecord(pathname, recordUrl);
+        if (trailingSegment && trailingSegment !== "edit") {
+            urlTab = trailingSegment;
         }
     }
 
@@ -307,20 +308,24 @@ function EntityFullScreenRoute({
         }
     }, [urlTab]);
 
-    const basePath = !entityId || isNew
-        ? pathname
-        : pathname.substring(0, pathname.lastIndexOf(`/${entityId}`));
+    // The URL of a record in this collection, or of one of its tabs.
+    const recordTabUrl = (id: string | number, tab?: string) =>
+        `${basePath}/${encodeUrlPathSegment(String(id))}${tab ? "/" + encodeUrlPathSegment(tab) : ""}`;
 
-    const entityPath = basePath + `/${entityId}`;
+    // Compared decoded: a location's pathname spells an id the way whoever
+    // wrote it encoded it, and these paths are built here.
+    const entityPath = decodeUrlPath(recordUrl ?? `${basePath}/${entityId}`);
+    const decodedBasePath = decodeUrlPath(basePath);
 
     const blocker = useNavigationBlocker(useCallback(({
         currentLocation,
         nextLocation
     }) => {
+        const nextPathname = decodeUrlPath(nextLocation.pathname);
         // Inside this record — a tab, `/edit`. By path segment: a bare
         // prefix let Back to `/c/products/12` out of `/c/products/1` without
         // asking.
-        if (isPathWithinRecord(nextLocation.pathname, entityPath))
+        if (isPathWithinRecord(nextPathname, entityPath))
             return false;
 
         // Side panel overlay navigations preserve the underlying form via
@@ -334,12 +339,12 @@ function EntityFullScreenRoute({
         // Closing a side panel (navigate(-1) back to the form's own path)
         const currentHash = currentLocation.hash;
         if ((currentHash === "#side" || currentHash === "#new_side") &&
-            (nextLocation.pathname === basePath ||
-             isPathWithinRecord(nextLocation.pathname, entityPath)))
+            (nextPathname === decodedBasePath ||
+             isPathWithinRecord(nextPathname, entityPath)))
             return false;
 
         return blocked.current;
-    }, [entityPath, basePath]));
+    }, [entityPath, decodedBasePath]));
 
     const lastCollectionEntry = [...navigationEntries].reverse().find((entry) => entry.type === "collection");
 
@@ -405,12 +410,7 @@ function EntityFullScreenRoute({
                 }}
                 onTabChange={(params) => {
                     setSelectedTab(params.selectedTab);
-                    const newSelectedTab = params.selectedTab;
-                    if (newSelectedTab) {
-                        navigate(`${basePath}/${entityId}/${newSelectedTab}${hash}`, { replace: true });
-                    } else {
-                        navigate(`${basePath}/${entityId}${hash}`, { replace: true });
-                    }
+                    navigate(`${recordTabUrl(entityId, params.selectedTab)}${hash}`, { replace: true });
                 }}
                 parentCollectionSlugs={parentCollectionSlugs}
                 parentEntityIds={parentEntityIds}
@@ -436,25 +436,16 @@ function EntityFullScreenRoute({
             }}
             onSaved={(params) => {
                 const newSelectedTab = params.selectedTab;
-                const newEntityId = params.entityId;
+                const newEntityId = params.entityId ?? params.entity.id;
                 const savedHash = isNew ? "" : hash;
-                if (newSelectedTab) {
-                    navigate(`${basePath}/${newEntityId}/${newSelectedTab}${savedHash}`, { replace: true });
-                } else {
-                    navigate(`${basePath}/${newEntityId}${savedHash}`, { replace: true });
-                }
+                navigate(`${recordTabUrl(newEntityId, newSelectedTab)}${savedHash}`, { replace: true });
             }}
             onTabChange={(params) => {
                 setSelectedTab(params.selectedTab);
-                if (isNew) {
+                if (isNew || entityId === undefined) {
                     return;
                 }
-                const newSelectedTab = params.selectedTab;
-                if (newSelectedTab) {
-                    navigate(`${basePath}/${entityId}/${newSelectedTab}${hash}`, { replace: true });
-                } else {
-                    navigate(`${basePath}/${entityId}${hash}`, { replace: true });
-                }
+                navigate(`${recordTabUrl(entityId, params.selectedTab)}${hash}`, { replace: true });
             }}
             parentCollectionSlugs={parentCollectionSlugs} parentEntityIds={parentEntityIds}
         />

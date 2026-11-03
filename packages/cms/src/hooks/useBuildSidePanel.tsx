@@ -304,10 +304,12 @@ const propsToSidePanel = (props: SidePanelBindingProps,
     // opens as an overlay without affecting the browser URL / router.
     const shouldUpdateUrl = props.updateUrl !== false;
 
+    // `buildUrlCollectionPath` encodes every segment of the data path it is
+    // given, the record id among them, so the query and the hash go after it.
     const urlPath = shouldUpdateUrl
         ? (props.entityId
-            ? buildUrlCollectionPath(`${collectionPath}/${props.entityId}${props.selectedTab ? "/" + props.selectedTab : ""}${locationSearch}#${SIDE_URL_HASH}`)
-            : buildUrlCollectionPath(`${collectionPath}${locationSearch}#${NEW_URL_HASH}`))
+            ? `${buildUrlCollectionPath(`${collectionPath}/${props.entityId}${props.selectedTab ? "/" + props.selectedTab : ""}`)}${locationSearch}#${SIDE_URL_HASH}`
+            : `${buildUrlCollectionPath(collectionPath)}${locationSearch}#${NEW_URL_HASH}`)
         : undefined;
 
     const parentUrlPath = shouldUpdateUrl

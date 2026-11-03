@@ -3,6 +3,7 @@ import { useCallback, useMemo } from "react";
 import { removeInitialAndTrailingSlashes, resolveCollectionPathIds } from "@rebasepro/app";
 import { CollectionRegistryController } from "@rebasepro/types";
 import { useNavigate } from "react-router";
+import { decodeUrlPath, encodeUrlPath } from "./url_segments";
 
 export function useBuildUrlController(props: {
     basePath: string,
@@ -15,8 +16,11 @@ export function useBuildUrlController(props: {
 
     const homeUrl = basePath === "/" ? "/" : `/${removeInitialAndTrailingSlashes(basePath)}`;
 
+    // `path` is a data path: each of its segments, record ids included, is
+    // written percent-encoded, and a query or hash goes after the result.
     const buildUrlCollectionPath = useCallback((path: string): string => {
-        const fullPath = basePath === "/" ? `${baseCollectionPath}/${path}` : `${basePath}${baseCollectionPath}/${path}`;
+        const urlPath = encodeUrlPath(path);
+        const fullPath = basePath === "/" ? `${baseCollectionPath}/${urlPath}` : `${basePath}${baseCollectionPath}/${urlPath}`;
         return fullPath.replace(/\/\//g, "/");
     }, [basePath, baseCollectionPath]);
 
@@ -33,7 +37,9 @@ export function useBuildUrlController(props: {
         if (path.startsWith(baseCollectionPath)) {
             path = path.replace(baseCollectionPath, "");
         }
-        return removeInitialAndTrailingSlashes(path);
+        // The pathname arrives percent-encoded, by the browser or by
+        // `buildUrlCollectionPath`; the data path holds the ids themselves.
+        return decodeUrlPath(removeInitialAndTrailingSlashes(path));
     }, [basePath, baseCollectionPath]);
 
     const isUrlCollectionPath = useCallback((urlPath: string): boolean => {
