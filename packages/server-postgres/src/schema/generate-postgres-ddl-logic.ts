@@ -16,6 +16,7 @@ import { CollectionConfig, SecurityRule, isPostgresCollectionConfig } from "@reb
 import { getTableName } from "@rebasepro/common";
 import { planSchema, compileSecurityRule, quoteSqlLiteral, defaultBelongsToOnDelete } from "./plan/plan-schema";
 import {
+    renderDenyingPolicyStatements,
     renderPgType,
     renderPoliciesDdl,
     renderPolicyStatements,
@@ -249,6 +250,23 @@ export interface CollectionPolicyPlan {
     enableRls: string;
     /** `DROP POLICY IF EXISTS` / `CREATE POLICY` statements, in order. */
     policyStatements: string[];
+    /**
+     * The same statements, grouped by policy, with each restrictive policy's
+     * denying stand-in. What the boot applier's one-statement-at-a-time
+     * fallback walks: it creates the restrictive gates before any grant, and
+     * puts the stand-in where a gate could not be created.
+     */
+    policies: PolicyApplyPlan[];
+}
+
+/** One policy of a {@link CollectionPolicyPlan}, as the statements that make it. */
+export interface PolicyApplyPlan {
+    name: string;
+    restrictive: boolean;
+    /** Its `DROP POLICY IF EXISTS` / `CREATE POLICY` statements — a slice of `policyStatements`. */
+    statements: string[];
+    /** For a restrictive policy, the statements that make it deny every row instead. */
+    denying?: string[];
 }
 
 /**
@@ -266,13 +284,25 @@ export const planCollectionPolicies = (allCollections: CollectionConfig[]): Coll
         ...plan.tables.filter(t => t.kind === "collection"),
         ...plan.tables.filter(t => t.kind === "junction")
     ];
-    return ordered.map(table => ({
-        schema: table.schema,
-        table: table.table,
-        qualified: table.qualified,
-        enableRls: `ALTER TABLE "${table.schema}"."${table.table}" ENABLE ROW LEVEL SECURITY;`,
-        policyStatements: table.policies.flatMap(policy => renderPolicyStatements(table, policy))
-    }));
+    return ordered.map(table => {
+        const policies: PolicyApplyPlan[] = table.policies.map(policy => {
+            const restrictive = policy.mode === "restrictive";
+            return {
+                name: policy.name,
+                restrictive,
+                statements: renderPolicyStatements(table, policy),
+                ...(restrictive ? { denying: renderDenyingPolicyStatements(table, policy) } : {})
+            };
+        });
+        return {
+            schema: table.schema,
+            table: table.table,
+            qualified: table.qualified,
+            enableRls: `ALTER TABLE "${table.schema}"."${table.table}" ENABLE ROW LEVEL SECURITY;`,
+            policyStatements: policies.flatMap(policy => policy.statements),
+            policies
+        };
+    });
 };
 
 /**

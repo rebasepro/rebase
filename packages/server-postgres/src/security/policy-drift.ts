@@ -14,6 +14,7 @@
  * against exactly what would be applied rather than a reimplementation.
  */
 import { RLS_UID_SQL, type CollectionConfig } from "@rebasepro/types";
+import { toPostgresIdentifier } from "@rebasepro/utils";
 
 import { generatePostgresPoliciesDdl } from "../schema/generate-postgres-ddl-logic";
 
@@ -146,7 +147,15 @@ function normalizeMode(raw: unknown): "PERMISSIVE" | "RESTRICTIVE" | undefined {
     return undefined;
 }
 
-/** Parse the generated DDL rather than rebuilding the shape by hand. */
+/**
+ * Parse the generated DDL rather than rebuilding the shape by hand.
+ *
+ * Each name is the one Postgres stores — its first 63 bytes — because that is
+ * the name every live policy is compared under. A rule's name can be longer,
+ * and read as written its policy was both "missing" and, once cut to a name of
+ * the generated shape, an "orphan" the push's reconcile dropped right after
+ * `policies.sql` created it.
+ */
 export function parseExpectedPolicies(ddl: string): PolicyRef[] {
     const found: PolicyRef[] = [];
     for (const m of ddl.matchAll(CREATE_POLICY)) {
@@ -164,7 +173,7 @@ export function parseExpectedPolicies(ddl: string): PolicyRef[] {
             : /WITH CHECK/i.test(clause);
 
         found.push({
-            schema, table, name, roles,
+            schema, table, name: toPostgresIdentifier(name), roles,
             command: command.toUpperCase(),
             hasUsing, hasWithCheck,
             mode: normalizeMode(modeRaw)

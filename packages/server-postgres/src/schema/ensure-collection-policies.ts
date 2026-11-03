@@ -61,6 +61,7 @@
  */
 import { createHash } from "node:crypto";
 import { type CollectionConfig } from "@rebasepro/types";
+import { toPostgresIdentifier } from "@rebasepro/utils";
 import { planCollectionPolicies, type CollectionPolicyPlan } from "./generate-postgres-ddl-logic";
 import { isGeneratedPolicyName } from "../security/policy-drift";
 import { describeDriverError, type Queryable } from "./ensure-collection-tables";
@@ -148,12 +149,29 @@ export interface PolicyEnsureResult {
 
 const isCreatePolicy = (statement: string): boolean => /^\s*CREATE POLICY/i.test(statement);
 
-/** The policy names a plan creates. */
+/**
+ * The name a `CREATE POLICY` statement's policy is stored under, or undefined
+ * for any other statement.
+ *
+ * Postgres keeps the first 63 bytes of an identifier, and a rule's policy name
+ * can be longer (`<table>_<op>_<hash>_<i>` on a 48-byte table is 65). Every
+ * name read back from the catalogue is the stored one, so the plan's names are
+ * compared in that form too. Compared as written, the policy just created was
+ * not among the planned names, matched the generated shape once cut, and the
+ * next boot dropped it as an orphan — a restrictive gate included, leaving the
+ * grants beside it to answer alone.
+ */
+const createdPolicyName = (statement: string): string | undefined => {
+    const match = /^\s*CREATE POLICY\s+"([^"]+)"/i.exec(statement);
+    return match ? toPostgresIdentifier(match[1]) : undefined;
+};
+
+/** The policy names a plan creates, as Postgres stores them. */
 const plannedPolicyNames = (plan: CollectionPolicyPlan): Set<string> => {
     const expected = new Set<string>();
     for (const statement of plan.policyStatements) {
-        const match = /^\s*CREATE POLICY\s+"([^"]+)"/i.exec(statement);
-        if (match) expected.add(match[1]);
+        const name = createdPolicyName(statement);
+        if (name) expected.add(name);
     }
     return expected;
 };
@@ -212,8 +230,8 @@ const stampOf = (renderedHash: string, liveHash: string): string =>
 const renderedHashes = (plan: CollectionPolicyPlan): Map<string, string> => {
     const hashes = new Map<string, string>();
     for (const statement of plan.policyStatements) {
-        const match = /^\s*CREATE POLICY\s+"([^"]+)"/i.exec(statement);
-        if (match) hashes.set(match[1], sha256Hex(statement.trim()));
+        const name = createdPolicyName(statement);
+        if (name) hashes.set(name, sha256Hex(statement.trim()));
     }
     return hashes;
 };
@@ -362,8 +380,8 @@ export async function probeRenderedPolicies(
     const statements = new Map<string, string>();
     for (const plan of planCollectionPolicies(collections)) {
         for (const statement of plan.policyStatements) {
-            const match = /^\s*CREATE POLICY\s+"([^"]+)"/i.exec(statement);
-            if (match) statements.set(`${plan.schema}.${plan.table}.${match[1]}`, statement.trim());
+            const name = createdPolicyName(statement);
+            if (name) statements.set(`${plan.schema}.${plan.table}.${name}`, statement.trim());
         }
     }
     const answers = new Map<string, boolean>();
@@ -607,10 +625,12 @@ type AtomicOutcome =
  * old policies or the new ones, never neither.
  *
  * If the transaction fails for any reason but a lock timeout, the table is
- * applied again one statement at a time, exactly as before — so a rule that
- * cannot be created (a function a migration has not added yet) leaves the
- * table in the same deny-leaning partial state it always did, rather than
- * rolling back to the old, possibly looser, policies.
+ * applied again one statement at a time — so a rule that cannot be created (a
+ * function a migration has not added yet) leaves the table in a deny-leaning
+ * partial state rather than rolling back to the old, possibly looser,
+ * policies. Deny-leaning holds for restrictive rules too: they are applied
+ * first, and one that cannot be created is replaced by a restrictive policy
+ * that passes nothing, never left out from under the grants.
  *
  * ## Lock budget
  *
@@ -811,15 +831,44 @@ async function applyEachStatement(
     }
     result.tablesSecured++;
 
-    try {
-        let created = 0;
-        for (const statement of plan.policyStatements) {
-            await run(statement);
-            if (isCreatePolicy(statement)) {
-                result.policiesApplied++;
-                created++;
+    // The restrictive gates go in before any grant, and a gate that cannot be
+    // created is replaced by one that passes nothing. A restrictive policy is
+    // ANDed over the permissive ones, so a missing gate is not a denial: the
+    // grants made beside it would answer alone, and a tenancy or admin-write
+    // gate that failed to apply let every grant through it.
+    let created = 0;
+    let gateError: string | undefined;
+    for (const policy of plan.policies.filter(p => p.restrictive)) {
+        try {
+            for (const statement of policy.statements) await run(statement);
+            result.policiesApplied++;
+            created++;
+        } catch (err) {
+            gateError ??= `${policy.name}: ${describeDriverError(err)}`;
+            try {
+                for (const statement of policy.denying ?? []) await run(statement);
+            } catch (denyErr) {
+                // Neither the gate nor its stand-in is in place, so the grants
+                // already on the table answer alone: closed the way a table RLS
+                // cannot be enabled on is.
+                result.tablesSecured--;
+                const closed = await withdrawGrant(client, plan,
+                    `restrictive policy ${gateError}; its denying stand-in failed too: ${describeDriverError(denyErr)}`);
+                if (!closed.locked) {
+                    result.unsecured.push({ table: plan.qualified, error: closed.error, grantWithdrawn: closed.grantWithdrawn });
+                }
+                return;
             }
         }
+    }
+
+    try {
+        for (const policy of plan.policies.filter(p => !p.restrictive)) {
+            for (const statement of policy.statements) await run(statement);
+            result.policiesApplied++;
+            created++;
+        }
+        if (gateError) throw new Error(`restrictive policy ${gateError}; it denies every row until it can be created`);
         for (const name of table.orphans) {
             await run(dropPolicySql(plan, name));
             result.orphansDropped++;
