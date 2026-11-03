@@ -160,6 +160,7 @@ describe("BranchService", () => {
                 .mockResolvedValueOnce({ rows: [] } as never) // existence check
                 .mockResolvedValueOnce(undefined as never) // disconnectDatabase (noop)
                 .mockResolvedValueOnce({ rows: [{ xid: "4242" }] } as never) // the fork point
+                .mockResolvedValueOnce(undefined as never) // the home comment
                 .mockResolvedValueOnce(undefined as never); // INSERT metadata
 
             const result = await service.createBranch("staging");
@@ -173,15 +174,15 @@ describe("BranchService", () => {
             // poolManager.disconnectDatabase should be called with the source db
             expect(poolManager.disconnectDatabase).toHaveBeenCalledWith("my_app_db");
 
-            // existence check, CREATE DB, the fork point, INSERT. The disconnect
-            // is on poolManager, not db.
-            expect(db.execute).toHaveBeenCalledTimes(4);
+            // existence check, CREATE DB, the fork point, the home comment,
+            // INSERT. The disconnect is on poolManager, not db.
+            expect(db.execute).toHaveBeenCalledTimes(5);
             // The fork point is read from the new database's catalog row right
             // after it is made, and kept: that row's xmin moves on any later
             // GRANT or ALTER DATABASE.
             expect(statementAt(db, 2).sql).toBe("SELECT xmin::text AS xid FROM pg_database WHERE datname = $1");
             expect(statementAt(db, 2).params).toEqual(["rb_staging"]);
-            expect(statementAt(db, 3).params[4]).toBe(JSON.stringify({ forkXid: "4242" }));
+            expect(statementAt(db, 4).params[4]).toBe(JSON.stringify({ forkXid: "4242" }));
         });
 
         it("should use a custom source database when provided", async () => {
@@ -219,7 +220,7 @@ describe("BranchService", () => {
             expect(statementAt(db, 1).params).toEqual([]);
 
             // The metadata row, by contrast, is fully parameterised.
-            expect(statementAt(db, 3).params).toEqual([
+            expect(statementAt(db, 4).params).toEqual([
                 "my-feature-branch",
                 "rb_my-feature-branch",
                 "my_app_db",
