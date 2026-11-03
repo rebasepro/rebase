@@ -819,6 +819,15 @@ file: "package.json" });
         expect(detectDeclaredDepConflicts(scratch)).toEqual([]);
     });
 
+    it("reads a partial caret as the wildcard it is", () => {
+        // `^0` is >=0.0.0 <1.0.0 and `^0.0` is >=0.0.0 <0.1.0: 0.5.1 satisfies
+        // the first and 0.0.9 the second, so neither pair is a conflict.
+        write("package.json", JSON.stringify({ dependencies: { left: "^0", right: "^0.0" } }));
+        write("backend/package.json", JSON.stringify({ dependencies: { left: "^0.5.1", right: "~0.0.9" } }));
+
+        expect(detectDeclaredDepConflicts(scratch)).toEqual([]);
+    });
+
     it("ignores names the runtime image supplies", () => {
         // These are stripped from `deps.declared`, so a disagreement about them
         // never reaches a bundle; `disagreeing` reports the framework ones.

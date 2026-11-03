@@ -874,8 +874,11 @@ function upperBoundOf(range: string): [number, number, number] | null {
     if (trimmed.startsWith(">=")) return null; // open — reaches anything
     const [major, minor, patch] = min;
     if (trimmed.startsWith("^")) {
-        if (major > 0) return [major + 1, 0, 0];
-        if (minor > 0) return [0, minor + 1, 0];
+        // A caret pins the first part it was given that is not zero, and a
+        // part left out is a wildcard: `^0` is <1.0.0 and `^0.0` is <0.1.0.
+        const given = trimmed.replace(/^\^v?/, "").split(".").length;
+        if (major > 0 || given === 1) return [major + 1, 0, 0];
+        if (minor > 0 || given === 2) return [0, minor + 1, 0];
         return [0, 0, patch + 1];
     }
     if (trimmed.startsWith("~")) {
