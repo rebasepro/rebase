@@ -751,10 +751,18 @@ async function storageCreateCommand(rawArgs: string[]): Promise<void> {
 
     try {
         noteBlank();
-        note(chalk.gray("Provisioning managed storage — this creates a bucket and its credentials..."));
+        note(chalk.gray("Provisioning managed storage — this creates a bucket and grants your project access to it..."));
 
         const res = await client.functions.invoke<{
-            data: { bucketName: string; region: string; endpoint: string; accessKeyId: string };
+            data: {
+                bucketName: string;
+                region: string;
+                // Absent from a control plane that predates keyless buckets,
+                // which only ever answered with a key.
+                access?: "s3-key" | "workload-identity";
+                endpoint: string | null;
+                accessKeyId: string | null;
+            };
             // The project id is a SUB-PATH, not part of the function name.
             // `invoke` runs `encodeURIComponent` over the name — correct, since
             // a function name is one path segment — so folding the id into it
@@ -771,6 +779,9 @@ async function storageCreateCommand(rawArgs: string[]): Promise<void> {
         // fallback between two response shapes by making `data` optional on one
         // of them; `invoke<T>` returns `T`, and `T` here declares `data`.
         const info = res.data;
+        // A GCS bucket granted to the project's workload identity has no key
+        // at all, so "the secret is stored encrypted" would be untrue there.
+        const access = info.access ?? (info.accessKeyId ? "s3-key" : "workload-identity");
 
         success(`Managed storage provisioned for ${displayProjectRef(rawArgs)}.`);
         emit(
@@ -779,13 +790,16 @@ async function storageCreateCommand(rawArgs: string[]): Promise<void> {
                     ["Bucket", info.bucketName],
                     ["Region", info.region],
                     ["Endpoint", info.endpoint],
-                    ["Access key", info.accessKeyId]
+                    ["Access key", info.accessKeyId],
+                    ["Access", access === "workload-identity" ? "workload identity (no key)" : undefined]
                 ]);
                 noteBlank();
                 // The secret is never returned by the endpoint — it goes to the
                 // row and to the tenant's environment. Say so, or the absence
                 // reads as a bug.
-                note(chalk.gray("The secret key is stored encrypted and injected at deploy time; it is not displayed."));
+                note(chalk.gray(access === "workload-identity"
+                    ? "The bucket is granted to your project's workload identity; there is no key to store or rotate."
+                    : "The secret key is stored encrypted and injected at deploy time; it is not displayed."));
                 note(chalk.gray("Redeploy for the tenant to pick it up:  ") + chalk.bold("rebase cloud deploy"));
                 noteBlank();
             },
@@ -794,6 +808,7 @@ async function storageCreateCommand(rawArgs: string[]): Promise<void> {
                 projectId,
                 bucketName: info.bucketName,
                 region: info.region,
+                access,
                 endpoint: info.endpoint,
                 accessKeyId: info.accessKeyId,
                 // Stated, not omitted: a caller that finds no secret in the
