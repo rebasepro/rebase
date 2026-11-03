@@ -98,6 +98,9 @@ export function parseOlderThan(value: string): number | null {
     return match[2]?.toLowerCase() === "w" ? amount * 7 : amount;
 }
 
+/** Named the way `db push` names its scratch database: `<db>_dev_diff`. */
+const isAtlasScratch = (database: string): boolean => database.endsWith("_dev_diff");
+
 export function planPrune(
     input: {
         rows: readonly BranchRow[];
@@ -121,7 +124,11 @@ export function planPrune(
     const staleRows = input.rows.filter((row) => !present.has(row.dbName));
 
     const orphanDatabases = input.databases
-        .filter((name) => name.startsWith(input.branchPrefix) && !registered.has(name))
+        // An unregistered `rb_feat_dev_diff` is the scratch database `db push`
+        // made while the checkout was on `feat`, not a branch: it is listed
+        // with the scratch databases and removed only when asked. Never in both
+        // lists: a second DROP of the same database fails and stops the prune.
+        .filter((name) => name.startsWith(input.branchPrefix) && !registered.has(name) && !isAtlasScratch(name))
         .filter((name) => {
             if (!isActive(name)) return true;
             active = { name, database: name };
@@ -145,7 +152,11 @@ export function planPrune(
             })
             .sort((a, b) => b.ageDays - a.ageDays);
 
-    const devDiff = input.databases.filter((name) => name.endsWith("_dev_diff")).sort();
+    // A registered branch is not Atlas scratch, whatever it is called:
+    // `create schema_dev_diff` is a legal branch, `rb_schema_dev_diff`.
+    const devDiff = input.databases
+        .filter((name) => isAtlasScratch(name) && !registered.has(name) && !isActive(name))
+        .sort();
 
     return { staleRows, orphanDatabases, expired, devDiff, active };
 }
