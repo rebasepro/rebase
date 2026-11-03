@@ -731,7 +731,15 @@ function quoteLiteral(value: string | number | boolean | null): string {
     return `'${value.replace(/'/g, "''")}'`;
 }
 
-/** Sorted, single-quoted `ARRAY['a','b']` — matches the generators' output. */
+/**
+ * Sorted, single-quoted `ARRAY['a','b']` — matches the generators' output.
+ *
+ * Each role goes through {@link quoteLiteral}, which leaves an ordinary name
+ * byte-for-byte as it is and doubles a quote inside one (`o'reilly`). An
+ * unescaped quote would close the literal early: a syntax error at
+ * `CREATE POLICY`, which leaves the table with RLS on and no policy, or — for a
+ * name built to do it — SQL of its own in the clause.
+ */
 function rolesArraySql(roles: readonly string[]): string {
-    return `ARRAY[${[...roles].sort().map(r => `'${r}'`).join(",")}]`;
+    return `ARRAY[${[...roles].sort().map(quoteLiteral).join(",")}]`;
 }

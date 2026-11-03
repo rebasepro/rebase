@@ -382,6 +382,16 @@ describe("policyToPostgres — row-independent parts become initPlans", () => {
     });
 });
 
+describe("policyToPostgres — role names", () => {
+    it("escapes a quote in a role name rather than closing the literal", () => {
+        expect(policyToPostgres(policy.rolesOverlap(["o'reilly", "admin"])))
+            .toBe("(SELECT string_to_array(rebase.roles(), ',') && ARRAY['admin','o''reilly'])");
+        // A name written to break out of the literal stays one element.
+        expect(policyToPostgres(policy.rolesContain(["x'] OR true OR ARRAY['y"])))
+            .toBe("(SELECT string_to_array(rebase.roles(), ',') @> ARRAY['x''] OR true OR ARRAY[''y'])");
+    });
+});
+
 describe("sqlToPolicy — reading the initPlan spelling back", () => {
     it("reads a fully understood (SELECT x) back as x", () => {
         expect(sqlToPolicy("(SELECT string_to_array(rebase.roles(), ',') && ARRAY['admin'])"))
