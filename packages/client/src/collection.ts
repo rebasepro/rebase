@@ -408,8 +408,49 @@ function withoutBulkRowPrefix(error: unknown): unknown {
     return error;
 }
 
+/** Whether a URL path segment is `.` or `..`, percent-encoded or not. */
+function isDotSegment(segment: string): boolean {
+    return /^(?:\.|%2e){1,2}$/i.test(segment);
+}
+
+/**
+ * A collection path as the URL path under `/data/`, refused when one of its
+ * segments is `.` or `..`.
+ *
+ * The path may hold slashes (a nested collection), so it is not encoded whole,
+ * and `fetch` resolves a dot segment before the request leaves: `../admin/users`
+ * would read another route, as whoever this client is. The URL parser also
+ * reads `\` as `/` and drops tabs and newlines, so the path is split as it
+ * will.
+ */
+function collectionPathSegment(slug: string): string {
+    if (slug.replace(/[\t\n\r]/g, "").split(/[/\\]/).some(isDotSegment)) {
+        throw new RebaseClientError(
+            `Invalid collection path ${JSON.stringify(slug)}: a \`.\` or \`..\` segment would leave /data.`,
+            { code: "INVALID_COLLECTION_PATH", details: { path: slug } }
+        );
+    }
+    return slug;
+}
+
+/**
+ * A row id as one URL path segment. Encoded, which keeps a `/` or `?` inside
+ * it; and refused when it is `.` or `..`, which encoding leaves as they are and
+ * `fetch` resolves, moving the request up a level.
+ */
+function rowIdSegment(id: string | number): string {
+    const segment = encodeURIComponent(String(id));
+    if (isDotSegment(segment)) {
+        throw new RebaseClientError(
+            `Invalid row id ${JSON.stringify(String(id))}: it would address the collection, not a row.`,
+            { code: "INVALID_ID", details: { id } }
+        );
+    }
+    return segment;
+}
+
 export function createCollectionClient<M extends Record<string, unknown> = Record<string, unknown>>(transport: Transport, slug: string, ws?: RebaseWebSocketClient): CollectionClient<M> {
-    const basePath = `/data/${slug}`;
+    const basePath = `/data/${collectionPathSegment(slug)}`;
 
     /**
      * A listing — the live rows, or with `deleted` the trash's. One reader for
@@ -524,7 +565,7 @@ export function createCollectionClient<M extends Record<string, unknown> = Recor
                 return client.updateMany(ids.map((id) => ({ id, data })), options);
             },
             async purge(id: string | number, options?: WriteOptions) {
-                await transport.request<void>(`${basePath}/${encodeURIComponent(String(id))}?hard=true`, {
+                await transport.request<void>(`${basePath}/${rowIdSegment(id)}?hard=true`, {
                     method: "DELETE",
                     ...writeHeaders(options)
                 });
@@ -557,7 +598,7 @@ export function createCollectionClient<M extends Record<string, unknown> = Recor
             try {
                 const meta: ResponseMeta = {};
                 const raw = await transport.request<Record<string, unknown>>(
-                    `${basePath}/${encodeURIComponent(String(id))}${buildQueryString({ include: options?.include })}`,
+                    `${basePath}/${rowIdSegment(id)}${buildQueryString({ include: options?.include })}`,
                     { method: "GET" },
                     meta
                 );
@@ -672,7 +713,7 @@ export function createCollectionClient<M extends Record<string, unknown> = Recor
          */
         async update(id: string | number, data: Partial<M> | UpdateValues<Partial<M>>, options?: WriteOptions) {
             const meta: ResponseMeta = {};
-            const raw = await transport.request<Record<string, unknown>>(`${basePath}/${encodeURIComponent(String(id))}`, {
+            const raw = await transport.request<Record<string, unknown>>(`${basePath}/${rowIdSegment(id)}`, {
                 method: "PATCH",
                 body: JSON.stringify(data),
                 ...writeHeaders(options)
@@ -701,7 +742,7 @@ export function createCollectionClient<M extends Record<string, unknown> = Recor
         },
 
         async delete(id: string | number, options?: WriteOptions) {
-            await transport.request<void>(`${basePath}/${encodeURIComponent(String(id))}`, {
+            await transport.request<void>(`${basePath}/${rowIdSegment(id)}`, {
                 method: "DELETE",
                 // The only write on this surface that took no options at all,
                 // so the one mutation a retry cannot make safe on its own — a
