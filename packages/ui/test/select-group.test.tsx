@@ -38,3 +38,33 @@ describe("SelectGroup", () => {
         expect(within(numbers).getAllByRole("option")).toHaveLength(1);
     });
 });
+
+/**
+ * The trigger shows the selected item's label wherever the item sits. It
+ * looked for the item among the select's direct children only, so a value
+ * held by an item inside a `SelectGroup` or a fragment showed the placeholder.
+ */
+describe("a Select's trigger", () => {
+    it("shows the label of a selected item inside a group", () => {
+        render(<Select aria-label="type" value="b" placeholder="Pick one" onValueChange={() => { /* noop */ }}>
+            <SelectGroup label="Text">
+                <SelectItem value="a">Short text</SelectItem>
+                <SelectItem value="b">Markdown</SelectItem>
+            </SelectGroup>
+        </Select>);
+
+        expect(screen.getByRole("combobox")).toHaveTextContent("Markdown");
+        expect(screen.getByRole("combobox")).not.toHaveTextContent("Pick one");
+    });
+
+    it("shows the label of a selected item inside a fragment", () => {
+        render(<Select aria-label="type" value="b" placeholder="Pick one" onValueChange={() => { /* noop */ }}>
+            <>
+                <SelectItem value="a">Short text</SelectItem>
+                <SelectItem value="b">Markdown</SelectItem>
+            </>
+        </Select>);
+
+        expect(screen.getByRole("combobox")).toHaveTextContent("Markdown");
+    });
+});
