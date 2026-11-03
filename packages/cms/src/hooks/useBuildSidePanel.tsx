@@ -16,6 +16,7 @@ import { CircularProgressCenter } from "@rebasepro/ui";
 // Lazy: this hook runs on every page (the side-panel provider is mounted by
 // RebaseNavigation), and the panel's form stack is not needed until one opens.
 import { LazySidePanelBinding as SidePanelBinding } from "../components/lazy_record_views";
+import { hasEntityId } from "../util/entity_id";
 
 /**
  * Thin wrapper that resolves the Entity.SidePanel component override.
@@ -165,14 +166,14 @@ width: newWidth };
     const open = useCallback((propsIn: SidePanelBindingProps<any>) => {
         const props = routesMounted ? propsIn : { ...propsIn, updateUrl: false, allowFullScreen: false };
 
-        if (props.copy && !props.entityId) {
+        if (props.copy && !hasEntityId(props.entityId)) {
             throw Error("If you want to copy a entity you need to provide a entityId");
         }
 
         const defaultSelectedView = resolveDefaultSelectedView(
             props.collection ? props.collection.defaultSelectedView : undefined,
             {
-                status: props.copy ? "copy" : (props.entityId ? "existing" : "new"),
+                status: props.copy ? "copy" : (hasEntityId(props.entityId) ? "existing" : "new"),
                 entityId: props.entityId
             }
         );
@@ -194,7 +195,7 @@ width: newWidth };
     const replace = useCallback((propsIn: SidePanelBindingProps<any>) => {
         const props = routesMounted ? propsIn : { ...propsIn, updateUrl: false, allowFullScreen: false };
 
-        if (props.copy && !props.entityId) {
+        if (props.copy && !hasEntityId(props.entityId)) {
             throw Error("If you want to copy a entity you need to provide a entityId");
         }
 
@@ -264,7 +265,7 @@ export function buildSidePanelsFromUrl(path: string, collections: AdminCollectio
         const defaultView = resolveDefaultSelectedView(
             sidePanel.collection.defaultSelectedView,
             {
-                status: sidePanel.copy ? "copy" : (sidePanel.entityId ? "existing" : "new"),
+                status: sidePanel.copy ? "copy" : (hasEntityId(sidePanel.entityId) ? "existing" : "new"),
                 entityId: sidePanel.entityId
             }
         );
@@ -307,7 +308,7 @@ const propsToSidePanel = (props: SidePanelBindingProps,
     // `buildUrlCollectionPath` encodes every segment of the data path it is
     // given, the record id among them, so the query and the hash go after it.
     const urlPath = shouldUpdateUrl
-        ? (props.entityId
+        ? (hasEntityId(props.entityId)
             ? `${buildUrlCollectionPath(`${collectionPath}/${props.entityId}${props.selectedTab ? "/" + props.selectedTab : ""}`)}${locationSearch}#${SIDE_URL_HASH}`
             : `${buildUrlCollectionPath(collectionPath)}${locationSearch}#${NEW_URL_HASH}`)
         : undefined;

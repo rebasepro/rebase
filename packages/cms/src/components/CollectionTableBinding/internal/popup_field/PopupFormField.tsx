@@ -19,6 +19,7 @@ import { useAuthController, useCustomizationController, useData, useRebaseContex
 import type { OnCellValueChangeParams } from "@rebasepro/app";
 import { isDisabled, isReadOnly } from "@rebasepro/app";
 import type { AdminCollection } from "@rebasepro/cms-types";
+import { hasEntityId } from "../../../../util/entity_id";
 
 interface PopupFormFieldProps<M extends Record<string, unknown>> {
     customFieldValidator?: CustomFieldValidator;
@@ -64,7 +65,7 @@ export function PopupFormFieldLoading<M extends Record<string, unknown>>({
     const dataClient = useData();
     const [entity, setEntity] = useState<Entity<M> | undefined>(undefined);
     useEffect(() => {
-        if (entityId && inputCollection) {
+        if (hasEntityId(entityId) && inputCollection) {
             dataClient.collection(path).findById(entityId).then((result) => setEntity(result as Entity<M> | undefined));
         }
     }, [entityId, inputCollection, dataClient, path]);
@@ -205,7 +206,7 @@ export function PopupFormFieldInternal<M extends Record<string, unknown>>({
     // the popup holds: a `conditions` rule or a `dynamicProps` validation
     // depends on them, as it does in the record form.
     const validationSchemaFor = (values: Partial<M>) => {
-        if (!collection || !entityId || !propertyKey) return undefined;
+        if (!collection || !hasEntityId(entityId) || !propertyKey) return undefined;
         return getEntitySchema(
             entityId,
             cellValidationProperties<M>(collection.properties, propertyKey as string, values, entity?.values, entityId, {

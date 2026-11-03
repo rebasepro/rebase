@@ -8,6 +8,7 @@ import { usePermissions, useSnackbarController, useTranslation } from "@rebasepr
 import { ConfirmationDialog } from "@rebasepro/app";
 import { useState } from "react";
 import { useHistory } from "../../hooks/useHistory";
+import { hasEntityId } from "../../util/entity_id";
 
 /**
  * Entity history tab view. Shows a paginated list of entity revisions
@@ -40,7 +41,7 @@ export function EntityHistoryView<M extends Record<string, unknown>>({
     } = useHistory({
         slug,
         entityId,
-        enabled: !!entityId,
+        enabled: hasEntityId(entityId),
         pageSize: 10,
         refreshToken
     });

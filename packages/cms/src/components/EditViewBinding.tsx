@@ -70,6 +70,7 @@ import {
     ENTITY_VIEW_TAB_CLASS,
     ENTITY_VIEW_TAB_LABEL_CLASS
 } from "../util/view_constants";
+import { hasEntityId } from "../util/entity_id";
 export { MAIN_TAB_VALUE, JSON_TAB_VALUE, HISTORY_TAB_VALUE };
 
 export type BarActionsParams = {
@@ -209,7 +210,7 @@ export function EditViewBinding<M extends Record<string, unknown>>({
     const { t } = useTranslation();
     const urlController = useUrlController();
 
-    const initialStatus = props.copy ? "copy" : (entityId ? "existing" : "new");
+    const initialStatus = props.copy ? "copy" : (hasEntityId(entityId) ? "existing" : "new");
     const [status, setStatus] = useState<EntityStatus>(initialStatus);
 
     // The record as it was last delivered while this view had it open. A live
@@ -257,7 +258,7 @@ export function EditViewBinding<M extends Record<string, unknown>>({
      * because the same thing is true of a copy in flight, and because "we have
      * nothing to look up" is the actual reason.
      */
-    const nothingToLookUp = !entityId;
+    const nothingToLookUp = !hasEntityId(entityId);
 
     if (!dataLoading && !initialDirtyValues && !entity && !nothingToLookUp && !deletedElsewhere
         && (status === "existing" || status === "copy")) {
@@ -474,7 +475,7 @@ parentEntityIds,
      * default rendering, and `additionalFields` vanished from the default one.
      */
     const readOnlyFormContext = useMemo<FormContext<M> | undefined>(() => {
-        if (!entityId) return undefined;
+        if (!hasEntityId(entityId)) return undefined;
         const formexStub = createFormexStub<M>(usedEntity?.values ?? {} as M);
         return {
             entityId,
@@ -516,7 +517,7 @@ parentEntityIds,
                 return null;
             }
 
-            if (!entityId) {
+            if (!hasEntityId(entityId)) {
                 return null;
             }
 
@@ -972,7 +973,7 @@ parentEntityIds,
 
     const fullScreenButton = !barActions && // Not in split: the list panel beside it carries the close control,
     // and an expand button there competes with it.
-    (layout === "side_panel" || layout === "dialog") && entityId ? (
+    (layout === "side_panel" || layout === "dialog") && hasEntityId(entityId) ? (
         <Tooltip title={"Open full screen"}>
             <IconButton aria-label={"Open full screen"}
                 size="small"

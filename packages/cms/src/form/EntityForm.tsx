@@ -43,6 +43,7 @@ import {
     withoutUnsetNulls,
     zodToFormErrors
 } from "./form_utils";
+import { hasEntityId } from "../util/entity_id";
 
 /**
  * Headless entity form component.
@@ -60,7 +61,7 @@ export function EntityForm<M extends Record<string, unknown>>({
     onValuesModified,
     onIdChange,
     onSaved,
-    entity,
+    entity: entityProp,
     initialDirtyValues,
     onFormContextReady,
     initialStatus,
@@ -104,6 +105,16 @@ export function EntityForm<M extends Record<string, unknown>>({
 
     const authController = useAuthController();
     const [status, setStatus] = useState<EntityStatus>(initialStatus);
+
+    /**
+     * The record as this form last saved it. A create turns the form into the
+     * editor of the record it made, and the `entity` prop names that record
+     * only once the caller has caught up — a caller that never does (the form
+     * used on its own) left an "existing" form with no record: it re-seeded
+     * itself with the defaults and refused the next Save.
+     */
+    const [savedEntity, setSavedEntity] = useState<Entity<M> | undefined>(undefined);
+    const entity = entityProp ?? (status === "existing" ? savedEntity : undefined);
 
     const updateStatus = (status: EntityStatus) => {
         setStatus(status);
@@ -357,6 +368,7 @@ export function EntityForm<M extends Record<string, unknown>>({
     }, [formex]);
 
     const afterSave = (updatedEntity: Entity<M>) => {
+        setSavedEntity(updatedEntity);
         onResetProp?.();
         onValuesModified?.(false, updatedEntity.values);
         onEntityChange?.(updatedEntity);
@@ -878,7 +890,7 @@ export function EntityForm<M extends Record<string, unknown>>({
 
             {children}
 
-            {initialEntityId && !entity && initialStatus !== "new" && <Alert color={"info"} size={"small"}>
+            {hasEntityId(initialEntityId) && !entity && initialStatus !== "new" && <Alert color={"info"} size={"small"}>
                 {t("entity_does_not_exist")}
             </Alert>}
 
@@ -933,7 +945,7 @@ export function EntityForm<M extends Record<string, unknown>>({
     </ErrorBoundary>;
 
     useEffect(() => {
-        if (entityId && onIdChange)
+        if (hasEntityId(entityId) && onIdChange)
             onIdChange(entityId);
     }, [entityId, onIdChange]);
 

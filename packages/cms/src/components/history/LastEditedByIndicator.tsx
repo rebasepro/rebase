@@ -6,6 +6,7 @@ import { formatRelativeTime, type RelativeTimeLabels } from "@rebasepro/utils";
 import { useUiLabels } from "@rebasepro/ui";
 import { HistoryEntryData } from "../../hooks";
 import type { AdminCollection } from "@rebasepro/cms-types";
+import { hasEntityId } from "../../util/entity_id";
 
 const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
 
@@ -39,7 +40,7 @@ export function LastEditedByIndicator({
     const [latestEntry, setLatestEntry] = useState<HistoryEntryData | undefined>();
 
     const fetchLatest = useCallback(async () => {
-        if (!apiConfig?.apiUrl || !entityId || !collection.slug) return;
+        if (!apiConfig?.apiUrl || !hasEntityId(entityId) || !collection.slug) return;
 
         try {
             const token = await apiConfig.getAuthToken?.();

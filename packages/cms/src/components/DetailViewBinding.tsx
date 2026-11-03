@@ -59,6 +59,7 @@ import {
     ENTITY_VIEW_TAB_CLASS,
     ENTITY_VIEW_TAB_LABEL_CLASS
 } from "../util/view_constants";
+import { hasEntityId } from "../util/entity_id";
 
 export type BarActionsParams = {
     values: object,
@@ -270,7 +271,7 @@ entityId }
 
     // Read-only form context for custom entity views
     const readOnlyFormContext = useMemo<FormContext<M> | undefined>(() => {
-        if (!entityId) return undefined;
+        if (!hasEntityId(entityId)) return undefined;
         const formexStub = createFormexStub<M>(usedEntity?.values ?? {} as M);
         return {
             entityId,
@@ -358,7 +359,7 @@ entityId }
             if (!customView) return null;
             const Builder = resolveComponentRef<EntityCustomViewParams>(customView.Builder);
             if (!Builder) return null;
-            if (!entityId) return null;
+            if (!hasEntityId(entityId)) return null;
 
             const isActive = activeTab === customView.key;
             const hasBeenMounted = mountedTabsRef.current.has(customView.key);
@@ -556,7 +557,7 @@ entityId }
 
     const fullScreenButton = !barActions && // Not in split: the list panel beside it carries the close control,
     // and an expand button there competes with it.
-    (layout === "side_panel" || layout === "dialog") && entityId ? (
+    (layout === "side_panel" || layout === "dialog") && hasEntityId(entityId) ? (
         <Tooltip title={"Open full screen"}>
             <IconButton aria-label={"Open full screen"}
                 size="small"

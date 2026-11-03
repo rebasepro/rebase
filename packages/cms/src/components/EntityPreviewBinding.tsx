@@ -33,6 +33,7 @@ import { useSidePanel } from "../hooks/useSidePanel";
 import { EntityPreviewLayout, NestedEntityPreviewBoundary } from "./EntityPreviewNesting";
 import { isEmptyPreviewValue } from "../preview/util";
 import type { AdminCollection } from "@rebasepro/cms-types";
+import { hasEntityId } from "../util/entity_id";
 
 export type EntityPreviewBindingProps = {
     size?: PreviewSize,
@@ -392,7 +393,7 @@ export function EntityPreviewBindingWithId({
 
     useEffect(() => {
         let isMounted = true;
-        if (!entityId || !path) {
+        if (!hasEntityId(entityId) || !path) {
             setEntity(undefined);
             return;
         }
