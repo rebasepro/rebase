@@ -1,8 +1,9 @@
-import { DataDriver, DeleteProps, CollectionConfig, EntityReference, FetchCollectionProps, FetchOneProps, FilterValues, GeoPoint, ListenCollectionProps, ListenOneProps, OrderByTuple, SaveProps, WhereFilterOp } from "@rebasepro/types";
-import { normalizeDriverOrderBy } from "@rebasepro/common";
+import { DataDriver, DeleteProps, CollectionConfig, EntityReference, FetchCollectionProps, FetchOneProps, FilterValues, GeoPoint, ListenCollectionProps, ListenOneProps, LogicalCondition, OrderByTuple, SaveProps, WhereFilterOp } from "@rebasepro/types";
+import { normalizeDriverOrderBy, toFilterTuples } from "@rebasepro/common";
 import { FilterCombination } from "@rebasepro/cms-types";
 import { User } from "firebase/auth";
 import {
+    and as andClause,
     collection as collectionClause,
     CollectionReference,
     deleteDoc,
@@ -18,10 +19,13 @@ import {
     getFirestore,
     limit as limitClause,
     onSnapshot,
+    or as orClause,
     orderBy as orderByClause,
     Query,
     query,
-    QueryConstraint,
+    QueryFieldFilterConstraint,
+    QueryFilterConstraint,
+    QueryNonFilterConstraint,
     serverTimestamp,
     setDoc,
     startAfter as startAfterClause,
@@ -187,6 +191,55 @@ export function listenToSearchResults({
 }
 
 /**
+ * One condition, as the Firestore filter it means.
+ *
+ * Null-testing operators map to `==` / `!=` against null. Firestore has no
+ * LIKE/ILIKE, so those fail loudly rather than return wrong results.
+ */
+function firestoreCondition(key: string, op: WhereFilterOp, value: unknown, firestore: Firestore): QueryFieldFilterConstraint {
+    if (op === "is-null") return whereClause(key, "==", null);
+    if (op === "is-not-null") return whereClause(key, "!=", null);
+    if (op === "like" || op === "ilike" || op === "not-like" || op === "not-ilike") {
+        throw new Error(
+            `Firestore does not support the "${op}" operator (SQL pattern matching). ` +
+            "Use a full-text search index or the collection's searchString instead."
+        );
+    }
+    return whereClause(key, op, rebaseToFirestoreModel(value, firestore));
+}
+
+/**
+ * An `or(...)` / `and(...)` group as a Firestore composite filter, nesting
+ * included, or `undefined` for a group with no conditions in it.
+ *
+ * A group the driver does not translate is refused, never dropped: a dropped
+ * `or(...)` does not fail, it answers with the whole collection. `not(...)` is
+ * one — Firestore has no negation of a conjunction, and `!=` on each leaf
+ * matches a different set of documents.
+ */
+export function firestoreLogicalCondition(
+    logical: LogicalCondition | undefined,
+    firestore: Firestore
+): QueryFilterConstraint | undefined {
+    if (!logical || !Array.isArray(logical.conditions)) return undefined;
+    if (logical.type === "not") {
+        throw new Error("Firestore does not support a not(...) filter group. Write the condition without the negation.");
+    }
+    const parts: QueryFilterConstraint[] = [];
+    for (const entry of logical.conditions) {
+        if (!entry) continue;
+        if ("conditions" in entry) {
+            const nested = firestoreLogicalCondition(entry, firestore);
+            if (nested) parts.push(nested);
+            continue;
+        }
+        parts.push(firestoreCondition(entry.column, entry.operator, entry.value, firestore));
+    }
+    if (parts.length === 0) return undefined;
+    return logical.type === "or" ? orClause(...parts) : andClause(...parts);
+}
+
+/**
  * Use this hook to build a {@link DataDriver} based on Firestore
  * @param firebaseApp
  * @param textSearchControllerBuilder
@@ -219,42 +272,26 @@ export function useFirestoreDriver({
         order: "desc" | "asc" | undefined,
         startAfter: unknown[] | undefined,
         limit: number | undefined,
-        databaseId?: string) => {
+        databaseId?: string,
+        logical?: LogicalCondition) => {
 
         if (!firebaseApp) throw Error("useFirestoreDriver Firebase not initialised");
 
         const firestore = databaseId ? getFirestore(firebaseApp, databaseId) : getFirestore(firebaseApp);
         const collectionReference: Query = collectionClause(firestore, path);
 
-        const queryParams: QueryConstraint[] = [];
-        if (filter) {
-            Object.entries(filter)
-                .filter(([_, entry]) => !!entry)
-                .forEach(([key, filterParameter]) => {
-                    const [op, value] = filterParameter as [WhereFilterOp, any];
-
-                    // Null-testing operators map to Firestore's == / != against null.
-                    if (op === "is-null") {
-                        queryParams.push(whereClause(key, "==", null));
-                        return;
-                    }
-                    if (op === "is-not-null") {
-                        queryParams.push(whereClause(key, "!=", null));
-                        return;
-                    }
-
-                    // Firestore has no LIKE/ILIKE — fail loudly rather than silently
-                    // returning wrong results. Use `searchString` / a search index instead.
-                    if (op === "like" || op === "ilike" || op === "not-like" || op === "not-ilike") {
-                        throw new Error(
-                            `Firestore does not support the "${op}" operator (SQL pattern matching). ` +
-                            "Use a full-text search index or the collection's searchString instead."
-                        );
-                    }
-
-                    queryParams.push(whereClause(key, op, rebaseToFirestoreModel(value, firestore)));
-                });
+        // Every tuple of every field, through one leaf translation — a field
+        // may carry a list of them (`{ age: [[">=", 18], ["<", 65]] }`), the
+        // grammar `toFilterTuples` reads for every driver.
+        const filters: QueryFieldFilterConstraint[] = [];
+        for (const [key, filterParameter] of Object.entries(filter ?? {})) {
+            for (const [op, value] of toFilterTuples(filterParameter)) {
+                filters.push(firestoreCondition(key, op, value, firestore));
+            }
         }
+        const group = firestoreLogicalCondition(logical, firestore);
+
+        const queryParams: QueryNonFilterConstraint[] = [];
 
         // Firestore composes several `orderBy` constraints into a compound sort,
         // applied in the order they are added — the same meaning the tuple list
@@ -272,7 +309,12 @@ export function useFirestoreDriver({
             queryParams.push(limitClause(limit));
         }
 
-        return query(collectionReference, ...queryParams);
+        // A composite filter is the one form Firestore takes an `or` in, and
+        // it has to carry every other condition of the query with it.
+        if (group) {
+            return query(collectionReference, andClause(...filters, group), ...queryParams);
+        }
+        return query(collectionReference, ...filters, ...queryParams);
     }, [firebaseApp]);
 
     const getAndBuildEntity = useCallback((path: string,
@@ -417,6 +459,7 @@ export function useFirestoreDriver({
     const fetchCollection = useCallback(async <M extends Record<string, any>>({
         path,
         filter,
+        logical,
         limit,
         offset,
         startAfter,
@@ -456,7 +499,7 @@ export function useFirestoreDriver({
             fetchLimit,
             skip
         } = resolveOffsetWindow(limit, offset);
-        const query = buildQuery(resolvedPath, filter, orderBy, order, startAfter as unknown[] | undefined, fetchLimit, databaseId);
+        const query = buildQuery(resolvedPath, filter, orderBy, order, startAfter as unknown[] | undefined, fetchLimit, databaseId, logical);
 
         const entity = await getDocs(query);
         return entity.docs.slice(skip).map((doc) => createRowFromDocument(doc));
@@ -482,6 +525,7 @@ export function useFirestoreDriver({
         {
             path,
             filter,
+            logical,
             limit,
             offset,
             startAfter,
@@ -534,7 +578,7 @@ export function useFirestoreDriver({
             fetchLimit,
             skip
         } = resolveOffsetWindow(limit, offset);
-        const query = buildQuery(resolvedPath, filter, orderBy, order, startAfter as unknown[] | undefined, fetchLimit, databaseId);
+        const query = buildQuery(resolvedPath, filter, orderBy, order, startAfter as unknown[] | undefined, fetchLimit, databaseId, logical);
         return onSnapshot(query,
             {
                 next: (entity) => {
@@ -686,6 +730,7 @@ export function useFirestoreDriver({
     const count = useCallback(async ({
         path,
         filter,
+        logical,
         order,
         orderBy,
         searchString,
@@ -698,7 +743,7 @@ export function useFirestoreDriver({
             // What `fetchCollection` pages over for the same search.
             return (await searchIds(resolvedPath, searchString, databaseId) ?? []).length;
         }
-        const query = buildQuery(resolvedPath, filter, orderBy, order, undefined, undefined, databaseId);
+        const query = buildQuery(resolvedPath, filter, orderBy, order, undefined, undefined, databaseId, logical);
         const entity = await getCountFromServer(query);
         return entity.data().count;
     }, [firebaseApp, buildQuery, searchIds]);
