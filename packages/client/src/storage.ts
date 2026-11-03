@@ -1,4 +1,4 @@
-import { ClientStorageSource, ClientUploadFileProps, UploadFileResult, DownloadConfig, StorageListResult, DownloadMetadata, PUBLIC_STORAGE_PREFIX, RebaseApiError, isPublicStoragePath, storageObjectPath } from "@rebasepro/types";
+import { ClientStorageSource, ClientUploadFileProps, UploadFileResult, DownloadConfig, StorageListResult, DownloadMetadata, PUBLIC_STORAGE_PREFIX, RebaseApiError, RebaseClientError, isPublicStoragePath, storageObjectPath } from "@rebasepro/types";
 import {
     DOWNLOAD_URL_CONCURRENCY,
     RESUMABLE_UPLOAD_THRESHOLD,
@@ -36,9 +36,23 @@ import { defaultCodeForStatus, Transport, type ResponseMeta } from "./transport"
  * other character is encoded, including a literal `%`. Verified to round-trip
  * through the server's decode for all of the above, plus `+`, accented
  * characters and a trailing `%`.
+ *
+ * Throws `INVALID_STORAGE_KEY` for a key with a `..` segment.
  */
 export function encodeStorageKey(key: string): string {
-    return key.split("/").map(encodeURIComponent).join("/");
+    const segments = key.split("/");
+    // `fetch` resolves a `..` segment before the request leaves, and `%2e%2e`
+    // is the same segment to the URL parser — so no encoding keeps it in the
+    // storage route. `files/../../admin/users/<uid>` sent to `deleteObject`
+    // would be a `DELETE` of that route instead, as whoever this client is.
+    // The server refuses such a key anyway, with this code.
+    if (segments.includes("..")) {
+        throw new RebaseClientError(
+            `Storage key ${JSON.stringify(key)} contains a '..' path segment. Keys must name an object directly.`,
+            { code: "INVALID_STORAGE_KEY", details: { key } }
+        );
+    }
+    return segments.map(encodeURIComponent).join("/");
 }
 
 /**

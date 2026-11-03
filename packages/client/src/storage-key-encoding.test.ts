@@ -14,7 +14,8 @@
  *
  * The last is the one worth the test: no error, no log, the wrong bytes.
  */
-import { encodeStorageKey } from "./storage";
+import { createStorage, encodeStorageKey } from "./storage";
+import { createTransport } from "./transport";
 
 describe("encodeStorageKey", () => {
     it("leaves an ordinary key untouched", () => {
@@ -61,5 +62,40 @@ describe("encodeStorageKey", () => {
         ]) {
             expect(decodeURIComponent(encodeStorageKey(key))).toBe(key);
         }
+    });
+});
+
+/**
+ * A `..` segment in a key. `fetch` resolves it before the request leaves, so
+ * `deleteObject("uploads/../../../admin/users/u1")` sent
+ * `DELETE /api/admin/users/u1` — with whatever token the client holds, the
+ * service key included — and never reached the storage route, which refuses
+ * such a key. `%2e%2e` is the same segment to the URL parser, so encoding the
+ * dots does not help: the key is refused before any request.
+ */
+describe("a storage key with a '..' segment", () => {
+    it.each([
+        ["../x.png"],
+        ["uploads/../../../admin/users/u1"],
+        ["a/.."]
+    ])("is refused (%s)", (key) => {
+        expect(() => encodeStorageKey(key)).toThrow(expect.objectContaining({ code: "INVALID_STORAGE_KEY" }));
+    });
+
+    it("is not confused with a name that only contains dots", () => {
+        expect(encodeStorageKey("a/..b/c../...")).toBe("a/..b/c../...");
+    });
+
+    it("never reaches another route through deleteObject", async () => {
+        const sent: string[] = [];
+        const fetchFn: typeof fetch = async (input) => {
+            const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
+            sent.push(new URL(url).pathname);
+            return new Response(JSON.stringify({ success: true }), { status: 200, headers: { "Content-Type": "application/json" } });
+        };
+        const storage = createStorage(createTransport({ baseUrl: "http://api.test", token: "service-key", fetch: fetchFn }));
+
+        await expect(storage.deleteObject("uploads/../../../admin/users/u1")).rejects.toMatchObject({ code: "INVALID_STORAGE_KEY" });
+        expect(sent).toEqual([]);
     });
 });
