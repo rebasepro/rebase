@@ -1,5 +1,6 @@
 
 import type { Property } from "@rebasepro/types";
+import { hasEntityId } from "@rebasepro/common";
 import type { CustomizationController, SidePanelBindingProps, SideDialogPanelProps, SideDialogsController, SidePanelController, UrlController, NavigationStateController, AdminCollection } from "@rebasepro/cms-types";
 import { useCallback, useEffect, useRef, useMemo } from "react";
 import { CollectionRegistryController } from "@rebasepro/types";
@@ -16,7 +17,6 @@ import { CircularProgressCenter } from "@rebasepro/ui";
 // Lazy: this hook runs on every page (the side-panel provider is mounted by
 // RebaseNavigation), and the panel's form stack is not needed until one opens.
 import { LazySidePanelBinding as SidePanelBinding } from "../components/lazy_record_views";
-import { hasEntityId } from "../util/entity_id";
 
 /**
  * Thin wrapper that resolves the Entity.SidePanel component override.

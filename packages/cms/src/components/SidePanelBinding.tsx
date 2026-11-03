@@ -1,5 +1,6 @@
 
 import type { SidePanelBindingProps, AdminCollection } from "@rebasepro/cms-types";
+import { hasEntityId } from "@rebasepro/common";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import type { OnUpdateParams } from "../types/components/EntityFormProps";
@@ -14,7 +15,6 @@ import { useCollectionRegistryController } from "../hooks/navigation/contexts/Co
 import { useSidePanel } from "../hooks/useSidePanel";
 import { useUrlController } from "../hooks/navigation/contexts/UrlContext";
 import { resolveDefaultSelectedView } from "@rebasepro/app";
-import { hasEntityId } from "../util/entity_id";
 
 /**
  * This is the component in charge of rendering the side dialog used

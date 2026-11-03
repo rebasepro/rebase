@@ -1,5 +1,6 @@
 
 import type { PluginFormActionProps, AdminCollection } from "@rebasepro/cms-types";
+import { hasEntityId } from "@rebasepro/common";
 import React, { useCallback, useMemo, useState } from "react";
 import { Entity, EntityStatus, EntityValues } from "@rebasepro/types";
 import { AnalyticsEvent } from "@rebasepro/cms-types";
@@ -38,7 +39,6 @@ import {
     getUnappliedLocalChanges,
     overlayEdit
 } from "./form_utils";
-import { hasEntityId } from "../util/entity_id";
 
 /**
  * Props for the admin-connected EntityFormBinding wrapper.

@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useRef, useState, useMemo } from "react";
+import { hasEntityId } from "@rebasepro/common";
 import { useApiBase, useApiConfig, useRlsSimulation } from "@rebasepro/app";
 import { simulationHeaders } from "@rebasepro/types";
 import type { EntityHistoryEntry } from "@rebasepro/types";
-import { hasEntityId } from "../util/entity_id";
 
 /**
  * What the history REST endpoint returns. The fourth declaration of this shape

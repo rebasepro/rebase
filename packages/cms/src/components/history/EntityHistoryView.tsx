@@ -1,5 +1,6 @@
 
 import type { EntityCustomViewParams } from "@rebasepro/cms-types";
+import { hasEntityId } from "@rebasepro/common";
 import { useRef, useEffect } from "react";
 import { cls, IconButton, Label, Tooltip, Typography } from "@rebasepro/ui";
 import { ErrorBoundary, HistoryIcon } from "@rebasepro/ui";
@@ -8,7 +9,6 @@ import { usePermissions, useSnackbarController, useTranslation } from "@rebasepr
 import { ConfirmationDialog } from "@rebasepro/app";
 import { useState } from "react";
 import { useHistory } from "../../hooks/useHistory";
-import { hasEntityId } from "../../util/entity_id";
 
 /**
  * Entity history tab view. Shows a paginated list of entity revisions

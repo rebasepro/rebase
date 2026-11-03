@@ -1418,6 +1418,7 @@ function getSubcollections
 function getTableName
 function getTableVarName
 function getTenantConfig
+function hasEntityId
 function hasFieldAccessRules
 function includableRelationNames
 function includePaths

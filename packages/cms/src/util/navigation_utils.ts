@@ -1,7 +1,7 @@
 
 import type { UrlController, SidePanelBindingProps, SidePanelController, NavigateOptions, AdminCollection } from "@rebasepro/cms-types";
+import { hasEntityId } from "@rebasepro/common";
 import { withListState } from "./view_mode";
-import { hasEntityId } from "./entity_id";
 
 // Canonical path utilities — single source of truth in @rebasepro/common
 export { removeInitialAndTrailingSlashes, removeInitialSlash, removeTrailingSlash, addInitialSlash, getLastSegment, resolveCollectionPathIds, getCollectionBySlugWithin, getCollectionPathsCombinations } from "@rebasepro/app";

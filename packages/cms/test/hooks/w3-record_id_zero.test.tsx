@@ -40,7 +40,7 @@ jest.mock("@rebasepro/app", () => {
 import { useBuildSidePanel } from "../../src/hooks/useBuildSidePanel";
 import { useBuildUrlController } from "../../src/hooks/navigation/useBuildUrlController";
 import { navigateToEntity } from "../../src/util/navigation_utils";
-import { hasEntityId } from "../../src/util/entity_id";
+import { hasEntityId } from "@rebasepro/common";
 
 const statuses: string[] = [];
 const products = {

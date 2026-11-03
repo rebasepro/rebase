@@ -1,4 +1,5 @@
 import type { Properties } from "@rebasepro/types";
+import { hasEntityId } from "@rebasepro/common";
 
 import type { FormContext, PropertyFieldBindingProps } from "../../../../types/fields";
 import type { Property } from "@rebasepro/types";
@@ -19,7 +20,6 @@ import { useAuthController, useCustomizationController, useData, useRebaseContex
 import type { OnCellValueChangeParams } from "@rebasepro/app";
 import { isDisabled, isReadOnly } from "@rebasepro/app";
 import type { AdminCollection } from "@rebasepro/cms-types";
-import { hasEntityId } from "../../../../util/entity_id";
 
 interface PopupFormFieldProps<M extends Record<string, unknown>> {
     customFieldValidator?: CustomFieldValidator;

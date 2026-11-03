@@ -11,6 +11,14 @@ Die Übersetzung steht noch aus. Der Inhalt unten ist auf Englisch.
 
 ## [Unreleased]
 
+### Added
+
+#### Common
+
+- **`hasEntityId(id)`** says whether an id names a record: any number but
+  `NaN`, `0` included, and any non-empty string. The admin uses it where it
+  read an id's truthiness, which took record `0` for a new one.
+
 ### Changed
 
 #### Admin (CMS & app)

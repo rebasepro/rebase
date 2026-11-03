@@ -9,7 +9,7 @@ import { deepEqual as equal } from "fast-equals";
 
 import { ErrorBoundary, isKeyHandled } from "@rebasepro/ui";
 import { AlignLeftIcon, useDebouncedCallback } from "@rebasepro/ui";
-import { effectiveAccess, getCopyValues, getDefaultValuesFor } from "@rebasepro/common";
+import { effectiveAccess, getCopyValues, getDefaultValuesFor, hasEntityId } from "@rebasepro/common";
 import { isDisabled, isHidden, isReadOnly } from "@rebasepro/app";
 import { useAuthController, useCustomizationController, useRebaseContext, useTranslation } from "@rebasepro/app";
 
@@ -43,7 +43,6 @@ import {
     withoutUnsetNulls,
     zodToFormErrors
 } from "./form_utils";
-import { hasEntityId } from "../util/entity_id";
 
 /**
  * Headless entity form component.

@@ -1,4 +1,5 @@
 import type { ComponentRef } from "@rebasepro/types";
+import { hasEntityId } from "@rebasepro/common";
 import type { EntityCustomViewParams, FormViewConfig, AdminCollection } from "@rebasepro/cms-types";
 import type { FormContext } from "../types/fields";
 import type { PluginFormActionProps } from "@rebasepro/cms-types";
@@ -59,7 +60,6 @@ import {
     ENTITY_VIEW_TAB_CLASS,
     ENTITY_VIEW_TAB_LABEL_CLASS
 } from "../util/view_constants";
-import { hasEntityId } from "../util/entity_id";
 
 export type BarActionsParams = {
     values: object,

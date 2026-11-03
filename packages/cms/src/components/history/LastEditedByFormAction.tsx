@@ -1,8 +1,8 @@
 import type { PluginFormActionProps } from "@rebasepro/cms-types";
+import { hasEntityId } from "@rebasepro/common";
 import React from "react";
 ;
 import { LastEditedByIndicator } from "./LastEditedByIndicator";
-import { hasEntityId } from "../../util/entity_id";
 
 /**
  * Renders the "last edited by" indicator in the entity form top bar.

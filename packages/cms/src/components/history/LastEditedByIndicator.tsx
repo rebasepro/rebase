@@ -1,12 +1,12 @@
 
 import React, { useEffect, useState, useCallback, useMemo } from "react";
+import { hasEntityId } from "@rebasepro/common";
 import { useApiBase, useApiConfig, useAuthController, useRlsSimulation } from "@rebasepro/app";
 import { simulationHeaders } from "@rebasepro/types";
 import { formatRelativeTime, type RelativeTimeLabels } from "@rebasepro/utils";
 import { useUiLabels } from "@rebasepro/ui";
 import { HistoryEntryData } from "../../hooks";
 import type { AdminCollection } from "@rebasepro/cms-types";
-import { hasEntityId } from "../../util/entity_id";
 
 const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
 
