@@ -32,16 +32,6 @@ import { formatRelativeTime } from "@rebasepro/utils";
 import { classifyLoadFailure, type LoadFailure } from "../load-failure";
 import { BranchDiffView } from "./BranchDiffView";
 
-/**
- * The prefix the driver puts on every branch database.
- *
- * Stated here rather than derived from the row, because `BranchInfo` carries
- * the *name* a person typed and not the database it became — and the detail
- * pane used to print the name under "Database:", which is a connection string
- * to nothing. Kept in step with `BranchService.BRANCH_DB_PREFIX` and the CLI's
- * `branch-pointer.ts`, which say the same thing for the same reason.
- */
-const BRANCH_DB_PREFIX = "rb_";
 import { LoadFailureView } from "../load-failure-view";
 
 function formatSize(bytes: number | undefined): string {
@@ -344,18 +334,19 @@ export function BranchesView() {
                                         <Typography variant="caption" className="text-[10px] uppercase tracking-wider text-surface-400 mb-2 block font-medium">{t("studio_branches_connection_details")}</Typography>
                                         <div className="space-y-2">
                                             <div className="flex items-center gap-2">
-                                                {/* The *database*, not the branch name. They are not the
-                                                    same string — the driver prefixes every branch database
-                                                    with `rb_` — and a connection string built from the name
-                                                    on this pane pointed at a database that does not
-                                                    exist. */}
+                                                {/* The *database*, as the branch's record names it — not
+                                                    built from the branch name. They are not the same
+                                                    string: the driver prefixes every branch database with
+                                                    `rb_`, and a branch recorded under an older naming
+                                                    scheme (`my-feature` in `rb_myfeature`) is not even
+                                                    that. */}
                                                 <Typography variant="caption" color="secondary" className="w-24 shrink-0 text-[11px]">{t("studio_branches_row_database")}</Typography>
-                                                <Typography variant="body2" className="font-mono text-[12px]">{`${BRANCH_DB_PREFIX}${selected.name}`}</Typography>
+                                                <Typography variant="body2" className="font-mono text-[12px]">{selected.database}</Typography>
                                             </div>
                                             <div className="flex items-start gap-2">
                                                 <Typography variant="caption" color="secondary" className="w-24 shrink-0 text-[11px]">{t("studio_branches_row_connect")}</Typography>
                                                 <Typography variant="body2" className="font-mono text-[12px] break-all">
-                                                    {`DATABASE_URL=…/${BRANCH_DB_PREFIX}${selected.name}`}
+                                                    {`DATABASE_URL=…/${selected.database}`}
                                                 </Typography>
                                             </div>
                                             <div className="flex items-center gap-2">
