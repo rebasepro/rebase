@@ -85,8 +85,19 @@ export function generateOtpCode(): string {
  * so that the address the user types matches the one they were mailed at.
  */
 export function otpTokenMaterial(email: string, code: string): string {
-    return `otp:${email.trim().toLowerCase()}:${code}`;
+    return `${OTP_TOKEN_PREFIX}${email.trim().toLowerCase()}:${code}`;
 }
+
+/**
+ * How every code's stored material begins.
+ *
+ * Codes share the magic-link token store, and `/magic-link/verify` hashes
+ * whatever token it is handed — so the material of a code, which is the
+ * address and six digits, is a token that route would find. It refuses
+ * anything with this prefix, which no link token has, so a code is only ever
+ * spent here, behind the per-address limit.
+ */
+export const OTP_TOKEN_PREFIX = "otp:";
 
 /**
  * Per-address throttle on code verification.

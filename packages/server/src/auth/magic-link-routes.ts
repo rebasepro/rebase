@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import type { MiddlewareHandler } from "hono";
 import type { AuthModuleConfig, CreateSessionAndTokens } from "./routes";
 import { accountForPasswordlessRequest } from "./passwordless-signup";
+import { OTP_TOKEN_PREFIX } from "./otp-routes";
 import type { ResolvedAuthHooks } from "./auth-hooks";
 import type { HonoEnv } from "../api/types";
 import { ApiError } from "../api/errors";
@@ -163,6 +164,14 @@ export function mountMagicLinkRoutes(deps: {
      */
     router.post("/magic-link/verify", limiters.strict, async (c) => {
         const { token } = parseBody(verifyMagicLinkSchema, await c.req.json());
+
+        // An email code's stored material, presented as a link token, would
+        // be found in the store the two share: a guess at one account's six
+        // digits under the IP limit alone, past the per-address budget that
+        // `/otp/verify` holds codes to. No link token has the prefix.
+        if (token.startsWith(OTP_TOKEN_PREFIX)) {
+            throw ApiError.badRequest("Invalid or expired magic link", "INVALID_TOKEN");
+        }
 
         // Find valid token
         const tokenHash = hashToken(token);
