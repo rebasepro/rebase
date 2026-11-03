@@ -272,7 +272,9 @@ export class MemoryAuthStore {
             },
             markPasswordResetTokenUsed: async (tokenHash) => {
                 const token = this.resetTokens.get(tokenHash);
-                if (token) token.used = true;
+                if (!token || token.used || token.expiresAt <= new Date()) return false;
+                token.used = true;
+                return true;
             },
             deleteAllPasswordResetTokensForUser: async (uid) => {
                 for (const [hash, token] of this.resetTokens) {
@@ -289,7 +291,9 @@ export class MemoryAuthStore {
             },
             markMagicLinkTokenUsed: async (tokenHash) => {
                 const token = this.magicLinkTokens.get(tokenHash);
-                if (token) token.used = true;
+                if (!token || token.used || token.expiresAt <= new Date()) return false;
+                token.used = true;
+                return true;
             },
 
             // ── MFA ──

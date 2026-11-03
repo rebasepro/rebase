@@ -1284,6 +1284,13 @@ displayName: user.displayName }, appName, logoUrl);
             throw ApiError.badRequest("Invalid or expired reset token", "INVALID_TOKEN");
         }
 
+        // Spent before the password changes, not after: two requests can both
+        // find the link valid, and only the one whose mark takes it may set a
+        // password.
+        if (await authRepo.markPasswordResetTokenUsed(tokenHash) === false) {
+            throw ApiError.badRequest("Invalid or expired reset token", "INVALID_TOKEN");
+        }
+
         // Update the password and log out every session. The whole point of a
         // reset is that someone else may be holding a token and actively
         // refreshing it; see `replaceUserPassword` for why deleting the rows
@@ -1301,9 +1308,6 @@ displayName: user.displayName }, appName, logoUrl);
         } else {
             await replaceUserPassword(authRepo, storedToken.uid, passwordHash);
         }
-
-        // Mark token as used
-        await authRepo.markPasswordResetTokenUsed(tokenHash);
 
         if (ops.onAuthenticated && account) {
             ops.onAuthenticated(account, "password-reset").catch(err => {

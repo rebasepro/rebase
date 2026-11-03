@@ -926,11 +926,22 @@ expiresAt }]);
         });
 
         describe("markAsUsed", () => {
-            it("should mark token as used", async () => {
-                await passwordResetTokenService.markAsUsed("token-hash");
+            it("marks the token used only while it is still valid, in one statement", async () => {
+                mockExecute.mockResolvedValueOnce({ rows: [{ token_hash: "token-hash" }] });
 
-                expect(db.update).toHaveBeenCalledWith(passwordResetTokens);
-                expect(mockUpdateSet).toHaveBeenCalledWith({ usedAt: expect.any(Date) });
+                expect(await passwordResetTokenService.markAsUsed("token-hash")).toBe(true);
+
+                const { text, values } = readSql(mockExecute.mock.calls[mockExecute.mock.calls.length - 1][0]);
+                expect(text).toMatch(/UPDATE .*password_reset_tokens/);
+                expect(text).toMatch(/used_at IS NULL/);
+                expect(text).toMatch(/expires_at > NOW\(\)/);
+                expect(values).toEqual(["token-hash"]);
+            });
+
+            it("says it consumed nothing when another request already did", async () => {
+                mockExecute.mockResolvedValueOnce({ rows: [] });
+
+                expect(await passwordResetTokenService.markAsUsed("token-hash")).toBe(false);
             });
         });
 

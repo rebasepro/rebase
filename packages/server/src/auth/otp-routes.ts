@@ -349,7 +349,11 @@ export function mountOtpRoutes(deps: {
             throw ApiError.badRequest("Invalid or expired code", "INVALID_CODE");
         }
 
-        await authRepo.markMagicLinkTokenUsed(tokenHash);
+        // One-time use: of two requests that found the code valid, only the
+        // one whose mark takes it signs in.
+        if (await authRepo.markMagicLinkTokenUsed(tokenHash) === false) {
+            throw ApiError.badRequest("Invalid or expired code", "INVALID_CODE");
+        }
 
         let user = await authRepo.getUserById(storedToken.uid);
         if (!user) {

@@ -181,8 +181,11 @@ export function mountMagicLinkRoutes(deps: {
             throw ApiError.badRequest("Invalid or expired magic link", "INVALID_TOKEN");
         }
 
-        // Mark token as used (one-time use)
-        await authRepo.markMagicLinkTokenUsed(tokenHash);
+        // One-time use. Two requests can both find the link valid; only the
+        // one whose mark takes it signs in.
+        if (await authRepo.markMagicLinkTokenUsed(tokenHash) === false) {
+            throw ApiError.badRequest("Invalid or expired magic link", "INVALID_TOKEN");
+        }
 
         // Get user
         let user = await authRepo.getUserById(storedToken.uid);

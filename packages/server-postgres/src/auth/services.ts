@@ -1277,13 +1277,22 @@ export class PasswordResetTokenService {
     }
 
     /**
-     * Mark token as used
+     * Mark the token used if it is still valid, and say whether this call did.
+     *
+     * The check and the mark are one statement, so of two requests presenting
+     * the same token only one gets `true`.
      */
-    async markAsUsed(tokenHash: string): Promise<void> {
-        await this.db
-            .update(this.passwordResetTokensTable)
-            .set({ usedAt: new Date() })
-            .where(eq(this.passwordResetTokensTable.tokenHash, tokenHash));
+    async markAsUsed(tokenHash: string): Promise<boolean> {
+        const tableName = this.getQualifiedPasswordResetTokensTableName();
+        const result = await this.db.execute(sql`
+            UPDATE ${sql.raw(tableName)}
+            SET used_at = NOW()
+            WHERE token_hash = ${tokenHash}
+              AND used_at IS NULL
+              AND expires_at > NOW()
+            RETURNING token_hash
+        `);
+        return result.rows.length > 0;
     }
 
     /**
@@ -1368,11 +1377,22 @@ export class MagicLinkTokenService {
         `);
     }
 
-    async markAsUsed(tokenHash: string): Promise<void> {
-        await this.db
-            .update(this.magicLinkTokensTable)
-            .set({ usedAt: new Date() })
-            .where(eq(this.magicLinkTokensTable.tokenHash, tokenHash));
+    /**
+     * Mark the link or code used if it is still valid, and say whether this
+     * call did — in one statement, so of two requests presenting it only one
+     * gets `true`.
+     */
+    async markAsUsed(tokenHash: string): Promise<boolean> {
+        const tableName = this.getQualifiedTableName();
+        const result = await this.db.execute(sql`
+            UPDATE ${sql.raw(tableName)}
+            SET used_at = NOW()
+            WHERE token_hash = ${tokenHash}
+              AND used_at IS NULL
+              AND expires_at > NOW()
+            RETURNING token_hash
+        `);
+        return result.rows.length > 0;
     }
 }
 
@@ -1450,8 +1470,8 @@ export class PostgresTokenRepository implements TokenRepository {
         return this.passwordResetTokenService.findValidByHash(tokenHash);
     }
 
-    async markPasswordResetTokenUsed(tokenHash: string): Promise<void> {
-        await this.passwordResetTokenService.markAsUsed(tokenHash);
+    async markPasswordResetTokenUsed(tokenHash: string): Promise<boolean> {
+        return this.passwordResetTokenService.markAsUsed(tokenHash);
     }
 
     async deleteAllPasswordResetTokensForUser(uid: string): Promise<void> {
@@ -1478,8 +1498,8 @@ export class PostgresTokenRepository implements TokenRepository {
         return this.magicLinkTokenService.findValidByHash(tokenHash);
     }
 
-    async markMagicLinkTokenUsed(tokenHash: string): Promise<void> {
-        await this.magicLinkTokenService.markAsUsed(tokenHash);
+    async markMagicLinkTokenUsed(tokenHash: string): Promise<boolean> {
+        return this.magicLinkTokenService.markAsUsed(tokenHash);
     }
 }
 
@@ -1668,8 +1688,8 @@ export class PostgresAuthRepository implements AuthRepository {
         return this.tokenRepository.findValidPasswordResetToken(tokenHash);
     }
 
-    async markPasswordResetTokenUsed(tokenHash: string): Promise<void> {
-        await this.tokenRepository.markPasswordResetTokenUsed(tokenHash);
+    async markPasswordResetTokenUsed(tokenHash: string): Promise<boolean> {
+        return this.tokenRepository.markPasswordResetTokenUsed(tokenHash);
     }
 
     async deleteAllPasswordResetTokensForUser(uid: string): Promise<void> {
@@ -1691,8 +1711,8 @@ export class PostgresAuthRepository implements AuthRepository {
         return this.tokenRepository.findValidMagicLinkToken(tokenHash);
     }
 
-    async markMagicLinkTokenUsed(tokenHash: string): Promise<void> {
-        await this.tokenRepository.markMagicLinkTokenUsed(tokenHash);
+    async markMagicLinkTokenUsed(tokenHash: string): Promise<boolean> {
+        return this.tokenRepository.markMagicLinkTokenUsed(tokenHash);
     }
 
     // MFA operations (delegate to MfaService)
