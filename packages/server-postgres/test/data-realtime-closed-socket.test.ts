@@ -27,7 +27,7 @@ jest.mock("../src/services/dataService", () => ({
 }));
 
 class MockWebSocket {
-    public readyState = WebSocket.OPEN;
+    public readyState: number = WebSocket.OPEN;
     public send = jest.fn();
     public on = jest.fn();
     public close = jest.fn(() => { this.readyState = WebSocket.CLOSED; });
@@ -38,8 +38,7 @@ const postsCollection: CollectionConfig = {
     slug: "posts",
     name: "Posts",
     table: "posts",
-    properties: { id: { type: "number" } },
-    idField: "id"
+    properties: { id: { type: "number" } }
 };
 
 function createService() {

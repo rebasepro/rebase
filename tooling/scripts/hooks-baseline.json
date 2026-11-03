@@ -12,7 +12,6 @@
   "packages/app/src/core/PluginLifecycleManager.tsx::React Hook useEffect has missing dependencies: 'context', 'currentUser?.uid', and 'plugins'. Either include them or remove the dependency array.": 1,
   "packages/app/src/debug/crm-dashboard/TaskTable.tsx::React Hook useCallback has an unnecessary dependency: 'recentlyToggledIds'. Either exclude it or remove the dependency array.": 1,
   "packages/app/src/hooks/data/useCollection.tsx::React Hook useEffect has missing dependencies: 'orderByParams' and 'reportSchemaDrift'. Either include them or remove the dependency array.": 1,
-  "packages/app/src/hooks/data/useRelationSelector.tsx::React Hook useCallback has a missing dependency: 'path'. Either include it or remove the dependency array.": 1,
   "packages/app/src/hooks/useBuildLocalConfigurationPersistence.tsx::React Hook useMemo has an unnecessary dependency: 'configVersion'. Either exclude it or remove the dependency array.": 1,
   "packages/app/src/hooks/useClipboard.tsx::React Hook useCallback has a missing dependency: 'isSupported'. Either include it or remove the dependency array.": 1,
   "packages/app/src/hooks/useClipboard.tsx::React Hook useEffect has a missing dependency: 'copiedDuration'. Either include it or remove the dependency array.": 1,

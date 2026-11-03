@@ -946,7 +946,7 @@ function checkProperty(
 }
 
 /**
- * A property held inside a map or an array: checked as any property is, and
+ * A property held inside a map or an array: checked like every other one, and
  * warned about if it carries a field rule.
  *
  * Field rules — `access` and `excludeFromApi` — are enforced on a collection's

@@ -408,16 +408,12 @@ name: null }]);
         it("should handle SQL injection attempts in IDs safely", async () => {
             const maliciousId = "1; DROP TABLE test_table;--";
 
-            const mockEntity = { id: 1,
-name: "Safe" };
-            db.limit.mockResolvedValue([mockEntity]);
-
             // A numeric key is addressed by a whole integer and nothing else.
             // This one is not, so it names no row: no statement is composed
             // at all, and the lookup finds nothing — rather than reading the
             // leading `1` and answering with row 1.
             await expect(dataService.fetchOne("test", maliciousId)).resolves.toBeUndefined();
-            expect(db.where).not.toHaveBeenCalled();
+            expect(db.select).not.toHaveBeenCalled();
         });
 
         it("carries a whole numeric id as a bound value", async () => {
