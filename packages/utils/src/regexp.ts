@@ -15,7 +15,11 @@ export function serializeRegExp(input: RegExp): string {
  */
 export function hydrateRegExp(input?: string): RegExp | undefined {
     if (!input) return undefined;
-    const fragments = input.match(/\/(.*?)\/([a-z]*)?$/i);
+    // Anchored at the start: only a string that *is* a `/source/flags` literal
+    // is read as one. A plain pattern with a slash in it is the whole pattern —
+    // `"abc/def/g"` is not `/def/g`, and `"https://example.com/users"` is not
+    // the source `/example.com` with the flags `users`.
+    const fragments = input.match(/^\/(.*)\/([a-z]*)$/i);
     if (fragments) {
         return new RegExp(fragments[1], fragments[2] || "");
     } else {

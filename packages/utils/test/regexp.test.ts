@@ -29,6 +29,25 @@ describe("regexp utils", () => {
             expect(regex?.flags).toBe("");
         });
 
+        it("reads a plain pattern containing slashes as the whole pattern", () => {
+            // Only a string that starts with `/` is a serialized literal.
+            const sliced = hydrateRegExp("abc/def/g");
+            expect(sliced?.source).toBe("abc\\/def\\/g");
+            expect(sliced?.flags).toBe("");
+            expect(sliced?.test("abc/def/g")).toBe(true);
+            expect(sliced?.test("def")).toBe(false);
+
+            const url = hydrateRegExp("https://example.com/users");
+            expect(url?.test("https://example.com/users")).toBe(true);
+            expect(isValidRegExp("https://example.com/users")).toBe(true);
+        });
+
+        it("keeps every slash inside a serialized literal's source", () => {
+            const regex = hydrateRegExp("/a/b/i");
+            expect(regex?.source).toBe("a\\/b");
+            expect(regex?.flags).toBe("i");
+        });
+
         it("should handle empty or undefined input gracefully", () => {
             expect(hydrateRegExp("")).toBeUndefined();
             expect(hydrateRegExp(undefined)).toBeUndefined();
