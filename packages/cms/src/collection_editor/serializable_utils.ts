@@ -9,6 +9,7 @@
  */
 
 import { resourceKeyOf } from "@rebasepro/types";
+import { serializeRegExp } from "@rebasepro/utils";
 import { isRelationalCollectionConfig, type Relation, type ArrayProperty, type BinaryProperty, type BooleanProperty, type DateProperty, type GeopointProperty, type MapProperty, type NumberProperty, type Properties, type Property, type ReferenceProperty, type RelationProperty, type StorageConfig, type StringProperty, type VectorProperty } from "@rebasepro/types";
 import type { AdminPropertyOptions } from "@rebasepro/cms-types";
 import type { AdminCollection } from "@rebasepro/cms-types";
@@ -137,12 +138,14 @@ function toSerializableStorageConfig(storage: StorageConfig | undefined): Serial
 }
 
 /**
- * Convert a RegExp or string `matches` validation to a plain string.
+ * Convert a RegExp or string `matches` validation to a plain string: the
+ * `/source/flags` form `hydrateRegExp` reads back, so a flag such as `i`
+ * survives the round trip.
  */
 function serializeMatches(matches: string | RegExp | undefined): string | undefined {
     if (matches === undefined) return undefined;
     if (typeof matches === "string") return matches;
-    return matches.source;
+    return serializeRegExp(matches);
 }
 
 /**
