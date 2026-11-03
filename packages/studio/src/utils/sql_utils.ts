@@ -108,6 +108,30 @@ export function quoteIdentifier(identifier: string): string {
     return `"${identifier.replace(/"/g, "\"\"")}"`;
 }
 
+/**
+ * The schema browser's statements for `table`, every name in them quoted. A
+ * name is folded to lower case unless it is quoted, so `Posts` reads a table
+ * `posts` that is not there and a column `createdAt` one called `createdat`;
+ * and a reserved word is not a name at all — `SELECT * FROM user` answers
+ * with the current role instead of reading the table. A table in `public` is
+ * named without its schema.
+ */
+export function tableStatementTemplates(schemaName: string, table: Pick<TableInfo, "tableName" | "columns">): {
+    selectTop: string;
+    selectAll: string;
+    insert: string;
+    update: string;
+} {
+    const from = schemaName === "public" ? quoteIdentifier(table.tableName) : quoteTableName(table.tableName, schemaName);
+    const columns = table.columns.map(column => quoteIdentifier(column.name));
+    return {
+        selectTop: `SELECT * FROM ${from} LIMIT 100;`,
+        selectAll: `SELECT \n  ${columns.join(",\n  ")}\nFROM ${from};`,
+        insert: `INSERT INTO ${from} (\n  ${columns.join(",\n  ")}\n) VALUES (\n  ${columns.map(() => "?").join(",\n  ")}\n);`,
+        update: `UPDATE ${from} \nSET \n  ${columns.map(column => `${column} = ?`).join(",\n  ")}\nWHERE id = ?;`
+    };
+}
+
 /** What the console knows about a result: its columns, and the tables they came from. */
 export type ResultProvenance = Pick<SqlScriptResult, "columns" | "tables">;
 
