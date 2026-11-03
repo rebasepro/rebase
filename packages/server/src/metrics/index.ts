@@ -354,8 +354,9 @@ export function classifySurface(pathname: string, basePath = "/api"): {
     const prefix = basePath.endsWith("/") ? basePath.slice(0, -1) : basePath;
     // Outside the API entirely — the app's own routes. Distinct from `other`,
     // which now means "under the API, and not a surface we serve": the two
-    // answer different questions and only one of them is a bug.
-    if (!pathname.startsWith(prefix)) {
+    // answer different questions and only one of them is a bug. "Under" is by
+    // segment: `/apidocs` is a page of the app, not an API path.
+    if (prefix !== "" && pathname !== prefix && !pathname.startsWith(`${prefix}/`)) {
         return { surface: "app" };
     }
 

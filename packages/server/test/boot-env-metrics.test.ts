@@ -258,6 +258,15 @@ describe("classifySurface", () => {
         expect(classifySurface("/api/nonesuch").surface).toBe("other");
     });
 
+    it("reads the base path by segment, so an app page that starts with it is the app's", () => {
+        // `/apidocs` and `/api-reference` are ordinary site routes beside an
+        // API at `/api`; counted as `other` they read as unrecognised API calls.
+        expect(classifySurface("/apidocs").surface).toBe("app");
+        expect(classifySurface("/api-reference/intro").surface).toBe("app");
+        expect(classifySurface("/api").surface).toBe("other");
+        expect(classifySurface("/v2data/products", "/v2").surface).toBe("app");
+    });
+
     it("labels the collection but never the entity id", () => {
         // An id per label would create unbounded time series — the classic way
         // to take down a Prometheus.
