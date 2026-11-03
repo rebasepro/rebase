@@ -195,8 +195,11 @@ export function useRebaseAuthController(
             throw new RebaseClientError("Not signed in: there is no session to read a token from.", { code: "NOT_SIGNED_IN" });
         }
 
-        // If we have a valid token, return it
-        if (session.accessToken && session.expiresAt > Date.now() + 10000) {
+        // A token with time left is returned as it is. So is one whose expiry
+        // the server never stated: the SDK uses it until the server refuses
+        // it, and reading the missing expiry as passed refreshed the session —
+        // a `POST /auth/refresh` and a rotated refresh token — on every call.
+        if (session.accessToken && (!Number.isFinite(session.expiresAt) || session.expiresAt > Date.now() + 10000)) {
             return session.accessToken;
         }
 

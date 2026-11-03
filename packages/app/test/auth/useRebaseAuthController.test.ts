@@ -704,6 +704,21 @@ describe("useRebaseAuthController hook (Unified Auth)", () => {
             expect(mockAuth.refreshSession).toHaveBeenCalled();
         });
 
+        // A backend that leaves `accessTokenExpiresAt` out leaves the session
+        // with no expiry to compare against (undefined, here NaN: every
+        // comparison is false either way). The SDK uses such a token until the
+        // server refuses it; read as expired here, every call refreshed.
+        it("returns a token whose expiry was never stated without refreshing", async () => {
+            const unstated = { ...mockSession, expiresAt: Number.NaN };
+            mockAuth.getSession.mockReturnValue(unstated);
+
+            const { result } = renderHook(() => useRebaseAuthController({ client: mockClient }));
+            await act(async () => { await Promise.resolve(); });
+
+            await expect(result.current.getAuthToken()).resolves.toBe("access_token_123");
+            expect(mockAuth.refreshSession).not.toHaveBeenCalled();
+        });
+
         it("should throw when no auth is available", async () => {
             const { result } = renderHook(() => useRebaseAuthController({}));
 
