@@ -145,7 +145,7 @@ export function useRelationSelector<M extends Record<string, any> = any>(
             data: entity,
             relation: relation ? relation : new EntityRelation(entity.id, path)
         };
-    }, [getLabelFromEntity, getDescriptionFromEntity, descriptionProperty]);
+    }, [getLabelFromEntity, getDescriptionFromEntity, descriptionProperty, path]);
 
     // Clean up any existing subscription
     const cleanupSubscription = useCallback(() => {
