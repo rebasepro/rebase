@@ -466,10 +466,16 @@ export class UserService implements UserRepository {
 
         const whereClause = conditions.length > 0 ? sql`WHERE ${sql.join(conditions, sql` AND `)}` : sql``;
 
-        // Sorting: users with roles first if no role filter, then by requested order
+        // Sorting: users with roles first if no role filter, then by requested
+        // order, then by id. The id is what makes the order total: the pages
+        // are cut by OFFSET, and over a tie — every user a seed or an import
+        // created in one statement shares `created_at` — Postgres is free to
+        // order the tied rows differently for each page, so one user is served
+        // on two pages and another on none.
+        const tieBreak = sql`${sql.raw(usersTableName)}.${sql.raw(idColumn)} ASC`;
         const orderByClause = roleId
-            ? sql`ORDER BY ${sql.raw(usersTableName)}.${sql.raw(orderColumn)} ${direction}`
-            : sql`ORDER BY array_length(${sql.raw(usersTableName)}.roles, 1) DESC NULLS LAST, ${sql.raw(usersTableName)}.${sql.raw(orderColumn)} ${direction}`;
+            ? sql`ORDER BY ${sql.raw(usersTableName)}.${sql.raw(orderColumn)} ${direction}, ${tieBreak}`
+            : sql`ORDER BY array_length(${sql.raw(usersTableName)}.roles, 1) DESC NULLS LAST, ${sql.raw(usersTableName)}.${sql.raw(orderColumn)} ${direction}, ${tieBreak}`;
 
         const countResult = await this.db.execute(sql`
             SELECT count(*)::int as total FROM ${sql.raw(usersTableName)}
