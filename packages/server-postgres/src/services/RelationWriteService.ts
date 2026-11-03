@@ -566,11 +566,14 @@ export class RelationWriteService {
                         .set({ [fkField]: null })
                         .where(and(eq(foreignKeyColumn, sourceKeyValue), visible));
 
-                    // Then, update the new target row to point to this source row
+                    // Then, update the new target row to point to this source
+                    // row — only one the caller can see, as the to-many writer
+                    // holds to. A row the target's `beforeQuery` or the trash
+                    // hides is not theirs to take from whichever parent it has.
                     await tx
                         .update(targetTable)
                         .set({ [fkField]: sourceKeyValue })
-                        .where(eq(targetIdField, parsedNewTargetId));
+                        .where(and(eq(targetIdField, parsedNewTargetId), visible));
                 }
             } catch (e) {
                 // This catch is here so that one relation whose columns cannot
@@ -746,12 +749,18 @@ export class RelationWriteService {
             if (parentRows.length === 0) continue;
             const parentFKValue = parentRows[0].val as string | number | null;
 
+            // The target rows this caller can see — the target's `beforeQuery`
+            // scope and its soft delete — as the `hasOne` and to-many writers
+            // read them: a row they hide is neither detached from this parent
+            // nor taken from another one.
+            const visible = await this.reads.visibleTargetCondition(parentCollection, relation, parentId);
+
             if (newTargetId === null || newTargetId === undefined) {
                 // Clear any target rows currently linked to this parent via the FK
                 if (parentFKValue !== null && parentFKValue !== undefined) {
                     await tx.update(targetTable)
                         .set({ [targetFKColName]: null })
-                        .where(eq(targetFKCol, String(parentFKValue)));
+                        .where(and(eq(targetFKCol, String(parentFKValue)), visible));
                 }
                 continue;
             }
@@ -764,7 +773,7 @@ export class RelationWriteService {
             if (parentFKValue !== null && parentFKValue !== undefined) {
                 await tx.update(targetTable)
                     .set({ [targetFKColName]: null })
-                    .where(eq(targetFKCol, String(parentFKValue)));
+                    .where(and(eq(targetFKCol, String(parentFKValue)), visible));
             } else {
                 // Not a configuration problem: the row is simply missing the
                 // value the link joins on, so there is nothing for the target
@@ -781,7 +790,7 @@ export class RelationWriteService {
             // Now set the FK on the target row
             await tx.update(targetTable)
                 .set({ [targetFKColName]: parentFKValue })
-                .where(eq(targetIdCol, parsedTargetId));
+                .where(and(eq(targetIdCol, parsedTargetId), visible));
         }
     }
 
@@ -864,8 +873,8 @@ parentSourceColName };
 
             // Create the junction table entry linking parent to the target row.
             const junctionData = {
-                [binding.parentColumn.name]: parentId,
-                [binding.targetColumn.name]: parsedNewEntityId
+                [binding.parentKey]: parentId,
+                [binding.targetKey]: parsedNewEntityId
             };
 
             // Idempotent: a link either exists or it does not, so asking for one
