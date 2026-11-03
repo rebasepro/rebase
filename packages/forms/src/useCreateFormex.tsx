@@ -304,16 +304,22 @@ export function useCreateFormex<T = any>({
             flushDeferredValuesChange();
             setIsSubmitting(true);
             setSubmitCount((prev: number) => prev + 1);
-            await beforeSubmitRef.current?.();
-            const validationErrors = await validationRef.current?.(valuesRef.current);
-            if (validationErrors && Object.keys(validationErrors).length > 0) {
-                setErrors(validationErrors);
-            } else {
-                setErrors({});
-                await onSubmitRef.current?.(valuesRef.current, controllerRef.current);
+            // A submit ends however it ends. One whose `onSubmit`, validation
+            // or `beforeSubmit` threw left `isSubmitting` true, and a form that
+            // disables itself while submitting stayed disabled for good.
+            try {
+                await beforeSubmitRef.current?.();
+                const validationErrors = await validationRef.current?.(valuesRef.current);
+                if (validationErrors && Object.keys(validationErrors).length > 0) {
+                    setErrors(validationErrors);
+                } else {
+                    setErrors({});
+                    await onSubmitRef.current?.(valuesRef.current, controllerRef.current);
+                }
+            } finally {
+                setIsSubmitting(false);
+                setVersion((prev: number) => prev + 1);
             }
-            setIsSubmitting(false);
-            setVersion((prev: number) => prev + 1);
         },
         [flushDeferredValuesChange]
     );
