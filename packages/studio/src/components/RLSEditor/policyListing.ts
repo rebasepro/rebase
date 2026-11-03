@@ -30,6 +30,47 @@ export interface ListedPolicy extends PostgresPolicy {
     generated?: boolean;
 }
 
+/**
+ * The roles of a `pg_policies` row, from its `roles` column.
+ *
+ * A driver hands a `name[]` back as an array or as Postgres's text for one:
+ * `{public}`, `{anon,authenticated}`, and with an element quoted — a `"` or
+ * `\` in it escaped by a backslash — when it holds a comma, a brace, a quote,
+ * a backslash or a space: `{"my role",anon}`. Split on commas, that last one
+ * reads as the role `"my role"`, quotes and all: the policy shows drift that
+ * is not there, and an edit of it names a role that does not exist.
+ */
+export function readPolicyRoles(value: unknown): string[] {
+    if (Array.isArray(value)) return value.filter((role): role is string => typeof role === "string");
+    if (typeof value !== "string") return [];
+    const body = value.trim().replace(/^\{/, "").replace(/\}$/, "");
+    const roles: string[] = [];
+    let i = 0;
+    while (i < body.length) {
+        if (body[i] === "\"") {
+            let role = "";
+            i++;
+            while (i < body.length && body[i] !== "\"") {
+                if (body[i] === "\\") i++;
+                role += body[i] ?? "";
+                i++;
+            }
+            roles.push(role);
+            i++;
+        } else {
+            const comma = body.indexOf(",", i);
+            const end = comma === -1 ? body.length : comma;
+            const role = body.slice(i, end).trim();
+            if (role) roles.push(role);
+            i = end;
+        }
+        // Past the comma that ends this element, if there is one.
+        while (i < body.length && body[i] !== ",") i++;
+        i++;
+    }
+    return roles;
+}
+
 const COMMANDS: Record<SecurityOperation, PostgresPolicy["cmd"]> = {
     select: "SELECT",
     insert: "INSERT",

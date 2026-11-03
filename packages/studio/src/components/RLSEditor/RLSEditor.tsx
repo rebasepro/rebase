@@ -34,7 +34,7 @@ import { resolveJunctionSpecs, getJunctionSecurityRules, getEffectiveSecurityRul
 import { PolicyEditor } from "./PolicyEditor";
 import { saveRules, isCancellation } from "./saveRules";
 import { applyPolicyEdit, type PolicyEditRefusal } from "./policyRules";
-import { listPolicies, type ListedPolicy } from "./policyListing";
+import { listPolicies, readPolicyRoles, type ListedPolicy } from "./policyListing";
 import { quoteIdentifier } from "../../utils/sql_utils";
 
 type TableCategory = "collection" | "junction" | "internal" | "other";
@@ -398,14 +398,7 @@ export const RLSEditor = ({ apiUrl = "" }: { apiUrl?: string }) => {
                 const key = `${schema}.${table}`;
 
                 if (tableMap[key]) {
-                    // Postgres roles come back as an array string like "{public}" or literal array
-                    let parsedRoles: string[] = [];
-                    const r = p.roles || p.ROLES;
-                    if (Array.isArray(r)) {
-                        parsedRoles = r;
-                    } else if (typeof r === "string") {
-                        parsedRoles = r.replace(/^{|}$/g, "").split(",").map(s => s.trim());
-                    }
+                    const parsedRoles = readPolicyRoles(p.roles || p.ROLES);
 
                     tableMap[key].policies.push({
                         policyname: p.policyname || p.POLICYNAME || "",
