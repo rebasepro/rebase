@@ -296,9 +296,14 @@ export class RebaseRealtimeChannel {
         if (onConnectionLost) this.unsubscribers.push(onConnectionLost);
 
         await this.send("join_channel");
+        // A `leave()` that landed while the join was on the wire has already
+        // released this membership; asking for its roster or its history now
+        // would start a catch-up nothing is listening for.
+        if (!this.joined) return;
         // Not optional. Joining does not push the roster — without this the
         // channel believes it is alone until somebody else happens to move.
         await this.send("presence_state");
+        if (!this.joined) return;
         if (this.wantsHistory) await this.requestHistory();
     }
 
@@ -398,10 +403,15 @@ export class RebaseRealtimeChannel {
      */
     async track(state: Record<string, unknown>): Promise<void> {
         await this.join();
+        // Left while joining — an effect cleaned up right after it ran. The
+        // state is not published, and no heartbeat is started that `leave()`
+        // could no longer stop.
+        if (!this.joined) return;
         this.trackedState = state;
 
         await this.send("presence_track", { state });
 
+        if (!this.joined || this.trackedState !== state) return;
         if (!this.heartbeat) {
             this.heartbeat = setInterval(() => {
                 if (!this.trackedState) return;
@@ -812,13 +822,32 @@ export class RebaseRealtimeChannel {
         }
     }
 
+    /**
+     * Hand an event to every broadcast handler, each isolated from the
+     * others. A throw is reported and goes no further: this runs in the middle
+     * of a replay or a flush, and one escaping it would end that pass with the
+     * catch-up still marked in flight and its timeout already cleared, so every
+     * later message on the channel would be held back for good.
+     */
     private deliver(event: BroadcastEvent): void {
-        for (const handler of [...this.broadcastHandlers]) handler(event);
+        for (const handler of [...this.broadcastHandlers]) {
+            try {
+                handler(event);
+            } catch (e) {
+                console.error("Error in channel broadcast handler:", e);
+            }
+        }
     }
 
     private emitPresence(diff?: PresenceDiff): void {
         const snapshot = { ...this.presences };
-        for (const handler of this.presenceHandlers) handler(snapshot, diff);
+        for (const handler of [...this.presenceHandlers]) {
+            try {
+                handler(snapshot, diff);
+            } catch (e) {
+                console.error("Error in channel presence handler:", e);
+            }
+        }
     }
 }
 
