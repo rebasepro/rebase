@@ -80,18 +80,16 @@ export function encodeExtraEquals(connectionString: string): string {
     const query = hash === -1 ? rest : rest.slice(0, hash);
     const fragment = hash === -1 ? "" : rest.slice(hash);
 
-    const fixed = query
-        .split("&")
-        .map((part) => {
-            const first = part.indexOf("=");
-            if (first === -1) return part;
-            const name = part.slice(0, first);
-            const value = part.slice(first + 1).replace(/=/g, "%3D");
-            return `${name}=${value}`;
-        })
-        .join("&");
+    const fixed = query.split("&").map(encodeParamExtraEquals).join("&");
 
     return `${head}${fixed}${fragment}`;
+}
+
+/** One `name=value` query parameter with every `=` after its separator encoded. */
+function encodeParamExtraEquals(part: string): string {
+    const first = part.indexOf("=");
+    if (first === -1) return part;
+    return `${part.slice(0, first)}=${part.slice(first + 1).replace(/=/g, "%3D")}`;
 }
 
 /** One connection string, found somewhere on disk, that libpq cannot parse. */
@@ -104,6 +102,11 @@ export interface LibpqUrlFinding {
     params: string[];
     /** The same string with the offending `=` encoded. */
     suggested: string;
+    /**
+     * Each offending parameter as it is, and as it should be. What a report
+     * prints: the whole string carries the database password.
+     */
+    fixes: Array<{ from: string; to: string }>;
 }
 
 /** Variables whose value is a Postgres connection string. */
@@ -146,7 +149,8 @@ export function scanTextForLibpqUrls(file: string, text: string): LibpqUrlFindin
                 file,
                 variable,
                 params: params.map((p) => p.name),
-                suggested: encodeExtraEquals(value)
+                suggested: encodeExtraEquals(value),
+                fixes: params.map((p) => ({ from: p.raw, to: encodeParamExtraEquals(p.raw) }))
             });
         }
     }
