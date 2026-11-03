@@ -4375,6 +4375,14 @@ yet, listed so that nobody reads a promise into them:
   UNKNOWN_FILTER_FIELD on Postgres** where it used to be guessed as a foreign
   key (`manager` → `managerId`). Name the property itself.
 
+##### CLI
+
+- **REBASE_TOKEN is not sent to a control plane that only the repository's
+  `.rebase/cloud.json` names.** A host that is neither the default nor one you
+  signed in to answers `unknown_control_plane`; pass `--url` or set
+  `REBASE_CLOUD_URL` to use it. CI that targets a self-hosted control plane only
+  through a committed link needs the variable.
+
 #### Fixed
 
 ##### Auth
@@ -4427,6 +4435,9 @@ yet, listed so that nobody reads a promise into them:
 - **A field rule (`access`, `excludeFromApi`) on a property nested in a map or
   an array is warned about at boot.** Rules are enforced on top-level
   properties only, and a nested one withheld nothing.
+- **The OpenAPI spec states a `matches` regex as its source.** It printed the
+  slashes and flags into `pattern`, so a generated client refused valid values.
+  A regex with an `i`, `m` or `s` flag states no pattern.
 
 ##### Postgres
 
@@ -4482,6 +4493,25 @@ yet, listed so that nobody reads a promise into them:
   socket.
 - **A departed client's shared presence row is not put back** by its own
   in-flight heartbeat.
+- **A to-one relation write touches only rows the caller can see.** Setting a
+  hasOne relation, or a one-to-one via relation, pointed the target row at the
+  parent with no visibility condition, so a tenant could attach another
+  tenant's (or a trashed) row to theirs.
+- **`db branch prune` leaves alone a branch database another project on the
+  same server registered.** It listed every unregistered `rb_*` database as an
+  orphan and dropped other projects' branches. A new branch database records
+  which main database owns it; branches made before carry no mark.
+- **A row's history lists one write's entries newest first**, with a stable
+  order across pages.
+- **A batch update or delete by a reference that resolves to null is refused**
+  (it inserted a new row), and **a delete's history and realtime event use the
+  row's address** (`010` deleted row 10 but was recorded as `010`).
+- **Junction links insert into a junction table whose property keys differ
+  from its column names.**
+- **A database name with non-ASCII characters in the connection string** is
+  decoded for branching and pooling.
+- **A realtime channel frame needs a non-empty string channel name**
+  (INVALID_CHANNEL).
 
 ##### MongoDB
 
@@ -4523,6 +4553,11 @@ yet, listed so that nobody reads a promise into them:
   anonymously**, so a public route answers with its public rows.
 - **`canRestoreSession()` is false for a client with `persistSession: false`**,
   which restores nothing, so it no longer probes `/auth/me` on every mount.
+- **A collection path or row id cannot leave `/data`.** A `..` segment
+  (`../admin/users`, an id of `..`) was resolved by `fetch` and reached another
+  route with the client's token; it is refused before any request.
+- **Two tabs creating offline in the same millisecond get different temporary
+  ids.**
 
 ##### CLI
 
@@ -4537,6 +4572,11 @@ yet, listed so that nobody reads a promise into them:
   `rebase build` and `rebase cloud deploy`.
 - **Folding a static app accepts a protocol-relative asset reference**
   (`//cdn.example.com/x.js`).
+- **`rebase cloud` opens URLs without a shell on every platform.** On Windows a
+  URL with `&` ran the rest as a command.
+- **`rebase cloud env pull` leaves an existing `.env` owner-only**, and
+  **`rebase doctor` no longer prints the database password** when it reports a
+  connection string libpq cannot parse.
 
 ##### MCP
 
@@ -4544,6 +4584,8 @@ yet, listed so that nobody reads a promise into them:
   `postgres://…@localhost/app?host=db.prod.example.com` connects to production,
   and the gate let `rebase_db_push`, `rebase_db_migrate` and the branch tools
   run against it.
+- **A cloud project is sent only the token its own control plane issued**,
+  and `rebase_schema_plan` on a cloud project sends one.
 
 ##### Admin (CMS & app)
 
@@ -4572,6 +4614,19 @@ yet, listed so that nobody reads a promise into them:
   opens from its URL**, on reload and from a shared link.
 - **The admin's auth-token getter does not refresh on every call** when the server
   states no token expiry.
+- **A record whose id is `0` opens as that record**; it opened as a new
+  record, and saving created a row instead of editing it.
+- **A form that creates a record goes on editing it** without an `entity`
+  prop handed back, and **a number field takes decimals typed a key at a time**
+  (`0.05` could not be entered).
+- **A Formex submit whose callback throws still ends**, so the form is not
+  left disabled.
+- **The collection editor refuses two enum values with one id**, and **an
+  import file with a plain and a nested column of one name is read.**
+- **Studio's SQL console** registers its completions once, quotes names in the
+  schema browser's templates, and keeps the current run's rows and the current
+  database's schema on screen. **A branch's connection details** name its
+  recorded database, and **the RLS editor reads quoted roles.**
 
 ### [0.27.0] - 2026-11-02
 
