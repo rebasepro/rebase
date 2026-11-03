@@ -388,6 +388,34 @@ describe("editing a policy in the database", () => {
         // connection inside an aborted transaction.
         expect(statement).not.toMatch(/\bBEGIN\b|\bCOMMIT\b/i);
     });
+
+    /**
+     * A policy name is any identifier Postgres accepts, and the presets this
+     * editor offers are named in words ("Enable read access for all users").
+     * A name with a space or a quote is written as a quoted identifier, its
+     * `"` doubled, not refused as unsafe.
+     */
+    it("writes a policy name with spaces and quotes as a quoted identifier", async () => {
+        hasCodebase = false;
+        livePolicies = [{ ...publicRead, policyname: "Enable read access for all users" }];
+        render(<RLSEditor/>);
+
+        let row: HTMLElement | null = await screen.findByText("Enable read access for all users");
+        while (row && within(row).queryAllByRole("button", { name: label("studio_rls_edit") }).length !== 1) {
+            row = row.parentElement;
+        }
+        if (!row) throw new Error("no row for the policy");
+        fireEvent.click(within(row).getByRole("button", { name: label("studio_rls_edit") }));
+        const nameField = await screen.findByLabelText(label("studio_policy_name"));
+        fireEvent.change(nameField, { target: { value: "Everyone reads \"authors\"" } });
+        fireEvent.click(screen.getByRole("button", { name: label("studio_policy_save") }));
+
+        await waitFor(() => expect(policyDdl().length).toBeGreaterThan(0));
+        const [statement] = policyDdl();
+        expect(statement).toMatch(/DROP POLICY IF EXISTS "Enable read access for all users" ON "public"\."authors"/);
+        expect(statement).toContain("CREATE POLICY \"Everyone reads \"\"authors\"\"\" ON \"public\".\"authors\"");
+        expect(snackbarOpen.mock.calls.filter(([o]) => o.type === "error")).toHaveLength(0);
+    });
 });
 
 /**

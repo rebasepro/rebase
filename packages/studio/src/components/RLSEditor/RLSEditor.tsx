@@ -35,6 +35,7 @@ import { PolicyEditor } from "./PolicyEditor";
 import { saveRules, isCancellation } from "./saveRules";
 import { applyPolicyEdit, type PolicyEditRefusal } from "./policyRules";
 import { listPolicies, type ListedPolicy } from "./policyListing";
+import { quoteIdentifier } from "../../utils/sql_utils";
 
 type TableCategory = "collection" | "junction" | "internal" | "other";
 
@@ -92,18 +93,6 @@ function classifyTableClient(
     }
     if (junctionTableNames.has(tableName)) return "junction";
     return "other";
-}
-
-/**
- * Validates and double-quotes a SQL identifier to prevent injection.
- * Only allows safe Postgres identifiers (letters, digits, underscores).
- * Throws if the identifier contains unsafe characters.
- */
-function sanitizeSqlIdentifier(name: string): string {
-    if (!/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(name)) {
-        throw new Error(`Invalid SQL identifier: "${name}". Only letters, digits, and underscores are allowed.`);
-    }
-    return `"${name}"`;
 }
 
 // Re-exported for the components that used to import it from here.
@@ -248,7 +237,7 @@ export const RLSEditor = ({ apiUrl = "" }: { apiUrl?: string }) => {
         setConfirming(true);
         try {
             await databaseAdmin!.executeSql!(
-                `ALTER TABLE ${sanitizeSqlIdentifier(schema)}.${sanitizeSqlIdentifier(table)} ${action} ROW LEVEL SECURITY`
+                `ALTER TABLE ${quoteIdentifier(schema)}.${quoteIdentifier(table)} ${action} ROW LEVEL SECURITY`
             );
             snackbarController.open({ type: "success",
                 message: `RLS ${action.toLowerCase()}d on ${table}` });
@@ -269,7 +258,7 @@ export const RLSEditor = ({ apiUrl = "" }: { apiUrl?: string }) => {
         setConfirming(true);
         try {
             await databaseAdmin!.executeSql!(
-                `DROP POLICY ${sanitizeSqlIdentifier(policyName)} ON ${sanitizeSqlIdentifier(schema)}.${sanitizeSqlIdentifier(table)}`
+                `DROP POLICY ${quoteIdentifier(policyName)} ON ${quoteIdentifier(schema)}.${quoteIdentifier(table)}`
             );
             snackbarController.open({ type: "success",
                 message: `Policy "${policyName}" dropped` });
@@ -949,12 +938,12 @@ message: "Policy saved successfully" });
                                             return;
                                         }
                                         try {
-                                            const qualifiedTable = `${sanitizeSqlIdentifier(activeTableData.schemaName)}.${sanitizeSqlIdentifier(activeTableData.tableName)}`;
-                                            const policyName = sanitizeSqlIdentifier(newPolicy.policyname || "unnamed_policy");
+                                            const qualifiedTable = `${quoteIdentifier(activeTableData.schemaName)}.${quoteIdentifier(activeTableData.tableName)}`;
+                                            const policyName = quoteIdentifier(newPolicy.policyname || "unnamed_policy");
                                             const cmd = newPolicy.cmd || "ALL";
                                             const permissive = (newPolicy.permissive || "PERMISSIVE") === "PERMISSIVE" ? "PERMISSIVE" : "RESTRICTIVE";
                                             const roles = newPolicy.roles && newPolicy.roles.length > 0
-                                                ? newPolicy.roles.map(r => sanitizeSqlIdentifier(r)).join(", ")
+                                                ? newPolicy.roles.map(r => quoteIdentifier(r)).join(", ")
                                                 : "public";
 
                                             let sql = `CREATE POLICY ${policyName} ON ${qualifiedTable}`;
@@ -978,7 +967,7 @@ message: "Policy saved successfully" });
                                             // COMMIT is skipped and the pooled connection is
                                             // returned inside an aborted transaction.
                                             if (editingPolicy !== "new") {
-                                                const previousName = sanitizeSqlIdentifier(editingPolicy.policyname);
+                                                const previousName = quoteIdentifier(editingPolicy.policyname);
                                                 sql = `DROP POLICY IF EXISTS ${previousName} ON ${qualifiedTable}; ${sql}`;
                                             }
 
