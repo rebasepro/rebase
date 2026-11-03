@@ -62,7 +62,7 @@ export function EnumForm({
                         fieldError.label = "You must specify a label for this enum value entry";
                         hasAnyError = true;
                     }
-                    if (!enumValue?.id) {
+                    if (!hasEnumId(enumValue)) {
                         fieldError.id = "You must specify an ID for this enum value entry";
                         hasAnyError = true;
                     }
@@ -96,6 +96,15 @@ export function EnumForm({
             getData={getData}/>
     </Formex>
 
+}
+
+/**
+ * Whether an enum value has its id. `0` is one: a number select's first
+ * value is often `0`, and a truthiness check called it missing.
+ */
+export function hasEnumId(enumValue: EnumValueConfig | undefined): boolean {
+    const id = enumValue?.id;
+    return id !== undefined && id !== null && id !== "";
 }
 
 type EnumFormFieldsProps = {
