@@ -1,4 +1,4 @@
-import { serializePropertyToServer } from "../src/data-transformer";
+import { sanitizeAndConvertDates, serializePropertyToServer } from "../src/data-transformer";
 import type { Property } from "@rebasepro/types";
 
 describe("serializePropertyToServer", () => {
@@ -269,5 +269,28 @@ value: [1.5, -2.0, 3.14] };
         it("should return null for null values", () => {
             expect(serializePropertyToServer(null, binaryProp)).toBeNull();
         });
+    });
+});
+
+describe("sanitizeAndConvertDates", () => {
+    // A binary value written through dataAsAdmin reached the column as
+    // `{"0":1,"1":2,…}`: the walk copied the Buffer key by key into a plain
+    // object, and the driver JSON-encoded that.
+    it("passes a Buffer through as a Buffer", () => {
+        const out = sanitizeAndConvertDates({ audio: Buffer.from([1, 2, 3]) }) as { audio: unknown };
+        expect(Buffer.isBuffer(out.audio)).toBe(true);
+        expect([...(out.audio as Buffer)]).toEqual([1, 2, 3]);
+    });
+
+    it("passes a Uint8Array through untouched", () => {
+        const bytes = new Uint8Array([4, 5]);
+        const out = sanitizeAndConvertDates({ audio: bytes }) as { audio: unknown };
+        expect(out.audio).toBe(bytes);
+    });
+
+    it("keeps a data URL decoded by serializePropertyToServer a Buffer", () => {
+        const decoded = serializePropertyToServer("data:application/octet-stream;base64,AQID", { type: "binary" } as Property);
+        const out = sanitizeAndConvertDates({ audio: decoded }) as { audio: unknown };
+        expect(Buffer.isBuffer(out.audio)).toBe(true);
     });
 });
