@@ -904,14 +904,20 @@ export function createPostgresWebSocket(
         const session = clientSessions.get(clientId);
         const credential = session?.credential;
         if (!session?.user || !credential) return "live";
+        const impersonate = session.impersonate;
         let outcome: Awaited<ReturnType<typeof resolveIdentity>>;
         try {
-            outcome = await resolve(credential, session.impersonate);
+            outcome = await resolve(credential, impersonate);
         } catch (error) {
             return { unavailable: storeUnavailableAnswer(error) };
         }
         // Re-authenticated while this was in flight: that answer is newer.
-        if (session.credential !== credential || !session.user) return session.user ? "live" : "ended";
+        // The same token asking to act as someone else, or no longer to, is
+        // a re-authentication too: this answer is about the identity it held
+        // before, and applied it would put that one back.
+        if (session.credential !== credential || session.impersonate !== impersonate || !session.user) {
+            return session.user ? "live" : "ended";
+        }
         session.checkedAt = Date.now();
         if (!("user" in outcome)) {
             // An impersonation that no longer holds — the administrator was
