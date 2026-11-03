@@ -11,6 +11,219 @@ A tradução está pendente. O conteúdo abaixo está em inglês.
 
 ## [Unreleased]
 
+### Changed
+
+#### Admin (CMS & app)
+
+- **`UrlController.buildUrlCollectionPath` percent-encodes each segment of the
+  data path, and `urlPathToDataPath` decodes each one.** Append a query or hash
+  to the built URL rather than passing it inside the path. A plain id builds
+  the same URL as before.
+
+#### Server & REST
+
+- **A filter or sort on a name that is no property answers 400
+  UNKNOWN_FILTER_FIELD on Postgres** where it used to be guessed as a foreign
+  key (`manager` → `managerId`). Name the property itself.
+
+### Fixed
+
+#### Auth
+
+- **A magic link, email code or password-reset link is spent once, also under
+  concurrent use.** Two requests presenting one token at the same moment both
+  passed the lookup before either marked it used, so both signed in, or both
+  set a password. The repositories now consume a token in the statement that
+  checks it and say whether that call did; the request that lost is refused.
+  `AuthRepository.markPasswordResetTokenUsed` and `markMagicLinkTokenUsed` may
+  resolve `false`; a custom repository that resolves nothing still works as
+  before.
+- **An email code cannot be redeemed through `/auth/magic-link/verify`.** With
+  both `enableEmailOtp` and `enableMagicLink` on, a code's stored material was a
+  valid link token, so guesses at a six-digit code ran under the per-IP limit
+  alone, past the per-address limit that `/auth/otp/verify` holds codes to.
+- **An email change ends the magic links and codes mailed to the old address**,
+  as it already ended its password-reset links. A custom repository opts in with
+  the new optional `AuthRepository.deleteAllMagicLinkTokensForUser`.
+- **`/auth/change-password` is rate-limited per account** (10 attempts per 15
+  minutes), so a stolen access token cannot guess the current password without
+  limit.
+- **A malformed refresh cookie no longer breaks `/auth/refresh` and
+  `/auth/logout`.** A value that is not valid percent-encoding (a sibling
+  subdomain can set one) answered 500, and `/logout` never cleared it.
+
+#### Server & REST
+
+- **A `_batch` update or delete on the users collection cannot name its user
+  by a reference to another operation.** The last-administrator guard, the
+  `beforeUserDelete` veto and session revocation ran on the unresolved
+  reference, so such a batch deleted the real account past all three. It is refused with 400 `INVALID_BATCH_REF`.
+- **Removing a user from a many-to-many is an unlink, not an account
+  deletion.** `DELETE /teams/1/members/<uid>` answered `LAST_ADMIN` for the last
+  administrator, ran the user-deletion hooks and signed the user out everywhere.
+- **A numeric key is addressed by a whole integer only.** `/products/12abc`,
+  `12.9` and `1e3` addressed (and could delete) row 12; they now name no row. A
+  `bigint` id past 2^53 is no longer rounded to a neighbouring row's id.
+- **A multi-line query parameter is redacted from logs in full.** The redaction
+  stopped at the first newline, so the rest of that value and every value after
+  it reached stdout, `cron_logs` and `/health`.
+- **The Backups panel finds a backup cron registered through a crons directory,
+  the crons option or a bundle.** Its mark was lost when the job was copied for the scheduler, so
+  `GET /admin/backups` reported no schedule.
+- **The SPA fallback is never cached as immutable.** A deep link whose last
+  segment looked like a hashed asset (`/invoices/INV-2024ABCD.pdf`) pinned
+  `index.html` in the browser for a year.
+- **Metrics read the API base path by segment:** `/apidocs` is an app page, not
+  an unrecognised API call.
+- **A field rule (`access`, `excludeFromApi`) on a property nested in a map or
+  an array is warned about at boot.** Rules are enforced on top-level
+  properties only, and a nested one withheld nothing.
+
+#### Postgres
+
+- **A filter or sort resolves only names the field-access check judged.** A name
+  that matched no column was guessed as a foreign key (`manager` →
+  `managerId`) even with the collection known, so `?manager=eq.x` filtered on a
+  read-restricted `managerId`. Such a name now answers 400
+  UNKNOWN_FILTER_FIELD; the guess applies only where no collection is given.
+- **A filter or sort on `constructor`, `toString` or another object-method name
+  is an unknown field.** It compiled to a comparison of two bound values and
+  returned every row, and `__proto__` answered 500.
+- **`array-contains-any` matches numbers in a `jsonb` array**; it matched string
+  elements only.
+- **A write keeps the text it is given.** Any string equal to `nan` became NULL
+  and any ISO-shaped string was re-printed (cutting microseconds), whatever its
+  property. `"NaN"` is now null only on a `number` property, and date text is
+  normalized only on a `date` property.
+- **The admin user list serves every user once across pages.** Users created in
+  one statement share `created_at`, and pages over that tie skipped some users
+  and repeated others.
+- **A realtime frame from a socket that already closed registers nothing.** Its
+  subscription or channel membership leaked for the life of the process.
+- **Role names are quoted in compiled RLS policies.** A role containing `'`
+  failed `CREATE POLICY`, leaving the table with RLS on and no policy.
+- **A tuple array (`of: [...]`) keeps every element in its slot on save.** `0`,
+  `""`, `false` and `null` were dropped and later elements shifted.
+- **`db branch create`, delete, info and diff act on the branch named, and
+  `--from=<source>` is honoured.** `create --force feat` created a branch called
+  `--force`, and `--from=production` copied the main database.
+- **`db branch prune` keeps a branch's Atlas scratch database (`*_dev_diff`) out
+  of the orphans**, and no longer stops part-way on dropping it twice.
+- **Backup retention keeps each database's backups apart.** Two databases
+  backing up to one destination ranked together, and the one still running
+  deleted the other's backups past `retentionDays`.
+- **Restoring roles keeps a statement whole across a `;` in a quoted literal**
+  (`COMMENT ON ROLE x IS 'read-only; used by BI'`).
+- **A restrictive policy that cannot be created no longer leaves the grants
+  beside it open.** When boot fell back to applying a table's policies one at a
+  time, it created a permissive grant and then failed on the restrictive gate
+  (for example, a function a migration has not added yet), leaving every row
+  readable. Restrictive policies are now applied first, and one that fails is
+  replaced by a gate that passes nothing until it can be created.
+- **A generated policy name longer than 63 bytes is not dropped as an orphan
+  on the next boot or `db push`**, and two rules whose policies Postgres would
+  store under one name are refused at plan time.
+- **A raw rule ending in a `--` comment, or with an integer past 2^53, compiles
+  to the SQL it says.** The comment swallowed the closing paren, and the number
+  was rounded to another id. `rolesOverlap([])` compiles to a typed empty array.
+- **A re-scoped realtime subscription has its `include` judged again** when the
+  socket's roles change, so a demoted user's `include` filtering on a field they
+  can no longer read is refused, as a new subscription is.
+- **A stale identity check cannot undo a change of impersonation** on a realtime
+  socket.
+- **A departed client's shared presence row is not put back** by its own
+  in-flight heartbeat.
+
+#### MongoDB
+
+- **A filter column cannot be a MongoDB operator.** `$expr` as a column compiled
+  to an aggregation over any field, withheld ones included. It is refused with
+  400 UNKNOWN_FILTER_FIELD.
+- **A dotted filter or sort into a withheld field is refused** (`address.city`
+  under a read-restricted `address`).
+- **Security rules treat null and missing fields as SQL does.**
+  `visibility != 'private'` matched documents with no `visibility`, and single-row
+  checks granted a document missing the compared field.
+
+#### Firebase
+
+- **The Firestore driver applies `or()`/`and()` groups and fields with several
+  conditions.** A group was ignored and returned the whole collection.
+
+#### Client SDK
+
+- **A queued offline `updateMany`/`deleteMany` follows a temporary id to the id
+  the server assigns.** The update was rolled back and lost; the delete was
+  dropped as done while the row stayed on the server.
+- **A realtime channel keeps delivering after a broadcast or presence handler
+  throws.** A throw during a history catch-up held back every later message.
+- **A presence track that a leave overtakes publishes nothing** and starts no
+  heartbeat that cannot be stopped.
+- **Every listener hears a refused subscription**, past one whose `onError`
+  throws.
+- **A storage key with a `..` segment is refused** (`INVALID_STORAGE_KEY`)
+  before it leaves the client: `fetch` resolved it, so `deleteObject` could
+  reach another route with the client's credentials.
+- **`functions.invoke` refuses a path that escapes the function through `\` or
+  a tab or newline.**
+- **An MFA step-up and anonymous linking keep the new session's refresh cookie**
+  in cookie mode across origins, and **a guest that links a provider becomes the
+  account** on the client, with `USER_UPDATED`. The realtime socket signs in
+  with the account's token too.
+- **A request made while a refused stored session is being restored goes out
+  anonymously**, so a public route answers with its public rows.
+- **`canRestoreSession()` is false for a client with `persistSession: false`**,
+  which restores nothing, so it no longer probes `/auth/me` on every mount.
+
+#### CLI
+
+- **`rebase skills install` never deletes files outside the skills directory**,
+  whatever the committed manifest lists.
+- **`rebase dev` starts the backend under a path with spaces or shell
+  characters**; `~/My Projects/app` exited 127.
+- **`rebase doctor` reads `.env` as the server's dotenv does**: a trailing
+  `# comment` is no longer part of the value, so `NODE_ENV=production # x` gets
+  the production checks.
+- **A partial caret range (`^0`, `^0.0`) is not a dependency conflict** in
+  `rebase build` and `rebase cloud deploy`.
+- **Folding a static app accepts a protocol-relative asset reference**
+  (`//cdn.example.com/x.js`).
+
+#### MCP
+
+- **The local-only gate reads the host a Postgres URL names in its query.**
+  `postgres://…@localhost/app?host=db.prod.example.com` connects to production,
+  and the gate let `rebase_db_push`, `rebase_db_migrate` and the branch tools
+  run against it.
+
+#### Admin (CMS & app)
+
+- **The RLS editor quotes policy, table and role names instead of refusing
+  them**, so its own word-named presets can be applied, edited and dropped.
+- **A `matches` regex gives the same answer every time and keeps its flags when
+  the collection editor saves it.** A `g` regex refused a value it had just
+  accepted; an `i` flag was dropped on save.
+- **The cron history stays the selected job's** when another job's run ends.
+- **Opening another record in place never shows the previous record's values**
+  (`useFetch`), and **a relation picker whose path changes stores references to
+  the new collection.**
+- **Revoking two sessions in a row keeps the first one revoked.**
+- **A `Select` shows the selected item's label inside a `SelectGroup` or
+  fragment.**
+- **Clearing a column filter's text removes the filter**, and a number enum
+  filter reads a fractional id as written.
+- **Number enums in the collection editor accept id `0` and keep their default
+  value.**
+- **Picking a property for the import's id column takes effect.**
+- **Exports keep a null map null, and `downloadDataAsCsv` escapes its header
+  row** and includes every column.
+- **`hydrateRegExp` reads only a whole `/source/flags` string as a literal**,
+  and `resolveEnumValues` reads a plain value array by value.
+- **A record whose id holds a space, `#`, `?`, `%` or a non-ASCII character
+  opens from its URL**, on reload and from a shared link.
+- **The admin's auth-token getter does not refresh on every call** when the server
+  states no token expiry.
+
 ## [0.27.0] - 2026-11-02
 
 ### Breaking
