@@ -926,19 +926,47 @@ function checkProperty(
     if (type === "array") {
         const of = property.of;
         if (Array.isArray(of)) {
-            of.forEach((entry, index) => checkProperty(entry, `${path}.of[${index}]`, collect));
+            of.forEach((entry, index) => checkNestedProperty(entry, `${path}.of[${index}]`, collect));
         } else if (of !== undefined) {
-            checkProperty(of, `${path}.of`, collect);
+            checkNestedProperty(of, `${path}.of`, collect);
         }
         const oneOf = property.oneOf;
         if (isPlainObject(oneOf) && isPlainObject(oneOf.properties)) {
-            checkProperties(oneOf.properties, `${path}.oneOf.properties`, collect);
+            for (const [key, nested] of Object.entries(oneOf.properties)) {
+                checkNestedProperty(nested, `${path}.oneOf.properties.${key}`, collect);
+            }
         }
     }
 
     if (type === "map" && isPlainObject(property.properties)) {
-        checkProperties(property.properties, `${path}.properties`, collect);
+        for (const [key, nested] of Object.entries(property.properties)) {
+            checkNestedProperty(nested, `${path}.properties.${key}`, collect);
+        }
     }
+}
+
+/**
+ * A property held inside a map or an array: checked as any property is, and
+ * warned about if it carries a field rule.
+ *
+ * Field rules — `access` and `excludeFromApi` — are enforced on a collection's
+ * top-level properties: the row strip, the write refusal and the filter and
+ * sort checks all read those. One on a nested property is read by none of
+ * them, so the value it was meant to withhold is served, and accepted, with
+ * the rest of its field. A warning rather than a refusal: a config that boots
+ * today keeps booting, and says what it does not do.
+ */
+function checkNestedProperty(property: unknown, path: string, collect: ProblemCollector): void {
+    if (isPlainObject(property) && (property.access !== undefined || property.excludeFromApi)) {
+        const rule = property.excludeFromApi ? "`excludeFromApi`" : "`access`";
+        collect.warn(
+            path,
+            `${rule} on a property nested in a map or an array is not enforced: the value is served and ` +
+            "accepted with the rest of its top-level field. Put the rule on the top-level field, or move " +
+            "this value into a field of its own."
+        );
+    }
+    checkProperty(property, path, collect);
 }
 
 function checkProperties(
