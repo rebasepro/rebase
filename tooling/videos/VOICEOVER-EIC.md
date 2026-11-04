@@ -45,6 +45,16 @@ this one instead (1080p, small file, AAC):
 pnpm exec remotion render src/index.ts EIC out/REBASE_EIC_Video.mp4 --props=takes/<take-id>/props.json --timeout=120000 --crf=20
 ```
 
+Then master the sound: the take is recorded raw, room and all.
+`scripts/master-audio.sh` removes rumble and room noise, and brings it to
+-16 LUFS with peaks under -1 dBTP; the picture is copied untouched. The last
+number is the start of one second with nobody speaking (1:18.6 in the take of
+2026-11-04: the pause after "…admin panel and AI agents"):
+
+```bash
+scripts/master-audio.sh out/REBASE_EIC_Video.mp4 out/REBASE_EIC_Video-mastered.mp4 78.6
+```
+
 ## The script
 
 | Line | Who | Script |
