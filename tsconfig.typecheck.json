@@ -83,6 +83,9 @@
       "@rebasepro/mcp/*": [
         "./packages/mcp/src/*"
       ],
+      "@rebasepro/mcp-apps": [
+        "./packages/mcp-apps/src"
+      ],
       "@rebasepro/plugin-ai": [
         "./packages/plugin-ai/src"
       ],
@@ -187,6 +190,10 @@
     "packages/common/src",
     "packages/forms/src",
     "packages/mcp/src",
+    "packages/mcp-apps/src",
+    // The views: build input, bundled into the HTML the package ships, so
+    // outside `src` — which the dependency gate reads as runtime imports.
+    "packages/mcp-apps/views",
     "packages/plugin-ai/src",
     "packages/plugin-insights/src",
     "packages/plugin-review/src",

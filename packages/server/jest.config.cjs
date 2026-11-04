@@ -17,6 +17,8 @@ module.exports = {
         // Only the shipped templates import this, and only for `defineCollection`
         // — see test/stubs/cms-types.ts. The server itself may not depend on it.
         "^@rebasepro/cms-types$": "<rootDir>/test/stubs/cms-types.ts",
+        // Its module inlines a built HTML file — see test/stubs/mcp-apps.ts.
+        "^@rebasepro/mcp-apps$": "<rootDir>/test/stubs/mcp-apps.ts",
         "^(\\.{1,2}/.*)\\.js$": "$1"
     },
     // Many suites here boot a whole backend per test — middlewares, boot-time

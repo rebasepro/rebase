@@ -202,6 +202,8 @@ export interface HarnessOptions {
     authAdapter?: AuthAdapter;
     /** How `/mcp` verifies an `rk_` API key. Absent, keys are not accepted. */
     resolveApiKey?: McpRoutesConfig["resolveApiKey"];
+    /** The MCP App views `/mcp` serves. Absent, it serves none. */
+    apps?: McpRoutesConfig["apps"];
 }
 
 export function buildApp(options: HarnessOptions = {}) {
@@ -219,7 +221,8 @@ export function buildApp(options: HarnessOptions = {}) {
         maxBodySize: options.maxBodySize,
         rateLimit: options.rateLimit,
         resolveApiKey: options.resolveApiKey,
-        identity: options.identity
+        identity: options.identity,
+        apps: options.apps
     };
     app.route("/", createMcpWellKnownRoutes(mcpConfig));
     app.route("/mcp", createMcpRoutes(mcpConfig));
