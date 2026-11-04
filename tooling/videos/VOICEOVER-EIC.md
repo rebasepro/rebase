@@ -20,10 +20,10 @@ Open http://localhost:3500/?film=eic in Chrome. Allow the camera and the
 microphone and pick them in the two menus. Chrome's speech recognition uses
 the *system* input, so make that the same microphone.
 
-- **Sit side by side, one camera, both in frame.** Francesco on the LEFT of
-  the picture as a viewer sees it, so in the room he sits on Marian's right.
-  The page's preview is a mirror, so there Francesco appears on the right.
-  If you sit the other way round, say so: it's one constant (`SEAT`).
+- **Sit side by side, one camera, both in frame.** The take of 2026-11-04
+  has Francesco on the RIGHT of the picture as a viewer sees it, Marian on
+  the left; `SEAT` says so. The page's preview is a mirror, so there it
+  looks the other way round. Sit the other way and you flip `SEAT`.
 - Fill the frame with the two of you, eyes at the top third. In the corner
   the film crops to whoever is speaking (each half of the frame), so each of
   you should be roughly centred in your half.
@@ -34,8 +34,9 @@ the *system* input, so make that the same microphone.
   subtitles wrong. If the prompter stalls, press **→** at the end of the line.
   **Esc** stops, **R** throws the take away.
 - **Pace.** About 140 words a minute. Keep the handoffs short. The REC clock
-  should read about 2:45 or less at "Thank you". Over 2:55 is too long, so
-  record it again a little faster.
+  should read about 2:45 or less at "Thank you" (the 2026-11-04 read of the
+  previous 278 words took 2:03). Over 2:55 is too long, so record it again a
+  little faster.
 
 When the take stops, the page measures it and prints a render command. Use
 this one instead (1080p, small file, AAC):
@@ -53,7 +54,8 @@ pnpm exec remotion render src/index.ts EIC out/REBASE_EIC_Video.mp4 --props=take
 | firecms | Francesco | Together we created FireCMS, an open-source CMS used in over ten thousand projects. |
 | health | Marian | Between us, we've built the technology behind a certified medical device, and a healthcare platform serving a hundred million patients. |
 | missing | Francesco | Today we're building something Europe is missing: its own Supabase or Firebase. |
-| leak | Francesco | Every app needs a backend, and most of them leak the same way. |
+| baas | Francesco | A backend-as-a-service is everything behind an app: the database, APIs, logins and file storage, ready to use, so teams build the product, not the plumbing. |
+| leak | Francesco | And most backends leak the same way. |
 | paths | Francesco | Access rules live in application code, so cron jobs, scripts, dashboards and AI agents go straight around them. |
 | forgotten | Francesco | One forgotten check exposes every customer's data. And the leading platforms are American. |
 | schema | Marian | With Rebase, you describe your data in one small schema file. |
@@ -77,6 +79,7 @@ pnpm exec remotion render src/index.ts EIC out/REBASE_EIC_Video.mp4 --props=take
 |-------|---------|
 | intro, marian | both of you, large; a name tag under each |
 | firecms – missing | both of you on the left; FireCMS 10,000+, MedicalMotion, 100M+ patients on the right |
+| baas | your app on top of one backend-as-a-service block: database, APIs, logins, file storage, admin |
 | leak – forgotten | five callers and one database: only the API passes the checks in app code, the rest go around |
 | forgotten (end) | Supabase and Firebase, US-based; Europe, no equivalent |
 | schema, generate | the collection file, the parts it generates, the admin panel running |
@@ -90,5 +93,5 @@ pnpm exec remotion render src/index.ts EIC out/REBASE_EIC_Video.mp4 --props=take
 | eic – thanks | both of you, large |
 | end | the mark, rebase.pro, FireCMS S.L. · Madrid, Spain |
 
-From "Every app needs a backend" to "bootstrapped", the camera sits in the
+From "A backend-as-a-service is" to "bootstrapped", the camera sits in the
 corner, cropped to whoever is speaking, with their name on it.

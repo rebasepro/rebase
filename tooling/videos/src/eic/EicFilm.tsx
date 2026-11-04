@@ -18,6 +18,7 @@ import {
     Scenes,
     SeriesContext,
     useCue,
+    useBodyFor,
     useSeries,
     Window,
     type Box,
@@ -52,7 +53,7 @@ type Speaker = "francesco" | "marian" | "both";
 /** Where each of you sits in the RECORDED picture, as the viewer sees it.
  *  The live page's preview is a mirror, so there it looks the other way
  *  round. If the take has you swapped, flip this and render again. */
-const SEAT: Record<"francesco" | "marian", "left" | "right"> = { francesco: "left", marian: "right" };
+const SEAT: Record<"francesco" | "marian", "left" | "right"> = { francesco: "right", marian: "left" };
 
 const PEOPLE = {
     francesco: { name: "Francesco Gatti", role: "Co-founder & CEO, Rebase" },
@@ -65,7 +66,8 @@ const SPOKEN: [id: string, speaker: Speaker, text: string][] = [
     ["firecms", "francesco", "Together we created FireCMS, an open-source CMS used in over ten thousand projects."],
     ["health", "marian", "Between us, we've built the technology behind a certified medical device, and a healthcare platform serving a hundred million patients."],
     ["missing", "francesco", "Today we're building something Europe is missing: its own Supabase or Firebase."],
-    ["leak", "francesco", "Every app needs a backend, and most of them leak the same way."],
+    ["baas", "francesco", "A backend-as-a-service is everything behind an app: the database, APIs, logins and file storage, ready to use, so teams build the product, not the plumbing."],
+    ["leak", "francesco", "And most backends leak the same way."],
     ["paths", "francesco", "Access rules live in application code, so cron jobs, scripts, dashboards and AI agents go straight around them."],
     ["forgotten", "francesco", "One forgotten check exposes every customer's data. And the leading platforms are American."],
     ["schema", "marian", "With Rebase, you describe your data in one small schema file."],
@@ -186,7 +188,84 @@ const Team: React.FC = () => {
     );
 };
 
-/* ── 2 · paths to the data: the problem, then the fix ───────────────── */
+/* ── 2 · what a backend-as-a-service is ─────────────────────────────── */
+
+const BAAS_HEADLINE = "Backend-as-a-service: everything behind an app.";
+
+/** The app a team builds on top; under it, one block with the parts every
+ *  app needs, there before anyone writes them. */
+const Baas: React.FC = () => {
+    const frame = useCurrentFrame();
+    const { x, y } = useBodyFor(BAAS_HEADLINE);
+    const app = useAt("baas", "app", -4);
+    const block = useAt("baas", "database", -6);
+    const parts = [
+        { name: "Database", at: useAt("baas", "database") },
+        { name: "APIs", at: useAt("baas", "APIs") },
+        { name: "Logins", at: useAt("baas", "logins") },
+        { name: "File storage", at: useAt("baas", "file") },
+        { name: "Admin", at: useAt("baas", "ready", -4) },
+    ];
+    const ready = useAt("baas", "ready");
+    const product = useAt("baas", "product");
+    const W = 1380;
+    const link = ramp(frame, block, 12, ENTER);
+    return (
+        <>
+            <Headline text={BAAS_HEADLINE} accent={ACCENT} mark={["everything"]} />
+            <At x={x} y={y} w={W}>
+                <Card at={app} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "20px 30px" }}>
+                    <div>
+                        <Eyebrow>What your team builds</Eyebrow>
+                        <Big size={40}>Your app</Big>
+                    </div>
+                    <Chip at={product} color={SAFE}>
+                        the product
+                    </Chip>
+                </Card>
+                <div style={{ height: 44, display: "flex", justifyContent: "center" }}>
+                    <div style={{ width: 2, height: 44 * link, background: INK.rule }} />
+                </div>
+                <Card at={block} style={{ border: `1px solid ${ACCENT}`, padding: "22px 30px 28px" }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                        <Eyebrow color={ACCENT}>Backend-as-a-service</Eyebrow>
+                        <Chip at={ready} color={ACCENT}>
+                            ready to use
+                        </Chip>
+                    </div>
+                    <div style={{ display: "flex", gap: 16, marginTop: 18 }}>
+                        {parts.map((p) => {
+                            const o = ramp(frame, p.at, 12, ENTER);
+                            return (
+                                <div
+                                    key={p.name}
+                                    style={{
+                                        flex: 1,
+                                        padding: "22px 18px",
+                                        borderRadius: 12,
+                                        background: GROUND.base,
+                                        border: `1px solid ${SURFACE.hairline}`,
+                                        fontFamily: FONT.display,
+                                        fontWeight: 600,
+                                        fontSize: 32,
+                                        color: INK.high,
+                                        textAlign: "center",
+                                        opacity: o,
+                                        transform: o < 1 ? `translateY(${(1 - o) * 10}px)` : undefined,
+                                    }}
+                                >
+                                    {p.name}
+                                </div>
+                            );
+                        })}
+                    </div>
+                </Card>
+            </At>
+        </>
+    );
+};
+
+/* ── 3 · paths to the data: the problem, then the fix ───────────────── */
 
 const ROW_Y = 318;
 const ROW_H = 68;
@@ -425,7 +504,7 @@ const American: React.FC = () => (
     </>
 );
 
-/* ── 3 · the solution ───────────────────────────────────────────────── */
+/* ── 4 · the solution ───────────────────────────────────────────────── */
 
 const ORDERS = `const ordersCollection = defineCollection({
     name: "Orders",
@@ -582,7 +661,7 @@ const Agents: React.FC = () => {
     );
 };
 
-/* ── 4 · proof ──────────────────────────────────────────────────────── */
+/* ── 5 · proof ──────────────────────────────────────────────────────── */
 
 const Sovereign: React.FC = () => {
     const open = useAt("own", "open", -2);
@@ -653,7 +732,7 @@ const Production: React.FC = () => {
     );
 };
 
-/* ── 5 · market and ask ─────────────────────────────────────────────── */
+/* ── 6 · market and ask ─────────────────────────────────────────────── */
 
 const Market: React.FC = () => {
     const frame = useCurrentFrame();
@@ -754,10 +833,11 @@ export const EIC: FilmSpec = checkFilm({
     title: "EIC Accelerator",
     accent: ACCENT,
     script: EIC_SCRIPT,
-    toCorner: { line: "leak", plus: -4 },
+    toCorner: { line: "baas", plus: -4 },
     close: { line: "eic", plus: -2 },
     scenes: [
         { id: "team", at: { line: "firecms", plus: 2 }, render: Team, roll: 0.62 },
+        { id: "baas", at: { line: "baas", plus: 2 }, render: Baas, roll: 0.42 },
         { id: "leak", at: { line: "leak", plus: 2 }, render: Leak, roll: 0.2 },
         { id: "american", at: { line: "forgotten", word: "platforms", plus: -8 }, render: American, roll: 0.74 },
         { id: "schema", at: { line: "schema", plus: 2 }, render: Schema, roll: 0.34 },
