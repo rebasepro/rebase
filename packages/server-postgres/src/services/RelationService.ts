@@ -3,7 +3,7 @@ import { AnyPgColumn, PgTable } from "drizzle-orm/pg-core";
 import { DrizzleClient } from "../interfaces";
 import { CollectionConfig, FilterValues, OrderByTuple, ResolvedRelation, ResolvedManyToMany, ResolvedHasMany, ResolvedHasOne } from "@rebasepro/types";
 import { getTableName, getJunctionConfigForRelation, resolveCollectionRelations, findRelation, fieldKeyForColumn } from "@rebasepro/common";
-import { hasForeignKeyOnTarget, isManyToMany, type ResolvedVia } from "@rebasepro/types";
+import { hasForeignKeyOnTarget, isManyToMany, joinConditions, type JoinStep, type ResolvedVia } from "@rebasepro/types";
 import { DrizzleConditionBuilder, joinColumn } from "../utils/drizzle-conditions";
 import {
     getCollectionByPath,
@@ -86,26 +86,34 @@ export function applyDynamicJoin<T>(query: T, joinTable: PgTable, condition: SQL
  * `on.from`/`on.to` are a column or a tuple, and a tuple is how a step joins on
  * a composite key. Comparing the first pair alone joined each row to every row
  * sharing that column — every locale of a translation, not the one addressed.
+ *
+ * A step listing several conditions joins on any one of them, OR-ed: a row
+ * that meets two of them is still one row of an inner join, so a link held in
+ * either of two columns is read once either way.
  */
 export function joinStepCondition(
     currentTable: PgTable,
     joinTable: PgTable,
-    step: { on: { from: string | string[]; to: string | string[] } }
+    step: Pick<JoinStep, "on">
 ): { condition: SQL } | { missing: string } {
-    const from = Array.isArray(step.on.from) ? step.on.from : [step.on.from];
-    const to = Array.isArray(step.on.to) ? step.on.to : [step.on.to];
-    const pairs: SQL[] = [];
-    for (let i = 0; i < Math.max(from.length, to.length); i++) {
-        const fromColumn = from[i] ?? "(none)";
-        const toColumn = to[i] ?? "(none)";
-        // By SQL name or property key: a generated table keys `order_id` as
-        // `orderId`, and a step names the column. See `joinColumn`.
-        const fromCol = joinColumn(currentTable, fromColumn);
-        const toCol = joinColumn(joinTable, toColumn);
-        if (!fromCol || !toCol) return { missing: `${fromColumn} -> ${toColumn}` };
-        pairs.push(eq(fromCol, toCol));
+    const alternatives: SQL[] = [];
+    for (const on of joinConditions(step)) {
+        const from = Array.isArray(on.from) ? on.from : [on.from];
+        const to = Array.isArray(on.to) ? on.to : [on.to];
+        const pairs: SQL[] = [];
+        for (let i = 0; i < Math.max(from.length, to.length); i++) {
+            const fromColumn = from[i] ?? "(none)";
+            const toColumn = to[i] ?? "(none)";
+            // By SQL name or property key: a generated table keys `order_id` as
+            // `orderId`, and a step names the column. See `joinColumn`.
+            const fromCol = joinColumn(currentTable, fromColumn);
+            const toCol = joinColumn(joinTable, toColumn);
+            if (!fromCol || !toCol) return { missing: `${fromColumn} -> ${toColumn}` };
+            pairs.push(eq(fromCol, toCol));
+        }
+        alternatives.push(pairs.length === 1 ? pairs[0] : and(...pairs)!);
     }
-    return { condition: pairs.length === 1 ? pairs[0] : and(...pairs)! };
+    return { condition: alternatives.length === 1 ? alternatives[0] : or(...alternatives)! };
 }
 
 /**

@@ -1,5 +1,5 @@
 ---
-sourceHash: 5902e196f7801815
+sourceHash: 64e5ab958b00ecd9
 title: Relações
 sidebar_label: Relações
 description: Defina relações SQL um-para-um, um-para-muitos e muitos-para-muitos entre coleções com chaves estrangeiras, tabelas de junção e junções multi-salto.
@@ -319,6 +319,15 @@ joinPath: [
 ]
 ```
 
+### Corresponder a qualquer uma de duas colunas
+
+Uma lista em `on` une uma linha que atende a **qualquer uma** das condições: uma amizade guardada
+uma única vez, com cada pessoa em `a` ou em `b`. Uma cadeia assim é **somente leitura**.
+
+```typescript
+joinPath: [{ table: "friendships", on: [{ from: "id", to: "a" }, { from: "id", to: "b" }] }]
+```
+
 ## Regras de Cascata
 
 Controle o que acontece quando entidades relacionadas são atualizadas ou excluídas:
@@ -577,7 +586,7 @@ interface ViaRelation extends RelationBase {
 O que você escreve acima é a forma de *autoria*. Internamente o Rebase trabalha
 com `ResolvedRelation`: o mesmo vínculo com todos os padrões preenchidos e nada
 opcional, mais `cardinality`, `targetSlug` e duas flags — `writable` (falsa
-apenas para um `via` de vários saltos) e `shared` (verdadeira quando as linhas de destino pertencem
+apenas para um `via` de vários saltos ou com um passo que corresponde a qualquer uma de várias condições) e `shared` (verdadeira quando as linhas de destino pertencem
 também a outros pais, de modo que remover desvincula em vez de excluir).
 
 `sourceKey` é a única exceção a "nada opcional": o seu padrão é a chave primária

@@ -1,7 +1,7 @@
 import { and, eq, inArray, notInArray, sql } from "drizzle-orm";
 import { AnyPgColumn } from "drizzle-orm/pg-core";
 import { CollectionConfig, JUNCTION_PIVOT_KEY, Properties, Property, ResolvedManyToMany, ResolvedRelation, ResolvedVia } from "@rebasepro/types";
-import { hasForeignKeyOnTarget, isManyToMany } from "@rebasepro/types";
+import { hasForeignKeyOnTarget, isManyToMany, soleJoinCondition } from "@rebasepro/types";
 import { getTableName, resolveCollectionRelations, findRelation, fieldKeyForColumn } from "@rebasepro/common";
 import { ApiError, logger } from "@rebasepro/server";
 import { DrizzleClient } from "../interfaces";
@@ -799,8 +799,8 @@ export class RelationWriteService {
         const parentTableName = getTableName(parentCollection);
         const joinPath = relation.joinPath;
         let index = joinPath.length - 1;
-        const targetFKColName = DrizzleConditionBuilder.getColumnNamesFromColumns(joinPath[index].on.to)[0];
-        let currentFrom = joinPath[index].on.from;
+        const targetFKColName = DrizzleConditionBuilder.getColumnNamesFromColumns(soleJoinCondition(joinPath[index]).to)[0];
+        let currentFrom = soleJoinCondition(joinPath[index]).from;
 
         // Back along the path to the step whose `from` is on the parent's
         // table. A `table.column` spelling names that table; a bare column —
@@ -818,7 +818,8 @@ export class RelationWriteService {
             }
             const prevIndex = qualifiedTable
                 ? joinPath.findIndex((s) => {
-                    const to = Array.isArray(s.on.to) ? s.on.to[0] : s.on.to;
+                    const on = soleJoinCondition(s);
+                    const to = Array.isArray(on.to) ? on.to[0] : on.to;
                     return to === currentFrom;
                 })
                 : index - 1;
@@ -826,7 +827,7 @@ export class RelationWriteService {
                 throw new Error(`Could not resolve parent source column for joinPath relation '${relation.relationName}'`);
             }
             index = prevIndex;
-            currentFrom = joinPath[index].on.from;
+            currentFrom = soleJoinCondition(joinPath[index]).from;
         }
         const parentSourceColName = DrizzleConditionBuilder.getColumnNamesFromColumns(currentFrom)[0];
         return { targetFKColName,

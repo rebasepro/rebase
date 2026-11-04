@@ -1,5 +1,5 @@
 ---
-sourceHash: 5902e196f7801815
+sourceHash: 64e5ab958b00ecd9
 title: Relaciones
 sidebar_label: Relaciones
 description: Define relaciones SQL uno a uno, uno a muchos y muchos a muchos entre colecciones con claves foráneas, tablas de unión y uniones multi-salto.
@@ -324,6 +324,15 @@ joinPath: [
 ]
 ```
 
+### Coincidir con cualquiera de dos columnas
+
+Una lista en `on` une una fila que cumple **cualquiera** de las condiciones: una amistad guardada
+una sola vez, con cada persona en `a` o en `b`. Una cadena así es de **solo lectura**.
+
+```typescript
+joinPath: [{ table: "friendships", on: [{ from: "id", to: "a" }, { from: "id", to: "b" }] }]
+```
+
 ## Reglas de Cascada
 
 Controla qué sucede cuando las entidades relacionadas son actualizadas o eliminadas:
@@ -584,7 +593,7 @@ interface ViaRelation extends RelationBase {
 Lo que escribes arriba es la forma de *autoría*. Internamente Rebase trabaja con
 `ResolvedRelation`: el mismo enlace con todos los valores por defecto rellenos y
 nada opcional, más `cardinality`, `targetSlug` y dos banderas — `writable`
-(falsa solo para un `via` de varios saltos) y `shared` (cierta cuando las filas destino pertenecen
+(falsa solo para un `via` de varios saltos o con un paso que coincide con cualquiera de varias condiciones) y `shared` (cierta cuando las filas destino pertenecen
 también a otros padres, de modo que quitar desenlaza en vez de borrar).
 
 `sourceKey` es la única excepción a «nada opcional»: su valor por defecto es la

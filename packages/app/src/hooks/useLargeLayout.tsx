@@ -55,8 +55,15 @@ function getServerSnapshot(): boolean {
 export const useLargeLayout = (): boolean =>
     useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
 
+/**
+ * Tailwind's own test for the breakpoint, `min-width: <n>px`, so the layout
+ * this returns and the `lg:` classes styling it switch at the same pixel. It
+ * used to add one: at exactly 1024px the sheet took its inset `lg:` frame while
+ * this still said "small", and the phone's floating menu button sat on top of
+ * the collection toolbar.
+ */
 function checkLargeLayout(breakpoint: "xs" | "sm" | "md" | "lg" | "xl" | "2xl" | "3xl" = "lg"): boolean {
     if (typeof window === "undefined" || typeof window.matchMedia !== "function")
         return false;
-    return window.matchMedia(`(min-width: ${breakpoints[breakpoint] + 1}px)`).matches;
+    return window.matchMedia(`(min-width: ${breakpoints[breakpoint]}px)`).matches;
 }

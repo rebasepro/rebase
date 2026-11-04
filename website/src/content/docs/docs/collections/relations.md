@@ -317,6 +317,14 @@ joinPath: [
 ]
 ```
 
+### Matching either of two columns
+
+A list in `on` joins a row meeting **any one** condition — a link kept in `a` or `b`. It is **read-only**.
+
+```typescript
+joinPath: [{ table: "friendships", on: [{ from: "id", to: "a" }, { from: "id", to: "b" }] }]
+```
+
 ## Cascade Rules
 
 Control what happens when related entities are updated or deleted:
@@ -573,7 +581,7 @@ interface ViaRelation extends RelationBase {
 What you write above is the *authoring* shape. Internally Rebase works with
 `ResolvedRelation`: the same link with every default filled in and nothing
 optional, plus `cardinality`, `targetSlug`, and two flags — `writable` (false
-only for a multi-hop `via`) and `shared` (true when the target rows belong to other parents
+only for a multi-hop `via` or one with a step matching any of several conditions) and `shared` (true when the target rows belong to other parents
 too, so a removal unlinks rather than deletes).
 
 `sourceKey` is the one exception to "nothing optional": its default is the

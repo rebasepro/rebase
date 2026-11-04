@@ -1,4 +1,4 @@
-import { isRelationalCollectionConfig, type Property, type Relation } from "@rebasepro/types";
+import { isRelationalCollectionConfig, joinConditions, type Property, type Relation } from "@rebasepro/types";
 import { generateForeignKeyName } from "@rebasepro/utils";
 import type { AdminCollection } from "@rebasepro/cms-types";
 import { getPrimaryKeys, isPropertyBuilder } from "@rebasepro/common";
@@ -82,9 +82,11 @@ function getForeignKeyColumns<M extends Record<string, unknown>>(collection: Adm
                 break;
             case "via": {
                 // Only the first hop starts on this collection's table.
-                const from = relation.joinPath?.[0]?.on?.from;
-                for (const column of Array.isArray(from) ? from : [from]) {
-                    if (column) keys.add(column);
+                const first = relation.joinPath?.[0];
+                for (const on of first?.on ? joinConditions(first) : []) {
+                    for (const column of Array.isArray(on.from) ? on.from : [on.from]) {
+                        if (column) keys.add(column);
+                    }
                 }
                 break;
             }

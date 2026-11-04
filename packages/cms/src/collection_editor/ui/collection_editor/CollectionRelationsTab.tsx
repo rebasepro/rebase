@@ -24,7 +24,7 @@ import {
     Typography
 } from "@rebasepro/ui";
 import { useFormex } from "@rebasepro/forms";
-import { Relation, RelationKind, JoinStep, OnAction } from "@rebasepro/types";
+import { Relation, RelationKind, JoinCondition, JoinStep, OnAction, joinConditions } from "@rebasepro/types";
 import { RELATION_KINDS, RELATION_KIND_ORDER } from "../../relation_kinds";
 import { useCollectionsConfigController } from "../../useCollectionsConfigController";
 import type { AdminPostgresCollection } from "@rebasepro/cms-types";
@@ -68,6 +68,11 @@ const EMPTY_STEP: JoinStep = { table: "",
 on: { from: "",
 to: "" } };
 
+/** A comma-separated column list as typed into a field, as the step stores it. */
+function columnsText(columns: string | string[]): string {
+    return typeof columns === "string" ? columns : columns.join(", ");
+}
+
 /**
  * Whether a draft is complete enough to be a relation of its kind.
  *
@@ -83,7 +88,7 @@ export function draftIsComplete(draft: RelationDraft): boolean {
     if (draft.kind === "via") {
         const steps = draft.joinPath ?? [];
         if (steps.length === 0) return false;
-        return steps.every(s => s.table && s.on?.from && s.on?.to);
+        return steps.every(s => s.table && s.on && joinConditions(s).every(on => on.from && on.to));
     }
     return true;
 }
@@ -372,18 +377,24 @@ cardinality: val as "one" | "many" }
                                             </Select>
 
                                             {(editingRelationState.joinPath ?? []).map((step, stepIndex) => {
-                                                const updateStep = (patch: Partial<JoinStep> & { from?: string; to?: string }) =>
+                                                const conditions = joinConditions(step);
+                                                // One condition is stored bare, as it always was; two or
+                                                // more as the list a step joins on any one of.
+                                                const setConditions = (next: JoinCondition[]) =>
                                                     setEditingRelationState(prev => {
                                                         if (!prev) return null;
                                                         const steps = [...(prev.joinPath ?? [])];
-                                                        const current = steps[stepIndex];
-                                                        steps[stepIndex] = {
-                                                            table: patch.table ?? current.table,
-                                                            on: {
-                                                                from: patch.from ?? current.on.from,
-                                                                to: patch.to ?? current.on.to
-                                                            }
-                                                        };
+                                                        steps[stepIndex] = { ...steps[stepIndex],
+on: next.length === 1 ? next[0] : next };
+                                                        return { ...prev,
+joinPath: steps };
+                                                    });
+                                                const updateTable = (table: string) =>
+                                                    setEditingRelationState(prev => {
+                                                        if (!prev) return null;
+                                                        const steps = [...(prev.joinPath ?? [])];
+                                                        steps[stepIndex] = { ...steps[stepIndex],
+table };
                                                         return { ...prev,
 joinPath: steps };
                                                     });
@@ -408,24 +419,53 @@ joinPath: (prev.joinPath ?? []).filter((_, i) => i !== stepIndex) }
                                                             label="Join into table"
                                                             placeholder="e.g. user_roles"
                                                             value={step.table}
-                                                            onChange={(e) => updateStep({ table: e.target.value })}
+                                                            onChange={(e) => updateTable(e.target.value)}
                                                         />
-                                                        <div className="flex gap-4">
-                                                            <TextField
-                                                                className="flex-1"
-                                                                label="From column"
-                                                                placeholder={stepIndex === 0 ? "column on this table" : "column on the previous table"}
-                                                                value={typeof step.on.from === "string" ? step.on.from : step.on.from.join(", ")}
-                                                                onChange={(e) => updateStep({ from: e.target.value })}
-                                                            />
-                                                            <TextField
-                                                                className="flex-1"
-                                                                label="To column"
-                                                                placeholder={`column on ${step.table || "that table"}`}
-                                                                value={typeof step.on.to === "string" ? step.on.to : step.on.to.join(", ")}
-                                                                onChange={(e) => updateStep({ to: e.target.value })}
-                                                            />
-                                                        </div>
+                                                        {conditions.map((on, conditionIndex) => (
+                                                            <div key={conditionIndex} className="flex items-center gap-4">
+                                                                {conditions.length > 1 && (
+                                                                    <Typography variant="caption" className="text-text-secondary w-6 shrink-0">
+                                                                        {conditionIndex === 0 ? "On" : "Or"}
+                                                                    </Typography>
+                                                                )}
+                                                                <TextField
+                                                                    className="flex-1"
+                                                                    label="From column"
+                                                                    placeholder={stepIndex === 0 ? "column on this table" : "column on the previous table"}
+                                                                    value={columnsText(on.from)}
+                                                                    onChange={(e) => setConditions(conditions.map((c, i) => i === conditionIndex ? { ...c,
+from: e.target.value } : c))}
+                                                                />
+                                                                <TextField
+                                                                    className="flex-1"
+                                                                    label="To column"
+                                                                    placeholder={`column on ${step.table || "that table"}`}
+                                                                    value={columnsText(on.to)}
+                                                                    onChange={(e) => setConditions(conditions.map((c, i) => i === conditionIndex ? { ...c,
+to: e.target.value } : c))}
+                                                                />
+                                                                {conditions.length > 1 && (
+                                                                    <IconButton
+                                                                        size="small"
+                                                                        aria-label="Remove this alternative"
+                                                                        onClick={() => setConditions(conditions.filter((_, i) => i !== conditionIndex))}
+                                                                    >
+                                                                        <Trash2Icon size={iconSize.smallest}/>
+                                                                    </IconButton>
+                                                                )}
+                                                            </div>
+                                                        ))}
+                                                        {/* A link kept in either of two columns: a row
+                                                            that meets any one condition joins. Read-only. */}
+                                                        <Button
+                                                            variant="text"
+                                                            size="small"
+                                                            className="self-start"
+                                                            onClick={() => setConditions([...conditions, { from: "",
+to: "" }])}
+                                                        >
+                                                            Or join on another column
+                                                        </Button>
                                                     </div>
                                                 );
                                             })}
@@ -435,8 +475,9 @@ joinPath: (prev.joinPath ?? []).filter((_, i) => i !== stepIndex) }
                                                 size="small"
                                                 onClick={() => setEditingRelationState(prev => prev
                                                     ? { ...prev,
-joinPath: [...(prev.joinPath ?? []), { ...EMPTY_STEP,
-on: { ...EMPTY_STEP.on } }] }
+joinPath: [...(prev.joinPath ?? []), { table: EMPTY_STEP.table,
+on: { from: "",
+to: "" } }] }
                                                     : null)}
                                             >
                                                 Add step

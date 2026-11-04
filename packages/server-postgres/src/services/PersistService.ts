@@ -306,7 +306,8 @@ export class PersistService {
             case "via":
                 // The link lives in an intermediate table, not in a column on
                 // the target — nothing to stamp.
-                return relation.joinPath.length === 1
+                // A step with alternatives names no one column either.
+                return relation.joinPath.length === 1 && !Array.isArray(relation.joinPath[0].on)
                     ? fieldKeyForColumn(
                         hop.targetCollection,
                         DrizzleConditionBuilder.getColumnNamesFromColumns(relation.joinPath[0].on.to)[0]

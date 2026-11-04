@@ -364,7 +364,7 @@ interface MfaChallengeInfo { attempts, createdAt, factorId, id, ipAddress, verif
 interface MfaFactor { createdAt, factorType, friendlyName, id, lastUsedCounter, uid, updatedAt, verified }
 interface MfaRepository { claimMfaFactorCounter, createMfaChallenge, createMfaFactor, createRecoveryCodes, deleteAllRecoveryCodes, deleteMfaFactor, getMfaChallengeById, getMfaFactorById, getMfaFactors, getUnusedRecoveryCodeCount, hasVerifiedMfaFactors, recordMfaChallengeAttempt, updateMfaFactorSecret, useRecoveryCode, verifyMfaChallenge, verifyMfaFactor }
 interface NestedWriteHop { parentCollection, relation, targetCollection }
-interface OAuthProvider { id, schema, verify }
+interface OAuthProvider { id, publicClientId, schema, verify }
 interface OAuthProviderProfile { displayName, email, emailVerified, photoUrl, providerId }
 interface OutboundUrlGuardOptions { allowPrivateNetworks, lookup }
 interface PaginatedGuestsResult { guests, total }
@@ -616,6 +616,7 @@ function isToMany
 function isUnsupported
 function isValidAppHost
 function isValidEngine
+function joinConditions
 function knownScopes
 function nestAdminCollectionKeys
 function nestAdminKeysOf
@@ -657,6 +658,7 @@ function serializeCollections
 function setQueueRuntime
 function setTopicRuntime
 function simulationHeaders
+function soleJoinCondition
 function sortKeyToString
 function storageEnvSuffix
 function storageObjectPath
@@ -691,14 +693,14 @@ interface AppAddress { host, path }
 interface ArrayProperty { access, callbacks, columnName, columnType, conditions, databaseDefault, defaultValue, description, dynamicProps, excludeFromApi, metadata, name, of, oneOf, propertyConfig, type, validation }
 interface ArrayPropertyValidationSchema { max, min, required, requiredMessage, unique, uniqueInArray }
 interface AuthAdapter { createAdminRoutes, createAuthRoutes, describeUserCreationContract, destroy, finalizeUserCreation, finalizeUserDeletions, getCapabilities, id, initialize, prepareUserCreation, prepareUserDeletions, prepareUserUpdates, resolveUser, serviceKey, transformAuthResponse, userManagement, verifyRequest, verifyToken }
-interface AuthAdapterCapabilities { adminPasswordReset, anonymousLogin, emailOtp, emailPasswordLogin, emailVerification, enabledProviders, externalLoginUrl, hasBuiltInAuthRoutes, magicLink, needsSetup, passwordReset, profileUpdate, registrationEnabled, sessionManagement }
+interface AuthAdapterCapabilities { adminPasswordReset, anonymousLogin, emailOtp, emailPasswordLogin, emailVerification, enabledProviders, externalLoginUrl, hasBuiltInAuthRoutes, magicLink, needsSetup, passwordReset, profileUpdate, providerClientIds, registrationEnabled, sessionManagement }
 interface AuthClaimPolicyOperand { kind, name }
-interface AuthClient { canRestoreSession, getSession, getSessions, getUser, isInitialized, onAuthStateChange, refreshSession, revokeAllSessions, revokeSession, signOut }
+interface AuthClient { canRestoreSession, getAccessToken, getSession, getSessions, getUser, isInitialized, onAuthStateChange, refreshSession, revokeAllSessions, revokeSession, signOut }
 interface AuthCollectionConfig { actions, enabled, onCreateUser, onResetPassword, personalKeys, roles, scopes }
 interface AuthCollectionContext { appName, emailConfigured, hashPassword, resetPasswordUrl, sendEmail }
 interface AuthCollectionCreateResult { invitationSent, temporaryPassword, values }
 interface AuthCollectionResetResult { invitationSent, temporaryPassword }
-interface AuthConfigDocument { adminPasswordReset, anonymousLogin, emailOtp, emailPasswordLogin, emailVerification, enabledProviders, externalLoginUrl, hasBuiltInAuthRoutes, magicLink, needsSetup, passwordReset, profileUpdate, registrationEnabled, sessionManagement, storage }
+interface AuthConfigDocument { adminPasswordReset, anonymousLogin, emailOtp, emailPasswordLogin, emailVerification, enabledProviders, externalLoginUrl, hasBuiltInAuthRoutes, magicLink, needsSetup, passwordReset, profileUpdate, providerClientIds, registrationEnabled, sessionManagement, storage }
 interface AuthCreateUserData { displayName, email, emailVerified, metadata, password, photoUrl }
 interface AuthResponsePayload { tokens, user }
 interface AuthRolesPolicyOperand { kind }
@@ -839,6 +841,7 @@ interface IncludeOptions { count, fields, include, limit, logical, orderBy, wher
 interface IncludeOptionsFor { count, fields, include, limit, logical, orderBy, where }
 interface IndexKey { direction, nulls, prop }
 interface InitializedDriver { collectionRegistry, collections, connection, driver, internals, realtimeProvider, unprotectedTables }
+interface JoinCondition { from, to }
 interface JoinStep { on, table }
 interface LazyComponentRef { load }
 interface ListLimitBounds { defaultLimit, maxLimit, vectorDefaultLimit }
@@ -1173,6 +1176,7 @@ class RebaseClientError { code, details, requestId, retryAfterSeconds, status }
 class RebasePaginationError { code }
 class RebaseRealtimeChannel { broadcast, enableHistory, history, join, leave, name, onBroadcast, onBroadcast, onError, onPresence, sequence, track, untrack }
 class RebaseWebSocketClient { authenticate, checkUniqueField, count, createBranch, delete, deleteBranch, disconnect, ensureConnected, executeSql, fetchApplicationRoles, fetchAvailableDatabases, fetchAvailableRoles, fetchCollection, fetchCurrentDatabase, fetchOne, fetchTableMetadata, fetchUnmappedTables, getAuthToken, hasServerOptIn, hasSocket, listBranches, listenCollection, listenOne, on, onChannelMessage, onConnectionLost, onReconnect, onStateChange, onUnauthorized, reauthenticate, runSqlScript, save, sendMessage, setAffinity, setAuthTokenGetter, socketClientId, state }
+const APPLE_JS_SDK_URL
 const STORAGE_REFERENCE_SCHEME
 function and { conditions, type }
 function cond { column, operator, value }
@@ -1185,6 +1189,8 @@ function isStorageReference
 function not { conditions, type }
 function or { conditions, type }
 function parseStorageReference
+function preloadAppleSignIn
+function requestAppleAuthorization
 function resolveStorageReferences
 function storageReference
 function storageReferencesForDownloadUrls
@@ -1196,6 +1202,9 @@ interface AggregateParams { groupBy, limit, logical, offset, orderBy, searchStri
 interface AggregateResult { meta }
 interface ApiKeyMasked { created_at, created_by, expires_at, id, key_prefix, kind, last_used_at, name, owner_uid, rate_limit, revoked_at, roles, scopes, updated_at }
 interface ApiKeyWithSecret { created_at, created_by, expires_at, id, key, key_prefix, kind, last_used_at, name, owner_uid, rate_limit, revoked_at, roles, scopes, updated_at }
+interface AppleAuthorization { code, redirectUri, user }
+interface AppleAuthorizationRequest { clientId, redirectUri }
+interface AppleSignInPayload { bundleId, code, redirectUri, user }
 interface AuthStorage { getItem, removeItem, setItem }
 interface AuthTokens { accessToken, accessTokenExpiresAt, refreshToken }
 interface BackupStream { name, size, stream }
