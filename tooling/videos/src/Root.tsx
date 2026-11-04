@@ -5,6 +5,7 @@ import { loadFonts } from "./fonts";
 import { RebaseIntro, RebaseIntroVO, STANDALONE } from "./Intro";
 import { deskDuration, RebaseDesk, RebaseDeskVO, type DeskProps } from "./desk/DeskFilm";
 import { SERIES_FILMS } from "./series";
+import { EicFilm, eicDuration } from "./eic/EicFilm";
 import { DeskPlane } from "./desk/DeskPlane";
 import { INTRO_DURATION, SCENES } from "./film";
 import { OVERLAP } from "./transitions";
@@ -78,6 +79,18 @@ export const RemotionRoot: React.FC = () => (
             <Still key={variant} id={`LaunchThumb-${variant}`} component={LaunchThumbnail} defaultProps={{ variant }} width={WIDTH} height={HEIGHT} />
         ))}
 
+        {/* THE EIC FILM — the EIC Accelerator pitch, Francesco and Marian on
+            camera. Its length is the take's: --props=takes/<id>/props.json. */}
+        <Composition
+            id="EIC"
+            component={EicFilm}
+            defaultProps={{ timing: null, take: null }}
+            calculateMetadata={({ props }) => ({ durationInFrames: eicDuration(props) })}
+            durationInFrames={eicDuration({})}
+            fps={FPS}
+            width={WIDTH}
+            height={HEIGHT}
+        />
         {/* THE SERIES — ten short films, one benefit each, wide and tall from
             the same take. See src/series/kit.tsx. */}
         {SERIES_FILMS.map(({ spec, component, duration }) => (

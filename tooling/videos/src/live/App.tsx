@@ -510,6 +510,7 @@ const Prompter: React.FC<{ position: { line: number; word: number }; timing: Tim
             >
                 {SCRIPT.map((line, k) => (
                     <p key={line.id} style={{ margin: "0 0 0.45em" }}>
+                        {line.speaker && line.speaker !== SCRIPT[k - 1]?.speaker && <Speaker name={line.speaker} />}
                         {line.words.map((w, i) => {
                             const said = !idle && (k < current || (k === current && i < spoken));
                             const next = !idle && k === current && i === spoken;
@@ -541,6 +542,29 @@ const Prompter: React.FC<{ position: { line: number; word: number }; timing: Tim
         </div>
     );
 };
+
+/** Whose line it is, inline before its first word, wherever the voice
+ *  changes: in the row being read, so the next voice sees it in time. */
+const SPEAKER_COLOR: Record<string, string> = { francesco: "#FFC600", marian: "#36CCD6", both: "#FF9A9E" };
+
+const Speaker: React.FC<{ name: string }> = ({ name }) => (
+    <span
+        style={{
+            fontFamily: "JetBrains Mono, monospace",
+            fontSize: "0.5em",
+            letterSpacing: "0.16em",
+            textTransform: "uppercase",
+            verticalAlign: "0.35em",
+            marginRight: "0.7em",
+            padding: "0.15em 0.5em",
+            borderRadius: 6,
+            color: "#090A0C",
+            background: SPEAKER_COLOR[name] ?? "#FFFFFF",
+        }}
+    >
+        {name}
+    </span>
+);
 
 const Meter: React.FC<{ level: number; threshold: number; speaking: boolean }> = ({ level, threshold, speaking }) => {
     const x = (db: number) => `${Math.max(0, Math.min(100, ((db + 80) / 80) * 100))}%`;
