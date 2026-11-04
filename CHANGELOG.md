@@ -10,6 +10,26 @@
   `NaN`, `0` included, and any non-empty string. The admin uses it where it
   read an id's truthiness, which took record `0` for a new one.
 
+#### CLI
+
+- **`rebase schema reconcile` relaxes and drops what boot will not.** Boot
+  only adds, so a property made optional kept its `NOT NULL`, and a removed
+  property left a column that could block every insert. The command plans
+  through the running backend, Rebase Cloud included. It relaxes `NOT NULL`
+  on optional properties, drops only the undeclared columns you name with
+  `--drop <collection>.<column>` (with the count of rows holding a value), and
+  applies once you confirm. The server runs only the plan whose digest you
+  confirmed. Boot's drift and orphan warnings now name it.
+
+#### MCP
+
+- **`list_documents` takes `fields`, and leaves binary values out unless
+  asked.** Each binary column comes back as its size. Name the column in
+  `fields`, or pass `includeBinary: true` (also on `get_document`), to get its
+  contents. A collection with an audio column returned about a megabyte for
+  `limit: 1`.
+
+
 ### Changed
 
 #### Admin (CMS & app)
@@ -230,6 +250,13 @@
 
 #### MCP
 
+- **The cloud read tools follow `rebase_project_use_cloud`.** These are
+  `rebase_cloud_logs`, `rebase_cloud_status`, `rebase_cloud_env_list` and
+  `rebase_cloud_deployments_list`. They now act on the selected project
+  (`--project`). Before, in a directory linked to nothing, they refused with
+  `no_project` right after a project had been selected. A deploy, an env change
+  and a rollback still act only on the linked project.
+
 - **The local-only gate reads the host a Postgres URL names in its query.**
   `postgres://…@localhost/app?host=db.prod.example.com` connects to production,
   and the gate let `rebase_db_push`, `rebase_db_migrate` and the branch tools
@@ -278,6 +305,11 @@
   database's schema on screen. **A branch's connection details** name its
   recorded database, and **the RLS editor reads quoted roles.**
 
+#### Storage
+
+- **An S3-compatible endpoint works without the SDK's default checksums.** A
+  custom `S3_ENDPOINT` now signs with `WHEN_REQUIRED` checksums, the AWS SDK's
+  behaviour before v3.729. GCS's S3 API does not implement the newer default.
 
 ## [0.27.0] - 2026-11-02
 
@@ -398,15 +430,6 @@
   `appleClientId` and `appleRedirectUri` on `LoginView` override the defaults.
 
 #### CLI
-
-- **`rebase schema reconcile` relaxes and drops what boot will not.** Boot
-  only adds, so a property made optional kept its `NOT NULL`, and a removed
-  property left a column that could block every insert. The command plans
-  through the running backend, Rebase Cloud included. It relaxes `NOT NULL`
-  on optional properties, drops only the undeclared columns you name with
-  `--drop <collection>.<column>` (with the count of rows holding a value), and
-  applies once you confirm. The server runs only the plan whose digest you
-  confirmed. Boot's drift and orphan warnings now name it.
 
 - **`rebase cloud metrics` shows realtime per instance**: each instance's sockets,
   channels, and the frames it sent to the channel bus or held back, in `--json`
