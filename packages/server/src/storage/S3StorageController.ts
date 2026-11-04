@@ -85,6 +85,16 @@ export class S3StorageController implements StorageController {
                 region: this.config.region || "us-east-1",
                 endpoint: this.config.endpoint,
                 forcePathStyle: this.config.forcePathStyle ?? !!this.config.endpoint, // Auto-enable for custom endpoints (MinIO)
+                // Since v3.729 the SDK computes a CRC32 for every request and
+                // asks for one back on every read (`WHEN_SUPPORTED`). That is
+                // AWS's own integrity protocol (`x-amz-checksum-*`, and
+                // `aws-chunked` trailers for streamed bodies), and S3-compatible
+                // stores implement it unevenly: GCS's interop API does not. A
+                // custom endpoint gets the SDK's behaviour from before that
+                // default, which every S3-compatible store supports.
+                ...(this.config.endpoint
+                    ? { requestChecksumCalculation: "WHEN_REQUIRED" as const, responseChecksumValidation: "WHEN_REQUIRED" as const }
+                    : {}),
                 credentials: {
                     accessKeyId: this.config.accessKeyId,
                     secretAccessKey: this.config.secretAccessKey

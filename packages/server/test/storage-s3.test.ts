@@ -71,6 +71,24 @@ describe("S3StorageController", () => {
             }));
         });
 
+        // GCS's S3 API does not implement the SDK's default checksum protocol,
+        // so a custom endpoint signs and reads the way every S3-compatible
+        // store accepts. AWS itself keeps the SDK's default.
+        it("turns the SDK's default checksums off for a custom endpoint only", async () => {
+            const gcs = new S3StorageController({ ...defaultConfig, endpoint: "https://storage.googleapis.com" });
+            mockSend.mockResolvedValue({});
+            await gcs.deleteObject("uploads/test.txt");
+            expect(S3Client).toHaveBeenLastCalledWith(expect.objectContaining({
+                requestChecksumCalculation: "WHEN_REQUIRED",
+                responseChecksumValidation: "WHEN_REQUIRED"
+            }));
+
+            await controller.deleteObject("uploads/test.txt");
+            const awsConfig = vi.mocked(S3Client).mock.calls.at(-1)?.[0];
+            expect(awsConfig).not.toHaveProperty("requestChecksumCalculation");
+            expect(awsConfig).not.toHaveProperty("responseChecksumValidation");
+        });
+
         it("should return 's3' as type", () => {
             expect(controller.getType()).toBe("s3");
         });
