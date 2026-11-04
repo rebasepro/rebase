@@ -107,6 +107,42 @@ export interface StorageSourceDefinition {
 
     /** Human-readable label for the UI (e.g. "Firebase Storage", "S3 Media"). */
     label?: string;
+
+    /**
+     * Delete, on a schedule, the files in this source that no row names.
+     *
+     * Absent, nothing is swept. See {@link OrphanSweepOptions}.
+     */
+    orphanSweep?: OrphanSweepOptions;
+}
+
+/**
+ * A scheduled sweep of a storage source's unreferenced files.
+ *
+ * Deleting a row leaves the files it named in the bucket, because a key is not
+ * owned by one row: another row, a version in row history, or app code holding
+ * the key in a plain string may still name it. So nothing is deleted with the
+ * row. The sweep is the same scan as `rebase storage orphans --delete`: every
+ * row of every collection and every history entry is read, a file still named
+ * anywhere is kept, a file newer than the grace period is kept, and each one is
+ * checked again right before it is deleted. A collection the scan cannot read
+ * keeps everything, that run.
+ *
+ * It runs as a cron job, `storage-orphan-sweep-<source>`, so it shows in the
+ * admin's cron list with its history, runs on one instance per slot, and can be
+ * triggered or paused like any other job.
+ *
+ * @group Models
+ */
+export interface OrphanSweepOptions {
+    /**
+     * How old an unreferenced file must be before it is deleted, in hours. At
+     * least 24, because an upload is written before the row that names it is
+     * saved. Defaults to 168 (a week).
+     */
+    olderThanHours?: number;
+    /** When to run, as a cron expression in UTC. Defaults to daily at 04:17. */
+    schedule?: string;
 }
 
 /**

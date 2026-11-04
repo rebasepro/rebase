@@ -30,6 +30,17 @@
   `limit: 1`.
 
 
+#### Storage
+
+- **A bucket can sweep away the files no row names, on a schedule.** Declare
+  `bucket("voice", { orphanSweep: { olderThanHours: 72 } })`, or
+  `orphanSweep: true` for the defaults (a week, daily at 04:17 UTC). The
+  backend schedules a cron job, `storage-orphan-sweep-<bucket>`, that runs the
+  scan behind `rebase storage orphans --delete`. It keeps any file a row or
+  history entry names, any file inside the grace period (at least 24 hours),
+  and every file when a collection can't be read. Deleting a row still leaves
+  its files until the sweep runs.
+
 ### Changed
 
 #### Admin (CMS & app)

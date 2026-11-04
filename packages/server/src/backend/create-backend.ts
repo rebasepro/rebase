@@ -123,6 +123,8 @@ import { createJwtService, DEFAULT_REFRESH_EXPIRES_IN, processJwtService, type J
 import { createJwksRoutes } from "../auth/jwks-routes";
 import { readRuntimeVersion } from "../boot/version-skew";
 import { createStorageMaintenanceRoutes } from "../storage/maintenance-routes";
+import { orphanSweepJobs } from "../storage/orphan-sweep";
+import type { LoadedCronJob } from "../cron/cron-loader";
 import {
     createOrphanScanService,
     STORAGE_ORPHANS_TASK,
@@ -2269,6 +2271,8 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
     let storageMaintenanceSurface: Hono<HonoEnv> | undefined;
     /** The orphan scan's background half, whenever storage is on: the job queue's `storage.orphans` handler. */
     let orphanScans: OrphanScanService | undefined;
+    /** The `orphanSweep` cron jobs the declared buckets ask for, scheduled with the app's crons. */
+    let storageSweepJobs: LoadedCronJob[] = [];
     /** Whether the storage group carries its own upload body limit, in place of the global one. */
     let storageCarriesUploadLimit = false;
 
@@ -2356,6 +2360,12 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
             jobs: () => jobQueue
         };
         orphanScans = createOrphanScanService(maintenanceSources);
+        // `bucket(…, { orphanSweep })`: the same scan, on a schedule, as cron
+        // jobs — so one instance runs each slot and the run history says what
+        // it deleted. Registered with the app's crons below.
+        const sweeps = orphanSweepJobs(declaredStorageSources, maintenanceSources);
+        for (const problem of sweeps.problems) logger.warn(`[storage] ${problem}`);
+        storageSweepJobs = sweeps.jobs;
         if (surfaces.admin) {
             const maintenanceRouter = new Hono<HonoEnv>();
             applyAdminGate(maintenanceRouter, "Storage maintenance", { read: "database:read", write: "database:write" });
@@ -3078,7 +3088,7 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
     // that could never succeed. The argument three paragraphs down — mounted
     // for the directory, not for the jobs in it, because an empty list is the
     // honest answer — just stopped one level too early.
-    if (surfaces.cron || ((config.cronsDir || config.crons) && ownership.cronScheduler)) {
+    if (surfaces.cron || ((config.cronsDir || config.crons || storageSweepJobs.length > 0) && ownership.cronScheduler)) {
         const { cronJobsFrom, readCronsDirectory, withHiddenPropertiesOf } = await import("../cron/cron-loader");
         const { CronScheduler } = await import("../cron/cron-scheduler");
         const { createCronRoutes } = await import("../cron/cron-routes");
@@ -3092,15 +3102,18 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
         loadFailures.push(...cronFailures);
         // Each run in this backend's scope, so a handler that imports `rebase`
         // gets this backend's client — the one `ctx.rebase` is.
-        const loadedCronJobs = cronJobsFrom(cronRecord).map(job => ({
-            ...job,
-            // The definition's hidden marks too — see `withHiddenPropertiesOf`.
-            definition: withHiddenPropertiesOf(job.definition, {
-                ...job.definition,
-                handler: (ctx: Parameters<typeof job.definition.handler>[0]) =>
-                    runInBackendScope(ownScope, () => job.definition.handler(ctx))
-            })
-        }));
+        const loadedCronJobs = [
+            ...cronJobsFrom(cronRecord).map(job => ({
+                ...job,
+                // The definition's hidden marks too — see `withHiddenPropertiesOf`.
+                definition: withHiddenPropertiesOf(job.definition, {
+                    ...job.definition,
+                    handler: (ctx: Parameters<typeof job.definition.handler>[0]) =>
+                        runInBackendScope(ownScope, () => job.definition.handler(ctx))
+                })
+            })),
+            ...storageSweepJobs
+        ];
 
         cronScheduler = new CronScheduler();
 

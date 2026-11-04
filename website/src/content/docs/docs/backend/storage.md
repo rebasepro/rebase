@@ -407,6 +407,34 @@ the GCS `GCS_PROJECT_ID` / `GCS_KEY_FILENAME` pair. The bucket name never does:
 it is what distinguishes one source from another. A per-bucket value still wins,
 so one source can move providers without breaking the rest.
 
+### Deleting files no row names, on a schedule
+
+Deleting a row leaves its files in the bucket. Nothing is deleted with the row:
+another row, a version in [history](/docs/backend/history/), or your own code
+holding the key in a plain string may still name the file. A bucket can ask for
+the clean-up that can see all of those instead:
+
+```ts
+export const voice = bucket("voice", { engine: "s3", orphanSweep: { olderThanHours: 72 } });
+export const media = bucket("media", { orphanSweep: true }); // a week, daily at 04:17 UTC
+```
+
+Each declared sweep is a cron job, `storage-orphan-sweep-<bucket>`
+(`storage-orphan-sweep-default` for the default bucket). It runs the scan behind
+`rebase storage orphans --delete`. That scan reads every row of every
+collection and every history entry, and it keeps:
+
+- a file that anything still names;
+- a file newer than `olderThanHours` (at least 24, a week by default);
+- every file, for that run, when a collection can't be read.
+
+It then checks each file again right before deleting it. Set `schedule` to a
+cron expression (UTC) to change when it runs. Being a cron job, it runs on one
+instance per slot. Its run history records how many files it deleted and kept,
+and it can be paused or run by hand from the admin's cron list. It needs a
+bucket this backend serves: a `transport: "direct"` bucket is refused at boot
+with a warning.
+
 ## Frontend Storage Sources
 
 The frontend learns the server's sources from `GET /api/storage/sources`, so a `server` source needs no entry. Pass `storageSources` to the `<Rebase>` provider for a `direct` source, which uploads straight to its provider, or to set a label or transport yourself:

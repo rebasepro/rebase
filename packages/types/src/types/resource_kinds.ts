@@ -22,7 +22,7 @@ import {
     type ResourceHandle
 } from "./resources";
 import { DEFAULT_DATA_SOURCE_KEY, type DataSourceDefinition } from "./data_source";
-import { DEFAULT_STORAGE_SOURCE_KEY, type StorageSourceDefinition } from "./storage_source";
+import { DEFAULT_STORAGE_SOURCE_KEY, type OrphanSweepOptions, type StorageSourceDefinition } from "./storage_source";
 
 // ── database ─────────────────────────────────────────────────────────────────
 
@@ -179,7 +179,8 @@ registerResourceKind({
 // to say which one serves unqualified uploads. The literal above is frozen, so
 // the new option key arrives here.
 amendResourceKind("bucket", {
-    optionKeys: ["publicRead", "prefix", "account", "default"],
+    // `orphanSweep` arrived the same way, after `default`.
+    optionKeys: ["publicRead", "prefix", "account", "default", "orphanSweep"],
     envBases: [
         "STORAGE_TYPE",
         "STORAGE_PATH",
@@ -258,6 +259,16 @@ export interface BucketOptions extends DeclareOptions {
      * their shared account.
      */
     account?: string;
+    /**
+     * Delete, on a schedule, the files in this bucket that no row names:
+     * `true` for the defaults, or `{ olderThanHours, schedule }`. See
+     * {@link OrphanSweepOptions}.
+     *
+     * ```ts
+     * export const voice = bucket("voice", { engine: "gcs", orphanSweep: { olderThanHours: 72 } });
+     * ```
+     */
+    orphanSweep?: boolean | OrphanSweepOptions;
 }
 
 /** A bucket handle. Storage properties point at it via `storageSource`. */
@@ -790,7 +801,26 @@ export function resourceToStorageSource(declaration: ResourceDeclaration): Stora
             ? { account: declaration.options.account }
             : {}),
         ...(declaration.options.default === true ? { default: true } : {}),
+        ...orphanSweepOf(declaration.options.orphanSweep),
         ...(declaration.label !== undefined ? { label: declaration.label } : {})
+    };
+}
+
+/**
+ * A bucket's `orphanSweep` option as a definition carries it: `true` is the
+ * defaults, an object keeps only the fields of the right type. The runtime
+ * checks the values (the grace-period floor, the schedule) and refuses a bad
+ * one loudly; this only refuses to invent one.
+ */
+function orphanSweepOf(option: unknown): { orphanSweep?: OrphanSweepOptions } {
+    if (option === true) return { orphanSweep: {} };
+    if (!option || typeof option !== "object") return {};
+    const { olderThanHours, schedule } = option as Record<string, unknown>;
+    return {
+        orphanSweep: {
+            ...(typeof olderThanHours === "number" ? { olderThanHours } : {}),
+            ...(typeof schedule === "string" ? { schedule } : {})
+        }
     };
 }
 

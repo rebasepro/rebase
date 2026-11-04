@@ -1,6 +1,10 @@
 # Bucket hygiene: orphaned files, expiry, metering
 
-Status: design, not built (2026-11-04). It came out of SongBuzz moving its voice
+Status (2026-11-04): §1's scheduled sweep is built (`bucket(…, { orphanSweep })`,
+a cron job per bucket). `deleteWithRow` is not: see §1. §3's gauge is built in
+saas and records without billing (`STORAGE_BILLING`). §2 is still a design.
+
+It came out of SongBuzz moving its voice
 recordings into its managed bucket, which raised three gaps. None was built in
 the same change. Each one either destroys a customer's files on a rule the
 platform infers, or starts billing for something it has never billed. Those
@@ -29,14 +33,17 @@ names, and `--delete` removes them after a prompt. Files newer than
 **Proposal.** Keep deletion a sweep, not a hook, and make the sweep automatic
 for those who ask for it:
 
-- `storage: { ..., deleteWithRow: true }` on a property states that its keys
+- *(Not built, on purpose.)* `storage: { ..., deleteWithRow: true }` on a property states that its keys
   belong to that row alone. Only then does an `afterDelete` delete the object.
   The delete is best-effort and logged: it never fails the row delete, and
   anything it misses the sweep catches. Off by default, because the property
-  is the only place that can state the ownership.
-- A scheduled orphan sweep, opted into per source in `rebase.json` (`storage[]
-  .orphanSweep: { olderThanHours: 168 }`), running the same scan as `rebase
-  storage orphans --delete --older-than`. It is grace-period based, so an
+  is the only place that can state the ownership. Left out once the sweep
+  existed: deleting at once would have to check every other row and history
+  entry for the key on every delete, which is exactly the sweep's work, and
+  the sweep only adds the grace period.
+- *(Built.)* A scheduled orphan sweep, opted into per bucket
+  (`bucket("voice", { orphanSweep: { olderThanHours: 168 } })`), running the
+  same scan as `rebase storage orphans --delete --older-than`. It is grace-period based, so an
   upload whose row hasn't been written yet is never swept. Sources with
   unscannable collections (the scan already reports `unscanned`) refuse to
   sweep rather than guess.
