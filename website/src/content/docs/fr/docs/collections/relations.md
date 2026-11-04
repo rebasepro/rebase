@@ -1,5 +1,5 @@
 ---
-sourceHash: 5902e196f7801815
+sourceHash: 64e5ab958b00ecd9
 title: Relations
 sidebar_label: Relations
 description: Définir les relations SQL un-à-un, un-à-plusieurs et plusieurs-à-plusieurs entre les collections avec des clés étrangères, des tables de jonction et des jointures multi-sauts.
@@ -320,6 +320,15 @@ joinPath: [
 ]
 ```
 
+### Correspondre à l'une de deux colonnes
+
+Une liste dans `on` joint une ligne qui remplit **l'une quelconque** des conditions — une amitié enregistrée
+une seule fois, avec chaque personne dans `a` ou `b`. Une telle chaîne est en **lecture seule**.
+
+```typescript
+joinPath: [{ table: "friendships", on: [{ from: "id", to: "a" }, { from: "id", to: "b" }] }]
+```
+
 ## Règles de Cascade
 
 Contrôlez ce qui se passe lorsque les entités liées sont mises à jour ou supprimées :
@@ -584,7 +593,7 @@ interface ViaRelation extends RelationBase {
 Ce que vous écrivez ci-dessus est la forme *d'écriture*. En interne, Rebase
 travaille avec `ResolvedRelation` : le même lien avec toutes les valeurs par
 défaut remplies et rien d'optionnel, plus `cardinality`, `targetSlug` et deux
-drapeaux — `writable` (faux uniquement pour une `via` à plusieurs sauts) et `shared` (vrai lorsque les
+drapeaux — `writable` (faux uniquement pour une `via` à plusieurs sauts ou dont une étape correspond à l'une de plusieurs conditions) et `shared` (vrai lorsque les
 lignes cibles appartiennent aussi à d'autres parents, un retrait déliant alors
 au lieu de supprimer).
 

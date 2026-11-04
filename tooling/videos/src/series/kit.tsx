@@ -166,7 +166,7 @@ export function checkFilm(spec: FilmSpec): FilmSpec {
     return spec;
 }
 
-const SeriesContext = createContext<SeriesTimeline | null>(null);
+export const SeriesContext = createContext<SeriesTimeline | null>(null);
 const SceneContext = createContext<{ start: number; next: number | null }>({ start: 0, next: null });
 
 export function useSeries(): SeriesTimeline {
@@ -242,7 +242,7 @@ const FADE_TALL = "linear-gradient(to bottom, #000 0%, #000 6%, rgba(0,0,0,0.55)
 
 /** The ribbon: one Neat plane under the whole film, turning to each scene's
  *  roll over the scene's first second, steady in between. */
-const Ribbon: React.FC = () => {
+export const Ribbon: React.FC = () => {
     const frame = useCurrentFrame();
     const { fps } = useVideoConfig();
     const series = useSeries();
@@ -291,7 +291,7 @@ const Ribbon: React.FC = () => {
 
 /* ── scenes ─────────────────────────────────────────────────────────── */
 
-const Scenes: React.FC = () => {
+export const Scenes: React.FC = () => {
     const series = useSeries();
     return (
         <>

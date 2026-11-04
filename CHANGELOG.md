@@ -380,6 +380,13 @@
 
 #### Server & REST
 
+- **A `via` join step can match any of several conditions.** Give `on` a list —
+  `on: [{ from: "id", to: "a" }, { from: "id", to: "b" }]` — and a row that
+  meets any one of them joins. That reads a link stored in either of two
+  columns, such as a friendship kept as one row with the smaller account first,
+  as one relation instead of two. A chain with such a step is read-only. The
+  collection editor's relation dialog adds alternatives with "Or join on
+  another column".
 - **Streamed object writes.** `StorageController.putObjectStream` writes an
   object from a `ReadableStream` a chunk at a time, on the local, S3 and GCS
   controllers. Past `maxBytes` it rejects with `ObjectTooLargeError`, and on that
@@ -642,6 +649,19 @@
   stayed at the value it had on first render.
 - **`conditions.min` and `conditions.max` take a number,** as the docs write
   them; only a JSON Logic rule compiled.
+- **A list with `listProperties` keeps the status and date its `display`
+  declares.** They were dropped as soon as a collection named columns of its
+  own; they now follow those columns. Only declared slots join them, not
+  inferred ones.
+- **A list whose title is written as a function names that column after the
+  collection's `singularName`.** It took the name of whichever property the
+  row fell back to while the title loaded, and offered to sort by it.
+- **A read-only field marked required shows no red asterisk.** No one can fill
+  it in, so the form no longer asks for it.
+- **At exactly 1024px wide the menu button no longer covers the collection
+  toolbar.** The layout switch now happens at the same width as the `lg:`
+  styles. Below it, an admin without an app bar shows the menu button in its own
+  row above the page.
 
 ## [0.26.0] - 2026-10-29
 

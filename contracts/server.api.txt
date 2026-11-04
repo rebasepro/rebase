@@ -616,6 +616,7 @@ function isToMany
 function isUnsupported
 function isValidAppHost
 function isValidEngine
+function joinConditions
 function knownScopes
 function nestAdminCollectionKeys
 function nestAdminKeysOf
@@ -657,6 +658,7 @@ function serializeCollections
 function setQueueRuntime
 function setTopicRuntime
 function simulationHeaders
+function soleJoinCondition
 function sortKeyToString
 function storageEnvSuffix
 function storageObjectPath
@@ -839,6 +841,7 @@ interface IncludeOptions { count, fields, include, limit, logical, orderBy, wher
 interface IncludeOptionsFor { count, fields, include, limit, logical, orderBy, where }
 interface IndexKey { direction, nulls, prop }
 interface InitializedDriver { collectionRegistry, collections, connection, driver, internals, realtimeProvider, unprotectedTables }
+interface JoinCondition { from, to }
 interface JoinStep { on, table }
 interface LazyComponentRef { load }
 interface ListLimitBounds { defaultLimit, maxLimit, vectorDefaultLimit }

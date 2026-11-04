@@ -1,5 +1,5 @@
 ---
-sourceHash: 5902e196f7801815
+sourceHash: 64e5ab958b00ecd9
 title: Beziehungen
 sidebar_label: Beziehungen
 description: Definieren Sie Eins-zu-Eins-, Eins-zu-Viele- und Viele-zu-Viele-SQL-Beziehungen zwischen Sammlungen mit Fremdschlüsseln, Verbindungstabellen und Multi-Hop-Joins.
@@ -327,6 +327,15 @@ joinPath: [
 ]
 ```
 
+### Eine von zwei Spalten treffen
+
+Eine Liste in `on` verbindet eine Zeile, die **eine beliebige** Bedingung erfüllt – etwa eine einmal
+gespeicherte Freundschaft, in der jede Person in `a` oder `b` steht. Eine solche Kette ist **schreibgeschützt**.
+
+```typescript
+joinPath: [{ table: "friendships", on: [{ from: "id", to: "a" }, { from: "id", to: "b" }] }]
+```
+
 ## Kaskadenregeln
 
 Steuern Sie, was passiert, wenn verwandte Entitäten aktualisiert oder gelöscht werden:
@@ -593,7 +602,7 @@ interface ViaRelation extends RelationBase {
 Was Sie oben schreiben, ist die *Autoren*-Form. Intern arbeitet Rebase mit
 `ResolvedRelation`: dieselbe Verknüpfung mit allen eingesetzten Standardwerten
 und nichts Optionalem, dazu `cardinality`, `targetSlug` und zwei Flags —
-`writable` (nur bei einem mehrstufigen `via` false) und `shared` (true, wenn die Zielzeilen auch
+`writable` (nur bei einem mehrstufigen `via` oder einem mit einem Schritt, der eine von mehreren Bedingungen trifft, false) und `shared` (true, wenn die Zielzeilen auch
 anderen Elternteilen gehören, ein Entfernen also die Verknüpfung löst, statt zu
 löschen).
 

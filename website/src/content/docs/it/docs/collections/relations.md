@@ -1,5 +1,5 @@
 ---
-sourceHash: 5902e196f7801815
+sourceHash: 64e5ab958b00ecd9
 title: Relazioni
 sidebar_label: Relazioni
 description: Definisci relazioni SQL uno-a-uno, uno-a-molti e molti-a-molti tra collezioni con chiavi esterne, tabelle di giunzione e join multi-hop.
@@ -324,6 +324,15 @@ joinPath: [
 ]
 ```
 
+### Corrispondere a una di due colonne
+
+Una lista in `on` unisce una riga che soddisfa **una qualsiasi** delle condizioni: un'amicizia salvata
+una sola volta, con ciascuna persona in `a` o in `b`. Una catena così è di **sola lettura**.
+
+```typescript
+joinPath: [{ table: "friendships", on: [{ from: "id", to: "a" }, { from: "id", to: "b" }] }]
+```
+
 ## Regole a Cascata
 
 Controlla cosa succede quando le entità correlate vengono aggiornate o eliminate:
@@ -586,7 +595,7 @@ interface ViaRelation extends RelationBase {
 Quello che scrivi sopra è la forma di *autore*. Internamente Rebase lavora con
 `ResolvedRelation`: lo stesso collegamento con ogni valore predefinito riempito e
 niente di opzionale, più `cardinality`, `targetSlug` e due flag — `writable`
-(falso solo per un `via` multi-hop) e `shared` (vero quando le righe di destinazione
+(falso solo per un `via` multi-hop o con un passo che corrisponde a una qualsiasi di più condizioni) e `shared` (vero quando le righe di destinazione
 appartengono anche ad altri padri, così che una rimozione scolleghi invece di
 eliminare).
 

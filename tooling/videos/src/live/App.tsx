@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Player, type PlayerRef } from "@remotion/player";
 import { filmById, FILMS, type FilmProps } from "./films";
-import { buildDeskTimeline, LIVE_HORIZON, type Timing } from "../desk/timeline";
+import { LIVE_HORIZON, type Timing } from "../desk/timeline";
 import { Follower } from "./follow";
 import { canRecognize, Recognizer, TakeRecorder, VoiceDetector } from "./listen";
 import { simulateRead } from "./simulate";
@@ -24,6 +24,8 @@ import { simulateRead } from "./simulate";
  */
 
 const FPS = 30;
+/** Seconds counted down between Start and the recorder starting. */
+const COUNTDOWN = 3;
 const params = new URLSearchParams(location.search);
 const SIMULATE = params.has("simulate") ? Number(params.get("simulate")) || 155 : null;
 const LANG = params.get("lang") ?? "en-US";
@@ -32,6 +34,13 @@ const FILM = filmById(params.get("film"));
 const SCRIPT = FILM.script;
 
 type Phase = "setup" | "ready" | "recording" | "saving" | "saved" | "error";
+
+interface MicTest {
+    state: "listening" | "playing" | "done";
+    /** What the recogniser made of it. */
+    heard: string;
+    recognition: string;
+}
 
 interface Saved {
     id: string;
@@ -93,10 +102,14 @@ export const App: React.FC = () => {
     const [status, setStatus] = useState({ recognition: "idle", transcript: "", level: -100, threshold: -58, speaking: false });
     const [elapsed, setElapsed] = useState(0);
     const [saved, setSaved] = useState<Saved | null>(null);
+    const [micTest, setMicTest] = useState<MicTest | null>(null);
+    const testing = useRef<{ recorder: MediaRecorder; timer: number; stopPlayback: (() => void) | null } | null>(null);
 
     const player = useRef<PlayerRef>(null);
     const session = useRef<Session | null>(null);
     const starting = useRef(false);
+    const [countdown, setCountdown] = useState<number | null>(null);
+    const callOff = useRef(false);
 
     /* ── the camera and microphone ───────────────────────────────────── */
 
@@ -166,10 +179,12 @@ export const App: React.FC = () => {
            than a film that drifts from the voice for a whole take. */
         const p = player.current;
         if (p && Math.round(frame) % 15 === 0 && Math.abs(p.getCurrentFrame() - frame) > 4) p.seekTo(Math.round(frame));
-        /* The film ends by itself: its own length is known once the last
-           line is, and the take stops a second after it. */
-        const duration = buildDeskTimeline(s.lastTiming).duration;
-        if (duration !== null && frame > duration + FPS && !s.stopping) {
+        /* The read ends by itself: once the script's LAST line has ended,
+           the take stops a little after it. It was the desk film's own
+           length, which read the desk's last line by its position — in any
+           film with more lines, the take stopped mid-read on that line. */
+        const last = s.lastTiming.lines[SCRIPT.length - 1];
+        if (last?.end !== undefined && frame > last.end + 50 + FPS && !s.stopping) {
             void stop();
             return;
         }
@@ -180,10 +195,23 @@ export const App: React.FC = () => {
         /* Space on a focused Start button is both a keydown and, on keyup,
            a click: without the latch, the second arrives while the recorder
            is still starting and a second take starts beside the first. */
-        if (session.current || starting.current || (phase !== "ready" && phase !== "saved")) return;
+        if (session.current || starting.current || testing.current || (phase !== "ready" && phase !== "saved")) return;
         starting.current = true;
         setSaved(null);
         setError(null);
+        /* A countdown before the recorder starts, so the take does not open
+           on a hand leaving the key or the mouse. Esc during it calls it off. */
+        callOff.current = false;
+        for (let n = COUNTDOWN; n > 0; n--) {
+            setCountdown(n);
+            await new Promise((r) => window.setTimeout(r, 1000));
+            if (callOff.current) break;
+        }
+        setCountdown(null);
+        if (callOff.current) {
+            starting.current = false;
+            return;
+        }
         const id = takeId();
         const follower = new Follower(FPS, 15, SCRIPT);
         const s: Session = {
@@ -304,6 +332,54 @@ export const App: React.FC = () => {
         }
     }, []);
 
+    /* ── a microphone test ───────────────────────────────────────────── */
+
+    /* Before a take: a few seconds from the chosen microphone, what the
+       recogniser made of them (it hears the SYSTEM input, which may not be
+       the same microphone), and the recording played back, to hear what
+       the take will sound like. M starts it; M again stops early. */
+    const testMic = useCallback(() => {
+        const t = testing.current;
+        if (t) {
+            if (t.recorder.state === "recording") t.recorder.stop();
+            else t.stopPlayback?.();
+            return;
+        }
+        if (!stream || session.current || starting.current || (phase !== "ready" && phase !== "saved")) return;
+        const recorder = new MediaRecorder(new MediaStream(stream.getAudioTracks()));
+        const chunks: Blob[] = [];
+        const recognizer = new Recognizer(LANG, {
+            onSession: () => undefined,
+            onTranscript: (text) => setMicTest((m) => m && { ...m, heard: text }),
+            onState: (state, detail) => {
+                if (state !== "stopped") setMicTest((m) => m && { ...m, recognition: detail ?? state });
+            },
+        });
+        recorder.ondataavailable = (e) => chunks.push(e.data);
+        recorder.onstop = () => {
+            const current = testing.current;
+            if (!current) return;
+            window.clearTimeout(current.timer);
+            recognizer.stop();
+            const url = URL.createObjectURL(new Blob(chunks, { type: recorder.mimeType }));
+            const audio = new Audio(url);
+            const done = () => {
+                audio.pause();
+                URL.revokeObjectURL(url);
+                testing.current = null;
+                setMicTest((m) => m && { ...m, state: "done" });
+            };
+            audio.onended = done;
+            current.stopPlayback = done;
+            setMicTest((m) => m && { ...m, state: "playing" });
+            void audio.play();
+        };
+        testing.current = { recorder, timer: window.setTimeout(() => recorder.stop(), 15000), stopPlayback: null };
+        setMicTest({ state: "listening", heard: "", recognition: "starting" });
+        recorder.start();
+        recognizer.start();
+    }, [stream, phase]);
+
     /* ── keys ────────────────────────────────────────────────────────── */
 
     useEffect(() => {
@@ -316,6 +392,8 @@ export const App: React.FC = () => {
             } else if (e.code === "Escape" && s) {
                 e.preventDefault();
                 void stop();
+            } else if (e.code === "Escape" && starting.current) {
+                callOff.current = true;
             } else if ((e.code === "ArrowRight" || e.code === "PageDown") && s) {
                 /* A presenter's clicker sends PageDown. */
                 e.preventDefault();
@@ -323,11 +401,14 @@ export const App: React.FC = () => {
             } else if (e.code === "KeyR" && s && !s.stopping) {
                 e.preventDefault();
                 void stop(true);
+            } else if (e.code === "KeyM" && !s) {
+                e.preventDefault();
+                testMic();
             }
         };
         window.addEventListener("keydown", onKey);
         return () => window.removeEventListener("keydown", onKey);
-    }, [start, stop]);
+    }, [start, stop, testMic]);
 
     /* ── the page ────────────────────────────────────────────────────── */
 
@@ -400,6 +481,11 @@ export const App: React.FC = () => {
                         <button style={button} onClick={() => void start()}>
                             Start — Space
                         </button>
+                        {!SIMULATE && (
+                            <button style={button} onClick={testMic}>
+                                {micTest?.state === "listening" ? "Stop test — M" : micTest?.state === "playing" ? "Stop playback — M" : "Test mic — M"}
+                            </button>
+                        )}
                         <label style={{ display: "flex", gap: 8, alignItems: "center" }}>
                             Film
                             <select
@@ -436,6 +522,26 @@ export const App: React.FC = () => {
                 ) : null}
             </div>
 
+            {countdown !== null && (
+                <div style={{ position: "fixed", inset: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", pointerEvents: "none" }}>
+                    <div style={{ fontSize: 220, fontWeight: 700, lineHeight: 1, color: "#FFFFFF", textShadow: "0 4px 40px rgba(0,0,0,0.8)" }}>{countdown}</div>
+                    <div style={{ marginTop: 12, fontSize: 18, color: "rgba(255,255,255,0.7)", textShadow: "0 2px 12px rgba(0,0,0,0.9)" }}>recording starts after 1 · Esc calls it off</div>
+                </div>
+            )}
+            {micTest && !recording && (
+                <div style={panel}>
+                    <div style={{ fontWeight: 600, marginBottom: 8 }}>
+                        {micTest.state === "listening"
+                            ? "Mic test: say a line of the script, then press M (it stops by itself after 15 s)"
+                            : micTest.state === "playing"
+                              ? "Mic test: playing back what was recorded"
+                              : "Mic test: done. M runs it again."}
+                    </div>
+                    <div style={{ fontFamily: "JetBrains Mono, monospace", fontSize: 13, color: "rgba(255,255,255,0.7)" }}>
+                        Speech recognition heard: {micTest.heard || (micTest.state === "listening" ? `… (${micTest.recognition})` : "nothing. Make this microphone the system input in System Settings → Sound.")}
+                    </div>
+                </div>
+            )}
             {error && <div style={{ ...panel, borderColor: "rgba(255,90,95,0.5)", color: "#FFB4B6" }}>{error}</div>}
             {saved && (
                 <div style={{ ...panel, maxHeight: "60vh", overflow: "auto" }}>
@@ -510,6 +616,7 @@ const Prompter: React.FC<{ position: { line: number; word: number }; timing: Tim
             >
                 {SCRIPT.map((line, k) => (
                     <p key={line.id} style={{ margin: "0 0 0.45em" }}>
+                        {line.speaker && line.speaker !== SCRIPT[k - 1]?.speaker && <Speaker name={line.speaker} />}
                         {line.words.map((w, i) => {
                             const said = !idle && (k < current || (k === current && i < spoken));
                             const next = !idle && k === current && i === spoken;
@@ -541,6 +648,29 @@ const Prompter: React.FC<{ position: { line: number; word: number }; timing: Tim
         </div>
     );
 };
+
+/** Whose line it is, inline before its first word, wherever the voice
+ *  changes: in the row being read, so the next voice sees it in time. */
+const SPEAKER_COLOR: Record<string, string> = { francesco: "#FFC600", marian: "#36CCD6", both: "#FF9A9E" };
+
+const Speaker: React.FC<{ name: string }> = ({ name }) => (
+    <span
+        style={{
+            fontFamily: "JetBrains Mono, monospace",
+            fontSize: "0.5em",
+            letterSpacing: "0.16em",
+            textTransform: "uppercase",
+            verticalAlign: "0.35em",
+            marginRight: "0.7em",
+            padding: "0.15em 0.5em",
+            borderRadius: 6,
+            color: "#090A0C",
+            background: SPEAKER_COLOR[name] ?? "#FFFFFF",
+        }}
+    >
+        {name}
+    </span>
+);
 
 const Meter: React.FC<{ level: number; threshold: number; speaking: boolean }> = ({ level, threshold, speaking }) => {
     const x = (db: number) => `${Math.max(0, Math.min(100, ((db + 80) / 80) * 100))}%`;
@@ -595,7 +725,7 @@ function runSimulation(follower: Follower, t0: number, wpm: number, onText: (tex
 }
 
 function summarize(t: Timing): string {
-    const tl = buildDeskTimeline(t);
+    const end = t.lines[SCRIPT.length - 1]?.end;
     return SCRIPT.map((l, k) => {
         const s = t.lines[k];
         if (!s) return `${l.id.padEnd(9)} —`;
@@ -603,7 +733,7 @@ function summarize(t: Timing): string {
         const end = (s.end ?? s.words[s.words.length - 1]) / FPS;
         return `${l.id.padEnd(9)} ${clock(start)} → ${clock(end)}  ${Math.round((l.words.length / Math.max(0.1, end - start)) * 60)} wpm`;
     })
-        .concat(`film: ${tl.duration === null ? "—" : clock(tl.duration / FPS)}`)
+        .concat(`read: ${end === undefined ? "—" : clock(end / FPS)}`)
         .join("\n");
 }
 

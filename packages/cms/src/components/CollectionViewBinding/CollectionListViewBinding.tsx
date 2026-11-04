@@ -24,7 +24,7 @@ import {
 import { useAnalyticsController } from "@rebasepro/app";
 import { IconForView } from "@rebasepro/app";
 import { getIcon } from "@rebasepro/app";
-import { hasDeclaredDisplay } from "@rebasepro/app";
+import { getDisplayResolver, hasDeclaredDisplay } from "@rebasepro/app";
 import { useTranslation } from "@rebasepro/app";
 import { getValueInPath } from "@rebasepro/utils";
 import { formatCollectionDate } from "../../util/format_collection_date";
@@ -416,6 +416,22 @@ export function CollectionListViewBinding<M extends Record<string, unknown> = Re
      * title; otherwise it stays in {@link declaredColumns} and gets a cell.
      */
     const titleColumn = useMemo<ListColumn | undefined>(() => {
+        // A title written as a function has no property behind it. The key the
+        // slots derive meanwhile is a guess at a name — the first readable
+        // string — and labelling the column with it put "Room" over
+        // "3 Nov · ABCD · 4 players", and offered to sort the rows by a field
+        // the cell does not show. The column is named for what each row is.
+        if (getDisplayResolver(resolvedCollection, "title")) {
+            return {
+                key: "display:title",
+                label: resolvedCollection.singularName || resolvedCollection.name || "Name",
+                align: "left",
+                width: "flex-1 min-w-0",
+                widthPx: TITLE_COMFORTABLE_WIDTH,
+                sortable: false,
+                priority: Number.MAX_SAFE_INTEGER
+            };
+        }
         const key = titlePropertyKey ?? (columnMode ? resolvedCollection.listProperties?.[0] : undefined);
         if (!key) return undefined;
         const property = resolvedCollection.properties[key] as Property | undefined;
@@ -433,20 +449,28 @@ export function CollectionListViewBinding<M extends Record<string, unknown> = Re
 
     /**
      * The trailing columns the collection itself implies: the developer's
-     * `listProperties` when there are any, otherwise the display slots the row
-     * has always shown to the right of the title.
+     * `listProperties`, then the display slots the row has always shown to the
+     * right of the title.
+     *
+     * Both, not one or the other. `listProperties` names the extra columns a
+     * collection wants; it says nothing about dropping the status and date its
+     * `display` already declares, and reading it that way hid "Finished" and
+     * the start time of every game the moment the collection asked for a
+     * score column as well.
      */
     const declaredColumns = useMemo<ListColumn[]>(() => {
+        const cols: ListColumn[] = [];
+
         if (columnMode) {
             // Everything the identity cell does not already show. Which is the
             // title property wherever it appears in the list, not merely a
             // first entry: a column repeating the line above it is the one
             // duplicate this owes the reader.
             const keys = resolvedCollection.listProperties!.filter(key => key !== titleColumn?.key);
-            return keys.flatMap((key, index) => {
+            keys.forEach((key, index) => {
                 const property = resolvedCollection.properties[key] as Property | undefined;
-                if (!property) return [];
-                return [{
+                if (!property) return;
+                cols.push({
                     key,
                     label: property.name || key,
                     property,
@@ -454,13 +478,12 @@ export function CollectionListViewBinding<M extends Record<string, unknown> = Re
                     ...getIdealColumnWidth(property),
                     sortable: sortableKeys.has(key),
                     // Declared order is a statement of importance: the first
-                    // column after the title outlives the last one.
-                    priority: PRIORITY_DECLARED + (keys.length - index)
-                }];
+                    // column after the title outlives the last one, and every
+                    // named column outlives the slots after it.
+                    priority: PRIORITY_TAGS + (keys.length - index)
+                });
             });
         }
-
-        const cols: ListColumn[] = [];
 
         // A slot column exists when the collection has something to put in it —
         // a property to read, or a resolver that computes one. Whether a given
@@ -475,16 +498,24 @@ export function CollectionListViewBinding<M extends Record<string, unknown> = Re
             priority: number
         ): ListColumn | undefined => {
             const declared = hasDeclaredDisplay(resolvedCollection, slot);
-            if (!key && !declared) return undefined;
-            const property = key ? resolvedCollection.properties[key] as Property | undefined : undefined;
+            // Beside the developer's own columns, only a slot the collection
+            // states: an inferred one is a guess the named columns outrank.
+            if (columnMode && !declared) return undefined;
+            // A slot filled by a resolver is labelled and ordered by nothing:
+            // the key the ladder inferred meanwhile is not what the cell shows.
+            const slotKey = getDisplayResolver(resolvedCollection, slot) ? undefined : key;
+            if (!slotKey && !declared) return undefined;
+            // Already a named column: one cell per value.
+            if (slotKey && cols.some(col => col.key === slotKey)) return undefined;
+            const property = slotKey ? resolvedCollection.properties[slotKey] as Property | undefined : undefined;
             return {
-                key: key ?? `display:${slot}`,
+                key: slotKey ?? `display:${slot}`,
                 label: property?.name || fallbackLabel,
                 slot,
                 property,
                 ...layout,
                 // A computed slot has no column to order by, whatever it renders.
-                sortable: !!key && sortableKeys.has(key),
+                sortable: !!slotKey && sortableKeys.has(slotKey),
                 priority
             };
         };

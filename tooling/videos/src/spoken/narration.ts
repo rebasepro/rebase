@@ -22,6 +22,9 @@ export interface ScriptLine {
     id: string;
     at: number;
     words: string[];
+    /** Who says it, when a film has more than one presenter. The prompter
+     *  names them wherever the voice changes. */
+    speaker?: string;
 }
 
 export type Script = readonly ScriptLine[];
