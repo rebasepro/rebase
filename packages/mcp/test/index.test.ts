@@ -27,7 +27,8 @@ import {
     untrustedEnvelope,
     managedDatabaseRefusal,
     cloudProvisionArgv,
-    parseCloudProvisionResult
+    parseCloudProvisionResult,
+    omitBinaryValues
 } from "../src/index";
 import type { PackageManager } from "../src/index";
 import { spawn } from "node:child_process";
@@ -1336,6 +1337,65 @@ describe("the gate covers escalation and destruction, not just deletes", () => {
         });
         expect(result.isError).toBeUndefined();
         expect(mockClient.admin.listUsers).toHaveBeenCalled();
+    });
+});
+
+/**
+ * SongBuzz's voice cache keeps a WAV per row in a `binary` column, and
+ * `list_documents` with `limit: 1` came back at about a megabyte.
+ */
+describe("binary columns in data reads", () => {
+    const handler = () => (server as any)._requestHandlers.get("tools/call");
+    const wav = `data:application/octet-stream;base64,${"A".repeat(4000)}`;
+
+    beforeEach(() => {
+        vi.clearAllMocks();
+    });
+
+    it("replaces a binary value with its size, and keeps the rest", () => {
+        expect(omitBinaryValues({ data: [{ id: "v1", text: "hi", wav }] }, new Set())).toEqual({
+            data: [{ id: "v1", text: "hi", wav: { omitted: "binary", bytes: 3000, include: "includeBinary: true, or name it in fields" } }]
+        });
+    });
+
+    it("keeps a binary column the caller named", () => {
+        expect(omitBinaryValues({ id: "v1", wav }, new Set(["wav"]))).toEqual({ id: "v1", wav });
+    });
+
+    it("leaves ordinary strings alone, including ones that merely mention base64", () => {
+        const row = { id: "v1", note: "base64,AAAA", url: "https://example.com/data:x" };
+        expect(omitBinaryValues(row, new Set())).toEqual(row);
+    });
+
+    it("forwards `fields` to the query and omits binary values by default", async () => {
+        const find = vi.fn().mockResolvedValue({ data: [{ id: "v1", wav }] });
+        mockClient.data.collection.mockReturnValueOnce({ ...mockClient.data.collection(), find });
+        const result = await handler()({
+            method: "tools/call",
+            params: { name: "list_documents", arguments: { collection: "voice_cache", limit: 1, fields: ["id", "text"] } }
+        });
+        expect(find).toHaveBeenCalledWith(expect.objectContaining({ limit: 1, fields: ["id", "text"] }));
+        const text = result.content[0].text as string;
+        expect(text).not.toContain("AAAA");
+        expect(text).toContain("\"omitted\":\"binary\"");
+    });
+
+    it("returns the contents when asked", async () => {
+        const find = vi.fn().mockResolvedValue({ data: [{ id: "v1", wav }] });
+        mockClient.data.collection.mockReturnValueOnce({ ...mockClient.data.collection(), find });
+        const result = await handler()({
+            method: "tools/call",
+            params: { name: "list_documents", arguments: { collection: "voice_cache", includeBinary: true } }
+        });
+        expect(result.content[0].text as string).toContain("AAAA");
+    });
+
+    it("refuses a `fields` that is not a list of names", async () => {
+        const result = await handler()({
+            method: "tools/call",
+            params: { name: "list_documents", arguments: { collection: "voice_cache", fields: "wav" } }
+        });
+        expect(result.isError).toBe(true);
     });
 });
 

@@ -147,8 +147,46 @@ export interface CloudCall {
     tailLines: number;
 }
 
-/** `validateToolArgs`, then the argv for that tool. Throws `ToolArgumentError`. */
-export function cloudToolCall(name: CloudCommandTool, schema: ToolInputSchema, rawArgs: unknown): CloudCall {
+/**
+ * The cloud tools that read a project, and so follow `rebase_project_use_cloud`.
+ *
+ * After an agent points the tools at a project, these act on it with
+ * `--project`, which every `rebase cloud` command takes. Without it they asked
+ * the directory's link, and refused `no_project` in a directory linked to
+ * nothing, right after the agent had selected the project it wanted.
+ *
+ * The writes are left out on purpose. A deploy ships THIS directory's code, so
+ * it can only go to the project the directory is linked to. An env change and
+ * a rollback change production, and the link is the one place a person
+ * decided which project that is.
+ */
+export const CLOUD_TOOLS_FOLLOWING_SELECTION: ReadonlySet<CloudCommandTool> = new Set<CloudCommandTool>([
+    "rebase_cloud_status",
+    "rebase_cloud_logs",
+    "rebase_cloud_env_list",
+    "rebase_cloud_deployments_list"
+]);
+
+/**
+ * `validateToolArgs`, then the argv for that tool. Throws `ToolArgumentError`.
+ *
+ * `selectedProject` is the id `rebase_project_use_cloud` selected, if any. The
+ * read tools act on it (see {@link CLOUD_TOOLS_FOLLOWING_SELECTION}).
+ */
+export function cloudToolCall(
+    name: CloudCommandTool,
+    schema: ToolInputSchema,
+    rawArgs: unknown,
+    selectedProject?: string
+): CloudCall {
+    const call = buildCloudToolCall(name, schema, rawArgs);
+    if (selectedProject && CLOUD_TOOLS_FOLLOWING_SELECTION.has(name)) {
+        call.argv.push("--project", selectedProject);
+    }
+    return call;
+}
+
+function buildCloudToolCall(name: CloudCommandTool, schema: ToolInputSchema, rawArgs: unknown): CloudCall {
     const args = validateToolArgs(name, schema, rawArgs);
     const str = (key: string) => (typeof args[key] === "string" ? (args[key] as string) : undefined);
     const num = (key: string) => (typeof args[key] === "number" ? (args[key] as number) : undefined);
@@ -338,8 +376,12 @@ export function withTailedLogs(value: unknown, count: number): unknown {
 export function cloudRefusalNext(tool: CloudCommandTool, refusal: { code: string; status: number | null; message: string }): string | null {
     switch (refusal.code) {
         case "no_project":
-            return "This directory is not linked to a Rebase Cloud project. rebase_cloud_provision gives it one without an account; " +
-                "otherwise ask the user to run `rebase cloud link` (or `rebase cloud projects create --link`) here.";
+            return CLOUD_TOOLS_FOLLOWING_SELECTION.has(tool)
+                ? "This directory is not linked to a Rebase Cloud project, and no project is selected. rebase_project_use_cloud " +
+                    "selects one for this tool; rebase_cloud_provision gives the directory one without an account."
+                : "This directory is not linked to a Rebase Cloud project. A deploy, an env change and a rollback act only on the " +
+                    "linked project, whatever rebase_project_use_cloud selected. rebase_cloud_provision gives this directory one " +
+                    "without an account; otherwise ask the user to run `rebase cloud link` (or `rebase cloud projects create --link`) here.";
         case "not_logged_in":
         case "session_expired":
             return "The CLI holds no usable credential for the control plane here. Ask the user to run `rebase cloud login`, " +

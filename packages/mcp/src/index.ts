@@ -1470,6 +1470,16 @@ description: "Sort field, optionally with :asc or :desc suffix" },
                     type: "object",
                     description: "Filter object, e.g. { \"status\": \"eq.active\", \"price\": \"gte.100\" }",
                     additionalProperties: true
+                },
+                fields: {
+                    type: "array",
+                    items: { type: "string" },
+                    description: "Columns to return (`id` is always included). Omit for every column."
+                },
+                includeBinary: {
+                    type: "boolean",
+                    description: "Return binary columns' contents. Off by default: each is replaced by its size, " +
+                        "because one audio or image column can make a single row megabytes. A column named in `fields` is always returned."
                 }
             },
             required: ["collection"]
@@ -1484,7 +1494,11 @@ description: "Sort field, optionally with :asc or :desc suffix" },
                 collection: { type: "string",
 description: "Collection slug" },
                 id: { type: "string",
-description: "Document ID" }
+description: "Document ID" },
+                includeBinary: {
+                    type: "boolean",
+                    description: "Return binary columns' contents. Off by default: each is replaced by its size."
+                }
             },
             required: ["collection", "id"]
         }
@@ -1820,7 +1834,9 @@ const PROJECT_TOOLS: ToolDef[] = [
             "the signed-in account can reach, linked here or not. Calls go through the console's Studio proxy with the CLI's " +
             "own login (`rebase cloud access-token`); the control plane checks the person's access and attaches the project's " +
             "service key on its side, so no key is needed or shown. Reads work; tools that change data stay refused against " +
-            "it unless REBASE_MCP_ALLOW_REMOTE_WRITES is set. rebase_project_switch goes back to another project.",
+            "it unless REBASE_MCP_ALLOW_REMOTE_WRITES is set. The cloud read tools (rebase_cloud_status, rebase_cloud_logs, " +
+            "rebase_cloud_env_list, rebase_cloud_deployments_list) follow it too; a deploy, an env change and a rollback " +
+            "stay on the project this directory is linked to. rebase_project_switch goes back to another project.",
         inputSchema: {
             type: "object",
             properties: {
@@ -2120,12 +2136,12 @@ function cloudToolSchema(name: string): ToolDef["inputSchema"] {
  * dispatcher runs, and what the schema-against-handler test drives. Throws a
  * `ToolArgumentError` before anything is spawned.
  */
-export function parseCloudToolArgs(name: string, args: unknown): { argv: string[]; stdin?: string; secrets: string[]; tailLines: number } {
+export function parseCloudToolArgs(name: string, args: unknown, selectedProject?: string): { argv: string[]; stdin?: string; secrets: string[]; tailLines: number } {
     if (name === "rebase_cloud_provision") {
         return { argv: cloudProvisionArgv(validateToolArgs(name, cloudToolSchema(name), args)), secrets: [], tailLines: CLOUD_LOGS_DEFAULT_TAIL };
     }
     if (!isCloudCommandTool(name)) throw new ToolArgumentError(`No cloud tool named ${name}.`);
-    return cloudToolCall(name, cloudToolSchema(name), args);
+    return cloudToolCall(name, cloudToolSchema(name), args, selectedProject);
 }
 
 /**
@@ -2139,11 +2155,17 @@ export function parseCloudToolArgs(name: string, args: unknown): { argv: string[
  * the exception both ways — its result is built from its own arguments, and
  * the value it set is cut out of anything it returns.
  */
+/** The cloud project `rebase_project_use_cloud` made active, or undefined. */
+function selectedCloudProjectId(): string | undefined {
+    const active = registry.activeProject ? registry.projects[registry.activeProject] : undefined;
+    return active?.cloud?.projectId;
+}
+
 async function runCloudTool(name: string, args: unknown) {
     if (!isCloudCommandTool(name)) return { ...textResult(`No cloud tool named ${name}.`), isError: true };
     let call: ReturnType<typeof cloudToolCall>;
     try {
-        call = cloudToolCall(name, cloudToolSchema(name), args);
+        call = cloudToolCall(name, cloudToolSchema(name), args, selectedCloudProjectId());
     } catch (err) {
         return { ...textResult(err instanceof Error ? err.message : String(err)), isError: true };
     }
@@ -2391,6 +2413,34 @@ export function untrustedEnvelope(source: string, body: string): string {
 }
 
 /** JSON from the target environment, marked as untrusted. */
+/** How the REST API serializes a `binary` property's value. */
+const BINARY_VALUE = /^data:[\w.+-]+\/[\w.+-]+;base64,/;
+
+/**
+ * A read's result with every binary value replaced by its size.
+ *
+ * A `binary` column comes back as a base64 data URL, and one audio clip or image
+ * per row made a `list_documents` of `limit: 1` on SongBuzz's voice cache about
+ * a megabyte — most of an agent's context, spent on bytes it cannot read. Found
+ * by the value's shape rather than the collection's schema, which this server
+ * does not have for a cloud project. A column the caller named in `fields` is
+ * left whole: asking for it by name is asking for its contents.
+ */
+export function omitBinaryValues<T>(value: T, keep: ReadonlySet<string>, depth = 0): T {
+    if (depth > 4 || value === null || typeof value !== "object") return value;
+    if (Array.isArray(value)) return value.map((item) => omitBinaryValues(item, keep, depth + 1)) as T;
+    const out: Record<string, unknown> = {};
+    for (const [key, field] of Object.entries(value as Record<string, unknown>)) {
+        if (typeof field === "string" && !keep.has(key) && BINARY_VALUE.test(field)) {
+            const base64 = field.length - field.indexOf(",") - 1;
+            out[key] = { omitted: "binary", bytes: Math.floor((base64 * 3) / 4), include: "includeBinary: true, or name it in fields" };
+        } else {
+            out[key] = omitBinaryValues(field, keep, depth + 1);
+        }
+    }
+    return out as T;
+}
+
 function untrustedJsonResult(source: string, data: unknown) {
     return textResult(untrustedEnvelope(source, JSON.stringify(data)));
 }
@@ -2839,23 +2889,39 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
     switch (name) {
         case "list_documents": {
-            const argsObj = args as { collection: string; limit?: number; offset?: number; orderBy?: string; where?: Record<string, unknown> };
+            const argsObj = args as {
+                collection: string; limit?: number; offset?: number; orderBy?: string; where?: Record<string, unknown>;
+                fields?: unknown; includeBinary?: boolean;
+            };
             const { collection: slug, limit, offset, orderBy, where } = argsObj;
+            const fields = Array.isArray(argsObj.fields) && argsObj.fields.every((f): f is string => typeof f === "string")
+                ? argsObj.fields
+                : undefined;
+            if (argsObj.fields !== undefined && !fields) {
+                return { ...textResult("`fields` is a list of column names."), isError: true };
+            }
             const result = await client.data.collection(slug).find({
                 limit,
                 offset,
                 orderBy,
-                where
+                where,
+                ...(fields?.length ? { fields } : {})
             });
-            return untrustedJsonResult(`collection "${slug}"`, result);
+            return untrustedJsonResult(
+                `collection "${slug}"`,
+                argsObj.includeBinary === true ? result : omitBinaryValues(result, new Set(fields ?? []))
+            );
         }
 
         case "get_document": {
-            const argsObj = args as { collection: string; id: string };
+            const argsObj = args as { collection: string; id: string; includeBinary?: boolean };
             const { collection: slug, id } = argsObj;
             const entity = await client.data.collection(slug).findById(id);
             if (!entity) return textResult(`Document ${id} not found in ${slug}`);
-            return untrustedJsonResult(`collection "${slug}"`, entity);
+            return untrustedJsonResult(
+                `collection "${slug}"`,
+                argsObj.includeBinary === true ? entity : omitBinaryValues(entity, new Set())
+            );
         }
 
         case "create_document": {

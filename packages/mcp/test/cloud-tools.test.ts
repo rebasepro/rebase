@@ -210,6 +210,33 @@ describe("cloud tool argv", () => {
         expect(() => parseCloudToolArgs("rebase_cloud_deploy", { wait: false, timeoutSeconds: 60 })).toThrow(/timeoutSeconds/);
     });
 
+    /**
+     * After `rebase_project_use_cloud songbuzz`, `rebase_cloud_logs` still asked
+     * the directory's link and refused `no_project`, while
+     * `rebase cloud logs --runtime --project songbuzz` worked.
+     */
+    it("points the read tools at the project rebase_project_use_cloud selected", () => {
+        const id = "aca0185f-0000-4000-8000-000000000000";
+        expect(parseCloudToolArgs("rebase_cloud_logs", { since: "1h" }, id).argv)
+            .toEqual(["cloud", "logs", "--runtime", "--json", `--tail=${CLOUD_LOGS_DEFAULT_TAIL}`, "--since=1h", "--project", id]);
+        expect(parseCloudToolArgs("rebase_cloud_logs", { source: "build" }, id).argv).toEqual(["cloud", "logs", "--json", "--project", id]);
+        expect(parseCloudToolArgs("rebase_cloud_status", {}, id).argv).toEqual(["cloud", "status", "--json", "--project", id]);
+        expect(parseCloudToolArgs("rebase_cloud_env_list", {}, id).argv).toContain("--project");
+        expect(parseCloudToolArgs("rebase_cloud_deployments_list", {}, id).argv).toContain("--project");
+    });
+
+    it("keeps deploys, env changes and rollbacks on the linked project, whatever is selected", () => {
+        const id = "aca0185f-0000-4000-8000-000000000000";
+        for (const [name, sample] of [
+            ["rebase_cloud_deploy", {}],
+            ["rebase_cloud_env_set", { key: "A", value: "b" }],
+            ["rebase_cloud_rollback", {}],
+            ["rebase_cloud_projects_list", {}]
+        ] as const) {
+            expect(parseCloudToolArgs(name, sample, id).argv).not.toContain("--project");
+        }
+    });
+
     it("defaults a runtime log to the last 200 lines", () => {
         expect(parseCloudToolArgs("rebase_cloud_logs", {}).argv).toEqual(["cloud", "logs", "--runtime", "--json", `--tail=${CLOUD_LOGS_DEFAULT_TAIL}`]);
     });
