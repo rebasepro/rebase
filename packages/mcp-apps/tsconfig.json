@@ -16,7 +16,9 @@
     "skipLibCheck": true,
     "isolatedModules": true,
     "forceConsistentCasingInFileNames": true,
-    "types": [],
+    "types": [
+      "vite/client"
+    ],
     "noEmit": true
   },
   "include": [

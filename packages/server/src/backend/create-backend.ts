@@ -1721,8 +1721,9 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
             // collections it reaches.
             resolveApiKey: apiKeyStore ? (token: string) => resolveApiKey(apiKeyStore, token, access) : undefined,
             // The views a client like Claude shows a tool's result in. Imported
-            // on first use: the HTML is large, and only a client that renders
-            // views ever asks for it.
+            // on the first `/mcp` request that needs them — any client's first
+            // `initialize` or `tools/list` — not at boot: the HTML is large, and
+            // a backend no MCP client calls never loads it.
             apps: async () => (await import("@rebasepro/mcp-apps")).MCP_APPS
         };
 

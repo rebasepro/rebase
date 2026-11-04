@@ -97,9 +97,12 @@ export function CollectionTable({ bridge }: { bridge: McpAppBridge }) {
         try {
             // The same read the model asked for, one page on. query_collection
             // and show_collection take the same arguments.
+            // `offset` counts on from the one it asked for, and `collection`
+            // is the page's own in case the host sent no tool input.
             const result = await bridge.callTool("query_collection", {
                 ...inputRef.current,
-                offset: page.data.length
+                collection: page.collection,
+                offset: (Number(inputRef.current.offset) || 0) + page.data.length
             });
             const next = rowsOf(result);
             if (typeof next === "string") setFailure(next);
@@ -303,8 +306,11 @@ function InlineTextEditor({ column, value, onCancel, onSave }: {
     onCancel: () => void;
     onSave: (value: unknown) => void;
 }) {
-    const [draft, setDraft] = useState(value === null || value === undefined ? "" : String(value));
+    const original = value === null || value === undefined ? "" : String(value);
+    const [draft, setDraft] = useState(original);
     const commit = () => {
+        // Left as it was: nothing to save. An empty cell stays null, not "".
+        if (draft === original) return onCancel();
         if (column.type === "number") {
             const parsed = draft.trim() === "" ? null : Number(draft);
             if (parsed !== null && Number.isNaN(parsed)) return onCancel();

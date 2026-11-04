@@ -197,6 +197,7 @@ has one line saying where it runs, or that nothing does and why;
 - `@rebasepro/cli` `test:integration` — lane `vitest` of `ci:e2e`.
 - `@rebasepro/cli` `typecheck:test` — the same files are in `tsconfig.tests.json`, which `typecheck` (static job) runs.
 - `@rebasepro/rls-check` `typecheck` — its `src` is in `tsconfig.typecheck.json`, which `typecheck` (static job) runs.
+- `@rebasepro/mcp-apps` `typecheck` — its `src` and `views` are in `tsconfig.typecheck.json` and its `test` in `tsconfig.tests.json`, which `typecheck` (static job) runs.
 - `@rebasepro/server-postgres` `smoke:baas` — **runs in no pipeline.** BaaS mode end to end against a Docker Postgres, run by hand as the root `pnpm smoke:baas`.
 - `@rebasepro/app` `test:lint` — `check:lint` (static job) lints the same files.
 - `@rebasepro/client` `test:lint` — `check:lint` (static job) lints the same files.

@@ -1,8 +1,8 @@
 ---
-sourceHash: 3c5e837860d6c8c6
+sourceHash: e777b5a7b5dab590
 title: Der Remote-MCP-Endpunkt
 sidebar_label: Remote-MCP-Endpunkt
-description: Stellen Sie MCP von einem bereitgestellten Backend unter /mcp bereit, damit die Benutzer Ihrer App Claude oder Cursor als sich selbst verbinden können – OAuth mit Zustimmungsbildschirm, acht Tools unter drei Scopes, jeder Aufruf unter ihrer eigenen Row-Level Security.
+description: Stellen Sie MCP von einem bereitgestellten Backend unter /mcp bereit, damit die Benutzer Ihrer App Claude oder Cursor als sich selbst verbinden können – OAuth mit Zustimmungsbildschirm, neun Tools unter drei Scopes, jeder Aufruf unter ihrer eigenen Row-Level Security.
 ---
 
 Der [MCP-Server](/docs/ai/mcp/) ist ein Entwickler-Tool: Er läuft auf Ihrem Rechner und
@@ -37,9 +37,9 @@ den Grund im Boot-Log. Keine `REBASE_ROLE` schaltet ihn ein.
   Autorisierungscode gesendet wird, und weist darauf hin, dass dieser Host nicht
   verifiziert ist: Jeder darf einen Client unter einem beliebigen Namen registrieren,
   daher ist der Host der Teil, den eine Person überprüfen kann.
-- **Acht Tools, drei Scopes.** Dieselben [Scopes](/docs/backend/roles-and-scopes/), die
+- **Neun Tools, drei Scopes.** Dieselben [Scopes](/docs/backend/roles-and-scopes/), die
   jedes Zugangsdatum verwendet. `data:read` bietet `list_collections`,
-  `describe_collection`, `query_collection`, `count_documents` und `get_document`;
+  `describe_collection`, `query_collection`, `show_collection`, `count_documents` und `get_document`;
   `data:write` fügt `create_document` und `update_document` hinzu; `data:delete` fügt
   `delete_document` hinzu. Ein Client, der nichts anfordert, erhält `data:read`. Jeder
   davon lässt sich auf eine Collection eingrenzen: `data:read:posts` listet, beschreibt
@@ -47,6 +47,15 @@ den Grund im Boot-Log. Keine `REBASE_ROLE` schaltet ihn ein.
   werden und welche Collections sie erreichen, nicht welche Zeilen: Eine leere Liste kann
   bedeuten, dass RLS funktioniert, und `data:write` kann dennoch keine Zeile schreiben,
   die die Person nicht schreiben könnte.
+- **`show_collection` zeigt der Person die Zeilen.** Es nimmt die Argumente von
+  `query_collection` entgegen und antwortet mit derselben Seite, dazu den Spalten, die
+  das Admin-Panel zeigt. Ein Client, der MCP Apps darstellt, etwa Claude, öffnet sie
+  als Tabelle im Gespräch: Die Person kann weitere Zeilen laden und, wo die Verbindung
+  `data:write` hält, eine Zelle direkt bearbeiten. Jede Speicherung ist ein
+  `update_document`-Aufruf in ihrem Namen, unter ihrem RLS, und das Modell erfährt,
+  was sie geändert hat. Ein Client ohne MCP Apps, etwa Claude Code oder Cursor, zeigt
+  keine Tabelle, und das Modell liest die Seite so, wie es sie von `query_collection`
+  bekäme.
 - **Vor 0.24 erteilte Berechtigungen behalten ihre Reichweite.** `mcp:read` wird als
   `data:read` gelesen und `mcp:write` als `data:write data:delete`, bei gespeicherten
   Berechtigungen ebenso wie bei bereits ausgestellten Tokens.

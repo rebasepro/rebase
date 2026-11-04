@@ -580,12 +580,14 @@ const TOOLS: McpToolDefinition[] = [
     {
         name: "show_collection",
         description:
-            "Show rows of a collection to the user as an interactive table, in the conversation. Use it when "
-            + "the user wants to see, browse or edit data, rather than for reading rows yourself (that is "
-            + "query_collection). It takes query_collection's arguments, and its result is the same page of "
-            + "rows plus the columns the table shows. Where this connection may write the collection, the "
-            + "user can edit cells in the table; their edits are saved as them, and you are told what they "
-            + "changed." + UNTRUSTED_ROWS,
+            "Show rows of a collection to the user. In a client that renders MCP Apps, this opens an "
+            + "editable table in the conversation; in any other client nothing is shown, and the result is "
+            + "the same page of rows query_collection returns. The result does not say which happened, so "
+            + "do not tell the user a table appeared: report what the rows say. Use it when the user wants to see, browse or edit data, rather than for "
+            + "reading rows yourself (that is query_collection). It takes query_collection's arguments, and "
+            + "its result is that page plus the columns the table shows. Where a table is shown and this "
+            + "connection may write the collection, the user can edit cells in it; their edits are saved as "
+            + "them, and you are told what they changed." + UNTRUSTED_ROWS,
         requiredScope: "data:read",
         inputSchema: QUERY_INPUT_SCHEMA,
         ui: { resourceUri: COLLECTION_TABLE_URI },
@@ -598,7 +600,8 @@ const TOOLS: McpToolDefinition[] = [
                 idKey: idPropertyEntry(collection)?.[0] ?? "id",
                 columns: tableColumns(collection, ctx),
                 // The table's edit affordance, not a permission: RLS still
-                // decides each save, and a refused one is shown on its cell.
+                // decides each save, and a refused one is shown above the
+                // table while the cell keeps its value.
                 writable: reaches(ctx, "data:write", collection),
                 ...page
             };

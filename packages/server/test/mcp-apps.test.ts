@@ -148,6 +148,27 @@ describe("show_collection", () => {
         expect(JSON.stringify(result?.content)).toContain("show_collection on collection");
     });
 
+    it("is offered to a read-only connection, whose edits from the table are refused as out of scope", async () => {
+        // The view relays a cell edit as `update_document` with the host's
+        // token. `writable: false` hides the editor; the scope is what refuses.
+        const stub = stubDriver();
+        const { app } = buildApp({ apps: withViews, driver: stub.driver, collections: [CANDIDATES] });
+        const bearer = await token("data:read");
+
+        expect(await toolNamed(app, bearer, "show_collection")).toBeDefined();
+        expect(await toolNamed(app, bearer, "update_document")).toBeUndefined();
+
+        const res = await rpc(app, bearer, {
+            jsonrpc: "2.0", id: 1, method: "tools/call",
+            params: { name: "update_document", arguments: { collection: "candidates", id: "c1", data: { name: "Grace" } } }
+        });
+        const body = await res.json() as { error?: { code: number; message: string } };
+        expect(body.error?.message).toBe("\"update_document\" requires the data:write scope, which this token does not hold.");
+        expect(res.headers.get("WWW-Authenticate")).toContain("insufficient_scope");
+        expect(stub.scopedAs).toEqual([]);
+        expect(stub.calls).toEqual([]);
+    });
+
     it("marks scalar, writable columns editable when the connection may write — never the id or a read-only field", async () => {
         const { result } = await show("data:read data:write");
         const content = result?.structuredContent as { writable: boolean; columns: { key: string; editable: boolean }[] };

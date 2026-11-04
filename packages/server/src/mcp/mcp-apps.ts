@@ -33,8 +33,9 @@ export interface McpAppResource {
 /**
  * Where the views come from, asked once and remembered.
  *
- * A function rather than the list because the HTML is large and only a client
- * that renders views ever reads it.
+ * A function rather than the list because the HTML is large: it is loaded on
+ * the first `/mcp` request that needs it (any client's first `initialize` or
+ * `tools/list`), not when the backend boots.
  */
 export type McpAppsSource = () => Promise<readonly McpAppResource[]>;
 

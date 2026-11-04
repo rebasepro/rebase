@@ -1,6 +1,6 @@
 {
   "name": "@rebasepro/mcp-apps",
-  "version": "0.26.0",
+  "version": "0.27.0",
   "description": "MCP App views for Rebase: the collection table a client like Claude shows tool results in, built from the Rebase UI kit.",
   "keywords": [
     "rebase",

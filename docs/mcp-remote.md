@@ -112,7 +112,7 @@ and no others — `MCP_SCOPES` in `mcp/oauth-metadata.ts`:
 
 | Scope | What it grants |
 |---|---|
-| `data:read` | `list_collections`, `describe_collection`, `query_collection`, `count_documents`, `get_document` |
+| `data:read` | `list_collections`, `describe_collection`, `query_collection`, `show_collection` (where the MCP App views are served — `mcp/mcp-apps.ts`), `count_documents`, `get_document` |
 | `data:write` | `create_document`, `update_document` |
 | `data:delete` | `delete_document` |
 

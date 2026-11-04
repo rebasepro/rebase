@@ -1,5 +1,5 @@
 ---
-sourceHash: 63db41eff259cc37
+sourceHash: 448871502e7447b5
 slug: de/docs/compatibility
 title: Kompatibilität
 description: Was Rebase über Versionen hinweg verspricht und was nicht — die sechs versionierten Verträge, wie jeder einzelne fehlschlägt und was sich in einem Minor-Release noch ändern kann.
@@ -42,7 +42,7 @@ Die drei Einstufungen bedeuten:
 | Offline-Synchronisierung | Beta | Mutationen enthalten Idempotenzschlüssel, die der Server berücksichtigt, und die im Juli-Audit gefundenen Datenverlustfehler wurden behoben. Das Konfliktmodell ist Last-Write-Wins ohne Merge auf Feldebene |
 | Entity-Historie | Stable | Snapshot-basiert, abgesichert durch eine eigene Test-Suite |
 | Functions und Crons | Stable | Der portable Einstiegspunkt (`@rebasepro/server/functions`) ist ein versionierter Vertrag mit einem eigenen API-Surface-Abschnitt |
-| MCP-Server + Agent Skills | Beta | `@rebasepro/mcp` läuft über stdio: 53 Tools, Bearer-Auth pro Projekt, destruktive Tools verweigern nicht-lokale Ziele, sofern nicht explizit aktiviert. Seit 0.21 kann der Server auch einen Remote-Endpunkt `/mcp` mounten — OAuth 2.1, acht Daten-Tools, jeder Aufruf unter dem RLS der angemeldeten Person — standardmäßig deaktiviert, es sei denn `REBASE_MCP_ENABLED=true`, und nur für Postgres |
+| MCP-Server + Agent Skills | Beta | `@rebasepro/mcp` läuft über stdio: 53 Tools, Bearer-Auth pro Projekt, destruktive Tools verweigern nicht-lokale Ziele, sofern nicht explizit aktiviert. Seit 0.21 kann der Server auch einen Remote-Endpunkt `/mcp` mounten — OAuth 2.1, neun Daten-Tools, jeder Aufruf unter dem RLS der angemeldeten Person — standardmäßig deaktiviert, es sei denn `REBASE_MCP_ENABLED=true`, und nur für Postgres |
 | Studio (SQL, Schema, RLS, API-Explorer) | Beta | Täglich in echten Projekten im Einsatz. Branching ist im OSS-Paket vorhanden und wird in Rebase Cloud bewusst nicht bereitgestellt, da das Verschieben eines laufenden Deployments auf einen Branch noch kein definiertes Konzept hat |
 | CMS + Admin-Panel | Beta | Vollständig für CRUD, Relationen, Storage-Felder und Rollen. **Die Datentabelle besitzt keine Grid-Semantik** — keine `role`, kein `aria-rowindex`, `tabIndex` entfernt — daher können Tastatur- und Screenreader-Benutzer die Hauptansicht nicht bedienen. Keine Entwürfe, keine Inhalte pro Locale, kein Block-Rich-Text |
 | Verwaltete PGlite-Entwicklungsdatenbank | Beta | Zero-Setup `rebase dev` ohne Docker. Jeweils nur eine Session, daher serialisieren Anfragen und Nebenläufigkeit kann damit nicht reproduziert werden; auf Atlas basierende Befehle (`db push`, `generate`, `migrate`) planen gegen eine zweite, temporäre PGlite-Instanz, die für den Befehl gestartet wird (unter 0.24 verweigern sie die verwaltete Datenbank); `db branch` funktioniert dort nicht und weist darauf hin |

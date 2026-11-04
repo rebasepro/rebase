@@ -1,5 +1,5 @@
 ---
-sourceHash: 63db41eff259cc37
+sourceHash: 448871502e7447b5
 slug: pt/docs/compatibility
 title: Compatibilidade
 description: O que o Rebase promete entre versões e o que não promete — os seis contratos versionados, como cada um falha e o que ainda pode mudar em uma versão minor.
@@ -66,7 +66,7 @@ As três classificações significam:
 | Sincronização offline | Beta | Mutações contêm chaves de idempotência que o servidor respeita, e os defeitos de perda de dados encontrados na auditoria de julho foram corrigidos. O modelo de conflito é last-write-wins sem mesclagem por campo |
 | Histórico de entidades | Stable | Baseado em snapshots, protegido por sua própria suíte de testes |
 | Functions e crons | Stable | O ponto de entrada portátil (`@rebasepro/server/functions`) é um contrato versionado com sua própria seção de superfície de API |
-| Servidor MCP + habilidades de agente | Beta | `@rebasepro/mcp` roda sobre stdio: cinquenta e três ferramentas, autenticação bearer por projeto, ferramentas destrutivas recusam alvos não locais a menos que explicitamente configuradas. Desde a 0.21, o servidor também pode montar um endpoint remoto `/mcp` — OAuth 2.1, oito ferramentas de dados, cada chamada sob o próprio RLS da pessoa autenticada — desativado a menos que `REBASE_MCP_ENABLED=true`, e apenas para Postgres |
+| Servidor MCP + habilidades de agente | Beta | `@rebasepro/mcp` roda sobre stdio: cinquenta e três ferramentas, autenticação bearer por projeto, ferramentas destrutivas recusam alvos não locais a menos que explicitamente configuradas. Desde a 0.21, o servidor também pode montar um endpoint remoto `/mcp` — OAuth 2.1, nove ferramentas de dados, cada chamada sob o próprio RLS da pessoa autenticada — desativado a menos que `REBASE_MCP_ENABLED=true`, e apenas para Postgres |
 | Studio (SQL, esquema, RLS, explorador de API) | Beta | Usado diariamente em projetos reais. O suporte a branches está presente no pacote OSS e deliberadamente não foi exposto no Rebase Cloud, pois mover uma implantação em execução para um branch ainda não tem uma solução definida |
 | CMS + painel administrativo | Beta | Completo para CRUD, relações, campos de armazenamento e funções (roles). **A tabela de dados não possui semântica de grade** — sem `role`, sem `aria-rowindex`, `tabIndex` removido — de modo que usuários de teclado e leitores de tela não conseguem operar a visualização principal. Sem rascunhos, sem conteúdo por localidade, sem rich-text em blocos |
 | Banco de dados de desenvolvimento gerenciado PGlite | Beta | `rebase dev` sem configuração e sem Docker. Uma sessão por vez, portanto as requisições são serializadas e a concorrência não pode ser reproduzida nele; comandos baseados em Atlas (`db push`, `generate`, `migrate`) planejam contra um segundo PGlite temporário iniciado para o comando (na 0.24 eles recusam o banco gerenciado); `db branch` não funciona nele e informa isso explicitamente |
