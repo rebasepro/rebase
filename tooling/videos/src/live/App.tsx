@@ -24,6 +24,8 @@ import { simulateRead } from "./simulate";
  */
 
 const FPS = 30;
+/** Seconds counted down between Start and the recorder starting. */
+const COUNTDOWN = 3;
 const params = new URLSearchParams(location.search);
 const SIMULATE = params.has("simulate") ? Number(params.get("simulate")) || 155 : null;
 const LANG = params.get("lang") ?? "en-US";
@@ -106,6 +108,8 @@ export const App: React.FC = () => {
     const player = useRef<PlayerRef>(null);
     const session = useRef<Session | null>(null);
     const starting = useRef(false);
+    const [countdown, setCountdown] = useState<number | null>(null);
+    const callOff = useRef(false);
 
     /* ── the camera and microphone ───────────────────────────────────── */
 
@@ -195,6 +199,19 @@ export const App: React.FC = () => {
         starting.current = true;
         setSaved(null);
         setError(null);
+        /* A countdown before the recorder starts, so the take does not open
+           on a hand leaving the key or the mouse. Esc during it calls it off. */
+        callOff.current = false;
+        for (let n = COUNTDOWN; n > 0; n--) {
+            setCountdown(n);
+            await new Promise((r) => window.setTimeout(r, 1000));
+            if (callOff.current) break;
+        }
+        setCountdown(null);
+        if (callOff.current) {
+            starting.current = false;
+            return;
+        }
         const id = takeId();
         const follower = new Follower(FPS, 15, SCRIPT);
         const s: Session = {
@@ -328,7 +345,7 @@ export const App: React.FC = () => {
             else t.stopPlayback?.();
             return;
         }
-        if (!stream || session.current || (phase !== "ready" && phase !== "saved")) return;
+        if (!stream || session.current || starting.current || (phase !== "ready" && phase !== "saved")) return;
         const recorder = new MediaRecorder(new MediaStream(stream.getAudioTracks()));
         const chunks: Blob[] = [];
         const recognizer = new Recognizer(LANG, {
@@ -375,6 +392,8 @@ export const App: React.FC = () => {
             } else if (e.code === "Escape" && s) {
                 e.preventDefault();
                 void stop();
+            } else if (e.code === "Escape" && starting.current) {
+                callOff.current = true;
             } else if ((e.code === "ArrowRight" || e.code === "PageDown") && s) {
                 /* A presenter's clicker sends PageDown. */
                 e.preventDefault();
@@ -503,6 +522,12 @@ export const App: React.FC = () => {
                 ) : null}
             </div>
 
+            {countdown !== null && (
+                <div style={{ position: "fixed", inset: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", pointerEvents: "none" }}>
+                    <div style={{ fontSize: 220, fontWeight: 700, lineHeight: 1, color: "#FFFFFF", textShadow: "0 4px 40px rgba(0,0,0,0.8)" }}>{countdown}</div>
+                    <div style={{ marginTop: 12, fontSize: 18, color: "rgba(255,255,255,0.7)", textShadow: "0 2px 12px rgba(0,0,0,0.9)" }}>recording starts after 1 · Esc calls it off</div>
+                </div>
+            )}
             {micTest && !recording && (
                 <div style={panel}>
                     <div style={{ fontWeight: 600, marginBottom: 8 }}>
