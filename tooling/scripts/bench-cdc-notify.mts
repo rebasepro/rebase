@@ -1,18 +1,19 @@
 /**
- * What trigger-based change capture costs a write, measured on a throwaway
- * Postgres.
+ * What change capture costs a write, measured on a throwaway Postgres.
  *
  *     node --import tsx tooling/scripts/bench-cdc-notify.mts
  *     node --import tsx tooling/scripts/bench-cdc-notify.mts --flush-delay-us 1000
  *     node --import tsx tooling/scripts/bench-cdc-notify.mts --clients 1,8,32,64 --seconds 15
  *
- * Three copies of one table, written to by pgbench:
+ * Four copies of one table, written to by pgbench:
  *
  * - `plain` has no triggers.
  * - `fake` has the capture triggers exactly as provisioning attaches them, with
  *   `pg_notify` swapped for a function that does nothing.
  * - `cdc` has the real triggers, and a session listening on the channel and
- *   draining it, as a running server does.
+ *   draining it, as a running server does (`REALTIME_CDC=trigger`).
+ * - `wal` has no triggers; the table is in a publication and `pg_recvlogical`
+ *   streams it through `pgoutput`, as `REALTIME_CDC=wal` does.
  *
  * `plain` → `fake` is what the trigger body costs. `fake` → `cdc` is what
  * NOTIFY costs, and it is the larger of the two once writes are concurrent:
@@ -20,32 +21,36 @@
  * ("database 0", AccessExclusiveLock, `PreCommit_Notify` in async.c) and holds
  * it until the transaction ends, disk flush included. So those commits happen
  * one at a time and cannot share a flush, where every other write can.
+ * `plain` → `wal` is what logical decoding costs a writer: the decoding runs in
+ * the WAL sender, outside the writer's transaction.
  *
  * A laptop SSD flushes in microseconds, which hides most of that.
  * `--flush-delay-us` sets `commit_delay`, which waits that long inside the
  * flush, to stand in for a network disk.
  *
- * The SQL is generated from `trigger-cdc.ts`, not copied, so it measures the
- * triggers this checkout installs. Needs `initdb`, `pg_ctl`, `psql` and
- * `pgbench` on PATH. The cluster lives in the OS temp directory and is removed
- * on exit.
+ * The cluster runs with `wal_level=logical` for every variant, so they write
+ * the same WAL. The trigger SQL is generated from `trigger-cdc.ts`, not copied,
+ * so it measures the triggers this checkout installs. Needs `initdb`,
+ * `pg_ctl`, `psql`, `pgbench` and `pg_recvlogical` on PATH. The cluster lives
+ * in the OS temp directory and is removed on exit.
  */
 import fs from "fs";
 import os from "os";
 import path from "path";
 import net from "net";
-import { spawn, spawnSync } from "child_process";
+import { spawn, spawnSync, type ChildProcess } from "child_process";
 import {
     CDC_CHANNEL,
     buildCdcFunctionSql,
     buildCdcTriggerSql
 } from "../../packages/server-postgres/src/services/cdc/trigger-cdc.ts";
 
-type Variant = "plain" | "fake" | "cdc";
+type Variant = "plain" | "fake" | "cdc" | "wal";
 type Workload = "insert" | "update";
 
-const VARIANTS: readonly Variant[] = ["plain", "fake", "cdc"];
+const VARIANTS: readonly Variant[] = ["plain", "fake", "cdc", "wal"];
 const SEED_ROWS = 10_000;
+const SLOT = "bench_wal";
 
 const WORKLOADS: Record<Workload, string> = {
     insert: "INSERT INTO items (title, n) VALUES ('x', 1);\n",
@@ -70,10 +75,12 @@ interface Options {
 }
 
 function parseArgs(argv: string[]): Options {
-    const options: Options = { seconds: 10,
-clients: [1, 8, 32],
-workloads: ["insert", "update"],
-flushDelayUs: 0 };
+    const options: Options = {
+        seconds: 10,
+        clients: [1, 8, 32],
+        workloads: ["insert", "update"],
+        flushDelayUs: 0
+    };
     for (let i = 0; i < argv.length; i++) {
         const flag = argv[i];
         const value = argv[i + 1];
@@ -105,7 +112,7 @@ function workload(value: string): Workload {
 }
 
 function requireTools(): void {
-    const missing = ["initdb", "pg_ctl", "psql", "pgbench"].filter((tool) => spawnSync("which", [tool]).status !== 0);
+    const missing = ["initdb", "pg_ctl", "psql", "pgbench", "pg_recvlogical"].filter((tool) => spawnSync("which", [tool]).status !== 0);
     if (missing.length) throw new Error(`Not on PATH: ${missing.join(", ")}. Install Postgres (e.g. brew install postgresql).`);
 }
 
@@ -122,9 +129,13 @@ function freePort(): Promise<number> {
 }
 
 function run(command: string, args: string[], env?: NodeJS.ProcessEnv): string {
-    const result = spawnSync(command, args, { encoding: "utf8",
-env: { ...process.env,
-...env } });
+    const result = spawnSync(command, args, {
+        encoding: "utf8",
+        env: {
+            ...process.env,
+            ...env
+        }
+    });
     if (result.status !== 0) {
         throw new Error(`${command} ${args.join(" ")} failed:\n${result.stderr || result.stdout}`);
     }
@@ -139,7 +150,7 @@ env: { ...process.env,
  * listener the queue still fills and the lock is still taken, but a server
  * always has one, so the measurement does too.
  */
-function startListener(psqlArgs: string[]): { stop: () => Promise<number> } {
+function startListener(psqlArgs: string[]): { stop: () => Promise<string> } {
     const child = spawn("psql", [...psqlArgs, "-d", "cdc", "-X", "-q"], { stdio: ["pipe", "pipe", "ignore"] });
     let received = 0;
     let tail = "";
@@ -155,9 +166,37 @@ function startListener(psqlArgs: string[]): { stop: () => Promise<number> } {
     return {
         stop: () => new Promise((resolve) => {
             clearInterval(timer);
-            child.on("close", () => resolve(received));
+            child.on("close", () => resolve(`${received} notifications`));
             child.stdin.end("SELECT 1;\n");
         })
+    };
+}
+
+/**
+ * `pg_recvlogical` streaming the `wal` database's publication, as the WAL
+ * listener does. Stopping it reports how far behind the end of WAL its slot
+ * was left, which says whether the consumer kept up.
+ */
+function startWalConsumer(connArgs: string[], psqlArgs: string[]): { stop: () => Promise<string> } {
+    // The slot sat idle through the other variants' runs; skip their WAL, so
+    // what is left behind at the end is this run's alone.
+    run("psql", [...psqlArgs, "-d", "wal", "-qtA", "-c", `SELECT pg_replication_slot_advance('${SLOT}', pg_current_wal_lsn())`]);
+    const child: ChildProcess = spawn("pg_recvlogical", [
+        ...connArgs, "-d", "wal", "--slot", SLOT, "--start",
+        "-o", "proto_version=1", "-o", `publication_names=${SLOT}`, "-F", "1", "-f", "/dev/null"
+    ], { stdio: "ignore" });
+    // Listened for now: a consumer that dies early must not leave `stop` waiting on an event already gone.
+    const closed = new Promise<void>((resolve) => child.on("close", () => resolve()));
+    return {
+        stop: async () => {
+            // A second's feedback interval: let the last position reach the slot first.
+            await sleep(1500);
+            child.kill("SIGINT");
+            await closed;
+            const lag = run("psql", [...psqlArgs, "-d", "wal", "-tA", "-c",
+                `SELECT pg_size_pretty(pg_wal_lsn_diff(pg_current_wal_lsn(), confirmed_flush_lsn)) FROM pg_replication_slots WHERE slot_name = '${SLOT}'`]).trim();
+            return `slot ${lag} behind`;
+        }
     };
 }
 
@@ -172,7 +211,8 @@ async function main(): Promise<void> {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), "rebase-cdc-bench-"));
     const dataDir = path.join(dir, "pgdata");
     const port = await freePort();
-    const psqlArgs = ["-h", "127.0.0.1", "-p", String(port), "-U", "rebase", "-v", "ON_ERROR_STOP=1"];
+    const connArgs = ["-h", "127.0.0.1", "-p", String(port), "-U", "rebase"];
+    const psqlArgs = [...connArgs, "-v", "ON_ERROR_STOP=1"];
     // The postmaster refuses to start on macOS without a locale in the
     // environment ("became multithreaded during startup").
     const pgEnv = { LC_ALL: process.env.LC_ALL ?? "en_US.UTF-8" };
@@ -182,7 +222,8 @@ async function main(): Promise<void> {
         run("initdb", ["-D", dataDir, "-U", "rebase", "--auth=trust", "--no-locale", "-E", "UTF8"]);
         // No unix socket: a temp path can exceed the ~103-character limit.
         run("pg_ctl", ["-D", dataDir, "-l", path.join(dir, "pg.log"), "-w", "-o",
-            `-p ${port} -c listen_addresses=127.0.0.1 -c unix_socket_directories='' -c max_connections=${Math.max(...options.clients) + 20}`,
+            `-p ${port} -c listen_addresses=127.0.0.1 -c unix_socket_directories='' -c max_connections=${Math.max(...options.clients) + 20} ` +
+            "-c wal_level=logical -c max_replication_slots=4 -c max_wal_senders=4",
             "start"], pgEnv);
         started = true;
 
@@ -203,6 +244,8 @@ async function main(): Promise<void> {
         }
         run("psql", [...psqlArgs, "-d", "fake", "-q", "-c", fakeSql], { PGOPTIONS: "-c client_min_messages=warning" });
         run("psql", [...psqlArgs, "-d", "cdc", "-q", "-c", captureSql], { PGOPTIONS: "-c client_min_messages=warning" });
+        run("psql", [...psqlArgs, "-d", "wal", "-q", "-c", `CREATE PUBLICATION ${SLOT} FOR TABLE items`]);
+        run("pg_recvlogical", [...connArgs, "-d", "wal", "--slot", SLOT, "--create-slot", "--plugin", "pgoutput"]);
 
         const pgOptions = options.flushDelayUs > 0
             ? { PGOPTIONS: `-c commit_delay=${options.flushDelayUs} -c commit_siblings=1` }
@@ -215,39 +258,53 @@ async function main(): Promise<void> {
         }
 
         console.log(`Postgres ${run("psql", [...psqlArgs, "-d", "postgres", "-tA", "-c", "SHOW server_version"]).trim()}, ` +
-            `${options.seconds}s per run` +
+            `wal_level=logical, ${options.seconds}s per run` +
             (options.flushDelayUs ? `, commit_delay ${options.flushDelayUs}µs standing in for a slower disk flush` : "") + "\n");
-        console.log("| workload | clients | plain tps | fake tps | cdc tps | NOTIFY cost (fake ÷ cdc) | notifications |");
-        console.log("|---|---|---|---|---|---|---|");
+        console.log("| workload | clients | plain tps | fake tps | cdc tps | wal tps | NOTIFY cost (fake ÷ cdc) | wal ÷ cdc | consumers |");
+        console.log("|---|---|---|---|---|---|---|---|---|");
 
         for (const name of options.workloads) {
             const file = workloadFiles.get(name);
             if (!file) continue;
             for (const clients of options.clients) {
-                const tps: Record<Variant, number> = { plain: 0,
-fake: 0,
-cdc: 0 };
-                let received = 0;
+                const tps: Record<Variant, number> = {
+                    plain: 0,
+                    fake: 0,
+                    cdc: 0,
+                    wal: 0
+                };
+                const consumers: string[] = [];
                 for (const variant of VARIANTS) {
-                    const listener = variant === "cdc" ? startListener(psqlArgs) : undefined;
-                    if (listener) await sleep(500);
-                    const out = run("pgbench", [...psqlArgs.filter((arg) => arg !== "-v" && arg !== "ON_ERROR_STOP=1"),
+                    const consumer = variant === "cdc"
+                        ? startListener(psqlArgs)
+                        : variant === "wal" ? startWalConsumer(connArgs, psqlArgs) : undefined;
+                    if (consumer) await sleep(500);
+                    const out = run("pgbench", [...connArgs,
                         "-n", "-c", String(clients), "-j", String(Math.min(clients, 8)),
                         "-T", String(options.seconds), "-f", file, variant], pgOptions);
                     const match = /^tps = ([\d.]+)/m.exec(out);
                     if (!match) throw new Error(`pgbench printed no tps:\n${out}`);
                     tps[variant] = Number(match[1]);
-                    if (listener) received = await listener.stop();
+                    if (consumer) consumers.push(await consumer.stop());
                 }
-                const ratio = tps.cdc > 0 ? (tps.fake / tps.cdc).toFixed(1) + "×" : "—";
-                console.log(`| ${name} | ${clients} | ${Math.round(tps.plain)} | ${Math.round(tps.fake)} | ${Math.round(tps.cdc)} | ${ratio} | ${received} |`);
+                const times = (a: number, b: number) => (b > 0 ? (a / b).toFixed(1) + "×" : "—");
+                console.log(`| ${name} | ${clients} | ${Math.round(tps.plain)} | ${Math.round(tps.fake)} | ${Math.round(tps.cdc)} | ` +
+                    `${Math.round(tps.wal)} | ${times(tps.fake, tps.cdc)} | ${times(tps.wal, tps.cdc)} | ${consumers.join("; ")} |`);
             }
         }
     } finally {
-        if (started) spawnSync("pg_ctl", ["-D", dataDir, "-m", "immediate", "stop"], { env: { ...process.env,
-...pgEnv } });
-        fs.rmSync(dir, { recursive: true,
-force: true });
+        if (started) {
+            spawnSync("pg_ctl", ["-D", dataDir, "-m", "immediate", "stop"], {
+                env: {
+                    ...process.env,
+                    ...pgEnv
+                }
+            });
+        }
+        fs.rmSync(dir, {
+            recursive: true,
+            force: true
+        });
     }
 }
 

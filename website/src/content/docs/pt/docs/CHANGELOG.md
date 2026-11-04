@@ -331,6 +331,19 @@ A tradução está pendente. O conteúdo abaixo está em inglês.
 
 ### Added
 
+#### Realtime
+
+- **`REALTIME_CDC=wal` reads changes from the write-ahead log.** It used to fall
+  back to triggers. Changes now arrive through logical replication (`pgoutput`)
+  on a temporary slot per instance, so a write runs no capture trigger and sends
+  no `NOTIFY`, whose commit-time lock makes every notifying transaction on the
+  server commit one at a time, disk flush included. With 32 concurrent writers
+  and a 1 ms flush, inserts ran about ten times faster than under trigger
+  capture. It needs `wal_level=logical` and a role that may replicate, and falls
+  back to triggers with a warning otherwise. A boot that provisions and consumes
+  removes the capture triggers once its stream is open; a table with no primary
+  key stays out of the publication, because Postgres would refuse its updates.
+
 #### Server & REST
 
 - **Streamed object writes.** `StorageController.putObjectStream` writes an
@@ -462,6 +475,10 @@ A tradução está pendente. O conteúdo abaixo está em inglês.
 
 #### Realtime
 
+- **A change to a junction table that names no list refreshes the relation's
+  lists.** A link or unlink whose key was too large to notify carried neither
+  id and was dropped, so no subscriber of the child list heard of it. Every
+  subscribed list of that relation now refetches.
 - **The Postgres channel bus only publishes what another instance is waiting
   for.** Every broadcast and presence change was a `NOTIFY` on the primary, with
   every member of the channel on one instance or no other instance running.

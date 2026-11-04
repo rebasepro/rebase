@@ -17,7 +17,10 @@ import { collectionKeyColumns } from "./cdc/identity-columns";
 import { ApiError, logger, rawQueryLoggingEnabled, rowETag } from "@rebasepro/server";
 import { assertReadRequestReadable } from "./read-field-access";
 import { sanitizeErrorForClient } from "../utils/pg-error-utils";
-import { CdcListener, type CdcChangeEvent } from "./cdc/CdcListener";
+import { CdcListener, type CdcChangeEvent, type CdcSource } from "./cdc/CdcListener";
+import { WalCdcListener } from "./cdc/WalCdcListener";
+import { CDC_PUBLICATION } from "./cdc/wal-cdc";
+import type { CdcTableRef } from "./cdc/trigger-cdc";
 import { PgNotifyListener } from "./pg-notify-listener";
 import { terminateIfBacklogged } from "./socket-liveness";
 import { deriveRowAddress, getPrimaryKeys, type PrimaryKeyInfo } from "./collection-helpers";
@@ -745,8 +748,8 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
     private static readonly REFETCH_MAX_WAIT_MS = DEFAULT_REFETCH_MAX_WAIT_MS;
 
     // ── Database-level Change Data Capture (CDC) ──
-    /** Dedicated LISTEN client for DB-level change events (undefined unless CDC is enabled). */
-    private cdcListener?: CdcListener;
+    /** Where DB-level change events come from — capture triggers or the WAL (undefined unless CDC is enabled). */
+    private cdcListener?: CdcSource;
     /** Whether database-level CDC is the active cross-instance change source. */
     private cdcActive = false;
     /** Junction table → the child lists its rows belong to, built when CDC starts. */
@@ -3839,18 +3842,45 @@ lastSeen: Date.now() });
      *                         (bypass PgBouncer — LISTEN needs a session connection).
      */
     async enableCdc(connectionString: string): Promise<void> {
+        await this.activateCdc(() => new CdcListener(
+            connectionString,
+            (events) => this.handleCdcEvents(events),
+            () => this.resyncSubscriptions(),
+            this.listenerApplicationName
+        ));
+    }
+
+    /**
+     * Enable change capture read from the write-ahead log instead of NOTIFY —
+     * `REALTIME_CDC=wal`. Same events, same pipeline as {@link enableCdc};
+     * writers pay for no trigger and no NOTIFY. Rejects when the stream cannot
+     * be opened (see {@link WalCdcListener.start}), leaving CDC inactive so the
+     * caller can enable the trigger listener instead.
+     *
+     * @param tables What provisioning captures, with the columns each table's
+     *        rows are addressed by. A table it does not name is addressed by
+     *        its replica identity.
+     */
+    async enableWalCdc(connectionString: string, tables: readonly CdcTableRef[]): Promise<void> {
+        const identity = new Map(tables.map((t) => [`${t.schema}.${t.table}`, t.identityColumns ?? []]));
+        await this.activateCdc(() => new WalCdcListener({
+            connectionString,
+            publication: CDC_PUBLICATION,
+            onEvents: (events) => this.handleCdcEvents(events),
+            onReconnect: () => this.resyncSubscriptions(),
+            identityColumns: (schema, table) => identity.get(`${schema}.${table}`),
+            applicationName: this.listenerApplicationName
+        }));
+    }
+
+    private async activateCdc(create: () => CdcSource): Promise<void> {
         if (this.cdcActive) {
             logger.warn("⚠️ [CDC] enableCdc called but CDC is already active. Ignoring.");
             return;
         }
         this.cdcTableMap = this.buildCdcTableMap();
         this.junctionLinkMap = buildJunctionLinkMap(this.registry);
-        this.cdcListener = new CdcListener(
-            connectionString,
-            (events) => this.handleCdcEvents(events),
-            () => this.resyncSubscriptions(),
-            this.listenerApplicationName
-        );
+        this.cdcListener = create();
         try {
             // start() validates the initial connection; if it can't be established
             // it rejects here, and we leave CDC inactive so the caller can fall
@@ -4024,15 +4054,7 @@ lastSeen: Date.now() });
         if (event.op === "TRUNCATE") {
             // Every link is gone, so every list of this relation that is
             // subscribed to has changed — whichever parent it belongs to.
-            for (const link of links) {
-                const prefix = `${link.parentCollection.slug}/`;
-                const suffix = `/${link.relationKey}`;
-                const lists = [...this.subscribedPaths.keys()].filter((path) =>
-                    path.startsWith(prefix) && path.endsWith(suffix) && path.split("/").length === 3);
-                for (const path of lists) {
-                    await this.notifyUpdate(path, ANY_ROW, null, (link.parentCollection as { databaseId?: string }).databaseId, /* broadcast */ false, /* origin */ "cdc");
-                }
-            }
+            for (const link of links) await this.notifyEveryListOf(link, null);
             return true;
         }
 
@@ -4040,9 +4062,16 @@ lastSeen: Date.now() });
             const sourceId = event.row?.[link.sourceColumn];
             const targetId = event.row?.[link.targetColumn];
             if (sourceId === undefined || sourceId === null || targetId === undefined || targetId === null) {
+                // The change cannot say which list it belongs to: a key too
+                // large to notify, or a WAL delete whose old tuple carries a
+                // surrogate key and not the two ids. Every list of the
+                // relation may have changed, so every subscribed one looks
+                // again — it used to be skipped, and that link or unlink
+                // reached nobody.
                 this.debugLog(
-                    `📡 [CDC] Junction row on ${event.table} is missing '${link.sourceColumn}'/'${link.targetColumn}' — skipping.`
+                    `📡 [CDC] Junction row on ${event.table} does not name '${link.sourceColumn}'/'${link.targetColumn}' — refreshing every list of ${link.parentCollection.slug}.${link.relationKey}.`
                 );
+                await this.notifyEveryListOf(link, { _rebase_invalidated: true });
                 continue;
             }
 
@@ -4062,6 +4091,21 @@ lastSeen: Date.now() });
         }
 
         return true;
+    }
+
+    /**
+     * Notify every subscribed child list of one many-to-many relation,
+     * whichever parent it belongs to — for a junction change that names no
+     * single list.
+     */
+    private async notifyEveryListOf(link: JunctionLink, row: Record<string, unknown> | null): Promise<void> {
+        const prefix = `${link.parentCollection.slug}/`;
+        const suffix = `/${link.relationKey}`;
+        const lists = [...this.subscribedPaths.keys()].filter((path) =>
+            path.startsWith(prefix) && path.endsWith(suffix) && path.split("/").length === 3);
+        for (const path of lists) {
+            await this.notifyUpdate(path, ANY_ROW, row, (link.parentCollection as { databaseId?: string }).databaseId, /* broadcast */ false, /* origin */ "cdc");
+        }
     }
 
     /**

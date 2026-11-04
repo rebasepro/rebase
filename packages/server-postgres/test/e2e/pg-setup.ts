@@ -106,8 +106,12 @@ export async function imageForLocalClient(): Promise<string> {
  */
 export const PGVECTOR_IMAGE = "pgvector/pgvector:pg18";
 
+/**
+ * @param options.args Server flags after the image, as `postgres` takes them —
+ *        `["-c", "wal_level=logical"]` for a suite that needs logical decoding.
+ */
 export async function startPgContainer(
-    options: { image?: string } = {}
+    options: { image?: string; args?: string[] } = {}
 ): Promise<PgContainer> {
     const image = options.image ?? DEFAULT_PG_IMAGE;
     // `REBASE_E2E_CONTAINER_PREFIX` lets several runs on one machine tell their
@@ -129,7 +133,8 @@ export async function startPgContainer(
         "-e", "POSTGRES_PASSWORD=rebase",
         "-p", "5432",          // random host port
         "-d",
-        image
+        image,
+        ...(options.args ?? [])
     ]);
 
     // Discover the assigned host port
