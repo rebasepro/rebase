@@ -314,6 +314,19 @@ export function describeSchemaDifference(difference: SchemaDifference): string {
 }
 
 /**
+ * The `rebase schema reconcile` line for a difference it can apply: a column
+ * the database requires and the collection made optional, or one the
+ * collection no longer declares. Undefined for the rest.
+ */
+export function reconcileFix(difference: SchemaDifference): string | undefined {
+    if (difference.kind === "nullability" && difference.live === "NOT NULL") return "rebase schema reconcile";
+    if (difference.kind === "extra-column" && difference.collection) {
+        return `rebase schema reconcile --drop ${difference.collection}.${difference.column}`;
+    }
+    return undefined;
+}
+
+/**
  * Report the differences, one warning each, and never throw.
  *
  * Per difference rather than one summary block on purpose: these are read out of
@@ -334,8 +347,9 @@ export function warnOnGeneratedSchemaDrift(differences: SchemaDifference[]): voi
         `📄 [schema] schema.generated.ts and the database disagree (${differences.length} difference` +
         `${differences.length === 1 ? "" : "s"}). Boot applies only additive changes; these are the ones it ` +
         "left for you. Run `rebase db push` to apply them (it shows the plan and asks before anything " +
-        "destructive), or `rebase db generate` for a migration. If the collections changed since " +
-        "schema.generated.ts was written, run `rebase schema generate` first."
+        "destructive), or `rebase db generate` for a migration. A NOT NULL to relax or a column to drop " +
+        "can also be applied through the running backend, Rebase Cloud included: `rebase schema reconcile`. " +
+        "If the collections changed since schema.generated.ts was written, run `rebase schema generate` first."
     );
 
     for (const difference of differences) {
@@ -349,7 +363,7 @@ export function warnOnGeneratedSchemaDrift(differences: SchemaDifference[]): voi
                 generated: difference.generated,
                 live: difference.live
             },
-            fix: "rebase db push"
+            fix: reconcileFix(difference) ?? "rebase db push"
         });
     }
 }

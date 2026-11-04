@@ -63,6 +63,7 @@ import { applyAuthContext } from "./security/rls-enforcement";
 import { withFieldViewer } from "./services/field-viewer";
 import { generateSchemaCommit } from "./schema/generate-schema-commit";
 import { readSchemaFactsFor, type Queryable } from "./schema/ensure-collection-tables";
+import { readReconcileFacts } from "./schema/reconcile-schema";
 import { onOwnSession, openSqlCursorOnPool, readWithinBudget, refuseOversizedRows, RESET_SESSION_STATEMENTS, runSqlScriptOnPool, sqlScriptResultFromRows } from "./services/sql-script";
 import { PgNotifyListener } from "./services/pg-notify-listener";
 import { diffDatabaseBranch, mergeDatabaseBranch } from "./branching/branch-diff";
@@ -514,6 +515,14 @@ export class PostgresBackendDriver implements DataDriver {
                     after as CollectionConfig[]
                 )
             }),
+            // The reviewed counterpart to boot's additive ensure: relaxing NOT
+            // NULL and dropping columns no collection declares. Plans only;
+            // the caller runs the statements once a person confirms them.
+            planSchemaReconcile: async (collections, options) => readReconcileFacts(
+                this.schemaFactsQueryable(),
+                collections as CollectionConfig[],
+                options
+            ),
             listen: (...args: Parameters<NonNullable<SQLAdmin["listen"]>>) => this.listen(...args),
             // Branch operations (only available when poolManager is configured)
             ...(this.branchService ? {

@@ -17,7 +17,8 @@ The backend also applies the additive part itself at every boot, on any
 database — missing tables, columns and enum types, and the RLS policies
 (`REBASE_MIGRATE_ON_BOOT=ensure`, the default) — so under `rebase dev` an added
 property or collection needs neither step. Boot never drops, renames or narrows:
-that is what `db push` and the migrations are for.
+that is what `db push` and the migrations are for, and on a deployed backend
+`rebase schema reconcile` (see "Removing a Property" below).
 
 ```mermaid
 graph LR
@@ -134,6 +135,33 @@ rebase schema generate && rebase db push
 # Production
 rebase schema generate && rebase db generate && rebase db migrate
 ```
+
+### Removing a Property, or Making One Optional
+
+Boot never relaxes a constraint or drops a column. Making a property optional
+leaves its column `NOT NULL`, and removing one leaves the column behind with its
+data. If that column was `NOT NULL` with no default, every insert then fails on
+a field nobody can send. Boot reports both on every start.
+
+`rebase schema reconcile` is the reviewed step for these, and it works on
+Rebase Cloud too, because it runs through the deployed backend rather than a
+database URL:
+
+```bash
+# 1. Deploy the collection change first. Reconcile plans against what the backend runs.
+# 2. Review and apply: relaxes NOT NULL on optional properties and lists undeclared columns.
+rebase schema reconcile
+# 3. Drop a column no property declares. Name each one. The plan shows how many rows hold a value.
+rebase schema reconcile --drop voice_cache.wav
+```
+
+It prints the plan and applies it only after you type `yes`. The server runs
+the plan only on the digest of the plan you read, so if anything changed in
+between it refuses and shows the new plan. It needs `REBASE_SERVICE_KEY` in
+`.env`. Agents: show the human the plan and let them run the `--drop`. Never
+pass `--yes` on their behalf.
+
+Locally, `rebase db push` does the same through its destructive-change gate.
 
 ### Changing a Property Type
 

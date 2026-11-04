@@ -146,6 +146,7 @@ booting and prints that line.
 | `rebase schema generate` | Generate Drizzle schema from collection definitions |
 | `rebase schema introspect` | Introspect a live database → generate Rebase collection files. Since 0.25 each table's RLS policies land in its `securityRules` (the `<table>_default_*` ones Rebase adds are left out), so the `db push` after it keeps them |
 | `rebase schema stale` | Report generated schema files the collections have moved past. `--fix` regenerates them |
+| `rebase schema reconcile` | Through the running backend (Rebase Cloud included): relax NOT NULL on properties made optional, and drop the undeclared columns named with `--drop <collection>.<column>`. Prints the plan and asks; show it to the human and never pass `--yes` for them |
 | `rebase schema --help` | Show schema command help |
 
 > **IMPORTANT FOR AGENTS:** Schema commands are delegated to the active database driver plugin (e.g. `@rebasepro/server-postgres`). The plugin must be installed in `backend/package.json` or the command will fail with `Could not detect an active database plugin`.

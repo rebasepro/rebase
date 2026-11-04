@@ -185,4 +185,59 @@ export interface SchemaEditingAdmin {
             sourceOnly?: boolean;
         }
     ): Promise<SchemaChangePlan>;
+
+    /**
+     * What it would take to bring the database's existing columns in line with
+     * the collections, beyond what boot does on its own.
+     *
+     * Boot is additive: it never relaxes a constraint and never drops a column,
+     * because nobody reads its plan. This is the reviewed counterpart. It
+     * plans `DROP NOT NULL` for every column the collections declare optional
+     * and the database still requires, lists every column no collection
+     * declares, and drops only the ones named in `drop`. Read-only; applying
+     * is `executeSql`, gated by the caller on the plan's `digest`.
+     *
+     * Optional so a driver that cannot answer stays a valid admin.
+     */
+    planSchemaReconcile?(
+        collections: unknown[],
+        options?: {
+            /** Undeclared columns to drop, as `<collection slug>.<column>`. */
+            drop?: string[];
+        }
+    ): Promise<SchemaReconcilePlan>;
+}
+
+/** A column that exists in a collection's table and that no property declares. */
+export interface SchemaReconcileColumn {
+    /** The collection slug whose table holds it. */
+    collection: string;
+    /** `schema.table`. */
+    table: string;
+    column: string;
+    /** NOT NULL with no default: every insert through the API fails on it. */
+    blocksInserts: boolean;
+    /** Rows holding a value in it. Counted only for a column being dropped. */
+    rowsWithValue?: number;
+}
+
+/**
+ * The plan `planSchemaReconcile` returns.
+ *
+ * `digest` identifies exactly these statements. A caller applies a plan only
+ * when handed back the digest the person reviewed, so what runs is what was
+ * read, and a database that changed in between is planned and shown again.
+ */
+export interface SchemaReconcilePlan {
+    /** Columns declared optional that the database still requires. */
+    relaxed: Array<{ collection: string; table: string; column: string }>;
+    /** Every column no collection declares, dropped or not. */
+    undeclared: SchemaReconcileColumn[];
+    /** The undeclared columns this plan drops: the ones `drop` named. */
+    dropped: SchemaReconcileColumn[];
+    /** In order: every `DROP NOT NULL`, then every `DROP COLUMN`. */
+    statements: string[];
+    /** Why a requested drop cannot be planned. A plan with problems is not applied. */
+    problems: string[];
+    digest: string;
 }

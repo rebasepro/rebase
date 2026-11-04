@@ -1038,5 +1038,106 @@ export function createLiveSchemaRoutes(config: LiveSchemaRoutesConfig): Hono<Hon
         });
     });
 
+    /**
+     * The reviewed counterpart to boot's additive ensure.
+     *
+     * Boot never relaxes a constraint or drops a column, because nobody reads
+     * its plan. These two routes are the place somebody does: `plan` lists every
+     * column the collections made optional that the database still requires,
+     * and every column no collection declares; it drops only the columns named
+     * in `drop`. `apply` runs a plan only on the `digest` it was shown, so what
+     * runs is what was read, and a database that changed in between is refused
+     * with the new plan rather than altered on the old one.
+     *
+     * No repository is involved, unlike `/apply` above. The collections the
+     * server runs are already the source of truth; this brings the database to
+     * them. That is also what makes it reachable on a deployment running from a
+     * built bundle, where the runtime is the only thing that can reach the
+     * database at all.
+     */
+    const requireReconciler = () => {
+        const admin = config.getAdmin();
+        if (!isSchemaEditingAdmin(admin) || typeof admin.planSchemaReconcile !== "function") {
+            throw ApiError.serviceUnavailable(
+                "This backend's driver cannot plan a schema reconcile. It is available on Postgres.",
+                "SCHEMA_RECONCILE_UNSUPPORTED"
+            );
+        }
+        return { plan: admin.planSchemaReconcile.bind(admin) };
+    };
+
+    const readReconcileRequest = async (c: Context<HonoEnv>): Promise<{ drop: string[]; confirm?: string }> => {
+        const body = await readBody(c);
+        if (!isRecord(body)) throw ApiError.badRequest("Expected a JSON object.", "INVALID_RECONCILE");
+        const drop = body.drop ?? [];
+        if (!Array.isArray(drop) || !drop.every((d): d is string => typeof d === "string")) {
+            throw ApiError.badRequest("`drop` is a list of \"<collection>.<column>\" strings.", "INVALID_RECONCILE");
+        }
+        const confirm = typeof body.confirm === "string" ? body.confirm : undefined;
+        return { drop, confirm };
+    };
+
+    router.post("/reconcile/plan", async (c) => {
+        const { drop } = await readReconcileRequest(c);
+        const plan = await requireReconciler().plan(config.getCollections(), { drop });
+        return c.json(plan);
+    });
+
+    router.post("/reconcile/apply", requireScope("schema:write"), async (c) => {
+        const { drop, confirm } = await readReconcileRequest(c);
+        if (!confirm) {
+            throw ApiError.badRequest(
+                "Applying needs `confirm`: the digest of the plan you reviewed, from /reconcile/plan.",
+                "SCHEMA_RECONCILE_UNCONFIRMED"
+            );
+        }
+        if (config.databaseChangesOff) {
+            throw ApiError.conflict(config.databaseChangesOff.message, config.databaseChangesOff.code);
+        }
+        const reconciler = requireReconciler();
+
+        return oneApplyAtATime(async () => {
+            const plan = await reconciler.plan(config.getCollections(), { drop });
+            if (plan.problems.length > 0) {
+                throw ApiError.badRequest(
+                    "This reconcile cannot be applied:\n" + plan.problems.map(p => `  • ${p}`).join("\n"),
+                    "SCHEMA_RECONCILE_INVALID",
+                    { plan }
+                );
+            }
+            if (plan.digest !== confirm) {
+                throw ApiError.conflict(
+                    "The database or the collections changed since that plan was made, so it was not " +
+                    "applied. Review the new plan and confirm it.",
+                    "SCHEMA_RECONCILE_STALE",
+                    { plan }
+                );
+            }
+
+            const sql = config.getAdmin();
+            if (!isSQLAdmin(sql)) {
+                throw ApiError.serviceUnavailable("The driver cannot run SQL.", "SCHEMA_RECONCILE_UNSUPPORTED");
+            }
+            // One at a time, and the count travels with a failure: a relaxed
+            // constraint that landed before a failed drop is still relaxed.
+            const applied: string[] = [];
+            for (const statement of plan.statements) {
+                try {
+                    await sql.executeSql(statement);
+                } catch (err) {
+                    throw ApiError.badRequest(
+                        `Applied ${applied.length} of ${plan.statements.length} statements, then ` +
+                        `${statement} failed: ${err instanceof Error ? err.message : String(err)}`,
+                        "SCHEMA_RECONCILE_FAILED",
+                        { applied }
+                    );
+                }
+                applied.push(statement);
+            }
+            logger.warn(`[schema] Reconciled the database: ${applied.length} statement(s).`, { applied });
+            return c.json({ applied, plan });
+        });
+    });
+
     return router;
 }

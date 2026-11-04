@@ -312,6 +312,39 @@ describe("warnOnGeneratedSchemaDrift", () => {
         expect(details[0].context).toMatchObject({ fix: "rebase db push" });
     });
 
+    /**
+     * The two differences a deployed backend can apply on its own, after
+     * review: a NOT NULL the collection relaxed, and a column it stopped
+     * declaring. SongBuzz's `voice_cache.wav` was the first: optional in the
+     * collection, NOT NULL in the database, reported on every boot with a fix
+     * (`db push`) that cannot reach a Cloud database.
+     */
+    it("names `rebase schema reconcile` for what it can apply, and `db push` for the rest", () => {
+        const warnings: { message: string; context: unknown }[] = [];
+        const spy = jest.spyOn(logger, "warn").mockImplementation(((message: string, context?: unknown) => {
+            warnings.push({ message, context });
+        }) as never);
+        try {
+            warnOnGeneratedSchemaDrift([
+                { kind: "nullability", table: "songbuzz_voice_cache", collection: "voice_cache", column: "wav", property: "wav", generated: "nullable", live: "NOT NULL" },
+                { kind: "extra-column", table: "songbuzz_voice_cache", collection: "voice_cache", column: "legacy", live: "text" },
+                { kind: "nullability", table: "tags", collection: "tags", column: "color", property: "color", generated: "NOT NULL", live: "nullable" },
+                { kind: "type", table: "tags", collection: "tags", column: "day", property: "day", generated: "text", live: "date" }
+            ]);
+        } finally {
+            spy.mockRestore();
+        }
+
+        const [summary, ...details] = warnings;
+        expect(summary.message).toContain("`rebase schema reconcile`");
+        expect(details.map(d => (d.context as { fix: string }).fix)).toEqual([
+            "rebase schema reconcile",
+            "rebase schema reconcile --drop voice_cache.legacy",
+            "rebase db push",
+            "rebase db push"
+        ]);
+    });
+
     it("says nothing when there is no difference", () => {
         const spy = jest.spyOn(logger, "warn").mockImplementation((() => undefined) as never);
         try {

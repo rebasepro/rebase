@@ -22,6 +22,7 @@ import { DEV_DATABASE_KIND_ENV, devDatabaseKind, managedNotices, prepareDatabase
 import { absolutizeLocalPathArgs } from "./db";
 import { COLLECTIONS_FLAG_HELP, refuseMissingCollectionsPath } from "../utils/path-flags";
 import { collectionsDirArgs } from "../utils/collections-dir";
+import { RECONCILE_USAGE } from "./schema-reconcile";
 
 /**
  * The line handed to the driver, its paths resolved from where the command was
@@ -62,6 +63,15 @@ export async function schemaCommand(subcommand: string | undefined, rawArgs: str
     }
 
     const projectRoot = requireProjectRoot();
+
+    // Talks to the running backend, not the driver: on Rebase Cloud the
+    // backend is the only thing that reaches the database.
+    if (subcommand === "reconcile") {
+        void recordEvent("cli.schema", { subcommand }, { projectRoot });
+        const { schemaReconcileCommand } = await import("./schema-reconcile");
+        await schemaReconcileCommand(rawArgs);
+        return;
+    }
 
     // Fire-and-forget, and a no-op unless the developer opted in. Never awaited:
     // the command is what the user is waiting for, and a slow collector must not
@@ -157,6 +167,15 @@ const SCHEMA_ACTION_HELP: Record<string, { usage: string; summary: string; notes
                 + "--docker uses the compose one, starting it if needed."
         ]
     },
+    reconcile: {
+        usage: RECONCILE_USAGE,
+        summary: "Relax and drop what boot will not: NOT NULL on properties made optional, and columns no property declares.",
+        notes: [
+            "Plans on the running backend (the one `.env` and the cloud link point at), prints the plan, and applies it once you type yes.",
+            "A column is dropped only when named: --drop voice_cache.wav. Each drop shows how many rows hold a value.",
+            "--yes skips the prompt, for a plan already read. Needs REBASE_SERVICE_KEY in .env."
+        ]
+    },
     stale: {
         usage: "rebase schema stale [--collections <dir>] [--output <file>] [--fix]",
         summary: "Report generated schema files that no longer match the collections.",
@@ -194,6 +213,7 @@ ${chalk.green.bold("Commands")}
   ${chalk.blue.bold("generate")}    Generate Schema from collection definitions
   ${chalk.blue.bold("introspect")}  Introspect an existing database to generate collection definitions
   ${chalk.blue.bold("stale")}       Report generated schema files that no longer match the collections
+  ${chalk.blue.bold("reconcile")}   Relax NOT NULL and drop columns the collections no longer declare, after review
 
 ${chalk.green.bold("generate Options")}
   ${chalk.blue("--collections, -c")}  ${COLLECTIONS_FLAG_HELP}

@@ -399,6 +399,15 @@
 
 #### CLI
 
+- **`rebase schema reconcile` relaxes and drops what boot will not.** Boot
+  only adds, so a property made optional kept its `NOT NULL`, and a removed
+  property left a column that could block every insert. The command plans
+  through the running backend, Rebase Cloud included. It relaxes `NOT NULL`
+  on optional properties, drops only the undeclared columns you name with
+  `--drop <collection>.<column>` (with the count of rows holding a value), and
+  applies once you confirm. The server runs only the plan whose digest you
+  confirmed. Boot's drift and orphan warnings now name it.
+
 - **`rebase cloud metrics` shows realtime per instance**: each instance's sockets,
   channels, and the frames it sent to the channel bus or held back, in `--json`
   as `realtime`. A control plane that does not report them leaves the table out.
