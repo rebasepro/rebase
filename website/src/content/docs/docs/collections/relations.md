@@ -325,6 +325,8 @@ A list in `on` joins a row meeting **any one** condition — a link kept in `a` 
 joinPath: [{ table: "friendships", on: [{ from: "id", to: "a" }, { from: "id", to: "b" }] }]
 ```
 
+Adding a second step to `people` (`on: [{ from: "a", to: "id" }, { from: "b", to: "id" }]`) also matches the parent's own column, so each person comes back as their own friend: list the friendship rows, or filter the person out.
+
 ## Cascade Rules
 
 Control what happens when related entities are updated or deleted:

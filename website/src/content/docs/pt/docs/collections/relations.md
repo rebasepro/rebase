@@ -328,6 +328,8 @@ uma única vez, com cada pessoa em `a` ou em `b`. Uma cadeia assim é **somente 
 joinPath: [{ table: "friendships", on: [{ from: "id", to: "a" }, { from: "id", to: "b" }] }]
 ```
 
+Um segundo passo até `people` (`on: [{ from: "a", to: "id" }, { from: "b", to: "id" }]`) também corresponde à coluna da própria linha de origem, então cada pessoa volta como amiga de si mesma: liste as linhas de amizade ou filtre a própria pessoa.
+
 ## Regras de Cascata
 
 Controle o que acontece quando entidades relacionadas são atualizadas ou excluídas:

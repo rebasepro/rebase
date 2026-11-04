@@ -273,6 +273,71 @@ to: "id" } }
             const [d] = defectsFor(viaRelation([]));
             expect(d.problem).toContain("`joinPath` is empty");
         });
+
+        describe("a step whose `on` lists alternatives", () => {
+            const toRoles = { table: "roles", on: { from: "role_id", to: "id" } };
+
+            it("accepts alternatives that each connect the same two tables", () => {
+                expect(defectsFor(viaRelation([
+                    { table: "user_roles", on: [{ from: "author_id", to: "user_id" }, { from: "id", to: "user_id" }] },
+                    toRoles
+                ]))).toEqual([]);
+            });
+
+            it("names the alternative whose `from` column is not on the previous table", () => {
+                const [d] = defectsFor(viaRelation([
+                    { table: "user_roles", on: [{ from: "author_id", to: "user_id" }, { from: "owner_id", to: "user_id" }] },
+                    toRoles
+                ]));
+                expect(d.problem).toContain("step 1 (alternative 2) joins `posts.owner_id`");
+                expect(d.fix).toContain("`joinPath[0].on[1].from`");
+            });
+
+            it("names the alternative whose `to` column is not on the step's table", () => {
+                const [d] = defectsFor(viaRelation([
+                    { table: "user_roles", on: [{ from: "author_id", to: "account_id" }, { from: "id", to: "user_id" }] },
+                    toRoles
+                ]));
+                expect(d.problem).toContain("step 1 (alternative 1) joins into `user_roles.account_id`");
+                expect(d.fix).toContain("`joinPath[0].on[0].to`");
+            });
+
+            it("names the alternative comparing unequal numbers of columns", () => {
+                const found = defectsFor(viaRelation([
+                    { table: "user_roles", on: [{ from: "author_id", to: "user_id" }, { from: ["author_id", "id"], to: "user_id" }] },
+                    toRoles
+                ]));
+                const d = found.find(x => x.problem.includes("compares 2 column(s) against 1"));
+                expect(d?.problem).toContain("step 1 (alternative 2)");
+                expect(d?.fix).toContain("`joinPath[0].on[1]`");
+            });
+
+            it("rejects an empty list, which would join on nothing", () => {
+                const found = defectsFor(viaRelation([{ table: "user_roles", on: [] }, toRoles]));
+                expect(found).toHaveLength(1);
+                expect(found[0].problem).toContain("`joinPath[0].on` lists no conditions");
+                expect(found[0].fix).toContain("at least one `{ from, to }`");
+            });
+
+            it("rejects alternatives that name different tables", () => {
+                const found = defectsFor(viaRelation([
+                    { table: "user_roles", on: [{ from: "author_id", to: "user_id" }, { from: "users.id", to: "user_id" }] },
+                    toRoles
+                ]));
+                const d = found.find(x => x.problem.includes("join different tables"));
+                expect(d?.problem).toContain("alternative 1 joins `posts` → `user_roles`");
+                expect(d?.problem).toContain("alternative 2 joins `users` → `user_roles`");
+                expect(d?.fix).toContain("every entry of `joinPath[0].on` joins `posts` to `user_roles`");
+            });
+
+            it("says nothing of tables when a spelling names the tables the step joins anyway", () => {
+                const found = defectsFor(viaRelation([
+                    { table: "user_roles", on: [{ from: "author_id", to: "user_id" }, { from: "posts.id", to: "user_roles.user_id" }] },
+                    toRoles
+                ]));
+                expect(found.some(x => x.problem.includes("join different tables"))).toBe(false);
+            });
+        });
     });
 
     describe("assertRelationsResolve", () => {

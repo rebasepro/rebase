@@ -333,6 +333,8 @@ una sola volta, con ciascuna persona in `a` o in `b`. Una catena così è di **s
 joinPath: [{ table: "friendships", on: [{ from: "id", to: "a" }, { from: "id", to: "b" }] }]
 ```
 
+Un secondo passo verso `people` (`on: [{ from: "a", to: "id" }, { from: "b", to: "id" }]`) corrisponde anche alla colonna della riga di partenza, quindi ogni persona torna come amica di sé stessa: elenca le righe di amicizia oppure escludi la persona stessa con un filtro.
+
 ## Regole a Cascata
 
 Controlla cosa succede quando le entità correlate vengono aggiornate o eliminate:

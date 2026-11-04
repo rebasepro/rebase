@@ -1,7 +1,7 @@
 import { eq, and, isNotNull, isNull, sql, SQL } from "drizzle-orm";
 import { AnyPgColumn, PgTable } from "drizzle-orm/pg-core";
 // import { NodePgDatabase } from "drizzle-orm/node-postgres";
-import { CollectionConfig, JUNCTION_PIVOT_KEY, Properties, ResolvedRelation, type ResolvedManyToMany, isManyToMany, hasForeignKeyOnTarget } from "@rebasepro/types";
+import { CollectionConfig, JUNCTION_PIVOT_KEY, Properties, ResolvedRelation, type ResolvedManyToMany, isManyToMany, hasForeignKeyOnTarget, joinConditions } from "@rebasepro/types";
 import { getTableName, resolveCollectionRelations, fieldKeyForColumn } from "@rebasepro/common";
 import { DrizzleConditionBuilder } from "../utils/drizzle-conditions";
 import {
@@ -306,11 +306,12 @@ export class PersistService {
             case "via":
                 // The link lives in an intermediate table, not in a column on
                 // the target — nothing to stamp.
-                // A step with alternatives names no one column either.
-                return relation.joinPath.length === 1 && !Array.isArray(relation.joinPath[0].on)
+                // A step with alternatives names no one column either; a list
+                // of one names its one.
+                return relation.joinPath.length === 1 && joinConditions(relation.joinPath[0]).length === 1
                     ? fieldKeyForColumn(
                         hop.targetCollection,
-                        DrizzleConditionBuilder.getColumnNamesFromColumns(relation.joinPath[0].on.to)[0]
+                        DrizzleConditionBuilder.getColumnNamesFromColumns(joinConditions(relation.joinPath[0])[0].to)[0]
                     )
                     : undefined;
 

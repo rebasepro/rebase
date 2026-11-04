@@ -126,7 +126,8 @@ export function isJunctionBackedRelation(relation: ResolvedRelation): boolean {
 
 /**
  * Reject a create or update whose body names a relation Rebase does not write
- * — a multi-hop `via` (`writable: false`) — before anything is read or written.
+ * — a multi-hop `via`, or one whose step joins on either of several columns
+ * (`writable: false`) — before anything is read or written.
  *
  * A single-hop `via` is written through this door as it shipped (to-one: the
  * target's key; to-many: one junction's rows). A longer chain used to get as
@@ -152,9 +153,9 @@ export function assertNoReadOnlyRelationValues(values: Record<string, unknown>, 
     if (named.length === 0) return;
     const list = named.map(key => `'${key}'`).join(", ");
     throw ApiError.badRequest(
-        `${list} on '${collection.slug}' ${named.length > 1 ? "are multi-hop `via` relations" : "is a multi-hop `via` relation"}, ` +
+        `${list} on '${collection.slug}' ${named.length > 1 ? "are multi-hop or either-column `via` relations" : "is a multi-hop or either-column `via` relation"}, ` +
         "which is read-only: only single-hop via relations are writable — a to-one chain of one step, or a to-many " +
-        "chain through one junction table. Write the rows the chain joins directly.",
+        "chain through one junction table, each step joining on one condition. Write the rows the chain joins directly.",
         "RELATION_NOT_WRITABLE",
         { collection: collection.slug, fields: named }
     );

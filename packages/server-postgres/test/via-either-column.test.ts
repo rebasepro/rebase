@@ -30,7 +30,7 @@ const friendshipsTable = pgTable("friendships", {
     games: integer("games")
 });
 
-function people(): CollectionConfig {
+function people(withFriendPeople = false): CollectionConfig {
     return {
         name: "People", slug: "people", table: "people",
         properties: {
@@ -45,7 +45,25 @@ function people(): CollectionConfig {
                     cardinality: "many",
                     joinPath: [{ table: "friendships", on: [{ from: "id", to: "a" }, { from: "id", to: "b" }] }]
                 }
-            }
+            },
+            // On to the people at either end: both steps list alternatives,
+            // so the inner join and the correlation of the EXISTS are each OR-ed.
+            // Only in its own test: a chain from a table back to itself is read
+            // at a nested address (aliased EXISTS) but not yet loaded with its
+            // parent, whose reverse joins name `people` twice.
+            ...(withFriendPeople ? { friendPeople: {
+                name: "Friend people",
+                type: "relation",
+                relation: {
+                    kind: "via",
+                    target: () => people(true),
+                    cardinality: "many",
+                    joinPath: [
+                        { table: "friendships", on: [{ from: "id", to: "a" }, { from: "id", to: "b" }] },
+                        { table: "people", on: [{ from: "a", to: "id" }, { from: "b", to: "id" }] }
+                    ]
+                }
+            } } : {})
         }
     } as unknown as CollectionConfig;
 }
@@ -64,9 +82,9 @@ function friendships(): CollectionConfig {
 
 let db: PGlite;
 
-function driverOver(pglite: PGlite): PostgresBackendDriver {
+function driverOver(pglite: PGlite, withFriendPeople = false): PostgresBackendDriver {
     const registry = new PostgresCollectionRegistry();
-    registry.registerMultiple([people(), friendships()]);
+    registry.registerMultiple([people(withFriendPeople), friendships()]);
     registry.registerTable(peopleTable, "people");
     registry.registerTable(friendshipsTable, "friendships");
     const orm = drizzle(pglite, { schema: { people: peopleTable, friendships: friendshipsTable } }) as never;
@@ -123,8 +141,18 @@ describe("a via step with alternatives", () => {
     it("is read-only: a write naming it is refused before anything is written", async () => {
         const driver = driverOver(db);
         await expect(driver.save({ path: "people", id: 4, values: { friends: [{ id: 10 }] } as never, status: "existing" } as never))
-            .rejects.toThrow(/read-only/);
+            .rejects.toThrow(/either-column `via` relation, which is read-only/);
         const { rows } = await db.query<{ n: number }>("SELECT count(*)::int AS n FROM friendships WHERE a = 4 OR b = 4");
         expect(rows[0].n).toBe(0);
+    });
+
+    // The second step's alternatives also match the column that holds the
+    // parent, so each person is among their own friends: what the docs warn of.
+    it("lists people through two steps of alternatives, the parent among them", async () => {
+        const driver = driverOver(db, true);
+        const listed = await driver.fetchCollection({ path: "people/2/friendPeople" });
+        expect(listed.map(r => Number(r.id)).sort()).toEqual([1, 2, 3]);
+        expect(await driver.count({ path: "people/2/friendPeople" })).toBe(3);
+        expect(await driver.fetchCollection({ path: "people/4/friendPeople" })).toEqual([]);
     });
 });

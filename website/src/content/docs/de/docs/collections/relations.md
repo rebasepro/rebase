@@ -336,6 +336,8 @@ gespeicherte Freundschaft, in der jede Person in `a` oder `b` steht. Eine solche
 joinPath: [{ table: "friendships", on: [{ from: "id", to: "a" }, { from: "id", to: "b" }] }]
 ```
 
+Ein zweiter Schritt weiter zu `people` (`on: [{ from: "a", to: "id" }, { from: "b", to: "id" }]`) trifft auch die eigene Spalte der Ausgangszeile, sodass jede Person als ihr eigener Freund zurückkommt: Listen Sie die Freundschaftszeilen auf oder filtern Sie die Person selbst heraus.
+
 ## Kaskadenregeln
 
 Steuern Sie, was passiert, wenn verwandte Entitäten aktualisiert oder gelöscht werden:

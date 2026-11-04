@@ -1294,3 +1294,74 @@ describe("DrizzleConditionBuilder - join path with bare column names", () => {
         expect(renderSql(query.where.mock.calls[0][0] as SQL)).toMatchObject({ sql: '"products"."id" = $1', params: [7] });
     });
 });
+
+/**
+ * A `via` step whose `on` lists alternatives, in the `EXISTS` a nested listing
+ * and count are scoped by: every alternative's pairs AND-ed, the alternatives
+ * OR-ed — in the inner join of a step before the last and in the correlation
+ * the last step makes with the outer row.
+ */
+describe("DrizzleConditionBuilder - join path scope with alternatives", () => {
+    const people = pgTable("people", { id: serial("id").primaryKey(), name: varchar("name") });
+    const friendships = pgTable("friendships", { id: serial("id").primaryKey(), a: integer("a"), b: integer("b") });
+
+    const registry = { getTable: jest.fn() } as unknown as PostgresCollectionRegistry;
+    (registry.getTable as jest.Mock).mockImplementation((name: string) =>
+        ({ people, friendships } as Record<string, unknown>)[name]);
+
+    const peopleCollection = { slug: "people", table: "people" } as unknown as CollectionConfig;
+    const friendshipsCollection = { slug: "friendships", table: "friendships" } as unknown as CollectionConfig;
+
+    const scope = (target: CollectionConfig, targetTable: typeof people | typeof friendships, joinPath: unknown[]) =>
+        renderSql(DrizzleConditionBuilder.buildRelationScopeCondition(
+            resolveRelation({
+                kind: "via",
+                relationName: "friends",
+                target: () => target,
+                cardinality: "many",
+                joinPath
+            } as Relation, peopleCollection),
+            () => ({ table: people, key: [{ column: people.id, value: 2 }] }),
+            2,
+            targetTable,
+            targetTable.id,
+            registry
+        ));
+
+    const either = [{ from: "id", to: "a" }, { from: "id", to: "b" }];
+
+    it("correlates the last step with the outer row on either column", () => {
+        const { sql: text, params } = scope(friendshipsCollection, friendships, [{ table: "friendships", on: either }]);
+        expect(text).toBe(
+            'EXISTS (SELECT 1 FROM "people" AS "__rel_src" WHERE "__rel_src"."id" = $1 AND ' +
+            '(("__rel_src"."id" = "friendships"."a") OR ("__rel_src"."id" = "friendships"."b")))'
+        );
+        expect(params).toEqual([2]);
+    });
+
+    it("ORs the alternatives of an inner step inside its JOIN, and of the last in the correlation", () => {
+        const { sql: text } = scope(peopleCollection, people, [
+            { table: "friendships", on: either },
+            { table: "people", on: [{ from: "a", to: "id" }, { from: "b", to: "id" }] }
+        ]);
+        expect(text).toContain(
+            'JOIN "friendships" AS "__rel_j0" ON (("__rel_src"."id" = "__rel_j0"."a") OR ("__rel_src"."id" = "__rel_j0"."b"))'
+        );
+        expect(text).toContain('(("__rel_j0"."a" = "people"."id") OR ("__rel_j0"."b" = "people"."id")))');
+    });
+
+    it("ANDs a composite alternative's pairs before OR-ing it with the others", () => {
+        const { sql: text } = scope(friendshipsCollection, friendships, [{
+            table: "friendships",
+            on: [{ from: ["id", "name"], to: ["a", "id"] }, { from: "id", to: "b" }]
+        }]);
+        expect(text).toContain(
+            '(("__rel_src"."id" = "friendships"."a" AND "__rel_src"."name" = "friendships"."id") OR ("__rel_src"."id" = "friendships"."b"))'
+        );
+    });
+
+    it("renders a list of one exactly as the bare condition", () => {
+        expect(scope(friendshipsCollection, friendships, [{ table: "friendships", on: [{ from: "id", to: "a" }] }]))
+            .toEqual(scope(friendshipsCollection, friendships, [{ table: "friendships", on: { from: "id", to: "a" } }]));
+    });
+});

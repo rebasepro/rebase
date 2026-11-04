@@ -598,9 +598,10 @@ export interface JoinStep {
      * { table: "friendships", on: [{ from: "id", to: "a" }, { from: "id", to: "b" }] }
      * ```
      *
-     * A step with alternatives is read-only, whatever its position in the
-     * chain: a new link could go in either column, and which one is the
-     * application's rule, not something to guess.
+     * A step with two or more alternatives is read-only, whatever its
+     * position in the chain: a new link could go in either column, and which
+     * one is the application's rule, not something to guess. A list of one is
+     * the bare condition, and is read and written the same.
      */
     on: JoinCondition | JoinCondition[];
 }
@@ -634,6 +635,7 @@ export function joinConditions(step: Pick<JoinStep, "on">): JoinCondition[] {
 export function soleJoinCondition(step: Pick<JoinStep, "on" | "table">): JoinCondition {
     if (Array.isArray(step.on)) {
         if (step.on.length === 1) return step.on[0];
+        if (step.on.length === 0) throw new Error(`The join into '${step.table}' lists no conditions, so it joins nothing.`);
         throw new Error(`The join into '${step.table}' matches any of ${step.on.length} conditions, so it is read-only: there is no one column to write a link into.`);
     }
     return step.on;

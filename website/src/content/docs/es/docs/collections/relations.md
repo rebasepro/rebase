@@ -333,6 +333,8 @@ una sola vez, con cada persona en `a` o en `b`. Una cadena así es de **solo lec
 joinPath: [{ table: "friendships", on: [{ from: "id", to: "a" }, { from: "id", to: "b" }] }]
 ```
 
+Un segundo paso hasta `people` (`on: [{ from: "a", to: "id" }, { from: "b", to: "id" }]`) también coincide con la columna de la propia fila de origen, así que cada persona vuelve como amiga de sí misma: lista las filas de amistad o filtra a la propia persona.
+
 ## Reglas de Cascada
 
 Controla qué sucede cuando las entidades relacionadas son actualizadas o eliminadas:
