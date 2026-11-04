@@ -6,3 +6,5 @@ takes/
 public/takes/
 # The launch film's soundtrack, written by `pnpm launch:music`.
 public/launch/
+# The EIC film's music bed, written by scripts/compose-eic-bed.mjs.
+public/eic/

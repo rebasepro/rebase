@@ -55,6 +55,14 @@ number is the start of one second with nobody speaking (1:18.6 in the take of
 scripts/master-audio.sh out/REBASE_EIC_Video.mp4 out/REBASE_EIC_Video-mastered.mp4 78.6
 ```
 
+Last, the music: a quiet bed of piano and strings (no lyrics, as the call
+asks), composed on the launch films' engine and ducked under the voices.
+
+```bash
+node scripts/compose-eic-bed.mjs
+scripts/mix-bed.sh out/REBASE_EIC_Video-mastered.mp4 out/REBASE_EIC_Video-final.mp4
+```
+
 ## The script
 
 | Line | Who | Script |
