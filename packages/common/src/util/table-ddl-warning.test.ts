@@ -61,6 +61,30 @@ describe("table DDL guard", () => {
         expect(findTableDdl("CREATE EXTENSION IF NOT EXISTS pgcrypto")).toEqual([]);
     });
 
+    it("reads `$` inside a name as part of the name, not as a dollar quote", () => {
+        // Were `$b$` a quote opening, it would swallow the rest of the script.
+        expect(findTableDdl("SELECT a$b$ FROM t; CREATE TABLE after_name (a int)")).toEqual([
+            { statement: "create table", schema: "public", table: "after_name" }
+        ]);
+        expect(findTableDdl("CREATE TABLE cost$ (a int); CREATE TABLE next_one (a int)").map(d => d.table)).toEqual([
+            "cost$",
+            "next_one"
+        ]);
+        expect(findTableDdl("SELECT $x$; CREATE TABLE hidden (a int)$x$")).toEqual([]);
+    });
+
+    it("does not scan a statement with no create, alter or drop in it", () => {
+        const rows = Array.from({ length: 60_000 }, (_, n) => `(${n}, 'song ${n} -- /* ''quoted'' $q$', $$${n}$$)`);
+        const insert = `INSERT INTO plays (n, title, extra) VALUES ${rows.join(", ")}`;
+        expect(insert.length).toBeGreaterThan(2_500_000);
+        const started = performance.now();
+        expect(findTableDdl(insert)).toEqual([]);
+        expect(performance.now() - started).toBeLessThan(100);
+        expect(findTableDdl("SELECT 1; Create Index plays_n ON plays (n)")).toEqual([
+            { statement: "create index", schema: "public", table: "plays" }
+        ]);
+    });
+
     it("tells the reader how to do it instead", () => {
         const message = tableDdlMessage({ statement: "create table", schema: "public", table: "songbuzz_events" });
         expect(message).toContain("CREATE TABLE songbuzz_events");
@@ -70,6 +94,20 @@ describe("table DDL guard", () => {
         expect(message).toContain("pnpm schema:introspect");
         const index = tableDdlMessage({ statement: "create index", schema: "public", table: "songbuzz_events" });
         expect(index).toContain("`indexes`");
+    });
+
+    it("says to change or remove the collection for ALTER and DROP, not to declare one", () => {
+        const alter = tableDdlMessage({ statement: "alter table", schema: "public", table: "songbuzz_events" });
+        expect(alter).toContain("ALTER TABLE songbuzz_events");
+        expect(alter).toContain("Change its collection");
+        expect(alter).toContain("table: \"songbuzz_events\"");
+        expect(alter).toContain("pnpm db:generate");
+        expect(alter).not.toContain("Declare it");
+        const drop = tableDdlMessage({ statement: "drop table", schema: "app", table: "old_scores" });
+        expect(drop).toContain("DROP TABLE app.old_scores");
+        expect(drop).toContain("Remove its collection");
+        expect(drop).not.toContain("Declare it");
+        expect(drop).not.toContain("schema:introspect");
     });
 
     it("never throws, and warns once per table", () => {

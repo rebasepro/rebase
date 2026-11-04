@@ -27,6 +27,10 @@ export interface TableDdl {
     table: string;
 }
 
+/** A character that continues an identifier: `$` is one, so `a$b$` is a name and not a dollar quote. */
+const IDENTIFIER_CHAR = /[\w$]/;
+const DOLLAR_QUOTE = /\$([A-Za-z_]\w*)?\$/y;
+
 /**
  * Comments and literals out, quoted identifiers kept: a `CREATE TABLE` inside a
  * string is data, and a table named `"Order"` must keep its case.
@@ -35,19 +39,19 @@ function stripCommentsAndLiterals(sqlText: string): string {
     let out = "";
     let i = 0;
     while (i < sqlText.length) {
-        const rest = sqlText.slice(i);
-        if (rest.startsWith("--")) {
+        const char = sqlText[i];
+        if (char === "-" && sqlText.startsWith("--", i)) {
             const end = sqlText.indexOf("\n", i);
             i = end === -1 ? sqlText.length : end;
             continue;
         }
-        if (rest.startsWith("/*")) {
+        if (char === "/" && sqlText.startsWith("/*", i)) {
             const end = sqlText.indexOf("*/", i + 2);
             i = end === -1 ? sqlText.length : end + 2;
             out += " ";
             continue;
         }
-        if (sqlText[i] === "'") {
+        if (char === "'") {
             i++;
             while (i < sqlText.length) {
                 if (sqlText[i] === "'" && sqlText[i + 1] === "'") i += 2;
@@ -57,21 +61,24 @@ function stripCommentsAndLiterals(sqlText: string): string {
             out += "''";
             continue;
         }
-        const dollar = /^\$([A-Za-z_]\w*)?\$/.exec(rest);
-        if (dollar) {
-            const end = sqlText.indexOf(dollar[0], i + dollar[0].length);
-            i = end === -1 ? sqlText.length : end + dollar[0].length;
-            out += "''";
-            continue;
+        if (char === "$" && !(i > 0 && IDENTIFIER_CHAR.test(sqlText[i - 1]))) {
+            DOLLAR_QUOTE.lastIndex = i;
+            const dollar = DOLLAR_QUOTE.exec(sqlText);
+            if (dollar) {
+                const end = sqlText.indexOf(dollar[0], i + dollar[0].length);
+                i = end === -1 ? sqlText.length : end + dollar[0].length;
+                out += "''";
+                continue;
+            }
         }
-        if (sqlText[i] === "\"") {
+        if (char === "\"") {
             const end = sqlText.indexOf("\"", i + 1);
             const stop = end === -1 ? sqlText.length : end + 1;
             out += sqlText.slice(i, stop);
             i = stop;
             continue;
         }
-        out += sqlText[i];
+        out += char;
         i++;
     }
     return out;
@@ -94,6 +101,10 @@ function unquote(part: string): string {
 
 /** The application-table DDL in a SQL string, one entry per statement that has it. */
 export function findTableDdl(sqlText: string): TableDdl[] {
+    // Every statement this finds starts with one of these words (`CREATE INDEX`
+    // with `create`), so a query without them — a large INSERT, most of all —
+    // is not scanned.
+    if (!/\b(?:create|alter|drop)\b/i.test(sqlText)) return [];
     const found: TableDdl[] = [];
     for (const raw of stripCommentsAndLiterals(sqlText).split(";")) {
         const statement = raw.trim();
@@ -115,16 +126,35 @@ export function findTableDdl(sqlText: string): TableDdl[] {
 export function tableDdlMessage(ddl: TableDdl): string {
     const qualified = ddl.schema === "public" ? ddl.table : `${ddl.schema}.${ddl.table}`;
     const file = ddl.table.replace(/_/g, "-");
+    const collection = `its collection in config/collections/ (the one with \`table: "${ddl.table}"\`)`;
+    const migrations = "`pnpm db:push` in development, `pnpm db:generate` then `pnpm db:migrate` for production";
+    const introspect = "A table with no collection yet: `pnpm schema:introspect` writes one.";
+    const ran = "The statement ran. See ai-instructions.md.";
+    if (ddl.statement === "alter table") {
+        return [
+            `rebase.sql() ran \`ALTER TABLE ${qualified}\`: in a Rebase project every application table is a collection.`,
+            `Change ${collection} and let the migration do it: ${migrations}.`,
+            introspect,
+            ran
+        ].join("\n");
+    }
+    if (ddl.statement === "drop table") {
+        return [
+            `rebase.sql() ran \`DROP TABLE ${qualified}\`: in a Rebase project every application table is a collection.`,
+            `Remove ${collection} instead, and leave dropping the table to a person, who can see what it holds first.`,
+            ran
+        ].join("\n");
+    }
     const what = ddl.statement === "create index"
         ? `\`CREATE INDEX\` on ${qualified}: an index belongs in the collection's \`indexes\`, which boot creates.`
-        : `\`${ddl.statement.toUpperCase()} ${qualified}\`: in a Rebase project every application table is a collection.`;
+        : `\`CREATE TABLE ${qualified}\`: in a Rebase project every application table is a collection.`;
     return [
         `rebase.sql() ran ${what}`,
         `Declare it in config/collections/${file}.ts with defineCollection({ slug, table: "${ddl.table}", properties, securityRules, indexes }).` +
         " `pnpm dev` (or `pnpm schema:generate`) creates the table and its columns and indexes, and gives it validation, callbacks, security rules, an admin view and SDK types.",
         "Read and write it with `rebase.dataAsAdmin.<slug>`, or `getDriver(c)` to act as the caller — never raw SQL against an application table.",
-        "A table that already exists: `pnpm schema:introspect` writes its collection. A change boot leaves alone (a rename, a dropped column): `pnpm db:push` in development, `pnpm db:generate` then `pnpm db:migrate` for production.",
-        "The statement ran. See ai-instructions.md."
+        `A table that already exists: \`pnpm schema:introspect\` writes its collection. A change boot leaves alone (a rename, a dropped column): ${migrations}.`,
+        ran
     ].join("\n");
 }
 

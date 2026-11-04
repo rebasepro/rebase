@@ -6,7 +6,7 @@ import inquirer from "inquirer";
 import { createRequire } from "module";
 import os from "os";
 import { findProjectRoot } from "../utils/project";
-import { writeRootPointers } from "../utils/root-pointer";
+import { type RootPointerResult, writeRootPointers } from "../utils/root-pointer";
 import { parseCommandArgs, UsageError, wantsHelp } from "../utils/args";
 import { unknownCommand } from "../utils/unknown-command";
 
@@ -936,10 +936,16 @@ ${chalk.green.bold("Examples")}
 `);
 }
 
-/** One line per repository-root agent file the project's rules were written into. */
-export function reportRootPointers(changed: readonly string[]): void {
-    for (const file of changed) {
-        const shown = path.relative(process.cwd(), file) || file;
-        console.log(`  ${chalk.green("✓")} Rebase rules in ${chalk.gray(shown)}, for an assistant started at the repository root`);
+/** One line per repository-root agent file the project's rules were written into, or left alone. */
+export function reportRootPointers(result: RootPointerResult): void {
+    const shown = (file: string) => path.relative(process.cwd(), file) || file;
+    for (const file of result.changed) {
+        console.log(`  ${chalk.green("✓")} Rebase rules in ${chalk.gray(shown(file))}, for an assistant started at the repository root`);
+    }
+    for (const { file, reason } of result.untouched) {
+        console.warn(`  ${chalk.yellow("!")} Left ${chalk.gray(shown(file))} as it is: ${reason}. Fix or remove them and run ${chalk.cyan("rebase skills install")} again.`);
+    }
+    if (result.refused !== null) {
+        console.log(chalk.gray(`  No Rebase rules at the repository root: ${result.refused}.`));
     }
 }

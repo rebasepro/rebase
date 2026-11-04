@@ -78,6 +78,11 @@ export function sanitizeAndConvertDates(obj: unknown): unknown {
     if (ArrayBuffer.isView(obj)) {
         return obj;
     }
+    // A bare ArrayBuffer has no own keys at all, so the walk made it `{}`; the
+    // driver takes bytes as a Buffer.
+    if (obj instanceof ArrayBuffer) {
+        return Buffer.from(obj);
+    }
 
     if (typeof obj === "object") {
         const newObj: Record<string, unknown> = {};

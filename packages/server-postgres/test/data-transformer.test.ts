@@ -288,6 +288,14 @@ describe("sanitizeAndConvertDates", () => {
         expect(out.audio).toBe(bytes);
     });
 
+    it("turns a bare ArrayBuffer into a Buffer of the same bytes, not {}", () => {
+        const buffer = new Uint8Array([7, 8, 9]).buffer;
+        const out = sanitizeAndConvertDates({ audio: buffer, nested: [buffer] }) as { audio: unknown; nested: unknown[] };
+        expect(Buffer.isBuffer(out.audio)).toBe(true);
+        expect([...(out.audio as Buffer)]).toEqual([7, 8, 9]);
+        expect(Buffer.isBuffer(out.nested[0])).toBe(true);
+    });
+
     it("keeps a data URL decoded by serializePropertyToServer a Buffer", () => {
         const decoded = serializePropertyToServer("data:application/octet-stream;base64,AQID", { type: "binary" } as Property);
         const out = sanitizeAndConvertDates({ audio: decoded }) as { audio: unknown };

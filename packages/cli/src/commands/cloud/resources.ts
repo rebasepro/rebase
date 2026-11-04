@@ -811,8 +811,10 @@ async function storageCreateCommand(rawArgs: string[]): Promise<void> {
                 access,
                 endpoint: info.endpoint,
                 accessKeyId: info.accessKeyId,
-                // Stated, not omitted: a caller that finds no secret in the
-                // payload should know it was withheld, not lost.
+                // Always null, and stated rather than omitted so a caller does
+                // not read its absence as a bug: with a key the secret is
+                // stored encrypted and never returned; with workload identity
+                // (see `access`) there is none.
                 secretAccessKey: null,
                 pendingRedeploy: true
             }
