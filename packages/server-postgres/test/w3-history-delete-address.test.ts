@@ -1,0 +1,96 @@
+/**
+ * A delete's history entry is keyed by the row's address, as a save's is.
+ *
+ * A save records its entry under the address derived from the stored row
+ * (`deriveRowAddress`); a delete recorded the id as the caller spelled it. A
+ * numeric key addressed as `010` names row 10 — the delete found it and
+ * removed it — but its entry went under `010`, so `GET /docs/10/history`
+ * never showed the delete: the one entry nothing else can reconstruct.
+ */
+import { describe, it, expect, beforeEach, afterEach } from "@jest/globals";
+import { PGlite } from "@electric-sql/pglite";
+import { drizzle } from "drizzle-orm/pglite";
+import { integer, pgTable, serial, varchar } from "drizzle-orm/pg-core";
+import { relations } from "drizzle-orm";
+import type { CollectionConfig } from "@rebasepro/types";
+
+import { PostgresBackendDriver } from "../src/PostgresBackendDriver";
+import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
+import { RealtimeService } from "../src/services/realtimeService";
+
+const ownersTable = pgTable("owners", { id: serial("id").primaryKey(), name: varchar("name") });
+const docsTable = pgTable("docs", { id: serial("id").primaryKey(), title: varchar("title"), ownerId: integer("owner_id") });
+const ownersRelations = relations(ownersTable, ({ many }) => ({ docs: many(docsTable) }));
+const docsRelations = relations(docsTable, ({ one }) => ({
+    owner: one(ownersTable, { fields: [docsTable.ownerId], references: [ownersTable.id] })
+}));
+
+function ownersCollection(): CollectionConfig {
+    return {
+        name: "Owners", slug: "owners", table: "owners",
+        properties: {
+            id: { name: "ID", type: "number", isId: "increment" },
+            name: { name: "Name", type: "string" },
+            docs: { name: "Docs", type: "relation", relation: { kind: "hasMany", target: () => docsCollection(), foreignKeyOnTarget: "owner_id" } }
+        }
+    } as unknown as CollectionConfig;
+}
+
+function docsCollection(): CollectionConfig {
+    return {
+        name: "Docs", slug: "docs", table: "docs", history: true,
+        properties: {
+            id: { name: "ID", type: "number", isId: "increment" },
+            title: { name: "Title", type: "string" },
+            owner: { name: "Owner", type: "relation", relation: { kind: "belongsTo", target: () => ownersCollection(), localKey: "owner_id" } }
+        }
+    } as unknown as CollectionConfig;
+}
+
+let db: PGlite;
+let recorded: { tableName: string; id: string; action: string }[];
+
+function driverOver(pglite: PGlite): PostgresBackendDriver {
+    const registry = new PostgresCollectionRegistry();
+    registry.registerMultiple([ownersCollection(), docsCollection()]);
+    registry.registerTable(ownersTable, "owners");
+    registry.registerTable(docsTable, "docs");
+    registry.registerRelations({ owners: ownersRelations, docs: docsRelations });
+    const orm = drizzle(pglite, { schema: { owners: ownersTable, docs: docsTable, ownersRelations, docsRelations } }) as never;
+    const history = {
+        assertRecordable: () => undefined,
+        recordHistory: async (p: { tableName: string; id: string; action: string }) => {
+            recorded.push({ tableName: p.tableName, id: String(p.id), action: p.action });
+        }
+    };
+    return new PostgresBackendDriver(orm, new RealtimeService(orm, registry), registry, undefined, undefined, history as never);
+}
+
+beforeEach(async () => {
+    recorded = [];
+    db = new PGlite();
+    await db.waitReady;
+    await db.exec(`
+        CREATE TABLE owners (id serial PRIMARY KEY, name varchar);
+        CREATE TABLE docs (id serial PRIMARY KEY, title varchar, owner_id integer REFERENCES owners(id));
+        INSERT INTO owners (id, name) VALUES (1, 'Ada');
+        INSERT INTO docs (id, title, owner_id) VALUES (10, 'alpha', 1);
+        SELECT setval('docs_id_seq', 10);
+    `);
+});
+
+afterEach(async () => {
+    await db.close();
+});
+
+describe("a delete's history entry", () => {
+    it("is keyed by the row's address, however the caller spelled the id", async () => {
+        await driverOver(db).delete({ row: { id: "010", path: "docs" } });
+        expect(recorded).toEqual([{ tableName: "docs", id: "10", action: "delete" }]);
+    });
+
+    it("and so is one made through a parent", async () => {
+        await driverOver(db).delete({ row: { id: "010", path: "owners/1/docs" } });
+        expect(recorded).toEqual([{ tableName: "docs", id: "10", action: "delete" }]);
+    });
+});

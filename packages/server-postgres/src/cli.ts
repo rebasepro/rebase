@@ -74,7 +74,7 @@ import { CommandStopped, ScratchDatabase } from "./cli-scratch-database";
 import { baselineVersionProblem, describeBaselinePlan, latestRecordedMigration, planBaseline } from "./schema/migrate-baseline";
 import { promptConfirm } from "./cli-prompt";
 import { applyPoliciesFile, applyPushPlan, stampableTables, type PolicyStamping } from "./cli-push";
-import { resolveBranchSwitches, unexpectedBranchArgs } from "./branch-argv";
+import { branchNameIn, branchSourceIn, resolveBranchSwitches, unexpectedBranchArgs } from "./branch-argv";
 import { assertKnownFlags, collectionsPathIn, parseDriverLine, resolveDriverSwitches } from "./cli-flags";
 import { assertCollectionsPathExists } from "./cli-collections-path";
 import { DESIRED_STATE_URL, GENERATED_SQL_DIR, generatedSqlDir, prepareGeneratedSqlDir } from "./generated-sql";
@@ -1515,8 +1515,7 @@ const BRANCH_FLAGS = {
 
 /** The source `branch create --from <source>` names, if it names one. */
 function createSource(rawArgs: readonly string[]): string | undefined {
-    const at = rawArgs.indexOf("--from");
-    return at !== -1 && rawArgs[at + 1] ? rawArgs[at + 1] : undefined;
+    return branchSourceIn(rawArgs.slice(2));
 }
 
 async function branchCommand(rawArgs: string[]): Promise<void> {
@@ -1539,8 +1538,9 @@ async function branchCommand(rawArgs: string[]): Promise<void> {
         outError("");
         outError(chalk.gray(`  ${chalk.bold("rebase db branch")} takes one name. A branch name may contain letters,`));
         outError(chalk.gray("  digits, underscores and hyphens — no spaces."));
-        if (rawArgs[3]) {
-            outError(chalk.gray(`  Did you mean: ${chalk.cyan(redactConnectionPasswords(`rebase db branch ${branchAction} ${[rawArgs[3], ...extras].join("-")}`))}`));
+        const named = branchNameIn(rawArgs.slice(2));
+        if (named) {
+            outError(chalk.gray(`  Did you mean: ${chalk.cyan(redactConnectionPasswords(`rebase db branch ${branchAction} ${[named, ...extras].join("-")}`))}`));
         }
         outError("");
         process.exit(1);
@@ -1606,7 +1606,7 @@ max: 3 });
         }
         switch (branchAction) {
             case "create": {
-                const name = rawArgs[3];
+                const name = branchNameIn(rawArgs.slice(2));
                 if (!name) {
                     outError(chalk.red("✗ Branch name is required."));
                     out(chalk.gray("  Usage: rebase db branch create <name> [--from <source>]"));
@@ -1653,7 +1653,7 @@ max: 3 });
             }
 
             case "delete": {
-                const name = rawArgs[3];
+                const name = branchNameIn(rawArgs.slice(2));
                 if (!name) {
                     outError(chalk.red("✗ Branch name is required."));
                     out(chalk.gray("  Usage: rebase db branch delete <name>"));
@@ -1668,7 +1668,7 @@ max: 3 });
             }
 
             case "info": {
-                const name = rawArgs[3];
+                const name = branchNameIn(rawArgs.slice(2));
                 if (!name) {
                     outError(chalk.red("✗ Branch name is required."));
                     out(chalk.gray("  Usage: rebase db branch info <name>"));
@@ -1701,13 +1701,13 @@ max: 3 });
             }
 
             case "diff": {
-                const name = rawArgs[3];
+                const name = branchNameIn(rawArgs.slice(2));
                 if (!name || name.startsWith("-")) {
                     outError(chalk.red("✗ Branch name is required."));
                     out(chalk.gray("  Usage: rebase db branch diff <name> [--json] [--sample-limit <n>]"));
                     process.exit(1);
                 }
-                const parsed = arg(BRANCH_FLAGS, { argv: rawArgs.slice(4), permissive: true });
+                const parsed = arg(BRANCH_FLAGS, { argv: rawArgs.slice(3), permissive: true });
                 const { diffDatabaseBranch } = await import("./branching/branch-diff");
                 const { branchDiffReport } = await import("./branching/branch-diff-report");
                 // The SQL and branch halves of an admin, on this command's own

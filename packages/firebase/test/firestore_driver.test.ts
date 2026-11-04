@@ -285,6 +285,45 @@ describe("useFirestoreDriver", () => {
             .rejects.toThrow(/FirestoreTextSearchController/);
     });
 
+    /**
+     * `logical` was never read: `fetchCollection`, `listenCollection` and
+     * `count` did not destructure it, so an `or(...)` query answered with the
+     * whole collection.
+     */
+    it("an or() group narrows the read, ANDed with the filter", async () => {
+        const logical = {
+            type: "or" as const,
+            conditions: [
+                { column: "name", operator: "==" as const, value: "amy" },
+                { column: "name", operator: "==" as const, value: "zed" }
+            ]
+        };
+        const rows = await driver.fetchCollection({ path: "people", logical });
+        expect(rows.map((row) => row.id).sort()).toEqual(["a1", "b2"]);
+
+        const rowsWithFilter = await driver.fetchCollection({ path: "people", logical, filter: { age: [">", 20] } });
+        expect(rowsWithFilter.map((row) => row.id)).toEqual(["a1"]);
+    });
+
+    it("refuses a not() group rather than ignoring it", async () => {
+        await expect(driver.fetchCollection({
+            path: "people",
+            logical: { type: "not", conditions: [{ column: "name", operator: "==", value: "amy" }] }
+        })).rejects.toThrow(/not\(\.\.\.\)/);
+    });
+
+    /**
+     * Several conditions on one field arrive as a list of tuples. The first
+     * tuple was read as the operator, which is no operator at all.
+     */
+    it("applies every condition a field lists", async () => {
+        const rows = await driver.fetchCollection({
+            path: "people",
+            filter: { age: [[">=", 20], ["<", 50]] }
+        });
+        expect(rows.map((row) => row.id).sort()).toEqual(["c3", "d4"]);
+    });
+
     it("a count with a search string does not count the whole collection", async () => {
         const { count } = driver;
         if (!count) throw new Error("the driver cannot count");

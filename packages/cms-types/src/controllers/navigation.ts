@@ -24,6 +24,9 @@ export type UrlController = {
      * `/c/products` => `products`
      * `/my_cms/c/products/B34SAP8Z` => `products/B34SAP8Z`
      * `/my_cms/my_view` => `my_view`
+     *
+     * Each segment is percent-decoded, so the data path holds a record's id as
+     * the database does: `/c/products/caf%C3%A9` => `products/café`.
      * @param cmsPath
      */
     urlPathToDataPath: (cmsPath: string) => string;
@@ -43,6 +46,11 @@ export type UrlController = {
      * Build a URL collection path from a data path
      * `products` => `/c/products`
      * `products/B34SAP8Z` => `/c/products/B34SAP8Z`
+     *
+     * Each segment is percent-encoded, so a record id with a space, `#`, `?` or
+     * a non-ASCII character makes a URL that leads back to it:
+     * `products/café` => `/c/products/caf%C3%A9`. A query or a hash is
+     * appended to the result, not passed in.
      * @param path
      */
     buildUrlCollectionPath: (path: string) => string;

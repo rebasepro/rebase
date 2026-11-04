@@ -214,6 +214,19 @@ function missingRegistryError(err: unknown): Error | undefined {
 const BRANCHES_TABLE = "rebase.branches";
 
 /**
+ * What a branch database's comment starts with: the rest is the main database
+ * whose `rebase.branches` registers it. Written between `CREATE DATABASE` and
+ * the registry row, so a database a crash left without its row still says
+ * whose it is.
+ */
+const BRANCH_HOME_COMMENT_PREFIX = "rebase:branch-of:";
+
+/** The comment that marks a database as a branch registered in `homeDatabase`. */
+function branchHomeComment(homeDatabase: string): string {
+    return `${BRANCH_HOME_COMMENT_PREFIX}${homeDatabase}`;
+}
+
+/**
  * The connected server cannot branch, so nothing was done.
  *
  * A refusal, not a fault: typed so the transports can forward it intact.
@@ -463,6 +476,14 @@ export class BranchService {
             sql`SELECT xmin::text AS xid FROM pg_database WHERE datname = ${dbName}`
         );
         const forkXid = (forkResult.rows as Record<string, unknown>[])[0]?.xid;
+
+        // Which registry this database belongs to, on the database itself and
+        // before the row: prune reads it to leave alone an `rb_*` database
+        // another project on the same server registered. Best-effort — a
+        // database without it is judged by the registry alone, as before.
+        const homeLiteral = branchHomeComment(await this.home.database()).replace(/'/g, "''");
+        await this.db.execute(sql.raw(`COMMENT ON DATABASE "${safeDbName}" IS '${homeLiteral}'`))
+            .catch(() => undefined);
 
         // Record metadata in the registry — asked for again, as copying the
         // main database closed any pool on it.
@@ -806,6 +827,12 @@ export class BranchService {
      * so the *disagreements* between the two are visible — a row whose database
      * is gone and a database with no row are the two things prune exists to
      * find, and a join hides both.
+     *
+     * A database whose comment marks it as another main database's branch
+     * (see {@link BRANCH_HOME_COMMENT_PREFIX}) is left out, unless this
+     * registry names it: it is another project's branch on the same server,
+     * which has no row here because it is registered there, and dropping it as
+     * an orphan would destroy that project's work.
      */
     async pruneCandidates(): Promise<{ rows: BranchRow[]; databases: string[] }> {
         const rowResult = await (await this.home.registry()).execute(sql.raw(`
@@ -816,11 +843,21 @@ export class BranchService {
             dbName: row.db_name as string,
             createdAt: new Date(row.created_at as string)
         }));
+        const registered = new Set(rows.map((row) => row.dbName));
+        const ownComment = branchHomeComment(await this.home.database());
 
         const dbResult = await this.db.execute(sql`
-            SELECT datname FROM pg_database WHERE NOT datistemplate
+            SELECT datname, shobj_description(oid, 'pg_database') AS comment
+              FROM pg_database WHERE NOT datistemplate
         `);
-        const databases = (dbResult.rows as Record<string, unknown>[]).map((row) => String(row.datname));
+        const databases = (dbResult.rows as Record<string, unknown>[])
+            .filter((row) => {
+                const comment = typeof row.comment === "string" ? row.comment : "";
+                return !comment.startsWith(BRANCH_HOME_COMMENT_PREFIX)
+                    || comment === ownComment
+                    || registered.has(String(row.datname));
+            })
+            .map((row) => String(row.datname));
 
         return { rows, databases };
     }

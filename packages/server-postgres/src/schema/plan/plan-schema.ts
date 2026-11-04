@@ -554,6 +554,42 @@ export const compileSecurityRule = (
 };
 
 /**
+ * Refuse two of a table's policies that Postgres would store under one name.
+ *
+ * Each policy is rendered as `DROP POLICY IF EXISTS "<name>"` and then its
+ * `CREATE`, and Postgres keeps the first 63 bytes of the name, so the second
+ * of two policies whose names share those bytes drops the first and takes its
+ * place. On a table of 56 bytes or more every unnamed rule of one operation is
+ * `<table>_<op>` once stored, so a restrictive gate followed by a grant left
+ * the grant alone in force. One rule's own operations never collide here —
+ * `getPolicyNamesForRule` names them apart — so a collision is always two
+ * rules, and the author names one of them.
+ */
+const sameStoredPolicy = (a: PolicyPlan, b: PolicyPlan): boolean =>
+    a.name === b.name && a.operation === b.operation && a.mode === b.mode
+    && a.roles.join(",") === b.roles.join(",") && a.using === b.using && a.withCheck === b.withCheck;
+
+function assertDistinctStoredPolicyNames(policies: PolicyPlan[]): void {
+    const owners = new Map<string, PolicyPlan>();
+    for (const policy of policies) {
+        const stored = toPostgresIdentifier(policy.name);
+        const first = owners.get(stored);
+        if (!first) {
+            owners.set(stored, policy);
+            continue;
+        }
+        // The same policy twice — a rule repeated verbatim — replaces itself.
+        if (sameStoredPolicy(first, policy)) continue;
+        throw new Error(
+            `The security rules "${first.ruleKey}" and "${policy.ruleKey}" compile to the policies ` +
+            `"${first.name}" and "${policy.name}", which Postgres stores under one name, "${stored}": it ` +
+            "keeps only the first 63 bytes of an identifier, so the second would replace the first. " +
+            "Give one of the rules a shorter `name`, or the collection a shorter `table`."
+        );
+    }
+}
+
+/**
  * A table's policies, minus any superseded name Postgres would store one of
  * them under.
  *
@@ -564,6 +600,7 @@ export const compileSecurityRule = (
  * POLICY IF EXISTS` already removes the old policy, so nothing is lost.
  */
 const withoutLiveSupersededNames = (policies: PolicyPlan[]): PolicyPlan[] => {
+    assertDistinctStoredPolicyNames(policies);
     const stored = new Set(policies.map(policy => toPostgresIdentifier(policy.name)));
     return policies.map(policy => {
         if (!policy.supersedes) return policy;

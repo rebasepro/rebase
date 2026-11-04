@@ -150,9 +150,14 @@ function MapEditView<T extends Record<string, unknown>>({
             }
             return row;
         }));
+        // A row with no key yet is not in the value, and choosing its type does
+        // not put it there: `{ "": … }` would be saved as an entry under the
+        // empty key.
+        const key = internalState.find((row) => row[0] === id)?.[1].key;
+        if (!key) return;
         setValue({
             ...(value ?? {} as T),
-            [internalState.find((row) => row[0] === id)?.[1].key ?? ""]: getDefaultValueFortype(type)
+            [key]: getDefaultValueFortype(type)
         })
     };
 

@@ -687,7 +687,11 @@ reason: "no .env quoting carries this value unchanged" });
             written.push(v.key);
         }
 
+        // Owner-only, whether the file is new or replaced: `mode` applies only
+        // when the file is created, so an existing world-readable `.env`
+        // would keep its mode while it takes the project's values.
         fs.writeFileSync(outPath, lines.length ? lines.join("\n") + "\n" : "", { mode: 0o600 });
+        fs.chmodSync(outPath, 0o600);
 
         emit(
             () => {

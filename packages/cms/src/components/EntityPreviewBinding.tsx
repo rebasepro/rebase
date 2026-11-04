@@ -1,5 +1,6 @@
 
 import type { Property } from "@rebasepro/types";
+import { hasEntityId } from "@rebasepro/common";
 import * as React from "react";
 import { useEffect, useMemo } from "react";
 
@@ -392,7 +393,7 @@ export function EntityPreviewBindingWithId({
 
     useEffect(() => {
         let isMounted = true;
-        if (!entityId || !path) {
+        if (!hasEntityId(entityId) || !path) {
             setEntity(undefined);
             return;
         }

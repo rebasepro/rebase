@@ -64,7 +64,7 @@ function tokenStore() {
     };
 }
 
-function createApp(opts: { withEmail?: boolean; knownEmail?: string } = {}) {
+function createApp(opts: { withEmail?: boolean; knownEmail?: string; withMagicLink?: boolean } = {}) {
     configureJwt({ secret: TEST_SECRET });
 
     const email = opts.knownEmail ?? nextEmail();
@@ -103,6 +103,7 @@ function createApp(opts: { withEmail?: boolean; knownEmail?: string } = {}) {
     const config: AuthModuleConfig = {
         authRepo,
         enableEmailOtp: true,
+        enableMagicLink: opts.withMagicLink === true,
         emailService: {
             isConfigured: () => opts.withEmail !== false,
             send: async (message: { to: string; subject: string; html?: string; text?: string }) => {
@@ -297,6 +298,24 @@ describe("POST /auth/otp/verify", () => {
 
         expect(response.status).toBe(200);
         expect((await response.json() as { user: { emailVerified: boolean } }).user.emailVerified).toBe(true);
+    });
+});
+
+describe("POST /auth/magic-link/verify with a code", () => {
+    it("refuses a code presented as a link token, and leaves the code usable", async () => {
+        // Codes and links share one token store, and the link route hashes
+        // whatever it is handed. A code's stored material is no secret beyond
+        // its six digits, so taken there it was a guess at one account under
+        // the IP limit alone — the per-address budget below never ran.
+        const { app, sent, email } = createApp({ withMagicLink: true });
+        await post(app, "/auth/otp", { email });
+        const code = codeFrom(sent[0]);
+
+        const viaLink = await post(app, "/auth/magic-link/verify", { token: otpTokenMaterial(email, code) });
+        expect(viaLink.status).toBe(400);
+        expect((await viaLink.json() as { error: { code: string } }).error.code).toBe("INVALID_TOKEN");
+
+        expect((await post(app, "/auth/otp/verify", { email, code })).status).toBe(200);
     });
 });
 

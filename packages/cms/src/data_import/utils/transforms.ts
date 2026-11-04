@@ -1,6 +1,24 @@
 import { isPrototypePollutingKey, pathTraversesPrototype } from "@rebasepro/utils";
 
 /**
+ * Make `holder[slot]` an array or an object to write into, unless it is one.
+ *
+ * A file can carry a plain column and nested ones under the same name — `tags`
+ * beside `tags[0]`, `address` beside `address.city`. The nested columns win:
+ * they say what shape the value has, and writing an index or a key into the
+ * text a plain column left there threw (strict mode), which failed the whole
+ * file.
+ */
+function containerAt(holder: { [key: string]: any }, slot: string | number, kind: "array" | "object", column: string): void {
+    const existing = holder[slot];
+    if (existing !== null && typeof existing === "object") return;
+    if (existing !== undefined && existing !== null && existing !== "") {
+        console.warn(`Column "${column}" nests under "${String(slot)}", which another column set to a plain value; the nested columns are kept`);
+    }
+    holder[slot] = kind === "array" ? [] : {};
+}
+
+/**
  * Take an object with keys of type `address.street`, `address.city` and
  * convert it to an object with nested objects like `{ address: { street: ..., city: ... } }`
  *
@@ -26,23 +44,25 @@ export function unflattenObject(flatObj: { [key: string]: any }) {
         const keyParts = key.split(".");
         keyParts.forEach((keyPart, i) => {
 
-            if (/^[\w]+\[\d+\]$/.test(keyPart)) {
-                const mainPropertyName = keyPart.slice(0, keyPart.indexOf("["));
-                const index = parseInt(keyPart.slice(keyPart.indexOf("[") + 1, keyPart.indexOf("]")));
+            const indexed = /^(.+)\[(\d+)\]$/.exec(keyPart);
+            if (indexed) {
+                const mainPropertyName = indexed[1];
+                const index = parseInt(indexed[2], 10);
 
-                if (!currentObj[mainPropertyName]) {
-                    currentObj[mainPropertyName] = []
-                }
+                containerAt(currentObj, mainPropertyName, "array", key);
 
                 if (i !== keyParts.length - 1) {
-                    currentObj[mainPropertyName][index] = currentObj[mainPropertyName][index] || {};
+                    containerAt(currentObj[mainPropertyName], index, "object", key);
                     currentObj = currentObj[mainPropertyName][index];
                 } else {
                     currentObj[mainPropertyName][index] = flatObj[key];
                 }
             } else if (i !== keyParts.length - 1) {
-                currentObj[keyPart] = currentObj[keyPart] || {};
+                containerAt(currentObj, keyPart, "object", key);
                 currentObj = currentObj[keyPart];
+            } else if (currentObj[keyPart] !== null && typeof currentObj[keyPart] === "object") {
+                // Nested columns already gave this name its shape; see `containerAt`.
+                console.warn(`Column "${key}" is a plain value where nested columns already are; the nested columns are kept`);
             } else {
                 currentObj[keyPart] = flatObj[key];
             }

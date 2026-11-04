@@ -1,5 +1,5 @@
 ---
-sourceHash: 53c151ad9bf8af55
+sourceHash: e3f0b557b79dc3c6
 title: "Acquisizione delle modifiche a livello di database (CDC)"
 sidebar_label: "Acquisizione delle modifiche a livello di database (CDC)"
 description: "Eventi realtime per ogni scrittura sottoposta a commit, comunque sia stata eseguita: i trigger di acquisizione, l'impostazione REALTIME_CDC e ciò di cui hanno bisogno."
@@ -17,7 +17,7 @@ CDC è controllato dalla variabile d'ambiente `REALTIME_CDC`:
 | --- | --- |
 | `auto` *(predefinito)* | Abilita l'acquisizione a livello di database se la connessione lo supporta; effettua un **fallback silenzioso** al realtime a livello applicativo in caso contrario. Zero configurazione. |
 | `trigger` | Forza l'acquisizione basata su trigger. Funziona su qualsiasi istanza PostgreSQL, incluse le istanze gestite prive di replica logica. Emette un avviso (invece del fallback silenzioso) se non è possibile effettuare il provisioning. |
-| `wal` | Predilige la replica logica WAL. Non ancora integrata — degrada a `trigger` e registra nei log la modalità attiva. |
+| `wal` | Legge le modifiche dal write-ahead log tramite replica logica invece che con i trigger, così una scrittura non esegue alcun trigger e non invia alcun `NOTIFY`. Richiede `wal_level=logical` e un ruolo autorizzato a replicare; se uno dei due manca, degrada a `trigger` con un avviso. Vedere [Acquisizione dal WAL](#acquisizione-dal-wal). |
 | `off` | Solo realtime a livello applicativo. Usalo per evitare l'overhead dei trigger per ogni scrittura su carichi di lavoro ad alta intensità di scrittura. Un boot con `off` che possiede lo schema **rimuove** anche i trigger e le funzioni di cattura che un boot precedente aveva installato, e registra quanti ne ha tolti; rimuovi l'impostazione e il boot successivo li installa di nuovo. |
 
 La stessa impostazione è
@@ -48,6 +48,28 @@ Se la connessione non lo supporta, `auto` registra invece una riga informativa e
 4. **Tra istanze (Cross-instance)** — Poiché ogni istanza osserva ogni commit attraverso il flusso di modifiche, CDC funge anche da canale cross-instance; il broadcast legacy `rebase_entity_changes` per mutazione non viene utilizzato quando CDC è attivo.
 5. **Deduplicazione** — Una mutazione effettuata tramite l'API di Rebase pianifica un refetch per i sottoscrittori locali nell'istante in cui viene eseguito il commit e viene anche rimandata indietro come eco attraverso il flusso di modifiche. L'istanza di origine sopprime un'eco che arriva entro la finestra di debounce del refetch (un record a vita breve delle proprie emissioni), quindi una scrittura API normalmente produce un solo frame. Un'eco che arriva più tardi innesca un ulteriore refetch, che consegna di nuovo le stesse righe: innocuo, ma un sottoscrittore può vedere due volte un frame identico.
 
+## Acquisizione dal WAL
+
+`REALTIME_CDC=wal` legge le modifiche dal write-ahead log di PostgreSQL tramite replica logica (il plugin integrato `pgoutput`) invece che con i trigger. Una scrittura allora non esegue alcun trigger e non invia alcun `NOTIFY`, e questo conta appena le scritture sono concorrenti: una transazione che ha chiamato `NOTIFY` prende al commit un lock per l'intero server e lo tiene per tutta la scrittura su disco, quindi con l'acquisizione tramite trigger quei commit avvengono uno alla volta. Misurata su PostgreSQL 18 con 32 scrittori concorrenti e un flush su disco di 1&nbsp;ms, l'acquisizione tramite trigger ha limitato gli insert a circa un decimo del ritmo raggiunto dall'acquisizione dal WAL.
+
+Requisiti:
+
+- `wal_level = logical` sul server, che richiede un riavvio. Su Amazon RDS impostare `rds.logical_replication = 1`; su Cloud SQL, `cloudsql.logical_decoding = on`.
+- Un ruolo autorizzato a replicare: `ALTER ROLE <role> REPLICATION`, o l'equivalente del provider (su RDS, l'appartenenza a `rds_replication`).
+- Uno slot di replica e un WAL sender liberi per ogni istanza del server (`max_replication_slots` e `max_wal_senders`, entrambi 10 per impostazione predefinita).
+- Una connessione diretta (`DATABASE_DIRECT_URL`): un pooler non trasporta il protocollo di replica.
+
+Se manca uno di questi, l'avvio registra il motivo e usa l'acquisizione tramite trigger.
+
+Cosa fa un avvio:
+
+- Crea una pubblicazione chiamata `rebase_cdc` e vi aggiunge la tabella di ogni collection e ogni tabella di giunzione di una relazione many-to-many. Le tabelle vengono solo aggiunte, così una versione precedente ancora in esecuzione durante un rolling deploy non può toglierne la tabella di una collection più recente.
+- Una tabella senza chiave primaria, o con `REPLICA IDENTITY NOTHING`, resta fuori con un avviso: PostgreSQL rifiuta `UPDATE` e `DELETE` su una tabella pubblicata che non sa dire quale riga è cambiata. Le scritture su di essa fatte fuori da Rebase non vengono acquisite.
+- Ogni istanza legge la pubblicazione tramite il proprio slot di replica **temporaneo**, che PostgreSQL elimina alla chiusura della connessione: un'istanza che va in crash non può quindi lasciare uno slot che trattiene WAL fino a riempire il disco. Una riconnessione apre un nuovo slot e ogni sottoscrizione ricarica i dati, perché ciò che è stato confermato durante l'interruzione non viene riprodotto.
+- Una volta aperto il suo flusso, un avvio che esegue sia il provisioning sia il consumo rimuove i trigger di acquisizione, come fa `off`. Durante un rolling deploy che abbandona l'acquisizione tramite trigger, le istanze che la usano ancora smettono di ricevere le scritture fatte altrove finché non vengono sostituite; le loro scritture continuano ad arrivare ai loro sottoscrittori. Un processo che esegue solo il provisioning, come il job di migrazione di un [deployment suddiviso](/docs/deployment/split-processes/), mantiene i trigger per i consumatori che non possono leggere il flusso e ripiegano su di essi.
+
+Gli scrittori mantengono tutta la loro velocità durante un picco, ma un solo WAL sender decodifica ogni slot, quindi oltre alcune migliaia di scritture al secondo sostenute gli eventi possono arrivare in ritardo. Un ruolo con `REPLICATION` può leggere ogni riga di una tabella pubblicata tramite un proprio slot; il flusso resta all'interno del server e i sottoscrittori continuano a rileggere ogni riga con il proprio RLS.
+
 ## Requisiti e note
 
 `directConnectionString` è l'opzione dell'adattatore; su 0.24 usa `DATABASE_DIRECT_URL`.
@@ -55,7 +77,6 @@ Se la connessione non lo supporta, `auto` registra invece una riga informativa e
 - CDC richiede una stringa di connessione diretta (`DATABASE_DIRECT_URL`, la `directConnectionString` dell'adattatore o la connessione primaria) per il client `LISTEN` — i connection pooler in modalità transazione non supportano sessioni `LISTEN` persistenti.
 - I trigger vengono installati solo su tabelle collegate a una collezione registrata, e sulle tabelle di giunzione delle sue relazioni many-to-many. Le scritture su tabelle non mappate vengono ignorate.
 - Una collezione la cui tabella non è ancora stata migrata viene ignorata con un avviso invece di bloccare CDC per il resto.
-- Lo streaming di replica logica WAL nativo (`wal2json`/`pgoutput`) è pianificato; attualmente `REALTIME_CDC=wal` degrada al percorso basato su trigger, che garantisce una copertura equivalente a livello di database.
 
 ## Passaggi successivi
 

@@ -1,5 +1,5 @@
 ---
-sourceHash: 6a3ef60662c3afa5
+sourceHash: dfb1bbaa122356f7
 title: Autenticazione
 sidebar_label: Autenticazione
 description: Autenticazione lato client con l'SDK Rebase — accesso con email/password, provider OAuth, gestione della sessione e listener dello stato di autenticazione.
@@ -183,7 +183,7 @@ await client.auth.linkAnonymous("user@example.com", "correct-horse-battery");
 | `NOT_ANONYMOUS` (400) | La sessione corrente appartiene a un account ordinario |
 | `EMAIL_EXISTS` (409) | L'indirizzo ha già un account associato — accedi a quell'account |
 
-<span class="since-badge" data-since="0.27">Da 0.27</span> Un ospite che non torna più rimane memorizzato come riga nel database. Un amministratore può
+Un ospite che non torna più rimane memorizzato come riga nel database. Un amministratore può
 rimuoverli con `client.admin.listGuests()`, `client.admin.deleteGuest(uid)` e
 `client.admin.deleteGuests({ lastSeenBefore })`, oppure su Rebase Cloud con
 [`rebase cloud guests`](/docs/cli/cloud/#guests). Questi comandi agiscono esclusivamente sugli ospiti,

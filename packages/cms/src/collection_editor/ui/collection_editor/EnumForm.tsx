@@ -1,6 +1,7 @@
 
 import { FieldCaption } from "../../_cms_internals";
 import React, { useEffect } from "react";
+import { useTranslation } from "@rebasepro/app";
 import { deepEqual as equal } from "fast-equals"
 
 ;
@@ -46,32 +47,17 @@ export function EnumForm({
     getData
 }: EnumFormProps) {
 
+    const { t } = useTranslation();
     const formex = useCreateFormex<{
         enum: EnumValueConfig[]
     }>({
         initialValues: { enum: enumValues },
         validateOnChange: true,
         validation: (values) => {
-            interface EnumFieldError { label?: string; id?: string; }
-            const enumErrors: EnumFieldError[] = [];
-            let hasAnyError = false;
-            if (values.enum) {
-                values.enum.forEach((enumValue, index) => {
-                    const fieldError: EnumFieldError = {};
-                    if (!enumValue?.label) {
-                        fieldError.label = "You must specify a label for this enum value entry";
-                        hasAnyError = true;
-                    }
-                    if (!enumValue?.id) {
-                        fieldError.id = "You must specify an ID for this enum value entry";
-                        hasAnyError = true;
-                    }
-                    enumErrors[index] = fieldError;
-                });
-            }
-            const errors = hasAnyError ? { enum: enumErrors } : {};
+            const enumErrors = enumValueErrors(values.enum ?? [], t);
+            const hasAnyError = enumErrors.some(error => error.label !== undefined || error.id !== undefined);
             onError?.(hasAnyError);
-            return errors as Record<string, string>;
+            return (hasAnyError ? { enum: enumErrors } : {}) as Record<string, string>;
         }
     });
 
@@ -96,6 +82,45 @@ export function EnumForm({
             getData={getData}/>
     </Formex>
 
+}
+
+/** What is wrong with one enum value entry, if anything. */
+export interface EnumFieldError { label?: string; id?: string; }
+
+/**
+ * The errors of each enum value entry, by index: a missing label, a missing
+ * id, or an id an earlier entry already has. An id names one value — two with
+ * the same id store the same thing, and the panel cannot tell which label a
+ * row means — compared as text, as the stored value and the select compare it.
+ */
+export function enumValueErrors(
+    enumValues: EnumValueConfig[],
+    t: (key: string, options?: Record<string, string>) => string
+): EnumFieldError[] {
+    const seenIds = new Set<string>();
+    return enumValues.map((enumValue) => {
+        const fieldError: EnumFieldError = {};
+        if (!enumValue?.label) {
+            fieldError.label = "You must specify a label for this enum value entry";
+        }
+        if (!hasEnumId(enumValue)) {
+            fieldError.id = "You must specify an ID for this enum value entry";
+        } else if (seenIds.has(String(enumValue.id))) {
+            fieldError.id = t("enum_id_duplicate", { id: String(enumValue.id) });
+        } else {
+            seenIds.add(String(enumValue.id));
+        }
+        return fieldError;
+    });
+}
+
+/**
+ * Whether an enum value has its id. `0` is one: a number select's first
+ * value is often `0`, and a truthiness check called it missing.
+ */
+export function hasEnumId(enumValue: EnumValueConfig | undefined): boolean {
+    const id = enumValue?.id;
+    return id !== undefined && id !== null && id !== "";
 }
 
 type EnumFormFieldsProps = {

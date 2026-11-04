@@ -94,12 +94,30 @@ export function readRefreshToken(c: Context<HonoEnv>, body: { refreshToken?: str
         for (const part of cookies) {
             const trimmed = part.trim();
             if (trimmed.startsWith(prefix)) {
-                const fromCookie = decodeURIComponent(trimmed.slice(prefix.length));
+                const fromCookie = decodeCookieValue(trimmed.slice(prefix.length));
                 if (fromCookie) return fromCookie;
             }
         }
     }
     return body.refreshToken || undefined;
+}
+
+/**
+ * A cookie value as this server wrote it, or `undefined` when it is not valid
+ * percent-encoding.
+ *
+ * `setRefreshCookie` encodes, so such a value is never one of ours: it is a
+ * cookie of the same name set by somebody else — a sibling subdomain can set
+ * one on the parent domain. It is no token, and the next cookie of the name
+ * may be. A throw here would answer 500 on `/refresh` and on `/logout`, and
+ * `/logout` would never reach the line that clears the cookie.
+ */
+function decodeCookieValue(value: string): string | undefined {
+    try {
+        return decodeURIComponent(value);
+    } catch {
+        return undefined;
+    }
 }
 
 /**

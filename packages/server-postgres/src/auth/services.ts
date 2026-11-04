@@ -466,10 +466,16 @@ export class UserService implements UserRepository {
 
         const whereClause = conditions.length > 0 ? sql`WHERE ${sql.join(conditions, sql` AND `)}` : sql``;
 
-        // Sorting: users with roles first if no role filter, then by requested order
+        // Sorting: users with roles first if no role filter, then by requested
+        // order, then by id. The id is what makes the order total: the pages
+        // are cut by OFFSET, and over a tie — every user a seed or an import
+        // created in one statement shares `created_at` — Postgres is free to
+        // order the tied rows differently for each page, so one user is served
+        // on two pages and another on none.
+        const tieBreak = sql`${sql.raw(usersTableName)}.${sql.raw(idColumn)} ASC`;
         const orderByClause = roleId
-            ? sql`ORDER BY ${sql.raw(usersTableName)}.${sql.raw(orderColumn)} ${direction}`
-            : sql`ORDER BY array_length(${sql.raw(usersTableName)}.roles, 1) DESC NULLS LAST, ${sql.raw(usersTableName)}.${sql.raw(orderColumn)} ${direction}`;
+            ? sql`ORDER BY ${sql.raw(usersTableName)}.${sql.raw(orderColumn)} ${direction}, ${tieBreak}`
+            : sql`ORDER BY array_length(${sql.raw(usersTableName)}.roles, 1) DESC NULLS LAST, ${sql.raw(usersTableName)}.${sql.raw(orderColumn)} ${direction}, ${tieBreak}`;
 
         const countResult = await this.db.execute(sql`
             SELECT count(*)::int as total FROM ${sql.raw(usersTableName)}
@@ -1271,13 +1277,22 @@ export class PasswordResetTokenService {
     }
 
     /**
-     * Mark token as used
+     * Mark the token used if it is still valid, and say whether this call did.
+     *
+     * The check and the mark are one statement, so of two requests presenting
+     * the same token only one gets `true`.
      */
-    async markAsUsed(tokenHash: string): Promise<void> {
-        await this.db
-            .update(this.passwordResetTokensTable)
-            .set({ usedAt: new Date() })
-            .where(eq(this.passwordResetTokensTable.tokenHash, tokenHash));
+    async markAsUsed(tokenHash: string): Promise<boolean> {
+        const tableName = this.getQualifiedPasswordResetTokensTableName();
+        const result = await this.db.execute(sql`
+            UPDATE ${sql.raw(tableName)}
+            SET used_at = NOW()
+            WHERE token_hash = ${tokenHash}
+              AND used_at IS NULL
+              AND expires_at > NOW()
+            RETURNING token_hash
+        `);
+        return result.rows.length > 0;
     }
 
     /**
@@ -1353,6 +1368,11 @@ export class MagicLinkTokenService {
         };
     }
 
+    /** Every link and email code issued to a user, used or not. */
+    async deleteAllForUser(uid: string): Promise<void> {
+        await this.db.delete(this.magicLinkTokensTable).where(eq(this.magicLinkTokensTable.uid, uid));
+    }
+
     /** Links and email codes past their expiry, used or not. */
     async deleteExpired(): Promise<void> {
         const tableName = this.getQualifiedTableName();
@@ -1362,11 +1382,22 @@ export class MagicLinkTokenService {
         `);
     }
 
-    async markAsUsed(tokenHash: string): Promise<void> {
-        await this.db
-            .update(this.magicLinkTokensTable)
-            .set({ usedAt: new Date() })
-            .where(eq(this.magicLinkTokensTable.tokenHash, tokenHash));
+    /**
+     * Mark the link or code used if it is still valid, and say whether this
+     * call did — in one statement, so of two requests presenting it only one
+     * gets `true`.
+     */
+    async markAsUsed(tokenHash: string): Promise<boolean> {
+        const tableName = this.getQualifiedTableName();
+        const result = await this.db.execute(sql`
+            UPDATE ${sql.raw(tableName)}
+            SET used_at = NOW()
+            WHERE token_hash = ${tokenHash}
+              AND used_at IS NULL
+              AND expires_at > NOW()
+            RETURNING token_hash
+        `);
+        return result.rows.length > 0;
     }
 }
 
@@ -1444,8 +1475,8 @@ export class PostgresTokenRepository implements TokenRepository {
         return this.passwordResetTokenService.findValidByHash(tokenHash);
     }
 
-    async markPasswordResetTokenUsed(tokenHash: string): Promise<void> {
-        await this.passwordResetTokenService.markAsUsed(tokenHash);
+    async markPasswordResetTokenUsed(tokenHash: string): Promise<boolean> {
+        return this.passwordResetTokenService.markAsUsed(tokenHash);
     }
 
     async deleteAllPasswordResetTokensForUser(uid: string): Promise<void> {
@@ -1472,8 +1503,12 @@ export class PostgresTokenRepository implements TokenRepository {
         return this.magicLinkTokenService.findValidByHash(tokenHash);
     }
 
-    async markMagicLinkTokenUsed(tokenHash: string): Promise<void> {
-        await this.magicLinkTokenService.markAsUsed(tokenHash);
+    async markMagicLinkTokenUsed(tokenHash: string): Promise<boolean> {
+        return this.magicLinkTokenService.markAsUsed(tokenHash);
+    }
+
+    async deleteAllMagicLinkTokensForUser(uid: string): Promise<void> {
+        await this.magicLinkTokenService.deleteAllForUser(uid);
     }
 }
 
@@ -1662,8 +1697,8 @@ export class PostgresAuthRepository implements AuthRepository {
         return this.tokenRepository.findValidPasswordResetToken(tokenHash);
     }
 
-    async markPasswordResetTokenUsed(tokenHash: string): Promise<void> {
-        await this.tokenRepository.markPasswordResetTokenUsed(tokenHash);
+    async markPasswordResetTokenUsed(tokenHash: string): Promise<boolean> {
+        return this.tokenRepository.markPasswordResetTokenUsed(tokenHash);
     }
 
     async deleteAllPasswordResetTokensForUser(uid: string): Promise<void> {
@@ -1685,8 +1720,12 @@ export class PostgresAuthRepository implements AuthRepository {
         return this.tokenRepository.findValidMagicLinkToken(tokenHash);
     }
 
-    async markMagicLinkTokenUsed(tokenHash: string): Promise<void> {
-        await this.tokenRepository.markMagicLinkTokenUsed(tokenHash);
+    async markMagicLinkTokenUsed(tokenHash: string): Promise<boolean> {
+        return this.tokenRepository.markMagicLinkTokenUsed(tokenHash);
+    }
+
+    async deleteAllMagicLinkTokensForUser(uid: string): Promise<void> {
+        await this.tokenRepository.deleteAllMagicLinkTokensForUser(uid);
     }
 
     // MFA operations (delegate to MfaService)

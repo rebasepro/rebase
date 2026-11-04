@@ -1,5 +1,6 @@
 
 import type { EntityCustomViewParams } from "@rebasepro/cms-types";
+import { hasEntityId } from "@rebasepro/common";
 import { useRef, useEffect } from "react";
 import { cls, IconButton, Label, Tooltip, Typography } from "@rebasepro/ui";
 import { ErrorBoundary, HistoryIcon } from "@rebasepro/ui";
@@ -40,7 +41,7 @@ export function EntityHistoryView<M extends Record<string, unknown>>({
     } = useHistory({
         slug,
         entityId,
-        enabled: !!entityId,
+        enabled: hasEntityId(entityId),
         pageSize: 10,
         refreshToken
     });

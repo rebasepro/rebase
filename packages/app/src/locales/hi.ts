@@ -185,6 +185,7 @@ export const hi: RebaseTranslations = {
     add_on_top: "शीर्ष पर जोड़ें",
     add_below: "नीचे जोड़ें",
     add_to_field: "{{fieldName}} में जोड़ें",
+    enum_id_duplicate: "कोई दूसरा enum मान पहले से ID \"{{id}}\" का उपयोग कर रहा है",
     value: "मान",
     key: "कुंजी",
     drag_drop_multiple: "कुछ फ़ाइलों को यहां खींचें और छोड़ें, या फ़ाइलों का चयन करने के लिए क्लिक करें। पुन: क्रमबद्ध करने के लिए खींचें।",

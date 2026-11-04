@@ -175,6 +175,19 @@ export function useFetch<M extends Record<string, any>, USER extends User = User
     const [dataLoading, setDataLoading] = useState<boolean>(!cachedEntity);
     const [dataLoadingError, setDataLoadingError] = useState<Error | undefined>();
 
+    // The record the state above is for. When the caller asks for another one
+    // in place, the state moves to it during this render — its cached copy, or
+    // nothing while it loads — so no render pairs the new id with the record
+    // read for the old one.
+    const [stateKey, setStateKey] = useState(cacheKey);
+    if (stateKey !== cacheKey) {
+        const cachedForKey = cacheKey ? readCache<M>(cacheKey) : undefined;
+        setStateKey(cacheKey);
+        setEntity(cachedForKey);
+        setDataLoading(Boolean(cacheKey) && !cachedForKey);
+        setDataLoadingError(undefined);
+    }
+
     useEffect(() => {
 
         const key = `${path}/${entityId}`;

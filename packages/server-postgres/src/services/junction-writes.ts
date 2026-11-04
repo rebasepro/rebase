@@ -31,6 +31,14 @@ export interface JunctionBinding {
     parentColumn: AnyPgColumn;
     /** The junction column holding the id of the row on the far side. */
     targetColumn: AnyPgColumn;
+    /**
+     * The keys the junction's drizzle table holds those two columns under —
+     * what an insert's values are keyed by. A table may key a column by
+     * another name than the column's own (`postId: integer("post_id")`), and
+     * drizzle leaves a value under any other key out of the statement.
+     */
+    parentKey: string;
+    targetKey: string;
     /** `<collection>.<relation>`, for error messages. */
     label: string;
     /**
@@ -96,6 +104,8 @@ export function bindThroughJunction(
         table,
         parentColumn: column(table, through.sourceColumn, label, "source"),
         targetColumn: column(table, through.targetColumn, label, "target"),
+        parentKey: through.sourceColumn,
+        targetKey: through.targetColumn,
         label,
         payload: through.properties ?? {}
     };
@@ -176,6 +186,8 @@ export function bindJoinPathJunction(
         table,
         parentColumn: column(table, parentColumnName, label, "source"),
         targetColumn: column(table, targetColumnName, label, "target"),
+        parentKey: parentColumnName,
+        targetKey: targetColumnName,
         label,
         // A `via` reaches through a table it did not declare, so there is no
         // `through.properties` to read and nothing to write beyond the keys.
@@ -358,8 +370,8 @@ export async function applyJunctionMembership(
     if (added.length > 0) {
         await tx.insert(binding.table)
             .values(added.map(link => ({
-                [binding.parentColumn.name]: parentId,
-                [binding.targetColumn.name]: link.id,
+                [binding.parentKey]: parentId,
+                [binding.targetKey]: link.id,
                 ...(link.pivot ?? {})
             })))
             .onConflictDoNothing();

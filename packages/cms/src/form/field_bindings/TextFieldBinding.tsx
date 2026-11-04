@@ -52,6 +52,11 @@ export function TextFieldBinding<T extends string | number>({
     }
 
     const displayValue = (value !== undefined && value !== null) ? String(value) : "";
+    // A number goes to the input as a number. React leaves a number input
+    // alone while its text reads as the value (`"1.0" == 1`); handed `"1"`, it
+    // compares strings and rewrites `"1.0"` to `"1"` as the zero is typed, so
+    // `1.05` could not be entered.
+    const inputValue: string | number = typeof value === "number" ? value : displayValue;
 
     const handleClearClick = useCallback((e: React.MouseEvent) => {
         e.stopPropagation();
@@ -62,7 +67,7 @@ export function TextFieldBinding<T extends string | number>({
     const onChange = (event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
         if (inputType === "number") {
             const numberValue = event.target.value ? parseFloat(event.target.value) : undefined;
-            if (numberValue && isNaN(numberValue)) {
+            if (numberValue !== undefined && Number.isNaN(numberValue)) {
                 setValue(null);
             } else if (numberValue !== undefined && numberValue !== null) {
                 setValue(numberValue as T);
@@ -168,7 +173,7 @@ export function TextFieldBinding<T extends string | number>({
             ) : (
                 <TextField
                     size={size}
-                    value={displayValue}
+                    value={inputValue}
                     onChange={onChange}
                     autoFocus={autoFocus}
                     label={label}

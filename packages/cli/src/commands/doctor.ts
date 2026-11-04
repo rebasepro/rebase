@@ -20,6 +20,7 @@ import {
 import { fileURLToPath, pathToFileURL } from "url";
 import { createRequire } from "module";
 import { scanTextForLibpqUrls, type LibpqUrlFinding } from "../utils/libpq-url";
+import { redactConnectionPasswords } from "../utils/redact";
 import { analyseFunctionsDirectory, summarisePortability } from "../function-portability";
 import { reportSpawnFailure } from "../utils/spawn-error";
 import { argsFromCommand } from "../utils/command-words";
@@ -98,7 +99,7 @@ export function findLibpqUrlProblems(projectRoot: string, envFile?: string | nul
  * defect, and a project with it will otherwise get a clean bill of health while
  * `rebase db backup` fails.
  */
-function reportLibpqUrlProblems(findings: LibpqUrlFinding[]): boolean {
+export function reportLibpqUrlProblems(findings: LibpqUrlFinding[]): boolean {
     if (findings.length === 0) return false;
 
     console.log("");
@@ -106,9 +107,15 @@ function reportLibpqUrlProblems(findings: LibpqUrlFinding[]): boolean {
     console.log("");
     for (const f of findings) {
         console.log(`    ${chalk.bold(f.file)} → ${chalk.bold(f.variable)}`);
-        console.log(chalk.gray(`      the "${f.params.join('", "')}" parameter contains an unencoded "=".`));
-        console.log(chalk.gray("      Replace the value with:"));
-        console.log(`      ${chalk.cyan(f.suggested)}`);
+        console.log(chalk.gray(`      the "${f.params.join('", "')}" parameter contains an unencoded "=". In the value, replace:`));
+        // The parameter, not the whole string: the string carries the
+        // database password, and this report lands in terminals, CI logs and
+        // an assistant's context. A `password=` parameter is masked too.
+        for (const fix of f.fixes) {
+            console.log(`        ${chalk.cyan(redactConnectionPasswords(fix.from))}`);
+            console.log(chalk.gray("      with:"));
+            console.log(`        ${chalk.cyan(redactConnectionPasswords(fix.to))}`);
+        }
         console.log("");
     }
     console.log(chalk.gray("    libpq splits a query parameter on the first \"=\" and rejects any further"));

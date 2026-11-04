@@ -117,5 +117,8 @@ describe("a scheduled backup whose dump fails validation", () => {
             "app-2026-09-23T03-00-00-000Z.globals.sql"
         ]);
         expect(mockPruneBackups).toHaveBeenCalledTimes(1);
+        // Scoped to this database, so a destination shared with another one
+        // never ranks that one's backups in this retention.
+        expect(mockPruneBackups.mock.calls[0][1]).toEqual(expect.objectContaining({ database: "app" }));
     });
 });

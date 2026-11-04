@@ -135,3 +135,36 @@ describe("cron files and jobs that did not become jobs", () => {
         expect(await screen.findByText(en.studio_cron_empty_title!)).toBeTruthy();
     });
 });
+
+/**
+ * A run ends long after its click, and the view may show another job by then.
+ * The finished run re-read the execution history of the job it ran and put it
+ * on screen whatever was selected, so the other job's panel listed the first
+ * job's runs under its own name.
+ */
+describe("the execution history", () => {
+    it("stays the selected job's when a run of another job finishes", async () => {
+        const weekly: CronJobStatus = { ...nightly, id: "weekly", name: "Weekly report" };
+        listJobs.mockResolvedValue({ jobs: [nightly, weekly] });
+        let finishRun: (value: { log: CronJobLogEntry; job: CronJobStatus }) => void = () => undefined;
+        triggerJob.mockImplementation(() => new Promise(resolve => { finishRun = resolve; }));
+        const getLogs = getJobLogs as unknown as jest.Mock<(id: string) => Promise<{ logs: CronJobLogEntry[] }>>;
+        getLogs.mockImplementation(async (id: string) => ({
+            logs: [runLog(id === "nightly" ? { jobId: "nightly", durationMs: 2000 } : { jobId: "weekly", durationMs: 500 })]
+        }));
+
+        render(<CronJobsView/>);
+        fireEvent.click(await screen.findByText("Nightly sync"));
+        fireEvent.click(await screen.findByText("Run now"));
+        fireEvent.click(screen.getByText("Weekly report"));
+        expect(await screen.findByText("500ms")).toBeTruthy();
+
+        finishRun({ log: runLog({ success: true }), job: nightly });
+        await waitFor(() => expect(openSnackbar).toHaveBeenCalled());
+        await waitFor(() => expect(listJobs).toHaveBeenCalledTimes(2));
+        await new Promise(resolve => setTimeout(resolve, 0));
+
+        expect(screen.getByText("500ms")).toBeTruthy();
+        expect(screen.queryByText("2.0s")).toBeNull();
+    });
+});

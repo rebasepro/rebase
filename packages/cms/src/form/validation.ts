@@ -242,7 +242,7 @@ function getZodStringSchema({
             { message: `${fieldLabel(property, name)} must be max ${validation.max} characters long` }
         );
         if (validation.matches) {
-            const regExp = typeof validation.matches === "string" ? hydrateRegExp(validation.matches) : validation.matches;
+            const regExp = toMatchesPattern(validation.matches);
             if (regExp) {
                 schema = schema.refine(
                     (value: unknown) => value == null || (typeof value === "string" && regExp.test(value)),
@@ -287,6 +287,18 @@ function getZodStringSchema({
         }
     }
     return schema;
+}
+
+/**
+ * `validation.matches` as a regex that answers the same for the same value
+ * every time. A `g` or `y` regex keeps `lastIndex` between `test` calls, so a
+ * value it accepted once it refused on the next validation; the flags are
+ * dropped, as the server's write validation drops them.
+ */
+function toMatchesPattern(matches: string | RegExp): RegExp | undefined {
+    const regExp = typeof matches === "string" ? hydrateRegExp(matches) : matches;
+    if (!regExp) return undefined;
+    return regExp.global || regExp.sticky ? new RegExp(regExp.source, regExp.flags.replace(/[gy]/g, "")) : regExp;
 }
 
 /**

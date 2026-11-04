@@ -2,7 +2,7 @@
  * Retention pruning for scheduled backups. Pure logic — no I/O — so it can
  * be exhaustively unit-tested without touching a storage backend.
  */
-import { parseBackupTimestamp } from "./pg-tools";
+import { isBackupOfDatabase, parseBackupTimestamp } from "./pg-tools";
 
 export interface BackupObject {
     /** Storage key / file name. */
@@ -36,6 +36,18 @@ export interface RetentionOptions {
     keepMinimum?: number;
     /** Reference "now" — injectable for deterministic tests. */
     now?: Date;
+    /**
+     * Prune only this database's backups — the ones `buildBackupFilename`
+     * named after it — and count only them toward `keepMinimum`.
+     *
+     * A destination is often shared: one bucket prefix for staging and
+     * production. Ranked together, the database still being backed up fills
+     * `keepMinimum` with its own fresh dumps, and every backup of the other
+     * one — the database whose backups stopped, which is the outage
+     * `keepMinimum` is there for — falls past the cutoff and is deleted.
+     * Absent, every backup in the listing is ranked as one series.
+     */
+    database?: string;
 }
 
 /**
@@ -44,7 +56,8 @@ export interface RetentionOptions {
  * Rules, applied in order:
  *  1. Objects whose key isn't a recognised rebase backup (no parseable
  *     timestamp and no `createdAt`) are never selected — foreign files in a
- *     shared bucket are left untouched.
+ *     shared bucket are left untouched. With `database` set, neither is
+ *     another database's backup.
  *  2. The `keepMinimum` newest backups are always retained.
  *  3. Of the remainder, any older than `retentionDays` are selected for
  *     deletion.
@@ -64,7 +77,9 @@ export function selectBackupsToPrune(
     }
 
     // Resolve a timestamp for every object; drop the ones we can't date.
+    const database = options.database;
     const dated = backups
+        .filter((b) => database === undefined || isBackupOfDatabase(b.key, database))
         .map((b) => {
             const createdAt = b.createdAt ?? parseBackupTimestamp(b.key);
             return createdAt ? { key: b.key, createdAt } : null;

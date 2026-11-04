@@ -162,6 +162,23 @@ collections: [podcasts] }).map(entry => entry.type))
         expect(result).toEqual([]);
     });
 
+    // A data path holds record ids as they are: the URL controller decodes a
+    // URL's segments once, so nothing here decodes them a second time.
+    it.each(["B34SAP8Z", "café", "big chair", "a#b", "a?b", "50%", "%41"])(
+        "takes the record id %s from a data path as it is, nested ones included",
+        (id) => {
+            const variants = makeCollection({ slug: "variants", name: "Variants" });
+            const collections = [makeCollection({ childCollections: () => [variants] })];
+            const result = getNavigationEntriesFromPath({
+                path: `products/${id}/variants/${id}`,
+                collections
+            });
+            expect(result.map((entry) => entry.type)).toEqual(["collection", "entity", "collection", "entity"]);
+            expect(result.map((entry) => entry.type === "entity" ? entry.entityId : entry.path))
+                .toEqual(["products", id, `products/${id}/variants`, id]);
+            expect(result[3].path).toBe(`products/${id}/variants/${id}`);
+        });
+
     it("handles leading/trailing slashes", () => {
         const collections = [makeCollection()];
         const result = getNavigationEntriesFromPath({

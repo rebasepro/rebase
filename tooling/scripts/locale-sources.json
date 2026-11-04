@@ -385,6 +385,7 @@
     "entity_not_found_body": ["d436e043","67de209b","9f519532","7cfadfbb","6fde4cbd","1140a172","309dbf7b"],
     "entity_saved": ["b5c120b3","5e2338e2","3a660ff5","166301d0","8e95c457","2a4e8552","3a660ff5"],
     "enum_form_dialog": ["a2e137b1","8e2cf62a","6a6eed14","1ca71933","8c80ac95","43ef8e0d","43ad4c66"],
+    "enum_id_duplicate": ["f1c82819","8fe39bb0","1b6cd1e3","d651d1f3","6367cbe0","0ea96f8d","6af97d6e"],
     "error": ["54a0e8c1","f6cc01cb","54a0e8c1","46148e25","346faf27","53c64e44","6dba8ec2"],
     "error_after_saving": ["0bb65cd6","aa589fca","53c2ab27","b62fe102","9953b42e","70c9bfab","19733945"],
     "error_before_delete": ["f5577362","0ccb593f","b3e5ad97","7773fc42","76c26c29","472a87fd","2b562634"],

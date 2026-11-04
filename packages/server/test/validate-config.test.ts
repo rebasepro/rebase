@@ -37,6 +37,40 @@ const errors = (collections: unknown[], options = {}) =>
 const warnings = (collections: unknown[], options = {}) =>
     findCollectionConfigProblems(collections, options).filter(p => p.severity === "warning");
 
+describe("a field rule on a nested property", () => {
+    // Field rules are enforced on top-level properties only. One nested in a
+    // map or an array was accepted without a word and withheld nothing.
+    it("is warned about, in a map and in an array, and refuses nothing", () => {
+        const collection = valid();
+        Object.assign(collection.properties, {
+            profile: {
+                name: "Profile",
+                type: "map",
+                properties: {
+                    nickname: { name: "Nickname", type: "string" },
+                    ssn: { name: "SSN", type: "string", access: { read: ["hr"] } }
+                }
+            },
+            notes: {
+                name: "Notes",
+                type: "array",
+                of: { name: "Note", type: "map", properties: { internal: { name: "Internal", type: "string", excludeFromApi: true } } }
+            }
+        });
+        expect(warnings([collection]).map(p => p.path)).toEqual([
+            "posts.properties.profile.properties.ssn",
+            "posts.properties.notes.of.properties.internal"
+        ]);
+        expect(errors([collection])).toEqual([]);
+    });
+
+    it("is not warned about on a top-level property", () => {
+        const collection = valid();
+        Object.assign(collection.properties, { salary: { name: "Salary", type: "number", access: { read: ["hr"] } } });
+        expect(warnings([collection])).toEqual([]);
+    });
+});
+
 describe("a current-era config", () => {
     it("passes clean", () => {
         expect(findCollectionConfigProblems([valid()])).toEqual([]);

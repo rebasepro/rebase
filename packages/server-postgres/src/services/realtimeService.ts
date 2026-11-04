@@ -17,7 +17,10 @@ import { collectionKeyColumns } from "./cdc/identity-columns";
 import { ApiError, logger, rawQueryLoggingEnabled, rowETag } from "@rebasepro/server";
 import { assertReadRequestReadable } from "./read-field-access";
 import { sanitizeErrorForClient } from "../utils/pg-error-utils";
-import { CdcListener, type CdcChangeEvent } from "./cdc/CdcListener";
+import { CdcListener, type CdcChangeEvent, type CdcSource } from "./cdc/CdcListener";
+import { WalCdcListener } from "./cdc/WalCdcListener";
+import { CDC_PUBLICATION } from "./cdc/wal-cdc";
+import type { CdcTableRef } from "./cdc/trigger-cdc";
 import { PgNotifyListener } from "./pg-notify-listener";
 import { terminateIfBacklogged } from "./socket-liveness";
 import { deriveRowAddress, getPrimaryKeys, type PrimaryKeyInfo } from "./collection-helpers";
@@ -576,6 +579,9 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
      */
     private presenceTrackers = new Set<string>();
 
+    /** Each client's roster writes still running, chained in order — see {@link presenceStoreOp}. */
+    private presenceStoreQueues = new Map<string, Promise<void>>();
+
     /**
      * Channels whose oversized ephemeral broadcasts have already been reported,
      * so a hot channel logs the problem once rather than once per message.
@@ -742,8 +748,8 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
     private static readonly REFETCH_MAX_WAIT_MS = DEFAULT_REFETCH_MAX_WAIT_MS;
 
     // ── Database-level Change Data Capture (CDC) ──
-    /** Dedicated LISTEN client for DB-level change events (undefined unless CDC is enabled). */
-    private cdcListener?: CdcListener;
+    /** Where DB-level change events come from — capture triggers or the WAL (undefined unless CDC is enabled). */
+    private cdcListener?: CdcSource;
     /** Whether database-level CDC is the active cross-instance change source. */
     private cdcActive = false;
     /** Junction table → the child lists its rows belong to, built when CDC starts. */
@@ -1366,7 +1372,7 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
         // a query, and so is it for a client that never tracked presence here:
         // it has no rows.
         if (this.presenceTrackers.delete(clientId)) {
-            await this.presenceStoreOp(() => this.presenceStore!.removeClient(clientId), "client removal");
+            await this.presenceStoreOp(clientId, (store) => store.removeClient(clientId), "client removal");
         }
 
         // Remove from the broadcast channels it joined
@@ -1435,6 +1441,22 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
     }
 
     /**
+     * Whether `clientId` is a socket this service still holds.
+     *
+     * A frame reaches this service after the socket door has awaited — the
+     * identity recheck, the data rate limiter — and a channel frame may await
+     * again for its authorizer. A client that closed inside one of those awaits
+     * was already removed by `removeClient`, which runs on `close`, so whatever
+     * its frame registers now is never cleaned up: a subscription that keeps
+     * its group and its refetches for the life of the process, or a membership
+     * that keeps a channel alive with nobody in it. Checked synchronously
+     * before the registration, so nothing can close the socket in between.
+     */
+    private socketIsOpen(clientId: string): boolean {
+        return this.clients.has(clientId);
+    }
+
+    /**
      * Refuse a new subscription past the socket's ceiling, and say so.
      *
      * Every collection subscription is a refetch on every write to its
@@ -1461,6 +1483,8 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
         // Out here so the `catch` can check it. It is claimed before the fetch
         // starts, so a failed fetch always has one.
         let canDeliver: DeliveryCheck | undefined;
+
+        if (!this.socketIsOpen(clientId)) return;
 
         try {
             // Early validation: ensure the requested collection exists in the registry
@@ -1635,6 +1659,8 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
         // As in the collection case: claimed before the fetch, checked in the `catch`.
         let canDeliver: DeliveryCheck | undefined;
 
+        if (!this.socketIsOpen(clientId)) return;
+
         try {
             // Early validation: ensure the requested collection exists in the registry
             const collection = this.registry.getCollectionByPath(request.path);
@@ -1764,22 +1790,27 @@ export class RealtimeService extends EventEmitter implements RealtimeProvider {
             if (!subscription) continue;
             const subscriptionId = subscription.subscriptionId;
 
-            if (subscription.type === "collection" && subscription.collectionRequest) {
+            // Everything the subscribe frame was judged on, judged again: a
+            // list's filter, sort, projection and `include`, and a row's
+            // `include`. An `include` that filters or sorts its target on a
+            // field the new roles may not read still answers that predicate
+            // in every frame — which related rows come back is the answer.
+            const request = subscription.type === "collection" ? subscription.collectionRequest : undefined;
+            const judged = request
+                ? {
+                    // Stored from the subscription's own request, which carried it as one.
+                    filter: request.filter as FilterValues<string>,
+                    logical: request.logical,
+                    orderBy: request.orderBy,
+                    fields: request.fields,
+                    include: request.include
+                }
+                : subscription.type === "single" ? { include: subscription.include } : undefined;
+            if (judged) {
                 const collection = this.registry.getCollectionByPath(subscription.path);
-                const request = subscription.collectionRequest;
                 try {
                     if (collection) {
-                        assertReadRequestReadable(
-                            {
-                                // Stored from the subscription's own request, which carried it as one.
-                                filter: request.filter as FilterValues<string>,
-                                logical: request.logical,
-                                orderBy: request.orderBy,
-                                fields: request.fields
-                            },
-                            collection,
-                            { roles: authContext.roles ?? ["anon"] }
-                        );
+                        assertReadRequestReadable(judged, collection, { roles: authContext.roles ?? ["anon"] });
                     }
                 } catch (e) {
                     if (!(e instanceof ApiError)) throw e;
@@ -2654,7 +2685,17 @@ roles: ["anon"] };
         payload: Record<string, unknown> | undefined,
         authContext?: SubscriptionAuthContext
     ): void | Promise<void> {
-        const channel = payload?.channel as string;
+        // A channel is named by a non-empty string. Anything else is refused
+        // before membership or the authorizer see it: a number `1` is another
+        // key in memory than `"1"` but the same rows in the shared presence
+        // and history tables, so the authorizer would be asked about one
+        // channel and the rows of another read; and a prefix retention rule
+        // calls string methods on the name.
+        const channel = payload?.channel;
+        if (typeof channel !== "string" || channel === "") {
+            this.sendError(clientId, "A channel frame needs `channel`, a non-empty string.", undefined, "INVALID_CHANNEL");
+            return;
+        }
 
         // Leaving and untracking only ever remove the caller's own state, so
         // they need no permission — refusing them could only strand a client.
@@ -2683,6 +2724,9 @@ roles: ["anon"] };
         channel: string,
         payload: Record<string, unknown> | undefined
     ): void | Promise<void> {
+        // An authorizer that answers asynchronously can answer after the
+        // socket closed — see `socketIsOpen`.
+        if (!this.socketIsOpen(clientId)) return;
         switch (type) {
             case "join_channel":
                 this.joinChannel(clientId, channel);
@@ -3324,7 +3368,7 @@ lastSeen: Date.now() });
 
         // Refresh the shared roster on every heartbeat — that timestamp is what
         // tells other instances this client is still here.
-        void this.presenceStoreOp(() => this.presenceStore!.track(channel, clientId, state), "track");
+        void this.presenceStoreOp(clientId, (store) => store.track(channel, clientId, state), "track");
 
         // Announce a join or a state change, here and to the other instances —
         // and nothing else. An unchanged heartbeat used to be delivered to
@@ -3357,7 +3401,7 @@ lastSeen: Date.now() });
             this.deliverPresenceDiff(channel, {}, { [clientId]: entry.state });
             this.publishPresenceDiff(channel, {}, { [clientId]: entry.state });
             if (!options?.skipStore) {
-                void this.presenceStoreOp(() => this.presenceStore!.remove(channel, clientId), "remove");
+                void this.presenceStoreOp(clientId, (store) => store.remove(channel, clientId), "remove");
             }
         }
 
@@ -3546,14 +3590,34 @@ lastSeen: Date.now() });
         unref(this.busGossipInterval); // never hold the process open for housekeeping
     }
 
-    /** Run a roster write when there is a roster, and never let it throw. */
-    private async presenceStoreOp(op: () => Promise<void>, label: string): Promise<void> {
-        if (!this.presenceStore) return;
-        try {
-            await op();
-        } catch (error) {
-            logger.warn(`⚠️ [Presence] Shared roster ${label} failed`, { error });
-        }
+    /**
+     * Run one of `clientId`'s roster writes when there is a roster, after the
+     * ones it made before, and never let it throw.
+     *
+     * In order, because each is its own statement on the pool: a removal sent
+     * while the client's upsert was still on its way could run first, and the
+     * upsert then put the row back. That row is this instance's, so the
+     * stale-roster sweep leaves it alone, and the in-process sweep no longer
+     * knows the client — the departed client stayed in every roster for as
+     * long as the instance ran.
+     */
+    private presenceStoreOp(clientId: string, op: (store: ChannelPresenceStore) => Promise<void>, label: string): Promise<void> {
+        if (!this.presenceStore) return Promise.resolve();
+        const previous = this.presenceStoreQueues.get(clientId) ?? Promise.resolve();
+        const next = previous.then(async () => {
+            const store = this.presenceStore;
+            if (!store) return;
+            try {
+                await op(store);
+            } catch (error) {
+                logger.warn(`⚠️ [Presence] Shared roster ${label} failed`, { error });
+            }
+        });
+        this.presenceStoreQueues.set(clientId, next);
+        void next.finally(() => {
+            if (this.presenceStoreQueues.get(clientId) === next) this.presenceStoreQueues.delete(clientId);
+        });
+        return next;
     }
 
     /** Periodic cleanup for stale presences */
@@ -3681,6 +3745,9 @@ lastSeen: Date.now() });
         // replica to wait out a TTL window on ghosts — a rolling deploy would
         // otherwise show 30s of departed users on every restart.
         if (this.presenceStore) {
+            // After the writes still on their way, or one of them puts a row back.
+            await Promise.allSettled([...this.presenceStoreQueues.values()]);
+            this.presenceStoreQueues.clear();
             try {
                 await this.presenceStore.removeInstance();
             } catch (error) {
@@ -3775,18 +3842,45 @@ lastSeen: Date.now() });
      *                         (bypass PgBouncer — LISTEN needs a session connection).
      */
     async enableCdc(connectionString: string): Promise<void> {
+        await this.activateCdc(() => new CdcListener(
+            connectionString,
+            (events) => this.handleCdcEvents(events),
+            () => this.resyncSubscriptions(),
+            this.listenerApplicationName
+        ));
+    }
+
+    /**
+     * Enable change capture read from the write-ahead log instead of NOTIFY —
+     * `REALTIME_CDC=wal`. Same events, same pipeline as {@link enableCdc};
+     * writers pay for no trigger and no NOTIFY. Rejects when the stream cannot
+     * be opened (see {@link WalCdcListener.start}), leaving CDC inactive so the
+     * caller can enable the trigger listener instead.
+     *
+     * @param tables What provisioning captures, with the columns each table's
+     *        rows are addressed by. A table it does not name is addressed by
+     *        its replica identity.
+     */
+    async enableWalCdc(connectionString: string, tables: readonly CdcTableRef[]): Promise<void> {
+        const identity = new Map(tables.map((t) => [`${t.schema}.${t.table}`, t.identityColumns ?? []]));
+        await this.activateCdc(() => new WalCdcListener({
+            connectionString,
+            publication: CDC_PUBLICATION,
+            onEvents: (events) => this.handleCdcEvents(events),
+            onReconnect: () => this.resyncSubscriptions(),
+            identityColumns: (schema, table) => identity.get(`${schema}.${table}`),
+            applicationName: this.listenerApplicationName
+        }));
+    }
+
+    private async activateCdc(create: () => CdcSource): Promise<void> {
         if (this.cdcActive) {
             logger.warn("⚠️ [CDC] enableCdc called but CDC is already active. Ignoring.");
             return;
         }
         this.cdcTableMap = this.buildCdcTableMap();
         this.junctionLinkMap = buildJunctionLinkMap(this.registry);
-        this.cdcListener = new CdcListener(
-            connectionString,
-            (events) => this.handleCdcEvents(events),
-            () => this.resyncSubscriptions(),
-            this.listenerApplicationName
-        );
+        this.cdcListener = create();
         try {
             // start() validates the initial connection; if it can't be established
             // it rejects here, and we leave CDC inactive so the caller can fall
@@ -3960,15 +4054,7 @@ lastSeen: Date.now() });
         if (event.op === "TRUNCATE") {
             // Every link is gone, so every list of this relation that is
             // subscribed to has changed — whichever parent it belongs to.
-            for (const link of links) {
-                const prefix = `${link.parentCollection.slug}/`;
-                const suffix = `/${link.relationKey}`;
-                const lists = [...this.subscribedPaths.keys()].filter((path) =>
-                    path.startsWith(prefix) && path.endsWith(suffix) && path.split("/").length === 3);
-                for (const path of lists) {
-                    await this.notifyUpdate(path, ANY_ROW, null, (link.parentCollection as { databaseId?: string }).databaseId, /* broadcast */ false, /* origin */ "cdc");
-                }
-            }
+            for (const link of links) await this.notifyEveryListOf(link, null);
             return true;
         }
 
@@ -3976,9 +4062,16 @@ lastSeen: Date.now() });
             const sourceId = event.row?.[link.sourceColumn];
             const targetId = event.row?.[link.targetColumn];
             if (sourceId === undefined || sourceId === null || targetId === undefined || targetId === null) {
+                // The change cannot say which list it belongs to: a key too
+                // large to notify, or a WAL delete whose old tuple carries a
+                // surrogate key and not the two ids. Every list of the
+                // relation may have changed, so every subscribed one looks
+                // again — it used to be skipped, and that link or unlink
+                // reached nobody.
                 this.debugLog(
-                    `📡 [CDC] Junction row on ${event.table} is missing '${link.sourceColumn}'/'${link.targetColumn}' — skipping.`
+                    `📡 [CDC] Junction row on ${event.table} does not name '${link.sourceColumn}'/'${link.targetColumn}' — refreshing every list of ${link.parentCollection.slug}.${link.relationKey}.`
                 );
+                await this.notifyEveryListOf(link, { _rebase_invalidated: true });
                 continue;
             }
 
@@ -3998,6 +4091,21 @@ lastSeen: Date.now() });
         }
 
         return true;
+    }
+
+    /**
+     * Notify every subscribed child list of one many-to-many relation,
+     * whichever parent it belongs to — for a junction change that names no
+     * single list.
+     */
+    private async notifyEveryListOf(link: JunctionLink, row: Record<string, unknown> | null): Promise<void> {
+        const prefix = `${link.parentCollection.slug}/`;
+        const suffix = `/${link.relationKey}`;
+        const lists = [...this.subscribedPaths.keys()].filter((path) =>
+            path.startsWith(prefix) && path.endsWith(suffix) && path.split("/").length === 3);
+        for (const path of lists) {
+            await this.notifyUpdate(path, ANY_ROW, row, (link.parentCollection as { databaseId?: string }).databaseId, /* broadcast */ false, /* origin */ "cdc");
+        }
     }
 
     /**

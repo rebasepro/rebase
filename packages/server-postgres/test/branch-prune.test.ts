@@ -42,6 +42,32 @@ describe("planPrune", () => {
         expect(plan.orphanDatabases).toEqual(["rb_halfdone"]);
     });
 
+    it("keeps a branch's Atlas scratch database out of the orphans", () => {
+        // `db push` on a checkout switched to `feat` plans against
+        // `rb_feat_dev_diff`. Read as an orphan branch, it was dropped without
+        // --include-dev-diff, and with it, dropped twice.
+        const plan = planPrune({
+            rows: [row("feat", 1)],
+            databases: ["leadgen", "rb_feat", "rb_feat_dev_diff", "leadgen_dev_diff"],
+            branchPrefix: "rb_"
+        });
+
+        expect(plan.orphanDatabases).toEqual([]);
+        expect(plan.devDiff).toEqual(["leadgen_dev_diff", "rb_feat_dev_diff"]);
+    });
+
+    it("never takes a registered branch for Atlas scratch", () => {
+        // `schema_dev_diff` is a legal branch name.
+        const plan = planPrune({
+            rows: [row("schema_dev_diff", 1)],
+            databases: ["leadgen", "rb_schema_dev_diff"],
+            branchPrefix: "rb_"
+        });
+
+        expect(plan.devDiff).toEqual([]);
+        expect(plan.orphanDatabases).toEqual([]);
+    });
+
     it("never treats the main database as an orphan", () => {
         const plan = planPrune({ rows: [], databases: ["leadgen", "postgres"], branchPrefix: "rb_" });
 

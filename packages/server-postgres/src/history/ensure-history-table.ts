@@ -108,6 +108,12 @@ export async function ensureHistoryTableExists(db: NodePgDatabase, options: Boot
         return { inTransaction: false, entryFormat: 1 };
     }
 
+    // The entry is stamped with `clock_timestamp()`, the moment it is written,
+    // not the column's `NOW()` default: inside a write's transaction `NOW()` is
+    // the transaction's start, so every entry one write records — a `_batch`
+    // that creates a row and then updates it — would share one `updated_at`,
+    // and the newest-first history list would order them by chance.
+    //
     // The entry has to commit with the row it describes, so it is written on
     // the write's transaction — which runs as the request role, revoked from
     // this table just above. A `SECURITY DEFINER` function is the one door:
@@ -127,8 +133,8 @@ export async function ensureHistoryTableExists(db: NodePgDatabase, options: Boot
             SET search_path = pg_catalog, pg_temp
             AS $fn$
                 INSERT INTO rebase.entity_history
-                    (table_name, entity_id, action, changed_fields, "values", previous_values, updated_by, format)
-                VALUES (p_table_name, p_entity_id, p_action, p_changed_fields, p_values, p_previous_values, p_updated_by, p_format)
+                    (table_name, entity_id, action, changed_fields, "values", previous_values, updated_by, format, updated_at)
+                VALUES (p_table_name, p_entity_id, p_action, p_changed_fields, p_values, p_previous_values, p_updated_by, p_format, clock_timestamp())
             $fn$
         `
             : `
@@ -141,8 +147,8 @@ export async function ensureHistoryTableExists(db: NodePgDatabase, options: Boot
             SET search_path = pg_catalog, pg_temp
             AS $fn$
                 INSERT INTO rebase.entity_history
-                    (table_name, entity_id, action, changed_fields, "values", previous_values, updated_by)
-                VALUES (p_table_name, p_entity_id, p_action, p_changed_fields, p_values, p_previous_values, p_updated_by)
+                    (table_name, entity_id, action, changed_fields, "values", previous_values, updated_by, updated_at)
+                VALUES (p_table_name, p_entity_id, p_action, p_changed_fields, p_values, p_previous_values, p_updated_by, clock_timestamp())
             $fn$
         `));
         await db.execute(sql.raw(`REVOKE ALL ON FUNCTION ${signature} FROM PUBLIC`));

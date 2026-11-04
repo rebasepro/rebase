@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState, useMemo } from "react";
+import { hasEntityId } from "@rebasepro/common";
 import { useApiBase, useApiConfig, useRlsSimulation } from "@rebasepro/app";
 import { simulationHeaders } from "@rebasepro/types";
 import type { EntityHistoryEntry } from "@rebasepro/types";
@@ -68,7 +69,7 @@ export function useHistory(params: {
         currentOffset: number,
         signal?: AbortSignal
     ) => {
-        if (!apiConfig?.apiUrl || !entityId || !enabled) return;
+        if (!apiConfig?.apiUrl || !hasEntityId(entityId) || !enabled) return;
 
         setIsLoading(true);
         setError(undefined);
@@ -127,7 +128,7 @@ signal });
             setOffset(0);
         }
 
-        if (!enabled || !entityId) return;
+        if (!enabled || !hasEntityId(entityId)) return;
 
         const abortController = new AbortController();
         // When entity changed, always fetch from offset 0
@@ -149,7 +150,7 @@ signal });
     }, [isLoading, hasMore, pageSize, entries.length, total]);
 
     const revert = useCallback(async (historyId: string): Promise<Record<string, unknown>> => {
-        if (!apiConfig?.apiUrl || !entityId) {
+        if (!apiConfig?.apiUrl || !hasEntityId(entityId)) {
             throw new Error("Cannot revert: missing API configuration or entity ID");
         }
 

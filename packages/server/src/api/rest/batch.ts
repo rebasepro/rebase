@@ -262,3 +262,19 @@ export function assertRefsResolvable(operations: readonly ParsedBatchOperation[]
         if (operation.ref) seen.add(operation.ref);
     });
 }
+
+/**
+ * Whether `value` is, or anywhere contains, a `$ref` marker.
+ *
+ * A reference is resolved by the driver, inside the transaction. Anything that
+ * has to judge a value *before* the transaction opens — the auth adapter's
+ * user-administration step, which decides whose account an update or a delete
+ * touches — sees the marker rather than the value it stands for.
+ */
+export function containsBatchRef(value: unknown): boolean {
+    if (Array.isArray(value)) return value.some(containsBatchRef);
+    if (!isPlainObject(value)) return false;
+    const keys = Object.keys(value);
+    if (keys.length === 1 && keys[0] === BATCH_REF_KEY) return true;
+    return Object.values(value).some(containsBatchRef);
+}

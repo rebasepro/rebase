@@ -161,6 +161,28 @@ export const renderPolicyStatements = (
     return [...superseded, `DROP POLICY IF EXISTS "${policy.name}" ON ${target};`, `${create};`];
 };
 
+/**
+ * A restrictive policy, under its own name, command and roles, that passes no
+ * row: `USING (false)` / `WITH CHECK (false)` for the clauses its command takes.
+ *
+ * What the boot applier puts in place of a restrictive policy whose own
+ * `CREATE` failed. A restrictive policy is a gate ANDed over every permissive
+ * one, so its absence does not deny — it opens whatever the permissive policies
+ * grant. Standing in for it with a gate nothing passes keeps the failure on
+ * the denying side until the rule can be created.
+ */
+export const renderDenyingPolicyStatements = (
+    table: Pick<TablePlan, "schema" | "table">,
+    policy: PolicyPlan
+): string[] => {
+    const target = `"${table.schema}"."${table.table}"`;
+    let create = `CREATE POLICY "${policy.name}" ON ${target} AS RESTRICTIVE ` +
+        `FOR ${policy.operation.toUpperCase()} TO ${policy.roles.map(r => `"${r}"`).join(", ")}`;
+    if (policy.operation !== "insert") create += " USING (false)";
+    if (policy.operation !== "select" && policy.operation !== "delete") create += " WITH CHECK (false)";
+    return [`DROP POLICY IF EXISTS "${policy.name}" ON ${target};`, `${create};`];
+};
+
 /** `ALTER TABLE … ENABLE ROW LEVEL SECURITY;` — every generated table is locked. */
 export const renderEnableRls = (table: Pick<TablePlan, "schema" | "table">): string =>
     `ALTER TABLE "${table.schema}"."${table.table}" ENABLE ROW LEVEL SECURITY;`;

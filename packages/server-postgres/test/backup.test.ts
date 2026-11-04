@@ -43,6 +43,28 @@ describe("backup pg-tools", () => {
             expect(splitGlobalsStatements("CREATE ROLE a;\nALTER ROLE a NOSUPERUSER;"))
                 .toEqual(["CREATE ROLE a", "ALTER ROLE a NOSUPERUSER"]);
         });
+
+        it("does not split on a semicolon inside a quoted literal or identifier", () => {
+            // pg_dumpall writes role comments and per-role settings as string
+            // literals; split on every `;`, each came back as two syntax errors,
+            // reported as skipped globals, and the comment or setting was lost.
+            const sql = [
+                "CREATE ROLE \"odd;name\";",
+                "COMMENT ON ROLE analyst IS 'read-only; it''s for BI';",
+                "ALTER ROLE analyst SET search_path TO 'a;b';",
+                "COMMENT ON ROLE writer IS 'first line",
+                "-- not a comment, part of the literal",
+                "last line';",
+                "GRANT analyst TO postgres;"
+            ].join("\n");
+            expect(splitGlobalsStatements(sql)).toEqual([
+                "CREATE ROLE \"odd;name\"",
+                "COMMENT ON ROLE analyst IS 'read-only; it''s for BI'",
+                "ALTER ROLE analyst SET search_path TO 'a;b'",
+                "COMMENT ON ROLE writer IS 'first line\n-- not a comment, part of the literal\nlast line'",
+                "GRANT analyst TO postgres"
+            ]);
+        });
     });
 
 
@@ -309,6 +331,37 @@ describe("backup retention pruning", () => {
         ];
         const pruned = selectBackupsToPrune(backups, { retentionDays: 30, now });
         expect(pruned).toEqual(["rebase-app-20260101T000000Z.dump"]);
+    });
+
+    it("keeps one database's backups out of another's retention", () => {
+        // One bucket prefix for staging and production. Production's backups
+        // stopped 40 days ago; staging's run used to fill keepMinimum with its
+        // own fresh dumps and delete every production backup.
+        const backups = [
+            { key: "backups/rebase-staging-20260713T030000Z.dump" },
+            { key: "backups/rebase-staging-20260712T030000Z.dump" },
+            { key: "backups/rebase-staging-20260711T030000Z.dump" },
+            { key: "backups/rebase-staging-20260520T030000Z.dump" },
+            { key: "backups/rebase-prod-20260604T030000Z.dump" },
+            { key: "backups/rebase-prod-20260603T030000Z.dump" },
+            { key: "backups/rebase-prod-20260602T030000Z.dump" },
+            { key: "backups/rebase-prod-20260501T030000Z.dump" }
+        ];
+        expect(selectBackupsToPrune(backups, { retentionDays: 30, keepMinimum: 3, now, database: "staging" }))
+            .toEqual(["backups/rebase-staging-20260520T030000Z.dump"]);
+        expect(selectBackupsToPrune(backups, { retentionDays: 30, keepMinimum: 3, now, database: "prod" }))
+            .toEqual(["backups/rebase-prod-20260501T030000Z.dump"]);
+    });
+
+    it("tells apart databases whose names share a prefix", () => {
+        const backups = [
+            { key: "rebase-my-app-20260101T000000Z.dump" },
+            { key: "rebase-my-20260101T000000Z.dump" }
+        ];
+        expect(selectBackupsToPrune(backups, { retentionDays: 30, now, database: "my" }))
+            .toEqual(["rebase-my-20260101T000000Z.dump"]);
+        expect(selectBackupsToPrune(backups, { retentionDays: 30, now, database: "my-app" }))
+            .toEqual(["rebase-my-app-20260101T000000Z.dump"]);
     });
 
     it("recovers timestamps from keys when createdAt is absent", () => {

@@ -12,7 +12,7 @@ import { assertFieldOpsValid, assertNoFieldOpsOnCreate } from "./field-ops";
 import { resolveConflictTarget } from "./conflict-target";
 import { assertNestedWriteAllowed, type NestedWriteKind } from "./nested-write-access";
 import { ETAG_HEADER, IF_MATCH_HEADER, assertIfMatch, rowETag } from "./etag";
-import { assertRefsResolvable, parseBatchBody, type ParsedBatchOperation } from "./batch";
+import { assertRefsResolvable, containsBatchRef, parseBatchBody, type ParsedBatchOperation } from "./batch";
 import { httpMethodToOperation, type DataOperation } from "../../auth/api-keys/http-operation";
 import { refuseSimulatedWrite } from "../../auth/simulation-read-only";
 import {
@@ -27,7 +27,7 @@ import {
     prepareUserCreations,
     type UserCreatingAdapter
 } from "./auth-collection-writes";
-import { apiHiddenFieldNames, findRelation, getJunctionConfigForRelation, getTableName, resolveCollectionRelations, resolvePrimaryKeys } from "@rebasepro/common";
+import { apiHiddenFieldNames, findRelation, getJunctionConfigForRelation, getTableName, isJunctionBackedRelation, resolveCollectionRelations, resolvePrimaryKeys } from "@rebasepro/common";
 import type { FieldViewer } from "@rebasepro/common";
 import {
     createIdempotencyStore,
@@ -361,6 +361,7 @@ export class RestApiGenerator {
                 );
                 const collection = bySlug.get(operation.collection)!;
                 if (operation.op === "upsert") assertNoUserUpsert(this.authAdapter, collection, `Operation ${index}`);
+                this.assertNoUserAdministrationRef(collection, operation, index);
                 if (!operation.values) return;
                 if (operation.op === "create" && createsUsers(this.authAdapter, collection)) {
                     // A user creation, as on `POST /users`: what it consumes,
@@ -469,6 +470,40 @@ export class RestApiGenerator {
                 ? respond(await execute())
                 : this.runIdempotent(c, body, execute, respond);
         });
+    }
+
+    /**
+     * Refuse a `$ref` in what the auth adapter judges about a batch's update or
+     * delete of a user.
+     *
+     * The adapter's user administration — the last administrator stays one,
+     * `beforeUserDelete` may veto, an email is stored normalized and not taken
+     * by another account, the sessions end with the account — runs before the
+     * transaction opens, on the uid and the values as sent. A `$ref` is resolved
+     * only inside the transaction, so those checks would be asked about the
+     * marker: `{ "op": "delete", "collection": "users", "id": { "$ref": "x.uid" } }`
+     * reads to them as the user `[object Object]` and passes every one, while
+     * the driver deletes whichever account the reference resolves to — the last
+     * administrator included, with the veto never asked and that user's
+     * sessions left alive. So such an operation is refused before anything runs.
+     */
+    private assertNoUserAdministrationRef(
+        collection: CollectionConfig,
+        operation: ParsedBatchOperation,
+        index: number
+    ): void {
+        if (!isAuthCollection(collection)) return;
+        const judged = operation.op === "delete"
+            ? !!this.authAdapter?.prepareUserDeletions || !!this.authAdapter?.finalizeUserDeletions
+            : operation.op === "update" && !!this.authAdapter?.prepareUserUpdates;
+        if (!judged) return;
+        if (!containsBatchRef(operation.id) && !(operation.op === "update" && containsBatchRef(operation.values))) return;
+        throw ApiError.badRequest(
+            `Operation ${index}: an ${operation.op} on "${collection.slug}", whose rows are the users, cannot carry a ` +
+            "`$ref`. Its user-administration checks run before the batch's transaction opens, where a reference is " +
+            "not yet a value. Name the user and the values directly.",
+            "INVALID_BATCH_REF"
+        );
     }
 
     /**
@@ -1284,7 +1319,14 @@ export class RestApiGenerator {
         c: Context<HonoEnv>,
         driver: DataDriver,
         address: RowAddress,
-        id: string
+        id: string,
+        /**
+         * The address reaches the row through a junction, so the driver drops
+         * the link and leaves the row. On the auth collection that is a user
+         * leaving a team, not an account being deleted: none of the account
+         * deletion's checks, hooks or session revocation apply to it.
+         */
+        unlinks = false
     ): Promise<Response> {
         const { collection, path } = address;
 
@@ -1314,7 +1356,7 @@ export class RestApiGenerator {
                 driver, address, id, hardDelete ? true : undefined, c.req.header(IF_MATCH_HEADER)
             );
 
-            await this.deletingUsers(collection, [id], () => driver.delete({
+            await this.deletingUsers(unlinks ? undefined : collection, [id], () => driver.delete({
                 hard: hardDelete,
                 ...(precondition ? { precondition } : {}),
                 row: {
@@ -2113,7 +2155,7 @@ id };
             // parent's relation.
             this.assertNestedRelationWritable(c, nested, "unlink");
 
-            return this.deleteRow(c, driver, nestedRow(nested), parsed.id);
+            return this.deleteRow(c, driver, nestedRow(nested), parsed.id, isJunctionBackedRelation(nested.relation));
         });
     }
 

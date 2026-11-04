@@ -142,6 +142,36 @@ describe("MongoConditionBuilder", () => {
             })).toThrow(/not supported/);
         });
 
+        /**
+         * The column is the key of the condition this builder emits. `$expr`
+         * as a column compiled `[">", ["$salary", 100000]]` into an
+         * aggregation expression over any field of the document — a withheld
+         * one included — and `$function` inside it runs JavaScript.
+         */
+        it("refuses a column Mongo would read as an operator, in a filter and in a group", () => {
+            expect(() => MongoConditionBuilder.buildFilterConditions({
+                $expr: [">", ["$salary", 100000]]
+            })).toThrow(/not a field a filter can name/);
+            expect(() => MongoConditionBuilder.buildFilterConditions({
+                "profile.$where": ["==", "sleep(1000)"]
+            })).toThrow(/not a field a filter can name/);
+            expect(() => MongoConditionBuilder.buildQuery({
+                logical: {
+                    type: "or",
+                    conditions: [
+                        { column: "status", operator: "==", value: "draft" },
+                        { column: "$expr", operator: "==", value: [{ $function: { body: "return true", args: [], lang: "js" } }, true] }
+                    ]
+                }
+            })).toThrow(/not a field a filter can name/);
+        });
+
+        it("still filters on a nested field by its dotted path", () => {
+            expect(MongoConditionBuilder.buildFilterConditions({
+                "address.city": ["==", "Lisbon"]
+            })).toEqual([{ "address.city": { $eq: "Lisbon" } }]);
+        });
+
         it("should skip null filter params", () => {
             const filter: FilterValues<string> = {
                 status: ["==", "active"],

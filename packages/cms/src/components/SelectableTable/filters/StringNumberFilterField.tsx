@@ -200,9 +200,13 @@ export function StringNumberFilterField({
                     disabled={isNullOperation}
                     placeholder={isNullOperation ? "null" : undefined}
                     onChange={(evt) => {
-                        const val = type === "number"
-                            ? parseFloat(evt.target.value)
-                            : evt.target.value;
+                        // Text typed and deleted again is no filter, not a
+                        // filter for the empty string.
+                        const val = evt.target.value === ""
+                            ? undefined
+                            : type === "number"
+                                ? parseFloat(evt.target.value)
+                                : evt.target.value;
                         updateFilter(operation, val);
                     }}
                     endAdornment={internalValue !== undefined && internalValue != null && <IconButton aria-label={t("clear")}
@@ -223,7 +227,7 @@ export function StringNumberFilterField({
                         value={hasSingleValue ? String(internalValue) : ""}
                         onValueChange={(value) => {
                             if (value !== "")
-                                updateFilter(operation, type === "number" ? parseInt(value as string) : value as string)
+                                updateFilter(operation, type === "number" ? parseFloat(value as string) : value as string)
                         }}
                         endAdornment={hasSingleValue && <IconButton aria-label={t("clear")}
                             onClick={(e) => updateFilter(operation, undefined)}>
@@ -260,7 +264,7 @@ export function StringNumberFilterField({
                         value={Array.isArray(internalValue) ? internalValue.map(e => String(e)) : []}
                         disabled={isNullOperation}
                         onValueChange={(value) => {
-                            updateFilter(operation, type === "number" ? (value ?? []).map(v => parseInt(v)) : value)
+                            updateFilter(operation, type === "number" ? (value ?? []).map(v => parseFloat(v)) : value)
                         }}
                     >
                         {enumValues.map((enumConfig) => (

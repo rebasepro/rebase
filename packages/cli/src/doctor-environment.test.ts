@@ -131,6 +131,20 @@ describe(".env sanity", () => {
         expect(values.MALFORMED).toBeUndefined();
         expect(process.env.REBASE_DOCTOR_FIXTURE).toBe(before);
     });
+
+    it("reads a trailing comment as a comment, as the server's dotenv does", () => {
+        const values = parseEnvFile([
+            "NODE_ENV=production # deployed with compose",
+            "JWT_SECRET=0123456789abcdef0123456789abcdef   # rotated quarterly"
+        ].join("\r\n"));
+
+        expect(values.NODE_ENV).toBe("production");
+        expect(values.JWT_SECRET).toBe("0123456789abcdef0123456789abcdef");
+        // Production with no CORS is reported, and the 32-character secret is not.
+        expect(checkEnvSanity(values).map(f => f.message)).toEqual([
+            expect.stringContaining("NODE_ENV=production with neither CORS_ORIGINS nor FRONTEND_URL")
+        ]);
+    });
 });
 
 describe("version skew", () => {

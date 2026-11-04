@@ -1,5 +1,6 @@
 
 import React, { useEffect, useState, useCallback, useMemo } from "react";
+import { hasEntityId } from "@rebasepro/common";
 import { useApiBase, useApiConfig, useAuthController, useRlsSimulation } from "@rebasepro/app";
 import { simulationHeaders } from "@rebasepro/types";
 import { formatRelativeTime, type RelativeTimeLabels } from "@rebasepro/utils";
@@ -39,7 +40,7 @@ export function LastEditedByIndicator({
     const [latestEntry, setLatestEntry] = useState<HistoryEntryData | undefined>();
 
     const fetchLatest = useCallback(async () => {
-        if (!apiConfig?.apiUrl || !entityId || !collection.slug) return;
+        if (!apiConfig?.apiUrl || !hasEntityId(entityId) || !collection.slug) return;
 
         try {
             const token = await apiConfig.getAuthToken?.();

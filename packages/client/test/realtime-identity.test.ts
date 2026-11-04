@@ -70,6 +70,13 @@ function loginAs(uid: string) {
     }), { status: 200, headers: { "content-type": "application/json" } });
 }
 
+function asGuest(uid: string, accessToken: string) {
+    return new Response(JSON.stringify({
+        tokens: { accessToken, refreshToken: `refresh-${accessToken}`, accessTokenExpiresAt: Date.now() + 60 * 60 * 1000 },
+        user: { uid, email: accessToken === "guest-token" ? null : `${uid}@example.test`, isAnonymous: accessToken === "guest-token" }
+    }), { status: 200, headers: { "content-type": "application/json" } });
+}
+
 describe("the realtime socket across a change of account", () => {
     const originalWebSocket = (globalThis as Record<string, unknown>).WebSocket;
     let clients: CreateRebaseClientResult[] = [];
@@ -95,6 +102,9 @@ describe("the realtime socket across a change of account", () => {
         const fetchMock = jest.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
             const body = JSON.parse(String(init?.body ?? "{}"));
             if (String(input).endsWith("/auth/login")) return loginAs(String(body.email).split("@")[0]);
+            // A guest, and that same guest made an account: one uid, two tokens.
+            if (String(input).endsWith("/auth/anonymous")) return asGuest("guest-1", "guest-token");
+            if (String(input).endsWith("/auth/anonymous/link")) return asGuest("guest-1", "account-token");
             return new Response(JSON.stringify({ data: [], meta: { total: 0, limit: 20, offset: 0, hasMore: false } }), {
                 status: 200, headers: { "content-type": "application/json" }
             });
@@ -107,6 +117,28 @@ describe("the realtime socket across a change of account", () => {
         clients.push(created);
         return created;
     }
+
+    /**
+     * A guest that becomes an account keeps its uid and gets a new token, one
+     * without the guest claim, announced as `USER_UPDATED`. The socket was
+     * re-authenticated only on `SIGNED_IN` and `TOKEN_REFRESHED`, so it went
+     * on as the guest — RLS reading `is_anonymous()` true — until the next
+     * refresh, an hour later.
+     */
+    it("signs the socket in with the account's token when a guest becomes the account", async () => {
+        const rebase = client();
+        await rebase.auth.signInAnonymously();
+        rebase.data.collection("inbox").listen({}, jest.fn());
+        await jest.advanceTimersByTimeAsync(10);
+        const socket = latest();
+
+        await rebase.auth.linkAnonymous("guest@example.test", "Passw0rd-Long");
+        await jest.advanceTimersByTimeAsync(0);
+
+        expect(latest()).toBe(socket);
+        const authenticated = socket.sent.filter(f => f.type === "AUTHENTICATE").map(f => f.payload?.token);
+        expect(authenticated.at(-1)).toBe("account-token");
+    });
 
     it("lets a visitor with no account subscribe, for the server to allow or refuse", async () => {
         const rebase = client();

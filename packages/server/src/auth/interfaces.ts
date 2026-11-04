@@ -626,9 +626,16 @@ export interface TokenRepository {
     findValidPasswordResetToken(tokenHash: string): Promise<PasswordResetTokenInfo | null>;
 
     /**
-     * Mark a password reset token as used
+     * Mark a password reset token as used, if it is still valid.
+     *
+     * Resolves `false` when it consumed nothing — the token was already used,
+     * or expired, by the time this ran. That is how a link stays single-use
+     * against two requests presenting it at once: both can find it valid, and
+     * only one of the marks takes it. Mark it in the same statement that checks
+     * it (`UPDATE … WHERE used_at IS NULL AND expires_at > now()`). Resolving
+     * nothing is read as consumed.
      */
-    markPasswordResetTokenUsed(tokenHash: string): Promise<void>;
+    markPasswordResetTokenUsed(tokenHash: string): Promise<boolean | void>;
 
     /**
      * Delete all password reset tokens for a user
@@ -657,9 +664,22 @@ export interface TokenRepository {
     findValidMagicLinkToken(tokenHash: string): Promise<MagicLinkTokenInfo | null>;
 
     /**
-     * Mark a magic link token as used
+     * Mark a magic link token (or an email code) as used, if it is still valid.
+     *
+     * Resolves `false` when it consumed nothing, as
+     * {@link markPasswordResetTokenUsed} does: of two requests that found the
+     * same token valid, only the one whose mark took it may sign in.
      */
-    markMagicLinkTokenUsed(tokenHash: string): Promise<void>;
+    markMagicLinkTokenUsed(tokenHash: string): Promise<boolean | void>;
+
+    /**
+     * Delete every magic link and email code issued to a user, used or not.
+     *
+     * Called when the account's address changes: a link or a code still in the
+     * old inbox would otherwise sign in for the rest of its lifetime. Optional;
+     * a repository without it keeps those until they expire.
+     */
+    deleteAllMagicLinkTokensForUser?(uid: string): Promise<void>;
 }
 
 // =============================================================================

@@ -1,5 +1,5 @@
 ---
-sourceHash: 6a3ef60662c3afa5
+sourceHash: dfb1bbaa122356f7
 title: Authentification
 sidebar_label: Authentification
 description: Authentification côté client avec le SDK Rebase — connexion par e-mail/mot de passe, fournisseurs OAuth, gestion des sessions et écouteurs d'état d'authentification.
@@ -188,7 +188,7 @@ await client.auth.linkAnonymous("user@example.com", "correct-horse-battery");
 | `NOT_ANONYMOUS` (400) | La session actuelle appartient déjà à un compte standard |
 | `EMAIL_EXISTS` (409) | L'adresse e-mail possède déjà un compte — connectez-vous plutôt à celui-ci |
 
-<span class="since-badge" data-since="0.27">Depuis la version 0.27</span> Un invité qui ne revient jamais reste sous forme de ligne dans la base. Un administrateur peut
+Un invité qui ne revient jamais reste sous forme de ligne dans la base. Un administrateur peut
 les nettoyer avec `client.admin.listGuests()`, `client.admin.deleteGuest(uid)` et
 `client.admin.deleteGuests({ lastSeenBefore })`, ou sur Rebase Cloud avec
 [`rebase cloud guests`](/docs/cli/cloud/#guests). Ces méthodes ne touchent qu'aux invités,

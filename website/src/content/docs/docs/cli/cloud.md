@@ -261,8 +261,6 @@ endpoint) until Ctrl-C; `--reveal` adds the password. Owner or admin only.
 
 ## Guests
 
-<span class="since-badge" data-since="0.27">Since 0.27</span>
-
 Every `signInAnonymously()` in a test, a bot or an abandoned visit leaves a row
 in the project's users. These commands count those rows and remove them, so
 nobody has to click through them one by one.

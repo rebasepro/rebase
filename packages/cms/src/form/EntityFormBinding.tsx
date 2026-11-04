@@ -1,5 +1,6 @@
 
 import type { PluginFormActionProps, AdminCollection } from "@rebasepro/cms-types";
+import { hasEntityId } from "@rebasepro/common";
 import React, { useCallback, useMemo, useState } from "react";
 import { Entity, EntityStatus, EntityValues } from "@rebasepro/types";
 import { AnalyticsEvent } from "@rebasepro/cms-types";
@@ -106,6 +107,11 @@ export function EntityFormBinding<M extends Record<string, unknown>>({
     const analyticsController = useAnalyticsController();
 
     const [status, setStatus] = useState<EntityStatus>(initialStatus);
+    // The record a create made, until the `entity` prop names it: from the
+    // create on, the form edits that record, and a caller that does not hand
+    // it back would otherwise leave an "existing" form with nothing behind it.
+    const [savedEntity, setSavedEntity] = useState<Entity<M> | undefined>(undefined);
+    const currentEntity = entity ?? (status === "existing" ? savedEntity : undefined);
     // A new record given an id is created under it — a settings record kept
     // at a known key, a profile keyed by its user. Where the collection
     // declares its key property, the id is that property's value, set and
@@ -139,17 +145,17 @@ export function EntityFormBinding<M extends Record<string, unknown>>({
     // --- Compute initial values with local changes ---
     const baseInitialValues = useMemo(
         () => ({
-            ...getInitialEntityValues(authController, collection, path, status, entity, customizationController.propertyConfigs),
+            ...getInitialEntityValues(authController, collection, path, status, currentEntity, customizationController.propertyConfigs),
             ...parentLinkValues
         }),
-        [authController, collection, path, status, entity, customizationController.propertyConfigs, parentLinkValues]
+        [authController, collection, path, status, currentEntity, customizationController.propertyConfigs, parentLinkValues]
     );
 
     const localChangesBackup = getLocalChangesBackup(collection);
     const autoApplyLocalChanges = localChangesBackup === "auto_apply";
     const manualApplyLocalChanges = localChangesBackup === "manual_apply";
 
-    const localChangesDataRaw = useMemo(() => entityId
+    const localChangesDataRaw = useMemo(() => hasEntityId(entityId)
         ? getEntityFromCache(path + "/" + entityId)
         : getEntityFromCache(path + "#new"), [entityId, path]);
 
@@ -238,16 +244,17 @@ export function EntityFormBinding<M extends Record<string, unknown>>({
                 path,
                 entityId,
                 values,
-                previousValues: entity?.values,
+                previousValues: currentEntity?.values,
                 collection,
                 status,
                 // The version the form's baseline is — it follows the live
                 // record, tag and all — so a save made against a version that
                 // someone has since replaced is refused, not written over it.
-                ifMatch: status === "existing" ? entity?.etag : undefined,
+                ifMatch: status === "existing" ? currentEntity?.etag : undefined,
                 data: dataClient,
                 context,
                 afterSave: (updatedEntity: Entity<M>) => {
+                    setSavedEntity(updatedEntity);
                     clearDirtyCache();
                     onValuesModified?.(false, updatedEntity.values);
                     onEntityChange?.(updatedEntity);
@@ -301,7 +308,7 @@ export function EntityFormBinding<M extends Record<string, unknown>>({
             console.error(e);
             throw e;
         }
-    }, [path, entityId, entity, collection, status, dataClient, context, clearDirtyCache, onValuesModified, onEntityChange, onSaved, onStatusChange, snackbarController, analyticsController, t]);
+    }, [path, entityId, currentEntity, collection, status, dataClient, context, clearDirtyCache, onValuesModified, onEntityChange, onSaved, onStatusChange, snackbarController, analyticsController, t]);
 
     // --- Unique field validation via data layer ---
     const uniqueFieldValidator = useCallback(async ({
@@ -314,7 +321,7 @@ export function EntityFormBinding<M extends Record<string, unknown>>({
                 where: { [name]: ["==", value] },
                 limit: 2
             });
-            const otherEntities = entityId ? data.filter(e => e.id !== entityId) : data;
+            const otherEntities = hasEntityId(entityId) ? data.filter(e => String(e.id) !== String(entityId)) : data;
             return otherEntities.length === 0;
         } catch (e: unknown) {
             console.error("Error checking unique field", e);
@@ -356,7 +363,7 @@ export function EntityFormBinding<M extends Record<string, unknown>>({
             path={path}
             entityId={entityIdProp}
             collection={collection}
-            entity={entity}
+            entity={currentEntity}
             initialStatus={initialStatus}
             initialDirtyValues={initialDirtyValues}
             // Not handed down: `onSubmit` above reports the save, for Save and

@@ -442,8 +442,14 @@ function parseOperand(str: string) {
     // Unambiguous in both directions: a SQL identifier cannot begin with a
     // digit, and bare `true`/`false`/`null` are always the literals — a column
     // so named would have to be double-quoted to be referenced at all.
-    if (/^-?\d+$/.test(str)) return policy.literal(Number(str));
-    if (/^-?\d*\.\d+$/.test(str)) return policy.literal(Number(str));
+    //
+    // Only a number a JS `number` holds exactly. The literal is re-emitted from
+    // the parsed value, so `org_id = 1234567890123456789` came back as
+    // `org_id = 1234567890123456800` — a comparison against another tenant's
+    // id, written into the database as the policy. Anything wider stays `raw`.
+    if (/^-?\d+$/.test(str) || /^-?\d*\.\d+$/.test(str)) {
+        return isExactNumber(str) ? policy.literal(Number(str)) : null;
+    }
     if (/^true$/i.test(str)) return policy.literal(true);
     if (/^false$/i.test(str)) return policy.literal(false);
     if (/^null$/i.test(str)) return policy.literal(null);
@@ -459,6 +465,21 @@ function parseOperand(str: string) {
     }
 
     return null;
+}
+
+/**
+ * Whether the decimal numeral `str` survives a trip through a JS `number` and
+ * back to text with its value intact: `0.50` does (as `0.5`), `2^53 + 1` and
+ * a twentieth decimal place do not.
+ */
+function isExactNumber(str: string): boolean {
+    const negative = str.startsWith("-");
+    const [whole, fraction = ""] = (negative ? str.slice(1) : str).split(".");
+    const digits = whole.replace(/^0+(?=\d)/, "") || "0";
+    const decimals = fraction.replace(/0+$/, "");
+    const canonical = decimals ? `${digits}.${decimals}` : digits;
+    const value = Number(str);
+    return String(Math.abs(value)) === canonical;
 }
 
 /**

@@ -1071,8 +1071,12 @@ function assertQueryFieldsReadable(
     if (refused.size === 0) return;
 
     const named = new Set<string>();
+    // A dotted name is a path into the field before its first dot:
+    // `address.city` filters on, and sorts by, part of a withheld `address`.
     const consider = (field: unknown) => {
-        if (typeof field === "string" && refused.has(field)) named.add(field);
+        if (typeof field !== "string") return;
+        const head = field.split(".")[0];
+        if (refused.has(head)) named.add(head);
     };
     Object.keys(props.filter ?? {}).forEach(consider);
     const walk = (logical: LogicalCondition | undefined) => {

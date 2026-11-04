@@ -810,7 +810,7 @@ image. A project that has ejected owns these decisions in its own code instead.
 | `REBASE_PROVISION` | `false` makes the runtime change nothing in its database: no table, column, index, function, trigger, policy, role or grant, at boot or later, the framework's own included. It reports what is missing by name instead. For a database that only your change process may change. See [When only your change process may change the database](/docs/deployment/self-hosting/#when-only-your-change-process-may-change-the-database). Only `true` and `false` are accepted. | `true` |
 | `REBASE_REQUIRE_SCHEMA_MATCH` | Refuse to boot when the database was last provisioned from a different set of collections than this process was built from. Unset (or anything other than `true`/`1`) warns instead. | warn |
 | `REBASE_REQUIRE_FILES_LOADED` | Refuse to boot when a function or cron file throws or does not parse while importing, naming each file and why, so a rolling deploy leaves the old version serving. A restart is held to it too. Unset (or anything other than `true`) skips the file and serves the rest. A file that imports cleanly and exports no function or job is always skipped, not refused. | skip |
-| `REALTIME_CDC` | Database-level change capture: `auto` (enable where the connection supports it, silently fall back otherwise), `trigger` (force it, warn if impossible), `wal` (degrades to `trigger` today), `off`. See [Realtime](/docs/backend/realtime-cdc/). Wins over `realtime.cdc`. | `auto` |
+| `REALTIME_CDC` | Database-level change capture: `auto` (enable where the connection supports it, silently fall back otherwise), `trigger` (force it, warn if impossible), `wal` (read changes from the write-ahead log instead of triggers; needs `wal_level=logical` and a role that may replicate, falls back to `trigger` otherwise), `off`. See [Realtime](/docs/backend/realtime-cdc/). Wins over `realtime.cdc`. | `auto` |
 | `REALTIME_CHANNEL_BUS` | Cross-instance transport for broadcast channels and presence: `memory` or `postgres`. Ignored when `realtime.bus` was given a constructed transport. | `memory` |
 | `REALTIME_MAX_SUBSCRIPTIONS_PER_SOCKET` | How many subscriptions one realtime socket may hold; the next is refused with `TOO_MANY_SUBSCRIPTIONS`. A positive whole number — anything else stops the server at boot. Wins over `realtime.maxSubscriptionsPerSocket`. See [Realtime](/docs/backend/realtime#what-a-write-costs-and-the-limits). | `1000` |
 | `REALTIME_MAX_SOCKETS_PER_USER` | How many realtime sockets one user, or one API key, may hold open on one server instance. An administrator's impersonating sockets count against the administrator. The next one's sign-in is refused with `TOO_MANY_SOCKETS` and the socket closed (4002); the SDK keeps retrying, so it gets in when another closes. A positive whole number — anything else stops the server at boot. Wins over `realtime.maxSocketsPerUser`. | No ceiling |
@@ -4360,6 +4360,284 @@ yet, listed so that nobody reads a promise into them:
 
 ### [Unreleased]
 
+#### Added
+
+##### Common
+
+- **`hasEntityId(id)`** says whether an id names a record: any number but
+  `NaN`, `0` included, and any non-empty string. The admin uses it where it
+  read an id's truthiness, which took record `0` for a new one.
+
+#### Changed
+
+##### Admin (CMS & app)
+
+- **`UrlController.buildUrlCollectionPath` percent-encodes each segment of the
+  data path, and `urlPathToDataPath` decodes each one.** Append a query or hash
+  to the built URL rather than passing it inside the path. A plain id builds
+  the same URL as before.
+
+##### Server & REST
+
+- **A filter or sort on a name that is no property answers 400
+  UNKNOWN_FILTER_FIELD on Postgres** where it used to be guessed as a foreign
+  key (`manager` → `managerId`). Name the property itself.
+
+##### CLI
+
+- **REBASE_TOKEN is not sent to a control plane that only the repository's
+  `.rebase/cloud.json` names.** A host that is neither the default nor one you
+  signed in to answers `unknown_control_plane`; pass `--url` or set
+  `REBASE_CLOUD_URL` to use it. CI that targets a self-hosted control plane only
+  through a committed link needs the variable.
+
+#### Fixed
+
+##### Auth
+
+- **A magic link, email code or password-reset link is spent once, also under
+  concurrent use.** Two requests presenting one token at the same moment both
+  passed the lookup before either marked it used, so both signed in, or both
+  set a password. The repositories now consume a token in the statement that
+  checks it and say whether that call did; the request that lost is refused.
+  `AuthRepository.markPasswordResetTokenUsed` and `markMagicLinkTokenUsed` may
+  resolve `false`; a custom repository that resolves nothing still works as
+  before.
+- **An email code cannot be redeemed through `/auth/magic-link/verify`.** With
+  both `enableEmailOtp` and `enableMagicLink` on, a code's stored material was a
+  valid link token, so guesses at a six-digit code ran under the per-IP limit
+  alone, past the per-address limit that `/auth/otp/verify` holds codes to.
+- **An email change ends the magic links and codes mailed to the old address**,
+  as it already ended its password-reset links. A custom repository opts in with
+  the new optional `AuthRepository.deleteAllMagicLinkTokensForUser`.
+- **`/auth/change-password` is rate-limited per account** (10 attempts per 15
+  minutes), so a stolen access token cannot guess the current password without
+  limit.
+- **A malformed refresh cookie no longer breaks `/auth/refresh` and
+  `/auth/logout`.** A value that is not valid percent-encoding (a sibling
+  subdomain can set one) answered 500, and `/logout` never cleared it.
+
+##### Server & REST
+
+- **A `_batch` update or delete on the users collection cannot name its user
+  by a reference to another operation.** The last-administrator guard, the
+  `beforeUserDelete` veto and session revocation ran on the unresolved
+  reference, so such a batch deleted the real account past all three. It is refused with 400 `INVALID_BATCH_REF`.
+- **Removing a user from a many-to-many is an unlink, not an account
+  deletion.** `DELETE /teams/1/members/<uid>` answered `LAST_ADMIN` for the last
+  administrator, ran the user-deletion hooks and signed the user out everywhere.
+- **A numeric key is addressed by a whole integer only.** `/products/12abc`,
+  `12.9` and `1e3` addressed (and could delete) row 12; they now name no row. A
+  `bigint` id past 2^53 is no longer rounded to a neighbouring row's id.
+- **A multi-line query parameter is redacted from logs in full.** The redaction
+  stopped at the first newline, so the rest of that value and every value after
+  it reached stdout, `cron_logs` and `/health`.
+- **The Backups panel finds a backup cron registered through a crons directory,
+  the crons option or a bundle.** Its mark was lost when the job was copied for the scheduler, so
+  `GET /admin/backups` reported no schedule.
+- **The SPA fallback is never cached as immutable.** A deep link whose last
+  segment looked like a hashed asset (`/invoices/INV-2024ABCD.pdf`) pinned
+  `index.html` in the browser for a year.
+- **Metrics read the API base path by segment:** `/apidocs` is an app page, not
+  an unrecognised API call.
+- **A field rule (`access`, `excludeFromApi`) on a property nested in a map or
+  an array is warned about at boot.** Rules are enforced on top-level
+  properties only, and a nested one withheld nothing.
+- **The OpenAPI spec states a `matches` regex as its source.** It printed the
+  slashes and flags into `pattern`, so a generated client refused valid values.
+  A regex with an `i`, `m` or `s` flag states no pattern.
+
+##### Postgres
+
+- **A filter or sort resolves only names the field-access check judged.** A name
+  that matched no column was guessed as a foreign key (`manager` →
+  `managerId`) even with the collection known, so `?manager=eq.x` filtered on a
+  read-restricted `managerId`. Such a name now answers 400
+  UNKNOWN_FILTER_FIELD; the guess applies only where no collection is given.
+- **A filter or sort on `constructor`, `toString` or another object-method name
+  is an unknown field.** It compiled to a comparison of two bound values and
+  returned every row, and `__proto__` answered 500.
+- **`array-contains-any` matches numbers in a `jsonb` array**; it matched string
+  elements only.
+- **A write keeps the text it is given.** Any string equal to `nan` became NULL
+  and any ISO-shaped string was re-printed (cutting microseconds), whatever its
+  property. `"NaN"` is now null only on a `number` property, and date text is
+  normalized only on a `date` property.
+- **The admin user list serves every user once across pages.** Users created in
+  one statement share `created_at`, and pages over that tie skipped some users
+  and repeated others.
+- **A realtime frame from a socket that already closed registers nothing.** Its
+  subscription or channel membership leaked for the life of the process.
+- **Role names are quoted in compiled RLS policies.** A role containing `'`
+  failed `CREATE POLICY`, leaving the table with RLS on and no policy.
+- **A tuple array (`of: [...]`) keeps every element in its slot on save.** `0`,
+  `""`, `false` and `null` were dropped and later elements shifted.
+- **`db branch create`, delete, info and diff act on the branch named, and
+  `--from=<source>` is honoured.** `create --force feat` created a branch called
+  `--force`, and `--from=production` copied the main database.
+- **`db branch prune` keeps a branch's Atlas scratch database (`*_dev_diff`) out
+  of the orphans**, and no longer stops part-way on dropping it twice.
+- **Backup retention keeps each database's backups apart.** Two databases
+  backing up to one destination ranked together, and the one still running
+  deleted the other's backups past `retentionDays`.
+- **Restoring roles keeps a statement whole across a `;` in a quoted literal**
+  (`COMMENT ON ROLE x IS 'read-only; used by BI'`).
+- **A restrictive policy that cannot be created no longer leaves the grants
+  beside it open.** When boot fell back to applying a table's policies one at a
+  time, it created a permissive grant and then failed on the restrictive gate
+  (for example, a function a migration has not added yet), leaving every row
+  readable. Restrictive policies are now applied first, and one that fails is
+  replaced by a gate that passes nothing until it can be created.
+- **A generated policy name longer than 63 bytes is not dropped as an orphan
+  on the next boot or `db push`**, and two rules whose policies Postgres would
+  store under one name are refused at plan time.
+- **A raw rule ending in a `--` comment, or with an integer past 2^53, compiles
+  to the SQL it says.** The comment swallowed the closing paren, and the number
+  was rounded to another id. `rolesOverlap([])` compiles to a typed empty array.
+- **A re-scoped realtime subscription has its `include` judged again** when the
+  socket's roles change, so a demoted user's `include` filtering on a field they
+  can no longer read is refused, as a new subscription is.
+- **A stale identity check cannot undo a change of impersonation** on a realtime
+  socket.
+- **A departed client's shared presence row is not put back** by its own
+  in-flight heartbeat.
+- **A to-one relation write touches only rows the caller can see.** Setting a
+  hasOne relation, or a one-to-one via relation, pointed the target row at the
+  parent with no visibility condition, so a tenant could attach another
+  tenant's (or a trashed) row to theirs.
+- **`db branch prune` leaves alone a branch database another project on the
+  same server registered.** It listed every unregistered `rb_*` database as an
+  orphan and dropped other projects' branches. A new branch database records
+  which main database owns it; branches made before carry no mark.
+- **A row's history lists one write's entries newest first**, with a stable
+  order across pages.
+- **A batch update or delete by a reference that resolves to null is refused**
+  (it inserted a new row), and **a delete's history and realtime event use the
+  row's address** (`010` deleted row 10 but was recorded as `010`).
+- **Junction links insert into a junction table whose property keys differ
+  from its column names.**
+- **A database name with non-ASCII characters in the connection string** is
+  decoded for branching and pooling.
+- **A realtime channel frame needs a non-empty string channel name**
+  (INVALID_CHANNEL).
+
+##### MongoDB
+
+- **A filter column cannot be a MongoDB operator.** `$expr` as a column compiled
+  to an aggregation over any field, withheld ones included. It is refused with
+  400 UNKNOWN_FILTER_FIELD.
+- **A dotted filter or sort into a withheld field is refused** (`address.city`
+  under a read-restricted `address`).
+- **Security rules treat null and missing fields as SQL does.**
+  `visibility != 'private'` matched documents with no `visibility`, and single-row
+  checks granted a document missing the compared field.
+
+##### Firebase
+
+- **The Firestore driver applies `or()`/`and()` groups and fields with several
+  conditions.** A group was ignored and returned the whole collection.
+
+##### Client SDK
+
+- **A queued offline `updateMany`/`deleteMany` follows a temporary id to the id
+  the server assigns.** The update was rolled back and lost; the delete was
+  dropped as done while the row stayed on the server.
+- **A realtime channel keeps delivering after a broadcast or presence handler
+  throws.** A throw during a history catch-up held back every later message.
+- **A presence track that a leave overtakes publishes nothing** and starts no
+  heartbeat that cannot be stopped.
+- **Every listener hears a refused subscription**, past one whose `onError`
+  throws.
+- **A storage key with a `..` segment is refused** (`INVALID_STORAGE_KEY`)
+  before it leaves the client: `fetch` resolved it, so `deleteObject` could
+  reach another route with the client's credentials.
+- **`functions.invoke` refuses a path that escapes the function through `\` or
+  a tab or newline.**
+- **An MFA step-up and anonymous linking keep the new session's refresh cookie**
+  in cookie mode across origins, and **a guest that links a provider becomes the
+  account** on the client, with `USER_UPDATED`. The realtime socket signs in
+  with the account's token too.
+- **A request made while a refused stored session is being restored goes out
+  anonymously**, so a public route answers with its public rows.
+- **`canRestoreSession()` is false for a client with `persistSession: false`**,
+  which restores nothing, so it no longer probes `/auth/me` on every mount.
+- **A collection path or row id cannot leave `/data`.** A `..` segment
+  (`../admin/users`, an id of `..`) was resolved by `fetch` and reached another
+  route with the client's token; it is refused before any request.
+- **Two tabs creating offline in the same millisecond get different temporary
+  ids.**
+
+##### CLI
+
+- **`rebase skills install` never deletes files outside the skills directory**,
+  whatever the committed manifest lists.
+- **`rebase dev` starts the backend under a path with spaces or shell
+  characters**; `~/My Projects/app` exited 127.
+- **`rebase doctor` reads `.env` as the server's dotenv does**: a trailing
+  `## comment` is no longer part of the value, so `NODE_ENV=production ## x` gets
+  the production checks.
+- **A partial caret range (`^0`, `^0.0`) is not a dependency conflict** in
+  `rebase build` and `rebase cloud deploy`.
+- **Folding a static app accepts a protocol-relative asset reference**
+  (`//cdn.example.com/x.js`).
+- **`rebase cloud` opens URLs without a shell on every platform.** On Windows a
+  URL with `&` ran the rest as a command.
+- **`rebase cloud env pull` leaves an existing `.env` owner-only**, and
+  **`rebase doctor` no longer prints the database password** when it reports a
+  connection string libpq cannot parse.
+
+##### MCP
+
+- **The local-only gate reads the host a Postgres URL names in its query.**
+  `postgres://…@localhost/app?host=db.prod.example.com` connects to production,
+  and the gate let `rebase_db_push`, `rebase_db_migrate` and the branch tools
+  run against it.
+- **A cloud project is sent only the token its own control plane issued**,
+  and `rebase_schema_plan` on a cloud project sends one.
+
+##### Admin (CMS & app)
+
+- **The RLS editor quotes policy, table and role names instead of refusing
+  them**, so its own word-named presets can be applied, edited and dropped.
+- **A `matches` regex gives the same answer every time and keeps its flags when
+  the collection editor saves it.** A `g` regex refused a value it had just
+  accepted; an `i` flag was dropped on save.
+- **The cron history stays the selected job's** when another job's run ends.
+- **Opening another record in place never shows the previous record's values**
+  (`useFetch`), and **a relation picker whose path changes stores references to
+  the new collection.**
+- **Revoking two sessions in a row keeps the first one revoked.**
+- **A `Select` shows the selected item's label inside a `SelectGroup` or
+  fragment.**
+- **Clearing a column filter's text removes the filter**, and a number enum
+  filter reads a fractional id as written.
+- **Number enums in the collection editor accept id `0` and keep their default
+  value.**
+- **Picking a property for the import's id column takes effect.**
+- **Exports keep a null map null, and `downloadDataAsCsv` escapes its header
+  row** and includes every column.
+- **`hydrateRegExp` reads only a whole `/source/flags` string as a literal**,
+  and `resolveEnumValues` reads a plain value array by value.
+- **A record whose id holds a space, `#`, `?`, `%` or a non-ASCII character
+  opens from its URL**, on reload and from a shared link.
+- **The admin's auth-token getter does not refresh on every call** when the server
+  states no token expiry.
+- **A record whose id is `0` opens as that record**; it opened as a new
+  record, and saving created a row instead of editing it.
+- **A form that creates a record goes on editing it** without an `entity`
+  prop handed back, and **a number field takes decimals typed a key at a time**
+  (`0.05` could not be entered).
+- **A Formex submit whose callback throws still ends**, so the form is not
+  left disabled.
+- **The collection editor refuses two enum values with one id**, and **an
+  import file with a plain and a nested column of one name is read.**
+- **Studio's SQL console** registers its completions once, quotes names in the
+  schema browser's templates, and keeps the current run's rows and the current
+  database's schema on screen. **A branch's connection details** name its
+  recorded database, and **the RLS editor reads quoted roles.**
+
+### [0.27.0] - 2026-11-02
+
 #### Breaking
 
 ##### Runtime
@@ -4400,6 +4678,19 @@ yet, listed so that nobody reads a promise into them:
   `/auth/refresh` request, which `auth.isInitialized()` waits for.
 
 #### Added
+
+##### Realtime
+
+- **`REALTIME_CDC=wal` reads changes from the write-ahead log.** It used to fall
+  back to triggers. Changes now arrive through logical replication (`pgoutput`)
+  on a temporary slot per instance, so a write runs no capture trigger and sends
+  no `NOTIFY`, whose commit-time lock makes every notifying transaction on the
+  server commit one at a time, disk flush included. With 32 concurrent writers
+  and a 1 ms flush, inserts ran about ten times faster than under trigger
+  capture. It needs `wal_level=logical` and a role that may replicate, and falls
+  back to triggers with a warning otherwise. A boot that provisions and consumes
+  removes the capture triggers once its stream is open; a table with no primary
+  key stays out of the publication, because Postgres would refuse its updates.
 
 ##### Server & REST
 
@@ -4532,6 +4823,10 @@ yet, listed so that nobody reads a promise into them:
 
 ##### Realtime
 
+- **A change to a junction table that names no list refreshes the relation's
+  lists.** A link or unlink whose key was too large to notify carried neither
+  id and was dropped, so no subscriber of the child list heard of it. Every
+  subscribed list of that relation now refetches.
 - **The Postgres channel bus only publishes what another instance is waiting
   for.** Every broadcast and presence change was a `NOTIFY` on the primary, with
   every member of the channel on one instance or no other instance running.
@@ -27552,9 +27847,9 @@ a collection reaches none of this. See [Roles and scopes](/docs/backend/roles-an
 | `DELETE` | `/api/admin/users/:uid` | `users:write` | Refused for an account that holds more than the caller |
 | `POST` | `/api/admin/users/:uid/reset-password` | `users:write` | Issues a temporary password |
 | `DELETE` | `/api/admin/users/:uid/mfa` | `users:write` | Removes the account's second factors and recovery codes, ends its sessions |
-| `GET` | `/api/admin/guests` | `users:read` | <span class="since-badge" data-since="0.27">Since 0.27</span> Guests, last seen longest ago first. `?lastSeenBefore=` narrows them to what the delete below would take, and `total` counts them |
-| `DELETE` | `/api/admin/guests` | `users:write` | <span class="since-badge" data-since="0.27">Since 0.27</span> Deletes one batch of the guests last seen before `?lastSeenBefore=`, which is required. Answers `{ deleted, skipped, remaining }`. Repeat while `remaining` is not 0, with `?offset=` set to how many have been skipped. Accounts cannot be reached |
-| `DELETE` | `/api/admin/guests/:uid` | `users:write` | <span class="since-badge" data-since="0.27">Since 0.27</span> Deletes one guest. An account is refused with `NOT_ANONYMOUS` |
+| `GET` | `/api/admin/guests` | `users:read` | Guests, last seen longest ago first. `?lastSeenBefore=` narrows them to what the delete below would take, and `total` counts them |
+| `DELETE` | `/api/admin/guests` | `users:write` | Deletes one batch of the guests last seen before `?lastSeenBefore=`, which is required. Answers `{ deleted, skipped, remaining }`. Repeat while `remaining` is not 0, with `?offset=` set to how many have been skipped. Accounts cannot be reached |
+| `DELETE` | `/api/admin/guests/:uid` | `users:write` | Deletes one guest. An account is refused with `NOT_ANONYMOUS` |
 | `GET` | `/api/admin/roles` | `users:read` | `admin` and the roles the project declares, with their scopes |
 | `GET` | `/api/admin/api-keys` | `keys:read` | [API keys](/docs/backend/api-keys/). Never an API key |
 | `POST` | `/api/admin/api-keys` | `keys:write` | The plaintext key is returned once, on creation |
@@ -31868,7 +32163,7 @@ CDC is controlled by the `REALTIME_CDC` environment variable:
 | --- | --- |
 | `auto` *(default)* | Enable database-level capture where the connection supports it; **silently fall back** to application-level realtime otherwise. Zero-config. |
 | `trigger` | Force trigger-based capture. Works on any PostgreSQL, including managed instances without logical replication. Warns (rather than silently falling back) if it can't provision. |
-| `wal` | Prefer WAL logical replication. Not yet bundled — degrades to `trigger` and logs the active mode. |
+| `wal` | Read changes from the write-ahead log through logical replication instead of triggers, so a write runs no trigger and sends no `NOTIFY`. Needs `wal_level=logical` and a role that may replicate; falls back to `trigger`, with a warning, when either is missing. See [Capture from the WAL](#capture-from-the-wal). |
 | `off` | Application-level realtime only. Use this to avoid the per-write trigger overhead on write-heavy workloads. A boot with `off` that owns the schema also **removes** the capture triggers and functions an earlier boot installed, and logs how many it took off; unset it and the next boot installs them again. |
 
 The same setting is
@@ -31899,6 +32194,28 @@ If the connection can't support it, `auto` logs an informational line instead an
 4. **Cross-instance** — Because every instance observes every commit through the change stream, CDC also *is* the cross-instance channel; the legacy per-mutation `rebase_entity_changes` broadcast is not used while CDC is active.
 5. **De-duplication** — A mutation made through the Rebase API schedules a refetch for the local subscribers the instant it commits and is also echoed back through the change stream. The originating instance suppresses an echo that arrives within the refetch debounce window (a short-lived record of its own emits), so an API write normally produces one frame. An echo that arrives later than that triggers one more refetch, which delivers the same rows again: harmless, but a subscriber can see an identical frame twice.
 
+### Capture from the WAL
+
+`REALTIME_CDC=wal` reads changes from PostgreSQL's write-ahead log through logical replication (the built-in `pgoutput` plugin) instead of triggers. A write then runs no trigger and sends no `NOTIFY`, which matters once writes are concurrent: a transaction that called `NOTIFY` takes one lock for the whole server at commit and holds it through the disk flush, so under trigger capture those commits happen one at a time. Measured on PostgreSQL 18 with 32 concurrent writers and a 1&nbsp;ms disk flush, trigger capture held inserts to about a tenth of the rate WAL capture reached.
+
+It needs:
+
+- `wal_level = logical` on the server, which takes a restart. On Amazon RDS set `rds.logical_replication = 1`; on Cloud SQL, `cloudsql.logical_decoding = on`.
+- A role that may replicate: `ALTER ROLE <role> REPLICATION`, or the host's equivalent (on RDS, membership of `rds_replication`).
+- One free replication slot and WAL sender per server instance (`max_replication_slots` and `max_wal_senders`, both 10 by default).
+- A direct connection (`DATABASE_DIRECT_URL`): a pooler does not carry the replication protocol.
+
+When any of these is missing, the boot logs why and uses trigger capture instead.
+
+What a boot does:
+
+- It creates a publication named `rebase_cdc` and adds every collection's table and every many-to-many junction table to it. Tables are only ever added, so an older version still running during a rolling deploy cannot take a newer collection's table back out.
+- A table with no primary key, or with `REPLICA IDENTITY NOTHING`, is left out with a warning: PostgreSQL refuses `UPDATE` and `DELETE` on a published table that cannot say which row changed. Writes to it made outside Rebase are not captured.
+- Each instance streams the publication through its own **temporary** replication slot, which PostgreSQL drops when the connection closes, so an instance that crashes cannot leave a slot behind holding WAL until the disk fills. A reconnect starts a new slot, and every subscription refetches, because what committed in the gap is not replayed.
+- Once its stream is open, a boot that both provisions and consumes removes the capture triggers, as `off` does. During a rolling deploy away from trigger capture, instances still running it stop hearing writes made elsewhere until they are replaced; their own writes still reach their subscribers. A process that only provisions, such as the migration job of a [split deployment](/docs/deployment/split-processes/), keeps the triggers for consumers that cannot stream and fall back to them.
+
+Writers keep their full speed under a burst, but one WAL sender decodes each slot, so past several thousand writes per second sustained, events can arrive late. A role with `REPLICATION` can read every row of a published table through a slot of its own; the stream stays inside the server, and subscribers still re-read each row under their own RLS.
+
 ### Requirements & Notes
 
 `directConnectionString` is the adapter option; on 0.24 use `DATABASE_DIRECT_URL`.
@@ -31906,7 +32223,6 @@ If the connection can't support it, `auto` logs an informational line instead an
 - CDC requires a direct connection string (`DATABASE_DIRECT_URL`, the adapter's `directConnectionString`, or the primary connection) for the `LISTEN` client — connection poolers in transaction mode do not support long-lived `LISTEN` sessions.
 - Triggers are installed only on tables backed by a registered collection, and on the junction tables of their many-to-many relations. Writes to unmapped tables are ignored.
 - A collection whose table has not yet been migrated is skipped with a warning rather than blocking CDC for the rest.
-- Native WAL logical-replication streaming (`wal2json`/`pgoutput`) is planned; today `REALTIME_CDC=wal` degrades to the trigger-based path, which provides equivalent database-level coverage.
 
 ### Next Steps
 
@@ -33634,7 +33950,7 @@ be what you get by default.
 - **Out of attempts** → `failed`, and the row *stays*. A queue that silently
   drops what it could not deliver is indistinguishable from one with nothing to
   do.
-- **A failure no retry can change** <span class="since-badge" data-since="0.27">Since 0.27</span> → throw `PermanentJobError`, from
+- **A failure no retry can change** → throw `PermanentJobError`, from
   `@rebasepro/server`: the job goes to `failed` on this attempt, with the
   message as its `last_error`, instead of spending its remaining attempts.
 
@@ -47859,7 +48175,7 @@ await client.auth.linkAnonymous("user@example.com", "correct-horse-battery");
 | `NOT_ANONYMOUS` (400) | The current session belongs to an ordinary account |
 | `EMAIL_EXISTS` (409) | The address already has an account — sign in to that one instead |
 
-<span class="since-badge" data-since="0.27">Since 0.27</span> A guest that never comes back stays as a row. An administrator clears
+A guest that never comes back stays as a row. An administrator clears
 them with `client.admin.listGuests()`, `client.admin.deleteGuest(uid)` and
 `client.admin.deleteGuests({ lastSeenBefore })`, or on Rebase Cloud with
 [`rebase cloud guests`](/docs/cli/cloud/#guests). These only ever touch guests,
@@ -51848,8 +52164,6 @@ endpoint) until Ctrl-C; `--reveal` adds the password. Owner or admin only.
 
 ### Guests
 
-<span class="since-badge" data-since="0.27">Since 0.27</span>
-
 Every `signInAnonymously()` in a test, a bot or an abandoned visit leaves a row
 in the project's users. These commands count those rows and remove them, so
 nobody has to click through them one by one.
@@ -53454,7 +53768,7 @@ before it agrees to boot:
 ```jsonc
 {
   "bundleFormat": 2,
-  "runtime": { "range": "^1", "builtAgainst": "0.26.0", "contract": 1 },
+  "runtime": { "range": "^1", "builtAgainst": "0.27.0", "contract": 1 },
   "schemaVersion": "v1:c5d97d0f96b7f87a",
   "kind": "backend",
   "entry": {
@@ -53505,7 +53819,7 @@ different one rather than start and misbehave later.
 This is why upgrading Rebase in a self-hosted deployment is a tag change:
 
 ```yaml
-image: rebasepro/server:0.26.0   # a newer tag — your bundle is untouched
+image: rebasepro/server:0.27.0   # a newer tag — your bundle is untouched
 ```
 
 ### Development uses the same path
@@ -53918,7 +54232,7 @@ version stamp reveals nothing about the schema it stands for:
 
 ```bash
 curl -s https://api.example.com/api/meta/schema-version
-# {"schemaVersion":"v1:c5d97d0f96b7f87a","runtime":{"version":"0.26.0","contract":1}}
+# {"schemaVersion":"v1:c5d97d0f96b7f87a","runtime":{"version":"0.27.0","contract":1}}
 ```
 
 Comparing the two in CI turns a silent mismatch into a failed check. The stamp
@@ -54860,7 +55174,7 @@ except one that restarts the database, which waits for a maintenance window.
 | `service-key` | `REBASE_SERVICE_KEY`, admin on the app's own API: when it was last rotated; `rotate` gives the app a new one. Owners and admins |
 | `domains` | Custom domains, the DNS records to add, and verification. A project can answer on several, each verified on its own; `verify` and `remove` take the domain to act on, which may be left out only when there is one (for `verify`, one still pending). `list --json` returns `{ projectId, tenantHost, domains: [...] }` |
 | `db` | Attach or create a database, connect to it from your machine, backups, restore, and point-in-time recovery |
-| `guests` | <span class="since-badge" data-since="0.27">Since 0.27</span> The guest users anonymous sign-in left behind: count them, delete one, prune the ones not seen for an age. See [Guests](/docs/cli/cloud/#guests). Owners and admins |
+| `guests` | The guest users anonymous sign-in left behind: count them, delete one, prune the ones not seen for an age. See [Guests](/docs/cli/cloud/#guests). Owners and admins |
 | `extensions` | The Postgres extension allowlist |
 | `storage` | The project's bucket |
 | `resources` | Which databases and buckets the platform holds, against what the code declares |
@@ -55755,7 +56069,7 @@ For a real deployment, prefer baking both into an image, which also pins exactly
 what runs:
 
 ```dockerfile
-FROM rebasepro/server:0.26.0
+FROM rebasepro/server:0.27.0
 COPY dist-bundle /bundle
 ```
 
@@ -55950,7 +56264,7 @@ containers works. Two things to get right everywhere:
 
 ```toml
 [build]
-  dockerfile = "Dockerfile"   # FROM rebasepro/server:0.26.0 + COPY dist-bundle /bundle
+  dockerfile = "Dockerfile"   # FROM rebasepro/server:0.27.0 + COPY dist-bundle /bundle
 
 [http_service]
   internal_port = 8080
@@ -56155,7 +56469,7 @@ processes. See [Split processes](/docs/deployment/split-processes/).
 ### Upgrading
 
 ```yaml
-image: rebasepro/server:0.26.0
+image: rebasepro/server:0.27.0
 ```
 
 Restart. Your bundle is unchanged. Within a runtime contract major, a bundle that
@@ -56432,7 +56746,7 @@ split: true
 functions:
   enabled: true
   image:
-    tag: "0.26.0"     # this unit only; the rest stay on the release-wide tag
+    tag: "0.27.0"     # this unit only; the rest stay on the release-wide tag
 ```
 
 Only the tag is usually worth pinning: the repository is inherited, so this is
@@ -57252,7 +57566,7 @@ rebase build
 For App Runner, which pulls from a registry, bake the bundle into a derived image. That is three lines and it pins exactly what runs:
 
 ```dockerfile title="Dockerfile"
-FROM rebasepro/server:0.26.0
+FROM rebasepro/server:0.27.0
 COPY dist-bundle /bundle
 ```
 
@@ -57352,7 +57666,7 @@ rebase build
 Cloud Run pulls from a registry, so bake the bundle into a derived image. Three lines, and it pins exactly what runs:
 
 ```dockerfile title="Dockerfile"
-FROM rebasepro/server:0.26.0
+FROM rebasepro/server:0.27.0
 COPY dist-bundle /bundle
 ```
 
@@ -57456,7 +57770,7 @@ rebase build
 Container Apps pulls from a registry, so bake the bundle into a derived image. Three lines, and it pins exactly what runs:
 
 ```dockerfile title="Dockerfile"
-FROM rebasepro/server:0.26.0
+FROM rebasepro/server:0.27.0
 COPY dist-bundle /bundle
 ```
 
@@ -57546,7 +57860,7 @@ module "rebase" {
   admin_email     = "you@example.com"
 
   bundle_url      = "https://storage.example.com/bundles/app-1.4.0.tar.gz"
-  runtime_version = "0.26.0" # required with bundle_url: `latest` is refused at plan
+  runtime_version = "0.27.0" # required with bundle_url: `latest` is refused at plan
 
   s3_bucket            = "example-uploads"
   s3_access_key_id     = var.s3_access_key_id
@@ -57585,7 +57899,7 @@ rsync -a dist-bundle/ root@<your-server-ip>:/opt/rebase/dist-bundle/
 
 For a real deployment, prefer one of the two shapes that do not involve copying files to a box by hand:
 
-- **Bake it into an image** — `FROM rebasepro/server:0.26.0` then `COPY dist-bundle /bundle`, and deploy by changing a tag.
+- **Bake it into an image** — `FROM rebasepro/server:0.27.0` then `COPY dist-bundle /bundle`, and deploy by changing a tag.
 - **Serve it over HTTP** — set `REBASE_BUNDLE_URL` and the runtime fetches and unpacks the bundle on every start. This is what the Terraform module above does, and the same mechanism the Helm chart uses.
 
 ### 4. Configure and run
@@ -57726,7 +58040,7 @@ rebase build
 Serverless Containers pulls from a registry, so bake the bundle into a derived image. Three lines, and it pins exactly what runs:
 
 ```dockerfile title="Dockerfile"
-FROM rebasepro/server:0.26.0
+FROM rebasepro/server:0.27.0
 COPY dist-bundle /bundle
 ```
 
@@ -57837,7 +58151,7 @@ rebase build
 Commit a three-line `Dockerfile` at the repository root, so Railway's build step is a copy rather than a compilation:
 
 ```dockerfile title="Dockerfile"
-FROM rebasepro/server:0.26.0
+FROM rebasepro/server:0.27.0
 COPY dist-bundle /bundle
 ```
 
@@ -57930,7 +58244,7 @@ rebase build
 Commit a three-line `Dockerfile` at the project root:
 
 ```dockerfile title="Dockerfile"
-FROM rebasepro/server:0.26.0
+FROM rebasepro/server:0.27.0
 COPY dist-bundle /bundle
 ```
 

@@ -1,5 +1,5 @@
 ---
-sourceHash: c364fafa85c26d36
+sourceHash: 279e0eca02e1be02
 title: rebase cloud
 sidebar_label: rebase cloud
 description: Die Befehlsgruppen für Rebase Cloud im CLI – Auth, Projektverknüpfung, Deployments, Benachrichtigungen, Konfiguration, Organisationen, Datenbanken, Ressourcen, Compute, Storage, Cluster, Abrechnung und Nutzung.
@@ -260,8 +260,6 @@ rebase cloud db pitr status | restore | cutover | discard
 Endpunkt), bis Ctrl-C gedrückt wird; `--reveal` fügt das Passwort hinzu. Nur für Owner oder Admins.
 
 ## Gäste
-
-<span class="since-badge" data-since="0.27">Seit 0.27</span>
 
 Jedes `signInAnonymously()` in einem Test, durch einen Bot oder bei einem abgebrochenen Besuch hinterlässt eine Zeile
 in den Benutzern des Projekts. Diese Befehle zählen diese Zeilen und entfernen sie, sodass

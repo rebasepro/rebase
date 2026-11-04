@@ -210,6 +210,18 @@ function quoteForShell(value: string): string {
 }
 
 /**
+ * The backend's `tsx watch` line, quoted for the shell it is spawned through.
+ *
+ * Under `shell: true` execa joins the file and its arguments with spaces and
+ * hands the line to the shell as it stands, so the binary needs quoting as
+ * much as its arguments do: it is `<project>/backend/node_modules/.bin/tsx`,
+ * and a project under `~/My Projects/` ran `~/My` and exited 127.
+ */
+export function backendWatchCommand(tsxBin: string, watchArgs: readonly string[]): { file: string; args: string[] } {
+    return { file: quoteForShell(tsxBin), args: watchArgs.map(quoteForShell) };
+}
+
+/**
  * Locate the dev runtime shim shipped with the CLI.
  *
  * Published under `runtime/` in the package rather than compiled into `dist/`,
@@ -1925,7 +1937,7 @@ export async function devCommand(rawArgs: string[]): Promise<void> {
         }
         const usableTrigger = restartTrigger && fs.existsSync(restartTrigger) ? restartTrigger : null;
         const envFileForDev = envFile && envFileHiddenFromTsx(envFile, backendDir) ? envFile : null;
-        const watchArgs = devWatchArgs(projectRoot, runtimePaths, entryTarget, usableTrigger, envFileForDev ? null : envFile).map(quoteForShell);
+        const backendCommand = backendWatchCommand(tsxBin, devWatchArgs(projectRoot, runtimePaths, entryTarget, usableTrigger, envFileForDev ? null : envFile));
         /** Restart the backend once, after dev has finished reacting to a collection save. */
         const restartBackend = (): void => {
             if (!usableTrigger) return; // tsx restarted on the save itself
@@ -2058,8 +2070,8 @@ export async function devCommand(rawArgs: string[]): Promise<void> {
         }
 
         const backendChild = execa(
-            tsxBin,
-            watchArgs,
+            backendCommand.file,
+            backendCommand.args,
             {
                 cwd: backendDir,
                 stdio: ["inherit", "pipe", "pipe"],

@@ -254,8 +254,11 @@ describe("sanitizeAndConvertDates", () => {
         expect(sanitizeAndConvertDates(NaN)).toBeNull();
     });
 
-    it("converts 'NaN' string to null", () => {
-        expect(sanitizeAndConvertDates("NaN")).toBeNull();
+    it("leaves a string that reads 'NaN' as the text it is", () => {
+        // A name, a label, a word: this pass knows no property types, so it
+        // cannot tell one from a number that failed to parse.
+        expect(sanitizeAndConvertDates("Nan")).toBe("Nan");
+        expect(sanitizeAndConvertDates({ label: "nan" })).toEqual({ label: "nan" });
     });
 
     it("converts Date to ISO string", () => {
@@ -263,9 +266,9 @@ describe("sanitizeAndConvertDates", () => {
         expect(sanitizeAndConvertDates(date)).toBe("2024-01-01T00:00:00.000Z");
     });
 
-    it("converts ISO string to ISO string", () => {
-        const iso = "2024-01-01T00:00:00Z";
-        expect(sanitizeAndConvertDates(iso)).toBe("2024-01-01T00:00:00.000Z");
+    it("leaves text shaped like a timestamp as written", () => {
+        const iso = "2024-01-01T00:00:00.123456Z";
+        expect(sanitizeAndConvertDates(iso)).toBe(iso);
     });
 
     it("passes through non-date strings unchanged", () => {

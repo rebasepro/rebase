@@ -867,16 +867,18 @@ describe("DrizzleConditionBuilder - Filter Operators", () => {
             expect(query.params).toEqual(["featured", "popular", "trending"]);
         });
 
-        it("should generate a JSONB overlap (?|) condition for non-native array columns", () => {
+        it("should generate one JSONB containment test per value for non-native array columns", () => {
+            // Containment, not `?|`: `?|` only matches string elements, so a
+            // number array searched for "any of [3]" matched nothing.
             const condition = DrizzleConditionBuilder.buildSingleFilterCondition(
                 mockUsersTable.name,
                 "array-contains-any",
-                ["featured", "popular", "trending"]
+                ["featured", 3, true]
             );
             expect(condition).not.toBeNull();
             const query = pgDialect.sqlToQuery(condition!);
-            expect(query.sql).toBe('"users"."name" ?| array[$1, $2, $3]');
-            expect(query.params).toEqual(["featured", "popular", "trending"]);
+            expect(query.sql).toBe('("users"."name" @> $1 OR "users"."name" @> $2 OR "users"."name" @> $3)');
+            expect(query.params).toEqual(['["featured"]', "[3]", "[true]"]);
         });
 
         it("should fallback to native array-contains for native array columns with single value", () => {

@@ -185,6 +185,7 @@ export const de: RebaseTranslations = {
     add_on_top: "Oben hinzufügen",
     add_below: "Unten hinzufügen",
     add_to_field: "Zu {{fieldName}} hinzufügen",
+    enum_id_duplicate: "Ein anderer Enum-Wert verwendet bereits die ID \"{{id}}\"",
     value: "Wert",
     key: "Schlüssel",
     drag_drop_multiple: "Ziehen Sie einige Dateien hierher oder klicken Sie, um Dateien auszuwählen. Ziehen zum Neuordnen.",

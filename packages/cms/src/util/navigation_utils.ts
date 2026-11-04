@@ -1,5 +1,6 @@
 
 import type { UrlController, SidePanelBindingProps, SidePanelController, NavigateOptions, AdminCollection } from "@rebasepro/cms-types";
+import { hasEntityId } from "@rebasepro/common";
 import { withListState } from "./view_mode";
 
 // Canonical path utilities — single source of truth in @rebasepro/common
@@ -73,14 +74,14 @@ export function navigateToEntity({
         });
 
     } else {
-        let to = navigation.buildUrlCollectionPath(entityId ? `${path ?? path}/${entityId}` : path ?? path);
-        if (entityId && selectedTab) {
+        let to = navigation.buildUrlCollectionPath(hasEntityId(entityId) ? `${path}/${entityId}` : path);
+        if (hasEntityId(entityId) && selectedTab) {
             to += `/${selectedTab}`;
         }
         // The whole list state, not just the view mode: a record opened from a
         // search must come back to that search.
         to = withListState(to);
-        if (!entityId) {
+        if (!hasEntityId(entityId)) {
             to += "#new";
         }
         if (copy) {

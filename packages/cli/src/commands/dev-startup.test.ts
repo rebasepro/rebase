@@ -138,7 +138,10 @@ vi.mock("execa", () => ({
     }
 }));
 
-import { DEV_PORT_FILENAME, devCommand, devRestartTrigger, frontendCanStartWithBackend, overlapDevStartup } from "./dev";
+import { backendWatchCommand, DEV_PORT_FILENAME, devCommand, devRestartTrigger, frontendCanStartWithBackend, overlapDevStartup } from "./dev";
+
+/** The backend's spawn: `resolveTsx` above, as dev quotes it for the shell. */
+const BACKEND_FILE = backendWatchCommand("/bin/true", []).file;
 
 const managedDatabase: PreparedDatabase = {
     database: { kind: "external", source: "flag", url: "postgres://u@127.0.0.1:5432/app" },
@@ -248,10 +251,10 @@ describe("rebase dev's start-up", () => {
         await vi.waitFor(() => expect(runDriverSchemaCommand).toHaveBeenCalled());
         await vi.waitFor(() => expect(prepareDatabaseEnv).toHaveBeenCalledTimes(1));
         // Still generating: the database did not wait for it.
-        expect(spawned.some(s => s.file === "/bin/true")).toBe(false);
+        expect(spawned.some(s => s.file === BACKEND_FILE)).toBe(false);
 
         generation.resolve();
-        await vi.waitFor(() => expect(spawned.some(s => s.file === "/bin/true")).toBe(true));
+        await vi.waitFor(() => expect(spawned.some(s => s.file === BACKEND_FILE)).toBe(true));
 
         for (const child of spawned) child.end();
         await run;
@@ -268,7 +271,7 @@ describe("rebase dev's start-up", () => {
             spawned.length = 0;
             const run = devCommand(["node", "rebase", "dev", "--backend-only", "--port", port]);
             generation.resolve();
-            await vi.waitFor(() => expect(spawned.some(s => s.file === "/bin/true")).toBe(true));
+            await vi.waitFor(() => expect(spawned.some(s => s.file === BACKEND_FILE)).toBe(true));
             for (const child of spawned) child.end();
             await run;
         };
@@ -314,7 +317,7 @@ describe("rebase dev's start-up", () => {
         try {
             const run = devCommand(["node", "rebase", "dev", "--backend-only", "--docker", "--port", "45127"]);
             generation.resolve();
-            await vi.waitFor(() => expect(spawned.some(s => s.file === "/bin/true")).toBe(true));
+            await vi.waitFor(() => expect(spawned.some(s => s.file === BACKEND_FILE)).toBe(true));
             for (const child of spawned) child.end();
             await run;
         } finally {
@@ -342,7 +345,7 @@ describe("rebase dev's start-up", () => {
         expect(errors).toContain("--database-url");
         expect(errors).toContain("127.0.0.1:5999");
         expect(errors).not.toContain(".env");
-        expect(spawned.some(s => s.file === "/bin/true")).toBe(false);
+        expect(spawned.some(s => s.file === BACKEND_FILE)).toBe(false);
         expect(prepareDatabaseEnv).not.toHaveBeenCalled();
         expect(preflightUrls).toEqual([]);
         exit.mockRestore();
@@ -356,7 +359,7 @@ describe("rebase dev's start-up", () => {
         const run = devCommand(["node", "rebase", "dev", "--backend-only", "--port", "45132",
             "--database-url", "postgres://u@127.0.0.1:5998/app"]);
         generation.resolve();
-        await vi.waitFor(() => expect(spawned.some(s => s.file === "/bin/true")).toBe(true));
+        await vi.waitFor(() => expect(spawned.some(s => s.file === BACKEND_FILE)).toBe(true));
         for (const child of spawned) child.end();
         await run;
         expect(preflightDisabled).toEqual([true]);
@@ -380,7 +383,7 @@ describe("rebase dev's start-up", () => {
         try {
             const run = devCommand(["node", "rebase", "dev", "--backend-only", "--docker", "--port", "45128"]);
             generation.resolve();
-            await vi.waitFor(() => expect(spawned.some(s => s.file === "/bin/true")).toBe(true));
+            await vi.waitFor(() => expect(spawned.some(s => s.file === BACKEND_FILE)).toBe(true));
             for (const child of spawned) child.end();
             await run;
         } finally {
@@ -401,7 +404,7 @@ describe("rebase dev's start-up", () => {
             const logged = vi.mocked(console.log);
             logged.mockClear();
             const run = devCommand(["node", "rebase", "dev", "--backend-only", "--port", port]);
-            await vi.waitFor(() => expect(spawned.some(s => s.file === "/bin/true")).toBe(true));
+            await vi.waitFor(() => expect(spawned.some(s => s.file === BACKEND_FILE)).toBe(true));
             for (const child of spawned) child.end();
             await run;
             return logged.mock.calls.map(call => call.map(String).join(" ")).join("\n");
@@ -418,7 +421,7 @@ describe("rebase dev's start-up", () => {
         await vi.waitFor(() => expect(runDriverSchemaCommand).toHaveBeenCalled());
 
         generation.resolve();
-        await vi.waitFor(() => expect(spawned.some(s => s.file === "/bin/true")).toBe(true));
+        await vi.waitFor(() => expect(spawned.some(s => s.file === BACKEND_FILE)).toBe(true));
         expect(prepareDatabaseEnv).not.toHaveBeenCalled();
 
         for (const child of spawned) child.end();
@@ -460,7 +463,7 @@ describe("frontendCanStartWithBackend", () => {
 
 describe("the admin panel and the backend", () => {
     const isFrontend = (s: Spawned) => s.options.cwd === frontendDir;
-    const isBackend = (s: Spawned) => s.file === "/bin/true";
+    const isBackend = (s: Spawned) => s.file === BACKEND_FILE;
 
     beforeEach(() => {
         frontendDir = path.join(scratch, "frontend");
@@ -555,7 +558,7 @@ describe("the admin panel and the backend", () => {
  */
 describe("the SDK's example address", () => {
     const isSdk = (s: Spawned) => s.args.includes("generate-sdk");
-    const isBackend = (s: Spawned) => s.file === "/bin/true";
+    const isBackend = (s: Spawned) => s.file === BACKEND_FILE;
     const sdkUrls = () => spawned.filter(isSdk).map(s => s.options.env?.REBASE_DEV_BACKEND_URL);
 
     /** Boxed: an async function returning the run itself would wait for it to end. */
@@ -626,7 +629,7 @@ describe("collections that appear while dev runs", () => {
         // Nothing to generate at start, and the regeneration later finishes.
         generation.resolve();
         const run = devCommand(["node", "rebase", "dev", "--backend-only", "--port", "45170"]);
-        await vi.waitFor(() => expect(spawned.some(s => s.file === "/bin/true")).toBe(true));
+        await vi.waitFor(() => expect(spawned.some(s => s.file === BACKEND_FILE)).toBe(true));
         const collections = path.join(scratch, "config", "collections");
         const config = watched.find(w => w.dir === path.join(scratch, "config") && !w.recursive);
         expect(config).toBeDefined();
@@ -672,7 +675,7 @@ describe("a refusal dev raises itself", () => {
  * left for "the watcher restarts it on the next change" (see `BootRetry`).
  */
 describe("a boot that lost its database", () => {
-    const isBackend = (s: Spawned) => s.file === "/bin/true";
+    const isBackend = (s: Spawned) => s.file === BACKEND_FILE;
     const triggerText = (trigger: string) => (fs.existsSync(trigger) ? fs.readFileSync(trigger, "utf8") : null);
 
     async function start(): Promise<{ run: Promise<void>; say: (line: string) => void }> {

@@ -5,7 +5,7 @@ import { useSafeSnackbarController } from "../../../useSafeSnackbarController";
 import { EnumValueConfig, EnumValues } from "@rebasepro/types";
 import { resolveEnumValues } from "@rebasepro/common";
 import { Select, SelectItem } from "@rebasepro/ui";
-import { EnumForm } from "../EnumForm";
+import { EnumForm, hasEnumId } from "../EnumForm";
 import { StringPropertyValidation } from "./validation/StringPropertyValidation";
 import { ArrayPropertyValidation } from "./validation/ArrayPropertyValidation";
 import { ValidationPanel } from "./validation/ValidationPanel";
@@ -54,8 +54,10 @@ export function EnumPropertyField({
             return;
         setFieldValue(enumValuesPath, value);
         if (!multiselect) {
-            const enumIds = value.filter(v => Boolean(v?.id)).map((v: EnumValueConfig) => v.id);
-            if (defaultValue && !enumIds.includes(defaultValue)) {
+            // Compared as text, as the default value select compares them: a
+            // number select's default written as `"1"` is still the `1`.
+            const enumIds = value.filter(hasEnumId).map((v: EnumValueConfig) => String(v.id));
+            if (defaultValue !== undefined && defaultValue !== null && !enumIds.includes(String(defaultValue))) {
                 setFieldValue("defaultValue", undefined);
                 snackbarContext?.open({
                     type: "warning",
@@ -106,12 +108,15 @@ export function EnumPropertyField({
                     position={"item-aligned"}
                     fullWidth={true}
                     onValueChange={(value: string) => {
-                        setFieldValue("defaultValue", value);
+                        // The select's values are strings; the default is the
+                        // enum's own id, a number for a number select.
+                        const picked = enumValues.find((enumValue) => hasEnumId(enumValue) && String(enumValue.id) === value);
+                        setFieldValue("defaultValue", picked ? picked.id : value);
                     }}
                     label={t("default_value")}
                     value={defaultValue?.toString() ?? ""}>
                     {enumValues
-                        .filter((enumValue) => Boolean(enumValue?.id))
+                        .filter(hasEnumId)
                         .map((enumValue) => (
                             <SelectItem key={enumValue.id}
                                 value={enumValue.id?.toString()}>

@@ -121,9 +121,9 @@ export interface AuthClient {
      * Whether a session could exist that this client has not loaded yet.
      *
      * `false` means the only way this client can hold a session is an explicit
-     * sign-in during this page's lifetime: it neither persists sessions nor
-     * carries an httpOnly auth cookie, so there is nothing on disk or in the
-     * browser to restore from. A caller that would otherwise probe the server
+     * sign-in during this page's lifetime: it does not persist sessions
+     * (`persistSession: false`), so it restores none on load, from storage or,
+     * in cookie mode, from the httpOnly auth cookie. A caller that would otherwise probe the server
      * — `getUser()` on mount, say — can skip it, because the answer is already
      * known and the request can only ever fail.
      *

@@ -166,6 +166,44 @@ describe("deleting a user through the data API", () => {
         expect(deleteAllRefreshTokensForUser).toHaveBeenCalledWith("editor-1");
     });
 
+    it("removing a user from a many-to-many is an unlink, not a user deletion", async () => {
+        const teams = {
+            slug: "teams",
+            name: "Teams",
+            table: "teams",
+            properties: {
+                id: { name: "ID", type: "number", isId: "increment" },
+                name: { name: "Name", type: "string" },
+                members: {
+                    name: "Members",
+                    type: "relation",
+                    relation: {
+                        kind: "manyToMany",
+                        target: () => users,
+                        through: { table: "teams_users", sourceColumn: "team_id", targetColumn: "user_id" }
+                    }
+                }
+            }
+        } as unknown as CollectionConfig;
+        const beforeUserDelete = jest.fn(async (_uid: string) => undefined);
+        const afterUserDelete = jest.fn(async (_uid: string) => undefined);
+        const { app, writes, deleteAllRefreshTokensForUser } = harness({
+            admins: ["admin-1"],
+            hooks: { beforeUserDelete, afterUserDelete },
+            collections: [users, posts, teams]
+        });
+
+        // The last administrator leaving a team is not the last administrator
+        // leaving the project, and their sessions are not the team's to end.
+        const res = await send(app, "DELETE", "/teams/1/members/admin-1");
+
+        expect(res.status).toBe(204);
+        expect(writes().map(([method]) => method)).toEqual(["delete"]);
+        expect(beforeUserDelete).not.toHaveBeenCalled();
+        expect(afterUserDelete).not.toHaveBeenCalled();
+        expect(deleteAllRefreshTokensForUser).not.toHaveBeenCalled();
+    });
+
     it("lets beforeUserDelete veto the delete, as it does on /admin/users", async () => {
         const hooks: AuthHooks = {
             beforeUserDelete: async () => { throw new Error("user has open invoices"); }
@@ -201,6 +239,59 @@ describe("deleting a user through the data API", () => {
         expect(res.status).toBe(403);
         expect((await errorOf(res)).code).toBe("LAST_ADMIN");
         expect(writes()).toHaveLength(0);
+    });
+
+    it("refuses a _batch delete whose user is a $ref, which the checks could not judge", async () => {
+        const beforeUserDelete = jest.fn(async (_uid: string) => undefined);
+        const { app, writes } = harness({ admins: ["admin-1"], hooks: { beforeUserDelete } });
+
+        const res = await send(app, "POST", "/_batch", {
+            operations: [
+                { op: "create", collection: "posts", ref: "p", values: { title: "admin-1" } },
+                { op: "delete", collection: "users", id: { $ref: "p.title" } }
+            ]
+        });
+
+        expect(res.status).toBe(400);
+        expect((await errorOf(res)).code).toBe("INVALID_BATCH_REF");
+        expect(beforeUserDelete).not.toHaveBeenCalled();
+        expect(writes()).toHaveLength(0);
+    });
+
+    it("refuses a _batch update whose user or values are a $ref", async () => {
+        const { app, writes } = harness({ admins: ["admin-1"] });
+
+        const byId = await send(app, "POST", "/_batch", {
+            operations: [
+                { op: "create", collection: "posts", ref: "p", values: { title: "admin-1" } },
+                { op: "update", collection: "users", id: { $ref: "p.title" }, values: { roles: ["viewer"] } }
+            ]
+        });
+        const byValue = await send(app, "POST", "/_batch", {
+            operations: [
+                { op: "create", collection: "posts", ref: "p", values: { title: "Taken@Example.COM" } },
+                { op: "update", collection: "users", id: "editor-1", values: { email: { $ref: "p.title" } } }
+            ]
+        });
+
+        expect(byId.status).toBe(400);
+        expect((await errorOf(byId)).code).toBe("INVALID_BATCH_REF");
+        expect(byValue.status).toBe(400);
+        expect((await errorOf(byValue)).code).toBe("INVALID_BATCH_REF");
+        expect(writes()).toHaveLength(0);
+    });
+
+    it("still resolves a $ref inside a _batch user creation and into other collections", async () => {
+        const { app } = harness({ admins: ["admin-1"] });
+
+        const res = await send(app, "POST", "/_batch", {
+            operations: [
+                { op: "create", collection: "users", ref: "u", values: { email: "n@e.w" } },
+                { op: "update", collection: "posts", id: "1", values: { title: { $ref: "u.email" } } }
+            ]
+        });
+
+        expect(res.status).toBe(200);
     });
 });
 

@@ -771,7 +771,19 @@ export async function requireClient(rawArgs: string[]): Promise<{ client: CloudC
     // call, and a direct-linked directory has no control plane to make it
     // against.
     refuseDirectLink(rawArgs);
-    const url = resolveCloudUrl(rawArgs);
+    const { url, source } = resolveCloudTarget(rawArgs);
+    // `REBASE_TOKEN` is the user's, and the link file is the repository's: a
+    // cloned repository whose `.rebase/cloud.json` names a host the user never
+    // chose would otherwise receive the token as the bearer of its first
+    // request. As for a password at `login`, such a host is used only when
+    // the user names it.
+    if (source === "link" && !isKnownControlPlane(url)) {
+        fail(
+            `This directory's .rebase/cloud.json names the control plane ${url}, which you have not signed in to before.`,
+            `${TOKEN_ENV} would be sent there. To use it there on purpose, pass --url ${url} or set REBASE_CLOUD_URL.`,
+            "unknown_control_plane"
+        );
+    }
     // REBASE_TOKEN wins, as documented — unless it holds no scope on the
     // project `init --claim` linked here, which it would only be refused on:
     // a CI token made for other projects, set in the shell. Then the
@@ -1838,6 +1850,36 @@ export function reportError(e: unknown, context: string): never {
 }
 
 /**
+ * The program, and its argv, that hands `target` to the default browser on
+ * `platform` — or null when `target` is not an http(s) URL, which is left for
+ * the reader to open by hand.
+ *
+ * No shell is involved on any platform. `start` is a `cmd.exe` builtin, so it
+ * can only be reached through one, and `cmd.exe` reads `&`, `|` and `^` in its
+ * command line as operators: through it, `start https://x/?a=1&b=2` opens
+ * `?a=1` and runs `b=2` as a second command, and a URL the control plane
+ * returns can run anything. `rundll32 url.dll,FileProtocolHandler` is the shell's own URL
+ * handler as a plain program. The URL travels as its serialized `href`, which
+ * percent-encodes spaces and quotes, so it stays one argument through
+ * Windows' command-line quoting too.
+ */
+export function browserOpener(
+    target: string,
+    platform: NodeJS.Platform
+): { command: string; args: string[] } | null {
+    let href: string;
+    try {
+        const parsed = new URL(target);
+        if (parsed.protocol !== "http:" && parsed.protocol !== "https:") return null;
+        href = parsed.href;
+    } catch {
+        return null;
+    }
+    if (platform === "win32") return { command: "rundll32.exe", args: ["url.dll,FileProtocolHandler", href] };
+    return { command: platform === "darwin" ? "open" : "xdg-open", args: [href] };
+}
+
+/**
  * Open a URL in the user's default browser (best effort). Always announces the
  * URL first so it stays usable over SSH or when no browser is available.
  *
@@ -1850,13 +1892,13 @@ export function openUrl(target: string, label = "Opening"): void {
     noteBlank();
     note(`${label} ${chalk.cyan(target)}`);
     noteBlank();
-    const opener =
-        process.platform === "darwin" ? "open" : process.platform === "win32" ? "start" : "xdg-open";
+    const opener = browserOpener(target, process.platform);
+    if (!opener) return;
     try {
-        const child = spawn(opener, [target], {
+        const child = spawn(opener.command, opener.args, {
             stdio: "ignore",
             detached: true,
-            shell: process.platform === "win32"
+            shell: false
         });
         child.on("error", () => {
             /* URL already printed for manual copy */

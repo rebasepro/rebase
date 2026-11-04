@@ -1,5 +1,5 @@
 ---
-sourceHash: 6a3ef60662c3afa5
+sourceHash: dfb1bbaa122356f7
 title: Autenticação
 sidebar_label: Autenticação
 description: Autenticação do lado do cliente com o Rebase SDK — login com e-mail/senha, provedores OAuth, gerenciamento de sessão e listeners de estado de autenticação.
@@ -188,7 +188,7 @@ await client.auth.linkAnonymous("user@example.com", "correct-horse-battery");
 | `NOT_ANONYMOUS` (400) | A sessão atual pertence a uma conta comum |
 | `EMAIL_EXISTS` (409) | O endereço já possui uma conta — faça login nela em vez disso |
 
-<span class="since-badge" data-since="0.27">Desde 0.27</span> Um convidado que nunca mais retorna permanece como uma linha. Um administrador os
+Um convidado que nunca mais retorna permanece como uma linha. Um administrador os
 remove com `client.admin.listGuests()`, `client.admin.deleteGuest(uid)` e
 `client.admin.deleteGuests({ lastSeenBefore })`, ou no Rebase Cloud com
 [`rebase cloud guests`](/docs/cli/cloud/#guests). Eles afetam apenas convidados,

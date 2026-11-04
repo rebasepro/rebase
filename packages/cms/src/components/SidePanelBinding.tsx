@@ -1,5 +1,6 @@
 
 import type { SidePanelBindingProps, AdminCollection } from "@rebasepro/cms-types";
+import { hasEntityId } from "@rebasepro/common";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import type { OnUpdateParams } from "../types/components/EntityFormProps";
@@ -136,7 +137,7 @@ export function SidePanelBinding(props: SidePanelBindingProps) {
     const isDialogMode = collection?.openEntityMode === "dialog";
     const [editInDialog, setEditInDialog] = useState(false);
     const showEditInPanel = isDialogMode ? editInDialog : selectedTab === "edit";
-    const isDetailMode = collection?.defaultEntityAction === "view" && !showEditInPanel && Boolean(entityId);
+    const isDetailMode = collection?.defaultEntityAction === "view" && !showEditInPanel && hasEntityId(entityId);
 
     // Reset edit mode when switching entities
     useEffect(() => {
@@ -144,7 +145,7 @@ export function SidePanelBinding(props: SidePanelBindingProps) {
     }, [entityId]);
 
     const openEditView = useCallback(() => {
-        if (isDialogMode || !entityId) {
+        if (isDialogMode || !hasEntityId(entityId)) {
             setEditInDialog(true);
             return;
         }
@@ -158,7 +159,7 @@ export function SidePanelBinding(props: SidePanelBindingProps) {
     }, [isDialogMode, entityId, path, collection, sidePanelController]);
 
     const closeEditView = useCallback(() => {
-        if (isDialogMode || !entityId) {
+        if (isDialogMode || !hasEntityId(entityId)) {
             setEditInDialog(false);
             return;
         }
@@ -184,7 +185,7 @@ export function SidePanelBinding(props: SidePanelBindingProps) {
     useEffect(() => {
         if (hasCorrectedDefaultView.current) return;
         if (selectedTab) return; // Already has a tab — no correction needed
-        if (!entityId || !collection?.defaultSelectedView) return;
+        if (!hasEntityId(entityId) || !collection?.defaultSelectedView) return;
 
         const effectiveDefault = resolveDefaultSelectedView(
             collection.defaultSelectedView,
@@ -272,7 +273,7 @@ entityId }
                                 className="self-center"
                                 size={"small"}
                                 onClick={() => {
-                                    if (entityId) {
+                                    if (hasEntityId(entityId)) {
                                         const fullScreenUrl = urlController.buildUrlCollectionPath(`${path}/${entityId}`);
                                         navigate(fullScreenUrl, { state: null });
                                     }
@@ -323,7 +324,7 @@ entityId }
                                     carryEdit?.();
                                     setBlocked(false);
                                     setBlockedNavigationMessage(undefined);
-                                    if (entityId) {
+                                    if (hasEntityId(entityId)) {
                                         const fullScreenUrl = urlController.buildUrlCollectionPath(`${path}/${entityId}`);
                                         navigate(fullScreenUrl, { state: null });
                                     } else {

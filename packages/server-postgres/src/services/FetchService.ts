@@ -8,6 +8,7 @@ import { DrizzleConditionBuilder, getUnknownFilterFieldsMode, listedColumnKeys, 
 import { namesHiddenFromCaller } from "./field-viewer";
 import { enableIterativeScan, inTransaction, iterativeScansAvailable } from "./vector-iterative-scan";
 import {
+    columnAtKey,
     getCollectionByPath,
     getTableForCollection,
     getPrimaryKeys,
@@ -516,8 +517,7 @@ target });
         orderBy: string,
         collection?: CollectionConfig
     ): AnyPgColumn | undefined {
-        const columnAt = (key: string): AnyPgColumn | undefined =>
-            (key in table ? table[key as keyof typeof table] as AnyPgColumn : undefined) || undefined;
+        const columnAt = (key: string): AnyPgColumn | undefined => columnAtKey(table, key);
 
         const direct = columnAt(orderBy);
         if (direct) return direct;
@@ -533,15 +533,19 @@ target });
         // No collection in hand — the shapes an owning relation's key takes by
         // default (e.g. `project` → `projectId`, `userProfile` →
         // `userProfileId`), then the snake forms for a project that authored the
-        // property under its column name.
-        for (const guess of [
-            `${orderBy}Id`,
-            toWireKey(generateForeignKeyName(orderBy)),
-            `${orderBy}_id`,
-            generateForeignKeyName(orderBy)
-        ]) {
-            const foreignKey = columnAt(guess);
-            if (foreignKey) return foreignKey;
+        // property under its column name. Only then, for the reason the filter
+        // resolution gives: with a collection, a guess sorts on a column under
+        // a name the field-access check never saw.
+        if (!collection) {
+            for (const guess of [
+                `${orderBy}Id`,
+                toWireKey(generateForeignKeyName(orderBy)),
+                `${orderBy}_id`,
+                generateForeignKeyName(orderBy)
+            ]) {
+                const foreignKey = columnAt(guess);
+                if (foreignKey) return foreignKey;
+            }
         }
 
         // Nothing resolved. Returning `undefined` is exactly what the docblock

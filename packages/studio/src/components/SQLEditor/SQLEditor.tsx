@@ -528,7 +528,17 @@ role: selectedRole } : t));
         }
     }, [tabs, selectedDatabase, selectedRole, projectPrefix]);
 
+    /**
+     * The latest schema read asked for. Only its answer is shown: a read of
+     * the database picked before can answer after the one picked now, and
+     * would list — and offer to complete — that database's tables under this
+     * one.
+     */
+    const schemaRequestRef = useRef(0);
+
     const fetchSchema = useCallback(async () => {
+        const request = ++schemaRequestRef.current;
+        const isCurrent = () => request === schemaRequestRef.current;
         if (!databaseAdmin?.executeSql) {
             setSchemaError(t("studio_sql_sql_not_supported"));
             setIsSchemaLoading(false);
@@ -563,6 +573,7 @@ role: selectedRole } : t));
             `;
             // Pass the selected database so schema introspection targets the right DB.
             const result = await databaseAdmin!.executeSql!(sql, { database: selectedDatabase });
+            if (!isCurrent()) return;
 
             const processGrouped = (data: Record<string, unknown>[]) => {
                 setSchemas(groupSchemaRows(data));
@@ -584,11 +595,12 @@ role: selectedRole } : t));
 
             schemaFetchedRef.current = true;
         } catch (e: unknown) {
+            if (!isCurrent()) return;
             console.error("Schema fetch error:", e);
             const message = e instanceof Error ? e.message : String(e);
             setSchemaError(t("studio_sql_schema_fetch_error", { message }));
         } finally {
-            setIsSchemaLoading(false);
+            if (isCurrent()) setIsSchemaLoading(false);
         }
     }, [databaseAdmin, selectedDatabase]);
 
@@ -697,6 +709,8 @@ message: t(resolution.refusal.key, resolution.refusal.params) });
             return;
         }
         const target = resolution.target;
+        const tabId = activeTab.id;
+        const editedProvenance = activeTab.lastProvenance;
 
         const formatValue = (val: unknown) => {
             if (val === null || val === undefined) return "NULL";
@@ -731,12 +745,16 @@ role: connection.role });
                 return;
             }
 
-            const newResults = [...(activeTab.results || [])];
-            if (newResults[rowIndex]) {
-                newResults[rowIndex] = { ...newResults[rowIndex],
-[columnKey]: newValue };
-            }
-            updateActiveTab({ results: newResults });
+            // Drawn into the rows the edit was made in, and only while they
+            // are on screen: a run that ended while the UPDATE was in flight
+            // put other rows there, and the old ones drawn back over them
+            // would be edited next against the new run's columns.
+            setTabs(prev => prev.map(tab => {
+                if (tab.id !== tabId || tab.lastProvenance !== editedProvenance || !tab.results?.[rowIndex]) return tab;
+                const results = [...tab.results];
+                results[rowIndex] = { ...results[rowIndex], [columnKey]: newValue };
+                return { ...tab, results };
+            }));
 
             snackbarController.open({
                 type: "success",
@@ -748,7 +766,7 @@ role: connection.role });
                 message: t("studio_sql_update_failed", { message: e instanceof Error ? e.message : String(e) })
             });
         }
-    }, [editingCell, resolveEdit, activeTab.lastExecutedSql, activeTab.lastExecutedConnection, activeTab.results, isCurrentConnection, databaseAdmin, updateActiveTab, snackbarController, t]);
+    }, [editingCell, resolveEdit, activeTab.id, activeTab.lastExecutedSql, activeTab.lastExecutedConnection, activeTab.lastProvenance, isCurrentConnection, databaseAdmin, snackbarController, t]);
 
     const [columnWidths, setColumnWidths] = useState<ColumnWidthsByQuery>(() => {
         const projectPrefixSync = client?.baseUrl ? client.baseUrl.replace(/^https?:\/\//, "").replace(/[^a-zA-Z0-9]/g, "_") : "default";

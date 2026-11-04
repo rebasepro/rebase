@@ -15,7 +15,11 @@ export class DatabasePoolManager {
         this.rootConnectionString = adminConnectionString;
         try {
             const url = new URL(adminConnectionString);
-            this.defaultDatabaseName = url.pathname.slice(1);
+            // Decoded as pg decodes it to connect (`decodeURI`): the URL holds
+            // `caf%C3%A9` for the database `café`, and this name is used as an
+            // SQL identifier and as the key of the pool `getPool` builds back
+            // from it.
+            this.defaultDatabaseName = decodeURI(url.pathname.slice(1));
         } catch (e) {
             throw new Error(`Invalid adminConnectionString provided: ${e}`);
         }

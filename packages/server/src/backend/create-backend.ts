@@ -3079,7 +3079,7 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
     // for the directory, not for the jobs in it, because an empty list is the
     // honest answer — just stopped one level too early.
     if (surfaces.cron || ((config.cronsDir || config.crons) && ownership.cronScheduler)) {
-        const { cronJobsFrom, readCronsDirectory } = await import("../cron/cron-loader");
+        const { cronJobsFrom, readCronsDirectory, withHiddenPropertiesOf } = await import("../cron/cron-loader");
         const { CronScheduler } = await import("../cron/cron-scheduler");
         const { createCronRoutes } = await import("../cron/cron-routes");
         const { createCronStore } = await import("../cron/cron-store");
@@ -3094,11 +3094,12 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
         // gets this backend's client — the one `ctx.rebase` is.
         const loadedCronJobs = cronJobsFrom(cronRecord).map(job => ({
             ...job,
-            definition: {
+            // The definition's hidden marks too — see `withHiddenPropertiesOf`.
+            definition: withHiddenPropertiesOf(job.definition, {
                 ...job.definition,
                 handler: (ctx: Parameters<typeof job.definition.handler>[0]) =>
                     runInBackendScope(ownScope, () => job.definition.handler(ctx))
-            }
+            })
         }));
 
         cronScheduler = new CronScheduler();

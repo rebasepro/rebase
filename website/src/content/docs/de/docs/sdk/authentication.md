@@ -1,5 +1,5 @@
 ---
-sourceHash: 6a3ef60662c3afa5
+sourceHash: dfb1bbaa122356f7
 title: Authentifizierung
 sidebar_label: Authentifizierung
 description: Clientseitige Authentifizierung mit dem Rebase SDK — E-Mail/Passwort-Anmeldung, OAuth-Anbieter, Sitzungsverwaltung und Auth-Status-Listener.
@@ -188,7 +188,7 @@ await client.auth.linkAnonymous("user@example.com", "correct-horse-battery");
 | `NOT_ANONYMOUS` (400) | Die aktuelle Sitzung gehört zu einem regulären Konto |
 | `EMAIL_EXISTS` (409) | Für die Adresse existiert bereits ein Konto — melden Sie sich stattdessen bei diesem an |
 
-<span class="since-badge" data-since="0.27">Seit 0.27</span> Ein Gast, der nie wiederkehrt, bleibt als Zeile bestehen. Ein Administrator kann
+Ein Gast, der nie wiederkehrt, bleibt als Zeile bestehen. Ein Administrator kann
 diese mit `client.admin.listGuests()`, `client.admin.deleteGuest(uid)` und
 `client.admin.deleteGuests({ lastSeenBefore })` oder auf Rebase Cloud mit
 [`rebase cloud guests`](/docs/cli/cloud/#guests) bereinigen. Diese Methoden betreffen ausschließlich Gäste,

@@ -410,6 +410,32 @@ describe("RebaseRealtimeChannel", () => {
             expect(received.map((e) => e.seq)).toEqual([301, 302]);
         });
 
+        it("keeps replaying and delivering live messages when a broadcast handler throws", async () => {
+            // A handler that throws mid-replay used to end the replay pass with
+            // the catch-up still marked in flight and its timeout cleared, so
+            // the rest of the page and every later message were held back.
+            const errorSpy = jest.spyOn(console, "error").mockImplementation(() => undefined);
+            const { channel: retained, received } = await retainedChannel({ settle: false });
+            retained.onBroadcast(() => { throw new Error("render failed"); });
+
+            fake.push({
+                type: "channel_history",
+                channel: "doc:42",
+                retained: true,
+                latestSeq: 2,
+                messages: [
+                    { seq: 1, event: "op", payload: { n: 1 }, at: "2026-01-01T00:00:01Z" },
+                    { seq: 2, event: "op", payload: { n: 2 }, at: "2026-01-01T00:00:02Z" }
+                ]
+            });
+            fake.push({ type: "broadcast", channel: "doc:42", event: "op", payload: { n: 3 }, seq: 3 });
+
+            expect(received.map((e) => e.seq)).toEqual([1, 2, 3]);
+            expect(retained.sequence).toBe(3);
+            expect(errorSpy).toHaveBeenCalled();
+            errorSpy.mockRestore();
+        });
+
         it("forgets its position on leave, so a rejoin does not skip the past", async () => {
             const { channel: retained } = await retainedChannel();
             fake.push({ type: "broadcast", channel: "doc:42", event: "op", payload: {}, seq: 9 });
@@ -640,6 +666,19 @@ describe("RebaseRealtimeChannel", () => {
             const beats = fake.types().filter((t) => t === "presence_track").length;
             await jest.advanceTimersByTimeAsync(60_000);
             expect(fake.types().filter((t) => t === "presence_track")).toHaveLength(beats);
+        });
+
+        it("starts no heartbeat for a track that a leave overtook", async () => {
+            // An effect that tracks on mount and leaves on cleanup: the leave
+            // lands while the track is still joining.
+            const tracking = channel.track({ cursor: 1 });
+            await channel.leave();
+            await tracking;
+            const afterLeave = fake.types().slice(fake.types().lastIndexOf("leave_channel") + 1);
+            expect(afterLeave).not.toContain("presence_track");
+
+            await jest.advanceTimersByTimeAsync(60_000);
+            expect(fake.types().slice(fake.types().lastIndexOf("leave_channel") + 1)).toEqual([]);
         });
 
         it("can rejoin after leaving", async () => {

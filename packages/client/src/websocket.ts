@@ -1674,12 +1674,9 @@ export class RebaseWebSocketClient {
                     collectionSub.subscribeTimeout = undefined;
                     collectionSub.subscribeInFlight = false;
 
-                    const error = frameError(message);
-                    collectionSub.callbacks.forEach(callback => {
-                        if (callback.onError) {
-                            callback.onError(error);
-                        }
-                    });
+                    // Each listener told in turn: one whose handler throws
+                    // must not leave the ones after it waiting.
+                    this.notifyError(collectionSub.callbacks, frameError(message));
                     return;
                 }
             }
@@ -1704,12 +1701,9 @@ export class RebaseWebSocketClient {
                     entitySub.subscribeTimeout = undefined;
                     entitySub.subscribeInFlight = false;
 
-                    const error = frameError(message);
-                    entitySub.callbacks.forEach(callback => {
-                        if (callback.onError) {
-                            callback.onError(error);
-                        }
-                    });
+                    // Each listener told in turn: one whose handler throws
+                    // must not leave the ones after it waiting.
+                    this.notifyError(entitySub.callbacks, frameError(message));
                     return;
                 }
             }

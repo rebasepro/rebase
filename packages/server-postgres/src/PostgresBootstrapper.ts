@@ -46,7 +46,8 @@ import { buildBaasSchema, readCatalogueSchema } from "./schema/catalogue-schema"
 import { diffGeneratedSchemaAgainstCatalogue, warnOnGeneratedSchemaDrift } from "./schema/generated-schema-diff";
 import type { TableMeta } from "./schema/introspect-db-logic";
 import { detectConnectionPosture, ensureAppRole, ensureAppRoleGrants, findExposedInternalTables, revokeUserRoleSql, validatePolicyPgRoles, warnOnAnonymousGrants, warnOnLegacyRlsFunctions, warnOnRoleSchemaCollision, REBASE_USER_ROLE, type RawSqlRunner } from "./security/rls-enforcement";
-import { provisionTriggerCdc, settleInstalledCapture, type CdcTableRef } from "./services/cdc/trigger-cdc";
+import { provisionTriggerCdc, removeTriggerCdc, settleInstalledCapture, type CdcTableRef } from "./services/cdc/trigger-cdc";
+import { provisionWalPublication, reportUnpublishedTables, walCaptureBlocker } from "./services/cdc/wal-cdc";
 import { collectJunctionLinks } from "./services/cdc/junction-tables";
 import { collectionKeyColumns } from "./services/cdc/identity-columns";
 import { createChannelBus, resolveChannelBusSetting } from "./services/channel-bus";
@@ -1111,91 +1112,152 @@ export async function openPostgresDriver(
         if (explicitCdc) logger.warn(`⚠️ [CDC] REALTIME_CDC=${cdcMode} but ${reason} — using app-level realtime.`);
         else logger.info(`ℹ️ [CDC] Using app-level realtime — ${reason}.`);
     } else if (wantsCdc && directUrl) {
-        if (cdcMode === "wal") {
-            // Native WAL logical-replication streaming requires wal_level=logical,
-            // a replication-privileged role and a replication slot, none of which
-            // are bundled with this adapter yet. Degrade to trigger-based capture,
-            // which provides equivalent database-level coverage.
-            logger.warn(
-                "⚠️ [CDC] REALTIME_CDC=wal: native WAL streaming is not bundled in this build; " +
-                "using trigger-based change capture instead (equivalent database-level coverage)."
-            );
+        // Each table is captured with the columns its rows are addressed
+        // by, and a change carries those and nothing else — any login can
+        // LISTEN. See `buildCdcFunctionSql`.
+        const cdcTables: CdcTableRef[] = collectionsOnThisSource()
+            .map((c) => ({
+                schema: (c as { schema?: string }).schema ?? "public",
+                table: getCollectionTableName(c),
+                identityColumns: collectionKeyColumns(c, registry).map((k) => k.columnName)
+            }))
+            .filter((t) => Boolean(t.table) && registry.hasTableForCollection(t.table));
+        // Junction tables back no collection, so the list above misses
+        // them — and a link or unlink is a write nobody would hear
+        // about. Their rows are the contents of a child list, which is
+        // as much a change as a write to the rows themselves.
+        // Filtered by the parent's source for the same reason as the
+        // list above: `posts_tags` lives in the database `posts`
+        // lives in, and asking a second database to instrument it
+        // produced one "Could not attach change-capture trigger"
+        // warning per junction on every boot.
+        const ownSlugs = new Set(collectionsOnThisSource().map(c => c.slug));
+        for (const link of collectJunctionLinks(registry)) {
+            if (!ownSlugs.has(link.parentCollection.slug)) continue;
+            // A junction row is addressed by the two ids that name
+            // the child list it belongs to, whatever its own key is.
+            cdcTables.push({
+                schema: link.schema,
+                table: link.table,
+                identityColumns: [link.sourceColumn, link.targetColumn]
+            });
         }
-        try {
-            // Each table is attached with the columns its rows are
-            // addressed by, and the payload carries those and nothing
-            // else — any login can LISTEN. See `buildCdcFunctionSql`.
-            const cdcTables: CdcTableRef[] = collectionsOnThisSource()
-                .map((c) => ({
-                    schema: (c as { schema?: string }).schema ?? "public",
-                    table: getCollectionTableName(c),
-                    identityColumns: collectionKeyColumns(c, registry).map((k) => k.columnName)
-                }))
-                .filter((t) => Boolean(t.table) && registry.hasTableForCollection(t.table));
-            // Junction tables back no collection, so the list above misses
-            // them — and a link or unlink is a write nobody would hear
-            // about. Their rows are the contents of a child list, which is
-            // as much a change as a write to the rows themselves.
-            // Filtered by the parent's source for the same reason as the
-            // list above: `posts_tags` lives in the database `posts`
-            // lives in, and asking a second database to instrument it
-            // produced one "Could not attach change-capture trigger"
-            // warning per junction on every boot.
-            const ownSlugs = new Set(collectionsOnThisSource().map(c => c.slug));
-            for (const link of collectJunctionLinks(registry)) {
-                if (!ownSlugs.has(link.parentCollection.slug)) continue;
-                // A junction row is addressed by the two ids that name
-                // the child list it belongs to, whatever its own key is.
-                cdcTables.push({
-                    schema: link.schema,
-                    table: link.table,
-                    identityColumns: [link.sourceColumn, link.targetColumn]
-                });
+
+        // REALTIME_CDC=wal reads changes from the write-ahead log, so a
+        // write pays for no trigger and no NOTIFY — whose commit-time lock
+        // makes notifying transactions commit one at a time, disk flush
+        // included (tooling/scripts/bench-cdc-notify.mts). Whatever is in
+        // the way — wal_level, a role that may not replicate, no free slot
+        // — falls through to trigger capture below.
+        let walActive = false;
+        if (cdcMode === "wal") {
+            try {
+                const blocker = await walCaptureBlocker(cdcRunSql);
+                if (blocker) throw new Error(blocker);
+                if (realtimeProvisions) reportUnpublishedTables(await provisionWalPublication(cdcRunSql, cdcTables));
+                if (realtimeSubscribes) await realtimeService.enableWalCdc(directUrl, cdcTables);
+                walActive = true;
+            } catch (err) {
+                logger.warn(
+                    "⚠️ [CDC] REALTIME_CDC=wal, but changes cannot be streamed from the WAL — using trigger-based capture instead.",
+                    { detail: err instanceof Error ? err.message : String(err) }
+                );
             }
-            // Provisioning throws only when the connection can't create the
-            // trigger function (insufficient privilege); enableCdc throws when
-            // the LISTEN connection can't be established. Either → fall back.
-            if (realtimeProvisions) {
-                await provisionTriggerCdc(cdcRunSql, cdcTables);
-                cdcFunctionCurrent = true;
-            }
-            if (realtimeSubscribes) await realtimeService.enableCdc(directUrl);
+        }
+
+        if (walActive) {
             cdcEnabled = true;
-            // Boot steps that create their own tables (auth) run after
-            // this one and use it to instrument what they just created.
-            // Left undefined where this process installs nothing, so a
-            // later boot step cannot re-enter the DDL path by the side
-            // door — the callers already treat it as optional, because a
-            // driver without CDC never sets it either.
-            if (realtimeProvisions) {
+            if (realtimeProvisions && realtimeSubscribes) {
+                // This process streams the WAL, so the capture triggers now
+                // only cost every write a trigger and a NOTIFY: they come off,
+                // as with REALTIME_CDC=off. An instance still running trigger
+                // capture stops hearing writes made elsewhere until it is
+                // replaced; its own writes still reach its subscribers.
+                try {
+                    const removed = await removeTriggerCdc(cdcRunSql);
+                    cdcFunctionCurrent = true;
+                    if (removed > 0) {
+                        logger.info(`ℹ️ [CDC] Removed ${removed} change-capture trigger(s): this process streams changes from the WAL instead.`);
+                    }
+                } catch (err) {
+                    logger.warn(
+                        "⚠️ [CDC] Could not remove the change-capture triggers, so every write still runs one and a NOTIFY. The next boot tries again.",
+                        { detail: err instanceof Error ? err.message : String(err) }
+                    );
+                }
                 provisionCdcForTables = async (tables) => {
+                    reportUnpublishedTables(await provisionWalPublication(cdcRunSql, tables));
+                };
+            } else if (realtimeProvisions) {
+                // Provisioning alone: the consumers are other processes, and
+                // whether each can stream is for it to find out. One that
+                // cannot falls back to LISTEN, so the triggers stay for it.
+                try {
+                    await provisionTriggerCdc(cdcRunSql, cdcTables);
+                    cdcFunctionCurrent = true;
+                } catch (err) {
+                    logger.warn(
+                        "⚠️ [CDC] Could not attach the change-capture triggers a consumer that cannot stream the WAL would fall back to.",
+                        { detail: err instanceof Error ? err.message : String(err) }
+                    );
+                }
+                provisionCdcForTables = async (tables) => {
+                    reportUnpublishedTables(await provisionWalPublication(cdcRunSql, tables));
                     await provisionTriggerCdc(cdcRunSql, tables);
                 };
             }
-            // Say which half ran. "All writes now emit realtime events"
-            // is a claim about the database and stays true for a process
-            // that only installed the triggers; what changes is whether
-            // *this* process is listening, and an operator reading one
-            // pod's log should not have to infer that from its role.
             logger.info(
-                `📡 [CDC] Realtime source = database-level change capture (mode: ${cdcMode === "wal" ? "wal→trigger" : "trigger"}). ` +
-                `All writes now emit realtime events regardless of origin.` +
-                (realtimeSubscribes ? "" : " This process installs the capture but does not consume it.")
+                "📡 [CDC] Realtime source = database-level change capture (mode: wal). " +
+                "All writes now emit realtime events regardless of origin." +
+                (realtimeSubscribes ? "" : " This process sets up the capture but does not consume it.")
             );
-        } catch (err) {
-            if (explicitCdc) {
-                // Handled — realtime carries on, app-level — so one line with
-                // the reason, not a stack.
-                logger.warn(
-                    "⚠️ [CDC] Could not enable database-level change capture — falling back to app-level realtime.",
-                    { detail: err instanceof Error ? err.message : String(err) }
-                );
-            } else {
+        } else {
+            try {
+                // Provisioning throws only when the connection can't create the
+                // trigger function (insufficient privilege); enableCdc throws when
+                // the LISTEN connection can't be established. Either → fall back.
+                if (realtimeProvisions) {
+                    await provisionTriggerCdc(cdcRunSql, cdcTables);
+                    cdcFunctionCurrent = true;
+                }
+                if (realtimeSubscribes) await realtimeService.enableCdc(directUrl);
+                cdcEnabled = true;
+                // Boot steps that create their own tables (auth) run after
+                // this one and use it to instrument what they just created.
+                // Left undefined where this process installs nothing, so a
+                // later boot step cannot re-enter the DDL path by the side
+                // door — the callers already treat it as optional, because a
+                // driver without CDC never sets it either.
+                if (realtimeProvisions) {
+                    provisionCdcForTables = async (tables) => {
+                        await provisionTriggerCdc(cdcRunSql, tables);
+                    };
+                }
+                // Say which half ran. "All writes now emit realtime events"
+                // is a claim about the database and stays true for a process
+                // that only installed the triggers; what changes is whether
+                // *this* process is listening, and an operator reading one
+                // pod's log should not have to infer that from its role.
                 logger.info(
-                    "ℹ️ [CDC] Database-level change capture unavailable (likely insufficient privileges to create triggers, " +
-                    "or the LISTEN connection was refused) — using app-level realtime. Set REALTIME_CDC=off to silence this.",
-                    { detail: err instanceof Error ? err.message : String(err) }
+                    `📡 [CDC] Realtime source = database-level change capture (mode: ${cdcMode === "wal" ? "wal→trigger" : "trigger"}). ` +
+                    `All writes now emit realtime events regardless of origin.` +
+                    (realtimeSubscribes ? "" : " This process installs the capture but does not consume it.")
                 );
+            } catch (err) {
+                if (explicitCdc) {
+                    // Handled — realtime carries on, app-level — so one line with
+                    // the reason, not a stack.
+                    logger.warn(
+                        "⚠️ [CDC] Could not enable database-level change capture — falling back to app-level realtime.",
+                        { detail: err instanceof Error ? err.message : String(err) }
+                    );
+                } else {
+                    logger.info(
+                        "ℹ️ [CDC] Database-level change capture unavailable (likely insufficient privileges to create triggers, " +
+                        "or the LISTEN connection was refused) — using app-level realtime. Set REALTIME_CDC=off to silence this.",
+                        { detail: err instanceof Error ? err.message : String(err) }
+                    );
+                }
             }
         }
     }

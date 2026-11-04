@@ -14,6 +14,7 @@
  * check has a fixture that fails it without a filesystem, a project or a
  * database.
  */
+import dotenv from "dotenv";
 
 /** One thing that is wrong, and what to do about it. */
 export interface EnvironmentFinding {
@@ -280,26 +281,17 @@ export function checkEnvSanity(values: Record<string, string>): EnvironmentFindi
 }
 
 /**
- * Parse a `.env` into a plain object.
+ * Parse a `.env` into a plain object, the way the runtime reads it.
  *
- * Deliberately not `dotenv`: this must not touch `process.env`, and doctor may
- * be reading a file for a different environment than the one it is running in.
+ * `dotenv.parse`, not `dotenv.config`: this must not touch `process.env`, and
+ * doctor may be reading a file for a different environment than the one it is
+ * running in. And dotenv's grammar, not a line splitter: the server loads this
+ * file with dotenv, so `NODE_ENV=production # deploy` is production to it, and
+ * a reading that kept the comment in the value judged the file as development
+ * and skipped every production check.
  */
 export function parseEnvFile(text: string): Record<string, string> {
-    const values: Record<string, string> = {};
-    for (const line of text.split("\n")) {
-        const trimmed = line.trim();
-        if (!trimmed || trimmed.startsWith("#")) continue;
-        const eq = trimmed.indexOf("=");
-        if (eq <= 0) continue;
-        const key = trimmed.slice(0, eq).replace(/^export\s+/, "").trim();
-        let value = trimmed.slice(eq + 1).trim();
-        if ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith("'") && value.endsWith("'"))) {
-            value = value.slice(1, -1);
-        }
-        values[key] = value;
-    }
-    return values;
+    return dotenv.parse(text);
 }
 
 // ── Version skew ─────────────────────────────────────────────────────────

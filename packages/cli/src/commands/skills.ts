@@ -440,13 +440,27 @@ function sha256(bytes: Buffer | string): string {
     return createHash("sha256").update(bytes).digest("hex");
 }
 
+/**
+ * Whether a manifest path names a file inside the target directory.
+ *
+ * The manifest is committed with the project, so whoever wrote the repository
+ * wrote it too, and the retired-file sweep below deletes what it lists — with
+ * `--force`, whatever it holds. A path that climbs out (`../../.bashrc`) or is
+ * absolute was never written by an install, and is not this command's to touch.
+ */
+function insideTarget(targetBase: string, relPath: string): boolean {
+    const relative = path.relative(targetBase, path.resolve(targetBase, relPath));
+    return relative !== "" && !relative.startsWith("..") && !path.isAbsolute(relative);
+}
+
 function readManifest(targetBase: string): SkillsManifest | null {
     try {
         const parsed: unknown = JSON.parse(fs.readFileSync(path.join(targetBase, SKILLS_MANIFEST), "utf-8"));
         if (parsed && typeof parsed === "object" && "files" in parsed) {
             const files = (parsed as { files: unknown }).files;
             if (files && typeof files === "object") {
-                const entries = Object.entries(files).filter((e): e is [string, string] => typeof e[1] === "string");
+                const entries = Object.entries(files)
+                    .filter((e): e is [string, string] => typeof e[1] === "string" && insideTarget(targetBase, e[0]));
                 return { version: 1, files: Object.fromEntries(entries) };
             }
         }

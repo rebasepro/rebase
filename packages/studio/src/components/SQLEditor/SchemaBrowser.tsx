@@ -15,6 +15,7 @@ import {
     Typography
 } from "@rebasepro/ui";
 import type { TableInfo } from "./sql_editor_types";
+import { tableStatementTemplates } from "../../utils/sql_utils";
 import { ErrorView, useTranslation } from "@rebasepro/app";
 
 export const SchemaBrowser = ({
@@ -104,19 +105,19 @@ export const SchemaBrowser = ({
                                                 >
                                                     <MenuItem dense className="text-xs" onClick={(e: React.MouseEvent) => {
                                                         e.stopPropagation();
-                                                        onTableClick?.(`SELECT * FROM ${schemaName !== "public" ? `${schemaName}.` : ""}${table.tableName} LIMIT 100;`);
+                                                        onTableClick?.(tableStatementTemplates(schemaName, table).selectTop);
                                                     }}>SELECT (Top 100)</MenuItem>
                                                     <MenuItem dense className="text-xs" onClick={(e: React.MouseEvent) => {
                                                         e.stopPropagation();
-                                                        onTableClick?.(`SELECT \n  ${table.columns.map(c => c.name).join(",\n  ")}\nFROM ${schemaName !== "public" ? `${schemaName}.` : ""}${table.tableName};`);
+                                                        onTableClick?.(tableStatementTemplates(schemaName, table).selectAll);
                                                     }}>SELECT (All columns)</MenuItem>
                                                     <MenuItem dense className="text-xs" onClick={(e: React.MouseEvent) => {
                                                         e.stopPropagation();
-                                                        onTableClick?.(`INSERT INTO ${schemaName !== "public" ? `${schemaName}.` : ""}${table.tableName} (\n  ${table.columns.map(c => c.name).join(",\n  ")}\n) VALUES (\n  ${table.columns.map(() => "?").join(",\n  ")}\n);`);
+                                                        onTableClick?.(tableStatementTemplates(schemaName, table).insert);
                                                     }}>INSERT statement</MenuItem>
                                                     <MenuItem dense className="text-xs" onClick={(e: React.MouseEvent) => {
                                                         e.stopPropagation();
-                                                        onTableClick?.(`UPDATE ${schemaName !== "public" ? `${schemaName}.` : ""}${table.tableName} \nSET \n  ${table.columns.map(c => `${c.name} = ?`).join(",\n  ")}\nWHERE id = ?;`);
+                                                        onTableClick?.(tableStatementTemplates(schemaName, table).update);
                                                     }}>UPDATE statement</MenuItem>
                                                 </Menu>
 
@@ -126,7 +127,7 @@ export const SchemaBrowser = ({
                                                     className="text-[10px] text-primary uppercase min-h-0 py-0.5 px-1 font-medium ml-1 flex-shrink-0 leading-none h-[22px]"
                                                     onClick={(e) => {
                                                         e.stopPropagation();
-                                                        onTableClick?.(`SELECT * FROM ${schemaName !== "public" ? `${schemaName}.` : ""}${table.tableName} LIMIT 100;`);
+                                                        onTableClick?.(tableStatementTemplates(schemaName, table).selectTop);
                                                     }}
                                                 >
                                                     SELECT

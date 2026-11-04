@@ -741,6 +741,12 @@ export function serveSPA<E extends import("hono").Env>(app: Hono<E>, config: Ser
             }
         }
 
+        // The document, whatever the URL looks like. The cache middleware
+        // reads `immutable` off the request path's file name, and a deep link
+        // whose last segment has the shape of a hashed chunk
+        // (`/invoices/INV-2024ABCD.pdf`) would otherwise pin this index.html
+        // in the browser for a year under that URL.
+        c.header("Cache-Control", REVALIDATE_CACHE);
         if (cachedHtmlFile) {
             if (isNotModified(c, cachedHtmlFile.etag, cachedHtmlFile.mtimeMs)) return notModified(c, cachedHtmlFile);
             c.header("ETag", cachedHtmlFile.etag);

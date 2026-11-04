@@ -22,6 +22,19 @@ export interface CdcChangeEvent {
     truncated?: boolean;
 }
 
+/**
+ * Where committed changes come from: this listener (capture triggers and
+ * NOTIFY) or `WalCdcListener` (logical replication). `RealtimeService` reads
+ * the same events from either.
+ */
+export interface CdcSource {
+    /** Rejects when the first connection cannot be made, so the caller can fall back. */
+    start(): Promise<void>;
+    stop(): Promise<void>;
+    readonly connected: boolean;
+    status(): PgNotifyListenerStatus;
+}
+
 const OPS = new Set(["INSERT", "UPDATE", "DELETE", "TRUNCATE"]);
 
 /**

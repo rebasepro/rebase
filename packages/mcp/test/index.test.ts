@@ -513,6 +513,19 @@ describe("isLocalTarget", () => {
         expect(isLocalTarget("postgresql://u:p@db.prod.example.com:5432/app")).toBe(false);
     });
 
+    /**
+     * `?host=` wins over the host before the path, in libpq and in
+     * `pg-connection-string`: this string connects to production, and the
+     * gate let `rebase_db_push` run against it as a local database.
+     */
+    it("reads the server a Postgres URL names in its query, which is the one it connects to", () => {
+        expect(isLocalTarget("postgres://u:p@localhost:5432/app?host=db.prod.example.com")).toBe(false);
+        expect(isLocalTarget("postgresql://u:p@127.0.0.1/app?sslmode=require&hostaddr=10.0.4.2")).toBe(false);
+        expect(isLocalTarget("postgres://u:p@localhost/app?host=localhost,db.prod.example.com")).toBe(false);
+        expect(isLocalTarget("postgres://u:p@localhost/app?host=/var/run/postgresql")).toBe(true);
+        expect(isLocalTarget("postgres://u:p@localhost/app?host=127.0.0.1")).toBe(true);
+    });
+
     it("treats an unverifiable value as remote, not local", () => {
         expect(isLocalTarget("")).toBe(false);
         expect(isLocalTarget("not a url")).toBe(false);

@@ -217,6 +217,11 @@ export class HistoryService {
 
     /**
      * Fetch history entries for an row, ordered by most recent first.
+     *
+     * `id` breaks a tie in `updated_at`, so the order is the same on every
+     * read and `offset` pages neither repeat nor skip an entry. Entries written
+     * by `rebase.record_history` carry the moment they were written, so one
+     * write's entries do not tie; the tiebreak covers those that do.
      */
     async fetchHistory(
         tableName: string,
@@ -239,7 +244,7 @@ export class HistoryService {
                 FROM rebase.entity_history
                 WHERE table_name = ${tableName}
                   AND entity_id = ${String(id)}
-                ORDER BY updated_at DESC
+                ORDER BY updated_at DESC, id DESC
                 LIMIT ${limit}
                 OFFSET ${offset}
             `)
@@ -325,7 +330,7 @@ export class HistoryService {
                     SELECT id FROM rebase.entity_history
                     WHERE table_name = ${tableName}
                       AND entity_id = ${String(id)}
-                    ORDER BY updated_at DESC
+                    ORDER BY updated_at DESC, id DESC
                     OFFSET ${this.retention.maxEntries}
                 )
               )

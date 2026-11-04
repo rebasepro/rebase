@@ -125,6 +125,10 @@ export function CronJobsView() {
     clientRef.current = client;
     const snackbarRef = useRef(snackbar);
     snackbarRef.current = snackbar;
+    // The job on screen now, for a read that ends after the selection moved:
+    // its answer belongs to the job it was made for, not to the one shown.
+    const selectedIdRef = useRef(selectedId);
+    selectedIdRef.current = selectedId;
 
     // ── Fetch jobs on mount + poll every 15s ──
     useEffect(() => {
@@ -235,13 +239,17 @@ export function CronJobsView() {
         setLogsFailure(null);
         try {
             const res = await c.cron.getJobLogs(id, { limit: 25 });
+            if (selectedIdRef.current !== id) return;
             setLogs(res.logs);
         } catch (e: unknown) {
+            if (selectedIdRef.current !== id) return;
             // Clearing the list silently reads as "this job has never run".
             setLogs([]);
             setLogsFailure(classifyLoadFailure(e));
         }
-        finally { setLogsLoading(false); }
+        finally {
+            if (selectedIdRef.current === id) setLogsLoading(false);
+        }
     }
 
     const handleTrigger = async (id: string) => {
@@ -257,7 +265,7 @@ export function CronJobsView() {
                 ? { type: "success", message: t("studio_cron_run_succeeded", { job }) }
                 : { type: "error", message: t("studio_cron_run_failed", { job, error: log.error ?? "—" }) });
             await refreshJobs();
-            if (selectedId === id) refreshLogs(id);
+            if (selectedIdRef.current === id) refreshLogs(id);
         } catch (e: unknown) {
             snackbarRef.current.open({ type: "error",
 message: e instanceof Error ? e.message : String(e) });

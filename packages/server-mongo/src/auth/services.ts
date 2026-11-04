@@ -444,11 +444,18 @@ usedAt: null });
         };
     }
 
-    async markAsUsed(tokenHash: string): Promise<void> {
-        await this.collection.updateOne(
-            { tokenHash },
-            { $set: { usedAt: new Date() } }
+    /**
+     * Mark the token used if it is still valid, and say whether this call did.
+     * The filter is the validity check, so of two requests presenting the same
+     * token only one modifies it.
+     */
+    async markAsUsed(tokenHash: string): Promise<boolean> {
+        const now = new Date();
+        const result = await this.collection.updateOne(
+            { tokenHash, usedAt: null, expiresAt: { $gt: now } },
+            { $set: { usedAt: now } }
         );
+        return result.modifiedCount > 0;
     }
 
     async deleteAllForUser(uid: string): Promise<void> {
@@ -521,8 +528,8 @@ export class MongoTokenRepository implements TokenRepository {
         return this.passwordResetTokenService.findValidByHash(tokenHash);
     }
 
-    async markPasswordResetTokenUsed(tokenHash: string): Promise<void> {
-        await this.passwordResetTokenService.markAsUsed(tokenHash);
+    async markPasswordResetTokenUsed(tokenHash: string): Promise<boolean> {
+        return this.passwordResetTokenService.markAsUsed(tokenHash);
     }
 
     async deleteAllPasswordResetTokensForUser(uid: string): Promise<void> {
@@ -548,9 +555,19 @@ export class MongoTokenRepository implements TokenRepository {
         return { uid: doc.uid as string, expiresAt: doc.expiresAt as Date };
     }
 
-    async markMagicLinkTokenUsed(tokenHash: string): Promise<void> {
+    /** As {@link MongoPasswordResetTokenService.markAsUsed}: `true` only for the call that consumed it. */
+    async markMagicLinkTokenUsed(tokenHash: string): Promise<boolean> {
         const col = this.db.collection("magic_link_tokens");
-        await col.updateOne({ tokenHash }, { $set: { usedAt: new Date() } });
+        const now = new Date();
+        const result = await col.updateOne(
+            { tokenHash, usedAt: null, expiresAt: { $gt: now } },
+            { $set: { usedAt: now } }
+        );
+        return result.modifiedCount > 0;
+    }
+
+    async deleteAllMagicLinkTokensForUser(uid: string): Promise<void> {
+        await this.db.collection("magic_link_tokens").deleteMany({ uid });
     }
 }
 
@@ -687,8 +704,8 @@ export class MongoAuthRepository implements AuthRepository {
         return this.tokenRepository.findValidPasswordResetToken(tokenHash);
     }
 
-    async markPasswordResetTokenUsed(tokenHash: string): Promise<void> {
-        await this.tokenRepository.markPasswordResetTokenUsed(tokenHash);
+    async markPasswordResetTokenUsed(tokenHash: string): Promise<boolean> {
+        return this.tokenRepository.markPasswordResetTokenUsed(tokenHash);
     }
 
     async deleteAllPasswordResetTokensForUser(uid: string): Promise<void> {
@@ -709,8 +726,12 @@ export class MongoAuthRepository implements AuthRepository {
         return this.tokenRepository.findValidMagicLinkToken(tokenHash);
     }
 
-    async markMagicLinkTokenUsed(tokenHash: string): Promise<void> {
-        await this.tokenRepository.markMagicLinkTokenUsed(tokenHash);
+    async markMagicLinkTokenUsed(tokenHash: string): Promise<boolean> {
+        return this.tokenRepository.markMagicLinkTokenUsed(tokenHash);
+    }
+
+    async deleteAllMagicLinkTokensForUser(uid: string): Promise<void> {
+        await this.tokenRepository.deleteAllMagicLinkTokensForUser(uid);
     }
 
     // ── MFA: not implemented on this engine ──────────────────────────────

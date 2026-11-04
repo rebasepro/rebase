@@ -343,20 +343,17 @@ export function getArrayResolvedProperties({
         : [];
 }
 
-export function resolveEnumValues(input: EnumValues): EnumValueConfig[] | undefined {
-    if (typeof input === "object") {
-        return Object.entries(input).map(([id, value]) =>
-        (typeof value === "string"
-            ? {
-                id,
-                label: value
-            }
-            : value));
-    } else if (Array.isArray(input)) {
-        return input as EnumValueConfig[];
-    } else {
-        return undefined;
-    }
+/**
+ * An enum as `{ id, label }` entries, or `undefined` when it is not one.
+ *
+ * {@link enumToObjectEntries} is the reading: an array is a list of entries or
+ * of plain values (`["draft", "published"]`, whose ids are the values, not
+ * their positions), and a map entry's id is its key even when its value is a
+ * config that does not repeat it.
+ */
+export function resolveEnumValues(input: EnumValues | Array<string | number>): EnumValueConfig[] | undefined {
+    if (typeof input !== "object" || input === null) return undefined;
+    return enumToObjectEntries(input);
 }
 
 

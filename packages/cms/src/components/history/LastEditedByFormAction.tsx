@@ -1,4 +1,5 @@
 import type { PluginFormActionProps } from "@rebasepro/cms-types";
+import { hasEntityId } from "@rebasepro/common";
 import React from "react";
 ;
 import { LastEditedByIndicator } from "./LastEditedByIndicator";
@@ -13,7 +14,7 @@ export function LastEditedByFormAction({
     status,
     collection
 }: PluginFormActionProps) {
-    if (status === "new" || status === "copy" || !entityId) return null;
+    if (status === "new" || status === "copy" || !hasEntityId(entityId)) return null;
     if (!collection.history) return null;
 
     return <LastEditedByIndicator

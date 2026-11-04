@@ -268,18 +268,12 @@ export const Select = forwardRef<HTMLDivElement, SelectProps>(({
         onValueChangeInternal(newValue);
     }, [lazyOptions, hasEmptyOption, onValueChangeInternal]);
 
+    // The selected item's content, found among every item — inside a
+    // `SelectGroup` or a fragment as well as at the top level.
     const displayChildren = useMemo(() => {
         if (!hasValue || renderValue) return null;
-
-        // Find the child that matches the current value to display its content
-        let found: React.ReactNode = null;
-        Children.forEach(children, (child) => {
-            if (React.isValidElement<SelectItemProps>(child) && String(child.props.value) === String(value)) {
-                found = child.props.children;
-            }
-        });
-        return found;
-    }, [children, hasValue, renderValue, value]);
+        return options.find((option) => option.value === stringValue)?.element.props.children ?? null;
+    }, [options, hasValue, renderValue, stringValue]);
 
     // Radix reads a value of "" as nothing selected and shows the placeholder
     // slot, whatever the Value's children say. So an item whose value really is
@@ -287,11 +281,10 @@ export const Select = forwardRef<HTMLDivElement, SelectProps>(({
     // trigger stays blank while it is the selected one.
     const emptyItemDisplay = useMemo(() => {
         if (stringValue !== "") return null;
-        const emptyItem = Children.toArray(children).find((child): child is React.ReactElement<SelectItemProps> =>
-            React.isValidElement<SelectItemProps>(child) && String(child.props.value) === "");
+        const emptyItem = options.find((option) => option.value === "");
         if (!emptyItem) return null;
-        return value !== undefined && renderValue ? renderValue(value) : emptyItem.props.children;
-    }, [children, renderValue, stringValue, value]);
+        return value !== undefined && renderValue ? renderValue(value) : emptyItem.element.props.children;
+    }, [options, renderValue, stringValue, value]);
 
     const bare = triggerContent !== undefined;
     // Radix's value slot is an inline `span` that drops the class it is

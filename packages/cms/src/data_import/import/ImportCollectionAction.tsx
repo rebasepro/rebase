@@ -31,7 +31,7 @@ import {
 import { buildEntityPropertiesFromData } from "@rebasepro/inference";
 import { useImportConfig } from "../hooks";
 import { convertImportData, getInferenceType, ImportConversionProblem } from "../utils";
-import { guessIdColumn } from "../utils/id_column";
+import { guessIdColumn, remapImportColumn } from "../utils/id_column";
 import { buildHeadersMappingFromData, takesObjectWhole } from "../utils/import_columns";
 import { DataNewPropertiesMapping } from "../components/DataNewPropertiesMapping";
 import { ImportFileUpload } from "../components/ImportFileUpload";
@@ -152,23 +152,14 @@ export function ImportCollectionAction<M extends Record<string, unknown>, USER e
                                 onPropertySelected={(newPropertyKey) => {
 
                                     onAnalyticsEvent?.("import_mapping_field_updated");
-                                    const newHeadersMapping: Record<string, string | null> = Object.entries(importConfig.headersMapping)
-                                        .map(([currentImportKey, currentPropertyKey]) => {
-                                            if (currentPropertyKey === newPropertyKey) {
-                                                return { [currentImportKey]: null };
-                                            }
-                                            if (currentImportKey === importKey) {
-                                                return { [currentImportKey]: newPropertyKey };
-                                            }
-                                            return { [currentImportKey]: currentPropertyKey };
-                                        })
-                                        .reduce((acc, curr) => ({ ...acc,
-...curr }), {});
-                                    importConfig.setHeadersMapping(newHeadersMapping as Record<string, string>);
-
-                                    if (newPropertyKey === importConfig.idColumn) {
-                                        importConfig.setIdColumn(undefined);
-                                    }
+                                    const remapped = remapImportColumn({
+                                        headersMapping: importConfig.headersMapping,
+                                        idColumn: importConfig.idColumn,
+                                        column: importKey,
+                                        targetKey: newPropertyKey
+                                    });
+                                    importConfig.setHeadersMapping(remapped.headersMapping);
+                                    importConfig.setIdColumn(remapped.idColumn);
 
                                 }}
                             />;
@@ -267,8 +258,10 @@ function PropertyTreeSelect({
 
     const onSelectValueChange = (value: string) => {
         if (value === internalIDValue) {
-            onIdSelected();
+            // The column's property is let go first, which also lets go of
+            // whichever column was the id; then this one becomes it.
             onPropertySelected(null);
+            onIdSelected();
         } else if (value === "__do_not_import") {
             onPropertySelected(null);
         } else {

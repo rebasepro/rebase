@@ -43,7 +43,17 @@ export interface SerializedEntityData {
     }>;
 }
 /**
- * Helper function to sanitize and convert dates to ISO strings
+ * The last pass over a row before it is written: `undefined` and `NaN` become
+ * `null`, a `Date` becomes its ISO string, recursively through arrays and
+ * objects.
+ *
+ * Strings are left as they came. This pass knows no property types, and a
+ * string is text unless its property says otherwise: reading `"Nan"` as a
+ * failed number nulled a person's name, and re-printing anything shaped like
+ * an ISO timestamp cut the microseconds out of text that happened to hold one.
+ * The coercions a string *does* need are made by its property, in
+ * {@link serializePropertyToServer}: `"NaN"` on a `number`, a date's text on a
+ * `date`.
  */
 export function sanitizeAndConvertDates(obj: unknown): unknown {
     if (obj === null || obj === undefined) {
@@ -51,10 +61,6 @@ export function sanitizeAndConvertDates(obj: unknown): unknown {
     }
 
     if (typeof obj === "number" && isNaN(obj)) {
-        return null;
-    }
-
-    if (typeof obj === "string" && obj.toLowerCase() === "nan") {
         return null;
     }
 
@@ -82,18 +88,19 @@ export function sanitizeAndConvertDates(obj: unknown): unknown {
         return newObj;
     }
 
-    if (typeof obj === "string") {
-        const isoDateRegex = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z$/;
-        const jsDateRegex = /^\w{3} \w{3} \d{2} \d{4} \d{2}:\d{2}:\d{2} GMT[+-]\d{4} \(.+\)$/;
-        if (isoDateRegex.test(obj) || jsDateRegex.test(obj)) {
-            const date = new Date(obj);
-            if (!isNaN(date.getTime())) {
-                return date.toISOString();
-            }
-        }
-    }
-
     return obj;
+}
+
+/** A UTC ISO timestamp, as `Date.prototype.toISOString` and most clients write one. */
+const ISO_DATE_TEXT = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z$/;
+/** `Date.prototype.toString()`'s form, which Postgres cannot parse. */
+const JS_DATE_TEXT = /^\w{3} \w{3} \d{2} \d{4} \d{2}:\d{2}:\d{2} GMT[+-]\d{4} \(.+\)$/;
+
+/** A date property's text in the ISO form Postgres reads; anything else as it came. */
+function normalizeDateText(value: unknown): unknown {
+    if (typeof value !== "string" || !(ISO_DATE_TEXT.test(value) || JS_DATE_TEXT.test(value))) return value;
+    const date = new Date(value);
+    return isNaN(date.getTime()) ? value : date.toISOString();
 }
 
 /**
@@ -284,7 +291,13 @@ export function serializePropertyToServer(value: unknown, property: Property, pr
 
     switch (propertyType) {
         case "date":
-            return property.columnType === "time" ? dateToTimeOfDay(value) : value;
+            return property.columnType === "time" ? dateToTimeOfDay(value) : normalizeDateText(value);
+
+        case "number":
+            // A number that did not parse, as some clients print one. Postgres
+            // reads `'NaN'` as a valid `numeric`, and rejects it outright on an
+            // integer column, so neither is what was meant.
+            return typeof value === "string" && value.trim().toLowerCase() === "nan" ? null : value;
 
         case "relation":
             if (Array.isArray(value)) {

@@ -1,6 +1,7 @@
 import { CollectionConfig, Property, StringProperty, NumberProperty, ArrayProperty, MapProperty, isToMany, ResolvedRelation, VectorProperty, DEFAULT_LIST_LIMIT, MAX_LIST_LIMIT } from "@rebasepro/types";
 import { effectiveAccess, fieldKeyForColumn, findRelation, getTenantConfig, isRelationRequired, resolveCollectionRelations, softDeleteFieldOf } from "@rebasepro/common";
 import { DELETED_QUERY_PARAM, HARD_DELETE_QUERY_PARAM } from "./rest/soft-delete-params";
+import { hydrateRegExp } from "@rebasepro/utils";
 
 /**
  * OpenAPI 3.0.3 specification generator.
@@ -1864,7 +1865,8 @@ function convertPropertyTypeToSchema(property: Property): Record<string, unknown
                     base.maxLength = sp.validation.length;
                 }
                 if (sp.validation.matches !== undefined) {
-                    base.pattern = String(sp.validation.matches);
+                    const pattern = jsonSchemaPattern(sp.validation.matches);
+                    if (pattern !== undefined) base.pattern = pattern;
                 }
             }
 
@@ -2219,4 +2221,23 @@ function toPascalCase(str: string): string {
         .filter(Boolean)
         .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
         .join("");
+}
+
+/**
+ * A `validation.matches` as a JSON Schema `pattern`, or `undefined` when it
+ * cannot be stated as one.
+ *
+ * A pattern is a regex's source and nothing else: no delimiting slashes and no
+ * flags. `matches` is a `RegExp` or a string the server reads with
+ * `hydrateRegExp` (`/^[a-z]{2}$/i` included), so it is read the same way here.
+ * Written out as `String(matches)`, the slashes and flags became characters a
+ * value had to contain, and a generated client refused every valid value. A
+ * flag that changes what the source matches (`i`, `m`, `s`) has no JSON
+ * Schema spelling; the source alone would refuse values the server accepts,
+ * so no pattern is stated.
+ */
+function jsonSchemaPattern(matches: string | RegExp): string | undefined {
+    const regExp = typeof matches === "string" ? hydrateRegExp(matches) : matches;
+    if (!regExp) return undefined;
+    return /[ims]/.test(regExp.flags) ? undefined : regExp.source;
 }

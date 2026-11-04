@@ -1,7 +1,25 @@
-import { describe, expect, test } from "@jest/globals";
+import { describe, expect, jest, test } from "@jest/globals";
 import { unflattenObject } from "../../src/data_import/utils/transforms";
 
 describe("UnflattenObject function", () => {
+
+    test("keeps the nested columns when a plain column shares their name, in either order", () => {
+        const warn = jest.spyOn(console, "warn").mockImplementation(() => undefined);
+        // A plain cell first: writing an index into its text threw, and the
+        // whole file failed to read.
+        expect(unflattenObject({ tags: "a;b", "tags[0]": "a", "tags[1]": "b" })).toEqual({ tags: ["a", "b"] });
+        expect(unflattenObject({ "tags[0]": "a", tags: "a;b" })).toEqual({ tags: ["a"] });
+        expect(unflattenObject({ address: "Main St 1", "address.city": "Lisbon" })).toEqual({ address: { city: "Lisbon" } });
+        // An empty plain cell is no conflict worth reporting.
+        warn.mockClear();
+        expect(unflattenObject({ tags: "", "tags[0]": "a" })).toEqual({ tags: ["a"] });
+        expect(warn).not.toHaveBeenCalled();
+        warn.mockRestore();
+    });
+
+    test("reads an indexed column whose name has a hyphen", () => {
+        expect(unflattenObject({ "my-tags[0]": "a", "my-tags[1]": "b" })).toEqual({ "my-tags": ["a", "b"] });
+    });
 
     test("Unflattens dotted and indexed keys into nested objects and arrays", () => {
         const input = {

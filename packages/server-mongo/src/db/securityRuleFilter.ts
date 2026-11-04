@@ -44,6 +44,16 @@ const MATCH_ALL: Filter<Document> = {};
  */
 const MATCH_NONE: Filter<Document> = { _id: { $exists: false } };
 
+/**
+ * Matches no document, for a comparison SQL answers with NULL — one against a
+ * NULL value. NULL denies a row exactly as `false` does, so this is a filter
+ * like {@link MATCH_NONE}; it is a distinct object because the two part ways
+ * under `not`: `NOT false` is true, `NOT NULL` is still NULL. Neither
+ * {@link isMatchAll} nor {@link isMatchNone} recognises it, so a negation over
+ * it is refused rather than folded into "match every document".
+ */
+const MATCH_UNKNOWN: Filter<Document> = { _id: { $exists: false } };
+
 /** The expression has no MongoDB equivalent — the caller must refuse. */
 const UNTRANSLATABLE = "untranslatable" as const;
 
@@ -256,14 +266,31 @@ export function policyToMongoFilter(expr: PolicyExpression, user: User | undefin
             const right = resolveOperand(expr.right, ctx);
             if (left.kind === "unknown" || right.kind === "unknown") return UNTRANSLATABLE;
 
+            // SQL answers NULL for every comparison against NULL, and NULL
+            // grants nothing. MongoDB answers it: `{ f: { $eq: null } }`
+            // matches every document without `f`, `$ne` matches every document
+            // whose `f` is null or missing, and an aggregation `$lt` ranks null
+            // below every value. So a value of null decides nothing, and a
+            // field must hold a value for its comparison to grant the row:
+            // `visibility != 'private'` hides a document with no visibility,
+            // as Postgres does.
+            if ((left.kind === "value" && left.value == null) || (right.kind === "value" && right.value == null)) {
+                return MATCH_UNKNOWN;
+            }
             if (left.kind === "field" && right.kind === "value") {
-                return { [left.name]: { [COMPARE_TO_MONGO[expr.op]]: right.value } } as Filter<Document>;
+                return compareField(left.name, expr.op, right.value);
             }
             if (left.kind === "value" && right.kind === "field") {
-                return { [right.name]: { [COMPARE_TO_MONGO[INVERTED_COMPARE[expr.op]]]: left.value } } as Filter<Document>;
+                return compareField(right.name, INVERTED_COMPARE[expr.op], left.value);
             }
             if (left.kind === "field" && right.kind === "field") {
-                return { $expr: { [COMPARE_TO_MONGO[expr.op]]: [`$${left.name}`, `$${right.name}`] } } as Filter<Document>;
+                return {
+                    $and: [
+                        { [left.name]: { $ne: null } },
+                        { [right.name]: { $ne: null } },
+                        { $expr: { [COMPARE_TO_MONGO[expr.op]]: [`$${left.name}`, `$${right.name}`] } }
+                    ]
+                } as Filter<Document>;
             }
             // Both sides are known values — the comparison is a constant.
             if (left.kind === "value" && right.kind === "value") {
@@ -290,6 +317,18 @@ export function policyToMongoFilter(expr: PolicyExpression, user: User | undefin
         case "raw":
             return UNTRANSLATABLE;
     }
+}
+
+/**
+ * `field <op> value` for a value that is not null. Only `$ne` needs more than
+ * the operator: it is the one that matches a document whose field is null or
+ * missing, where SQL's `<>` is NULL.
+ */
+function compareField(name: string, op: keyof typeof COMPARE_TO_MONGO, value: unknown): Filter<Document> {
+    if (op === "neq") {
+        return { [name]: { $ne: value, $nin: [null] } } as Filter<Document>;
+    }
+    return { [name]: { [COMPARE_TO_MONGO[op]]: value } } as Filter<Document>;
 }
 
 function compareValues(op: keyof typeof COMPARE_TO_MONGO, a: unknown, b: unknown): TranslationResult {

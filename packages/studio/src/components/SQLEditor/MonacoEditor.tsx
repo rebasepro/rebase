@@ -1,4 +1,4 @@
-import React, { useImperativeHandle, useRef } from "react";
+import React, { useEffect, useImperativeHandle, useRef } from "react";
 import Editor, { Monaco, OnMount } from "@monaco-editor/react";
 import type { editor, Position, IRange } from "monaco-editor";
 import { cls, defaultBorderMixin } from "@rebasepro/ui";
@@ -31,6 +31,11 @@ function selectedTextOf(instance: editor.IStandaloneCodeEditor): string | undefi
     return instance.getModel()?.getValueInRange(selection)?.trim() || undefined;
 }
 
+/** `text` as a regular expression that matches exactly it. */
+function escapeRegExp(text: string): string {
+    return text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
 export type MonacoEditorProps = {
     ref?: React.Ref<MonacoEditorHandle>;
     value: string;
@@ -60,6 +65,19 @@ export const MonacoEditor = ({
 
     const schemasRef = useRef(schemas);
     schemasRef.current = schemas;
+
+    /**
+     * The completion provider this editor registered. Monaco keeps one
+     * language registry for the whole page, so a provider outlives the editor
+     * that registered it unless it is disposed: each visit to the console
+     * would add another, offering every table and keyword once per visit —
+     * the earlier ones from the schemas of the database picked back then.
+     */
+    const completionProviderRef = useRef<ReturnType<Monaco["languages"]["registerCompletionItemProvider"]> | null>(null);
+    useEffect(() => () => {
+        completionProviderRef.current?.dispose();
+        completionProviderRef.current = null;
+    }, []);
 
     useImperativeHandle(ref, () => ({
         getSelectedText: () => (editorRef.current ? selectedTextOf(editorRef.current) : undefined),
@@ -92,7 +110,8 @@ export const MonacoEditor = ({
             "CASE", "WHEN", "THEN", "ELSE", "END", "CAST", "COALESCE"
         ];
 
-        monaco.languages.registerCompletionItemProvider("pgsql", {
+        completionProviderRef.current?.dispose();
+        completionProviderRef.current = monaco.languages.registerCompletionItemProvider("pgsql", {
             triggerCharacters: [".", " ", "A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L", "M", "N", "O", "P", "Q", "R", "S", "T", "U", "V", "W", "X", "Y", "Z", "a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l", "m", "n", "o", "p", "q", "r", "s", "t", "u", "v", "w", "x", "y", "z"],
             provideCompletionItems: (model: editor.ITextModel, position: Position) => {
                 const word = model.getWordUntilPosition(position);
@@ -166,7 +185,9 @@ export const MonacoEditor = ({
                     const activeTables = new Set<string>();
                     for (const [, tables] of Object.entries(allSchemas)) {
                         tables.forEach(table => {
-                            const regex = new RegExp(`\\b${table.tableName}\\b`, "i");
+                            // The name is text to find, not a pattern: a `[` or `(`
+                            // in it would throw, and take every suggestion with it.
+                            const regex = new RegExp(`\\b${escapeRegExp(table.tableName)}\\b`, "i");
                             if (regex.test(fullText)) {
                                 activeTables.add(table.tableName);
                             }

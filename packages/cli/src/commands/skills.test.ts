@@ -193,6 +193,27 @@ describe("re-running the install", () => {
         expect(again.kept).toEqual([]);
     });
 
+    it("never touches a file outside the target directory, whatever the committed manifest lists", () => {
+        // The manifest is committed with the project, so a repository can put
+        // anything in it, and `--force` deletes what it lists without comparing.
+        const { dir } = project();
+        const outside = path.join(scratch, "outside.txt");
+        fs.writeFileSync(outside, "keep me\n");
+        const base = path.join(dir, ".claude/skills");
+        fs.mkdirSync(base, { recursive: true });
+        const escape = path.relative(base, outside);
+        fs.writeFileSync(path.join(base, SKILLS_MANIFEST), JSON.stringify({
+            version: 1,
+            files: { [escape]: "0".repeat(64), [outside]: "0".repeat(64) }
+        }));
+
+        const result = installForAgent("claude", loadSkills(fixture()), dir, { force: true });
+
+        expect(fs.readFileSync(outside, "utf-8")).toBe("keep me\n");
+        expect(result.removed).toEqual([]);
+        expect(result.kept).toEqual([]);
+    });
+
     it("leaves files it never installed alone", () => {
         const { dir } = project();
         const own = path.join(dir, ".claude/skills/our-skill/SKILL.md");
