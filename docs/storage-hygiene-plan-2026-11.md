@@ -2,7 +2,7 @@
 
 Status (2026-11-04): §1's scheduled sweep is built (`bucket(…, { orphanSweep })`,
 a cron job per bucket). `deleteWithRow` is not: see §1. §3's gauge is built in
-saas and records without billing (`STORAGE_BILLING`). §2 is still a design.
+saas (GCS only) and records without billing until `REBASE_BILL_STORAGE` is on. §2 is still a design.
 
 It came out of SongBuzz moving its voice
 recordings into its managed bucket, which raised three gaps. None was built in
