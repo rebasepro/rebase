@@ -52,7 +52,7 @@ La traduzione è in arrivo. Il contenuto qui sotto è in inglese.
   `query_collection`'s arguments and returns the same page, plus the columns
   the admin panel shows (`propertiesOrder`, `hideFromCollection`, `readOnly`).
   `/mcp` serves the view as a `ui://` resource (`resources/list`,
-  `resources/read`), built by the new `@rebasepro/mcp-apps` package. Paging
+  `resources/read`), built into `@rebasepro/server`; nothing new to install. Paging
   and cell edits are tool calls the client relays with its own token, so they
   run as the same person under the same RLS, and each saved edit is reported
   to the model. A client without MCP Apps, such as Claude Code or Cursor,

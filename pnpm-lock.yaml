@@ -1460,9 +1460,6 @@ importers:
       '@rebasepro/common':
         specifier: workspace:*
         version: link:../common
-      '@rebasepro/mcp-apps':
-        specifier: workspace:*
-        version: link:../mcp-apps
       '@rebasepro/types':
         specifier: workspace:*
         version: link:../types
@@ -1497,6 +1494,9 @@ importers:
       '@jest/globals':
         specifier: ^30.4.1
         version: 30.4.1
+      '@rebasepro/mcp-apps':
+        specifier: workspace:*
+        version: link:../mcp-apps
       '@types/jest':
         specifier: ^30.0.0
         version: 30.0.0

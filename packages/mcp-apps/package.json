@@ -1,6 +1,7 @@
 {
   "name": "@rebasepro/mcp-apps",
   "version": "0.27.0",
+  "private": true,
   "description": "MCP App views for Rebase: the collection table a client like Claude shows tool results in, built from the Rebase UI kit.",
   "keywords": [
     "rebase",
@@ -59,8 +60,5 @@
     "typescript": "^6.0.3",
     "vite": "^8.1.5",
     "vitest": "4.1.11"
-  },
-  "publishConfig": {
-    "access": "public"
   }
 }

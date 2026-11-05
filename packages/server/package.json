@@ -61,7 +61,6 @@
     "@hono/node-server": "^2.0.12",
     "@rebasepro/client": "workspace:*",
     "@rebasepro/common": "workspace:*",
-    "@rebasepro/mcp-apps": "workspace:*",
     "@rebasepro/types": "workspace:*",
     "@rebasepro/utils": "workspace:*",
     "drizzle-orm": "^0.45.2",
@@ -71,6 +70,7 @@
   },
   "devDependencies": {
     "@jest/globals": "^30.4.1",
+    "@rebasepro/mcp-apps": "workspace:*",
     "@types/jest": "^30.0.0",
     "@types/jsonwebtoken": "^9.0.10",
     "@types/node": "^26.1.2",
