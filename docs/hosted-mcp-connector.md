@@ -337,8 +337,30 @@ gates → per tenant call, a 5-minute platform token for one project.
 and every confirmed call (tool, account, client, confirmation `jti`). A deploy
 or rollback started from the connector is recorded with `triggerSource: "mcp"`
 and shows as "via the Rebase connector" in the console. The tenant logs
-`[Auth] Platform token accepted` with the token's `jti`. Writing connector
-actions to the organization's activity log is not built.
+`[Auth] Platform token accepted` with the token's `jti`.
+
+The organization's activity log (what the console's Activity page and
+`rebase cloud activity` read) records the connector's actions as the person,
+labelled "<email> via the Rebase connector". Deploys, rollbacks and env
+changes are recorded by the control plane's own routes, which see that the
+in-process request was the connector's: the mark is the `Request` object in a
+`WeakSet`, so no network caller can forge or shed it. Rows written and cron
+jobs run inside a project pass no such route, so the connector records them
+itself: `data.create`, `data.update`, `data.delete` (the row's id and field
+names, never values), `cron.run`, `cron.enable`, `cron.disable`. The activity
+log lives on the unmerged saas branch `sweep/2026-10-24`, so this part is on
+the saas branch `feat/hosted-mcp-connector-audit`, stacked on it.
+
+Two things are left out on purpose:
+
+- `runtime-token` (what `rebase cloud cron` uses) issues `cron:read` only. The
+  connector signs its own tokens after its own gates, and nothing in the CLI
+  would use more; issuing `data:*` there would hand a `--can logs` token a way
+  into project data that no command needs.
+- Preview pods get no platform-token variables. A preview needs an audience of
+  its own (for example `<project>:preview:<name>`), or it would accept
+  production's tokens, and nothing mints a preview token yet. It belongs with
+  a "previews" target for the tools.
 
 ## What changes where
 
@@ -363,7 +385,10 @@ actions to the organization's activity log is not built.
 7. The consent screen: the app's scope descriptions, and "Continue as you"
    from the session the app's own frontend keeps in the browser.
 
-**Control plane (`rebasepro/saas`):**
+**Control plane (`rebasepro/saas`):** branch `feat/hosted-mcp-connector` (on
+`main`), and `feat/hosted-mcp-connector-audit` (the same two commits stacked on
+`sweep/2026-10-24`, plus the activity log). Ship the second once the sweep
+branch is merged; until then the first ships without the activity log.
 
 1. The unbuilt half of platform tokens (spec in `docs/platform-tokens.md`): the
    signing key derived from `ENCRYPTION_KEY`, both variables injected on every
