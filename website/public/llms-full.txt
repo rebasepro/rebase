@@ -950,6 +950,7 @@ Read by `rebase`, not by the server. Nothing here affects a deployment.
 | `REBASE_SERVICE_KEY` | The service key those commands authenticate with, read from `.env`: the same variable the server reads (see above). | — |
 | `SERVICE_KEY` | An older name for that key. When `.env` sets it, `rebase api-keys` and `rebase storage` read it in place of `REBASE_SERVICE_KEY`. | — |
 | `REBASE_ENV_FILE_PATH` | Which `.env` the CLI reads and writes, when it is not the project's. | — |
+| `REBASE_ROOT_RULES` | <span class="since-badge" data-since="0.28">Since 0.28</span> `0` stops `rebase init` and `rebase skills install` from writing the project's rules into the repository root's `CLAUDE.md` and `AGENTS.md`, for a root whose agent files you keep by hand. | on |
 | `REBASE_CLOUD_URL` | The control plane `rebase cloud` talks to. | — |
 | `REBASE_CLOUD_EMAIL` | The account `rebase cloud login` signs in as, instead of prompting. | — |
 | `REBASE_CLOUD_PASSWORD` | Its password, so a secret store can hand it over without it reaching the shell's history. | — |
@@ -23599,80 +23600,7 @@ For the full query builder reference (filtering, sorting, pagination, real-time)
 
 ### Relations in the admin panel
 
-Every to-many relation — `hasMany`, `manyToMany`, or a to-many `via` — becomes a
-**tab** under a record in the admin panel, listing the rows that record reaches.
-
-#### The path segment is the relation name
-
-A child list is addressed as `parent/parentId/relationName`:
-
-```
-/c/authors/a-1/posts          the posts of author a-1
-/c/posts/p-1/tags             the tags of post p-1
-```
-
-The last segment is the **relation name**, not the target collection's slug. They
-are often the same, because an unnamed relation takes its target's slug — but an
-inline relation property takes the *property key*:
-
-```typescript
-properties: {
-    featuredTags: {
-        type: "relation",
-        relation: { kind: "manyToMany", target: () => tagsCollection }
-    }
-}
-// tab and path segment: featuredTags   (not "tags")
-```
-
-This is also what makes two relations to the same collection work: each has its own
-name, so each gets its own tab and its own path.
-
-#### Owned rows versus shared rows
-
-What a tab lets you do depends on how the relation is stored, because the two cases
-mean different things:
-
-| | One-to-many (`foreignKeyOnTarget`) | Many-to-many (`through`) |
-|---|---|---|
-| The child belongs to | this parent alone | every parent that links it |
-| Create | creates the row under this parent | creates the row and links it |
-| Add existing | — | links an existing row |
-| Remove | **deletes** the row | **unlinks** it; the row is untouched |
-
-The admin panel renders each accordingly: a many-to-many tab offers **Add existing**
-and **Remove from this record**, and never a delete that would take the row away
-from other parents.
-
-#### The same rules over REST
-
-Child lists are ordinary collection queries narrowed to one parent, so they accept
-everything a root list does — filters, `orderBy`, `limit`, `offset`, `include` — and
-`meta.total` counts the filtered rows. Filter either per field (`?field=op.value`) or
-with a whole-object `?where={"field":["op","value"]}`; both reach the same query:
-
-```
-GET    /api/data/authors/a-1/posts?status=eq.published&orderBy=title&limit=20
-GET    /api/data/authors/a-1/posts?where={"status":["==","published"]}&orderBy=title
-GET    /api/data/authors/a-1/posts/p-1
-POST   /api/data/authors/a-1/posts          create under this parent
-PATCH  /api/data/authors/a-1/posts/p-1      update; will not reparent
-DELETE /api/data/authors/a-1/posts/p-1      delete (one-to-many) / unlink (many-to-many)
-```
-
-The parent segment is enforced, not decorative. Addressing a row that is not under
-that parent returns `404`, and `PATCH` never moves a row from one parent to another —
-set the foreign key explicitly if that is what you want.
-
-For a many-to-many, `PATCH parent/id/child/childId` is *set membership*: it links the
-row if it is not linked yet, and is idempotent. That is how you attach a row that
-already exists.
-
-#### What does not become a tab
-
-- **To-one relations** — they are a field on the record, not a list. Writing through
-  a to-one path is rejected: the foreign key lives on the parent's table.
-- **Relations declared inside a `map`** — they are a field of that map.
+Every to-many relation (`hasMany`, `manyToMany`, or a to-many `via`) becomes a tab under a record in the admin panel, addressed by the relation's name. [Relations in the admin panel](/docs/collections/relations-in-the-admin-panel/) covers the paths, what a tab creates, links, unlinks or deletes, the same rules over REST, and what does not become a tab.
 
 ### Full Relation Interface
 
@@ -23754,6 +23682,88 @@ normalization.
 
 - **[Security Rules](/docs/collections/security-rules)** — Row Level Security
 - **[Properties](/docs/collections/properties)** — Property types reference
+
+## Relations in the admin panel
+
+Every to-many relation — `hasMany`, `manyToMany`, or a to-many `via` — becomes a
+**tab** under a record in the admin panel, listing the rows that record reaches.
+
+### The path segment is the relation name
+
+A child list is addressed as `parent/parentId/relationName`:
+
+```
+/c/authors/a-1/posts          the posts of author a-1
+/c/posts/p-1/tags             the tags of post p-1
+```
+
+The last segment is the **relation name**, not the target collection's slug. They
+are often the same, because an unnamed relation takes its target's slug — but an
+inline relation property takes the *property key*:
+
+```typescript
+properties: {
+    featuredTags: {
+        type: "relation",
+        relation: { kind: "manyToMany", target: () => tagsCollection }
+    }
+}
+// tab and path segment: featuredTags   (not "tags")
+```
+
+This is also what makes two relations to the same collection work: each has its own
+name, so each gets its own tab and its own path.
+
+### Owned rows versus shared rows
+
+What a tab lets you do depends on how the relation is stored, because the two cases
+mean different things:
+
+| | One-to-many (`foreignKeyOnTarget`) | Many-to-many (`through`) |
+|---|---|---|
+| The child belongs to | this parent alone | every parent that links it |
+| Create | creates the row under this parent | creates the row and links it |
+| Add existing | — | links an existing row |
+| Remove | **deletes** the row | **unlinks** it; the row is untouched |
+
+The admin panel renders each accordingly: a many-to-many tab offers **Add existing**
+and **Remove from this record**, and never a delete that would take the row away
+from other parents.
+
+### The same rules over REST
+
+Child lists are ordinary collection queries narrowed to one parent, so they accept
+everything a root list does — filters, `orderBy`, `limit`, `offset`, `include` — and
+`meta.total` counts the filtered rows. Filter either per field (`?field=op.value`) or
+with a whole-object `?where={"field":["op","value"]}`; both reach the same query:
+
+```
+GET    /api/data/authors/a-1/posts?status=eq.published&orderBy=title&limit=20
+GET    /api/data/authors/a-1/posts?where={"status":["==","published"]}&orderBy=title
+GET    /api/data/authors/a-1/posts/p-1
+POST   /api/data/authors/a-1/posts          create under this parent
+PATCH  /api/data/authors/a-1/posts/p-1      update; will not reparent
+DELETE /api/data/authors/a-1/posts/p-1      delete (one-to-many) / unlink (many-to-many)
+```
+
+The parent segment is enforced, not decorative. Addressing a row that is not under
+that parent returns `404`, and `PATCH` never moves a row from one parent to another —
+set the foreign key explicitly if that is what you want.
+
+For a many-to-many, `PATCH parent/id/child/childId` is *set membership*: it links the
+row if it is not linked yet, and is idempotent. That is how you attach a row that
+already exists.
+
+### What does not become a tab
+
+- **To-one relations** — they are a field on the record, not a list. Writing through
+  a to-one path is rejected: the foreign key lives on the parent's table.
+- **Relations declared inside a `map`** — they are a field of that map.
+
+### Next Steps
+
+- **[Relations](/docs/collections/relations/)** — the five kinds, and how to declare each
+- **[Writing over REST](/docs/backend/writes/)** — create, update and delete beyond a child list
 
 ## Soft delete
 
@@ -27788,6 +27798,24 @@ so a panel can grey the feature out instead of showing an error.
 | `SCHEMA_EDITOR_PRODUCTION` | 501 | The editor is off under `NODE_ENV=production`: a deployed server's files are rebuilt from your repository on every deploy, so an edit here would be discarded. | Edit collections in development and deploy, or configure `liveSchema.repository` to commit them there. |
 | `SQL_EXPORT_UNSUPPORTED` | 501 | `POST /api/admin/sql/csv` cannot stream a result here: the in-process development database (PGlite) has one connection, and a cursor held across a download would hold every other query behind it; or the data source has no SQL cursor. | Point `DATABASE_URL` at a Postgres of your own (`rebase dev --docker` starts one), or add a `LIMIT` and export the rows on screen. |
 
+#### Schema reconcile
+
+<span class="since-badge" data-since="0.28">Since 0.28</span>
+
+[`rebase schema reconcile`](/docs/cli/schema/#rebase-schema-reconcile) plans
+through `POST /api/admin/schema/reconcile/plan` and applies through
+`/reconcile/apply`. A refusal changes nothing; only `SCHEMA_RECONCILE_FAILED`
+leaves part of a plan applied.
+
+| Code | Status | Means | Do |
+| --- | --- | --- | --- |
+| `INVALID_RECONCILE` | 400 | The body is not a JSON object, or `drop` is not a list of `"<collection>.<column>"` strings. | Send `{ "drop": ["voice_cache.wav"] }`, or leave `drop` out. |
+| `SCHEMA_RECONCILE_FAILED` | 400 | A statement failed partway through. The statements before it ran and stay applied; `details.applied` lists them. | Fix what the message names, then plan again: the new plan leaves out what already ran. |
+| `SCHEMA_RECONCILE_INVALID` | 400 | The plan cannot be applied, and the message lists why: a `drop` that is not `<collection>.<column>`, names no collection or no column, or names a column the collection still declares. `details.plan` is the plan. | Fix the `drop` list. A declared column is dropped by removing its property, deploying, then reconciling. |
+| `SCHEMA_RECONCILE_STALE` | 409 | The database or the collections changed since the plan you confirmed. `details.plan` is the new one. | Review the new plan and confirm its `digest`. |
+| `SCHEMA_RECONCILE_UNCONFIRMED` | 400 | `/reconcile/apply` was sent no `confirm`. | Plan first and send the plan's `digest` as `confirm`. The CLI does this once you type `yes`. |
+| `SCHEMA_RECONCILE_UNSUPPORTED` | 503 | This backend's driver cannot plan a reconcile, or cannot run SQL. | Reconcile works on Postgres. |
+
 #### Why a branch's table cannot be merged
 
 `BRANCH_MERGE_BLOCKED` names each table it refused in `details.tables`, with one
@@ -27994,6 +28022,8 @@ a collection reaches none of this. See [Roles and scopes](/docs/backend/roles-an
 | `GET` | `/api/admin/schema/status` | `schema:read` | [Live schema editing](/docs/backend/live-schema-editing/) |
 | `POST` | `/api/admin/schema/plan` | `schema:read` | Plans a change; never applies one |
 | `POST` | `/api/admin/schema/apply` | `schema:write` | A person only, unless `REBASE_LIVE_SCHEMA_ALLOW_MACHINE_APPLY` |
+| `POST` | `/api/admin/schema/reconcile/plan` | `schema:read` | <span class="since-badge" data-since="0.28">Since 0.28</span> Plans relaxing `NOT NULL` and dropping the undeclared columns named in `drop`, for [schema reconcile](/docs/cli/schema/#rebase-schema-reconcile); never applies one |
+| `POST` | `/api/admin/schema/reconcile/apply` | `schema:write` | <span class="since-badge" data-since="0.28">Since 0.28</span> Applies a reconcile plan, only if its `digest` is the `confirm` sent |
 | `GET` | `/api/admin/schema-editor/status` | `schema:read` | Whether the editor is available, and the reason when it is not |
 | `POST` | `/api/admin/schema-editor/collection/save` | `schema:write` | [Studio](/docs/studio/) — rewrites collection source |
 | `POST` | `/api/admin/schema-editor/collection/delete` | `schema:write` | [Studio](/docs/studio/) |
@@ -34650,62 +34680,7 @@ A rejection is logged rather than left to the unhandled-rejection handler, so a 
 
 ### Runtime portability
 
-A custom function is a Hono app, and Hono runs on every JavaScript server runtime. Whether *your* function could run somewhere other than a Node process therefore comes down to what its own file imports and touches.
-
-Nothing here is a restriction on what you may write today. Every Rebase deployment is a Node process, a function that reads a file or opens a socket is a perfectly good function, and no build or deploy fails because of any of this. It is written down so the answer is knowable now rather than discovered per-file later.
-
-**Portable — works on any runtime:**
-
-- Everything exported from `@rebasepro/server/functions`
-- `getDriver(c)` and `rebase.dataAsAdmin` — both go over the same wire wherever they run
-- `rebase.auth`, `rebase.storage`, `rebase.email`
-- `fetch`, `Request`/`Response`, `URL`, `crypto.subtle`, `TextEncoder` — the web platform
-- Any dependency that does not need Node
-
-**Node-only:**
-
-- `rebase.sql()` — the database owner connection is a TCP socket
-- A directly imported Drizzle/`pg`/`mongodb` client, for the same reason
-- Node built-ins: `fs`, `path`, `crypto` (the Node module — `globalThis.crypto` is portable), `child_process`, …
-- Packages built on them: `jsonwebtoken`, `nodemailer`, `sharp`, `bcrypt`, …
-
-**Latent bugs on every runtime** — these are worth fixing regardless:
-
-- `process.env` read at module scope (see [Configuration and Secrets](#configuration-and-secrets))
-- Fire-and-forget promises instead of [`waitUntil`](#background-work)
-- Relying on a handler continuing to run after its request timed out. On Node it does; that is a property of the process, not a promise the framework makes
-
-#### Checking your own functions
-
-`rebase build` prints a line per actionable finding and records the verdict per function in the bundle manifest:
-
-```json
-{
-  "functions": [
-    { "name": "hello", "file": "backend/functions/hello.js", "portable": true },
-    { "name": "reports", "file": "backend/functions/reports.js", "portable": false,
-      "requires": ["imports the Node built-in \"fs\""] }
-  ]
-}
-```
-
-`rebase doctor` reports the same thing without building.
-
-#### If you need a runtime-specific path
-
-`runtimeKey()` returns `"node"`, `"workerd"`, `"deno"`, `"bun"`, `"edge-light"`, `"fastly"` or `"other"`; `isNodeRuntime()` is the common check. Use them to degrade, not to fork an implementation — a function that needs two implementations is two functions.
-
-```typescript
-import { defineFunction, isNodeRuntime } from "@rebasepro/server/functions";
-
-export default defineFunction((app, { rebase }) => {
-    app.get("/stats", async (c) => {
-        if (!isNodeRuntime()) return c.json({ error: "Not available here" }, 501);
-        const rows = await rebase.sql("SELECT count(*) AS total FROM jobs");
-        return c.json({ totalJobs: Number(rows[0]?.total ?? 0) });
-    });
-});
-```
+A custom function is a Hono app, so whether it could run somewhere other than a Node process comes down to what its own file imports. `rebase.sql()`, a directly imported database client and Node built-ins tie it to Node; the rest of `rebase` and the web platform do not, and nothing fails today because of either. [Runtime portability](/docs/backend/runtime-portability/) lists what is portable, how `rebase build` and `rebase doctor` report it, and how to branch on the runtime.
 
 ### Route Registration Order
 
@@ -34815,6 +34790,65 @@ knowing before you design around them. See
 - **[Backend Overview](/docs/backend)** — Full backend configuration reference
 - **[Entity Callbacks](/docs/collections/callbacks)** — Run logic on data changes
 - **[Cron Jobs](/docs/backend/cron-jobs)** — Scheduled background tasks
+
+## Runtime portability
+
+A custom function is a Hono app, and Hono runs on every JavaScript server runtime. Whether *your* function could run somewhere other than a Node process therefore comes down to what its own file imports and touches.
+
+Nothing here is a restriction on what you may write today. Every Rebase deployment is a Node process, a function that reads a file or opens a socket is a perfectly good function, and no build or deploy fails because of any of this. It is written down so the answer is knowable now rather than discovered per-file later.
+
+**Portable — works on any runtime:**
+
+- Everything exported from `@rebasepro/server/functions`
+- `getDriver(c)` and `rebase.dataAsAdmin` — both go over the same wire wherever they run
+- `rebase.auth`, `rebase.storage`, `rebase.email`
+- `fetch`, `Request`/`Response`, `URL`, `crypto.subtle`, `TextEncoder` — the web platform
+- Any dependency that does not need Node
+
+**Node-only:**
+
+- `rebase.sql()` — the database owner connection is a TCP socket
+- A directly imported Drizzle/`pg`/`mongodb` client, for the same reason
+- Node built-ins: `fs`, `path`, `crypto` (the Node module — `globalThis.crypto` is portable), `child_process`, …
+- Packages built on them: `jsonwebtoken`, `nodemailer`, `sharp`, `bcrypt`, …
+
+**Latent bugs on every runtime** — these are worth fixing regardless:
+
+- `process.env` read at module scope (see [Configuration and Secrets](/docs/backend/custom-functions/#configuration-and-secrets))
+- Fire-and-forget promises instead of [`waitUntil`](/docs/backend/custom-functions/#background-work)
+- Relying on a handler continuing to run after its request timed out. On Node it does; that is a property of the process, not a promise the framework makes
+
+### Checking your own functions
+
+`rebase build` prints a line per actionable finding and records the verdict per function in the bundle manifest:
+
+```json
+{
+  "functions": [
+    { "name": "hello", "file": "backend/functions/hello.js", "portable": true },
+    { "name": "reports", "file": "backend/functions/reports.js", "portable": false,
+      "requires": ["imports the Node built-in \"fs\""] }
+  ]
+}
+```
+
+`rebase doctor` reports the same thing without building.
+
+### If you need a runtime-specific path
+
+`runtimeKey()` returns `"node"`, `"workerd"`, `"deno"`, `"bun"`, `"edge-light"`, `"fastly"` or `"other"`; `isNodeRuntime()` is the common check. Use them to degrade, not to fork an implementation — a function that needs two implementations is two functions.
+
+```typescript
+import { defineFunction, isNodeRuntime } from "@rebasepro/server/functions";
+
+export default defineFunction((app, { rebase }) => {
+    app.get("/stats", async (c) => {
+        if (!isNodeRuntime()) return c.json({ error: "Not available here" }, 501);
+        const rows = await rebase.sql("SELECT count(*) AS total FROM jobs");
+        return c.json({ totalJobs: Number(rows[0]?.total ?? 0) });
+    });
+});
+```
 
 ## Typed server-side data
 
@@ -50790,7 +50824,7 @@ to one user, the endpoint declines to mount and says why in the boot log. No
   lists, describes and reads `posts` and nothing else. A scope decides which tools are
   offered and which collections they reach, not which rows: an empty list can be
   RLS working, and `data:write` still cannot write a row the person could not.
-- **`show_collection` puts the rows in front of the person.** It takes
+- <span class="since-badge" data-since="0.28">Since 0.28</span> **`show_collection` puts the rows in front of the person.** It takes
   `query_collection`'s arguments and answers the same page, plus the columns the
   admin panel shows. A client that renders MCP Apps, such as Claude, opens it as a
   table in the conversation: the person can load more rows and, where the
@@ -52546,6 +52580,8 @@ or a CI step. It takes `--collections` and `--output` as `rebase schema generate
 does.
 
 #### `rebase schema reconcile`
+
+<span class="since-badge" data-since="0.28">Since 0.28</span>
 
 Relax and drop what boot will not, after you have read the plan:
 

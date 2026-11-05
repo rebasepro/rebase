@@ -65,6 +65,7 @@
 - [File upload fields](https://rebase.pro/docs/collections/file-uploads): Declaring a file or image field on a collection: the storage block, single and multi-file uploads, and which of its options the panel resolves rather than the server.
 - [Validation and conditions](https://rebase.pro/docs/collections/validation-and-conditions): Enum values, per-property validation rules, and the conditional fields that make a property required, disabled or hidden based on the entity's own values.
 - [Relations](https://rebase.pro/docs/collections/relations): Define one-to-one, one-to-many, and many-to-many SQL relations between collections with foreign keys, junction tables, and multi-hop joins.
+- [Relations in the admin panel](https://rebase.pro/docs/collections/relations-in-the-admin-panel): How every to-many relation becomes a tab under a record — the path segment, owned versus shared rows, the same rules over REST, and what does not become a tab.
 - [Soft delete](https://rebase.pro/docs/collections/soft-delete): Turn delete into a timestamp, hide stamped rows from every read, and restore them with an ordinary update.
 - [Entity Callbacks](https://rebase.pro/docs/collections/callbacks): Use lifecycle callbacks to run custom logic when entities are created, updated, read, or deleted. Includes the context.data API for cross-collection operations.
 - [The context.data API](https://rebase.pro/docs/collections/context-data-api): Read and write other collections from inside a callback with context.data — its methods, the privileges it runs with, transaction semantics, and the connection a callback holds.
@@ -101,6 +102,7 @@
 - [Cron across instances](https://rebase.pro/docs/backend/cron-across-instances): How cron jobs behave with more than one server process: one run per slot, a slot a restart dropped, a pause every replica honours, and runs that never overlap.
 - [Background Jobs](https://rebase.pro/docs/backend/jobs): A durable, Postgres-backed job queue — work that survives a restart, retried with backoff, with failures kept rather than dropped.
 - [Custom Functions](https://rebase.pro/docs/backend/custom-functions): Add custom Hono API endpoints alongside your Rebase CRUD routes. Auto-discovered from a directory, with full access to the backend instance.
+- [Runtime portability](https://rebase.pro/docs/backend/runtime-portability): What a custom function imports decides whether it could run outside a Node process — what is portable, what is Node-only, and how rebase build and rebase doctor report it.
 - [Typed server-side data](https://rebase.pro/docs/backend/typed-server-data): Register your generated Database type once, and context.data, rebase.dataAsAdmin and the rebase a function or cron receives are typed from it: rows, filters, sorts, includes and write inputs.
 - [Global Backend Hooks](https://rebase.pro/docs/backend/hooks): Apply cross-cutting lifecycle callbacks to every collection at the server level using CollectionCallbacks.
 - [Entity History](https://rebase.pro/docs/backend/history): Track every change to your entities with a full audit trail — who changed what, when, and the complete before/after entity.
