@@ -28,10 +28,12 @@ Ningún `REBASE_ROLE` lo activa.
   a los clientes que tú registres) y envía a la persona a una pantalla de consentimiento que
   la autentica mediante tu `/auth/login` existente. A una cuenta con un segundo factor se le
   pide entonces su código del autenticador o un código de recuperación, a través de las
-  rutas `/auth/mfa/challenge` existentes. La pantalla inicia sesión solo con contraseña:
-  quien solo ha usado Google, GitHub o un enlace por correo establece una primero con
-  `/auth/forgot-password` (el "Olvidé mi contraseña" de tu aplicación), y la pantalla se lo
-  indica. También nombra el host al que se envía el código de autorización, y avisa de que
+  rutas `/auth/mfa/challenge` existentes. Si el propio frontend de tu aplicación
+  mantiene una sesión en el mismo navegador, la pantalla ofrece esa cuenta, y Permitir
+  consiente con ella sin contraseña; así se conecta quien solo inicia sesión con Google,
+  GitHub o un enlace por correo. Si no, inicia sesión con contraseña, y quien no tiene
+  una la establece primero con `/auth/forgot-password` (el "Olvidé mi contraseña" de tu
+  aplicación); la pantalla se lo indica. También nombra el host al que se envía el código de autorización, y avisa de que
   ese host no está verificado: cualquiera puede registrar un cliente con cualquier nombre,
   así que el host es la parte que una persona puede comprobar.
 - **Nueve herramientas, tres alcances.** Los mismos [alcances](/docs/backend/roles-and-scopes/)

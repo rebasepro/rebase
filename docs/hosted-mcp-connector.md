@@ -1,7 +1,10 @@
 # The hosted Rebase connector (one MCP server for everything)
 
-**Status: design, awaiting approval (2026-11-05).** Nothing here is built yet.
-[Decisions left open](#decisions-left-open) lists what needs an answer first.
+**Status: built, not shipped (2026-11-05).** Approved with the recommended
+answers to every [decision](#decisions-taken). The framework half is on the
+rebase branch `claude/objective-jang-72ac1e`, the control-plane half on the
+saas branch `feat/hosted-mcp-connector`. [Shipping it](#rollout-order) is a
+release, a control-plane deploy and a fleet rollout.
 
 A developer adds one connector in claude.ai (Settings → Connectors), signs in
 with their Rebase account, and gets their projects, the cloud operations on
@@ -94,26 +97,30 @@ everywhere, demoted all stop the next call, as for `/mcp` today).
 the control plane's existing function routes. A hosted tool does not
 re-implement them. It calls them in-process, as the account:
 
-- The framework adds an in-process principal: a request the server builds for
-  itself and dispatches on its own Hono app, marked in a `WeakMap` keyed by
-  the `Request` object. The auth middleware reads that marker and sets `user`
-  (the account, with its live roles) and `scopes` (the grant's scopes, within
-  the account's). A request from the network is a different object and can
-  never carry the marker; there is no header to forge.
+- The tool mints a session token for the account with the backend's own key
+  and hands a `Request` carrying it straight to `backend.fetch`, the whole
+  backend as a fetch handler with no port (`saas/backend/src/mcp/as-account.ts`).
+  The token exists only on that in-process request. No framework change was
+  needed for this.
 - Every existing gate then runs unchanged: `verifyProjectOwner` /
-  `verifyProjectAdmin` answer the organization role, and `hasScope` answers the
-  OAuth grant's scope on that project. A `member` gets what a member gets in
-  the console. An owner who consented only to `project:read` cannot deploy.
-  There is no second copy of an authorization rule to drift.
+  `verifyProjectAdmin` answer the organization role. A `member` gets what a
+  member gets in the console. There is no second copy of an authorization rule
+  to drift.
+- A session holds every scope its person holds, so the grant's narrower scopes
+  are checked by the tool before it calls (`requireGrant` in `access.ts`). An
+  owner who consented only to `project:read` cannot deploy.
 
 **Inside a project** (data, schema, the table view, cron) the control plane
 reaches the tenant the way `docs/platform-tokens.md` designed for cron: it
 signs a platform token for this account and this project, and the tenant
 verifies it with a public key.
 
-- Gate in the control plane, before minting: `verifyProjectAdmin(c, project,
-  "project:studio")` and the project's Studio switch (`isStudioEnabled`). That
-  is the console's Studio gate. The connector reaches a project's data exactly
+- Gate in the control plane, before minting (`requireTenantAccess` in
+  `saas/backend/src/mcp/access.ts`): an owner or admin of the organization, the
+  grant's `project:studio` on the project, and the project's Studio switch
+  (`isStudioEnabled`), read fresh. That is the console's Studio gate.
+  Reading cron is the exception: it needs membership and `project:logs`, what
+  `runtime-token` issues `cron:read` for. The connector reaches a project's data exactly
   when the console would let the same person open Studio on it, and the
   customer's "Studio access off" switch turns both off.
 - The token: `rpt_<ES256 JWS>`, `aud` = the project, `sub` = the account,
@@ -264,8 +271,8 @@ server verifies, in this order, and refuses on the first failure:
    key on `jti`). A second use fails on the conflict, across replicas.
 5. Authorization again, live. A demotion between the two steps refuses.
 
-Then it executes, and the result names the `jti` so the audit lines on both
-sides can be matched.
+Then it executes. The server logs the `jti` with the account and the client,
+so the audit lines on both sides can be matched.
 
 **What it protects against, and what it does not.** It makes a destructive
 action impossible in one call, so a prompt injection in a row or a log line
@@ -327,10 +334,11 @@ gates → per tenant call, a 5-minute platform token for one project.
 | Abuse of the endpoint | The data rate limiter on the control plane's `/mcp`, bucketed by account; the tenant's own limiter, bucketed by `platform:<uid>` |
 
 **Audit.** The control plane logs every mint (`sub`, project, scopes, `jti`)
-and every executed mutation (account, client name, tool, action, project,
-`jti`). It also writes executed mutations to the organization's activity log,
-the one `rebase cloud activity` reads, as "via the Rebase connector (Claude)".
-The tenant logs `[Auth] Platform token accepted` with the same `jti`.
+and every confirmed call (tool, account, client, confirmation `jti`). A deploy
+or rollback started from the connector is recorded with `triggerSource: "mcp"`
+and shows as "via the Rebase connector" in the console. The tenant logs
+`[Auth] Platform token accepted` with the token's `jti`. Writing connector
+actions to the organization's activity log is not built.
 
 ## What changes where
 
@@ -343,19 +351,17 @@ The tenant logs `[Auth] Platform token accepted` with the same `jti`.
    descriptions) in place of the default data tools.
 3. The confirmation protocol: `confirmation.ts`, the `mcp_confirmations` table,
    and tests.
-4. The in-process principal for calling the app's own routes as an account,
-   with a test that a network request cannot assume it.
-5. Platform tokens: `PLATFORM_TOKEN_SCOPES` gains `cron:write`, `data:read`,
+4. Platform tokens: `PLATFORM_TOKEN_SCOPES` gains `cron:write`, `data:read`,
    `data:write`, `data:delete`. The platform caller is `platform:<sub>` with the
    role `admin`, on `/api/admin/mcp` and on the cron routes only. It stays a 401
    on `/api/data`, the websocket and the public `/mcp`. This is the change
    `docs/platform-tokens.md` says needs its own review: this document is that
    review.
-6. `POST /api/admin/mcp`: the platform MCP endpoint.
-7. The view: tool names from the structured result, and inline confirmation
+5. `POST /api/admin/mcp`: the platform MCP endpoint.
+6. The view: tool names from the structured result, and inline confirmation
    for edits.
-8. The consent screen: the app's scope descriptions, and a way to sign in
-   without a password (see decisions).
+7. The consent screen: the app's scope descriptions, and "Continue as you"
+   from the session the app's own frontend keeps in the browser.
 
 **Control plane (`rebasepro/saas`):**
 
@@ -374,7 +380,7 @@ entries, and this file kept as the design record.
 
 ## Rollout order
 
-1. Release the framework (a `@rebasepro/server` with items 1–8) and roll the
+1. Release the framework (a `@rebasepro/server` with items 1–7) and roll the
    managed runtime to it. On its own this changes nothing on any tenant: the
    platform endpoint is off without the platform variables.
 2. Ship the control plane with the platform-token signing key and env
@@ -387,9 +393,11 @@ entries, and this file kept as the design record.
 Steps 1, 2 and 3 are a release, a control-plane deploy and a fleet rollout.
 Each needs Francesco's explicit go. The branch prepares them and ships nothing.
 
-## Decisions left open
+## Decisions taken
 
-1. **Who you are inside a project.** Recommended: membership-derived, as above
+Francesco approved every recommendation on 2026-11-05.
+
+1. **Who you are inside a project.** Taken: membership-derived, as above
    (owner/admin with `project:studio` and Studio on → `platform:<uid>` with the
    `admin` role, the console's Studio reach; members → no data). The
    alternative is a *linked app account*: the tenant maps the token to the app
@@ -400,19 +408,19 @@ Each needs Francesco's explicit go. The branch prepares them and ships nothing.
 2. **The address.** `https://app.rebase.pro/mcp` needs no infrastructure.
    `https://mcp.rebase.pro/mcp` reads better but needs DNS, an ingress rule,
    and a separate public URL for the MCP surface (the token audience is the
-   URL people paste). Recommended: `app.rebase.pro/mcp` now, the alias later.
+   URL people paste). Taken: `app.rebase.pro/mcp` now, the alias later.
 3. **Signing in on the consent screen.** It accepts a password today, and many
    Cloud accounts sign in with Google or GitHub only. Options: (a) "Continue
    as <you>" from the console session in the same browser, with a button press
    (never automatic); (b) Google and GitHub buttons that come back to the
-   consent request; (c) both. Recommended: (a) first, it is smaller and covers
+   consent request; (c) both. Taken: (a), built, it is smaller and covers
    anyone who has the console open.
 4. **Elicitation.** A human-only confirmation through MCP elicitation needs
-   server-initiated messages (an SSE response). Recommended: not now; the
+   server-initiated messages (an SSE response). Taken: not now; the
    two-step plus the host's approval prompt is the v1.
-5. **Scope of v1.** Recommended: the ten tools above. Candidates for later:
+5. **Scope of v1.** Taken: the ten tools above. Candidates for later:
    backups (list, create), storage objects, invoking functions, creating a
    project.
-6. **The per-app `/mcp`.** Recommended: unchanged, except that its tools get
+6. **The per-app `/mcp`.** Taken: unchanged, except that its tools get
    annotations. Adopting the confirmation protocol for its `delete_document`
    would change behaviour for apps' end users, and is a separate decision.

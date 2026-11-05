@@ -28,10 +28,12 @@ Nessun `REBASE_ROLE` lo attiva.
   limita ai client che registri tu) e porta la persona su una schermata di consenso che la fa
   accedere tramite il tuo `/auth/login` esistente. A un account con un secondo fattore viene poi
   chiesto il codice del suo autenticatore o un codice di recupero, tramite le route
-  `/auth/mfa/challenge` esistenti. La schermata consente l'accesso solo con password:
-  chi ha sempre usato soltanto Google, GitHub o un link via email ne imposta prima una con
-  `/auth/forgot-password` (la funzione "Password dimenticata?" della tua app), e la schermata glielo
-  dice. Indica inoltre l'host a cui viene inviato il codice di autorizzazione, e precisa che
+  `/auth/mfa/challenge` esistenti. Se il frontend della tua app tiene una
+  sessione nello stesso browser, la schermata propone quell'account, e Consenti dà il
+  consenso con esso senza password; è così che si collega chi accede solo con Google,
+  GitHub o un link via email. Altrimenti l'accesso avviene con la password, e chi non ne
+  ha una la imposta prima con `/auth/forgot-password` (la funzione "Password
+  dimenticata?" della tua app); la schermata glielo dice. Indica inoltre l'host a cui viene inviato il codice di autorizzazione, e precisa che
   quell'host non è verificato: chiunque può registrare un client con qualsiasi nome, quindi
   l'host è la parte che una persona può controllare.
 - **Nove tool, tre scope.** Gli stessi [scope](/docs/backend/roles-and-scopes/) usati da ogni

@@ -27,10 +27,12 @@ to one user, the endpoint declines to mount and says why in the boot log. No
   to clients you register), and sends the person to a consent screen that signs
   them in through your existing `/auth/login`. An account with a second factor
   is then asked for its authenticator code or a recovery code, through the
-  existing `/auth/mfa/challenge` routes. The screen signs in with a password
-  only: someone who has only ever used Google, GitHub or an email link sets one
-  first with `/auth/forgot-password` (your app's "Forgot password"), and the
-  screen tells them so. It also names the host the authorization code is sent
+  existing `/auth/mfa/challenge` routes. When your app's own frontend
+  keeps a session in the same browser, the screen offers that account, and
+  Allow consents as it with no password; that is how someone who signs in only
+  with Google, GitHub or an email link connects. Otherwise it signs in with a
+  password, and someone with none sets one first with `/auth/forgot-password`
+  (your app's "Forgot password"); the screen tells them so. It also names the host the authorization code is sent
   to, and says that host is not verified: anyone may register a client under
   any name, so the host is the part a person can check.
 - **Nine tools, three scopes.** The same [scopes](/docs/backend/roles-and-scopes/)

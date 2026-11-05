@@ -28,10 +28,13 @@ la raison dans le log de démarrage. Aucun `REBASE_ROLE` ne l'active.
   aux clients que vous enregistrez), et envoie la personne vers un écran de consentement
   qui la connecte via votre `/auth/login` existant. Un compte doté d'un second facteur
   doit ensuite saisir le code de son application d'authentification ou un code de
-  récupération, via les routes `/auth/mfa/challenge` existantes. L'écran ne se connecte
-  que par mot de passe : quelqu'un qui n'a jamais utilisé que Google, GitHub ou un lien
-  par e-mail en définit d'abord un avec `/auth/forgot-password` (le « Mot de passe oublié »
-  de votre app), et l'écran le lui indique. Il nomme aussi l'hôte vers lequel le code
+  récupération, via les routes `/auth/mfa/challenge` existantes. Quand le frontend de votre app
+  garde une session dans le même navigateur, l'écran propose ce compte, et Autoriser
+  consent avec lui sans mot de passe ; c'est ainsi que se connecte quelqu'un qui ne se
+  connecte qu'avec Google, GitHub ou un lien par e-mail. Sinon, il se connecte par mot
+  de passe, et quelqu'un qui n'en a pas en définit d'abord un avec
+  `/auth/forgot-password` (le « Mot de passe oublié » de votre app) ; l'écran le lui
+  indique. Il nomme aussi l'hôte vers lequel le code
   d'autorisation est envoyé, et précise que cet hôte n'est pas vérifié : n'importe qui
   peut enregistrer un client sous n'importe quel nom, l'hôte est donc la partie qu'une
   personne peut vérifier.
