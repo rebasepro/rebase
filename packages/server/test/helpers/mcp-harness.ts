@@ -39,6 +39,7 @@ export function memoryStore(): OAuthStore {
         record: RefreshTokenRecord; issuedAt: number; expiresAt: number; consumed: boolean; revoked: boolean;
     }>();
     const consents = new Map<string, { scope: string; grantedAt: string }>();
+    const spentConfirmations = new Set<string>();
 
     return {
         async ensureTables() { /* nothing to create */ },
@@ -138,6 +139,12 @@ export function memoryStore(): OAuthStore {
             }
             if (consents.delete(`${uid}:${clientId}`)) touched = true;
             return touched;
+        },
+
+        async consumeConfirmation(jti) {
+            if (spentConfirmations.has(jti)) return false;
+            spentConfirmations.add(jti);
+            return true;
         }
     };
 }
@@ -208,6 +215,8 @@ export interface HarnessOptions {
     tools?: McpRoutesConfig["tools"];
     vocabulary?: McpRoutesConfig["vocabulary"];
     instructions?: McpRoutesConfig["instructions"];
+    /** Where confirmed calls are spent. This process's memory when absent. */
+    confirmations?: McpRoutesConfig["confirmations"];
 }
 
 export function buildApp(options: HarnessOptions = {}) {
@@ -229,7 +238,8 @@ export function buildApp(options: HarnessOptions = {}) {
         apps: options.apps,
         tools: options.tools,
         vocabulary: options.vocabulary,
-        instructions: options.instructions
+        instructions: options.instructions,
+        confirmations: options.confirmations
     };
     app.route("/", createMcpWellKnownRoutes(mcpConfig));
     app.route("/mcp", createMcpRoutes(mcpConfig));

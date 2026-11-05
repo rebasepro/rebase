@@ -47,6 +47,7 @@ import {
     type McpScopeVocabulary
 } from "./oauth-metadata.js";
 import { toolsForScopes, declaredArgumentsOnly, McpToolError, MCP_TOOLS, type McpCaller, type McpToolDefinition } from "./mcp-tools.js";
+import { memoryConfirmationStore, withConfirmation, type McpConfirmationStore } from "./confirmation.js";
 import { MCP_APP_MIME_TYPE, mcpAppResourceMeta, mcpAppToolMeta, type McpAppResource, type McpAppsSource } from "./mcp-apps.js";
 import type { ApiKeyIdentity, ApiKeyRefusal } from "../auth/api-keys/api-key-middleware.js";
 import { isAccessTokenRevoked } from "../auth/token-revocation.js";
@@ -154,6 +155,12 @@ export interface McpRoutesConfig {
     instructions?: string;
     /** The scopes a grant may hold. The data vocabulary when omitted. */
     vocabulary?: McpScopeVocabulary;
+    /**
+     * Where a confirmed call's token is spent (`confirmation.ts`). The OAuth
+     * store's table on a backend; this process's memory when omitted, which
+     * is single-use only within one process.
+     */
+    confirmations?: McpConfirmationStore;
 }
 
 /**
@@ -207,8 +214,13 @@ export function createMcpRoutes(config: McpRoutesConfig): Hono<HonoEnv> {
     const jwt = config.jwt ?? processJwtService;
     const vocabulary = config.vocabulary ?? DATA_SCOPE_VOCABULARY;
     const defaultScope = vocabulary.defaultScope;
-    // An app's own tools refuse undeclared arguments as the defaults do.
-    const allTools: readonly McpToolDefinition[] = config.tools ? config.tools.map(declaredArgumentsOnly) : MCP_TOOLS;
+    // An app's own tools refuse undeclared arguments as the defaults do, and
+    // one that declares `confirm` takes two calls. Confirmation wraps first,
+    // so the argument it adds is one the declared-arguments check knows.
+    const confirmations = { jwt, store: config.confirmations ?? memoryConfirmationStore(), audience: canonicalResource };
+    const allTools: readonly McpToolDefinition[] = config.tools
+        ? config.tools.map(tool => declaredArgumentsOnly(withConfirmation(tool, confirmations)))
+        : MCP_TOOLS;
 
     const maxBodySize = config.maxBodySize ?? RUNTIME_DEFAULT_MAX_BODY_SIZE;
     if (maxBodySize > 0) {

@@ -29,9 +29,10 @@ const CLIENTS = "rebase.oauth_clients";
 const CODES = "rebase.oauth_authorization_codes";
 const REFRESH = "rebase.oauth_refresh_tokens";
 const CONSENTS = "rebase.oauth_consents";
+const CONFIRMATIONS = "rebase.mcp_confirmations";
 
 /** Every table this store owns, for the revoke sweep and for tests. */
-export const OAUTH_TABLES = [CLIENTS, CODES, REFRESH, CONSENTS] as const;
+export const OAUTH_TABLES = [CLIENTS, CODES, REFRESH, CONSENTS, CONFIRMATIONS] as const;
 
 /** How often, at most, issuing a credential also sweeps expired codes and tokens. */
 const SWEEP_INTERVAL_MS = 60 * 60 * 1000;
@@ -177,6 +178,13 @@ export interface OAuthStore {
      * than implying an instant cut-off.
      */
     revokeGrant(uid: string, clientId: string): Promise<boolean>;
+
+    /**
+     * Spend a tool call's confirmation (`confirmation.ts`): true the first
+     * time a `jti` is presented, false after. One row per confirmed call,
+     * kept until its token could no longer verify anyway.
+     */
+    consumeConfirmation(jti: string, expiresAt: Date): Promise<boolean>;
 }
 
 /** One row of the "applications you have connected" list. */
@@ -306,6 +314,13 @@ export function createOAuthStore(
                     scope      text NOT NULL,
                     granted_at timestamptz NOT NULL DEFAULT now(),
                     PRIMARY KEY (uid, client_id)
+                )
+            `);
+
+            await ddl.ensureObject(CONFIRMATIONS, `
+                CREATE TABLE IF NOT EXISTS ${CONFIRMATIONS} (
+                    jti        text PRIMARY KEY,
+                    expires_at timestamptz NOT NULL
                 )
             `);
 
@@ -627,6 +642,21 @@ export function createOAuthStore(
                 });
             }
             return found;
+        },
+
+        async consumeConfirmation(jti, expiresAt) {
+            // The insert is the check: two replicas presented the same token
+            // race on the primary key, and exactly one of them gets a row back.
+            const rows = await exec(
+                `INSERT INTO ${CONFIRMATIONS} (jti, expires_at) VALUES ($1, $2)
+                 ON CONFLICT (jti) DO NOTHING
+                 RETURNING jti`,
+                [jti, expiresAt]
+            );
+            // A spent row only matters while its token could still verify.
+            exec(`DELETE FROM ${CONFIRMATIONS} WHERE expires_at < now() - interval '1 hour'`)
+                .catch(error => logger.warn("[oauth] Sweeping spent confirmations failed", { error }));
+            return rows.length > 0;
         }
     };
 }

@@ -1729,7 +1729,9 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
             // tools under `data:*` otherwise.
             tools: config.mcp?.tools,
             instructions: config.mcp?.instructions,
-            vocabulary: config.mcp?.scopes
+            vocabulary: config.mcp?.scopes,
+            // A confirmed call is spent once across every replica.
+            confirmations: store
         };
 
         app.route("/", createMcpWellKnownRoutes(mcpConfig));

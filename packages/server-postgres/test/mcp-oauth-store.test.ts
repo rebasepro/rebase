@@ -97,7 +97,7 @@ const soon = () => new Date(Date.now() + 60_000);
 const past = () => new Date(Date.now() - 60_000);
 
 describe("ensureTables", () => {
-    it("actually creates all four tables", async () => {
+    it("actually creates all five tables", async () => {
         // The DDL bootstrapper logs failures instead of throwing, so "no error"
         // is not evidence. This asks the database.
         for (const table of OAUTH_TABLES) {
@@ -567,5 +567,23 @@ describe("revokeTokenForClient (RFC 7009)", () => {
         const res = await db.query(`SELECT token_hash FROM rebase.oauth_refresh_tokens`);
         expect(String((res.rows[0] as { token_hash: string }).token_hash)).not.toBe("rt-secret");
         expect(await store.revokeTokenForClient("rt-secret", "mcp_abc")).toBe(true);
+    });
+});
+
+describe("confirmations", () => {
+    it("spends a jti once, however many replicas race for it", async () => {
+        const results = await Promise.all([1, 2, 3].map(() => store.consumeConfirmation("jti-1", soon())));
+        expect(results.filter(Boolean)).toHaveLength(1);
+        expect(await store.consumeConfirmation("jti-1", soon())).toBe(false);
+        expect(await store.consumeConfirmation("jti-2", soon())).toBe(true);
+    });
+
+    it("forgets a spent jti an hour after its token expired", async () => {
+        await store.consumeConfirmation("old", new Date(Date.now() - 2 * 3600_000));
+        await store.consumeConfirmation("trigger-sweep", soon());
+        // The sweep is not awaited by the call that starts it.
+        await new Promise(resolve => setTimeout(resolve, 50));
+        const res = await db.query(`SELECT jti FROM rebase.mcp_confirmations ORDER BY jti`);
+        expect((res.rows as { jti: string }[]).map(row => row.jti)).toEqual(["trigger-sweep"]);
     });
 });

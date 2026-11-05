@@ -41,6 +41,7 @@ import {
 } from "../api/rest/auth-collection-writes.js";
 import { logger } from "../utils/logger.js";
 import type { McpScope } from "./oauth-metadata.js";
+import type { McpConfirmationPlan } from "./confirmation.js";
 
 /** The identity a tool call runs as. Comes from the verified access token. */
 export interface McpCaller {
@@ -113,6 +114,15 @@ export interface McpToolDefinition {
      * served.
      */
     ui?: { resourceUri: string };
+    /**
+     * Make the tool take two calls (`confirmation.ts`): the first answers the
+     * plan this returns and a token, and changes nothing; the second, with
+     * the same arguments and the token, runs {@link run}. For a tool that
+     * changes production or reaches outward. It must check what `run` will
+     * check, and throw {@link McpToolError} for what `run` would refuse, so a
+     * plan is never offered for a call that cannot happen.
+     */
+    confirm?(args: Record<string, unknown>, ctx: McpToolContext): Promise<McpConfirmationPlan>;
     run(args: Record<string, unknown>, ctx: McpToolContext): Promise<unknown>;
 }
 
@@ -831,8 +841,15 @@ export const MCP_TOOLS: McpToolDefinition[] = TOOLS.map(declaredArgumentsOnly);
  * serves goes through this — the default data tools and an app's own.
  */
 export function declaredArgumentsOnly(tool: McpToolDefinition): McpToolDefinition {
+    const confirm = tool.confirm;
     return {
         ...tool,
+        ...(confirm && {
+            confirm: (args: Record<string, unknown>, ctx: McpToolContext) => {
+                assertDeclaredArguments(tool, args);
+                return confirm(args, ctx);
+            }
+        }),
         run: (args, ctx) => {
             assertDeclaredArguments(tool, args);
             return tool.run(args, ctx);
