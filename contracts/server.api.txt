@@ -616,6 +616,7 @@ function isToMany
 function isUnsupported
 function isValidAppHost
 function isValidEngine
+function joinConditions
 function knownScopes
 function nestAdminCollectionKeys
 function nestAdminKeysOf
@@ -657,6 +658,7 @@ function serializeCollections
 function setQueueRuntime
 function setTopicRuntime
 function simulationHeaders
+function soleJoinCondition
 function sortKeyToString
 function storageEnvSuffix
 function storageObjectPath
@@ -748,7 +750,7 @@ interface BrinIndex { on, reason, using, where }
 interface BroadcastAckMessage { channel, error, payload, requestId, row, rows, seq, subscriptionId, type }
 interface BroadcastMessage { channel, error, event, payload, requestId, row, rows, seq, subscriptionId, type }
 interface BtreeIndex { include, on, reason, unique, using, where }
-interface BucketOptions { account, default, engine, label, prefix, publicRead, transport }
+interface BucketOptions { account, default, engine, label, orphanSweep, prefix, publicRead, transport }
 interface ByIdReadOptions { include }
 interface CallerCredential { id, kind, name }
 interface ChannelBus { kind, maxFrameBytes, publish, publishesOnDemand, start, stop }
@@ -839,6 +841,7 @@ interface IncludeOptions { count, fields, include, limit, logical, orderBy, wher
 interface IncludeOptionsFor { count, fields, include, limit, logical, orderBy, where }
 interface IndexKey { direction, nulls, prop }
 interface InitializedDriver { collectionRegistry, collections, connection, driver, internals, realtimeProvider, unprotectedTables }
+interface JoinCondition { from, to }
 interface JoinStep { on, table }
 interface LazyComponentRef { load }
 interface ListLimitBounds { defaultLimit, maxLimit, vectorDefaultLimit }
@@ -855,6 +858,7 @@ interface NotPolicyExpression { kind, operand }
 interface NumberProperty { access, callbacks, columnName, columnType, conditions, databaseDefault, defaultValue, description, dynamicProps, enum, excludeFromApi, isId, metadata, name, precision, propertyConfig, scale, type, validation }
 interface NumberPropertyValidationSchema { integer, lessThan, max, min, moreThan, negative, positive, required, requiredMessage, unique, uniqueInArray }
 interface OrPolicyExpression { kind, operands }
+interface OrphanSweepOptions { olderThanHours, schedule }
 interface OuterFieldPolicyOperand { kind, name }
 interface OwnerSecurityRule { access, check, condition, mode, name, operation, operations, ownerField, pgRoles, roles, using, withCheck }
 interface PageWalkOptions { cursor, maxPages, pageSize }
@@ -941,7 +945,9 @@ interface SchemaChange { collection, detail, kept, kind, property, remedy, sourc
 interface SchemaChangeFile { contents, deleted, path }
 interface SchemaChangePlan { classified, files, message, statements, withheldConstraints }
 interface SchemaCommitPaths { schemaFile }
-interface SchemaEditingAdmin { planSchemaChange }
+interface SchemaEditingAdmin { planSchemaChange, planSchemaReconcile }
+interface SchemaReconcileColumn { blocksInserts, collection, column, rowsWithValue, table }
+interface SchemaReconcilePlan { digest, dropped, problems, relaxed, statements, undeclared }
 interface ScopeDefinition { description, label, target }
 interface ScopeDescription { description, label }
 interface ScopeProblem { reason, scope }
@@ -969,7 +975,7 @@ interface StorageListResult { items, nextPageToken, prefixes }
 interface StorageReference { bucket, contentType, fullPath, name, parent, root, size, toString, updated }
 interface StorageReferenceTarget { key, storageId }
 interface StorageSource { deleteObject, getObject, getObjectStream, getSignedUrl, listObjects, putObject, putObjectStream, statObject }
-interface StorageSourceDefinition { account, default, engine, key, label, transport }
+interface StorageSourceDefinition { account, default, engine, key, label, orphanSweep, transport }
 interface StorageSourceRegistry { get, getDefault, getOrDefault, has, list }
 interface StoredObjectInfo { contentType, lastModified, size }
 interface StoredObjectRange { end, start }
@@ -1390,6 +1396,7 @@ function evaluatePolicy
 function fieldKeyForColumn
 function findAnonymousGrants
 function findRelation
+function findTableDdl
 function firstSqlRow
 function fullPathToCollectionSegments
 function getArrayResolvedProperties
@@ -1485,6 +1492,7 @@ function sortProperties
 function sqlRows
 function sqlToPolicy
 function stripCollectionPath
+function tableDdlMessage
 function tenantBypassRoles
 function tenantPolicyName
 function tenantScopeExpression
@@ -1511,6 +1519,7 @@ function updateUserAutoValues
 function uploadResumable
 function vectorPropertyNames
 function warnDeprecated
+function warnOnTableDdl
 function withETag
 function withRelationReferencesOnly
 function wrapAsEntityData
@@ -1542,6 +1551,7 @@ interface ResumableUploadOptions { chunkSize, file, metadata, retryDelaysMs, sen
 interface ResumableUploadResponse { error, header, status }
 interface RoutedRebaseDataParams { defaultData, resolveAccessor, resolveKey, sources }
 interface RuleConditions { usingExpr, withCheckExpr }
+interface TableDdl { schema, statement, table }
 interface TenantWriteInput { bypass, callerTenants, callerTenantsComplete, previousValues, slug, status, tenant, values }
 interface TenantWriteRefusal { code, field, message }
 interface UnknownFieldAnswer { code, details, message }

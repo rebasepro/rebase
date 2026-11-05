@@ -35,6 +35,10 @@ export function ReadOnlyFieldBinding({
 
     const skipCardWrapper = property.type === "relation" || property.type === "reference";
 
+    // No required marker on either label: the asterisk asks the person filling
+    // the form for a value, and nobody fills this one in. `validation.required`
+    // on a read-only field is about the column (NOT NULL), not about them.
+
     // A one-line value at the form's size is drawn like the one-line fields
     // around it: the same 64px box, the label shrunk into its top edge. It keeps
     // the outline and drops the fill — that is what says it cannot be edited.
@@ -49,7 +53,6 @@ export function ReadOnlyFieldBinding({
                         className={"pointer-events-none absolute top-1 left-0 text-text-secondary dark:text-text-secondary-dark"}>
                         <LabelWithIcon
                             icon={getIconForProperty(property, "small")}
-                            required={property.validation?.required}
                             title={property.name ?? propertyKey}/>
                     </InputLabel>
                     <div className={"min-h-6 flex items-center overflow-x-auto no-scrollbar opacity-80"}>
@@ -78,7 +81,6 @@ export function ReadOnlyFieldBinding({
             {!minimalistView && !hideLabel && <LabelWithIcon
                 propertyKey={propertyKey}
                 icon={getIconForProperty(property, "small")}
-                required={property.validation?.required}
                 title={property.name ?? propertyKey}
                 className={"h-8 text-text-secondary dark:text-text-secondary-dark ml-3"}/>
             }

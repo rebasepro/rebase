@@ -19,7 +19,9 @@ import { defineConfig } from "vitest/config";
  * `delete` this variable in their own `beforeEach` — they manage the whole
  * environment deliberately — so nothing here weakens what they assert.
  */
-export const TEST_ENV = { REBASE_TELEMETRY_DISABLED: "1" };
+// REBASE_ROOT_RULES: some suites scaffold inside this repository, and a
+// scaffold below a repository root writes into that root's CLAUDE.md and AGENTS.md.
+export const TEST_ENV = { REBASE_TELEMETRY_DISABLED: "1", REBASE_ROOT_RULES: "0" };
 
 /**
  * `@rebasepro/<name>` → `packages/<name>/src/index.ts`, for every workspace

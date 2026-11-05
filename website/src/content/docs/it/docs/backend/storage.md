@@ -1,5 +1,5 @@
 ---
-sourceHash: 7f46b01ad01541e2
+sourceHash: c72a777b7542e004
 title: Configurazione dello storage
 sidebar_label: Configurazione dello storage
 description: Configura backend di storage per filesystem locale, compatibili con S3 o GCS/Firebase Storage per il caricamento di file, immagini e contenuti multimediali.
@@ -295,6 +295,34 @@ S3_ENDPOINT__MINIO=https://minio.internal
 ```
 
 Solo le variabili con ambito account (account-scoped) utilizzano il fallback — `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY`, `S3_ENDPOINT`, `S3_REGION`, `S3_FORCE_PATH_STYLE` e la coppia GCS `GCS_PROJECT_ID` / `GCS_KEY_FILENAME`. Il nome del bucket non usa mai il fallback: è ciò che distingue una sorgente dall'altra. Un valore impostato a livello di singolo bucket ha comunque sempre la precedenza, consentendo a una sorgente di cambiare provider senza compromettere le altre.
+
+### Eliminare a intervalli i file che nessuna riga nomina
+
+Eliminare una riga lascia i suoi file nel bucket. Nulla viene eliminato insieme alla
+riga: un'altra riga, una versione nella [cronologia](/docs/backend/history/) o il tuo
+codice che conserva la chiave in una semplice stringa possono ancora nominare il
+file. Un bucket può invece chiedere la pulizia che vede tutto questo:
+
+```ts
+export const voice = bucket("voice", { engine: "s3", orphanSweep: { olderThanHours: 72 } });
+export const media = bucket("media", { orphanSweep: true }); // a week, daily at 04:17 UTC
+```
+
+Ogni pulizia dichiarata è un cron job, `storage-orphan-sweep-<bucket>`
+(`storage-orphan-sweep-default` per il bucket predefinito). Esegue la scansione alla
+base di `rebase storage orphans --delete`. Quella scansione legge ogni riga di ogni
+collection e ogni voce della cronologia, e conserva:
+
+- un file che qualcosa nomina ancora;
+- un file più recente di `olderThanHours` (almeno 24, una settimana per impostazione predefinita);
+- tutti i file, per quell'esecuzione, quando una collection non può essere letta.
+
+Poi ricontrolla ogni file subito prima di eliminarlo. Imposta `schedule` su
+un'espressione cron (UTC) per cambiare quando viene eseguita. Essendo un cron job,
+viene eseguita su una sola istanza per slot. La sua cronologia delle esecuzioni
+registra quanti file ha eliminato e conservato, e può essere messa in pausa o
+avviata a mano dall'elenco dei cron dell'admin. Richiede un bucket servito da questo
+backend: un bucket `transport: "direct"` viene rifiutato all'avvio con un avviso.
 
 ## Sorgenti di storage nel frontend
 

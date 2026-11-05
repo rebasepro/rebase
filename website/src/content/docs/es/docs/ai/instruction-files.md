@@ -1,8 +1,8 @@
 ---
-sourceHash: 5dd46da9d88b962e
+sourceHash: 718e4f07d8240ddd
 title: Archivos de instrucciones de IA
 sidebar_label: Archivos de instrucciones de IA
-description: Cada proyecto de Rebase generado incluye ai-instructions.md junto con archivos de puntero de tres líneas para Claude, Cursor, Windsurf, Copilot y AGENTS.md — una única fuente de verdad, muchos nombres de archivo.
+description: Cada proyecto de Rebase generado incluye ai-instructions.md junto con archivos de puntero para Claude, Cursor, Windsurf, Copilot y AGENTS.md que llevan las cinco reglas que los asistentes más incumplen — una única fuente de verdad, muchos nombres de archivo.
 ---
 
 Cada asistente quiere sus reglas en un archivo diferente. Claude Code lee
@@ -25,12 +25,22 @@ your-project/
     └── copilot-instructions.md   ← pointer
 ```
 
-Cada archivo de puntero consta de tres líneas:
+Cada archivo de puntero nombra el archivo real, indica dónde están las habilidades y lleva las cinco reglas que un asistente no debe incumplir aunque nunca abra nada más:
 
 ```markdown title="CLAUDE.md"
 # Rebase AI Rules
 Please refer to and follow the instructions defined in [ai-instructions.md](./ai-instructions.md).
 The Rebase skills for this assistant live in `.claude/skills/`. If they are not there yet, install them, with the Rebase MCP server: `rebase skills install --agent claude --mcp`.
+
+## Before you write any code
+
+These hold before you have opened ai-instructions.md, and in every session:
+
+- **A table is a collection.** Declare it in `config/collections/<name>.ts` with `defineCollection`, and `pnpm dev` creates it. Never `CREATE TABLE`, `ALTER TABLE` or `CREATE INDEX` in code, and never raw SQL or Drizzle against an application table, `rebase.sql()` included, except to read a column marked `excludeFromApi`, which the API never returns: raw SQL skips validation, callbacks, security rules, the admin view and the SDK types. A table that already exists gets its collection from `pnpm schema:introspect`.
+- **Data goes through the SDK:** `rebase.dataAsAdmin.<slug>` in functions and crons, `getDriver(c)` to act as the caller.
+- **A route in `backend/functions/` is public until you guard it** with `requireAuth` or `requireAdmin` from `@rebasepro/server/functions`.
+- **Never deploy, never edit `.env`, never edit generated files** (`backend/src/schema.generated.ts`, `rebase.resources.json`).
+- **When Rebase cannot do what the task needs, tell the human** what is missing instead of working around it.
 ```
 
 En la versión 0.23, la tercera línea solo le indica al asistente que ejecute
@@ -75,18 +85,25 @@ en esa máquina. Consulta [la precedencia](/docs/ai/mcp#which-directory-it-acts-
 
 ## Por qué un puntero en lugar de una copia
 
-Los archivos de puntero carecen deliberadamente de contenido. Los asistentes siguen
-los enlaces relativos de Markdown, por lo que un archivo de tres líneas que apunta
-al verdadero obtiene el mismo resultado que una copia, y además tiene propiedades
-que una copia no posee:
+Los archivos de puntero no contienen casi nada. Un archivo que apunta al verdadero
+mantiene las convenciones en un solo lugar, y tiene propiedades que una copia no posee:
 
 - **Un solo archivo para editar.** Las reglas no pueden diferir entre asistentes,
   porque solo hay un conjunto de reglas.
 - **Un solo diff para revisar.** Un cambio en las convenciones del proyecto es un
   cambio en un solo archivo, no en cinco archivos idénticos que un revisor deba
   comparar.
-- **Añadir un asistente toma tres líneas.** Una nueva herramienta con un nuevo
+- **Añadir un asistente es un archivo pequeño.** Una nueva herramienta con un nuevo
   nombre de archivo recibe un puntero, no una sexta copia de tus convenciones.
+
+La única excepción es el bloque **Before you write any code**. Un asistente no sigue
+un enlace de forma fiable: uno ocupado con una tarea escribe primero el código, y uno
+iniciado en la raíz de un repositorio cuyo proyecto de Rebase está en una subcarpeta
+nunca carga estos archivos. Por eso las cinco reglas cuyo incumplimiento causa más
+daño (una tabla creada en código en lugar de una colección, datos leídos y escritos
+sin pasar por el SDK, una ruta sin proteger, un despliegue, un archivo generado
+editado) están escritas en cada puntero, de forma idéntica. Una comprobación en CI
+mantiene iguales las cinco copias.
 
 Vale la pena mantener este patrón si haces un fork de la estructura inicial (scaffold),
 y vale la pena adoptarlo en repositorios que ni siquiera son proyectos de Rebase.

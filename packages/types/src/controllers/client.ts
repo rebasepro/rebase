@@ -658,6 +658,12 @@ export interface RebaseServerClient<DB = RegisteredDatabase> extends Omit<Rebase
      * `rebase.dataAsAdmin` go over the same wire wherever they run. A function
      * that genuinely needs raw SQL can ask `runtimeKey()` and degrade, rather
      * than discovering it at the call.
+     *
+     * It is not for making tables. An application table is a collection in
+     * `config/collections/`, created by boot with its validation, callbacks,
+     * security rules, admin view and SDK type; a `CREATE TABLE`, `ALTER TABLE`,
+     * `DROP TABLE` or `CREATE INDEX` run here gets none of those. Such a
+     * statement still runs, and logs a warning naming the collection to declare.
      */
     sql(query: string, options?: { database?: ResourceRef; role?: string; params?: unknown[] }): Promise<Record<string, unknown>[]>;
 

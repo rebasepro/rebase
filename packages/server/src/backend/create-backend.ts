@@ -43,7 +43,7 @@ import {
     type CollectionCallbacks,
     type RebaseServerClient
 } from "@rebasepro/types";
-import { createDataSourceRegistry, resolveDataSource, buildSdkData, buildRoutedRebaseData, createAccessorSlugResolver, getEffectiveSecurityRules, assertBeforeQueryIsPostgresOnly } from "@rebasepro/common";
+import { createDataSourceRegistry, resolveDataSource, buildSdkData, buildRoutedRebaseData, createAccessorSlugResolver, getEffectiveSecurityRules, assertBeforeQueryIsPostgresOnly, warnOnTableDdl } from "@rebasepro/common";
 import { randomBytes } from "node:crypto";
 import type { Server } from "node:http";
 import nodePath from "node:path";
@@ -1719,7 +1719,12 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
             // A client configured with a header instead of an OAuth flow
             // presents a key; its `data:*` scopes decide which tools and
             // collections it reaches.
-            resolveApiKey: apiKeyStore ? (token: string) => resolveApiKey(apiKeyStore, token, access) : undefined
+            resolveApiKey: apiKeyStore ? (token: string) => resolveApiKey(apiKeyStore, token, access) : undefined,
+            // The views a client like Claude shows a tool's result in. Imported
+            // on the first `/mcp` request that needs them — any client's first
+            // `initialize` or `tools/list` — not at boot: the HTML is large, and
+            // a backend no MCP client calls never loads it.
+            apps: async () => (await import("@rebasepro/mcp-apps")).MCP_APPS
         };
 
         app.route("/", createMcpWellKnownRoutes(mcpConfig));
@@ -2871,6 +2876,8 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
         };
         Object.assign(serverClient, {
             sql: async (query: string, sqlOptions?: { database?: import("@rebasepro/types").ResourceRef; role?: string; params?: unknown[] }) => {
+                // Application tables are collections: a table made here has no rules, callbacks or admin view (see warnOnTableDdl).
+                warnOnTableDdl(query, message => logger.warn(message));
                 const admin = sqlOptions?.database !== undefined ? sqlAdminFor(resourceKeyOf(sqlOptions.database)) : driverAdmin;
                 return admin.executeSql(query, sqlOptions && { role: sqlOptions.role, params: sqlOptions.params });
             }

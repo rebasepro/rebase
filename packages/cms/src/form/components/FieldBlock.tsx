@@ -2,6 +2,7 @@ import type { Property } from "@rebasepro/types";
 import type { PropertySpan } from "@rebasepro/cms-types";
 import React from "react";
 import { cls, ErrorBoundary, Typography } from "@rebasepro/ui";
+import { isReadOnly } from "@rebasepro/app";
 import { getIconForProperty } from "../../util/property_utils";
 import { PropertyKeyHint } from "../../components/PropertyKeyHint";
 
@@ -144,7 +145,10 @@ export function FieldBlock({
 
     const reading = mode === "read";
     const description = property?.description?.trim();
-    const required = Boolean(property?.validation?.required);
+    // Only where someone can supply the value: on a read-only field the marker
+    // asks for input nobody can give, and `validation.required` there states
+    // what the column holds, which the form need not shout about.
+    const required = Boolean(property?.validation?.required) && !(property && isReadOnly(property));
     const footed = labelInside && !reading;
 
     return (

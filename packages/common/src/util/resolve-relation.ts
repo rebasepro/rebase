@@ -1,5 +1,6 @@
 import {
     CollectionConfig,
+    JoinStep,
     Relation,
     ResolvedRelation
 } from "@rebasepro/types";
@@ -164,10 +165,15 @@ export function resolveRelation(
  * whatever column the first step read. So those are read-only, and every door
  * reads this answer through `writable` rather than re-deriving it.
  */
-function isSingleHopVia(cardinality: "one" | "many", joinPath: readonly { table: string }[] | undefined): boolean {
+function isSingleHopVia(cardinality: "one" | "many", joinPath: readonly Pick<JoinStep, "table" | "on">[] | undefined): boolean {
     // A chain declared without its steps resolves — resolution cannot fail;
     // the relation validator names the missing `joinPath` — and is not written.
     if (!Array.isArray(joinPath)) return false;
+    // A step that joins on any of several columns has no one column to write a
+    // new link into: which of them it goes in is the application's rule. A
+    // list of one is the bare condition written as a list, and is written the
+    // same; an empty list joins nothing (the validator names it).
+    if (joinPath.some(step => Array.isArray(step.on) && step.on.length !== 1)) return false;
     if (cardinality === "one") return joinPath.length === 1;
     return joinPath.length === 2 && joinPath[0].table !== joinPath[1].table;
 }

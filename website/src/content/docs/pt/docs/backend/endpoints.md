@@ -1,5 +1,5 @@
 ---
-sourceHash: 6a4e7986acbd9fa0
+sourceHash: f66ad55337850ab8
 title: Índice de endpoints
 sidebar_label: Índice de endpoints
 description: Cada rota HTTP montada por um backend Rebase — dados, autenticação, armazenamento, administração, meta — com a restrição de acesso (gate) de cada uma e a página que a explica.
@@ -162,6 +162,8 @@ uma coleção não acessa nada disso. Consulte [Papéis e escopos](/docs/backend
 | `GET` | `/api/admin/schema/status` | `schema:read` | [Live schema editing](/docs/backend/live-schema-editing/) |
 | `POST` | `/api/admin/schema/plan` | `schema:read` | Planeja uma alteração; nunca aplica |
 | `POST` | `/api/admin/schema/apply` | `schema:write` | Apenas uma pessoa, a menos que `REBASE_LIVE_SCHEMA_ALLOW_MACHINE_APPLY` |
+| `POST` | `/api/admin/schema/reconcile/plan` | `schema:read` | <span class="since-badge" data-since="0.28">Since 0.28</span> Planeja afrouxar `NOT NULL` e remover as colunas não declaradas nomeadas em `drop`, para [a reconciliação do schema](/docs/cli/schema/#rebase-schema-reconcile); nunca aplica um |
+| `POST` | `/api/admin/schema/reconcile/apply` | `schema:write` | <span class="since-badge" data-since="0.28">Since 0.28</span> Aplica um plano de reconciliação, somente se o `digest` dele for o `confirm` enviado |
 | `GET` | `/api/admin/schema-editor/status` | `schema:read` | Se o editor está disponível, e a razão quando não está |
 | `POST` | `/api/admin/schema-editor/collection/save` | `schema:write` | [Studio](/docs/studio/) — reescreve o código-fonte da coleção |
 | `POST` | `/api/admin/schema-editor/collection/delete` | `schema:write` | [Studio](/docs/studio/) |

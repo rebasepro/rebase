@@ -46,6 +46,13 @@ const ALLOWED = new Map([
         "Resolved with createRequire() against the *user's* project root, to read "
         + "their tsconfig with their TypeScript. Wrapped in try/catch with a "
         + "documented JSON fallback, so an absent TypeScript is a supported state."
+    ],
+    [
+        "@rebasepro/server::@rebasepro/mcp-apps",
+        "A private workspace package, never published. packages/server/vite.config.ts "
+        + "inlines every @rebasepro/* import, so the view's HTML ships as a chunk of "
+        + "the server's own dist (loaded with import(\"./dist-….js\")) and no bare "
+        + "specifier reaches a consumer. It is a devDependency so the build finds it."
     ]
 ]);
 

@@ -161,6 +161,15 @@ export function loadCliCommands(root) {
         sub.set("db", new Set([...(sub.get("db") ?? []), ...selfHandled]));
     }
 
+    // `schema.ts` does the same: `reconcile` talks to the running backend, not
+    // the driver, so it is answered there and never reaches the driver's
+    // `subcommand === "x"` list.
+    const schemaSelf = read(root, "packages/cli/src/commands/schema.ts");
+    const schemaSelfHandled = [...schemaSelf.matchAll(/subcommand === "([a-z][a-z0-9-]*)"/g)].map(m => m[1]);
+    if (schemaSelfHandled.length) {
+        sub.set("schema", new Set([...(sub.get("schema") ?? []), ...schemaSelfHandled]));
+    }
+
     return { top, sub };
 }
 
@@ -269,6 +278,9 @@ export function loadCliFlags(root) {
         add("db", driver);
         add("schema", driver);
     }
+    // `rebase schema reconcile` parses `--drop` and `--yes` in its own module,
+    // which `schema.ts` hands the argv to.
+    add("schema", read(root, "packages/cli/src/commands/schema-reconcile.ts"));
 
     // `db backup` parses its own argv in the backup module rather than in the
     // driver's cli.ts, so without this the union is missing `--out` — the flag

@@ -1,8 +1,8 @@
 ---
-sourceHash: 3c5e837860d6c8c6
+sourceHash: 0da7580e73a7f0c9
 title: O Endpoint MCP Remoto
 sidebar_label: Endpoint MCP remoto
-description: Sirva o MCP a partir de um backend implantado em /mcp, para que as pessoas que usam seu app conectem o Claude ou o Cursor como elas mesmas — OAuth com tela de consentimento, oito ferramentas sob três escopos, cada chamada sob a própria segurança em nível de linha delas.
+description: Sirva o MCP a partir de um backend implantado em /mcp, para que as pessoas que usam seu app conectem o Claude ou o Cursor como elas mesmas — OAuth com tela de consentimento, nove ferramentas sob três escopos, cada chamada sob a própria segurança em nível de linha delas.
 ---
 
 O [servidor MCP](/docs/ai/mcp/) é uma ferramenta de desenvolvedor: ele roda na sua máquina e
@@ -33,15 +33,23 @@ de inicialização. Nenhum `REBASE_ROLE` o ativa.
   do seu app), e a tela avisa isso. Ela também informa o host para o qual o código de
   autorização é enviado e diz que esse host não é verificado: qualquer pessoa pode
   registrar um cliente com qualquer nome, então o host é a parte que alguém pode conferir.
-- **Oito ferramentas, três escopos.** Os mesmos [escopos](/docs/backend/roles-and-scopes/)
+- **Nove ferramentas, três escopos.** Os mesmos [escopos](/docs/backend/roles-and-scopes/)
   que toda credencial usa. `data:read` oferece `list_collections`, `describe_collection`,
-  `query_collection`, `count_documents` e `get_document`; `data:write` acrescenta
+  `query_collection`, `show_collection`, `count_documents` e `get_document`; `data:write` acrescenta
   `create_document` e `update_document`; `data:delete` acrescenta `delete_document`. Um
   cliente que não pede nada recebe `data:read`. Cada um pode ser restrito a uma coleção:
   `data:read:posts` lista, descreve e lê `posts` e nada além disso. Um escopo decide quais
   ferramentas são oferecidas e quais coleções elas alcançam, não quais linhas: uma lista
   vazia pode ser a RLS funcionando, e `data:write` continua sem poder gravar uma linha que
   a pessoa não poderia gravar.
+- <span class="since-badge" data-since="0.28">Since 0.28</span> **`show_collection` coloca as linhas diante da pessoa.** Recebe os argumentos de
+  `query_collection` e responde a mesma página, mais as colunas que o painel de
+  administração mostra. Um cliente que exibe MCP Apps, como o Claude, a abre como uma tabela
+  na conversa: a pessoa pode carregar mais linhas e, onde a conexão tem `data:write`, editar
+  uma célula no lugar. Cada gravação é uma chamada a `update_document` feita em nome dela,
+  sob a RLS dela, e o modelo fica sabendo o que ela mudou. Um cliente sem MCP Apps, como o
+  Claude Code ou o Cursor, não mostra tabela nenhuma, e o modelo lê a página como a leria de
+  `query_collection`.
 - **Concessões feitas antes da 0.24 mantêm o seu alcance.** `mcp:read` é lido como
   `data:read`, e `mcp:write` como `data:write data:delete`, nas concessões armazenadas e
   nos tokens já emitidos.

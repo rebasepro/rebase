@@ -1,5 +1,5 @@
 ---
-sourceHash: 6a4e7986acbd9fa0
+sourceHash: f66ad55337850ab8
 title: Index des points de terminaison
 sidebar_label: Index des points de terminaison
 description: Chaque route HTTP montée par un backend Rebase — données, auth, stockage, admin, méta — avec son contrôle d'accès et la page qui l'explique.
@@ -162,6 +162,8 @@ une collection ne peut accéder à rien de tout cela. Voir [Rôles et portées](
 | `GET` | `/api/admin/schema/status` | `schema:read` | [Édition de schéma en direct](/docs/backend/live-schema-editing/) |
 | `POST` | `/api/admin/schema/plan` | `schema:read` | Planifie une modification ; ne l'applique jamais |
 | `POST` | `/api/admin/schema/apply` | `schema:write` | Une personne uniquement, sauf si `REBASE_LIVE_SCHEMA_ALLOW_MACHINE_APPLY` |
+| `POST` | `/api/admin/schema/reconcile/plan` | `schema:read` | <span class="since-badge" data-since="0.28">Since 0.28</span> Planifie l'assouplissement de `NOT NULL` et la suppression des colonnes non déclarées nommées dans `drop`, pour [la réconciliation du schéma](/docs/cli/schema/#rebase-schema-reconcile) ; n'en applique jamais |
+| `POST` | `/api/admin/schema/reconcile/apply` | `schema:write` | <span class="since-badge" data-since="0.28">Since 0.28</span> Applique un plan de réconciliation, uniquement si son `digest` est le `confirm` envoyé |
 | `GET` | `/api/admin/schema-editor/status` | `schema:read` | Si l'éditeur est disponible, et la raison s'il ne l'est pas |
 | `POST` | `/api/admin/schema-editor/collection/save` | `schema:write` | [Studio](/docs/studio/) — réécrit le code source de la collection |
 | `POST` | `/api/admin/schema-editor/collection/delete` | `schema:write` | [Studio](/docs/studio/) |

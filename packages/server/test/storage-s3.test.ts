@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, jest as vi } from "@jest/globals";
 import { S3StorageController } from "../src/storage/S3StorageController";
+import type { S3StorageConfig } from "../src/storage/types";
 
 // Mock the AWS SDK before importing the controller
 vi.mock("@aws-sdk/client-s3", () => ({
@@ -14,7 +15,7 @@ vi.mock("@aws-sdk/client-s3", () => ({
 }));
 
 vi.mock("@aws-sdk/s3-request-presigner", () => ({
-    getSignedUrl: vi.fn().mockResolvedValue("https://presigned-url.example.com")
+    getSignedUrl: vi.fn<() => Promise<string>>().mockResolvedValue("https://presigned-url.example.com")
 }));
 
 import { S3Client, PutObjectCommand, GetObjectCommand, DeleteObjectCommand, ListObjectsV2Command } from "@aws-sdk/client-s3";
@@ -22,9 +23,10 @@ import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 
 describe("S3StorageController", () => {
     let controller: S3StorageController;
-    let mockSend: vi.Mock;
+    let mockSend: vi.Mock<(command: unknown) => Promise<unknown>>;
 
-    const defaultConfig = {
+    const defaultConfig: S3StorageConfig = {
+        type: "s3",
         bucket: "test-bucket",
         region: "us-east-1",
         accessKeyId: "test-access-key",
@@ -33,7 +35,7 @@ describe("S3StorageController", () => {
 
     beforeEach(() => {
         vi.clearAllMocks();
-        mockSend = vi.fn();
+        mockSend = vi.fn<(command: unknown) => Promise<unknown>>();
         vi.mocked(S3Client).mockImplementation(function() {
             return { send: mockSend };
         } as any);

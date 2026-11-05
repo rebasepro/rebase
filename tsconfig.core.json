@@ -53,6 +53,9 @@
             "@rebasepro/server-postgres": [
                 "./packages/server-postgres/src"
             ],
+            "@rebasepro/mcp-apps": [
+                "./packages/mcp-apps/src"
+            ],
             "@rebasepro/server-mongo": [
                 "./packages/server-mongo/src"
             ],
@@ -86,7 +89,9 @@
         "packages/server-mongo/src",
         "packages/inference/src",
         "packages/cli/src",
-        "packages/mcp/src"
+        "packages/mcp/src",
+        // only the declaration of its built view, which the server imports
+        "packages/mcp-apps/src/raw.d.ts"
     ],
     "exclude": [
         "**/node_modules",

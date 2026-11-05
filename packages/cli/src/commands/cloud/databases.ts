@@ -701,7 +701,12 @@ path: `list/${projectId}` }
                 console.log(chalk.bold(`  💾 Backups — project ${projectRef}`));
                 console.log("");
                 if (!res.backups?.length) {
-                    console.log(chalk.gray("  No backups yet. Create one with `rebase cloud db backup create`."));
+                    // This lists manual dumps only. Saying "no backups" to a
+                    // project with daily base backups and continuous WAL read
+                    // as having none at all.
+                    console.log(chalk.gray("  No manual backups. Create one with `rebase cloud db backup create`."));
+                    console.log(chalk.gray("  Automated daily backups and point-in-time recovery are listed separately:"));
+                    console.log(chalk.gray("  `rebase cloud db backup status` and `rebase cloud db pitr status`."));
                     console.log("");
                     return;
                 }
@@ -881,7 +886,7 @@ description: "Test database connectivity" },
 
             { action: "backup list",
 section: "Backups",
-description: "List backups" },
+description: "List manual backups" },
             { action: "backup create",
 section: "Backups",
 description: "Create a manual backup" },

@@ -1,8 +1,8 @@
 ---
-sourceHash: 3c5e837860d6c8c6
+sourceHash: 0da7580e73a7f0c9
 title: Le point de terminaison MCP distant
 sidebar_label: Point de terminaison MCP distant
-description: Servez MCP depuis un backend déployé sur /mcp, afin que les personnes qui utilisent votre app puissent connecter Claude ou Cursor en leur nom propre — OAuth avec écran de consentement, huit outils sous trois portées, chaque appel exécuté sous leur propre sécurité au niveau des lignes.
+description: Servez MCP depuis un backend déployé sur /mcp, afin que les personnes qui utilisent votre app puissent connecter Claude ou Cursor en leur nom propre — OAuth avec écran de consentement, neuf outils sous trois portées, chaque appel exécuté sous leur propre sécurité au niveau des lignes.
 ---
 
 Le [serveur MCP](/docs/ai/mcp/) est un outil de développement : il s'exécute sur votre
@@ -35,15 +35,23 @@ la raison dans le log de démarrage. Aucun `REBASE_ROLE` ne l'active.
   d'autorisation est envoyé, et précise que cet hôte n'est pas vérifié : n'importe qui
   peut enregistrer un client sous n'importe quel nom, l'hôte est donc la partie qu'une
   personne peut vérifier.
-- **Huit outils, trois portées.** Les mêmes [portées](/docs/backend/roles-and-scopes/)
+- **Neuf outils, trois portées.** Les mêmes [portées](/docs/backend/roles-and-scopes/)
   que celles de chaque identifiant. `data:read` propose `list_collections`, `describe_collection`,
-  `query_collection`, `count_documents` et `get_document` ; `data:write` ajoute `create_document` et
+  `query_collection`, `show_collection`, `count_documents` et `get_document` ; `data:write` ajoute `create_document` et
   `update_document` ; `data:delete` ajoute `delete_document`. Un client qui ne demande
   rien obtient `data:read`. Chacune peut se restreindre à une collection : `data:read:posts`
   liste, décrit et lit `posts` et rien d'autre. Une portée décide quels outils sont proposés et
   quelles collections ils atteignent, pas quelles lignes : une liste vide peut être le RLS
   qui fait son travail, et `data:write` ne peut toujours pas écrire une ligne que la personne
   ne pourrait pas écrire elle-même.
+- <span class="since-badge" data-since="0.28">Since 0.28</span> **`show_collection` met les lignes sous les yeux de la personne.** Il prend les arguments
+  de `query_collection` et répond la même page, avec les colonnes qu'affiche le panneau
+  d'administration. Un client qui affiche les MCP Apps, comme Claude, l'ouvre sous forme de
+  tableau dans la conversation : la personne peut charger plus de lignes et, là où la
+  connexion détient `data:write`, modifier une cellule sur place. Chaque enregistrement est
+  un appel à `update_document` fait en son nom, sous son RLS, et le modèle apprend ce
+  qu'elle a changé. Un client sans MCP Apps, comme Claude Code ou Cursor, n'affiche aucun
+  tableau, et le modèle lit la page comme il la lirait avec `query_collection`.
 - **Les autorisations accordées avant la 0.24 gardent leur étendue.** `mcp:read` est lu comme
   `data:read`, et `mcp:write` comme `data:write data:delete`, sur les autorisations
   enregistrées et sur les jetons déjà émis.

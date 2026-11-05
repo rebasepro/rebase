@@ -76,6 +76,8 @@ does.
 
 ### `rebase schema reconcile`
 
+<span class="since-badge" data-since="0.28">Since 0.28</span>
+
 Relax and drop what boot will not, after you have read the plan:
 
 ```bash

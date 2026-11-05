@@ -10,7 +10,22 @@
   `NaN`, `0` included, and any non-empty string. The admin uses it where it
   read an id's truthiness, which took record `0` for a new one.
 
+#### Server & REST
+
+- **`rebase.sql()` warns when it creates, alters, drops or indexes an
+  application table.** A table is a collection: the warning names what to do
+  instead (declare it, change its collection, or remove the collection), once
+  per table, and the statement still runs. Temporary tables and Rebase's own
+  schemas are left alone.
+
 #### CLI
+
+- **`rebase init` and `rebase skills install` write the project's rules into
+  the repository root's `CLAUDE.md` and `AGENTS.md`** when the project sits
+  below that root, between `<!-- rebase:project -->` markers, so an assistant
+  started at the root reads them too. The home folder and a root whose
+  repository ignores the project are left alone, and a file with a broken
+  marker is not touched. `REBASE_ROOT_RULES=0` turns it off.
 
 - **`rebase schema reconcile` relaxes and drops what boot will not.** Boot
   only adds, so a property made optional kept its `NOT NULL`, and a removed
@@ -23,12 +38,23 @@
 
 #### MCP
 
+- **`show_collection` puts rows in front of the person, as a table they can
+  edit, in Claude and any client that renders MCP Apps.** It takes
+  `query_collection`'s arguments and returns the same page, plus the columns
+  the admin panel shows (`propertiesOrder`, `hideFromCollection`, `readOnly`).
+  `/mcp` serves the view as a `ui://` resource (`resources/list`,
+  `resources/read`), built into `@rebasepro/server`; nothing new to install. Paging
+  and cell edits are tool calls the client relays with its own token, so they
+  run as the same person under the same RLS, and each saved edit is reported
+  to the model. A client without MCP Apps, such as Claude Code or Cursor,
+  shows nothing and gets the page `query_collection` would return. Offered
+  under `data:read`; cells are editable only with `data:write`.
+
 - **`list_documents` takes `fields`, and leaves binary values out unless
   asked.** Each binary column comes back as its size. Name the column in
   `fields`, or pass `includeBinary: true` (also on `get_document`), to get its
   contents. A collection with an audio column returned about a megabyte for
   `limit: 1`.
-
 
 #### Storage
 
@@ -121,6 +147,10 @@
   A regex with an `i`, `m` or `s` flag states no pattern.
 
 #### Postgres
+
+- **A binary value reaches its `bytea` column as bytes.** A Buffer, typed
+  array or `ArrayBuffer` was copied into `{"0":1,"1":2,…}` and stored as that
+  JSON, while reads looked right.
 
 - **A filter or sort resolves only names the field-access check judged.** A name
   that matched no column was guessed as a foreign key (`manager` →
@@ -241,6 +271,13 @@
   ids.**
 
 #### CLI
+
+- **`rebase cloud storage create` no longer claims a stored secret for a
+  keyless bucket.** A bucket granted to the project's workload identity says
+  so, and `--json` carries `access`.
+- **`rebase cloud db backup list` says "No manual backups"** and points to
+  `backup status` and `pitr status`. It answered "No backups yet" for a
+  project with daily backups and continuous WAL.
 
 - **`rebase skills install` never deletes files outside the skills directory**,
   whatever the committed manifest lists.
@@ -380,6 +417,13 @@
 
 #### Server & REST
 
+- **A `via` join step can match any of several conditions.** Give `on` a list —
+  `on: [{ from: "id", to: "a" }, { from: "id", to: "b" }]` — and a row that
+  meets any one of them joins. That reads a link stored in either of two
+  columns, such as a friendship kept as one row with the smaller account first,
+  as one relation instead of two. A chain with such a step is read-only. The
+  collection editor's relation dialog adds alternatives with "Or join on
+  another column".
 - **Streamed object writes.** `StorageController.putObjectStream` writes an
   object from a `ReadableStream` a chunk at a time, on the local, S3 and GCS
   controllers. Past `maxBytes` it rejects with `ObjectTooLargeError`, and on that
@@ -642,6 +686,19 @@
   stayed at the value it had on first render.
 - **`conditions.min` and `conditions.max` take a number,** as the docs write
   them; only a JSON Logic rule compiled.
+- **A list with `listProperties` keeps the status and date its `display`
+  declares.** They were dropped as soon as a collection named columns of its
+  own; they now follow those columns. Only declared slots join them, not
+  inferred ones.
+- **A list whose title is written as a function names that column after the
+  collection's `singularName`.** It took the name of whichever property the
+  row fell back to while the title loaded, and offered to sort by it.
+- **A read-only field marked required shows no red asterisk.** No one can fill
+  it in, so the form no longer asks for it.
+- **At exactly 1024px wide the menu button no longer covers the collection
+  toolbar.** The layout switch now happens at the same width as the `lg:`
+  styles. Below it, an admin without an app bar shows the menu button in its own
+  row above the page.
 
 ## [0.26.0] - 2026-10-29
 

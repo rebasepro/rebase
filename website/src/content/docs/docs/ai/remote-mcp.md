@@ -1,7 +1,7 @@
 ---
 title: The Remote MCP Endpoint
 sidebar_label: Remote MCP endpoint
-description: Serve MCP from a deployed backend at /mcp, so the people who use your app can connect Claude or Cursor as themselves — OAuth with a consent screen, eight tools under three scopes, every call under their own row-level security.
+description: Serve MCP from a deployed backend at /mcp, so the people who use your app can connect Claude or Cursor as themselves — OAuth with a consent screen, nine tools under three scopes, every call under their own row-level security.
 ---
 
 The [MCP server](/docs/ai/mcp/) is a developer tool: it runs on your machine and holds a service
@@ -33,14 +33,22 @@ to one user, the endpoint declines to mount and says why in the boot log. No
   screen tells them so. It also names the host the authorization code is sent
   to, and says that host is not verified: anyone may register a client under
   any name, so the host is the part a person can check.
-- **Eight tools, three scopes.** The same [scopes](/docs/backend/roles-and-scopes/)
+- **Nine tools, three scopes.** The same [scopes](/docs/backend/roles-and-scopes/)
   every credential uses. `data:read` offers `list_collections`, `describe_collection`,
-  `query_collection`, `count_documents` and `get_document`; `data:write` adds `create_document` and
+  `query_collection`, `show_collection`, `count_documents` and `get_document`; `data:write` adds `create_document` and
   `update_document`; `data:delete` adds `delete_document`. A client that asks for
   nothing gets `data:read`. Each one narrows to a collection: `data:read:posts`
   lists, describes and reads `posts` and nothing else. A scope decides which tools are
   offered and which collections they reach, not which rows: an empty list can be
   RLS working, and `data:write` still cannot write a row the person could not.
+- <span class="since-badge" data-since="0.28">Since 0.28</span> **`show_collection` puts the rows in front of the person.** It takes
+  `query_collection`'s arguments and answers the same page, plus the columns the
+  admin panel shows. A client that renders MCP Apps, such as Claude, opens it as a
+  table in the conversation: the person can load more rows and, where the
+  connection holds `data:write`, edit a cell in place. Each save is an
+  `update_document` call made as them, under their RLS, and the model is told what
+  they changed. A client without MCP Apps, such as Claude Code or Cursor, shows no
+  table, and the model reads the page as it would from `query_collection`.
 - **Grants made before 0.24 keep their reach.** `mcp:read` is read as
   `data:read`, and `mcp:write` as `data:write data:delete`, on stored grants and
   on tokens already issued.

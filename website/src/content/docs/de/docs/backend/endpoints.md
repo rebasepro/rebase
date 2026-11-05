@@ -1,5 +1,5 @@
 ---
-sourceHash: 6a4e7986acbd9fa0
+sourceHash: f66ad55337850ab8
 title: Endpunkt-Index
 sidebar_label: Endpunkt-Index
 description: Jede HTTP-Route, die ein Rebase-Backend mountet – Daten, Authentifizierung, Speicher, Admin, Meta – mit dem jeweiligen Gate und der Seite, die sie erklärt.
@@ -162,6 +162,8 @@ der auf eine Collection beschränkt ist, erreicht nichts davon. Siehe [Rollen un
 | `GET` | `/api/admin/schema/status` | `schema:read` | [Live-Schema-Bearbeitung](/docs/backend/live-schema-editing/) |
 | `POST` | `/api/admin/schema/plan` | `schema:read` | Plant eine Änderung; wendet sie niemals an |
 | `POST` | `/api/admin/schema/apply` | `schema:write` | Nur eine Person, außer wenn `REBASE_LIVE_SCHEMA_ALLOW_MACHINE_APPLY` |
+| `POST` | `/api/admin/schema/reconcile/plan` | `schema:read` | <span class="since-badge" data-since="0.28">Since 0.28</span> Plant das Lockern von `NOT NULL` und das Entfernen der in `drop` genannten nicht deklarierten Spalten, für [Schema-Reconcile](/docs/cli/schema/#rebase-schema-reconcile); wendet nie einen an |
+| `POST` | `/api/admin/schema/reconcile/apply` | `schema:write` | <span class="since-badge" data-since="0.28">Since 0.28</span> Wendet einen Reconcile-Plan an, nur wenn sein `digest` das gesendete `confirm` ist |
 | `GET` | `/api/admin/schema-editor/status` | `schema:read` | Ob der Editor verfügbar ist, und der Grund, falls nicht |
 | `POST` | `/api/admin/schema-editor/collection/save` | `schema:write` | [Studio](/docs/studio/) – schreibt den Collection-Quellcode neu |
 | `POST` | `/api/admin/schema-editor/collection/delete` | `schema:write` | [Studio](/docs/studio/) |

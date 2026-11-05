@@ -1,7 +1,7 @@
 import { and, eq, inArray, sql, type SQL } from "drizzle-orm";
 import { AnyPgColumn, PgTable } from "drizzle-orm/pg-core";
 import { ApiError, logger } from "@rebasepro/server";
-import type { Properties, ResolvedVia } from "@rebasepro/types";
+import { soleJoinCondition, type Properties, type ResolvedVia } from "@rebasepro/types";
 import { DrizzleClient } from "../interfaces";
 import { PostgresCollectionRegistry } from "../collections/PostgresCollectionRegistry";
 import { relationMisconfigured } from "./collection-helpers";
@@ -156,19 +156,20 @@ export function bindJoinPathJunction(
     let previousTable = parentTableName;
 
     for (const step of joinPath) {
-        const fromTable = tablePart(step.on.from) ?? previousTable;
-        const toTable = tablePart(step.on.to) ?? step.table;
+        const on = soleJoinCondition(step);
+        const fromTable = tablePart(on.from) ?? previousTable;
+        const toTable = tablePart(on.to) ?? step.table;
 
         // Take the column on the junction's own side of the step, and let the
         // other side say which end of the relation this step reached.
         if (toTable === junctionName && fromTable === parentTableName) {
-            parentColumnName = columnPart(step.on.to);
+            parentColumnName = columnPart(on.to);
         } else if (fromTable === junctionName && toTable === parentTableName) {
-            parentColumnName = columnPart(step.on.from);
+            parentColumnName = columnPart(on.from);
         } else if (toTable === junctionName && fromTable === targetTableName) {
-            targetColumnName = columnPart(step.on.to);
+            targetColumnName = columnPart(on.to);
         } else if (fromTable === junctionName && toTable === targetTableName) {
-            targetColumnName = columnPart(step.on.from);
+            targetColumnName = columnPart(on.from);
         }
 
         previousTable = step.table;

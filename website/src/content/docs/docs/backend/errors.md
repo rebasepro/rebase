@@ -354,6 +354,24 @@ so a panel can grey the feature out instead of showing an error.
 | `SCHEMA_EDITOR_PRODUCTION` | 501 | The editor is off under `NODE_ENV=production`: a deployed server's files are rebuilt from your repository on every deploy, so an edit here would be discarded. | Edit collections in development and deploy, or configure `liveSchema.repository` to commit them there. |
 | `SQL_EXPORT_UNSUPPORTED` | 501 | `POST /api/admin/sql/csv` cannot stream a result here: the in-process development database (PGlite) has one connection, and a cursor held across a download would hold every other query behind it; or the data source has no SQL cursor. | Point `DATABASE_URL` at a Postgres of your own (`rebase dev --docker` starts one), or add a `LIMIT` and export the rows on screen. |
 
+### Schema reconcile
+
+<span class="since-badge" data-since="0.28">Since 0.28</span>
+
+[`rebase schema reconcile`](/docs/cli/schema/#rebase-schema-reconcile) plans
+through `POST /api/admin/schema/reconcile/plan` and applies through
+`/reconcile/apply`. A refusal changes nothing; only `SCHEMA_RECONCILE_FAILED`
+leaves part of a plan applied.
+
+| Code | Status | Means | Do |
+| --- | --- | --- | --- |
+| `INVALID_RECONCILE` | 400 | The body is not a JSON object, or `drop` is not a list of `"<collection>.<column>"` strings. | Send `{ "drop": ["voice_cache.wav"] }`, or leave `drop` out. |
+| `SCHEMA_RECONCILE_FAILED` | 400 | A statement failed partway through. The statements before it ran and stay applied; `details.applied` lists them. | Fix what the message names, then plan again: the new plan leaves out what already ran. |
+| `SCHEMA_RECONCILE_INVALID` | 400 | The plan cannot be applied, and the message lists why: a `drop` that is not `<collection>.<column>`, names no collection or no column, or names a column the collection still declares. `details.plan` is the plan. | Fix the `drop` list. A declared column is dropped by removing its property, deploying, then reconciling. |
+| `SCHEMA_RECONCILE_STALE` | 409 | The database or the collections changed since the plan you confirmed. `details.plan` is the new one. | Review the new plan and confirm its `digest`. |
+| `SCHEMA_RECONCILE_UNCONFIRMED` | 400 | `/reconcile/apply` was sent no `confirm`. | Plan first and send the plan's `digest` as `confirm`. The CLI does this once you type `yes`. |
+| `SCHEMA_RECONCILE_UNSUPPORTED` | 503 | This backend's driver cannot plan a reconcile, or cannot run SQL. | Reconcile works on Postgres. |
+
 ### Why a branch's table cannot be merged
 
 `BRANCH_MERGE_BLOCKED` names each table it refused in `details.tables`, with one

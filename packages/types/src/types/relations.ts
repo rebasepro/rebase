@@ -588,9 +588,55 @@ export interface JoinStep {
      *
      * When using arrays, both `from` and `to` must have the same length,
      * and columns are matched by position (index 0 with index 0, etc.).
+     *
+     * A list of conditions joins a row that meets **any one** of them. That is
+     * how a link stored in either of two columns is read: a friendship kept as
+     * one row with the smaller account first holds a person in `a` on some rows
+     * and in `b` on others, and both are their friends.
+     *
+     * ```typescript
+     * { table: "friendships", on: [{ from: "id", to: "a" }, { from: "id", to: "b" }] }
+     * ```
+     *
+     * A step with two or more alternatives is read-only, whatever its
+     * position in the chain: a new link could go in either column, and which
+     * one is the application's rule, not something to guess. A list of one is
+     * the bare condition, and is read and written the same.
      */
-    on: {
-        from: string | string[];
-        to: string | string[];
-    };
+    on: JoinCondition | JoinCondition[];
+}
+
+/**
+ * One way a {@link JoinStep} can match: every `from` column equal to its `to`
+ * column.
+ * @group Models
+ */
+export interface JoinCondition {
+    from: string | string[];
+    to: string | string[];
+}
+
+/**
+ * The conditions of a join step, as a list: one entry for a plain step, one
+ * per alternative for a step that joins on any of several.
+ * @group Models
+ */
+export function joinConditions(step: Pick<JoinStep, "on">): JoinCondition[] {
+    return Array.isArray(step.on) ? step.on : [step.on];
+}
+
+/**
+ * The one condition of a step that has no alternatives — for the write paths,
+ * which only run on a writable chain and a chain with alternatives never is.
+ * Throws rather than pick one of several: writing a link into the wrong column
+ * is the mistake read-only exists to prevent.
+ * @group Models
+ */
+export function soleJoinCondition(step: Pick<JoinStep, "on" | "table">): JoinCondition {
+    if (Array.isArray(step.on)) {
+        if (step.on.length === 1) return step.on[0];
+        if (step.on.length === 0) throw new Error(`The join into '${step.table}' lists no conditions, so it joins nothing.`);
+        throw new Error(`The join into '${step.table}' matches any of ${step.on.length} conditions, so it is read-only: there is no one column to write a link into.`);
+    }
+    return step.on;
 }

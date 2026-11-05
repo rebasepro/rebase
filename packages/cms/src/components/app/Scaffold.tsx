@@ -220,6 +220,11 @@ export const Scaffold = React.memo<PropsWithChildren<ScaffoldProps>>(
         const computedDrawerHovered = Boolean(largeLayout && onHover);
 
         const hasAppBar = Boolean(appBarChildren.length > 0);
+        // Below `lg` the drawer is a sheet, opened from a menu button. An app
+        // bar leaves room for that button; without one, the button floated over
+        // the first thing on the page — the collection toolbar's view switcher —
+        // so it gets a row of its own instead.
+        const menuButtonRow = Boolean(includeDrawer) && !largeLayout && !hasAppBar;
         const appContextValue = useMemo(() => ({
             hasDrawer: Boolean(includeDrawer),
             drawerOpen: computedDrawerOpen,
@@ -253,7 +258,8 @@ export const Scaffold = React.memo<PropsWithChildren<ScaffoldProps>>(
                         onMouseLeave={setOnHoverFalse}
                         open={drawerOpen}
                         hovered={onHover}
-                        setDrawerOpen={setDrawerOpen}>
+                        setDrawerOpen={setDrawerOpen}
+                        floatingMenuButton={!menuButtonRow}>
                         {includeDrawer && drawerChildren}
                     </DrawerWrapper>
 
@@ -261,6 +267,7 @@ export const Scaffold = React.memo<PropsWithChildren<ScaffoldProps>>(
                         className="flex flex-col grow overflow-auto">
 
                         {hasAppBar && <DrawerHeader/>}
+                        {menuButtonRow && <MenuButtonRow onOpen={handleDrawerOpen}/>}
 
                         {/* Above the sheet, so it is there on every screen: while
                             the realtime connection is down, every live view is
@@ -314,6 +321,18 @@ const DrawerHeader = () => {
     );
 };
 
+/** The small-layout menu button, in the flow above the sheet. */
+function MenuButtonRow({ onOpen }: { onOpen: () => void }) {
+    const { t } = useTranslation();
+    return (
+        <div className="flex items-center shrink-0 px-2 sm:px-4 pt-1">
+            <IconButton aria-label={t("open_menu")} onClick={onOpen}>
+                <MenuIcon/>
+            </IconButton>
+        </div>
+    );
+}
+
 function DrawerWrapper(props: {
     children: React.ReactNode,
     displayed: boolean,
@@ -321,6 +340,8 @@ function DrawerWrapper(props: {
     logo?: string,
     hovered: boolean,
     setDrawerOpen: (open: boolean) => void,
+    /** Draw the small layout's menu button over the page; false when the page has a row for it. */
+    floatingMenuButton: boolean,
     onMouseEnter: () => void,
     onMouseMove: () => void,
     onMouseLeave: () => void
@@ -355,13 +376,13 @@ function DrawerWrapper(props: {
         if (!props.displayed)
             return null;
         return <>
-            <IconButton
+            {props.floatingMenuButton && <IconButton
                 aria-label={t("open_menu")}
                 onClick={() => props.setDrawerOpen(true)}
                 className="absolute sm:top-2 sm:left-4 top-1 left-2"
             >
                 <MenuIcon/>
-            </IconButton>
+            </IconButton>}
             <Sheet side={"left"}
                 transparent={true}
                 open={props.open}

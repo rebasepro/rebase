@@ -1,5 +1,5 @@
 ---
-sourceHash: 829ce13f7c169a96
+sourceHash: 62f93178ab231a98
 title: Generazione dello Schema
 sidebar_label: Generazione dello Schema
 description: Genera schemi Drizzle ORM dalle definizioni delle collezioni, crea migrazioni SQL e mantieni il tuo database sincronizzato con la CLI di Rebase.
@@ -73,6 +73,25 @@ rebase schema stale --fix    # regenerate the file instead
 
 `rebase dev` mantiene il file aggiornato da sé, quindi questo è il controllo per una build
 o per un passaggio di CI. Accetta `--collections` e `--output` come `rebase schema generate`.
+
+### `rebase schema reconcile`
+
+<span class="since-badge" data-since="0.28">Since 0.28</span>
+
+Allenta ed elimina ciò che l'avvio non tocca, dopo aver letto il piano:
+
+```bash
+rebase schema reconcile                         # relax NOT NULL on properties made optional
+rebase schema reconcile --drop voice_cache.wav  # and drop a column no property declares
+```
+
+**Cosa fa:**
+- Chiede al backend in esecuzione di pianificare sul proprio database. È il backend a cui puntano `.env` e il collegamento cloud, quindi funziona su Rebase Cloud, dove nient'altro raggiunge il database.
+- Pianifica `DROP NOT NULL` per ogni colonna che una collezione dichiara opzionale e che il database richiede ancora.
+- Elenca ogni colonna che nessuna collezione dichiara. Elimina solo quelle che nomini con `--drop <collection>.<column>`, e mostra quante righe hanno un valore in ciascuna.
+- Applica il piano quando digiti `yes`. Il server esegue il piano solo sul digest di quello che hai letto: se nel frattempo il database o le collezioni sono cambiati, lo rifiuta e lo riesamini. `--yes` salta la conferma.
+
+L'avvio aggiunge soltanto, quindi dopo aver rimosso una proprietà la sua colonna resta, con i suoi dati. Una colonna `NOT NULL` senza default fa allora fallire ogni inserimento, e il log dell'avvio nomina questo comando per risolverlo. Esegui prima il deploy della modifica alla collezione, perché reconcile pianifica su ciò che il backend esegue. Richiede `REBASE_SERVICE_KEY` in `.env`. In locale, `rebase db push` copre lo stesso caso con il suo controllo sulle modifiche distruttive.
 
 ### `rebase schema introspect`
 

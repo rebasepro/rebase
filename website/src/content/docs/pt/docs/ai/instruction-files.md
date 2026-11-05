@@ -1,8 +1,8 @@
 ---
-sourceHash: 5dd46da9d88b962e
+sourceHash: 718e4f07d8240ddd
 title: Arquivos de Instruções de IA
 sidebar_label: Arquivos de Instruções de IA
-description: Todo projeto Rebase estruturado inclui o ai-instructions.md mais arquivos de ponteiro de três linhas para Claude, Cursor, Windsurf, Copilot e AGENTS.md — uma única fonte de verdade, muitos nomes de arquivo.
+description: Todo projeto Rebase estruturado inclui o ai-instructions.md mais arquivos de ponteiro para Claude, Cursor, Windsurf, Copilot e AGENTS.md que trazem as cinco regras que os assistentes mais violam — uma única fonte de verdade, muitos nomes de arquivo.
 ---
 
 Cada assistente quer suas regras em um arquivo diferente. O Claude Code lê
@@ -25,12 +25,22 @@ your-project/
     └── copilot-instructions.md   ← pointer
 ```
 
-Cada arquivo de ponteiro tem três linhas:
+Cada arquivo de ponteiro nomeia o verdadeiro, diz onde ficam as skills e traz as cinco regras que um assistente não deve violar mesmo que nunca abra mais nada:
 
 ```markdown title="CLAUDE.md"
 # Rebase AI Rules
 Please refer to and follow the instructions defined in [ai-instructions.md](./ai-instructions.md).
 The Rebase skills for this assistant live in `.claude/skills/`. If they are not there yet, install them, with the Rebase MCP server: `rebase skills install --agent claude --mcp`.
+
+## Before you write any code
+
+These hold before you have opened ai-instructions.md, and in every session:
+
+- **A table is a collection.** Declare it in `config/collections/<name>.ts` with `defineCollection`, and `pnpm dev` creates it. Never `CREATE TABLE`, `ALTER TABLE` or `CREATE INDEX` in code, and never raw SQL or Drizzle against an application table, `rebase.sql()` included, except to read a column marked `excludeFromApi`, which the API never returns: raw SQL skips validation, callbacks, security rules, the admin view and the SDK types. A table that already exists gets its collection from `pnpm schema:introspect`.
+- **Data goes through the SDK:** `rebase.dataAsAdmin.<slug>` in functions and crons, `getDriver(c)` to act as the caller.
+- **A route in `backend/functions/` is public until you guard it** with `requireAuth` or `requireAdmin` from `@rebasepro/server/functions`.
+- **Never deploy, never edit `.env`, never edit generated files** (`backend/src/schema.generated.ts`, `rebase.resources.json`).
+- **When Rebase cannot do what the task needs, tell the human** what is missing instead of working around it.
 ```
 
 Na versão 0.23, a terceira linha apenas diz ao assistente para executar
@@ -75,16 +85,23 @@ ao que quer que o último projeto nessa máquina tenha persistido. Consulte
 
 ## Por que um ponteiro em vez de uma cópia
 
-Os arquivos de ponteiro são deliberadamente vazios de conteúdo. Os assistentes seguem links
-relativos em Markdown, portanto, um arquivo de três linhas que aponta para o verdadeiro obtém o mesmo resultado
-que uma cópia — e possui propriedades que uma cópia não tem:
+Os arquivos de ponteiro quase não contêm nada. Um arquivo que nomeia o verdadeiro
+mantém as convenções em um só lugar, e possui propriedades que uma cópia não tem:
 
 - **Um arquivo para editar.** As regras não divergem entre os assistentes, porque há
   apenas um conjunto de regras.
 - **Um diff para revisar.** Uma alteração nas convenções do projeto é uma alteração em um
   único arquivo, e não em cinco arquivos idênticos que um revisor precisa comparar.
-- **Adicionar um assistente requer três linhas.** Uma nova ferramenta com um novo nome de arquivo recebe um
-  ponteiro, e não uma sexta cópia das suas convenções.
+- **Adicionar um assistente é um arquivo pequeno.** Uma nova ferramenta com um novo nome
+  de arquivo recebe um ponteiro, e não uma sexta cópia das suas convenções.
+
+A única exceção é o bloco **Before you write any code**. Um assistente não segue um
+link de forma confiável: um que está ocupado com uma tarefa escreve o código primeiro, e um
+iniciado na raiz de um repositório cujo projeto Rebase fica em uma subpasta nunca carrega
+esses arquivos. Por isso, as cinco regras cuja violação causa mais estrago (uma tabela
+criada em código em vez de uma collection, dados lidos e escritos contornando o SDK, uma
+rota sem proteção, um deploy, um arquivo gerado editado) estão escritas em cada ponteiro,
+de forma idêntica. Uma verificação na CI mantém as cinco cópias iguais.
 
 Vale a pena manter esse padrão se você fizer um fork do scaffold, e vale a pena adotá-lo em
 repositórios que nem sequer são projetos Rebase.

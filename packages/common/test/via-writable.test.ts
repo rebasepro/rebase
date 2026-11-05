@@ -42,7 +42,22 @@ const users = {
             { table: "roles_tags", on: { from: "role_id", to: "role_id" } },
             { table: "tags", on: { from: "tag_id", to: "id" } }
         ]),
-        ownedTags: via("ownedTags", "many", tags, [{ table: "tags", on: { from: "id", to: "owner_id" } }])
+        ownedTags: via("ownedTags", "many", tags, [{ table: "tags", on: { from: "id", to: "owner_id" } }]),
+        // The bare conditions above, each written as a list of one.
+        listedBadge: via("listedBadge", "one", badges, [{ table: "badges", on: [{ from: "id", to: "owner_id" }] }]),
+        listedTags: via("listedTags", "many", tags, [
+            { table: "users_tags", on: [{ from: "id", to: "user_id" }] },
+            { table: "tags", on: [{ from: "tag_id", to: "id" }] }
+        ]),
+        // A link held in either of two columns.
+        eitherBadge: via("eitherBadge", "one", badges, [
+            { table: "badges", on: [{ from: "id", to: "owner_id" }, { from: "id", to: "co_owner_id" }] }
+        ]),
+        eitherTags: via("eitherTags", "many", tags, [
+            { table: "users_tags", on: [{ from: "id", to: "user_id" }, { from: "id", to: "editor_id" }] },
+            { table: "tags", on: { from: "tag_id", to: "id" } }
+        ]),
+        noConditionBadge: via("noConditionBadge", "one", badges, [{ table: "badges", on: [] }])
     }
 } as unknown as CollectionConfig;
 
@@ -67,5 +82,19 @@ describe("a via relation's writable flag", () => {
 
     it("is false for a to-many chain with no table between the ends to hold the links", () => {
         expect(relations.ownedTags.writable).toBe(false);
+    });
+
+    it("treats a list of one condition as the bare condition, so it stays writable", () => {
+        expect(relations.listedBadge.writable).toBe(true);
+        expect(relations.listedTags.writable).toBe(true);
+    });
+
+    it("is false for a step that joins on either of two columns, to-one or to-many", () => {
+        expect(relations.eitherBadge.writable).toBe(false);
+        expect(relations.eitherTags.writable).toBe(false);
+    });
+
+    it("is false for a step that lists no conditions", () => {
+        expect(relations.noConditionBadge.writable).toBe(false);
     });
 });

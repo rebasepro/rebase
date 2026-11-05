@@ -950,6 +950,7 @@ Read by `rebase`, not by the server. Nothing here affects a deployment.
 | `REBASE_SERVICE_KEY` | The service key those commands authenticate with, read from `.env`: the same variable the server reads (see above). | — |
 | `SERVICE_KEY` | An older name for that key. When `.env` sets it, `rebase api-keys` and `rebase storage` read it in place of `REBASE_SERVICE_KEY`. | — |
 | `REBASE_ENV_FILE_PATH` | Which `.env` the CLI reads and writes, when it is not the project's. | — |
+| `REBASE_ROOT_RULES` | <span class="since-badge" data-since="0.28">Since 0.28</span> `0` stops `rebase init` and `rebase skills install` from writing the project's rules into the repository root's `CLAUDE.md` and `AGENTS.md`, for a root whose agent files you keep by hand. | on |
 | `REBASE_CLOUD_URL` | The control plane `rebase cloud` talks to. | — |
 | `REBASE_CLOUD_EMAIL` | The account `rebase cloud login` signs in as, instead of prompting. | — |
 | `REBASE_CLOUD_PASSWORD` | Its password, so a secret store can hand it over without it reaching the shell's history. | — |
@@ -4017,7 +4018,7 @@ The three ratings mean:
 | Offline sync | Beta | Mutations carry idempotency keys the server honours, and the data-loss defects found in the July audit are fixed. The conflict model is last-write-wins with no per-field merge |
 | Entity history | Stable | Snapshot-based, gated by its own suite |
 | Functions and crons | Stable | The portable entry point (`@rebasepro/server/functions`) is a versioned contract with its own API-surface section |
-| MCP server + agent skills | Beta | `@rebasepro/mcp` runs over stdio: fifty-three tools, bearer auth per project, destructive tools refuse non-local targets unless opted in. Since 0.21 the server can also mount a remote `/mcp` endpoint — OAuth 2.1, eight data tools, every call under the signed-in person's own RLS — off unless `REBASE_MCP_ENABLED=true`, and Postgres only |
+| MCP server + agent skills | Beta | `@rebasepro/mcp` runs over stdio: fifty-three tools, bearer auth per project, destructive tools refuse non-local targets unless opted in. Since 0.21 the server can also mount a remote `/mcp` endpoint — OAuth 2.1, nine data tools, every call under the signed-in person's own RLS — off unless `REBASE_MCP_ENABLED=true`, and Postgres only |
 | Studio (SQL, schema, RLS, API explorer) | Beta | Used daily against real projects. Branching is present in the OSS package and deliberately not exposed in Rebase Cloud, because moving a running deployment onto a branch has no story yet |
 | CMS + admin panel | Beta | Complete for CRUD, relations, storage fields and roles. **The data table has no grid semantics** — no `role`, no `aria-rowindex`, `tabIndex` stripped — so keyboard and screen-reader users cannot operate the main view. No drafts, no per-locale content, no block rich-text |
 | PGlite managed dev database | Beta | Zero-setup `rebase dev` with no Docker. One session at a time, so requests serialize and concurrency cannot be reproduced against it; Atlas-backed commands (`db push`, `generate`, `migrate`) plan against a throwaway second PGlite started for the command (on 0.24 they refuse the managed database); `db branch` does not work there and says so |
@@ -4368,6 +4369,63 @@ yet, listed so that nobody reads a promise into them:
   `NaN`, `0` included, and any non-empty string. The admin uses it where it
   read an id's truthiness, which took record `0` for a new one.
 
+##### Server & REST
+
+- **`rebase.sql()` warns when it creates, alters, drops or indexes an
+  application table.** A table is a collection: the warning names what to do
+  instead (declare it, change its collection, or remove the collection), once
+  per table, and the statement still runs. Temporary tables and Rebase's own
+  schemas are left alone.
+
+##### CLI
+
+- **`rebase init` and `rebase skills install` write the project's rules into
+  the repository root's `CLAUDE.md` and `AGENTS.md`** when the project sits
+  below that root, between `<!-- rebase:project -->` markers, so an assistant
+  started at the root reads them too. The home folder and a root whose
+  repository ignores the project are left alone, and a file with a broken
+  marker is not touched. `REBASE_ROOT_RULES=0` turns it off.
+
+- **`rebase schema reconcile` relaxes and drops what boot will not.** Boot
+  only adds, so a property made optional kept its `NOT NULL`, and a removed
+  property left a column that could block every insert. The command plans
+  through the running backend, Rebase Cloud included. It relaxes `NOT NULL`
+  on optional properties, drops only the undeclared columns you name with
+  `--drop <collection>.<column>` (with the count of rows holding a value), and
+  applies once you confirm. The server runs only the plan whose digest you
+  confirmed. Boot's drift and orphan warnings now name it.
+
+##### MCP
+
+- **`show_collection` puts rows in front of the person, as a table they can
+  edit, in Claude and any client that renders MCP Apps.** It takes
+  `query_collection`'s arguments and returns the same page, plus the columns
+  the admin panel shows (`propertiesOrder`, `hideFromCollection`, `readOnly`).
+  `/mcp` serves the view as a `ui://` resource (`resources/list`,
+  `resources/read`), built into `@rebasepro/server`; nothing new to install. Paging
+  and cell edits are tool calls the client relays with its own token, so they
+  run as the same person under the same RLS, and each saved edit is reported
+  to the model. A client without MCP Apps, such as Claude Code or Cursor,
+  shows nothing and gets the page `query_collection` would return. Offered
+  under `data:read`; cells are editable only with `data:write`.
+
+- **`list_documents` takes `fields`, and leaves binary values out unless
+  asked.** Each binary column comes back as its size. Name the column in
+  `fields`, or pass `includeBinary: true` (also on `get_document`), to get its
+  contents. A collection with an audio column returned about a megabyte for
+  `limit: 1`.
+
+##### Storage
+
+- **A bucket can sweep away the files no row names, on a schedule.** Declare
+  `bucket("voice", { orphanSweep: { olderThanHours: 72 } })`, or
+  `orphanSweep: true` for the defaults (a week, daily at 04:17 UTC). The
+  backend schedules a cron job, `storage-orphan-sweep-<bucket>`, that runs the
+  scan behind `rebase storage orphans --delete`. It keeps any file a row or
+  history entry names, any file inside the grace period (at least 24 hours),
+  and every file when a collection can't be read. Deleting a row still leaves
+  its files until the sweep runs.
+
 #### Changed
 
 ##### Admin (CMS & app)
@@ -4448,6 +4506,10 @@ yet, listed so that nobody reads a promise into them:
   A regex with an `i`, `m` or `s` flag states no pattern.
 
 ##### Postgres
+
+- **A binary value reaches its `bytea` column as bytes.** A Buffer, typed
+  array or `ArrayBuffer` was copied into `{"0":1,"1":2,…}` and stored as that
+  JSON, while reads looked right.
 
 - **A filter or sort resolves only names the field-access check judged.** A name
   that matched no column was guessed as a foreign key (`manager` →
@@ -4569,6 +4631,13 @@ yet, listed so that nobody reads a promise into them:
 
 ##### CLI
 
+- **`rebase cloud storage create` no longer claims a stored secret for a
+  keyless bucket.** A bucket granted to the project's workload identity says
+  so, and `--json` carries `access`.
+- **`rebase cloud db backup list` says "No manual backups"** and points to
+  `backup status` and `pitr status`. It answered "No backups yet" for a
+  project with daily backups and continuous WAL.
+
 - **`rebase skills install` never deletes files outside the skills directory**,
   whatever the committed manifest lists.
 - **`rebase dev` starts the backend under a path with spaces or shell
@@ -4587,6 +4656,13 @@ yet, listed so that nobody reads a promise into them:
   connection string libpq cannot parse.
 
 ##### MCP
+
+- **The cloud read tools follow `rebase_project_use_cloud`.** These are
+  `rebase_cloud_logs`, `rebase_cloud_status`, `rebase_cloud_env_list` and
+  `rebase_cloud_deployments_list`. They now act on the selected project
+  (`--project`). Before, in a directory linked to nothing, they refused with
+  `no_project` right after a project had been selected. A deploy, an env change
+  and a rollback still act only on the linked project.
 
 - **The local-only gate reads the host a Postgres URL names in its query.**
   `postgres://…@localhost/app?host=db.prod.example.com` connects to production,
@@ -4635,6 +4711,12 @@ yet, listed so that nobody reads a promise into them:
   schema browser's templates, and keeps the current run's rows and the current
   database's schema on screen. **A branch's connection details** name its
   recorded database, and **the RLS editor reads quoted roles.**
+
+##### Storage
+
+- **An S3-compatible endpoint works without the SDK's default checksums.** A
+  custom `S3_ENDPOINT` now signs with `WHEN_REQUIRED` checksums, the AWS SDK's
+  behaviour before v3.729. GCS's S3 API does not implement the newer default.
 
 ### [0.27.0] - 2026-11-02
 
@@ -4694,6 +4776,13 @@ yet, listed so that nobody reads a promise into them:
 
 ##### Server & REST
 
+- **A `via` join step can match any of several conditions.** Give `on` a list —
+  `on: [{ from: "id", to: "a" }, { from: "id", to: "b" }]` — and a row that
+  meets any one of them joins. That reads a link stored in either of two
+  columns, such as a friendship kept as one row with the smaller account first,
+  as one relation instead of two. A chain with such a step is read-only. The
+  collection editor's relation dialog adds alternatives with "Or join on
+  another column".
 - **Streamed object writes.** `StorageController.putObjectStream` writes an
   object from a `ReadableStream` a chunk at a time, on the local, S3 and GCS
   controllers. Past `maxBytes` it rejects with `ObjectTooLargeError`, and on that
@@ -4956,6 +5045,19 @@ yet, listed so that nobody reads a promise into them:
   stayed at the value it had on first render.
 - **`conditions.min` and `conditions.max` take a number,** as the docs write
   them; only a JSON Logic rule compiled.
+- **A list with `listProperties` keeps the status and date its `display`
+  declares.** They were dropped as soon as a collection named columns of its
+  own; they now follow those columns. Only declared slots join them, not
+  inferred ones.
+- **A list whose title is written as a function names that column after the
+  collection's `singularName`.** It took the name of whichever property the
+  row fell back to while the title loaded, and offered to sort by it.
+- **A read-only field marked required shows no red asterisk.** No one can fill
+  it in, so the form no longer asks for it.
+- **At exactly 1024px wide the menu button no longer covers the collection
+  toolbar.** The layout switch now happens at the same width as the `lg:`
+  styles. Below it, an admin without an app bar shows the menu button in its own
+  row above the page.
 
 ### [0.26.0] - 2026-10-29
 
@@ -22077,7 +22179,7 @@ All property types share these options:
 | `propertyConfig` | `string` | Registered property config key |
 | `columnName` | `string` | Explicit database column name (bypasses snake_case conversion) |
 | `callbacks` | `PropertyCallbacks` | Hooks for `afterRead` and `beforeSave` transforms |
-| `excludeFromApi` | `boolean` | Never mention this column on the API surface, in either direction — for a password hash or a verification token. The value is still written and queryable server-side; it is stripped from every row the API serves, for every caller including admins and service keys, and it is absent from the generated `Row`, `Insert` and `Update` types and from the OpenAPI schema. Sugar for `access: { read: [], write: [] }` — the two are one mechanism, and setting both on one property is refused at boot |
+| `excludeFromApi` | `boolean` | Never mention this column on the API surface, in either direction — for a password hash or a verification token. The value is still written, and readable server-side through `rebase.sql()` only; it is stripped from every row the API serves, for every caller including admins, service keys and `rebase.dataAsAdmin` reads, and it is absent from the generated `Row`, `Insert` and `Update` types and from the OpenAPI schema. Sugar for `access: { read: [], write: [] }` — the two are one mechanism, and setting both on one property is refused at boot |
 | `access` | `{ read?: string[]; write?: string[] }` | Who may read and who may write this one field, by role. An omitted list delegates to the row's [security rules](/docs/collections/security-rules/); `[]` is nobody through the API; a role list is those roles plus `admin`. An unreadable field is **absent** from responses rather than `null`, and a write naming an unwritable one is a 400. See [Field access](/docs/collections/field-access/) |
 | `metadata` | `Record<string, unknown>` | Anything your own code needs to hang off a property. Rebase does not read it; it survives serialization unchanged |
 | `dynamicProps` | `function` | Dynamic property builder (see [Conditional fields](/docs/collections/validation-and-conditions/#conditional-fields)). **Admin form only — not enforced by the API or the database.** |
@@ -23371,6 +23473,16 @@ joinPath: [
 ]
 ```
 
+#### Matching either of two columns
+
+A list in `on` joins a row meeting **any one** condition — a link kept in `a` or `b`. It is **read-only**.
+
+```typescript
+joinPath: [{ table: "friendships", on: [{ from: "id", to: "a" }, { from: "id", to: "b" }] }]
+```
+
+Adding a second step to `people` (`on: [{ from: "a", to: "id" }, { from: "b", to: "id" }]`) also matches the parent's own column, so each person comes back as their own friend: list the friendship rows, or filter the person out.
+
 ### Cascade Rules
 
 Control what happens when related entities are updated or deleted:
@@ -23488,80 +23600,7 @@ For the full query builder reference (filtering, sorting, pagination, real-time)
 
 ### Relations in the admin panel
 
-Every to-many relation — `hasMany`, `manyToMany`, or a to-many `via` — becomes a
-**tab** under a record in the admin panel, listing the rows that record reaches.
-
-#### The path segment is the relation name
-
-A child list is addressed as `parent/parentId/relationName`:
-
-```
-/c/authors/a-1/posts          the posts of author a-1
-/c/posts/p-1/tags             the tags of post p-1
-```
-
-The last segment is the **relation name**, not the target collection's slug. They
-are often the same, because an unnamed relation takes its target's slug — but an
-inline relation property takes the *property key*:
-
-```typescript
-properties: {
-    featuredTags: {
-        type: "relation",
-        relation: { kind: "manyToMany", target: () => tagsCollection }
-    }
-}
-// tab and path segment: featuredTags   (not "tags")
-```
-
-This is also what makes two relations to the same collection work: each has its own
-name, so each gets its own tab and its own path.
-
-#### Owned rows versus shared rows
-
-What a tab lets you do depends on how the relation is stored, because the two cases
-mean different things:
-
-| | One-to-many (`foreignKeyOnTarget`) | Many-to-many (`through`) |
-|---|---|---|
-| The child belongs to | this parent alone | every parent that links it |
-| Create | creates the row under this parent | creates the row and links it |
-| Add existing | — | links an existing row |
-| Remove | **deletes** the row | **unlinks** it; the row is untouched |
-
-The admin panel renders each accordingly: a many-to-many tab offers **Add existing**
-and **Remove from this record**, and never a delete that would take the row away
-from other parents.
-
-#### The same rules over REST
-
-Child lists are ordinary collection queries narrowed to one parent, so they accept
-everything a root list does — filters, `orderBy`, `limit`, `offset`, `include` — and
-`meta.total` counts the filtered rows. Filter either per field (`?field=op.value`) or
-with a whole-object `?where={"field":["op","value"]}`; both reach the same query:
-
-```
-GET    /api/data/authors/a-1/posts?status=eq.published&orderBy=title&limit=20
-GET    /api/data/authors/a-1/posts?where={"status":["==","published"]}&orderBy=title
-GET    /api/data/authors/a-1/posts/p-1
-POST   /api/data/authors/a-1/posts          create under this parent
-PATCH  /api/data/authors/a-1/posts/p-1      update; will not reparent
-DELETE /api/data/authors/a-1/posts/p-1      delete (one-to-many) / unlink (many-to-many)
-```
-
-The parent segment is enforced, not decorative. Addressing a row that is not under
-that parent returns `404`, and `PATCH` never moves a row from one parent to another —
-set the foreign key explicitly if that is what you want.
-
-For a many-to-many, `PATCH parent/id/child/childId` is *set membership*: it links the
-row if it is not linked yet, and is idempotent. That is how you attach a row that
-already exists.
-
-#### What does not become a tab
-
-- **To-one relations** — they are a field on the record, not a list. Writing through
-  a to-one path is rejected: the foreign key lives on the parent's table.
-- **Relations declared inside a `map`** — they are a field of that map.
+Every to-many relation (`hasMany`, `manyToMany`, or a to-many `via`) becomes a tab under a record in the admin panel, addressed by the relation's name. [Relations in the admin panel](/docs/collections/relations-in-the-admin-panel/) covers the paths, what a tab creates, links, unlinks or deletes, the same rules over REST, and what does not become a tab.
 
 ### Full Relation Interface
 
@@ -23627,7 +23666,7 @@ interface ViaRelation extends RelationBase {
 What you write above is the *authoring* shape. Internally Rebase works with
 `ResolvedRelation`: the same link with every default filled in and nothing
 optional, plus `cardinality`, `targetSlug`, and two flags — `writable` (false
-only for a multi-hop `via`) and `shared` (true when the target rows belong to other parents
+only for a multi-hop `via` or one with a step matching any of several conditions) and `shared` (true when the target rows belong to other parents
 too, so a removal unlinks rather than deletes).
 
 `sourceKey` is the one exception to "nothing optional": its default is the
@@ -23643,6 +23682,88 @@ normalization.
 
 - **[Security Rules](/docs/collections/security-rules)** — Row Level Security
 - **[Properties](/docs/collections/properties)** — Property types reference
+
+## Relations in the admin panel
+
+Every to-many relation — `hasMany`, `manyToMany`, or a to-many `via` — becomes a
+**tab** under a record in the admin panel, listing the rows that record reaches.
+
+### The path segment is the relation name
+
+A child list is addressed as `parent/parentId/relationName`:
+
+```
+/c/authors/a-1/posts          the posts of author a-1
+/c/posts/p-1/tags             the tags of post p-1
+```
+
+The last segment is the **relation name**, not the target collection's slug. They
+are often the same, because an unnamed relation takes its target's slug — but an
+inline relation property takes the *property key*:
+
+```typescript
+properties: {
+    featuredTags: {
+        type: "relation",
+        relation: { kind: "manyToMany", target: () => tagsCollection }
+    }
+}
+// tab and path segment: featuredTags   (not "tags")
+```
+
+This is also what makes two relations to the same collection work: each has its own
+name, so each gets its own tab and its own path.
+
+### Owned rows versus shared rows
+
+What a tab lets you do depends on how the relation is stored, because the two cases
+mean different things:
+
+| | One-to-many (`foreignKeyOnTarget`) | Many-to-many (`through`) |
+|---|---|---|
+| The child belongs to | this parent alone | every parent that links it |
+| Create | creates the row under this parent | creates the row and links it |
+| Add existing | — | links an existing row |
+| Remove | **deletes** the row | **unlinks** it; the row is untouched |
+
+The admin panel renders each accordingly: a many-to-many tab offers **Add existing**
+and **Remove from this record**, and never a delete that would take the row away
+from other parents.
+
+### The same rules over REST
+
+Child lists are ordinary collection queries narrowed to one parent, so they accept
+everything a root list does — filters, `orderBy`, `limit`, `offset`, `include` — and
+`meta.total` counts the filtered rows. Filter either per field (`?field=op.value`) or
+with a whole-object `?where={"field":["op","value"]}`; both reach the same query:
+
+```
+GET    /api/data/authors/a-1/posts?status=eq.published&orderBy=title&limit=20
+GET    /api/data/authors/a-1/posts?where={"status":["==","published"]}&orderBy=title
+GET    /api/data/authors/a-1/posts/p-1
+POST   /api/data/authors/a-1/posts          create under this parent
+PATCH  /api/data/authors/a-1/posts/p-1      update; will not reparent
+DELETE /api/data/authors/a-1/posts/p-1      delete (one-to-many) / unlink (many-to-many)
+```
+
+The parent segment is enforced, not decorative. Addressing a row that is not under
+that parent returns `404`, and `PATCH` never moves a row from one parent to another —
+set the foreign key explicitly if that is what you want.
+
+For a many-to-many, `PATCH parent/id/child/childId` is *set membership*: it links the
+row if it is not linked yet, and is idempotent. That is how you attach a row that
+already exists.
+
+### What does not become a tab
+
+- **To-one relations** — they are a field on the record, not a list. Writing through
+  a to-one path is rejected: the foreign key lives on the parent's table.
+- **Relations declared inside a `map`** — they are a field of that map.
+
+### Next Steps
+
+- **[Relations](/docs/collections/relations/)** — the five kinds, and how to declare each
+- **[Writing over REST](/docs/backend/writes/)** — create, update and delete beyond a child list
 
 ## Soft delete
 
@@ -27677,6 +27798,24 @@ so a panel can grey the feature out instead of showing an error.
 | `SCHEMA_EDITOR_PRODUCTION` | 501 | The editor is off under `NODE_ENV=production`: a deployed server's files are rebuilt from your repository on every deploy, so an edit here would be discarded. | Edit collections in development and deploy, or configure `liveSchema.repository` to commit them there. |
 | `SQL_EXPORT_UNSUPPORTED` | 501 | `POST /api/admin/sql/csv` cannot stream a result here: the in-process development database (PGlite) has one connection, and a cursor held across a download would hold every other query behind it; or the data source has no SQL cursor. | Point `DATABASE_URL` at a Postgres of your own (`rebase dev --docker` starts one), or add a `LIMIT` and export the rows on screen. |
 
+#### Schema reconcile
+
+<span class="since-badge" data-since="0.28">Since 0.28</span>
+
+[`rebase schema reconcile`](/docs/cli/schema/#rebase-schema-reconcile) plans
+through `POST /api/admin/schema/reconcile/plan` and applies through
+`/reconcile/apply`. A refusal changes nothing; only `SCHEMA_RECONCILE_FAILED`
+leaves part of a plan applied.
+
+| Code | Status | Means | Do |
+| --- | --- | --- | --- |
+| `INVALID_RECONCILE` | 400 | The body is not a JSON object, or `drop` is not a list of `"<collection>.<column>"` strings. | Send `{ "drop": ["voice_cache.wav"] }`, or leave `drop` out. |
+| `SCHEMA_RECONCILE_FAILED` | 400 | A statement failed partway through. The statements before it ran and stay applied; `details.applied` lists them. | Fix what the message names, then plan again: the new plan leaves out what already ran. |
+| `SCHEMA_RECONCILE_INVALID` | 400 | The plan cannot be applied, and the message lists why: a `drop` that is not `<collection>.<column>`, names no collection or no column, or names a column the collection still declares. `details.plan` is the plan. | Fix the `drop` list. A declared column is dropped by removing its property, deploying, then reconciling. |
+| `SCHEMA_RECONCILE_STALE` | 409 | The database or the collections changed since the plan you confirmed. `details.plan` is the new one. | Review the new plan and confirm its `digest`. |
+| `SCHEMA_RECONCILE_UNCONFIRMED` | 400 | `/reconcile/apply` was sent no `confirm`. | Plan first and send the plan's `digest` as `confirm`. The CLI does this once you type `yes`. |
+| `SCHEMA_RECONCILE_UNSUPPORTED` | 503 | This backend's driver cannot plan a reconcile, or cannot run SQL. | Reconcile works on Postgres. |
+
 #### Why a branch's table cannot be merged
 
 `BRANCH_MERGE_BLOCKED` names each table it refused in `details.tables`, with one
@@ -27883,6 +28022,8 @@ a collection reaches none of this. See [Roles and scopes](/docs/backend/roles-an
 | `GET` | `/api/admin/schema/status` | `schema:read` | [Live schema editing](/docs/backend/live-schema-editing/) |
 | `POST` | `/api/admin/schema/plan` | `schema:read` | Plans a change; never applies one |
 | `POST` | `/api/admin/schema/apply` | `schema:write` | A person only, unless `REBASE_LIVE_SCHEMA_ALLOW_MACHINE_APPLY` |
+| `POST` | `/api/admin/schema/reconcile/plan` | `schema:read` | <span class="since-badge" data-since="0.28">Since 0.28</span> Plans relaxing `NOT NULL` and dropping the undeclared columns named in `drop`, for [schema reconcile](/docs/cli/schema/#rebase-schema-reconcile); never applies one |
+| `POST` | `/api/admin/schema/reconcile/apply` | `schema:write` | <span class="since-badge" data-since="0.28">Since 0.28</span> Applies a reconcile plan, only if its `digest` is the `confirm` sent |
 | `GET` | `/api/admin/schema-editor/status` | `schema:read` | Whether the editor is available, and the reason when it is not |
 | `POST` | `/api/admin/schema-editor/collection/save` | `schema:write` | [Studio](/docs/studio/) — rewrites collection source |
 | `POST` | `/api/admin/schema-editor/collection/delete` | `schema:write` | [Studio](/docs/studio/) |
@@ -30523,6 +30664,34 @@ Only the account-scoped variables fall back — `S3_ACCESS_KEY_ID`,
 the GCS `GCS_PROJECT_ID` / `GCS_KEY_FILENAME` pair. The bucket name never does:
 it is what distinguishes one source from another. A per-bucket value still wins,
 so one source can move providers without breaking the rest.
+
+#### Deleting files no row names, on a schedule
+
+Deleting a row leaves its files in the bucket. Nothing is deleted with the row:
+another row, a version in [history](/docs/backend/history/), or your own code
+holding the key in a plain string may still name the file. A bucket can ask for
+the clean-up that can see all of those instead:
+
+```ts
+export const voice = bucket("voice", { engine: "s3", orphanSweep: { olderThanHours: 72 } });
+export const media = bucket("media", { orphanSweep: true }); // a week, daily at 04:17 UTC
+```
+
+Each declared sweep is a cron job, `storage-orphan-sweep-<bucket>`
+(`storage-orphan-sweep-default` for the default bucket). It runs the scan behind
+`rebase storage orphans --delete`. That scan reads every row of every
+collection and every history entry, and it keeps:
+
+- a file that anything still names;
+- a file newer than `olderThanHours` (at least 24, a week by default);
+- every file, for that run, when a collection can't be read.
+
+It then checks each file again right before deleting it. Set `schedule` to a
+cron expression (UTC) to change when it runs. Being a cron job, it runs on one
+instance per slot. Its run history records how many files it deleted and kept,
+and it can be paused or run by hand from the admin's cron list. It needs a
+bucket this backend serves: a `transport: "direct"` bucket is refused at boot
+with a warning.
 
 ### Frontend Storage Sources
 
@@ -34418,6 +34587,8 @@ For most projects the distinction never surfaces, because the default policies R
 
 If you genuinely need an unconditional bypass, `rebase.sql()` is it: raw SQL on the owner connection, no policies, every row. It is the most privileged thing in a function's context — more so than the accessor with "admin" in its name.
 
+It is not for making tables. A table is a [collection](/docs/collections/), declared in `config/collections/` and created by boot; one made with `CREATE TABLE` in a function has no validation, callbacks, security rules, admin view or SDK type. `rebase.sql()` runs such a statement, and logs a warning naming the collection to declare instead.
+
 ```typescript
 import { defineFunction, requireAuth, requireAdmin } from "@rebasepro/server/functions";
 
@@ -34509,62 +34680,7 @@ A rejection is logged rather than left to the unhandled-rejection handler, so a 
 
 ### Runtime portability
 
-A custom function is a Hono app, and Hono runs on every JavaScript server runtime. Whether *your* function could run somewhere other than a Node process therefore comes down to what its own file imports and touches.
-
-Nothing here is a restriction on what you may write today. Every Rebase deployment is a Node process, a function that reads a file or opens a socket is a perfectly good function, and no build or deploy fails because of any of this. It is written down so the answer is knowable now rather than discovered per-file later.
-
-**Portable — works on any runtime:**
-
-- Everything exported from `@rebasepro/server/functions`
-- `getDriver(c)` and `rebase.dataAsAdmin` — both go over the same wire wherever they run
-- `rebase.auth`, `rebase.storage`, `rebase.email`
-- `fetch`, `Request`/`Response`, `URL`, `crypto.subtle`, `TextEncoder` — the web platform
-- Any dependency that does not need Node
-
-**Node-only:**
-
-- `rebase.sql()` — the database owner connection is a TCP socket
-- A directly imported Drizzle/`pg`/`mongodb` client, for the same reason
-- Node built-ins: `fs`, `path`, `crypto` (the Node module — `globalThis.crypto` is portable), `child_process`, …
-- Packages built on them: `jsonwebtoken`, `nodemailer`, `sharp`, `bcrypt`, …
-
-**Latent bugs on every runtime** — these are worth fixing regardless:
-
-- `process.env` read at module scope (see [Configuration and Secrets](#configuration-and-secrets))
-- Fire-and-forget promises instead of [`waitUntil`](#background-work)
-- Relying on a handler continuing to run after its request timed out. On Node it does; that is a property of the process, not a promise the framework makes
-
-#### Checking your own functions
-
-`rebase build` prints a line per actionable finding and records the verdict per function in the bundle manifest:
-
-```json
-{
-  "functions": [
-    { "name": "hello", "file": "backend/functions/hello.js", "portable": true },
-    { "name": "reports", "file": "backend/functions/reports.js", "portable": false,
-      "requires": ["imports the Node built-in \"fs\""] }
-  ]
-}
-```
-
-`rebase doctor` reports the same thing without building.
-
-#### If you need a runtime-specific path
-
-`runtimeKey()` returns `"node"`, `"workerd"`, `"deno"`, `"bun"`, `"edge-light"`, `"fastly"` or `"other"`; `isNodeRuntime()` is the common check. Use them to degrade, not to fork an implementation — a function that needs two implementations is two functions.
-
-```typescript
-import { defineFunction, isNodeRuntime } from "@rebasepro/server/functions";
-
-export default defineFunction((app, { rebase }) => {
-    app.get("/stats", async (c) => {
-        if (!isNodeRuntime()) return c.json({ error: "Not available here" }, 501);
-        const rows = await rebase.sql("SELECT count(*) AS total FROM jobs");
-        return c.json({ totalJobs: Number(rows[0]?.total ?? 0) });
-    });
-});
-```
+A custom function is a Hono app, so whether it could run somewhere other than a Node process comes down to what its own file imports. `rebase.sql()`, a directly imported database client and Node built-ins tie it to Node; the rest of `rebase` and the web platform do not, and nothing fails today because of either. [Runtime portability](/docs/backend/runtime-portability/) lists what is portable, how `rebase build` and `rebase doctor` report it, and how to branch on the runtime.
 
 ### Route Registration Order
 
@@ -34674,6 +34790,65 @@ knowing before you design around them. See
 - **[Backend Overview](/docs/backend)** — Full backend configuration reference
 - **[Entity Callbacks](/docs/collections/callbacks)** — Run logic on data changes
 - **[Cron Jobs](/docs/backend/cron-jobs)** — Scheduled background tasks
+
+## Runtime portability
+
+A custom function is a Hono app, and Hono runs on every JavaScript server runtime. Whether *your* function could run somewhere other than a Node process therefore comes down to what its own file imports and touches.
+
+Nothing here is a restriction on what you may write today. Every Rebase deployment is a Node process, a function that reads a file or opens a socket is a perfectly good function, and no build or deploy fails because of any of this. It is written down so the answer is knowable now rather than discovered per-file later.
+
+**Portable — works on any runtime:**
+
+- Everything exported from `@rebasepro/server/functions`
+- `getDriver(c)` and `rebase.dataAsAdmin` — both go over the same wire wherever they run
+- `rebase.auth`, `rebase.storage`, `rebase.email`
+- `fetch`, `Request`/`Response`, `URL`, `crypto.subtle`, `TextEncoder` — the web platform
+- Any dependency that does not need Node
+
+**Node-only:**
+
+- `rebase.sql()` — the database owner connection is a TCP socket
+- A directly imported Drizzle/`pg`/`mongodb` client, for the same reason
+- Node built-ins: `fs`, `path`, `crypto` (the Node module — `globalThis.crypto` is portable), `child_process`, …
+- Packages built on them: `jsonwebtoken`, `nodemailer`, `sharp`, `bcrypt`, …
+
+**Latent bugs on every runtime** — these are worth fixing regardless:
+
+- `process.env` read at module scope (see [Configuration and Secrets](/docs/backend/custom-functions/#configuration-and-secrets))
+- Fire-and-forget promises instead of [`waitUntil`](/docs/backend/custom-functions/#background-work)
+- Relying on a handler continuing to run after its request timed out. On Node it does; that is a property of the process, not a promise the framework makes
+
+### Checking your own functions
+
+`rebase build` prints a line per actionable finding and records the verdict per function in the bundle manifest:
+
+```json
+{
+  "functions": [
+    { "name": "hello", "file": "backend/functions/hello.js", "portable": true },
+    { "name": "reports", "file": "backend/functions/reports.js", "portable": false,
+      "requires": ["imports the Node built-in \"fs\""] }
+  ]
+}
+```
+
+`rebase doctor` reports the same thing without building.
+
+### If you need a runtime-specific path
+
+`runtimeKey()` returns `"node"`, `"workerd"`, `"deno"`, `"bun"`, `"edge-light"`, `"fastly"` or `"other"`; `isNodeRuntime()` is the common check. Use them to degrade, not to fork an implementation — a function that needs two implementations is two functions.
+
+```typescript
+import { defineFunction, isNodeRuntime } from "@rebasepro/server/functions";
+
+export default defineFunction((app, { rebase }) => {
+    app.get("/stats", async (c) => {
+        if (!isNodeRuntime()) return c.json({ error: "Not available here" }, 501);
+        const rows = await rebase.sql("SELECT count(*) AS total FROM jobs");
+        return c.json({ totalJobs: Number(rows[0]?.total ?? 0) });
+    });
+});
+```
 
 ## Typed server-side data
 
@@ -50641,14 +50816,22 @@ to one user, the endpoint declines to mount and says why in the boot log. No
   screen tells them so. It also names the host the authorization code is sent
   to, and says that host is not verified: anyone may register a client under
   any name, so the host is the part a person can check.
-- **Eight tools, three scopes.** The same [scopes](/docs/backend/roles-and-scopes/)
+- **Nine tools, three scopes.** The same [scopes](/docs/backend/roles-and-scopes/)
   every credential uses. `data:read` offers `list_collections`, `describe_collection`,
-  `query_collection`, `count_documents` and `get_document`; `data:write` adds `create_document` and
+  `query_collection`, `show_collection`, `count_documents` and `get_document`; `data:write` adds `create_document` and
   `update_document`; `data:delete` adds `delete_document`. A client that asks for
   nothing gets `data:read`. Each one narrows to a collection: `data:read:posts`
   lists, describes and reads `posts` and nothing else. A scope decides which tools are
   offered and which collections they reach, not which rows: an empty list can be
   RLS working, and `data:write` still cannot write a row the person could not.
+- <span class="since-badge" data-since="0.28">Since 0.28</span> **`show_collection` puts the rows in front of the person.** It takes
+  `query_collection`'s arguments and answers the same page, plus the columns the
+  admin panel shows. A client that renders MCP Apps, such as Claude, opens it as a
+  table in the conversation: the person can load more rows and, where the
+  connection holds `data:write`, edit a cell in place. Each save is an
+  `update_document` call made as them, under their RLS, and the model is told what
+  they changed. A client without MCP Apps, such as Claude Code or Cursor, shows no
+  table, and the model reads the page as it would from `query_collection`.
 - **Grants made before 0.24 keep their reach.** `mcp:read` is read as
   `data:read`, and `mcp:write` as `data:write data:delete`, on stored grants and
   on tokens already issued.
@@ -50907,12 +51090,22 @@ your-project/
     └── copilot-instructions.md   ← pointer
 ```
 
-Each pointer file is three lines:
+Each pointer file names the real one, says where the skills live, and carries the five rules an assistant must not break even if it never opens anything else:
 
 ```markdown title="CLAUDE.md"
 # Rebase AI Rules
 Please refer to and follow the instructions defined in [ai-instructions.md](./ai-instructions.md).
 The Rebase skills for this assistant live in `.claude/skills/`. If they are not there yet, install them, with the Rebase MCP server: `rebase skills install --agent claude --mcp`.
+
+## Before you write any code
+
+These hold before you have opened ai-instructions.md, and in every session:
+
+- **A table is a collection.** Declare it in `config/collections/<name>.ts` with `defineCollection`, and `pnpm dev` creates it. Never `CREATE TABLE`, `ALTER TABLE` or `CREATE INDEX` in code, and never raw SQL or Drizzle against an application table, `rebase.sql()` included, except to read a column marked `excludeFromApi`, which the API never returns: raw SQL skips validation, callbacks, security rules, the admin view and the SDK types. A table that already exists gets its collection from `pnpm schema:introspect`.
+- **Data goes through the SDK:** `rebase.dataAsAdmin.<slug>` in functions and crons, `getDriver(c)` to act as the caller.
+- **A route in `backend/functions/` is public until you guard it** with `requireAuth` or `requireAdmin` from `@rebasepro/server/functions`.
+- **Never deploy, never edit `.env`, never edit generated files** (`backend/src/schema.generated.ts`, `rebase.resources.json`).
+- **When Rebase cannot do what the task needs, tell the human** what is missing instead of working around it.
 ```
 
 On 0.23 the third line only tells the assistant to run
@@ -50957,16 +51150,24 @@ whatever the last project on that machine persisted. See
 
 ### Why a pointer rather than a copy
 
-The pointer files are deliberately content-free. Assistants follow relative
-Markdown links, so a three-line file that names the real one gets the same result
-as a copy — and it has properties a copy does not:
+The pointer files hold almost nothing. A file that names the real one keeps the
+conventions in one place, and it has properties a copy does not:
 
 - **One file to edit.** Rules cannot drift between assistants, because there is
   only one set of rules.
 - **One diff to review.** A change to project conventions is a change to one
   file, not five identical ones a reviewer must compare.
-- **Adding an assistant is three lines.** A new tool with a new filename gets a
-  pointer, not a sixth copy of your conventions.
+- **Adding an assistant is one small file.** A new tool with a new filename gets
+  a pointer, not a sixth copy of your conventions.
+
+The one exception is the **Before you write any code** block. An assistant does
+not reliably follow a link: one that is busy with a task writes the code first,
+and one started at the root of a repository whose Rebase project sits in a
+subfolder never loads these files at all. So the five rules whose breaking does
+the most damage (a table made in code instead of a collection, data read and
+written around the SDK, an unguarded route, a deploy, an edited generated file)
+are written into every pointer, identically. A check in CI keeps the five
+copies the same.
 
 The pattern is worth keeping if you fork the scaffold, and worth adopting in
 repos that are not Rebase projects at all.
@@ -52377,6 +52578,25 @@ rebase schema stale --fix    # regenerate the file instead
 `rebase dev` keeps the file current by itself, so this is the check for a build
 or a CI step. It takes `--collections` and `--output` as `rebase schema generate`
 does.
+
+#### `rebase schema reconcile`
+
+<span class="since-badge" data-since="0.28">Since 0.28</span>
+
+Relax and drop what boot will not, after you have read the plan:
+
+```bash
+rebase schema reconcile                         # relax NOT NULL on properties made optional
+rebase schema reconcile --drop voice_cache.wav  # and drop a column no property declares
+```
+
+**What it does:**
+- Asks the running backend to plan against its own database. That's the backend `.env` and the cloud link point at, so it works on Rebase Cloud, where nothing else reaches the database.
+- Plans `DROP NOT NULL` for every column a collection declares optional that the database still requires.
+- Lists every column no collection declares. It drops only the ones you name with `--drop <collection>.<column>`, and shows how many rows hold a value in each.
+- Applies once you type `yes`. The server runs the plan only on the digest of the one you read, so if the database or the collections changed in between, it refuses and you review again. `--yes` skips the prompt.
+
+Boot only ever adds, so after you remove a property its column stays, with its data. A `NOT NULL` column with no default then makes every insert fail, and boot's log names this command for it. Deploy the collection change first, because reconcile plans against what the backend runs. It needs `REBASE_SERVICE_KEY` in `.env`. Locally, `rebase db push` covers the same through its destructive-change gate.
 
 #### `rebase schema introspect`
 

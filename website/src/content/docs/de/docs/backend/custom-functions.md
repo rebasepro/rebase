@@ -1,5 +1,5 @@
 ---
-sourceHash: 22d7c8bbab763065
+sourceHash: f6f92e433b71765f
 title: Eigene Funktionen (Custom Functions)
 sidebar_label: Custom Functions
 description: Fügen Sie eigene Hono-API-Endpunkte neben Ihren Rebase-CRUD-Routen hinzu. Automatische Erkennung aus einem Verzeichnis, mit vollem Zugriff auf die Backend-Instanz.
@@ -344,6 +344,8 @@ Bei den meisten Projekten fällt dieser Unterschied nicht auf, da die von Rebase
 
 Wenn Sie zwingend eine bedingungslose Umgehung benötigen, ist `rebase.sql()` die Lösung: Raw SQL über die Owner-Verbindung, keine Policies, Zugriff auf alle Zeilen. Es ist das mächtigste Werkzeug im Kontext einer Funktion — mehr noch als der Accessor mit "admin" im Namen.
 
+Zum Anlegen von Tabellen ist es nicht gedacht. Eine Tabelle ist eine [Collection](/docs/collections/), deklariert in `config/collections/` und beim Booten erstellt; eine mit `CREATE TABLE` in einer Funktion angelegte Tabelle hat keine Validierung, keine Callbacks, keine Sicherheitsregeln, keine Admin-Ansicht und keinen SDK-Typ. `rebase.sql()` führt eine solche Anweisung aus und protokolliert eine Warnung, die die stattdessen zu deklarierende Collection nennt.
+
 ```typescript
 import { defineFunction, requireAuth, requireAdmin } from "@rebasepro/server/functions";
 
@@ -435,62 +437,7 @@ Ein Fehler wird geloggt, anstatt an den Unhandled-Rejection-Handler übergeben z
 
 ## Portabilität der Laufzeitumgebung
 
-Eine Custom Function ist eine Hono-App, und Hono läuft auf jeder JavaScript-Server-Laufzeitumgebung. Ob *Ihre* Funktion außerhalb eines Node-Prozesses laufen kann, hängt davon ab, was ihre eigene Datei importiert und verwendet.
-
-Nichts davon schränkt ein, was Sie heute schreiben können. Jedes Rebase-Deployment ist ein Node-Prozess; eine Funktion, die eine Datei liest oder einen Socket öffnet, ist völlig legitim, und kein Build oder Deployment schlägt deswegen fehl. Dies ist dokumentiert, damit die Antwort bereits jetzt bekannt ist und nicht später dateiweise ermittelt werden muss.
-
-**Portabel — funktioniert auf jeder Laufzeitumgebung:**
-
-- Alles, was aus `@rebasepro/server/functions` exportiert wird
-- `getDriver(c)` und `rebase.dataAsAdmin` — beide kommunizieren unabhängig von der Umgebung über dieselbe Schnittstelle
-- `rebase.auth`, `rebase.storage`, `rebase.email`
-- `fetch`, `Request`/`Response`, `URL`, `crypto.subtle`, `TextEncoder` — Web-Standards
-- Jede Abhängigkeit, die kein Node erfordert
-
-**Nur unter Node:**
-
-- `rebase.sql()` — die Owner-Verbindung zur Datenbank ist ein TCP-Socket
-- Ein direkt importierter Drizzle-/`pg`-/`mongodb`-Client aus demselben Grund
-- Node-eigene Module: `fs`, `path`, `crypto` (das Node-Modul — `globalThis.crypto` ist portabel), `child_process`, …
-- Darauf aufbauende Pakete: `jsonwebtoken`, `nodemailer`, `sharp`, `bcrypt`, …
-
-**Latente Fehler auf jeder Laufzeitumgebung** — diese sollten in jedem Fall behoben werden:
-
-- `process.env`-Zugriffe auf Modulebene (siehe [Konfiguration und Secrets](#konfiguration-und-secrets))
-- Fire-and-Forget-Promises anstelle von [`waitUntil`](#hintergrundaufgaben)
-- Sich darauf zu verlassen, dass ein Handler nach dem Timeout seiner Anfrage weiterläuft. Unter Node tut er das; das ist jedoch eine Eigenschaft des Prozesses, keine Garantie des Frameworks
-
-### Eigene Funktionen überprüfen
-
-`rebase build` gibt für jeden relevanten Befund eine Zeile aus und vermerkt das Ergebnis pro Funktion im Bundle-Manifest:
-
-```json
-{
-  "functions": [
-    { "name": "hello", "file": "backend/functions/hello.js", "portable": true },
-    { "name": "reports", "file": "backend/functions/reports.js", "portable": false,
-      "requires": ["imports the Node built-in \"fs\""] }
-  ]
-}
-```
-
-`rebase doctor` meldet dasselbe, ohne dass ein Build erforderlich ist.
-
-### Wenn Sie einen laufzeitspezifischen Pfad benötigen
-
-`runtimeKey()` gibt `"node"`, `"workerd"`, `"deno"`, `"bun"`, `"edge-light"`, `"fastly"` oder `"other"` zurück; `isNodeRuntime()` ist die gängige Prüfung. Nutzen Sie diese für Fallbacks, nicht um eine Implementierung zu forken — eine Funktion, die zwei Implementierungen erfordert, sind eigentlich zwei Funktionen.
-
-```typescript
-import { defineFunction, isNodeRuntime } from "@rebasepro/server/functions";
-
-export default defineFunction((app, { rebase }) => {
-    app.get("/stats", async (c) => {
-        if (!isNodeRuntime()) return c.json({ error: "Not available here" }, 501);
-        const rows = await rebase.sql("SELECT count(*) AS total FROM jobs");
-        return c.json({ totalJobs: Number(rows[0]?.total ?? 0) });
-    });
-});
-```
+Eine eigene Funktion ist eine Hono-App, also hängt die Frage, ob sie außerhalb eines Node-Prozesses laufen könnte, davon ab, was ihre eigene Datei importiert. `rebase.sql()`, ein direkt importierter Datenbank-Client und Node-Built-ins binden sie an Node; der Rest von `rebase` und die Web-Plattform nicht, und keins von beidem lässt heute etwas fehlschlagen. [Portabilität der Laufzeitumgebung](/docs/backend/runtime-portability/) listet auf, was portabel ist, wie `rebase build` und `rebase doctor` es melden und wie man nach der Laufzeitumgebung verzweigt.
 
 ## Reihenfolge der Routen-Registrierung
 

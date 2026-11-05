@@ -1,8 +1,8 @@
 ---
-sourceHash: 5dd46da9d88b962e
+sourceHash: 718e4f07d8240ddd
 title: Fichiers d'instructions IA
 sidebar_label: Fichiers d'instructions IA
-description: Chaque projet Rebase généré inclut ai-instructions.md ainsi que des fichiers pointeurs de trois lignes pour Claude, Cursor, Windsurf, Copilot et AGENTS.md — une source de vérité unique, de multiples noms de fichiers.
+description: Chaque projet Rebase généré inclut ai-instructions.md ainsi que des fichiers pointeurs pour Claude, Cursor, Windsurf, Copilot et AGENTS.md qui portent les cinq règles que les assistants enfreignent le plus — une source de vérité unique, de multiples noms de fichiers.
 ---
 
 Chaque assistant veut ses règles dans un fichier différent. Claude Code lit
@@ -25,12 +25,22 @@ your-project/
     └── copilot-instructions.md   ← pointer
 ```
 
-Chaque fichier pointeur fait trois lignes :
+Chaque fichier pointeur nomme le vrai fichier, indique où se trouvent les skills et porte les cinq règles qu'un assistant ne doit pas enfreindre, même s'il n'ouvre rien d'autre :
 
 ```markdown title="CLAUDE.md"
 # Rebase AI Rules
 Please refer to and follow the instructions defined in [ai-instructions.md](./ai-instructions.md).
 The Rebase skills for this assistant live in `.claude/skills/`. If they are not there yet, install them, with the Rebase MCP server: `rebase skills install --agent claude --mcp`.
+
+## Before you write any code
+
+These hold before you have opened ai-instructions.md, and in every session:
+
+- **A table is a collection.** Declare it in `config/collections/<name>.ts` with `defineCollection`, and `pnpm dev` creates it. Never `CREATE TABLE`, `ALTER TABLE` or `CREATE INDEX` in code, and never raw SQL or Drizzle against an application table, `rebase.sql()` included, except to read a column marked `excludeFromApi`, which the API never returns: raw SQL skips validation, callbacks, security rules, the admin view and the SDK types. A table that already exists gets its collection from `pnpm schema:introspect`.
+- **Data goes through the SDK:** `rebase.dataAsAdmin.<slug>` in functions and crons, `getDriver(c)` to act as the caller.
+- **A route in `backend/functions/` is public until you guard it** with `requireAuth` or `requireAdmin` from `@rebasepro/server/functions`.
+- **Never deploy, never edit `.env`, never edit generated files** (`backend/src/schema.generated.ts`, `rebase.resources.json`).
+- **When Rebase cannot do what the task needs, tell the human** what is missing instead of working around it.
 ```
 
 Sur la version 0.23, la troisième ligne indique seulement à l'assistant d'exécuter
@@ -75,18 +85,25 @@ se rabat sur ce que le dernier projet sur cette machine a persisté. Voir
 
 ## Pourquoi un pointeur plutôt qu'une copie
 
-Les fichiers pointeurs sont délibérément dépourvus de contenu. Les assistants suivent
-les liens Markdown relatifs, donc un fichier de trois lignes qui pointe vers le vrai
-fichier obtient le même résultat qu'une copie — et il possède des propriétés qu'une
-copie n'a pas :
+Les fichiers pointeurs ne contiennent presque rien. Un fichier qui nomme le vrai garde
+les conventions en un seul endroit, et il possède des propriétés qu'une copie n'a pas :
 
 - **Un seul fichier à modifier.** Les règles ne peuvent pas diverger entre les
   assistants, car il n'existe qu'un seul jeu de règles.
 - **Un seul diff à relire.** Une modification des conventions du projet est une
   modification d'un seul fichier, et non de cinq fichiers identiques qu'un
   relecteur doit comparer.
-- **Ajouter un assistant prend trois lignes.** Un nouvel outil avec un nouveau nom
+- **Ajouter un assistant, c'est un petit fichier.** Un nouvel outil avec un nouveau nom
   de fichier reçoit un pointeur, et non une sixième copie de vos conventions.
+
+La seule exception est le bloc **Before you write any code**. Un assistant ne suit pas
+un lien de façon fiable : celui qui est occupé par une tâche écrit d'abord le code, et
+celui qui est lancé à la racine d'un dépôt dont le projet Rebase se trouve dans un
+sous-dossier ne charge jamais ces fichiers. Les cinq règles dont la violation fait le plus
+de dégâts (une table créée dans le code au lieu d'une collection, des données lues et
+écrites en contournant le SDK, une route non protégée, un déploiement, un fichier généré
+modifié) sont donc écrites dans chaque pointeur, à l'identique. Une vérification en CI
+maintient les cinq copies identiques.
 
 Ce modèle mérite d'être conservé si vous forkez le squelette (scaffold), et mérite
 d'être adopté dans des dépôts qui ne sont pas du tout des projets Rebase.

@@ -67,6 +67,10 @@ const quote = (xs: Iterable<string>) => Array.from(xs).map(s => `\`${s}\``).join
 /** `on.from` / `on.to` accept a single column or a composite tuple. */
 const asColumns = (value: string | string[]): string[] => Array.isArray(value) ? value : [value];
 
+/** The table a `table.column` spelling names, or `undefined` for a bare column. */
+const tablePart = (column: string | undefined): string | undefined =>
+    column?.includes(".") ? column.split(".")[0] : undefined;
+
 /**
  * A one-column link into a key of several columns, or `undefined`.
  *
@@ -377,31 +381,67 @@ kind: relation.kind };
                         }
                         const stepColumns = columnNames(stepTable);
 
-                        for (const column of asColumns(step.on.from)) {
-                            if (!prevColumns.has(column)) {
-                                defects.push({
-                                    ...at,
-                                    problem: `step ${i + 1} joins \`${prevName}.${column}\` → \`${step.table}\`, but \`${column}\` is not a column on \`${prevName}\``,
-                                    fix: `\`joinPath[${i}].on.from\` names columns on ${i === 0 ? "this collection's table" : `the previous step's table (\`${prevName}\`)`}: ${quote(prevColumns)}`
-                                });
-                            }
+                        // A step may list alternatives (any one joins); each is
+                        // checked as a plain step would be, and named by its place.
+                        const alternatives = Array.isArray(step.on) ? step.on : [step.on];
+
+                        // An empty list joins on nothing: the reader would build
+                        // an `ON` with no condition, a syntax error at query time.
+                        if (alternatives.length === 0) {
+                            defects.push({
+                                ...at,
+                                problem: `\`joinPath[${i}].on\` lists no conditions, so step ${i + 1} joins \`${prevName}\` → \`${step.table}\` on nothing`,
+                                fix: `give \`joinPath[${i}].on\` at least one \`{ from, to }\`, or write the one condition as an object`
+                            });
                         }
-                        for (const column of asColumns(step.on.to)) {
-                            if (!stepColumns.has(column)) {
+
+                        // Alternatives are several ways to match one pair of
+                        // tables, not several paths: a `table.column` spelling
+                        // naming another table makes the step a different join.
+                        if (alternatives.length > 1) {
+                            const pairs = alternatives.map(on => ({
+                                from: tablePart(asColumns(on.from)[0]) ?? prevName,
+                                to: tablePart(asColumns(on.to)[0]) ?? step.table
+                            }));
+                            if (pairs.some(p => p.from !== pairs[0].from || p.to !== pairs[0].to)) {
                                 defects.push({
                                     ...at,
-                                    problem: `step ${i + 1} joins into \`${step.table}.${column}\`, but \`${column}\` is not a column on \`${step.table}\``,
-                                    fix: `\`joinPath[${i}].on.to\` names columns on \`${step.table}\`: ${quote(stepColumns)}`
+                                    problem: `the alternatives of step ${i + 1} join different tables: ` +
+                                        pairs.map((p, j) => `alternative ${j + 1} joins \`${p.from}\` → \`${p.to}\``).join(", "),
+                                    fix: `every entry of \`joinPath[${i}].on\` joins \`${prevName}\` to \`${step.table}\`; a path through other tables is a step, or a relation, of its own`
                                 });
                             }
                         }
 
-                        if (asColumns(step.on.from).length !== asColumns(step.on.to).length) {
-                            defects.push({
-                                ...at,
-                                problem: `step ${i + 1} compares ${asColumns(step.on.from).length} column(s) against ${asColumns(step.on.to).length}`,
-                                fix: `\`from\` and \`to\` must name the same number of columns in \`joinPath[${i}]\``
-                            });
+                        for (const [j, on] of alternatives.entries()) {
+                            const where = Array.isArray(step.on) ? `joinPath[${i}].on[${j}]` : `joinPath[${i}].on`;
+                            const alt = Array.isArray(step.on) ? ` (alternative ${j + 1})` : "";
+                            for (const column of asColumns(on.from)) {
+                                if (!prevColumns.has(column)) {
+                                    defects.push({
+                                        ...at,
+                                        problem: `step ${i + 1}${alt} joins \`${prevName}.${column}\` → \`${step.table}\`, but \`${column}\` is not a column on \`${prevName}\``,
+                                        fix: `\`${where}.from\` names columns on ${i === 0 ? "this collection's table" : `the previous step's table (\`${prevName}\`)`}: ${quote(prevColumns)}`
+                                    });
+                                }
+                            }
+                            for (const column of asColumns(on.to)) {
+                                if (!stepColumns.has(column)) {
+                                    defects.push({
+                                        ...at,
+                                        problem: `step ${i + 1}${alt} joins into \`${step.table}.${column}\`, but \`${column}\` is not a column on \`${step.table}\``,
+                                        fix: `\`${where}.to\` names columns on \`${step.table}\`: ${quote(stepColumns)}`
+                                    });
+                                }
+                            }
+
+                            if (asColumns(on.from).length !== asColumns(on.to).length) {
+                                defects.push({
+                                    ...at,
+                                    problem: `step ${i + 1}${alt} compares ${asColumns(on.from).length} column(s) against ${asColumns(on.to).length}`,
+                                    fix: `\`from\` and \`to\` must name the same number of columns in \`${where}\``
+                                });
+                            }
                         }
 
                         prevName = step.table;

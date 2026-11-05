@@ -579,10 +579,12 @@
     },
     {
       "id": "ai-and-extras",
-      "title": "MCP server, AI, insights and review plugins, inference, rls-check",
+      "title": "MCP server and its app views, AI, insights and review plugins, inference, rls-check",
       "paths": [
         "packages/mcp/src/**",
         "packages/server/src/mcp/**",
+        "packages/mcp-apps/src/**",
+        "packages/mcp-apps/views/**",
         "packages/plugin-ai/src/**",
         "packages/plugin-insights/src/**",
         "packages/plugin-review/src/**",
@@ -590,7 +592,7 @@
         "packages/rls-check/src/**",
         "packages/cli/src/commands/agent-setup.ts"
       ],
-      "focus": "Could an LLM complete common tasks from the MCP tool descriptions alone? Every MCP tool behaves like the REST door for the same operation. Prompt injection through row data into plugin-ai or MCP output. Inference on messy real-world CSV/JSON. rls-check against a live database with broken and correct policies: false positives and negatives. The agent setup rebase init writes: current, and safe to re-run over user edits.",
+      "focus": "Could an LLM complete common tasks from the MCP tool descriptions alone? Every MCP tool behaves like the REST door for the same operation. An MCP App view (show_collection's table) writes only what the person changed, through the same tools and scopes. Prompt injection through row data into plugin-ai or MCP output. Inference on messy real-world CSV/JSON. rls-check against a live database with broken and correct policies: false positives and negatives. The agent setup rebase init writes: current, and safe to re-run over user edits.",
       "audits": [
         {
           "date": "2026-10-01",

@@ -20,7 +20,8 @@ import type { PackageManager, PMCommands } from "../utils/package-manager";
 import { promptForConsent } from "../telemetry/consent";
 import { durationBucket, recordEvent } from "../telemetry";
 import { parseEnvBoolean } from "@rebasepro/types";
-import { AGENT_KEYS, AGENTS, type AgentKey, resolveAgentNames } from "./skills";
+import { AGENT_KEYS, AGENTS, type AgentKey, reportRootPointers, resolveAgentNames } from "./skills";
+import { writeRootPointers } from "../utils/root-pointer";
 import { configureAgents, printAgentSetup, promptForAgents, retargetScaffoldMcpConfig } from "./agent-setup";
 
 const access = promisify(fs.access);
@@ -1062,6 +1063,11 @@ async function createProject(options: InitOptions) {
         console.log(chalk.gray("  Setting up AI coding agents..."));
         printAgentSetup(configureAgents(options.agents, options.targetDirectory, undefined, options.pm), options.pm);
     }
+
+    // Inside a larger repository, an assistant started at its root loads none of
+    // the project's agent files: write the rules there too (utils/root-pointer).
+    // Before git init, which would make the project its own repository root.
+    reportRootPointers(writeRootPointers(options.targetDirectory, options.templateDirectory));
 
     // Create the repository now, but commit at the very end — see
     // commitScaffold below for why the two halves are separated.

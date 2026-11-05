@@ -23,7 +23,7 @@
  */
 import type { AuthAdapter, CallerCredential, CollectionConfig, DataDriver, OrderBySpec } from "@rebasepro/types";
 import { ALL_WHERE_FILTER_OPS, DEFAULT_LIST_LIMIT, MAX_LIST_LIMIT, getCollectionDataPath, scopeGrants, scopeGrantsAny } from "@rebasepro/types";
-import { type FieldViewer, OrderBySpecError, restoresSoftDeletedRow, serializeOrderBy, softDeleteFieldOf } from "@rebasepro/common";
+import { type FieldViewer, OrderBySpecError, enumToObjectEntries, restoresSoftDeletedRow, serializeOrderBy, softDeleteFieldOf } from "@rebasepro/common";
 import { scopeDataDriver } from "../auth/rls-scope.js";
 import { ApiError } from "../api/errors.js";
 import { assertWriteRequestValid } from "../api/rest/write-validation.js";
@@ -31,7 +31,7 @@ import { assertFieldOpsValid, assertNoFieldOpsOnCreate } from "../api/rest/field
 import { parseQueryOptions } from "../api/rest/query-parser.js";
 import { RestApiGenerator, type RowAddress } from "../api/rest/api-generator.js";
 import type { QueryOptions } from "../api/types.js";
-import { buildCollectionInputSchema, buildCollectionSchema } from "../api/openapi-generator.js";
+import { buildCollectionInputSchema, buildCollectionSchema, idPropertyEntry } from "../api/openapi-generator.js";
 import {
     assertUserCreationBodyValid,
     createUserThroughAuthCollection,
@@ -86,6 +86,12 @@ export interface McpToolDefinition {
      * so the reply is not twice its size. Defaults to true.
      */
     structuredContent?: boolean;
+    /**
+     * The MCP App view a host shows this tool's result in (see
+     * `mcp-apps.ts`). A tool with one is offered only where that view is
+     * served.
+     */
+    ui?: { resourceUri: string };
     run(args: Record<string, unknown>, ctx: McpToolContext): Promise<unknown>;
 }
 
@@ -370,6 +376,123 @@ const SEARCH_ARG = {
         + "(or the collection's declared full-text search)."
 };
 
+/** A read's arguments: query_collection's, and show_collection's, which reads the same page. */
+const QUERY_INPUT_SCHEMA: Record<string, unknown> = {
+    type: "object",
+    properties: {
+        collection: COLLECTION_ARG,
+        where: WHERE_ARG,
+        orderBy: {
+            type: ["string", "array"],
+            description: "Sort, as the SDK's `orderBy`: [\"created_at\", \"desc\"], a list of those "
+                + "applied in order, or \"created_at:desc\"."
+        },
+        searchString: SEARCH_ARG,
+        limit: {
+            type: "number",
+            description: `Rows to return, 1 to ${MAX_LIST_LIMIT} (default ${DEFAULT_LIST_LIMIT}). A larger limit is refused.`
+        },
+        offset: { type: "number", description: "Rows to skip." },
+        deleted: DELETED_ARG
+    },
+    required: ["collection"],
+    additionalProperties: false
+};
+
+/** One page of rows, as the REST list route serves it. */
+async function readPage(
+    args: Record<string, unknown>,
+    collection: CollectionConfig,
+    ctx: McpToolContext
+): Promise<{ data: unknown[]; meta: unknown }> {
+    const options = readOptions(args, collection, ctx);
+    const driver = await scopedDriver(ctx);
+    // REST's own listing, so a row here is the row `GET` serves — not
+    // the admin panel's view model (`{ __type: "date" }`, a relation
+    // as an embedded row), which no write door accepts back.
+    const page = await RestApiGenerator.readPage(driver, collection, options, searchStringOf(args));
+    return { data: page.rows, meta: page.meta };
+}
+
+/** The `ui://` resource show_collection opens. Built by `@rebasepro/mcp-apps`. */
+export const COLLECTION_TABLE_URI = "ui://rebase/collection-table.html";
+
+/** A column of the table view: what a cell shows, and whether it can be edited in place. */
+interface TableColumn {
+    key: string;
+    title: string;
+    type: "string" | "number" | "boolean" | "date" | "other";
+    enum?: { id: string | number; label: string; color?: string }[];
+    editable: boolean;
+}
+
+/**
+ * The columns show_collection's table draws, in the admin panel's order.
+ *
+ * The keys are the ones a row carries on the wire — the row schema REST
+ * publishes, so a field hidden from the API is not a column and a belongsTo is
+ * its foreign key. The presentation is the collection's `admin` block:
+ * `propertiesOrder`, and `hideFromCollection`, `readOnly` and `disabled` per
+ * property. Only scalars are edited in place; anything else is shown as text.
+ */
+function tableColumns(collection: CollectionConfig, ctx: McpToolContext): TableColumn[] {
+    const rowSchema = buildCollectionSchema(collection, new Set());
+    const wireKeys = Object.keys(isRecord(rowSchema.properties) ? rowSchema.properties : {});
+    const idKey = idPropertyEntry(collection)?.[0] ?? "id";
+    const order = stringList(adminOption(collection, "propertiesOrder"));
+    const ordered = [
+        ...order.filter(key => wireKeys.includes(key)),
+        ...wireKeys.filter(key => !order.includes(key))
+    ];
+    const writable = reaches(ctx, "data:write", collection);
+
+    const columns: TableColumn[] = [];
+    for (const key of ordered) {
+        const property = collection.properties[key];
+        if (property && adminOption(property, "hideFromCollection") === true && key !== idKey) continue;
+        const type = property?.type === "string" || property?.type === "number"
+            || property?.type === "boolean" || property?.type === "date"
+            ? property.type
+            : "other";
+        const enumValues = (property?.type === "string" || property?.type === "number") && property.enum
+            ? enumToObjectEntries(property.enum).map(entry => ({
+                id: entry.id,
+                label: entry.label,
+                ...(typeof entry.color === "string" && { color: entry.color })
+            }))
+            : undefined;
+        columns.push({
+            key,
+            title: property?.name ?? key,
+            type,
+            ...(enumValues && { enum: enumValues }),
+            editable: writable && key !== idKey && property !== undefined
+                && (type === "string" || type === "number" || type === "boolean")
+                && !adminOption(property, "readOnly") && !adminOption(property, "disabled")
+        });
+    }
+    return columns;
+}
+
+/**
+ * One option from an `admin` block — a collection's or a property's.
+ *
+ * The block is the admin panel's (`@rebasepro/cms-types`), which this package
+ * does not import, so it is read as data: present or not, whatever it holds.
+ */
+function adminOption(holder: object, option: string): unknown {
+    if (!("admin" in holder) || !isRecord(holder.admin)) return undefined;
+    return holder.admin[option];
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+    return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function stringList(value: unknown): string[] {
+    return Array.isArray(value) ? value.filter((item): item is string => typeof item === "string") : [];
+}
+
 const TOOLS: McpToolDefinition[] = [
     {
         name: "list_collections",
@@ -447,36 +570,41 @@ const TOOLS: McpToolDefinition[] = [
             + "empty result can mean 'none match' or 'none visible to you'. Page with `offset` while "
             + "`meta.hasMore` is true." + UNTRUSTED_ROWS,
         requiredScope: "data:read",
-        inputSchema: {
-            type: "object",
-            properties: {
-                collection: COLLECTION_ARG,
-                where: WHERE_ARG,
-                orderBy: {
-                    type: ["string", "array"],
-                    description: "Sort, as the SDK's `orderBy`: [\"created_at\", \"desc\"], a list of those "
-                        + "applied in order, or \"created_at:desc\"."
-                },
-                searchString: SEARCH_ARG,
-                limit: {
-                    type: "number",
-                    description: `Rows to return, 1 to ${MAX_LIST_LIMIT} (default ${DEFAULT_LIST_LIMIT}). A larger limit is refused.`
-                },
-                offset: { type: "number", description: "Rows to skip." },
-                deleted: DELETED_ARG
-            },
-            required: ["collection"],
-            additionalProperties: false
-        },
+        inputSchema: QUERY_INPUT_SCHEMA,
         async run(args, ctx) {
             const collection = resolveCollection(ctx, args.collection, "data:read");
-            const options = readOptions(args, collection, ctx);
-            const driver = await scopedDriver(ctx);
-            // REST's own listing, so a row here is the row `GET` serves — not
-            // the admin panel's view model (`{ __type: "date" }`, a relation
-            // as an embedded row), which no write door accepts back.
-            const page = await RestApiGenerator.readPage(driver, collection, options, searchStringOf(args));
-            return { data: page.rows, meta: page.meta };
+            return readPage(args, collection, ctx);
+        }
+    },
+
+    {
+        name: "show_collection",
+        description:
+            "Show rows of a collection to the user. In a client that renders MCP Apps, this opens an "
+            + "editable table in the conversation; in any other client nothing is shown, and the result is "
+            + "the same page of rows query_collection returns. The result does not say which happened, so "
+            + "do not tell the user a table appeared: report what the rows say. Use it when the user wants to see, browse or edit data, rather than for "
+            + "reading rows yourself (that is query_collection). It takes query_collection's arguments, and "
+            + "its result is that page plus the columns the table shows. Where a table is shown and this "
+            + "connection may write the collection, the user can edit cells in it; their edits are saved as "
+            + "them, and you are told what they changed." + UNTRUSTED_ROWS,
+        requiredScope: "data:read",
+        inputSchema: QUERY_INPUT_SCHEMA,
+        ui: { resourceUri: COLLECTION_TABLE_URI },
+        async run(args, ctx) {
+            const collection = resolveCollection(ctx, args.collection, "data:read");
+            const page = await readPage(args, collection, ctx);
+            return {
+                collection: collectionPath(collection),
+                title: collection.name,
+                idKey: idPropertyEntry(collection)?.[0] ?? "id",
+                columns: tableColumns(collection, ctx),
+                // The table's edit affordance, not a permission: RLS still
+                // decides each save, and a refused one is shown above the
+                // table while the cell keeps its value.
+                writable: reaches(ctx, "data:write", collection),
+                ...page
+            };
         }
     },
 

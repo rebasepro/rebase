@@ -1,0 +1,12 @@
+@import "tailwindcss";
+@import "@rebasepro/ui/index.css" layer(base);
+
+@source "../../ui/src/**/*.{ts,tsx}";
+@source "./**/*.{ts,tsx}";
+@custom-variant dark (&:where(.dark, .dark *));
+
+@layer base {
+    body {
+        @apply m-0 bg-surface-sheet;
+    }
+}

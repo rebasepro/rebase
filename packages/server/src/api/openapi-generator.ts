@@ -1350,7 +1350,7 @@ function excludedApiKeys(collection: CollectionConfig, direction: "read" | "writ
  * was `integer` in `Post` and `string` in `PostInput`. One helper now answers
  * the question for all three.
  */
-function idPropertyEntry(collection: CollectionConfig | undefined): [string, Property] | undefined {
+export function idPropertyEntry(collection: CollectionConfig | undefined): [string, Property] | undefined {
     for (const [key, property] of Object.entries(collection?.properties ?? {})) {
         if ((property as Record<string, unknown>)?.isId) return [key, property as Property];
     }

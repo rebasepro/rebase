@@ -1,8 +1,8 @@
 ---
-sourceHash: 3c5e837860d6c8c6
+sourceHash: 0da7580e73a7f0c9
 title: L'endpoint MCP remoto
 sidebar_label: Endpoint MCP remoto
-description: Servi MCP da un backend distribuito su /mcp, così le persone che usano la tua app possono collegare Claude o Cursor come sé stesse — OAuth con schermata di consenso, otto tool sotto tre scope, ogni chiamata sotto la propria sicurezza a livello di riga.
+description: Servi MCP da un backend distribuito su /mcp, così le persone che usano la tua app possono collegare Claude o Cursor come sé stesse — OAuth con schermata di consenso, nove tool sotto tre scope, ogni chiamata sotto la propria sicurezza a livello di riga.
 ---
 
 Il [server MCP](/docs/ai/mcp/) è uno strumento per sviluppatori: viene eseguito sulla tua macchina e
@@ -34,15 +34,23 @@ Nessun `REBASE_ROLE` lo attiva.
   dice. Indica inoltre l'host a cui viene inviato il codice di autorizzazione, e precisa che
   quell'host non è verificato: chiunque può registrare un client con qualsiasi nome, quindi
   l'host è la parte che una persona può controllare.
-- **Otto tool, tre scope.** Gli stessi [scope](/docs/backend/roles-and-scopes/) usati da ogni
+- **Nove tool, tre scope.** Gli stessi [scope](/docs/backend/roles-and-scopes/) usati da ogni
   credenziale. `data:read` offre `list_collections`, `describe_collection`,
-  `query_collection`, `count_documents` e `get_document`; `data:write` aggiunge `create_document` e
+  `query_collection`, `show_collection`, `count_documents` e `get_document`; `data:write` aggiunge `create_document` e
   `update_document`; `data:delete` aggiunge `delete_document`. Un client che non richiede
   nulla ottiene `data:read`. Ciascuno si restringe a una collection: `data:read:posts`
   elenca, descrive e legge `posts` e nient'altro. Uno scope decide quali tool vengono
   offerti e quali collection raggiungono, non quali righe: un elenco vuoto può essere
   l'RLS che funziona, e `data:write` non può comunque scrivere una riga che la persona non
   potrebbe scrivere.
+- <span class="since-badge" data-since="0.28">Since 0.28</span> **`show_collection` mette le righe davanti alla persona.** Accetta gli argomenti di
+  `query_collection` e risponde con la stessa pagina, più le colonne che mostra il pannello
+  di amministrazione. Un client che visualizza le MCP Apps, come Claude, la apre come tabella
+  nella conversazione: la persona può caricare altre righe e, dove la connessione ha
+  `data:write`, modificare una cella sul posto. Ogni salvataggio è una chiamata a
+  `update_document` fatta a suo nome, sotto la sua RLS, e al modello viene detto cosa ha
+  cambiato. Un client senza MCP Apps, come Claude Code o Cursor, non mostra alcuna tabella,
+  e il modello legge la pagina come la leggerebbe da `query_collection`.
 - **I grant concessi prima della 0.24 mantengono la loro portata.** `mcp:read` viene letto come
   `data:read`, e `mcp:write` come `data:write data:delete`, sui grant memorizzati e
   sui token già emessi.

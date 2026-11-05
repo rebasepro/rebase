@@ -53,6 +53,9 @@
             "@rebasepro/server-postgres": [
                 "../../../packages/server-postgres/src"
             ],
+            "@rebasepro/mcp-apps": [
+                "../../../packages/mcp-apps/src"
+            ],
             // Mapped explicitly, not via a "*" catch-all: a catch-all resolves
             // every bare specifier to the implementation in the pnpm store, and
             // TypeScript then never looks for its @types — `pg` and
@@ -72,6 +75,8 @@
     },
     "include": [
         "src",
-        "stubs"
+        "stubs",
+        // the server imports @rebasepro/mcp-apps, whose view is text from a build
+        "../../../packages/mcp-apps/src/raw.d.ts"
     ]
 }

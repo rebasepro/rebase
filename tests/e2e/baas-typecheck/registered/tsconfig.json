@@ -3,6 +3,7 @@
     "extends": "../tsconfig.json",
     "include": [
         "*.ts",
-        "../stubs"
+        "../stubs",
+        "../../../../packages/mcp-apps/src/raw.d.ts"
     ]
 }

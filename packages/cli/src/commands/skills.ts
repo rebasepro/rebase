@@ -6,6 +6,7 @@ import inquirer from "inquirer";
 import { createRequire } from "module";
 import os from "os";
 import { findProjectRoot } from "../utils/project";
+import { type RootPointerResult, writeRootPointers } from "../utils/root-pointer";
 import { parseCommandArgs, UsageError, wantsHelp } from "../utils/args";
 import { unknownCommand } from "../utils/unknown-command";
 
@@ -840,7 +841,7 @@ async function skillsInstall(rawArgs: string[] = []) {
     // The MCP server, as `rebase init --agent` registers it. Imported here
     // rather than at the top: agent-setup imports this module.
     const {
-        MCP_SERVER_NAME, ensureMcpDependency, mcpDependencyNote, mcpServerRegistered, writeMcpConfig
+        MCP_SERVER_NAME, ensureMcpDependency, mcpDependencyNote, mcpServerRegistered, writeMcpConfig, cliPackageRoot
     } = await import("./agent-setup");
     const { detectPackageManager } = await import("../utils/package-manager");
     const shownFile = (file: string) => path.relative(process.cwd(), path.join(projectDir, file)) || file;
@@ -870,6 +871,13 @@ async function skillsInstall(rawArgs: string[] = []) {
     if (withHooks) {
         console.log("");
         await installHooksAndReport(projectDir, force);
+    }
+
+    // A project below its repository's root: an assistant started at that root
+    // loads none of the project's own files, so the rules go there too.
+    // Only for a Rebase project: this command also runs in repositories that are not one.
+    if (findProjectRoot(projectDir) === projectDir) {
+        reportRootPointers(writeRootPointers(projectDir, path.join(cliPackageRoot(), "templates", "template")));
     }
 
     console.log("");
@@ -926,4 +934,18 @@ ${chalk.green.bold("Examples")}
   ${chalk.cyan("rebase skills install --agent all")}   ${chalk.gray("# scripted / CI")}
   ${chalk.cyan("rebase skills --hooks")}   ${chalk.gray("# the Claude Code guardrail hook only")}
 `);
+}
+
+/** One line per repository-root agent file the project's rules were written into, or left alone. */
+export function reportRootPointers(result: RootPointerResult): void {
+    const shown = (file: string) => path.relative(process.cwd(), file) || file;
+    for (const file of result.changed) {
+        console.log(`  ${chalk.green("✓")} Rebase rules in ${chalk.gray(shown(file))}, for an assistant started at the repository root`);
+    }
+    for (const { file, reason } of result.untouched) {
+        console.warn(`  ${chalk.yellow("!")} Left ${chalk.gray(shown(file))} as it is: ${reason}. Fix or remove them and run ${chalk.cyan("rebase skills install")} again.`);
+    }
+    if (result.refused !== null) {
+        console.log(chalk.gray(`  No Rebase rules at the repository root: ${result.refused}.`));
+    }
 }

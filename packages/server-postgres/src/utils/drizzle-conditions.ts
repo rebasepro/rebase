@@ -2,7 +2,7 @@ import { and, eq, not, or, sql, SQL, ilike, inArray, getTableColumns, getTableNa
 import { AnyPgColumn, PgTable } from "drizzle-orm/pg-core";
 import {
     ALL_WHERE_FILTER_OPS,
-    CollectionConfig, FilterValues, WhereFilterOp, JoinStep, LogicalCondition, FilterCondition,
+    CollectionConfig, FilterValues, WhereFilterOp, JoinStep, joinConditions, LogicalCondition, FilterCondition,
     ResolvedRelation, ResolvedBelongsTo, ResolvedHasOne, ResolvedHasMany,
     ResolvedForeignKeyOnTarget, ResolvedManyToMany, hasForeignKeyOnTarget, isManyToMany,
     encodeRelationAggregateSort, type Property, type RelationAggregateFn, type RelationAggregateSort
@@ -610,13 +610,19 @@ export class DrizzleConditionBuilder {
         const fromRef = (stepIndex: number, column: string) =>
             sql`${sql.identifier(stepIndex === 0 ? sourceAlias : aliasFor(stepIndex - 1))}.${sql.identifier(getColumnName(column))}`;
 
-        const pairs = (step: JoinStep): { from: string; to: string }[] => {
-            const from = Array.isArray(step.on.from) ? step.on.from : [step.on.from];
-            const to = Array.isArray(step.on.to) ? step.on.to : [step.on.to];
+        // One list of column pairs per alternative; a plain step has one.
+        const alternatives = (step: JoinStep): { from: string; to: string }[][] => joinConditions(step).map(on => {
+            const from = Array.isArray(on.from) ? on.from : [on.from];
+            const to = Array.isArray(on.to) ? on.to : [on.to];
             if (from.length !== to.length) {
                 throw new Error(`Join step on '${step.table}' has ${from.length} \`from\` columns and ${to.length} \`to\` columns`);
             }
             return from.map((f, i) => ({ from: f, to: to[i] }));
+        });
+        // Every pair of one alternative, AND-ed; the alternatives, OR-ed.
+        const anyOf = (step: JoinStep, pair: (p: { from: string; to: string }) => SQL): SQL => {
+            const each = alternatives(step).map(pairs => sql.join(pairs.map(pair), sql` AND `));
+            return each.length === 1 ? each[0] : sql`(${sql.join(each.map(c => sql`(${c})`), sql` OR `)})`;
         };
 
         const inner = joinPath.slice(0, -1);
@@ -625,10 +631,10 @@ export class DrizzleConditionBuilder {
         const joins: SQL[] = inner.map((step, index) => {
             const table = registry.getTable(step.table);
             if (!table) throw new Error(`Join table not found: ${step.table}`);
-            const on = pairs(step).map(({ from, to }) =>
+            const on = anyOf(step, ({ from, to }) =>
                 sql`${fromRef(index, from)} = ${sql.identifier(aliasFor(index))}.${sql.identifier(getColumnName(to))}`
             );
-            return sql`JOIN ${table} AS ${sql.identifier(aliasFor(index))} ON ${sql.join(on, sql` AND `)}`;
+            return sql`JOIN ${table} AS ${sql.identifier(aliasFor(index))} ON ${on}`;
         });
 
         // The last step correlates to the outer row instead of joining the
@@ -649,10 +655,7 @@ export class DrizzleConditionBuilder {
             return column;
         };
 
-        const correlation = sql.join(
-            pairs(last).map(({ from, to }) => sql`${fromRef(inner.length, from)} = ${targetColumn(to)}`),
-            sql` AND `
-        );
+        const correlation = anyOf(last, ({ from, to }) => sql`${fromRef(inner.length, from)} = ${targetColumn(to)}`);
 
         const joinsSql = joins.length > 0 ? sql` ${sql.join(joins, sql` `)}` : sql``;
 
@@ -1952,32 +1955,11 @@ whereConditions };
 
         // Process join steps in reverse order to build path back to parent
         for (let index = joinPath.length - 1; index >= 0; index--) {
-            const joinStep = joinPath[index];
-            const { fromTableName, toTableName } = this.joinStepTableNames(joinPath, index, sourceTableName);
-            const fromColName = this.getColumnNamesFromColumns(joinStep.on.from)[0];
-            const toColName = this.getColumnNamesFromColumns(joinStep.on.to)[0];
-
-            const fromTable = registry.getTable(fromTableName);
-            const toTable = registry.getTable(toTableName);
-
-            if (!fromTable || !toTable) {
-                throw new Error(`Join tables not found for step: from ${fromTableName} to ${toTableName}`);
-            }
-
             const {
                 joinTable,
                 condition,
                 additionalJoins
-            } = this.buildSingleJoinCondition(
-                currentTable,
-                fromTable,
-                toTable,
-                fromColName,
-                toColName,
-                fromTableName,
-                toTableName,
-                registry
-            );
+            } = this.buildReverseJoinStep(joinPath, index, sourceTableName, currentTable, registry, true);
 
             joins.push({
                 table: joinTable,
@@ -2029,6 +2011,50 @@ whereConditions };
             joins,
             finalCondition
         };
+    }
+
+    /**
+     * One step of a join path walked target → parent: the table it brings in
+     * and the condition it joins on.
+     *
+     * A step listing alternatives joins on any of them, OR-ed. Each alternative
+     * is built the way a plain step is, and they must all bring in the same
+     * table — they are several ways to match one pair of tables, not several
+     * paths. The junction fallback is only tried for a plain step: guessing a
+     * junction for one alternative of several is guessing twice.
+     */
+    private static buildReverseJoinStep(
+        joinPath: JoinStep[],
+        index: number,
+        sourceTableName: string,
+        currentTable: PgTable<any>,
+        registry: PostgresCollectionRegistry,
+        allowJunctionFallback: boolean
+    ): { joinTable: PgTable<any>; condition: SQL; additionalJoins?: { table: PgTable<any>; condition: SQL }[] } {
+        const { fromTableName, toTableName } = this.joinStepTableNames(joinPath, index, sourceTableName);
+        const fromTable = registry.getTable(fromTableName);
+        const toTable = registry.getTable(toTableName);
+
+        if (!fromTable || !toTable) {
+            throw new Error(`Join tables not found for step: from ${fromTableName} to ${toTableName}`);
+        }
+
+        const alternatives = joinConditions(joinPath[index]);
+        const built = alternatives.map(on => this.buildSingleJoinCondition(
+            currentTable,
+            fromTable,
+            toTable,
+            this.getColumnNamesFromColumns(on.from)[0],
+            this.getColumnNamesFromColumns(on.to)[0],
+            fromTableName,
+            toTableName,
+            allowJunctionFallback && alternatives.length === 1 ? registry : undefined
+        ));
+        if (built.length === 1) return built[0];
+        if (built.some(step => step.joinTable !== built[0].joinTable)) {
+            throw new Error(`The alternatives of the join into '${joinPath[index].table}' do not join the same tables`);
+        }
+        return { joinTable: built[0].joinTable, condition: or(...built.map(step => step.condition))! };
     }
 
     /**
@@ -2844,27 +2870,7 @@ whereConditions };
 
         // Process join steps in reverse order
         for (let index = joinPath.length - 1; index >= 0; index--) {
-            const joinStep = joinPath[index];
-            const { fromTableName, toTableName } = this.joinStepTableNames(joinPath, index, sourceTableName);
-            const fromColName = this.getColumnNamesFromColumns(joinStep.on.from)[0];
-            const toColName = this.getColumnNamesFromColumns(joinStep.on.to)[0];
-
-            const fromTable = registry.getTable(fromTableName);
-            const toTable = registry.getTable(toTableName);
-
-            if (!fromTable || !toTable) {
-                throw new Error(`Join tables not found for step: from ${fromTableName} to ${toTableName}`);
-            }
-
-            const { joinTable, condition } = this.buildSingleJoinCondition(
-                currentTable,
-                fromTable,
-                toTable,
-                fromColName,
-                toColName,
-                fromTableName,
-                toTableName
-            );
+            const { joinTable, condition } = this.buildReverseJoinStep(joinPath, index, sourceTableName, currentTable, registry, false);
 
             query = query.innerJoin(joinTable, condition);
             currentTable = joinTable;
@@ -2942,10 +2948,12 @@ whereConditions };
         sourceTableName: string
     ): { fromTableName: string; toTableName: string } {
         const step = joinPath[index];
+        // Alternatives join one pair of tables, so the first says which.
+        const [on] = joinConditions(step);
         return {
-            fromTableName: this.getTableNamesFromColumns(step.on.from)[0]
+            fromTableName: this.getTableNamesFromColumns(on.from)[0]
                 || (index === 0 ? sourceTableName : joinPath[index - 1].table),
-            toTableName: this.getTableNamesFromColumns(step.on.to)[0] || step.table
+            toTableName: this.getTableNamesFromColumns(on.to)[0] || step.table
         };
     }
 

@@ -184,6 +184,11 @@
     "packages/server/test/mcp-hardening.test.ts",
     "packages/server/test/mcp-boot-wiring.test.ts",
     "packages/server/test/helpers/mcp-harness.ts",
+    "packages/server/test/mcp-apps.test.ts",
+    // The MCP App views' suites. vitest strips their types without checking
+    // them, so the host stubs and the table's fixtures are held to the view's
+    // own types only here.
+    "packages/mcp-apps/test",
     // The storage controller contract and the S3/GCS client fakes it runs
     // against. Listed for the reason the MCP harness is: a fake that drifts
     // from the SDK shape it stands in for keeps every assertion green against

@@ -5,7 +5,9 @@
  * `@modelcontextprotocol/sdk`. The SDK's HTTP transport is built around Node's
  * `req`/`res`, this server is Hono, and the adapter would be more code than the
  * protocol — which, for a server that offers tools and neither prompts nor
- * sampling, is `initialize`, `tools/list`, `tools/call` and `ping`. It also
+ * sampling, is `initialize`, `tools/list`, `tools/call` and `ping`, plus
+ * `resources/list` and `resources/read` for the MCP App views (`mcp-apps.ts`)
+ * when there are any. It also
  * keeps a dependency out of `@rebasepro/server`, whose import graph feeds the
  * portable functions bundle.
  *
@@ -43,7 +45,8 @@ import {
     upgradeStoredMcpScope,
     DEFAULT_MCP_SCOPE
 } from "./oauth-metadata.js";
-import { findTool, toolsForScopes, McpToolError, MCP_TOOLS, type McpCaller } from "./mcp-tools.js";
+import { toolsForScopes, McpToolError, MCP_TOOLS, type McpCaller, type McpToolDefinition } from "./mcp-tools.js";
+import { MCP_APP_MIME_TYPE, mcpAppResourceMeta, mcpAppToolMeta, type McpAppResource, type McpAppsSource } from "./mcp-apps.js";
 import type { ApiKeyIdentity, ApiKeyRefusal } from "../auth/api-keys/api-key-middleware.js";
 import { isAccessTokenRevoked } from "../auth/token-revocation.js";
 import type { McpGrantIdentity } from "./oauth-routes.js";
@@ -64,6 +67,7 @@ const INVALID_REQUEST = -32600;
 const METHOD_NOT_FOUND = -32601;
 const INVALID_PARAMS = -32602;
 const INTERNAL_ERROR = -32603;
+const RESOURCE_NOT_FOUND = -32002;
 
 /**
  * The most messages one JSON-RPC batch may carry.
@@ -124,6 +128,12 @@ export interface McpRoutesConfig {
      * user repository, and then a token carries the roles it was minted with.
      */
     identity?: McpGrantIdentity;
+    /**
+     * The MCP App views this endpoint serves as `ui://` resources. Without
+     * them it declares no resources, and a tool that opens a view is not
+     * offered. See `mcp-apps.ts`.
+     */
+    apps?: McpAppsSource;
 }
 
 /**
@@ -184,6 +194,33 @@ export function createMcpRoutes(config: McpRoutesConfig): Hono<HonoEnv> {
                 error_description: `Request body too large. Maximum size is ${maxBodySize} bytes.`
             }, 413)
         }));
+    }
+
+    // Asked once. A source that fails is no views, said once, rather than a
+    // failure of every `tools/list` after it.
+    let appsLoaded: Promise<readonly McpAppResource[]> | undefined;
+    const apps = (): Promise<readonly McpAppResource[]> => {
+        appsLoaded ??= config.apps
+            ? config.apps().catch((error: unknown) => {
+                logger.warn("[mcp] Could not load the MCP App views — tools that open one are not offered.", { error });
+                return [];
+            })
+            : Promise.resolve([]);
+        return appsLoaded;
+    };
+
+    /** Whether the view a tool opens, if any, is served here. A tool whose view is not does not exist here. */
+    async function viewServed(tool: McpToolDefinition): Promise<boolean> {
+        return !tool.ui || (await apps()).some(app => app.uri === tool.ui?.resourceUri);
+    }
+
+    /** The tools this caller is offered: their scope, and the view a tool opens being served. */
+    async function offeredTools(scopes: readonly string[]): Promise<McpToolDefinition[]> {
+        const offered: McpToolDefinition[] = [];
+        for (const tool of toolsForScopes(scopes)) {
+            if (await viewServed(tool)) offered.push(tool);
+        }
+        return offered;
     }
 
     const rateLimited = config.rateLimit
@@ -389,14 +426,19 @@ export function createMcpRoutes(config: McpRoutesConfig): Hono<HonoEnv> {
         async function route(): Promise<Record<string, unknown> | null> {
         switch (method) {
             case "initialize": {
+                const servesApps = (await apps()).length > 0;
                 const asked = typeof params?.protocolVersion === "string" ? params.protocolVersion : undefined;
                 return rpcResult(id, {
                     protocolVersion: asked && SUPPORTED_PROTOCOL_VERSIONS.includes(asked)
                         ? asked
                         : LATEST_PROTOCOL_VERSION,
-                    // Only tools. Declaring a capability this server does not
-                    // implement makes a client call something that 404s.
-                    capabilities: { tools: { listChanged: false } },
+                    // Tools, and resources only when there are views to read.
+                    // Declaring a capability this server does not implement
+                    // makes a client call something that 404s.
+                    capabilities: {
+                        tools: { listChanged: false },
+                        ...(servesApps && { resources: { listChanged: false } })
+                    },
                     serverInfo: config.serverInfo,
                     instructions:
                         "Data tools for this Rebase project. Every call runs as the signed-in user, " +
@@ -417,12 +459,40 @@ export function createMcpRoutes(config: McpRoutesConfig): Hono<HonoEnv> {
 
             case "tools/list":
                 return rpcResult(id, {
-                    tools: toolsForScopes(caller.scopes).map(tool => ({
+                    tools: (await offeredTools(caller.scopes)).map(tool => ({
                         name: tool.name,
                         description: tool.description,
-                        inputSchema: tool.inputSchema
+                        inputSchema: tool.inputSchema,
+                        ...(tool.ui && { _meta: mcpAppToolMeta(tool.ui.resourceUri) })
                     }))
                 });
+
+            // The views are the same for every caller: a document with no data
+            // in it. What a view shows arrives as a tool result, scoped then.
+            // With none, these are methods this server does not have, as
+            // `initialize` said.
+            case "resources/list":
+                if ((await apps()).length === 0) return rpcError(id, METHOD_NOT_FOUND, `Unknown method: ${method}`);
+                return rpcResult(id, {
+                    resources: (await apps()).map(app => ({
+                        uri: app.uri,
+                        name: app.name,
+                        description: app.description,
+                        mimeType: MCP_APP_MIME_TYPE,
+                        _meta: mcpAppResourceMeta()
+                    }))
+                });
+
+            case "resources/read": {
+                if ((await apps()).length === 0) return rpcError(id, METHOD_NOT_FOUND, `Unknown method: ${method}`);
+                const uri = typeof params?.uri === "string" ? params.uri : "";
+                const app = (await apps()).find(candidate => candidate.uri === uri);
+                // -32002 is MCP's "resource not found".
+                if (!app) return rpcError(id, RESOURCE_NOT_FOUND, `Unknown resource: ${uri}`);
+                return rpcResult(id, {
+                    contents: [{ uri: app.uri, mimeType: MCP_APP_MIME_TYPE, text: app.html, _meta: mcpAppResourceMeta() }]
+                });
+            }
 
             case "tools/call":
                 return callTool(c, id, params, caller);
@@ -442,13 +512,14 @@ export function createMcpRoutes(config: McpRoutesConfig): Hono<HonoEnv> {
         const name = typeof params?.name === "string" ? params.name : "";
         const args = (params?.arguments ?? {}) as Record<string, unknown>;
 
-        const tool = findTool(name, caller.scopes);
+        const tool = (await offeredTools(caller.scopes)).find(candidate => candidate.name === name);
         if (!tool) {
             // A tool that exists but is out of scope is reported as a scope
             // problem, not as "unknown" — the client can act on the first and
             // only give up on the second. The HTTP 403 challenge cannot be sent
             // from inside a JSON-RPC result, so the guidance goes in the error.
-            const outOfScope = MCP_TOOLS.find(t => t.name === name);
+            const known = MCP_TOOLS.find(t => t.name === name);
+            const outOfScope = known && await viewServed(known) ? known : undefined;
             if (outOfScope) {
                 c.header("WWW-Authenticate", insufficientScopeChallenge(
                     config.publicUrl, config.mcpPath, outOfScope.requiredScope,

@@ -53,6 +53,23 @@ describe("FieldBlock", () => {
         }
     });
 
+    test("a read-only field carries no required marker, in either mode", () => {
+        // `validation.required` on a field nobody can edit states what the
+        // column holds; the asterisk asks the person filling the form for a
+        // value they cannot give.
+        const readOnly = { ...(property as object), admin: { readOnly: true } } as never;
+        for (const mode of ["edit", "read"] as const) {
+            const { unmount } = render(
+                <FieldBlock propertyKey={"subtotal"} property={readOnly} showLabel mode={mode}>
+                    <span>185.11</span>
+                </FieldBlock>
+            );
+            expect(screen.getByText("Subtotal")).toBeTruthy();
+            expect(screen.queryByText("*")).toBeNull();
+            unmount();
+        }
+    });
+
     test("the label is styled identically in both modes", () => {
         expect(labelRow("read")).toEqual(labelRow("edit"));
     });

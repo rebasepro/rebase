@@ -1,5 +1,5 @@
 ---
-sourceHash: 7f46b01ad01541e2
+sourceHash: c72a777b7542e004
 title: Speicher-Konfiguration
 sidebar_label: Speicher-Konfiguration
 description: Konfigurieren Sie lokales Dateisystem, S3-kompatible Backends oder GCS/Firebase Storage für Datei-Uploads, Bilder und Medien.
@@ -405,6 +405,36 @@ Nur Variablen mit Konto-Geltungsbereich fallen auf den Fallback zurück — `S3_
 das GCS-Paar `GCS_PROJECT_ID` / `GCS_KEY_FILENAME`. Der Bucket-Name tut dies nie:
 Er unterscheidet eine Quelle von der anderen. Ein Wert auf Bucket-Ebene hat immer Vorrang,
 sodass eine Quelle den Provider wechseln kann, ohne die anderen zu beeinträchtigen.
+
+### Dateien, die keine Zeile nennt, nach Zeitplan löschen
+
+Das Löschen einer Zeile lässt ihre Dateien im Bucket. Mit der Zeile wird nichts
+gelöscht: Eine andere Zeile, eine Version in der [History](/docs/backend/history/)
+oder Ihr eigener Code, der den Schlüssel in einem einfachen String hält, kann die
+Datei noch nennen. Ein Bucket kann stattdessen die Bereinigung anfordern, die all
+das sehen kann:
+
+```ts
+export const voice = bucket("voice", { engine: "s3", orphanSweep: { olderThanHours: 72 } });
+export const media = bucket("media", { orphanSweep: true }); // a week, daily at 04:17 UTC
+```
+
+Jede deklarierte Bereinigung ist ein Cron-Job, `storage-orphan-sweep-<bucket>`
+(`storage-orphan-sweep-default` für den Standard-Bucket). Er führt den Scan hinter
+`rebase storage orphans --delete` aus. Dieser Scan liest jede Zeile jeder
+Collection und jeden History-Eintrag und behält:
+
+- eine Datei, die noch irgendetwas nennt;
+- eine Datei, die neuer ist als `olderThanHours` (mindestens 24, standardmäßig eine Woche);
+- für diesen Lauf jede Datei, wenn eine Collection nicht gelesen werden kann.
+
+Anschließend prüft er jede Datei unmittelbar vor dem Löschen erneut. Setzen Sie
+`schedule` auf einen Cron-Ausdruck (UTC), um zu ändern, wann er läuft. Als Cron-Job
+läuft er pro Slot auf einer Instanz. Sein Laufverlauf zeichnet auf, wie viele
+Dateien er gelöscht und behalten hat, und er kann in der Cron-Liste des Admins
+pausiert oder manuell gestartet werden. Er benötigt einen Bucket, den dieses
+Backend bedient: Ein Bucket mit `transport: "direct"` wird beim Booten mit einer
+Warnung abgelehnt.
 
 ## Frontend-Speicherquellen
 

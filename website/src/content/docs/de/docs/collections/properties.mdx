@@ -1,5 +1,5 @@
 ---
-sourceHash: 53bc3cc4a868eb7f
+sourceHash: d77bb90d91162c26
 title: Properties
 sidebar_label: Properties
 description: Property-Typen definieren den Datentyp, die Validierung und das UI-Rendering für jedes Feld in einer Collection. Rebase unterstützt string-, number-, boolean-, date-, array-, map-, reference-, relation- und geopoint-Typen.
@@ -47,7 +47,7 @@ Alle Property-Typen teilen sich diese Optionen:
 | `propertyConfig` | `string` | Registrierter Property-Config-Schlüssel |
 | `columnName` | `string` | Expliziter Datenbankspaltenname (umgeht die snake_case-Konvertierung) |
 | `callbacks` | `PropertyCallbacks` | Hooks für `afterRead`- und `beforeSave`-Transformationen |
-| `excludeFromApi` | `boolean` | Diese Spalte niemals auf der API-Oberfläche erwähnen, in keiner Richtung – für einen Passwort-Hash oder ein Verifikationstoken. Der Wert wird serverseitig weiterhin geschrieben und abgefragt; er wird aus jeder Zeile entfernt, die die API ausliefert, für jeden Aufrufer einschließlich Admins und Service-Schlüsseln, und fehlt in den generierten `Row`-, `Insert`- und `Update`-Typen sowie im OpenAPI-Schema. Syntaktischer Zucker für `access: { read: [], write: [] }` – beides ist derselbe Mechanismus, und das Festlegen von beidem für eine Property wird beim Booten abgelehnt |
+| `excludeFromApi` | `boolean` | Diese Spalte niemals auf der API-Oberfläche erwähnen, in keiner Richtung – für einen Passwort-Hash oder ein Verifikationstoken. Der Wert wird weiterhin geschrieben und ist serverseitig nur über `rebase.sql()` lesbar; er wird aus jeder Zeile entfernt, die die API ausliefert, für jeden Aufrufer einschließlich Admins, Service-Schlüsseln und Lesezugriffen über `rebase.dataAsAdmin`, und fehlt in den generierten `Row`-, `Insert`- und `Update`-Typen sowie im OpenAPI-Schema. Syntaktischer Zucker für `access: { read: [], write: [] }` – beides ist derselbe Mechanismus, und das Festlegen von beidem für eine Property wird beim Booten abgelehnt |
 | `access` | `{ read?: string[]; write?: string[] }` | Wer dieses einzelne Feld lesen und wer es schreiben darf, nach Rolle. Eine weggelassene Liste delegiert an die [Sicherheitsregeln](/docs/collections/security-rules/) der Zeile; `[]` bedeutet niemand über die API; eine Rollenliste umfasst diese Rollen plus `admin`. Ein nicht lesbares Feld ist in Antworten **nicht vorhanden** (statt `null`), und ein Schreibzugriff, der ein nicht schreibbares Feld benennt, ergibt einen 400-Fehler. Siehe [Feldzugriff](/docs/collections/field-access/) |
 | `metadata` | `Record<string, unknown>` | Alles, was Ihr eigener Code an eine Property anhängen muss. Rebase liest es nicht; es übersteht die Serialisierung unverändert |
 | `dynamicProps` | `function` | Dynamischer Property-Builder (siehe [Bedingte Felder](/docs/collections/validation-and-conditions/#conditional-fields)). **Nur Admin-Formular – wird nicht von der API oder der Datenbank erzwungen.** |

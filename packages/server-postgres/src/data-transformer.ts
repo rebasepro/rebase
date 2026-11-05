@@ -72,6 +72,18 @@ export function sanitizeAndConvertDates(obj: unknown): unknown {
         return obj.toISOString();
     }
 
+    // A Buffer or Uint8Array is a bytea value, not a record to walk: copied key
+    // by key it became `{"0":1,"1":2,…}`, which the driver then JSON-encoded
+    // into the column.
+    if (ArrayBuffer.isView(obj)) {
+        return obj;
+    }
+    // A bare ArrayBuffer has no own keys at all, so the walk made it `{}`; the
+    // driver takes bytes as a Buffer.
+    if (obj instanceof ArrayBuffer) {
+        return Buffer.from(obj);
+    }
+
     if (typeof obj === "object") {
         const newObj: Record<string, unknown> = {};
         for (const key in obj) {

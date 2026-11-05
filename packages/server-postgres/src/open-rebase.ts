@@ -21,7 +21,7 @@ import {
     type RegisteredDatabase,
     type User
 } from "@rebasepro/types";
-import { buildSdkData, createAccessorSlugResolver } from "@rebasepro/common";
+import { buildSdkData, createAccessorSlugResolver, warnOnTableDdl } from "@rebasepro/common";
 import { logger } from "@rebasepro/server";
 import { deepestErrorMessage, parseHostInfo } from "./cli-errors";
 import { extractPgError } from "./utils/pg-error-utils";
@@ -237,6 +237,8 @@ export async function openRebase<DB = RegisteredDatabase>(options: OpenRebaseOpt
         collections,
         async sql(query, sqlOptions) {
             if (!isSQLAdmin(admin)) throw new Error("This driver cannot run raw SQL.");
+            // Application tables are collections, here as in a function (see warnOnTableDdl).
+            warnOnTableDdl(query, message => logger.warn(message));
             // `{ database }` names a data source, as on the server. This opened
             // exactly one, so any other key is refused by name: it used to be
             // passed on as a Postgres database name, running the query on

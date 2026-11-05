@@ -383,8 +383,9 @@ export interface BaseProperty<CustomProps = unknown> {
      *
      * For secrets the server must store and read but no client should ever
      * receive — password hashes, verification tokens. The value is still
-     * written and queryable server-side; it is stripped from every row the API
-     * serves, for every caller, including admins and service keys, and it is
+     * written, and readable server-side through `rebase.sql()` only; it is
+     * stripped from every row the API serves, for every caller, including
+     * admins, service keys and `rebase.dataAsAdmin` reads, and it is
      * absent from every generated description of the surface: the SDK's `Row`,
      * `Insert` and `Update` types, and the OpenAPI schemas, filters and
      * parameters.
