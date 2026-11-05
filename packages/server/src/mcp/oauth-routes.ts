@@ -36,8 +36,10 @@ import type { OAuthStore } from "./oauth-store.js";
 import { AUTHORIZATION_CODE_TTL_MS } from "./oauth-store.js";
 import {
     canonicalResourceUri,
+    DATA_SCOPE_VOCABULARY,
     issuerFor,
     narrowScope,
+    type McpScopeVocabulary,
     redirectUriAllowed,
     resourceMatches,
     scopeList,
@@ -89,6 +91,8 @@ export interface OAuthRoutesConfig {
      * repository, and then a grant carries the roles it was consented with.
      */
     identity?: McpGrantIdentity;
+    /** The scopes this server issues and how consent words them. The data vocabulary when omitted. */
+    vocabulary?: McpScopeVocabulary;
 }
 
 /**
@@ -144,6 +148,7 @@ export function createOAuthRoutes(config: OAuthRoutesConfig): Hono<HonoEnv> {
     const jwt = config.jwt ?? processJwtService;
     const issuer = issuerFor(publicUrl);
     const canonicalResource = canonicalResourceUri(publicUrl, mcpPath);
+    const vocabulary = config.vocabulary ?? DATA_SCOPE_VOCABULARY;
 
     // The limiters are created PER ROUTER, not at module scope.
     //
@@ -268,7 +273,7 @@ export function createOAuthRoutes(config: OAuthRoutesConfig): Hono<HonoEnv> {
             }, 400);
         }
 
-        const scope = narrowScope(typeof body.scope === "string" ? body.scope : undefined);
+        const scope = narrowScope(typeof body.scope === "string" ? body.scope : undefined, vocabulary);
 
         await store.registerClient({
             clientId,
@@ -365,7 +370,7 @@ export function createOAuthRoutes(config: OAuthRoutesConfig): Hono<HonoEnv> {
             return fail("invalid_target", `resource must identify ${canonicalResource}.`);
         }
 
-        const scope = narrowScope(q.scope);
+        const scope = narrowScope(q.scope, vocabulary);
 
         const requestToken = await jwt.signPurposeToken(
             "mcp-authorize-request",
@@ -387,10 +392,11 @@ export function createOAuthRoutes(config: OAuthRoutesConfig): Hono<HonoEnv> {
         return c.body(renderConsentPage({
             clientName: client.clientName,
             scope,
-            scopeDescriptions: describeScopes(scope),
+            scopeDescriptions: describeScopes(scope, vocabulary),
             requestToken,
             loginUrl: `${config.authBasePath}/login`,
             mfaChallengeUrl: `${config.authBasePath}/mfa/challenge`,
+            refreshUrl: `${config.authBasePath}/refresh`,
             mfaVerifyUrl: `${config.authBasePath}/mfa/challenge/verify`,
             redirectUri,
             decisionUrl: `${c.req.path}/decision`,
@@ -617,7 +623,7 @@ export function createOAuthRoutes(config: OAuthRoutesConfig): Hono<HonoEnv> {
         const held = scopeList(heldScope);
         let scope = heldScope;
         if (form.scope) {
-            const asked = scopeList(narrowScope(String(form.scope)));
+            const asked = scopeList(narrowScope(String(form.scope), vocabulary));
             // Covered, not merely equal: `data:read:posts` narrows `data:read`.
             const granted = intersectScopes(asked, held);
             // An empty intersection must NOT fall back to the held scope: a
@@ -932,15 +938,13 @@ function escapeHtml(value: string): string {
  * they need to read here is that the client gets *their own* access and no
  * more, and which collections it reaches when the grant names some.
  */
-export function describeScopes(scope: string): { scope: string; description: string }[] {
-    const verbs: Record<string, string> = {
-        "data:read": "Read data you already have access to",
-        "data:write": "Create and change data you already have access to",
-        "data:delete": "Delete data you already have access to"
-    };
+export function describeScopes(
+    scope: string,
+    vocabulary: McpScopeVocabulary = DATA_SCOPE_VOCABULARY
+): { scope: string; description: string }[] {
     return scopeList(scope).flatMap(entry => {
         const parsed = parseScope(entry);
-        const verb = parsed ? verbs[parsed.scope] : undefined;
+        const verb = parsed ? vocabulary.supported.find(known => known.scope === parsed.scope)?.description : undefined;
         if (!parsed || !verb) return [];
         return [{ scope: entry, description: parsed.target ? `${verb}, in ${parsed.target} only` : verb }];
     });

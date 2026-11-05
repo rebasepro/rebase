@@ -4361,6 +4361,49 @@ yet, listed so that nobody reads a promise into them:
 
 ### [Unreleased]
 
+#### Added
+
+##### MCP
+
+- **A backend can serve its own MCP tools.** `initializeRebaseBackend({ mcp:
+  { tools, scopes, instructions } })` replaces the data tools on `/mcp` with
+  the app's own, under its own scope vocabulary: discovery, authorize and the
+  consent screen read it. `McpToolDefinition`, `McpToolError` and
+  `DATA_SCOPE_VOCABULARY` are exported from `@rebasepro/server`. The Rebase
+  Cloud control plane serves its hosted connector this way.
+
+- **Every MCP tool is listed with a title and annotations.** `readOnlyHint`,
+  `destructiveHint`, `idempotentHint` and `openWorldHint`, which hosts such as
+  Claude read to decide whether to ask before a call. The data tools' reads are
+  read-only; `update_document` and `delete_document` are destructive.
+
+- **An MCP tool can take two calls: a plan, then a confirmed run.** A tool that
+  declares `confirm` changes nothing on its first call and answers a plan and a
+  token; the second call, with the same arguments and the token, runs it. The
+  token is bound to the account, the client, the tool, the arguments and the
+  endpoint, lives five minutes, and is spent once (`rebase.mcp_confirmations`,
+  created with the OAuth tables). The data tools do not use it.
+
+- **The MCP consent screen can use the session the app's own frontend keeps.**
+  When the browser holds one (the SDK's `rebase_auth`, same origin), Allow
+  consents as that account, renewing the session first when it has expired.
+  An account that signs in only with Google or GitHub no longer needs a
+  password to connect a client.
+
+- **Platform tokens reach the app's MCP data tools at `/api/admin/mcp`**, and
+  may hold `cron:write` on the admin surfaces. The endpoint is mounted only
+  where the platform set `REBASE_PLATFORM_TOKEN_KEY` and
+  `REBASE_PLATFORM_TOKEN_AUDIENCE`, takes platform tokens and nothing else, and
+  runs the app's own tools under RLS as `platform:<sub>` with the `admin` role.
+  Data scopes are honoured there alone. Rebase Cloud's hosted connector uses
+  it to read and change a project's data for its owners and admins.
+
+- **The `show_collection` table pages and saves with the tools its server
+  names, and asks before a confirmed save.** A result may carry `actions`;
+  without them the view calls `query_collection` and `update_document` as
+  before. A save the server answers with a plan waits for the person to press
+  Save.
+
 ### [0.28.0] - 2026-11-05
 
 #### Added
@@ -50810,10 +50853,12 @@ to one user, the endpoint declines to mount and says why in the boot log. No
   to clients you register), and sends the person to a consent screen that signs
   them in through your existing `/auth/login`. An account with a second factor
   is then asked for its authenticator code or a recovery code, through the
-  existing `/auth/mfa/challenge` routes. The screen signs in with a password
-  only: someone who has only ever used Google, GitHub or an email link sets one
-  first with `/auth/forgot-password` (your app's "Forgot password"), and the
-  screen tells them so. It also names the host the authorization code is sent
+  existing `/auth/mfa/challenge` routes. When your app's own frontend
+  keeps a session in the same browser, the screen offers that account, and
+  Allow consents as it with no password; that is how someone who signs in only
+  with Google, GitHub or an email link connects. Otherwise it signs in with a
+  password, and someone with none sets one first with `/auth/forgot-password`
+  (your app's "Forgot password"); the screen tells them so. It also names the host the authorization code is sent
   to, and says that host is not verified: anyone may register a client under
   any name, so the host is the part a person can check.
 - **Nine tools, three scopes.** The same [scopes](/docs/backend/roles-and-scopes/)
@@ -50877,6 +50922,101 @@ already issued keeps working until it expires, within the hour.
 
 The routes are in [Endpoints](/docs/backend/endpoints/#mcp-surface) and the
 variables in [Configuration](/docs/getting-started/configuration/#mcp-surface).
+
+## Connect Claude to Rebase Cloud
+
+The Rebase connector is one MCP server for everything you run on Rebase Cloud.
+You add it once in Claude, sign in with your Rebase account, and Claude can see
+your projects, read their logs, deploy and roll them back, set their
+environment variables, and read and change their data. It works in Claude on
+the web, the desktop app and mobile.
+
+It acts as **you**, with the access your account has in the console: the
+projects of the organizations you belong to, the role you hold in each, and the
+data access the console's Studio gives you. It holds no key of its own.
+
+### Add it
+
+In Claude, open **Settings → Connectors → Add custom connector** and enter:
+
+```text
+https://app.rebase.pro/mcp
+```
+
+Claude opens the Rebase consent screen. If you are signed in to the console in
+the same browser, it offers that account: press **Allow**. Otherwise sign in
+there. The screen lists what you are granting; you can connect again later to
+grant less.
+
+### What Claude can do with it
+
+Ten tools. The first six only read:
+
+| Tool | What it does |
+|---|---|
+| `projects` | Lists your projects, their status and your role in each |
+| `project_status` | One project's status and latest deployment; optionally its recent deployments, its environment variable **names**, its cron jobs |
+| `logs` | The running app's output, a deployment's build log, or a cron job's runs |
+| `schema` | A project's collections, or one collection's fields |
+| `query` | Reads rows: one by id, a filtered page, or a count |
+| `show_collection` | Shows rows as a table in the conversation, where you can page and edit cells |
+
+The other four change production, and each one asks first:
+
+| Tool | What it does |
+|---|---|
+| `write` | Creates, updates or deletes one row (users included: they are rows of your users collection) |
+| `deploy` | Deploys a git branch, rolls back to an earlier deployment, or cancels one in progress |
+| `env` | Sets or removes environment variables; a change applies at the next deploy |
+| `cron` | Runs a cron job now, or switches one on or off |
+
+Deploying code from your machine stays with the CLI (`rebase cloud deploy`) and
+the [local MCP server](/docs/ai/mcp/), which also covers local development,
+schema generation and database branches.
+
+### Every change is confirmed
+
+A tool that changes something takes two calls. The first changes nothing: it
+answers a plan, such as "Roll shop back to deployment d_81f2", and a
+confirmation token. Claude shows you the plan, and calls again with the token
+only if you agree. The token works for five minutes, once, for exactly the
+arguments it was made for: if anything differs, nothing runs.
+
+Claude also asks your permission before it calls any of these four tools,
+because they are marked as destructive. In the table view, an edited cell
+shows the plan and waits for you to press **Save**.
+
+Environment variable values are never shown back: a plan shows their length,
+and `project_status` lists names only. A value you set does pass through the
+conversation.
+
+### What it can reach
+
+- **Projects and cloud operations**: what the console allows you. A member of an
+  organization can read status and logs and, as in the console, deploy and set
+  variables.
+- **Data, schemas and cron jobs**: what Studio in the console allows you. That
+  is an owner or admin of the organization, on a project whose Studio access is
+  switched on. Calls run inside the project, under its row-level security, with
+  the admin role Studio has. Turning Studio access off for a project turns this
+  off too.
+- **What you granted.** You can grant the connector less than your account
+  holds: only reading, or only one project. It never asks for backups,
+  restores, database credentials or project settings.
+
+A project reaches its data through the connector once it runs a runtime that
+takes the connector's calls. Until its next deploy or platform rollout, those
+tools say so.
+
+### Disconnecting
+
+Remove the connector in Claude's settings. Its access token stops working
+within the hour. Deleting your Rebase account, or signing out everywhere, stops
+it at the next call.
+
+The connector is for the people who build on Rebase Cloud. To let the people
+who **use** your app connect Claude to it as themselves, serve the
+[remote MCP endpoint](/docs/ai/remote-mcp/) from your own backend.
 
 ## Agent Skills
 

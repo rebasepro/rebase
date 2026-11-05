@@ -39,6 +39,7 @@ export function memoryStore(): OAuthStore {
         record: RefreshTokenRecord; issuedAt: number; expiresAt: number; consumed: boolean; revoked: boolean;
     }>();
     const consents = new Map<string, { scope: string; grantedAt: string }>();
+    const spentConfirmations = new Set<string>();
 
     return {
         async ensureTables() { /* nothing to create */ },
@@ -138,6 +139,12 @@ export function memoryStore(): OAuthStore {
             }
             if (consents.delete(`${uid}:${clientId}`)) touched = true;
             return touched;
+        },
+
+        async consumeConfirmation(jti) {
+            if (spentConfirmations.has(jti)) return false;
+            spentConfirmations.add(jti);
+            return true;
         }
     };
 }
@@ -204,6 +211,12 @@ export interface HarnessOptions {
     resolveApiKey?: McpRoutesConfig["resolveApiKey"];
     /** The MCP App views `/mcp` serves. Absent, it serves none. */
     apps?: McpRoutesConfig["apps"];
+    /** An app's own tools, scopes and instructions, in place of the data tools. */
+    tools?: McpRoutesConfig["tools"];
+    vocabulary?: McpRoutesConfig["vocabulary"];
+    instructions?: McpRoutesConfig["instructions"];
+    /** Where confirmed calls are spent. This process's memory when absent. */
+    confirmations?: McpRoutesConfig["confirmations"];
 }
 
 export function buildApp(options: HarnessOptions = {}) {
@@ -222,7 +235,11 @@ export function buildApp(options: HarnessOptions = {}) {
         rateLimit: options.rateLimit,
         resolveApiKey: options.resolveApiKey,
         identity: options.identity,
-        apps: options.apps
+        apps: options.apps,
+        tools: options.tools,
+        vocabulary: options.vocabulary,
+        instructions: options.instructions,
+        confirmations: options.confirmations
     };
     app.route("/", createMcpWellKnownRoutes(mcpConfig));
     app.route("/mcp", createMcpRoutes(mcpConfig));
@@ -232,7 +249,8 @@ export function buildApp(options: HarnessOptions = {}) {
         mcpPath: "/mcp",
         authBasePath: "/api/auth",
         allowDynamicRegistration: options.allowDynamicRegistration ?? true,
-        identity: options.identity
+        identity: options.identity,
+        vocabulary: options.vocabulary
     }));
     return { app, store };
 }

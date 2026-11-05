@@ -30,9 +30,14 @@
  * - **Reach another project.** One platform key signs for every tenant, so the
  *   audience is what binds a token to this one: `aud` must equal
  *   `REBASE_PLATFORM_TOKEN_AUDIENCE`.
- * - **Act as a person of this app.** The caller is `platform:<sub>` with no
- *   roles: row-level security sees nobody it knows, and every surface that
- *   checks a scope other than the granted ones refuses it.
+ * - **Act as a person of this app.** The caller is `platform:<sub>`: row-level
+ *   security sees nobody it knows by that uid, and every surface that checks a
+ *   scope other than the granted ones refuses it. On the admin surfaces it
+ *   holds no role. On the platform's MCP endpoint (`/api/admin/mcp`,
+ *   `mcp/platform-mcp.ts`) — and nowhere else — a token holding `data:*` runs
+ *   the app's MCP data tools with the `admin` role, under RLS: the reach the
+ *   platform's own Studio has, which the platform grants only to the project's
+ *   owners and admins.
  *
  * ## Wire format
  *
@@ -57,13 +62,23 @@ export const PLATFORM_TOKEN_PREFIX = "rpt_";
 export const PLATFORM_TOKEN_ISSUER = "rebase-cloud";
 
 /**
- * Everything a platform token can be granted on this server.
+ * Everything a platform token can be granted on this server's admin surfaces.
  *
- * Read-only on purpose. Adding a scope here is a decision about what the
- * platform may do inside a customer's app on a person's behalf, and belongs in
- * its own change.
+ * Adding a scope here is a decision about what the platform may do inside a
+ * customer's app on a person's behalf, and belongs in its own change.
+ * `cron:write` (run a job, switch one on or off) was added with the hosted
+ * Rebase connector (docs/hosted-mcp-connector.md), whose `cron` tool takes a
+ * confirmed second call before it sends one.
  */
-export const PLATFORM_TOKEN_SCOPES: readonly AdminScope[] = ["cron:read"];
+export const PLATFORM_TOKEN_SCOPES: readonly AdminScope[] = ["cron:read", "cron:write"];
+
+/**
+ * What a platform token can be granted on the platform's MCP endpoint, and
+ * only there: the app's own MCP data tools. Never on `/api/data`, the socket,
+ * the public `/mcp`, or an admin surface. Added with the hosted connector, in
+ * the same review as `cron:write`.
+ */
+export const PLATFORM_MCP_SCOPES: readonly string[] = ["data:read", "data:write", "data:delete"];
 
 /** The longest `exp - iat` a platform token may declare. */
 export const PLATFORM_TOKEN_MAX_LIFETIME_SECONDS = 600;
@@ -196,7 +211,9 @@ function stringClaim(claims: JwtClaims, name: string): string | undefined {
 export async function verifyPlatformToken(
     token: string,
     config: PlatformTokenConfig,
-    nowSeconds: number = Math.floor(Date.now() / 1000)
+    nowSeconds: number = Math.floor(Date.now() / 1000),
+    /** The scopes this door grants: the admin surfaces' unless it says otherwise. */
+    grantable: readonly string[] = PLATFORM_TOKEN_SCOPES
 ): Promise<PlatformCaller | PlatformTokenRefusal> {
     if (!isPlatformToken(token)) return { refusal: "Not a platform token" };
     const jws = token.slice(PLATFORM_TOKEN_PREFIX.length);
@@ -241,11 +258,11 @@ export async function verifyPlatformToken(
     if (!subject) return { refusal: "A platform token must name who it acts for (sub)" };
 
     const requested = (stringClaim(claims, "scope") ?? "").split(/\s+/).filter(Boolean);
-    const scopes = requested.filter(scope => (PLATFORM_TOKEN_SCOPES as readonly string[]).includes(scope));
+    const scopes = requested.filter(scope => grantable.includes(scope));
     if (scopes.length === 0) {
         return {
-            refusal: `This platform token carries no scope this server grants to the platform ` +
-                `(${PLATFORM_TOKEN_SCOPES.join(", ")})`
+            refusal: `This platform token carries no scope this server grants to the platform here ` +
+                `(${grantable.join(", ")})`
         };
     }
 

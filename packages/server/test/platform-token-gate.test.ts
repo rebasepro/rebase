@@ -84,9 +84,16 @@ function stubDriver() {
         countCollection: async () => 0,
         checkUniqueField: async () => true,
         healthCheck: async () => ({ healthy: true, latencyMs: 1 }),
-        admin: { executeSql: async () => [] }
+        admin: { executeSql: async () => [] },
+        // Who each scoped call ran as: what RLS would have evaluated.
+        withAuth: async (identity: { uid: string; roles?: string[] }) => {
+            scopedAs.push({ uid: identity.uid, roles: identity.roles ?? [] });
+            return stubDriver();
+        }
     } as never;
 }
+
+const scopedAs: Array<{ uid: string; roles: string[] }> = [];
 
 const bootstrapper: BackendBootstrapper = {
     type: "fake",
@@ -182,15 +189,26 @@ describe("a platform token on the admin gate", () => {
         expect(await errorCode(res)).toBe("SCOPE_MISSING");
     });
 
-    it("is granted only the scopes the server allows, whatever the platform signed", async () => {
-        // A control plane that signs `cron:write` — by a bug or by being
-        // compromised — still gets read-only access: the ceiling is the app's.
+    it("triggers a job with cron:write", async () => {
         const app = await boot();
-        const token = await platformToken({ scope: "cron:read cron:write backups:read" });
+
+        const res = await app.request("/api/admin/cron/fixture-job/trigger",
+            bearer(await platformToken({ scope: "cron:read cron:write" }), "POST"));
+
+        expect(res.status).toBe(200);
+    });
+
+    it("is granted only the scopes the server allows, whatever the platform signed", async () => {
+        // A control plane that signs `backups:read` or `data:read` for an admin
+        // surface — by a bug or by being compromised — gets neither: the
+        // ceiling is the app's, and data scopes are honoured on the platform's
+        // MCP endpoint alone.
+        const app = await boot();
+        const token = await platformToken({ scope: "cron:read backups:read data:read" });
 
         expect((await app.request("/api/admin/cron", bearer(token))).status).toBe(200);
-        expect((await app.request("/api/admin/cron/fixture-job/trigger", bearer(token, "POST"))).status).toBe(403);
         expect((await app.request("/api/admin/backups", bearer(token))).status).toBe(403);
+        expect((await app.request("/api/data/jobs", bearer(token))).status).toBe(401);
     });
 
     it("reads cron through the legacy alias too", async () => {
@@ -248,7 +266,9 @@ describe("a platform token that must be refused", () => {
         ["that lives longer than ten minutes", { exp: now() + 3600 }],
         ["issued in the future", { iat: now() + 600, exp: now() + 900 }],
         ["with no subject", { sub: "" }],
-        ["with no scope this server grants", { scope: "cron:write users:write" }]
+        ["with no scope this server grants", { scope: "users:write backups:write" }],
+        // Data scopes are the platform MCP endpoint's, never an admin surface's.
+        ["with only data scopes", { scope: "data:read data:write" }]
     ])("refuses one %s", async (_case, overrides) => {
         const app = await boot();
 
@@ -326,5 +346,62 @@ describe("the platform key in the environment", () => {
         const verified = await verifyPlatformToken(await platformToken(), config);
 
         expect(verified).toEqual({ subject: "cloud-user-1", scopes: ["cron:read"], tokenId: "tok-1" });
+    });
+});
+
+describe("the platform MCP endpoint", () => {
+    const mcp = async (app: Hono, token: string | undefined, method: string, params: Record<string, unknown> = {}) => {
+        const res = await app.request("/api/admin/mcp", {
+            method: "POST",
+            headers: { "content-type": "application/json", ...(token ? { authorization: `Bearer ${token}` } : {}) },
+            body: JSON.stringify({ jsonrpc: "2.0", id: 1, method, params })
+        });
+        return { status: res.status, body: await res.json() as { result?: Record<string, unknown>; error?: unknown } };
+    };
+
+    it("serves the app's data tools to a token holding data scopes, and only those it holds", async () => {
+        const app = await boot();
+        const { status, body } = await mcp(app, await platformToken({ scope: "data:read" }), "tools/list");
+
+        expect(status).toBe(200);
+        const names = (body.result?.tools as { name: string }[]).map(tool => tool.name);
+        expect(names).toEqual(expect.arrayContaining(["list_collections", "query_collection", "get_document"]));
+        expect(names).not.toContain("create_document");
+        expect(names).not.toContain("delete_document");
+    });
+
+    it("runs each call as platform:<sub> with the admin role, under RLS", async () => {
+        const app = await boot();
+        scopedAs.length = 0;
+        const { body } = await mcp(app, await platformToken({ scope: "data:read" }), "tools/call",
+            { name: "query_collection", arguments: { collection: "jobs" } });
+
+        expect(body.result?.isError).toBeUndefined();
+        expect(scopedAs).toContainEqual({ uid: "platform:cloud-user-1", roles: ["admin"] });
+    });
+
+    it.each([
+        ["no credential", undefined],
+        ["a token with only admin scopes", "cron"],
+        ["an admin user's session", "session"],
+        ["a token for another project", "other"]
+    ])("refuses %s", async (_case, kind) => {
+        const app = await boot();
+        const token = kind === undefined ? undefined
+            : kind === "cron" ? await platformToken({ scope: "cron:read cron:write" })
+                : kind === "session" ? await generateAccessToken("admin-1", ["admin"])
+                    : await platformToken({ scope: "data:read", aud: "some-other-project" });
+
+        const { status } = await mcp(app, token, "tools/list");
+
+        expect(status).toBe(401);
+    });
+
+    it("is not there when the platform set nothing", async () => {
+        const app = await boot({});
+
+        const { status } = await mcp(app, await platformToken({ scope: "data:read" }), "tools/list");
+
+        expect(status).not.toBe(200);
     });
 });

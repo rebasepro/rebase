@@ -9,6 +9,11 @@
  * - Load more asks for the page after the one shown, counted from the
  *   offset the model asked for.
  * - A save the server refuses is shown, and the cell keeps its value.
+ * - The server can name the tools the view pages and saves with, and the
+ *   arguments it always sends them (the hosted connector's `query` and
+ *   `write`, with the project).
+ * - A save the server answers with a plan is held until the person
+ *   confirms it, then sent again with the plan's token.
  */
 import React, { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
@@ -26,7 +31,11 @@ const COLUMNS = [
     { key: "name", title: "Name", type: "string", editable: true }
 ];
 
-function tableResult(rows: Record<string, unknown>[], meta: Record<string, unknown> = {}): ToolResult {
+function tableResult(
+    rows: Record<string, unknown>[],
+    meta: Record<string, unknown> = {},
+    extra: Record<string, unknown> = {}
+): ToolResult {
     return {
         structuredContent: {
             collection: "candidates",
@@ -35,9 +44,26 @@ function tableResult(rows: Record<string, unknown>[], meta: Record<string, unkno
             columns: COLUMNS,
             writable: true,
             data: rows,
-            meta
+            meta,
+            ...extra
         }
     };
+}
+
+/** What the hosted connector's show_collection adds: its own tools, and the project. */
+const HOSTED_ACTIONS = {
+    actions: {
+        page: { tool: "query", arguments: { project: "shop" } },
+        edit: { tool: "write", arguments: { project: "shop", action: "update" } }
+    }
+};
+
+async function editTo(row: number, column: number, value: string): Promise<void> {
+    const input = await openEditor(row, column);
+    await act(async () => {
+        type(input, value);
+        input.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+    });
 }
 
 let container: HTMLDivElement;
@@ -167,5 +193,72 @@ describe("load more", () => {
         await act(async () => button("Load more").click());
 
         expect(callTool).toHaveBeenCalledWith("query_collection", { collection: "candidates", offset: 2 });
+    });
+});
+
+describe("a server that names its own tools", () => {
+    it("pages and saves with them, sending the arguments it named", async () => {
+        const { bridge, callTool } = bridgeWith(
+            { project: "shop", collection: "candidates", limit: 1 },
+            tableResult([{ id: "1", name: "Ada" }], { hasMore: true }, HOSTED_ACTIONS)
+        );
+        callTool.mockResolvedValue({ structuredContent: { data: [], meta: { hasMore: false } } });
+        await render(bridge);
+
+        await act(async () => button("Load more").click());
+        expect(callTool).toHaveBeenLastCalledWith("query", { project: "shop", collection: "candidates", limit: 1, offset: 1 });
+
+        callTool.mockResolvedValue({ structuredContent: { id: "1", name: "Grace" } });
+        await editTo(0, 1, "Grace");
+        expect(callTool).toHaveBeenLastCalledWith("write", {
+            project: "shop", action: "update", collection: "candidates", id: "1", data: { name: "Grace" }
+        });
+        expect(cell(0, 1).textContent).toBe("Grace");
+    });
+});
+
+describe("a save that needs the person's yes", () => {
+    const PLAN = {
+        structuredContent: {
+            status: "confirmation_required",
+            plan: { summary: "Change name of candidates row 1 in shop (production) from \"Ada\" to \"Grace\"." },
+            confirm: "rmc_token",
+            expiresAt: "2026-11-05T10:00:00Z"
+        }
+    };
+
+    it("is held, saved only once confirmed, and sent again with the plan's token", async () => {
+        const { bridge, callTool } = bridgeWith({ project: "shop", collection: "candidates" },
+            tableResult([{ id: "1", name: "Ada" }], {}, HOSTED_ACTIONS));
+        callTool.mockResolvedValueOnce(PLAN);
+        await render(bridge);
+
+        await editTo(0, 1, "Grace");
+        expect(container.textContent).toContain("from \"Ada\" to \"Grace\"");
+        expect(cell(0, 1).textContent).toBe("Ada");
+        expect(bridge.updateModelContext).not.toHaveBeenCalled();
+
+        callTool.mockResolvedValueOnce({ structuredContent: { id: "1", name: "Grace" } });
+        await act(async () => button("Save").click());
+
+        expect(callTool).toHaveBeenLastCalledWith("write", {
+            project: "shop", action: "update", collection: "candidates", id: "1", data: { name: "Grace" }, confirm: "rmc_token"
+        });
+        expect(cell(0, 1).textContent).toBe("Grace");
+        expect(bridge.updateModelContext).toHaveBeenCalled();
+    });
+
+    it("is dropped on cancel, and nothing is saved", async () => {
+        const { bridge, callTool } = bridgeWith({ project: "shop", collection: "candidates" },
+            tableResult([{ id: "1", name: "Ada" }], {}, HOSTED_ACTIONS));
+        callTool.mockResolvedValueOnce(PLAN);
+        await render(bridge);
+
+        await editTo(0, 1, "Grace");
+        await act(async () => button("Cancel").click());
+
+        expect(callTool).toHaveBeenCalledTimes(1);
+        expect(container.textContent).not.toContain("to \"Grace\"");
+        expect(cell(0, 1).textContent).toBe("Ada");
     });
 });

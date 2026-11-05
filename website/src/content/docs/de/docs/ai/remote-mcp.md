@@ -1,5 +1,5 @@
 ---
-sourceHash: e777b5a7b5dab590
+sourceHash: 66f2808f3fe34b6b
 title: Der Remote-MCP-Endpunkt
 sidebar_label: Remote-MCP-Endpunkt
 description: Stellen Sie MCP von einem bereitgestellten Backend unter /mcp bereit, damit die Benutzer Ihrer App Claude oder Cursor als sich selbst verbinden können – OAuth mit Zustimmungsbildschirm, neun Tools unter drei Scopes, jeder Aufruf unter ihrer eigenen Row-Level Security.
@@ -30,10 +30,12 @@ den Grund im Boot-Log. Keine `REBASE_ROLE` schaltet ihn ein.
   Zustimmungsbildschirm, der sie über Ihr bestehendes `/auth/login` anmeldet. Ein Konto
   mit einem zweiten Faktor wird anschließend über die bestehenden
   `/auth/mfa/challenge`-Routen nach dem Code seiner Authenticator-App oder nach einem
-  Wiederherstellungscode gefragt. Der Bildschirm meldet nur mit einem Passwort an: Wer
-  bisher ausschließlich Google, GitHub oder einen E-Mail-Link verwendet hat, legt
-  zuerst eines über `/auth/forgot-password` fest („Passwort vergessen“ in Ihrer App),
-  und der Bildschirm sagt ihm das. Er nennt außerdem den Host, an den der
+  Wiederherstellungscode gefragt. Hält das eigene Frontend Ihrer App im selben Browser
+  eine Sitzung, bietet der Bildschirm dieses Konto an, und „Zulassen“ stimmt damit
+  ohne Passwort zu; so verbindet sich, wer sich nur mit Google, GitHub oder einem
+  E-Mail-Link anmeldet. Andernfalls meldet er mit einem Passwort an, und wer keines
+  hat, legt zuerst eines über `/auth/forgot-password` fest („Passwort vergessen“ in
+  Ihrer App); der Bildschirm sagt ihm das. Er nennt außerdem den Host, an den der
   Autorisierungscode gesendet wird, und weist darauf hin, dass dieser Host nicht
   verifiziert ist: Jeder darf einen Client unter einem beliebigen Namen registrieren,
   daher ist der Host der Teil, den eine Person überprüfen kann.

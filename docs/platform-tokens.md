@@ -68,12 +68,21 @@ on the platform's side should not take a customer's app down.
 | `iat`, `exp` | Both required. `exp - iat` ≤ 600 seconds. `iat` may be at most 60 seconds ahead of the server's clock. |
 | `jti` | Recommended. The runtime logs it. |
 
-**What it grants.** The caller becomes `platform:<sub>`, with no roles, holding
-the token's scopes intersected with `PLATFORM_TOKEN_SCOPES`, which is
-`["cron:read"]` today. A token that asks for `cron:write` still gets read-only
-access, and one that holds no allowed scope is refused. Every other admin
+**What it grants.** On the admin surfaces the caller becomes `platform:<sub>`,
+with no roles, holding the token's scopes intersected with
+`PLATFORM_TOKEN_SCOPES`, which is `["cron:read", "cron:write"]`. A token that
+asks for `backups:read` or `data:read` there gets neither, and one that holds
+no allowed scope is refused. `cron:write` (run a job, switch one on or off) was
+added with the hosted Rebase connector ([hosted-mcp-connector.md](hosted-mcp-connector.md)). Every other admin
 route checks its own scope and answers `403 SCOPE_MISSING`. On the data
-plane, a platform token is an invalid session (401). Each accepted request
+plane, a platform token is an invalid session (401).
+
+**The platform's MCP endpoint.** `POST /api/admin/mcp` is mounted with the
+variables, and takes platform tokens and nothing else. There, and only there,
+a token may hold `PLATFORM_MCP_SCOPES` (`data:read`, `data:write`,
+`data:delete`), and the call runs the app's own MCP data tools under RLS as
+`platform:<sub>` with the `admin` role. The hosted connector forwards a
+project's data calls to it (`src/mcp/platform-mcp.ts`). Each accepted request
 logs `[Auth] Platform token accepted` with `subject`, `jti`, `scopes`,
 `method` and `path`.
 
@@ -103,6 +112,12 @@ the platform never injected its key), `cron_not_served`, `not_found`,
 capability now includes `functions:invoke:runtime-token`.
 
 ## What the control plane must add
+
+**Built** on the saas branch `feat/hosted-mcp-connector` (2026-11-05): the
+signing key and `mintPlatformToken` in `src/utils/platform-token-key.ts`, the
+injection on every tenant path, and `functions/runtime-token.ts`, which issues
+`cron:read` only. The hosted connector mints its own tokens with the same
+signer after its own gates. The spec below is kept as the record.
 
 Everything below is in `saas`. Paths are relative to `saas/backend`.
 

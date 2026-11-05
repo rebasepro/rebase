@@ -183,6 +183,31 @@ on the tool). The text is
 compact JSON — indentation was half of it. The `initialize` instructions and
 each row-returning tool's description say so.
 
+## An app's own tools
+
+A backend can serve its own tools on `/mcp` in place of the data tools:
+`initializeRebaseBackend({ mcp: { tools, scopes, instructions } })`. The OAuth
+server, the consent screen, the token checks and everything below stay the
+same; the scope vocabulary (`McpScopeVocabulary`) is what discovery
+advertises, what authorize keeps from a request, and how the consent screen
+words each line. The Rebase Cloud control plane serves the hosted connector
+this way ([hosted-mcp-connector.md](hosted-mcp-connector.md)).
+
+Every tool is listed with a `title` and MCP's `annotations` (`readOnlyHint`,
+`destructiveHint`, `idempotentHint`, `openWorldHint`). Hosts read them to
+decide whether to ask the person before a call. The data tools carry them too:
+the reads are read-only, `create_document` adds, `update_document` and
+`delete_document` overwrite.
+
+**Plan, then confirm** (`mcp/confirmation.ts`). A tool that declares
+`confirm(args, ctx)` takes two calls. The first changes nothing and answers
+`{ status: "confirmation_required", plan, confirm, expiresAt }`. The second,
+with the same arguments and the token, runs it. The token is bound to the
+account, the OAuth client, the tool, a hash of the canonical arguments and
+this endpoint, lives five minutes, and is spent once in
+`rebase.mcp_confirmations`, so two replicas racing a token run one call. The
+data tools do not use it.
+
 ## The consent screen
 
 One page, self-contained HTML with no build step and no external asset, because
@@ -198,6 +223,14 @@ never seen the page. The rest of the policy follows from what the page is —
 `form-action 'self'` so an injection cannot repoint the credential form,
 `no-store` because the HTML embeds a signed authorization request, and
 `no-referrer` so the `client_id` and `state` do not travel onward.
+
+When the app's own frontend keeps a session in the same browser (the SDK's
+`rebase_auth` in `localStorage`, same origin), the screen offers "Signed in on
+this site as …": Allow then uses that session's access token, renewing it
+through `/auth/refresh` first when it has expired and writing the rotated pair
+back where the frontend reads it. Nothing is sent before the press. This is
+how an account that signs in only with Google or GitHub consents without a
+password.
 
 The password never reaches this surface. The form posts to the existing
 `${basePath}/auth/login` — the same endpoint, password policy, rate limits and
@@ -273,6 +306,9 @@ thief, so both lose.
 | `packages/server/test/mcp-revocation.test.ts` | Disconnecting, and who may do it |
 | `packages/server/test/mcp-hardening.test.ts` | Tampered tokens, malformed JSON-RPC, hostile tool inputs |
 | `packages/server/test/mcp-boot-wiring.test.ts` | `init.ts` — the four ways it declines to mount, and the one way it proceeds |
+| `packages/server/test/mcp-own-tools.test.ts` | An app's own tools and scope vocabulary; every tool's annotations |
+| `packages/server/test/mcp-confirmation.test.ts` | Plan, then confirm: the token's bindings, expiry and single use |
+| `packages/server/test/platform-token-gate.test.ts` | Platform tokens on the admin surfaces and on `/api/admin/mcp` |
 | `packages/server-postgres/test/mcp-oauth-store.test.ts` | The store's SQL, against a real Postgres (PGlite) |
 | `packages/server-postgres/test/mcp-rls-end-to-end.test.ts` | **The product claim**: real tables, real policies, real `applyAuthContext` |
 

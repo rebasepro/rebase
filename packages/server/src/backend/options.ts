@@ -29,6 +29,8 @@ import type { RlsAuditConfig } from "../rls-audit";
 import type { BackendStorageConfig, StorageController } from "../storage";
 import type { SchemaEditPolicy, RemoteRepositoryConfig } from "../schema-edit/schema-edit-permissions";
 import type { RuntimeOwnershipOptions, RuntimeSurfaceOptions } from "../init/surfaces";
+import type { McpToolDefinition } from "../mcp/mcp-tools";
+import type { McpScopeVocabulary } from "../mcp/oauth-metadata";
 
 /**
  * Who may change this project's schema through a running backend.
@@ -859,6 +861,25 @@ export interface RebaseBackendOptions {
      * whole file.
      */
     maxBodySize?: number;
+    /**
+     * What `/mcp` serves, for a backend that brings its own tools instead of
+     * the data tools — the Rebase Cloud control plane serves its projects and
+     * their operations this way. The surface is still switched on by
+     * `REBASE_MCP_ENABLED` and `REBASE_PUBLIC_URL`; this only decides what is
+     * on it. Omitted, `/mcp` serves the data tools under `data:*` scopes.
+     *
+     * The OAuth server, its consent screen and its token checks are the same
+     * either way: a tool runs as the account that consented, with the scopes
+     * it consented to (`McpToolContext.caller`).
+     */
+    mcp?: {
+        /** The tools, in place of the data tools. Each is offered to a grant holding its `requiredScope`. */
+        tools: readonly McpToolDefinition[];
+        /** The scopes a grant may hold, with the consent screen's wording for each. */
+        scopes: McpScopeVocabulary;
+        /** What `initialize` tells the client about the tools. */
+        instructions: string;
+    };
     /**
      * Response compression for API routes. **Enabled by default.**
      *
