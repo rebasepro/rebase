@@ -1,1 +1,3 @@
-{}
+{
+    "rebase.sql()": "the accessor has shipped since 0.14 (custom-functions.md has taught it since then); the entry makes it warn on DDL against an application table, and changes nothing a page teaches about calling it"
+}
