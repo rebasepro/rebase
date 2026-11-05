@@ -23,7 +23,7 @@
  * 401, and a token too narrow for the tool it names is 403 `insufficient_scope`.
  */
 import { Hono } from "hono";
-import type { Context } from "hono";
+import type { Context, HonoRequest } from "hono";
 import { bodyLimit } from "hono/body-limit";
 import { createMiddleware } from "hono/factory";
 import type { AuthAdapter, CollectionConfig, DataDriver } from "@rebasepro/types";
@@ -161,6 +161,14 @@ export interface McpRoutesConfig {
      * is single-use only within one process.
      */
     confirmations?: McpConfirmationStore;
+    /**
+     * Decide who a request is, in place of the OAuth token and `rk_` key
+     * checks. A refusal is answered 401 with its words and a bare `Bearer`
+     * challenge — there is no authorization server to point at. The
+     * platform's endpoint (`platform-mcp.ts`) accepts platform tokens this
+     * way, and nothing else.
+     */
+    authenticate?(request: HonoRequest): Promise<McpCaller | { refusal: string }>;
 }
 
 /**
@@ -361,6 +369,18 @@ export function createMcpRoutes(config: McpRoutesConfig): Hono<HonoEnv> {
         };
     }
 
+    /** The app's own decision, with its refusal answered as a 401. */
+    async function authenticateWith(
+        decide: NonNullable<McpRoutesConfig["authenticate"]>,
+        c: Context<McpCallerEnv>
+    ): Promise<McpCaller | Response> {
+        const decided = await decide(c.req);
+        if ("refusal" in decided) {
+            return c.json({ error: "invalid_token", error_description: decided.refusal }, 401, { "WWW-Authenticate": "Bearer" });
+        }
+        return decided;
+    }
+
     /**
      * The token gate, as middleware, so the rate limiter after it knows whom
      * to count.
@@ -372,7 +392,7 @@ export function createMcpRoutes(config: McpRoutesConfig): Hono<HonoEnv> {
      * addresses: one busy session would spend everyone's allowance.
      */
     const authenticated = createMiddleware<McpCallerEnv>(async (c, next) => {
-        const caller = await authenticate(c);
+        const caller = config.authenticate ? await authenticateWith(config.authenticate, c) : await authenticate(c);
         if (caller instanceof Response) return caller;
         c.set("mcpCaller", caller);
         c.set("user", { uid: caller.uid, roles: caller.roles });

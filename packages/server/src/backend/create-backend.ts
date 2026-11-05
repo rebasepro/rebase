@@ -135,6 +135,7 @@ import { supportsRlsScoping } from "../auth/rls-scope";
 import { createOAuthStore, type OAuthStore } from "../mcp/oauth-store";
 import { createOAuthRoutes, grantIdentityFromRepository } from "../mcp/oauth-routes";
 import { createMcpRoutes, createMcpWellKnownRoutes } from "../mcp/mcp-routes";
+import { createPlatformMcpRoutes, PLATFORM_MCP_PATH } from "../mcp/platform-mcp";
 import {
     BackendStorageConfig,
     createStorageRoutes,
@@ -1296,7 +1297,8 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
     // authenticates everything under it, ahead of each surface's gate. What a
     // token then reaches is the surfaces' scope checks to decide, exactly as
     // for a key.
-    const platformTokenPreAuth = createPlatformTokenPreAuth(await platformTokensFromEnv(process.env));
+    const platformTokens = await platformTokensFromEnv(process.env);
+    const platformTokenPreAuth = createPlatformTokenPreAuth(platformTokens);
 
     // A backup download link — `GET /admin/backups/download?key=…&token=…`,
     // minted behind the Backups gate by `POST /admin/backups/download-url` —
@@ -1759,6 +1761,44 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
         })));
 
         if (announce) logger.info(`MCP endpoint mounted at ${publicUrl}${mcpPath} (OAuth at ${oauthBasePath})`);
+    };
+
+    /**
+     * Mount the platform's MCP endpoint (`mcp/platform-mcp.ts`): the app's own
+     * data tools, for platform tokens holding `data:*`. Only where the
+     * platform configured platform tokens, and only on a driver that can run
+     * each call under RLS — the same refusal as `/mcp`'s, for the same reason.
+     */
+    const mountPlatformMcp = (app: Hono<HonoEnv>, basePath: string, announce: boolean): void => {
+        if (!platformTokens) return;
+        const driver = defaultDriver;
+        if (!driver || !supportsRlsScoping(driver)) {
+            if (announce) logger.warn("[mcp] Platform tokens are on, but this data driver cannot scope by user — "
+                + `not mounting ${basePath}${PLATFORM_MCP_PATH}.`);
+            return;
+        }
+        const mcpPath = `${basePath}${PLATFORM_MCP_PATH}`;
+        app.route(mcpPath, group(createPlatformMcpRoutes({
+            platformTokens,
+            // Names nothing a client reads: there is no OAuth here. The
+            // deployment's own origin when it has one.
+            publicUrl: process.env.REBASE_PUBLIC_URL || "http://localhost",
+            mcpPath,
+            oauthBasePath: `${basePath}/oauth`,
+            getDriver: () => defaultDriver,
+            getCollections: () => activeCollections,
+            getAuthAdapter: () => authAdapter,
+            serverInfo: {
+                name: "rebase",
+                version: readRuntimeVersion([process.cwd()]) ?? "unknown"
+            },
+            maxBodySize: config.maxBodySize,
+            rateLimit: rateLimitConfig,
+            // show_collection is offered where its view is served; the
+            // control plane serves the view itself and relays this result.
+            apps: async () => (await import("@rebasepro/mcp-apps")).MCP_APPS
+        })));
+        if (announce) logger.info(`Platform MCP endpoint mounted at ${mcpPath} (platform tokens only)`);
     };
 
     // ─── Warnings that belong to a mount ──────────────────────────────────
@@ -3831,6 +3871,10 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
         // naming what it ran as — is installed by the data and functions
         // groups themselves (see `group`), so it holds wherever they are mounted.
 
+        // Ahead of the admin group, whose auth adapter router authenticates
+        // everything under `/admin`: this endpoint takes platform tokens and
+        // nothing else, and answers before that router is reached.
+        if (surfaces.admin) mountPlatformMcp(app, basePath, announce);
         if (surfaces.admin) app.route(`${basePath}/admin`, groups.admin());
         else if (!announce) mountInProcessAdmin(app, basePath);
         if (surfaces.auth) app.route(`${basePath}/auth`, groups.auth());
