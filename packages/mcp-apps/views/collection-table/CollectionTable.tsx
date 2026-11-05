@@ -29,6 +29,28 @@ interface Column {
     editable: boolean;
 }
 
+/** A tool the view calls, and the arguments it always sends to it. */
+interface ToolAction {
+    tool: string;
+    arguments: Record<string, unknown>;
+}
+
+/**
+ * What the view calls to page and to save a cell. The server that served it
+ * may name its own (`actions` in show_collection's result): the hosted Rebase
+ * connector pages with `query` and saves with `write`, each with the project.
+ * Absent, they are the app's own `/mcp` tools.
+ */
+interface TableActions {
+    page: ToolAction;
+    edit: ToolAction;
+}
+
+const DEFAULT_ACTIONS: TableActions = {
+    page: { tool: "query_collection", arguments: {} },
+    edit: { tool: "update_document", arguments: {} }
+};
+
 /** show_collection's structured result. */
 interface TablePage {
     collection: string;
@@ -39,6 +61,20 @@ interface TablePage {
     data: Record<string, unknown>[];
     total?: number;
     hasMore: boolean;
+    actions: TableActions;
+}
+
+/**
+ * A save the server answered with a plan instead of running: it is held here
+ * until the person confirms it, then sent again with the plan's token.
+ */
+interface PendingSave {
+    row: Row;
+    column: Column;
+    value: unknown;
+    args: Record<string, unknown>;
+    confirm: string;
+    summary: string;
 }
 
 /** One edit the person made here, kept to tell the model. */
@@ -56,6 +92,7 @@ export function CollectionTable({ bridge }: { bridge: McpAppBridge }) {
     const [loadingMore, setLoadingMore] = useState(false);
     const [editing, setEditing] = useState<{ id: string; key: string }>();
     const [saving, setSaving] = useState<Set<string>>(new Set());
+    const [pending, setPending] = useState<PendingSave>();
     const inputRef = useRef<Record<string, unknown>>({});
     const editsRef = useRef<Edit[]>([]);
     const rootRef = useRef<HTMLDivElement>(null);
@@ -99,8 +136,9 @@ export function CollectionTable({ bridge }: { bridge: McpAppBridge }) {
             // and show_collection take the same arguments.
             // `offset` counts on from the one it asked for, and `collection`
             // is the page's own in case the host sent no tool input.
-            const result = await bridge.callTool("query_collection", {
+            const result = await bridge.callTool(page.actions.page.tool, {
                 ...inputRef.current,
+                ...page.actions.page.arguments,
                 collection: page.collection,
                 offset: (Number(inputRef.current.offset) || 0) + page.data.length
             });
@@ -114,21 +152,25 @@ export function CollectionTable({ bridge }: { bridge: McpAppBridge }) {
         }
     }, [bridge, page]);
 
-    const save = useCallback(async (row: Row, column: Column, value: unknown) => {
+    /**
+     * Send one cell's save — the first time, or with a plan's token once the
+     * person confirmed it — and apply it when it ran.
+     */
+    const send = useCallback(async (row: Row, column: Column, value: unknown, args: Record<string, unknown>) => {
         if (!page) return;
         const id = String(row[page.idKey] ?? row.id);
-        setEditing(undefined);
-        if (value === row[column.key]) return;
         const cellKey = `${id}:${column.key}`;
         setSaving(current => new Set(current).add(cellKey));
         setFailure(undefined);
         try {
-            const result = await bridge.callTool("update_document", {
-                collection: page.collection,
-                id,
-                data: { [column.key]: value }
-            });
+            const result = await bridge.callTool(page.actions.edit.tool, args);
             if (result.isError) throw new Error(textOf(result) ?? "The row could not be saved.");
+            // The server wants the person's yes first: nothing was saved.
+            const plan = planOf(result);
+            if (plan) {
+                setPending({ row, column, value, args, ...plan });
+                return;
+            }
             setPage(current => current && {
                 ...current,
                 data: current.data.map(candidate => String(candidate[current.idKey] ?? candidate.id) === id
@@ -156,6 +198,26 @@ export function CollectionTable({ bridge }: { bridge: McpAppBridge }) {
         }
     }, [bridge, page]);
 
+    const save = useCallback(async (row: Row, column: Column, value: unknown) => {
+        if (!page) return;
+        const id = String(row[page.idKey] ?? row.id);
+        setEditing(undefined);
+        setPending(undefined);
+        if (value === row[column.key]) return;
+        await send(row, column, value, {
+            ...page.actions.edit.arguments,
+            collection: page.collection,
+            id,
+            data: { [column.key]: value }
+        });
+    }, [page, send]);
+
+    const confirmPending = useCallback(async () => {
+        if (!pending) return;
+        setPending(undefined);
+        await send(pending.row, pending.column, pending.value, { ...pending.args, confirm: pending.confirm });
+    }, [pending, send]);
+
     return (
         <div ref={rootRef} className="flex flex-col gap-3 p-4 bg-surface-sheet">
             {page ? (
@@ -171,6 +233,25 @@ export function CollectionTable({ bridge }: { bridge: McpAppBridge }) {
                     </div>
 
                     {failure && <Alert color="error" size="small">{failure}</Alert>}
+
+                    {pending && (
+                        <Alert
+                            color="warning"
+                            size="small"
+                            action={
+                                <div className="flex gap-1">
+                                    <Button variant="text" color="neutral" size="small" onClick={() => setPending(undefined)}>
+                                        Cancel
+                                    </Button>
+                                    <Button variant="filled" color="primary" size="small" onClick={confirmPending}>
+                                        Save
+                                    </Button>
+                                </div>
+                            }
+                        >
+                            {pending.summary}
+                        </Alert>
+                    )}
 
                     <div className="overflow-x-auto">
                         <Table className="w-full">
@@ -376,7 +457,27 @@ function pageOf(result: ToolResult): TablePage | string {
         idKey: typeof content.idKey === "string" ? content.idKey : "id",
         columns: content.columns.filter(isRecord).map(columnOf),
         writable: content.writable === true,
+        actions: actionsOf(content.actions),
         ...rows
+    };
+}
+
+function actionsOf(raw: unknown): TableActions {
+    if (!isRecord(raw)) return DEFAULT_ACTIONS;
+    const action = (value: unknown, fallback: ToolAction): ToolAction => isRecord(value) && typeof value.tool === "string"
+        ? { tool: value.tool, arguments: isRecord(value.arguments) ? value.arguments : {} }
+        : fallback;
+    return { page: action(raw.page, DEFAULT_ACTIONS.page), edit: action(raw.edit, DEFAULT_ACTIONS.edit) };
+}
+
+/** The plan and token of a result that asks for confirmation before it runs (the server's `confirmation.ts`). */
+function planOf(result: ToolResult): { confirm: string; summary: string } | undefined {
+    const content = result.structuredContent;
+    if (!isRecord(content) || content.status !== "confirmation_required" || typeof content.confirm !== "string") return undefined;
+    const plan = isRecord(content.plan) ? content.plan : {};
+    return {
+        confirm: content.confirm,
+        summary: typeof plan.summary === "string" ? plan.summary : "Save this change?"
     };
 }
 
