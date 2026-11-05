@@ -11,6 +11,8 @@ La traduzione è in arrivo. Il contenuto qui sotto è in inglese.
 
 ## [Unreleased]
 
+## [0.28.1] - 2026-11-05
+
 ### Added
 
 #### MCP
