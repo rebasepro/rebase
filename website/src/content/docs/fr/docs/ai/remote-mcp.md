@@ -1,5 +1,5 @@
 ---
-sourceHash: e777b5a7b5dab590
+sourceHash: 66f2808f3fe34b6b
 title: Le point de terminaison MCP distant
 sidebar_label: Point de terminaison MCP distant
 description: Servez MCP depuis un backend déployé sur /mcp, afin que les personnes qui utilisent votre app puissent connecter Claude ou Cursor en leur nom propre — OAuth avec écran de consentement, neuf outils sous trois portées, chaque appel exécuté sous leur propre sécurité au niveau des lignes.

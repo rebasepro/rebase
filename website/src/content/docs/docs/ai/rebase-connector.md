@@ -29,8 +29,6 @@ grant less.
 
 ## What Claude can do with it
 
-<span class="since-badge" data-since="0.28">Since 0.28</span>
-
 Ten tools. The first six only read:
 
 | Tool | What it does |

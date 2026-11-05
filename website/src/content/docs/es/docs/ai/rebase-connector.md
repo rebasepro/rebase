@@ -1,5 +1,5 @@
 ---
-sourceHash: e1c04397c988a38d
+sourceHash: 97232ebc628a975c
 title: Conecta Claude a Rebase Cloud
 sidebar_label: Conector de Rebase Cloud
 description: Un solo conector MCP para todos tus proyectos de Rebase Cloud — añádelo una vez en Claude, inicia sesión con tu cuenta de Rebase, y lee, despliega y cambia tus proyectos con el acceso que tienes en la consola, confirmando antes cada cambio.
@@ -31,8 +31,6 @@ iniciada en la consola en el mismo navegador, ofrece esa cuenta: pulsa
 puedes volver a conectar más tarde para conceder menos.
 
 ## Qué puede hacer Claude con él
-
-<span class="since-badge" data-since="0.28">Since 0.28</span>
 
 Diez herramientas. Las seis primeras solo leen:
 

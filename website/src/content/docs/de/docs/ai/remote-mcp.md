@@ -1,5 +1,5 @@
 ---
-sourceHash: e777b5a7b5dab590
+sourceHash: 66f2808f3fe34b6b
 title: Der Remote-MCP-Endpunkt
 sidebar_label: Remote-MCP-Endpunkt
 description: Stellen Sie MCP von einem bereitgestellten Backend unter /mcp bereit, damit die Benutzer Ihrer App Claude oder Cursor als sich selbst verbinden können – OAuth mit Zustimmungsbildschirm, neun Tools unter drei Scopes, jeder Aufruf unter ihrer eigenen Row-Level Security.

@@ -1,5 +1,5 @@
 ---
-sourceHash: e777b5a7b5dab590
+sourceHash: 66f2808f3fe34b6b
 title: El endpoint remoto de MCP
 sidebar_label: Endpoint remoto de MCP
 description: Sirve MCP desde un backend desplegado en /mcp, para que las personas que usan tu aplicación conecten Claude o Cursor como ellas mismas — OAuth con pantalla de consentimiento, nueve herramientas bajo tres alcances, y cada llamada bajo su propia seguridad a nivel de fila.
