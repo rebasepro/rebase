@@ -36,6 +36,37 @@ export type McpScope = (typeof MCP_SCOPES)[number];
 export const DEFAULT_MCP_SCOPE = "data:read";
 
 /**
+ * The scopes one MCP surface issues: what a client may ask for, what it gets
+ * when it asks for nothing, and how the consent screen words each.
+ *
+ * A backend serves the data vocabulary ({@link DATA_SCOPE_VOCABULARY}) unless
+ * it supplies its own tools, and with them the scopes those tools need — the
+ * Rebase Cloud control plane issues `project:*`. A scope outside the
+ * vocabulary is dropped from a request, never granted.
+ */
+export interface McpScopeVocabulary {
+    /** Every scope a grant may hold, each with the line the consent screen shows for it. */
+    supported: readonly { scope: string; description: string }[];
+    /** What a client that asks for nothing gets. One of `supported`. */
+    defaultScope: string;
+}
+
+/** The data-plane vocabulary: `/mcp`'s own, and every backend's unless it brings its own tools. */
+export const DATA_SCOPE_VOCABULARY: McpScopeVocabulary = {
+    supported: [
+        { scope: "data:read", description: "Read data you already have access to" },
+        { scope: "data:write", description: "Create and change data you already have access to" },
+        { scope: "data:delete", description: "Delete data you already have access to" }
+    ],
+    defaultScope: DEFAULT_MCP_SCOPE
+};
+
+/** The scope names a vocabulary issues. */
+export function supportedScopes(vocabulary: McpScopeVocabulary): string[] {
+    return vocabulary.supported.map(entry => entry.scope);
+}
+
+/**
  * A scope string as granted before `/mcp` spoke the shared vocabulary, read as
  * what it granted: `mcp:read` was every read, `mcp:write` every create, change
  * and delete. Applied to stored refresh grants and to access tokens still in
@@ -102,7 +133,8 @@ export interface ProtectedResourceMetadata {
 
 export function protectedResourceMetadata(
     publicUrl: string,
-    mcpPath = "/mcp"
+    mcpPath = "/mcp",
+    vocabulary: McpScopeVocabulary = DATA_SCOPE_VOCABULARY
 ): ProtectedResourceMetadata {
     return {
         resource: canonicalResourceUri(publicUrl, mcpPath),
@@ -111,7 +143,7 @@ export function protectedResourceMetadata(
         // protected resource SHOULD NOT advertise it, because a refresh token
         // is a property of the client's session with the authorization server
         // and not something this resource requires to answer a request.
-        scopes_supported: [...MCP_SCOPES],
+        scopes_supported: supportedScopes(vocabulary),
         bearer_methods_supported: ["header"],
         resource_documentation: "https://rebase.pro/docs/ai/mcp"
     };
@@ -135,7 +167,8 @@ export interface AuthorizationServerMetadata {
 
 export function authorizationServerMetadata(
     publicUrl: string,
-    oauthBasePath: string
+    oauthBasePath: string,
+    vocabulary: McpScopeVocabulary = DATA_SCOPE_VOCABULARY
 ): AuthorizationServerMetadata {
     const issuer = issuerFor(publicUrl);
     const base = `${issuer}${oauthBasePath}`;
@@ -149,7 +182,7 @@ export function authorizationServerMetadata(
         // that finds no such endpoint keeps a live refresh token forever.
         revocation_endpoint: `${base}/revoke`,
         revocation_endpoint_auth_methods_supported: ["client_secret_post", "client_secret_basic", "none"],
-        scopes_supported: [...MCP_SCOPES],
+        scopes_supported: supportedScopes(vocabulary),
         response_types_supported: ["code"],
         // No implicit, no password, no client_credentials. OAuth 2.1 removes the
         // first two outright; the third would mint a token with no user behind
@@ -248,13 +281,17 @@ export function redirectUriAllowed(candidate: string, registered: string[]): boo
  * entitled to and none of the ones it invented. A collection target is kept:
  * `data:read:posts` is a narrower grant, never a wider one.
  */
-export function narrowScope(requested: string | undefined | null): string {
-    if (!requested) return DEFAULT_MCP_SCOPE;
+export function narrowScope(
+    requested: string | undefined | null,
+    vocabulary: McpScopeVocabulary = DATA_SCOPE_VOCABULARY
+): string {
+    if (!requested) return vocabulary.defaultScope;
+    const issued = supportedScopes(vocabulary);
     const granted = upgradeStoredMcpScope(requested)
         .split(/\s+/)
         .filter(Boolean)
-        .filter(entry => (MCP_SCOPES as readonly string[]).includes(parseScope(entry)?.scope ?? ""));
-    return granted.length ? [...new Set(granted)].join(" ") : DEFAULT_MCP_SCOPE;
+        .filter(entry => issued.includes(parseScope(entry)?.scope ?? ""));
+    return granted.length ? [...new Set(granted)].join(" ") : vocabulary.defaultScope;
 }
 
 /** A granted scope string as the list of scopes it holds. */

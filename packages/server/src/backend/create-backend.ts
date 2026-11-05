@@ -1724,7 +1724,12 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
             // on the first `/mcp` request that needs them — any client's first
             // `initialize` or `tools/list` — not at boot: the HTML is large, and
             // a backend no MCP client calls never loads it.
-            apps: async () => (await import("@rebasepro/mcp-apps")).MCP_APPS
+            apps: async () => (await import("@rebasepro/mcp-apps")).MCP_APPS,
+            // An app's own tools and scopes, when it brings them; the data
+            // tools under `data:*` otherwise.
+            tools: config.mcp?.tools,
+            instructions: config.mcp?.instructions,
+            vocabulary: config.mcp?.scopes
         };
 
         app.route("/", createMcpWellKnownRoutes(mcpConfig));
@@ -1747,7 +1752,8 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
             // issue IDs itself — with any spelling of no; `!== "false"` left it
             // open on `=0`.
             allowDynamicRegistration: parseEnvBoolean(process.env.REBASE_MCP_OPEN_REGISTRATION) !== false,
-            identity
+            identity,
+            vocabulary: config.mcp?.scopes
         })));
 
         if (announce) logger.info(`MCP endpoint mounted at ${publicUrl}${mcpPath} (OAuth at ${oauthBasePath})`);

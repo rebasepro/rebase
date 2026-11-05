@@ -204,6 +204,10 @@ export interface HarnessOptions {
     resolveApiKey?: McpRoutesConfig["resolveApiKey"];
     /** The MCP App views `/mcp` serves. Absent, it serves none. */
     apps?: McpRoutesConfig["apps"];
+    /** An app's own tools, scopes and instructions, in place of the data tools. */
+    tools?: McpRoutesConfig["tools"];
+    vocabulary?: McpRoutesConfig["vocabulary"];
+    instructions?: McpRoutesConfig["instructions"];
 }
 
 export function buildApp(options: HarnessOptions = {}) {
@@ -222,7 +226,10 @@ export function buildApp(options: HarnessOptions = {}) {
         rateLimit: options.rateLimit,
         resolveApiKey: options.resolveApiKey,
         identity: options.identity,
-        apps: options.apps
+        apps: options.apps,
+        tools: options.tools,
+        vocabulary: options.vocabulary,
+        instructions: options.instructions
     };
     app.route("/", createMcpWellKnownRoutes(mcpConfig));
     app.route("/mcp", createMcpRoutes(mcpConfig));
@@ -232,7 +239,8 @@ export function buildApp(options: HarnessOptions = {}) {
         mcpPath: "/mcp",
         authBasePath: "/api/auth",
         allowDynamicRegistration: options.allowDynamicRegistration ?? true,
-        identity: options.identity
+        identity: options.identity,
+        vocabulary: options.vocabulary
     }));
     return { app, store };
 }

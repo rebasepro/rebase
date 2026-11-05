@@ -69,15 +69,36 @@ export interface McpToolContext {
     authAdapter?: AuthAdapter;
 }
 
+/**
+ * What a host may assume about a tool, sent with it on `tools/list` (MCP's
+ * `ToolAnnotations`). Hints, not guarantees: a host uses them to decide
+ * whether to ask the person before a call — Claude asks before any tool not
+ * marked read-only — and the server never relies on a host honouring them.
+ */
+export interface McpToolAnnotations {
+    /** It changes nothing. A host may call it without asking. */
+    readOnlyHint?: boolean;
+    /** It may overwrite or remove what exists, rather than only add. Meaningful when not read-only. */
+    destructiveHint?: boolean;
+    /** Calling it twice with the same arguments does no more than calling it once. */
+    idempotentHint?: boolean;
+    /** It reaches outside this server (the open web, a third party). */
+    openWorldHint?: boolean;
+}
+
 export interface McpToolDefinition {
     name: string;
+    /** The tool's name for a person, where a host shows one. */
+    title?: string;
     description: string;
     inputSchema: Record<string, unknown>;
     /**
-     * The scope a caller must hold — on at least one collection for the tool
-     * to be listed, and on the collection a call names for it to run.
+     * The scope a caller must hold — on at least one target for the tool to
+     * be listed. The data tools also check it on the collection a call names.
+     * A scope of the vocabulary the surface issues (see `McpScopeVocabulary`).
      */
-    requiredScope: McpScope;
+    requiredScope: string;
+    annotations?: McpToolAnnotations;
     /**
      * Whether the reply carries the result a second time, as
      * `structuredContent`. The text block always carries it — it is what a
@@ -132,6 +153,13 @@ function reaches(ctx: McpToolContext, scope: McpScope, collection: CollectionCon
  * never offers one that cannot be described.
  */
 const SCHEMA_SCOPE: McpScope = "data:read";
+
+/** A tool that only reads. */
+const READS: McpToolAnnotations = { readOnlyHint: true, openWorldHint: false };
+/** A tool that adds a row and touches no other. */
+const CREATES: McpToolAnnotations = { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false };
+/** A tool that overwrites or removes a row; the same call twice leaves the same row. */
+const CHANGES: McpToolAnnotations = { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false };
 
 /** An error whose message is safe to hand back to the model. */
 export class McpToolError extends Error {}
@@ -496,12 +524,14 @@ function stringList(value: unknown): string[] {
 const TOOLS: McpToolDefinition[] = [
     {
         name: "list_collections",
+        title: "List collections",
         description:
             "List the collections in this project: each one's `name`, `title` and `description`. Call this "
             + "first — every other tool takes a collection name from here. It carries no schemas: call "
             + "describe_collection for a collection's fields before writing to it, or before filtering on a "
             + "field you have not seen in its rows.",
         requiredScope: SCHEMA_SCOPE,
+        annotations: READS,
         inputSchema: { type: "object", properties: {}, additionalProperties: false },
         // Read by the model alone. Sent once.
         structuredContent: false,
@@ -523,6 +553,7 @@ const TOOLS: McpToolDefinition[] = [
 
     {
         name: "describe_collection",
+        title: "Describe a collection",
         description:
             "The schema of one collection. `row` is the JSON Schema of a row as the read tools return it "
             + "(required fields, enum values, a belongsTo relation as its foreign key, e.g. `authorId`), and "
@@ -530,6 +561,7 @@ const TOOLS: McpToolDefinition[] = [
             + "it. `softDeleteField`, when present, is the field a delete stamps: a deleted row is hidden, and "
             + "update_document setting that field to null restores it. Call this before writing to a collection.",
         requiredScope: SCHEMA_SCOPE,
+        annotations: READS,
         inputSchema: {
             type: "object",
             properties: { collection: COLLECTION_ARG },
@@ -563,6 +595,7 @@ const TOOLS: McpToolDefinition[] = [
 
     {
         name: "query_collection",
+        title: "Query rows",
         description:
             "Read rows from a collection, exactly as the REST API's `GET /api/data/<collection>` serves them: "
             + "`data` is the rows (dates as ISO text, a belongsTo relation as its foreign key, e.g. `authorId`), "
@@ -570,6 +603,7 @@ const TOOLS: McpToolDefinition[] = [
             + "empty result can mean 'none match' or 'none visible to you'. Page with `offset` while "
             + "`meta.hasMore` is true." + UNTRUSTED_ROWS,
         requiredScope: "data:read",
+        annotations: READS,
         inputSchema: QUERY_INPUT_SCHEMA,
         async run(args, ctx) {
             const collection = resolveCollection(ctx, args.collection, "data:read");
@@ -579,6 +613,7 @@ const TOOLS: McpToolDefinition[] = [
 
     {
         name: "show_collection",
+        title: "Show a collection as a table",
         description:
             "Show rows of a collection to the user. In a client that renders MCP Apps, this opens an "
             + "editable table in the conversation; in any other client nothing is shown, and the result is "
@@ -589,6 +624,7 @@ const TOOLS: McpToolDefinition[] = [
             + "connection may write the collection, the user can edit cells in it; their edits are saved as "
             + "them, and you are told what they changed." + UNTRUSTED_ROWS,
         requiredScope: "data:read",
+        annotations: READS,
         inputSchema: QUERY_INPUT_SCHEMA,
         ui: { resourceUri: COLLECTION_TABLE_URI },
         async run(args, ctx) {
@@ -610,10 +646,12 @@ const TOOLS: McpToolDefinition[] = [
 
     {
         name: "count_documents",
+        title: "Count rows",
         description:
             "Count the rows of a collection that match, exactly as the REST API's "
             + "`GET /api/data/<collection>/count` does. Counts only rows the signed-in user is allowed to see.",
         requiredScope: "data:read",
+        annotations: READS,
         inputSchema: {
             type: "object",
             properties: {
@@ -636,10 +674,12 @@ const TOOLS: McpToolDefinition[] = [
 
     {
         name: "get_document",
+        title: "Get a row",
         description:
             "Read one row by id, exactly as the REST API's `GET /api/data/<collection>/<id>` serves it. "
             + "Fails if the signed-in user cannot see it." + UNTRUSTED_ROWS,
         requiredScope: "data:read",
+        annotations: READS,
         inputSchema: {
             type: "object",
             properties: {
@@ -661,9 +701,11 @@ const TOOLS: McpToolDefinition[] = [
 
     {
         name: "create_document",
+        title: "Create a row",
         description: "Create a row. Subject to the same permissions as creating it in the app."
             + DESCRIBE_FIRST + UNTRUSTED_ROWS,
         requiredScope: "data:write",
+        annotations: CREATES,
         inputSchema: {
             type: "object",
             properties: {
@@ -701,10 +743,12 @@ const TOOLS: McpToolDefinition[] = [
 
     {
         name: "update_document",
+        title: "Update a row",
         description: "Change fields on an existing row, as the SDK's `update(id, data)`. Only the fields "
             + "given are touched. A row read with get_document or query_collection can be sent back as it is."
             + DESCRIBE_FIRST + UNTRUSTED_ROWS,
         requiredScope: "data:write",
+        annotations: CHANGES,
         inputSchema: {
             type: "object",
             properties: {
@@ -744,11 +788,13 @@ const TOOLS: McpToolDefinition[] = [
 
     {
         name: "delete_document",
+        title: "Delete a row",
         description:
             "Delete a row by id. On a collection with a `softDeleteField` (see describe_collection) the row goes "
             + "to the trash: query_collection with `deleted: \"only\"` finds it, and update_document setting that "
             + "field to null restores it. On any other collection the delete is permanent.",
         requiredScope: "data:delete",
+        annotations: CHANGES,
         inputSchema: {
             type: "object",
             properties: {
@@ -778,13 +824,21 @@ const TOOLS: McpToolDefinition[] = [
     }
 ];
 
-export const MCP_TOOLS: McpToolDefinition[] = TOOLS.map(tool => ({
-    ...tool,
-    run: (args, ctx) => {
-        assertDeclaredArguments(tool, args);
-        return tool.run(args, ctx);
-    }
-}));
+export const MCP_TOOLS: McpToolDefinition[] = TOOLS.map(declaredArgumentsOnly);
+
+/**
+ * The tool, refusing any argument it does not declare. Every tool `/mcp`
+ * serves goes through this — the default data tools and an app's own.
+ */
+export function declaredArgumentsOnly(tool: McpToolDefinition): McpToolDefinition {
+    return {
+        ...tool,
+        run: (args, ctx) => {
+            assertDeclaredArguments(tool, args);
+            return tool.run(args, ctx);
+        }
+    };
+}
 
 /**
  * Refuse an argument the tool does not declare.
@@ -806,11 +860,18 @@ function assertDeclaredArguments(tool: McpToolDefinition, args: Record<string, u
 }
 
 /** The tools a caller holding `scopes` may see and call: each needs its scope on at least one collection. */
-export function toolsForScopes(scopes: readonly string[]): McpToolDefinition[] {
-    return MCP_TOOLS.filter(tool => scopeGrantsAny(scopes, tool.requiredScope));
+export function toolsForScopes(
+    scopes: readonly string[],
+    tools: readonly McpToolDefinition[] = MCP_TOOLS
+): McpToolDefinition[] {
+    return tools.filter(tool => scopeGrantsAny(scopes, tool.requiredScope));
 }
 
 /** Look up a tool by name, honouring scope — an unlisted tool is not callable. */
-export function findTool(name: string, scopes: readonly string[]): McpToolDefinition | undefined {
-    return toolsForScopes(scopes).find(tool => tool.name === name);
+export function findTool(
+    name: string,
+    scopes: readonly string[],
+    tools: readonly McpToolDefinition[] = MCP_TOOLS
+): McpToolDefinition | undefined {
+    return toolsForScopes(scopes, tools).find(tool => tool.name === name);
 }

@@ -219,6 +219,14 @@ export { verifyCredential } from "./auth/verify-credential";
 export type { VerifiedCredential } from "./auth/verify-credential";
 export type { ApiKeyIdentity, ApiKeyRefusal } from "./auth/api-keys";
 
+// For a backend that serves its own tools on `/mcp` (the `mcp` option): the
+// tool shape, the error a tool refuses with, and the data vocabulary to
+// extend or replace.
+export { McpToolError } from "./mcp/mcp-tools";
+export type { McpToolDefinition, McpToolContext, McpCaller, McpToolAnnotations } from "./mcp/mcp-tools";
+export { DATA_SCOPE_VOCABULARY } from "./mcp/oauth-metadata";
+export type { McpScopeVocabulary } from "./mcp/oauth-metadata";
+
 // =============================================================================
 // API Layer — public types + error surface only. The `RestApiGenerator`
 // route builder (`./api/rest`) is internal framework wiring, not re-exported.
