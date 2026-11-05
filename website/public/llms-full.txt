@@ -4361,6 +4361,49 @@ yet, listed so that nobody reads a promise into them:
 
 ### [Unreleased]
 
+#### Added
+
+##### MCP
+
+- **A backend can serve its own MCP tools.** `initializeRebaseBackend({ mcp:
+  { tools, scopes, instructions } })` replaces the data tools on `/mcp` with
+  the app's own, under its own scope vocabulary: discovery, authorize and the
+  consent screen read it. `McpToolDefinition`, `McpToolError` and
+  `DATA_SCOPE_VOCABULARY` are exported from `@rebasepro/server`. The Rebase
+  Cloud control plane serves its hosted connector this way.
+
+- **Every MCP tool is listed with a title and annotations.** `readOnlyHint`,
+  `destructiveHint`, `idempotentHint` and `openWorldHint`, which hosts such as
+  Claude read to decide whether to ask before a call. The data tools' reads are
+  read-only; `update_document` and `delete_document` are destructive.
+
+- **An MCP tool can take two calls: a plan, then a confirmed run.** A tool that
+  declares `confirm` changes nothing on its first call and answers a plan and a
+  token; the second call, with the same arguments and the token, runs it. The
+  token is bound to the account, the client, the tool, the arguments and the
+  endpoint, lives five minutes, and is spent once (`rebase.mcp_confirmations`,
+  created with the OAuth tables). The data tools do not use it.
+
+- **The MCP consent screen can use the session the app's own frontend keeps.**
+  When the browser holds one (the SDK's `rebase_auth`, same origin), Allow
+  consents as that account, renewing the session first when it has expired.
+  An account that signs in only with Google or GitHub no longer needs a
+  password to connect a client.
+
+- **Platform tokens reach the app's MCP data tools at `/api/admin/mcp`**, and
+  may hold `cron:write` on the admin surfaces. The endpoint is mounted only
+  where the platform set `REBASE_PLATFORM_TOKEN_KEY` and
+  `REBASE_PLATFORM_TOKEN_AUDIENCE`, takes platform tokens and nothing else, and
+  runs the app's own tools under RLS as `platform:<sub>` with the `admin` role.
+  Data scopes are honoured there alone. Rebase Cloud's hosted connector uses
+  it to read and change a project's data for its owners and admins.
+
+- **The `show_collection` table pages and saves with the tools its server
+  names, and asks before a confirmed save.** A result may carry `actions`;
+  without them the view calls `query_collection` and `update_document` as
+  before. A save the server answers with a plan waits for the person to press
+  Save.
+
 ### [0.28.0] - 2026-11-05
 
 #### Added
@@ -4410,45 +4453,6 @@ yet, listed so that nobody reads a promise into them:
   to the model. A client without MCP Apps, such as Claude Code or Cursor,
   shows nothing and gets the page `query_collection` would return. Offered
   under `data:read`; cells are editable only with `data:write`.
-
-- **A backend can serve its own MCP tools.** `initializeRebaseBackend({ mcp:
-  { tools, scopes, instructions } })` replaces the data tools on `/mcp` with
-  the app's own, under its own scope vocabulary: discovery, authorize and the
-  consent screen read it. `McpToolDefinition`, `McpToolError` and
-  `DATA_SCOPE_VOCABULARY` are exported from `@rebasepro/server`. The Rebase
-  Cloud control plane serves its hosted connector this way.
-
-- **Every MCP tool is listed with a title and annotations.** `readOnlyHint`,
-  `destructiveHint`, `idempotentHint` and `openWorldHint`, which hosts such as
-  Claude read to decide whether to ask before a call. The data tools' reads are
-  read-only; `update_document` and `delete_document` are destructive.
-
-- **An MCP tool can take two calls: a plan, then a confirmed run.** A tool that
-  declares `confirm` changes nothing on its first call and answers a plan and a
-  token; the second call, with the same arguments and the token, runs it. The
-  token is bound to the account, the client, the tool, the arguments and the
-  endpoint, lives five minutes, and is spent once (`rebase.mcp_confirmations`,
-  created with the OAuth tables). The data tools do not use it.
-
-- **The MCP consent screen can use the session the app's own frontend keeps.**
-  When the browser holds one (the SDK's `rebase_auth`, same origin), Allow
-  consents as that account, renewing the session first when it has expired.
-  An account that signs in only with Google or GitHub no longer needs a
-  password to connect a client.
-
-- **Platform tokens reach the app's MCP data tools at `/api/admin/mcp`**, and
-  may hold `cron:write` on the admin surfaces. The endpoint is mounted only
-  where the platform set `REBASE_PLATFORM_TOKEN_KEY` and
-  `REBASE_PLATFORM_TOKEN_AUDIENCE`, takes platform tokens and nothing else, and
-  runs the app's own tools under RLS as `platform:<sub>` with the `admin` role.
-  Data scopes are honoured there alone. Rebase Cloud's hosted connector uses
-  it to read and change a project's data for its owners and admins.
-
-- **The `show_collection` table pages and saves with the tools its server
-  names, and asks before a confirmed save.** A result may carry `actions`;
-  without them the view calls `query_collection` and `update_document` as
-  before. A save the server answers with a plan waits for the person to press
-  Save.
 
 - **`list_documents` takes `fields`, and leaves binary values out unless
   asked.** Each binary column comes back as its size. Name the column in
@@ -50945,8 +50949,6 @@ there. The screen lists what you are granting; you can connect again later to
 grant less.
 
 ### What Claude can do with it
-
-<span class="since-badge" data-since="0.28">Since 0.28</span>
 
 Ten tools. The first six only read:
 
