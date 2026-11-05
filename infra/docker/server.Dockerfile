@@ -42,6 +42,8 @@ COPY packages/utils/package.json packages/utils/
 COPY packages/common/package.json packages/common/
 COPY packages/client/package.json packages/client/
 COPY packages/codegen/package.json packages/codegen/
+COPY packages/ui/package.json packages/ui/
+COPY packages/mcp-apps/package.json packages/mcp-apps/
 COPY packages/server/package.json packages/server/
 COPY packages/server-postgres/package.json packages/server-postgres/
 
@@ -63,6 +65,12 @@ COPY packages/utils packages/utils
 COPY packages/common packages/common
 COPY packages/client packages/client
 COPY packages/codegen packages/codegen
+# The server inlines every @rebasepro/* package it imports, and `/mcp` imports
+# @rebasepro/mcp-apps, whose built HTML is the MCP App views. Those views are
+# built from the UI kit, so ui and mcp-apps build before the server; neither
+# reaches the runtime stage except inside the server's dist.
+COPY packages/ui packages/ui
+COPY packages/mcp-apps packages/mcp-apps
 COPY packages/server packages/server
 COPY packages/server-postgres packages/server-postgres
 # `tooling/scripts`, not `scripts`. Every package build below shells out to
@@ -77,6 +85,8 @@ RUN pnpm --filter @rebasepro/types build \
     && pnpm --filter @rebasepro/common build \
     && pnpm --filter @rebasepro/client build \
     && pnpm --filter @rebasepro/codegen build \
+    && pnpm --filter @rebasepro/ui build \
+    && pnpm --filter @rebasepro/mcp-apps build \
     && pnpm --filter @rebasepro/server build \
     && pnpm --filter @rebasepro/server-postgres build
 
