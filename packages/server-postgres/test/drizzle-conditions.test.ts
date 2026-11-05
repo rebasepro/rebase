@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, jest } from "@jest/globals";
 import { eq, SQL } from "drizzle-orm";
-import { integer, pgTable, PgDialect, primaryKey, serial, varchar, text } from "drizzle-orm/pg-core";
+import { integer, pgTable, PgDialect, PgTable, primaryKey, serial, varchar, text } from "drizzle-orm/pg-core";
 import { CollectionConfig, EntityRelation, Relation } from "@rebasepro/types";
 import { resolveRelation } from "@rebasepro/common";
 import { PostgresCollectionRegistry } from "../src/collections/PostgresCollectionRegistry";
@@ -1251,9 +1251,10 @@ describe("DrizzleConditionBuilder - join path with bare column names", () => {
     });
     const orders = pgTable("orders", { id: serial("id").primaryKey(), status: varchar("status") });
 
-    const registry = { getTable: jest.fn() } as unknown as PostgresCollectionRegistry;
-    (registry.getTable as jest.Mock).mockImplementation((name: string) =>
-        ({ products, order_items: orderItems, orders } as Record<string, unknown>)[name]);
+    const tables: Record<string, PgTable> = { products, order_items: orderItems, orders };
+    const registry = {
+        getTable: jest.fn<PostgresCollectionRegistry["getTable"]>((name) => tables[name])
+    } as unknown as PostgresCollectionRegistry;
 
     const relation: Relation = {
         kind: "via",
@@ -1305,9 +1306,10 @@ describe("DrizzleConditionBuilder - join path scope with alternatives", () => {
     const people = pgTable("people", { id: serial("id").primaryKey(), name: varchar("name") });
     const friendships = pgTable("friendships", { id: serial("id").primaryKey(), a: integer("a"), b: integer("b") });
 
-    const registry = { getTable: jest.fn() } as unknown as PostgresCollectionRegistry;
-    (registry.getTable as jest.Mock).mockImplementation((name: string) =>
-        ({ people, friendships } as Record<string, unknown>)[name]);
+    const tables: Record<string, PgTable> = { people, friendships };
+    const registry = {
+        getTable: jest.fn<PostgresCollectionRegistry["getTable"]>((name) => tables[name])
+    } as unknown as PostgresCollectionRegistry;
 
     const peopleCollection = { slug: "people", table: "people" } as unknown as CollectionConfig;
     const friendshipsCollection = { slug: "friendships", table: "friendships" } as unknown as CollectionConfig;
