@@ -7,6 +7,16 @@ description: Every released change to Rebase — new features, fixes, and the br
 
 ## [Unreleased]
 
+### Fixed
+
+#### MCP
+
+- **`REBASE_MCP_ENABLED` switches on `/mcp` for a backend built in code.** Only
+  the containerized boot read it, so `initializeRebaseBackend` and
+  `createRebaseBackend` ignored it: with both documented variables set, `/mcp`
+  answered 404 and the log said nothing. The variable now decides when
+  `surfaces.mcp` is not set; set, the option wins.
+
 ## [0.28.1] - 2026-11-05
 
 ### Added

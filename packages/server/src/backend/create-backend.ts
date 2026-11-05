@@ -617,7 +617,7 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
     // so a caller that passes neither builds the backend this server has always
     // booted. Resolved here, before anything is built, so every gate below reads
     // one already-decided answer rather than re-deriving it from optionals.
-    const surfaces = resolveSurfaces(config.surfaces);
+    const surfaces = resolveSurfaces(config.surfaces, process.env);
     const ownership = resolveOwnership(config.ownership);
     // `trimmedSurfaces`, not `disabledSurfaces`: a surface that is off by
     // default was not turned off by anyone, and counting it made every

@@ -724,6 +724,9 @@ export interface RebaseBackendOptions {
      * Omitting it, or naming only some surfaces, leaves the rest mounted. That
      * default is deliberate: a surface added in a later version is served by
      * every existing deployment without anyone editing a list.
+     *
+     * `mcp` is the exception: off unless named here or switched on by
+     * `REBASE_MCP_ENABLED`. Named here, it wins over the variable.
      */
     surfaces?: RuntimeSurfaceOptions;
     /**
