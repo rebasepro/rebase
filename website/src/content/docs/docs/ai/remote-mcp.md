@@ -41,7 +41,7 @@ to one user, the endpoint declines to mount and says why in the boot log. No
   lists, describes and reads `posts` and nothing else. A scope decides which tools are
   offered and which collections they reach, not which rows: an empty list can be
   RLS working, and `data:write` still cannot write a row the person could not.
-- <span class="since-badge" data-since="0.28">Since 0.28</span> **`show_collection` puts the rows in front of the person.** It takes
+- **`show_collection` puts the rows in front of the person.** It takes
   `query_collection`'s arguments and answers the same page, plus the columns the
   admin panel shows. A client that renders MCP Apps, such as Claude, opens it as a
   table in the conversation: the person can load more rows and, where the

@@ -356,8 +356,6 @@ so a panel can grey the feature out instead of showing an error.
 
 ### Schema reconcile
 
-<span class="since-badge" data-since="0.28">Since 0.28</span>
-
 [`rebase schema reconcile`](/docs/cli/schema/#rebase-schema-reconcile) plans
 through `POST /api/admin/schema/reconcile/plan` and applies through
 `/reconcile/apply`. A refusal changes nothing; only `SCHEMA_RECONCILE_FAILED`

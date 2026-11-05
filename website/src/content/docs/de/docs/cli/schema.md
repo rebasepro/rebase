@@ -1,5 +1,5 @@
 ---
-sourceHash: 62f93178ab231a98
+sourceHash: f64b55578741ad50
 title: Schema-Generierung
 sidebar_label: Schema-Generierung
 description: Generieren Sie Drizzle-ORM-Schemas aus Collection-Definitionen, erstellen Sie SQL-Migrationen und halten Sie Ihre Datenbank mit der Rebase-CLI synchron.
@@ -75,8 +75,6 @@ rebase schema stale --fix    # regenerate the file instead
 oder einen CI-Schritt. Er nimmt `--collections` und `--output` wie `rebase schema generate`.
 
 ### `rebase schema reconcile`
-
-<span class="since-badge" data-since="0.28">Since 0.28</span>
 
 Lockern und entfernen Sie, was der Boot-Prozess nicht anfasst, nachdem Sie den Plan gelesen haben:
 

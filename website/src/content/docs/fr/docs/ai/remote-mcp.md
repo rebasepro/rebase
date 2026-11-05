@@ -1,5 +1,5 @@
 ---
-sourceHash: 0da7580e73a7f0c9
+sourceHash: e777b5a7b5dab590
 title: Le point de terminaison MCP distant
 sidebar_label: Point de terminaison MCP distant
 description: Servez MCP depuis un backend déployé sur /mcp, afin que les personnes qui utilisent votre app puissent connecter Claude ou Cursor en leur nom propre — OAuth avec écran de consentement, neuf outils sous trois portées, chaque appel exécuté sous leur propre sécurité au niveau des lignes.
@@ -44,7 +44,7 @@ la raison dans le log de démarrage. Aucun `REBASE_ROLE` ne l'active.
   quelles collections ils atteignent, pas quelles lignes : une liste vide peut être le RLS
   qui fait son travail, et `data:write` ne peut toujours pas écrire une ligne que la personne
   ne pourrait pas écrire elle-même.
-- <span class="since-badge" data-since="0.28">Since 0.28</span> **`show_collection` met les lignes sous les yeux de la personne.** Il prend les arguments
+- **`show_collection` met les lignes sous les yeux de la personne.** Il prend les arguments
   de `query_collection` et répond la même page, avec les colonnes qu'affiche le panneau
   d'administration. Un client qui affiche les MCP Apps, comme Claude, l'ouvre sous forme de
   tableau dans la conversation : la personne peut charger plus de lignes et, là où la

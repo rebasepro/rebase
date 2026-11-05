@@ -1,5 +1,5 @@
 ---
-sourceHash: 4c6a854f868076ab
+sourceHash: 3db77ebbf107015d
 title: Fehlercodes
 sidebar_label: Fehlercodes
 description: Jeder Fehlercode, den ein Rebase-Backend zurückgeben kann, mit seinem HTTP-Status, seiner Bedeutung und Lösungsansätzen – plus Response-Envelope, X-Request-ID und den Details-Regeln.
@@ -322,8 +322,6 @@ Diese besagen eher, dass eine Funktion deaktiviert oder unkonfiguriert ist, als 
 | `SQL_EXPORT_UNSUPPORTED` | 501 | `POST /api/admin/sql/csv` kann hier kein Ergebnis streamen: Die In-Process-Entwicklungsdatenbank (PGlite) hat eine Verbindung, und ein über einen Download gehaltener Cursor würde jede andere Abfrage dahinter aufhalten; oder die Datenquelle hat keinen SQL-Cursor. | Verweisen Sie `DATABASE_URL` auf ein eigenes Postgres (`rebase dev --docker` startet eines), oder fügen Sie ein `LIMIT` hinzu und exportieren Sie die Zeilen auf dem Bildschirm. |
 
 ### Schema-Reconcile
-
-<span class="since-badge" data-since="0.28">Since 0.28</span>
 
 [`rebase schema reconcile`](/docs/cli/schema/#rebase-schema-reconcile) plant über
 `POST /api/admin/schema/reconcile/plan` und wendet über `/reconcile/apply` an.

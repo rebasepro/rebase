@@ -11,6 +11,8 @@ La traducción está pendiente. El contenido siguiente está en inglés.
 
 ## [Unreleased]
 
+## [0.28.0] - 2026-11-05
+
 ### Added
 
 #### Common

@@ -161,8 +161,8 @@ a collection reaches none of this. See [Roles and scopes](/docs/backend/roles-an
 | `GET` | `/api/admin/schema/status` | `schema:read` | [Live schema editing](/docs/backend/live-schema-editing/) |
 | `POST` | `/api/admin/schema/plan` | `schema:read` | Plans a change; never applies one |
 | `POST` | `/api/admin/schema/apply` | `schema:write` | A person only, unless `REBASE_LIVE_SCHEMA_ALLOW_MACHINE_APPLY` |
-| `POST` | `/api/admin/schema/reconcile/plan` | `schema:read` | <span class="since-badge" data-since="0.28">Since 0.28</span> Plans relaxing `NOT NULL` and dropping the undeclared columns named in `drop`, for [schema reconcile](/docs/cli/schema/#rebase-schema-reconcile); never applies one |
-| `POST` | `/api/admin/schema/reconcile/apply` | `schema:write` | <span class="since-badge" data-since="0.28">Since 0.28</span> Applies a reconcile plan, only if its `digest` is the `confirm` sent |
+| `POST` | `/api/admin/schema/reconcile/plan` | `schema:read` | Plans relaxing `NOT NULL` and dropping the undeclared columns named in `drop`, for [schema reconcile](/docs/cli/schema/#rebase-schema-reconcile); never applies one |
+| `POST` | `/api/admin/schema/reconcile/apply` | `schema:write` | Applies a reconcile plan, only if its `digest` is the `confirm` sent |
 | `GET` | `/api/admin/schema-editor/status` | `schema:read` | Whether the editor is available, and the reason when it is not |
 | `POST` | `/api/admin/schema-editor/collection/save` | `schema:write` | [Studio](/docs/studio/) — rewrites collection source |
 | `POST` | `/api/admin/schema-editor/collection/delete` | `schema:write` | [Studio](/docs/studio/) |

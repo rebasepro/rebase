@@ -950,7 +950,7 @@ Read by `rebase`, not by the server. Nothing here affects a deployment.
 | `REBASE_SERVICE_KEY` | The service key those commands authenticate with, read from `.env`: the same variable the server reads (see above). | — |
 | `SERVICE_KEY` | An older name for that key. When `.env` sets it, `rebase api-keys` and `rebase storage` read it in place of `REBASE_SERVICE_KEY`. | — |
 | `REBASE_ENV_FILE_PATH` | Which `.env` the CLI reads and writes, when it is not the project's. | — |
-| `REBASE_ROOT_RULES` | <span class="since-badge" data-since="0.28">Since 0.28</span> `0` stops `rebase init` and `rebase skills install` from writing the project's rules into the repository root's `CLAUDE.md` and `AGENTS.md`, for a root whose agent files you keep by hand. | on |
+| `REBASE_ROOT_RULES` | `0` stops `rebase init` and `rebase skills install` from writing the project's rules into the repository root's `CLAUDE.md` and `AGENTS.md`, for a root whose agent files you keep by hand. | on |
 | `REBASE_CLOUD_URL` | The control plane `rebase cloud` talks to. | — |
 | `REBASE_CLOUD_EMAIL` | The account `rebase cloud login` signs in as, instead of prompting. | — |
 | `REBASE_CLOUD_PASSWORD` | Its password, so a secret store can hand it over without it reaching the shell's history. | — |
@@ -4360,6 +4360,8 @@ yet, listed so that nobody reads a promise into them:
 ## Changelog
 
 ### [Unreleased]
+
+### [0.28.0] - 2026-11-05
 
 #### Added
 
@@ -27800,8 +27802,6 @@ so a panel can grey the feature out instead of showing an error.
 
 #### Schema reconcile
 
-<span class="since-badge" data-since="0.28">Since 0.28</span>
-
 [`rebase schema reconcile`](/docs/cli/schema/#rebase-schema-reconcile) plans
 through `POST /api/admin/schema/reconcile/plan` and applies through
 `/reconcile/apply`. A refusal changes nothing; only `SCHEMA_RECONCILE_FAILED`
@@ -28022,8 +28022,8 @@ a collection reaches none of this. See [Roles and scopes](/docs/backend/roles-an
 | `GET` | `/api/admin/schema/status` | `schema:read` | [Live schema editing](/docs/backend/live-schema-editing/) |
 | `POST` | `/api/admin/schema/plan` | `schema:read` | Plans a change; never applies one |
 | `POST` | `/api/admin/schema/apply` | `schema:write` | A person only, unless `REBASE_LIVE_SCHEMA_ALLOW_MACHINE_APPLY` |
-| `POST` | `/api/admin/schema/reconcile/plan` | `schema:read` | <span class="since-badge" data-since="0.28">Since 0.28</span> Plans relaxing `NOT NULL` and dropping the undeclared columns named in `drop`, for [schema reconcile](/docs/cli/schema/#rebase-schema-reconcile); never applies one |
-| `POST` | `/api/admin/schema/reconcile/apply` | `schema:write` | <span class="since-badge" data-since="0.28">Since 0.28</span> Applies a reconcile plan, only if its `digest` is the `confirm` sent |
+| `POST` | `/api/admin/schema/reconcile/plan` | `schema:read` | Plans relaxing `NOT NULL` and dropping the undeclared columns named in `drop`, for [schema reconcile](/docs/cli/schema/#rebase-schema-reconcile); never applies one |
+| `POST` | `/api/admin/schema/reconcile/apply` | `schema:write` | Applies a reconcile plan, only if its `digest` is the `confirm` sent |
 | `GET` | `/api/admin/schema-editor/status` | `schema:read` | Whether the editor is available, and the reason when it is not |
 | `POST` | `/api/admin/schema-editor/collection/save` | `schema:write` | [Studio](/docs/studio/) — rewrites collection source |
 | `POST` | `/api/admin/schema-editor/collection/delete` | `schema:write` | [Studio](/docs/studio/) |
@@ -50824,7 +50824,7 @@ to one user, the endpoint declines to mount and says why in the boot log. No
   lists, describes and reads `posts` and nothing else. A scope decides which tools are
   offered and which collections they reach, not which rows: an empty list can be
   RLS working, and `data:write` still cannot write a row the person could not.
-- <span class="since-badge" data-since="0.28">Since 0.28</span> **`show_collection` puts the rows in front of the person.** It takes
+- **`show_collection` puts the rows in front of the person.** It takes
   `query_collection`'s arguments and answers the same page, plus the columns the
   admin panel shows. A client that renders MCP Apps, such as Claude, opens it as a
   table in the conversation: the person can load more rows and, where the
@@ -52581,8 +52581,6 @@ does.
 
 #### `rebase schema reconcile`
 
-<span class="since-badge" data-since="0.28">Since 0.28</span>
-
 Relax and drop what boot will not, after you have read the plan:
 
 ```bash
@@ -53988,7 +53986,7 @@ before it agrees to boot:
 ```jsonc
 {
   "bundleFormat": 2,
-  "runtime": { "range": "^1", "builtAgainst": "0.27.0", "contract": 1 },
+  "runtime": { "range": "^1", "builtAgainst": "0.28.0", "contract": 1 },
   "schemaVersion": "v1:c5d97d0f96b7f87a",
   "kind": "backend",
   "entry": {
@@ -54039,7 +54037,7 @@ different one rather than start and misbehave later.
 This is why upgrading Rebase in a self-hosted deployment is a tag change:
 
 ```yaml
-image: rebasepro/server:0.27.0   # a newer tag — your bundle is untouched
+image: rebasepro/server:0.28.0   # a newer tag — your bundle is untouched
 ```
 
 ### Development uses the same path
@@ -54452,7 +54450,7 @@ version stamp reveals nothing about the schema it stands for:
 
 ```bash
 curl -s https://api.example.com/api/meta/schema-version
-# {"schemaVersion":"v1:c5d97d0f96b7f87a","runtime":{"version":"0.27.0","contract":1}}
+# {"schemaVersion":"v1:c5d97d0f96b7f87a","runtime":{"version":"0.28.0","contract":1}}
 ```
 
 Comparing the two in CI turns a silent mismatch into a failed check. The stamp
@@ -56289,7 +56287,7 @@ For a real deployment, prefer baking both into an image, which also pins exactly
 what runs:
 
 ```dockerfile
-FROM rebasepro/server:0.27.0
+FROM rebasepro/server:0.28.0
 COPY dist-bundle /bundle
 ```
 
@@ -56484,7 +56482,7 @@ containers works. Two things to get right everywhere:
 
 ```toml
 [build]
-  dockerfile = "Dockerfile"   # FROM rebasepro/server:0.27.0 + COPY dist-bundle /bundle
+  dockerfile = "Dockerfile"   # FROM rebasepro/server:0.28.0 + COPY dist-bundle /bundle
 
 [http_service]
   internal_port = 8080
@@ -56689,7 +56687,7 @@ processes. See [Split processes](/docs/deployment/split-processes/).
 ### Upgrading
 
 ```yaml
-image: rebasepro/server:0.27.0
+image: rebasepro/server:0.28.0
 ```
 
 Restart. Your bundle is unchanged. Within a runtime contract major, a bundle that
@@ -56966,7 +56964,7 @@ split: true
 functions:
   enabled: true
   image:
-    tag: "0.27.0"     # this unit only; the rest stay on the release-wide tag
+    tag: "0.28.0"     # this unit only; the rest stay on the release-wide tag
 ```
 
 Only the tag is usually worth pinning: the repository is inherited, so this is
@@ -57786,7 +57784,7 @@ rebase build
 For App Runner, which pulls from a registry, bake the bundle into a derived image. That is three lines and it pins exactly what runs:
 
 ```dockerfile title="Dockerfile"
-FROM rebasepro/server:0.27.0
+FROM rebasepro/server:0.28.0
 COPY dist-bundle /bundle
 ```
 
@@ -57886,7 +57884,7 @@ rebase build
 Cloud Run pulls from a registry, so bake the bundle into a derived image. Three lines, and it pins exactly what runs:
 
 ```dockerfile title="Dockerfile"
-FROM rebasepro/server:0.27.0
+FROM rebasepro/server:0.28.0
 COPY dist-bundle /bundle
 ```
 
@@ -57990,7 +57988,7 @@ rebase build
 Container Apps pulls from a registry, so bake the bundle into a derived image. Three lines, and it pins exactly what runs:
 
 ```dockerfile title="Dockerfile"
-FROM rebasepro/server:0.27.0
+FROM rebasepro/server:0.28.0
 COPY dist-bundle /bundle
 ```
 
@@ -58080,7 +58078,7 @@ module "rebase" {
   admin_email     = "you@example.com"
 
   bundle_url      = "https://storage.example.com/bundles/app-1.4.0.tar.gz"
-  runtime_version = "0.27.0" # required with bundle_url: `latest` is refused at plan
+  runtime_version = "0.28.0" # required with bundle_url: `latest` is refused at plan
 
   s3_bucket            = "example-uploads"
   s3_access_key_id     = var.s3_access_key_id
@@ -58119,7 +58117,7 @@ rsync -a dist-bundle/ root@<your-server-ip>:/opt/rebase/dist-bundle/
 
 For a real deployment, prefer one of the two shapes that do not involve copying files to a box by hand:
 
-- **Bake it into an image** — `FROM rebasepro/server:0.27.0` then `COPY dist-bundle /bundle`, and deploy by changing a tag.
+- **Bake it into an image** — `FROM rebasepro/server:0.28.0` then `COPY dist-bundle /bundle`, and deploy by changing a tag.
 - **Serve it over HTTP** — set `REBASE_BUNDLE_URL` and the runtime fetches and unpacks the bundle on every start. This is what the Terraform module above does, and the same mechanism the Helm chart uses.
 
 ### 4. Configure and run
@@ -58260,7 +58258,7 @@ rebase build
 Serverless Containers pulls from a registry, so bake the bundle into a derived image. Three lines, and it pins exactly what runs:
 
 ```dockerfile title="Dockerfile"
-FROM rebasepro/server:0.27.0
+FROM rebasepro/server:0.28.0
 COPY dist-bundle /bundle
 ```
 
@@ -58371,7 +58369,7 @@ rebase build
 Commit a three-line `Dockerfile` at the repository root, so Railway's build step is a copy rather than a compilation:
 
 ```dockerfile title="Dockerfile"
-FROM rebasepro/server:0.27.0
+FROM rebasepro/server:0.28.0
 COPY dist-bundle /bundle
 ```
 
@@ -58464,7 +58462,7 @@ rebase build
 Commit a three-line `Dockerfile` at the project root:
 
 ```dockerfile title="Dockerfile"
-FROM rebasepro/server:0.27.0
+FROM rebasepro/server:0.28.0
 COPY dist-bundle /bundle
 ```
 

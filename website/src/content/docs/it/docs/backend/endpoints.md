@@ -1,5 +1,5 @@
 ---
-sourceHash: f66ad55337850ab8
+sourceHash: 5d49ebc487bc9040
 title: Indice degli endpoint
 sidebar_label: Indice degli endpoint
 description: Ogni route HTTP montata da un backend Rebase — data, auth, storage, admin, meta — con il relativo gate e la pagina che la descrive.
@@ -162,8 +162,8 @@ una collection non può accedere a nulla di tutto questo. Vedi [Ruoli e scope](/
 | `GET` | `/api/admin/schema/status` | `schema:read` | [Modifica dello schema in tempo reale](/docs/backend/live-schema-editing/) |
 | `POST` | `/api/admin/schema/plan` | `schema:read` | Pianifica una modifica; non ne applica mai una |
 | `POST` | `/api/admin/schema/apply` | `schema:write` | Solo una persona, a meno che non sia impostato `REBASE_LIVE_SCHEMA_ALLOW_MACHINE_APPLY` |
-| `POST` | `/api/admin/schema/reconcile/plan` | `schema:read` | <span class="since-badge" data-since="0.28">Since 0.28</span> Pianifica l'allentamento di `NOT NULL` e l'eliminazione delle colonne non dichiarate nominate in `drop`, per [la riconciliazione dello schema](/docs/cli/schema/#rebase-schema-reconcile); non ne applica mai uno |
-| `POST` | `/api/admin/schema/reconcile/apply` | `schema:write` | <span class="since-badge" data-since="0.28">Since 0.28</span> Applica un piano di riconciliazione, solo se il suo `digest` è il `confirm` inviato |
+| `POST` | `/api/admin/schema/reconcile/plan` | `schema:read` | Pianifica l'allentamento di `NOT NULL` e l'eliminazione delle colonne non dichiarate nominate in `drop`, per [la riconciliazione dello schema](/docs/cli/schema/#rebase-schema-reconcile); non ne applica mai uno |
+| `POST` | `/api/admin/schema/reconcile/apply` | `schema:write` | Applica un piano di riconciliazione, solo se il suo `digest` è il `confirm` inviato |
 | `GET` | `/api/admin/schema-editor/status` | `schema:read` | Indica se l'editor è disponibile e il motivo quando non lo è |
 | `POST` | `/api/admin/schema-editor/collection/save` | `schema:write` | [Studio](/docs/studio/) — riscrive il sorgente della collection |
 | `POST` | `/api/admin/schema-editor/collection/delete` | `schema:write` | [Studio](/docs/studio/) |

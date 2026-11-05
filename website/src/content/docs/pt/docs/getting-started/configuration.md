@@ -1,5 +1,5 @@
 ---
-sourceHash: 91da44dc16cfc314
+sourceHash: d1aaac1b3505e1af
 title: Ambiente e Configuração
 sidebar_label: Configuração
 description: Todas as variáveis de ambiente e opções de configuração para projetos Rebase.
@@ -372,7 +372,7 @@ Lido pelo `rebase`, não pelo servidor. Nada aqui afeta uma implantação.
 | `REBASE_SERVICE_KEY` | A service key com a qual esses comandos se autenticam, lida do `.env`: a mesma variável que o servidor lê (veja acima). | — |
 | `SERVICE_KEY` | Um nome mais antigo para essa chave. Quando o `.env` a define, `rebase api-keys` e `rebase storage` a leem no lugar de `REBASE_SERVICE_KEY`. | — |
 | `REBASE_ENV_FILE_PATH` | Qual arquivo `.env` a CLI lê e grava, quando não for o padrão do projeto. | — |
-| `REBASE_ROOT_RULES` | <span class="since-badge" data-since="0.28">Since 0.28</span> `0` impede que `rebase init` e `rebase skills install` escrevam as regras do projeto em `CLAUDE.md` e `AGENTS.md` na raiz do repositório, para uma raiz cujos arquivos de agente você mantém à mão. | ativado |
+| `REBASE_ROOT_RULES` | `0` impede que `rebase init` e `rebase skills install` escrevam as regras do projeto em `CLAUDE.md` e `AGENTS.md` na raiz do repositório, para uma raiz cujos arquivos de agente você mantém à mão. | ativado |
 | `REBASE_CLOUD_URL` | O plano de controle com o qual o `rebase cloud` se comunica. | — |
 | `REBASE_CLOUD_EMAIL` | A conta com a qual o `rebase cloud login` faz login, em vez de solicitar interativamente. | — |
 | `REBASE_CLOUD_PASSWORD` | Sua senha, para que um cofre de segredos possa fornecê-la sem que ela vá para o histórico do shell. | — |

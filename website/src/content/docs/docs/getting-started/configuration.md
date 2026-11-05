@@ -372,7 +372,7 @@ Read by `rebase`, not by the server. Nothing here affects a deployment.
 | `REBASE_SERVICE_KEY` | The service key those commands authenticate with, read from `.env`: the same variable the server reads (see above). | — |
 | `SERVICE_KEY` | An older name for that key. When `.env` sets it, `rebase api-keys` and `rebase storage` read it in place of `REBASE_SERVICE_KEY`. | — |
 | `REBASE_ENV_FILE_PATH` | Which `.env` the CLI reads and writes, when it is not the project's. | — |
-| `REBASE_ROOT_RULES` | <span class="since-badge" data-since="0.28">Since 0.28</span> `0` stops `rebase init` and `rebase skills install` from writing the project's rules into the repository root's `CLAUDE.md` and `AGENTS.md`, for a root whose agent files you keep by hand. | on |
+| `REBASE_ROOT_RULES` | `0` stops `rebase init` and `rebase skills install` from writing the project's rules into the repository root's `CLAUDE.md` and `AGENTS.md`, for a root whose agent files you keep by hand. | on |
 | `REBASE_CLOUD_URL` | The control plane `rebase cloud` talks to. | — |
 | `REBASE_CLOUD_EMAIL` | The account `rebase cloud login` signs in as, instead of prompting. | — |
 | `REBASE_CLOUD_PASSWORD` | Its password, so a secret store can hand it over without it reaching the shell's history. | — |

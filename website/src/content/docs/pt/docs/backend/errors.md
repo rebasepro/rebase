@@ -1,5 +1,5 @@
 ---
-sourceHash: 4c6a854f868076ab
+sourceHash: 3db77ebbf107015d
 title: Códigos de erro
 sidebar_label: Códigos de erro
 description: Todos os códigos de erro que um backend Rebase pode retornar, com seu status HTTP, significado e o que fazer a respeito — além do envelope de resposta, X-Request-ID e as regras de details.
@@ -361,8 +361,6 @@ visualmente o recurso em vez de exibir um erro.
 | `SQL_EXPORT_UNSUPPORTED` | 501 | `POST /api/admin/sql/csv` não consegue transmitir um resultado aqui: o banco de dados de desenvolvimento em processo (PGlite) tem uma única conexão, e um cursor mantido durante um download seguraria todas as outras consultas atrás dele; ou a fonte de dados não tem cursor SQL. | Aponte `DATABASE_URL` para um Postgres seu (`rebase dev --docker` inicia um), ou adicione um `LIMIT` e exporte as linhas da tela. |
 
 ### Reconciliação do schema
-
-<span class="since-badge" data-since="0.28">Since 0.28</span>
 
 [`rebase schema reconcile`](/docs/cli/schema/#rebase-schema-reconcile) planeja via
 `POST /api/admin/schema/reconcile/plan` e aplica via `/reconcile/apply`. Uma
