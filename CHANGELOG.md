@@ -113,6 +113,12 @@
 
 #### MCP
 
+- **`REBASE_MCP_ENABLED` switches on `/mcp` for a backend built in code.** Only
+  the containerized boot read it, so `initializeRebaseBackend` and
+  `createRebaseBackend` ignored it: with both documented variables set, `/mcp`
+  answered 404 and the log said nothing. The variable now decides when
+  `surfaces.mcp` is not set; set, the option wins.
+
 - **Connecting an MCP client from Chrome now finishes.** The consent screen
   allowed form submissions to its own origin only (`form-action 'self'`), and
   Chrome applies that to the redirect after Allow, so the authorization code

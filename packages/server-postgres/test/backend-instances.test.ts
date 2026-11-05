@@ -483,6 +483,44 @@ describe("a read reached over any door sees its backend as rebase", () => {
         const text = await res.text();
         expect(text).toContain("\\\"imported\\\":\\\"M\\\"");
     });
+
+    it("an MCP surface switched on by REBASE_MCP_ENABLED alone", async () => {
+        // The documented switch. A backend built in code took its surfaces
+        // from its options only, so the variable left `/mcp` a bare 404.
+        const publicUrl = "https://mcp-env.test";
+        const db = await database("N");
+        const previous = { url: process.env.REBASE_PUBLIC_URL, enabled: process.env.REBASE_MCP_ENABLED };
+        process.env.REBASE_PUBLIC_URL = publicUrl;
+        process.env.REBASE_MCP_ENABLED = "true";
+        let backend: RebaseBackend;
+        try {
+            backend = await createRebaseBackend({
+                collections: [collection("epsilon_items")],
+                bootstrappers: [bootstrapper("N", db)],
+                auth: { jwtSecret: SECRET.DEFAULT },
+                cronPersistence: false,
+                provision: true
+            });
+        } finally {
+            if (previous.url === undefined) delete process.env.REBASE_PUBLIC_URL;
+            else process.env.REBASE_PUBLIC_URL = previous.url;
+            if (previous.enabled === undefined) delete process.env.REBASE_MCP_ENABLED;
+            else process.env.REBASE_MCP_ENABLED = previous.enabled;
+        }
+        built.push({ backend, db });
+        const app = new Hono<HonoEnv>();
+        backend.mount(app, { basePath: "/api" });
+
+        const metadata = await app.request("/.well-known/oauth-protected-resource/mcp");
+        expect(metadata.status).toBe(200);
+        expect(await metadata.json()).toMatchObject({ resource: `${publicUrl}/mcp` });
+        const anonymous = await app.request("/mcp", {
+            method: "POST",
+            headers: { "content-type": "application/json", accept: "application/json, text/event-stream" },
+            body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "tools/list" })
+        });
+        expect(anonymous.status).toBe(401);
+    });
 });
 
 describe("two backends built from one options object", () => {

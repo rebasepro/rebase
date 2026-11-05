@@ -15,6 +15,8 @@
  * {@link RuntimeOwnership}.
  */
 
+import { parseEnvBoolean } from "@rebasepro/types";
+
 /**
  * A mountable HTTP surface.
  *
@@ -136,6 +138,11 @@ export type RuntimeOwnershipOptions = Partial<ResolvedOwnership>;
  */
 const DEFAULT_OFF: readonly RuntimeSurface[] = ["mcp"] as const;
 
+/** The environment {@link resolveSurfaces} reads, for the surfaces a variable can switch. */
+export interface SurfaceEnv {
+    REBASE_MCP_ENABLED?: string;
+}
+
 /**
  * Resolve a partial surface set against the default, which is everything on
  * except {@link DEFAULT_OFF}.
@@ -144,11 +151,24 @@ const DEFAULT_OFF: readonly RuntimeSurface[] = ["mcp"] as const;
  * says nothing gets the process this server has always booted, and a surface
  * added later is mounted by every existing deployment without anyone editing a
  * list. See {@link DEFAULT_OFF} for the one place that rule is wrong and why.
+ *
+ * `env` is the process environment for a backend built in code; omitted, only
+ * `options` decide.
  */
-export function resolveSurfaces(options?: RuntimeSurfaceOptions): ResolvedSurfaces {
+export function resolveSurfaces(options?: RuntimeSurfaceOptions, env: SurfaceEnv = {}): ResolvedSurfaces {
     const resolved = {} as ResolvedSurfaces;
     for (const surface of ALL_RUNTIME_SURFACES) {
         resolved[surface] = options?.[surface] ?? !DEFAULT_OFF.includes(surface);
+    }
+    // `mcp` is documented as switched on by `REBASE_MCP_ENABLED`, and the
+    // containerized boot path reads it (`resolveRole`). A backend built in
+    // code — `initializeRebaseBackend`, `createRebaseBackend` — passed only its
+    // own options here, so following the documentation left `/mcp` a bare 404
+    // with nothing in the log. The variable now answers for a caller that did
+    // not decide; a `surfaces.mcp` in code still wins.
+    if (options?.mcp === undefined) {
+        const fromEnv = parseEnvBoolean(env.REBASE_MCP_ENABLED);
+        if (fromEnv !== undefined) resolved.mcp = fromEnv;
     }
     return resolved;
 }

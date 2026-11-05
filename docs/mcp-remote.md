@@ -77,6 +77,11 @@ to hand credentials to third-party software, which is a product decision rather
 than a topology one. `REBASE_MCP_ENABLED` is therefore the single line to grep
 for when asking whether a deployment serves agents.
 
+A backend built in code (`initializeRebaseBackend`, `createRebaseBackend`)
+reads the same variable. Its own `surfaces: { mcp }` option, when set, wins over
+it. Through 0.28.1 only the containerized boot read the variable, so a backend
+built in code that followed this page answered `/mcp` with a bare 404.
+
 Optional:
 
 ```bash
