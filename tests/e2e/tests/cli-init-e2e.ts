@@ -265,13 +265,20 @@ export function packLocalPackages(projectPath: string): Record<string, string> {
         pkgObj.version = tempVersion;
 
         // Rewrite any workspace/registry dependency on @rebasepro/* to the absolute tarball path
-        const updateDeps = (deps: Record<string, string> | undefined) => {
+        const updateDeps = (deps: Record<string, string> | undefined, dev = false) => {
             if (!deps) return;
             for (const name of Object.keys(deps)) {
                 if (name.startsWith("@rebasepro/")) {
                     const tarballPath = packageTarballPaths[name];
                     if (tarballPath) {
                         deps[name] = tarballPath;
+                    } else if (dev) {
+                        // A devDependency is only ever installed in this repo,
+                        // never for a consumer. An unpacked one is a private,
+                        // build-only package (`@rebasepro/mcp-apps`, which the
+                        // server's build inlines), so it has no place in the
+                        // tarball's manifest.
+                        delete deps[name];
                     } else {
                         // Loud, and fatal. This used to warn and leave the spec
                         // alone, so an unpacked first-party package silently
@@ -289,7 +296,7 @@ export function packLocalPackages(projectPath: string): Record<string, string> {
         };
 
         updateDeps(pkgObj.dependencies);
-        updateDeps(pkgObj.devDependencies);
+        updateDeps(pkgObj.devDependencies, true);
         updateDeps(pkgObj.peerDependencies);
 
         fs.writeFileSync(pkgPath, JSON.stringify(pkgObj, null, 2), "utf-8");
