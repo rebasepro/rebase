@@ -219,6 +219,9 @@ test("the real CLI's surface is read the same way", () => {
     assert.ok(sub.get("cloud")?.has("deploy"));
     assert.ok(flags.get("generate-sdk")?.has("--output"), "generate-sdk's spec is in cli.ts");
     assert.ok(flags.has("telemetry"), "a spec with no flags still says which flags are accepted: none");
+    assert.ok(sub.get("schema")?.has("reconcile"), "schema.ts answers `reconcile` itself, before the driver");
+    assert.ok(sub.get("schema")?.has("generate"), "the driver's schema subcommands are still read");
+    assert.ok(flags.get("schema")?.has("--drop"), "`schema reconcile` parses its flags in schema-reconcile.ts");
 });
 
 test("a variable the fence fills with `read` is assigned", () => {
