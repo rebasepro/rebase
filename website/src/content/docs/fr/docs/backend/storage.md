@@ -1,5 +1,5 @@
 ---
-sourceHash: 7f46b01ad01541e2
+sourceHash: c72a777b7542e004
 title: Configuration du stockage
 sidebar_label: Configuration du stockage
 description: Configurez les backends de stockage sur système de fichiers local, compatible S3 ou GCS/Firebase Storage pour les téléversements de fichiers, les images et les médias.
@@ -407,6 +407,35 @@ Seules les variables délimitées au compte adoptent une valeur de repli — `S3
 la paire GCS `GCS_PROJECT_ID` / `GCS_KEY_FILENAME`. Le nom du bucket n'a jamais de valeur de repli :
 c'est ce qui distingue une source d'une autre. Une valeur définie par bucket reste prioritaire,
 permettant ainsi à une source de changer de fournisseur sans impacter les autres.
+
+### Supprimer selon un calendrier les fichiers qu'aucune ligne ne nomme
+
+Supprimer une ligne laisse ses fichiers dans le bucket. Rien n'est supprimé avec la
+ligne : une autre ligne, une version dans l'[historique](/docs/backend/history/) ou
+votre propre code qui garde la clé dans une simple chaîne peut encore nommer le
+fichier. Un bucket peut demander à la place le nettoyage qui voit tout cela :
+
+```ts
+export const voice = bucket("voice", { engine: "s3", orphanSweep: { olderThanHours: 72 } });
+export const media = bucket("media", { orphanSweep: true }); // a week, daily at 04:17 UTC
+```
+
+Chaque nettoyage déclaré est une tâche cron, `storage-orphan-sweep-<bucket>`
+(`storage-orphan-sweep-default` pour le bucket par défaut). Elle exécute l'analyse
+derrière `rebase storage orphans --delete`. Cette analyse lit chaque ligne de chaque
+collection et chaque entrée d'historique, et conserve :
+
+- un fichier que quoi que ce soit nomme encore ;
+- un fichier plus récent que `olderThanHours` (au moins 24, une semaine par défaut) ;
+- tous les fichiers, pour cette exécution, quand une collection ne peut pas être lue.
+
+Elle vérifie ensuite à nouveau chaque fichier juste avant de le supprimer. Donnez à
+`schedule` une expression cron (UTC) pour changer le moment où elle s'exécute. En
+tant que tâche cron, elle s'exécute sur une seule instance par créneau. Son
+historique d'exécution indique combien de fichiers elle a supprimés et conservés, et
+elle peut être mise en pause ou lancée à la main depuis la liste des crons de
+l'admin. Elle nécessite un bucket que ce backend sert : un bucket
+`transport: "direct"` est refusé au démarrage avec un avertissement.
 
 ## Sources de stockage côté frontend
 

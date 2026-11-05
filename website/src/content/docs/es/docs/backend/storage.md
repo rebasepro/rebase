@@ -1,5 +1,5 @@
 ---
-sourceHash: 7f46b01ad01541e2
+sourceHash: c72a777b7542e004
 title: Configuración de Storage
 sidebar_label: Configuración de Storage
 description: Configura backends de sistema de archivos local, compatibles con S3 o GCS/Firebase Storage para subidas de archivos, imágenes y medios.
@@ -405,6 +405,35 @@ Solo las variables con ámbito de cuenta admiten el valor alternativo (fallback)
 el par de GCS `GCS_PROJECT_ID` / `GCS_KEY_FILENAME`. El nombre del bucket nunca lo hace:
 es lo que distingue a un origen de otro. Un valor a nivel de bucket sigue teniendo prioridad,
 de modo que un origen puede cambiar de proveedor sin afectar a los demás.
+
+### Borrar según una programación los archivos que ninguna fila nombra
+
+Borrar una fila deja sus archivos en el bucket. Nada se borra con la fila: otra
+fila, una versión en el [historial](/docs/backend/history/) o tu propio código que
+guarda la clave en un string simple todavía pueden nombrar el archivo. En su lugar,
+un bucket puede pedir la limpieza que sí ve todo eso:
+
+```ts
+export const voice = bucket("voice", { engine: "s3", orphanSweep: { olderThanHours: 72 } });
+export const media = bucket("media", { orphanSweep: true }); // a week, daily at 04:17 UTC
+```
+
+Cada limpieza declarada es un cron job, `storage-orphan-sweep-<bucket>`
+(`storage-orphan-sweep-default` para el bucket por defecto). Ejecuta el escaneo de
+`rebase storage orphans --delete`. Ese escaneo lee cada fila de cada colección y
+cada entrada del historial, y conserva:
+
+- un archivo que algo todavía nombra;
+- un archivo más reciente que `olderThanHours` (al menos 24, una semana por defecto);
+- todos los archivos, en esa ejecución, cuando no se puede leer una colección.
+
+Después vuelve a comprobar cada archivo justo antes de borrarlo. Asigna a
+`schedule` una expresión cron (UTC) para cambiar cuándo se ejecuta. Al ser un cron
+job, se ejecuta en una sola instancia por franja. Su historial de ejecuciones
+registra cuántos archivos borró y conservó, y se puede pausar o ejecutar a mano
+desde la lista de cron del panel de administración. Necesita un bucket que este
+backend sirva: un bucket con `transport: "direct"` se rechaza al arrancar con una
+advertencia.
 
 ## Orígenes de almacenamiento en el Frontend
 

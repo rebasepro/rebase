@@ -1,5 +1,5 @@
 ---
-sourceHash: 53bc3cc4a868eb7f
+sourceHash: d77bb90d91162c26
 title: Proprietà
 sidebar_label: Proprietà
 description: I tipi di proprietà definiscono il tipo di dato, la convalida e il rendering dell'interfaccia utente per ciascun campo in una collezione. Rebase supporta i tipi string, number, boolean, date, array, map, reference, relation e geopoint.
@@ -47,7 +47,7 @@ Tutti i tipi di proprietà condividono queste opzioni:
 | `propertyConfig` | `string` | Chiave di configurazione della proprietà registrata |
 | `columnName` | `string` | Nome esplicito della colonna del database (ignora la conversione in snake_case) |
 | `callbacks` | `PropertyCallbacks` | Hook per le trasformazioni `afterRead` e `beforeSave` |
-| `excludeFromApi` | `boolean` | Non menzionare mai questa colonna nell'API, in entrambe le direzioni — utile per l'hash di una password o un token di verifica. Il valore viene comunque scritto ed è interrogabile lato server; viene rimosso da ogni riga servita dall'API, per qualsiasi chiamante inclusi amministratori e service key, ed è assente dai tipi generati `Row`, `Insert` e `Update` nonché dallo schema OpenAPI. È una scorciatoia sintattica per `access: { read: [], write: [] }` — i due meccanismi sono identici, e impostarli entrambi su una proprietà viene rifiutato all'avvio |
+| `excludeFromApi` | `boolean` | Non menzionare mai questa colonna nell'API, in entrambe le direzioni — utile per l'hash di una password o un token di verifica. Il valore viene comunque scritto, ed è leggibile lato server solo tramite `rebase.sql()`; viene rimosso da ogni riga servita dall'API, per qualsiasi chiamante inclusi amministratori, service key e letture con `rebase.dataAsAdmin`, ed è assente dai tipi generati `Row`, `Insert` e `Update` nonché dallo schema OpenAPI. È una scorciatoia sintattica per `access: { read: [], write: [] }` — i due meccanismi sono identici, e impostarli entrambi su una proprietà viene rifiutato all'avvio |
 | `access` | `{ read?: string[]; write?: string[] }` | Chi può leggere e chi può scrivere questo singolo campo, in base al ruolo. Se la lista viene omessa, si delega alle [regole di sicurezza](/docs/collections/security-rules/) della riga; `[]` indica nessuno tramite l'API; un elenco di ruoli indica quei ruoli più `admin`. Un campo non leggibile è **assente** dalle risposte anziché essere `null`, e una scrittura che fa riferimento a un campo non scrivibile restituisce un 400. Vedi [Accesso ai campi](/docs/collections/field-access/) |
 | `metadata` | `Record<string, unknown>` | Qualsiasi elemento che il tuo codice debba associare a una proprietà. Rebase non lo legge; sopravvive invariato alla serializzazione |
 | `dynamicProps` | `function` | Costruttore di proprietà dinamiche (vedi [Campi condizionali](/docs/collections/validation-and-conditions/#conditional-fields)). **Solo form di amministrazione — non applicato dall'API o dal database.** |

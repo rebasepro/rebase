@@ -1,8 +1,8 @@
 ---
-sourceHash: 5dd46da9d88b962e
+sourceHash: 718e4f07d8240ddd
 title: KI-Instruktionsdateien
 sidebar_label: KI-Instruktionsdateien
-description: Jedes über Scaffolding erstellte Rebase-Projekt enthält ai-instructions.md sowie dreizeilige Pointer-Dateien für Claude, Cursor, Windsurf, Copilot und AGENTS.md – eine Single Source of Truth, viele Dateinamen.
+description: Jedes über Scaffolding erstellte Rebase-Projekt enthält ai-instructions.md sowie Pointer-Dateien für Claude, Cursor, Windsurf, Copilot und AGENTS.md, die die fünf Regeln enthalten, gegen die Assistenten am häufigsten verstoßen – eine Single Source of Truth, viele Dateinamen.
 ---
 
 Jeder Assistent erwartet seine Regeln in einer anderen Datei. Claude Code liest
@@ -25,7 +25,7 @@ your-project/
     └── copilot-instructions.md   ← pointer
 ```
 
-Jede Pointer-Datei besteht aus drei Zeilen:
+Jede Pointer-Datei nennt die eigentliche Datei, sagt, wo die Skills liegen, und enthält die fünf Regeln, gegen die ein Assistent nicht verstoßen darf, auch wenn er nichts anderes öffnet:
 
 ```markdown title="CLAUDE.md"
 # Rebase AI Rules
@@ -84,16 +84,24 @@ was das letzte Projekt auf diesem Rechner persistiert hat. Siehe
 
 ## Warum ein Pointer statt einer Kopie
 
-Die Pointer-Dateien sind bewusst inhaltlos. Assistenten folgen relativen
-Markdown-Links, sodass eine dreizeilige Datei, die auf die eigentliche Datei verweist, dasselbe Ergebnis
-erzielt wie eine Kopie – und sie besitzt Eigenschaften, die eine Kopie nicht hat:
+Die Pointer-Dateien enthalten fast nichts. Eine Datei, die auf die eigentliche verweist,
+hält die Konventionen an einem Ort, und sie besitzt Eigenschaften, die eine Kopie nicht hat:
 
 - **Nur eine Datei zum Bearbeiten.** Regeln können zwischen verschiedenen Assistenten nicht
   auseinanderdriften, da es nur ein einziges Regelwerk gibt.
 - **Nur ein Diff zum Reviewen.** Eine Änderung der Projektkonventionen ist eine Änderung an einer
   einzigen Datei, nicht an fünf identischen Dateien, die ein Reviewer vergleichen muss.
-- **Das Hinzufügen eines Assistenten erfordert nur drei Zeilen.** Ein neues Tool mit einem neuen Dateinamen
-  erhält einen Pointer, keine sechste Kopie Ihrer Konventionen.
+- **Das Hinzufügen eines Assistenten ist eine kleine Datei.** Ein neues Tool mit einem neuen
+  Dateinamen erhält einen Pointer, keine sechste Kopie Ihrer Konventionen.
+
+Die einzige Ausnahme ist der Block **Before you write any code**. Ein Assistent folgt einem
+Link nicht zuverlässig: Einer, der mit einer Aufgabe beschäftigt ist, schreibt zuerst den Code,
+und einer, der im Wurzelverzeichnis eines Repositorys gestartet wird, dessen Rebase-Projekt in
+einem Unterordner liegt, lädt diese Dateien überhaupt nicht. Deshalb stehen die fünf Regeln,
+deren Verletzung den größten Schaden anrichtet (eine im Code statt als Collection erstellte
+Tabelle, Daten, die am SDK vorbei gelesen und geschrieben werden, eine ungeschützte Route, ein
+Deploy, eine bearbeitete generierte Datei), identisch in jedem Pointer. Eine Prüfung in der CI
+hält die fünf Kopien gleich.
 
 Es lohnt sich, dieses Muster beizubehalten, wenn Sie das Scaffold forken, und es lohnt sich, es
 in Repositories zu übernehmen, die überhaupt keine Rebase-Projekte sind.

@@ -1,5 +1,5 @@
 ---
-sourceHash: 53bc3cc4a868eb7f
+sourceHash: d77bb90d91162c26
 title: Propriétés
 sidebar_label: Propriétés
 description: Les types de propriétés définissent le type de données, la validation et le rendu de l'interface utilisateur pour chaque champ d'une collection. Rebase prend en charge les types string, number, boolean, date, array, map, reference, relation et geopoint.
@@ -47,7 +47,7 @@ Tous les types de propriétés partagent ces options :
 | `propertyConfig` | `string` | Clé de configuration de propriété enregistrée |
 | `columnName` | `string` | Nom explicite de la colonne de base de données (contourne la conversion en snake_case) |
 | `callbacks` | `PropertyCallbacks` | Hooks pour les transformations `afterRead` et `beforeSave` |
-| `excludeFromApi` | `boolean` | Ne mentionne jamais cette colonne sur l'API, dans aucune des deux directions — pour un hachage de mot de passe ou un jeton de vérification. La valeur est toujours écrite et interrogeable côté serveur ; elle est supprimée de chaque ligne servie par l'API, pour chaque appelant, y compris les administrateurs et les clés de service, et elle est absente des types générés `Row`, `Insert` et `Update` ainsi que du schéma OpenAPI. Équivalent syntaxique de `access: { read: [], write: [] }` — les deux forment un seul et même mécanisme, et définir les deux sur une même propriété est refusé au démarrage |
+| `excludeFromApi` | `boolean` | Ne mentionne jamais cette colonne sur l'API, dans aucune des deux directions — pour un hachage de mot de passe ou un jeton de vérification. La valeur est toujours écrite, et lisible côté serveur uniquement via `rebase.sql()` ; elle est supprimée de chaque ligne servie par l'API, pour chaque appelant, y compris les administrateurs, les clés de service et les lectures via `rebase.dataAsAdmin`, et elle est absente des types générés `Row`, `Insert` et `Update` ainsi que du schéma OpenAPI. Équivalent syntaxique de `access: { read: [], write: [] }` — les deux forment un seul et même mécanisme, et définir les deux sur une même propriété est refusé au démarrage |
 | `access` | `{ read?: string[]; write?: string[] }` | Qui peut lire et qui peut écrire ce champ particulier, par rôle. Une liste omise délègue aux [règles de sécurité](/docs/collections/security-rules/) de la ligne ; `[]` signifie personne via l'API ; une liste de rôles correspond à ces rôles plus `admin`. Un champ non lisible est **absent** des réponses plutôt que `null`, et une écriture mentionnant un champ non inscriptible renvoie une erreur 400. Voir [Accès aux champs](/docs/collections/field-access/) |
 | `metadata` | `Record<string, unknown>` | Tout ce dont votre propre code a besoin d'associer à une propriété. Rebase ne le lit pas ; cela survit inchangé à la sérialisation |
 | `dynamicProps` | `function` | Générateur dynamique de propriétés (voir [Champs conditionnels](/docs/collections/validation-and-conditions/#conditional-fields)). **Formulaire d'administration uniquement — non appliqué par l'API ou la base de données.** |

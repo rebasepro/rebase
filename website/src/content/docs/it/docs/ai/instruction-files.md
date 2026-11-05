@@ -1,8 +1,8 @@
 ---
-sourceHash: 5dd46da9d88b962e
+sourceHash: 718e4f07d8240ddd
 title: File di istruzioni IA
 sidebar_label: File di istruzioni IA
-description: Ogni progetto Rebase creato da scaffold include ai-instructions.md oltre a file puntatore di tre righe per Claude, Cursor, Windsurf, Copilot e AGENTS.md — un'unica fonte di verità, molteplici nomi di file.
+description: Ogni progetto Rebase creato da scaffold include ai-instructions.md oltre a file puntatore per Claude, Cursor, Windsurf, Copilot e AGENTS.md che riportano le cinque regole che gli assistenti violano più spesso — un'unica fonte di verità, molteplici nomi di file.
 ---
 
 Ogni assistente vuole le proprie regole in un file diverso. Claude Code legge
@@ -25,7 +25,7 @@ your-project/
     └── copilot-instructions.md   ← pointer
 ```
 
-Ciascun file puntatore è composto da tre righe:
+Ciascun file puntatore nomina quello reale, indica dove si trovano le skill e riporta le cinque regole che un assistente non deve violare anche se non apre nient'altro:
 
 ```markdown title="CLAUDE.md"
 # Rebase AI Rules
@@ -85,16 +85,23 @@ ricade su qualunque cosa l'ultimo progetto su quella macchina abbia salvato. Con
 
 ## Perché un puntatore invece di una copia
 
-I file puntatore sono deliberatamente privi di contenuti. Gli assistenti seguono
-i link relativi Markdown, quindi un file di tre righe che punta a quello reale
-ottiene lo stesso risultato di una copia — e presenta vantaggi che una copia non ha:
+I file puntatore non contengono quasi nulla. Un file che nomina quello reale mantiene
+le convenzioni in un solo posto, e presenta vantaggi che una copia non ha:
 
 - **Un solo file da modificare.** Le regole non possono divergere tra gli assistenti,
   perché esiste un solo set di regole.
 - **Un solo diff da revisionare.** Una modifica alle convenzioni del progetto è una
   modifica a un singolo file, non a cinque file identici che un revisore deve confrontare.
-- **Aggiungere un assistente richiede tre righe.** Un nuovo strumento con un nuovo
+- **Aggiungere un assistente è un piccolo file.** Un nuovo strumento con un nuovo
   nome di file riceve un puntatore, non una sesta copia delle tue convenzioni.
+
+L'unica eccezione è il blocco **Before you write any code**. Un assistente non segue
+un link in modo affidabile: uno impegnato in un'attività scrive prima il codice, e uno
+avviato nella radice di un repository il cui progetto Rebase si trova in una sottocartella
+non carica mai questi file. Per questo le cinque regole la cui violazione fa più danni
+(una tabella creata nel codice invece che come collection, dati letti e scritti aggirando
+l'SDK, una route non protetta, un deploy, un file generato modificato) sono scritte in ogni
+puntatore, identiche. Un controllo in CI mantiene uguali le cinque copie.
 
 Questo pattern vale la pena di essere mantenuto se fai un fork dello scaffold,
 e vale la pena di essere adottato anche in repository che non sono affatto progetti Rebase.

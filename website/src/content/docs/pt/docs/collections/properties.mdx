@@ -1,5 +1,5 @@
 ---
-sourceHash: 53bc3cc4a868eb7f
+sourceHash: d77bb90d91162c26
 title: Propriedades
 sidebar_label: Propriedades
 description: Os tipos de propriedade definem o tipo de dados, a validação e a renderização da interface do usuário para cada campo em uma coleção. O Rebase suporta os tipos string, number, boolean, date, array, map, reference, relation e geopoint.
@@ -47,7 +47,7 @@ Todos os tipos de propriedade compartilham estas opções:
 | `propertyConfig` | `string` | Chave de configuração de propriedade registrada |
 | `columnName` | `string` | Nome explícito da coluna no banco de dados (ignora a conversão para snake_case) |
 | `callbacks` | `PropertyCallbacks` | Hooks para transformações em `afterRead` e `beforeSave` |
-| `excludeFromApi` | `boolean` | Nunca mencione esta coluna na superfície da API, em nenhuma direção — útil para um hash de senha ou token de verificação. O valor ainda é gravado e consultável no lado do servidor; ele é removido de todas as linhas que a API fornece, para todos os chamadores, incluindo administradores e chaves de serviço, e fica ausente dos tipos `Row`, `Insert` e `Update` gerados, bem como do esquema OpenAPI. Um atalho sintático para `access: { read: [], write: [] }` — ambos são o mesmo mecanismo, e definir ambos na mesma propriedade é recusado na inicialização |
+| `excludeFromApi` | `boolean` | Nunca mencione esta coluna na superfície da API, em nenhuma direção — útil para um hash de senha ou token de verificação. O valor ainda é gravado, e no lado do servidor só pode ser lido via `rebase.sql()`; ele é removido de todas as linhas que a API fornece, para todos os chamadores, incluindo administradores, chaves de serviço e leituras com `rebase.dataAsAdmin`, e fica ausente dos tipos `Row`, `Insert` e `Update` gerados, bem como do esquema OpenAPI. Um atalho sintático para `access: { read: [], write: [] }` — ambos são o mesmo mecanismo, e definir ambos na mesma propriedade é recusado na inicialização |
 | `access` | `{ read?: string[]; write?: string[] }` | Quem pode ler e quem pode gravar este campo específico, por função (role). Uma lista omitida delega às [regras de segurança](/docs/collections/security-rules/) da linha; `[]` significa ninguém por meio da API; uma lista de funções inclui essas funções mais `admin`. Um campo ilegível fica **ausente** das respostas em vez de `null`, e uma gravação nomeando um campo não gravável retorna um 400. Consulte [Acesso ao campo](/docs/collections/field-access/) |
 | `metadata` | `Record<string, unknown>` | Qualquer coisa que seu próprio código precise associar a uma propriedade. O Rebase não faz a leitura; os dados sobrevivem à serialização sem alterações |
 | `dynamicProps` | `function` | Construtor de propriedade dinâmica (consulte [Campos condicionais](/docs/collections/validation-and-conditions/#conditional-fields)). **Apenas no formulário administrativo — não é aplicado pela API nem pelo banco de dados.** |
