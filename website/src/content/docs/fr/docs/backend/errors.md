@@ -1,5 +1,5 @@
 ---
-sourceHash: 983cce6efed81a1a
+sourceHash: 4c6a854f868076ab
 title: Codes d'erreur
 sidebar_label: Codes d'erreur
 description: Tous les codes d'erreur qu'un backend Rebase peut renvoyer, avec leur statut HTTP, leur signification et la marche à suivre — ainsi que l'enveloppe de réponse, X-Request-ID et les règles applicables aux détails.
@@ -320,6 +320,24 @@ Ces codes indiquent qu'une fonctionnalité est désactivée ou non configurée, 
 | `SCHEMA_EDITOR_NO_COLLECTIONS_DIR` | 501 | Le serveur n'a pas de `collectionsDir` ; l'éditeur n'a donc aucun emplacement où écrire. | Définissez `collectionsDir`. |
 | `SCHEMA_EDITOR_PRODUCTION` | 501 | L'éditeur est désactivé avec `NODE_ENV=production` : les fichiers d'un serveur déployé étant reconstruits depuis votre dépôt à chaque déploiement, toute modification locale ici serait écrasée. | Modifiez les collections en développement puis déployez, ou configurez `liveSchema.repository` pour les y valider. |
 | `SQL_EXPORT_UNSUPPORTED` | 501 | `POST /api/admin/sql/csv` ne peut pas diffuser de résultat ici : la base de développement en processus (PGlite) n'a qu'une connexion, et un curseur conservé pendant un téléchargement retiendrait derrière lui toutes les autres requêtes ; ou la source de données n'a pas de curseur SQL. | Faites pointer `DATABASE_URL` vers un Postgres de votre choix (`rebase dev --docker` en démarre un), ou ajoutez un `LIMIT` et exportez les lignes affichées à l'écran. |
+
+### Réconciliation du schéma
+
+<span class="since-badge" data-since="0.28">Since 0.28</span>
+
+[`rebase schema reconcile`](/docs/cli/schema/#rebase-schema-reconcile) planifie via
+`POST /api/admin/schema/reconcile/plan` et applique via `/reconcile/apply`. Un
+refus ne change rien ; seul `SCHEMA_RECONCILE_FAILED` laisse une partie d'un plan
+appliquée.
+
+| Code | Statut | Signification | Action |
+| --- | --- | --- | --- |
+| `INVALID_RECONCILE` | 400 | Le corps n'est pas un objet JSON, ou `drop` n'est pas une liste de chaînes `"<collection>.<column>"`. | Envoyez `{ "drop": ["voice_cache.wav"] }`, ou omettez `drop`. |
+| `SCHEMA_RECONCILE_FAILED` | 400 | Une instruction a échoué en cours de route. Les instructions précédentes ont été exécutées et restent appliquées ; `details.applied` les liste. | Corrigez ce que nomme le message, puis planifiez à nouveau : le nouveau plan omet ce qui a déjà été exécuté. |
+| `SCHEMA_RECONCILE_INVALID` | 400 | Le plan ne peut pas être appliqué, et le message dit pourquoi : un `drop` qui n'est pas `<collection>.<column>`, qui ne nomme aucune collection ou colonne, ou qui nomme une colonne que la collection déclare encore. `details.plan` est le plan. | Corrigez la liste `drop`. Une colonne déclarée se supprime en retirant sa propriété, en déployant, puis en réconciliant. |
+| `SCHEMA_RECONCILE_STALE` | 409 | La base de données ou les collections ont changé depuis le plan que vous avez confirmé. `details.plan` est le nouveau. | Relisez le nouveau plan et confirmez son `digest`. |
+| `SCHEMA_RECONCILE_UNCONFIRMED` | 400 | `/reconcile/apply` a reçu une requête sans `confirm`. | Planifiez d'abord et envoyez le `digest` du plan comme `confirm`. Le CLI le fait dès que vous tapez `yes`. |
+| `SCHEMA_RECONCILE_UNSUPPORTED` | 503 | Le driver de ce backend ne peut pas planifier une réconciliation, ou ne peut pas exécuter de SQL. | La réconciliation fonctionne sur Postgres. |
 
 ### Pourquoi la table d'une branche ne peut pas être fusionnée
 

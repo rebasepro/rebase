@@ -1,5 +1,5 @@
 ---
-sourceHash: 6514a0c5bb157523
+sourceHash: 91da44dc16cfc314
 title: Ambiente e configurazione
 sidebar_label: Configurazione
 description: Tutte le variabili d'ambiente e le opzioni di configurazione per i progetti Rebase.
@@ -363,6 +363,7 @@ variabili produce impatti sull'ambiente di distribuzione remota.
 | `REBASE_SERVICE_KEY` | Chiave di servizio con cui tali comandi si autenticano, ricavata dal file `.env`: coincide con la medesima variabile letta dal server (vedere sopra). | — |
 | `SERVICE_KEY` | Denominazione pregressa per la service key. Se configurata in `.env`, viene considerata da `rebase api-keys` e `rebase storage` in sostituzione di `REBASE_SERVICE_KEY`. | — |
 | `REBASE_ENV_FILE_PATH` | Percorso specifico del file `.env` che la CLI deve leggere e scrivere, quando diverso dalla radice del progetto. | — |
+| `REBASE_ROOT_RULES` | <span class="since-badge" data-since="0.28">Since 0.28</span> `0` impedisce a `rebase init` e `rebase skills install` di scrivere le regole del progetto in `CLAUDE.md` e `AGENTS.md` nella radice del repository, per una radice i cui file per gli agenti mantieni a mano. | attivo |
 | `REBASE_CLOUD_URL` | Endpoint del piano di controllo (control plane) con cui comunica `rebase cloud`. | — |
 | `REBASE_CLOUD_EMAIL` | Account utilizzato da `rebase cloud login` per evitare richieste interattive a terminale. | — |
 | `REBASE_CLOUD_PASSWORD` | Password dell'account, per l'integrazione con gestori di segreti evitando la registrazione nei log della shell. | — |

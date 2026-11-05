@@ -1,5 +1,5 @@
 ---
-sourceHash: e777b5a7b5dab590
+sourceHash: 0da7580e73a7f0c9
 title: El endpoint remoto de MCP
 sidebar_label: Endpoint remoto de MCP
 description: Sirve MCP desde un backend desplegado en /mcp, para que las personas que usan tu aplicación conecten Claude o Cursor como ellas mismas — OAuth con pantalla de consentimiento, nueve herramientas bajo tres alcances, y cada llamada bajo su propia seguridad a nivel de fila.
@@ -42,7 +42,7 @@ Ningún `REBASE_ROLE` lo activa.
   lista, describe y lee `posts` y nada más. Un alcance decide qué herramientas se
   ofrecen y a qué colecciones llegan, no qué filas: una lista vacía puede ser RLS
   funcionando, y `data:write` sigue sin poder escribir una fila que la persona no podría.
-- **`show_collection` pone las filas delante de la persona.** Acepta los argumentos de
+- <span class="since-badge" data-since="0.28">Since 0.28</span> **`show_collection` pone las filas delante de la persona.** Acepta los argumentos de
   `query_collection` y responde la misma página, más las columnas que muestra el panel de
   administración. Un cliente que muestra MCP Apps, como Claude, la abre como una tabla en la
   conversación: la persona puede cargar más filas y, donde la conexión tiene `data:write`,

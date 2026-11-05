@@ -1,5 +1,5 @@
 ---
-sourceHash: e777b5a7b5dab590
+sourceHash: 0da7580e73a7f0c9
 title: Der Remote-MCP-Endpunkt
 sidebar_label: Remote-MCP-Endpunkt
 description: Stellen Sie MCP von einem bereitgestellten Backend unter /mcp bereit, damit die Benutzer Ihrer App Claude oder Cursor als sich selbst verbinden können – OAuth mit Zustimmungsbildschirm, neun Tools unter drei Scopes, jeder Aufruf unter ihrer eigenen Row-Level Security.
@@ -47,7 +47,7 @@ den Grund im Boot-Log. Keine `REBASE_ROLE` schaltet ihn ein.
   werden und welche Collections sie erreichen, nicht welche Zeilen: Eine leere Liste kann
   bedeuten, dass RLS funktioniert, und `data:write` kann dennoch keine Zeile schreiben,
   die die Person nicht schreiben könnte.
-- **`show_collection` zeigt der Person die Zeilen.** Es nimmt die Argumente von
+- <span class="since-badge" data-since="0.28">Since 0.28</span> **`show_collection` zeigt der Person die Zeilen.** Es nimmt die Argumente von
   `query_collection` entgegen und antwortet mit derselben Seite, dazu den Spalten, die
   das Admin-Panel zeigt. Ein Client, der MCP Apps darstellt, etwa Claude, öffnet sie
   als Tabelle im Gespräch: Die Person kann weitere Zeilen laden und, wo die Verbindung

@@ -1,5 +1,5 @@
 ---
-sourceHash: 6514a0c5bb157523
+sourceHash: 91da44dc16cfc314
 title: Umgebung & Konfiguration
 sidebar_label: Konfiguration
 description: Alle Umgebungsvariablen und Konfigurationsoptionen für Rebase-Projekte.
@@ -370,6 +370,7 @@ Wird von `rebase` gelesen, nicht vom Server. Nichts hier hat Einfluss auf ein De
 | `REBASE_SERVICE_KEY` | Der Service-Key, mit dem sich diese Befehle authentifizieren, gelesen aus `.env`: dieselbe Variable, die auch der Server liest (siehe oben). | — |
 | `SERVICE_KEY` | Eine ältere Bezeichnung für diesen Schlüssel. Wenn in `.env` gesetzt, lesen `rebase api-keys` und `rebase storage` diesen anstelle von `REBASE_SERVICE_KEY`. | — |
 | `REBASE_ENV_FILE_PATH` | Welche `.env`-Datei die CLI liest und schreibt, wenn es nicht die des Projekts ist. | — |
+| `REBASE_ROOT_RULES` | <span class="since-badge" data-since="0.28">Since 0.28</span> `0` verhindert, dass `rebase init` und `rebase skills install` die Regeln des Projekts in `CLAUDE.md` und `AGENTS.md` im Wurzelverzeichnis des Repositorys schreiben – für ein Wurzelverzeichnis, dessen Agent-Dateien Sie von Hand pflegen. | an |
 | `REBASE_CLOUD_URL` | Die Control-Plane, mit der `rebase cloud` kommuniziert. | — |
 | `REBASE_CLOUD_EMAIL` | Das Konto, als das sich `rebase cloud login` anmeldet, anstatt interaktiv danach zu fragen. | — |
 | `REBASE_CLOUD_PASSWORD` | Das zugehörige Passwort, damit ein Secret-Store es übergeben kann, ohne dass es in der Shell-Historie landet. | — |

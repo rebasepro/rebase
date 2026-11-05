@@ -1,5 +1,5 @@
 ---
-sourceHash: 829ce13f7c169a96
+sourceHash: 62f93178ab231a98
 title: Schema-Generierung
 sidebar_label: Schema-Generierung
 description: Generieren Sie Drizzle-ORM-Schemas aus Collection-Definitionen, erstellen Sie SQL-Migrationen und halten Sie Ihre Datenbank mit der Rebase-CLI synchron.
@@ -73,6 +73,25 @@ rebase schema stale --fix    # regenerate the file instead
 
 `rebase dev` hält die Datei von selbst aktuell, dies ist also die Prüfung für einen Build
 oder einen CI-Schritt. Er nimmt `--collections` und `--output` wie `rebase schema generate`.
+
+### `rebase schema reconcile`
+
+<span class="since-badge" data-since="0.28">Since 0.28</span>
+
+Lockern und entfernen Sie, was der Boot-Prozess nicht anfasst, nachdem Sie den Plan gelesen haben:
+
+```bash
+rebase schema reconcile                         # relax NOT NULL on properties made optional
+rebase schema reconcile --drop voice_cache.wav  # and drop a column no property declares
+```
+
+**Was er tut:**
+- Bittet das laufende Backend, gegen seine eigene Datenbank zu planen. Das ist das Backend, auf das `.env` und die Cloud-Verknüpfung zeigen, also funktioniert er auf Rebase Cloud, wo nichts anderes die Datenbank erreicht.
+- Plant `DROP NOT NULL` für jede Spalte, die eine Collection als optional deklariert und die die Datenbank noch verlangt.
+- Listet jede Spalte auf, die keine Collection deklariert. Er entfernt nur die, die Sie mit `--drop <collection>.<column>` nennen, und zeigt, wie viele Zeilen in jeder einen Wert enthalten.
+- Wendet den Plan an, sobald Sie `yes` eingeben. Der Server führt den Plan nur mit dem Digest des gelesenen Plans aus; haben sich die Datenbank oder die Collections inzwischen geändert, lehnt er ab, und Sie prüfen erneut. `--yes` überspringt die Abfrage.
+
+Der Boot-Prozess fügt immer nur hinzu, also bleibt nach dem Entfernen einer Property ihre Spalte mit ihren Daten bestehen. Eine `NOT NULL`-Spalte ohne Default lässt dann jedes Insert fehlschlagen, und das Boot-Log nennt dafür diesen Befehl. Deployen Sie zuerst die Collection-Änderung, denn reconcile plant gegen das, was das Backend ausführt. Er benötigt `REBASE_SERVICE_KEY` in `.env`. Lokal deckt `rebase db push` dasselbe über seine Sperre für destruktive Änderungen ab.
 
 ### `rebase schema introspect`
 
