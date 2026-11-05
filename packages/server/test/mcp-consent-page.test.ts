@@ -20,6 +20,7 @@ const BASE: ConsentPageParams = {
     mfaChallengeUrl: "/api/auth/mfa/challenge",
     mfaVerifyUrl: "/api/auth/mfa/challenge/verify",
     decisionUrl: "/api/oauth/authorize/decision",
+    refreshUrl: "/api/auth/refresh",
     resource: "https://app.example.com/mcp",
     redirectUri: "https://claude.ai/api/mcp/auth_callback",
     nonce: "n1"
@@ -45,7 +46,7 @@ interface FetchCall { url: string; headers: Record<string, string>; body: Record
 type Responder = (call: FetchCall) => { status: number; body: unknown } | { status: number; text: string };
 
 /** Mount the page's script against a stand-in DOM built from the page's own ids. */
-function mount(html: string, respond: Responder) {
+function mount(html: string, respond: Responder, storage?: Map<string, string>) {
     const elements = new Map<string, FakeElement>();
     for (const match of html.matchAll(/<[a-z]+\b([^>]*)>/g)) {
         const attrs = match[1];
@@ -94,7 +95,11 @@ function mount(html: string, respond: Responder) {
             return el;
         }
     };
-    vm.runInNewContext(script, { document, fetch, JSON, Promise, Error, setTimeout });
+    const localStorage = storage && {
+        getItem: (key: string) => storage.get(key) ?? null,
+        setItem: (key: string, value: string) => { storage.set(key, value); }
+    };
+    vm.runInNewContext(script, { document, fetch, JSON, Promise, Error, setTimeout, Date, ...(localStorage && { localStorage }) });
 
     const el = (id: string) => elements.get(id)!;
     return {
@@ -275,5 +280,81 @@ describe("consent page: what the person is told", () => {
         const html = renderConsentPage(BASE);
         expect(html).toMatch(/Google, GitHub/);
         expect(html).toMatch(/Forgot password/);
+    });
+});
+
+describe("consent page: someone signed in to this app in this browser", () => {
+    const session = (overrides: Record<string, unknown> = {}) => new Map([["rebase_auth", JSON.stringify({
+        accessToken: "console-token",
+        refreshToken: "console-refresh",
+        expiresAt: Date.now() + 30 * 60_000,
+        user: { email: "dev@example.com" },
+        ...overrides
+    })]]);
+
+    it("is offered that account, and Allow uses its session without a password", async () => {
+        const page = mount(renderConsentPage(BASE), () => SIGNED_IN, session());
+
+        expect(page.el("current").hidden).toBe(false);
+        expect(page.el("current_email").textContent).toBe("dev@example.com");
+        expect(page.el("signin").hidden).toBe(true);
+        expect(page.el("email").required).toBe(false);
+        // Nothing is sent before the press.
+        expect(page.calls).toEqual([]);
+
+        await page.submit();
+        expect(page.calls).toEqual([]);
+        expect(page.el("session_token").value).toBe("console-token");
+        expect(page.el("consent").submitted).toBe(1);
+    });
+
+    it("renews an expired session first, and hands the new pair back to the frontend", async () => {
+        const storage = session({ expiresAt: Date.now() - 1000 });
+        const page = mount(renderConsentPage(BASE), () => ({
+            status: 200,
+            body: { tokens: { accessToken: "renewed", refreshToken: "rotated", accessTokenExpiresAt: 123 } }
+        }), storage);
+
+        await page.submit();
+        expect(page.calls.map(c => [c.url, c.body])).toEqual([["/api/auth/refresh", { refreshToken: "console-refresh" }]]);
+        expect(page.el("session_token").value).toBe("renewed");
+        expect(JSON.parse(storage.get("rebase_auth")!)).toEqual({
+            accessToken: "renewed", refreshToken: "rotated", expiresAt: 123, user: { email: "dev@example.com" }
+        });
+    });
+
+    it("falls back to signing in here when the session cannot be renewed", async () => {
+        const page = mount(renderConsentPage(BASE),
+            () => ({ status: 401, body: { error: { message: "Invalid", code: "INVALID_TOKEN" } } }),
+            session({ expiresAt: Date.now() - 1000 }));
+
+        await page.submit();
+        expect(page.el("consent").submitted).toBe(0);
+        expect(page.el("signin").hidden).toBe(false);
+        expect(page.el("email").required).toBe(true);
+        expect(page.el("error").textContent).toContain("Sign in below");
+    });
+
+    it("can use another account instead", async () => {
+        const page = mount(renderConsentPage(BASE), () => SIGNED_IN, session());
+        page.click("other");
+        page.el("email").value = "a@b.c";
+        page.el("password").value = "pw";
+
+        await page.submit();
+        expect(page.calls.map(c => c.url)).toEqual(["/api/auth/login"]);
+    });
+
+    it("is not offered a stored value that is not a session", async () => {
+        for (const raw of ["not json", JSON.stringify({ accessToken: "t" }), JSON.stringify(null)]) {
+            const page = mount(renderConsentPage(BASE), () => SIGNED_IN, new Map([["rebase_auth", raw]]));
+            expect(page.el("current").hidden).toBe(true);
+            expect(page.el("signin").hidden).toBe(false);
+        }
+    });
+
+    it("shows the email as text, never as markup", async () => {
+        const page = mount(renderConsentPage(BASE), () => SIGNED_IN, session({ user: { email: "<img src=x onerror=alert(1)>" } }));
+        expect(page.el("current_email").textContent).toBe("<img src=x onerror=alert(1)>");
     });
 });

@@ -32,9 +32,12 @@
  *     client name is the registrant's to choose, so "“Claude” wants access"
  *     can be anyone. The redirect host cannot, and the page names it.
  *  7. **Let every account that can sign in consent.** An account with a second
- *     factor finishes here through the existing MFA routes; an account that
- *     has only ever used Google, GitHub or an email link is told how to get a
- *     password, rather than shown an error it cannot act on.
+ *     factor finishes here through the existing MFA routes. Someone already
+ *     signed in to this app's own frontend in this browser — with Google,
+ *     GitHub, an email link or a password — consents as that account (see
+ *     `refreshUrl`). An account with only a social sign-in and no session here
+ *     is told how to get a password, rather than shown an error it cannot act
+ *     on.
  *  8. **Refuse to be framed.** See {@link consentPageHeaders} — a consent screen
  *     that can be iframed is a consent screen an attacker can have clicked.
  */
@@ -56,6 +59,17 @@ export interface ConsentPageParams {
      */
     mfaChallengeUrl: string;
     mfaVerifyUrl: string;
+    /**
+     * The existing `POST /auth/refresh`. When this app's own frontend keeps a
+     * session in this browser (the SDK's `rebase_auth` in `localStorage`, on
+     * this same origin), the page offers to consent as that account: on
+     * Allow — never before, and never without the press — it uses the
+     * session's access token, or renews it here when it has expired and
+     * hands the renewed pair back to the frontend's storage. This is how an
+     * account that signs in with Google or GitHub consents without a
+     * password: the Rebase Cloud console and its connector share an origin.
+     */
+    refreshUrl?: string;
     /**
      * Where the authorization code goes once the person allows.
      *
@@ -172,6 +186,7 @@ export function renderConsentPage(params: ConsentPageParams): string {
   }
   button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
   button[disabled] { opacity: .55; cursor: progress; }
+  button.link { flex: none; padding: 0; border: 0; color: var(--accent); font-weight: 500; font-size: 13px; }
   .error { color: var(--danger); font-size: 13px; margin-top: 12px; min-height: 1em; }
   .who { font-size: 13px; color: var(--muted); margin-top: 4px; }
   .destination {
@@ -212,6 +227,10 @@ export function renderConsentPage(params: ConsentPageParams): string {
     <input type="hidden" name="session_token" id="session_token" value="">
     <input type="hidden" name="decision" id="decision" value="allow">
 
+    <div id="current" hidden>
+      <p class="who">Signed in on this site as <strong id="current_email"></strong>. Allow uses this account.</p>
+      <button type="button" class="link" id="other">Use another account</button>
+    </div>
     <div id="signin">
       <label for="email">Email</label>
       <input type="email" id="email" name="email" autocomplete="username" required>
@@ -247,6 +266,35 @@ export function renderConsentPage(params: ConsentPageParams): string {
   var decision = document.getElementById("decision");
   var error = document.getElementById("error");
   var allow = document.getElementById("allow");
+  var current = document.getElementById("current");
+  var currentEmail = document.getElementById("current_email");
+  var refreshUrl = ${JSON.stringify(params.refreshUrl ?? "")};
+
+  // The session this app's own frontend keeps in this browser, if any: the
+  // SDK's "rebase_auth", on this same origin. Shown by its email; used only
+  // when the person presses Allow, and sent nowhere but this server.
+  var stored = null;
+  try {
+    var raw = refreshUrl && typeof localStorage !== "undefined" ? JSON.parse(localStorage.getItem("rebase_auth") || "null") : null;
+    if (raw && typeof raw.accessToken === "string" && raw.user && typeof raw.user.email === "string") stored = raw;
+  } catch (e) {
+    stored = null;
+  }
+  function useStored(on) {
+    current.hidden = !on;
+    signin.hidden = on;
+    email.required = !on;
+    password.required = !on;
+  }
+  if (stored) {
+    currentEmail.textContent = stored.user.email;
+    useStored(true);
+  }
+  document.getElementById("other").addEventListener("click", function () {
+    stored = null;
+    useStored(false);
+    email.focus();
+  });
 
   // Set once the password was accepted and the account answered MFA_REQUIRED.
   var mfaToken = null;
@@ -354,6 +402,32 @@ export function renderConsentPage(params: ConsentPageParams): string {
     });
   }
 
+  // The stored session's access token, renewed first when it has expired or
+  // is about to. A renewal rotates the refresh token, so the new pair goes
+  // back where the frontend reads it; otherwise its next refresh would spend
+  // the old one and sign it out.
+  function storedSession() {
+    if (typeof stored.expiresAt === "number" && stored.expiresAt > Date.now() + 30000) {
+      return Promise.resolve(stored.accessToken);
+    }
+    if (!stored.refreshToken) {
+      return Promise.reject(failure("Your session on this site has ended. Sign in below."));
+    }
+    return post(refreshUrl, { refreshToken: stored.refreshToken }).then(function (r) {
+      var token = sessionFrom(r);
+      var tokens = (r.body && r.body.tokens) || {};
+      if (!r.ok || !token) throw failure("Your session on this site has ended. Sign in below.");
+      var renewed = {
+        accessToken: token,
+        refreshToken: tokens.refreshToken || stored.refreshToken,
+        expiresAt: tokens.accessTokenExpiresAt,
+        user: stored.user
+      };
+      try { localStorage.setItem("rebase_auth", JSON.stringify(renewed)); } catch (e) { /* the consent still stands */ }
+      return token;
+    });
+  }
+
   function verifyCode() {
     var code = String(mfaCode.value || "").trim();
     return post(${JSON.stringify(params.mfaVerifyUrl)}, { challengeId: challengeId, code: code }, mfaToken).then(function (r) {
@@ -378,10 +452,15 @@ export function renderConsentPage(params: ConsentPageParams): string {
     error.textContent = "";
     allow.disabled = true;
 
-    (mfaToken ? verifyCode() : signIn())
+    (mfaToken ? verifyCode() : stored ? storedSession().then(finish) : signIn())
       .then(function () { allow.disabled = false; })
       .catch(function (err) {
         allow.disabled = false;
+        // A stored session that cannot be used falls back to signing in here.
+        if (stored) {
+          stored = null;
+          useStored(false);
+        }
         error.textContent = (err && err.shown && err.message) || "Sign-in failed.";
       });
   });
