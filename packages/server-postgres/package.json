@@ -1,6 +1,6 @@
 {
   "name": "@rebasepro/server-postgres",
-  "version": "0.28.1",
+  "version": "0.28.2",
   "description": "PostgreSQL data source backend implementation for Rebase with Drizzle ORM",
   "keywords": [
     "cms",

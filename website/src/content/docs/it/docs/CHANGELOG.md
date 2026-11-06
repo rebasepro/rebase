@@ -11,6 +11,8 @@ La traduzione è in arrivo. Il contenuto qui sotto è in inglese.
 
 ## [Unreleased]
 
+## [0.28.2] - 2026-11-06
+
 ### Added
 
 #### CLI
