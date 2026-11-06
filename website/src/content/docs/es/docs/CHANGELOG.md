@@ -11,6 +11,17 @@ La traducción está pendiente. El contenido siguiente está en inglés.
 
 ## [Unreleased]
 
+### Fixed
+
+#### MCP
+
+- **Connecting an MCP client from Chrome now finishes.** The consent screen
+  allowed form submissions to its own origin only (`form-action 'self'`), and
+  Chrome applies that to the redirect after Allow, so the authorization code
+  was issued and the browser never went back to the client (claude.ai, or an
+  IDE on a loopback port). The page now also allows the origin of the
+  client's registered redirect URI.
+
 ## [0.28.2] - 2026-11-06
 
 ### Added

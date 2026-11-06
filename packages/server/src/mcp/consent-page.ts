@@ -109,7 +109,30 @@ export interface ConsentPageParams {
  * in this URL do not travel to whatever the redirect target loads. `form-action
  * 'self'`, so an injection cannot repoint the form at its own collector.
  */
-export function consentPageHeaders(nonce: string): Record<string, string> {
+/**
+ * The `form-action` source for where Allow and Deny end up.
+ *
+ * The page posts to this origin, which answers 302 to the client's
+ * `redirect_uri` — and Chrome holds a redirect after a form submission to the
+ * submitting page's `form-action` too. With `'self'` alone the decision was
+ * made, the code issued, and the browser refused to follow it home: no client
+ * on another origin (claude.ai, an IDE on a loopback port) could ever finish
+ * connecting. The redirect URI here is the one the client registered, already
+ * checked by `/authorize`, so naming exactly its origin widens nothing else.
+ * A custom scheme (`cursor://…`) has no origin; its scheme is the source.
+ */
+export function formActionSource(redirectUri: string): string | undefined {
+    try {
+        const url = new URL(redirectUri);
+        if (url.protocol === "https:" || url.protocol === "http:") return url.origin;
+        return /^[a-z][a-z0-9+.-]*:$/i.test(url.protocol) ? url.protocol : undefined;
+    } catch {
+        return undefined;
+    }
+}
+
+export function consentPageHeaders(nonce: string, redirectUri?: string): Record<string, string> {
+    const redirectSource = redirectUri ? formActionSource(redirectUri) : undefined;
     return {
         "Content-Type": "text/html; charset=utf-8",
         "X-Frame-Options": "DENY",
@@ -119,7 +142,8 @@ export function consentPageHeaders(nonce: string): Record<string, string> {
             "style-src 'unsafe-inline'",
             // The sign-in form posts to this origin's own login endpoint.
             "connect-src 'self'",
-            "form-action 'self'",
+            // The decision posts here, then redirects to the client.
+            `form-action 'self'${redirectSource ? ` ${redirectSource}` : ""}`,
             "frame-ancestors 'none'",
             "base-uri 'none'"
         ].join("; "),

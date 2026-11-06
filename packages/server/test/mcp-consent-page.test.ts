@@ -9,7 +9,7 @@
  * and only running the script reaches them.
  */
 import vm from "node:vm";
-import { renderConsentPage, type ConsentPageParams } from "../src/mcp/consent-page";
+import { consentPageHeaders, formActionSource, renderConsentPage, type ConsentPageParams } from "../src/mcp/consent-page";
 
 const BASE: ConsentPageParams = {
     clientName: "Claude",
@@ -356,5 +356,27 @@ describe("consent page: someone signed in to this app in this browser", () => {
     it("shows the email as text, never as markup", async () => {
         const page = mount(renderConsentPage(BASE), () => SIGNED_IN, session({ user: { email: "<img src=x onerror=alert(1)>" } }));
         expect(page.el("current_email").textContent).toBe("<img src=x onerror=alert(1)>");
+    });
+});
+
+describe("consent page: the browser may follow the decision home", () => {
+    // Allow posts to this origin, which answers 302 to the client's redirect
+    // URI, and Chrome holds that redirect to the page's form-action. With
+    // 'self' alone the code was issued and the browser stayed on the page:
+    // nobody could connect claude.ai, or anything else on another origin.
+    const formAction = (headers: Record<string, string>) =>
+        /form-action ([^;]+)/.exec(headers["Content-Security-Policy"])?.[1];
+
+    it("names the redirect URI's origin beside 'self'", () => {
+        expect(formAction(consentPageHeaders("n", "https://claude.ai/api/mcp/auth_callback")))
+            .toBe("'self' https://claude.ai");
+        expect(formAction(consentPageHeaders("n", "http://127.0.0.1:3118/callback")))
+            .toBe("'self' http://127.0.0.1:3118");
+    });
+
+    it("names a private-use scheme by its scheme, and nothing for what does not parse", () => {
+        expect(formActionSource("cursor://anysphere.cursor-mcp/oauth/callback")).toBe("cursor:");
+        expect(formActionSource("not a url")).toBeUndefined();
+        expect(formAction(consentPageHeaders("n"))).toBe("'self'");
     });
 });

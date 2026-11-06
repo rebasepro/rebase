@@ -402,7 +402,7 @@ export function createOAuthRoutes(config: OAuthRoutesConfig): Hono<HonoEnv> {
             decisionUrl: `${c.req.path}/decision`,
             resource: canonicalResource,
             nonce
-        }), 200, consentPageHeaders(nonce));
+        }), 200, consentPageHeaders(nonce, redirectUri));
     });
 
     /**
