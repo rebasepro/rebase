@@ -18,7 +18,7 @@ const breadcrumbs = [
         <article class="legal-doc">
             <header class="legal-doc__header">
                 <h1 class="legal-doc__title">PRIVACY NOTICE</h1>
-                <p class="legal-doc__meta">Last updated September 23, 2026</p>
+                <p class="legal-doc__meta">Last updated November 7, 2026</p>
             </header>
         <div><span>This privacy notice for FireCMS S.L., which operates Rebase ("<strong>Company</strong>," "<strong>we</strong>," "<strong>us</strong>," or "<strong>our</strong>"</span><span>), describes how and why we might collect, store, use, and/or share ("<strong>process</strong>") your information when you use our services ("<strong>Services</strong>"), such as when you:</span>
         </div>
@@ -110,6 +110,8 @@ const breadcrumbs = [
             <div><a href="#contact"><span>15. HOW CAN YOU CONTACT US ABOUT THIS NOTICE?</span></a>
             </div>
             <div><a href="#request"><span>16. HOW CAN YOU REVIEW, UPDATE, OR DELETE THE DATA WE COLLECT FROM YOU?</span></a>
+            </div>
+            <div><a href="#aiconnector"><span>17. THE REBASE CONNECTOR FOR AI ASSISTANTS</span></a>
             </div>
             </nav>
             <div><br></div>
@@ -1264,6 +1266,27 @@ const breadcrumbs = [
                                                                                                 </div>
                                                                                                 <div>
                                                                                                     <span>Based on the applicable laws of your country, you may have the right to request access to the personal information we collect from you, change that information, or delete it in some circumstances. To request to review, update, or delete your personal information, please submit a request via email to hello@rebase.pro&nbsp;</span><span>.</span>
+                                                                                                </div>
+                                                                                                <div>
+                                                                                                    <br>
+                                                                                                </div>
+                                                                                                <div>
+                                                                                                    <h2 id="aiconnector">17. THE REBASE CONNECTOR FOR AI ASSISTANTS</h2>
+                                                                                                </div>
+                                                                                                <div>
+                                                                                                    <br>
+                                                                                                </div>
+                                                                                                <div>
+                                                                                                    <span>When you connect an AI assistant such as Claude to Rebase through the Rebase connector (https://app.rebase.pro/mcp), we process the following, only to operate the connection you asked for:</span>
+                                                                                                </div>
+                                                                                                <ul>
+                                                                                                    <li><span><strong>The authorization you grant:</strong> the assistant's client registration (its name and redirect address), the permissions you allowed, and your account identifier. Access tokens expire after one hour. Refresh tokens last 30 days and are stored only as a SHA-256 hash; we delete expired ones within 30 days. You can revoke the connection at any time by removing the connector in your assistant, or by signing out everywhere in Rebase.</span></li>
+                                                                                                    <li><span><strong>Each request the assistant makes:</strong> the tool, its arguments and the project it names, to run it as you. The result (your project's data, logs or status) is returned to the assistant and is not stored by the connector. For a change, we keep only the identifier of the single-use confirmation token until it expires (five minutes), never its arguments.</span></li>
+                                                                                                    <li><span><strong>Operational logs:</strong> for each request into one of your projects, the time, your account identifier, the project and the permission used; for each confirmed change or failed request, also the tool. They are kept with our other service logs, for security and debugging. A project's own logs record the same request when it arrives there.</span></li>
+                                                                                                    <li><span><strong>Self-hosted instances you add:</strong> the instance's address, name and organization, until you remove it. Requests to it are made from our servers on your behalf and their results are not stored.</span></li>
+                                                                                                </ul>
+                                                                                                <div>
+                                                                                                    <span>What the assistant does with the data it receives is governed by its provider's terms and privacy policy (for Claude, Anthropic's). We do not sell this data or use it to train models.</span>
                                                                                                 </div>
                                                                                             </div>
                                                                                         </div>
