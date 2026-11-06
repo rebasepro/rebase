@@ -358,10 +358,14 @@ async function offerDotenv(env: Record<string, string>, yes: boolean): Promise<s
     return file;
 }
 
-async function connectInstance(rawArgs: string[], input: string, flags: { name?: string; org?: string; noWait: boolean; yes: boolean }): Promise<void> {
+async function connectInstance(
+    client: CloudClient,
+    controlPlane: string,
+    input: string,
+    flags: { name?: string; org?: string; noWait: boolean; yes: boolean }
+): Promise<void> {
     const origin = requireInstanceUrl(input);
     const name = flags.name?.trim() || new URL(origin).hostname;
-    const { client, url: controlPlane } = await requireClient(rawArgs);
     const organizationId = flags.org || getContextOrg(controlPlane);
 
     const linked = await linkInstance(
@@ -465,8 +469,7 @@ async function listInstances(client: CloudClient): Promise<LinkedInstance[]> {
     return res.instances.filter(isLinkedInstance);
 }
 
-async function listCommand(rawArgs: string[]): Promise<void> {
-    const { client } = await requireClient(rawArgs);
+async function listCommand(client: CloudClient): Promise<void> {
     const instances = await listInstances(client);
     emit(
         () => {
@@ -493,8 +496,7 @@ async function listCommand(rawArgs: string[]): Promise<void> {
     );
 }
 
-async function removeCommand(rawArgs: string[], ref: string, yes: boolean): Promise<void> {
-    const { client } = await requireClient(rawArgs);
+async function removeCommand(client: CloudClient, ref: string, yes: boolean): Promise<void> {
     const instances = await listInstances(client);
     const origin = normalizeInstanceUrl(ref);
     const target = instances.find(i => i.id === ref)
@@ -542,22 +544,25 @@ export async function connectCommand(rawArgs: string[]): Promise<void> {
     if ([list, remove !== undefined, input !== undefined].filter(Boolean).length > 1) {
         fail("Pass one of: an address, --list, or --remove <url-or-id>.", "Run `rebase cloud connect --help`.", "usage");
     }
-    if (list) {
-        await listCommand(rawArgs);
-        return;
-    }
-    if (remove !== undefined) {
-        await removeCommand(rawArgs, remove, yes);
-        return;
-    }
-    if (!input) {
+    if (!list && remove === undefined && !input) {
         fail(
             "Name the instance to add: `rebase cloud connect <url>`.",
             "Its public address, e.g. `rebase cloud connect your-app.com`. `--list` shows the ones already added.",
             "usage"
         );
     }
-    await connectInstance(rawArgs, input, {
+    // The line is parsed above; everything below takes the client it names.
+    const { client, url: controlPlane } = await requireClient(rawArgs);
+    if (list) {
+        await listCommand(client);
+        return;
+    }
+    if (remove !== undefined) {
+        await removeCommand(client, remove, yes);
+        return;
+    }
+    if (!input) return;
+    await connectInstance(client, controlPlane, input, {
         name: flags["--name"],
         org: flags["--org"],
         noWait: flags["--no-wait"] === true,
