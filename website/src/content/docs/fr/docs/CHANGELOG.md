@@ -22,6 +22,13 @@ La traduction est à venir. Le contenu ci-dessous est en anglais.
   IDE on a loopback port). The page now also allows the origin of the
   client's registered redirect URI.
 
+- **A backend with `csrf` configured accepts OAuth token requests again.** An
+  MCP client redeems its authorization code with a form post from its own
+  servers (`Origin: https://claude.ai`), which the CSRF check refused, so
+  connecting never finished. `/oauth/token` and `/oauth/revoke` are exempt:
+  they are authenticated by the code, the PKCE verifier and the client, never
+  a cookie. Every other route keeps the check, the consent decision included.
+
 ## [0.28.2] - 2026-11-06
 
 ### Added

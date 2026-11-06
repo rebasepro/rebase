@@ -102,9 +102,16 @@ export function configureMiddlewares(
 
     // CSRF Protection (opt-in)
     if (config.csrf?.origin) {
-        app.use(`${basePath}/*`, csrf({
-            origin: config.csrf.origin
-        }));
+        // OAuth's back-channel endpoints take a form body from a client's own
+        // server, on the client's origin (RFC 6749 §4.1.3), and are
+        // authenticated by the code, the PKCE verifier and the client, never a
+        // cookie, so there is no request a browser could be tricked into
+        // forging. The check refused every one: Claude's token exchange
+        // arrives with `Origin: https://claude.ai`, and no MCP client on a
+        // backend with CSRF on could ever finish connecting.
+        const oauthBackChannel = new Set([`${basePath}/oauth/token`, `${basePath}/oauth/revoke`]);
+        const checkOrigin = csrf({ origin: config.csrf.origin });
+        app.use(`${basePath}/*`, (c, next) => oauthBackChannel.has(c.req.path) ? next() : checkOrigin(c, next));
         logger.debug("CSRF protection enabled");
     }
 
