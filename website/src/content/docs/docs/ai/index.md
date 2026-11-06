@@ -4,18 +4,25 @@ sidebar_label: Overview
 description: What Rebase ships for AI coding assistants and autonomous agents — an MCP server, project-local agent skills, scaffolded instruction files, and the credential model that decides what an agent can actually reach.
 ---
 
-Rebase ships four separate things for AI assistants, and they solve different
-problems. It is worth knowing which one you are reaching for:
+**To use Claude with your Rebase projects, add the [Rebase connector](/docs/ai/rebase-connector/).**
+In Claude, open **Settings → Connectors → Add custom connector**, enter
+`https://app.rebase.pro/mcp`, and sign in with your Rebase account. Your Rebase
+Cloud projects are there at once; add each self-hosted server once with
+`rebase cloud connect https://your-app.com`. One connector reaches all of them.
+
+Beyond that, Rebase ships five separate things for AI assistants, and they solve
+different problems. It is worth knowing which one you are reaching for:
 
 | | What it is | Who consumes it |
 |---|---|---|
+| [**Rebase connector**](/docs/ai/rebase-connector) | One hosted MCP connector at `app.rebase.pro/mcp` for every project you run, on Rebase Cloud or self-hosted: data, schema, cron, and on Cloud deploys, env and logs | Claude on the web, desktop and mobile, as you |
 | [**MCP server**](/docs/ai/mcp) | A stdio Model Context Protocol server with 53 tools over your schema, data, users, storage, cron, dev server and Rebase Cloud project | An assistant, at runtime |
 | [**Agent skills**](/docs/ai/skills) | 23 Markdown skill files written into your repo by `rebase skills install` | An assistant, as reference material |
 | [**Instruction files**](/docs/ai/instruction-files) | `ai-instructions.md` plus per-assistant pointer files, written by `rebase init` | An assistant, as always-on rules |
 | [**API keys**](/docs/backend/api-keys) | Machine credentials holding [scopes](/docs/backend/roles-and-scopes), per collection and per operation | Anything calling the HTTP API |
 
-The first three are about giving an assistant *knowledge* and *tools*. The
-fourth is the only one that decides what it may actually do.
+The first four are about giving an assistant *knowledge* and *tools*. The
+fifth is the only one that decides what it may actually do.
 
 ## The part that matters: what an agent may touch
 
@@ -92,6 +99,7 @@ mechanism and the two do not interact.
 
 ## Where to go next
 
+- [Rebase connector](/docs/ai/rebase-connector) — Claude, connected to every project you run
 - [MCP Server](/docs/ai/mcp) — connect Claude Code, Cursor or any MCP client
 - [Agent Skills](/docs/ai/skills) — `rebase skills install` and the 23 skills
 - [AI Instruction Files](/docs/ai/instruction-files) — the scaffolded rules pattern

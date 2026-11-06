@@ -50025,18 +50025,25 @@ await client.storage.getSignedUrl("products/image.jpg");
 
 ## AI & Agents
 
-Rebase ships four separate things for AI assistants, and they solve different
-problems. It is worth knowing which one you are reaching for:
+**To use Claude with your Rebase projects, add the [Rebase connector](/docs/ai/rebase-connector/).**
+In Claude, open **Settings → Connectors → Add custom connector**, enter
+`https://app.rebase.pro/mcp`, and sign in with your Rebase account. Your Rebase
+Cloud projects are there at once; add each self-hosted server once with
+`rebase cloud connect https://your-app.com`. One connector reaches all of them.
+
+Beyond that, Rebase ships five separate things for AI assistants, and they solve
+different problems. It is worth knowing which one you are reaching for:
 
 | | What it is | Who consumes it |
 |---|---|---|
+| [**Rebase connector**](/docs/ai/rebase-connector) | One hosted MCP connector at `app.rebase.pro/mcp` for every project you run, on Rebase Cloud or self-hosted: data, schema, cron, and on Cloud deploys, env and logs | Claude on the web, desktop and mobile, as you |
 | [**MCP server**](/docs/ai/mcp) | A stdio Model Context Protocol server with 53 tools over your schema, data, users, storage, cron, dev server and Rebase Cloud project | An assistant, at runtime |
 | [**Agent skills**](/docs/ai/skills) | 23 Markdown skill files written into your repo by `rebase skills install` | An assistant, as reference material |
 | [**Instruction files**](/docs/ai/instruction-files) | `ai-instructions.md` plus per-assistant pointer files, written by `rebase init` | An assistant, as always-on rules |
 | [**API keys**](/docs/backend/api-keys) | Machine credentials holding [scopes](/docs/backend/roles-and-scopes), per collection and per operation | Anything calling the HTTP API |
 
-The first three are about giving an assistant *knowledge* and *tools*. The
-fourth is the only one that decides what it may actually do.
+The first four are about giving an assistant *knowledge* and *tools*. The
+fifth is the only one that decides what it may actually do.
 
 ### The part that matters: what an agent may touch
 
@@ -50113,6 +50120,7 @@ mechanism and the two do not interact.
 
 ### Where to go next
 
+- [Rebase connector](/docs/ai/rebase-connector) — Claude, connected to every project you run
 - [MCP Server](/docs/ai/mcp) — connect Claude Code, Cursor or any MCP client
 - [Agent Skills](/docs/ai/skills) — `rebase skills install` and the 23 skills
 - [AI Instruction Files](/docs/ai/instruction-files) — the scaffolded rules pattern
@@ -50133,6 +50141,13 @@ shows you the config block.
 A deployed backend can also serve MCP itself, over HTTP, to the people who use
 your application. That is a different thing with a different credential model:
 see [The Remote MCP Endpoint](/docs/ai/remote-mcp/).
+
+:::tip[Using Claude on the web, desktop or mobile?]
+Add the [Rebase connector](/docs/ai/rebase-connector/) instead:
+`https://app.rebase.pro/mcp`, once, for every project you run on Rebase Cloud
+or on your own servers. This page is the local server a coding assistant starts
+inside a project.
+:::
 
 ### Connecting a client
 
@@ -50832,6 +50847,12 @@ refuses it in a directory that is already linked.
 
 ## The Remote MCP Endpoint
 
+:::tip[Connecting Claude to your own projects?]
+That is the [Rebase connector](/docs/ai/rebase-connector/): one connector for
+all of them, and a self-hosted server joins it with `rebase cloud connect`. This
+page is for the people who **use** your app.
+:::
+
 The [MCP server](/docs/ai/mcp/) is a developer tool: it runs on your machine and holds a service
 key or an API key. A deployed backend can also serve MCP itself, at `/mcp`, for
 the people who use your application. An assistant one of them connects reads and
@@ -50925,13 +50946,13 @@ already issued keeps working until it expires, within the hour.
 The routes are in [Endpoints](/docs/backend/endpoints/#mcp-surface) and the
 variables in [Configuration](/docs/getting-started/configuration/#mcp-surface).
 
-## Connect Claude to Rebase Cloud
+## Connect Claude to Rebase
 
-The Rebase connector is one MCP server for everything you run on Rebase Cloud.
-You add it once in Claude, sign in with your Rebase account, and Claude can see
-your projects, read their logs, deploy and roll them back, set their
-environment variables, and read and change their data. It works in Claude on
-the web, the desktop app and mobile.
+The Rebase connector is one MCP server for every Rebase project you run: on
+Rebase Cloud, and on your own servers. You add it once in Claude, sign in with
+your Rebase account, and Claude can see your projects, read their logs, deploy
+and roll them back, set their environment variables, and read and change their
+data. It works in Claude on the web, the desktop app and mobile.
 
 It acts as **you**, with the access your account has in the console: the
 projects of the organizations you belong to, the role you hold in each, and the
@@ -50949,6 +50970,47 @@ Claude opens the Rebase consent screen. If you are signed in to the console in
 the same browser, it offers that account: press **Allow**. Otherwise sign in
 there. The screen lists what you are granting; you can connect again later to
 grant less.
+
+Your Rebase Cloud projects are there already. That is the whole setup for them.
+
+### Add your self-hosted instances
+
+Run this once for each server you host yourself:
+
+```bash
+rebase cloud connect https://admin.example.com
+```
+
+It adds the instance to your Rebase account and prints two variables. Set them
+on that server and restart it; the command waits until the server answers, then
+says it is connected. Inside the project's folder it offers to write them to
+`.env` for you.
+
+```bash
+REBASE_PLATFORM_TOKEN_KEY=…
+REBASE_PLATFORM_TOKEN_AUDIENCE=linked:…
+```
+
+From then on Claude lists the instance beside your Cloud projects, and you name
+it the same way: "show me the orders on admin.example.com". On a self-hosted
+instance the connector reads and changes data, reads its schema and runs its
+cron jobs. Deploys, environment variables and logs stay on your own server.
+
+- **The server needs Rebase 0.28.1 or later**, reachable over https at a public
+  address. Rebase Cloud calls it, so a server only on a private network cannot
+  be connected.
+- **The variables hold no secret.** The key is Rebase Cloud's public key; the
+  audience names this instance. With them the server accepts short-lived
+  tokens Rebase Cloud signs for this instance only, and grants them at most
+  what Studio would: data, under its row-level security, and cron.
+- **Calls go through Rebase Cloud.** Claude talks to the connector, and the
+  connector to your server. A server you never connect keeps its own
+  [remote MCP endpoint](/docs/ai/remote-mcp/), with nothing in between.
+- **To disconnect one**, run `rebase cloud connect --remove https://admin.example.com`,
+  or remove the two variables from the server.
+
+Adding an instance needs the organization's owner or admin role, like reaching
+a project's data does. `rebase cloud connect --list` shows the ones you added.
 
 ### What Claude can do with it
 
@@ -50999,7 +51061,7 @@ conversation.
   variables.
 - **Data, schemas and cron jobs**: what Studio in the console allows you. That
   is an owner or admin of the organization, on a project whose Studio access is
-  switched on. Calls run inside the project, under its row-level security, with
+  switched on, or on a self-hosted instance the organization connected. Calls run inside the project, under its row-level security, with
   the admin role Studio has. Turning Studio access off for a project turns this
   off too.
 - **What you granted.** You can grant the connector less than your account
@@ -51016,7 +51078,7 @@ Remove the connector in Claude's settings. Its access token stops working
 within the hour. Deleting your Rebase account, or signing out everywhere, stops
 it at the next call.
 
-The connector is for the people who build on Rebase Cloud. To let the people
+The connector is for the people who build on Rebase. To let the people
 who **use** your app connect Claude to it as themselves, serve the
 [remote MCP endpoint](/docs/ai/remote-mcp/) from your own backend.
 
@@ -52299,6 +52361,21 @@ rebase cloud unlink       # remove the link
 rebase cloud use [org]    # select the active organization
 rebase cloud open         # open the dashboard in a browser
 ```
+
+#### Connect a self-hosted instance to Claude
+
+```bash
+rebase cloud connect https://your-app.com      # add it to your account; prints two variables, waits until it answers
+rebase cloud connect --list                    # the instances you added, and whether each is connected
+rebase cloud connect --remove https://your-app.com
+```
+
+The [Rebase connector](/docs/ai/rebase-connector/) (`https://app.rebase.pro/mcp`)
+then reaches it beside your Cloud projects. `connect` prints
+`REBASE_PLATFORM_TOKEN_KEY` and `REBASE_PLATFORM_TOKEN_AUDIENCE`; set them on
+the server and restart it. In the project's folder it offers to write them to
+`.env`. Rerunning it is safe. `--name` names the instance, `--org` picks the
+organization, `--no-wait` returns without waiting. Owners and admins.
 
 ### Projects
 
@@ -55522,6 +55599,7 @@ except one that restarts the database, which waits for a maintenance window.
 | `login`, `logout`, `whoami`, `access-token` | Your session; `access-token` prints the bearer the CLI would send now, for scripts and the MCP server |
 | `tokens` | Tokens for CI and agents, each narrowed to one project. See [CI and agents](/docs/deployment/cloud-agents/#ci-and-agents) |
 | `link`, `unlink`, `use`, `open` | Binding this directory to a project, selecting an organization, opening the console |
+| `connect` | Adding a self-hosted Rebase server to your account, so the [Rebase connector](/docs/ai/rebase-connector/#add-your-self-hosted-instances) in Claude reaches it beside your Cloud projects. `--list` shows them, `--remove` takes one out. Owners and admins |
 | `init`, `claim` | With `--claim`: a live backend with no account, and a link to claim it; `claim` prints that link again. See [A backend with no account](/docs/deployment/cloud-agents/#a-backend-with-no-account) |
 | `projects` | Create, list, inspect, delete |
 | `deploy`, `logs`, `deployments`, `rollback`, `cancel` | Shipping and watching |
@@ -56817,6 +56895,19 @@ takes traffic — or a rolling deploy runs two side by side — go through
 [Running more than one instance](/docs/deployment/multiple-instances/): rate
 limits, broadcast channels, local files, resumable uploads and the image cache
 are per process until a setting shares them.
+
+### Connecting Claude
+
+One command adds this server to the [Rebase connector](/docs/ai/rebase-connector/),
+the single MCP connector that reaches all your projects from Claude:
+
+```bash
+rebase cloud connect https://your-app.com
+```
+
+Set the two variables it prints on this server and restart it. The server must
+run Rebase 0.28.1 or later and answer over https at a public address. Nothing
+else changes: it holds no secret, and it grants the connector what Studio would.
 
 ### Running functions in their own process
 

@@ -1,6 +1,6 @@
 ---
 name: rebase-cloud
-description: Guide for deploying and operating a project on Rebase Cloud — creating a project, attaching a managed or bring-your-own database, environment variables, extensions, domains, logs and rollbacks. Use this when the user wants to ship to Rebase Cloud, or is debugging a cloud deployment. For self-hosting, Docker or Kubernetes, use rebase-deployment instead.
+description: Guide for deploying and operating a project on Rebase Cloud — creating a project, attaching a managed or bring-your-own database, environment variables, extensions, domains, logs and rollbacks — and for connecting Claude to every Rebase project, Cloud or self-hosted, through the Rebase connector (`rebase cloud connect`). Use this when the user wants to ship to Rebase Cloud, is debugging a cloud deployment, or wants Claude connected to their projects. For self-hosting, Docker or Kubernetes, use rebase-deployment instead.
 ---
 
 # Rebase Cloud
@@ -605,6 +605,30 @@ rebase cloud tokens create --project shop --can deploy,logs --expires-in 90
 - `token_rejected` means the token expired, was revoked, or is for another
   control plane. Create a new one; do not fall back to a password.
 
+## Connecting Claude to every project
+
+One hosted MCP connector reaches all of the user's projects: `https://app.rebase.pro/mcp`.
+
+1. In Claude: **Settings → Connectors → Add custom connector**, that URL, sign in
+   with the Rebase account. Every Cloud project of their organizations is there.
+2. For each **self-hosted** server, once:
+
+   ```bash
+   rebase cloud connect https://their-app.com
+   ```
+
+   It adds the server to the account and prints `REBASE_PLATFORM_TOKEN_KEY` and
+   `REBASE_PLATFORM_TOKEN_AUDIENCE`. They go on **that server** (in its folder the
+   command offers to write them to `.env`); after a restart the command sees it
+   answer and prints `Connected`. Rerunning it is safe and reports the state.
+
+Then Claude names any of them by name or host. On a self-hosted instance the
+connector reads and changes data, reads the schema and runs cron jobs; deploys,
+env vars and logs are Cloud-only and it says so. The server needs Rebase 0.28.1
+or later at a public https address; adding one needs the organization's owner or
+admin role. `rebase cloud connect --list` shows them, `--remove <url>` takes one
+out.
+
 ## Command reference
 
 | Command | What it does |
@@ -613,6 +637,7 @@ rebase cloud tokens create --project shop --can deploy,logs --expires-in 90
 | `rebase cloud tokens list` / `create --can …` / `revoke <id>` | Tokens for CI and agents (`REBASE_TOKEN`) |
 | `rebase cloud use` | Select the active organization |
 | `rebase cloud link` / `unlink` / `open` | Link this directory to a project |
+| `rebase cloud connect <url>` / `--list` / `--remove <url>` | Add a self-hosted server to the Rebase connector in Claude |
 | `rebase cloud init --claim` | A live backend with no account, and a link to claim it within 72 hours |
 | `rebase cloud claim` | That link again, and how long is left |
 | `rebase cloud projects list` / `create` / `info` / `delete` | Projects |
@@ -653,7 +678,8 @@ Global flags on every one of them: `--project, -p <slug>`, `--json`,
 **Never run a command that changes the hosted platform unless the user asked in
 the current conversation.** That includes `deploy`, `projects create`,
 `projects delete`, `db create`, `env set`, `domains add`, `rollback`, `stop`,
-`restart`, `compute set`, `extensions enable` and `tokens create` / `tokens revoke`.
+`restart`, `compute set`, `extensions enable`, `tokens create` / `tokens revoke`
+and `connect` / `connect --remove`.
 
 **Never pass these to get past an error:**
 
@@ -668,7 +694,7 @@ the current conversation.** That includes `deploy`, `projects create`,
 
 **Safe to run unasked:** `status`, `logs`, `deployments list`, `env list`,
 `resources`, `compute`, `metrics`, `debug`, `db info`, `domains list`, `extensions list`,
-and any `--help`.
+`connect --list`, and any `--help`.
 
 ---
 

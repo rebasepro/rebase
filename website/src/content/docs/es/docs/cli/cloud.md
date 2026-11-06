@@ -1,21 +1,21 @@
 ---
-sourceHash: 279e0eca02e1be02
+sourceHash: 784025478be49fb3
 title: rebase cloud
 sidebar_label: rebase cloud
-description: Los grupos de comandos para Rebase Cloud en la CLI — autenticación, enlace de proyectos, despliegues, notificaciones, configuración, organizaciones, bases de datos, recursos, cómputo, almacenamiento, clústeres, facturación y uso.
+description: Los grupos de comandos para Rebase Cloud en la CLI — autenticación, vinculación de proyectos, despliegues, notificaciones, configuración, organizaciones, bases de datos, recursos, cómputo, almacenamiento, clústeres, facturación y uso.
 ---
 
-Todo lo relacionado con Rebase Cloud, que está en fase beta privada. Consulta la
+Todo lo relacionado con Rebase Cloud, que se encuentra en beta privada. Consulta la
 [guía de Rebase Cloud](/docs/deployment/cloud/) para saber qué es y qué no
-incluye la versión beta.
+incluye la beta.
 
 Cada grupo responde a `--help`, y `--help` nunca ejecuta el comando. La mayoría de los comandos
 actúan sobre el proyecto vinculado en `.rebase/cloud.json`; `--project <id>` opera sobre
-uno sin necesidad de vincularlo.
+uno sin vincularlo.
 
-Se aplican tres opciones en todas partes: `--json` para salida legible por máquina (también
-la predeterminada cuando se usa una tubería, excepto para `deploy`, o con `REBASE_JSON=1`), `--url <origin>` para apuntar a un
-plano de control específico (o `REBASE_CLOUD_URL`), y `--project, -p <id>`.
+Tres opciones se aplican en todas partes: `--json` para salida legible por máquina (también
+el valor predeterminado al usar tuberías (pipes), excepto para `deploy`, o con `REBASE_JSON=1`), `--url <origin>` para apuntar a
+un plano de control específico (o `REBASE_CLOUD_URL`), y `--project, -p <id>`.
 
 ## Auth
 
@@ -31,17 +31,17 @@ rebase cloud tokens create --can billing --org <id>   # a token for an organizat
 
 `--can` acepta `deploy`, `logs`, `env`, `database` y `backups` en un proyecto
 (`--project`, o el vinculado), y `billing`, `audit` y
-`notifications` en una organización: `--org`, o en su defecto la organización del proyecto,
-o la seleccionada. Un token puede contener únicamente capacidades a nivel de organización.
-`logs` también cubre `usage`. Lo que abarca cada una se encuentra en
-[CI and agents](/docs/deployment/cloud-agents/#ci-and-agents). Cuando el plano de
+`notifications` en una organización: `--org`, de lo contrario la organización del proyecto,
+o si no la seleccionada. Un token puede contener únicamente permisos de organización.
+`logs` también abarca `usage`. El alcance de cada uno se describe en
+[CI y agentes](/docs/deployment/cloud-agents/#ci-and-agents). Cuando el plano de
 control marca una respuesta a un token como obsoleta (un token anterior a `billing`
-que lee la facturación), la CLI imprime el aviso una vez en stderr, nunca en el
+que lee facturación), la CLI muestra el aviso una vez en stderr, nunca en el
 valor de `--json`.
 
 En una terminal sin contraseña proporcionada, `login` pregunta si deseas usar tu contraseña
 o un código que el plano de control te envía por correo electrónico. Con la autenticación de dos factores activada,
-luego solicita el código del autenticador (o un código de recuperación). Sin una terminal
+luego solicita tu código de autenticador (o un código de recuperación). Sin una terminal
 no se puede escribir ninguno: establece `REBASE_TOKEN` con un token de acceso creado en la consola
 en Settings → Access tokens. Consulta [Rebase Cloud](/docs/deployment/cloud#link-a-project).
 
@@ -55,6 +55,21 @@ rebase cloud use [org]    # select the active organization
 rebase cloud open         # open the dashboard in a browser
 ```
 
+### Conectar una instancia autoalojada a Claude
+
+```bash
+rebase cloud connect https://your-app.com      # add it to your account; prints two variables, waits until it answers
+rebase cloud connect --list                    # the instances you added, and whether each is connected
+rebase cloud connect --remove https://your-app.com
+```
+
+El [conector de Rebase](/docs/ai/rebase-connector/) (`https://app.rebase.pro/mcp`)
+entonces se comunica con ella junto a tus proyectos de Cloud. `connect` imprime
+`REBASE_PLATFORM_TOKEN_KEY` y `REBASE_PLATFORM_TOKEN_AUDIENCE`; configúralos en
+el servidor y reinícialo. En la carpeta del proyecto, ofrece escribirlos en
+`.env`. Volver a ejecutarlo es seguro. `--name` nombra la instancia, `--org` elige la
+organización, `--no-wait` regresa sin esperar. Propietarios y administradores.
+
 ## Projects
 
 ```bash
@@ -67,17 +82,17 @@ rebase cloud projects info [id]
 rebase cloud projects delete [id]
 ```
 
-`claim` imprime el enlace de reclamo del proyecto que `init --claim` aprovisionó en este
-directorio y el tiempo restante antes de que se elimine sin reclamar (`Unclaimed: deleted
+`claim` imprime el enlace de reclamación del proyecto que `init --claim` aprovisionó en este
+directorio, y el tiempo restante antes de que se elimine sin reclamar (`Unclaimed: deleted
 in 41h`). `--open` también lo abre en un navegador. El enlace se guarda únicamente en la
 máquina que ejecutó `init --claim`, en `~/.rebase/credentials.json`; el plano de
 control almacena un hash del mismo y no puede volver a imprimirlo. Antes de responder, `claim`
-consulta al plano de control si el propio token del proyecto sigue funcionando. Un reclamo
+pregunta al plano de control si el token propio del proyecto todavía funciona. Una reclamación
 revoca ese token, por lo que una vez que alguien ha reclamado el proyecto, `claim` rechaza
-la solicitud con `already_claimed` en lugar de imprimir un enlace inactivo. También la rechaza una vez transcurrido
-el plazo (`claim_expired`), y en un directorio sin enlace de reclamo
+la operación con `already_claimed` en lugar de imprimir un enlace inactivo. También la rechaza una vez
+que la ventana ha finalizado (`claim_expired`), y en un directorio sin enlace de reclamación
 (`no_claim_link`). `rebase cloud status` y `rebase cloud whoami` muestran el mismo
-enlace mientras el proyecto no haya sido reclamado.
+enlace mientras el proyecto permanezca sin reclamar.
 
 ## Deploy and observe
 
@@ -95,47 +110,47 @@ rebase cloud metrics                     # live CPU / memory / disk, realtime pe
 rebase cloud debug [health|logs|…]       # diagnose a deployment, read-only
 ```
 
-`deploy` sin el nombre de una app despliega el backend. El despliegue de un bundle
-de backend también sube el código fuente del proyecto —lo que rastrea git, nunca un `.env`— para
-que una actualización de la plataforma pueda reconstruirlo; `--no-source` omite esto en una ocasión, y `cloud settings set
---platform-rebuilds off` lo desactiva y elimina la copia almacenada. `--allow-downgrade` despliega una versión anterior.
+`deploy` sin nombre de aplicación despliega el backend. Un despliegue de paquete
+de backend también sube el código fuente del proyecto —lo que git rastrea, nunca un `.env`— para que una
+actualización de la plataforma pueda reconstruirlo; `--no-source` omite eso una vez, y `cloud settings set
+--platform-rebuilds off` lo detiene y elimina la copia almacenada. `--allow-downgrade` despliega una versión anterior.
 
-Un `deploy` con seguimiento finaliza con un resumen: cada app entregada junto con su URL, el
-id del despliegue, cuánto tardó y si la nueva versión responde allí.
-Espera hasta `--live-timeout` segundos (por defecto 60; `0` omite la comprobación) a que
-el `/health` del backend y la dirección de cada app estática respondan. Un despliegue fallido
-termina con una línea que indica la app y el motivo, y sale con un código distinto de cero. El resumen
-se imprime incluso si se redirige mediante una tubería; `--json` (o `REBASE_JSON=1`) imprime un objeto en su lugar,
+Un `deploy` seguido finaliza con un resumen: cada aplicación que se distribuyó con su URL, el
+id del despliegue, cuánto tiempo tomó y si la nueva versión responde allí.
+Espera hasta `--live-timeout` segundos (por defecto 60; `0` omite la comprobación) para que el
+`/health` de un backend y la dirección de cada aplicación estática respondan. Un despliegue fallido
+termina en una sola línea indicando la aplicación y el motivo, y finaliza con un código distinto de cero. El resumen
+se imprime incluso cuando se usa una tubería (pipe); `--json` (o `REBASE_JSON=1`) imprime un objeto en su lugar,
 con `apps`, `hosts`, `live`, `liveChecks` y `durationMs`.
 
-Antes de subir los archivos, `deploy` analiza el JavaScript de cada app estática que entrega:
-los archivos `.js`/`.mjs`/`.cjs` en su `output` y los bloques `<script>` en línea en
+Antes de subir, `deploy` analiza el JavaScript de cada aplicación estática que envía:
+los archivos `.js`/`.mjs`/`.cjs` en su `output` y los bloques inline `<script>` en
 su HTML. Un error de sintaxis detiene el despliegue con `file:line:column` (código
-`syntax_error` con `--json`), y `--no-verify` omite la comprobación. Un despliegue
-exitoso finaliza indicando la vía de reversión, `rebase cloud rollback`. Una app estática desplegada
-por sí sola aún no se puede revertir; consulta
+`syntax_error` bajo `--json`), y `--no-verify` omite la comprobación. Un despliegue
+exitoso termina indicando la forma de volver atrás, `rebase cloud rollback`. Una aplicación estática desplegada por
+sí sola aún no se puede revertir; consulta
 [Roll back](/docs/deployment/cloud#roll-back).
 
 `--preview` sirve la compilación en `https://<project>--<name>.rebase.website` y
-no modifica producción. Una vista previa del backend ejecuta su propio backend, en una
-base de datos propia vacía, con sus apps estáticas integradas. Aún no se puede
-previsualizar una app estática por sí sola en Rebase Cloud: `rebase cloud deploy <app> --preview`
+no altera producción. Una vista previa (preview) del backend ejecuta su propio backend, en una
+base de datos vacía propia, con sus aplicaciones estáticas integradas. Una aplicación estática no puede
+previsualizarse por sí sola en Rebase Cloud todavía: `rebase cloud deploy <app> --preview`
 se rechaza con `PREVIEW_STATIC_UNSERVED` y no publica nada. Una vista previa
-de backend se factura como una unidad de app adicional al tamaño por defecto mientras exista, y
-el despliegue indica a cuánto asciende al mes según la cotización del propio plano de control
-(`cost` con `--json`; solo la regla y este enlace cuando el plano de control no puede
+de backend se factura como una unidad de aplicación adicional en el tamaño predeterminado mientras exista, y
+el despliegue indica a cuánto equivale por mes, según la cotización del propio plano de control
+(`cost` bajo `--json`; solo la regla y este enlace cuando el plano de control no puede
 calcular el precio); `rebase cloud previews delete <name>` la detiene. `rebase cloud previews`
-muestra una vista previa que la plataforma pausó (su base de datos superó el límite de vista previa) como
-`paused`, con el motivo (`statusMessage` con `--json`). Una nueva dirección de vista previa
-puede ser rechazada con `preview_cert_budget` cuando se agota el presupuesto semanal de certificados
-de vista previa de la plataforma; el mensaje indica hasta cuándo.
-Consulta [Preview a change](/docs/deployment/cloud/#preview-a-change).
+muestra una vista previa que la plataforma pausó (su base de datos creció más allá del límite de preview) como
+`paused`, con el motivo (`statusMessage` bajo `--json`). Una nueva dirección de vista previa
+puede ser rechazada con `preview_cert_budget` cuando se agota el presupuesto semanal de certificados de vista
+previa de la plataforma; el mensaje indica hasta cuándo.
+Consulta [Previsualizar un cambio](/docs/deployment/cloud/#preview-a-change).
 
 ### Logs
 
-`rebase cloud logs` imprime el log de compilación más reciente, y `-f` sigue en tiempo real una compilación que
-aún se está ejecutando. `--runtime` lee lo que imprime la app en su lugar, desde cada pod
-detrás de ella, con cada línea etiquetada con su pod:
+`rebase cloud logs` imprime el registro de compilación más reciente, y `-f` sigue en tiempo real una compilación que
+todavía se está ejecutando. `--runtime` lee lo que la aplicación imprime en su lugar, desde cada pod
+detrás de ella, cada línea etiquetada con su pod:
 
 ```bash
 rebase cloud logs --runtime -f                    # follow until Ctrl-C (exits 0)
@@ -144,26 +159,26 @@ rebase cloud logs --runtime -f --level error      # errors only
 rebase cloud logs --runtime --previous            # a restarted container's last run
 ```
 
-- `--since` acepta una duración (`30s`, `5m`, `1h`) o una marca temporal RFC3339.
-- `--tail <n>` es el número de líneas por pod desde el cual comenzar (el plano de control lo limita a 2000).
-- `--grep` conserva las líneas que contienen el texto, sin distinguir mayúsculas de minúsculas; escribe `/re/flags` para
-  una expresión regular.
-- `--level error|warn|info|debug` conserva las líneas con esa severidad o peor. Lee
+- `--since` acepta una duración (`30s`, `5m`, `1h`) o una hora en formato RFC3339.
+- `--tail <n>` es la cantidad de líneas por pod desde donde comenzar (el plano de control lo limita a 2000).
+- `--grep` conserva las líneas que contienen el texto, sin distinguir mayúsculas de minúsculas; escribe `/re/flags` para una
+  expresión regular.
+- `--level error|warn|info|debug` conserva las líneas en esa severidad o peor. Lee
   la `severity` estructurada que registra un backend de Rebase, una palabra de nivel al inicio de una
-  línea simple o un formato de error como `TypeError:`. Las líneas sin ninguno de estos se omiten.
+  línea simple, o una estructura de error como `TypeError:`. Las líneas sin ninguna de estas se omiten.
 
-Un seguimiento (`follow`) sondea cada dos segundos e imprime cada línea una vez. Anuncia los pods
-que se inician, detienen o reinician. Cuando un contenedor se reinicia, también imprime las últimas
-líneas de la instancia que terminó, donde suele encontrarse la causa. Espera mientras no haya ningún
-pod en ejecución y, tras una desconexión, reintenta con retroceso exponencial (backoff) y
-reanuda desde donde lo dejó. Con `--json`, el seguimiento imprime un objeto JSON por
-línea (NDJSON): `{"type":"line","ts","pod","text"}` para cada línea de log y
+Un seguimiento continuo (follow) sondea cada dos segundos e imprime cada línea una vez. Anuncia pods
+que se inician, se detienen o se reinician. Cuando un contenedor se reinicia, también imprime las últimas
+líneas de la instancia que falló, donde habitualmente se encuentra el motivo. Espera mientras no haya ningún
+pod en ejecución, y tras una pérdida de conexión reintenta con retroceso progresivo (backoff) y
+reanuda donde se quedó. Con `--json`, el seguimiento imprime un objeto JSON por
+línea (NDJSON): `{"type":"line","ts","pod","text"}` para cada línea de registro, y
 `{"type":"event","event":…}` para el resto.
 
-`--preview <name>` lee una vista previa en lugar de producción. Usa el nombre de la vista
-previa o el id de despliegue que imprimió el despliegue de preview. Por sí solo, `--preview`
-lee la única vista previa del proyecto. Una vista previa estática tiene log de compilación pero no
-log de tiempo de ejecución (runtime), ya que no ejecuta ningún servidor.
+`--preview <name>` lee una vista previa en lugar de producción. Usa el nombre
+de la vista previa, o el id de despliegue que imprimió un despliegue de preview. Por sí solo, `--preview`
+lee la única vista previa del proyecto. Una vista previa estática tiene un registro de compilación pero no
+un registro de tiempo de ejecución (runtime), porque no ejecuta ningún servidor.
 
 ## Config
 
@@ -176,29 +191,29 @@ rebase cloud app-key [rotate]           # the app key init --claim wrote; owners
 rebase cloud service-key [rotate]       # REBASE_SERVICE_KEY; owners and admins
 ```
 
-`app-key` lista la
-clave que `rebase cloud init --claim` generó en la app y escribió en `.env` como
+`app-key` enumera la
+clave que `rebase cloud init --claim` generó en la aplicación y escribió en `.env` como
 `REBASE_API_TOKEN`, mediante su prefijo y nunca su valor. Reclamar el proyecto
-transfiere esa clave y deja de caducar. `app-key rotate` genera una nueva y
-revoca todas las claves de agente anteriores a la vez. Escribe la nueva clave en un `.env`
+transfiere esa clave y deja de expirar. `app-key rotate` genera una nueva y
+revoca todas las claves de agente anteriores al mismo tiempo. Escribe la nueva clave en un `.env`
 que ya defina `REBASE_API_TOKEN`, y la excluye de `--json` en ese caso. En
-cualquier otro directorio, imprime la clave una vez. Las claves creadas en el panel de administración de la app
-no se modifican. Se ejecuta con tu sesión de inicio: ninguna capacidad de token la otorga.
+cualquier otro directorio, imprime la clave una sola vez. Las claves creadas en el panel de administración de la aplicación
+no se modifican. Se ejecuta con tu inicio de sesión: ningún permiso de token la otorga.
 
 `service-key`
-imprime la generación del `REBASE_SERVICE_KEY` del proyecto, cuándo se rotó por última
-vez y si la app aún se está reiniciando con la más reciente. Nunca
-imprime la clave: para eso está `env reveal REBASE_SERVICE_KEY`. `service-key rotate`
-emite una nueva clave y reinicia la app con ella. La clave antigua funciona hasta que el
-reinicio finalice, y nada después. Se rechaza mientras haya un despliegue en
-curso, y se ejecuta con tu sesión. Reclamar un proyecto también rota su service
-key.
+imprime la generación de `REBASE_SERVICE_KEY` del proyecto, cuándo se rotó por última vez
+y si la aplicación todavía se está reiniciando con la más reciente. Nunca
+imprime la clave: eso corresponde a `env reveal REBASE_SERVICE_KEY`. `service-key rotate`
+emite una nueva clave y reinicia la aplicación utilizándola. La clave anterior funciona hasta que
+el reinicio haya finalizado, y nada después. Se rechaza mientras un despliegue esté
+en ejecución, y se ejecuta con tu inicio de sesión. Reclamar un proyecto también rota su clave
+de servicio.
 
-Una vista previa de backend parte de las variables de producción, claves activas incluidas.
-`env set KEY=VALUE --preview` asigna a las vistas previas su propio valor, `env unset KEY
+Una vista previa de backend comienza a partir de las variables de producción, claves activas incluidas.
+`env set KEY=VALUE --preview` da a las vistas previas su propio valor, `env unset KEY
 --preview` excluye la variable de ellas, `env reset KEY --preview` restablece
-el valor de producción y `env list --preview` muestra las diferencias.
-Ninguno de ellos modifica jamás la producción.
+el valor de producción, y `env list --preview` muestra las diferencias.
+Producción nunca se modifica con ninguno de ellos.
 
 `env set KEY --stdin` lee el valor desde la entrada estándar en lugar de la
 línea de comandos, donde `ps` y el historial de tu shell lo mostrarían:
@@ -208,8 +223,8 @@ read -rs STRIPE_KEY   # paste the value; nothing is echoed
 printf %s "$STRIPE_KEY" | rebase cloud env set STRIPE_KEY --stdin --secret
 ```
 
-Se descarta un salto de línea final. `rebase_cloud_env_set` del servidor MCP establece
-los valores de esta manera.
+Se descarta un salto de línea final. El método `rebase_cloud_env_set` del servidor MCP establece
+valores de esta manera.
 
 ## Organizations
 
@@ -221,31 +236,31 @@ rebase cloud activity [--project <id|slug>] [--action <area|action>] [--actor <e
 ```
 
 `members invite` crea una invitación e imprime su enlace: de un solo uso,
-válido por 7 días, aceptado solo por una cuenta que haya verificado esa dirección.
-Nadie se une hasta que la acepte, incluso alguien que ya tenga una cuenta de Rebase.
+válido por 7 días, aceptado únicamente por una cuenta que haya verificado esa dirección.
+Nadie se une hasta que acepte, incluso alguien que ya tenga una cuenta de Rebase.
 La salida (y `emailDelivery` en `--json`) indica si se envió por correo; cuando
-no fue así, una advertencia indica que debes enviar el enlace tú mismo. `--role` es `admin` o
-`member` (por defecto). A nadie se le invita como `owner`: invítalo como administrador, y
-un propietario lo promocionará con `members role <email> owner` una vez que se haya unido.
+no fue así, una advertencia indica que envíes el enlace tú mismo. `--role` es `admin` o
+`member` (por defecto). Nadie es invitado como `owner`: invítalos como admin, y
+un propietario los ascenderá con `members role <email> owner` una vez que se hayan unido.
 `invites resend` genera un nuevo enlace y el anterior deja de funcionar.
-Invitar y usar `invites` requieren una sesión de `rebase cloud login`; se
-rechaza `REBASE_TOKEN`. Invitar, listar, reenviar y revocar requieren el rol de
-owner o admin; a un miembro se le notificará esto.
-`members remove` pide confirmación previa (`--yes` la omite); eliminar o degradar a un owner
-requiere ser owner, y el último owner permanece. `--org <id>` selecciona una organización
-distinta a la seleccionada.
+Invitar y usar `invites` requieren una sesión de `rebase cloud login`; `REBASE_TOKEN` se
+rechaza. Invitar, listar, reenviar y revocar requieren el rol de propietario o administrador;
+a un miembro se le notificará esto.
+`members remove` pide confirmación previa (`--yes` la omite); eliminar o degradar a un propietario
+requiere ser propietario, y el último propietario permanece. `--org <id>` selecciona una organización
+distinta de la seleccionada.
 
-`activity` es el registro de auditoría de la organización seleccionada, con los eventos más recientes primero: quién
+`activity` es el registro de auditoría de la organización seleccionada, del más reciente al más antiguo: quién
 desplegó, revirtió, definió, eliminó o reveló una variable de entorno (por
-nombre, nunca por valor), cambió un dominio, creó, restauró o descargó una
-copia de seguridad, cambió el cómputo de un proyecto, detuvo o eliminó un proyecto, cambió el
-rol de un miembro, o creó o revocó un token de acceso. `--action` acepta un área
+nombre, nunca por valor), modificó un dominio, creó, restauró o descargó una
+copia de seguridad, modificó el cómputo de un proyecto, detuvo o eliminó un proyecto, cambió el
+rol de un miembro, o creó o revocó un token de acceso. `--action` toma un área
 (`deploy`, `deploy_hook`, `env`, `domain`, `backup`, `pitr`, `database`,
 `extension`, `storage`, `project`, `org`, `member`, `invite`, `token`) o una acción completa
 como `env.set`. Una página contiene hasta 100 entradas (`--limit`, por defecto 50); la
-salida imprime el cursor `--before` para la siguiente página. `--json` es un valor único,
-`{ org, events, nextCursor }`. Requiere el rol de owner o admin de la organización.
-Un token solo lo lee con la capacidad `audit` en la organización
+salida imprime el cursor `--before` para la siguiente. `--json` es un valor único,
+`{ org, events, nextCursor }`. Requiere el rol de propietario o administrador de la organización.
+Un token lo lee únicamente con el permiso `audit` en la organización
 (`rebase cloud tokens create --can audit`). La página **Activity** de la consola
 muestra el mismo registro.
 
@@ -258,13 +273,13 @@ rebase cloud db pitr status | restore | cutover | discard
 ```
 
 `db connect` abre un puerto local que *es* la base de datos gestionada (sin endpoint
-público) hasta que se presione Ctrl-C; `--reveal` añade la contraseña. Solo para owner o admin.
+público) hasta Ctrl-C; `--reveal` agrega la contraseña. Solo propietarios o administradores.
 
 ## Guests
 
-Cada `signInAnonymously()` en una prueba, bot o visita abandonada deja una fila
-en los usuarios del proyecto. Estos comandos cuentan esas filas y las eliminan, para
-que nadie tenga que recorrerlas una por una.
+Cada `signInAnonymously()` en una prueba, un bot o una visita abandonada deja una fila
+en los usuarios del proyecto. Estos comandos cuentan esas filas y las eliminan, para que
+nadie tenga que ir haciéndolo clic por clic uno a uno.
 
 ```bash
 rebase cloud guests                              # how many, and the ones last seen longest ago
@@ -274,52 +289,52 @@ rebase cloud guests prune --older-than 30d       # dry run: how many would go
 rebase cloud guests prune --older-than 30d --yes # deletes them
 ```
 
-`prune` toma una antigüedad con una unidad: `45m`, `12h`, `30d` o `2w`. Sin `--yes`,
+`prune` toma una antigüedad con una unidad: `45m`, `12h`, `30d` o `2w`. Sin `--yes`
 cuenta y no elimina nada. Procesa un proyecto de cualquier tamaño en pequeños
 lotes.
 
-Solo se pueden eliminar invitados. Un invitado es una fila con `is_anonymous` activado, sin contraseña y sin
+Solo los invitados se pueden eliminar. Un invitado es una fila con `is_anonymous` establecido, sin contraseña y sin
 identidad vinculada, y la aplicación aplica esa regla en la instrucción que elimina la
-fila, por lo que el comando no puede afectar a una cuenta real, incluso a una que se haya registrado un momento
+fila, por lo que el comando no puede afectar a una cuenta real, incluso a una que se haya registrado un instante
 después de haber sido listada. `delete` rechaza una cuenta con `NOT_ANONYMOUS`.
 
-**Last seen** (visto por última vez) es cuando la sesión del invitado se emitió o renovó por última vez, o cuando
-se creó el invitado si no le queda ningún token de actualización. Un invitado que sigue regresando
-no se considera antiguo, sin importar hace cuánto se creó. Los tokens de actualización y cualquier
-otra fila de autenticación de un invitado eliminado se suprimen con él.
+**Last seen** es cuando la sesión del invitado fue emitida o renovada por última vez, o cuando
+el invitado fue creado si ya no le queda ningún token de actualización (refresh token). Un invitado que sigue regresando
+no se considera antiguo, sin importar hace cuánto se haya creado. Los refresh tokens de un invitado eliminado
+y cualquier otra fila de autenticación se eliminan junto con él.
 
 Las filas en tus propias tablas siguen su clave foránea:
 
-| La columna | Qué sucede con la fila |
+| Columna | Qué le sucede a la fila |
 |---|---|
-| Enlace opcional (`ON DELETE SET NULL`, por defecto) | Se conserva, con el enlace vaciado |
-| Enlace requerido (`ON DELETE RESTRICT`, por defecto) | Se conserva, y el invitado con ella: el invitado se reporta como omitido, con `GUEST_REFERENCED` |
+| Enlace opcional (`ON DELETE SET NULL`, el valor predeterminado) | Se conserva, con el enlace vaciado |
+| Enlace requerido (`ON DELETE RESTRICT`, el valor predeterminado) | Se conserva, y el invitado con ella: el invitado se reporta como omitido, con `GUEST_REFERENCED` |
 | `onDelete: "cascade"` | Se elimina junto con el invitado |
-| Sin clave foránea (un campo `userSelect`, un id simple) | Se conserva, conteniendo un id que ya no existe |
+| Sin clave foránea (un campo `userSelect`, un id simple) | Se conserva, manteniendo un id que ya no existe |
 
 Comprueba cuáles de tus enlaces están en cascada antes de pasar `--yes`: no se puede deshacer.
 
-El comando lee `REBASE_SERVICE_KEY` de la misma manera que lo hace `env reveal`, por lo que requiere un
-owner o admin (o un token con la capacidad `env` que pertenezca a uno). La
-clave permanece en memoria y viaja únicamente a la propia dirección del proyecto. A un proyecto en un
-runtime anterior se le notificará que necesita uno más reciente.
+El comando lee `REBASE_SERVICE_KEY` del mismo modo que `env reveal`, por lo que requiere un
+propietario o administrador (o un token con el permiso `env` que pertenezca a uno). La
+clave permanece en memoria y se envía únicamente a la dirección propia del proyecto. A un proyecto en un
+runtime más antiguo se le notificará que necesita uno más reciente.
 
 ## Resources
 
-Lo que la plataforma mantiene para el proyecto, frente a lo que declara su código.
+Lo que la plataforma mantiene para el proyecto, frente a lo que su código declara.
 
 ```bash
 rebase cloud resources                       # each database and bucket: declared? provisioned?
 rebase cloud resources prune database <key>  # remove one the code no longer declares
 ```
 
-Un despliegue nunca elimina una base de datos aprovisionada cuando desaparece su declaración;
-eso implicaría borrar datos mediante un push. La mantiene, la vincula y la factura hasta que alguien
-la depure (`prune`) por su nombre.
+Un despliegue nunca elimina una base de datos aprovisionada cuando su declaración desaparece; eso
+serían datos eliminados por un push. La mantiene, vincula y factura hasta que alguien
+la purgue por su nombre.
 
 ## Compute
 
-Lo que reserva el proyecto y cuánto cuesta.
+Lo que el proyecto reserva y cuánto cuesta.
 
 ```bash
 rebase cloud compute            # the current reservation and its monthly cost
@@ -330,8 +345,8 @@ rebase cloud compute set        # change it
 `--db-instances`, `--db-cpu`, `--db-memory`,
 `--storage`, `--autoscale-max`, `--autoscale-cpu-target` y `--no-autoscale`.
 `--scale-to-zero` está retirado: cada backend ejecuta al menos una instancia, por lo
-que `true` se rechaza y `false` se ignora con una advertencia. No hay niveles
-de planes: todo se tarifica por recurso. Consulta
+que `true` se rechaza y `false` se ignora con una advertencia. No hay niveles de plan:
+todo se tarifa por recurso. Consulta
 [Rebase Cloud](/docs/deployment/cloud/).
 
 ## Storage, notifications, clusters, billing and usage
@@ -353,53 +368,53 @@ rebase cloud usage org           # every project of the selected organization, w
 ```
 
 `notifications add <url>` envía los eventos del proyecto vinculado a una URL. `--events`
-acepta una lista separada por comas de `deploy.failed` (por defecto),
+toma una lista separada por comas de `deploy.failed` (por defecto),
 `deploy.succeeded`, `deploy.rolled_back`, `backup.unhealthy`,
 `billing.payment_failed`, `usage.threshold` y `preview.paused`. `--format slack` envía
-`{ "text" }` únicamente en lugar del JSON del evento, que también incluye un `text`. La URL
-es un argumento posicional porque `--url` especifica el plano de control. `add` imprime
-el secreto de firma una sola vez; `--json` devuelve `{ projectId, webhook, secret }`.
-`test <id>` sale con código 1 y el error `delivery_failed` cuando el receptor no aceptó
-el evento de prueba. La visualización en lista está disponible para cualquier miembro de la organización; `add`, `test`
-y `remove` requieren el rol de owner o admin. Un token los administra con la
-capacidad `notifications` en la organización, bajo la misma regla de roles. Consulta
-[Cloud notifications](/docs/deployment/cloud-notifications/).
+`{ "text" }` únicamente en lugar del JSON del evento, que también incluye un campo `text`. La URL
+es un argumento posicional porque `--url` nombra al plano de control. `add` imprime
+el secreto de firma una vez; `--json` devuelve `{ projectId, webhook, secret }`.
+`test <id>` finaliza con código 1 y `delivery_failed` cuando el receptor no aceptó
+el evento de prueba. La acción de listar está abierta a cualquier miembro de la organización; `add`, `test`
+y `remove` requieren el rol de propietario o administrador. Un token los gestiona con el
+permiso `notifications` en la organización, bajo la misma regla de roles. Consulta
+[Notificaciones de Cloud](/docs/deployment/cloud-notifications/).
 
 `clusters registry <cluster-id> --repository <host/project/repo>
---push-service-account <email> --pull-key-file <key.json>` proporciona al clúster
-propio del cliente un registro de imágenes dedicado, utilizado exclusivamente para ese clúster. Sin
-él, dicho clúster utiliza el registro compartido de la plataforma, y cada despliegue en él
-lo indicará en sus logs. Con él, las compilaciones suben imágenes a ese repositorio con un token para
-esa cuenta, los pods descargan imágenes utilizando únicamente esa clave, y un rollback acepta las
-imágenes del proyecto alojadas allí. Las imágenes
-que el proyecto compiló previamente en el registro compartido siguen estando disponibles para descarga y siguen siendo
-objetivos válidos de reversión. Los tres valores se configuran juntos; `--clear` los elimina. La clave
+--push-service-account <email> --pull-key-file <key.json>` proporciona al clúster propio
+de un cliente un registro de imágenes propio, usado únicamente para ese clúster. Sin
+él, dicho clúster utiliza el registro compartido de la plataforma, y cada despliegue hacia él
+lo indica en su registro. Con uno, las compilaciones suben a ese repositorio con un token para
+esa cuenta, los pods descargan solo con esa clave, y un rollback acepta las
+imágenes del proyecto allí. Las imágenes
+que el proyecto haya compilado en el repositorio compartido anteriormente siguen siendo descargables y siguen
+siendo objetivos de reversión (rollback). Los tres valores van juntos; `--clear` los elimina. La clave
 se sella cuando se escribe y nunca se vuelve a leer. Al igual que el resto de `clusters`,
-requiere el rol platform-admin. El operador crea el repositorio y ambas
-cuentas mediante Terraform (`saas/infra/gcp/registry-linked-clusters.tf`).
+requiere el rol de administrador de plataforma (platform-admin). El operador crea el repositorio y ambas
+cuentas con Terraform (`saas/infra/gcp/registry-linked-clusters.tf`).
 
 `billing invoices` y `billing upcoming` leen los mismos datos de Stripe que la
-página de Facturación de la consola, y solo están disponibles para los owners y admins
-de la organización. Un token accede a ellos, y al resto de `billing`, con la capacidad
-`billing` en la organización; un token creado antes de esa capacidad sigue
-funcionando durante una versión más, mostrando una advertencia en cada respuesta. Los importes en `--json` se expresan en la unidad fraccionaria de la moneda (céntimos/centavos), exactamente como
-los envía Stripe. Las facturas en borrador no se listan; la vista previa la calcula
-Stripe y sus conceptos de consumo medido continúan acumulándose hasta que se cierre el período.
+página Billing de la consola, y están abiertos únicamente a propietarios y administradores de la organización.
+Un token puede acceder a ellos, y al resto de `billing`, con el permiso `billing`
+en la organización; un token creado antes de esa funcionalidad sigue
+funcionando durante una versión, con una advertencia en cada respuesta. Los importes en `--json` están en la unidad menor de la moneda (centavos), exactamente como
+los envía Stripe. Las facturas en borrador no se listan; la vista previa es calculada por
+Stripe y sus líneas medidas continúan aumentando hasta que se cierra el período.
 
-`usage` consulta lo que el proyecto vinculado (o `--project`) ha consumido en un mes
-natural, en UTC: solicitudes frente al límite incluido, errores 5xx, el exceso
-hasta la fecha en euros y, para el mes en curso, hacia dónde se dirige a este
-ritmo (una estimación). El exceso es el cálculo propio del informe de sobrecostes, el
-mismo que indica a Stripe qué facturar y que se reflejará en la factura del mes siguiente.
-`usage org` enumera cada proyecto de la organización seleccionada con `rebase cloud
-use`, junto con el total. Cualquier miembro de la organización puede consultarlo. Un token lo consulta
-con la capacidad `logs` en el proyecto; `usage org` lista los proyectos sobre los cuales el
-token posee dicha capacidad.
-`--month` toma un mes anterior. La respuesta incluye `caveats`, cada una con un `code`: `storage_not_measured`
-(el almacenamiento de objetos marca 0), `multi_pod_undercount` (las solicitudes atendidas mientras se ejecutan dos o
-más pods de la app no se contabilizan), `partial_days`, `metering_off`,
+`usage` lee lo que el proyecto vinculado (o `--project`) ha consumido en un mes
+calendario, en UTC: solicitudes frente a la cuota incluida, errores 5xx, el exceso (overage)
+hasta el momento en euros y, para el mes en curso, hacia dónde se dirige a este
+ritmo (una estimación). El sobreuso es el cálculo propio del informe de exceso,
+aquel que le indica a Stripe qué facturar, y se refleja en la factura del mes siguiente.
+`usage org` lista cada proyecto de la organización seleccionada con `rebase cloud
+use`, junto con el total. Cualquier miembro de la organización puede leerlo. Un token lo lee
+con el permiso `logs` en el proyecto; `usage org` lista los proyectos en los que el
+token dispone de él.
+`--month` acepta un mes pasado. La respuesta contiene `caveats`, cada uno con un `code`: `storage_not_measured`
+(el almacenamiento de objetos lee 0), `multi_pod_undercount` (las solicitudes atendidas mientras se ejecutan dos o
+más pods de la aplicación no se cuentan), `partial_days`, `metering_off`,
 `overage_billing_off`, `not_billed`, `billed_next_month`, `pre_claim_days` (un
-proyecto reclamado desde un agente solo cuenta los días a partir de la reclamación) y
-`autoscale_not_charged` (se ejecutaron pods por encima de `--replicas` y esta plataforma aún no los
-cobra). La respuesta de un proyecto con autoescalado también incluye `autoscale`:
-`extraPodSeconds` por encima del mínimo base, `amountEur` según sus tarifas y `charged`.
+proyecto reclamado desde un agente cuenta solo los días a partir de la reclamación) y
+`autoscale_not_charged` (los pods se ejecutaron por encima de `--replicas` y esta plataforma no
+los cobra aún). La respuesta de un proyecto con autoescalado también contiene `autoscale`:
+`extraPodSeconds` por encima del mínimo base, `amountEur` a sus tarifas, y `charged`.

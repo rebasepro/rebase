@@ -1,6 +1,6 @@
 ---
 name: rebase-deployment
-description: Guide for deploying Rebase applications. Use this skill when the user needs to deploy to Rebase Cloud, set up Docker, self-host on AWS/GCP/Hetzner, or use a PaaS like Railway or Render.
+description: Guide for deploying Rebase applications. Use this skill when the user needs to deploy to Rebase Cloud, set up Docker, self-host on AWS/GCP/Hetzner, use a PaaS like Railway or Render, or connect a self-hosted server to Claude.
 ---
 
 # Rebase Deployment
@@ -143,6 +143,20 @@ builds them. That is the supported way to take over the boot path — and the on
 reason to have a build recipe of your own.
 
 ---
+
+## Connecting a self-hosted server to Claude
+
+The Rebase connector (`https://app.rebase.pro/mcp`) is one MCP connector for all
+of the user's projects. A self-hosted server joins it once:
+
+```bash
+rebase cloud connect https://their-app.com
+```
+
+Set the two variables it prints (`REBASE_PLATFORM_TOKEN_KEY`,
+`REBASE_PLATFORM_TOKEN_AUDIENCE`) on that server and restart it; the command
+waits until it answers. Needs Rebase 0.28.1 or later at a public https address.
+The variables hold no secret. See the rebase-cloud skill for the rest.
 
 ## Environment Variables
 

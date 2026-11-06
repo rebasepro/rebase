@@ -519,6 +519,19 @@ takes traffic — or a rolling deploy runs two side by side — go through
 limits, broadcast channels, local files, resumable uploads and the image cache
 are per process until a setting shares them.
 
+## Connecting Claude
+
+One command adds this server to the [Rebase connector](/docs/ai/rebase-connector/),
+the single MCP connector that reaches all your projects from Claude:
+
+```bash
+rebase cloud connect https://your-app.com
+```
+
+Set the two variables it prints on this server and restart it. The server must
+run Rebase 0.28.1 or later and answer over https at a public address. Nothing
+else changes: it holds no secret, and it grants the connector what Studio would.
+
 ## Running functions in their own process
 
 Everything above is one container serving the whole project, which is the right

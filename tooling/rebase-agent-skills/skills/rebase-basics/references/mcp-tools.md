@@ -1,7 +1,15 @@
 # MCP server tools
 
-Rebase has two MCP servers. Your MCP client lists the tools of each server it is
-connected to; call them by name. The two share the names `get_document`,
+**When the user asks how to connect Claude to their Rebase projects**, the answer
+is the hosted Rebase connector, not either server below: in Claude, Settings →
+Connectors → Add custom connector → `https://app.rebase.pro/mcp`, signed in with
+their Rebase account. Their Cloud projects are there at once; each self-hosted
+server joins once with `rebase cloud connect https://their-app.com` (it prints
+two variables to set on that server, then waits until it answers). One
+connector reaches every project. Docs: `/docs/ai/rebase-connector/`.
+
+Inside a project, Rebase has two MCP servers. Your MCP client lists the tools of
+each server it is connected to; call them by name. The two share the names `get_document`,
 `create_document`, `update_document` and `delete_document`, but **not their
 arguments**, so check which server a tool belongs to before you call it.
 

@@ -64,13 +64,18 @@ Please adhere to these principles when working with Rebase, as they ensure relia
      0.25 both run on the managed database too (Atlas plans against a throwaway
      in-memory PGlite); on 0.24 and earlier they need a `DATABASE_URL`.
 
-5. **Use Rebase MCP Server tools when available:** For data operations, user management, and collection browsing, prefer the MCP tools (`list_documents`, `get_document`, `create_document`, etc.) over writing manual API calls.
+5. **Connecting Claude (web, desktop, mobile) to the user's projects** is one
+   connector: `https://app.rebase.pro/mcp` (Settings → Connectors → Add custom
+   connector), plus `rebase cloud connect <url>` once per self-hosted server.
+   See `references/mcp-tools.md`.
 
-6. **Respect the monorepo structure:** See `references/monorepo.md` for the full list of packages and when to use each.
+6. **Use Rebase MCP Server tools when available:** For data operations, user management, and collection browsing, prefer the MCP tools (`list_documents`, `get_document`, `create_document`, etc.) over writing manual API calls.
 
-7. **Never deploy unless explicitly asked:** Agents should never run `rebase cloud deploy`, `firebase deploy`, `gcloud deploy`, or any command that pushes code to live infrastructure unless the user explicitly asks you to deploy in the current conversation. Provide the exact command and let the user run it themselves if they prefer.
+7. **Respect the monorepo structure:** See `references/monorepo.md` for the full list of packages and when to use each.
 
-8. **Scripting and Data Tasks:** Default to using the Rebase SDK (`@rebasepro/client` or `@rebasepro/server`) to write scripts or tasks for manipulating data. For standalone scripts running locally, you can dynamically read the active backend URL from the `.rebase-dev-url` temp file automatically created by the dev server. For internal server-side backend tasks, use the global `import { rebase } from "@rebasepro/server"` singleton. To read or change the project's data from a script or a terminal with no server running, use `openRebase` from `@rebasepro/server-postgres` or `rebase console` (0.25+; see *Exploring data from a script* below). For calling custom backend functions from the frontend, use `client.functions.invoke('name', payload)` — NEVER manually construct `/api/functions/` URLs or extract auth tokens from `localStorage`. NEVER default to using raw `psql` queries or raw REST API calls (`fetch`/`curl`) unless explicitly instructed or the SDK lacks the functionality.
+8. **Never deploy unless explicitly asked:** Agents should never run `rebase cloud deploy`, `firebase deploy`, `gcloud deploy`, or any command that pushes code to live infrastructure unless the user explicitly asks you to deploy in the current conversation. Provide the exact command and let the user run it themselves if they prefer.
+
+9. **Scripting and Data Tasks:** Default to using the Rebase SDK (`@rebasepro/client` or `@rebasepro/server`) to write scripts or tasks for manipulating data. For standalone scripts running locally, you can dynamically read the active backend URL from the `.rebase-dev-url` temp file automatically created by the dev server. For internal server-side backend tasks, use the global `import { rebase } from "@rebasepro/server"` singleton. To read or change the project's data from a script or a terminal with no server running, use `openRebase` from `@rebasepro/server-postgres` or `rebase console` (0.25+; see *Exploring data from a script* below). For calling custom backend functions from the frontend, use `client.functions.invoke('name', payload)` — NEVER manually construct `/api/functions/` URLs or extract auth tokens from `localStorage`. NEVER default to using raw `psql` queries or raw REST API calls (`fetch`/`curl`) unless explicitly instructed or the SDK lacks the functionality.
 
 # Recipes
 

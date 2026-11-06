@@ -54,6 +54,21 @@ rebase cloud use [org]    # select the active organization
 rebase cloud open         # open the dashboard in a browser
 ```
 
+### Connect a self-hosted instance to Claude
+
+```bash
+rebase cloud connect https://your-app.com      # add it to your account; prints two variables, waits until it answers
+rebase cloud connect --list                    # the instances you added, and whether each is connected
+rebase cloud connect --remove https://your-app.com
+```
+
+The [Rebase connector](/docs/ai/rebase-connector/) (`https://app.rebase.pro/mcp`)
+then reaches it beside your Cloud projects. `connect` prints
+`REBASE_PLATFORM_TOKEN_KEY` and `REBASE_PLATFORM_TOKEN_AUDIENCE`; set them on
+the server and restart it. In the project's folder it offers to write them to
+`.env`. Rerunning it is safe. `--name` names the instance, `--org` picks the
+organization, `--no-wait` returns without waiting. Owners and admins.
+
 ## Projects
 
 ```bash

@@ -19,6 +19,13 @@ A deployed backend can also serve MCP itself, over HTTP, to the people who use
 your application. That is a different thing with a different credential model:
 see [The Remote MCP Endpoint](/docs/ai/remote-mcp/).
 
+:::tip[Using Claude on the web, desktop or mobile?]
+Add the [Rebase connector](/docs/ai/rebase-connector/) instead:
+`https://app.rebase.pro/mcp`, once, for every project you run on Rebase Cloud
+or on your own servers. This page is the local server a coding assistant starts
+inside a project.
+:::
+
 ## Connecting a client
 
 The server runs from your project: `@rebasepro/mcp` is a devDependency every

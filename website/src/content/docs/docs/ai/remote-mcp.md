@@ -4,6 +4,12 @@ sidebar_label: Remote MCP endpoint
 description: Serve MCP from a deployed backend at /mcp, so the people who use your app can connect Claude or Cursor as themselves — OAuth with a consent screen, nine tools under three scopes, every call under their own row-level security.
 ---
 
+:::tip[Connecting Claude to your own projects?]
+That is the [Rebase connector](/docs/ai/rebase-connector/): one connector for
+all of them, and a self-hosted server joins it with `rebase cloud connect`. This
+page is for the people who **use** your app.
+:::
+
 The [MCP server](/docs/ai/mcp/) is a developer tool: it runs on your machine and holds a service
 key or an API key. A deployed backend can also serve MCP itself, at `/mcp`, for
 the people who use your application. An assistant one of them connects reads and

@@ -11,6 +11,19 @@ La traduction est à venir. Le contenu ci-dessous est en anglais.
 
 ## [Unreleased]
 
+### Added
+
+#### CLI
+
+- **`rebase cloud connect <url>` adds a self-hosted instance to your Rebase
+  account**, so the Rebase connector in Claude (`app.rebase.pro/mcp`) reaches it
+  beside your Cloud projects: one connector for all of them. It prints the two
+  variables the instance sets (`REBASE_PLATFORM_TOKEN_KEY`,
+  `REBASE_PLATFORM_TOKEN_AUDIENCE`), offers to write them to `./.env`, and waits
+  until the instance answers. Rerunning it is safe. `--list` and `--remove`
+  manage what was added. The instance needs 0.28.1 or later and a public https
+  address; adding one needs the organization's owner or admin role.
+
 ## [0.28.1] - 2026-11-05
 
 ### Added
