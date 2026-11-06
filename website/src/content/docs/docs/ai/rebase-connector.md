@@ -1,14 +1,14 @@
 ---
-title: Connect Claude to Rebase Cloud
-sidebar_label: Rebase Cloud connector
-description: One MCP connector for all your Rebase Cloud projects — add it once in Claude, sign in with your Rebase account, and read, deploy and change your projects with the access you have in the console, every change confirmed first.
+title: Connect Claude to Rebase
+sidebar_label: Rebase connector
+description: One MCP connector for all your Rebase projects, on Rebase Cloud or self-hosted — add it once in Claude, sign in with your Rebase account, and read, deploy and change your projects with the access you have in the console, every change confirmed first.
 ---
 
-The Rebase connector is one MCP server for everything you run on Rebase Cloud.
-You add it once in Claude, sign in with your Rebase account, and Claude can see
-your projects, read their logs, deploy and roll them back, set their
-environment variables, and read and change their data. It works in Claude on
-the web, the desktop app and mobile.
+The Rebase connector is one MCP server for every Rebase project you run: on
+Rebase Cloud, and on your own servers. You add it once in Claude, sign in with
+your Rebase account, and Claude can see your projects, read their logs, deploy
+and roll them back, set their environment variables, and read and change their
+data. It works in Claude on the web, the desktop app and mobile.
 
 It acts as **you**, with the access your account has in the console: the
 projects of the organizations you belong to, the role you hold in each, and the
@@ -26,6 +26,47 @@ Claude opens the Rebase consent screen. If you are signed in to the console in
 the same browser, it offers that account: press **Allow**. Otherwise sign in
 there. The screen lists what you are granting; you can connect again later to
 grant less.
+
+Your Rebase Cloud projects are there already. That is the whole setup for them.
+
+## Add your self-hosted instances
+
+Run this once for each server you host yourself:
+
+```bash
+rebase cloud connect https://admin.example.com
+```
+
+It adds the instance to your Rebase account and prints two variables. Set them
+on that server and restart it; the command waits until the server answers, then
+says it is connected. Inside the project's folder it offers to write them to
+`.env` for you.
+
+```bash
+REBASE_PLATFORM_TOKEN_KEY=…
+REBASE_PLATFORM_TOKEN_AUDIENCE=linked:…
+```
+
+From then on Claude lists the instance beside your Cloud projects, and you name
+it the same way: "show me the orders on admin.example.com". On a self-hosted
+instance the connector reads and changes data, reads its schema and runs its
+cron jobs. Deploys, environment variables and logs stay on your own server.
+
+- **The server needs Rebase 0.28.1 or later**, reachable over https at a public
+  address. Rebase Cloud calls it, so a server only on a private network cannot
+  be connected.
+- **The variables hold no secret.** The key is Rebase Cloud's public key; the
+  audience names this instance. With them the server accepts short-lived
+  tokens Rebase Cloud signs for this instance only, and grants them at most
+  what Studio would: data, under its row-level security, and cron.
+- **Calls go through Rebase Cloud.** Claude talks to the connector, and the
+  connector to your server. A server you never connect keeps its own
+  [remote MCP endpoint](/docs/ai/remote-mcp/), with nothing in between.
+- **To disconnect one**, run `rebase cloud connect --remove https://admin.example.com`,
+  or remove the two variables from the server.
+
+Adding an instance needs the organization's owner or admin role, like reaching
+a project's data does. `rebase cloud connect --list` shows the ones you added.
 
 ## What Claude can do with it
 
@@ -76,7 +117,7 @@ conversation.
   variables.
 - **Data, schemas and cron jobs**: what Studio in the console allows you. That
   is an owner or admin of the organization, on a project whose Studio access is
-  switched on. Calls run inside the project, under its row-level security, with
+  switched on, or on a self-hosted instance the organization connected. Calls run inside the project, under its row-level security, with
   the admin role Studio has. Turning Studio access off for a project turns this
   off too.
 - **What you granted.** You can grant the connector less than your account
@@ -93,6 +134,6 @@ Remove the connector in Claude's settings. Its access token stops working
 within the hour. Deleting your Rebase account, or signing out everywhere, stops
 it at the next call.
 
-The connector is for the people who build on Rebase Cloud. To let the people
+The connector is for the people who build on Rebase. To let the people
 who **use** your app connect Claude to it as themselves, serve the
 [remote MCP endpoint](/docs/ai/remote-mcp/) from your own backend.

@@ -1,5 +1,5 @@
 ---
-sourceHash: 42c888cb0d0b2a71
+sourceHash: a66e695d7d7fc2a9
 title: Rebase Cloud
 sidebar_label: Rebase Cloud
 description: Rebase Cloud è lo stesso Rebase, gestito per te. Cos'è, come collegare ed eseguire il deploy di un progetto e cosa non include ancora la beta privata.
@@ -462,6 +462,7 @@ tranne quella che comporta il riavvio del database, che attende una finestra di 
 | `login`, `logout`, `whoami`, `access-token` | La tua sessione; `access-token` stampa il token bearer che la CLI invierebbe ora, per script e per il server MCP |
 | `tokens` | Token per CI e agenti, ciascuno limitato a un singolo progetto. Vedi [CI e agenti](/docs/deployment/cloud-agents/#ci-and-agents) |
 | `link`, `unlink`, `use`, `open` | Associazione di questa directory a un progetto, selezione di un'organizzazione, apertura della console |
+| `connect` | Aggiungere al tuo account un server Rebase self-hosted, così il [connettore Rebase](/docs/ai/rebase-connector/) in Claude lo raggiunge accanto ai tuoi progetti Cloud. `--list` li mostra, `--remove` ne toglie uno. Proprietari e amministratori |
 | `init`, `claim` | Con `--claim`: un backend attivo senza account e un link per riscattarlo; `claim` stampa nuovamente quel link. Vedi [Un backend senza account](/docs/deployment/cloud-agents/#a-backend-with-no-account) |
 | `projects` | Creazione, visualizzazione elenco, ispezione, eliminazione |
 | `deploy`, `logs`, `deployments`, `rollback`, `cancel` | Rilascio e monitoraggio |

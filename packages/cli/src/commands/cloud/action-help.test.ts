@@ -29,6 +29,7 @@ import { CREATE_TOKEN_FLAGS } from "./tokens";
 import { INIT_FLAGS } from "./init";
 import { CLAIM_FLAGS } from "./claim";
 import { CRON_LIST_FLAGS, CRON_LOGS_FLAGS } from "./cron";
+import { CONNECT_FLAGS } from "./connect";
 import { PREVIEWS_LIST_FLAGS, PREVIEWS_DELETE_FLAGS } from "./previews";
 import { USAGE_FLAGS, USAGE_ACTIONS } from "./usage";
 import { APP_KEY_FLAGS, APP_KEY_ACTIONS } from "./app-key";
@@ -113,6 +114,7 @@ const SPECS: Record<string, Record<string, unknown> | null> = {
     unlink: null,
     use: null,
     open: null,
+    connect: CONNECT_FLAGS,
     rollback: {},
     cancel: {},
     start: {},
@@ -259,6 +261,7 @@ flag: flag[1] });
         ["claim.ts", CLAIM_FLAGS],
         ["cron.ts", CRON_LIST_FLAGS],
         ["cron.ts", CRON_LOGS_FLAGS],
+        ["connect.ts", CONNECT_FLAGS],
         ["previews.ts", PREVIEWS_LIST_FLAGS],
         ["previews.ts", PREVIEWS_DELETE_FLAGS]
     ] as const) {

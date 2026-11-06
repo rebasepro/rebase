@@ -1,100 +1,140 @@
 ---
-sourceHash: 97232ebc628a975c
-title: Collegare Claude a Rebase Cloud
-sidebar_label: Connettore Rebase Cloud
-description: Un solo connettore MCP per tutti i tuoi progetti Rebase Cloud — aggiungilo una volta in Claude, accedi con il tuo account Rebase, e leggi, distribuisci e modifica i tuoi progetti con l'accesso che hai nella console, confermando prima ogni modifica.
+sourceHash: f5fcf560853b0193
+title: Connetti Claude a Rebase
+sidebar_label: Connettore Rebase
+description: Un unico connettore MCP per tutti i tuoi progetti Rebase, su Rebase Cloud o self-hosted — aggiungilo una volta in Claude, accedi con il tuo account Rebase, e leggi, distribuisci e modifica i tuoi progetti con i permessi di cui disponi nella console, con ogni modifica confermata prima dell'esecuzione.
 ---
 
-Il connettore Rebase è un unico server MCP per tutto ciò che esegui su Rebase
-Cloud. Lo aggiungi una volta in Claude, accedi con il tuo account Rebase, e
-Claude può vedere i tuoi progetti, leggerne i log, distribuirli e riportarli
-indietro, impostarne le variabili d'ambiente, e leggerne e modificarne i dati.
-Funziona in Claude sul web, nell'app desktop e su mobile.
+Il connettore Rebase è un unico server MCP per ogni progetto Rebase che esegui: su
+Rebase Cloud e sui tuoi server. Lo aggiungi una volta in Claude, accedi con
+il tuo account Rebase e Claude può visualizzare i tuoi progetti, leggerne i log, distribuirli
+ed eseguirne il rollback, impostare le relative variabili d'ambiente, nonché leggere e modificare i
+loro dati. Funziona in Claude sul web, nell'app desktop e su mobile.
 
-Agisce **come te**, con l'accesso che il tuo account ha nella console: i
-progetti delle organizzazioni di cui fai parte, il ruolo che hai in ciascuna, e
-l'accesso ai dati che ti dà lo Studio della console. Non ha alcuna chiave sua.
+Agisce a tuo **nome**, con i permessi di accesso di cui dispone il tuo account nella console: i
+progetti delle organizzazioni a cui appartieni, il ruolo che ricopri in ciascuna di esse e
+l'accesso ai dati che lo Studio della console ti garantisce. Non conserva alcuna chiave propria.
 
 ## Aggiungilo
 
-In Claude, apri **Impostazioni → Connettori → Aggiungi connettore
-personalizzato** e inserisci:
+In Claude, apri **Settings → Connectors → Add custom connector** e inserisci:
 
 ```text
 https://app.rebase.pro/mcp
 ```
 
-Claude apre la schermata di consenso di Rebase. Se hai già effettuato l'accesso
-alla console nello stesso browser, propone quell'account: premi **Consenti**.
-Altrimenti accedi lì. La schermata elenca ciò che concedi; puoi ricollegarti più
-tardi per concedere meno.
+Claude apre la schermata di consenso di Rebase. Se hai già effettuato l'accesso alla console
+nello stesso browser, ti proporrà quell'account: premi **Allow**. Altrimenti, accedi
+da lì. La schermata elenca i permessi che stai concedendo; potrai riconnetterti in seguito
+per concederne meno.
 
-## Cosa può farci Claude
+I tuoi progetti Rebase Cloud sono già presenti. Per loro, la configurazione termina qui.
 
-Dieci tool. I primi sei leggono soltanto:
+## Aggiungi le tue istanze self-hosted
+
+Esegui questo comando una volta per ciascun server che ospiti autonomamente:
+
+```bash
+rebase cloud connect https://admin.example.com
+```
+
+Questo aggiunge l'istanza al tuo account Rebase e stampa due variabili. Impostale
+su quel server e riavvialo; il comando attende che il server risponda, quindi
+conferma la connessione. All'interno della cartella del progetto, si offrirà di scriverle nel
+file `.env` per te.
+
+```bash
+REBASE_PLATFORM_TOKEN_KEY=…
+REBASE_PLATFORM_TOKEN_AUDIENCE=linked:…
+```
+
+Da quel momento in poi, Claude elencherà l'istanza accanto ai tuoi progetti Cloud, e potrai fare
+riferimento ad essa nello stesso modo: "mostrami gli ordini su admin.example.com". Su un'istanza self-hosted
+il connettore legge e modifica i dati, legge il relativo schema ed esegue i
+cron job. Deploy, variabili d'ambiente e log rimangono sul tuo server.
+
+- **Il server necessita di Rebase 0.28.1 o versioni successive**, raggiungibile via HTTPS a un
+  indirizzo pubblico. Rebase Cloud effettua chiamate verso di esso, pertanto un server presente solo su
+  una rete privata non può essere connesso.
+- **Le variabili non contengono segreti.** La chiave è la chiave pubblica di Rebase Cloud;
+  l'audience identifica questa istanza. Grazie a esse il server accetta token di breve
+  durata firmati da Rebase Cloud esclusivamente per questa istanza, concedendo loro al massimo
+  ciò che concederebbe Studio: dati, soggetti alla row-level security, e cron.
+- **Le chiamate passano attraverso Rebase Cloud.** Claude comunica con il connettore e il
+  connettore con il tuo server. Un server che non connetti mai mantiene il proprio
+  [endpoint MCP remoto](/docs/ai/remote-mcp/), senza nulla nel mezzo.
+- **Per disconnetterne una**, esegui `rebase cloud connect --remove https://admin.example.com`,
+  oppure rimuovi le due variabili dal server.
+
+L'aggiunta di un'istanza richiede il ruolo di owner o admin dell'organizzazione, come per
+accedere ai dati di un progetto. Il comando `rebase cloud connect --list` mostra quelle che hai aggiunto.
+
+## Cosa può fare Claude
+
+Dieci tool. I primi sei sono di sola lettura:
 
 | Tool | Cosa fa |
 |---|---|
 | `projects` | Elenca i tuoi progetti, il loro stato e il tuo ruolo in ciascuno |
-| `project_status` | Lo stato e l'ultimo deployment di un progetto; facoltativamente i deployment recenti, i **nomi** delle sue variabili d'ambiente, i suoi cron job |
-| `logs` | L'output dell'app in esecuzione, il log di build di un deployment, o le esecuzioni di un cron job |
-| `schema` | Le collection di un progetto, o i campi di una collection |
-| `query` | Legge righe: una per id, una pagina filtrata, o un conteggio |
-| `show_collection` | Mostra righe come tabella nella conversazione, dove puoi sfogliarle e modificare le celle |
+| `project_status` | Lo stato e l'ultima distribuzione di un progetto; opzionalmente i suoi deployment recenti, i **nomi** delle sue variabili d'ambiente, i suoi cron job |
+| `logs` | L'output dell'app in esecuzione, il log di build di un deployment o le esecuzioni di un cron job |
+| `schema` | Le collection di un progetto o i campi di una singola collection |
+| `query` | Legge le righe: una per ID, una pagina filtrata o un conteggio |
+| `show_collection` | Mostra le righe come tabella nella conversazione, dove puoi sfogliare le pagine e modificare le celle |
 
-Gli altri quattro modificano la produzione, e ciascuno chiede prima:
+Gli altri quattro apportano modifiche alla produzione e ciascuno richiede prima una conferma:
 
 | Tool | Cosa fa |
 |---|---|
-| `write` | Crea, aggiorna o elimina una riga (utenti compresi: sono righe della tua collection degli utenti) |
-| `deploy` | Distribuisce un branch git, torna a un deployment precedente, o annulla uno in corso |
-| `env` | Imposta o rimuove variabili d'ambiente; una modifica si applica al deploy successivo |
-| `cron` | Esegue subito un cron job, o lo attiva o disattiva |
+| `write` | Crea, aggiorna o elimina una riga (utenti inclusi: sono righe della tua collection users) |
+| `deploy` | Distribuisce un branch Git, esegue il rollback a un deployment precedente o ne annulla uno in corso |
+| `env` | Imposta o rimuove variabili d'ambiente; una modifica viene applicata al deployment successivo |
+| `cron` | Esegue subito un cron job, oppure ne attiva o disattiva uno |
 
-Distribuire codice dalla tua macchina resta compito della CLI
-(`rebase cloud deploy`) e del [server MCP locale](/docs/ai/mcp/), che copre anche
-lo sviluppo locale, la generazione dello schema e i branch del database.
+La distribuzione del codice dalla tua macchina rimane gestita dalla CLI (`rebase cloud deploy`) e
+dal [server MCP locale](/docs/ai/mcp/), che gestisce anche lo sviluppo locale,
+la generazione dello schema e i branch del database.
 
 ## Ogni modifica viene confermata
 
-Un tool che modifica qualcosa richiede due chiamate. La prima non cambia nulla:
-risponde con un piano, come "Riporta shop al deployment d_81f2", e un token di
-conferma. Claude ti mostra il piano e richiama con il token solo se sei
-d'accordo. Il token vale cinque minuti, una volta, esattamente per gli argomenti
-per cui è stato creato: se qualcosa è diverso, non viene eseguito nulla.
+Un tool che modifica qualcosa richiede due chiamate. La prima non modifica nulla:
+risponde con un piano, come "Roll shop back to deployment d_81f2", e un
+token di conferma. Claude ti mostra il piano e invia una nuova chiamata con il token
+solo se acconsenti. Il token è valido per cinque minuti, per una sola volta e per gli esatti
+argomenti per cui è stato generato: se qualcosa differisce, non viene eseguito nulla.
 
-Claude ti chiede anche il permesso prima di chiamare uno di questi quattro
-tool, perché sono contrassegnati come distruttivi. Nella vista a tabella, una
-cella modificata mostra il piano e aspetta che tu prema **Salva**.
+Inoltre, Claude richiede la tua autorizzazione prima di chiamare uno qualsiasi di questi quattro tool,
+poiché sono contrassegnati come distruttivi. Nella vista a tabella, una cella modificata
+mostra il piano e attende che tu prema **Save**.
 
-I valori delle variabili d'ambiente non vengono mai rimostrati: un piano ne
-indica la lunghezza, e `project_status` elenca solo i nomi. Un valore che
-imposti passa comunque dalla conversazione.
+I valori delle variabili d'ambiente non vengono mai mostrati in risposta: un piano ne mostra la lunghezza
+e `project_status` ne elenca solo i nomi. Tuttavia, un valore che imposti passa attraverso la
+conversazione.
 
-## Fin dove arriva
+## A cosa può accedere
 
-- **Progetti e operazioni cloud**: ciò che la console ti consente. Un membro di
-  un'organizzazione può leggere stato e log e, come nella console, distribuire e
-  impostare variabili.
-- **Dati, schemi e cron job**: ciò che Studio ti consente nella console. Cioè un
-  owner o admin dell'organizzazione, su un progetto con l'accesso di Studio
-  attivo. Le chiamate vengono eseguite dentro il progetto, sotto la sua
-  sicurezza a livello di riga, con il ruolo admin che ha Studio. Disattivare
-  l'accesso di Studio per un progetto disattiva anche questo.
-- **Ciò che hai concesso.** Puoi concedere al connettore meno di quanto ha il
-  tuo account: solo lettura, o un solo progetto. Non chiede mai backup,
-  ripristini, credenziali del database né impostazioni del progetto.
+- **Progetti e operazioni cloud**: ciò che ti consente la console. Un membro di
+  un'organizzazione può leggere stato e log e, come nella console, effettuare deploy e impostare
+  variabili.
+- **Dati, schemi e cron job**: ciò che ti consente lo Studio nella console. Vale a
+  dire un owner o admin dell'organizzazione, su un progetto per cui l'accesso a Studio è
+  abilitato, o su un'istanza self-hosted connessa dall'organizzazione. Le chiamate vengono eseguite all'interno del progetto, soggette alla sua row-level security, con
+  il ruolo di admin proprio di Studio. La disattivazione dell'accesso a Studio per un progetto disattiva
+  anche questa funzionalità.
+- **Cosa hai autorizzato.** Puoi concedere al connettore meno permessi di quanti ne
+  possegga il tuo account: sola lettura, o un solo progetto. Non richiede mai backup,
+  ripristini, credenziali del database o impostazioni del progetto.
 
-Un progetto rende raggiungibili i suoi dati tramite il connettore appena esegue
-un runtime che accetta le chiamate del connettore. Fino al suo prossimo deploy
-o al prossimo aggiornamento della piattaforma, quei tool lo segnalano.
+Un progetto accede ai propri dati tramite il connettore non appena esegue un runtime in grado
+di gestire le chiamate del connettore. Fino al successivo deploy o rollout della piattaforma,
+tali tool lo segnaleranno.
 
-## Scollegare
+## Disconnessione
 
-Rimuovi il connettore nelle impostazioni di Claude. Il suo token di accesso
-smette di funzionare entro un'ora. Se elimini il tuo account Rebase, o esci da
-tutte le sessioni, si ferma alla chiamata successiva.
+Rimuovi il connettore nelle impostazioni di Claude. Il suo token di accesso smette di funzionare
+entro un'ora. L'eliminazione del tuo account Rebase, o la disconnessione da tutte le sessioni,
+lo blocca alla chiamata successiva.
 
-Il connettore è per chi costruisce su Rebase Cloud. Perché le persone che
-**usano** la tua app possano collegarvi Claude a proprio nome, servi
+Il connettore è pensato per chi sviluppa su Rebase. Per consentire a chi
+**utilizza** la tua app di connettere Claude a essa con la propria identità, esponi
 l'[endpoint MCP remoto](/docs/ai/remote-mcp/) dal tuo backend.

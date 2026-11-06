@@ -1136,6 +1136,38 @@ export const ACTION_HELP: Record<string, ActionHelp> = {
         examples: ["rebase cloud open"]
     },
 
+    connect: {
+        command: "cloud connect",
+        usage: "cloud connect <url> [--name <name>] [--org <id>] [--no-wait] | --list | --remove <url-or-id>",
+        summary:
+            "Add a self-hosted Rebase instance to your Rebase account, so the Rebase connector in Claude "
+            + "(https://app.rebase.pro/mcp) reaches it as it reaches your Cloud projects. Prints the two variables "
+            + "the instance needs, offers to write them into ./.env, then waits for the instance to accept the "
+            + "connector once you restart it. Run it once per instance; rerunning it is safe and checks the connection.",
+        flags: [
+            ["--name <name>", "What to call the instance. Default: its hostname"],
+            ["--org <id>", "The organization it belongs to. Default: the active one (`rebase cloud use`)"],
+            ["--no-wait", "Print the variables and return, without waiting for the instance to accept the connector"],
+            ["--list", "List the self-hosted instances in your account"],
+            ["--remove <url-or-id>", "Remove one from your account. Confirms first unless --yes"]
+        ],
+        examples: [
+            "rebase cloud connect your-app.com",
+            "rebase cloud connect https://api.example.com --name \"Shop (EU)\" --org 3f2a9c1e",
+            "rebase cloud connect your-app.com --no-wait --json",
+            "rebase cloud connect --list",
+            "rebase cloud connect --remove your-app.com --yes"
+        ],
+        notes: [
+            "An address without a scheme is https; only the origin is kept, so a path or query is dropped.",
+            "The two variables are REBASE_PLATFORM_TOKEN_KEY and REBASE_PLATFORM_TOKEN_AUDIENCE: what the instance "
+                + "needs to accept the connector's short-lived tokens.",
+            "Adding an instance takes an owner or admin of the organization.",
+            "With --json it prints what the control plane answered and one check of the connection, and never prompts or waits.",
+            "Not `rebase cloud link`, which binds a directory to a project."
+        ]
+    },
+
     rollback: {
         command: "cloud rollback",
         usage: "cloud rollback [<deploymentId>] [--yes]",

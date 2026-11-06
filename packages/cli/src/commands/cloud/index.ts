@@ -25,6 +25,7 @@ import { deploymentsListCommand, rollbackCommand, cancelCommand } from "./deploy
 import { powerCommand } from "./power";
 import { debugCommand, printDebugHelp } from "./debug";
 import { cronCommand } from "./cron";
+import { connectCommand } from "./connect";
 import { previewsCommand } from "./previews";
 import { usageCommand } from "./usage";
 import { appKeyCommand } from "./app-key";
@@ -125,6 +126,7 @@ export const CLOUD_VALUE_FLAGS = {
     "--pull-key-file": String,
     "--push-service-account": String,
     "--region": String,
+    "--remove": String,
     "--replicas": String,
     "--repo": String,
     "--repository": String,
@@ -330,6 +332,9 @@ export async function cloudCommand(subcommand: string | undefined, rawArgs: stri
             break;
         case "open":
             openCommand(rawArgs);
+            break;
+        case "connect":
+            await connectCommand(rawArgs);
             break;
 
         /* projects */
@@ -543,6 +548,7 @@ export const CLOUD_GROUPS: HelpAction[] = [
     { action: "unlink", section: "Project link", description: "Remove the link" },
     { action: "use", section: "Project link", args: "[org]", description: "Select the active organization" },
     { action: "open", section: "Project link", description: "Open the console in a browser" },
+    { action: "connect", section: "Project link", args: "<url>", description: "Add a self-hosted instance to your account, so the Rebase connector in Claude reaches it" },
 
     { action: "init", section: "Projects", description: "With --claim: a live backend with no account, and a link to claim it within 72 hours" },
     { action: "claim", section: "Projects", description: "The claim link of the project `init --claim` made here, and the time left; --open opens it" },

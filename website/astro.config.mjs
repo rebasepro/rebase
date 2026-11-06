@@ -285,7 +285,7 @@ export default defineConfig({
                         { label: "MCP Server", slug: "docs/ai/mcp" },
                         { label: "MCP tool reference", slug: "docs/ai/mcp-tool-reference" },
                         { label: "Remote MCP endpoint", slug: "docs/ai/remote-mcp" },
-                        { label: "Rebase Cloud connector", slug: "docs/ai/rebase-connector" },
+                        { label: "Rebase connector", slug: "docs/ai/rebase-connector" },
                         { label: "Agent Skills", slug: "docs/ai/skills" },
                         { label: "AI Instruction Files", slug: "docs/ai/instruction-files" }
                     ]
