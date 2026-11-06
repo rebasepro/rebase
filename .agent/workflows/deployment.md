@@ -77,6 +77,13 @@ The reason it is absolute: a published npm version cannot be unpublished, a push
 tag is already on the branch, and every scaffolded project pulls
 `rebasepro/server:<version>`. None of it can be undone.
 
+**Even with consent, release only a commit CI passed.** Check
+`gh run list --workflow ci.yml --branch main --limit 3` first: publish.yml
+re-runs the lanes, so a red tip fails the release half an hour in, on failures
+CI had already reported. In the maintainers' setup the `release-ci` preflight
+check blocks the dispatch while CI on the tip is red, and asks while it is
+still running or was cancelled.
+
 **What to do instead:** prepare everything up to the irreversible step. Write the
 CHANGELOG, run the gates, get the tree green. Then stop, report what is ready,
 and name the exact command that would publish it.

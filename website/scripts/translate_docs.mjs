@@ -2,6 +2,7 @@ import { promises as fs, readFileSync } from 'fs';
 import path from 'path';
 import crypto from 'crypto';
 import { fileURLToPath } from 'url';
+import { createRequire } from 'module';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 
 /**
@@ -252,9 +253,11 @@ ${content}
             }
         );
 
-        // Post-process: quote description values containing `: ` to prevent YAML parse errors
-        translatedText = translatedText.replace(
-            /^(description:\s*)([^"'].+)$/m,
+        // Post-process: quote one-line values containing `: `, which YAML reads as a
+        // second key. A title or label can carry one as easily as a description.
+        // Only inside the frontmatter: a `title:` line in a code sample is the page's.
+        translatedText = translatedText.replace(/^---\n[\s\S]*?\n---/, (block) => block.replace(
+            /^((?:title|sidebar_label|description):\s*)([^"'\s].*)$/gm,
             (match, prefix, value) => {
                 if (value.includes(': ')) {
                     const escaped = value.trim().replace(/"/g, '\\"');
@@ -262,7 +265,7 @@ ${content}
                 }
                 return match;
             }
-        );
+        ));
 
         return translatedText;
     } catch (error) {
@@ -299,6 +302,16 @@ export function stripStrayClosingRule(text, sourceContent) {
     return text.slice(0, match.index).trimEnd() + '\n';
 }
 
+/** js-yaml as Astro resolves it: the parser `astro build` runs on every frontmatter block. */
+let yamlParser;
+function astroYaml() {
+    if (!yamlParser) {
+        const fromWebsite = createRequire(path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', 'package.json'));
+        yamlParser = createRequire(fromWebsite.resolve('astro/package.json'))('js-yaml');
+    }
+    return yamlParser;
+}
+
 /**
  * Rejects output Astro would refuse to load.
  *
@@ -327,6 +340,13 @@ function assertValidFrontmatter(text, sourceContent, label) {
     }
     if (/^title:/m.test(sourceContent) && !/^title:\s*\S/m.test(match[1])) {
         throw new Error(`${label}: frontmatter has no title, but the English source does`);
+    }
+    // Parsed with the YAML parser the site build uses: a block it refuses stops
+    // `astro build` for the whole site, not just this page.
+    try {
+        astroYaml().load(match[1]);
+    } catch (error) {
+        throw new Error(`${label}: frontmatter is not valid YAML (${String(error.reason ?? error.message).split('\n')[0]})`);
     }
 
     // Fence parity: a dropped or invented ``` silently swallows the rest of the page.

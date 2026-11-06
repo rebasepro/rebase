@@ -15,6 +15,7 @@ import path from "node:path";
 import { changedFiles, context } from "../lib/ctx.mjs";
 import { blocking, FAIL, WARN, PASS, finding } from "../lib/report.mjs";
 import * as controlPlane from "../checks/control-plane.mjs";
+import * as releaseCi from "../checks/release-ci.mjs";
 import * as lockfileWorktree from "../checks/lockfile-worktree.mjs";
 import * as migrationOrder from "../checks/migration-order.mjs";
 import * as rlsDrift from "../checks/rls-drift.mjs";
@@ -519,4 +520,46 @@ test("a task pinned by subject resolves to a commit in this history", (t) => {
         assert.match(commit, /^[0-9a-f]{7,}$/, task.id);
     }
     assert.equal(resolveCommit(root, { subject: "no commit has this subject line" }), "");
+});
+
+test("release-ci recognises the commands that publish a release, and not prose about them", () => {
+    for (const command of [
+        "gh workflow run publish.yml -f channel=stable -f version=0.28.2",
+        "cd /repo && gh workflow run publish.yml -f channel=canary",
+        "gh workflow run publish-runtime-image.yml -f version=0.28.2",
+        "pnpm -r publish --access public",
+        "npm publish",
+        "git push origin v0.28.2",
+        "git push origin main --follow-tags",
+    ]) assert.ok(releaseCi.isReleaseShaped(command), `must be release-shaped: ${command}`);
+    for (const command of [
+        "gh workflow list",
+        "gh run list --workflow publish.yml",
+        "git push origin main",
+        "git commit -m \"gh workflow run publish.yml stays manual\"",
+        "npm view @rebasepro/cli version",
+    ]) assert.equal(releaseCi.isReleaseShaped(command), false, command);
+    assert.equal(releaseCi.releaseRef("gh workflow run publish.yml -f channel=stable"), "main");
+    assert.equal(releaseCi.releaseRef("gh workflow run publish.yml --ref release/0.28 -f channel=stable"), "release/0.28");
+});
+
+test("release-ci passes green CI, blocks red, and asks for anything else", () => {
+    const command = "gh workflow run publish.yml -f channel=stable -f version=9.9.9";
+    const verdict = (runs, sha = "abcdef1234567890") =>
+        releaseCi.run({ root: "." }, { command, readCi: () => ({ sha, runs }) }).map((f) => f.level);
+    assert.deepEqual(verdict([{ status: "completed", conclusion: "success", url: "u" }]), [PASS]);
+    assert.deepEqual(verdict([{ status: "completed", conclusion: "failure", url: "u" }]), [FAIL]);
+    assert.deepEqual(verdict([{ status: "in_progress", conclusion: "", url: "u" }]), [WARN]);
+    assert.deepEqual(verdict([{ status: "completed", conclusion: "cancelled", url: "u" }]), [WARN]);
+    assert.deepEqual(verdict([]), [WARN]);
+    // The newest run decides: a later green run clears an older red one.
+    assert.deepEqual(verdict([
+        { status: "completed", conclusion: "success", url: "new" },
+        { status: "completed", conclusion: "failure", url: "old" },
+    ]), [PASS]);
+    // GitHub unreachable is not a pass.
+    const unreachable = releaseCi.run({ root: "." }, { command, readCi: () => { throw new Error("gh: offline"); } });
+    assert.deepEqual(unreachable.map((f) => f.level), [WARN]);
+    // A command that is not a release is not judged at all.
+    assert.deepEqual(releaseCi.run({ root: "." }, { command: "git status", readCi: () => assert.fail("asked GitHub") }).map((f) => f.level), [PASS]);
 });

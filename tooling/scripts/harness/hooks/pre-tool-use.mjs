@@ -17,7 +17,8 @@
 import { context } from "../lib/ctx.mjs";
 import { tracePath, append, readHookInput } from "../lib/trace.mjs";
 import { isDeployShaped } from "../checks/control-plane.mjs";
-import { runChecks, readStamp } from "../deploy/preflight.mjs";
+import { isReleaseShaped } from "../checks/release-ci.mjs";
+import { runChecks, readStamp, COMMAND_CHECK_IDS } from "../deploy/preflight.mjs";
 
 function decide(decision, reason) {
     process.stdout.write(
@@ -54,7 +55,7 @@ try {
 }
 
 const command = typeof toolInput.command === "string" ? toolInput.command : "";
-if (toolName !== "Bash" || !command || !isDeployShaped(command)) allow();
+if (toolName !== "Bash" || !command || !(isDeployShaped(command) || isReleaseShaped(command))) allow();
 
 try {
     // A recent passing stamp for this exact tree means preflight already ran; re-running
@@ -63,8 +64,8 @@ try {
     const findings = stamped ? stamped.findings : runChecks({ command });
 
     // The control-plane check is command-specific, so it always re-runs even when stamped.
-    const commandFindings = stamped ? runChecks({ command }).filter((f) => f.id === "control-plane") : [];
-    const all = [...findings.filter((f) => f.id !== "control-plane" || !stamped), ...commandFindings];
+    const commandFindings = stamped ? runChecks({ command }).filter((f) => COMMAND_CHECK_IDS.includes(f.id)) : [];
+    const all = [...findings.filter((f) => !COMMAND_CHECK_IDS.includes(f.id) || !stamped), ...commandFindings];
 
     const fails = all.filter((f) => f.level === "fail");
     const warns = all.filter((f) => f.level === "warn");
@@ -74,7 +75,7 @@ try {
     if (fails.length) {
         decide(
             "deny",
-            `Deploy preflight failed — this command is blocked:\n\n` +
+            `Preflight failed — this command is blocked:\n\n` +
                 fails.map((f) => `• ${f.message}${f.fix ? `\n  Fix: ${f.fix}` : ""}`).join("\n\n") +
                 `\n\nResolve these, then re-run: node tooling/scripts/harness/harness.mjs preflight`,
         );
@@ -83,7 +84,7 @@ try {
     if (warns.length) {
         decide(
             "ask",
-            `Deploy preflight raised warnings:\n\n` +
+            `Preflight raised warnings:\n\n` +
                 warns.map((f) => `• ${f.message}${f.fix ? `\n  Fix: ${f.fix}` : ""}`).join("\n\n") +
                 `\n\nConfirm this is the intended target before proceeding.`,
         );

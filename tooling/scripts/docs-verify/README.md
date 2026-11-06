@@ -62,6 +62,12 @@ and checks those numbers against `ALL_TOOLS` and `tooling/rebase-agent-skills/sk
 The tables are generated; the sentences around them were not, and stayed a
 release behind.
 
+Stage 1 also parses **every page's frontmatter** in all six locales
+(`check-frontmatter.mjs`) with the js-yaml that Astro loads. Every other stage
+reads page bodies, so a `description:` holding an unquoted `: ` (YAML reads it
+as a second key) left the gate green while `astro build` refused the page and
+rebase.pro could not deploy (2026-11-06, two Spanish pages).
+
 **2. `snippets` — English + skills, deep.** Compiles each fenced ts/js block
 against workspace *source* — the English docs, the skills, the example and
 package READMEs, and the agent instructions. English only, because the other

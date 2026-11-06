@@ -2,7 +2,7 @@
 
 Two things that share one mechanism:
 
-1. **A deploy gate** — blocks deploy-shaped commands whose preflight fails, before they run.
+1. **A deploy gate** — blocks deploy- and release-shaped commands whose preflight fails, before they run.
 2. **An eval harness** — scores agents on benchmark tasks derived from this repo's own fix commits.
 
 They share the hook layer: the same `PreToolUse`/`PostToolUse` hooks that enforce the gate
@@ -28,8 +28,8 @@ pnpm harness:preflight
 
 Runs every check and writes a stamp keyed to the exact tree (HEAD **plus** a hash of
 `git status`, so any uncommitted edit invalidates it). The `PreToolUse` hook reads that
-stamp; a `fail` denies the command, a `warn` escalates to the user, and anything not
-deploy-shaped is traced silently and allowed.
+stamp; a `fail` denies the command, a `warn` escalates to the user, and anything neither
+deploy- nor release-shaped is traced silently and allowed.
 
 The hook **fails open**. If a check crashes, the tool call proceeds and the error goes to
 the trace — a broken check must not be able to wedge a session.
@@ -41,6 +41,7 @@ the trace — a broken check must not be able to wedge a session.
 | `rls-drift` | A change to the policies `saas/config/collections` compiles to, with no migration SQL. The boot applies the rules but cannot create what a new one calls, so the table is left denying. Compares compiled policies at the merge-base and the working tree, so comments and respellings pass |
 | `config-build` | `saas/config` not compiling. The backend's tsc does not cover it, dev loads TS source, production loads `config/dist` |
 | `control-plane` | A deploy aimed at Cloud Run or Terraform, which do not serve `app.rebase.pro` (GKE does), and destructive `kubectl` verbs |
+| `release-ci` | A release command (`gh workflow run publish.yml`, `npm`/`pnpm publish`, pushing a `v*` tag) while CI on the commit it would ship is red (blocks) or not yet green (asks). Reads the remote branch tip from GitHub, so it judges what the dispatch builds |
 
 Add a check by dropping a module in `checks/` that exports `id`, `title`, and
 `run(ctx, { command })` returning findings, then listing it in `deploy/preflight.mjs`.

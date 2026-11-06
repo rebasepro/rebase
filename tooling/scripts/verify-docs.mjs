@@ -63,6 +63,7 @@ import { checkDocsLinks } from "./docs-verify/check-docs-links.mjs";
 import { checkTranslationFreshness } from "./docs-verify/check-translation-freshness.mjs";
 import { checkConfigExports } from "./docs-verify/check-config-exports.mjs";
 import { checkChangelogSections } from "./docs-verify/check-changelog-sections.mjs";
+import { checkFrontmatter } from "./docs-verify/check-frontmatter.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
 
@@ -110,6 +111,7 @@ if (asJson) {
         out.translationFreshness = checkTranslationFreshness(ROOT, { strict }).findings;
         out.configExports = checkConfigExports(ROOT).findings;
         out.changelogSections = checkChangelogSections(ROOT).findings;
+        out.frontmatter = checkFrontmatter(ROOT).findings;
     }
     if (only !== "names") {
         const r = await typecheckSnippets(ROOT);
@@ -272,6 +274,22 @@ if (only === "both" || only === "names") {
                 `English, so that one is a coverage gap rather than a break). ` +
                 `\`node scripts/translate_docs.mjs --dry-run\` in website/ lists them.${NC}`
         );
+    }
+}
+
+if (only === "both" || only === "names") {
+    console.log(`\n${YELLOW}━━━ Page frontmatter (all locales) ━━━${NC}`);
+    const { findings: bad, scanned } = checkFrontmatter(ROOT);
+    console.log(`${DIM}Parsed the frontmatter of ${scanned} docs page(s) with the YAML parser the site build uses.${NC}`);
+    if (!bad.length) {
+        console.log(`${GREEN}✓ Every page's frontmatter parses, so the build can load it.${NC}`);
+    } else {
+        findings += bad.length;
+        console.log(`${RED}✗ ${bad.length} page(s) whose frontmatter stops the site build:${NC}`);
+        for (const b of bad) {
+            console.log(`  ${RED}${b.file}:${b.line}${NC}`);
+            console.log(`      ${DIM}${b.message}${NC}`);
+        }
     }
 }
 

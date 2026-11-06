@@ -20,8 +20,16 @@ import * as rlsDrift from "../checks/rls-drift.mjs";
 import * as configBuild from "../checks/config-build.mjs";
 import * as lockfileWorktree from "../checks/lockfile-worktree.mjs";
 import * as controlPlane from "../checks/control-plane.mjs";
+import * as releaseCi from "../checks/release-ci.mjs";
 
-export const CHECKS = [lockfileWorktree, migrationOrder, rlsDrift, configBuild, controlPlane];
+export const CHECKS = [lockfileWorktree, migrationOrder, rlsDrift, configBuild, controlPlane, releaseCi];
+
+/**
+ * Checks that judge the proposed command rather than the tree. The hook runs them on
+ * every gated call, even with a fresh stamp: the stamp knows the tree, not the command,
+ * and CI's verdict on the branch can change between the stamp and the call.
+ */
+export const COMMAND_CHECK_IDS = [controlPlane.id, releaseCi.id];
 
 /**
  * Identity of the working tree, not just of HEAD.
