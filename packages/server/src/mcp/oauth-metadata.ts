@@ -47,7 +47,13 @@ export const DEFAULT_MCP_SCOPE = "data:read";
 export interface McpScopeVocabulary {
     /** Every scope a grant may hold, each with the line the consent screen shows for it. */
     supported: readonly { scope: string; description: string }[];
-    /** What a client that asks for nothing gets. One of `supported`. */
+    /**
+     * What a client that asks for nothing gets, and what the `401` challenge
+     * names in its `scope`, which is what Claude requests. Space-separated
+     * scopes from `supported`. The consent screen grants what was asked and
+     * cannot widen it, so a scope left out here is one a Claude user can
+     * never grant.
+     */
     defaultScope: string;
 }
 
