@@ -2,7 +2,7 @@
 sourceHash: 0ca75b0fa4561a93
 title: Relaciones en el panel de administración
 sidebar_label: Relaciones en el panel de administración
-description: Cómo cada relación a muchos se convierte en una pestaña bajo un registro: el segmento de la ruta, filas propias frente a compartidas, las mismas reglas por REST y qué no se convierte en pestaña.
+description: "Cómo cada relación a muchos se convierte en una pestaña bajo un registro: el segmento de la ruta, filas propias frente a compartidas, las mismas reglas por REST y qué no se convierte en pestaña."
 ---
 
 Toda relación a muchos — `hasMany`, `manyToMany` o un `via` a muchos — se

@@ -2,7 +2,7 @@
 sourceHash: 088ee76c9513e196
 title: Portabilidad en diferentes runtimes
 sidebar_label: Portabilidad en diferentes runtimes
-description: Lo que importa una función personalizada decide si podría ejecutarse fuera de un proceso de Node: qué es portable, qué es solo de Node y cómo lo informan rebase build y rebase doctor.
+description: "Lo que importa una función personalizada decide si podría ejecutarse fuera de un proceso de Node: qué es portable, qué es solo de Node y cómo lo informan rebase build y rebase doctor."
 ---
 
 Una función personalizada es una app de Hono, y Hono se ejecuta en cualquier runtime de servidor de JavaScript. Por lo tanto, el hecho de que *tu* función pueda ejecutarse fuera de un proceso de Node depende de lo que su propio archivo importe y utilice.
