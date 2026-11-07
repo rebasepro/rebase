@@ -216,6 +216,7 @@ function loadFunctions
 function loadFunctionsFromDirectory
 function loadFunctionsWithDiagnostics
 function loadUsersCollection
+function mcpAppBaseUri
 function mcpViewToolInputSchema
 function oauthCodeFlowSchema
 function overridableSecurityHeaders
@@ -277,6 +278,7 @@ function verifyCredential
 function verifyOidcIdToken
 function verifyPassword
 function versionProperty
+function versionedMcpAppUri
 function waitUntil
 interface AccessControl { model, resolveKeyOwner }
 interface AccessTokenPayload { aal, amr, claims, displayName, email, exp, iat, isAnonymous, mfa_verified, photoURL, roles, sid, uid }

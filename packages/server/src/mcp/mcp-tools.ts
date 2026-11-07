@@ -483,6 +483,10 @@ async function readPage(
 /**
  * The `ui://` resource show_collection, show_record and show_app open: the
  * admin panel's views, built by `@rebasepro/mcp-apps`.
+ *
+ * The base address. `/mcp` lists and advertises the view at this address
+ * plus its document's version (`versionedMcpAppUri`), and reads it at any
+ * version or none.
  */
 export const MCP_APP_URI = "ui://rebase/app.html";
 

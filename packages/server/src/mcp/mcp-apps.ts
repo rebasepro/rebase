@@ -16,6 +16,7 @@
  * The HTML itself is built by `@rebasepro/mcp-apps`; this file only knows its
  * shape, so `@rebasepro/server` carries no UI code.
  */
+import { sha256Hex } from "../utils/portable-crypto.js";
 
 /**
  * Compile an app the model wrote for the view (show_app's `code`): the code
@@ -62,6 +63,43 @@ export type McpAppsSource = () => Promise<readonly McpAppResource[]>;
  */
 export function mcpAppResourceMeta(): Record<string, unknown> {
     return { ui: { csp: {}, prefersBorder: true } };
+}
+
+/**
+ * The address a view is advertised at: its base `ui://` address with `?v=` and
+ * the first 12 hex digits of the document's SHA-256.
+ *
+ * A host may fetch a view once and cache it per URI (the MCP Apps
+ * specification allows it), and Claude does: under one fixed address a
+ * deploy's new view was never fetched, and the conversation ran the old one
+ * against the new tools. With the document's hash in it, a new build is a new
+ * address and an unchanged build keeps its cache. The specification asks only
+ * that the URI be `ui://` and served; the version rides in the query string,
+ * the part a reader strips to find the base ({@link mcpAppBaseUri}).
+ */
+export async function versionedMcpAppUri(baseUri: string, html: string): Promise<string> {
+    return withMcpAppVersion(baseUri, await mcpAppVersion(html));
+}
+
+/** The version {@link versionedMcpAppUri} puts in a document's address. */
+export async function mcpAppVersion(html: string): Promise<string> {
+    return (await sha256Hex(html)).slice(0, 12);
+}
+
+/** `baseUri` at `version`. */
+export function withMcpAppVersion(baseUri: string, version: string): string {
+    return `${mcpAppBaseUri(baseUri)}?v=${version}`;
+}
+
+/**
+ * A view address without its version: the base address that a hashed one, and
+ * the bare one hosts held before versions, both name. `resources/read` serves
+ * the current document for any version of a base it serves, so a host holding
+ * an older tool listing gets the current view rather than a not-found.
+ */
+export function mcpAppBaseUri(uri: string): string {
+    const query = uri.indexOf("?");
+    return query === -1 ? uri : uri.slice(0, query);
 }
 
 /**

@@ -12,12 +12,13 @@
  * - show_record and show_app check every block before a screen is opened, as
  *   the read and write tools would refuse it.
  */
+import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import path from "node:path";
-import { describe, it, expect, beforeAll } from "@jest/globals";
+import { describe, it, expect, beforeAll, jest } from "@jest/globals";
 import type { CollectionConfig } from "@rebasepro/types";
 import { configureJwt, generateMcpAccessToken } from "../src/auth/jwt";
-import { MCP_APP_MIME_TYPE, withProjectView, type McpAppResource } from "../src/mcp/mcp-apps";
+import { MCP_APP_MIME_TYPE, mcpAppBaseUri, versionedMcpAppUri, withProjectView, type McpAppResource } from "../src/mcp/mcp-apps";
 import { COLLECTION_TABLE_URI, MCP_APP_URI } from "../src/mcp/mcp-tools";
 import { buildApp, rpc, stubDriver, PUBLIC_URL } from "./helpers/mcp-harness";
 
@@ -76,8 +77,8 @@ describe("with views", () => {
 
         const listed = await call(app, bearer, "resources/list");
         expect(listed.result?.resources).toEqual([
-            expect.objectContaining({ uri: MCP_APP_URI, mimeType: MCP_APP_MIME_TYPE }),
-            expect.objectContaining({ uri: COLLECTION_TABLE_URI, mimeType: MCP_APP_MIME_TYPE })
+            expect.objectContaining({ uri: await versionedMcpAppUri(MCP_APP_URI, APP.html), mimeType: MCP_APP_MIME_TYPE }),
+            expect.objectContaining({ uri: await versionedMcpAppUri(COLLECTION_TABLE_URI, TABLE.html), mimeType: MCP_APP_MIME_TYPE })
         ]);
 
         const read = await call(app, bearer, "resources/read", { uri: COLLECTION_TABLE_URI });
@@ -94,12 +95,72 @@ describe("with views", () => {
 
     it("lists each show_* tool with the view it opens, in both spellings hosts read", async () => {
         const { app } = buildApp({ apps: withViews });
+        const advertised = await versionedMcpAppUri(MCP_APP_URI, APP.html);
         for (const name of ["show_collection", "show_record", "show_app"]) {
             const tool = await toolNamed(app, await token("data:read"), name);
-            expect(tool?._meta).toEqual({ ui: { resourceUri: MCP_APP_URI }, "ui/resourceUri": MCP_APP_URI });
+            expect(tool?._meta).toEqual({ ui: { resourceUri: advertised }, "ui/resourceUri": advertised });
         }
         // A tool with no view carries no `_meta` at all.
         expect((await toolNamed(app, await token("data:read"), "query_collection"))?._meta).toBeUndefined();
+    });
+});
+
+describe("the view's address carries its document's version", () => {
+    it("is the base address, `?v=` and twelve hex digits of the document's SHA-256", async () => {
+        const digest = createHash("sha256").update(APP.html).digest("hex");
+        expect(await versionedMcpAppUri(MCP_APP_URI, APP.html)).toBe(`${MCP_APP_URI}?v=${digest.slice(0, 12)}`);
+        // Versioning an already versioned address replaces its version.
+        expect(await versionedMcpAppUri(`${MCP_APP_URI}?v=000000000000`, APP.html)).toBe(`${MCP_APP_URI}?v=${digest.slice(0, 12)}`);
+        expect(mcpAppBaseUri(`${MCP_APP_URI}?v=${digest.slice(0, 12)}`)).toBe(MCP_APP_URI);
+        expect(mcpAppBaseUri(MCP_APP_URI)).toBe(MCP_APP_URI);
+    });
+
+    it("changes with the build, so a host that caches per address fetches the new one", async () => {
+        const advertisedFor = async (html: string) => {
+            const { app } = buildApp({ apps: async () => [{ ...APP, html }, { ...TABLE, html }] });
+            const tool = await toolNamed(app, await token("data:read"), "show_collection");
+            return (tool?._meta?.ui as { resourceUri: string }).resourceUri;
+        };
+        const before = await advertisedFor("<html>build 1</html>");
+        expect(await advertisedFor("<html>build 1</html>")).toBe(before);
+        const after = await advertisedFor("<html>build 2</html>");
+        expect(after).not.toBe(before);
+        expect(mcpAppBaseUri(after)).toBe(MCP_APP_URI);
+    });
+
+    it("reads the current document at the versioned address, the bare one, the old alias and a stale version", async () => {
+        const { app } = buildApp({ apps: withViews });
+        const bearer = await token("data:read");
+        for (const uri of [
+            await versionedMcpAppUri(MCP_APP_URI, APP.html),
+            MCP_APP_URI,
+            COLLECTION_TABLE_URI,
+            await versionedMcpAppUri(COLLECTION_TABLE_URI, TABLE.html),
+            `${MCP_APP_URI}?v=0123456789ab`
+        ]) {
+            const read = await call(app, bearer, "resources/read", { uri });
+            expect(read.result?.contents).toEqual([expect.objectContaining({ uri, mimeType: MCP_APP_MIME_TYPE, text: APP.html })]);
+        }
+        const unknown = await call(app, bearer, "resources/read", { uri: "ui://rebase/nope.html?v=0123456789ab" });
+        expect(unknown.error?.code).toBe(-32002);
+    });
+
+    it("hashes each loaded document once, however often the view is listed or read", async () => {
+        const digest = jest.spyOn(globalThis.crypto.subtle, "digest");
+        try {
+            const { app } = buildApp({ apps: withViews });
+            const bearer = await token("data:read");
+            await call(app, bearer, "tools/list");
+            await call(app, bearer, "resources/list");
+            await call(app, bearer, "resources/read", { uri: MCP_APP_URI });
+            await call(app, bearer, "tools/list");
+            // APP and TABLE are one document under two addresses.
+            const ofTheView = digest.mock.calls.filter(([, data]) =>
+                new TextDecoder().decode(data as Uint8Array) === APP.html);
+            expect(ofTheView).toHaveLength(1);
+        } finally {
+            digest.mockRestore();
+        }
     });
 });
 

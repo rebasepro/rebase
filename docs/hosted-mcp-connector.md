@@ -305,7 +305,12 @@ implementation beside the OAuth store.
   over a data driver that calls tools. `resources/list` and `resources/read`
   answer from the control plane, which also serves the same document under
   the old `ui://rebase/collection-table.html`. The tenant is never asked for
-  HTML.
+  HTML. The address the tools advertise and `resources/list` names carries
+  the document's version — `await versionedMcpAppUri(MCP_APP_URI, html)`,
+  `ui://rebase/app.html?v=<12 hex>` — because Claude caches a view per URI
+  and would otherwise never fetch a new build; `resources/read` matches on
+  `mcpAppBaseUri(uri)`, so the bare address, the old alias and a stale
+  version still read the current document. Both come from `@rebasepro/server`.
 - **The screen** is built by the tenant's own `show_collection`,
   `show_record` or `show_app`, under the platform token: the tenant holds the
   collections, checks the arguments as its read and write tools would (and

@@ -229,6 +229,10 @@ export type { McpToolDefinition, McpToolContext, McpCaller, McpToolAnnotations }
 // show_app teaches about the code it runs — so the two never disagree.
 export { MCP_APP_URI, MCP_VIEW_TOOLS, mcpViewToolInputSchema, SHOW_APP_CODE_GUIDE } from "./mcp/mcp-tools";
 export type { McpViewToolName } from "./mcp/mcp-tools";
+// The view's advertised address carries its document's version, so a host
+// that caches per URI fetches a new build: the address of a document, and the
+// base address any version of it names.
+export { versionedMcpAppUri, mcpAppBaseUri } from "./mcp/mcp-apps";
 export { DATA_SCOPE_VOCABULARY } from "./mcp/oauth-metadata";
 export type { McpScopeVocabulary } from "./mcp/oauth-metadata";
 

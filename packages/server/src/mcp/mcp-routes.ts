@@ -50,8 +50,11 @@ import { toolsForScopes, declaredArgumentsOnly, McpToolError, MCP_TOOLS, type Mc
 import { memoryConfirmationStore, withConfirmation, type McpConfirmationStore } from "./confirmation.js";
 import {
     MCP_APP_MIME_TYPE,
+    mcpAppBaseUri,
     mcpAppResourceMeta,
     mcpAppToolMeta,
+    mcpAppVersion,
+    withMcpAppVersion,
     type McpAppCompiler,
     type McpAppCompilerSource,
     type McpAppResource,
@@ -255,17 +258,24 @@ export function createMcpRoutes(config: McpRoutesConfig): Hono<HonoEnv> {
     }
 
     // Asked once. A source that fails is no views, said once, rather than a
-    // failure of every `tools/list` after it.
-    let appsLoaded: Promise<readonly McpAppResource[]> | undefined;
-    const apps = (): Promise<readonly McpAppResource[]> => {
+    // failure of every `tools/list` after it. Each view's versioned address
+    // is computed here, once per document loaded.
+    let appsLoaded: Promise<readonly ServedApp[]> | undefined;
+    const apps = (): Promise<readonly ServedApp[]> => {
         appsLoaded ??= config.apps
-            ? config.apps().catch((error: unknown) => {
+            ? config.apps().then(servedApps).catch((error: unknown) => {
                 logger.warn("[mcp] Could not load the MCP App views — tools that open one are not offered.", { error });
                 return [];
             })
             : Promise.resolve([]);
         return appsLoaded;
     };
+
+    /** The served view a `ui://` address names, at any version of it or none. */
+    async function appAt(uri: string): Promise<ServedApp | undefined> {
+        const base = mcpAppBaseUri(uri);
+        return (await apps()).find(app => app.base === base);
+    }
 
     let compilerLoaded: Promise<McpAppCompiler> | undefined;
     const compilerSource = config.appCompiler;
@@ -278,7 +288,7 @@ export function createMcpRoutes(config: McpRoutesConfig): Hono<HonoEnv> {
 
     /** Whether the view a tool opens, if any, is served here. A tool whose view is not does not exist here. */
     async function viewServed(tool: McpToolDefinition): Promise<boolean> {
-        return !tool.ui || (await apps()).some(app => app.uri === tool.ui?.resourceUri);
+        return !tool.ui || (await appAt(tool.ui.resourceUri)) !== undefined;
     }
 
     /** The tools this caller is offered: their scope, and the view a tool opens being served. */
@@ -530,17 +540,24 @@ export function createMcpRoutes(config: McpRoutesConfig): Hono<HonoEnv> {
             case "ping":
                 return rpcResult(id, {});
 
-            case "tools/list":
-                return rpcResult(id, {
-                    tools: (await offeredTools(caller.scopes)).map(tool => ({
+            // A tool names its view's base address; the listing names the
+            // version this server serves, so a host that cached an older build
+            // fetches this one.
+            case "tools/list": {
+                const listed = [];
+                for (const tool of await offeredTools(caller.scopes)) {
+                    const view = tool.ui && await appAt(tool.ui.resourceUri);
+                    listed.push({
                         name: tool.name,
                         ...(tool.title && { title: tool.title }),
                         description: tool.description,
                         inputSchema: tool.inputSchema,
                         ...(tool.annotations && { annotations: tool.annotations }),
-                        ...(tool.ui && { _meta: mcpAppToolMeta(tool.ui.resourceUri) })
-                    }))
-                });
+                        ...(view && { _meta: mcpAppToolMeta(view.uri) })
+                    });
+                }
+                return rpcResult(id, { tools: listed });
+            }
 
             // The views are the same for every caller: a document with no data
             // in it. What a view shows arrives as a tool result, scoped then.
@@ -558,14 +575,18 @@ export function createMcpRoutes(config: McpRoutesConfig): Hono<HonoEnv> {
                     }))
                 });
 
+            // Any version of a served address, or none, reads the current
+            // document: a host holding a tool listing from an earlier build
+            // asks for that build's address, or the bare one from before
+            // addresses had versions, and the view it should draw is this one.
             case "resources/read": {
                 if ((await apps()).length === 0) return rpcError(id, METHOD_NOT_FOUND, `Unknown method: ${method}`);
                 const uri = typeof params?.uri === "string" ? params.uri : "";
-                const app = (await apps()).find(candidate => candidate.uri === uri);
+                const app = await appAt(uri);
                 // -32002 is MCP's "resource not found".
                 if (!app) return rpcError(id, RESOURCE_NOT_FOUND, `Unknown resource: ${uri}`);
                 return rpcResult(id, {
-                    contents: [{ uri: app.uri, mimeType: MCP_APP_MIME_TYPE, text: app.html, _meta: mcpAppResourceMeta() }]
+                    contents: [{ uri, mimeType: MCP_APP_MIME_TYPE, text: app.html, _meta: mcpAppResourceMeta() }]
                 });
             }
 
@@ -681,6 +702,30 @@ export function createMcpRoutes(config: McpRoutesConfig): Hono<HonoEnv> {
     }
 
     return router;
+}
+
+/**
+ * A view as this endpoint serves it: `uri` is the versioned address it is
+ * listed and advertised at, `base` the address a tool names it by.
+ */
+interface ServedApp extends McpAppResource {
+    base: string;
+}
+
+/** The views, each at its versioned address — one digest per distinct document. */
+async function servedApps(loaded: readonly McpAppResource[]): Promise<readonly ServedApp[]> {
+    // The generic views are one document under two addresses, and it is
+    // megabytes: hashed once.
+    const versions = new Map<string, Promise<string>>();
+    return Promise.all(loaded.map(async app => {
+        let version = versions.get(app.html);
+        if (!version) {
+            version = mcpAppVersion(app.html);
+            versions.set(app.html, version);
+        }
+        const base = mcpAppBaseUri(app.uri);
+        return { ...app, base, uri: withMcpAppVersion(base, await version) };
+    }));
 }
 
 function rpcResult(id: string | number | null, result: unknown): Record<string, unknown> {
