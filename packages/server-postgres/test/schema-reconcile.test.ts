@@ -62,17 +62,47 @@ describe("planning and applying a schema reconcile", () => {
         const plan = await readReconcileFacts(queryable(db), [voiceCache]);
 
         expect(plan.problems).toEqual([]);
-        expect(plan.relaxed).toEqual([{ collection: "voice_cache", table: "public.voice_cache", column: "wav" }]);
+        expect(plan.relaxed).toEqual([
+            { collection: "voice_cache", table: "public.voice_cache", column: "wav" },
+            { collection: "voice_cache", table: "public.voice_cache", column: "legacy_blob", undeclared: true }
+        ]);
         expect(plan.undeclared).toEqual([
             { collection: "voice_cache", table: "public.voice_cache", column: "legacy_blob", blocksInserts: true },
             { collection: "voice_cache", table: "public.voice_cache", column: "note", blocksInserts: false }
         ]);
         expect(plan.dropped).toEqual([]);
         expect(plan.statements).toEqual([
-            `ALTER TABLE "public"."voice_cache" ALTER COLUMN "wav" DROP NOT NULL;`
+            `ALTER TABLE "public"."voice_cache" ALTER COLUMN "wav" DROP NOT NULL;`,
+            `ALTER TABLE "public"."voice_cache" ALTER COLUMN "legacy_blob" DROP NOT NULL;`
         ]);
-        // A required property stays required.
-        expect(plan.statements.join("\n")).not.toMatch(/"text"/);
+        // A required property stays required, and nothing is dropped.
+        expect(plan.statements.join("\n")).not.toMatch(/"text"|DROP COLUMN/);
+    });
+
+    it("keeps an undeclared required column's data and lets inserts through, without a drop", async () => {
+        // The state a removed property leaves: no property declares `legacy_blob`,
+        // it is NOT NULL with no default, and the API's insert never names it.
+        await expect(db.exec(`INSERT INTO public.voice_cache (text, wav) VALUES ('d', 'w')`)).rejects.toThrow(/legacy_blob/);
+
+        const plan = await readReconcileFacts(queryable(db), [voiceCache]);
+        for (const statement of plan.statements) await db.exec(statement);
+
+        await db.exec(`INSERT INTO public.voice_cache (text) VALUES ('d')`);
+        const { rows } = await db.query<{ legacy_blob: string | null }>(
+            `SELECT legacy_blob FROM public.voice_cache ORDER BY text`
+        );
+        expect(rows.map(r => r.legacy_blob)).toEqual(["blob-a", "blob-b", "blob-c", null]);
+
+        // Once relaxed it no longer blocks inserts, so it is only listed, and
+        // dropping it later is still the separate, named step.
+        const again = await readReconcileFacts(queryable(db), [voiceCache]);
+        expect(again.statements).toEqual([]);
+        expect(again.undeclared).toContainEqual(
+            { collection: "voice_cache", table: "public.voice_cache", column: "legacy_blob", blocksInserts: false }
+        );
+        const drop = await readReconcileFacts(queryable(db), [voiceCache], { drop: ["voice_cache.legacy_blob"] });
+        expect(drop.statements).toEqual([`ALTER TABLE "public"."voice_cache" DROP COLUMN "legacy_blob";`]);
+        expect(drop.dropped[0].rowsWithValue).toBe(3);
     });
 
     it("drops only the column named, and says how many rows hold data in it", async () => {

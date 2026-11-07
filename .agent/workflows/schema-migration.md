@@ -149,7 +149,8 @@ database URL:
 
 ```bash
 # 1. Deploy the collection change first. Reconcile plans against what the backend runs.
-# 2. Review and apply: relaxes NOT NULL on optional properties and lists undeclared columns.
+# 2. Review and apply: relaxes NOT NULL on optional properties, and on undeclared columns that
+#    block inserts (their data stays), and lists every undeclared column.
 rebase schema reconcile
 # 3. Drop a column no property declares. Name each one. The plan shows how many rows hold a value.
 rebase schema reconcile --drop voice_cache.wav

@@ -229,8 +229,13 @@ export interface SchemaReconcileColumn {
  * read, and a database that changed in between is planned and shown again.
  */
 export interface SchemaReconcilePlan {
-    /** Columns declared optional that the database still requires. */
-    relaxed: Array<{ collection: string; table: string; column: string }>;
+    /**
+     * Columns whose NOT NULL this plan drops: those declared optional that the
+     * database still requires, and those no property declares that block
+     * every insert (`undeclared: true`) and are not being dropped. Their data
+     * stays.
+     */
+    relaxed: Array<{ collection: string; table: string; column: string; undeclared?: boolean }>;
     /** Every column no collection declares, dropped or not. */
     undeclared: SchemaReconcileColumn[];
     /** The undeclared columns this plan drops: the ones `drop` named. */

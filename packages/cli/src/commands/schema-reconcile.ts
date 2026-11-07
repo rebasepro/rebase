@@ -35,13 +35,18 @@ export function parseReconcileArgs(rawArgs: string[]): { drop: string[]; yes: bo
 export function describeReconcilePlan(plan: SchemaReconcilePlan): string[] {
     const lines: string[] = [];
     for (const r of plan.relaxed) {
-        lines.push(`  ${chalk.cyan("relax")}  ${r.table}.${r.column}  ${chalk.gray(`optional in "${r.collection}", NOT NULL in the database`)}`);
+        const why = r.undeclared
+            ? `no property in "${r.collection}" declares it, and every insert fails on it; its data stays`
+            : `optional in "${r.collection}", NOT NULL in the database`;
+        lines.push(`  ${chalk.cyan("relax")}  ${r.table}.${r.column}  ${chalk.gray(why)}`);
     }
     for (const d of plan.dropped) {
         const rows = d.rowsWithValue === undefined ? "" : `${d.rowsWithValue.toLocaleString("en-US")} row(s) hold a value`;
         lines.push(`  ${chalk.red("drop")}   ${d.table}.${d.column}  ${chalk.red(rows)}`);
     }
-    const kept = plan.undeclared.filter(u => !plan.dropped.some(d => d.table === u.table && d.column === u.column));
+    const kept = plan.undeclared.filter(u =>
+        !plan.dropped.some(d => d.table === u.table && d.column === u.column)
+        && !plan.relaxed.some(r => r.undeclared && r.table === u.table && r.column === u.column));
     for (const u of kept) {
         const note = u.blocksInserts
             ? chalk.yellow("NOT NULL with no default: every insert fails until it is dropped or relaxed")
@@ -131,11 +136,11 @@ export async function schemaReconcileCommand(rawArgs: string[]): Promise<void> {
     }
     if (plan.statements.length === 0) {
         console.log(chalk.green("✓ Nothing to do: the database already matches what the collections declare."));
-        if (plan.undeclared.length > 0) {
-            console.log(chalk.gray("  To drop a column no property declares, name it: --drop <collection>.<column>"));
-        }
-        return;
     }
+    if (plan.undeclared.length > plan.dropped.length) {
+        console.log(chalk.gray("  To drop a column no property declares, name it: --drop <collection>.<column>"));
+    }
+    if (plan.statements.length === 0) return;
 
     console.log(chalk.bold("\nStatements"));
     for (const statement of plan.statements) console.log(`  ${statement}`);

@@ -1,5 +1,5 @@
 ---
-sourceHash: f64b55578741ad50
+sourceHash: 0ec000ff3cba5280
 title: Geração de Esquema
 sidebar_label: Geração de Esquema
 description: Gere esquemas Drizzle ORM a partir das definições de coleções, crie migrações SQL e mantenha seu banco de dados sincronizado com a CLI da Rebase.
@@ -81,17 +81,17 @@ para um build ou uma etapa de CI. Ele aceita `--collections` e `--output` como o
 Afrouxe e remova o que a inicialização não toca, depois de ler o plano:
 
 ```bash
-rebase schema reconcile                         # relax NOT NULL on properties made optional
+rebase schema reconcile                         # relax NOT NULL on properties made optional or removed
 rebase schema reconcile --drop voice_cache.wav  # and drop a column no property declares
 ```
 
 **O que ele faz:**
 - Pede ao backend em execução que planeje contra o próprio banco de dados. É o backend para o qual apontam o `.env` e o vínculo com a nuvem, então funciona no Rebase Cloud, onde nada mais alcança o banco de dados.
 - Planeja `DROP NOT NULL` para cada coluna que uma coleção declara opcional e que o banco de dados ainda exige.
-- Lista cada coluna que nenhuma coleção declara. Remove apenas as que você nomeia com `--drop <collection>.<column>`, e mostra quantas linhas têm um valor em cada uma.
+- Lista cada coluna que nenhuma coleção declara. Uma coluna `NOT NULL` sem valor padrão bloqueia cada inserção, então também é afrouxada, e seus dados ficam. Remove apenas as colunas que você nomeia com `--drop <collection>.<column>`, e mostra quantas linhas têm um valor em cada uma.
 - Aplica quando você digita `yes`. O servidor executa o plano apenas com o digest do que você leu, então, se o banco de dados ou as coleções mudaram nesse meio-tempo, ele recusa e você revisa de novo. `--yes` pula a confirmação.
 
-A inicialização só adiciona, então, depois que você remove uma propriedade, a coluna dela fica, com os dados. Uma coluna `NOT NULL` sem valor padrão faz então todo insert falhar, e o log da inicialização nomeia este comando para isso. Faça primeiro o deploy da alteração da coleção, porque o reconcile planeja contra o que o backend executa. Ele precisa de `REBASE_SERVICE_KEY` no `.env`. Localmente, o `rebase db push` cobre o mesmo com a sua trava de alterações destrutivas.
+A inicialização só adiciona, então, depois que você remove uma propriedade, a coluna dela fica, com os dados. Uma coluna `NOT NULL` sem valor padrão faz então todo insert falhar, e o log da inicialização nomeia este comando para isso: sem `--drop` para manter os dados, com ele para remover a coluna. Faça primeiro o deploy da alteração da coleção, porque o reconcile planeja contra o que o backend executa. Ele precisa de `REBASE_SERVICE_KEY` no `.env`. Localmente, o `rebase db push` cobre o mesmo com a sua trava de alterações destrutivas.
 
 ### `rebase schema introspect`
 

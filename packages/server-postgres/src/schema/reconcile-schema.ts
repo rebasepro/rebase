@@ -16,7 +16,10 @@
  * This plans both, for a person to read. It relaxes every column the
  * collections declare optional and the database still requires — the
  * `drop-not-null` actions the live editor's `converge` policy already plans —
- * and it lists every column no collection declares. It drops only the columns
+ * and it lists every column no collection declares. An undeclared column that
+ * blocks inserts (NOT NULL, no default) is relaxed too, unless it is being
+ * dropped: that keeps its data and makes the table writable again, which is
+ * the one thing a removed property must not prevent. It drops only the columns
  * the caller names, one by one: removing a property is not consent to destroy
  * the column's data, so the drop is a separate, explicit act.
  *
@@ -121,6 +124,14 @@ export function planSchemaReconcile(
         problems.push(table.columns.some(c => c.column === column)
             ? `"${request}": the "${slug}" collection still declares "${column}". Remove the property, deploy, then drop it.`
             : `"${request}": "${table.qualified}" has no column "${column}".`);
+    }
+
+    // An undeclared column every insert fails on, and that is not being
+    // dropped: stop requiring it. Its data stays where it is.
+    for (const column of undeclared) {
+        if (!column.blocksInserts || dropped.includes(column)) continue;
+        relaxed.push({ collection: column.collection, table: column.table, column: column.column, undeclared: true });
+        relaxStatements.push(`ALTER TABLE ${relation(column.tablePlan)} ALTER COLUMN "${column.column}" DROP NOT NULL;`);
     }
 
     const statements = [
