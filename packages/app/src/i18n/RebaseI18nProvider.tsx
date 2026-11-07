@@ -289,13 +289,15 @@ function createLocaleBackend(getOverrides: () => TranslationOverrides | undefine
 /**
  * The UI kit's own words (`@rebasepro/ui`'s list and card notices, the table's
  * error title, the search bar's names, the split view's back button and
- * divider, relative dates) in the admin language.
+ * divider, relative dates, the metric blocks' phrases and the language they
+ * write numbers in) in the admin language.
  * The kit speaks English on its own; this fills its labels from the
  * translations, and refills them when the language changes.
  */
 function UiLabelsFromTranslations({ children }: PropsWithChildren) {
     // `t` changes identity with the language, so the labels follow it.
-    const { t } = useTranslation();
+    const { t, i18n: instance } = useTranslation();
+    const language = instance.language;
     const labels = useMemo((): UiLabelsProviderProps["labels"] => ({
         errorLoadingData: (message) => t("error_loading_data_message", { message }),
         noEntriesFound: t("no_entries_found"),
@@ -307,6 +309,14 @@ function UiLabelsFromTranslations({ children }: PropsWithChildren) {
         openTimePicker: t("open_time_picker"),
         back: t("back"),
         resizeList: t("resize_list"),
+        changeUp: (change) => t("insights_change_up", { change }),
+        changeDown: (change) => t("insights_change_down", { change }),
+        noChange: t("insights_change_none"),
+        previousPeriodValue: (days, value) => t("insights_previous_period_value", { count: days, value }),
+        lastDays: (days) => t("insights_period_last_days", { count: days }),
+        noData: t("insights_no_data"),
+        date: t("date"),
+        locale: language,
         relativeTime: {
             justNow: t("relative_just_now"),
             inAMoment: t("relative_in_a_moment"),
@@ -317,6 +327,6 @@ function UiLabelsFromTranslations({ children }: PropsWithChildren) {
             daysAgo: (count) => t("relative_days_ago", { count }),
             inDays: (count) => t("relative_in_days", { count })
         }
-    }), [t]);
+    }), [t, language]);
     return <UiLabelsProvider labels={labels}>{children}</UiLabelsProvider>;
 }

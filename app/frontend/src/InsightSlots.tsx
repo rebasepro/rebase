@@ -4,18 +4,8 @@ import type { createRebaseClient } from "@rebasepro/client";
 import { resolveEnumValues } from "@rebasepro/common";
 import { useRebaseClient } from "@rebasepro/app";
 import { useSidePanel, useUrlController } from "@rebasepro/cms";
-import {
-    BarChart,
-    ChartCard,
-    KpiGrid,
-    KpiReadout,
-    KpiTile,
-    TimeSeriesChart,
-    useInsightData,
-    type Bar,
-    type InsightData,
-    type KpiProps
-} from "@rebasepro/plugin-insights";
+import { BarChart, ChartCard, KpiGrid, KpiReadout, KpiTile, TimeSeriesChart, type Bar, type KpiProps } from "@rebasepro/ui";
+import { useInsightData, type InsightData } from "@rebasepro/plugin-insights";
 
 /**
  * The demo's KPIs and charts, put in three places: the top of the home page,
@@ -23,7 +13,8 @@ import {
  *
  * Every figure and series is computed on the server by the `insights`
  * function, one route each, as the signed-in user. The components here only
- * load a route and draw it with the blocks from `@rebasepro/plugin-insights`.
+ * load a route with `useInsightData` and draw it with the metric blocks from
+ * `@rebasepro/ui`.
  * To add a chart: a route that answers with its rows, a `useInsights` call,
  * and a chart where it belongs.
  */
@@ -149,12 +140,12 @@ function HomeInsights() {
     const productIds = new Set((top.data ?? []).flatMap((product) => (product.id ? [product.id] : [])));
 
     return (
-        <div className="mt-6 pb-2 flex flex-col gap-4">
+        <div className="@container mt-6 pb-2 flex flex-col gap-4">
             <KpiGrid periodDays={PERIOD_DAYS}>
                 {HOME_KPIS.map((kpi) => <KpiTile key={kpi.id} icon={kpi.icon} {...figure(kpi, orders)}/>)}
             </KpiGrid>
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-                <ChartCard title="Revenue per day" icon="ChartArea" className="lg:col-span-2">
+            <div className="grid grid-cols-1 @4xl:grid-cols-3 gap-4">
+                <ChartCard title="Revenue per day" icon="ChartArea" className="@4xl:col-span-2">
                     <TimeSeriesChart
                         series={[{ id: "revenue", label: "Revenue", points: (daily.data ?? []).map((row) => ({ at: row.day, value: row.revenue })) }]}
                         format={USD}
@@ -193,10 +184,10 @@ function OrdersInsights({ path, collection }: CollectionWidgetsSlotProps) {
 
     return (
         <KpiGrid periodDays={PERIOD_DAYS} className="pb-4">
-            <div className="col-span-2 sm:col-span-1 flex flex-col gap-4">
+            <div className="col-span-2 @xl:col-span-1 flex flex-col gap-4">
                 {kpis.map((kpi) => <KpiTile key={kpi.id} icon={kpi.icon} {...figure(kpi, orders)}/>)}
             </div>
-            <ChartCard title="Orders by status" icon="ChartBar" className="col-span-2 lg:col-span-3">
+            <ChartCard title="Orders by status" icon="ChartBar" className="col-span-2 @4xl:col-span-3">
                 <BarChart
                     bars={bars}
                     loading={byStatus.loading}
@@ -220,10 +211,10 @@ function TicketsInsights({ path, collection }: CollectionWidgetsSlotProps) {
 
     return (
         <KpiGrid className="pb-4">
-            <div className="col-span-2 sm:col-span-1 flex flex-col gap-4">
+            <div className="col-span-2 @xl:col-span-1 flex flex-col gap-4">
                 {kpis.map((kpi) => <KpiTile key={kpi.id} icon={kpi.icon} {...figure(kpi, tickets)}/>)}
             </div>
-            <ChartCard title="Open tickets by priority" icon="ChartBar" className="col-span-2 lg:col-span-3">
+            <ChartCard title="Open tickets by priority" icon="ChartBar" className="col-span-2 @4xl:col-span-3">
                 <BarChart
                     bars={bars}
                     loading={byPriority.loading}

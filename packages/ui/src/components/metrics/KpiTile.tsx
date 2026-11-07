@@ -1,7 +1,13 @@
+"use client";
 import React from "react";
-import { getIcon, useTranslation } from "@rebasepro/app";
-import { cls, defaultBorderMixin, Tooltip, Typography } from "@rebasepro/ui";
-import { describeChange, formatNumber, type ChangeTone } from "./numbers";
+import { cls } from "../../util";
+import { describeChange, formatNumber, type ChangeTone } from "../../util/numbers";
+import { useUiLabels } from "../../hooks/UiLabelsContext";
+import { Card } from "../Card";
+import { Skeleton } from "../Skeleton";
+import { Tooltip } from "../Tooltip";
+import { Typography } from "../Typography";
+import { HeaderIcon } from "./chart_parts";
 
 /** The comparison window a tile names when no `periodDays` is given. */
 const DEFAULT_PERIOD_DAYS = 30;
@@ -14,9 +20,9 @@ const toneClasses: Record<ChangeTone, string> = {
     neutral: "text-text-secondary dark:text-text-secondary-dark"
 };
 
-/** A pulsing bar standing in for a figure that has not arrived, sized by its line box. */
+/** A shimmering bar standing in for a figure that has not arrived, sized by its line box. */
 export function Placeholder({ className }: { className: string }) {
-    return <span className={cls("inline-block align-middle rounded-sm bg-surface-200 dark:bg-surface-700 animate-pulse", className)}/>;
+    return <Skeleton className={cls("inline-block align-middle", className)}/>;
 }
 
 export interface KpiProps {
@@ -36,7 +42,7 @@ export interface KpiProps {
     error?: Error;
 }
 
-function displayValue(value: KpiProps["value"], format: Intl.NumberFormatOptions | undefined, locale: string): string {
+function displayValue(value: KpiProps["value"], format: Intl.NumberFormatOptions | undefined, locale: string | undefined): string {
     if (typeof value === "number") return formatNumber(value, format, locale);
     if (typeof value === "string" && value !== "") return value;
     return "—";
@@ -46,28 +52,32 @@ function displayValue(value: KpiProps["value"], format: Intl.NumberFormatOptions
  * The change against the previous window: an arrow and its size, coloured by
  * whether it is good news. The arrow carries the direction, so it reads
  * without the colour.
+ *
+ * Its words come from the nearest `UiLabelsProvider` (`changeUp`, `changeDown`,
+ * `noChange`, `previousPeriodValue`), and its numbers are written in that
+ * provider's `locale`.
  */
 export function KpiChange({ value, previous, format, goodWhen, show, periodDays = DEFAULT_PERIOD_DAYS, tooltip = true }: Pick<KpiProps, "value" | "previous" | "format" | "goodWhen" | "show" | "periodDays"> & {
     tooltip?: boolean;
 }) {
-    const { t, i18n } = useTranslation();
+    const labels = useUiLabels();
     if (typeof value !== "number" || typeof previous !== "number") return null;
 
-    const locale = i18n.language;
+    const locale = labels.locale;
     const change = describeChange({ current: value, previous, goodWhen, show, format, locale });
     const arrow = change.direction === "up" ? "↑ " : change.direction === "down" ? "↓ " : "";
     const spoken = change.direction === "up"
-        ? t("insights_change_up", { change: change.magnitude })
+        ? labels.changeUp(change.magnitude)
         : change.direction === "down"
-            ? t("insights_change_down", { change: change.magnitude })
-            : t("insights_change_none");
-    const previousLabel = t("insights_previous_period_value", { count: periodDays, value: formatNumber(previous, format, locale) });
+            ? labels.changeDown(change.magnitude)
+            : labels.noChange;
+    const previousLabel = labels.previousPeriodValue(periodDays, formatNumber(previous, format, locale));
 
     const label = (
-        <span className={cls("typography-mono text-xs font-medium whitespace-nowrap", toneClasses[change.tone])}>
+        <Typography variant="mono" component="span" color="inherit" className={cls("text-xs font-medium whitespace-nowrap", toneClasses[change.tone])}>
             <span aria-hidden="true">{arrow + change.magnitude}</span>
             <span className="sr-only">{`${spoken}. ${previousLabel}`}</span>
-        </span>
+        </Typography>
     );
     return tooltip ? <Tooltip title={previousLabel}>{label}</Tooltip> : label;
 }
@@ -76,29 +86,29 @@ export function KpiChange({ value, previous, format, goodWhen, show, periodDays 
  * One headline figure as a card: its label, its value and its change on the
  * previous window.
  *
- * The label renders before the figure arrives and only the figure pulses, so
- * nothing moves when the data lands.
+ * The label renders before the figure arrives and only the figure shimmers,
+ * so nothing moves when the data lands. Below 200px of its own width the
+ * tile tightens its padding and its figure.
  */
 export function KpiTile({ label, icon, className, ...figure }: KpiProps & {
-    /** An icon key, as `getIcon` takes it (`"DollarSign"`). */
-    icon?: string;
+    /** A Lucide icon name (`"DollarSign"`) or an icon element, drawn before the label. */
+    icon?: string | React.ReactNode;
     className?: string;
 }) {
-    const { i18n } = useTranslation();
+    const { locale } = useUiLabels();
     const { value, format, previous, loading, error } = figure;
-    const iconNode = icon ? getIcon(icon, "text-text-secondary dark:text-text-secondary-dark", undefined, 14) : null;
     const compares = previous !== undefined;
 
     return (
-        <div className={cls("@container rounded-xl bg-surface-card border min-w-0", defaultBorderMixin, className)}>
+        <Card className={cls("@container min-w-0", className)}>
             <div className="flex flex-col min-w-0 h-full px-5 py-4 @max-[200px]:px-3.5 @max-[200px]:py-3">
                 <div className="flex items-center gap-1.5 min-w-0 mb-2.5 @max-[200px]:mb-1">
-                    {iconNode && <span className="shrink-0 flex items-center [&>svg]:size-3.5">{iconNode}</span>}
+                    <HeaderIcon icon={icon}/>
                     <Typography variant="micro" color="secondary" className="truncate">{label}</Typography>
                 </div>
-                <div className="typography-stat leading-tight break-all text-text-primary dark:text-text-primary-dark @max-[200px]:text-xl">
-                    {loading ? <Placeholder className="h-[0.8em] w-24"/> : displayValue(value, format, i18n.language)}
-                </div>
+                <Typography variant="stat" component="div" className="leading-tight break-all @max-[200px]:text-xl">
+                    {loading ? <Placeholder className="h-[0.8em] w-24"/> : displayValue(value, format, locale)}
+                </Typography>
                 {error
                     ? <Typography variant="caption" color="error" className="block mt-1 truncate" title={error.message}>{error.message}</Typography>
                     : compares && (
@@ -107,13 +117,13 @@ export function KpiTile({ label, icon, className, ...figure }: KpiProps & {
                         </div>
                     )}
             </div>
-        </div>
+        </Card>
     );
 }
 
 /** One figure as a line of text — label, value, change — for tight places like a home-page card. */
 export function KpiReadout({ label, ...figure }: KpiProps) {
-    const { i18n } = useTranslation();
+    const { locale } = useUiLabels();
     const { value, format, loading, error } = figure;
 
     return (
@@ -122,9 +132,9 @@ export function KpiReadout({ label, ...figure }: KpiProps) {
             {loading
                 ? <Placeholder className="h-3 w-8"/>
                 : (
-                    <span className="text-sm font-semibold tabular-nums text-text-primary dark:text-text-primary-dark">
-                        {displayValue(value, format, i18n.language)}
-                    </span>
+                    <Typography variant="body1" component="span" className="font-semibold tabular-nums">
+                        {displayValue(value, format, locale)}
+                    </Typography>
                 )}
             {!loading && <KpiChange {...figure} tooltip={false}/>}
         </div>
@@ -132,23 +142,28 @@ export function KpiReadout({ label, ...figure }: KpiProps) {
 }
 
 /**
- * A grid of KPI tiles. Given `periodDays`, it names the window once above
- * them ("Last 30 days") rather than on every tile.
+ * A grid of KPI tiles, two to four across as its own width allows — inside a
+ * split panel or a narrow frame it stays at two however wide the window is.
+ * Given `periodDays`, it names the window once above them ("Last 30 days")
+ * rather than on every tile.
+ *
+ * The grid is a container, so a child that spans columns sizes itself with
+ * container variants too: `col-span-2 @4xl:col-span-3`.
  */
 export function KpiGrid({ periodDays, className, children }: {
     periodDays?: number;
     className?: string;
     children: React.ReactNode;
 }) {
-    const { t } = useTranslation();
+    const labels = useUiLabels();
     return (
-        <section className={cls("w-full", className)}>
+        <section className={cls("@container w-full", className)}>
             {periodDays !== undefined && (
                 <Typography variant="micro" color="secondary" component="h2" className="block py-1 mb-4">
-                    {t("insights_period_last_days", { count: periodDays })}
+                    {labels.lastDays(periodDays)}
                 </Typography>
             )}
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+            <div className="grid grid-cols-2 @xl:grid-cols-3 @4xl:grid-cols-4 gap-4">
                 {children}
             </div>
         </section>

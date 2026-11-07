@@ -88,6 +88,6 @@ export interface InsightDefinition {
         format?: InsightFormat;
     };
     comparison?: InsightComparison;
-    /** Optional icon key (e.g., "ShoppingCart", "Users"), resolved via `getIcon` */
+    /** Optional Lucide icon name (e.g., "ShoppingCart", "Users"). */
     icon?: string;
 }

@@ -1,4 +1,4 @@
-import { compactFormat, describeChange, formatNumber, niceTicks } from "./numbers";
+import { compactFormat, describeChange, formatNumber, niceTicks } from "../src/util/numbers";
 
 describe("niceTicks", () => {
     it("starts at zero and steps in round numbers past the maximum", () => {

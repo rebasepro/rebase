@@ -22,6 +22,7 @@ function Probe() {
         <span data-testid="loaded">{labels.allEntriesLoaded(3)}</span>
         <span data-testid="failed">{labels.errorLoadingData("boom")}</span>
         <span data-testid="relative">{formatRelativeTime(FIVE_MINUTES_AGO(), { labels: labels.relativeTime })}</span>
+        <span data-testid="metric">{`${labels.lastDays(30)} · ${labels.changeUp("12%")} · ${labels.noData} · ${labels.locale}`}</span>
         <SearchBar onTextSearch={() => undefined}/>
     </div>;
 }
@@ -45,6 +46,7 @@ describe("the UI kit's labels under the admin's i18n provider", () => {
         expect(screen.getByTestId("failed").textContent).toBe("Error loading data: boom");
         expect(screen.getByTestId("relative").textContent).toBe("5m ago");
         expect(screen.getByRole("search", { name: "Search" })).toBeTruthy();
+        expect(screen.getByTestId("metric").textContent).toBe("Last 30 days · Up 12% · No data for this period · en");
     });
 
     it("are Italian in Italian, and follow a change of language", async () => {
@@ -56,6 +58,7 @@ describe("the UI kit's labels under the admin's i18n provider", () => {
         expect(screen.getByTestId("failed").textContent).toBe("Errore nel caricamento dei dati: boom");
         expect(screen.getByTestId("relative").textContent).toBe("5 min fa");
         expect(screen.getByRole("search", { name: "Cerca" })).toBeTruthy();
+        expect(screen.getByTestId("metric").textContent).toBe("Ultimi 30 giorni · Aumento: 12% · Nessun dato per questo periodo · it");
 
         await view.setLocale("de");
         await waitFor(() => expect(screen.getByTestId("empty").textContent).toBe("Keine Einträge gefunden"), { timeout: 15_000 });

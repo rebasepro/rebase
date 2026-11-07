@@ -6,7 +6,7 @@ import { InsightsScorecardView } from "./InsightsScorecardView";
 /**
  * One insight, reading its source through the shared engine.
  *
- * @deprecated Use `KpiTile` reading `useInsightData` instead.
+ * @deprecated Use `KpiTile` from `@rebasepro/ui` reading `useInsightData` instead.
  */
 export function InsightWidget({
     definition,

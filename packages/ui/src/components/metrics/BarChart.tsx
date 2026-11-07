@@ -1,9 +1,12 @@
+"use client";
 import React from "react";
-import { useTranslation } from "@rebasepro/app";
-import { cls } from "@rebasepro/ui";
-import { formatNumber } from "../numbers";
+import { cls } from "../../util";
+import { formatNumber } from "../../util/numbers";
+import { SERIES_COLORS } from "../../util/series_colors";
+import { useUiLabels } from "../../hooks/UiLabelsContext";
+import { Button } from "../Button";
+import { Typography } from "../Typography";
 import { ChartStatus } from "./ChartCard";
-import { SERIES_COLORS } from "./palette";
 
 export interface Bar {
     /** Stable identity: the category's id, not its label. */
@@ -31,7 +34,7 @@ export function BarChart({ bars, format, onBarClick, loading, error, className }
     error?: Error;
     className?: string;
 }) {
-    const { i18n } = useTranslation();
+    const { locale } = useUiLabels();
     const height = Math.max(bars.length, 3) * ROW_HEIGHT;
     const empty = bars.length === 0;
     if (loading || error || empty) {
@@ -50,34 +53,36 @@ export function BarChart({ bars, format, onBarClick, loading, error, className }
                 const share = max > 0 ? Math.max(0, bar.value) / max : 0;
                 const row = (
                     <>
-                        <span className="w-[35%] max-w-40 shrink-0 truncate text-left text-xs text-text-secondary dark:text-text-secondary-dark" title={bar.label}>
+                        <Typography variant="body2" component="span" color="secondary" className="w-[35%] max-w-40 shrink-0 truncate text-left font-normal" title={bar.label}>
                             {bar.label}
-                        </span>
+                        </Typography>
                         <span className="grow min-w-0 h-full flex items-center">
                             <span
-                                // 4px rounded at the data end, square at the baseline; at least a
+                                // Rounded at the data end, square at the baseline; at least a
                                 // sliver for any value above zero, so it does not read as nothing.
-                                className={cls("block h-4 rounded-r-[4px] transition-opacity", SERIES_COLORS[0].bg, onBarClick && "group-hover:opacity-80")}
+                                className={cls("block h-4 rounded-r-sm transition-opacity", SERIES_COLORS[0].bg, onBarClick && "group-hover:opacity-80")}
                                 style={{ width: bar.value > 0 ? `max(2px, ${share * 100}%)` : 0 }}
                             />
                         </span>
-                        <span className="shrink-0 min-w-10 text-right text-xs font-semibold tabular-nums text-text-primary dark:text-text-primary-dark">
-                            {formatNumber(bar.value, format, i18n.language)}
-                        </span>
+                        <Typography variant="body2" component="span" className="shrink-0 min-w-10 text-right font-semibold tabular-nums">
+                            {formatNumber(bar.value, format, locale)}
+                        </Typography>
                     </>
                 );
-                const rowClasses = "w-full flex items-center gap-3 px-1 rounded-md";
+                const rowClasses = "w-full flex items-center gap-3 px-1";
                 return (
                     <li key={bar.key} style={{ height: ROW_HEIGHT }}>
                         {onBarClick
                             ? (
-                                <button
-                                    type="button"
-                                    className={cls(rowClasses, "group h-full cursor-pointer hover:bg-surface-100 dark:hover:bg-surface-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary")}
+                                <Button
+                                    variant="text"
+                                    size="smallest"
+                                    fullWidth
+                                    className={cls(rowClasses, "group h-full justify-start")}
                                     onClick={() => onBarClick(bar)}
                                 >
                                     {row}
-                                </button>
+                                </Button>
                             )
                             : <div className={cls(rowClasses, "h-full")}>{row}</div>}
                     </li>

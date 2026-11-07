@@ -5,8 +5,9 @@
  * contrast on the card): assign them in this order and never cycle them. A
  * ninth series folds into "Other" instead of getting a ninth hue.
  *
- * Each slot is literal Tailwind classes, so the stylesheet that scans this
- * package carries them.
+ * A series colour is data, not a surface, so each slot names its light and
+ * dark value itself rather than a theme token. Each is literal Tailwind
+ * classes, so the stylesheet that scans this package carries them.
  */
 export const SERIES_COLORS = [
     { stroke: "stroke-primary", fill: "fill-primary", bg: "bg-primary" },
@@ -20,9 +21,3 @@ export const SERIES_COLORS = [
 ] as const;
 
 export type SeriesColor = typeof SERIES_COLORS[number];
-
-/** Gridlines and axes: one step off the card, recessive. */
-export const GRID_CLASSES = "stroke-surface-200 dark:stroke-surface-700";
-
-/** Axis tick text: the secondary text tier, never a series colour. */
-export const TICK_CLASSES = "fill-text-secondary dark:fill-text-secondary-dark text-[11px] tabular-nums";

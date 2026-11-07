@@ -4,7 +4,8 @@ import React, { createContext, useContext, useMemo } from "react";
 /**
  * The words the kit itself puts on screen: the list and card views' notices,
  * the table's error title, the search bar's names, the split view's back
- * button and divider, and the relative-time phrases of `formatRelativeTime`
+ * button and divider, the metric blocks' change and period phrases, and the
+ * relative-time phrases of `formatRelativeTime`
  * (`@rebasepro/utils`).
  *
  * A label that carries a value is a function of it, so a translation can
@@ -31,6 +32,25 @@ export interface UiLabels {
     back: string;
     /** The divider between a `SplitView`'s master and detail. */
     resizeList: string;
+    /** A rise, as a screen reader hears a `KpiChange`: "Up 12%". */
+    changeUp: (change: string) => string;
+    /** A fall, as a screen reader hears a `KpiChange`: "Down 12%". */
+    changeDown: (change: string) => string;
+    /** A figure that did not move, as a screen reader hears a `KpiChange`. */
+    noChange: string;
+    /** The figure a change is measured against, in a `KpiChange` tooltip: "Previous 30 days: $1,200". */
+    previousPeriodValue: (days: number, value: string) => string;
+    /** The window a `KpiGrid` names above its tiles: "Last 30 days". */
+    lastDays: (days: number) => string;
+    /** A chart with nothing to draw. */
+    noData: string;
+    /** The heading of the dates column in a `TimeSeriesChart`'s screen-reader table. */
+    date: string;
+    /**
+     * The language the metric blocks write numbers and dates in, as a BCP 47
+     * tag (`"de"`, `"pt-BR"`). The runtime's own when absent.
+     */
+    locale?: string;
     /** The phrases `formatRelativeTime` (`@rebasepro/utils`) takes as `labels`. */
     relativeTime: UiRelativeTimeLabels;
 }
@@ -59,6 +79,13 @@ export const defaultUiLabels: UiLabels = {
     openTimePicker: "Open time picker",
     back: "Back",
     resizeList: "Resize the list",
+    changeUp: (change) => `Up ${change}`,
+    changeDown: (change) => `Down ${change}`,
+    noChange: "No change",
+    previousPeriodValue: (days, value) => (days === 1 ? `Previous day: ${value}` : `Previous ${days} days: ${value}`),
+    lastDays: (days) => (days === 1 ? "Last day" : `Last ${days} days`),
+    noData: "No data for this period",
+    date: "Date",
     relativeTime: {
         justNow: "just now",
         inAMoment: "in a moment",

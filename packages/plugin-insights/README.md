@@ -1,7 +1,8 @@
 # @rebasepro/plugin-insights
 
-KPI tiles and charts for the Rebase admin panel, as components you put where
-you want them.
+Figures for KPI tiles and charts in the Rebase admin panel. `useInsightData`
+loads each one once per signed-in user and shares it; the tiles and charts
+that draw them are in `@rebasepro/ui`.
 
 ## Installation
 
@@ -17,11 +18,12 @@ of it resolves too: Node has supported `require(esm)` since 22.12.
 
 ## What This Package Does
 
-It draws figures — revenue, orders, open tickets — and the series behind them,
-in the admin's own card, type and colour tokens. It does not decide what to
-show or where: you write a component that loads some numbers and draws them
-with these blocks, and put it in a place of the admin (`<Rebase slots>`, a page
-in `views`, a collection view).
+It loads figures — revenue, orders, open tickets — and the series behind
+them, for the metric blocks in `@rebasepro/ui` (`KpiTile`, `KpiGrid`,
+`ChartCard`, `TimeSeriesChart`, `BarChart`) to draw. It does not decide what
+to show or where: you write a component that loads some numbers with
+`useInsightData` and draws them with those blocks, and put it in a place of
+the admin (`<Rebase slots>`, a page in `views`, a collection view).
 
 The numbers come from wherever you like. The usual shape is a backend function
 that runs the `GROUP BY` in SQL, one route per figure or series, called as the
@@ -30,28 +32,19 @@ signed-in user so permissions and row-level security apply. The demo app's
 a complete example: KPI tiles, revenue per day, top products, and bars that
 open the collection filtered to what they count.
 
-Charts are SVG and HTML with no chart library, so they add a few kilobytes,
-follow the admin's light and dark themes, and print. They follow one set of
-rules: one y-axis starting at zero, 2px lines, bars at most 24px thick with a
-rounded data end, the kit's primary for a single series, a legend from two
-series, a hover (and arrow-key) readout, and a table for screen readers.
-
-## Building blocks
+## Exports
 
 | Export | What it is |
 |---|---|
 | `useInsightData(key, load, { ttl })` | Runs `load()` once per key **and signed-in user**, and shares the result with every component reading that key within `ttl` (60s by default). Returns `{ data, error, loading }`. |
-| `KpiTile` | One figure as a card: label, optional icon, value, and the change on the previous window (`previous`, `goodWhen`, `show`). |
-| `KpiReadout` | The same figure as one line of text, for a home-page card. |
-| `KpiGrid` | A responsive grid of tiles; given `periodDays`, it names the window once above them. |
-| `ChartCard` | A card with the header grammar (icon, micro title, optional headline and action) around a chart. |
-| `TimeSeriesChart` | One or more measures over time, as lines or a line with a wash (`variant`). Points are `{ at, value }`; a bare day (`"2026-11-07"`) is that calendar day. `null` leaves a gap. |
-| `BarChart` | Categories by size, as horizontal bars with their values beside them. `onBarClick` makes each row a button. |
-| `formatNumber`, `compactFormat`, `describeChange`, `niceTicks` | The number formatting and axis maths the blocks use. |
-| `SERIES_COLORS` | The validated series colours, as Tailwind classes, in the order series take them. |
+| `clearInsightData()` | Forgets every loaded result, so the next read loads again. |
+| `DEFAULT_INSIGHT_TTL` | The default `ttl`, in milliseconds. |
 
-Every block takes `Intl.NumberFormatOptions` for its numbers and writes them in
-the admin's language.
+The blocks the figures go into — `KpiTile`, `KpiReadout`, `KpiGrid`,
+`ChartCard`, `TimeSeriesChart`, `BarChart`, `SERIES_COLORS` and the number
+helpers — are documented with the kit, under "Metrics and charts" in
+`@rebasepro/ui`. They take `Intl.NumberFormatOptions` for their numbers and
+write them in the admin's language.
 
 ## Example
 
@@ -59,7 +52,8 @@ the admin's language.
 import { useRebaseClient } from "@rebasepro/app";
 import type { createRebaseClient } from "@rebasepro/client";
 import type { AnySlotContribution } from "@rebasepro/cms-types";
-import { ChartCard, KpiGrid, KpiTile, TimeSeriesChart, useInsightData } from "@rebasepro/plugin-insights";
+import { ChartCard, KpiGrid, KpiTile, TimeSeriesChart } from "@rebasepro/ui";
+import { useInsightData } from "@rebasepro/plugin-insights";
 
 type RebaseClient = ReturnType<typeof createRebaseClient>;
 type Figures = { revenue: number; previousRevenue: number };
@@ -86,7 +80,7 @@ function RevenueOverview() {
                 loading={totals.loading}
                 error={totals.error}
             />
-            <ChartCard title="Revenue per day" className="col-span-2 lg:col-span-3">
+            <ChartCard title="Revenue per day" className="col-span-2 @4xl:col-span-3">
                 <TimeSeriesChart
                     series={[{ id: "revenue", label: "Revenue", points: (daily.data ?? []).map((d) => ({ at: d.day, value: d.revenue })) }]}
                     format={{ style: "currency", currency: "USD" }}
@@ -130,4 +124,4 @@ and `InsightsRow`, and the `Insight*` types. To move a config over:
 
 - `@rebasepro/app` — Core framework: `<Rebase slots>`, `useRebaseClient`, i18n
 - `@rebasepro/cms` — The admin's places and the customization recipes
-- `@rebasepro/ui` — The kit whose cards, type and colours the blocks use
+- `@rebasepro/ui` — The kit: `KpiTile`, `TimeSeriesChart`, `BarChart` and the rest of the metric blocks

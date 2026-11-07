@@ -1,19 +1,26 @@
-// ── Building blocks ───────────────────────────────────────────────────
-// Components and hooks you put in places yourself: `<Rebase slots>`, a page,
-// a collection view.
+// ── Data ──────────────────────────────────────────────────────────────
+// Figures for the metric blocks in `@rebasepro/ui` (`KpiTile`, `TimeSeriesChart`,
+// `BarChart`), loaded once per key and signed-in user.
 export { useInsightData, clearInsightData, DEFAULT_INSIGHT_TTL } from "./blocks/useInsightData";
 export type { InsightData } from "./blocks/useInsightData";
-export { KpiTile, KpiReadout, KpiGrid, KpiChange, Placeholder } from "./blocks/KpiTile";
-export type { KpiProps } from "./blocks/KpiTile";
-export { ChartCard, ChartStatus } from "./blocks/charts/ChartCard";
-export { TimeSeriesChart } from "./blocks/charts/TimeSeriesChart";
-export type { TimeSeries, TimeSeriesPoint } from "./blocks/charts/TimeSeriesChart";
-export { BarChart } from "./blocks/charts/BarChart";
-export type { Bar } from "./blocks/charts/BarChart";
-export { SERIES_COLORS } from "./blocks/charts/palette";
-export type { SeriesColor } from "./blocks/charts/palette";
-export { formatNumber, compactFormat, describeChange, niceTicks } from "./blocks/numbers";
-export type { Change, ChangeDirection, ChangeTone } from "./blocks/numbers";
+// Re-exported until the MCP view and the guide import them from @rebasepro/ui.
+export {
+    KpiTile,
+    KpiReadout,
+    KpiGrid,
+    KpiChange,
+    Placeholder,
+    ChartCard,
+    ChartStatus,
+    TimeSeriesChart,
+    BarChart,
+    SERIES_COLORS,
+    formatNumber,
+    compactFormat,
+    describeChange,
+    niceTicks
+} from "@rebasepro/ui";
+export type { KpiProps, TimeSeries, TimeSeriesPoint, Bar, SeriesColor, Change, ChangeDirection, ChangeTone } from "@rebasepro/ui";
 
 // ── Deprecated: the configured plugin's engine and widgets ────────────
 // Kept working until they are removed.

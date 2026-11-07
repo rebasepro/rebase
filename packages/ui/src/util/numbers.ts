@@ -3,7 +3,7 @@
  * when the language is not a tag `Intl` accepts (i18next's `cimode`, a custom
  * bundle name).
  */
-export function numberFormat(locale: string | undefined, options: Intl.NumberFormatOptions = {}): Intl.NumberFormat {
+function numberFormat(locale: string | undefined, options: Intl.NumberFormatOptions = {}): Intl.NumberFormat {
     try {
         return new Intl.NumberFormat(locale, options);
     } catch {

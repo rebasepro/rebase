@@ -1,9 +1,14 @@
+"use client";
 import React, { useState } from "react";
-import { useTranslation } from "@rebasepro/app";
-import { cls, useElementWidth } from "@rebasepro/ui";
-import { compactFormat, formatNumber, niceTicks } from "../numbers";
+import { cls } from "../../util";
+import { compactFormat, formatNumber, niceTicks } from "../../util/numbers";
+import { SERIES_COLORS } from "../../util/series_colors";
+import { useUiLabels } from "../../hooks/UiLabelsContext";
+import { useElementWidth } from "../../hooks/useElementWidth";
+import { Table, TableBody, TableCell, TableHeader, TableRow } from "../Table";
+import { Typography } from "../Typography";
 import { ChartStatus } from "./ChartCard";
-import { GRID_CLASSES, SERIES_COLORS, TICK_CLASSES } from "./palette";
+import { GRID_CLASSES, TICK_CLASSES } from "./chart_parts";
 
 export interface TimeSeriesPoint {
     /** A `Date`, an epoch in ms, or an ISO string. A bare day (`"2026-11-07"`) is that calendar day. */
@@ -21,7 +26,7 @@ export interface TimeSeries {
 const MARGIN = { top: 8, right: 8, bottom: 22 };
 const DAY_ONLY = /^\d{4}-\d{2}-\d{2}$/;
 
-function dateFormatter(locale: string, options: Intl.DateTimeFormatOptions): Intl.DateTimeFormat {
+function dateFormatter(locale: string | undefined, options: Intl.DateTimeFormatOptions): Intl.DateTimeFormat {
     try {
         return new Intl.DateTimeFormat(locale, options);
     } catch {
@@ -73,6 +78,10 @@ function areaPath(points: { x: number; y: number | null }[], baseline: number): 
  *
  * Two measures of different scale (revenue and orders) are two charts, not
  * one with two axes.
+ *
+ * It fills its container's width, measured, so it redraws to fit a split
+ * panel or a narrow frame. Dates and numbers are written in the nearest
+ * `UiLabelsProvider`'s `locale`.
  */
 export function TimeSeriesChart({ series, variant = "area", format, dateFormat, height = 200, loading, error, xLabel, className }: {
     series: TimeSeries[];
@@ -84,14 +93,15 @@ export function TimeSeriesChart({ series, variant = "area", format, dateFormat, 
     height?: number;
     loading?: boolean;
     error?: Error;
-    /** What the x values are, for the table screen readers get. Defaults to "date". */
+    /** What the x values are, for the table screen readers get. Defaults to the `date` label. */
     xLabel?: string;
     className?: string;
 }) {
-    const { t, i18n } = useTranslation();
-    const locale = i18n.language;
+    const labels = useUiLabels();
+    const locale = labels.locale;
+    // On the root, which every state renders, so the width is known the
+    // moment the data lands.
     const [ref, width] = useElementWidth<HTMLDivElement>();
-    const [active, setActive] = useState<number | null>(null);
 
     const dayOnly = series.every((s) => s.points.every((p) => typeof p.at === "string" && DAY_ONLY.test(p.at)));
     // A bare day parses as its UTC midnight, so it is written in UTC or it
@@ -109,8 +119,48 @@ export function TimeSeriesChart({ series, variant = "area", format, dateFormat, 
     const values = parsed.flatMap((s) => s.points.flatMap((p) => (p.value === null ? [] : [p.value])));
     const empty = times.length === 0 || values.length === 0;
 
-    const status = <ChartStatus height={height} loading={loading} error={error} empty={!loading && !error && empty}/>;
-    if (loading || error || empty) return <div className={className}>{status}</div>;
+    return (
+        <div ref={ref} className={cls("w-full min-w-0", className)}>
+            {loading || error || empty
+                ? <ChartStatus height={height} loading={loading} error={error} empty={!loading && !error && empty}/>
+                : (
+                    <Plot
+                        series={parsed}
+                        times={times}
+                        values={values}
+                        width={width}
+                        height={height}
+                        variant={variant}
+                        format={format}
+                        dates={dates}
+                        locale={locale}
+                        xLabel={xLabel ?? labels.date}
+                    />
+                )}
+        </div>
+    );
+}
+
+interface ParsedSeries {
+    id: string;
+    label: string;
+    points: { t: number; value: number | null }[];
+}
+
+/** The legend, the marks, the readout and the screen-reader table of a chart with data. */
+function Plot({ series: parsed, times, values, width, height, variant, format, dates, locale, xLabel }: {
+    series: ParsedSeries[];
+    times: number[];
+    values: number[];
+    width: number;
+    height: number;
+    variant: "area" | "line";
+    format?: Intl.NumberFormatOptions;
+    dates: Intl.DateTimeFormat;
+    locale?: string;
+    xLabel: string;
+}) {
+    const [active, setActive] = useState<number | null>(null);
 
     const ticks = niceTicks(Math.min(...values), Math.max(...values));
     const yMin = ticks[0];
@@ -142,26 +192,25 @@ export function TimeSeriesChart({ series, variant = "area", format, dateFormat, 
     };
 
     const activeTime = active === null ? null : times[active];
-    const valueAt = (s: typeof parsed[number], time: number) => s.points.find((p) => p.t === time)?.value ?? null;
+    const valueAt = (s: ParsedSeries, time: number) => s.points.find((p) => p.t === time)?.value ?? null;
 
     return (
-        <div className={cls("w-full min-w-0", className)}>
-            {series.length > 1 && (
+        <>
+            {parsed.length > 1 && (
                 <ul className="flex flex-wrap gap-x-4 gap-y-1 mb-2">
-                    {series.map((s, i) => (
-                        <li key={s.id} className="flex items-center gap-1.5 text-xs text-text-secondary dark:text-text-secondary-dark">
-                            <span className={cls("w-3 h-0.5 rounded-full", SERIES_COLORS[i % SERIES_COLORS.length].bg)}/>
-                            {s.label}
+                    {parsed.map((s, i) => (
+                        <li key={s.id} className="flex items-center gap-1.5">
+                            <span aria-hidden="true" className={cls("w-3 h-0.5 rounded-full", SERIES_COLORS[i % SERIES_COLORS.length].bg)}/>
+                            <Typography variant="body2" component="span" color="secondary">{s.label}</Typography>
                         </li>
                     ))}
                 </ul>
             )}
             <div
-                ref={ref}
-                className="relative w-full outline-none focus-visible:ring-2 focus-visible:ring-primary rounded-md"
+                className="relative w-full outline-none focus-visible:ring-2 focus-visible:ring-primary rounded-lg"
                 style={{ height }}
                 tabIndex={0}
-                aria-label={series.map((s) => s.label).join(", ")}
+                aria-label={parsed.map((s) => s.label).join(", ")}
                 onPointerMove={(event) => setActive(nearest(event.clientX - event.currentTarget.getBoundingClientRect().left))}
                 onPointerLeave={() => setActive(null)}
                 onFocus={() => setActive((current) => current ?? times.length - 1)}
@@ -204,7 +253,7 @@ export function TimeSeriesChart({ series, variant = "area", format, dateFormat, 
                         })}
                         {activeTime !== null && (
                             <g>
-                                <line x1={xOf(activeTime)} x2={xOf(activeTime)} y1={y0} y2={y1} className="stroke-surface-400 dark:stroke-surface-500" strokeWidth={1}/>
+                                <line x1={xOf(activeTime)} x2={xOf(activeTime)} y1={y0} y2={y1} className="stroke-text-disabled dark:stroke-text-disabled-dark" strokeWidth={1}/>
                                 {parsed.map((s, i) => {
                                     const value = valueAt(s, activeTime);
                                     if (value === null) return null;
@@ -225,49 +274,45 @@ export function TimeSeriesChart({ series, variant = "area", format, dateFormat, 
                 )}
                 {activeTime !== null && (
                     <div
-                        className={cls(
-                            "pointer-events-none absolute top-0 z-10 min-w-32 rounded-lg border px-3 py-2 shadow-sm",
-                            "bg-surface-card border-surface-200 dark:border-surface-700"
-                        )}
+                        // A floating surface: the card fill, the strong hairline and a shadow.
+                        className="pointer-events-none absolute top-0 z-10 min-w-32 rounded-lg border border-hairline-strong bg-surface-card px-3 py-2 shadow-sm"
                         style={xOf(activeTime) > width / 2
                             ? { right: width - xOf(activeTime) + 12 }
                             : { left: xOf(activeTime) + 12 }}
                     >
-                        <div className="text-xs text-text-secondary dark:text-text-secondary-dark mb-1">{dates.format(activeTime)}</div>
+                        <Typography variant="body2" component="div" color="secondary" className="mb-1">{dates.format(activeTime)}</Typography>
                         {parsed.map((s, i) => {
                             const value = valueAt(s, activeTime);
                             return (
-                                <div key={s.id} className="flex items-center gap-2 text-xs whitespace-nowrap">
-                                    <span className={cls("w-3 h-0.5 rounded-full shrink-0", SERIES_COLORS[i % SERIES_COLORS.length].bg)}/>
-                                    <span className="font-semibold tabular-nums text-text-primary dark:text-text-primary-dark">
+                                <div key={s.id} className="flex items-center gap-2 whitespace-nowrap">
+                                    <span aria-hidden="true" className={cls("w-3 h-0.5 rounded-full shrink-0", SERIES_COLORS[i % SERIES_COLORS.length].bg)}/>
+                                    <Typography variant="body2" component="span" className="font-semibold tabular-nums">
                                         {value === null ? "—" : formatNumber(value, format, locale)}
-                                    </span>
-                                    <span className="text-text-secondary dark:text-text-secondary-dark">{s.label}</span>
+                                    </Typography>
+                                    <Typography variant="body2" component="span" color="secondary">{s.label}</Typography>
                                 </div>
                             );
                         })}
                     </div>
                 )}
             </div>
-            <table className="sr-only">
-                <thead>
-                    <tr>
-                        <th scope="col">{xLabel ?? t("date")}</th>
-                        {series.map((s) => <th key={s.id} scope="col">{s.label}</th>)}
-                    </tr>
-                </thead>
-                <tbody>
+            <Table className="sr-only">
+                <TableHeader>
+                    <TableCell>{xLabel}</TableCell>
+                    {parsed.map((s) => <TableCell key={s.id}>{s.label}</TableCell>)}
+                </TableHeader>
+                <TableBody>
                     {times.map((time) => (
-                        <tr key={time}>
-                            <th scope="row">{dates.format(time)}</th>
+                        <TableRow key={time}>
+                            <TableCell header scope="row">{dates.format(time)}</TableCell>
                             {parsed.map((s) => {
                                 const value = valueAt(s, time);
-                                return <td key={s.id}>{value === null ? "—" : formatNumber(value, format, locale)}</td>;
+                                return <TableCell key={s.id}>{value === null ? "—" : formatNumber(value, format, locale)}</TableCell>;
                             })}
-                        </tr>
+                        </TableRow>
                     ))}
-                </tbody>
-            </table>
-        </div>
+                </TableBody>
+            </Table>
+        </>
     );
 }
