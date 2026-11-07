@@ -7,6 +7,8 @@ import { DrizzleClient } from "./interfaces";
 import {
     ANONYMOUS_USER_ID,
     DatabaseAdmin,
+    DatabaseHealthSample,
+    DatabasePoolStats,
     SQLAdmin,
     DataDriver,
     DeleteProps,
@@ -67,6 +69,9 @@ import { readReconcileFacts } from "./schema/reconcile-schema";
 import { onOwnSession, openSqlCursorOnPool, readWithinBudget, refuseOversizedRows, RESET_SESSION_STATEMENTS, runSqlScriptOnPool, sqlScriptResultFromRows } from "./services/sql-script";
 import { PgNotifyListener } from "./services/pg-notify-listener";
 import { diffDatabaseBranch, mergeDatabaseBranch } from "./branching/branch-diff";
+import { isPooledPool, pooledTransactionSettings, transactionSettingsStatements } from "./connection";
+import { isReplicaFallbackError, type ReadRouter } from "./read-routing";
+import { poolStatsOf, sampleDatabaseHealth } from "./database-health";
 
 /**
  * Has an operator opted out of database role switching entirely?
@@ -433,6 +438,26 @@ export class PostgresBackendDriver implements DataDriver {
     public listenConnectionString?: string;
 
     /**
+     * A handle on this source's direct URL for the work that needs a session
+     * of its own — the Studio SQL console's runs, cursors and cancels — set by
+     * the bootstrapper when the pool reaches the database through a
+     * transaction-mode pooler (`DATABASE_POOLED=true`). There, `SET ROLE` for a
+     * session, a cursor held across reads and `pg_cancel_backend` of "this
+     * run's backend" mean nothing: each transaction may land on another server
+     * connection. Unset, the pool itself is direct and serves them.
+     */
+    public sessionDb?: DrizzleClient;
+
+    /**
+     * Where authenticated reads may go instead of the primary: this source's
+     * read replica, with its lag guard and read-your-writes pins. Set by the
+     * bootstrapper when `DATABASE_READ_URL` names another server. Read by
+     * {@link AuthenticatedPostgresBackendDriver}; this driver's own reads stay
+     * on the primary.
+     */
+    public readRouter?: ReadRouter<DrizzleClient>;
+
+    /**
      * When true, realtime notifications are deferred until after the
      * wrapping transaction commits.  Set by `withAuth` → `withTransaction`.
      */
@@ -524,6 +549,8 @@ export class PostgresBackendDriver implements DataDriver {
                 options
             ),
             listen: (...args: Parameters<NonNullable<SQLAdmin["listen"]>>) => this.listen(...args),
+            poolStats: () => this.poolStats(),
+            sampleHealth: () => this.sampleHealth(),
             // Branch operations (only available when poolManager is configured)
             ...(this.branchService ? {
                 createBranch: this.branchService.createBranch.bind(this.branchService),
@@ -573,8 +600,11 @@ export class PostgresBackendDriver implements DataDriver {
         options?: { onReconnect?: () => void }
     ): Promise<() => Promise<void>> {
         const pool = "$client" in this.db ? this.db.$client : undefined;
+        // Never the pool's own URL behind a transaction-mode pooler: the
+        // pooler takes the LISTEN and drops it with the transaction, and the
+        // channel then goes silent with nothing to say so.
         const connectionString = this.listenConnectionString
-            || (pool instanceof Pool ? pool.options.connectionString : undefined);
+            || (pool instanceof Pool && !isPooledPool(pool) ? pool.options.connectionString : undefined);
         if (!connectionString) {
             throw new Error("no database URL to hold a LISTEN connection on (set DATABASE_DIRECT_URL)");
         }
@@ -2600,6 +2630,40 @@ export class PostgresBackendDriver implements DataDriver {
     }
 
     /**
+     * {@link getTargetDb} for work that needs one session from start to end:
+     * the app database is reached through {@link sessionDb} when there is one.
+     * Other databases come from the pool manager, whose URL is already the
+     * direct one (`DATABASE_DIRECT_URL` before `DATABASE_URL`).
+     */
+    private async getSessionTargetDb(databaseName?: string): Promise<DrizzleClient> {
+        if (this.sessionDb && (!databaseName || databaseName === await this.appDatabaseName())) {
+            return this.sessionDb;
+        }
+        return this.getTargetDb(databaseName);
+    }
+
+    /** `SQLAdmin.poolStats`: the pools this driver opened beside the server's. */
+    poolStats(): DatabasePoolStats[] {
+        const stats: DatabasePoolStats[] = [];
+        const replica = this.readRouter && "$client" in this.readRouter.db ? this.readRouter.db.$client : undefined;
+        if (replica instanceof Pool) stats.push(poolStatsOf(replica, "read"));
+        const session = this.sessionDb && "$client" in this.sessionDb ? this.sessionDb.$client : undefined;
+        if (session instanceof Pool) stats.push(poolStatsOf(session, "session"));
+        return stats;
+    }
+
+    /**
+     * `SQLAdmin.sampleHealth`: the server behind the pool, and the replica's
+     * lag. Without a pg pool (PGlite) there is no server to sample.
+     */
+    async sampleHealth(): Promise<DatabaseHealthSample> {
+        const pool = "$client" in this.db ? this.db.$client : undefined;
+        if (!(pool instanceof Pool)) return {};
+        const replica = this.readRouter && "$client" in this.readRouter.db ? this.readRouter.db.$client : undefined;
+        return sampleDatabaseHealth(pool, replica instanceof Pool ? replica : undefined);
+    }
+
+    /**
      * Build one statement, binding `$n` placeholders as real parameters.
      *
      * Shared by the role-switched path (inside a transaction) and the
@@ -2629,7 +2693,7 @@ export class PostgresBackendDriver implements DataDriver {
     }): Promise<Record<string, unknown>[]> {
         if (options?.isolateSession) {
             return this.onIsolatedSession(
-                await this.getTargetDb(options.database),
+                await this.getSessionTargetDb(options.database),
                 options.role,
                 (db, role) => this.executeSqlOn(db, sqlText, { ...options, role }),
                 options.maxResultBytes
@@ -2657,7 +2721,9 @@ export class PostgresBackendDriver implements DataDriver {
             ...pool.options,
             connectionTimeoutMillis: timeoutMs,
             query_timeout: timeoutMs,
-            statement_timeout: timeoutMs
+            // A transaction-mode pooler refuses (or drops) a startup
+            // `statement_timeout`; `query_timeout` bounds the probe there.
+            ...(isPooledPool(pool) ? {} : { statement_timeout: timeoutMs })
         });
         // a probe that times out must not leave an error unhandled on the socket
         client.on("error", () => {});
@@ -2678,7 +2744,7 @@ export class PostgresBackendDriver implements DataDriver {
         role?: string,
         signal?: AbortSignal
     }): Promise<SqlScriptResult> {
-        const targetDb = await this.getTargetDb(options?.database);
+        const targetDb = await this.getSessionTargetDb(options?.database);
         const pool = "$client" in targetDb ? targetDb.$client : undefined;
         if (!(pool instanceof Pool)) {
             // One session in process: nothing on the wire to read a column's
@@ -2708,7 +2774,7 @@ export class PostgresBackendDriver implements DataDriver {
         role?: string,
         batchSize?: number
     }): Promise<SqlCursor> {
-        const targetDb = await this.getTargetDb(options?.database);
+        const targetDb = await this.getSessionTargetDb(options?.database);
         const pool = "$client" in targetDb ? targetDb.$client : undefined;
         if (!(pool instanceof Pool)) {
             // One session in process: a cursor held open across a download
@@ -3154,6 +3220,18 @@ export class PostgresBackendDriver implements DataDriver {
     }
 }
 
+/** How {@link AuthenticatedPostgresBackendDriver} opens a transaction. */
+interface TransactionOptions {
+    accessMode?: "read only" | "read write";
+    isolationLevel?: "read uncommitted" | "read committed" | "repeatable read" | "serializable";
+}
+
+/**
+ * The uid `dataAsAdmin`, crons and jobs act as (`SERVICE_IDENTITY` in
+ * `@rebasepro/server`). Its reads stay on the primary.
+ */
+const SERVICE_PRINCIPAL = "service";
+
 export class AuthenticatedPostgresBackendDriver implements DataDriver {
     key = "postgres";
     initialised = true;
@@ -3234,13 +3312,76 @@ export class AuthenticatedPostgresBackendDriver implements DataDriver {
         });
     }
 
+    /**
+     * Run `operation` in a transaction as this caller — on the read replica
+     * when this is a read the replica may serve (see {@link replicaFor}), else
+     * on the primary.
+     *
+     * A read the replica fails for the replica's own reasons (it is down,
+     * full, or cancelled the read to replay WAL — see
+     * `isReplicaFallbackError`) runs again on the primary; anything else it
+     * answered is the answer. A write pins this caller to the primary for
+     * `REBASE_READ_STICKY_MS`, from when it starts until that long after it
+     * ends, so the caller's next list shows what it just saved.
+     */
     private async withTransaction<T>(
         operation: (delegate: PostgresBackendDriver) => Promise<T>,
-        options?: {
-            accessMode?: "read only" | "read write";
-            isolationLevel?: "read uncommitted" | "read committed" | "repeatable read" | "serializable"
-        }
+        options?: TransactionOptions
     ): Promise<T> {
+        const router = this.delegate.readRouter;
+        const principal = this.user?.uid;
+        if (options?.accessMode !== "read only") {
+            if (!router || !principal) return this.runTransaction(this.delegate.db, operation, options);
+            router.notePrimaryWrite(principal);
+            try {
+                return await this.runTransaction(this.delegate.db, operation, options);
+            } finally {
+                router.notePrimaryWrite(principal);
+            }
+        }
+        const replica = this.replicaFor();
+        if (replica) {
+            try {
+                return await this.runTransaction(replica, operation, options);
+            } catch (error: unknown) {
+                if (!isReplicaFallbackError(error)) throw error;
+                router?.noteReplicaFailure(error);
+            }
+        }
+        return this.runTransaction(this.delegate.db, operation, options);
+    }
+
+    /**
+     * The replica's handle for a read by this caller, or `undefined` for the
+     * primary: there is no replica, the read is inside a write's transaction
+     * (it must see what that write has not committed), the caller is the
+     * service identity (crons, jobs, `dataAsAdmin` — server work that reads
+     * what it acts on), or the router says the replica is behind, failing, or
+     * this caller just wrote.
+     */
+    private replicaFor(): DrizzleClient | undefined {
+        const router = this.delegate.readRouter;
+        if (!router) return undefined;
+        if (currentWriteScope()) return undefined;
+        const principal = this.user?.uid;
+        if (principal === SERVICE_PRINCIPAL) return undefined;
+        const route = router.route(principal);
+        if (route.target === "primary") {
+            logger.debug(`[DataDriver] read served by the primary (${route.reason})`);
+            return undefined;
+        }
+        return router.db;
+    }
+
+    private async runTransaction<T>(
+        db: DrizzleClient,
+        operation: (delegate: PostgresBackendDriver) => Promise<T>,
+        options?: TransactionOptions
+    ): Promise<T> {
+        // What a transaction-mode pooler could not carry in the startup
+        // packet, set for this transaction alone. Nothing for a direct pool.
+        const pool = "$client" in db ? db.$client : undefined;
+        const transactionSettings = transactionSettingsStatements(pooledTransactionSettings(pool));
         const pendingNotifications: PostgresBackendDriver["_pendingNotifications"] = [];
 
         // What a write's callbacks hand off — a job, a history entry, a
@@ -3274,7 +3415,10 @@ export class AuthenticatedPostgresBackendDriver implements DataDriver {
         // `dataAsAdmin` read nested inside a user request restores the user's
         // viewer when it returns.
         const result = await withFieldViewer({ roles: this.user?.roles ?? [] }, async () =>
-            await runInWriteScope(writeScope, () => this.delegate.db.transaction(async (tx) => {
+            await runInWriteScope(writeScope, () => db.transaction(async (tx) => {
+                if (transactionSettings.length > 0) {
+                    await tx.execute(drizzleSql.raw(transactionSettings.join("; ")));
+                }
                 if (!this.user?.uid) {
                     logger.warn("[DataDriver] User ID (uid) is missing for authenticated delegate. Using 'anonymous'. User object", { detail: this.user });
                 }

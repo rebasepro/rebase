@@ -702,6 +702,41 @@ export interface SqlCursor {
 }
 
 /**
+ * One connection pool a driver holds, as `/metrics` reports it — see
+ * {@link SQLAdmin.poolStats}.
+ *
+ * @group Admin
+ */
+export interface DatabasePoolStats {
+    /** Which pool: `primary`, `read` (the replica), `session` (the direct pool for the SQL console). */
+    pool: string;
+    /** Connections open, busy or idle. */
+    total: number;
+    /** Open connections nobody holds. */
+    idle: number;
+    /** Callers queued for a connection. Above zero for long is a pool too small for its load. */
+    waiting: number;
+}
+
+/**
+ * A sample of the database server behind a source — see
+ * {@link SQLAdmin.sampleHealth}. A field is absent when it could not be read
+ * (a role without the privilege, an engine without the notion), never zero.
+ *
+ * @group Admin
+ */
+export interface DatabaseHealthSample {
+    /** Client connections on the server, by state (`active`, `idle`, `idle in transaction`, …). */
+    connections?: Record<string, number>;
+    /** The server's `max_connections`. */
+    maxConnections?: number;
+    /** The size of this source's database, in bytes. */
+    sizeBytes?: number;
+    /** How far the read replica is behind the primary, in seconds, when the source has one. */
+    replicaLagSeconds?: number;
+}
+
+/**
  * Administrative operations for SQL-based databases (PostgreSQL, MySQL, etc.).
  * Used by the SQL Editor, RLS Editor, and schema browser.
  *
@@ -738,6 +773,21 @@ export interface SQLAdmin {
      * through `executeSql` as before.
      */
     probe?(timeoutMs: number): Promise<void>;
+
+    /**
+     * The connection pools this source holds besides the one the server
+     * opened for it — the read replica's, the SQL console's direct one —
+     * for `/metrics`. Synchronous and free: counts the pools already keep.
+     */
+    poolStats?(): DatabasePoolStats[];
+
+    /**
+     * Sample the server behind this source: connections against
+     * `max_connections`, the database's size, the replica's lag. Run every 30
+     * seconds by the metrics probe, so the control plane can watch a database
+     * it may not be able to reach.
+     */
+    sampleHealth?(): Promise<DatabaseHealthSample>;
 
     /**
      * Run a script a person wrote — the Studio SQL console — and describe what

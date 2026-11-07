@@ -31,6 +31,23 @@ export interface PostgresPoolConfig {
      * is not "inherit".
      */
     searchPath?: string | false;
+    /**
+     * The URL reaches the database through a transaction-mode pooler such as
+     * PgBouncer (`DATABASE_POOLED=true`).
+     *
+     * A transaction-mode pooler hands each transaction whatever server
+     * connection is free, so nothing set for a *session* survives to the next
+     * statement — and the startup packet's parameters are either refused by
+     * the pooler or dropped by it (`ignore_startup_parameters`). So a pooled
+     * pool sends neither `statement_timeout` nor `options=-c search_path` at
+     * connect; {@link pooledTransactionSettings} says what to `SET LOCAL` at
+     * the start of each transaction instead, and the boot sets the role's
+     * default `search_path` (see `ensurePooledRoleDefaults`).
+     *
+     * Explicit rather than sniffed from the URL: a pooler's address looks like
+     * any other database's.
+     */
+    pooled?: boolean;
 }
 
 /**
@@ -70,6 +87,7 @@ export function cappedPoolMax(requested: number, env: NodeJS.ProcessEnv = proces
 const DEFAULT_POOL: Required<PostgresPoolConfig> = {
     max: 20,
     searchPath: "public",
+    pooled: false,
     idleTimeoutMillis: 30_000,
     connectionTimeoutMillis: 10_000,
     // The client-side read timeout MUST be comfortably above the server-side
@@ -105,6 +123,91 @@ export function defaultPoolTimeouts(): Pick<PoolConfig,
 
 /** ReadyForQuery status byte: `I` idle, `T` in transaction, `E` failed transaction. */
 const TX_IDLE = "I";
+
+/**
+ * What a pool behind a transaction-mode pooler would have sent at connect, and
+ * must instead set inside each transaction. See {@link PostgresPoolConfig.pooled}.
+ */
+export interface PooledTransactionSettings {
+    /** `false` when the pool was told to inherit the server's `search_path`. */
+    searchPath: string | false;
+    statementTimeoutMs: number;
+}
+
+const pooledPools = new WeakMap<object, PooledTransactionSettings>();
+
+/**
+ * The settings a transaction on `pool` must `SET LOCAL` for itself, or
+ * `undefined` when the pool talks to the database directly and sent them at
+ * connect.
+ */
+export function pooledTransactionSettings(pool: unknown): PooledTransactionSettings | undefined {
+    return pool !== null && typeof pool === "object" ? pooledPools.get(pool) : undefined;
+}
+
+/** Whether `pool` reaches its database through a transaction-mode pooler. */
+export function isPooledPool(pool: unknown): boolean {
+    return pooledTransactionSettings(pool) !== undefined;
+}
+
+/**
+ * The `SET LOCAL` statements that give a transaction on a pooled connection
+ * what a direct connection got from its startup packet. Empty for a direct
+ * pool. `SET LOCAL` ends with the transaction, so nothing reaches the next
+ * client the pooler hands that server connection to.
+ */
+export function transactionSettingsStatements(settings: PooledTransactionSettings | undefined): string[] {
+    if (!settings) return [];
+    const statements: string[] = [];
+    if (settings.searchPath !== false) {
+        statements.push(`SET LOCAL search_path TO ${searchPathList(settings.searchPath)}`);
+    }
+    if (settings.statementTimeoutMs > 0) {
+        statements.push(`SET LOCAL statement_timeout = ${Math.floor(settings.statementTimeoutMs)}`);
+    }
+    return statements;
+}
+
+/**
+ * A `search_path` value as a list of quoted identifiers, so a schema name can
+ * never be read as SQL. `"$user"` keeps its meaning quoted.
+ */
+export function searchPathList(searchPath: string): string {
+    return searchPath
+        .split(",")
+        .map(part => part.trim().replace(/^"(.*)"$/, "$1"))
+        .filter(part => part.length > 0)
+        .map(part => `"${part.replace(/"/g, "\"\"")}"`)
+        .join(", ");
+}
+
+/**
+ * The `pg.Pool` settings shared by every pool this module opens, with the
+ * startup parameters a transaction-mode pooler cannot carry left out when
+ * `pooled`. The pool is registered so {@link pooledTransactionSettings} can
+ * answer for it.
+ */
+function poolOptions(
+    connectionString: string,
+    opts: Required<PostgresPoolConfig>,
+    max: number
+): PoolConfig {
+    return {
+        connectionString: opts.pooled ? connectionString : pinSearchPath(connectionString, opts.searchPath),
+        max,
+        idleTimeoutMillis: opts.idleTimeoutMillis,
+        connectionTimeoutMillis: opts.connectionTimeoutMillis,
+        query_timeout: opts.queryTimeout,
+        ...(opts.pooled ? {} : { statement_timeout: opts.statementTimeout }),
+        keepAlive: opts.keepAlive,
+        keepAliveInitialDelayMillis: 0
+    };
+}
+
+function registerPooled(pool: Pool, opts: Required<PostgresPoolConfig>): void {
+    if (!opts.pooled) return;
+    pooledPools.set(pool, { searchPath: opts.searchPath, statementTimeoutMs: opts.statementTimeout });
+}
 
 /**
  * Pin `search_path` into a connection string, so unqualified SQL resolves to a
@@ -236,20 +339,11 @@ export function createPostgresDatabaseConnection(
 ) {
     const opts = { ...DEFAULT_POOL,
 ...poolConfig };
-    connectionString = pinSearchPath(connectionString, opts.searchPath);
-
-    const pgPoolConfig: PoolConfig = {
-        connectionString,
-        max: cappedPoolMax(opts.max, env),
-        idleTimeoutMillis: opts.idleTimeoutMillis,
-        connectionTimeoutMillis: opts.connectionTimeoutMillis,
-        query_timeout: opts.queryTimeout,
-        statement_timeout: opts.statementTimeout,
-        keepAlive: opts.keepAlive,
-        keepAliveInitialDelayMillis: 0
-    };
+    const pgPoolConfig = poolOptions(connectionString, opts, cappedPoolMax(opts.max, env));
+    connectionString = pgPoolConfig.connectionString ?? connectionString;
 
     const pool = new Pool(pgPoolConfig);
+    registerPooled(pool, opts);
 
     // ── Pool event logging ────────────────────────────────────────────────
     // Uses console.* because the structured logger lives in server
@@ -288,20 +382,11 @@ export function createDirectDatabaseConnection(
         max: 5,
         ...poolConfig
     };
-    connectionString = pinSearchPath(connectionString, opts.searchPath);
-
-    const pgPoolConfig: PoolConfig = {
-        connectionString,
-        max: cappedPoolMax(opts.max),
-        idleTimeoutMillis: opts.idleTimeoutMillis,
-        connectionTimeoutMillis: opts.connectionTimeoutMillis,
-        query_timeout: opts.queryTimeout,
-        statement_timeout: opts.statementTimeout,
-        keepAlive: opts.keepAlive,
-        keepAliveInitialDelayMillis: 0
-    };
+    const pgPoolConfig = poolOptions(connectionString, opts, cappedPoolMax(opts.max));
+    connectionString = pgPoolConfig.connectionString ?? connectionString;
 
     const pool = new Pool(pgPoolConfig);
+    registerPooled(pool, opts);
 
     pool.on("error", (err) => reportPoolError("pg-direct-pool", err));
     guardPoolAgainstDirtyRelease(pool, "pg-direct-pool");
@@ -327,20 +412,11 @@ export function createReadReplicaConnection(
         max: 10,
         ...poolConfig
     };
-    connectionString = pinSearchPath(connectionString, opts.searchPath);
-
-    const pgPoolConfig: PoolConfig = {
-        connectionString,
-        max: cappedPoolMax(opts.max),
-        idleTimeoutMillis: opts.idleTimeoutMillis,
-        connectionTimeoutMillis: opts.connectionTimeoutMillis,
-        query_timeout: opts.queryTimeout,
-        statement_timeout: opts.statementTimeout,
-        keepAlive: opts.keepAlive,
-        keepAliveInitialDelayMillis: 0
-    };
+    const pgPoolConfig = poolOptions(connectionString, opts, cappedPoolMax(opts.max));
+    connectionString = pgPoolConfig.connectionString ?? connectionString;
 
     const pool = new Pool(pgPoolConfig);
+    registerPooled(pool, opts);
 
     pool.on("error", (err) => reportPoolError("pg-replica-pool", err));
     guardPoolAgainstDirtyRelease(pool, "pg-replica-pool");
@@ -350,4 +426,35 @@ export function createReadReplicaConnection(
     return { db,
 pool,
 connectionString };
+}
+
+/**
+ * Close `companions` whenever `pool` is closed, before it.
+ *
+ * The pools a driver opens for itself — a read replica's, a direct session
+ * pool, the per-database pools — are invisible to whoever opened the main
+ * pool, and closing the main pool is the one shutdown signal every server
+ * version sends a driver. So the main pool's `end` is wrapped: companions
+ * first, then the pool, once however many times it is called (`pg.Pool`
+ * throws on a second `end`). A pool without `end`, or no pool, is left alone.
+ */
+export function closeWithPool(pool: unknown, companions: () => Promise<void>): void {
+    if (pool === null || typeof pool !== "object" || !("end" in pool) || typeof pool.end !== "function") return;
+    const end: (...args: unknown[]) => unknown = pool.end.bind(pool);
+    let closing: Promise<void> | undefined;
+    const wrapped = (callback?: (err?: Error) => void): Promise<void> | void => {
+        closing ??= (async () => {
+            try {
+                await companions();
+            } finally {
+                await end();
+            }
+        })();
+        if (typeof callback === "function") {
+            closing.then(() => callback(), (err: unknown) => callback(err instanceof Error ? err : new Error(String(err))));
+            return;
+        }
+        return closing;
+    };
+    Object.defineProperty(pool, "end", { value: wrapped, configurable: true, writable: true });
 }

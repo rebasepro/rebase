@@ -193,6 +193,15 @@ export const rebaseEnvSchema = z.object({
     DB_POOL_CONNECT_TIMEOUT: numericEnvVar("DB_POOL_CONNECT_TIMEOUT", 10000),
     DATABASE_DIRECT_URL: z.string().url().optional(),
     DATABASE_READ_URL: z.string().url().optional(),
+    // DATABASE_URL goes through a transaction-mode pooler (PgBouncer): session
+    // work moves to DATABASE_DIRECT_URL, which becomes required, and the pool
+    // sets search_path and statement_timeout per transaction.
+    DATABASE_POOLED: optionalBoolString,
+    // Read routing to DATABASE_READ_URL: how long a principal reads from the
+    // primary after its own write, and the replica lag past which every read
+    // does. Read by the Postgres driver, validated here.
+    REBASE_READ_STICKY_MS: numericEnvVar("REBASE_READ_STICKY_MS", 5000),
+    REBASE_READ_MAX_LAG_MS: numericEnvVar("REBASE_READ_MAX_LAG_MS", 1000),
     FORCE_LOCAL_STORAGE: optionalBoolString,
     // `gcs` is a first-class storage backend (GCSStorageController) and a valid
     // `type` in BackendStorageConfig, so it must validate here too — otherwise

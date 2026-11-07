@@ -59,6 +59,10 @@ export interface DriverConnection {
         query?: (sql: string) => Promise<unknown>;
         /** Checks a connection out. Timed, when metrics are on — see `metrics/pool-wait.ts`. */
         connect?: PoolConnect;
+        /** What `pg.Pool` keeps, reported on `/metrics` — see `metrics/database.ts`. */
+        totalCount?: number;
+        idleCount?: number;
+        waitingCount?: number;
     };
     /** Some drivers expose a query directly instead of via a pool. */
     query?: (sql: string) => Promise<unknown>;
@@ -375,14 +379,22 @@ export async function initializeDataSource(
     // drizzle only needs it for the relational query API, which the drivers do
     // not use, and passing the grouped bundle schema here would register
     // "tables"/"enums"/"relations" as if they were table names.
-    const connection = createConnection(source.connectionString, undefined, source.poolConfig);
+    const connection = createConnection(
+        source.connectionString,
+        undefined,
+        source.pooled ? { ...source.poolConfig, pooled: true } : source.poolConfig
+    );
 
     const adapter = createAdapter({
         connection: connection.db,
         connectionString: connection.connectionString ?? source.connectionString,
-        adminConnectionString: source.adminConnectionString || source.connectionString,
+        // Branching and cross-database SQL hold session advisory locks: never
+        // through a transaction-mode pooler when a direct URL is known.
+        adminConnectionString: source.adminConnectionString || source.directConnectionString || source.connectionString,
         readConnectionString: source.readConnectionString,
         directConnectionString: source.directConnectionString,
+        ...(source.pooled ? { pooled: true } : {}),
+        ...(source.poolConfig ? { poolConfig: source.poolConfig } : {}),
         ...(source.isDefault && schema ? { schema } : {})
     });
 

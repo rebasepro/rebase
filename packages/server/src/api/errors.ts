@@ -4,6 +4,7 @@ import type { HonoEnv } from "./types";
 import { logger } from "../utils/logger";
 import { hostEnv } from "../utils/host";
 import { closedDatabaseName, warnIfDatabaseClosed } from "./closed-database";
+import { noteDbConnectionError } from "../metrics/db-connection-errors";
 
 /**
  * A stale caller's schema stamp, as the cause of the error it explains.
@@ -169,6 +170,22 @@ function poolFailureOf(error: unknown, depth = 0): "DB_POOL_EXHAUSTED" | "DB_CON
 
 /** Seconds a client is asked to wait after a pool failure — one pool timeout's worth is too long to make a person wait. */
 const POOL_RETRY_AFTER_SECONDS = 1;
+
+/**
+ * SQLSTATEs that mean the database server has no connection to give:
+ * `53300` too many connections (`max_connections`, or a role's or database's
+ * own limit), `53400` a configuration limit such as that one exceeded. Like an
+ * exhausted pool, this is load rather than a fault, one level further down —
+ * every process connecting to the database is competing for the same slots,
+ * which is what an autoscaled app tier does to a database with no pooler in
+ * front of it.
+ */
+function connectionLimitOf(dbError: PgLikeError | null): "53300" | "53400" | undefined {
+    return dbError?.code === "53300" || dbError?.code === "53400" ? dbError.code : undefined;
+}
+
+/** Seconds a client is asked to wait when the server is out of connections. */
+const CONNECTION_LIMIT_RETRY_AFTER_SECONDS = 2;
 
 /**
  * SQLSTATEs that mean the database dropped or refused the connection, not
@@ -339,6 +356,20 @@ function warnDatabaseUnreachable(detail: string): void {
  */
 const POOL_WARNING_INTERVAL_MS = 60_000;
 let lastPoolWarningAt = 0;
+
+let lastConnectionLimitWarningAt = 0;
+
+function warnConnectionLimit(sqlState: string): void {
+    const now = Date.now();
+    if (now - lastConnectionLimitWarningAt < POOL_WARNING_INTERVAL_MS) return;
+    lastConnectionLimitWarningAt = now;
+    logger.warn(
+        `⚠️ The database server refused a connection (SQLSTATE ${sqlState}): it is out of connections, so ` +
+        "requests are answered 503. Every process connecting to it shares max_connections — lower DB_POOL_MAX " +
+        "(or cap it with REBASE_DB_POOL_MAX) across instances, put a pooler in front of the database " +
+        "(DATABASE_POOLED), or raise max_connections. Not repeated for a minute."
+    );
+}
 
 function warnPoolFailure(code: "DB_POOL_EXHAUSTED" | "DB_CONNECT_TIMEOUT"): void {
     const now = Date.now();
@@ -747,7 +778,18 @@ export const errorHandler: ErrorHandler<HonoEnv> = (err, c) => {
     // calls being down.
     const upstream = !poolFailure && !unreachable && !dbError && hasUpstreamSocketFailure(error);
 
-    if (poolFailure) {
+    const connectionLimit = connectionLimitOf(dbError);
+    if (connectionLimit) noteDbConnectionError(connectionLimit);
+    else if (poolFailure) noteDbConnectionError(poolFailure === "DB_POOL_EXHAUSTED" ? "pool_exhausted" : "connect_timeout");
+    else if (unreachable) noteDbConnectionError("unreachable");
+
+    if (connectionLimit) {
+        code = "DB_CONNECTIONS_EXHAUSTED";
+        statusCode = 503;
+        logMessage = `The database server is out of connections (SQLSTATE ${connectionLimit}): ${dbError?.message ?? ""}`.trim();
+        warnConnectionLimit(connectionLimit);
+        c.header("Retry-After", String(CONNECTION_LIMIT_RETRY_AFTER_SECONDS));
+    } else if (poolFailure) {
         code = poolFailure;
         statusCode = 503;
         logMessage = poolFailure === "DB_POOL_EXHAUSTED"
@@ -861,8 +903,8 @@ export const errorHandler: ErrorHandler<HonoEnv> = (err, c) => {
                 ""
             ].join("\n"));
         }
-    } else if (poolFailure || unreachable) {
-        // Said once a minute by `warnPoolFailure` / `warnDatabaseUnreachable`;
+    } else if (connectionLimit || poolFailure || unreachable) {
+        // Said once a minute by `warnConnectionLimit` / `warnPoolFailure` / `warnDatabaseUnreachable`;
         // the request line carries each occurrence.
         if (!requestWillBeLogged(c)) logger.warn(
             `⚠️ [API] ${c.req.method} ${c.req.path} → ${statusCode} ${code}: ${logMessage}` +
@@ -928,6 +970,8 @@ export const errorHandler: ErrorHandler<HonoEnv> = (err, c) => {
         const issue = pgErr.code === "42703" ? "column" : "table";
         const identifier = pgErr.table || pgErr.column || extractMissingIdentifier(pgErr.message || error.message) || "unknown";
         clientMessage = `Schema drift: ${issue} "${identifier}" does not exist. ${schemaDriftRemedy().short}`;
+    } else if (connectionLimit) {
+        clientMessage = "The database is busy: it has no connection free right now. Retry shortly.";
     } else if (poolFailure) {
         clientMessage = "The database is busy: no connection was free in time. Retry shortly.";
     } else if (unreachable) {
@@ -1008,7 +1052,8 @@ function codeToStatus(code?: string): number | undefined {
         DB_PERMISSION_DENIED: 500,
         INTERNAL_ERROR: 500,
         NOT_CONFIGURED: 503,
-        SERVICE_UNAVAILABLE: 503
+        SERVICE_UNAVAILABLE: 503,
+        DB_CONNECTIONS_EXHAUSTED: 503
     };
     return map[code];
 }

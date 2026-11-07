@@ -1,5 +1,5 @@
 import { describe, it, expect } from "@jest/globals";
-import { resolveSourceUrls } from "../src/PostgresBootstrapper";
+import { pooledWithoutDirectUrlError, resolveSourceUrls } from "../src/PostgresBootstrapper";
 
 /**
  * Which read replica and which direct URL one source's driver opens.
@@ -47,5 +47,32 @@ describe("resolveSourceUrls", () => {
             directUrl: "postgres://db/app"
         });
         expect(resolveSourceUrls({}, "(default)", {})).toEqual({ readUrl: undefined, directUrl: undefined });
+    });
+});
+
+/**
+ * Behind a transaction-mode pooler the pool's own URL is the one place a
+ * LISTEN must not go: the pooler accepts it and drops it with the
+ * transaction, and change capture, the channel bus and the job queue's
+ * wake-up go silent with nothing to say so. So a pooled source never falls
+ * back to it, and the boot refuses instead.
+ */
+describe("resolveSourceUrls for a pooled source", () => {
+    it("does not fall back to the pooled URL for the direct one", () => {
+        expect(resolveSourceUrls({ connectionString: "postgres://pooler/app", pooled: true }, "(default)", {})).toEqual({
+            readUrl: undefined,
+            directUrl: undefined
+        });
+    });
+
+    it("still takes a direct URL that is named", () => {
+        expect(resolveSourceUrls({ connectionString: "postgres://pooler/app", pooled: true }, "(default)", {
+            DATABASE_DIRECT_URL: "postgres://db/app"
+        }).directUrl).toBe("postgres://db/app");
+    });
+
+    it("refuses by naming the variable to set, with the source's suffix", () => {
+        expect(pooledWithoutDirectUrlError("(default)").message).toMatch(/DATABASE_DIRECT_URL is not set/);
+        expect(pooledWithoutDirectUrlError("analytics").message).toMatch(/DATABASE_DIRECT_URL__ANALYTICS/);
     });
 });

@@ -1,0 +1,67 @@
+# A CloudNativePG-shaped database for `pooler-replica-e2e.test.ts`: a primary,
+# a hot standby streaming from it, and PgBouncer in transaction mode in front
+# of both — `rebase` reaches the primary, `rebase_ro` the standby, the way
+# `postgres-pooler-rw` and `postgres-pooler-ro` do in a tenant namespace.
+#
+# Every port is published on a random host port; the suite reads them back
+# with `docker compose port`. Run under a unique project name (`-p`), so two
+# runs on one machine never share a container.
+services:
+  primary:
+    image: postgres:18-alpine
+    environment:
+      POSTGRES_DB: rebase
+      POSTGRES_USER: rebase
+      POSTGRES_PASSWORD: rebase
+    command:
+      - postgres
+      - -c
+      - wal_level=replica
+      - -c
+      - max_wal_senders=5
+      - -c
+      - hot_standby=on
+      # Small, like the default managed database, so the connection budget
+      # is a number a test can reach.
+      - -c
+      - max_connections=60
+    volumes:
+      - ./primary-init.sh:/docker-entrypoint-initdb.d/10-replication.sh:ro
+    ports:
+      - "5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U rebase -d rebase -h 127.0.0.1"]
+      interval: 1s
+      timeout: 3s
+      retries: 60
+
+  standby:
+    image: postgres:18-alpine
+    depends_on:
+      primary:
+        condition: service_healthy
+    environment:
+      PGPASSWORD: replicator
+    entrypoint: ["/bin/sh", "/standby.sh"]
+    volumes:
+      - ./standby.sh:/standby.sh:ro
+    ports:
+      - "5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U rebase -d rebase -h 127.0.0.1"]
+      interval: 1s
+      timeout: 3s
+      retries: 90
+
+  pooler:
+    image: edoburu/pgbouncer:v1.24.1-p1
+    depends_on:
+      primary:
+        condition: service_healthy
+      standby:
+        condition: service_healthy
+    volumes:
+      - ./pgbouncer.ini:/etc/pgbouncer/pgbouncer.ini:ro
+      - ./userlist.txt:/etc/pgbouncer/userlist.txt:ro
+    ports:
+      - "6432"

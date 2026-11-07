@@ -1,5 +1,5 @@
 ---
-sourceHash: 78957e0c3d6a8787
+sourceHash: dd7f515c841c860b
 title: Auto-hospedagem
 sidebar_label: Auto-hospedagem
 description: Execute o Rebase em qualquer lugar com a imagem oficial de runtime e o bundle do seu projeto — Docker Compose, Fly, Railway ou uma VPS comum.
@@ -299,6 +299,18 @@ REBASE_METRICS_TOKEN=<random string>
 Expõe métricas Prometheus em `/metrics`: contagem de requisições e histogramas de latência divididos por superfície de API (data, auth, storage, functions) e coleção, além de gauges do processo. Sem um token, o endpoint fica acessível a qualquer um que alcance a porta; defina um token a menos que esteja em uma rede privada.
 
 `rebase_db_pool_wait_ms` é um histograma do tempo de espera de cada consulta por uma conexão do pool do banco de dados (incluindo a abertura de uma nova), identificado pela chave da fonte de dados (`source="(default)"` em projetos que não declaram múltiplas fontes). Em um pool saudável, esse valor permanece próximo de zero. Uma cauda que cresce com o tráfego indica requisições esperando por conexões — geralmente presas por callbacks de escrita que aguardam operações lentas; veja [Um callback retém uma conexão](/docs/collections/context-data-api/#a-callback-holds-a-connection).
+
+O próprio banco de dados, por fonte de dados:
+
+| Métrica | O que diz |
+|---------|-----------|
+| `rebase_db_pool_total`, `_idle`, `_waiting` | As conexões de cada pool, etiquetadas `pool="primary"`, `"read"` (a réplica) ou `"session"` (o pool direto do console SQL atrás de um pooler). `waiting` acima de zero por muito tempo é um pool pequeno demais para a sua carga. |
+| `rebase_db_connection_errors_total` | Pedidos respondidos com 503 por falta de conexão, por `code`: `53300` / `53400` (o servidor ficou sem conexões), `pool_exhausted`, `connect_timeout`, `unreachable`. |
+| `rebase_db_connections` | Conexões de clientes no servidor, por `state`, face a `rebase_db_max_connections`. |
+| `rebase_db_size_bytes` | O tamanho do banco de dados. |
+| `rebase_db_replica_lag_seconds` | Quanto `DATABASE_READ_URL` está atrasada em relação à primária. |
+
+As quatro últimas são amostradas a cada 30 segundos na própria conexão da instância, por isso um scrape nunca se torna uma consulta.
 
 `rebase_realtime_*` reporta os sockets e canais abertos de cada instância, bem como os frames enviados ao barramento de canais ou retidos: veja [Acompanhando o que o barramento faz](/docs/backend/realtime-transports/#seeing-what-the-bus-does).
 

@@ -1,5 +1,5 @@
 ---
-sourceHash: 78957e0c3d6a8787
+sourceHash: dd7f515c841c860b
 title: Autoalojamiento
 sidebar_label: Autoalojamiento
 description: Ejecuta Rebase en cualquier lugar con la imagen oficial del runtime y el bundle de tu proyecto — Docker Compose, Fly, Railway o un VPS básico.
@@ -476,6 +476,18 @@ fuente de datos (`source="(default)"` en un proyecto que no declare fuentes de d
 estado lo mantiene cerca de cero. Una cola que crece con el tráfico indica que las solicitudes están
 esperando conexiones —con frecuencia retenidas por callbacks de escritura que esperan algo lento;
 consulta [Un callback retiene una conexión](/docs/collections/context-data-api/#a-callback-holds-a-connection).
+
+La propia base de datos, por fuente de datos:
+
+| Métrica | Qué dice |
+|---------|----------|
+| `rebase_db_pool_total`, `_idle`, `_waiting` | Las conexiones de cada pool, etiquetadas `pool="primary"`, `"read"` (la réplica) o `"session"` (el pool directo de la consola SQL detrás de un pooler). `waiting` por encima de cero durante mucho tiempo es un pool demasiado pequeño para su carga. |
+| `rebase_db_connection_errors_total` | Peticiones respondidas con 503 por falta de conexión, por `code`: `53300` / `53400` (el servidor se ha quedado sin conexiones), `pool_exhausted`, `connect_timeout`, `unreachable`. |
+| `rebase_db_connections` | Conexiones de clientes en el servidor, por `state`, frente a `rebase_db_max_connections`. |
+| `rebase_db_size_bytes` | El tamaño de la base de datos. |
+| `rebase_db_replica_lag_seconds` | Cuánto va `DATABASE_READ_URL` por detrás de la principal. |
+
+Las cuatro últimas se muestrean cada 30 segundos en la propia conexión de la instancia, así que un scrape nunca se convierte en una consulta.
 
 `rebase_realtime_*` reporta los sockets abiertos, los canales y las tramas enviadas al bus de canales o
 retenidas de cada instancia: consulta [Ver qué hace el bus](/docs/backend/realtime-transports/#seeing-what-the-bus-does).

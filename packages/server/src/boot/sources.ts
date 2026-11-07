@@ -217,6 +217,13 @@ export interface ResolvedDataSourceConfig {
     readConnectionString?: string;
     /** The source's direct (non-pooled) URL, for the connections that hold a `LISTEN`. */
     directConnectionString?: string;
+    /**
+     * `connectionString` goes through a transaction-mode pooler
+     * (`DATABASE_POOLED=true`, or `DATABASE_POOLED__<KEY>`), so the driver
+     * keeps every session-scoped thing off it — see the Postgres driver's
+     * `pooled` option.
+     */
+    pooled?: boolean;
     isDefault: boolean;
     poolConfig?: Record<string, number>;
 }
@@ -256,6 +263,15 @@ export function resolveDataSourceConnection(env: EnvBag, definition: DataSourceD
     }
 
     const poolConfig = resolvePoolConfig(env, suffixes);
+    const pooled = readVar(env, "DATABASE_POOLED", suffixes)?.trim().toLowerCase() === "true";
+    const directConnectionString = readVar(env, "DATABASE_DIRECT_URL", suffixes);
+    if (pooled && !directConnectionString) {
+        throw new BundleError(
+            `Data source "${definition.key}" sets DATABASE_POOLED${suffix}=true but no DATABASE_DIRECT_URL${suffix}.`,
+            "A transaction-mode pooler keeps no session, so realtime, the job queue's wake-up, index builds and " +
+            "the SQL console need a URL that reaches the database itself. Set it, or unset DATABASE_POOLED."
+        );
+    }
 
     return {
         key: definition.key,
@@ -264,7 +280,8 @@ export function resolveDataSourceConnection(env: EnvBag, definition: DataSourceD
         connectionString,
         adminConnectionString: readVar(env, "ADMIN_CONNECTION_STRING", suffixes),
         readConnectionString: readVar(env, "DATABASE_READ_URL", suffixes),
-        directConnectionString: readVar(env, "DATABASE_DIRECT_URL", suffixes),
+        directConnectionString,
+        ...(pooled ? { pooled: true } : {}),
         isDefault: definition.key === DEFAULT_DATA_SOURCE_KEY,
         poolConfig
     };

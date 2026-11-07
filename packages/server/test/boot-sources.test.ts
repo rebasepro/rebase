@@ -364,3 +364,38 @@ describe("a key whose uppercase is not letter-for-letter", () => {
         )).toThrow(/"straße" and "strasse" both map/);
     });
 });
+
+describe("DATABASE_POOLED", () => {
+    it("marks a source pooled from its own variable, and only that source", () => {
+        const sources = resolveDataSources({
+            DATABASE_URL: "postgres://pooler/app",
+            DATABASE_DIRECT_URL: "postgres://db/app",
+            DATABASE_POOLED: "true",
+            DATABASE_URL__ANALYTICS: "postgres://db/analytics"
+        }, [{ key: "analytics", engine: "postgres" }]);
+        expect(sources.find(s => s.isDefault)?.pooled).toBe(true);
+        expect(sources.find(s => s.key === "analytics")?.pooled).toBeUndefined();
+    });
+
+    it("reads the keyed spelling for a keyed source", () => {
+        const [, analytics] = resolveDataSources({
+            DATABASE_URL: "postgres://db/app",
+            DATABASE_URL__ANALYTICS: "postgres://pooler/analytics",
+            DATABASE_DIRECT_URL__ANALYTICS: "postgres://db/analytics",
+            DATABASE_POOLED__ANALYTICS: "TRUE"
+        }, [{ key: "analytics", engine: "postgres" }]);
+        expect(analytics.pooled).toBe(true);
+    });
+
+    it("is off for anything but true", () => {
+        const [source] = resolveDataSources({ DATABASE_URL: "postgres://db/app", DATABASE_POOLED: "1" }, []);
+        expect(source.pooled).toBeUndefined();
+    });
+
+    it("refuses a pooled source with no direct URL, naming the variable", () => {
+        expect(() => resolveDataSources({ DATABASE_URL: "postgres://pooler/app", DATABASE_POOLED: "true" }, []))
+            .toThrow(BundleError);
+        expect(() => resolveDataSources({ DATABASE_URL: "postgres://pooler/app", DATABASE_POOLED: "true" }, []))
+            .toThrow(/DATABASE_DIRECT_URL/);
+    });
+});

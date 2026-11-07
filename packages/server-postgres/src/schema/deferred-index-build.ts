@@ -109,6 +109,32 @@ export const poolIndexBuildSession = (pool: Pick<Pool, "connect">): OpenIndexBui
     };
 };
 
+/**
+ * A session on a connection opened for it, from a URL — for a pool behind a
+ * transaction-mode pooler, where "the pool's next connection" is not one
+ * backend: the pooler hands each statement whatever server connection is
+ * free, so a session advisory lock and `SET statement_timeout = 0` would land
+ * on one and the `CREATE INDEX` run on another. The URL must name the
+ * database itself (`DATABASE_DIRECT_URL`). Ended, not released, when done.
+ */
+export const clientIndexBuildSession = (connectionString: string): OpenIndexBuildSession => async () => {
+    const { Client } = await import("pg");
+    const client = new Client({ connectionString, connectionTimeoutMillis: 10_000 });
+    // A connection dropped mid-build fails the query in progress; a stray
+    // error event after that must not take the process down.
+    client.on("error", () => undefined);
+    await client.connect();
+    return {
+        dedicated: true,
+        async query<T>(text: string): Promise<{ rows: T[] }> {
+            const config: QueryConfig & { query_timeout: number } = { text, query_timeout: INDEX_BUILD_READ_TIMEOUT_MS };
+            const result = await client.query<T & QueryResultRow>(config);
+            return { rows: result.rows };
+        },
+        release: () => client.end().catch(() => undefined)
+    };
+};
+
 export interface DeferredIndexOptions extends BootLockOptions {
     /** Progress, one line per index. Failures are also `logger.warn`ed. */
     log?: (message: string) => void;

@@ -400,7 +400,7 @@ interface RefreshTokenInfo { aal, createdAt, expiresAt, id, ipAddress, method, r
 interface RefreshTokenSession { aal, id, method, rotatedFrom, startedAt }
 interface ResolveContext { defaultBasePath, production }
 interface ResolveStorageOptions { production }
-interface ResolvedDataSourceConfig { adminConnectionString, connectionString, directConnectionString, driverPackage, engine, isDefault, key, poolConfig, readConnectionString }
+interface ResolvedDataSourceConfig { adminConnectionString, connectionString, directConnectionString, driverPackage, engine, isDefault, key, poolConfig, pooled, readConnectionString }
 interface ResourceResolver { accountScoped, kind, reads, resolve }
 interface RlsAudit { runNow, start, status, stop }
 interface RlsAuditConfig { connectionString, enabled, intervalMs, runOnBoot, scan, schemas, statementTimeoutMs, warnAtSeverity }
@@ -502,6 +502,7 @@ const ADMIN_SCOPES
 const ALL_WHERE_FILTER_OPS
 const ANONYMOUS_USER_ID
 const ANONYMOUS_USER_IDS
+const AUTH_FLOW_HEADER
 const BATCH_REF_KEY
 const BUILT_IN_SCOPES
 const BUILT_IN_SCOPE_DESCRIPTIONS
@@ -800,7 +801,9 @@ interface DataTransformer { deserializeFromDatabase, serializeToDatabase }
 interface DatabaseAdapter { destroy, ensureCollectionPolicies, ensureCollectionSchema, ensureRlsRuntime, finalizeSecurityPosture, getAdmin, initializeAuth, initializeDriver, initializeHistory, initializeRealtime, initializeWebsockets, mountRoutes, readCollectionsSchemaVersion, stampCollectionsSchemaVersion, type, verifyConnection }
 interface DatabaseAdapterInitConfig { baas, collectionRegistry, collections, dataSourceKey, introspectCollections, provision, realtime, schemaProvisioning }
 interface DatabaseConnection { close, isConnected, type }
+interface DatabaseHealthSample { connections, maxConnections, replicaLagSeconds, sizeBytes }
 interface DatabaseOptions { databaseId, engine, extensions, label, migrations, transport }
+interface DatabasePoolStats { idle, pool, total, waiting }
 interface DateProperty { access, autoValue, callbacks, columnName, columnType, conditions, databaseDefault, defaultValue, description, dynamicProps, excludeFromApi, metadata, mode, name, propertyConfig, timezone, type, validation }
 interface DatePropertyValidationSchema { max, min, required, requiredMessage, unique, uniqueInArray }
 interface DeclareOptions { engine, label, transport }
@@ -944,7 +947,7 @@ interface RolesOverlapPolicyExpression { kind, roles }
 interface RowPrecondition { check, lock }
 interface SDKCollectionClient { after, aggregate, count, create, create, createMany, delete, deleteMany, distinct, fields, find, findAll, findById, get, include, iterate, limit, listen, listenById, listenCount, offset, orderBy, search, trash, update, update, updateMany, upsert, upsert, vectorSearch, where, where, where }
 interface SDKQueryBuilderInterface { after, aggregate, count, distinct, fields, find, findAll, include, iterate, limit, listen, offset, orderBy, search, vectorSearch, where, where, where }
-interface SQLAdmin { executeSql, fetchApplicationRoles, fetchAvailableDatabases, fetchAvailableRoles, fetchCurrentDatabase, listen, openSqlCursor, probe, runSqlScript }
+interface SQLAdmin { executeSql, fetchApplicationRoles, fetchAvailableDatabases, fetchAvailableRoles, fetchCurrentDatabase, listen, openSqlCursor, poolStats, probe, runSqlScript, sampleHealth }
 interface SaveManyProps { collection, onConflict, path, rows, upsert }
 interface SaveProps { collection, id, onConflict, path, precondition, previousValues, status, upsert, values }
 interface SchemaAdmin { fetchTableMetadata, fetchUnmappedTables }
