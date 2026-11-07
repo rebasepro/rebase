@@ -13,7 +13,8 @@ for a configuration flag for the feature (there is no `singleton: true`, no
 There are three things to know:
 
 1. **Building blocks** you render: `CollectionPanel`, `EntityFormPanel`,
-   `FormField`, `CollectionsProvider`, `RebaseAuthGate` (`@rebasepro/cms`), `LoginView`
+   `FormField`, `EntityViewPanel`, `FieldValue`, `CollectionsProvider`,
+   `RebaseAuthGate` (`@rebasepro/cms`), `LoginView`
    (`@rebasepro/app`) and the UI kit (`@rebasepro/ui`: `Button`, `Card`,
    `Typography`, `TextField`, `Select`, `Chip`, `Container`, …).
 2. **Hooks**: `useData`, `useCollection`, `useFetch`, `useAuthController`,
@@ -60,6 +61,15 @@ import only package entry points, so they compile as copied.
   fields) when a required field without a default is left out — show it, or
   give it a default. `collectionOverrides` changes the collection for that form
   only.
+- **A record to read, not edit, is `EntityViewPanel`** (0.29+), with the same
+  `collection`, `entityId`, `fields` and `collectionOverrides` as the form. It
+  hides what the form hides: a field a `conditions.hidden` rule hides for that
+  record, or one the user may not read.
+- **One value in your own JSX is `<FieldValue row={row} collection="orders"
+  field="status"/>`** (0.29+), not a hand-formatted string. It takes the row as
+  the server sends it (`useRows`, `client.data`), finds a belongsTo under its
+  foreign-key column, and draws the enum chip, the date in its timezone or the
+  relation's title as the admin does. The collection must be registered above it.
 - **Read and write through `useData()`.** Writes go through the server, so
   collection callbacks and security rules apply. Don't call `fetch` on the REST
   API from admin code.

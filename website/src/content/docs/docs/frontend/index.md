@@ -227,7 +227,48 @@ Each form scopes its DOM ids, so two forms can share a page. To find a field
 from a test, select `[data-form-field="title"]` inside the form's
 `[data-form-path="posts"]`.
 
-Both bring their own `CollectionsProvider` when none is above them. That is
+<span class="since-badge" data-since="0.29">Since 0.29</span>
+`<EntityViewPanel>` is the read-only twin of `EntityFormPanel`. It loads the
+record by `entityId` and draws it as the admin's record page does: the same
+sections and labels, with each value as its preview, so an enum shows as its
+chip, a date in its timezone and a relation as its target's title. It takes
+`fields` and `collectionOverrides` as the form does, and leaves out the fields
+the form leaves out: one a `conditions.hidden` rule hides for this record, and
+one the signed-in user may not read.
+
+```tsx
+import { EntityViewPanel } from "@rebasepro/cms";
+
+<EntityViewPanel
+    collection={ordersCollection}
+    entityId={orderId}
+    fields={["customer", "status", "total"]}/>
+```
+
+`<FieldValue>` draws one value the same way, inside your own JSX. It takes the
+whole row, as `useRows`, `useRow` and `client.data` return it, because a
+belongsTo relation arrives under its foreign-key column (`customerId`), not
+under the property's name; `field="customer"` finds it there. It needs the
+collection registered above it, by `<RebaseCMS>` or a `CollectionsProvider`.
+An unknown collection or field throws an error that names it.
+
+```tsx
+import { useRows } from "@rebasepro/app";
+import { FieldValue } from "@rebasepro/cms";
+
+function OrderList() {
+    const { rows } = useRows("orders", { limit: 20 });
+    return rows.map(row => (
+        <div key={String(row.id)} className="flex gap-4">
+            <FieldValue row={row} collection="orders" field="customer"/>
+            <FieldValue row={row} collection="orders" field="status"/>
+            <FieldValue row={row} collection="orders" field="placedAt"/>
+        </div>
+    ));
+}
+```
+
+The three panels bring their own `CollectionsProvider` when none is above them. That is
 the step underneath, and you can mount it yourself to share one scope between
 several panels, or to use the lower-level pieces (`CollectionViewBinding`,
 `useSidePanel`) under it. Inside it, a panel can name its collection by `path`:

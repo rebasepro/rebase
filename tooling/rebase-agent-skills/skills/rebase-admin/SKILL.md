@@ -22,6 +22,8 @@ The `@rebasepro/cms` package provides the admin-panel layer for Rebase. It handl
 | Look up a collection by slug | `useCollectionRegistryController()` | `@rebasepro/cms` |
 | Embed a collection in a custom page | `<CollectionPanel>` | `@rebasepro/cms` |
 | One record's form in your own page | `<EntityFormPanel>` | `@rebasepro/cms` |
+| One record, read-only, in your own page | `<EntityViewPanel>` | `@rebasepro/cms` |
+| One value of a row, drawn as the admin draws it | `<FieldValue>` | `@rebasepro/cms` |
 | Add custom top-level views | `<RebaseCMS views={[...]}>` | `@rebasepro/cms` |
 | Replace how one property is edited or shown | `admin: { Field, Preview }` | see §12 |
 | Open an entity selection dialog | `useSelectionDialog()` | `@rebasepro/cms` |
@@ -407,6 +409,16 @@ import { CollectionPanel, EntityFormPanel } from "@rebasepro/cms";
   renders above the fields.
 - Two forms on one page do not share DOM ids. In tests, find a field by
   `[data-form-field="title"]` inside the form's `[data-form-path="posts"]`.
+- `EntityViewPanel` (0.29+) is the read-only twin: `collection`, `entityId`,
+  `path?`, `fields?`, `collectionOverrides?`, `className?`. It draws the record
+  as the admin's record page does, and leaves out a field a `conditions.hidden`
+  rule hides for that record or one the user may not read.
+- `<FieldValue row={row} collection="orders" field="status" size?/>` (0.29+)
+  draws one value of a flat row (`useRows`, `client.data`) through
+  `PropertyPreview`. A belongsTo is read from its foreign-key column
+  (`customerId`) and shown as the target's title. It needs the collection
+  registered above it (`<RebaseCMS>` or `CollectionsProvider`); an unknown
+  collection or field throws.
 
 - No CMS route serves the page, so a record clicked in the table opens in a
   side panel or dialog **over** the page — never by URL (`full_screen` and
@@ -940,6 +952,8 @@ The admin package exports the following components (from `@rebasepro/cms`):
 | `CollectionPanel` | Embed a collection view inside custom pages — by slug, or with the collection as a value |
 | `EntityFormPanel` | One record's form in a page of your own app (0.25+); `fields`, `layout`, `collectionOverrides` (0.29+) |
 | `FormField` | One field of the record form it is rendered in, by property name (0.29+) |
+| `EntityViewPanel` | One record, read-only, in a page of your own app; `fields`, `collectionOverrides` (0.29+) |
+| `FieldValue` | One value of a flat row, drawn as the admin draws it (0.29+) |
 | `CollectionsProvider` | The minimal scope for collection views and record forms outside the CMS (0.25+) |
 | `CollectionViewBinding` | The collection view, bound to Rebase data |
 | `CollectionTableBinding` | The table rendering of a collection |

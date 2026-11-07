@@ -34,6 +34,8 @@ Components you render anywhere under `<Rebase>` and a router.
 | `CollectionPanel` | `@rebasepro/cms` | A collection's table, cards, board or custom view, with its toolbar, filters and record panel. |
 | `EntityFormPanel` | `@rebasepro/cms` | One record's form: loads it, validates, saves. Given an id no record has yet, it creates it there. `fields` shows some fields, in order; `layout` takes your own arrangement of `FormField`s; `collectionOverrides` changes the collection for this form only. It validates only the fields it shows. |
 | `FormField` | `@rebasepro/cms` | One field of the record form it sits in, by property name: `<FormField name="status"/>`, inside `EntityFormPanel`'s `layout` or a `formView.Builder`. |
+| `EntityViewPanel` | `@rebasepro/cms` | One record, read-only, drawn as the admin's record page draws it. Takes `fields` and `collectionOverrides` like `EntityFormPanel`, and leaves out what the form leaves out: a field a `conditions.hidden` rule hides for this record, or one the user may not read. |
+| `FieldValue` | `@rebasepro/cms` | One value of a row as the server sends it (`useRows`, `client.data`), drawn as the admin draws it: `<FieldValue row={row} collection="orders" field="status"/>`. An enum is its chip, a date is in its timezone, a belongsTo is read from its foreign-key column and shown as its target's title. |
 | `CollectionsProvider` | `@rebasepro/cms` | Makes collections known to the blocks in a page of your own that has no admin shell around it. |
 | `RebaseAuthGate` | `@rebasepro/cms` | Shows the login screen until someone is signed in, then its children. |
 | `LoginView` | `@rebasepro/app` | The built-in login screen, to frame or reuse. |

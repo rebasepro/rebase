@@ -1,5 +1,5 @@
 ---
-sourceHash: df43cc3f34990449
+sourceHash: c5facfe7c580b8cd
 title: Visión general del frontend
 sidebar_label: Frontend
 description: "Construye y personaliza el panel — Rebase CMS y Rebase Studio — con React: controladores, scaffold, enrutamiento y vistas."
@@ -205,7 +205,48 @@ Cada formulario acota sus ids del DOM, así que dos formularios pueden compartir
 página. Para encontrar un campo desde un test, selecciona
 `[data-form-field="title"]` dentro del `[data-form-path="posts"]` del formulario.
 
-Ambos traen su propio `CollectionsProvider` cuando no hay ninguno por encima. Ese es
+<span class="since-badge" data-since="0.29">Desde 0.29</span>
+`<EntityViewPanel>` es el gemelo de solo lectura de `EntityFormPanel`. Carga el registro
+por `entityId` y lo dibuja como lo hace la página de registro del admin: las mismas
+secciones y etiquetas, con cada valor como su vista previa, de modo que un enum se muestra
+como su chip, una fecha en su zona horaria y una relación como el título de su destino.
+Acepta `fields` y `collectionOverrides` como el formulario, y omite los campos que el
+formulario omite: uno que una regla `conditions.hidden` oculta para este registro, y uno
+que el usuario con sesión iniciada no puede leer.
+
+```tsx
+import { EntityViewPanel } from "@rebasepro/cms";
+
+<EntityViewPanel
+    collection={ordersCollection}
+    entityId={orderId}
+    fields={["customer", "status", "total"]}/>
+```
+
+`<FieldValue>` dibuja un solo valor de la misma manera, dentro de tu propio JSX. Recibe
+la fila completa, tal como la devuelven `useRows`, `useRow` y `client.data`, porque una
+relación belongsTo llega bajo su columna de clave foránea (`customerId`), no bajo el nombre
+de la propiedad; `field="customer"` la encuentra ahí. Necesita la colección registrada por
+encima, mediante `<RebaseCMS>` o un `CollectionsProvider`. Una colección o un campo
+desconocidos lanzan un error que los nombra.
+
+```tsx
+import { useRows } from "@rebasepro/app";
+import { FieldValue } from "@rebasepro/cms";
+
+function OrderList() {
+    const { rows } = useRows("orders", { limit: 20 });
+    return rows.map(row => (
+        <div key={String(row.id)} className="flex gap-4">
+            <FieldValue row={row} collection="orders" field="customer"/>
+            <FieldValue row={row} collection="orders" field="status"/>
+            <FieldValue row={row} collection="orders" field="placedAt"/>
+        </div>
+    ));
+}
+```
+
+Los tres paneles traen su propio `CollectionsProvider` cuando no hay ninguno por encima. Ese es
 el paso de debajo, y puedes montarlo tú mismo para compartir un único ámbito entre
 varios paneles, o para usar las piezas de nivel más bajo (`CollectionViewBinding`,
 `useSidePanel`) bajo él. Dentro de él, un panel puede nombrar su colección por `path`:
