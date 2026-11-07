@@ -41,9 +41,9 @@ to one user, the endpoint declines to mount and says why in the boot log. No
   (your app's "Forgot password"); the screen tells them so. It also names the host the authorization code is sent
   to, and says that host is not verified: anyone may register a client under
   any name, so the host is the part a person can check.
-- **Eleven tools, three scopes.** The same [scopes](/docs/backend/roles-and-scopes/)
+- **Twelve tools, three scopes.** The same [scopes](/docs/backend/roles-and-scopes/)
   every credential uses. `data:read` offers `list_collections`, `describe_collection`,
-  `query_collection`, `count_documents`, `get_document` and the three views,
+  `query_collection`, `count_documents`, `aggregate_documents`, `get_document` and the three views,
   `show_collection`, `show_record` and `show_app`; `data:write` adds `create_document` and
   `update_document`; `data:delete` adds `delete_document`. A client that asks for
   nothing gets `data:read`. Each one narrows to a collection: `data:read:posts`
@@ -93,10 +93,15 @@ to one user, the endpoint declines to mount and says why in the boot log. No
   back as REST serves it (ISO dates, a `belongsTo` as its foreign key, e.g.
   `authorId`) and can be sent back in an update unchanged. `query_collection`
   answers `{ data, meta }` with `meta.total` and `meta.hasMore`, and `count_documents`
-  `{ count }`. As on REST, a `limit` above 1000, an undeclared argument and an
+  `{ count }`. `aggregate_documents` is `GET /api/data/<collection>/aggregate`:
+  `select` is a list in REST's grammar (`["count()", "sum(total)"]`), `groupBy`
+  a list of fields, and it answers `{ data }` with one row per group, plus
+  `meta.hasMore` on a grouped call, whose groups page with `limit` and `offset`
+  and sort with `orderBy`. On a collection an `afterRead` callback rewrites it
+  serves `count()` alone, as REST does. As on REST, a `limit` above 1000, an undeclared argument and an
   edit or delete of a trashed row (404) are refused; setting the soft-delete
   field to `null` restores it. `deleted: "only"` (or `"include"`) on
-  `query_collection` and `count_documents` reads the trash, as REST's
+  `query_collection`, `count_documents` and `aggregate_documents` reads the trash, as REST's
   `?deleted=` does, so a row `delete_document` trashed can be found again to
   restore. Its description tells the model the delete is permanent only where
   the collection has no soft-delete field.

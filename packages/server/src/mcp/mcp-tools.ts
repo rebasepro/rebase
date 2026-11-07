@@ -368,6 +368,19 @@ function searchStringOf(args: Record<string, unknown>): string | undefined {
 }
 
 /**
+ * A list argument as REST's query string carries it: `["count()", "sum(total)"]`
+ * → `"count(),sum(total)"`, for REST's own parser to read and refuse in REST's
+ * words.
+ */
+function restList(raw: unknown, name: string): string | undefined {
+    if (raw === undefined || raw === null) return undefined;
+    if (!Array.isArray(raw) || raw.some(entry => typeof entry !== "string")) {
+        throw new McpToolError(`${name} must be a list of strings.`);
+    }
+    return raw.length > 0 ? raw.join(",") : undefined;
+}
+
+/**
  * The row an update or delete addresses, read the way REST's routes read it
  * before they write: the caller's own read, with the trash hidden — except for
  * a restore, the one edit that reaches a trashed row.
@@ -955,6 +968,69 @@ const TOOLS: McpToolDefinition[] = [
             const driver = await scopedDriver(ctx);
             const count = await RestApiGenerator.countRawEntities(driver, collection, options, searchStringOf(args));
             return { count };
+        }
+    },
+
+    {
+        name: "aggregate_documents",
+        title: "Aggregate rows",
+        description:
+            "Count, sum, average, minimum and maximum over the rows of a collection that match, optionally grouped, "
+            + "exactly as the REST API's `GET /api/data/<collection>/aggregate` does: `select` is a list like "
+            + "[\"count()\", \"sum(total)\"], `groupBy` the fields to group by. `data` is one row per group (one row "
+            + "without `groupBy`), each value under its alias (`count`, `sum_total`); a grouped call has `meta` with "
+            + "`hasMore` — page with `offset` while it is true. Aggregates only rows the signed-in user is allowed to "
+            + "see. Use it for totals and breakdowns rather than reading every row." + UNTRUSTED_ROWS,
+        requiredScope: "data:read",
+        annotations: READS,
+        inputSchema: {
+            type: "object",
+            properties: {
+                collection: COLLECTION_ARG,
+                select: {
+                    type: "array",
+                    items: { type: "string" },
+                    description: "The aggregates, as REST's `select`: \"count()\" counts rows; \"count(field)\", "
+                        + "\"sum(field)\", \"avg(field)\", \"min(field)\" and \"max(field)\" read a field. Each comes back "
+                        + "under its alias: `count`, `sum_total`, …"
+                },
+                groupBy: {
+                    type: "array",
+                    items: { type: "string" },
+                    description: "Fields to group by, e.g. [\"status\"]. Omit it for one row over every row that matches."
+                },
+                where: WHERE_ARG,
+                searchString: SEARCH_ARG,
+                orderBy: {
+                    type: ["string", "array"],
+                    description: "Sort the groups, by a `groupBy` field or an alias: [\"sum_total\", \"desc\"], a list "
+                        + "of those applied in order, or \"sum_total:desc\". Grouped calls only."
+                },
+                limit: {
+                    type: "number",
+                    description: `Groups to return, 1 to ${MAX_LIST_LIMIT} (default ${DEFAULT_LIST_LIMIT}). Grouped calls only.`
+                },
+                offset: { type: "number", description: "Groups to skip. Grouped calls only." },
+                deleted: DELETED_ARG
+            },
+            required: ["collection", "select"],
+            additionalProperties: false
+        },
+        async run(args, ctx) {
+            const collection = resolveCollection(ctx, args.collection, "data:read");
+            const select = restList(args.select, "`select`");
+            if (!select) throw new McpToolError("`select` is required, e.g. [\"count()\"] or [\"sum(total)\"].");
+            const groupBy = restList(args.groupBy, "`groupBy`");
+            const options = readOptions(args, collection, ctx);
+            const driver = await scopedDriver(ctx);
+            if (!driver.restFetchService?.aggregate) {
+                throw new McpToolError("Aggregates are not available on this project's database. "
+                    + "Use count_documents to count, or query_collection to read the rows.");
+            }
+            const { rows, meta } = await RestApiGenerator.aggregate(
+                driver, collection, options, select, groupBy, viewerOf(ctx), searchStringOf(args)
+            );
+            return meta ? { data: rows, meta } : { data: rows };
         }
     },
 

@@ -1486,78 +1486,16 @@ export class RestApiGenerator {
             const queryDict = c.req.queries();
             const queryOptions = this.parseQuery(queryDict, { collection: resolvedCollection, c });
             const searchString = Array.isArray(queryDict.searchString) ? queryDict.searchString[queryDict.searchString.length - 1] : undefined;
-
-            const aggregates = parseAggregateSelect(queryDict.select);
-            if (!aggregates) {
-                throw ApiError.badRequest(
-                    "`select` is required, e.g. `?select=count()` or `?select=sum(total)&groupBy=status`.",
-                    "MISSING_AGGREGATE_SELECT"
-                );
-            }
-
-            const driver = this.getScopedDriver(c);
-            const fetchService = driver.restFetchService;
-            if (!fetchService?.aggregate) {
-                // Every non-Postgres driver. A 501 naming the capability rather
-                // than a 500 — and emphatically not an empty result set, which
-                // reads as "nothing matched" and is the wrong thing to believe
-                // about a dashboard.
-                throw new ApiError(501, "AGGREGATE_NOT_SUPPORTED",
-                    "Aggregates are not implemented for this backend's data driver.");
-            }
-
-            // `sum(salary)` and `groupBy=salary` read the column as surely as
-            // selecting it does — an aggregate is the classic way to read a
-            // value you cannot select, one bucket at a time. `parseQuery` above
-            // has already judged `where`/`orderBy`; these two are parsed here,
-            // so they are judged here.
-            const groupBy = parseGroupBy(queryDict.groupBy);
-            const viewer = requestViewer(c);
-            assertReadableFields(aggregates.map(a => a.field), resolvedCollection, viewer, "select");
-            assertReadableFields(groupBy ?? [], resolvedCollection, viewer, "groupBy");
-            assertNoHiddenAggregateNames(aggregates, groupBy ?? [], resolvedCollection);
-
-            // The groups are paged like a listing's rows: `limit` bounds them,
-            // `offset` (or `page`) moves past them, `orderBy` sorts them by a
-            // group key or an aggregate. Without `groupBy` there is one row,
-            // and nothing to sort or skip — so a window there is refused rather
-            // than read as nothing, which is also what a cursor is: it names a
-            // row to continue after, and a group is not a row.
-            const grouped = groupBy !== undefined && groupBy.length > 0;
-            const orderBy = orderByEntriesToTuples(queryOptions.orderBy);
-            if (queryOptions.cursor || (!grouped && (queryOptions.offset || orderBy))) {
-                throw ApiError.badRequest(
-                    queryOptions.cursor
-                        ? "An aggregate is not paged by cursor: `after` continues after a row, and a group is not one. " +
-                          "Page the groups with `offset` or `page`."
-                        : "`offset`, `page` and `orderBy` page through the groups of an aggregate, and without " +
-                          "`groupBy` it has one row. Add `groupBy`, or drop them.",
-                    "INVALID_AGGREGATE_WINDOW"
-                );
-            }
-
-            // One group past the page, so `hasMore` is known rather than
-            // guessed from a page that happened to come back full.
-            const limit = queryOptions.limit;
-            const rows = await fetchService.aggregate(collection.slug, {
-                aggregates,
-                groupBy,
-                filter: queryOptions.where,
-                logical: queryOptions.logical,
-                searchString,
-                limit: grouped && limit !== undefined ? limit + 1 : limit,
-                offset: queryOptions.offset,
-                orderBy,
-                // Same reasoning as the listing and its count: an aggregate
-                // that counts stamped rows disagrees with the page beside it.
-                withDeleted: queryOptions.withDeleted
-            });
-
-            if (!grouped || limit === undefined) return c.json({ data: rows });
-            return c.json({
-                data: rows.slice(0, limit),
-                meta: { limit, offset: queryOptions.offset ?? 0, hasMore: rows.length > limit }
-            });
+            const { rows, meta } = await RestApiGenerator.aggregate(
+                this.getScopedDriver(c),
+                resolvedCollection,
+                queryOptions,
+                queryDict.select,
+                queryDict.groupBy,
+                requestViewer(c),
+                searchString
+            );
+            return c.json(meta ? { data: rows, meta } : { data: rows });
         });
 
         // GET /collection - List entities
@@ -2394,6 +2332,96 @@ id };
             // rows and a total that counts them is a page saying "1 of 5".
             withDeleted: queryOptions.withDeleted
         }) : 0;
+    }
+
+    /**
+     * `GET /:collection/aggregate`: `count`/`sum`/`avg`/`min`/`max`, optionally
+     * grouped, with the `meta` of a grouped page. The route and the MCP
+     * `aggregate_documents` tool both answer through here, so a check made
+     * once is made on both.
+     *
+     * @param select `?select=` as it arrived — `"count(),sum(total)"`.
+     * @param groupBy `?groupBy=` as it arrived — `"status,country"`.
+     * @param viewer the caller every field rule is judged against.
+     */
+    static async aggregate(
+        driver: DataDriver,
+        collection: CollectionConfig,
+        queryOptions: QueryOptions,
+        select: unknown,
+        groupBy: unknown,
+        viewer: FieldViewer,
+        searchString?: string
+    ): Promise<{ rows: Record<string, unknown>[]; meta?: { limit: number; offset: number; hasMore: boolean } }> {
+        const aggregates = parseAggregateSelect(select);
+        if (!aggregates) {
+            throw ApiError.badRequest(
+                "`select` is required, e.g. `?select=count()` or `?select=sum(total)&groupBy=status`.",
+                "MISSING_AGGREGATE_SELECT"
+            );
+        }
+
+        const fetchService = driver.restFetchService;
+        if (!fetchService?.aggregate) {
+            // Every non-Postgres driver. A 501 naming the capability rather
+            // than a 500 — and emphatically not an empty result set, which
+            // reads as "nothing matched" and is the wrong thing to believe
+            // about a dashboard.
+            throw new ApiError(501, "AGGREGATE_NOT_SUPPORTED",
+                "Aggregates are not implemented for this backend's data driver.");
+        }
+
+        // `sum(salary)` and `groupBy=salary` read the column as surely as
+        // selecting it does — an aggregate is the classic way to read a
+        // value you cannot select, one bucket at a time. The query parser
+        // has already judged `where`/`orderBy`; these two are parsed here,
+        // so they are judged here.
+        const groups = parseGroupBy(groupBy);
+        assertReadableFields(aggregates.map(a => a.field), collection, viewer, "select");
+        assertReadableFields(groups ?? [], collection, viewer, "groupBy");
+        assertNoHiddenAggregateNames(aggregates, groups ?? [], collection);
+
+        // The groups are paged like a listing's rows: `limit` bounds them,
+        // `offset` (or `page`) moves past them, `orderBy` sorts them by a
+        // group key or an aggregate. Without `groupBy` there is one row,
+        // and nothing to sort or skip — so a window there is refused rather
+        // than read as nothing, which is also what a cursor is: it names a
+        // row to continue after, and a group is not a row.
+        const grouped = groups !== undefined && groups.length > 0;
+        const orderBy = orderByEntriesToTuples(queryOptions.orderBy);
+        if (queryOptions.cursor || (!grouped && (queryOptions.offset || orderBy))) {
+            throw ApiError.badRequest(
+                queryOptions.cursor
+                    ? "An aggregate is not paged by cursor: `after` continues after a row, and a group is not one. " +
+                      "Page the groups with `offset` or `page`."
+                    : "`offset`, `page` and `orderBy` page through the groups of an aggregate, and without " +
+                      "`groupBy` it has one row. Add `groupBy`, or drop them.",
+                "INVALID_AGGREGATE_WINDOW"
+            );
+        }
+
+        // One group past the page, so `hasMore` is known rather than
+        // guessed from a page that happened to come back full.
+        const limit = queryOptions.limit;
+        const rows = await fetchService.aggregate(collection.slug, {
+            aggregates,
+            groupBy: groups,
+            filter: queryOptions.where,
+            logical: queryOptions.logical,
+            searchString,
+            limit: grouped && limit !== undefined ? limit + 1 : limit,
+            offset: queryOptions.offset,
+            orderBy,
+            // Same reasoning as the listing and its count: an aggregate
+            // that counts stamped rows disagrees with the page beside it.
+            withDeleted: queryOptions.withDeleted
+        });
+
+        if (!grouped || limit === undefined) return { rows };
+        return {
+            rows: rows.slice(0, limit),
+            meta: { limit, offset: queryOptions.offset ?? 0, hasMore: rows.length > limit }
+        };
     }
 
 

@@ -117,7 +117,7 @@ and no others — `MCP_SCOPES` in `mcp/oauth-metadata.ts`:
 
 | Scope | What it grants |
 |---|---|
-| `data:read` | `list_collections`, `describe_collection`, `query_collection`, `show_collection`, `show_record` and `show_app` (where the MCP App view is served — `mcp/mcp-apps.ts`), `count_documents`, `get_document` |
+| `data:read` | `list_collections`, `describe_collection`, `query_collection`, `show_collection`, `show_record` and `show_app` (where the MCP App view is served — `mcp/mcp-apps.ts`), `count_documents`, `aggregate_documents`, `get_document` |
 | `data:write` | `create_document`, `update_document` |
 | `data:delete` | `delete_document` |
 
@@ -149,14 +149,18 @@ The arguments are the SDK's — `where`, `orderBy`, `limit`, `offset`,
 `searchString`, and `data` for a write — and a read's arguments are handed to
 the REST list route's own parser (`parseQueryOptions`) as the query string the
 SDK would send. The reads then go through REST's own read path
-(`RestApiGenerator.readPage` / `readRow` / `countRawEntities`), so:
+(`RestApiGenerator.readPage` / `readRow` / `countRawEntities` / `aggregate`), so:
 
 - a row is the row `GET /api/data/<collection>` serves: dates as ISO strings, a
   `belongsTo` as its foreign key (`authorId`), never the admin view model's
   `{ "__type": "date" }` envelope or an embedded related row — which is what
   lets a model send a row it read back in `update_document`;
-- `query_collection` answers REST's list body, `{ data, meta }`, and
-  `count_documents` answers `/count`'s `{ count }`;
+- `query_collection` answers REST's list body, `{ data, meta }`,
+  `count_documents` answers `/count`'s `{ count }`, and `aggregate_documents`
+  answers `/aggregate`'s `{ data, meta? }` — its `select` and `groupBy` lists
+  joined into REST's `?select=` / `?groupBy=` and read by the same parser, with
+  the same field checks and the same `afterRead` refusal (only `count()` on a
+  collection a callback rewrites);
 - `list_collections` gives each collection's `name`, `title` and
   `description`, and nothing else: with every schema in it, 200 collections of
   20 fields were ~150k tokens of a model's context, and as a summary they are

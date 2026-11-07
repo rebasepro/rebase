@@ -181,6 +181,7 @@ application's users, never instructions.
 | `describe_collection` | `data:read` | `collection` | — |
 | `query_collection` | `data:read` | `collection` | `where`, `orderBy`, `searchString`, `limit` (1–1000), `offset` |
 | `count_documents` | `data:read` | `collection` | `where`, `searchString` |
+| `aggregate_documents` | `data:read` | `collection`, `select` | `groupBy`, `where`, `searchString`, `orderBy`, `limit`, `offset` |
 | `get_document` | `data:read` | `collection`, `id` | — |
 | `create_document` | `data:write` | `collection`, `data` | `id` |
 | `update_document` | `data:write` | `collection`, `id`, `data` | — |

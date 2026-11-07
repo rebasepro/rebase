@@ -74,6 +74,22 @@ const posts = {
     }
 } as unknown as CollectionConfig;
 
+/** A collection whose rows an `afterRead` callback masks. */
+const readersTable = pgTable("readers", {
+    id: varchar("id").primaryKey(),
+    email: varchar("email")
+});
+const readers = {
+    name: "Readers",
+    slug: "readers",
+    table: "readers",
+    properties: {
+        id: { name: "ID", type: "string", isId: true },
+        email: { name: "Email", type: "string" }
+    },
+    callbacks: { afterRead: ({ row }: { row: Record<string, unknown> }) => ({ ...row, email: "***" }) }
+} as unknown as CollectionConfig;
+
 const USER = { uid: "mcp-user", roles: ["admin"] };
 
 /** Every key named `__type`, at any depth — the admin view model's envelope. */
@@ -106,7 +122,7 @@ describe("remote MCP tools on the real driver (E2E)", () => {
         if (!definition) throw new Error(`No MCP tool ${name}`);
         return definition.run(args, {
             driver: driver as unknown as DataDriver,
-            collections: [authors, posts],
+            collections: [authors, posts, readers],
             caller: { ...USER, scopes: ["data:read", "data:write", "data:delete"], clientId: "mcp-e2e" }
         });
     }
@@ -147,6 +163,8 @@ describe("remote MCP tools on the real driver (E2E)", () => {
                 deleted_at timestamptz
             );
             INSERT INTO public.authors VALUES ('a1', 'Ada'), ('a2', 'Bob');
+            CREATE TABLE public.readers (id varchar PRIMARY KEY, email varchar);
+            INSERT INTO public.readers VALUES ('r1', 'ada@example.com');
             INSERT INTO public.posts (id, title, status, views, featured, published_at, body, author_id) VALUES
                 ('p1', 'Hello', 'published', 10, true, '2026-01-01T10:00:00Z', 'about gardens', 'a1'),
                 ('p2', 'Draft one', 'draft', 0, false, null, 'plain', 'a2'),
@@ -156,9 +174,10 @@ describe("remote MCP tools on the real driver (E2E)", () => {
         pool = new pg.Pool({ connectionString: container.connectionString });
         const db = drizzle(pool);
         const registry = new PostgresCollectionRegistry();
-        registry.registerMultiple([authors, posts]);
+        registry.registerMultiple([authors, posts, readers]);
         registry.registerTable(authorsTable, "authors");
         registry.registerTable(postsTable, "posts");
+        registry.registerTable(readersTable, "readers");
         const realtime = new RealtimeService(db as never, registry);
         driver = new PostgresBackendDriver(db as never, realtime as never, registry);
         realtime.setDataDriver(driver);
@@ -170,7 +189,7 @@ describe("remote MCP tools on the real driver (E2E)", () => {
             c.set("driver", await driver.withAuth(USER as never));
             await next();
         });
-        app.route("/api/data", new RestApiGenerator([authors, posts], driver).generateRoutes());
+        app.route("/api/data", new RestApiGenerator([authors, posts, readers], driver).generateRoutes());
     }, 120_000);
 
     afterAll(async () => {
@@ -215,6 +234,31 @@ describe("remote MCP tools on the real driver (E2E)", () => {
                 expect(counted).toEqual(served.json);
             }
             expect(await tool("count_documents", { collection: "posts", where: { status: ["==", "published"] } })).toEqual({ count: 2 });
+        });
+
+        it("aggregate_documents is REST's /aggregate, groups and meta", async () => {
+            const grouped = await tool("aggregate_documents", {
+                collection: "posts", select: ["count()", "sum(views)"], groupBy: ["status"], orderBy: ["status", "asc"], limit: 1
+            });
+            const served = await rest("/posts/aggregate?select=count(),sum(views)&groupBy=status&orderBy=status:asc&limit=1");
+            expect(served.status).toBe(200);
+            expect(grouped).toEqual(served.json);
+            expect(grouped).toEqual({
+                data: [{ status: "draft", count: 1, sum_views: 0 }],
+                meta: { limit: 1, offset: 0, hasMore: true }
+            });
+            const where = { status: ["==", "published"] };
+            const total = await tool("aggregate_documents", { collection: "posts", select: ["max(views)"], where });
+            expect(total).toEqual((await rest(`/posts/aggregate?select=max(views)&where=${encodeURIComponent(JSON.stringify(where))}`)).json);
+            expect(total).toEqual({ data: [{ max_views: 10 }] });
+        });
+
+        it("aggregate_documents serves only count() where afterRead rewrites the rows, as REST does", async () => {
+            const refused = await refusalOf("aggregate_documents", { collection: "readers", select: ["max(email)"] });
+            expect(refused).toContain("Aggregates other than count are refused on a collection whose rows an afterRead callback rewrites");
+            expect(refused).not.toContain("ada@example.com");
+            expect((await rest("/readers/aggregate?select=max(email)")).status).toBe(400);
+            expect(await tool("aggregate_documents", { collection: "readers", select: ["count()"] })).toEqual({ data: [{ count: 1 }] });
         });
 
         it("searchString finds what REST's search finds", async () => {
