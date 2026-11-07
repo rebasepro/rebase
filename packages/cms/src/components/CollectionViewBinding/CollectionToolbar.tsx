@@ -1,6 +1,9 @@
 import React from "react";
 import { getCollectionDataPath } from "@rebasepro/types";
-import { CollectionTableToolbar } from "../CollectionTableBinding/internal/CollectionTableToolbar";
+import { useLargeLayout, useTranslation } from "@rebasepro/app";
+import { SearchBar } from "@rebasepro/ui";
+import { CollectionTableToolbar, useToolbarLabels } from "../CollectionTableBinding/internal/CollectionTableToolbar";
+import { FiltersButton } from "./FiltersButton";
 import { CollectionViewStartActions } from "./CollectionViewStartActions";
 import { ViewModeToggle } from "./ViewModeToggle";
 import { EMPTY_ARRAY } from "./PluginColumnSlots";
@@ -9,6 +12,8 @@ import { useCollectionViewScope } from "./CollectionViewScope";
 /**
  * The view-mode switcher of the collection view it is drawn in, with the
  * size and kanban-column choices of the active view.
+ *
+ * @group Collection components
  */
 export function CollectionViewModeToggle() {
     const scope = useCollectionViewScope("CollectionViewModeToggle");
@@ -50,12 +55,70 @@ export function CollectionViewModeToggle() {
 }
 
 /**
- * The toolbar of the collection view it is drawn in: the view-mode switcher,
- * selection, filters, sort and count on the left; search, the
- * `Collection.Actions` override with the `collection.toolbar` and
- * `collection.actions` contributions, and the add button on the right.
+ * The search box of the collection view it is drawn in.
+ *
+ * @group Collection components
  */
-export function CollectionToolbar() {
+export function CollectionSearchBar() {
+    const { tableController } = useCollectionViewScope("CollectionSearchBar");
+    const { t } = useTranslation();
+    if (!tableController.setSearchString) return null;
+    return (
+        <SearchBar
+            size={"small"}
+            placeholder={t("search")}
+            onTextSearch={tableController.setSearchString}
+            expandable={true}
+            initialValue={tableController.searchString}/>
+    );
+}
+
+/**
+ * The filters button of the collection view it is drawn in, with the count
+ * of filters set, and the dialog it opens.
+ *
+ * @group Collection components
+ */
+export function CollectionFiltersButton() {
+    const { tableController, resolvedCollection, collection, isCompact } = useCollectionViewScope("CollectionFiltersButton");
+    const largeLayout = useLargeLayout();
+    const toolbarLabels = useToolbarLabels();
+    return (
+        <FiltersButton
+            tableController={tableController}
+            properties={resolvedCollection.properties}
+            fixedFilter={collection.fixedFilter}
+            iconOnly={!largeLayout || isCompact || !toolbarLabels}/>
+    );
+}
+
+/**
+ * @group Collection components
+ */
+export type CollectionToolbarProps = {
+    /**
+     * The leading group. With neither `start` nor `end`, the toolbar draws
+     * its full set of pieces.
+     */
+    start?: React.ReactNode;
+    /** The trailing group. */
+    end?: React.ReactNode;
+};
+
+/**
+ * The toolbar of the collection view it is drawn in — the default
+ * `toolbar` of a `CollectionPanel`.
+ *
+ * Without props: the view-mode switcher, selection, filters, sort and count
+ * on the left; search, the `Collection.Actions` override with the
+ * `collection.toolbar` and `collection.actions` contributions, and the add
+ * button on the right. With `start` or `end`: the same bar, holding only
+ * those — compose them from `CollectionViewModeToggle`,
+ * `CollectionFiltersButton`, `CollectionSearchBar` and `CollectionAddButton`.
+ *
+ * @group Collection components
+ */
+export function CollectionToolbar({ start, end }: CollectionToolbarProps) {
     const scope = useCollectionViewScope("CollectionToolbar");
     const {
         collection,
@@ -79,6 +142,15 @@ export function CollectionToolbar() {
         pluginToolbarWidgets,
         ResolvedCollectionActions
     } = scope;
+
+    if (start !== undefined || end !== undefined) {
+        return (
+            <CollectionTableToolbar
+                loading={tableController.dataLoading}
+                actionsStart={start}
+                actions={end}/>
+        );
+    }
 
     return (
         <CollectionTableToolbar
@@ -124,4 +196,19 @@ export function CollectionToolbar() {
             }
         />
     );
+}
+
+/** The default toolbar, as the element a view draws when it is given none. */
+export const DEFAULT_TOOLBAR = <CollectionToolbar/>;
+
+/** The toolbar a view was given: the default, a composition, or `null`. */
+export const CollectionToolbarSlotContext = React.createContext<React.ReactNode>(DEFAULT_TOOLBAR);
+
+/**
+ * Draws the view's toolbar. One element for the life of the view, so the
+ * toolbar keeps its place in the tree — and the view-mode popover stays open —
+ * whichever view is shown below it.
+ */
+export function CollectionToolbarSlot() {
+    return <>{React.useContext(CollectionToolbarSlotContext)}</>;
 }

@@ -5,7 +5,7 @@ import React, { Suspense } from "react";
 import { useLargeLayout, useTranslation, useSlot, resolveComponentRef } from "@rebasepro/app";
 import { CollectionActionsProps, EntityTableController, SelectionController, AdminCollection } from "@rebasepro/cms-types";
 import { Button, IconButton, Tooltip, Popover, iconSize, lazyChunk } from "@rebasepro/ui";
-import { ErrorBoundary, Link2Icon, MoreVerticalIcon, PlusIcon, Trash2Icon, Unlink2Icon } from "@rebasepro/ui";
+import { ErrorBoundary, Link2Icon, MoreVerticalIcon, Trash2Icon, Unlink2Icon } from "@rebasepro/ui";
 import { usePermissions } from "@rebasepro/app";
 import { toArray } from "@rebasepro/utils";
 // Lazy-load import/export — pulls in exceljs only on demand
@@ -15,6 +15,7 @@ import { EditorCollectionAction } from "../../collection_editor/ui/EditorCollect
 import { useCollectionEditorController } from "../../collection_editor/useCollectionEditorController";
 import { useAdminContext } from "../../hooks/useAdminContext";
 import { useToolbarLabels } from "../CollectionTableBinding/internal/CollectionTableToolbar";
+import { CollectionAddButton } from "./CollectionAddButton";
 
 export type CollectionViewActionsProps<M extends Record<string, unknown>> = {
     collection: AdminCollection<M>;
@@ -61,7 +62,7 @@ export function CollectionViewActions<M extends Record<string, unknown>>({
 }: CollectionViewActionsProps<M>) {
     const context = useAdminContext();
 
-    const { canCreate, canDelete } = usePermissions();
+    const { canDelete } = usePermissions();
 
     const largeLayout = useLargeLayout();
     const toolbarLabels = useToolbarLabels();
@@ -76,29 +77,8 @@ export function CollectionViewActions<M extends Record<string, unknown>>({
 
     const { selectedCount, hasSelection } = selectionController;
 
-    const addButton = canCreate(collection, path) &&
-        onNewClick && (labelled
-            ? <Button
-                id={`add_entity_${path}`}
-                onClick={onNewClick}
-                startIcon={<PlusIcon size={iconSize.small}/>}
-                size="small"
-                variant="filled"
-                color="primary">
-                {t("add_specific", { name: collection.singularName ?? collection.name })}
-            </Button>
-            // In the compact split-list toolbar the add action is the one filled
-            // control: a rounded square, so it reads as a button and not a badge.
-            : <IconButton
-                id={`add_entity_${path}`}
-                onClick={onNewClick}
-                variant="filled"
-                shape="square"
-                size="small"
-                aria-label={t("add_specific", { name: collection.singularName ?? collection.name })}
-            >
-                <PlusIcon size={iconSize.small}/>
-            </IconButton>);
+    const addButton = onNewClick &&
+        <CollectionAddButton collection={collection} path={path} onClick={onNewClick} compact={Boolean(compact)}/>;
 
     // On a junction-backed tab, creating a row is only half of what "add" means:
     // the far more common act is attaching one that already exists. There was no

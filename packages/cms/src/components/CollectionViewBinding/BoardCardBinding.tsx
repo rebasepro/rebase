@@ -17,6 +17,11 @@ export type BoardCardBindingProps<M extends Record<string, unknown> = Record<str
     selected?: boolean;
     onSelectionChange?: (entity: Entity<M>, selected: boolean) => void;
     selectionEnabled?: boolean;
+    /**
+     * Draws the record's actions beside the card's title — the collection's
+     * `entityActions` with Copy and Delete, placed as a table row places them.
+     */
+    renderActions?: (entity: Entity<M>) => React.ReactNode;
 };
 
 /**
@@ -36,7 +41,8 @@ function BoardCardBindingInner<M extends Record<string, unknown> = Record<string
     onClick,
     selected,
     onSelectionChange,
-    selectionEnabled = false
+    selectionEnabled = false,
+    renderActions
 }: BoardCardBindingProps<M>) {
     const { t } = useTranslation();
     const entity = item.data;
@@ -169,13 +175,16 @@ function BoardCardBindingInner<M extends Record<string, unknown> = Record<string
 
                 {/* Content */}
                 <div className="flex-1 min-w-0">
-                    {/* Title slot */}
-                    <div className="line-clamp-2 text-sm font-medium">
-                        {slots.title ? (
-                            <SlotValue slot={slots.title} size="small"/>
-                        ) : (
-                            <span className="text-surface-500">{entity.id}</span>
-                        )}
+                    {/* Title slot, and the record's actions beside it */}
+                    <div className="flex items-start gap-1">
+                        <div className="flex-1 min-w-0 line-clamp-2 text-sm font-medium">
+                            {slots.title ? (
+                                <SlotValue slot={slots.title} size="small"/>
+                            ) : (
+                                <span className="text-surface-500">{entity.id}</span>
+                            )}
+                        </div>
+                        {renderActions?.(entity)}
                     </div>
                     {/* Subtitle / Description */}
                     {slots.subtitle ? (
@@ -249,6 +258,7 @@ export function createBoardCardBindingComponent<M extends Record<string, unknown
         isEntitySelected?: (entity: Entity<M>) => boolean;
         onSelectionChange?: (entity: Entity<M>, selected: boolean) => void;
         selectionEnabled?: boolean;
+        renderActions?: (entity: Entity<M>) => React.ReactNode;
     }
 ): React.ComponentType<BoardItemViewProps<Entity<M>>> {
     return function BoardCardBindingWrapper(props: BoardItemViewProps<Entity<M>>) {
@@ -260,6 +270,7 @@ export function createBoardCardBindingComponent<M extends Record<string, unknown
                 selected={options.isEntitySelected?.(props.item.data)}
                 onSelectionChange={options.onSelectionChange}
                 selectionEnabled={options.selectionEnabled}
+                renderActions={options.renderActions}
             />
         );
     };

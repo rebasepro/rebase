@@ -1,11 +1,12 @@
 
 import type { ViewMode, AdminCollection } from "@rebasepro/cms-types";
+import type { Entity } from "@rebasepro/types";
 import React, { useContext, useMemo } from "react";
 import { CollectionViewBinding } from "./CollectionViewBinding/CollectionViewBinding";
 import { useCollectionRegistryController } from "../hooks/navigation/contexts/CollectionRegistryContext";
 import { useNavigationStateController } from "../hooks/navigation/contexts/NavigationStateContext";
 import { useUrlController } from "../hooks/navigation/contexts/UrlContext";
-import { CircularProgressCenter, Typography } from "@rebasepro/ui";
+import { CircularProgressCenter, cls, Typography } from "@rebasepro/ui";
 import { useComponentOverride, CollectionScopeProvider } from "@rebasepro/app";
 import { CollectionsScopeContext, isRegistered } from "./CollectionsScopeContext";
 import { CollectionsProvider } from "./CollectionsProvider";
@@ -62,7 +63,9 @@ export type CollectionPanelOptions = {
     title?: string | false;
 
     /**
-     * Force a specific view mode, overriding the collection's default.
+     * The view mode the panel opens in, over the collection's default, the
+     * one in the URL and the one the person last picked. They can still
+     * switch.
      */
     viewMode?: ViewMode;
 
@@ -103,6 +106,44 @@ export type CollectionPanelOptions = {
      * `enabledViews`, `entityActions`, `defaultFilter`, etc.).
      */
     collectionOverrides?: Partial<AdminCollection>;
+
+    /**
+     * The properties the panel shows, in this order; the ones it leaves out
+     * are not drawn.
+     *
+     * - Table: the columns.
+     * - List, cards, kanban cards: what the row's or card's places — title,
+     *   image, subtitle, status, date, relation chips, the list's columns —
+     *   are filled from, earlier ones first. A place none of them fills
+     *   stays empty.
+     *
+     * For this panel it wins over `propertiesOrder`, the column order the
+     * user saved, `listProperties` and what the cards infer. Column widths
+     * the user drags still persist; the order is yours, so columns are not
+     * dragged. A property hidden from collections stays hidden, and a
+     * custom view is handed the whole collection.
+     */
+    fields?: string[];
+
+    /**
+     * The toolbar above the rows. Defaults to the full toolbar; `null` draws
+     * none. Compose a smaller one from its pieces:
+     *
+     * ```tsx
+     * <CollectionPanel path="orders" toolbar={
+     *     <CollectionToolbar
+     *         start={<CollectionFiltersButton/>}
+     *         end={<><CollectionSearchBar/><CollectionAddButton/></>}/>
+     * }/>
+     * ```
+     */
+    toolbar?: React.ReactNode;
+
+    /**
+     * Called with the row when one is clicked, instead of the panel opening
+     * it. Without it the record opens as `openEntityMode` says.
+     */
+    onEntityClick?: (entity: Entity) => void;
 };
 
 /**
@@ -147,14 +188,20 @@ function CollectionPanelInner({
     overrides,
     path,
     title,
+    viewMode,
     updateUrl,
     highlightedEntityId,
+    fields,
+    toolbar,
+    onEntityClick,
     className
 }: CollectionPanelProps & { mergedCollection: AdminCollection; overrides: Partial<AdminCollection> }) {
     const ResolvedCollectionView = useComponentOverride("Collection.View", CollectionViewBinding);
 
+    // A column, so a height or a max-height on the panel reaches the view:
+    // it sizes to its rows up to that, then scrolls inside.
     return (
-        <div className={className}>
+        <div className={cls("flex flex-col min-h-0", className)}>
             {title !== false && (
                 <Typography
                     variant="subtitle2"
@@ -167,6 +214,11 @@ function CollectionPanelInner({
                 {...mergedCollection}
                 collectionOverrides={overrides}
                 {...(highlightedEntityId !== undefined && { highlightedEntityId })}
+                {...(viewMode && { viewMode })}
+                {...(fields && { fields })}
+                {...(toolbar !== undefined && { toolbar })}
+                {...(onEntityClick && { onEntityClick })}
+                {...(title === false && { title })}
                 path={path}
                 updateUrl={updateUrl}
             />

@@ -1,12 +1,12 @@
 import type { Properties } from "@rebasepro/types";
 
-import React, { useState, useCallback } from "react";
+import React, { useCallback } from "react";
 import { useAuthController, useLargeLayout, useTranslation, useSlot } from "@rebasepro/app";
 import { CollectionActionsProps, EntityTableController, SelectionController, SelectionQuery, AdminCollection, ViewMode } from "@rebasepro/cms-types";
 import { ErrorBoundary, iconSize } from "@rebasepro/ui";
-import { Badge, Button, cls, FilterIcon, IconButton, Skeleton, Tooltip, XIcon } from "@rebasepro/ui";
+import { IconButton, Skeleton, Tooltip, XIcon } from "@rebasepro/ui";
 import { ClearFilterSortButton } from "../ClearFilterSortButton";
-import { FiltersDialog } from "./FiltersDialog";
+import { FiltersButton } from "./FiltersButton";
 import { FilterPresetsButton } from "./FilterPresetsButton";
 import { SortButton } from "./SortButton";
 import { toArray } from "@rebasepro/utils";
@@ -77,16 +77,6 @@ export function CollectionViewStartActions<M extends Record<string, unknown>>({
     const urlController = useUrlController();
     const splitView = useSplitView();
 
-    // Filters dialog state
-    const [filtersDialogOpen, setFiltersDialogOpen] = useState(false);
-
-    // Count active filters (excluding force filters)
-    const filterValues = tableController.filterValues;
-    const fixedFilter = collection.fixedFilter;
-    const activeFilterCount = filterValues
-        ? Object.keys(filterValues).filter(key => !fixedFilter || !(key in fixedFilter)).length
-        : 0;
-
     const actionProps: CollectionActionsProps<M> = {
         path,
         relativePath,
@@ -130,34 +120,13 @@ parentEntityIds,
     // labels (`useToolbarLabels`) is a narrow layout too, whatever the window.
     const iconOnlyToolbar = !largeLayout || Boolean(compact) || !toolbarLabels;
 
-    const filtersButton = resolvedProperties && tableController.setFilterValues && (
-        <Tooltip title={t("filters")}
-            key={"filters_tooltip"}>
-            <Badge
-                color="primary"
-                invisible={activeFilterCount === 0}
-            >
-                {!iconOnlyToolbar ? (
-                    <Button
-                        variant="text"
-                        size="small"
-                        onClick={() => setFiltersDialogOpen(true)}
-                        startIcon={<FilterIcon size={iconSize.small}/>}
-                        className={cls(activeFilterCount > 0 && "text-primary")}
-                    >
-                        {activeFilterCount > 0 ? `(${activeFilterCount})` : t("filters")}
-                    </Button>
-                ) : (
-                    <IconButton aria-label={t("filters")}
-                        size={"small"}
-                        onClick={() => setFiltersDialogOpen(true)}
-                        className={cls(activeFilterCount > 0 && "text-primary")}
-                    >
-                        <FilterIcon size={iconSize.smallest}/>
-                    </IconButton>
-                )}
-            </Badge>
-        </Tooltip>
+    const filtersButton = resolvedProperties && (
+        <FiltersButton
+            key={"filters_tooltip"}
+            tableController={tableController}
+            properties={resolvedProperties}
+            fixedFilter={collection.fixedFilter}
+            iconOnly={iconOnlyToolbar}/>
     );
 
     // Everywhere a `sortBy` means something — which is every view but the
@@ -249,18 +218,6 @@ parentEntityIds,
         <>
             {actions}
             {pluginActionsStart}
-
-            {/* Filters Dialog */}
-            {resolvedProperties && tableController.setFilterValues && (
-                <FiltersDialog
-                    open={filtersDialogOpen}
-                    onOpenChange={setFiltersDialogOpen}
-                    properties={resolvedProperties}
-                    filterValues={tableController.filterValues}
-                    setFilterValues={(filterValues) => tableController.setFilterValues?.(filterValues ?? {})}
-                    fixedFilter={collection.fixedFilter}
-                />
-            )}
         </>
     );
 }

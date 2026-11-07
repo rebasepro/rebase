@@ -1,5 +1,6 @@
-import type { AdminCollection } from "@rebasepro/cms-types";
-import React from "react";
+import type { AdminCollection, ViewMode } from "@rebasepro/cms-types";
+import type { Entity } from "@rebasepro/types";
+import React, { useCallback, useRef } from "react";
 
 import { deepEqual as equal } from "fast-equals"
 import { CollectionScopeProvider } from "@rebasepro/app";
@@ -8,7 +9,7 @@ import { SplitListView } from "./SplitListView";
 import { useCollectionRegistryController } from "../../hooks/navigation/contexts/CollectionRegistryContext";
 import { useCollectionViewState } from "./useCollectionViewState";
 import { CollectionViewScopeContext } from "./CollectionViewScope";
-import { CollectionToolbar } from "./CollectionToolbar";
+import { CollectionToolbarSlot, CollectionToolbarSlotContext, DEFAULT_TOOLBAR } from "./CollectionToolbar";
 import { CollectionViewContent } from "./CollectionViewContent";
 import { CollectionViewDialogs } from "./CollectionViewDialogs";
 import { EntitiesCount } from "./EntitiesCount";
@@ -79,6 +80,48 @@ export type CollectionViewBindingProps<M extends Record<string, unknown>> = {
      */
     highlightedEntityId?: string | number | null;
 
+    /**
+     * The properties this view shows, in this order; the ones it leaves out
+     * are not drawn. In the table they are the columns. In the list, on a card
+     * and on a kanban card they are what the row's or card's places — title,
+     * image, subtitle, status, date, relation chips, the list's columns — are
+     * filled from, earlier ones first; a place none of them fills stays empty.
+     *
+     * Over `propertiesOrder`, the order the user saved, `listProperties` and
+     * what the cards infer, for this view only. Column widths the user drags
+     * still persist; the column order is the caller's, so columns are not
+     * dragged. A property hidden from collections stays hidden, and a custom
+     * view is handed the whole collection.
+     */
+    fields?: string[];
+
+    /**
+     * The mode this view opens in, over the one in the URL and the one the
+     * person last picked. They can still switch.
+     */
+    viewMode?: ViewMode;
+
+    /**
+     * The title the list view draws above its rows; `false` draws none.
+     * Defaults to the collection's name.
+     */
+    title?: string | false;
+
+    /**
+     * The toolbar drawn above the rows. Defaults to the full toolbar —
+     * `<CollectionToolbar/>`; `null` draws none. Compose a smaller one from
+     * its pieces: `CollectionSearchBar`, `CollectionFiltersButton`,
+     * `CollectionViewModeToggle`, `CollectionAddButton`.
+     */
+    toolbar?: React.ReactNode;
+
+    /**
+     * Called with the row when one is clicked, instead of the view opening
+     * it. Without it the record opens as the collection's `openEntityMode`
+     * says.
+     */
+    onEntityClick?: (entity: Entity<M>) => void;
+
 } & AdminCollection<M>;
 
 /**
@@ -91,7 +134,7 @@ const PROPS_COMPARED_BY_VALUE = new Set<string>([
     "properties", "propertiesOrder", "hideIdFromCollection", "inlineEditing", "selectionEnabled",
     "selectionController", "Actions", "defaultSize", "includeJsonView", "additionalFields",
     "sideDialogWidth", "openEntityMode", "exportable", "history", "fixedFilter",
-    "selectedEntityId", "selectedTab", "collectionOverrides", "highlightedEntityId"
+    "selectedEntityId", "selectedTab", "collectionOverrides", "highlightedEntityId", "fields"
 ]);
 
 /**
@@ -168,7 +211,7 @@ const CollectionViewBindingInner = React.memo(
             emptyComponent
         } = state;
 
-        const toolbarNode = <CollectionToolbar/>;
+        const toolbarNode = <CollectionToolbarSlot/>;
         const collectionSurface = <CollectionViewContent state={state}/>;
 
         return (
@@ -257,12 +300,29 @@ const CollectionViewBindingInner = React.memo(
     }, collectionViewPropsEqual) as React.FunctionComponent<CollectionViewBindingProps<any>>;
 
 export const CollectionViewBinding = React.memo(
-    function CollectionViewBinding<M extends Record<string, unknown>>(props: CollectionViewBindingProps<M>) {
+    function CollectionViewBinding<M extends Record<string, unknown>>({
+        toolbar,
+        onEntityClick,
+        ...props
+    }: CollectionViewBindingProps<M>) {
         const collectionRegistry = useCollectionRegistryController();
         const path = props.path ?? props.slug;
         const collection = collectionRegistry.getCollection(path) ?? props;
 
-        const content = <CollectionViewBindingInner {...props} />;
+        // Both are commonly written inline, a new value on every render of
+        // the caller. Neither reaches the memoised view as a prop: the
+        // handler is called through a ref, and the toolbar is read from
+        // context by the one element that draws it, so a caller's re-render
+        // redraws the toolbar and nothing else.
+        const onEntityClickRef = useRef(onEntityClick);
+        onEntityClickRef.current = onEntityClick;
+        const callEntityClick = useCallback((entity: Entity<M>) => onEntityClickRef.current?.(entity), []);
+
+        const content = (
+            <CollectionToolbarSlotContext.Provider value={toolbar === undefined ? DEFAULT_TOOLBAR : toolbar}>
+                <CollectionViewBindingInner {...props} onEntityClick={onEntityClick ? callEntityClick : undefined}/>
+            </CollectionToolbarSlotContext.Provider>
+        );
 
         if (collection) {
             return (

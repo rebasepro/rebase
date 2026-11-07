@@ -7,6 +7,7 @@ import { CollectionListViewBinding } from "./CollectionListViewBinding";
 import { CollectionBoardViewBinding } from "./CollectionBoardViewBinding";
 import { PluginAddColumnsContext, PluginHeaderActions, PluginHeaderActionsContext } from "./PluginColumnSlots";
 import type { CollectionViewState } from "./useCollectionViewState";
+import { EntityActionsScopeContext, renderCollectionEntityActions } from "./CollectionEntityActions";
 
 /**
  * The view the collection is drawn in: a custom view, the board, the cards,
@@ -55,7 +56,10 @@ export function CollectionViewContent({ state }: { state: CollectionViewState })
         getIdColumnWidth,
         idHeaderWidget,
         onColumnsOrderChange,
-        pluginWidgets
+        pluginWidgets,
+        viewCollection,
+        entityActionsScope,
+        title
     } = state;
 
     // A custom view wins over the built-in chain, but only after the
@@ -90,6 +94,8 @@ export function CollectionViewContent({ state }: { state: CollectionViewState })
         <CollectionBoardViewBinding
             key={`kanban-view-${path}-${selectedKanbanProperty}`}
             collection={collection}
+            cardCollection={viewCollection !== collection ? viewCollection : undefined}
+            renderActions={renderCollectionEntityActions}
             tableController={tableController}
             fullPath={path}
             parentCollectionSlugs={parentCollectionSlugs} parentEntityIds={parentEntityIds}
@@ -104,7 +110,8 @@ export function CollectionViewContent({ state }: { state: CollectionViewState })
     ) : viewMode === "cards" ? (
         <CollectionCardViewBinding
             key={`cards-view-${path}`}
-            collection={collection}
+            collection={viewCollection}
+            renderActions={renderCollectionEntityActions}
             tableController={tableController}
             onEntityClick={onEntityClick}
             selectionController={usedSelectionController}
@@ -118,7 +125,7 @@ export function CollectionViewContent({ state }: { state: CollectionViewState })
     ) : viewMode === "list" ? (
         <CollectionListViewBinding
             key={`list-view-${path}`}
-            collection={collection}
+            collection={viewCollection}
             tableController={tableController}
             onEntityClick={onEntityClick}
             selectionController={usedSelectionController}
@@ -169,7 +176,13 @@ export function CollectionViewContent({ state }: { state: CollectionViewState })
         </PluginAddColumnsContext.Provider>
     );
 
-    if (viewMode !== "list") return innerView;
+    const withActions = (
+        <EntityActionsScopeContext.Provider value={entityActionsScope}>
+            {innerView}
+        </EntityActionsScopeContext.Provider>
+    );
+
+    if (viewMode !== "list") return withActions;
 
     const detailOpen = selectedEntityId !== undefined;
 
@@ -184,7 +197,7 @@ export function CollectionViewContent({ state }: { state: CollectionViewState })
             )}
         >
             {/* Collapsible title — grid-rows for smooth height, transform for GPU */}
-            <div
+            {title !== false && <div
                 className={cls(
                     "grid transition-[grid-template-rows,transform,margin] duration-150 ease-out",
                     detailOpen
@@ -194,10 +207,10 @@ export function CollectionViewContent({ state }: { state: CollectionViewState })
             >
                 <div className="overflow-hidden flex items-center gap-4">
                     <Typography gutterBottom variant="h4" className="grow mb-0" component="h4">
-                        {collection.name}
+                        {title ?? collection.name}
                     </Typography>
                 </div>
-            </div>
+            </div>}
             {pluginWidgets.length > 0 && (
                 <div
                     className={cls(
@@ -210,7 +223,7 @@ export function CollectionViewContent({ state }: { state: CollectionViewState })
                     </div>
                 </div>
             )}
-            {innerView}
+            {withActions}
         </div>
     );
 }

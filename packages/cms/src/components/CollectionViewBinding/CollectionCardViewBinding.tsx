@@ -35,6 +35,8 @@ export type CollectionCardViewBindingProps<M extends Record<string, unknown> = R
      * - "xl": Extra large cards, fewest cards per row
      */
     size?: CollectionSize;
+    /** Draws a record's actions on its card; see {@link EntityCardBindingProps.renderActions}. */
+    renderActions?: (entity: Entity<M>) => React.ReactNode;
 };
 
 /**
@@ -91,7 +93,8 @@ export function CollectionCardViewBinding<M extends Record<string, unknown> = Re
     emptyComponent,
     onScroll,
     initialScroll,
-    size = "m"
+    size = "m",
+    renderActions
 }: CollectionCardViewBindingProps<M>) {
 
     const ResolvedEntityCard = useComponentOverride("Collection.Card", EntityCardBinding) as typeof EntityCardBinding;
@@ -196,8 +199,9 @@ export function CollectionCardViewBinding<M extends Record<string, unknown> = Re
                     onSelectionChange={handleRowSelectionChange}
                     selectionEnabled={selectionEnabled}
                     size={size}
+                    renderActions={renderActions}
                 />
-            ), [collection, selectionEnabled, size, handleRowSelectionChange, handleCardClick, MemoisedCard, tableController.searchString])}
+            ), [collection, selectionEnabled, size, handleRowSelectionChange, handleCardClick, MemoisedCard, tableController.searchString, renderActions])}
         />
     );
 }

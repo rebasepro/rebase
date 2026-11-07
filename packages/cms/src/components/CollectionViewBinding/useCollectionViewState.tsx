@@ -66,6 +66,8 @@ import { useSelectionDialog } from "../../hooks/useSelectionDialog";
 import { EntityIdHeaderWidget } from "./EntityIdHeaderWidget";
 import { EMPTY_ARRAY, HeaderActionsScope, PluginAddColumnComponents } from "./PluginColumnSlots";
 import type { CollectionViewBindingProps } from "./CollectionViewBinding";
+import { columnsForFields, restrictCollectionToFields } from "./fields";
+import type { EntityActionsScope } from "./CollectionEntityActions";
 
 /**
  * Everything a collection view holds and decides: the collection it draws
@@ -89,6 +91,11 @@ export function useCollectionViewState<M extends Record<string, unknown>>({
     selectedTab,
     collectionOverrides,
     highlightedEntityId,
+    fields,
+    viewMode: viewModeProp,
+    title,
+    onEntityClick: onEntityClickProp,
+    toolbar: _toolbar,
     ...collectionProp
 }: CollectionViewBindingProps<M>) {
 
@@ -140,6 +147,11 @@ export function useCollectionViewState<M extends Record<string, unknown>>({
         collectionPropRef.current = collectionProp;
     }
     const stableCollectionProp = collectionPropRef.current;
+
+    // `fields` by value, for the same reason: a caller writes it as a literal.
+    const fieldsRef = React.useRef(fields);
+    if (!equal(fieldsRef.current, fields)) fieldsRef.current = fields;
+    const stableFields = fieldsRef.current;
 
     const overridesRef = React.useRef(collectionOverrides);
     if (!equal(overridesRef.current, collectionOverrides)) overridesRef.current = collectionOverrides;
@@ -213,7 +225,8 @@ export function useCollectionViewState<M extends Record<string, unknown>>({
         [resolvedCustomViews]
     );
 
-    // View mode priority: URL > saved user config > collection.defaultViewMode
+    // View mode priority: the caller's `viewMode` > URL > saved user config >
+    // collection.defaultViewMode
     const defaultViewMode = isViewMode(collection.defaultViewMode, customViewKeys)
         ? collection.defaultViewMode
         // Covers a `defaultViewMode` naming a custom view that has since
@@ -222,11 +235,20 @@ export function useCollectionViewState<M extends Record<string, unknown>>({
         : "list";
     const [searchParams, setSearchParams] = useSearchParams();
 
-    // Read view from React Router's searchParams (reactive on back/forward)
+    // Read view from React Router's searchParams (reactive on back/forward).
+    // Only for a view that keeps its state in the URL: a record's tab or a
+    // panel on a page would otherwise follow — and write — the `__view` of
+    // the page around it.
     const urlView = useMemo((): ViewMode | null => {
+        if (!updateUrl) return null;
         const v = searchParams.get(VIEW_MODE_PARAM);
         return isViewMode(v, customViewKeys) ? v : null;
-    }, [searchParams, customViewKeys]);
+    }, [updateUrl, searchParams, customViewKeys]);
+
+    // The mode the caller asked for. It wins when the view mounts, over the
+    // URL and what the person last picked; once they pick here, theirs does.
+    const callerViewMode = isViewMode(viewModeProp, customViewKeys) ? viewModeProp : undefined;
+    const pickedViewModeRef = React.useRef(false);
 
     // Get saved view from local persistence.
     //
@@ -241,7 +263,8 @@ export function useCollectionViewState<M extends Record<string, unknown>>({
     }, [userConfigPersistence, path, customViewKeys]);
 
     const [viewMode, setViewModeState] = useState<ViewMode>(() => {
-        // Priority: URL > saved config > collection default
+        // Priority: caller > URL > saved config > collection default
+        if (callerViewMode) return callerViewMode;
         if (urlView) return urlView;
         const savedView = getSavedView();
         if (savedView) return savedView;
@@ -261,7 +284,7 @@ export function useCollectionViewState<M extends Record<string, unknown>>({
 
     // Sync URL with current view on init (if view came from saved config)
     useEffect(() => {
-        if (!urlView && viewMode !== defaultViewMode) {
+        if (updateUrl && !urlView && viewMode !== defaultViewMode) {
             // View came from saved config but URL doesn't have it - update URL without push
             // Built from `window.location.search`, not React Router's
             // `prev`. The table controller writes the filter, sort and
@@ -276,11 +299,13 @@ export function useCollectionViewState<M extends Record<string, unknown>>({
                 return next;
             }, { replace: true });
         }
-    }, []); // Only on mount
+        // eslint-disable-next-line react-hooks/exhaustive-deps -- once, on mount: the mode the view opened in goes into the URL
+    }, []);
 
     // Update URL when view mode changes (user action)
     const setViewMode = useCallback((newMode: ViewMode) => {
         setViewModeState(newMode);
+        if (!updateUrl) return;
 
         // Update URL with __view param via React Router
         setSearchParams(() => {
@@ -294,17 +319,30 @@ export function useCollectionViewState<M extends Record<string, unknown>>({
             }
             return next;
         });
-    }, [defaultViewMode, setSearchParams]);
+    }, [defaultViewMode, setSearchParams, updateUrl]);
 
-    // Sync viewMode state when URL changes via back/forward navigation
+    // Sync viewMode state when URL changes via back/forward navigation, and
+    // when the caller asks for another mode. The URL the view mounted with
+    // does not count as a change: the caller's mode won over it at mount.
+    const previousUrlViewRef = React.useRef(urlView);
+    const previousCallerViewModeRef = React.useRef(callerViewMode);
     useEffect(() => {
-        if (urlView) {
+        const urlChanged = urlView !== previousUrlViewRef.current;
+        previousUrlViewRef.current = urlView;
+        if (callerViewMode !== previousCallerViewModeRef.current) {
+            previousCallerViewModeRef.current = callerViewMode;
+            pickedViewModeRef.current = false;
+        }
+        const callerDecides = callerViewMode !== undefined && !pickedViewModeRef.current;
+        if (urlView && (urlChanged || !callerDecides)) {
             setViewModeState(urlView);
+        } else if (callerDecides) {
+            setViewModeState(callerViewMode);
         } else {
             const savedView = getSavedView();
-            setViewModeState(savedView ?? defaultViewMode);
+            setViewModeState(urlView ?? savedView ?? defaultViewMode);
         }
-    }, [urlView, getSavedView, defaultViewMode]);
+    }, [urlView, getSavedView, defaultViewMode, callerViewMode]);
 
     // List view size state - controls row height and info density
     const [listSize, setListSize] = useState<CollectionSize>(collection.defaultSize ?? "m");
@@ -355,6 +393,11 @@ export function useCollectionViewState<M extends Record<string, unknown>>({
     const onEntityClick = useCallback((clickedEntity: Entity<M>) => {
         const collection = collectionRef.current;
         setHighlightedEntity(clickedEntity);
+        // The caller's handler takes the row instead of the view opening it.
+        if (onEntityClickProp) {
+            onEntityClickProp(clickedEntity);
+            return;
+        }
         analyticsController.onAnalyticsEvent?.("edit_entity_clicked", {
             path: clickedEntity.path,
             entityId: clickedEntity.id
@@ -378,7 +421,7 @@ export function useCollectionViewState<M extends Record<string, unknown>>({
             replace: openEntityMode === "split" && selectedEntityIdProp !== undefined
         });
 
-    }, [sidePanelController, openEntityMode, selectedEntityIdProp, path, urlController, analyticsController]);
+    }, [sidePanelController, openEntityMode, selectedEntityIdProp, path, urlController, analyticsController, onEntityClickProp]);
 
     // A record created in the side panel or a dialog leaves this view
     // mounted, so it says so the way a delete does: the toolbar counts
@@ -557,6 +600,7 @@ parentEntityIds: parentEntityIds ?? EMPTY_ARRAY,
             from: viewMode,
             to: mode
         });
+        pickedViewModeRef.current = true;
         setViewMode(mode);
         // Save to local persistence for next visit
         if (userConfigPersistence) {
@@ -695,7 +739,21 @@ parentEntityIds: parentEntityIds ?? EMPTY_ARRAY,
         return resolvedCollection;
     }, [resolvedCollection, localPropertiesOrder]);
 
-    const displayedColumnIds = useColumnIds(collectionWithLocalOrder, true);
+    // `fields` lays the columns out in its own order, over the saved one, and
+    // drops the rest.
+    const columnsCollection = useMemo(() => stableFields
+        ? { ...collectionWithLocalOrder, propertiesOrder: stableFields as typeof collectionWithLocalOrder.propertiesOrder }
+        : collectionWithLocalOrder, [collectionWithLocalOrder, stableFields]);
+    const laidOutColumnIds = useColumnIds(columnsCollection, true);
+    const displayedColumnIds = useMemo(
+        () => stableFields ? columnsForFields(laidOutColumnIds, stableFields) : laidOutColumnIds,
+        [laidOutColumnIds, stableFields]);
+
+    // What the list, the cards and the kanban cards are drawn from: the
+    // collection, or only its `fields`.
+    const viewCollection = useMemo(
+        () => stableFields ? restrictCollectionToFields(collection, stableFields) : collection,
+        [collection, stableFields]);
 
     const additionalFields = useMemo(() => {
         // Each child view gets a column that jumps to its tab. Keyed by the
@@ -755,6 +813,17 @@ parentEntityIds: parentEntityIds ?? EMPTY_ARRAY,
     const isCompact = isSplitLayout && selectedEntityIdProp !== undefined;
     const activeSelectionEnabled = !isCompact && selectionEnabled;
 
+    // Edit opens the record — or, where the caller handles clicks, hands it
+    // the row the way a click does.
+    const editAction = useMemo<EntityAction>(() => onEntityClickProp
+        ? {
+            ...editEntityAction,
+            onClick: ({ entity }) => {
+                if (entity) onEntityClick(entity as Entity<M>);
+            }
+        }
+        : editEntityAction, [onEntityClickProp, onEntityClick]);
+
     const getActionsForEntity = useCallback(({
         entity,
         customEntityActions
@@ -766,7 +835,7 @@ parentEntityIds: parentEntityIds ?? EMPTY_ARRAY,
         const disableActions = collection.disableDefaultActions ?? [];
         const actions: EntityAction[] = [];
         if (!disableActions.includes("edit")) {
-            actions.push(editEntityAction);
+            actions.push(editAction);
         }
         if (createEnabled && !disableActions.includes("copy"))
             actions.push(copyEntityAction);
@@ -779,7 +848,7 @@ parentEntityIds: parentEntityIds ?? EMPTY_ARRAY,
         if (customEntityActions)
             return mergeEntityActions(actions, customEntityActions);
         return actions;
-    }, [canDelete, collection, path, createEnabled, isLinkedChildView]);
+    }, [canDelete, collection, path, createEnabled, isLinkedChildView, editAction]);
 
     const getIdColumnWidth = useCallback(() => {
         const entityActions = getActionsForEntity({});
@@ -837,6 +906,21 @@ parentEntityIds: parentEntityIds ?? EMPTY_ARRAY,
         // `selectionEnabled` they were built with.
     }, [updateLastDeleteTimestamp, usedSelectionController, customEntityActions, getActionsForEntity,
         activeSelectionEnabled, unselectNavigatedEntity, collection, path, openEntityMode]);
+
+    // What the cards and the kanban cards draw a record's actions from.
+    const getCardActions = useCallback(
+        (entity: Entity<M>) => getActionsForEntity({ entity, customEntityActions }),
+        [getActionsForEntity, customEntityActions]);
+    const entityActionsScope = useMemo<EntityActionsScope<M>>(() => ({
+        getActions: getCardActions,
+        collection,
+        path,
+        openEntityMode,
+        selectionController: usedSelectionController,
+        onCollectionChange: updateLastDeleteTimestamp,
+        highlightEntity: setHighlightedEntity,
+        unhighlightEntity: unselectNavigatedEntity
+    }), [getCardActions, collection, path, openEntityMode, usedSelectionController, updateLastDeleteTimestamp, unselectNavigatedEntity]);
 
     // Built once per change rather than once per render: each of these is a
     // prop of the table (and of the other views), and a new array or a new
@@ -1063,7 +1147,11 @@ parentEntityIds,
         liveSelectionQuery,
         headerActionsScope,
         addColumnComponentInternal,
-        onColumnsOrderChange,
+        // With `fields` the order is the caller's: columns are not dragged.
+        onColumnsOrderChange: stableFields ? undefined : onColumnsOrderChange,
+        viewCollection,
+        entityActionsScope,
+        title,
         viewModePopoverOpen,
         setViewModePopoverOpen,
         pluginErrorView,

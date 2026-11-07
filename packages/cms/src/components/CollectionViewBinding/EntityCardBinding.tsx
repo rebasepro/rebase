@@ -45,6 +45,12 @@ export type EntityCardBindingProps<M extends Record<string, unknown> = Record<st
      * Size of the card - affects checkbox styling
      */
     size?: CollectionSize;
+    /**
+     * Draws the record's actions — the collection's `entityActions` with
+     * Copy and Delete, placed as a table row places them. The card puts them
+     * beside its title; a copy of this card calls it where it wants them.
+     */
+    renderActions?: (entity: Entity<M>) => React.ReactNode;
 };
 
 /**
@@ -60,7 +66,8 @@ export function EntityCardBinding<M extends Record<string, unknown> = Record<str
     onSelectionChange,
     selectionEnabled,
     size = "m",
-    searchString
+    searchString,
+    renderActions
 }: EntityCardBindingProps<M>) {
     const { t } = useTranslation();
     const authController = useAuthController();
@@ -180,17 +187,20 @@ export function EntityCardBinding<M extends Record<string, unknown> = Record<str
                     full width, copyable and governed by
                     `hideIdFromCollection`, is where an id is actually read. */}
 
-                {/* Title slot */}
-                <div className="truncate my-1 text-sm font-medium min-h-[20px]">
-                    {slots.title ? (
-                        terms.length > 0 && typeof slots.title.value === "string"
-                            ? <Highlighted text={slots.title.value} terms={terms}/>
-                            : <SlotValue slot={slots.title} size="small"/>
-                    ) : (
-                        <Typography variant="body2" className="text-surface-500">
-                            {entity.id}
-                        </Typography>
-                    )}
+                {/* Title slot, and the record's actions beside it */}
+                <div className="flex items-start gap-1">
+                    <div className="flex-1 min-w-0 truncate my-1 text-sm font-medium min-h-[20px]">
+                        {slots.title ? (
+                            terms.length > 0 && typeof slots.title.value === "string"
+                                ? <Highlighted text={slots.title.value} terms={terms}/>
+                                : <SlotValue slot={slots.title} size="small"/>
+                        ) : (
+                            <Typography variant="body2" className="text-surface-500">
+                                {entity.id}
+                            </Typography>
+                        )}
+                    </div>
+                    {renderActions?.(entity)}
                 </div>
 
                 {/* Subtitle slot — or, while searching, where the hit was. A

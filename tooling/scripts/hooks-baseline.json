@@ -51,7 +51,6 @@
   "packages/cms/src/components/CollectionViewBinding/useBoardDataController.tsx::React Hook useEffect has missing dependencies: 'columnItemCounts', 'columns', and 'isColumnExcludedByFilter'. Either include them or remove the dependency array.": 1,
   "packages/cms/src/components/CollectionViewBinding/useCollectionViewState.tsx::React Hook useCallback has a missing dependency: 'analyticsController'. Either include it or remove the dependency array.": 1,
   "packages/cms/src/components/CollectionViewBinding/useCollectionViewState.tsx::React Hook useCallback has a missing dependency: 'tableController'. Either include it or remove the dependency array.": 1,
-  "packages/cms/src/components/CollectionViewBinding/useCollectionViewState.tsx::React Hook useEffect has missing dependencies: 'defaultViewMode', 'setSearchParams', 'urlView', and 'viewMode'. Either include them or remove the dependency array.": 1,
   "packages/cms/src/components/DeleteEntityDialog.tsx::React Hook useCallback has missing dependencies: 'snackbarController' and 't'. Either include them or remove the dependency array.": 1,
   "packages/cms/src/components/DetailViewBinding.tsx::React Hook useEffect has a missing dependency: 'selectedTab'. Either include it or remove the dependency array.": 1,
   "packages/cms/src/components/EditFormActions.tsx::React Hook useMemo has a missing dependency: 'customizationController.entityActions'. Either include it or remove the dependency array.": 1,

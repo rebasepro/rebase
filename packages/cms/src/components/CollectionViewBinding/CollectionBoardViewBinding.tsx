@@ -56,6 +56,14 @@ export type CollectionBoardViewBindingProps<M extends Record<string, unknown> = 
     emptyComponent?: React.ReactNode;
     /** Called when entities are deleted - used for optimistic count updates */
     deletedEntities?: Entity<M>[];
+    /**
+     * The collection the cards are drawn from, where it is not `collection`:
+     * a view given `fields` fills the cards from those alone, while the board
+     * still groups by its column property.
+     */
+    cardCollection?: AdminCollection<M>;
+    /** Draws a record's actions on its card. */
+    renderActions?: (entity: Entity<M>) => React.ReactNode;
 };
 
 /**
@@ -73,7 +81,9 @@ export function CollectionBoardViewBinding<M extends Record<string, unknown> = R
     selectionEnabled = true,
     highlightedEntities,
     emptyComponent,
-    deletedEntities
+    deletedEntities,
+    cardCollection,
+    renderActions
 }: CollectionBoardViewBindingProps<M>) {
     const customizationController = useCustomizationController();
     const context = useRebaseContext();
@@ -464,6 +474,10 @@ parentEntityIds,
     handleSelectionChangeRef.current = handleSelectionChange;
     const selectionEnabledRef = useRef(selectionEnabled);
     selectionEnabledRef.current = selectionEnabled;
+    const cardCollectionRef = useRef(cardCollection);
+    cardCollectionRef.current = cardCollection;
+    const renderActionsRef = useRef(renderActions);
+    renderActionsRef.current = renderActions;
 
     // Stable callback wrappers — identity never changes, delegates to refs.
     const stableOnClick = useCallback((entity: Entity<M>) => {
@@ -481,11 +495,12 @@ parentEntityIds,
         const Comp = (props: BoardItemViewProps<Entity<M>>) => (
             <BoardCardBinding
                 {...props}
-                collection={collectionRef.current as AdminCollection<M>}
+                collection={(cardCollectionRef.current ?? collectionRef.current) as AdminCollection<M>}
                 onClick={stableOnClick}
                 selected={isEntitySelectedRef.current(props.item.data)}
                 onSelectionChange={stableOnSelectionChange}
                 selectionEnabled={selectionEnabledRef.current}
+                renderActions={renderActionsRef.current}
             />
         );
         Comp.displayName = "KanbanItemComponent";

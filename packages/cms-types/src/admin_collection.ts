@@ -282,10 +282,12 @@ export type AdminCollectionOptions<
      * one you define in `properties`. Additional columns are added at the
      * end of the list, if the order is not specified.
      *
-     * You can use this prop to hide some properties from the table view.
-     * Note that if you set this prop, other ways to hide fields, like
-     * `hidden` in the property definition, will be ignored.
-     * `propertiesOrder` has precedence over `hidden`.
+     * It reorders and never hides: a property it leaves out is drawn after
+     * the ones it names, so a property added later cannot vanish from a table
+     * whose order a user saved. Dragging a column saves this as the user's
+     * own order. To hide a property from collection views, set
+     * `admin.hideFromCollection` on it; to show only some columns in one
+     * place, pass `fields` to that `CollectionPanel`.
      *
      * Supported entry formats:
      *     - For properties, use the property key.

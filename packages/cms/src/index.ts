@@ -169,6 +169,17 @@ export { NAVIGATION_DEFAULT_GROUP_NAME } from "./hooks/navigation/utils";
 // editor's gear, which a copy of `Collection.Actions` keeps beside its own.
 export { CollectionTableToolbar, useToolbarLabels } from "./components/CollectionTableBinding/internal/CollectionTableToolbar";
 export type { CollectionTableToolbarProps } from "./components/CollectionTableBinding/internal/CollectionTableToolbar";
+// A collection view's toolbar and its pieces, for a `CollectionPanel`'s
+// `toolbar`: each reads the view it is drawn in.
+export {
+    CollectionToolbar,
+    CollectionSearchBar,
+    CollectionFiltersButton,
+    CollectionViewModeToggle
+} from "./components/CollectionViewBinding/CollectionToolbar";
+export type { CollectionToolbarProps } from "./components/CollectionViewBinding/CollectionToolbar";
+export { CollectionAddButton } from "./components/CollectionViewBinding/CollectionAddButton";
+export type { CollectionAddButtonProps } from "./components/CollectionViewBinding/CollectionAddButton";
 export { EditorCollectionAction } from "./collection_editor/ui/EditorCollectionAction";
 
 // The table's cells and columns, for a copy of `Collection.Table`: the frame
