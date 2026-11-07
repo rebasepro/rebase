@@ -11,6 +11,7 @@ import {
     OverlaysSection,
     SplitViewSection
 } from "../src/debug/ui-reference/ComponentSections";
+import { MetricsSection } from "../src/debug/ui-reference/MetricsSection";
 
 /**
  * The reference's component chapters render, and the overlays open from the
@@ -50,6 +51,15 @@ describe("UI reference component chapters", () => {
         expect(screen.getAllByRole("button", { name: "Back" })).toHaveLength(2);
         fireEvent.click(screen.getAllByRole("button", { name: "Back" })[0]);
         expect(screen.getAllByRole("button", { name: "Back" })).toHaveLength(1);
+    });
+
+    it("shows every metric block, and a bar opens what it counts", () => {
+        render(<MetricsSection/>);
+        expect(screen.getByRole("heading", { name: "Metrics and charts" })).toBeInTheDocument();
+        expect(screen.getByRole("heading", { name: "Last 30 days" })).toBeInTheDocument();
+        expect(screen.getByText("The insights function returned 500")).toBeInTheDocument();
+        fireEvent.click(screen.getByRole("button", { name: /Shipped/ }));
+        expect(screen.getByText("opened Shipped")).toBeInTheDocument();
     });
 
     it("opens the dialog with its title and actions", () => {
