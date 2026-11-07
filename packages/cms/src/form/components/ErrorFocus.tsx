@@ -1,5 +1,6 @@
 import React, { useEffect, useRef } from "react";
 import { useFormex } from "@rebasepro/forms";
+import { fieldSelector } from "../form_dom_ids";
 
 export const ErrorFocus = ({ containerRef }:
     {
@@ -23,8 +24,10 @@ export const ErrorFocus = ({ containerRef }:
 
         // Whenever there are errors and the form has been submitted and is not validating
         if (!isValidating && keys.length > 0) {
+            // By key inside this form's own container: another form on the
+            // page holds a field of the same name.
             const errorElement = containerRef?.current?.querySelector<HTMLDivElement>(
-                `#form_field_${keys[0]}`
+                fieldSelector(keys[0])
             );
 
             if (errorElement) {

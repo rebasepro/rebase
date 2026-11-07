@@ -65,13 +65,13 @@ async function openCreateForm(page: Page, linkName: RegExp, path: RegExp, fields
 
     await page.getByRole("button", { name: /Add/i }).first().click();
     for (const key of Object.keys(fields)) {
-        await expect(page.locator(`#form_field_${key}`)).toBeVisible({ timeout: 15000 });
+        await expect(page.locator(`[data-form-field="${key}"]`)).toBeVisible({ timeout: 15000 });
     }
 }
 
 /**
  * The control box of each field. `FieldBlock` wraps a field as
- * `#form_field_<key>`: the label (unless the control draws it inside), then a
+ * `[data-form-field="<key>"]`: the label (unless the control draws it inside), then a
  * slot holding what the binding rendered, then the description. The control
  * box is the slot's first child.
  *
@@ -81,7 +81,7 @@ async function openCreateForm(page: Page, linkName: RegExp, path: RegExp, fields
  */
 async function measureFields(page: Page, fields: Fields): Promise<Measured[]> {
     return page.evaluate((keys: string[]) => keys.map(key => {
-        const field = document.getElementById(`form_field_${key}`);
+        const field = document.querySelector(`[data-form-field="${key}"]`);
         const box = field?.querySelector(":scope > [data-field-control]")?.firstElementChild;
         if (!box) return { key, height: -1, fontSize: "" };
         const text = box.querySelector("input") ?? box;
@@ -143,6 +143,6 @@ test.describe("entity form controls", () => {
         // labelled one less the 16px a label inside adds.
         expect(byKey.available_locales.height, `the multi-select box is off the form's size:\n${describe}`)
             .toBe(byKey.name.height - 16);
-        await expect(page.locator("#form_field_available_locales > :first-child")).toContainText("Available Locales");
+        await expect(page.locator("[data-form-field=\"available_locales\"] > :first-child")).toContainText("Available Locales");
     });
 });

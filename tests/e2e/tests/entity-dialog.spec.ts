@@ -28,7 +28,7 @@ async function openNewUser(page: Page): Promise<Locator> {
     await page.goto("/c/users");
     await page.getByRole("button", { name: /Add User/i }).first().click();
     const dialog = page.getByRole("dialog");
-    await expect(dialog.locator("#form_field_email input")).toBeVisible({ timeout: 15000 });
+    await expect(dialog.locator("[data-form-field=email] input")).toBeVisible({ timeout: 15000 });
     return dialog;
 }
 
@@ -38,8 +38,8 @@ test.describe("entity dialog", () => {
 
     test("Tab and Shift+Tab move field to field when something unmounts on the way", async ({ page }) => {
         const dialog = await openNewUser(page);
-        const email = dialog.locator("#form_field_email input");
-        const name = dialog.locator("#form_field_displayName input");
+        const email = dialog.locator("[data-form-field=email] input");
+        const name = dialog.locator("[data-form-field=displayName] input");
 
         // What the tooltip did: take a node out of the dialog in response to
         // the field losing focus, while the browser is between the two fields.
@@ -53,11 +53,11 @@ test.describe("entity dialog", () => {
         }, selector);
 
         await email.focus();
-        await armRemovalOnBlur("#form_field_email input");
+        await armRemovalOnBlur("[data-form-field=email] input");
         await page.keyboard.press("Tab");
         await expect(name, "Tab from Email did not reach Name").toBeFocused();
 
-        await armRemovalOnBlur("#form_field_displayName input");
+        await armRemovalOnBlur("[data-form-field=displayName] input");
         await page.keyboard.press("Shift+Tab");
         await expect(email, "Shift+Tab from Name did not return to Email").toBeFocused();
     });
@@ -70,7 +70,7 @@ test.describe("entity dialog", () => {
         await page.keyboard.press("Enter");
 
         const dialog = page.getByRole("dialog");
-        await expect(dialog.locator("#form_field_email input")).toBeVisible({ timeout: 15000 });
+        await expect(dialog.locator("[data-form-field=email] input")).toBeVisible({ timeout: 15000 });
         const focusIsInside = await page.evaluate(
             () => Boolean(document.activeElement?.closest("[role=dialog]"))
         );
@@ -83,14 +83,14 @@ test.describe("entity dialog", () => {
 
     test("focusing a field opens nothing over the form", async ({ page }) => {
         const dialog = await openNewUser(page);
-        await dialog.locator("#form_field_email input").focus();
+        await dialog.locator("[data-form-field=email] input").focus();
         await page.keyboard.press("Tab");
         await expect(page.locator("[data-radix-popper-content-wrapper]")).toHaveCount(0);
     });
 
     test("hovering a field reveals its key under the box, clear of the field", async ({ page }) => {
         const dialog = await openNewUser(page);
-        const block = dialog.locator("#form_field_displayName");
+        const block = dialog.locator("[data-form-field=displayName]");
         const hint = block.getByRole("button", { name: "Copy displayName" });
 
         // The label is inside the text field's box now, so there is no label
@@ -115,7 +115,7 @@ test.describe("entity dialog", () => {
         // Every field, not a chosen pair: the demo titles users by name, which
         // already gives Name a row of its own, and the pair that used to split
         // was further down.
-        const blocks = dialog.locator("[id^=form_field_]");
+        const blocks = dialog.locator("[data-form-field]");
         await expect(blocks.first()).toBeVisible();
         const boxes = await blocks.evaluateAll(elements => elements.map(el => {
             const r = el.getBoundingClientRect();
@@ -137,7 +137,7 @@ test.describe("entity dialog", () => {
         await expect(createAndClose).toBeVisible();
         await expect(create).toBeVisible();
 
-        const lastField = await dialog.locator("[id^=form_field_]").last().boundingBox();
+        const lastField = await dialog.locator("[data-form-field]").last().boundingBox();
         const button = await createAndClose.boundingBox();
         expect(lastField && button, "not laid out").toBeTruthy();
         expect(button!.y, "the actions are above the form").toBeGreaterThan(lastField!.y + lastField!.height);

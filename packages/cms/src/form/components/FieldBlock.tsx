@@ -5,6 +5,7 @@ import { cls, ErrorBoundary, Typography } from "@rebasepro/ui";
 import { isReadOnly } from "@rebasepro/app";
 import { getIconForProperty } from "../../util/property_utils";
 import { PropertyKeyHint } from "../../components/PropertyKeyHint";
+import { fieldDomId, useFormDomScope } from "../form_dom_ids";
 
 /**
  * Grid placement for a span.
@@ -150,13 +151,15 @@ export function FieldBlock({
     // what the column holds, which the form need not shout about.
     const required = Boolean(property?.validation?.required) && !(property && isReadOnly(property));
     const footed = labelInside && !reading;
+    const domScope = useFormDomScope();
 
     return (
         // Top-aligned: with the description below the control, every label is a
         // single line, so the controls line up on their own. (Bottom-aligning
         // was only needed while the description sat between label and control.)
         <div
-            id={`form_field_${propertyKey}`}
+            id={fieldDomId(domScope, propertyKey)}
+            data-form-field={propertyKey}
             // With the label inside the control there is no label row to hover
             // for the key; the whole field reveals it instead.
             className={cls("relative flex flex-col min-w-0", footed && "group/label")}>

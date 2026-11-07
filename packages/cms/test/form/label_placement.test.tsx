@@ -154,9 +154,12 @@ describe("the record form", () => {
         </RebaseI18nProvider>);
     }
 
+    /** A field's block, by the attribute that names it in every form. */
+    const fieldBlock = (key: string) => document.querySelector(`[data-form-field="${key}"]`);
+
     /** The label of a field is a `<label>` when the control draws it inside. */
     const drawnInside = (key: string, name: string) =>
-        Boolean(document.getElementById(`form_field_${key}`)
+        Boolean(fieldBlock(key)
             ?.querySelector("label")
             ?.textContent?.includes(name));
 
@@ -172,7 +175,7 @@ describe("the record form", () => {
     it("labels a multi-select above its box", () => {
         renderForm();
         expect(drawnInside("tags", "Tags")).toBe(false);
-        const block = document.getElementById("form_field_tags");
+        const block = fieldBlock("tags");
         expect(block?.firstElementChild?.className).toContain("text-[13px]");
         expect(block?.firstElementChild?.textContent).toContain("Tags");
     });
