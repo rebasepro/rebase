@@ -1,13 +1,13 @@
 ---
-sourceHash: f10362389108766c
+sourceHash: a9c03468852b95e3
 title: "Rezept: Benutzerdefiniertes Dashboard"
 sidebar_label: Benutzerdefiniertes Dashboard
-description: "Eine Dashboard-Seite mit KPI-Kacheln und Diagrammen erstellen — Zahlen in SQL berechnet, gezeichnet mit den Bausteinen aus @rebasepro/plugin-insights."
+description: "Eine Dashboard-Seite mit KPI-Kacheln und Diagrammen erstellen — Zahlen in SQL berechnet, gezeichnet mit den Bausteinen aus @rebasepro/ui."
 ---
 
 ## Übersicht
 
-Ein Dashboard besteht aus drei Teilen: einer Backend-Funktion, die die Zahlen in SQL berechnet, einer Komponente, die sie mit `useInsightData` lädt und mit den Bausteinen aus `@rebasepro/plugin-insights` zeichnet, und einem Ort, an dem es erscheint — hier eine eigene Seite in der Seitenleiste.
+Ein Dashboard besteht aus drei Teilen: einer Backend-Funktion, die die Zahlen in SQL berechnet, einer Komponente, die sie mit `useInsightData` lädt und mit den Bausteinen aus `@rebasepro/ui` zeichnet, und einem Ort, an dem es erscheint — hier eine eigene Seite in der Seitenleiste.
 
 Zählen Sie auf dem Server. Zeilen in den Browser zu laden und dort zu addieren stimmt nur, solange die Tabelle in eine Ergebnisseite passt; danach ist die Summe stillschweigend falsch.
 
@@ -62,7 +62,8 @@ export default defineFunction((app, { rebase }) => {
 ```tsx
 import { useRebaseClient } from "@rebasepro/app";
 import type { createRebaseClient } from "@rebasepro/client";
-import { ChartCard, KpiGrid, KpiTile, TimeSeriesChart, useInsightData } from "@rebasepro/plugin-insights";
+import { ChartCard, KpiGrid, KpiTile, TimeSeriesChart } from "@rebasepro/ui";
+import { useInsightData } from "@rebasepro/plugin-insights";
 
 type RebaseClient = ReturnType<typeof createRebaseClient>;
 type Summary = { orders: number; previousOrders: number; revenue: number };
@@ -189,7 +190,7 @@ Bauen Sie den Pfad dynamisch zusammen, anstatt ihn fest einzuprogrammieren: Coll
 
 ```tsx
 import { useUrlController } from "@rebasepro/cms";
-import { BarChart, ChartCard } from "@rebasepro/plugin-insights";
+import { BarChart, ChartCard } from "@rebasepro/ui";
 
 function OrdersByStatus({ counts, loading }: { counts?: Record<string, number>; loading: boolean }) {
     const urls = useUrlController();

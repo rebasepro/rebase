@@ -1,5 +1,5 @@
 ---
-sourceHash: 7486b595195ce75b
+sourceHash: 702686890d8244f9
 title: Agent Skills
 sidebar_label: Agent Skills
 description: "rebase skills install schreibt 24 Rebase-Referenz-Skills in dein Repo – genau in dem Layout, das dein KI-Assistent erwartet: Cursor, Claude Code, Windsurf, Gemini CLI und Antigravity."
@@ -128,7 +128,7 @@ Der Befehl funktioniert auch außerhalb eines Rebase-Projekts und weicht dabei a
 | `rebase-admin` | Navigation im Admin-Panel, Side-Drawers, URLs, Einbetten von Collection-Panels |
 | `rebase-customize-admin` | Das Admin-Panel mit React-Komponenten anpassen – Singletons, Einstellungsseiten, Bulk-Aktionen, Ansichtsmodi, benutzerdefinierte Felder, Ersetzen eingebauter Teile |
 | `rebase-custom-views` | Eigene Bildschirme im Admin-Panel – `rebase generate view`, Top-Level-Ansichten, Datensatz-Tabs, Feld-Widgets |
-| `rebase-dashboards` | KPIs, Diagramme und Dashboards — Zahlen in SQL berechnet, gezeichnet mit `@rebasepro/plugin-insights`, platziert in Slots oder auf einer Seite |
+| `rebase-dashboards` | KPIs, Diagramme und Dashboards — Zahlen in SQL berechnet, gezeichnet mit `@rebasepro/ui`, platziert in Slots oder auf einer Seite |
 | `rebase-ui-components` | Die `@rebasepro/ui`-Komponentenbibliothek |
 | `rebase-design-language` | Die UI-Designsprache: Tokens, Farben, Typografie, Spacing, Anti-Patterns |
 | `rebase-studio` | Die Studio-Entwicklertools-Schicht – SQL, RLS, Storage, Cron, Schema-Visualizer, Logs |

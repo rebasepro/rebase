@@ -1,6 +1,6 @@
 ---
 name: rebase-dashboards
-description: How to add KPIs, charts and dashboards to a Rebase admin — headline figures with their change on the previous period, revenue over time, counts by status, top-N rankings — the same way in every project. Covers the SQL route that computes each number, `useInsightData`, the `KpiTile` / `TimeSeriesChart` / `BarChart` blocks from `@rebasepro/plugin-insights`, where to put them (home page, above a collection, a page of its own), and linking a chart to the records it counts. Use it whenever someone asks for metrics, analytics, a chart or a dashboard in the admin.
+description: How to add KPIs, charts and dashboards to a Rebase admin — headline figures with their change on the previous period, revenue over time, counts by status, top-N rankings — the same way in every project. Covers the SQL route that computes each number, `useInsightData`, the `KpiTile` / `TimeSeriesChart` / `BarChart` blocks from `@rebasepro/ui`, where to put them (home page, above a collection, a page of its own), and linking a chart to the records it counts. Use it whenever someone asks for metrics, analytics, a chart or a dashboard in the admin.
 ---
 
 # Dashboards in the Rebase admin
@@ -10,19 +10,19 @@ way:
 
 1. **A route that computes the numbers** — SQL in a backend function, run as
    the signed-in user. One route per figure record or per series.
-2. **A component that loads the route and draws it** with the blocks from
-   `@rebasepro/plugin-insights`: `useInsightData`, `KpiTile`, `KpiReadout`,
-   `KpiGrid`, `ChartCard`, `TimeSeriesChart`, `BarChart`.
+2. **A component that loads the route and draws it**: `useInsightData` from
+   `@rebasepro/plugin-insights` loads it, and the metric blocks from
+   `@rebasepro/ui` draw it — `KpiTile`, `KpiReadout`, `KpiGrid`, `ChartCard`,
+   `TimeSeriesChart`, `BarChart`.
 3. **A place** for the component: `<Rebase slots>` or a page in
    `<RebaseCMS views>`.
 
 There is no configuration object and no chart library to choose. Read the
-installed package's README for the props — it matches the version in the
-project, this skill may not:
-
-```
-node_modules/@rebasepro/plugin-insights/README.md
-```
+installed packages for the props — they match the version in the project,
+this skill may not: `useInsightData` in
+`node_modules/@rebasepro/plugin-insights/README.md`, the blocks' props in their
+types under `node_modules/@rebasepro/ui` (the "Metrics and charts" section of
+the UI reference shows each one).
 
 The Rebase repository's demo app is the complete reference: its
 `app/backend/functions/insights.ts` (the routes) and
@@ -100,10 +100,17 @@ Pick the block by the job the number does:
 | Two measures of different scale | Two charts. Never a second y-axis. |
 | More than eight series | Fold the tail into "Other", or a table |
 
+Import the blocks from `@rebasepro/ui`:
+`import { BarChart, ChartCard, KpiGrid, KpiTile, TimeSeriesChart } from "@rebasepro/ui";`.
 Wrap each chart in a `ChartCard` with a short title. Pass `loading` and
 `error` from `useInsightData` to every block: they draw their own pulse, error
 and "no data" states, so nothing jumps when the numbers land. Pass number
 formats as `Intl.NumberFormatOptions` (`{ style: "currency", currency: "USD" }`).
+
+`KpiGrid` lays its tiles out by its own width, not the window's, so it is
+right inside a split panel or a narrow frame. A child that spans columns says
+so with container variants: `className="col-span-2 @4xl:col-span-3"`, never
+`lg:`.
 
 ## 3. Put it in a place
 

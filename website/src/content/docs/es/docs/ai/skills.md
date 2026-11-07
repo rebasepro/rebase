@@ -1,5 +1,5 @@
 ---
-sourceHash: 7486b595195ce75b
+sourceHash: 702686890d8244f9
 title: Habilidades del agente
 sidebar_label: Habilidades del agente
 description: rebase skills install escribe 24 habilidades de referencia de Rebase en tu repositorio, en el formato que espera tu asistente de IA — Cursor, Claude Code, Windsurf, Gemini CLI y Antigravity.
@@ -140,7 +140,7 @@ El comando también funciona fuera de un proyecto de Rebase, recurriendo al dire
 | `rebase-admin` | Navegación por el panel de administración, paneles laterales (side drawers), URLs e incrustación de paneles de colecciones |
 | `rebase-customize-admin` | Personalización del panel de administración con componentes de React: singletons, páginas de ajustes, acciones masivas, modos de vista, campos personalizados y sustitución de piezas integradas |
 | `rebase-custom-views` | Pantallas personalizadas dentro del panel de administración: `rebase generate view`, vistas de nivel superior, pestañas de registro y widgets de campo |
-| `rebase-dashboards` | KPIs, gráficos y dashboards: números calculados en SQL, dibujados con `@rebasepro/plugin-insights` y colocados en slots o en una página |
+| `rebase-dashboards` | KPIs, gráficos y dashboards: números calculados en SQL, dibujados con `@rebasepro/ui` y colocados en slots o en una página |
 | `rebase-ui-components` | La biblioteca de componentes `@rebasepro/ui` |
 | `rebase-design-language` | El lenguaje de diseño de la interfaz: tokens, color, tipografía, espaciado y antipatrones |
 | `rebase-studio` | La capa de herramientas de desarrollo de Studio: SQL, RLS, almacenamiento, cron, visualizador de esquemas y logs |

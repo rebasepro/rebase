@@ -472,7 +472,8 @@ export function CardsDataSection() {
                 The dashboard card is the most reusable idea in the system: a labelled instrument with one big value and
                 its context underneath. The header grammar never changes — dot, icon, micro label — so a grid of them
                 scans as one thing. Lists inside cards put the measured value flush right in the mono tier and show state
-                as a dot before the word.
+                as a dot before the word. A figure with its change on the previous period is
+                a <code className="font-mono text-xs">KpiTile</code> — see Metrics and charts.
             </Typography>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">

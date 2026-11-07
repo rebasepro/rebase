@@ -102,6 +102,7 @@ import {
     OverlaysSection,
     SplitViewSection
 } from "./ui-reference/ComponentSections";
+import { MetricsSection } from "./ui-reference/MetricsSection";
 
 /** The page's chapters, in reading order: the system first, then the elements built on it. */
 const SECTIONS: { id: string; label: string; icon: React.ComponentType<{ size?: number }>; group: "System" | "Shell" | "Controls" | "Screens" }[] = [
@@ -123,6 +124,7 @@ const SECTIONS: { id: string; label: string; icon: React.ComponentType<{ size?: 
     { id: "split-view", label: "Split view", icon: PanelLeftIcon, group: "Controls" },
     { id: "chips-alerts", label: "Chips and alerts", icon: TagIcon, group: "Controls" },
     { id: "data", label: "Cards and data", icon: LayoutGridIcon, group: "Controls" },
+    { id: "metrics", label: "Metrics and charts", icon: LayoutGridIcon, group: "Controls" },
     { id: "data-display", label: "Data display", icon: ListIcon, group: "Controls" },
     { id: "empty-states", label: "Empty states", icon: FileIcon, group: "Screens" },
     { id: "users", label: "Management", icon: UserIcon, group: "Screens" },
@@ -1048,6 +1050,7 @@ selected: true }, { name: "Tags" }].map(c => (
                 </SectionBlock>
 
                 <CardsDataSection/>
+                <MetricsSection/>
                 <DataDisplaySection/>
 
                 {/* ═══════════════════════════════════════════════

@@ -22,7 +22,7 @@ always match the version you have installed.
 | [Per-user preferences](my-preferences.tsx) | Each user edits their own record, keyed by their uid. |
 | [Bulk set status](bulk-set-status.tsx) | A toolbar button that updates every selected row. |
 | [Calendar view](calendar-view.tsx) | A new view mode for a collection: rows on a month grid. |
-| [Orders dashboard](orders-dashboard.tsx) | A page that reads data, draws a chart and links into the admin. For KPI tiles and real charts over SQL aggregates, use the blocks in `@rebasepro/plugin-insights` (its README). |
+| [Orders dashboard](orders-dashboard.tsx) | A page that reads data, draws a chart and links into the admin. For KPI tiles and real charts over SQL aggregates, use the metric blocks in `@rebasepro/ui` with `useInsightData` from `@rebasepro/plugin-insights` (its README). |
 | [Custom login screen](custom-login.tsx) | Replacing a built-in screen through `<Rebase components>`. |
 
 ## Building blocks

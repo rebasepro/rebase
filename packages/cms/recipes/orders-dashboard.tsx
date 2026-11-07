@@ -5,7 +5,7 @@
  * `useData()` (the same data layer, permissions and server callbacks as the
  * rest of the admin) and can draw with anything: this one uses plain divs so
  * it imports nothing beyond the admin. `BarChart`, `TimeSeriesChart` and
- * `KpiTile` from `@rebasepro/plugin-insights` draw the same in the admin's
+ * `KpiTile` from `@rebasepro/ui` draw the same in the admin's
  * tokens, with hover readouts and dark mode.
  *
  * Grouping happens in the browser, over the first `MAX_ROWS` rows, which is

@@ -1,14 +1,14 @@
 ---
 title: "Recipe: Custom Dashboard"
 sidebar_label: Custom Dashboard
-description: "Build a dashboard page with KPI tiles and charts — numbers computed in SQL, drawn with the blocks from @rebasepro/plugin-insights."
+description: "Build a dashboard page with KPI tiles and charts — numbers computed in SQL, drawn with the blocks from @rebasepro/ui."
 ---
 
 ## Overview
 
 A dashboard is three pieces: a backend function that computes the numbers in
 SQL, a component that loads them with `useInsightData` and draws them with the
-blocks from `@rebasepro/plugin-insights`, and a place to show it — here, a page
+blocks from `@rebasepro/ui`, and a place to show it — here, a page
 of its own in the drawer.
 
 Count on the server. Fetching rows into the browser and adding them up is right
@@ -69,7 +69,8 @@ loading, error and empty states:
 ```tsx
 import { useRebaseClient } from "@rebasepro/app";
 import type { createRebaseClient } from "@rebasepro/client";
-import { ChartCard, KpiGrid, KpiTile, TimeSeriesChart, useInsightData } from "@rebasepro/plugin-insights";
+import { ChartCard, KpiGrid, KpiTile, TimeSeriesChart } from "@rebasepro/ui";
+import { useInsightData } from "@rebasepro/plugin-insights";
 
 type RebaseClient = ReturnType<typeof createRebaseClient>;
 type Summary = { orders: number; previousOrders: number; revenue: number };
@@ -207,7 +208,7 @@ counts, or one record in the side panel.
 
 ```tsx
 import { useUrlController } from "@rebasepro/cms";
-import { BarChart, ChartCard } from "@rebasepro/plugin-insights";
+import { BarChart, ChartCard } from "@rebasepro/ui";
 
 function OrdersByStatus({ counts, loading }: { counts?: Record<string, number>; loading: boolean }) {
     const urls = useUrlController();

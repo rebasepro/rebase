@@ -1,5 +1,5 @@
 ---
-sourceHash: 7486b595195ce75b
+sourceHash: 702686890d8244f9
 title: Compétences d'agent
 sidebar_label: Compétences d'agent
 description: rebase skills install écrit 24 compétences de référence Rebase dans votre dépôt, selon l'organisation attendue par votre assistant IA — Cursor, Claude Code, Windsurf, Gemini CLI et Antigravity.
@@ -169,7 +169,7 @@ travail — ce qui est utile pour un dépôt frontend distinct qui communique av
 | `rebase-admin` | Navigation dans le panneau d'administration, volets latéraux, URL, intégration de panneaux de collection |
 | `rebase-customize-admin` | Personnalisation de l'admin avec des composants React — singletons, pages de paramètres, actions groupées, modes d'affichage, champs personnalisés, remplacement des éléments intégrés |
 | `rebase-custom-views` | Écrans personnalisés dans l'admin — `rebase generate view`, vues de premier niveau, onglets d'enregistrement, widgets de champ |
-| `rebase-dashboards` | KPI, graphiques et tableaux de bord — chiffres calculés en SQL, dessinés avec `@rebasepro/plugin-insights`, placés dans des slots ou une page |
+| `rebase-dashboards` | KPI, graphiques et tableaux de bord — chiffres calculés en SQL, dessinés avec `@rebasepro/ui`, placés dans des slots ou une page |
 | `rebase-ui-components` | La bibliothèque de composants `@rebasepro/ui` |
 | `rebase-design-language` | Le langage de design UI : tokens, couleurs, typographie, espacement, anti-patterns |
 | `rebase-studio` | La couche d'outils de développement Studio — SQL, RLS, stockage, cron, visualiseur de schéma, journaux |

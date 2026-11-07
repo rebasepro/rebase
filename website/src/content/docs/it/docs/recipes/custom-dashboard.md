@@ -1,13 +1,13 @@
 ---
-sourceHash: f10362389108766c
+sourceHash: a9c03468852b95e3
 title: "Ricetta: Dashboard personalizzata"
 sidebar_label: Dashboard personalizzata
-description: "Crea una pagina dashboard con KPI e grafici: numeri calcolati in SQL e disegnati con i blocchi di @rebasepro/plugin-insights."
+description: "Crea una pagina dashboard con KPI e grafici: numeri calcolati in SQL e disegnati con i blocchi di @rebasepro/ui."
 ---
 
 ## Panoramica
 
-Una dashboard è fatta di tre pezzi: una funzione backend che calcola i numeri in SQL, un componente che li carica con `useInsightData` e li disegna con i blocchi di `@rebasepro/plugin-insights`, e un posto dove mostrarla — qui, una pagina a sé nel menu laterale.
+Una dashboard è fatta di tre pezzi: una funzione backend che calcola i numeri in SQL, un componente che li carica con `useInsightData` e li disegna con i blocchi di `@rebasepro/ui`, e un posto dove mostrarla — qui, una pagina a sé nel menu laterale.
 
 Conta sul server. Portare le righe nel browser e sommarle è corretto solo finché la tabella sta in una pagina di risultati; oltre, il totale è sbagliato senza avvisare.
 
@@ -62,7 +62,8 @@ export default defineFunction((app, { rebase }) => {
 ```tsx
 import { useRebaseClient } from "@rebasepro/app";
 import type { createRebaseClient } from "@rebasepro/client";
-import { ChartCard, KpiGrid, KpiTile, TimeSeriesChart, useInsightData } from "@rebasepro/plugin-insights";
+import { ChartCard, KpiGrid, KpiTile, TimeSeriesChart } from "@rebasepro/ui";
+import { useInsightData } from "@rebasepro/plugin-insights";
 
 type RebaseClient = ReturnType<typeof createRebaseClient>;
 type Summary = { orders: number; previousOrders: number; revenue: number };
@@ -189,7 +190,7 @@ Costruisci il percorso anziché codificarlo manualmente (hard-coding): gli URL d
 
 ```tsx
 import { useUrlController } from "@rebasepro/cms";
-import { BarChart, ChartCard } from "@rebasepro/plugin-insights";
+import { BarChart, ChartCard } from "@rebasepro/ui";
 
 function OrdersByStatus({ counts, loading }: { counts?: Record<string, number>; loading: boolean }) {
     const urls = useUrlController();

@@ -1,13 +1,13 @@
 ---
-sourceHash: f10362389108766c
+sourceHash: a9c03468852b95e3
 title: "Receta: Dashboard personalizado"
 sidebar_label: Dashboard personalizado
-description: "Crea una página de dashboard con KPIs y gráficos: números calculados en SQL y dibujados con los bloques de @rebasepro/plugin-insights."
+description: "Crea una página de dashboard con KPIs y gráficos: números calculados en SQL y dibujados con los bloques de @rebasepro/ui."
 ---
 
 ## Descripción general
 
-Un dashboard tiene tres piezas: una función de backend que calcula los números en SQL, un componente que los carga con `useInsightData` y los dibuja con los bloques de `@rebasepro/plugin-insights`, y un lugar donde mostrarlo — aquí, una página propia en el menú lateral.
+Un dashboard tiene tres piezas: una función de backend que calcula los números en SQL, un componente que los carga con `useInsightData` y los dibuja con los bloques de `@rebasepro/ui`, y un lugar donde mostrarlo — aquí, una página propia en el menú lateral.
 
 Cuenta en el servidor. Traer filas al navegador y sumarlas solo es correcto mientras la tabla cabe en una página de resultados; a partir de ahí el total es incorrecto sin avisar.
 
@@ -62,7 +62,8 @@ export default defineFunction((app, { rebase }) => {
 ```tsx
 import { useRebaseClient } from "@rebasepro/app";
 import type { createRebaseClient } from "@rebasepro/client";
-import { ChartCard, KpiGrid, KpiTile, TimeSeriesChart, useInsightData } from "@rebasepro/plugin-insights";
+import { ChartCard, KpiGrid, KpiTile, TimeSeriesChart } from "@rebasepro/ui";
+import { useInsightData } from "@rebasepro/plugin-insights";
 
 type RebaseClient = ReturnType<typeof createRebaseClient>;
 type Summary = { orders: number; previousOrders: number; revenue: number };
@@ -189,7 +190,7 @@ Construye la ruta en lugar de escribirla manualmente (hard-code): las URLs de la
 
 ```tsx
 import { useUrlController } from "@rebasepro/cms";
-import { BarChart, ChartCard } from "@rebasepro/plugin-insights";
+import { BarChart, ChartCard } from "@rebasepro/ui";
 
 function OrdersByStatus({ counts, loading }: { counts?: Record<string, number>; loading: boolean }) {
     const urls = useUrlController();

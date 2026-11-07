@@ -168,7 +168,7 @@ directory — useful for a separate frontend repo that talks to a Rebase backend
 | `rebase-admin` | Navigating the admin panel, side drawers, URLs, embedding collection panels |
 | `rebase-customize-admin` | Customizing the admin with React components — singletons, settings pages, bulk actions, view modes, custom fields, replacing built-in parts |
 | `rebase-custom-views` | Custom screens inside the admin — `rebase generate view`, top-level views, record tabs, field widgets |
-| `rebase-dashboards` | KPIs, charts and dashboards — numbers computed in SQL, drawn with `@rebasepro/plugin-insights`, placed in slots or a page |
+| `rebase-dashboards` | KPIs, charts and dashboards — numbers computed in SQL, drawn with `@rebasepro/ui`, placed in slots or a page |
 | `rebase-ui-components` | The `@rebasepro/ui` component library |
 | `rebase-design-language` | The UI design language: tokens, color, typography, spacing, anti-patterns |
 | `rebase-studio` | The Studio developer tools layer — SQL, RLS, storage, cron, schema visualizer, logs |
