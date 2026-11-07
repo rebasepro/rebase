@@ -3,7 +3,11 @@ import type { InsightDefinition } from "../types";
 import { useInsightSource } from "../engine/useInsightSource";
 import { InsightsScorecardView } from "./InsightsScorecardView";
 
-/** One insight, reading its source through the shared engine. */
+/**
+ * One insight, reading its source through the shared engine.
+ *
+ * @deprecated Use `KpiTile` reading `useInsightData` instead.
+ */
 export function InsightWidget({
     definition,
     compact = false

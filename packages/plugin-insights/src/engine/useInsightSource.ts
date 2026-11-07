@@ -14,6 +14,8 @@ interface Settled {
  *
  * Waits for auth to settle: a source runs under the caller's permissions, so
  * fetching before the user is known would compute the figures for nobody.
+ *
+ * @deprecated Use `useInsightData` instead.
  */
 export function useInsightSource(sourceId: string): {
     result: SourceResult | null;

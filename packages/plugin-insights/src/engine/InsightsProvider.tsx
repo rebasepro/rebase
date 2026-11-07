@@ -9,6 +9,8 @@ const InsightsContext = createContext<InsightsEngine | null>(null);
  * Injected automatically by the plugin via `providers: [{ scope: "root" }]`.
  *
  * Holds the one `InsightsEngine` every insight widget reads its source from.
+ *
+ * @deprecated Use `useInsightData` instead; it needs no provider.
  */
 export function InsightsProvider({
     sources,
@@ -36,6 +38,8 @@ export function InsightsProvider({
  * The insights engine (for advanced usage).
  * Returns null when called outside of an `InsightsProvider`
  * (e.g. during auth-loading phase before plugin providers mount).
+ *
+ * @deprecated Use `useInsightData` instead.
  */
 export function useInsightsEngine(): InsightsEngine | null {
     return useContext(InsightsContext);

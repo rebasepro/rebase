@@ -1,7 +1,7 @@
 {
   "name": "@rebasepro/plugin-insights",
   "version": "0.28.2",
-  "description": "Insights plugin for the Rebase admin panel: charts and saved queries over your collections.",
+  "description": "KPI tiles and charts for the Rebase admin panel, as components you put where you want them.",
   "keywords": [
     "rebase",
     "plugin",
@@ -37,6 +37,7 @@
   },
   "dependencies": {
     "@rebasepro/cms-types": "workspace:*",
+    "@rebasepro/common": "workspace:*",
     "@rebasepro/app": "workspace:*",
     "@rebasepro/types": "workspace:*",
     "@rebasepro/ui": "workspace:*"

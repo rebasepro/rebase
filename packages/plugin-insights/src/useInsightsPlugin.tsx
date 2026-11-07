@@ -12,6 +12,7 @@ import { assertValidConfig } from "./validateConfig";
 import { HomeCardInsightSlot } from "./components/HomeCardInsightSlot";
 import { HomeInsightsSlot } from "./components/HomeInsightsSlot";
 import { CollectionInsightsInline } from "./components/CollectionInsightsInline";
+import { warnDeprecated } from "@rebasepro/common";
 
 /**
  * Creates the Insights plugin for Rebase.
@@ -57,8 +58,16 @@ import { CollectionInsightsInline } from "./components/CollectionInsightsInline"
  *     }
  * }), []));
  * ```
+ *
+ * @deprecated Put components in places instead: `<Rebase slots={[…]}>` with
+ * `KpiGrid`, `KpiTile`, `KpiReadout`, `TimeSeriesChart` and `BarChart`, reading
+ * figures through `useInsightData`. See the package README.
  */
 export function useInsightsPlugin(config: InsightsPluginConfig): RebasePlugin {
+    warnDeprecated(
+        "useInsightsPlugin",
+        "`useInsightsPlugin` is deprecated; put `KpiTile`, `TimeSeriesChart` and `BarChart` from @rebasepro/plugin-insights in `<Rebase slots>`, reading figures with `useInsightData`."
+    );
     const { insights, sources, period, cacheTTL } = config;
     const periodDays = period?.days ?? DEFAULT_PERIOD_DAYS;
 

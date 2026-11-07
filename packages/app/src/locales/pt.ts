@@ -1726,6 +1726,7 @@ export const pt: RebaseTranslations = {
     insights_change_up: "Alta: {{change}}",
     insights_change_down: "Queda: {{change}}",
     insights_change_none: "Sem alteração",
+    insights_no_data: "Sem dados para este período",
 
     // ─── Icon button names ───────────────────────────────────────
     add_to_favourites: "Adicionar aos favoritos",

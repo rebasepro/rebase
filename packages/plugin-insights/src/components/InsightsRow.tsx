@@ -9,6 +9,8 @@ import { InsightWidget } from "./InsightWidget";
 /**
  * A row of insight tiles. When any of them compares with the previous period,
  * the row says which period once, above the tiles, rather than on each.
+ *
+ * @deprecated Use `KpiGrid` with `KpiTile`s instead.
  */
 export function InsightsRow({
     insights,

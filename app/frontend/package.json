@@ -13,6 +13,7 @@
     "@rebasepro/client": "workspace:*",
     "@rebasepro/common": "workspace:*",
     "@rebasepro/plugin-ai": "workspace:*",
+    "@rebasepro/plugin-insights": "workspace:*",
     "@rebasepro/studio": "workspace:*",
     "@rebasepro/types": "workspace:*",
     "@rebasepro/ui": "workspace:*",

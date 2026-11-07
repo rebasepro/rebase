@@ -64,6 +64,31 @@
   the configs. Images and files show as labels: the view fetches nothing
   itself.
 
+#### Admin (CMS & app)
+
+- **KPI tiles and charts you place yourself.** `@rebasepro/plugin-insights`
+  now exports building blocks: `KpiTile`, `KpiReadout` and `KpiGrid` for
+  headline figures with their change on the previous window, `ChartCard`,
+  `TimeSeriesChart` (lines, or a line with a wash) and `BarChart` (horizontal
+  bars that can be buttons), and `useInsightData`, which loads a key once per
+  signed-in user and shares it with every reader for a TTL. Put them in
+  `<Rebase slots>`, a page or a collection view. The charts are SVG with no
+  chart library, drawn in the kit's tokens in both themes, with a hover and
+  arrow-key readout and a table for screen readers. The demo app shows revenue
+  per day and top products on the home page, and orders by status and open
+  tickets by priority above those lists; a bar opens the list filtered to what
+  it counts.
+
+### Deprecated
+
+- **`useInsightsPlugin`** and the pieces it is made of (`InsightsProvider`,
+  `useInsightsEngine`, `InsightsEngine`, `resolvePeriod`, `useInsightSource`,
+  `InsightsScorecardView`, `InsightWidget`, `InsightsRow`) in
+  `@rebasepro/plugin-insights`. They still work; `useInsightsPlugin` warns
+  once. Put `KpiTile`, `KpiReadout` and the charts in `<Rebase slots>`
+  yourself, reading figures with `useInsightData`; the package README maps
+  each config field to its replacement.
+
 ### Fixed
 
 #### Server & REST

@@ -1,6 +1,7 @@
 # @rebasepro/plugin-insights
 
-Scorecard and KPI widget plugin for the Rebase admin panel.
+KPI tiles and charts for the Rebase admin panel, as components you put where
+you want them.
 
 ## Installation
 
@@ -16,135 +17,113 @@ of it resolves too: Node has supported `require(esm)` since 22.12.
 
 ## What This Package Does
 
-This plugin puts figures — revenue, orders, open tickets — into the Rebase admin
-UI, each beside its change over a comparison period. You declare named
-`sources`, functions that fetch one record of figures for that period: use the
-Rebase SDK, call a backend function, or hit any API. Each insight names the
-source and the field it reads. The plugin fetches each source once per signed-in
-user, caches it, works out the change, and renders it in the right slots.
+It draws figures — revenue, orders, open tickets — and the series behind them,
+in the admin's own card, type and colour tokens. It does not decide what to
+show or where: you write a component that loads some numbers and draws them
+with these blocks, and put it in a place of the admin (`<Rebase slots>`, a page
+in `views`, a collection view).
 
-Figures appear in three places:
+The numbers come from wherever you like. The usual shape is a backend function
+that runs the `GROUP BY` in SQL, one route per figure or series, called as the
+signed-in user so permissions and row-level security apply. The demo app's
+`app/backend/functions/insights.ts` and `app/frontend/src/InsightSlots.tsx` are
+a complete example: KPI tiles, revenue per day, top products, and bars that
+open the collection filtered to what they count.
 
-- **Home page header**: a row of KPI cards via the `home.children.start` slot
-- **Collection list view**: a row of figures below the title, above the list, via `collection.widgets`
-- **Home page cards**: compact figures on each collection's card via `home.card.widget`
+Charts are SVG and HTML with no chart library, so they add a few kilobytes,
+follow the admin's light and dark themes, and print. They follow one set of
+rules: one y-axis starting at zero, 2px lines, bars at most 24px thick with a
+rounded data end, the kit's primary for a single series, a legend from two
+series, a hover (and arrow-key) readout, and a table for screen readers.
 
-Collection insights are defined once, under `collections.<slug>`, and render
-both in the collection's list view and on its home card. Every insight that
-reads a source shares one fetch of it, so a figure shown in two places is the
-same number.
+## Building blocks
 
-## Key Exports
+| Export | What it is |
+|---|---|
+| `useInsightData(key, load, { ttl })` | Runs `load()` once per key **and signed-in user**, and shares the result with every component reading that key within `ttl` (60s by default). Returns `{ data, error, loading }`. |
+| `KpiTile` | One figure as a card: label, optional icon, value, and the change on the previous window (`previous`, `goodWhen`, `show`). |
+| `KpiReadout` | The same figure as one line of text, for a home-page card. |
+| `KpiGrid` | A responsive grid of tiles; given `periodDays`, it names the window once above them. |
+| `ChartCard` | A card with the header grammar (icon, micro title, optional headline and action) around a chart. |
+| `TimeSeriesChart` | One or more measures over time, as lines or a line with a wash (`variant`). Points are `{ at, value }`; a bare day (`"2026-11-07"`) is that calendar day. `null` leaves a gap. |
+| `BarChart` | Categories by size, as horizontal bars with their values beside them. `onBarClick` makes each row a button. |
+| `formatNumber`, `compactFormat`, `describeChange`, `niceTicks` | The number formatting and axis maths the blocks use. |
+| `SERIES_COLORS` | The validated series colours, as Tailwind classes, in the order series take them. |
 
-| Export | Type | Description |
-|---|---|---|
-| `useInsightsPlugin` | Hook | Creates the plugin from an `InsightsPluginConfig`. Returns a `RebasePlugin` |
-| `InsightsPluginConfig` | Type | Top-level config: `sources`, `insights` (home + collections), optional `period` and `cacheTTL` |
-| `InsightSource` | Type | `(context: { period }) => Promise<DataRow>`: fetches one record of figures |
-| `InsightSourceContext` | Type | What a source is called with: `{ period: InsightPeriod }` |
-| `InsightPeriod` | Type | The resolved windows: `days`, `from`, `to`, `previousFrom` |
-| `InsightPeriodConfig` | Type | `{ days }`, the comparison window |
-| `InsightDefinition` | Type | One figure: `id`, `title`, `source`, `value`, optional `comparison` and `icon` |
-| `InsightComparison` | Type | `previous` field, `intent`, and `show` (`percent` or `absolute`) |
-| `InsightFormat` | Type | Number formatting: `style` (decimal/currency/percent), `notation`, `currency`, `decimals` |
-| `DataRow` | Type | `Record<string, string \| number \| boolean \| null>` |
-| `InsightsProvider` | Component | React context provider (injected automatically by the plugin) |
-| `useInsightsEngine` | Hook | Access the insights engine from context (advanced) |
-| `InsightsEngine` | Class | Fetches and caches sources per user, and anchors the period (advanced) |
-| `resolvePeriod` | Function | `(days, to) => InsightPeriod` (advanced) |
-| `useInsightSource` | Hook | Reads one source for the signed-in user (custom layouts) |
-| `InsightsRow` | Component | A row of insights under the period label (custom layouts) |
-| `InsightsScorecardView` | Component | Renders one figure from a record and its definition (custom layouts) |
-| `InsightWidget` | Component | Single insight container (custom layouts) |
+Every block takes `Intl.NumberFormatOptions` for its numbers and writes them in
+the admin's language.
 
-### `InsightsPluginConfig`
-
-| Prop | Type | Default | Description |
-|---|---|---|---|
-| `sources` | `Record<string, InsightSource>` | — | Where the figures come from, by name. Required |
-| `insights.home` | `InsightDefinition[]` | — | Insights shown at the top of the home page |
-| `insights.collections` | `Record<string, InsightDefinition[]>` | — | Insights per collection slug |
-| `period.days` | `number` | `30` | The comparison window: the last N days against the N days before them |
-| `cacheTTL` | `number` | `60_000` | How long a fetched source is reused, in milliseconds |
-
-Creating the plugin throws when an insight names a source that `sources` does
-not declare, or when `period.days` is not a whole number of at least 1. Pass a
-memoized config: a new `sources` object starts a new cache.
-
-### `InsightDefinition`
-
-| Prop | Type | Description |
-|---|---|---|
-| `source` | `string` | The key in `sources` this insight reads |
-| `value.field` | `string` | The field holding the figure |
-| `value.format` | `InsightFormat` | How to write it, in the admin panel's language |
-| `comparison.previous` | `string` | The field holding the same figure for the previous period |
-| `comparison.intent` | `"increase_is_good" \| "decrease_is_good"` | Which direction reads as good news |
-| `comparison.show` | `"percent" \| "absolute"` | The relative change (default), or the difference. Use `absolute` for small counts |
-| `icon` | `string` | Icon key (e.g., `"ShoppingCart"`), resolved via `getIcon` |
-
-## Quick Start
+## Example
 
 ```tsx
-import { useMemo } from "react";
-import { Rebase } from "@rebasepro/app";
-import { RebaseShell } from "@rebasepro/cms";
-import { useInsightsPlugin } from "@rebasepro/plugin-insights";
-import type { DataRow, InsightPeriod } from "@rebasepro/plugin-insights";
+import { useRebaseClient } from "@rebasepro/app";
+import type { AnySlotContribution } from "@rebasepro/cms-types";
+import { ChartCard, KpiGrid, KpiTile, TimeSeriesChart, useInsightData } from "@rebasepro/plugin-insights";
 
-const windowQuery = (period: InsightPeriod) => new URLSearchParams({
-    previousFrom: period.previousFrom.toISOString(),
-    from: period.from.toISOString(),
-    to: period.to.toISOString()
-}).toString();
+type Figures = { revenue: number; previousRevenue: number };
+type Day = { day: string; revenue: number };
 
-const insightsPlugin = useInsightsPlugin(useMemo(() => ({
-    period: { days: 30 },
-    sources: {
-        // One request answers every insight below: { revenue, previousRevenue, shipped, previousShipped }
-        orders: ({ period }) => rebaseClient.functions.invoke<DataRow>("insights", undefined, {
-            method: "GET",
-            path: `orders?${windowQuery(period)}`
-        })
-    },
-    insights: {
-        home: [
-            {
-                id: "revenue",
-                title: "Revenue",
-                source: "orders",
-                icon: "DollarSign",
-                value: { field: "revenue", format: { style: "currency", currency: "USD", notation: "compact" } },
-                comparison: { previous: "previousRevenue", intent: "increase_is_good" }
-            }
-        ],
-        collections: {
-            orders: [
-                {
-                    id: "shipped",
-                    title: "Shipped",
-                    source: "orders",
-                    icon: "Truck",
-                    value: { field: "shipped" },
-                    comparison: { previous: "previousShipped", intent: "increase_is_good", show: "absolute" }
-                }
-            ]
-        }
-    }
-}), []));
+function RevenueOverview() {
+    const client = useRebaseClient<RebaseClient>();
+    const read = <T,>(path: string) => () =>
+        client!.functions.invoke<T>("insights", undefined, { method: "GET", path });
 
-// Pass to your Rebase app:
-<Rebase client={rebaseClient} plugins={[insightsPlugin]}>
-    <RebaseShell />
-</Rebase>
+    const totals = useInsightData("orders", read<Figures>("orders"));
+    const daily = useInsightData("orders/daily", read<Day[]>("orders/daily"));
+
+    return (
+        <KpiGrid periodDays={30}>
+            <KpiTile
+                label="Revenue"
+                icon="DollarSign"
+                value={totals.data?.revenue}
+                previous={totals.data?.previousRevenue}
+                format={{ style: "currency", currency: "USD", notation: "compact" }}
+                loading={totals.loading}
+                error={totals.error}
+            />
+            <ChartCard title="Revenue per day" className="col-span-2 lg:col-span-3">
+                <TimeSeriesChart
+                    series={[{ id: "revenue", label: "Revenue", points: (daily.data ?? []).map((d) => ({ at: d.day, value: d.revenue })) }]}
+                    format={{ style: "currency", currency: "USD" }}
+                    loading={daily.loading}
+                    error={daily.error}
+                />
+            </ChartCard>
+        </KpiGrid>
+    );
+}
+
+// At the top of the home page:
+const slots: AnySlotContribution[] = [{ slot: "home.children.start", Component: RevenueOverview }];
+
+<Rebase client={rebaseClient} slots={slots}>…</Rebase>
 ```
 
-A source runs in the browser under the signed-in user's permissions. The demo
-app's `insights` backend function (`app/backend/functions/insights.ts`) is one
-way to compute both windows in a single query.
+The places a component can go: `home.children.start` (top of the home page),
+`collection.widgets` (above a collection's list, in list view; it receives the
+collection and its path), `home.card.widget` (on a collection's home card), a
+page in `<RebaseCMS views>`, and the others in `@rebasepro/cms`'s recipes README.
+
+## Deprecated: `useInsightsPlugin`
+
+`useInsightsPlugin(config)` — named `sources`, a list of insight definitions,
+and slots chosen for you — still works, and warns once that it is deprecated.
+So do the pieces it is made of: `InsightsProvider`, `useInsightsEngine`,
+`InsightsEngine`, `resolvePeriod`, `useInsightSource`, `InsightsScorecardView`,
+`InsightWidget` and `InsightsRow`, and the `Insight*` types. To move off it:
+
+- each source becomes a `useInsightData(key, load)` call, with the window in
+  the loader's query;
+- each insight becomes a `KpiTile` (or a `KpiReadout` on a home card) given the
+  field's value and its `previous` twin; `comparison.intent` becomes `goodWhen`
+  (`"up"` or `"down"`), `value.format.decimals` becomes `maximumFractionDigits`;
+- the home and collection lists become a component in `home.children.start`,
+  `collection.widgets` and `home.card.widget`, checking
+  `props.collection.slug` itself.
 
 ## Related Packages
 
-- `@rebasepro/app` — Core framework providing the plugin system
-- `@rebasepro/cms-types` — Shared types (`RebasePlugin`, `SlotContribution`)
-- `@rebasepro/ui` — UI components used by insight widgets
+- `@rebasepro/app` — Core framework: `<Rebase slots>`, `useRebaseClient`, i18n
+- `@rebasepro/cms` — The admin's places and the customization recipes
+- `@rebasepro/ui` — The kit whose cards, type and colours the blocks use

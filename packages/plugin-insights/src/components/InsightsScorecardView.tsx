@@ -81,6 +81,8 @@ function InsightChange({
  * share one shell, so nothing moves when the data arrives.
  *
  * `compact` is the inline readout on a home-page card; the default is a tile.
+ *
+ * @deprecated Use `KpiTile` or `KpiReadout` instead.
  */
 export function InsightsScorecardView({
     definition,

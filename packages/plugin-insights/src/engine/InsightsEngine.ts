@@ -4,7 +4,11 @@ export const DEFAULT_PERIOD_DAYS = 30;
 
 const DAY_MS = 86_400_000;
 
-/** The current and previous windows of `days` days, ending at `to`. */
+/**
+ * The current and previous windows of `days` days, ending at `to`.
+ *
+ * @deprecated Use `useInsightData` with the window in its loader instead.
+ */
 export function resolvePeriod(days: number, to: Date): InsightPeriod {
     const from = new Date(to.getTime() - days * DAY_MS);
     return {
@@ -40,6 +44,8 @@ export function sourceCacheKey(sourceId: string, userId: string | null): string 
  * join the request in flight, later ones read the cache until the TTL passes.
  * That is what keeps a figure shown on the home page and in a collection view
  * the same number.
+ *
+ * @deprecated Use `useInsightData` instead.
  */
 export class InsightsEngine {
     private readonly cache = new Map<string, { result: SourceResult; at: number }>();

@@ -494,6 +494,7 @@
     "insights_change_down": ["d6800516","ff78b2c8","80217477","ecf60061","c96bb522","5ea27595","b14f51b1"],
     "insights_change_none": ["41f9d57c","575e9d10","9e82d5e8","ca47055a","dfc69ac4","1b70156b","1d1d4098"],
     "insights_change_up": ["ccb368c7","d05df722","6d9acadb","2b7ddd30","9cb18f2c","751a65fa","4b6452df"],
+    "insights_no_data": ["dfdd39a6","91564e24","403df522","1d78e128","250c8614","c4e22d68","8d124908"],
     "insights_period_last_days": ["11f9c014","1fab2150","d6967fd8","228b6a1c","037684e7","a813ccdd","dbf72d88"],
     "insights_period_last_days_one": ["a4e24bc4","70671d30","173f1180","80039e7a","16fb6a3e","ad4a7095","84f9bbf9"],
     "insights_previous_period_value": ["a57cc1af","2083baf4","4fdd3af0","2941bcc6","9e2ff7dd","82d6aa03","aa733928"],

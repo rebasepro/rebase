@@ -4,7 +4,7 @@ import { defineFunction, requireAuth } from "@rebasepro/server";
 const MAX_WINDOW_MS = 366 * 86_400_000;
 
 /**
- * The comparison window the insights plugin asks for: the current period is
+ * The comparison window the admin asks for: the current period is
  * `[from, to)` and the previous one `[previousFrom, from)`.
  *
  * Taken from the request rather than computed here, so the figures describe
@@ -25,16 +25,16 @@ const WINDOW_REQUIRED = {
 };
 
 /**
- * Insights function — server-side KPI aggregations for the admin panel's
- * insights plugin.
+ * Insights function — the figures and series the admin's KPI tiles and
+ * charts draw, aggregated in SQL.
  *
  * Authored with `defineFunction`, which provides a typed `Hono<HonoEnv>`
  * app (so `c.var.user` / `c.var.driver` are typed) and the `rebase`
  * singleton via the injected context — no global import needed.
  *
- * Each route answers one plugin source with one record. A windowed figure is
- * returned with its `previous*` twin over the window before it; the plugin
- * works out the change.
+ * A figure route answers with one record: a windowed figure comes with its
+ * `previous*` twin over the window before it, and the tile works out the
+ * change. A series route answers with the rows a chart draws.
  */
 export default defineFunction((app, { rebase }) => {
     app.use("/*", requireAuth);
@@ -107,6 +107,90 @@ export default defineFunction((app, { rebase }) => {
         });
     });
 
+    /**
+     * GET /api/functions/insights/orders/daily?previousFrom=…&from=…&to=…
+     *
+     * Revenue and order count per UTC day of the current window, every day
+     * present (an empty one is zero). The first and last days are clipped to
+     * the window, so the days add up to the window's totals above.
+     */
+    app.get("/orders/daily", async (c) => {
+        if (!rebase.sql) return c.json({ error: "SQL not available" }, 501);
+        const range = readWindow((name) => c.req.query(name));
+        if (!range) return c.json(WINDOW_REQUIRED, 400);
+
+        const rows = await rebase.sql(`
+            SELECT
+                to_char(days.day, 'YYYY-MM-DD') AS day,
+                COALESCE(SUM(o.total), 0)       AS revenue,
+                COUNT(o.order_date)             AS orders
+            FROM generate_series(
+                date_trunc('day', $1::timestamptz AT TIME ZONE 'UTC'),
+                date_trunc('day', $2::timestamptz AT TIME ZONE 'UTC'),
+                interval '1 day'
+            ) AS days(day)
+            LEFT JOIN orders o
+                ON o.order_date >= GREATEST(days.day AT TIME ZONE 'UTC', $1::timestamptz)
+               AND o.order_date <  LEAST((days.day + interval '1 day') AT TIME ZONE 'UTC', $2::timestamptz)
+            GROUP BY days.day
+            ORDER BY days.day
+        `, { params: [range.from, range.to] });
+
+        return c.json(rows.map((row) => ({
+            day: String(row.day),
+            revenue: Number(row.revenue),
+            orders: Number(row.orders)
+        })));
+    });
+
+    /** GET /api/functions/insights/orders/status?previousFrom=…&from=…&to=… — orders of the current window per status. */
+    app.get("/orders/status", async (c) => {
+        if (!rebase.sql) return c.json({ error: "SQL not available" }, 501);
+        const range = readWindow((name) => c.req.query(name));
+        if (!range) return c.json(WINDOW_REQUIRED, 400);
+
+        const rows = await rebase.sql(`
+            SELECT status, COUNT(*) AS orders
+            FROM orders
+            WHERE order_date >= $1::timestamptz AND order_date < $2::timestamptz
+            GROUP BY status
+        `, { params: [range.from, range.to] });
+
+        return c.json(Object.fromEntries(rows.map((row) => [String(row.status), Number(row.orders)])));
+    });
+
+    /**
+     * GET /api/functions/insights/products/top?previousFrom=…&from=…&to=…
+     *
+     * The five products with the most revenue from the current window's
+     * orders. A line whose product was deleted is grouped under its name.
+     */
+    app.get("/products/top", async (c) => {
+        if (!rebase.sql) return c.json({ error: "SQL not available" }, 501);
+        const range = readWindow((name) => c.req.query(name));
+        if (!range) return c.json(WINDOW_REQUIRED, 400);
+
+        const rows = await rebase.sql(`
+            SELECT
+                p.id                               AS id,
+                COALESCE(p.name, oi.product_name)  AS name,
+                COALESCE(SUM(oi.line_total), 0)    AS revenue
+            FROM order_items oi
+            JOIN orders o ON o.id = oi.order_id
+            LEFT JOIN products p ON p.id = oi.product_id
+            WHERE o.order_date >= $1::timestamptz AND o.order_date < $2::timestamptz
+            GROUP BY p.id, COALESCE(p.name, oi.product_name)
+            ORDER BY revenue DESC
+            LIMIT 5
+        `, { params: [range.from, range.to] });
+
+        return c.json(rows.map((row) => ({
+            id: row.id === null ? null : String(row.id),
+            name: String(row.name ?? ""),
+            revenue: Number(row.revenue)
+        })));
+    });
+
     // Catalog size and open-ticket count are standing totals, not rates —
     // there is no window to compare them against.
 
@@ -122,5 +206,12 @@ export default defineFunction((app, { rebase }) => {
         if (!rebase.sql) return c.json({ error: "SQL not available" }, 501);
         const [stats] = await rebase.sql("SELECT COUNT(*) FILTER (WHERE status = 'open') AS open FROM tickets");
         return c.json({ open: Number(stats.open) });
+    });
+
+    /** GET /api/functions/insights/tickets/priority — open tickets per priority. */
+    app.get("/tickets/priority", async (c) => {
+        if (!rebase.sql) return c.json({ error: "SQL not available" }, 501);
+        const rows = await rebase.sql("SELECT priority, COUNT(*) AS open FROM tickets WHERE status = 'open' GROUP BY priority");
+        return c.json(Object.fromEntries(rows.map((row) => [String(row.priority), Number(row.open)])));
     });
 });

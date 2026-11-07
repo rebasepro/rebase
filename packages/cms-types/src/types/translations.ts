@@ -1873,6 +1873,8 @@ export interface RebaseTranslations {
     insights_change_up?: string;
     insights_change_down?: string;
     insights_change_none?: string;
+    /** In place of a chart that has no values to draw. */
+    insights_no_data?: string;
 
     // ─── Icon button names ───────────────────────────────────────
     add_to_favourites?: string;
