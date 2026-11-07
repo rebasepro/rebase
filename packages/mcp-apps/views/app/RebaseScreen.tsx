@@ -24,6 +24,7 @@ import { createToolDriver, describeChanges, type ToolDriver, type ViewChange, ty
 import { filterOf, findCollection, orderOf, type AppBlock, type CollectionBlock, type RecordBlock, type Screen } from "./payload";
 import { AppErrorBoundary, describeAppError, loadApp, type AppError } from "./code-app";
 import { AppSdkProvider } from "./sdk";
+import { VIEW_STORAGE_SOURCE } from "./storage-source";
 
 /** A collection's height in the conversation, where the host sizes the frame to the document. */
 const INLINE_COLLECTION_HEIGHT = 460;
@@ -80,6 +81,7 @@ export function RebaseScreen({ bridge, screen, context }: {
             dataSources={[{ key: "(default)", engine: "postgres", driver: tools.driver }]}
             authController={authController}
             modeController={modeController}
+            storageSource={VIEW_STORAGE_SOURCE}
         >
             <MemoryRouter>
                 <CollectionsProvider collections={screen.collections}>

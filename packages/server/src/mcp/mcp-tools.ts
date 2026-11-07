@@ -688,7 +688,8 @@ const SHOWN_NOT_SEEN = " In a client that renders MCP Apps this opens in the con
 export const MCP_APP_CODE_GUIDE = `
 The app is one TSX module whose default export is a React component (hooks welcome, no props). It runs in the conversation inside the project's admin panel, as the user, and may import only:
 - "react".
-- "@rebasepro/ui": the Rebase UI kit — Card, Button, IconButton, Typography, Tabs, Tab, Chip, Badge, Alert, TextField, Select, SelectItem, BooleanSwitch, Checkbox, Dialog, DialogTitle, DialogContent, DialogActions, Table, TableHeader, TableBody, TableRow, TableCell, Separator, CircularProgress, Tooltip, cls, and Lucide icons named with an Icon suffix (PlusIcon, Trash2Icon). Style with Tailwind classes; colours come from the kit (bg-surface-card, text-text-secondary), never hard-coded.
+- "@rebasepro/ui": the Rebase UI kit — Card, Button, IconButton, Typography, Tabs, Tab, Chip, Badge, Alert, TextField, Select, SelectItem, BooleanSwitch, Checkbox, Dialog, DialogTitle, DialogContent, DialogActions, Table, TableHeader, TableBody, TableRow, TableCell, Separator, CircularProgress, Tooltip, cls, and Lucide icons named with an Icon suffix (PlusIcon, Trash2Icon). Lay out and space with Tailwind's standard utilities (flex, grid, grid-cols-*, gap-*, p-*, w-*, text-sm, …); colours come from the kit (bg-surface-card, text-text-secondary), never hard-coded.
+- Width: the app is about 700px wide in the conversation, and the whole window when the person expands it. Put things side by side only from the lg: breakpoint (grid grid-cols-1 lg:grid-cols-2), never in fixed columns: a list and a form side by side at 700px are each too narrow to use.
 - "@rebasepro/plugin-insights": KpiGrid, KpiTile({ label, value, format?, change? }), ChartCard({ title, children }), BarChart({ bars: [{ label, value }] }), TimeSeriesChart({ series: [{ label, points: [{ date, value }] }] }), formatNumber.
 - "@rebasepro/mcp-apps", the project's data, as the user, under their RLS. Rows are as query_collection returns them (dates as ISO text, a belongsTo as its foreign key, e.g. authorId); \`where\` and \`orderBy\` are query_collection's.
   useQuery(collection, { where?, orderBy?, limit?, offset?, searchString? }) → { data, total, hasMore, loading, error, refresh }
@@ -713,7 +714,7 @@ export default function OrderDesk() {
     return (
         <div className="flex flex-col gap-4">
             <KpiGrid><KpiTile label="Pending" value={pending.count} /></KpiGrid>
-            <div className="grid grid-cols-2 gap-4 items-start">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-start">
                 <CollectionView collection="orders" view="list" onRowClick={setOrder} />
                 {order ? (
                     <div className="flex flex-col gap-2">

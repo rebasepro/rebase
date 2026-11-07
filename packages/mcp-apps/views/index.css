@@ -6,6 +6,34 @@
 @source "../../cms/src/**/*.{ts,tsx}";
 @source "../../plugin-insights/src/**/*.{ts,tsx}";
 @source "./**/*.{ts,tsx}";
+
+/*
+ * The utilities an app Claude writes may use. Tailwind generates only the
+ * classes it finds in these sources, and an app's code arrives after the
+ * build: a class missing here does nothing, silently. So the layout, spacing
+ * and type scale an app reaches for are generated whether or not the admin
+ * panel uses them — with the breakpoints, because an app is narrow in the
+ * conversation and the whole window when expanded.
+ */
+@source inline("{sm:,md:,lg:,xl:,}{flex,inline-flex,grid,block,inline-block,hidden}");
+@source inline("{sm:,md:,lg:,xl:,}{flex-row,flex-col,flex-wrap,flex-1,flex-none,shrink-0,grow,order-first,order-last}");
+@source inline("{sm:,md:,lg:,xl:,}grid-cols-{1,2,3,4,5,6,7,8,9,10,11,12}");
+@source inline("{sm:,md:,lg:,xl:,}col-span-{1,2,3,4,5,6,7,8,9,10,11,12,full}");
+@source inline("{sm:,md:,lg:,xl:,}{gap,gap-x,gap-y,p,px,py,pt,pb,pl,pr,m,mx,my,mt,mb,ml,mr,space-x,space-y}-{0,0.5,1,1.5,2,2.5,3,4,5,6,8,10,12,16}");
+@source inline("{sm:,md:,lg:,xl:,}{w,h,min-w,min-h,max-w,max-h}-{0,full,screen,fit,min,max,auto,1/2,1/3,2/3,1/4,3/4}");
+@source inline("{w,h,min-h,max-h,size}-{4,5,6,8,10,12,16,20,24,32,40,48,64,72,80,96}");
+@source inline("max-w-{xs,sm,md,lg,xl,2xl,3xl,4xl,5xl,6xl,7xl,prose}");
+@source inline("{items,self}-{start,center,end,stretch,baseline}");
+@source inline("justify-{start,center,end,between,around,evenly}");
+@source inline("text-{xs,sm,base,lg,xl,2xl,3xl,4xl,left,center,right}");
+@source inline("font-{normal,medium,semibold,bold,mono}");
+@source inline("{truncate,whitespace-nowrap,break-words,uppercase,tabular-nums,underline}");
+@source inline("leading-{tight,snug,normal,relaxed} tracking-{tight,wide}");
+@source inline("rounded{,-md,-lg,-xl,-full} border{,-t,-b,-l,-r,-hairline,-hairline-strong}");
+@source inline("overflow-{hidden,auto,x-auto,y-auto} {relative,absolute,sticky} {top,bottom,left,right,inset}-0 z-{10,20}");
+@source inline("opacity-{50,75} cursor-pointer select-none");
+@source inline("{,hover:}bg-surface-{frame,sheet,card,raised,lifted,field,hover,active,card-hover,raised-hover}");
+@source inline("text-text-{primary,secondary,disabled} dark:text-text-{primary,secondary,disabled}-dark");
 @custom-variant dark (&:where(.dark, .dark *));
 
 @layer base {
