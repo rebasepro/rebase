@@ -17,6 +17,35 @@
 
 ### Fixed
 
+#### Auth
+
+- **A json client stays signed in against a backend with `cookieAuth`.** Such
+  a backend, which the Rebase runtime always is, put the refresh token in an
+  HttpOnly cookie and answered the body's with `""`, so a client that keeps
+  the token itself (Node, React Native, or a second browser client with its own
+  `storage`, such as a guest beside the signed-in account) had nothing to
+  renew with and was signed out about an hour after sign-in. In
+  `authFlowMode: "json"` the client now sends `x-rebase-auth-flow: json` on its
+  auth requests (`AUTH_FLOW_HEADER` in `@rebasepro/types`), and the server
+  answers those requests as a server without `cookieAuth` does: the token in
+  the body, read back from the body, the cookie neither read, set nor cleared.
+  The cookie path is unchanged, and a json request never turns the cookie into
+  a token in a body the page's script can read. Needs the client and the
+  server from this release; a deployment that lists CORS `allowHeaders` by
+  hand must add the header.
+
+- **A json client with its own `storage` no longer logs a flow mismatch at
+  every sign-in.** Keeping a sign-in apart from the page's cookie session is a
+  choice, not a misconfiguration. A json client without its own storage still
+  logs when a server too old to honour the header leaves it unable to renew,
+  and the message now says to update the server.
+
+#### Admin (CMS & app)
+
+- **The admin's `getAuthToken()` renews a token about to expire.** It renewed
+  only one already past its expiry, so a token with a second left went out and
+  expired on the way. It now asks the client's `getAccessToken()`.
+
 #### MCP
 
 - **Connecting an MCP client from Chrome now finishes.** The consent screen

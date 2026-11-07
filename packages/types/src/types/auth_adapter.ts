@@ -70,6 +70,27 @@ export interface MountableRouter {
  */
 export const IMPERSONATE_HEADER = "x-rebase-impersonate";
 
+// ─── Refresh token delivery ──────────────────────────────────────────────────
+
+/**
+ * The request header a client sends to the auth routes to say where it keeps
+ * its refresh token. `json` asks for the token in the response body, and has
+ * the token it presents read from the request body.
+ *
+ * It matters only on a server with `cookieAuth`, which otherwise puts the
+ * token in an HttpOnly cookie and answers the body's with `""`, so a client
+ * with no cookie jar (Node, React Native), or one that keeps its own sign-in
+ * apart from the page's cookie session, held nothing to renew with. A request
+ * that sends it is answered as a server without `cookieAuth` answers: the
+ * cookie is neither read nor set. So it can never turn a cookie the page's
+ * script cannot read into a token it can.
+ *
+ * `@rebasepro/client` sends it on every auth request in `authFlowMode: "json"`.
+ *
+ * @group Auth
+ */
+export const AUTH_FLOW_HEADER = "x-rebase-auth-flow";
+
 // ─── Access simulation ───────────────────────────────────────────────────────
 
 /**

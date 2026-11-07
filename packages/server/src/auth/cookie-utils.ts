@@ -1,5 +1,5 @@
 import type { Context } from "hono";
-import type { AuthResponsePayload } from "@rebasepro/types";
+import { AUTH_FLOW_HEADER, type AuthResponsePayload } from "@rebasepro/types";
 import type { HonoEnv } from "../api/types";
 import type { CookieAuthConfig } from "./routes";
 import { jwtOf, MAX_COOKIE_AGE_MS } from "./jwt";
@@ -24,9 +24,44 @@ export function getCookieSettings(config: CookieAuthConfig | undefined) {
 }
 
 /**
+ * Whether the request asks for the refresh token in the body
+ * (`x-rebase-auth-flow: json`): a client with no cookie jar, or one keeping a
+ * sign-in apart from the page's cookie session.
+ */
+export function requestsJsonFlow(c: Context<HonoEnv>): boolean {
+    return c.req.header(AUTH_FLOW_HEADER)?.trim().toLowerCase() === "json";
+}
+
+/**
+ * The cookie settings that apply to this request: the server's, or none when
+ * the request asks for the json flow.
+ *
+ * A json-flow request is answered exactly as a server without `cookieAuth`
+ * answers it. The refresh token is read from the request body and returned in
+ * the response body; the cookie is never read, set or cleared. That is what
+ * keeps the exemption safe:
+ *
+ * - The cookie is the only credential a browser attaches by itself, and a
+ *   json-flow request never reads it. Nothing it does can be forged across
+ *   sites, and a cookie the page's script cannot read is never rotated into a
+ *   token handed back in a body it can. The cookie path is unchanged.
+ * - Every other credential a token-issuing route takes is in the request
+ *   itself — a password, a code, the token in the body, a bearer access
+ *   token — so whoever sends it already holds what the body token gives. A
+ *   bearer access token already reaches a durable sign-in on its own: it can
+ *   link a provider identity its holder controls.
+ * - The header is not a CORS-safelisted one, so a cross-site page cannot
+ *   send it without a preflight the server's CORS policy answers.
+ */
+function cookieConfigFor(c: Context<HonoEnv>, config: CookieAuthConfig | undefined): CookieAuthConfig | undefined {
+    return config && !requestsJsonFlow(c) ? config : undefined;
+}
+
+/**
  * Set the refresh token as an httpOnly cookie on the response.
  */
-export function setRefreshCookie(c: Context<HonoEnv>, refreshToken: string, config: CookieAuthConfig | undefined): void {
+export function setRefreshCookie(c: Context<HonoEnv>, refreshToken: string, cookieAuth: CookieAuthConfig | undefined): void {
+    const config = cookieConfigFor(c, cookieAuth);
     if (!config) return;
 
     const settings = getCookieSettings(config);
@@ -64,7 +99,8 @@ export function setRefreshCookie(c: Context<HonoEnv>, refreshToken: string, conf
 /**
  * Clear the refresh token cookie.
  */
-export function clearRefreshCookie(c: Context<HonoEnv>, config: CookieAuthConfig | undefined): void {
+export function clearRefreshCookie(c: Context<HonoEnv>, cookieAuth: CookieAuthConfig | undefined): void {
+    const config = cookieConfigFor(c, cookieAuth);
     if (!config) return;
 
     const settings = getCookieSettings(config);
@@ -77,6 +113,7 @@ export function clearRefreshCookie(c: Context<HonoEnv>, config: CookieAuthConfig
 
 /**
  * Read the refresh token from the request — cookie first, then body fallback.
+ * A json-flow request is read from the body alone (see `cookieConfigFor`).
  *
  * An empty string is no token, wherever it comes from. In cookie mode every
  * response this server sends carries `refreshToken: ""` (see
@@ -85,7 +122,8 @@ export function clearRefreshCookie(c: Context<HonoEnv>, config: CookieAuthConfig
  * body's `""` as the token, or refusing it at the schema, kept the cookie
  * beside it from ever being read.
  */
-export function readRefreshToken(c: Context<HonoEnv>, body: { refreshToken?: string }, config: CookieAuthConfig | undefined): string | undefined {
+export function readRefreshToken(c: Context<HonoEnv>, body: { refreshToken?: string }, cookieAuth: CookieAuthConfig | undefined): string | undefined {
+    const config = cookieConfigFor(c, cookieAuth);
     if (config) {
         const settings = getCookieSettings(config);
         const cookieHeader = c.req.header("cookie") || "";
@@ -121,14 +159,16 @@ function decodeCookieValue(value: string): string | undefined {
 }
 
 /**
- * Redact the refresh token from the response body when cookie mode is active.
+ * Redact the refresh token from the response body when cookie mode is active
+ * for this request (not for a json-flow one: see `cookieConfigFor`).
  */
 export function redactRefreshToken(
     response: AuthResponsePayload,
     c: Context<HonoEnv>,
     refreshToken: string,
-    config: CookieAuthConfig | undefined
+    cookieAuth: CookieAuthConfig | undefined
 ): AuthResponsePayload {
+    const config = cookieConfigFor(c, cookieAuth);
     if (!config) return response;
 
     setRefreshCookie(c, refreshToken, config);

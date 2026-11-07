@@ -158,6 +158,13 @@ export function useAuthSubscription(authClient?: AuthClient): AuthController {
 
     const getAuthToken = useCallback(async () => {
         if (!authClient) return "";
+        // The client's own answer when it has one: renewed when it has expired
+        // or is about to, and shared with every request renewing at once. The
+        // check below hands out a token with a second left, which expires on
+        // the way to the server.
+        if (authClient.getAccessToken) {
+            return (await authClient.getAccessToken().catch(() => null)) ?? "";
+        }
         const session = authClient.getSession();
         if (!session) return "";
         if (session.expiresAt < Date.now()) {

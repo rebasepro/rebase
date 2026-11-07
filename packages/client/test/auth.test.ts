@@ -1,6 +1,7 @@
 import { describe, it, expect, jest, beforeEach, afterEach } from "@jest/globals";
 import { createAuth, createMemoryStorage, createCookieStorage, RebaseSession, AuthChangeEvent } from "../src/auth";
 import type { RebaseSession as TypesRebaseSession, User } from "@rebasepro/types";
+import { AUTH_FLOW_HEADER } from "@rebasepro/types";
 import { Transport, RebaseApiError } from "../src/transport";
 
 // Compile-time assertions: RebaseSession from client and types are the same type
@@ -452,7 +453,7 @@ refreshToken: "" }));
             expect(sessionInfo.accessToken).toEqual(session.accessToken);
             expect(mockFetch).toHaveBeenCalledWith("http://localhost/api/v1/auth/login", {
                 method: "POST",
-                headers: { "Content-Type": "application/json" },
+                headers: { "Content-Type": "application/json", [AUTH_FLOW_HEADER]: "json" },
                 body: JSON.stringify({ email: "test@example.com",
 password: "password123" })
             });
@@ -522,7 +523,7 @@ user: mockUser })
             expect(sessionInfo.accessToken).toEqual("fake-jwt");
             expect(mockFetch).toHaveBeenCalledWith("http://localhost/api/v1/auth/register", {
                 method: "POST",
-                headers: { "Content-Type": "application/json" },
+                headers: { "Content-Type": "application/json", [AUTH_FLOW_HEADER]: "json" },
                 body: JSON.stringify({ email: "test@example.com",
 password: "password123",
 displayName: "Test User" })
@@ -573,7 +574,7 @@ user: mockUser })
             expect(sessionInfo.accessToken).toBe("fake-jwt");
             expect(mockFetch).toHaveBeenCalledWith("http://localhost/api/v1/auth/google", {
                 method: "POST",
-                headers: { "Content-Type": "application/json" },
+                headers: { "Content-Type": "application/json", [AUTH_FLOW_HEADER]: "json" },
                 body: JSON.stringify({ idToken: "google-id-token" })
             });
         });
@@ -615,7 +616,7 @@ json: async () => ({}) });
             expect(listener).toHaveBeenCalledWith("SIGNED_OUT", null);
             expect(mockFetch).toHaveBeenCalledWith("http://localhost/api/v1/auth/logout", {
                 method: "POST",
-                headers: { "Content-Type": "application/json" },
+                headers: { "Content-Type": "application/json", [AUTH_FLOW_HEADER]: "json" },
                 body: JSON.stringify({ refreshToken: "fake-refresh" })
             });
         });
@@ -923,7 +924,7 @@ message: "Reset email sent" })
             expect(result.success).toBe(true);
             expect(mockFetch).toHaveBeenCalledWith("http://localhost/api/v1/auth/forgot-password", {
                 method: "POST",
-                headers: { "Content-Type": "application/json" },
+                headers: { "Content-Type": "application/json", [AUTH_FLOW_HEADER]: "json" },
                 body: JSON.stringify({ email: "user@test.com" })
             });
         });
@@ -940,7 +941,7 @@ message: "Password reset" })
             expect(result.success).toBe(true);
             expect(mockFetch).toHaveBeenCalledWith("http://localhost/api/v1/auth/reset-password", {
                 method: "POST",
-                headers: { "Content-Type": "application/json" },
+                headers: { "Content-Type": "application/json", [AUTH_FLOW_HEADER]: "json" },
                 body: JSON.stringify({ token: "reset-token-123",
 password: "newPass" })
             });
@@ -1305,7 +1306,7 @@ message: "Sent" });
             expect(config.enabledProviders).toContain("google");
             expect(mockFetch).toHaveBeenCalledWith("http://localhost/api/v1/auth/config", {
                 method: "GET",
-                headers: { "Content-Type": "application/json" }
+                headers: { "Content-Type": "application/json", [AUTH_FLOW_HEADER]: "json" }
             });
         });
     });

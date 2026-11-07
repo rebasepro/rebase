@@ -1,5 +1,5 @@
 import { RebaseApiError, Transport } from "./transport";
-import { RebaseClientError } from "@rebasepro/types";
+import { AUTH_FLOW_HEADER, RebaseClientError } from "@rebasepro/types";
 import { requestAppleAuthorization } from "./apple-sign-in";
 import type { AuthConfigDocument, AuthChangeEvent, RebaseSession, AuthTokens, DeviceSession, User } from "@rebasepro/types";
 
@@ -141,6 +141,8 @@ export function createAuth(transport: Transport, options?: CreateAuthOptions) {
     const autoRefresh = opts.autoRefresh !== false;
     const persistSession = opts.persistSession !== false;
     const authFlowMode = resolveAuthFlowMode(opts);
+    /** Whether the app passed the storage this client keeps its session in. */
+    const ownStorage = opts.storage !== undefined;
 
     const STORAGE_KEY = "rebase_auth";
     const REFRESH_BUFFER_MS = 120000;
@@ -192,8 +194,35 @@ export function createAuth(transport: Transport, options?: CreateAuthOptions) {
         return transport.baseUrl + transport.apiPath + authPath + endpoint;
     }
 
-    function getFetch() {
-        return transport.fetchFn || globalThis.fetch;
+    /**
+     * What a json-mode client says on every auth request — through
+     * {@link getFetch}, and on the session upgrades sent through the
+     * transport: {@link AUTH_FLOW_HEADER}. A server with `cookieAuth` then
+     * hands it the refresh token in the body and reads the one it presents
+     * from there, as a server without `cookieAuth` does, so it can renew. Told
+     * nothing, that server answers `refreshToken: ""` and keeps the token in a
+     * cookie this client never sends — a Node or React Native client, or a
+     * second client in a browser that keeps its own sign-in apart from the
+     * page's cookie session — and the session ends with its first access
+     * token.
+     */
+    const flowHeaders: Record<string, string> = authFlowMode === "json" ? { [AUTH_FLOW_HEADER]: "json" } : {};
+
+    function withFlowHeaders(headers: HeadersInit | undefined): HeadersInit {
+        if (typeof Headers !== "undefined" && headers instanceof Headers) {
+            const merged = new Headers(headers);
+            merged.set(AUTH_FLOW_HEADER, "json");
+            return merged;
+        }
+        if (Array.isArray(headers)) return [...headers, [AUTH_FLOW_HEADER, "json"]];
+        return { ...flowHeaders, ...headers };
+    }
+
+    /** `fetch` for the auth routes: the transport's, carrying {@link flowHeaders}. */
+    function getFetch(): typeof fetch {
+        const fetchFn = transport.fetchFn || globalThis.fetch;
+        if (authFlowMode !== "json") return fetchFn;
+        return (input: RequestInfo | URL, init?: RequestInit) => fetchFn(input, { ...init, headers: withFlowHeaders(init?.headers) });
     }
 
     /**
@@ -231,16 +260,23 @@ export function createAuth(transport: Transport, options?: CreateAuthOptions) {
      * cannot renew the session it is starting.
      *
      * A server with `cookieAuth` answers `refreshToken: ""` and puts the token
-     * in the cookie; one without it puts the token in the body. A client in
-     * the other mode holds nothing it can renew with, and finds out when the
-     * access token expires — in json mode by dropping the session without a
-     * word. The answer to the sign-in is the first moment it is known.
+     * in the cookie; one without it puts the token in the body. A json client
+     * says so with {@link AUTH_FLOW_HEADER}, and a server that honours it puts
+     * its token in the body either way. A client in the other mode holds
+     * nothing it can renew with, and finds out when the access token expires —
+     * in json mode by dropping the session without a word. The answer to the
+     * sign-in is the first moment it is known.
      */
     function reportFlowMismatch(received: string | undefined, expiresAt: number) {
         // An answer without the field says nothing about where the token is.
         if (flowMismatchReported || received === undefined) return;
         const serverUsesCookie = received === "";
         if (serverUsesCookie === (authFlowMode === "cookie")) return;
+        // A json client that brought its own storage chose to keep its sign-in
+        // apart from the page's cookie session — a second client in a browser,
+        // such as a guest beside the signed-in account. That is a choice, not a
+        // misconfiguration, so it is not reported.
+        if (serverUsesCookie && ownStorage) return;
         flowMismatchReported = true;
         const ends = Number.isFinite(expiresAt)
             ? `in about ${Math.max(1, Math.round((expiresAt - Date.now()) / 60000))} minutes`
@@ -248,7 +284,9 @@ export function createAuth(transport: Transport, options?: CreateAuthOptions) {
         console.error(serverUsesCookie
             ? "[rebase] This server keeps the refresh token in an HttpOnly cookie (its `auth.cookieAuth`), " +
               "but this client is in json mode and was handed none, so the session it just started cannot be " +
-              `renewed and ends ${ends}. Create the client with \`auth: { authFlowMode: "cookie" }\`.`
+              `renewed and ends ${ends}. The server is older than the release that hands a json client its ` +
+              "refresh token: update it, or, in a browser, create the client with " +
+              `\`auth: { authFlowMode: "cookie" }\`.`
             : "[rebase] This server returned the refresh token in the response body, so it does not use " +
               "`auth.cookieAuth`, and this client, in cookie mode, cannot renew the session it just started: " +
               `it ends ${ends}. Turn on \`auth.cookieAuth\` on the server, or create the client with ` +
@@ -1192,6 +1230,7 @@ password })
             {
                 method: "POST",
                 body: JSON.stringify(payload),
+                headers: flowHeaders,
                 // A guest's link answers with its new session's refresh cookie.
                 credentials: authFlowMode === "cookie" ? "include" : undefined
             }
@@ -1420,6 +1459,7 @@ refreshToken: session.refreshToken };
             {
                 method: "POST",
                 body: JSON.stringify({ email, password }),
+                headers: flowHeaders,
                 // The answer sets the account's refresh cookie in cookie mode.
                 credentials: authFlowMode === "cookie" ? "include" : undefined
             }
@@ -1535,6 +1575,7 @@ refreshToken: session.refreshToken };
                 : await transport.request<Minted>(authPath + "/mfa/challenge/verify", {
                     method: "POST",
                     body: payload,
+                    headers: flowHeaders,
                     // The aal2 session's refresh cookie comes with the answer.
                     credentials: authFlowMode === "cookie" ? "include" : undefined
                 });
