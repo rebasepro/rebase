@@ -432,6 +432,26 @@ An un-awaited promise looks equivalent and is not. `waitUntil` buys two things:
 
 A rejection is logged rather than left to the unhandled-rejection handler, so a failure names the route it came from.
 
+<span class="since-badge" data-since="0.29">Since 0.29</span> Code that runs outside any request has no `c` to pass: a module-level initialiser, a helper that routes and crons share, work a cron run starts and does not wait for. Hand `waitUntil` the work alone:
+
+```typescript no-verify
+import { waitUntil } from "@rebasepro/server/functions";
+
+let ready: Promise<void> | undefined;
+
+export function ensureCatalogue(): Promise<void> {
+    ready ??= loadCatalogue().then(() => {
+        // No request to attach it to, but shutdown still waits for it.
+        waitUntil(rateNewSongs());
+    });
+    return ready;
+}
+```
+
+The work is tracked for graceful shutdown and a rejection is logged, as with `c`. What it cannot do is keep an isolate alive, because that is the request's execution context: pass `c` whenever there is a request. Work that a cron run, a job or a queue handler can simply `await` should be awaited instead; the run is what shutdown waits for, and its outcome is recorded with it.
+
+Shutdown waits at most 5 seconds for this work. Work that takes minutes belongs in a [cron job](/docs/backend/cron-jobs/) or a [job](/docs/backend/jobs/), which are recorded and restartable. A cron job also runs [one at a time across instances](/docs/backend/cron-across-instances/#concurrency-guarding), whether the schedule or a manual trigger started it.
+
 ## Runtime portability
 
 A custom function is a Hono app, so whether it could run somewhere other than a Node process comes down to what its own file imports. `rebase.sql()`, a directly imported database client and Node built-ins tie it to Node; the rest of `rebase` and the web platform do not, and nothing fails today because of either. [Runtime portability](/docs/backend/runtime-portability/) lists what is portable, how `rebase build` and `rebase doctor` report it, and how to branch on the runtime.

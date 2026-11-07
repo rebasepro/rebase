@@ -427,6 +427,38 @@ describe("waitUntil", () => {
         await drainBackgroundWork(1000);
     });
 
+    it("tracks work started outside any request", async () => {
+        // A module-level initialiser, a helper shared by several routes, work
+        // a cron run starts and does not wait for: none has a context to pass,
+        // and a floating promise is what shutdown cannot wait for.
+        let release: () => void = () => undefined;
+        waitUntil(new Promise<void>(resolve => { release = resolve; }));
+        expect(pendingBackgroundWork()).toBe(1);
+        expect(await drainBackgroundWork(20)).toBe(1);
+
+        release();
+        expect(await drainBackgroundWork(1000)).toBe(0);
+    });
+
+    it("runs a thunk, and logs its failure, without a request", async () => {
+        let ran = false;
+        waitUntil(() => {
+            ran = true;
+            return Promise.reject(new Error("nightly export refused"));
+        });
+        expect(await drainBackgroundWork(1000)).toBe(0);
+        expect(ran).toBe(true);
+        expect(String(consoleError.mock.calls[0][0])).toContain("nightly export refused");
+    });
+
+    it("survives a thunk that throws synchronously without a request", () => {
+        expect(() => waitUntil(() => {
+            throw new Error("bad setup");
+        })).not.toThrow();
+        expect(pendingBackgroundWork()).toBe(0);
+        expect(String(consoleError.mock.calls[0][0])).toContain("bad setup");
+    });
+
     it("drainBackgroundWork reports what it could not wait for", async () => {
         const app = new Hono<HonoEnv>();
         app.get("/", c => {

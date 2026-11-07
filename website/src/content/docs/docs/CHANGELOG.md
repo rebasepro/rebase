@@ -7,6 +7,19 @@ description: Every released change to Rebase — new features, fixes, and the br
 
 ## [Unreleased]
 
+### Added
+
+#### Server & REST
+
+- **`waitUntil(promise)` keeps background work alive with no request.** Code
+  outside a request (a module-level initialiser, a helper that routes and
+  crons share, work a cron run starts and does not wait for) had no `c` to
+  pass, so its promise floated: graceful shutdown did not wait for it and a
+  rejection was not logged. Called with the work alone, `waitUntil` tracks it
+  for shutdown and logs a failure, as `waitUntil(c, promise)` does. Only an
+  isolate host's keep-alive needs the request, so pass `c` whenever there is
+  one.
+
 ### Fixed
 
 #### MCP

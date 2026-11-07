@@ -52,6 +52,9 @@ type MaybeExecutionCtx = {
     executionCtx?: { waitUntil?: (promise: Promise<unknown>) => void };
 };
 
+/** What {@link waitUntil} keeps alive: a promise, or a function that starts one. */
+export type BackgroundWork = Promise<unknown> | (() => Promise<unknown> | unknown);
+
 /**
  * Keep `work` alive past the response, on any runtime.
  *
@@ -79,10 +82,37 @@ type MaybeExecutionCtx = {
  * });
  * ```
  */
-export function waitUntil(
-    c: Context,
-    work: Promise<unknown> | (() => Promise<unknown> | unknown)
-): void {
+export function waitUntil(c: Context, work: BackgroundWork): void;
+/**
+ * Keep `work` alive with no request to attach it to.
+ *
+ * For code that runs outside a request — a module-level initialiser, a helper
+ * several callers share, work a cron run starts and does not wait for. The
+ * promise is tracked exactly as with a context, so graceful shutdown waits for
+ * it and a rejection is logged rather than left floating.
+ *
+ * What it cannot do is tell an isolate host to stay alive: that is the
+ * request's execution context, and there is none here. Pass `c` whenever there
+ * is a request. Work that a cron run, a job or a queue handler can simply
+ * await should be awaited instead: the run is what shutdown waits for, and it
+ * is recorded with the run.
+ *
+ * @example
+ * ```ts
+ * let ready: Promise<void> | undefined;
+ * export function ensureCatalogue(): Promise<void> {
+ *     ready ??= loadCatalogue().then(() => {
+ *         waitUntil(rateNewSongs());   // no request here to hand it to
+ *     });
+ *     return ready;
+ * }
+ * ```
+ */
+export function waitUntil(work: BackgroundWork): void;
+export function waitUntil(...args: [Context, BackgroundWork] | [BackgroundWork]): void {
+    const c = args.length === 2 ? args[0] : undefined;
+    const work = args.length === 2 ? args[1] : args[0];
+
     let promise: Promise<unknown>;
     try {
         // A thunk is accepted because the natural way to write this —
@@ -104,6 +134,8 @@ export function waitUntil(
     set.add(tracked);
     void tracked.finally(() => set.delete(tracked));
 
+    if (!c) return;
+
     // `c.executionCtx` is a getter that *throws* on a host that has none —
     // notably `@hono/node-server` — so this cannot be an `if`.
     try {
@@ -116,11 +148,16 @@ export function waitUntil(
     }
 }
 
-function logBackgroundFailure(c: Context, error: unknown): void {
+function logBackgroundFailure(c: Context | undefined, error: unknown): void {
+    const cause = error instanceof Error ? error : new Error(String(error));
+    if (!c) {
+        logger.error("[functions] Background work failed", { error: cause });
+        return;
+    }
     logger.error("[functions] Background work failed after the response was sent", {
         method: c.req?.method,
         path: c.req?.path,
-        error: error instanceof Error ? error : new Error(String(error))
+        error: cause
     });
 }
 
