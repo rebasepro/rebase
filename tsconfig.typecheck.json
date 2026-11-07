@@ -32,6 +32,12 @@
       "@rebasepro/cms": [
         "./packages/cms/src"
       ],
+      // The MCP view runtime whole, as `@rebasepro/mcp-apps` (private, built
+      // from source) reaches it; the published subpath exports only its entry
+      // points (`packages/cms/src/mcp-view.ts`).
+      "@rebasepro/cms/mcp-view": [
+        "./packages/cms/src/mcp_view/index.tsx"
+      ],
       "@rebasepro/cms/*": [
         "./packages/cms/src/*"
       ],

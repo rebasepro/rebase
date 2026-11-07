@@ -27,6 +27,10 @@
     "forceConsistentCasingInFileNames": true,
     "resolveJsonModule": true,
     "isolatedModules": true,
+    // `vitePlugin.ts` imports `./mcp_view_build.ts` with its extension: a
+    // Vite config may load the plugin from source under Node, which resolves
+    // no extensionless relative import. (The package emits declarations only.)
+    "allowImportingTsExtensions": true,
     "types": [
       "vite/client",
       "node",

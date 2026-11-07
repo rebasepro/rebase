@@ -22,12 +22,17 @@
  *
  * Set once per document, before the first render, by the embedding's
  * bootstrap. Outside one it is never set, and every part behaves as before.
+ *
+ * @internal Framework plumbing between `@rebasepro/cms`' MCP view
+ * (`startMcpView`) and the parts that read it — not an app-facing API: an app
+ * gives `<Rebase>` its data, auth and storage through its props.
  */
 import type { ReactNode } from "react";
 import { useSyncExternalStore } from "react";
 import type { AdminCollection, AuthController } from "@rebasepro/cms-types";
 import type { DataDriver, StorageSource } from "@rebasepro/types";
 
+/** @internal */
 export interface RebaseEmbedHost {
     /** Every read and write of the embedded app. */
     dataDriver: DataDriver;
@@ -56,14 +61,14 @@ export interface RebaseEmbedHost {
 let current: RebaseEmbedHost | undefined;
 const listeners = new Set<() => void>();
 
-/** Set (or change) the embed host. Called by an embedding before the app renders, and when its context changes. */
+/** @internal Set (or change) the embed host. Called by an embedding before the app renders, and when its context changes. */
 export function setRebaseEmbedHost(host: RebaseEmbedHost | undefined): void {
     current = host;
     for (const listener of listeners) listener();
 }
 
 /** The embed host, outside React. */
-export function getRebaseEmbedHost(): RebaseEmbedHost | undefined {
+function getRebaseEmbedHost(): RebaseEmbedHost | undefined {
     return current;
 }
 
@@ -74,7 +79,7 @@ function subscribe(listener: () => void): () => void {
     };
 }
 
-/** The embed host, re-rendering when it changes; `undefined` outside an embedding. */
+/** @internal The embed host, re-rendering when it changes; `undefined` outside an embedding. */
 export function useRebaseEmbedHost(): RebaseEmbedHost | undefined {
     return useSyncExternalStore(subscribe, getRebaseEmbedHost, getRebaseEmbedHost);
 }

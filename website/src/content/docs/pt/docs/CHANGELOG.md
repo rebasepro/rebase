@@ -86,8 +86,8 @@ A tradução está pendente. O conteúdo abaixo está em inglês.
   the generic view, found beside the frontend `serveSPA` serves (or at
   `REBASE_MCP_VIEW`). In the view, `<Rebase>` reads and writes through the
   server's tools as the person, `<RebaseShell>` draws the opened screen in place
-  of its routes and sign-in gate, and Studio stays out — see `setRebaseEmbedHost`
-  in `@rebasepro/app` and `startMcpView` in the new `@rebasepro/cms/mcp-view`.
+  of its routes and sign-in gate, and Studio stays out — see `startMcpView` in
+  the new `@rebasepro/cms/mcp-view`.
   `CollectionPanel` takes `highlightedEntityId`, the row it draws as selected.
 
 #### Admin (CMS & app)

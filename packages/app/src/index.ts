@@ -20,6 +20,10 @@ export type { UnsavedChangesDialogProps } from "./components/UnsavedChangesDialo
 // nothing to the bundle.
 export type { RebaseStorageSource } from "./core/RebaseProps";
 export { UnsavedChangesDialog } from "./components/UnsavedChangesDialog";
+// The embed host `@rebasepro/cms`' MCP view sets and `<Rebase>`, `<RebaseCMS>`,
+// `<RebaseShell>` and `<RebaseStudio>` read.
+export { setRebaseEmbedHost, useRebaseEmbedHost } from "./core/embed_host";
+export type { RebaseEmbedHost } from "./core/embed_host";
 export * from "./i18n/RebaseI18nProvider";
 // English only: it is the fallback table and the reference for every key. The
 // other languages are chunks `RebaseI18nProvider` fetches on demand; a static

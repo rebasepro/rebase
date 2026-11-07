@@ -12,8 +12,9 @@ const PACKAGES = path.resolve(import.meta.dirname, "..");
 export default defineConfig({
     resolve: {
         alias: [
-            // The admin's MCP view runtime, a subpath of the CMS.
-            { find: /^@rebasepro\/cms\/mcp-view$/, replacement: `${PACKAGES}/cms/src/mcp-view.ts` },
+            // The admin's MCP view runtime whole, from source: the published
+            // `@rebasepro/cms/mcp-view` subpath exports only its entry points.
+            { find: /^@rebasepro\/cms\/mcp-view$/, replacement: `${PACKAGES}/cms/src/mcp_view/index.tsx` },
             { find: /^@rebasepro\/([a-z-]+)$/, replacement: `${PACKAGES}/$1/src/index.ts` },
             { find: /^react-router$/, replacement: path.resolve(PACKAGES, "cms/node_modules/react-router") }
         ],
