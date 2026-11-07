@@ -313,21 +313,17 @@ const client = createRebaseClient({
 | `"cookie"` | An **HttpOnly** cookie the backend sets. Script running on your page cannot read it, which is what makes it XSS-safe | In a browser |
 | `"json"` | Returned in the response body, kept in `storage` (`localStorage` by default) | Off the browser (Node, workers, React Native), and in a browser when you pass your own `storage` |
 
-Cookie mode needs `auth.cookieAuth` on the backend, and the Rebase runtime,
-which Rebase Cloud runs, always turns it on. Json mode works against either: a
-json client sends `x-rebase-auth-flow: json` on its auth requests, and a
-`cookieAuth` backend answers those with the refresh token in the body and
-leaves the cookie alone. A backend older than the release that added this
-hands a json client no refresh token, and its session ends when the access
-token expires, about an hour after sign-in. When the answer to a sign-in shows
-a client cannot renew, it logs an error saying what to change, except for a
-json client with its own `storage`, which chose to keep its sign-in apart.
+Cookie mode needs `auth.cookieAuth` on the backend, which the Rebase runtime,
+and so Rebase Cloud, always turns on. Json mode works against either: its auth
+requests carry `x-rebase-auth-flow: json`, and the backend answers them with the
+refresh token in the body. An older backend hands a json client no refresh
+token, so its session ends about an hour after sign-in, and the client logs
+which mode to use (unless it passed its own `storage`).
 
-Passing your own `storage` keeps a browser client in json mode. That is for a
-second client on the page that keeps its own sign-in apart from the page's
-cookie, such as a guest beside the signed-in account: in cookie mode nothing
-would be kept in that storage. Its refresh token is in that storage, where
-script on the page can read it, so keep the page's own account in cookie mode.
+Passing your own `storage` keeps a browser client in json mode, for a second
+client that keeps its own sign-in apart from the page's cookie, such as a guest
+beside the signed-in account. Its refresh token sits in that storage, where page
+script can read it, so keep the page's own account in cookie mode.
 
 ## Waiting for the Session to Be Restored
 
