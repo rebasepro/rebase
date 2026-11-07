@@ -295,6 +295,13 @@ export default defineFunction((app, { rebase }) => {
 });
 ```
 
+With no request to hand it (a module-level initialiser, a helper that routes
+and crons share), call `waitUntil(promise)` with the work alone (0.29+). It is
+still tracked for shutdown; only an isolate host's keep-alive needs `c`. In a
+cron, job or queue handler, `await` the work instead. Work that takes minutes
+belongs in a cron job or a job: shutdown waits for `waitUntil` work at most 5
+seconds.
+
 ### Use the `rebase` singleton for platform services — not raw SDKs
 
 > **🚨 CRITICAL FOR AGENTS:** For data, storage, auth, and email inside a

@@ -4361,6 +4361,19 @@ yet, listed so that nobody reads a promise into them:
 
 ### [Unreleased]
 
+#### Added
+
+##### Server & REST
+
+- **`waitUntil(promise)` keeps background work alive with no request.** Code
+  outside a request (a module-level initialiser, a helper that routes and
+  crons share, work a cron run starts and does not wait for) had no `c` to
+  pass, so its promise floated: graceful shutdown did not wait for it and a
+  rejection was not logged. Called with the work alone, `waitUntil` tracks it
+  for shutdown and logs a failure, as `waitUntil(c, promise)` does. Only an
+  isolate host's keep-alive needs the request, so pass `c` whenever there is
+  one.
+
 #### Fixed
 
 ##### MCP
@@ -34755,6 +34768,26 @@ An un-awaited promise looks equivalent and is not. `waitUntil` buys two things:
 - **On an isolate-based host**, the host is told to keep the isolate alive until the promise settles. Without it, work is dropped the moment the response resolves — silently, with a clean 200 in the logs.
 
 A rejection is logged rather than left to the unhandled-rejection handler, so a failure names the route it came from.
+
+<span class="since-badge" data-since="0.29">Since 0.29</span> Code that runs outside any request has no `c` to pass: a module-level initialiser, a helper that routes and crons share, work a cron run starts and does not wait for. Hand `waitUntil` the work alone:
+
+```typescript no-verify
+import { waitUntil } from "@rebasepro/server/functions";
+
+let ready: Promise<void> | undefined;
+
+export function ensureCatalogue(): Promise<void> {
+    ready ??= loadCatalogue().then(() => {
+        // No request to attach it to, but shutdown still waits for it.
+        waitUntil(rateNewSongs());
+    });
+    return ready;
+}
+```
+
+The work is tracked for graceful shutdown and a rejection is logged, as with `c`. What it cannot do is keep an isolate alive, because that is the request's execution context: pass `c` whenever there is a request. Work that a cron run, a job or a queue handler can simply `await` should be awaited instead; the run is what shutdown waits for, and its outcome is recorded with it.
+
+Shutdown waits at most 5 seconds for this work. Work that takes minutes belongs in a [cron job](/docs/backend/cron-jobs/) or a [job](/docs/backend/jobs/), which are recorded and restartable. A cron job also runs [one at a time across instances](/docs/backend/cron-across-instances/#concurrency-guarding), whether the schedule or a manual trigger started it.
 
 ### Runtime portability
 
