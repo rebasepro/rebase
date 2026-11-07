@@ -13,7 +13,7 @@ import {
     paperMixin
 } from "@rebasepro/ui";
 import { getFormFieldKeys, resolveFormLayout } from "@rebasepro/app";
-import { useRebaseContext } from "@rebasepro/app";
+import { useAuthController, useCustomizationController, useRebaseContext } from "@rebasepro/app";
 import { getValueInPath } from "@rebasepro/utils";
 
 import { FieldBlock, LABEL_ICON_SIZE, spanClass } from "../form/components/FieldBlock";
@@ -21,6 +21,8 @@ import { AdditionalFieldValue } from "./AdditionalFieldValue";
 import { EntityDisplayHeader, HEADER_DISPLAY_ROLES } from "./EntityDisplayHeader";
 import { FormSections } from "../form/components/FormSections";
 import { FormRail, RecordMeta } from "../form/components/FormRail";
+import { collectionShowing } from "../form/collection_showing";
+import { isFieldShown } from "../form/FormFieldsContext";
 import { useEntityDisplayValues } from "../hooks/useEntityDisplay";
 import { useRailVisible } from "../form/components/useRailVisible";
 import { PropertyPreview } from "../preview";
@@ -87,6 +89,13 @@ export interface EntityViewBindingProps<M extends Record<string, unknown>> {
      * than rendered against a fake context.
      */
     formContext?: FormContext<M>;
+    /**
+     * The fields to show, in this order; any other property is left out, and
+     * so is the header that lifts the record's picture, subtitle, status and
+     * tags out of the grid. Sections and the rail keep their grouping, each
+     * holding only these fields — as `EntityFormPanel`'s `fields` does.
+     */
+    fields?: string[];
 }
 
 /**
@@ -118,11 +127,16 @@ export function EntityViewBinding<M extends Record<string, unknown>>(
     {
         entity,
         collection,
+        path,
         className,
         asPage = false,
         openEntityMode = "full_screen",
-        formContext
+        formContext,
+        fields
     }: EntityViewBindingProps<M>) {
+
+    const authController = useAuthController();
+    const customizationController = useCustomizationController();
 
     // The record's name, picture, state and labels, lifted out of the grid and
     // into a header. Resolved here rather than inside it because the fields it
@@ -132,8 +146,12 @@ export function EntityViewBinding<M extends Record<string, unknown>>(
         entity
     });
 
+    // A view showing some fields shows only those, so no header: it draws
+    // properties nobody named.
+    const showHeader = !fields;
     const headerKeys = useMemo(() => {
         const keys = new Set<string>();
+        if (!showHeader) return keys;
         for (const role of HEADER_DISPLAY_ROLES) {
             // Set only for a role filled by a property of this collection. A
             // role filled by a resolver has no field on the grid to remove.
@@ -141,25 +159,47 @@ export function EntityViewBinding<M extends Record<string, unknown>>(
             if (key) keys.add(key);
         }
         return keys;
-    }, [display]);
+    }, [display, showHeader]);
+
+    const shownCollection = useMemo(
+        () => fields ? collectionShowing(collection, fields) : collection,
+        // eslint-disable-next-line react-hooks/exhaustive-deps -- `fields` is an inline array at most call sites: its contents, not its identity
+        [collection, fields?.join(",")]);
 
     // Only *whether* there is a form context changes the field list, not which
     // one it is — so the memo turns on the boolean rather than on the context
     // object, which is rebuilt on every keystroke of the form above it.
     const hasFormContext = Boolean(formContext);
     const fieldKeys = useMemo(
-        () => readOnlyFieldKeys(collection as AdminCollection, hasFormContext, headerKeys),
-        [collection, hasFormContext, headerKeys]
+        () => readOnlyFieldKeys(shownCollection as AdminCollection, hasFormContext, headerKeys)
+            // The form's rules: a field a dynamic condition hides for this
+            // record's values, or one this user may not read, is not shown.
+            // Dropped before the layout resolves, like the groups above, so it
+            // leaves no hole on the grid.
+            .filter(key => {
+                const property = collection.properties?.[key] as Property | undefined;
+                return !property || isFieldShown<M>({
+                    propertyKey: key,
+                    property,
+                    values: entity.values,
+                    previousValues: entity.values,
+                    path,
+                    entityId: entity.id,
+                    propertyConfigs: customizationController.propertyConfigs,
+                    authController
+                });
+            }),
+        [shownCollection, hasFormContext, headerKeys, collection.properties, entity.values, entity.id, path, customizationController.propertyConfigs, authController]
     );
 
     // `status: "existing"` — a record you are reading exists by definition, and
     // that is what routes a generated id and the audit timestamps out of the
     // column and into the record block.
     const layout = useMemo(() => resolveFormLayout({
-        collection,
+        collection: shownCollection,
         fieldKeys,
         status: "existing"
-    }), [collection, fieldKeys]);
+    }), [shownCollection, fieldKeys]);
 
     const containerRef = useRef<HTMLDivElement>(null);
     // Measured, not a breakpoint — see `useRailVisible`. The same reasoning as
@@ -321,10 +361,10 @@ export function EntityViewBinding<M extends Record<string, unknown>>(
         {/* The title only when nothing above is already showing it. Every
             full-page use sits under an identity bar that carries it; the
             inline ones — the delete dialog — have no bar. */}
-        <EntityDisplayHeader entity={entity}
+        {showHeader && <EntityDisplayHeader entity={entity}
             collection={collection}
             showTitle={!asPage}
-            className={"mb-10"}/>
+            className={"mb-10"}/>}
 
         <FormSections sections={sections}
             collapsed={collapsedSections}

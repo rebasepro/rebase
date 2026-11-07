@@ -1,6 +1,5 @@
-import type { ComponentRef } from "@rebasepro/types";
 import { hasEntityId } from "@rebasepro/common";
-import type { EntityCustomViewParams, FormViewConfig, AdminCollection } from "@rebasepro/cms-types";
+import type { EntityCustomViewParams, AdminCollection } from "@rebasepro/cms-types";
 import type { FormContext } from "../types/fields";
 import type { PluginFormActionProps } from "@rebasepro/cms-types";
 import React, { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -8,7 +7,7 @@ import { Entity, EntityStatus, Property } from "@rebasepro/types";
 import { PluginProviderStack, resolveComponentRef, useComponentOverride, CollectionScopeProvider, getAdminEntityChildViews } from "@rebasepro/app";
 
 import { CollectionViewBinding } from "./CollectionViewBinding/CollectionViewBinding";
-import { EntityViewBinding } from "./EntityViewBinding";
+import { EntityViewBody, useReadOnlyFormContext } from "./EntityViewBody";
 import { EntityIdentityBar } from "./EntityIdentityBar";
 import { SplitListCloseButton } from "./CollectionViewBinding/SplitListCloseButton";
 import { SplitListShowButton } from "./CollectionViewBinding/SplitListShowButton";
@@ -32,7 +31,7 @@ import {
     Typography
 } from "@rebasepro/ui";
 import { ErrorBoundary } from "@rebasepro/ui";
-import { ErrorView, createFormexStub, usePermissions, useTranslation, getIcon } from "@rebasepro/app";
+import { ErrorView, usePermissions, useTranslation, getIcon } from "@rebasepro/app";
 
 import { removeInitialAndTrailingSlashes, resolveDefaultSelectedView } from "@rebasepro/app";
 import { withListState } from "../util/view_mode";
@@ -113,6 +112,8 @@ export function DetailViewBinding<M extends Record<string, unknown>>({
     ...props
 }: DetailViewBindingProps<M>) {
 
+    const { t } = useTranslation();
+
     const {
         entity,
         dataLoading,
@@ -134,7 +135,7 @@ export function DetailViewBinding<M extends Record<string, unknown>>({
 
     if (!dataLoading && !entity) {
         return <CenteredView>
-            <Typography variant="label">Entity not found</Typography>
+            <Typography variant="label">{t("entity_not_found")}</Typography>
         </CenteredView>;
     }
 
@@ -270,32 +271,13 @@ entityId }
     }
 
     // Read-only form context for custom entity views
-    const readOnlyFormContext = useMemo<FormContext<M> | undefined>(() => {
-        if (!hasEntityId(entityId)) return undefined;
-        const formexStub = createFormexStub<M>(usedEntity?.values ?? {} as M);
-        return {
-            entityId,
-            disabled: true,
-            readOnly: true,
-            openEntityMode: layout,
-            status: "existing",
-            values: usedEntity?.values ?? ({} as M),
-            setFieldValue: () => {
-                throw new Error("Cannot update values in read-only detail view");
-            },
-            save: () => {
-                throw new Error("Cannot save in read-only detail view");
-            },
-            submit: () => {
-                throw new Error("Cannot submit in read-only detail view");
-            },
-            collection,
-            path,
-            entity: usedEntity,
-            savingError: undefined,
-            formex: formexStub
-        };
-    }, [entityId, layout, usedEntity, collection, path]);
+    const readOnlyFormContext = useReadOnlyFormContext<M>({
+        entityId,
+        entity: usedEntity,
+        collection,
+        path,
+        openEntityMode: layout
+    });
 
     // Plugin slots
     const formActionTopProps: PluginFormActionProps = useMemo(() => ({
@@ -335,10 +317,6 @@ entityId }
         entity: usedEntity,
         clickProps: recordActionClickProps
     });
-
-    // Resolve formView.Builder if provided
-    const formViewConfig = (collection as AdminCollection<M> & { formView?: FormViewConfig<M> }).formView;
-    const FormViewBuilder = formViewConfig?.Builder ? resolveComponentRef<EntityCustomViewParams>(formViewConfig.Builder as ComponentRef<EntityCustomViewParams>) : null;
 
     // The heading, resolved the one way — this used to be a copy of
     // `useEntityDisplayTitle`'s body, and the two had already drifted.
@@ -438,48 +416,18 @@ entityId }
         });
     }, [onTabChange, path, entityId, collection]);
 
-    const propertyDetailView = () => {
-        // formView.Builder replaces the default property display. It gets the
-        // centred column the record used to be given here; the default display
-        // now lays itself out, rail included.
-        if (FormViewBuilder && usedEntity) {
-            return <div className={"@container/form flex-1 min-w-0 overflow-y-auto flex justify-center items-start"}>
-                <div className={cls(
-                    // Same widths as the default form (see EntityForm).
-                    "w-full max-w-3xl @7xl/form:max-w-4xl 2xl:max-w-4xl flex flex-col",
-                    layout === "dialog"
-                        ? "pt-5 pb-12 px-6 sm:px-8"
-                        : "pt-6 pb-16 px-5 sm:px-8"
-                )}>
-                    <ErrorBoundary>
-                        <Suspense fallback={<CircularProgressCenter />}>
-                            <FormViewBuilder
-                                collection={collection}
-                                parentCollectionSlugs={parentCollectionSlugs}
-                                parentEntityIds={parentEntityIds}
-                                entity={usedEntity}
-                                modifiedValues={usedEntity?.values}
-                                formContext={readOnlyFormContext as FormContext<Record<string, unknown>>}
-                            />
-                        </Suspense>
-                    </ErrorBoundary>
-                </div>
-            </div>;
-        }
-
-        return (
-            <>
-                {usedEntity && <EntityViewBinding
-                    entity={usedEntity}
-                    collection={collection}
-                    path={path}
-                    asPage
-                    openEntityMode={layout}
-                    formContext={readOnlyFormContext}
-                />}
-            </>
-        );
-    };
+    // The record's body, drawn where `EntityViewPanel` draws it.
+    const propertyDetailView = () => usedEntity
+        ? <EntityViewBody<M>
+            entity={usedEntity}
+            collection={collection}
+            path={path}
+            formContext={readOnlyFormContext}
+            openEntityMode={layout}
+            parentCollectionSlugs={parentCollectionSlugs}
+            parentEntityIds={parentEntityIds}
+        />
+        : null;
 
     // Tabs
     const subcollectionTabs = subcollections && subcollections.map((subcollection) => {

@@ -2,8 +2,10 @@ import React, { useCallback, useContext } from "react";
 import { deepEqual as equal } from "fast-equals";
 import type { Entity } from "@rebasepro/types";
 import type { AdminCollection } from "@rebasepro/cms-types";
+import type { AuthState, Property } from "@rebasepro/types";
 import type { ResolvedFormField } from "@rebasepro/app";
 import { isHidden, useAuthController, useCustomizationController, useRebaseContext } from "@rebasepro/app";
+import type { ResolvePropertyProps } from "@rebasepro/common";
 import { effectiveAccess } from "@rebasepro/common";
 import { AlignLeftIcon, cls, paperMixin } from "@rebasepro/ui";
 import { FormexController, useFormexSelector } from "@rebasepro/forms";
@@ -62,6 +64,32 @@ export function useFormFieldsContext(): FormFieldsContextValue | undefined {
     return useContext(FormFieldsContext);
 }
 
+/**
+ * Whether a record shows a field, for these values, to this user: no
+ * `conditions.hidden` rule hides it and the user's field access lets them read
+ * it. The form's cells and the read-only view both ask here, so a field a rule
+ * hides while editing is not on the page that reads the record either.
+ */
+export function isFieldShown<M extends Record<string, unknown>>(props: {
+    propertyKey: string;
+    property: Property;
+    values: Partial<M>;
+    previousValues?: Partial<M>;
+    path: string;
+    entityId?: string | number;
+    propertyConfigs?: ResolvePropertyProps<M>["propertyConfigs"];
+    authController: AuthState;
+}): boolean {
+    const { property } = props;
+    // Most fields carry neither rule, and resolving one runs its dynamicProps.
+    if (!property.conditions?.hidden && !effectiveAccess(property)) return true;
+    const shown = resolveFormProperty<M>({
+        ...props,
+        ignoreMissingFields: true
+    });
+    return shown !== null && !isHidden(shown);
+}
+
 /** What {@link FormFieldsContextValue.renderField} renders: one cell, keyed for a list. */
 export function renderFormField(field: ResolvedFormField): React.ReactNode {
     return <FormFieldCell key={`${field.additional ? "additional" : "field"}_${field.key}`} field={field}/>;
@@ -101,10 +129,9 @@ const FormFieldCell = React.memo(function FieldCell({ field }: { field: Resolved
     // takes its label with it: the binding renders nothing, and a heading over
     // nothing is worse. Selected as a yes or no, so the cell re-renders when
     // that answer flips and not on every value its rule reads.
-    const judgesVisibility = Boolean(property && (property.conditions?.hidden || effectiveAccess(property)));
     const selectShown = useCallback((formex: FormexController<Values>): boolean => {
-        if (!property || !judgesVisibility) return true;
-        const shown = resolveFormProperty({
+        if (!property) return true;
+        return isFieldShown({
             propertyKey: field.key,
             property,
             values: formex.values,
@@ -112,11 +139,9 @@ const FormFieldCell = React.memo(function FieldCell({ field }: { field: Resolved
             path,
             entityId,
             propertyConfigs: customizationController.propertyConfigs,
-            ignoreMissingFields: true,
             authController
         });
-        return shown !== null && !isHidden(shown);
-    }, [property, judgesVisibility, field.key, previousValues, path, entityId, customizationController.propertyConfigs, authController]);
+    }, [property, field.key, previousValues, path, entityId, customizationController.propertyConfigs, authController]);
     const shown = useFormexSelector(selectShown);
 
     const selectUnderlyingChanged = useCallback((formex: FormexController<Values>): boolean =>

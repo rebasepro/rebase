@@ -113,7 +113,6 @@
   "packages/cms/src/components/CollectionTableBinding/CollectionTableBinding.tsx::column_cannot_be_edited": 1,
   "packages/cms/src/components/DefaultAppBar.tsx::toggle_theme": 1,
   "packages/cms/src/components/DefaultAppBar.tsx::user_menu": 1,
-  "packages/cms/src/components/DetailViewBinding.tsx::entity_not_found": 1,
   "packages/cms/src/components/EditFormActions.tsx::this_form_has_errors": 1,
   "packages/cms/src/components/EntityPreviewBinding.tsx::entity_not_found": 1,
   "packages/cms/src/components/EntityViewBinding.tsx::settings_heading": 1,
