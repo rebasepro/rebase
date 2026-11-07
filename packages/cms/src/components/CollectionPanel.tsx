@@ -88,6 +88,12 @@ export type CollectionPanelOptions = {
     openEntityMode?: "side_panel" | "full_screen" | "split" | "dialog";
 
     /**
+     * The row drawn as selected — the one a page shows beside the list, say.
+     * `null` draws none. Without it the panel highlights the row last opened.
+     */
+    selectedId?: string | number | null;
+
+    /**
      * Additional CSS class name for the container.
      */
     className?: string;
@@ -142,6 +148,7 @@ function CollectionPanelInner({
     path,
     title,
     updateUrl,
+    selectedId,
     className
 }: CollectionPanelProps & { mergedCollection: AdminCollection; overrides: Partial<AdminCollection> }) {
     const ResolvedCollectionView = useComponentOverride("Collection.View", CollectionViewBinding);
@@ -159,6 +166,7 @@ function CollectionPanelInner({
             <ResolvedCollectionView
                 {...mergedCollection}
                 overrides={overrides}
+                {...(selectedId !== undefined && { highlightedId: selectedId })}
                 path={path}
                 updateUrl={updateUrl}
             />

@@ -188,10 +188,12 @@ export interface CollectionViewProps {
     height?: number;
     /** A row was opened: given the row, instead of opening its form. */
     onRowClick?: (row: Row) => void;
+    /** The row drawn as selected (by its id), where the app keeps one; null for none. */
+    selectedId?: string | number | null;
 }
 
 /** The admin panel's collection view: search, filters, sorting, paging, its forms. */
-export function CollectionView({ collection, where, orderBy, view, height = 420, onRowClick }: CollectionViewProps) {
+export function CollectionView({ collection, where, orderBy, view, height = 420, onRowClick, selectedId }: CollectionViewProps) {
     const config = useCollection(collection);
     const { data } = useSdk();
     const parent = useSidePanel();
@@ -222,6 +224,7 @@ export function CollectionView({ collection, where, orderBy, view, height = 420,
                     className="h-full flex flex-col"
                     {...(view && { viewMode: view })}
                     {...(sort && { sort })}
+                    {...(selectedId !== undefined && { selectedId })}
                     collectionOverrides={overrides}
                 />
             </SidePanelControllerContext.Provider>

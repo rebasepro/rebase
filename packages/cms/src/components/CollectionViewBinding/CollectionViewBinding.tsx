@@ -215,6 +215,13 @@ export type CollectionViewBindingProps<M extends Record<string, unknown>> = {
      */
     overrides?: Partial<AdminCollection<M>>;
 
+    /**
+     * The row drawn as selected, where the caller decides which it is — a
+     * page that shows the opened row beside the list. `null` draws none.
+     * Without it the view highlights the row last opened, by itself.
+     */
+    highlightedId?: string | number | null;
+
 } & AdminCollection<M>;
 
 /**
@@ -227,7 +234,7 @@ const PROPS_COMPARED_BY_VALUE = new Set<string>([
     "properties", "propertiesOrder", "hideIdFromCollection", "inlineEditing", "selectionEnabled",
     "selectionController", "Actions", "defaultSize", "includeJsonView", "additionalFields",
     "sideDialogWidth", "openEntityMode", "exportable", "history", "fixedFilter",
-    "selectedEntityId", "selectedTab", "overrides"
+    "selectedEntityId", "selectedTab", "overrides", "highlightedId"
 ]);
 
 /**
@@ -287,6 +294,7 @@ const CollectionViewBindingInner = React.memo(
         selectedEntityId: selectedEntityIdProp,
         selectedTab: selectedTabProp,
         overrides,
+        highlightedId,
         ...collectionProp
     }: CollectionViewBindingProps<M>
     ) {
@@ -1052,9 +1060,15 @@ parentEntityIds: parentEntityIds ?? EMPTY_ARRAY,
         // element on every render of this component re-rendered every row of the
         // table — twice, the second time for the columns the id header widget
         // rebuilt — on each window emit, count arrival and popover toggle.
+        // The caller's selection, where it gives one, among the rows held.
+        const shownEntity = highlightedId === undefined
+            ? highlightedEntity
+            : highlightedId === null
+                ? undefined
+                : tableController.data.find(entity => String(entity.id) === String(highlightedId));
         const highlightedEntities = useMemo(
-            () => highlightedEntity ? [highlightedEntity] : EMPTY_ARRAY,
-            [highlightedEntity]);
+            () => shownEntity ? [shownEntity] : EMPTY_ARRAY,
+            [shownEntity]);
         const idHeaderWidget = useMemo(() => <EntityIdHeaderWidget
             path={path}
             idPath={path}
