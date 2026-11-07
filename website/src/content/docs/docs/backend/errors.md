@@ -165,6 +165,7 @@ the ID you got. Read the response header.
 
 | Code | Status | Means | Do |
 | --- | --- | --- | --- |
+| `AGGREGATE_MASKED_BY_AFTER_READ` | 400 | An aggregate other than `count()` without `groupBy` on a collection an `afterRead` callback rewrites (global, collection or property). An aggregate reads the stored values and never runs the callback, so a sum, minimum, maximum, field count or group would read what the callback hides. | Use `count()` without `groupBy`, or read the rows, which pass through the callback. |
 | `AGGREGATE_NOT_SUPPORTED` | 501 | This driver cannot compute the requested aggregate. | Use a driver that can, or compute it in the client. |
 | `BRANCHING_UNSUPPORTED` | — | A database branch was requested over the Studio websocket on the managed development database (PGlite), where a branch *is* the parent and nothing would be isolated. The refusal is the same one `rebase db branch` prints. | Point `DATABASE_URL` at a Postgres of your own (`rebase dev --docker` starts one) and branch there. |
 | `BATCH_TOO_LARGE` | 400 | `POST /api/data/_batch` carries more operations than the per-batch limit (1000 by default). One batch is one transaction and holds its locks for the whole of it. | Send it in chunks; the message names the limit and your count. |

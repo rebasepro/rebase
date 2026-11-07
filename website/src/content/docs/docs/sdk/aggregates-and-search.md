@@ -55,6 +55,12 @@ GET /api/data/orders/aggregate?select=count()&groupBy=customer&orderBy=count:des
 is a `400 INVALID_AGGREGATE_WINDOW`: an ungrouped aggregate has one row, and a
 group is not a row a cursor can continue after.
 
+An aggregate reads the stored values and never runs `afterRead`. So on a
+collection an `afterRead` callback rewrites — global, collection or property —
+only `count()` without `groupBy` is served, over HTTP and in process alike;
+anything else is a `400 AGGREGATE_MASKED_BY_AFTER_READ`, because a sum, a
+maximum or a group would read the values the callback hides.
+
 From the SDK, `aggregate()` takes the same `orderBy` a `find()` does — one
 `[key, "asc" | "desc"]` tuple or a list of them — where the key is a `groupBy`
 column or a result key. Both are typed: on a generated model, a key that is

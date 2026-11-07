@@ -370,6 +370,11 @@ realtime frame — and nothing else: `afterSave`, `beforeDelete`, `afterDelete` 
 never what an audit records or a revert writes back, and a field added here is
 never written.
 
+An aggregate returns sums and counts, not rows, so it cannot pass through
+`afterRead`. On a collection one applies to, only `count()` without `groupBy`
+is served; any other [aggregate](/docs/sdk/aggregates-and-search/#aggregates) is
+refused with `400 AGGREGATE_MASKED_BY_AFTER_READ`.
+
 ```typescript
 afterRead: async ({
     row,    // The row to transform
