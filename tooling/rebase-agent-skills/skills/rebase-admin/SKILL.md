@@ -323,7 +323,7 @@ type CollectionPanelProps = {
     /** Title above the collection. `false` to hide. Defaults to collection name. */
     title?: string | false;
 
-    /** Force a view mode (table, card, etc.) */
+    /** The view mode it opens in, over the URL's and the one the person saved; they can still switch */
     viewMode?: ViewMode;
 
     /** Override sort: [fieldName, direction] */
@@ -343,6 +343,22 @@ type CollectionPanelProps = {
 
     /** Additional collection-level overrides */
     collectionOverrides?: Partial<AdminCollection>;
+
+    /** The row drawn as selected; `null` for none. Default: the row last opened */
+    highlightedEntityId?: string | number | null;
+
+    /** Only these properties, in this order: the table's columns, and what list rows,
+     *  cards and kanban cards are filled from. Wins over propertiesOrder, the saved
+     *  order and listProperties for this panel */
+    fields?: string[];
+
+    /** The toolbar: the full one by default, `null` for none, or composed of
+     *  CollectionToolbar (start/end), CollectionSearchBar, CollectionFiltersButton,
+     *  CollectionViewModeToggle and CollectionAddButton */
+    toolbar?: React.ReactNode;
+
+    /** Called with the clicked row instead of opening it (rows, cards, kanban, Edit) */
+    onEntityClick?: (entity: Entity) => void;
 };
 ```
 
@@ -369,7 +385,22 @@ type CollectionPanelProps = {
         defaultFilter: { status: ["!=", "completed"] }
     }}
 />
+
+// Three columns, a small toolbar, and the click handled by the page
+<CollectionPanel
+    path="orders"
+    viewMode="table"
+    fields={["number", "status", "total"]}
+    toolbar={<CollectionToolbar start={<CollectionFiltersButton/>} end={<CollectionAddButton/>}/>}
+    onEntityClick={(order) => setSelectedId(order.id)}
+    className="max-h-[480px]"
+/>
 ```
+
+A panel sizes to its rows: with no height from its parent, or only a
+`max-height`, it draws its toolbar and rows and scrolls past that. It lays
+itself out by its own width, not the window's. The collection's
+`entityActions` draw on rows, cards and kanban cards alike.
 
 > **IMPORTANT FOR AGENTS:** `CollectionPanel` defaults `updateUrl` to `false` so embedded panels don't hijack the browser URL. Only set `updateUrl={true}` if you explicitly need URL sync.
 

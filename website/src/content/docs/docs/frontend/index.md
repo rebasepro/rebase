@@ -177,6 +177,68 @@ also lets a record with unsaved changes stop in-app navigation; under the
 others only the browser's leave-page prompt guards it. Wrap the panel in `<RebaseAuthGate>` if the page
 should show Rebase's sign-in first.
 
+### What a panel shows
+
+A panel draws the collection as the admin does. These props narrow it to what
+your page needs; none of them changes the collection's own page.
+
+```tsx
+import {
+    CollectionAddButton,
+    CollectionFiltersButton,
+    CollectionPanel,
+    CollectionSearchBar,
+    CollectionToolbar
+} from "@rebasepro/cms";
+
+<CollectionPanel
+    collection={ordersCollection}
+    viewMode="cards"
+    fields={["number", "status", "total"]}
+    toolbar={<CollectionToolbar
+        start={<CollectionFiltersButton/>}
+        end={<><CollectionSearchBar/><CollectionAddButton/></>}/>}
+    onEntityClick={(order) => setSelected(order.id)}
+    className="max-h-[480px]"/>
+```
+
+- `fields` — the properties it shows, in this order, and nothing else. In the
+  table they are the columns. In the list, on a card and on a kanban card they
+  are what the row's places — title, image, subtitle, status, date, relation
+  chips, the list's columns — are filled from, earlier ones first; a place none
+  of them fills stays empty. For this panel it wins over `propertiesOrder`, the
+  column order a user saved and `listProperties`. Column widths a user drags
+  still persist; the order is yours, so columns are not dragged.
+- `toolbar` — the full toolbar by default, `null` for none, or one composed of
+  its pieces: `CollectionToolbar` (with `start` and `end`),
+  `CollectionSearchBar`, `CollectionFiltersButton`, `CollectionViewModeToggle`
+  and `CollectionAddButton`. They read the panel they are drawn in, and throw
+  anywhere else. Plugin slots and the `Collection.Actions` override live in the
+  default toolbar.
+- `onEntityClick` — called with the clicked row (an `Entity`) instead of the
+  panel opening it, from a row, a card, a kanban card and the edit action.
+- `viewMode` — the mode it opens in, over the one in the URL and the one the
+  person last picked. They can still switch.
+- `title={false}` — no title above the panel, nor the list view's own heading.
+- `updateUrl` — off by default: the panel neither reads nor writes the page's
+  `__view`, filter and sort parameters.
+
+The collection's `entityActions` draw on every row, card and kanban card, as
+buttons when declared `collapsed: false` and in the row's menu otherwise — an
+"Approve" on every card is one action.
+
+A panel sizes to its rows. With no height from its parent, or only a
+`max-height`, a short collection draws its toolbar and rows and a long one
+scrolls inside the space it has, up to the window's height. Give it a height to
+fill it. It lays itself out by its own width, not the window's: in a narrow
+column it uses its compact layout, whatever the screen.
+
+`propertiesOrder` reorders and never hides: a property it leaves out is drawn
+after the ones it names. To hide one everywhere, set `admin.hideFromCollection`
+on it; to show only some in one place, pass `fields`.
+
+### One record's form
+
 `<EntityFormPanel>` does the same for one record's form. It loads the record
 by `entityId`, saves it through `<Rebase>`'s data layer as the admin's own
 form does, and calls `onSaved` after every save. Omit `entityId` to create a
@@ -267,6 +329,8 @@ function OrderList() {
     ));
 }
 ```
+
+### Several panels in one scope
 
 The three panels bring their own `CollectionsProvider` when none is above them. That is
 the step underneath, and you can mount it yourself to share one scope between

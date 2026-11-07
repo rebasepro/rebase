@@ -17,6 +17,12 @@ There are three things to know:
    `RebaseAuthGate` (`@rebasepro/cms`), `LoginView`
    (`@rebasepro/app`) and the UI kit (`@rebasepro/ui`: `Button`, `Card`,
    `Typography`, `TextField`, `Select`, `Chip`, `Container`, …).
+   `CollectionPanel` takes data and components, not flags: `fields` (the
+   properties it shows, in order), `toolbar` (`null`, or a `CollectionToolbar`
+   composed of `CollectionSearchBar`, `CollectionFiltersButton`,
+   `CollectionViewModeToggle`, `CollectionAddButton`), `onEntityClick` (the
+   row instead of opening it), `viewMode`, `highlightedEntityId`,
+   `collectionOverrides`, `sort`, `limit`, `title`.
 2. **Hooks**: `useData`, `useCollection`, `useFetch`, `useAuthController`,
    `useSnackbarController` (`@rebasepro/app`); `useSidePanel`,
    `useUrlController`, `useCollectionRegistryController`, `resolveSelection`

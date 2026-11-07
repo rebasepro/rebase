@@ -181,6 +181,25 @@ and `FilterFieldBindingProps` (`@rebasepro/cms-types`); `EntityFormProps`,
 (`@rebasepro/app`). The rest have no exported props type — write the shape you
 actually read.
 
+### What a `Collection.View` override must honour
+
+`Collection.View` is what a `CollectionPanel` draws, so the panel's props reach
+your override as `CollectionViewBindingProps` (`@rebasepro/cms`), spread over the
+collection's own. A replacement that ignores them breaks every page that embeds
+the collection. Honour at least these:
+
+| Prop | What the caller expects |
+|---|---|
+| `collectionOverrides` | What the caller changes about the collection (a fixed filter, a sort, the view mode), applied over the registered collection |
+| `fields` | Only these properties, in this order: the columns, and what list rows and cards are filled from |
+| `highlightedEntityId` | The row drawn as selected; `null` for none |
+| `onEntityClick` | Called with the clicked row instead of opening it |
+
+The panel also passes `viewMode` (the mode to open in), `toolbar` (the toolbar
+to draw, `null` for none) and `title` (`false` to draw no title), where its
+caller set them. The built-in `CollectionViewBinding` handles all of them; an
+override that wraps it rather than replacing it can pass them straight through.
+
 To start from the built-in part rather than from nothing, copy its source into
 your project and register the copy here: every part but `Collection.View`,
 `DetailView` and the home page's drag-and-drop compiles with package imports.
