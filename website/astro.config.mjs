@@ -11,18 +11,18 @@ import yaml from "@rollup/plugin-yaml";
 import tailwindcss from "@tailwindcss/vite";
 
 /**
- * Marketing routes that ask engines not to index them, read off the pages.
+ * Whether the built page asks engines not to index it.
  *
- * A slug appears here iff its `.astro` source sets `robots` to `noindex`, so
- * the sitemap `filter` below and the pages cannot disagree.
+ * Read off the HTML in `dist/` (the sitemap filter runs once the build has
+ * written it), so the sitemap and the pages cannot disagree — whichever source
+ * set the tag: a marketing page's own meta, a production redirect stub like
+ * `/dev/demos`, or a docs page Starlight rendered as an untranslated fallback.
  */
-const NOINDEX = new Set(
-    fs
-        .readdirSync("./src/pages/[...lang]")
-        .filter(file => file.endsWith(".astro"))
-        .filter(file => /content="noindex/.test(fs.readFileSync(`./src/pages/[...lang]/${file}`, "utf8")))
-        .map(file => file.replace(/\.astro$/, ""))
-);
+function builtPageIsNoindex(page) {
+    const file = new URL(`./dist${new URL(page).pathname}index.html`, import.meta.url);
+    if (!fs.existsSync(file)) return false;
+    return /<meta\s+name="robots"\s+content="[^"]*noindex/.test(fs.readFileSync(file, "utf8"));
+}
 
 // https://astro.build/config
 export default defineConfig({
@@ -37,6 +37,9 @@ export default defineConfig({
             // mistyped rebase.pro URL to a docs-shell page whose way out was
             // "Back to rebase.pro ↗" — an external-link icon, on rebase.pro.
             disable404Route: true,
+            // Untranslated locale pages: canonical → English, noindex, and no
+            // hreflang pointing at them. See the file for why.
+            routeMiddleware: "./src/starlightRouteData.ts",
             // Starlight emits og:title, og:type, og:url and og:description and
             // no og:image at all, so every documentation page previewed as a
             // bare text card. One image for the whole section: a page-specific
@@ -361,15 +364,10 @@ export default defineConfig({
              * instruction contradicting each other, in the two places a crawler
              * reads first.
              *
-             * The source is the page, not a list: `NOINDEX` is derived from the
-             * routes that actually set the meta tag, so adding a second private
-             * page needs nothing here.
+             * The source is the built page, not a list, so adding a second
+             * private page needs nothing here.
              */
-            filter: (page) => {
-                const route = new URL(page).pathname.replace(/\/$/, "").replace(/^\//, "");
-                const slug = route.replace(/^(?:es|de|fr|it|pt)\//, "");
-                return !NOINDEX.has(slug);
-            },
+            filter: (page) => !builtPageIsNoindex(page),
             i18n: {
                 defaultLocale: 'en',
                 locales: {
