@@ -1,11 +1,13 @@
 
 
+/** Every `PropertyConfigId` in `@rebasepro/cms-types` (`types/property_config.tsx`): keep the two lists equal. */
 export function isDefaultFieldConfigId(id: string): boolean {
     return ["text_field",
         "multiline",
         "markdown",
         "url",
         "email",
+        "user_select",
         "switch",
         "select",
         "multi_select",
@@ -22,6 +24,9 @@ export function isDefaultFieldConfigId(id: string): boolean {
         "key_value",
         "repeat",
         "custom_array",
-        "block"
+        "block",
+        "vector_input",
+        "geopoint",
+        "binary"
     ].includes(id);
 }

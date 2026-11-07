@@ -7,6 +7,7 @@ describe("isDefaultFieldConfigId", () => {
         "markdown",
         "url",
         "email",
+        "user_select",
         "switch",
         "select",
         "multi_select",
@@ -23,7 +24,10 @@ describe("isDefaultFieldConfigId", () => {
         "key_value",
         "repeat",
         "custom_array",
-        "block"
+        "block",
+        "vector_input",
+        "geopoint",
+        "binary"
     ];
 
     it.each(validIds)("returns true for known field config id: '%s'", (id) => {
