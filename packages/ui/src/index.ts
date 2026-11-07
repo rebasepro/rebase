@@ -38,6 +38,7 @@ export { useDebounceCallback } from "./hooks/useDebounceCallback";
 export { useIsDarkMode } from "./hooks/useIsDarkMode";
 export { useDebounceValue } from "./hooks/useDebounceValue";
 export { useInjectStyles } from "./hooks/useInjectStyles";
+export { useElementWidth } from "./hooks/useElementWidth";
 export { PortalContainerProvider, usePortalContainer } from "./hooks/PortalContainerContext";
 export type { PortalContainerContextType, PortalContainerProviderProps } from "./hooks/PortalContainerContext";
 export { UiLabelsProvider, useUiLabels, defaultUiLabels } from "./hooks/UiLabelsContext";

@@ -5,7 +5,7 @@ export { useInsightData, clearInsightData, DEFAULT_INSIGHT_TTL } from "./blocks/
 export type { InsightData } from "./blocks/useInsightData";
 export { KpiTile, KpiReadout, KpiGrid, KpiChange, Placeholder } from "./blocks/KpiTile";
 export type { KpiProps } from "./blocks/KpiTile";
-export { ChartCard, ChartStatus, useElementWidth } from "./blocks/charts/ChartCard";
+export { ChartCard, ChartStatus } from "./blocks/charts/ChartCard";
 export { TimeSeriesChart } from "./blocks/charts/TimeSeriesChart";
 export type { TimeSeries, TimeSeriesPoint } from "./blocks/charts/TimeSeriesChart";
 export { BarChart } from "./blocks/charts/BarChart";

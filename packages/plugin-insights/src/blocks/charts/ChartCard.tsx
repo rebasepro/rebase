@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React from "react";
 import { getIcon, useTranslation } from "@rebasepro/app";
 import { cls, defaultBorderMixin, Typography } from "@rebasepro/ui";
 
@@ -54,22 +54,4 @@ export function ChartStatus({ height, loading, error, empty }: {
                 )}
         </div>
     );
-}
-
-/**
- * The rendered width of the element the returned ref is attached to, kept
- * current as it resizes. A callback ref, so an element that mounts later —
- * after a loading state — is measured too.
- */
-export function useElementWidth<E extends HTMLElement>(): [(element: E | null) => void, number] {
-    const [element, setElement] = useState<E | null>(null);
-    const [width, setWidth] = useState(0);
-    useEffect(() => {
-        if (!element) return;
-        setWidth(element.getBoundingClientRect().width);
-        const observer = new ResizeObserver(([entry]) => setWidth(entry.contentRect.width));
-        observer.observe(element);
-        return () => observer.disconnect();
-    }, [element]);
-    return [setElement, width];
 }

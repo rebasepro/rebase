@@ -1,8 +1,8 @@
 import React, { useState } from "react";
 import { useTranslation } from "@rebasepro/app";
-import { cls } from "@rebasepro/ui";
+import { cls, useElementWidth } from "@rebasepro/ui";
 import { compactFormat, formatNumber, niceTicks } from "../numbers";
-import { ChartStatus, useElementWidth } from "./ChartCard";
+import { ChartStatus } from "./ChartCard";
 import { GRID_CLASSES, SERIES_COLORS, TICK_CLASSES } from "./palette";
 
 export interface TimeSeriesPoint {
