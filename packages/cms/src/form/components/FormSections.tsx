@@ -1,6 +1,8 @@
 import type { ResolvedFormField, ResolvedFormSection } from "@rebasepro/app";
 import React from "react";
 import { ChevronDownIcon, cls, defaultBorderMixin, iconSize } from "@rebasepro/ui";
+import { sectionDomId, useFormDomScope } from "../form_dom_ids";
+import { useFormFieldsContext } from "../FormFieldsContext";
 
 export interface FormSectionsProps {
     sections: ResolvedFormSection[];
@@ -13,7 +15,11 @@ export interface FormSectionsProps {
      * user cannot submit and cannot debug.
      */
     errorKeys: ReadonlySet<string>;
-    renderField: (field: ResolvedFormField) => React.ReactNode;
+    /**
+     * Renders one field. Defaults to the enclosing record form's own, which
+     * applies every rule the form has for a field.
+     */
+    renderField?: (field: ResolvedFormField) => React.ReactNode;
     /**
      * Which rendering this is. `"read"` opens the gaps up rather than closing
      * them: a control is a bordered 40px box that separates itself from the next
@@ -41,6 +47,10 @@ export function FormSections({
 }: FormSectionsProps) {
 
     const reading = mode === "read";
+    const domScope = useFormDomScope();
+    const formFields = useFormFieldsContext();
+    const render = renderField ?? formFields?.renderField;
+    if (!render) throw new Error("FormSections needs `renderField` outside a record form");
 
     return (
         <div className={cls("flex flex-col", reading ? "gap-10" : "gap-8")}>
@@ -48,6 +58,7 @@ export function FormSections({
 
                 const hasError = section.fields.some(f => errorKeys.has(f.key));
                 const isCollapsed = section.collapsible && collapsed.has(section.key) && !hasError;
+                const regionId = sectionDomId(domScope, section.key);
                 const summary = reading
                     && section.readVariant === "summary"
                     && Boolean(renderSummaryField);
@@ -60,12 +71,12 @@ export function FormSections({
                                 title={section.title}
                                 collapsible={section.collapsible}
                                 collapsed={isCollapsed}
-                                controls={`form_section_${section.key}`}
+                                controls={regionId}
                                 onToggle={() => onToggle(section.key)}/>
                         )}
 
                         {!isCollapsed && (summary
-                            ? <div id={`form_section_${section.key}`}
+                            ? <div id={regionId}
                                 className={"flex flex-col min-w-0 @2xl:max-w-md @2xl:ml-auto"}>
                                 {section.fields.map((field, index) =>
                                     renderSummaryField!(field, index, section.fields.length))}
@@ -75,7 +86,7 @@ export function FormSections({
                             // screen, side panel, split pane, dialog) inside the
                             // same viewport, so spans have to answer to the
                             // column they are in, not to the window.
-                            : <div id={`form_section_${section.key}`}
+                            : <div id={regionId}
                                 className={cls(
                                     "grid min-w-0",
                                     // 24px between rows of filled boxes: with no
@@ -86,7 +97,7 @@ export function FormSections({
                                     reading ? "gap-x-8 gap-y-7" : "gap-x-4 gap-y-6",
                                     "grid-cols-1 @2xl:grid-cols-4"
                                 )}>
-                                {section.fields.map(renderField)}
+                                {section.fields.map(render)}
                             </div>
                         )}
                     </section>

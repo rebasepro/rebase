@@ -133,6 +133,7 @@ export const fr: RebaseTranslations = {
     form_in_sync: "Le formulaire actuel est synchronisé avec la base de données",
     fix_errors_before_saving: "Corrigez les erreurs signalées avant d'enregistrer",
     form_predating_rule_violations: "Certains champs que vous n'avez pas modifiés ne respectent pas leurs règles actuelles. Ils n'empêchent pas l'enregistrement :",
+    form_required_fields_not_shown: "Ce formulaire crée un enregistrement sans afficher {{fields}}, dont un nouvel enregistrement a besoin. Affichez-les dans le formulaire ou donnez-leur une valeur par défaut.",
 
     admin: "Admin",
     home: "Accueil",

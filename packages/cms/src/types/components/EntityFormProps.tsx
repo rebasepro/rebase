@@ -61,7 +61,32 @@ export type EntityFormProps<M extends Record<string, unknown>> = {
     parentCollectionSlugs?: string[];
     parentEntityIds?: string[];
 
+    /**
+     * Rendered above the fields, inside the form.
+     */
     children?: React.ReactNode;
+
+    /**
+     * The fields the generated form shows, in this order; any other property
+     * is left out. Sections and the rail keep their grouping, each holding
+     * only these fields, ordered as here. Unknown keys are ignored.
+     *
+     * The form validates only what it shows. Creating a record, it refuses —
+     * with an error naming them — when a required field it leaves out has no
+     * default value and is not filled by the server or the database.
+     */
+    fields?: string[];
+
+    /**
+     * Your own arrangement of the fields, rendered in place of the generated
+     * ones: `<FormField name="…"/>`s in any JSX. Wins over the collection's
+     * `formView.Builder`.
+     *
+     * The form validates only the fields its `<FormField>`s render, and
+     * refuses to create a record, as {@link fields} does, when a required
+     * field without a default is not among them.
+     */
+    layout?: React.ReactNode;
 
     // --- Headless callbacks (replace internal admin hooks) ---
 

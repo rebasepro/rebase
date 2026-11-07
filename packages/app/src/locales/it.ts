@@ -133,6 +133,7 @@ export const it: RebaseTranslations = {
     form_in_sync: "Il modulo attuale è sincronizzato con il database",
     fix_errors_before_saving: "Correggi gli errori evidenziati prima di salvare",
     form_predating_rule_violations: "Alcuni campi che non hai modificato non rispettano le regole attuali. Non impediscono il salvataggio:",
+    form_required_fields_not_shown: "Questo modulo crea un record senza mostrare {{fields}}, che un nuovo record richiede. Mostrali nel modulo o assegna loro un valore predefinito.",
 
     admin: "Admin",
     home: "Home",

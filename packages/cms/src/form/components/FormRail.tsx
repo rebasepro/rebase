@@ -2,12 +2,17 @@ import type { Entity } from "@rebasepro/types";
 import type { ResolvedFormField } from "@rebasepro/app";
 import React from "react";
 import { CheckIcon, cls, CopyIcon, IconButton, iconSize, Tooltip, Typography } from "@rebasepro/ui";
+import { useFormFieldsContext } from "../FormFieldsContext";
 
 export interface FormRailProps {
     fields: ResolvedFormField[];
     showRecordMeta: boolean;
     entity?: Entity<Record<string, unknown>>;
-    renderField: (field: ResolvedFormField) => React.ReactNode;
+    /**
+     * Renders one field. Defaults to the enclosing record form's own, which
+     * applies every rule the form has for a field.
+     */
+    renderField?: (field: ResolvedFormField) => React.ReactNode;
 }
 
 /**
@@ -25,7 +30,11 @@ export function FormRail({
     renderField
 }: FormRailProps) {
 
+    const formFields = useFormFieldsContext();
+    const render = renderField ?? formFields?.renderField;
+
     if (!fields.length && !showRecordMeta) return null;
+    if (fields.length > 0 && !render) throw new Error("FormRail needs `renderField` outside a record form");
 
     return (
         <aside className={cls(
@@ -57,7 +66,7 @@ export function FormRail({
         )}>
             {fields.length > 0 && (
                 <div className={"flex flex-col gap-5"}>
-                    {fields.map(renderField)}
+                    {render && fields.map(render)}
                 </div>
             )}
 

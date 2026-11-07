@@ -15,7 +15,7 @@
   "cms": {
     "as any": 4,
     "as never": 11,
-    "as unknown as": 13
+    "as unknown as": 12
   },
   "cms-types": {
     "as unknown as": 1

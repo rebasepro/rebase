@@ -299,6 +299,8 @@ export interface RebaseTranslations {
     fix_errors_before_saving?: string;
     /** Above the fields a save went through with: untouched values that already broke a rule. */
     form_predating_rule_violations: string;
+    /** A form creating a record that leaves out required fields with no default; `{{fields}}` names them. */
+    form_required_fields_not_shown: string;
 
     admin: string;
     home: string;

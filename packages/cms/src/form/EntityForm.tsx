@@ -1,34 +1,34 @@
 
-import type { AdditionalFieldDelegateProps } from "@rebasepro/cms-types";
-import type { FormContext, PropertyFieldBindingProps } from "../types/fields";
-import React, { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import type { FormContext } from "../types/fields";
+import React, { Suspense, useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import { Entity, EntityStatus, EntityValues } from "@rebasepro/types";
 import type { Properties, Property } from "@rebasepro/types";
 import type { EntityFormProps } from "../types/components/EntityFormProps";
 import { deepEqual as equal } from "fast-equals";
 
 import { ErrorBoundary, isKeyHandled } from "@rebasepro/ui";
-import { AlignLeftIcon, useDebouncedCallback } from "@rebasepro/ui";
-import { effectiveAccess, getCopyValues, getDefaultValuesFor, hasEntityId } from "@rebasepro/common";
-import { isDisabled, isHidden, isReadOnly } from "@rebasepro/app";
-import { useAuthController, useCustomizationController, useRebaseContext, useTranslation } from "@rebasepro/app";
+import { useDebouncedCallback } from "@rebasepro/ui";
+import { getCopyValues, getDefaultValuesFor, hasEntityId } from "@rebasepro/common";
+import { isDisabled, isReadOnly } from "@rebasepro/app";
+import { useAuthController, useCustomizationController, useTranslation } from "@rebasepro/app";
 
 import { getFormFieldKeys, resolveFormLayout } from "@rebasepro/app";
-import type { ResolvedFormField } from "@rebasepro/app";
-import { Alert, Button, CircularProgressCenter, cls, defaultBorderMixin, Dialog, DialogActions, DialogContent, DialogTitle, paperMixin, Typography } from "@rebasepro/ui";
+import type { ResolvedFormField, ResolvedFormLayout } from "@rebasepro/app";
+import type { AdminCollection } from "@rebasepro/cms-types";
+import { Alert, Button, CircularProgressCenter, cls, defaultBorderMixin, Dialog, DialogActions, DialogContent, DialogTitle, Typography } from "@rebasepro/ui";
 import { Formex, FormexController, useCreateFormex } from "@rebasepro/forms";
 
-import { FieldBlock, isSelfLabellingProperty, LABEL_ICON_SIZE, spanClass } from "./components/FieldBlock";
-import { labelsInsideControl } from "./label_placement";
-import { AdditionalFieldValue } from "../components/AdditionalFieldValue";
 import { FormRail, RecordMeta } from "./components/FormRail";
 import { FormSections } from "./components/FormSections";
 import { useRailVisible } from "./components/useRailVisible";
-import { PropertyFieldBinding } from "./PropertyFieldBinding";
+import { FormFieldsContext, renderFormField } from "./FormFieldsContext";
+import type { FormFieldsContextValue } from "./FormFieldsContext";
+import { domScopeFromId, FormDomScopeContext } from "./form_dom_ids";
+import { propertiesOfFields } from "./resolve_cell_property";
 import { flattenKeys } from "@rebasepro/app";
 import { ErrorFocus } from "./components/ErrorFocus";
 import { applyValueTransforms, CustomFieldValidator, getEntitySchema, uniqueValueErrors } from "./validation";
-import { formViewer, resolveFormProperty, resolvePropertiesForValidation, withoutUnwritableDefaults } from "./resolve_form_properties";
+import { formViewer, resolvePropertiesForValidation, withoutUnwritableDefaults } from "./resolve_form_properties";
 import { EntityFormActions } from "./EntityFormActions";
 import type { EntityFormActionsProps } from "../types/components/EntityFormActionsProps";
 import { LocalChangesMenu } from "./components/LocalChangesMenu";
@@ -43,6 +43,8 @@ import {
     withoutUnsetNulls,
     zodToFormErrors
 } from "./form_utils";
+
+type CollectionProperty = NonNullable<AdminCollection["properties"][string]>;
 
 /**
  * Headless entity form component.
@@ -77,6 +79,8 @@ export function EntityForm<M extends Record<string, unknown>>({
     showDefaultActions = true,
     navigateBack: navigateBackProp,
     children,
+    fields: fieldsProp,
+    layout: customLayout,
     // Headless callback props
     onSubmit: onSubmitProp,
     onValuesChangeDeferred: onValuesChangeDeferredProp,
@@ -301,7 +305,7 @@ export function EntityForm<M extends Record<string, unknown>>({
      * the autosave runs it before each write.
      */
     async function validateForSave(values: M): Promise<Record<string, string>> {
-        const errors = await validationErrorsFor(values);
+        const errors = { ...await validationErrorsFor(values), ...unshownRequiredErrors() };
         if (status !== "existing" || !entity?.values || Object.keys(errors).length === 0) {
             setPredatingViolations({});
             return errors;
@@ -442,14 +446,6 @@ export function EntityForm<M extends Record<string, unknown>>({
 
     const disabled = formex.isSubmitting || Boolean(disabledProp);
 
-    // The context an `additionalFields` Builder is documented to receive, and
-    // the one `CollectionTableBinding` already hands it. This form used to pass
-    // its own `FormContext` instead, laundered through
-    // `formContext as unknown as AdditionalFieldDelegateProps["context"]` —
-    // two unrelated types, so a Builder reading anything off `RebaseContext`
-    // worked in the table view and read `undefined` in the form.
-    const rebaseContext = useRebaseContext();
-
     const formContext: FormContext<M> = {
         setFieldValue: useCallback((key: string, value: unknown) => formex.setFieldValue(key, value), []),
         values: formex.values,
@@ -577,7 +573,7 @@ export function EntityForm<M extends Record<string, unknown>>({
      * values being judged.
      */
     function validationPropertiesFor(values: M) {
-        return resolvePropertiesForValidation<M>({
+        const properties = resolvePropertiesForValidation<M>({
             properties: collection.properties,
             isNew: status === "new" || status === "copy",
             values,
@@ -587,6 +583,10 @@ export function EntityForm<M extends Record<string, unknown>>({
             propertyConfigs: customizationController.propertyConfigs,
             authController
         });
+        // A form that shows some of the fields judges those: an error on one
+        // it does not show would block the save with nothing to fix.
+        const shown = shownFieldKeys();
+        return shown ? propertiesOfFields(properties, shown) : properties;
     }
 
     useOnAutoSave(autoSave, formex, lastSavedValues, save);
@@ -640,19 +640,24 @@ export function EntityForm<M extends Record<string, unknown>>({
         });
     }, [baseInitialValues]);
 
-    const formFieldKeys = getFormFieldKeys(collection);
+    const shownCollection = useMemo(
+        () => fieldsProp ? collectionShowing(collection, fieldsProp) : collection,
+        // eslint-disable-next-line react-hooks/exhaustive-deps -- `fields` is an inline array at most call sites: its contents, not its identity
+        [collection, fieldsProp?.join(",")]);
+    const formFieldKeys = getFormFieldKeys(shownCollection);
 
     const layout = useMemo(() => resolveFormLayout({
-        collection,
+        collection: shownCollection,
         fieldKeys: formFieldKeys,
         status
-    }), [collection, formFieldKeys.join(","), status]);
+    }), [shownCollection, formFieldKeys.join(","), status]);
 
     const formElementRef = useRef<HTMLFormElement>(null);
     // Measured, not a breakpoint: the rail holds fields the resolver moved
     // out of the column, so when it cannot be shown they have to come back.
     const railVisible = useRailVisible(formElementRef);
-    const showRail = !Builder && layout.hasRail && railVisible;
+    const generatedFields = !Builder && customLayout === undefined;
+    const showRail = generatedFields && layout.hasRail && railVisible;
 
     // Collapsed sections are per-section-key so a renamed title keeps its state,
     // and initial state comes from the config rather than being forced open.
@@ -677,20 +682,24 @@ export function EntityForm<M extends Record<string, unknown>>({
     // group does not steal it.
     const autoFocusKey = useMemo(() => {
         if (status !== "new" && status !== "copy") return undefined;
+        if (!generatedFields) return undefined;
         const ordered = [...layout.sections.flatMap(s => s.fields), ...layout.sidebar];
         return ordered.find(field => {
             const property = collection.properties?.[field.key];
             return property ? !isFieldDisabled(field.key, property) : false;
         })?.key;
-    }, [layout, collection, status, disabledProp, lockedPropertyKeys]);
+    }, [layout, collection, status, disabledProp, lockedPropertyKeys, generatedFields]);
 
+    /**
+     * Every rule that disables a field but a save in progress, which a field
+     * reads from the form itself (see `FormFieldsContext`).
+     */
     function isFieldDisabled(key: string, property: NonNullable<typeof collection.properties[string]>): boolean {
         const isNew = status === "new" || status === "copy";
         const isStringOrNumber = property.type === "string" || property.type === "number";
         const isIdAndAuto = isStringOrNumber && "isId" in property && typeof property.isId === "string" && property.isId !== "manual";
         return Boolean(
             disabledProp
-            || (!autoSave && formex.isSubmitting)
             || isReadOnly(property)
             || isDisabled(property)
             || (!isNew && "isId" in property && Boolean(property.isId))
@@ -699,116 +708,119 @@ export function EntityForm<M extends Record<string, unknown>>({
         );
     }
 
-    const renderField = (field: ResolvedFormField): React.ReactNode => {
-
-        if (field.additional) {
-            const additionalField = collection.additionalFields?.find(f => f.key === field.key);
-            if (!additionalField || !entity) return null;
-
-            const AdditionalFieldBuilder = additionalField.Builder;
-            if (!AdditionalFieldBuilder && !additionalField.value) {
-                throw new Error("When using additional fields you need to provide a Builder or a value");
-            }
-            const child = AdditionalFieldBuilder
-                ? <AdditionalFieldBuilder entity={entity} context={rebaseContext}/>
-                : <div className={"w-full"}>
-                    <AdditionalFieldValue
-                        field={additionalField}
-                        entity={entity}
-                        context={rebaseContext}/>
-                </div>;
-
-            return (
-                // Through FieldBlock like every other cell, so a computed
-                // column is labelled at the same size, with the same gap to its
-                // box, as the property next to it on the grid.
-                <div key={`additional_${field.key}`}
-                    className={spanClass(field.span)}>
-                    <FieldBlock propertyKey={field.key}
-                        showLabel={true}
-                        label={additionalField.name}
-                        icon={<AlignLeftIcon size={LABEL_ICON_SIZE}/>}>
-                        <div className={cls(paperMixin, "w-full min-h-12 p-4 md:p-6 overflow-x-auto no-scrollbar")}>
-                            {child}
-                        </div>
-                    </FieldBlock>
-                </div>
-            );
-        }
-
-        const property = collection.properties?.[field.key];
-        if (!property) {
-            console.warn(`Property ${field.key} not found in collection ${collection.name} in properties or additional fields. Skipping.`);
-            return null;
-        }
-        // A field a rule hides for these values, or that this user may not
-        // read, takes its label with it: the binding renders nothing, and a
-        // heading over nothing is worse.
-        if (property.conditions?.hidden || effectiveAccess(property)) {
-            const shown = resolveFormProperty({
-                propertyKey: field.key,
-                property,
-                values: formex.values,
-                previousValues: baseInitialValues as Partial<M>,
-                path,
-                entityId,
-                propertyConfigs: customizationController.propertyConfigs,
-                ignoreMissingFields: true,
-                authController
-            });
-            if (!shown || isHidden(shown)) return null;
-        }
-
-        const underlyingValueHasChanged: boolean =
-            field.key in underlyingChanges &&
-            !equal(formex.values[field.key], underlyingChanges[field.key]);
-
-        const disabled = isFieldDisabled(field.key, property);
-        // Three places a label can be. The panel-style editors carry their own
-        // header. The one-line controls draw it inside their box, FireCMS-style,
-        // so they all stand the same height. Everything else — multi-selects,
-        // uploads, markdown, relations — is labelled above by FieldBlock.
-        const selfLabelling = isSelfLabellingProperty(property);
-        const labelInside = !selfLabelling
-            && labelsInsideControl(property, customizationController.propertyConfigs);
-
-        const cmsFormFieldProps: PropertyFieldBindingProps<M> = {
-            propertyKey: field.key,
-            disabled,
-            property,
-            // FieldBlock owns the description now, so the binding must not
-            // repeat it — it still renders validation errors, which belong
-            // against the control rather than under the label.
-            includeDescription: false,
-            hideLabel: !selfLabelling && !labelInside,
-            underlyingValueHasChanged: underlyingValueHasChanged && !autoSave,
-            context: fieldContext,
-            partOfArray: false,
-            minimalistView: false,
-            // One height for every control in the form. Left to their own
-            // defaults, a text field came out 48px, a select 44 and a switch 64.
-            // `large`: the record-form density — a 64px box with the label
-            // inside and a 16px value, or a 48px box under a label. 0.20.0 took
-            // the form to `small` (32px) to match the reference, and the fields
-            // read as cramped next to what they had been; see DESIGN.md "Form
-            // density".
-            size: "large",
-            autoFocus: autoFocusKey === field.key
+    // The fields a `<FormField>` has drawn, counted: one key can be drawn
+    // twice. Read at validation time from the ref; the version re-renders the
+    // form when a field comes or goes, for the create-time check below.
+    const registeredFields = useRef(new Map<string, number>());
+    const [registeredVersion, setRegisteredVersion] = useState(0);
+    const registerField = useCallback((key: string) => {
+        const registered = registeredFields.current;
+        registered.set(key, (registered.get(key) ?? 0) + 1);
+        setRegisteredVersion(v => v + 1);
+        return () => {
+            const count = (registered.get(key) ?? 1) - 1;
+            if (count > 0) registered.set(key, count); else registered.delete(key);
+            setRegisteredVersion(v => v + 1);
         };
+    }, []);
 
-        return (
-            <div key={`field_${field.key}`} className={spanClass(field.span)}>
-                <FieldBlock propertyKey={field.key}
-                    property={property}
-                    showLabel={!selfLabelling && !labelInside}
-                    labelInside={labelInside}>
-                    <PropertyFieldBinding {...cmsFormFieldProps}/>
-                </FieldBlock>
-            </div>
-        );
-    };
+    /**
+     * The fields this form shows, when it shows some and not all: the ones a
+     * `layout`'s `<FormField>`s draw, or the ones `fields` names. Undefined
+     * for the generated form of every field, which judges them all.
+     */
+    function shownFieldKeys(): string[] | undefined {
+        if (customLayout !== undefined) return [...registeredFields.current.keys()];
+        if (fieldsProp) return layoutFieldKeys(layout);
+        return undefined;
+    }
+
+    /**
+     * What a new record needs that this form will not ask for: a required
+     * field it does not show, opening empty — no default, no value handed in,
+     * not filled by the server or the database (the validation properties
+     * already relax those on create). Such a form can only fail to save, so
+     * it says so when it opens.
+     */
+    const openingValues = (initialModifiedValues ?? baseInitialValues) as Partial<M>;
+    const unshownRequired: { key: string, label: string }[] = useMemo(() => {
+        if (status !== "new" && status !== "copy") return [];
+        const shown = shownFieldKeys();
+        if (!shown) return [];
+        const shownSet = new Set(shown);
+        const judged = resolvePropertiesForValidation<M>({
+            properties: collection.properties,
+            isNew: true,
+            values: openingValues,
+            previousValues: baseInitialValues as Partial<M>,
+            path,
+            entityId,
+            propertyConfigs: customizationController.propertyConfigs,
+            authController
+        });
+        return Object.entries(judged)
+            .filter(([key, property]) => property.validation?.required
+                && !shownSet.has(key)
+                && !isGeneratedId(property)
+                && isEmptyValue(openingValues[key]))
+            .map(([key, property]) => ({ key, label: property.name ?? key }));
+        // eslint-disable-next-line react-hooks/exhaustive-deps -- `shownFieldKeys` reads the registered fields, which `registeredVersion` counts
+    }, [status, customLayout === undefined, layout, registeredVersion, collection, openingValues, path, entityId, customizationController.propertyConfigs, authController]);
+
+    function unshownRequiredErrors(): Record<string, string> {
+        if (unshownRequired.length === 0) return {};
+        const message = t("form_required_fields_not_shown", { fields: unshownRequired.map(f => f.label).join(", ") });
+        return Object.fromEntries(unshownRequired.map(({ key }) => [key, message]));
+    }
+
+    /**
+     * The field for a key: as the generated layout places it, when it holds
+     * the key, else at the property's declared span.
+     */
+    const fieldFor = useCallback((key: string): ResolvedFormField | undefined => {
+        const placed = [...layout.sections.flatMap(s => s.fields), ...layout.sidebar].find(f => f.key === key);
+        if (placed) return placed;
+        const property = collection.properties?.[key];
+        if (property) return { key, span: property.admin?.span ?? 4, additional: false };
+        if (collection.additionalFields?.some(f => f.key === key)) return { key, span: 4, additional: true };
+        return undefined;
+    }, [layout, collection]);
+
+    // Read through a ref so the fields' context keeps its identity; its inputs
+    // are among the context's dependencies all the same.
+    const isFieldDisabledRef = useRef(isFieldDisabled);
+    isFieldDisabledRef.current = isFieldDisabled;
+    const stableIsFieldDisabled = useCallback(
+        (key: string, property: CollectionProperty) => isFieldDisabledRef.current(key, property),
+        []);
+
+    const fieldsContext: FormFieldsContextValue = useMemo(() => ({
+        collection: collection as AdminCollection<Record<string, unknown>>,
+        path,
+        entityId,
+        entity: entity as Entity<Record<string, unknown>> | undefined,
+        status,
+        fieldContext: fieldContext as FormContext<Record<string, unknown>>,
+        previousValues: baseInitialValues as Partial<Record<string, unknown>>,
+        underlyingChanges,
+        autoSave: Boolean(autoSave),
+        autoFocusKey,
+        isFieldDisabled: stableIsFieldDisabled,
+        renderField: renderFormField,
+        fieldFor,
+        register: registerField
+        // eslint-disable-next-line react-hooks/exhaustive-deps -- `isFieldDisabled` reads `disabledProp` and `lockedPropertyKeys` through its ref
+    }), [collection, path, entityId, entity, status, fieldContext, baseInitialValues, underlyingChanges, autoSave, autoFocusKey, stableIsFieldDisabled, fieldFor, registerField, disabledProp, lockedPropertyKeys]);
+
+    const domScope = domScopeFromId(useId());
 
     const formFields = () => {
+
+        // Your own arrangement of `<FormField>`s, rendered inside the form so
+        // they bind to it and an error scrolls to them.
+        if (customLayout !== undefined) {
+            return <>{customLayout}</>;
+        }
 
         if (Builder) {
             // Its own boundary: a Builder is usually a lazy chunk, and without
@@ -848,8 +860,7 @@ export function EntityForm<M extends Record<string, unknown>>({
                 sections={sections}
                 collapsed={collapsedSections}
                 onToggle={toggleSection}
-                errorKeys={errorKeys}
-                renderField={renderField}/>
+                errorKeys={errorKeys}/>
 
             {/* Folded back with the rail's fields, and for the same reason. The
                 rail renders only where it has been measured to fit, so on the
@@ -896,6 +907,11 @@ export function EntityForm<M extends Record<string, unknown>>({
             {hasFormErrors && <Alert color={"error"} size={"small"} outerClassName={"w-full mt-2"}>
                 {t("fix_errors_before_saving")}
             </Alert>}
+
+            {unshownRequired.length > 0 &&
+                <Alert color={"error"} size={"small"} outerClassName={"w-full mt-2"}>
+                    {t("form_required_fields_not_shown", { fields: unshownRequired.map(f => f.label).join(", ") })}
+                </Alert>}
 
             {predatingViolationLines.length > 0 &&
                 <Alert color={"warning"} size={"small"} outerClassName={"w-full mt-2"}>
@@ -972,8 +988,11 @@ export function EntityForm<M extends Record<string, unknown>>({
     return (
         <Formex value={formex}>
             <FormUploadsContext.Provider value={uploadTracker}>
+            <FormDomScopeContext.Provider value={domScope}>
+            <FormFieldsContext.Provider value={fieldsContext}>
             <form
                 ref={formElementRef}
+                data-form-path={path}
                 onSubmit={formex.handleSubmit}
                 onReset={(e) => {
                     e.preventDefault();
@@ -1002,7 +1021,7 @@ export function EntityForm<M extends Record<string, unknown>>({
                         form appeared to have no padding however large `pb-*` grew. */}
                     <div className={"flex-1 min-w-0 overflow-y-auto flex justify-center items-start"}>
                         <div
-                            id={`form_${path}`}
+                            id={domScope}
                             className={cls(
                                 // Two rules widen the column, and they answer to
                                 // different things on purpose. `@7xl/form` measures
@@ -1041,17 +1060,59 @@ export function EntityForm<M extends Record<string, unknown>>({
                     {showRail && <FormRail
                         fields={layout.sidebar}
                         showRecordMeta={layout.showRecordMeta && status === "existing"}
-                        entity={entity as Entity<Record<string, unknown>> | undefined}
-                        renderField={renderField}/>}
+                        entity={entity as Entity<Record<string, unknown>> | undefined}/>}
                 </div>
 
                 {dialogActions}
 
             </form>
+            </FormFieldsContext.Provider>
+            </FormDomScopeContext.Provider>
             </FormUploadsContext.Provider>
 
         </Formex>
     );
+}
+
+/**
+ * The collection as a form showing only `fields` lays it out: `fields` as its
+ * order, which `getFormFieldKeys` also restricts to, and each section and the
+ * rail holding only those fields, in that order. Sections follow their first
+ * field.
+ */
+function collectionShowing<M extends Record<string, unknown>>(collection: AdminCollection<M>, fields: string[]): AdminCollection<M> {
+    const rank = new Map(fields.map((key, index) => [key, index] as const));
+    const ranked = (keys: string[]) => keys
+        .filter(key => rank.has(key))
+        .sort((a, b) => (rank.get(a) ?? 0) - (rank.get(b) ?? 0));
+    const form = collection.form;
+    const firstRank = (keys: string[]) => Math.min(...keys.map(key => rank.get(key) ?? Infinity));
+    return {
+        ...collection,
+        propertiesOrder: fields as AdminCollection<M>["propertiesOrder"],
+        form: form && {
+            ...form,
+            sidebar: form.sidebar && ranked(form.sidebar as string[]) as typeof form.sidebar,
+            sections: form.sections && form.sections
+                .map(section => ({ ...section, properties: ranked(section.properties as string[]) as typeof section.properties }))
+                .sort((a, b) => firstRank(a.properties as string[]) - firstRank(b.properties as string[]))
+        }
+    };
+}
+
+/** Every field a resolved layout places, in the column and in the rail. */
+function layoutFieldKeys(layout: ResolvedFormLayout): string[] {
+    return [...layout.sections.flatMap(section => section.fields), ...layout.sidebar].map(field => field.key);
+}
+
+/** An id the data source or the database generates, which no form asks for. */
+function isGeneratedId(property: Property): boolean {
+    return "isId" in property && typeof property.isId === "string" && property.isId !== "manual";
+}
+
+function isEmptyValue(value: unknown): boolean {
+    return value === undefined || value === null || value === ""
+        || (Array.isArray(value) && value.length === 0);
 }
 
 function useOnAutoSave<M extends Record<string, unknown>>(autoSave: undefined | boolean, formex: FormexController<M>, lastSavedValues: React.MutableRefObject<EntityValues<M> | undefined>, save: (values: EntityValues<M>) => Promise<Entity<M> | void>) {

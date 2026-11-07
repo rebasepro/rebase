@@ -441,6 +441,7 @@
     "form_in_sync": ["5aca9b96","9c848bd5","f6ae14d2","496725be","6d96e8b5","e34108be","831482db"],
     "form_modified": ["6d081a4f","5672e619","172c2cb3","1d01f60a","33fcc2c1","89162dd2","80053ef9"],
     "form_predating_rule_violations": ["9fbba3b9","cace13ef","b6a349d4","20695838","ef1e6b37","bef61b24","7e20b342"],
+    "form_required_fields_not_shown": ["47dd5777","ddebde1f","ef9c1628","3409a23f","545045a6","60b1f203","42851d93"],
     "full_screen": ["674fe2ac","8dc5f1f9","93f2f911","dee312b0","5c0810ba","dfd986c0","39fa832f"],
     "generate_collection_with_ai": ["3f549da5","a3665a3e","beac3603","42f9a7dc","db7d0664","3e42f5d9","38e1a9ed"],
     "generate_sql_templates": ["1562292e","5f5d5ca2","ccec47a6","92b8ec3a","27b131aa","86e5e0b9","3690a4a9"],

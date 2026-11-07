@@ -1,4 +1,5 @@
 import React, { useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
+import { deepEqual as equal } from "fast-equals";
 import type { Entity } from "@rebasepro/types";
 import type { AdminCollection } from "@rebasepro/cms-types";
 import { Alert, Button, CenteredView, CircularProgressCenter, Typography } from "@rebasepro/ui";
@@ -52,6 +53,39 @@ export type EntityFormPanelProps<M extends Record<string, unknown> = Record<stri
     defaultValues?: Partial<M>;
 
     className?: string;
+
+    /**
+     * The fields the form shows, in this order; any other property is left
+     * out. Sections and the rail keep their grouping, each holding only these
+     * fields. The form validates only what it shows, and, creating a record,
+     * refuses with an error naming them when a required field it leaves out
+     * has no default value and is not filled by the server or the database.
+     */
+    fields?: string[];
+
+    /**
+     * Your own arrangement of the fields, in place of the generated ones:
+     * `<FormField name="…"/>`s inside any JSX. Validation covers the fields
+     * its `<FormField>`s render, with the same create-time check as
+     * {@link fields}. Wins over the collection's `formView.Builder`.
+     *
+     * @example
+     * ```tsx
+     * <EntityFormPanel collection={orders} entityId={id}
+     *     layout={<div className="grid grid-cols-2 gap-4">
+     *         <FormField name="customer"/>
+     *         <FormField name="status"/>
+     *     </div>}/>
+     * ```
+     */
+    layout?: React.ReactNode;
+
+    /**
+     * Collection settings for this form only, applied over the registered
+     * collection the way `CollectionPanel` applies its own: a shallow merge,
+     * so `properties` given here replaces the collection's whole map.
+     */
+    collectionOverrides?: Partial<AdminCollection>;
 
     /** Anything else {@link EntityFormBinding} takes. */
     formProps?: Partial<Omit<EntityFormBindingProps<M>, "path" | "collection" | "entityId" | "entity" | "initialStatus">>;
@@ -112,6 +146,9 @@ function EntityFormPanelInScope<M extends Record<string, unknown>>({
     onClose,
     defaultValues,
     className,
+    fields,
+    layout,
+    collectionOverrides,
     formProps
 }: EntityFormPanelProps<M>) {
     const { t } = useTranslation();
@@ -124,10 +161,18 @@ function EntityFormPanelInScope<M extends Record<string, unknown>>({
     // saved overrides.
     // Looked up once per registry: each lookup builds a new object, and the
     // record's subscription is keyed on the collection it was opened with.
+    // The overrides are compared by value for the same reason: they are an
+    // inline object at most call sites, a new one on every render.
+    const overridesRef = useRef(collectionOverrides);
+    if (!equal(overridesRef.current, collectionOverrides)) overridesRef.current = collectionOverrides;
+    const stableOverrides = overridesRef.current;
     const lookUp = collectionRegistry.initialised || !navigationState.loading;
-    const collection = useMemo(
-        () => lookUp ? collectionRegistry.getCollection(path) : undefined,
-        [lookUp, collectionRegistry, path]);
+    const collection = useMemo(() => {
+        const registered = lookUp ? collectionRegistry.getCollection(path) : undefined;
+        return registered && stableOverrides
+            ? { ...registered, ...stableOverrides } as AdminCollection<M>
+            : registered;
+    }, [lookUp, collectionRegistry, path, stableOverrides]);
 
     const { entity, dataLoading, dataLoadingError } = useFetch<M>({
         path,
@@ -187,6 +232,8 @@ function EntityFormPanelInScope<M extends Record<string, unknown>>({
                     entity={asNew.saved}
                     initialStatus={"new"}
                     initialDirtyValues={asNew.values}
+                    fields={fields ?? formProps?.fields}
+                    layout={layout ?? formProps?.layout}
                     disabled={!canCreate(collection, path) || formProps?.disabled}
                     onEntityChange={(changed) => {
                         // The record it created, which it edits from then on.
@@ -227,6 +274,8 @@ function EntityFormPanelInScope<M extends Record<string, unknown>>({
                 entity={shownEntity}
                 initialStatus={creating ? "new" : "existing"}
                 initialDirtyValues={creating ? defaultValues : formProps?.initialDirtyValues}
+                fields={fields ?? formProps?.fields}
+                layout={layout ?? formProps?.layout}
                 disabled={!editable || formProps?.disabled}
                 onEntityChange={(changed) => {
                     setSavedEntity(changed);

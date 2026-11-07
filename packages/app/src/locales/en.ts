@@ -141,6 +141,7 @@ export const en: RebaseTranslations = {
     form_in_sync: "The current form is in sync with the database",
     fix_errors_before_saving: "Fix highlighted errors before saving",
     form_predating_rule_violations: "Some fields you did not change do not meet their current rules. They do not block saving:",
+    form_required_fields_not_shown: "This form creates a record without showing {{fields}}, which a new record needs. Show them in the form, or give them a default value.",
 
     admin: "Admin",
     home: "Home",

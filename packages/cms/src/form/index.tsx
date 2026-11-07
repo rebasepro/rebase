@@ -24,6 +24,8 @@ export { VectorFieldBinding } from "./field_bindings/VectorFieldBinding";
 export * from "./components";
 
 export { PropertyFieldBinding } from "./PropertyFieldBinding";
+export { FormField } from "./FormField";
+export type { FormFieldProps } from "./FormField";
 export * from "./useClearRestoreValue";
 
 // Shared form utilities

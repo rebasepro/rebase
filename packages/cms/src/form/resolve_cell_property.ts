@@ -78,6 +78,27 @@ export function propertiesOfCell(properties: Properties, propertyKey: string): P
 }
 
 /**
+ * The properties that judge a form showing only `keys`: each key's property as
+ * {@link propertiesOfCell} cuts it, two children of one map under one map.
+ */
+export function propertiesOfFields(properties: Properties, keys: Iterable<string>): Properties {
+    let result: Properties = {};
+    for (const key of keys) result = mergeProperties(result, propertiesOfCell(properties, key));
+    return result;
+}
+
+function mergeProperties(a: Properties, b: Properties): Properties {
+    const merged: Properties = { ...a };
+    for (const [key, property] of Object.entries(b)) {
+        const existing = merged[key];
+        merged[key] = existing?.type === "map" && property.type === "map" && existing !== property
+            ? { ...existing, ...property, properties: mergeProperties(existing.properties ?? {}, property.properties ?? {}) }
+            : property;
+    }
+    return merged;
+}
+
+/**
  * What the popup judges a cell by, given the values it holds now: the
  * collection's properties resolved as the record form resolves them on submit
  * (so a field a rule hides or disables is not judged), cut to the cell.

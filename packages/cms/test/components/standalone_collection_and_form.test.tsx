@@ -20,7 +20,7 @@ import type { DataDriver } from "@rebasepro/types";
 import type { AdminCollection } from "@rebasepro/cms-types";
 import { Rebase, RlsSimulationContext } from "@rebasepro/app";
 import type { RlsSimulationController } from "@rebasepro/app";
-import { CollectionPanel, CollectionsProvider, EntityFormPanel } from "@rebasepro/cms";
+import { CollectionPanel, CollectionsProvider, EntityFormPanel, FormField } from "@rebasepro/cms";
 
 if (typeof globalThis.ResizeObserver === "undefined") {
     class NoopResizeObserver {
@@ -353,5 +353,71 @@ describe("one record's form in a page of the host app", () => {
         expect(saves).toHaveLength(1);
         expect(saves[0].id).not.toBe("p1");
         expect(saves[0].values).toEqual(expect.objectContaining({ title: "Hello again" }));
+    });
+});
+
+describe("one record's form, composed", () => {
+    it("applies its overrides to a collection the scope registers", async () => {
+        // The form draws the registry's copy of a registered collection, and
+        // the overrides go over that copy.
+        const onSaved = jest.fn();
+        render(
+            <Page>
+                <CollectionsProvider collections={[posts]}>
+                    <EntityFormPanel collection={posts} entityId={"p1"} onSaved={onSaved}
+                        collectionOverrides={{
+                            properties: { ...posts.properties, title: { type: "string", name: "Headline" } }
+                        }}/>
+                </CollectionsProvider>
+            </Page>
+        );
+
+        const headline = await screen.findByLabelText("Headline");
+        await act(async () => {
+            fireEvent.change(headline, { target: { value: "Hello again" } });
+        });
+        fireEvent.click(screen.getByRole("button", { name: /^save$/i }));
+        await waitFor(() => expect(onSaved).toHaveBeenCalledTimes(1));
+        expect(saves[0].values).toEqual(expect.objectContaining({ title: "Hello again" }));
+    });
+
+    it("lays out the fields its layout places, and saves through them", async () => {
+        const onSaved = jest.fn();
+        render(<Page>
+            <EntityFormPanel collection={authors} entityId={"ada"} onSaved={onSaved}
+                layout={<div data-testid={"my-layout"}><FormField name={"name"}/></div>}/>
+        </Page>);
+
+        const name = await screen.findByDisplayValue("Ada Lovelace");
+        expect(within(screen.getByTestId("my-layout")).getByDisplayValue("Ada Lovelace")).toBe(name);
+        expect(document.querySelector("[data-form-field=\"handle\"]")).toBeNull();
+        await act(async () => {
+            fireEvent.change(name, { target: { value: "Ada King" } });
+        });
+        fireEvent.click(screen.getByRole("button", { name: /^save$/i }));
+        await waitFor(() => expect(onSaved).toHaveBeenCalledTimes(1));
+        expect(saves[0].values).toEqual({ name: "Ada King" });
+    });
+
+    it("shows only its fields, in their order", async () => {
+        render(<Page><EntityFormPanel collection={authors} entityId={"ada"} fields={["name"]}/></Page>);
+        await screen.findByDisplayValue("Ada Lovelace");
+        const keys = Array.from(document.querySelectorAll("[data-form-field]")).map(el => el.getAttribute("data-form-field"));
+        expect(keys).toEqual(["name"]);
+    });
+
+    it("puts two forms on one page without sharing an id", async () => {
+        render(<Page>
+            <EntityFormPanel collection={posts} entityId={"p1"}/>
+            <EntityFormPanel collection={posts} entityId={"p2"}/>
+        </Page>);
+        await screen.findByDisplayValue("Hello world");
+        await screen.findByDisplayValue("Second post");
+
+        const ids = Array.from(document.querySelectorAll("[id]")).map(el => el.id);
+        expect(new Set(ids).size).toBe(ids.length);
+        const forms = document.querySelectorAll("[data-form-path=\"posts\"]");
+        expect(forms).toHaveLength(2);
+        expect(within(forms[1] as HTMLElement).getByDisplayValue("Second post")).toBeTruthy();
     });
 });
