@@ -9,9 +9,14 @@
  * function had its header taken from the property the slots guess at
  * meanwhile: "Room" over "3 Nov · ABCD · 4 players", "Met in room" over
  * "Kamil → Fra".
+ *
+ * And the cells show what the collection says they are: a map or an array
+ * with its own `Preview` drew "4 fields" instead, a yes/no repeated its name
+ * under its own header, and a narrow list gave its date away before a third
+ * number.
  */
 import React from "react";
-import { beforeAll, describe, expect, it, jest } from "@jest/globals";
+import { beforeAll, beforeEach, describe, expect, it, jest } from "@jest/globals";
 import { act, render } from "@testing-library/react";
 import type { Entity } from "@rebasepro/types";
 
@@ -43,12 +48,17 @@ jest.mock("../../src/hooks/useAdminContext", () => ({ useAdminContext: () => ({}
 import { CollectionListViewBinding } from "../../src/components/CollectionViewBinding/CollectionListViewBinding";
 import { useSelectionController } from "../../src/components/CollectionViewBinding/useSelectionController";
 
-// Wide enough for every column: jsdom measures everything as 0px, which the
-// list reads as "not measured yet" and answers with the title alone.
+// jsdom measures everything as 0px, which the list reads as "not measured
+// yet" and answers with the title alone. Wide enough for every column unless a
+// test narrows it.
+let listWidth = 2400;
 beforeAll(() => {
-    jest.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockReturnValue({
-        width: 2400, height: 800, top: 0, left: 0, right: 2400, bottom: 800, x: 0, y: 0, toJSON: () => ({})
-    } as DOMRect);
+    jest.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockImplementation(() => ({
+        width: listWidth, height: 800, top: 0, left: 0, right: listWidth, bottom: 800, x: 0, y: 0, toJSON: () => ({})
+    } as DOMRect));
+});
+beforeEach(() => {
+    listWidth = 2400;
 });
 
 const properties = {
@@ -56,13 +66,35 @@ const properties = {
     startedAt: { type: "date", name: "Started" },
     finished: { type: "boolean", name: "Finished" },
     songsPlayed: { type: "number", name: "Songs played" },
-    topScore: { type: "number", name: "Winning score" }
+    minutes: { type: "number", name: "Minutes" },
+    topScore: { type: "number", name: "Winning score" },
+    look: { type: "map", name: "Look", properties: {}, admin: { Preview: LookPreview } },
+    music: { type: "array", name: "Music", of: { type: "string" }, admin: { Preview: MusicPreview } },
+    players: { type: "array", name: "Players", of: { type: "string" } }
 };
+
+function LookPreview({ value }: { value?: Record<string, unknown> }) {
+    return <span data-testid="look-preview">{`hat: ${String(value?.hat)}`}</span>;
+}
+
+function MusicPreview({ value }: { value?: string[] }) {
+    return <span data-testid="music-preview">{(value ?? []).map(code => code.toUpperCase()).join(" + ")}</span>;
+}
 
 const rows: Entity[] = [{
     id: 1,
     path: "games",
-    values: { room: "ABCD", startedAt: new Date("2026-11-03T20:00:00Z"), finished: true, songsPlayed: 12, topScore: 90 }
+    values: {
+        room: "ABCD",
+        startedAt: new Date("2026-11-03T20:00:00Z"),
+        finished: false,
+        songsPlayed: 12,
+        minutes: 31,
+        topScore: 90,
+        look: { hat: "crown", glasses: "round" },
+        music: ["es", "en"],
+        players: ["Kamil", "Fra", "Ana", "Leo", "Mia"]
+    }
 }];
 
 function List({ collection }: { collection: Record<string, unknown> }) {
@@ -79,13 +111,30 @@ function List({ collection }: { collection: Record<string, unknown> }) {
         highlightedEntities={[]}/>;
 }
 
-async function headerLabels(collection: Record<string, unknown>): Promise<string[]> {
+async function renderList(collection: Record<string, unknown>) {
+    let result: ReturnType<typeof render> | undefined;
     await act(async () => {
-        render(<List collection={collection}/>);
+        result = render(<List collection={collection}/>);
     });
-    const header = document.querySelector("div.select-none.border-b");
-    if (!header) throw new Error(`no list header in ${document.body.innerHTML.slice(0, 2000)}`);
+    return result!;
+}
+
+async function headerLabels(collection: Record<string, unknown>): Promise<string[]> {
+    const { container } = await renderList(collection);
+    const header = container.querySelector("div.select-none.border-b");
+    if (!header) throw new Error(`no list header in ${container.innerHTML.slice(0, 2000)}`);
     return Array.from(header.querySelectorAll("span.truncate")).map(el => el.textContent?.trim() ?? "");
+}
+
+/** The text of each cell after the identity cell in the first row, keyed by its header. */
+async function firstRowCells(collection: Record<string, unknown>): Promise<Record<string, HTMLElement>> {
+    const labels = await headerLabels(collection);
+    const row = document.querySelector("[data-list-row]");
+    if (!row) throw new Error("no list row");
+    // The cells sit in the last flex group before the actions, in header order.
+    const cells = Array.from(row.querySelectorAll<HTMLElement>(":scope > div.flex.items-center > div"));
+    // labels[0] is the identity cell's header.
+    return Object.fromEntries(labels.slice(1).map((label, i) => [label, cells[i]]));
 }
 
 describe("the list header", () => {
@@ -122,5 +171,86 @@ describe("the list header", () => {
         });
         expect(labels[0]).toBe("Game");
         expect(labels).not.toContain("Room");
+    });
+
+    it("keeps the property a function title was guessed from as a column of its own", async () => {
+        const labels = await headerLabels({
+            slug: "games",
+            name: "Games",
+            singularName: "Game",
+            properties,
+            listProperties: ["room", "songsPlayed"],
+            display: {
+                title: ({ entity }: { entity: Entity }) => `${entity.values.room} · game`
+            }
+        });
+        expect(labels).toEqual(["Game", "Room", "Songs played"]);
+    });
+
+    it("gives way with the collection's own columns before its declared status and date", async () => {
+        // Room for the title and three of the five columns: two must go, and
+        // they are the named ones, last first. The date is the narrowest
+        // column and the one that says when; a list that lost it to a third
+        // number lost every date on a laptop screen.
+        listWidth = 40 + 32 + 16 + 40 + 16 + 320 + (128 + 16) + (144 + 16) + (80 + 16) + 10;
+        const labels = await headerLabels({
+            slug: "games",
+            name: "Games",
+            singularName: "Game",
+            properties,
+            listProperties: ["songsPlayed", "minutes", "topScore"],
+            display: {
+                title: "room",
+                status: ({ entity }: { entity: Entity }) => entity.values.finished ? "Finished" : "Left early",
+                date: "startedAt"
+            }
+        });
+        expect(labels).toEqual(["Room", "Songs played", "Status", "Started"]);
+    });
+
+    it("treats a named column that is the declared date as the date", async () => {
+        listWidth = 40 + 32 + 16 + 40 + 16 + 320 + (112 + 16) + 10;
+        const labels = await headerLabels({
+            slug: "games",
+            name: "Games",
+            singularName: "Game",
+            properties,
+            listProperties: ["songsPlayed", "topScore", "startedAt"],
+            display: {
+                title: "room",
+                date: "startedAt"
+            }
+        });
+        expect(labels).toEqual(["Room", "Started"]);
+    });
+});
+
+describe("the list's cells", () => {
+
+    it("draw a map or an array with the property's own Preview", async () => {
+        const cells = await firstRowCells({
+            slug: "games",
+            name: "Games",
+            properties,
+            listProperties: ["look", "music", "players"],
+            display: { title: "room" }
+        });
+        expect(cells["Look"].querySelector("[data-testid=look-preview]")?.textContent).toBe("hat: crown");
+        expect(cells["Look"].textContent).not.toContain("fields");
+        expect(cells["Music"].querySelector("[data-testid=music-preview]")?.textContent).toBe("ES + EN");
+        // Without a Preview, an array still keeps the row to one line.
+        expect(cells["Players"].textContent).toContain("+");
+    });
+
+    it("show a yes/no under its header without repeating the property's name", async () => {
+        const cells = await firstRowCells({
+            slug: "games",
+            name: "Games",
+            properties,
+            listProperties: ["finished"],
+            display: { title: "room" }
+        });
+        expect(cells["Finished"]).toBeDefined();
+        expect(cells["Finished"].textContent).not.toContain("Finished");
     });
 });

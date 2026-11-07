@@ -66,6 +66,21 @@ A tradução está pendente. O conteúdo abaixo está em inglês.
   warning for it names the two reconcile commands instead of raw `ALTER TABLE`
   statements, which cannot reach a Rebase Cloud database.
 
+#### CMS
+
+- **A map or array column in the list draws the property's own `Preview`.**
+  The list printed "4 fields" or "a, b +3" in its place; it still does for a
+  map or array with no `Preview`, to keep a row one line high.
+
+- **A yes/no column in the list shows its box without repeating its name**,
+  which the column's header already gives.
+
+- **A narrow list gives up its `listProperties` columns before the tags,
+  status and date its `display` declares.** The date went first, so a list
+  with three columns of figures lost every date on a laptop screen. A
+  `listProperties` column that is also the declared date (or status, or tags)
+  stays as long as that slot would.
+
 #### MCP
 
 - **Connecting an MCP client from Chrome now finishes.** The consent screen

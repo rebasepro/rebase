@@ -1,8 +1,10 @@
 
-import type { OrderByTuple, Properties, Property } from "@rebasepro/types";
+import type { AuthState, OrderByTuple, Properties, Property } from "@rebasepro/types";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Entity } from "@rebasepro/types";
 import { CollectionSize, EntityAction, EntityActionClickProps, EntityTableController, SelectionController, AdminCollection } from "@rebasepro/cms-types";
+import type { PropertyConfig } from "@rebasepro/cms-types";
+import { resolveProperty } from "@rebasepro/common";
 import {
     ArrowDownIcon,
     ArrowUpIcon,
@@ -123,17 +125,24 @@ type ListColumn = {
 // Three bands. The sort or filter *in force* comes first: it is the reason the
 // rows are in the order they are in, and hiding the column it names leaves that
 // order unexplained. The collection's own columns come next — its `listProperties`,
-// or the status and date it was read as having. A column left over from a
-// request since cleared comes last: it is worth keeping while there is room for
-// it, and it is not worth the collection's own status.
+// and the tags, status and date its display slots fill. A column left over from
+// a request since cleared comes last: it is worth keeping while there is room
+// for it, and it is not worth the collection's own status.
+//
+// Within the collection's band the slots outlive the named columns. They say
+// what every row is — how it went and when — while `listProperties` are the
+// extra figures a reader scans for, and the date is the narrowest column the
+// row has: a list that gave its date away to keep a third number lost every
+// date on a laptop screen.
 
 /** A column left over from a sort or filter that is no longer applied. */
 const PRIORITY_STALE_REQUEST = 1000;
-/** The collection's own columns. Slots sit just above it, in give-way order. */
-const PRIORITY_DECLARED = 2000;
-const PRIORITY_DATE = PRIORITY_DECLARED;
-const PRIORITY_STATUS = PRIORITY_DECLARED + 1;
-const PRIORITY_TAGS = PRIORITY_DECLARED + 2;
+/** The collection's `listProperties`, plus how many come after a column: the last goes first. */
+const PRIORITY_NAMED = 2000;
+/** The display slots, above any number of named columns, in give-way order. */
+const PRIORITY_DATE = 2500;
+const PRIORITY_STATUS = PRIORITY_DATE + 1;
+const PRIORITY_TAGS = PRIORITY_DATE + 2;
 /** The sort or filter currently in force. */
 const PRIORITY_ACTIVE_REQUEST = 3000;
 
@@ -223,6 +232,22 @@ function isComplexPropertyType(property: Property): boolean {
         || property.type === "map"
         || property.type === "reference"
         || property.type === "relation";
+}
+
+/**
+ * Whether the property brings its own `Preview`, directly or through the
+ * property config it inherits from.
+ */
+function hasOwnPreview(
+    property: Property,
+    propertyKey: string,
+    propertyConfigs: Record<string, PropertyConfig> | undefined,
+    authController: AuthState
+): boolean {
+    if (property.admin?.Preview) return true;
+    if (!property.propertyConfig) return false;
+    const resolved = resolveProperty({ property, propertyKey, propertyConfigs, authController, ignoreMissingFields: true });
+    return !!resolved?.admin?.Preview;
 }
 
 /**
@@ -461,6 +486,21 @@ export function CollectionListViewBinding<M extends Record<string, unknown> = Re
     const declaredColumns = useMemo<ListColumn[]>(() => {
         const cols: ListColumn[] = [];
 
+        /**
+         * The property a slot is declared to read, when it reads one: a
+         * resolver computes its value, and an inferred key is a guess.
+         */
+        const declaredSlotKey = (slot: ListColumnSlot, key: string | undefined): string | undefined =>
+            key && hasDeclaredDisplay(resolvedCollection, slot) && !getDisplayResolver(resolvedCollection, slot)
+                ? key
+                : undefined;
+        const slotPriorities = new Map<string | undefined, number>([
+            [declaredSlotKey("tags", slotKeys.tagsKey), PRIORITY_TAGS],
+            [declaredSlotKey("status", statusPropertyKey), PRIORITY_STATUS],
+            [declaredSlotKey("date", datePropertyKey), PRIORITY_DATE]
+        ]);
+        slotPriorities.delete(undefined);
+
         if (columnMode) {
             // Everything the identity cell does not already show. Which is the
             // title property wherever it appears in the list, not merely a
@@ -478,9 +518,10 @@ export function CollectionListViewBinding<M extends Record<string, unknown> = Re
                     ...getIdealColumnWidth(property),
                     sortable: sortableKeys.has(key),
                     // Declared order is a statement of importance: the first
-                    // column after the title outlives the last one, and every
-                    // named column outlives the slots after it.
-                    priority: PRIORITY_TAGS + (keys.length - index)
+                    // column after the title outlives the last one. A named
+                    // column that is also the declared date (or status, or
+                    // tags) is that slot, wherever the list names it.
+                    priority: slotPriorities.get(key) ?? PRIORITY_NAMED + (keys.length - index)
                 });
             });
         }
@@ -1309,6 +1350,8 @@ function ListCell<M extends Record<string, unknown>>({
     slots: EntityPreviewSlots;
 }) {
     const relativeTimeLabels = useUiLabels().relativeTime;
+    const { propertyConfigs } = useCustomizationController();
+    const authController = useAuthController();
     if (column.slot === "tags") {
         if (!slots.tags) return null;
         return (
@@ -1345,7 +1388,9 @@ function ListCell<M extends Record<string, unknown>>({
     }
 
     // Complex types → compact single-line summary, so a row keeps its height.
-    if (isComplexPropertyType(property)) {
+    // Unless the property draws itself: a `Preview` is the developer saying
+    // how this value reads, and "4 fields" in its place says nothing.
+    if (isComplexPropertyType(property) && !hasOwnPreview(property, column.key, propertyConfigs, authController)) {
         const summary = compactValueSummary(value, property);
         return (
             <Typography variant="caption" className="text-surface-500 dark:text-surface-400 truncate">
@@ -1358,7 +1403,8 @@ function ListCell<M extends Record<string, unknown>>({
 
     return (
         <Typography component="div" variant="body2" className="text-surface-600 dark:text-surface-300 truncate">
-            <PropertyPreview propertyKey={column.key} value={value} property={property} size="small"/>
+            {/* The header names the column, so a yes/no shows its box alone. */}
+            <PropertyPreview propertyKey={column.key} value={value} property={property} size="small" hideLabel={true}/>
         </Typography>
     );
 }
