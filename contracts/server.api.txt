@@ -41,6 +41,8 @@ const ETAG_HEADER
 const FIELD_OPERATORS
 const IF_MATCH_HEADER
 const IMAGE_MIME_TYPES
+const MCP_APP_URI
+const MCP_VIEW_TOOLS
 const RUNTIME_BUNDLE_MOUNT
 const RUNTIME_DEFAULT_MAX_BODY_SIZE
 const RUNTIME_HEALTH_PATH
@@ -49,6 +51,7 @@ const RUNTIME_MIN_TERMINATION_GRACE_SECONDS
 const RUNTIME_PRESTOP_DRAIN_SECONDS
 const RUNTIME_PROBE_PATHS { liveness, readiness, startup }
 const RUNTIME_STARTUP_BUDGET_SECONDS
+const SHOW_APP_CODE_GUIDE
 const TOPOLOGY_ENV_VARS
 const UPLOAD_COLLECTION_FIELD
 const UPLOAD_PROPERTY_FIELD
@@ -213,6 +216,7 @@ function loadFunctions
 function loadFunctionsFromDirectory
 function loadFunctionsWithDiagnostics
 function loadUsersCollection
+function mcpViewToolInputSchema
 function oauthCodeFlowSchema
 function overridableSecurityHeaders
 function parseBackupDestination
@@ -364,8 +368,8 @@ interface MagicLinkTokenInfo { expiresAt, uid }
 interface McpCaller { clientId, credential, roles, scopes, uid }
 interface McpScopeVocabulary { defaultScope, supported }
 interface McpToolAnnotations { destructiveHint, idempotentHint, openWorldHint, readOnlyHint }
-interface McpToolContext { authAdapter, caller, collections, driver }
-interface McpToolDefinition { annotations, confirm, description, inputSchema, name, requiredScope, run, structuredContent, title, ui }
+interface McpToolContext { authAdapter, caller, collections, compileApp, driver }
+interface McpToolDefinition { annotations, confirm, description, inputSchema, modelResult, name, requiredScope, run, structuredContent, title, ui }
 interface MetricsHandle { middleware, registry, setKnownCollections }
 interface MfaChallengeInfo { attempts, createdAt, factorId, id, ipAddress, verifiedAt }
 interface MfaFactor { createdAt, factorType, friendlyName, id, lastUsedCounter, uid, updatedAt, verified }
@@ -441,6 +445,7 @@ type AuthMethod
 type AuthResult
 type BackendFactory
 type BackendStorageConfig
+type BackgroundWork
 type BackupDestination
 type ConditionBuilderStatic { buildFilterConditions, buildSearchConditions, combineConditionsWithAnd, combineConditionsWithOr }
 type CorsOriginResolver
@@ -465,6 +470,7 @@ type JobHandler
 type JobStatus
 type JwtSigningAlgorithm
 type MagicLinkTemplateFunction
+type McpViewToolName
 type MetricSurface
 type NestedWriteKind
 type PasswordResetTemplateFunction
@@ -1692,4 +1698,5 @@ function waitUntil
 interface ApiResponse { data, error, meta }
 interface FunctionUser { email, roles, uid }
 interface RebaseFunctionContext { rebase }
+type BackgroundWork
 type HonoEnv { Variables }

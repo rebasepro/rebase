@@ -9,7 +9,7 @@
  *
  * Rows are the read tools' rows (dates as ISO text, a belongsTo as its
  * foreign key), the shape the model already reads with query_collection.
- * The API is written in show_app's description (`MCP_APP_CODE_GUIDE` in the
+ * The API is written in show_app's description (`SHOW_APP_CODE_GUIDE` in the
  * server's `mcp-tools.ts`); the two change together.
  */
 import React, { createContext, useContext, useEffect, useMemo, useReducer, useState } from "react";

@@ -222,8 +222,13 @@ export type { ApiKeyIdentity, ApiKeyRefusal } from "./auth/api-keys";
 // For a backend that serves its own tools on `/mcp` (the `mcp` option): the
 // tool shape, the error a tool refuses with, and the data vocabulary to
 // extend or replace.
-export { McpToolError, MCP_APP_URI, MCP_APP_CODE_GUIDE, viewToolInputSchema } from "./mcp/mcp-tools";
-export type { McpToolDefinition, McpToolContext, McpCaller, McpToolAnnotations, McpViewToolName } from "./mcp/mcp-tools";
+export { McpToolError } from "./mcp/mcp-tools";
+export type { McpToolDefinition, McpToolContext, McpCaller, McpToolAnnotations } from "./mcp/mcp-tools";
+// For a server that relays the view tools to an app's own `/mcp` (the hosted
+// connector): the view they open, which they are, their arguments, and what
+// show_app teaches about the code it runs — so the two never disagree.
+export { MCP_APP_URI, MCP_VIEW_TOOLS, mcpViewToolInputSchema, SHOW_APP_CODE_GUIDE } from "./mcp/mcp-tools";
+export type { McpViewToolName } from "./mcp/mcp-tools";
 export { DATA_SCOPE_VOCABULARY } from "./mcp/oauth-metadata";
 export type { McpScopeVocabulary } from "./mcp/oauth-metadata";
 

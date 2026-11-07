@@ -685,12 +685,12 @@ const SHOWN_NOT_SEEN = " In a client that renders MCP Apps this opens in the con
  * What show_app's description teaches: the modules an app imports, and what
  * each gives it. The hosted connector's show_app says the same.
  */
-export const MCP_APP_CODE_GUIDE = `
+export const SHOW_APP_CODE_GUIDE = `
 The app is one TSX module whose default export is a React component (hooks welcome, no props). It runs in the conversation inside the project's admin panel, as the user, and may import only:
 - "react".
 - "@rebasepro/ui": the Rebase UI kit — Card, Button, IconButton, Typography, Tabs, Tab, Chip, Badge, Alert, TextField, Select, SelectItem, BooleanSwitch, Checkbox, Dialog, DialogTitle, DialogContent, DialogActions, Table, TableHeader, TableBody, TableRow, TableCell, Separator, CircularProgress, Tooltip, cls, and Lucide icons named with an Icon suffix (PlusIcon, Trash2Icon). Lay out and space with Tailwind's standard utilities (flex, grid, grid-cols-*, gap-*, p-*, w-*, text-sm, …); colours come from the kit (bg-surface-card, text-text-secondary), never hard-coded.
 - Width: the app is about 700px wide in the conversation, and the whole window when the person expands it. Put things side by side only from the lg: breakpoint (grid grid-cols-1 lg:grid-cols-2), never in fixed columns: a list and a form side by side at 700px are each too narrow to use.
-- "@rebasepro/plugin-insights": KpiGrid, KpiTile({ label, value, format?, change? }), ChartCard({ title, children }), BarChart({ bars: [{ label, value }] }), TimeSeriesChart({ series: [{ label, points: [{ date, value }] }] }), formatNumber.
+- "@rebasepro/plugin-insights": KpiGrid, KpiTile({ label, value, format?, previous?, goodWhen? ("up" | "down") }) — previous is the earlier period's value, shown as the change, ChartCard({ title, children }), BarChart({ bars: [{ key, label, value }] }), TimeSeriesChart({ series: [{ id, label, points: [{ at, value }] }] }) — at is a date, formatNumber.
 - "@rebasepro/mcp-apps", the project's data, as the user, under their RLS. Rows are as query_collection returns them (dates as ISO text, a belongsTo as its foreign key, e.g. authorId); \`where\` and \`orderBy\` are query_collection's.
   useQuery(collection, { where?, orderBy?, limit?, offset?, searchString? }) → { data, total, hasMore, loading, error, refresh }
   useRecord(collection, id) → { data, loading, error, refresh }
@@ -903,7 +903,7 @@ const TOOLS: McpToolDefinition[] = [
             + "is not enough (show_collection and show_record open those). The code is compiled before anything "
             + "opens: a mistake comes back as this call's error, with its line, to fix and call again. A runtime "
             + "error, and what the user changes, reach you with their next message." + SHOWN_NOT_SEEN
-            + "\n" + MCP_APP_CODE_GUIDE,
+            + "\n" + SHOW_APP_CODE_GUIDE,
         requiredScope: "data:read",
         annotations: READS,
         inputSchema: {
@@ -1113,14 +1113,15 @@ const TOOLS: McpToolDefinition[] = [
 export const MCP_TOOLS: McpToolDefinition[] = TOOLS.map(declaredArgumentsOnly);
 
 /** The tools that open the {@link MCP_APP_URI} view. */
-export type McpViewToolName = "show_collection" | "show_record" | "show_app";
+export const MCP_VIEW_TOOLS = ["show_collection", "show_record", "show_app"] as const;
+export type McpViewToolName = (typeof MCP_VIEW_TOOLS)[number];
 
 /**
  * A show_* tool's arguments, for a server that relays it to an app's own
  * `/mcp` — the hosted connector, which takes them plus its own `project` — so
  * the two never disagree about what a block is.
  */
-export function viewToolInputSchema(name: McpViewToolName): Record<string, unknown> {
+export function mcpViewToolInputSchema(name: McpViewToolName): Record<string, unknown> {
     const tool = TOOLS.find(candidate => candidate.name === name);
     if (!tool) throw new Error(`No view tool "${name}".`);
     return structuredClone(tool.inputSchema);

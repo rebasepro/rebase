@@ -63,6 +63,10 @@
   configs reduced to data, without the fields that caller never receives, and
   closes what their connection was not granted. The model reads the rows, not
   the configs.
+  A server that relays these tools to an app's own `/mcp` imports their
+  contract from `@rebasepro/server`: `MCP_APP_URI`, `MCP_VIEW_TOOLS`
+  (`McpViewToolName`), `mcpViewToolInputSchema(name)` and
+  `SHOW_APP_CODE_GUIDE`.
 
 - **The views in Claude are your admin app, customizations included.** Add
   `rebaseMcpViewPlugin()` from `@rebasepro/app/vitePlugin` to the frontend's
