@@ -24,7 +24,7 @@ import type {
     ListenOneProps,
     SaveProps
 } from "@rebasepro/types";
-import { fieldKeyForColumn, resolveCollectionRelations } from "@rebasepro/common";
+import { buildCompositeId, fieldKeyForColumn, getDeclaredPrimaryKeys, resolveCollectionRelations } from "@rebasepro/common";
 import { isRecord, type ToolResult } from "./bridge";
 
 /** A tool the view calls, and the arguments it always sends to it. */
@@ -191,13 +191,33 @@ export function createToolDriver(options: ToolDriverOptions): ToolDriver {
         return write(action, args);
     };
 
+    /**
+     * A page's rows into the row cache, keyed as {@link fetchOne} asks for
+     * them: the row a view lists is the row its record opens with, and an
+     * app's `get` of a row it was just shown asks the server nothing. By the
+     * collection's key where its config is known, by `id` otherwise; a write
+     * to the collection drops them, as it drops every row read. Not a page
+     * that lists deleted rows: `get` answers none for those.
+     */
+    const remember = (collection: string, page: Row[], config?: FetchCollectionProps["collection"]) => {
+        const keys = config ? getDeclaredPrimaryKeys(config) : [];
+        for (const row of page) {
+            const id = keys.length > 1 ? buildCompositeId(row, keys) : row[keys[0]?.fieldName ?? "id"];
+            if (typeof id !== "string" && typeof id !== "number") continue;
+            rows.set(`${collection}/${String(id)}`, Promise.resolve(row));
+        }
+    };
+
     const fetchCollection = async (props: FetchCollectionProps): Promise<Record<string, unknown>[]> => {
+        const collection = collectionArg(props.path);
         const page = await call(actions.page, {
-            collection: collectionArg(props.path),
+            collection,
             ...readArgs(props)
         });
         if (!isRecord(page) || !Array.isArray(page.data)) throw new Error("The read returned no rows.");
-        return page.data.filter(isRecord);
+        const found = page.data.filter(isRecord);
+        if (!props.withDeleted) remember(collection, found, props.collection);
+        return found;
     };
 
     const fetchOne = (props: FetchOneProps): Promise<Record<string, unknown> | undefined> => {
@@ -219,11 +239,14 @@ export function createToolDriver(options: ToolDriverOptions): ToolDriver {
 
     const data: ToolData = {
         async find(collection, args = {}) {
-            const page = await call(actions.page, { ...args, collection: collectionArg(collection) });
+            const name = collectionArg(collection);
+            const page = await call(actions.page, { ...args, collection: name });
             if (!isRecord(page) || !Array.isArray(page.data)) throw new Error("The read returned no rows.");
             const meta = isRecord(page.meta) ? page.meta : {};
+            const found = page.data.filter(isRecord);
+            if (args.deleted === undefined) remember(name, found);
             return {
-                data: page.data.filter(isRecord),
+                data: found,
                 ...(typeof meta.total === "number" && { total: meta.total }),
                 hasMore: meta.hasMore === true
             };

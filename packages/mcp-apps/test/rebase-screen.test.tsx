@@ -222,6 +222,35 @@ export default function Desk() {
         await vi.waitFor(() => expect(context).toHaveBeenCalledWith(expect.stringContaining("updated status on row o1 of orders")));
     }, 20000);
 
+    it("hands the app the row a click picks, with no read of its own", async () => {
+        const { calls } = open(appResult(`
+import { useState } from "react";
+import { Typography } from "@rebasepro/ui";
+import { CollectionView } from "@rebasepro/mcp-apps";
+
+export default function Picker() {
+    const [picked, setPicked] = useState("nothing");
+    return (
+        <div>
+            <Typography>Picked {picked}</Typography>
+            <CollectionView collection="orders" view="list" onRowClick={row => setPicked(String(row.number))} />
+        </div>
+    );
+}`), (name, args) => {
+            if (name === "count_documents") return ok({ count: ROWS.length });
+            if (name === "get_document") return ok(ROWS.find(row => row.id === args.id));
+            return ok({ data: ROWS, meta: { total: ROWS.length, hasMore: false } });
+        });
+
+        const row = await findText("ORD-42");
+        await act(async () => row.click());
+
+        await findText("Picked ORD-42");
+        expect(calls.some(call => call.name === "get_document")).toBe(false);
+        // Nothing opened over the app: the click was the app's.
+        expect(document.querySelector("[role=dialog]")).toBeNull();
+    }, 20000);
+
     it("names an import the view does not have, and tells the model", async () => {
         const { context } = open(appResult(`
 import { Sparkline } from "@rebasepro/plugin-insights";

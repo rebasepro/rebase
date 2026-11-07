@@ -115,6 +115,47 @@ describe("reading", () => {
         expect(calls.filter(call => call.name === "get_document")).toHaveLength(2);
     });
 
+    it("opens a row a page listed with no call of its own", async () => {
+        const { driver, data, calls } = driverWith((name, args) => name === "get_document"
+            ? ok({ id: args.id, name: "from get" })
+            : ok({ data: [{ id: "c1", name: "Ada" }, { id: "c2", name: "Grace" }], meta: {} }));
+
+        await driver.fetchCollection({ path: "customers", collection: customers });
+        expect(await driver.fetchOne({ path: "customers", id: "c2" })).toEqual({ id: "c2", name: "Grace" });
+        expect(await data.get("customers", "c1")).toEqual({ id: "c1", name: "Ada" });
+        expect(calls.map(call => call.name)).toEqual(["query_collection"]);
+
+        // An app's own page fills it too.
+        await data.find("orders");
+        await data.get("orders", "c1");
+        expect(calls.filter(call => call.name === "get_document")).toHaveLength(0);
+    });
+
+    it("reads a listed row again once its collection is written", async () => {
+        const { driver, calls } = driverWith((name, args) => name === "get_document"
+            ? ok({ id: args.id, name: "Ada L." })
+            : name === "query_collection" ? ok({ data: [{ id: "c1", name: "Ada" }], meta: {} }) : ok({ id: "c1" }));
+
+        await driver.fetchCollection({ path: "customers", collection: customers });
+        await driver.save({ path: "customers", id: "c1", values: { name: "Ada L." }, status: "existing" });
+        expect(await driver.fetchOne({ path: "customers", id: "c1" })).toEqual({ id: "c1", name: "Ada L." });
+        expect(calls.filter(call => call.name === "get_document")).toHaveLength(1);
+    });
+
+    it("keys a listed row by the collection's own key", async () => {
+        const authors: CollectionConfig = {
+            slug: "authors",
+            name: "Authors",
+            table: "authors",
+            properties: { handle: { type: "string", isId: true }, name: { type: "string" } }
+        };
+        const { driver, calls } = driverWith(() => ok({ data: [{ handle: "ada", name: "Ada" }], meta: {} }));
+
+        await driver.fetchCollection({ path: "authors", collection: authors });
+        expect(await driver.fetchOne({ path: "authors", id: "ada" })).toEqual({ handle: "ada", name: "Ada" });
+        expect(calls.map(call => call.name)).toEqual(["query_collection"]);
+    });
+
     it("answers no row for one the server says is not there", async () => {
         const { driver } = driverWith(() => ({ content: [{ type: "text", text: "No row with id \"x\" in orders." }], isError: true }));
         await expect(driver.fetchOne({ path: "orders", id: "x" })).resolves.toBeUndefined();
@@ -207,7 +248,7 @@ describe("an app's data", () => {
 
         expect(await data.find("orders", { where: { status: ["==", "paid"] }, limit: 5 }))
             .toEqual({ data: [{ id: "o1" }], total: 9, hasMore: true });
-        expect(await data.get("orders", "o1")).toEqual({ id: "o1" });
+        expect(await data.get("orders", "o2")).toEqual({ id: "o2" });
         expect(await data.count("orders", { status: ["==", "paid"] })).toBe(2);
         expect(calls.map(call => call.name)).toEqual(["query_collection", "get_document", "count_documents"]);
     });

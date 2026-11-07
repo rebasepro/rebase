@@ -14,10 +14,10 @@
  */
 import React, { createContext, useContext, useEffect, useMemo, useReducer, useState } from "react";
 import type { AdminCollection, SidePanelController } from "@rebasepro/cms-types";
-import type { CollectionRegistryController } from "@rebasepro/types";
+import type { CollectionRegistryController, Entity } from "@rebasepro/types";
 import { CollectionPanel } from "../components/CollectionPanel";
 import { EntityFormPanel } from "../components/EntityFormPanel";
-import { SidePanelControllerContext, useSidePanel } from "../hooks/useSidePanel";
+import { useSidePanel } from "../hooks/useSidePanel";
 import { useCollectionRegistryController } from "../hooks/navigation/contexts/CollectionRegistryContext";
 import type { ToolData } from "./tool_driver";
 import { filterOf, orderOf, type ViewMode } from "./payload";
@@ -204,17 +204,11 @@ export interface CollectionViewProps {
 export function CollectionView({ collection, where, orderBy, view, height = 420, onRowClick, highlightedEntityId }: CollectionViewProps) {
     const config = useCollection(collection);
     const { data } = useSdk();
-    const parent = useSidePanel();
-    const sidePanel = useMemo<SidePanelController>(() => !onRowClick ? parent : {
-        ...parent,
-        open: props => {
-            if (props.entityId === undefined || props.copy) {
-                parent.open(props);
-                return;
-            }
-            void data.get(collection, props.entityId).then(row => row && onRowClick(row));
-        }
-    }, [parent, onRowClick, data, collection]);
+    // The app is handed the row as the read tools serve it. The page the view
+    // drew filled the driver's row cache, so this asks the server nothing.
+    const onEntityClick = useMemo(() => onRowClick
+        ? (entity: Entity) => void data.get(config.slug, entity.id).then(row => row && onRowClick(row))
+        : undefined, [onRowClick, data, config.slug]);
     const filterKey = JSON.stringify(where ?? null);
     const overrides = useMemo<Partial<AdminCollection>>(() => {
         const filter = filterOf(JSON.parse(filterKey) ?? undefined);
@@ -224,18 +218,17 @@ export function CollectionView({ collection, where, orderBy, view, height = 420,
 
     return (
         <div className="min-h-0 min-w-0 rounded-xl overflow-hidden" style={{ height }}>
-            <SidePanelControllerContext.Provider value={sidePanel}>
-                <CollectionPanel
-                    key={filterKey}
-                    path={config.slug}
-                    title={false}
-                    className="h-full flex flex-col"
-                    {...(view && { viewMode: view })}
-                    {...(sort && { sort })}
-                    {...(highlightedEntityId !== undefined && { highlightedEntityId })}
-                    collectionOverrides={overrides}
-                />
-            </SidePanelControllerContext.Provider>
+            <CollectionPanel
+                key={filterKey}
+                path={config.slug}
+                title={false}
+                className="h-full flex flex-col"
+                {...(view && { viewMode: view })}
+                {...(sort && { sort })}
+                {...(highlightedEntityId !== undefined && { highlightedEntityId })}
+                {...(onEntityClick && { onEntityClick })}
+                collectionOverrides={overrides}
+            />
         </div>
     );
 }
