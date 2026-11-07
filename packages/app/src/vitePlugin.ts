@@ -618,10 +618,13 @@ export function rebaseManualChunks(id: string): string | undefined {
  * (show_collection, show_record, show_app), built from this app.
  *
  * A server serves a generic view — the admin panel with nothing of the
- * project's own. This builds the project's: its own entry (`src/main.tsx`),
- * started inside the view (`startMcpView` in `@rebasepro/cms/mcp-view`), so
- * the app's custom views, entity views, fields, previews, actions, plugins and
- * slots are what Claude draws. The output is one self-contained document,
+ * project's own. This builds the project's: its `App` component (the one
+ * `src/main.tsx` renders under its router) and its stylesheet, mounted inside
+ * the view (`startMcpView` in `@rebasepro/cms/mcp-view`), so the app's custom
+ * views, entity views, fields, previews, actions, plugins and slots are what
+ * Claude draws. Not `main.tsx` itself: a browser router cannot address a frame
+ * whose document is `about:srcdoc`, and in the view `<RebaseShell>` brings a
+ * router of its own. The output is one self-contained document,
  * `rebase-view.html` beside the build: a view's frame fetches nothing, so
  * every script, style and font is inside it. The backend serves it in place
  * of the generic one (`serveSPA` finds it in the frontend it serves).
@@ -629,8 +632,10 @@ export function rebaseManualChunks(id: string): string | undefined {
  * A second build, after the app's, from the same config.
  */
 export interface RebaseMcpViewPluginOptions {
-    /** The app's entry, which renders it. Default `src/main.tsx`. */
-    entry?: string;
+    /** The module that exports the app's root component, `App`. Default `src/App.tsx`. */
+    app?: string;
+    /** The app's stylesheet. Default `src/index.css`, where it exists. */
+    styles?: string;
     /** The file written into the build's output directory. Default `rebase-view.html`. */
     fileName?: string;
 }
@@ -648,16 +653,20 @@ export function rebaseMcpViewPlugin(options: RebaseMcpViewPluginOptions = {}): P
         },
         async closeBundle() {
             if (process.env[MCP_VIEW_BUILD] || config.build.ssr) return;
-            const entry = path.resolve(config.root, options.entry ?? "src/main.tsx");
-            if (!fs.existsSync(entry)) {
-                config.logger.warn(`[rebase] No MCP view: ${path.relative(config.root, entry)} does not exist.`);
+            const app = path.resolve(config.root, options.app ?? "src/App.tsx");
+            if (!fs.existsSync(app)) {
+                config.logger.warn(`[rebase] No MCP view: ${path.relative(config.root, app)} does not exist.`);
                 return;
             }
+            const styles = path.resolve(config.root, options.styles ?? "src/index.css");
             const work = fs.mkdtempSync(path.join(config.root, ".rebase-mcp-view-"));
             try {
                 fs.writeFileSync(path.join(work, "index.html"), mcpViewDocument());
                 fs.writeFileSync(path.join(work, "view.css"), MCP_VIEW_UTILITIES);
-                fs.writeFileSync(path.join(work, "boot.ts"), mcpViewBoot(entry, resolvesFrom(config.root, "@rebasepro/plugin-insights")));
+                fs.writeFileSync(path.join(work, "boot.tsx"), mcpViewBoot(
+                    app,
+                    fs.existsSync(styles) ? styles : undefined,
+                    resolvesFrom(config.root, "@rebasepro/plugin-insights")));
                 const { build } = await import("vite");
                 process.env[MCP_VIEW_BUILD] = "1";
                 try {
@@ -674,7 +683,10 @@ export function rebaseMcpViewPlugin(options: RebaseMcpViewPluginOptions = {}): P
                             sourcemap: false,
                             modulePreload: false,
                             cssCodeSplit: false,
-                            assetsInlineLimit: Number.MAX_SAFE_INTEGER,
+                            // Everything but fonts: a view's frame loads no
+                            // font file, inlined or not, so they would only
+                            // be megabytes the host downloads to throw away.
+                            assetsInlineLimit: file => !/\.(woff2?|ttf|otf|eot)$/i.test(file),
                             rollupOptions: {
                                 input: path.join(work, "index.html"),
                                 output: { codeSplitting: false }
@@ -704,7 +716,7 @@ function resolvesFrom(root: string, specifier: string): boolean {
 }
 
 /** The view's document: a root for the app, and storage that works in a frame with no origin of its own. */
-export function mcpViewDocument(entry = "./boot.ts"): string {
+export function mcpViewDocument(entry = "./boot.tsx"): string {
     return `<!doctype html>
 <html lang="en">
 <head>
@@ -740,15 +752,23 @@ export const MCP_VIEW_STORAGE_SHIM = `for (const name of ["localStorage", "sessi
     }
 }`;
 
-function mcpViewBoot(entry: string, insights: boolean): string {
+function mcpViewBoot(app: string, styles: string | undefined, insights: boolean): string {
     return [
+        "import React from \"react\";",
+        "import { createRoot } from \"react-dom/client\";",
+        ...(styles ? [`import ${JSON.stringify(styles)};`] : []),
         "import \"./view.css\";",
         "import { addAppModules, startMcpView } from \"@rebasepro/cms/mcp-view\";",
         ...(insights ? [
             "import { BarChart, ChartCard, ChartStatus, KpiChange, KpiGrid, KpiReadout, KpiTile, SERIES_COLORS, TimeSeriesChart, compactFormat, describeChange, formatNumber, niceTicks } from \"@rebasepro/plugin-insights\";",
             "addAppModules({ \"@rebasepro/plugin-insights\": { BarChart, ChartCard, ChartStatus, KpiChange, KpiGrid, KpiReadout, KpiTile, SERIES_COLORS, TimeSeriesChart, compactFormat, describeChange, formatNumber, niceTicks } });"
         ] : []),
-        `startMcpView({ mountApp: () => import(${JSON.stringify(entry)}) });`,
+        "startMcpView({",
+        `    mountApp: async () => {`,
+        `        const { App } = await import(${JSON.stringify(app)});`,
+        "        createRoot(document.getElementById(\"root\")!).render(<App/>);",
+        "    }",
+        "});",
         ""
     ].join("\n");
 }
@@ -757,9 +777,12 @@ function mcpViewBoot(entry: string, insights: boolean): string {
  * The utilities an app Claude writes may use (show_app). Tailwind generates
  * only the classes it finds when it builds, and an app's code arrives later:
  * a class missing here does nothing, silently. Colours are the app's own,
- * from its stylesheet.
+ * from its stylesheet. And the root is held to the frame's width: an app's
+ * stylesheet may lay out the page (a flex body sizes the root to its content).
  */
 export const MCP_VIEW_UTILITIES = `@import "tailwindcss/utilities" source(none);
+/* The view is as wide as its frame, whatever the app's stylesheet does with the page. */
+#root { width: 100%; min-width: 0; }
 @source inline("{sm:,md:,lg:,xl:,}{flex,inline-flex,grid,block,inline-block,hidden}");
 @source inline("{sm:,md:,lg:,xl:,}{flex-row,flex-col,flex-wrap,flex-1,flex-none,shrink-0,grow,order-first,order-last}");
 @source inline("{sm:,md:,lg:,xl:,}grid-cols-{1,2,3,4,5,6,7,8,9,10,11,12}");
