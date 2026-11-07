@@ -6,6 +6,10 @@
  *
  * Zero imports from any entity or data layer.
  *
+ * Deprecated, with every type below: use `CollectionPanel` from
+ * `@rebasepro/cms`, which renders the same four views for a collection with
+ * its permissions, actions, overrides, realtime updates and saved view state.
+ *
  * @module CollectionView
  */
 

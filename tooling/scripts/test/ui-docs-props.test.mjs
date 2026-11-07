@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 
-import { readProps } from "../../design-sync/gen-ui-docs.mjs";
+import { readDeprecation, readProps } from "../../design-sync/gen-ui-docs.mjs";
 
 /**
  * The component reference's Description column was empty in 488 cells, next to
@@ -76,4 +76,38 @@ test("a generic props interface is still found", () => {
     const [row] = readProps(src, "Thing");
     assert.equal(row.name, "row");
     assert.equal(row.doc, "The row.");
+});
+
+/**
+ * The component pages are regenerated wholesale from the types, so a
+ * deprecation written into a page by hand is gone at the next sync. The notice
+ * comes from the component's own `@deprecated` tag instead.
+ */
+test("a component's own @deprecated tag becomes its page's notice", () => {
+    const source = [
+        "/**",
+        " * A data-agnostic collection view.",
+        " *",
+        " * @group Collection View",
+        " * @deprecated Use `CollectionPanel` from `@rebasepro/cms` instead: the same",
+        " * four views, with the collection's permissions.",
+        " */",
+        "export declare function CollectionView(props: CollectionViewProps): JSX.Element;"
+    ].join("\n");
+    assert.equal(
+        readDeprecation(source, "CollectionView"),
+        "Use `CollectionPanel` from `@rebasepro/cms` instead: the same four views, with the collection's permissions."
+    );
+});
+
+test("a @deprecated tag on something else in the file is not the component's", () => {
+    const source = [
+        "export interface ThingProps {",
+        "    /** @deprecated Use `size` instead. */",
+        "    small?: boolean;",
+        "}",
+        "/** A thing. */",
+        "export declare function Thing(props: ThingProps): JSX.Element;"
+    ].join("\n");
+    assert.equal(readDeprecation(source, "Thing"), null);
 });

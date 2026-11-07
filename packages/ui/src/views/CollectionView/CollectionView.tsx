@@ -18,6 +18,19 @@ import type {
 } from "./CollectionViewTypes";
 
 /**
+ * Once per page load. The kit cannot depend on `@rebasepro/common`, whose
+ * `warnDeprecated` the rest of Rebase uses; this prints the same message the
+ * same way.
+ */
+let warnedDeprecated = false;
+
+function warnCollectionViewDeprecated(): void {
+    if (warnedDeprecated) return;
+    warnedDeprecated = true;
+    console.warn("[Rebase] Deprecated: `CollectionView` from @rebasepro/ui is deprecated; use `CollectionPanel` from @rebasepro/cms instead.");
+}
+
+/**
  * Props for the headless {@link CollectionView} component.
  *
  * This component is data-agnostic — it renders collection data based on
@@ -25,6 +38,7 @@ import type {
  * or data layer.
  *
  * @group Collection View
+ * @deprecated `CollectionView` is deprecated; use `CollectionPanel` from `@rebasepro/cms`.
  */
 export interface CollectionViewProps<T = Record<string, unknown>> {
     // ── Data ──────────────────────────────────────────────────────────
@@ -209,6 +223,10 @@ const DEFAULT_ENABLED_VIEWS: CollectionViewMode[] = ["list", "table", "cards", "
  * ```
  *
  * @group Collection View
+ * @deprecated Use `CollectionPanel` from `@rebasepro/cms` instead: the same
+ * table, cards, list and kanban, with the collection's permissions, actions,
+ * overrides, realtime updates and saved view state. Will be removed in a
+ * future release.
  */
 export function CollectionView<T extends Record<string, unknown> = Record<string, unknown>>({
     dataController,
@@ -246,6 +264,7 @@ export function CollectionView<T extends Record<string, unknown> = Record<string
     onColumnsOrderChange,
     className
 }: CollectionViewProps<T>) {
+    warnCollectionViewDeprecated();
 
     // ── View mode state (uncontrolled with controlled override) ───────
 

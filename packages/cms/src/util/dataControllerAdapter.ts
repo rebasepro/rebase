@@ -8,6 +8,7 @@ import { useMemo } from "react";
 import type { Entity } from "@rebasepro/types";
 import type { EntityTableController } from "@rebasepro/cms-types";
 import type { CollectionDataController } from "@rebasepro/ui";
+import { warnDeprecated } from "@rebasepro/common";
 
 /**
  * Unwrap `Entity<M>` objects to flat rows for the headless view.
@@ -31,10 +32,18 @@ function flattenEntities<M extends Record<string, unknown>>(
  *
  * <CollectionView dataController={dataController} ... />
  * ```
+ *
+ * @deprecated It feeds `CollectionView` from `@rebasepro/ui`, which is
+ * deprecated: render the collection with `CollectionPanel` instead. Will be
+ * removed in a future release.
  */
 export function useCollectionDataController<M extends Record<string, unknown>>(
     tableController: EntityTableController<M>
 ): CollectionDataController<M> {
+    warnDeprecated(
+        "cms.useCollectionDataController",
+        "`useCollectionDataController` is deprecated, with the `CollectionView` it feeds; render the collection with `CollectionPanel` instead."
+    );
     const flatData = useMemo(
         () => flattenEntities(tableController.data),
         [tableController.data]
@@ -71,6 +80,10 @@ export function useCollectionDataController<M extends Record<string, unknown>>(
 /**
  * Non-hook version for cases where you already have the data
  * and just need to build a static controller.
+ *
+ * @deprecated It feeds `CollectionView` from `@rebasepro/ui`, which is
+ * deprecated: render the collection with `CollectionPanel` instead. Will be
+ * removed in a future release.
  */
 export function createStaticDataController<T extends Record<string, unknown>>(
     data: T[],
@@ -79,6 +92,10 @@ export function createStaticDataController<T extends Record<string, unknown>>(
         error?: Error;
     }
 ): CollectionDataController<T> {
+    warnDeprecated(
+        "cms.createStaticDataController",
+        "`createStaticDataController` is deprecated, with the `CollectionView` it feeds; render the collection with `CollectionPanel` instead."
+    );
     return {
         data,
         loading: options?.loading ?? false,

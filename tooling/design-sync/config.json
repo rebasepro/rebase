@@ -153,8 +153,7 @@
     "DebouncedTextField": "/** Same contract as TextField; commits its value on a debounce. */\n  value?: string | number;\n  onChange?: React.ChangeEventHandler<HTMLInputElement>;\n  label?: React.ReactNode;\n  type?: \"text\" | \"number\" | \"search\" | \"email\" | \"url\" | \"password\" | \"date\" | \"time\" | \"datetime-local\" | \"month\" | \"week\" | \"color\" | \"phone\";\n  placeholder?: string;\n  size?: \"smallest\" | \"small\" | \"medium\" | \"large\";\n  multiline?: boolean;\n  minRows?: string | number;\n  maxRows?: string | number;\n  disabled?: boolean;\n  error?: boolean;\n  invisible?: boolean;\n  endAdornment?: React.ReactNode;\n  className?: string;\n  inputClassName?: string;",
     "CardView": "/** Virtualized card grid. Generic over the row type T. */\n  data: T[];\n  renderCard: (item: T, extra: { selected: boolean; highlighted: boolean; onSelectionChange: (selected: boolean) => void; onClick: (e: React.MouseEvent) => void }) => React.ReactNode;\n  dataLoading?: boolean;\n  noMoreToLoad?: boolean;\n  dataLoadingError?: Error;\n  itemCount?: number;\n  setItemCount?: (itemCount: number) => void;\n  pageSize?: number;\n  paginationEnabled?: boolean;\n  onItemClick?: (item: T) => void;\n  selectedIds?: Set<string | number>;\n  highlightedIds?: Set<string | number>;\n  selectionEnabled?: boolean;\n  onSelectionChange?: (item: T, selected: boolean) => void;\n  initialScroll?: number;\n  size?: \"xs\" | \"s\" | \"m\" | \"l\" | \"xl\";\n  emptyComponent?: React.ReactNode;",
     "ListView": "/** Virtualized list. Generic over the row type T. */\n  data: T[];\n  renderRow: (params: { item: T; index: number; style: React.CSSProperties; className: string; selected: boolean; highlighted: boolean; isLast: boolean; onClick: (e: React.MouseEvent) => void; onSelectionChange: (selected: boolean) => void }) => React.ReactNode;\n  dataLoading?: boolean;\n  noMoreToLoad?: boolean;\n  dataLoadingError?: Error;\n  itemCount?: number;\n  setItemCount?: (itemCount: number) => void;\n  pageSize?: number;\n  paginationEnabled?: boolean;\n  onItemClick?: (item: T) => void;\n  selectedIds?: Set<string | number>;\n  highlightedIds?: Set<string | number>;\n  selectedEntityId?: string | number;\n  selectionEnabled?: boolean;\n  onSelectionChange?: (item: T, selected: boolean) => void;\n  size?: \"xs\" | \"s\" | \"m\" | \"l\" | \"xl\";\n  emptyComponent?: React.ReactNode;",
-    "KanbanView": "/** Drag-and-drop board. T = card payload, COLUMN = the column key union. */\n  data: { id: string; data: T }[];\n  columns: COLUMN[];\n  assignColumn: (item: { id: string; data: T }) => COLUMN;\n  ItemComponent: React.ComponentType<{ item: { id: string; data: T }; isDragging: boolean; isClone?: boolean; isGroupedOver?: boolean; style?: React.CSSProperties; index?: number }>;\n  columnLabels?: Record<COLUMN, string>;\n  columnColors?: Record<COLUMN, unknown>;\n  allowColumnReorder?: boolean;\n  onColumnReorder?: (columns: COLUMN[]) => void;\n  onItemsReorder?: (items: { id: string; data: T }[], moveInfo?: { itemId: string; sourceColumn: COLUMN; targetColumn: COLUMN }) => void;\n  columnLoadingState?: { [columnKey: string]: { loading: boolean; hasMore: boolean; itemCount: number; totalCount?: number } };\n  onLoadMoreColumn?: (column: COLUMN) => void;\n  onAddItemToColumn?: (column: COLUMN) => void;\n  AddColumnComponent?: React.ReactNode;\n  className?: string;",
-    "DefaultCellRenderer": "row: Record<string, unknown>;\n  propertyKey: string;\n  /** CollectionPropertyConfig - inlined here because it is not separately emitted. */\n  property: { type: \"string\" | \"number\" | \"boolean\" | \"date\" | \"array\" | \"map\" | \"reference\" | \"relation\" | \"geopoint\"; name: string; description?: string; columnWidth?: number; hideFromCollection?: boolean; multiline?: boolean; previewAsTag?: boolean; url?: boolean | string; markdown?: boolean; storage?: boolean; email?: boolean; mode?: \"date\" | \"date_time\"; propertiesOrder?: string[] };\n  value: unknown;\n  size?: \"tiny\" | \"small\" | \"medium\" | \"large\";\n  width?: number;\n  height?: number;"
+    "KanbanView": "/** Drag-and-drop board. T = card payload, COLUMN = the column key union. */\n  data: { id: string; data: T }[];\n  columns: COLUMN[];\n  assignColumn: (item: { id: string; data: T }) => COLUMN;\n  ItemComponent: React.ComponentType<{ item: { id: string; data: T }; isDragging: boolean; isClone?: boolean; isGroupedOver?: boolean; style?: React.CSSProperties; index?: number }>;\n  columnLabels?: Record<COLUMN, string>;\n  columnColors?: Record<COLUMN, unknown>;\n  allowColumnReorder?: boolean;\n  onColumnReorder?: (columns: COLUMN[]) => void;\n  onItemsReorder?: (items: { id: string; data: T }[], moveInfo?: { itemId: string; sourceColumn: COLUMN; targetColumn: COLUMN }) => void;\n  columnLoadingState?: { [columnKey: string]: { loading: boolean; hasMore: boolean; itemCount: number; totalCount?: number } };\n  onLoadMoreColumn?: (column: COLUMN) => void;\n  onAddItemToColumn?: (column: COLUMN) => void;\n  AddColumnComponent?: React.ReactNode;\n  className?: string;"
   },
   "overrides": {
     "Menu": {
@@ -281,28 +280,7 @@
     "ListView": {
       "cardMode": "column"
     },
-    "TableView": {
-      "cardMode": "column"
-    },
     "KanbanView": {
-      "cardMode": "column"
-    },
-    "CollectionCardView": {
-      "cardMode": "column"
-    },
-    "CollectionListView": {
-      "cardMode": "column"
-    },
-    "CollectionTableView": {
-      "cardMode": "column"
-    },
-    "CollectionKanbanView": {
-      "cardMode": "column"
-    },
-    "CollectionViewToolbar": {
-      "cardMode": "column"
-    },
-    "DefaultCellRenderer": {
       "cardMode": "column"
     },
     "Table": {

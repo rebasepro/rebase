@@ -9,6 +9,7 @@
 import type { Property, Properties, EnumValues, EnumValueConfig } from "@rebasepro/types";
 import type { CollectionPropertyConfig, CollectionEnumValueConfig } from "@rebasepro/ui";
 import { prettifyIdentifier } from "@rebasepro/utils";
+import { warnDeprecated } from "@rebasepro/common";
 
 /**
  * Map Rebase property types to headless-supported types.
@@ -30,8 +31,20 @@ const TYPE_MAP: Record<string, CollectionPropertyConfig["type"]> = {
 
 /**
  * Convert a single Property to a CollectionPropertyConfig.
+ *
+ * @deprecated It feeds `CollectionView` from `@rebasepro/ui`, which is
+ * deprecated: render the collection with `CollectionPanel` instead. Will be
+ * removed in a future release.
  */
 export function mapPropertyToConfig(property: Property, key?: string): CollectionPropertyConfig {
+    warnDeprecated(
+        "cms.mapPropertyToConfig",
+        "`mapPropertyToConfig` is deprecated, with the `CollectionView` it feeds; render the collection with `CollectionPanel` instead."
+    );
+    return propertyToConfig(property, key);
+}
+
+function propertyToConfig(property: Property, key?: string): CollectionPropertyConfig {
     const base: CollectionPropertyConfig = {
         type: TYPE_MAP[property.type] ?? "string",
         // A column header has to say something, and `name` is optional on the
@@ -65,7 +78,7 @@ export function mapPropertyToConfig(property: Property, key?: string): Collectio
 
     // Array-specific
     if (property.type === "array" && property.of && !Array.isArray(property.of)) {
-        base.of = mapPropertyToConfig(property.of, key);
+        base.of = propertyToConfig(property.of, key);
     }
 
     // Map-specific
@@ -92,13 +105,21 @@ export function mapPropertyToConfig(property: Property, key?: string): Collectio
 
 /**
  * Convert a Properties record to a CollectionPropertyConfig record.
+ *
+ * @deprecated It feeds `CollectionView` from `@rebasepro/ui`, which is
+ * deprecated: render the collection with `CollectionPanel` instead. Will be
+ * removed in a future release.
  */
 export function mapPropertiesToConfigs(
     properties: Properties
 ): Record<string, CollectionPropertyConfig> {
+    warnDeprecated(
+        "cms.mapPropertiesToConfigs",
+        "`mapPropertiesToConfigs` is deprecated, with the `CollectionView` it feeds; render the collection with `CollectionPanel` instead."
+    );
     const result: Record<string, CollectionPropertyConfig> = {};
     for (const [key, property] of Object.entries(properties)) {
-        result[key] = mapPropertyToConfig(property, key);
+        result[key] = propertyToConfig(property, key);
     }
     return result;
 }

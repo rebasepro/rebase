@@ -266,6 +266,20 @@ function readExample(name) {
     return [...importLines, "", body].join("\n").replace(/\n{3,}/g, "\n\n").trimEnd();
 }
 
+/**
+ * The `@deprecated` note of the component's own doc comment — the block right
+ * above its `declare function`/`declare const` — flattened to one line, or
+ * null. A page regenerated from the types must keep saying the component is
+ * deprecated, so the notice comes from the source, not from an edit to the page.
+ */
+export function readDeprecation(dts, name) {
+    const own = new RegExp(`/\\*\\*((?:(?!\\*/)[\\s\\S])*)\\*/\\s*(?:export\\s+)?declare\\s+(?:function|const)\\s+${name}\\b`);
+    const doc = dts.match(own)?.[1];
+    const note = doc?.match(/@deprecated\b([\s\S]*?)(?=\n\s*\*\s*@|$)/)?.[1];
+    if (note === undefined) return null;
+    return note.split("\n").map(line => line.replace(/^\s*\*\s?/, "").trim()).filter(Boolean).join(" ") || "Deprecated.";
+}
+
 // Only `|` needs escaping: these land inside inline code spans, which MDX does
 // not parse as JSX, and HTML entities are NOT decoded inside a code span — so
 // escaping <> would render the entities literally.
@@ -298,6 +312,9 @@ function main() {
             let md = `---\ntitle: ${name}\nsidebar_label: ${name}\n`;
             md += `description: ${name} — a component from @rebasepro/ui, the library Rebase CMS and Rebase Studio are built from.\n---\n\n`;
             md += `\`\`\`ts\nimport { ${name} } from "@rebasepro/ui";\n\`\`\`\n\n`;
+
+            const deprecation = readDeprecation(dts, name);
+            if (deprecation) md += `:::caution[Deprecated]\n${deprecation}\n:::\n\n`;
 
             if (props.length) {
                 withProps++;
