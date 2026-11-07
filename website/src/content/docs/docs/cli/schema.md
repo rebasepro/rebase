@@ -79,17 +79,17 @@ does.
 Relax and drop what boot will not, after you have read the plan:
 
 ```bash
-rebase schema reconcile                         # relax NOT NULL on properties made optional
+rebase schema reconcile                         # relax NOT NULL on properties made optional or removed
 rebase schema reconcile --drop voice_cache.wav  # and drop a column no property declares
 ```
 
 **What it does:**
 - Asks the running backend to plan against its own database. That's the backend `.env` and the cloud link point at, so it works on Rebase Cloud, where nothing else reaches the database.
 - Plans `DROP NOT NULL` for every column a collection declares optional that the database still requires.
-- Lists every column no collection declares. It drops only the ones you name with `--drop <collection>.<column>`, and shows how many rows hold a value in each.
+- Lists every column no collection declares. One that is `NOT NULL` with no default blocks every insert, so it is relaxed too, and its data stays. It drops only the columns you name with `--drop <collection>.<column>`, and shows how many rows hold a value in each.
 - Applies once you type `yes`. The server runs the plan only on the digest of the one you read, so if the database or the collections changed in between, it refuses and you review again. `--yes` skips the prompt.
 
-Boot only ever adds, so after you remove a property its column stays, with its data. A `NOT NULL` column with no default then makes every insert fail, and boot's log names this command for it. Deploy the collection change first, because reconcile plans against what the backend runs. It needs `REBASE_SERVICE_KEY` in `.env`. Locally, `rebase db push` covers the same through its destructive-change gate.
+Boot only ever adds, so after you remove a property its column stays, with its data. A `NOT NULL` column with no default then makes every insert fail, and boot's log names this command for it: without `--drop` to keep the data, with it to remove the column. Deploy the collection change first, because reconcile plans against what the backend runs. It needs `REBASE_SERVICE_KEY` in `.env`. Locally, `rebase db push` covers the same through its destructive-change gate.
 
 ### `rebase schema introspect`
 

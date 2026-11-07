@@ -32,4 +32,19 @@ describe("rebase schema reconcile", () => {
         expect(lines[2]).toMatch(/keep {3}public\.voice_cache\.note {2}no property declares it/);
         expect(lines).toHaveLength(3);
     });
+
+    it("shows an undeclared column it relaxes once, as kept with its data, not also as blocking", () => {
+        const plan: SchemaReconcilePlan = {
+            relaxed: [{ collection: "voice_cache", table: "public.voice_cache", column: "wav", undeclared: true }],
+            undeclared: [{ collection: "voice_cache", table: "public.voice_cache", column: "wav", blocksInserts: true }],
+            dropped: [],
+            statements: ["…"],
+            problems: [],
+            digest: "d"
+        };
+        const lines = describeReconcilePlan(plan).map(stripVTControlCharacters);
+        expect(lines).toEqual([
+            `  relax  public.voice_cache.wav  no property in "voice_cache" declares it, and every insert fails on it; its data stays`
+        ]);
+    });
 });

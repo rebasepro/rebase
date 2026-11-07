@@ -674,15 +674,13 @@ export async function ensureCollectionTables(
     // error the API returns names a field the author has already deleted.
     // This is what a renamed property looks like to an additive provisioner.
     for (const orphan of plan.orphanedRequiredColumns) {
-        const [schema, table] = orphan.table.split(".");
         const message =
             `"${orphan.table}"."${orphan.column}" is NOT NULL with no default, and the "${orphan.slug}" ` +
             "collection no longer declares it. Every insert will be rejected for a field you cannot set " +
-            `(PG_23502, naming "${orphan.column}"). This is what a renamed property looks like: the new ` +
-            "column was added, and the old one cannot be dropped unattended. Fix it with " +
-            `\`rebase schema reconcile --drop ${orphan.slug}.${orphan.column}\` (it shows the plan and asks), or ONE of:\n` +
-            `      ALTER TABLE "${schema}"."${table}" DROP COLUMN "${orphan.column}";               -- the rename is complete\n` +
-            `      ALTER TABLE "${schema}"."${table}" ALTER COLUMN "${orphan.column}" DROP NOT NULL; -- keep the data, stop requiring it\n` +
+            `(PG_23502, naming "${orphan.column}"). This is what a removed or renamed property looks like: ` +
+            "boot neither relaxes nor drops a column unattended. Fix it with ONE of (each shows the plan and asks):\n" +
+            `      rebase schema reconcile                                    -- keep the data, stop requiring it\n` +
+            `      rebase schema reconcile --drop ${orphan.slug}.${orphan.column}  -- the column is no longer wanted\n` +
             "      ...or declare the property again, if the column is still wanted.";
         logger.warn(`[schema] ${message}`);
         log?.(message);
