@@ -13,15 +13,16 @@ an Owner. The listing belongs to the organization you submit from.
 
 ## Before submitting (in order)
 
-1. **Deploy the control plane with the scope fix** (saas `de1fab3`). Until it is
-   live, Claude requests only `project:read` and every data, deploy, env and
-   cron tool refuses. Check afterwards:
-   `curl -si -X POST https://app.rebase.pro/mcp -d '{}' | grep -i www-authenticate`
-   must name all five scopes.
-2. **Approve and publish the privacy-policy section** below. Anthropic rejects
-   a missing or incomplete policy outright, and the current notice says nothing
-   about the connector.
-3. **Create the reviewer account** (below). Reviewers must get "a fully
+1. ~~Deploy the scope fix~~ — done 2026-11-07. The 401 challenge names all
+   five scopes:
+   `curl -si -X POST https://app.rebase.pro/mcp -d '{}' | grep -i www-authenticate`.
+   Connecting from Claude in Chrome also works since 2026-11-07 (consent
+   `form-action` and the token endpoint's CSRF check, both fixed and deployed).
+2. ~~Publish the privacy-policy section~~ — live since 2026-11-07, section 17
+   of `https://rebase.pro/policy/privacy_policy/`.
+3. **Create the reviewer account** (below). The connector already being added
+   to your own Claude does not cover this: reviewers sign in with their own
+   login. Reviewers must get "a fully
    populated account" and be able to run the write tools on real data.
 4. **Run every tool yourself** in Claude (custom connector) and with
    `npx @modelcontextprotocol/inspector --cli https://app.rebase.pro/mcp --transport http --method tools/list`.
@@ -90,10 +91,20 @@ Ten tools; every one has a `title` and annotations.
 - **Allowed link URIs:** leave empty. The table opens no links.
 - **Carousel screenshots** (required because `show_collection` is an MCP App;
   PNG, ≥1000 px wide, 3–5, the app response only, no prompt in the image,
-  each paired with its prompt): **not made yet.** Take them in Claude itself,
-  with the connector on the reviewer project, after the control-plane deploy
-  in step 1 — the real table over real Rebase data, in light and dark, plus
-  one edited cell waiting on Save.
+  each paired with its prompt). Taken in Claude on 2026-11-07 with the live
+  connector, the table opened fullscreen over a real Rebase project
+  (SongBuzz's `songs`: public song metadata, no personal data). 1568×680
+  PNG each:
+
+  | File | Prompt |
+  |---|---|
+  | [`screenshots/1-table.png`](screenshots/1-table.png) | Show me the songs table in my SongBuzz project, most played first. |
+  | [`screenshots/2-edit-plan.png`](screenshots/2-edit-plan.png) | (in the table) Edit a song's title — the change waits on Save. |
+  | [`screenshots/3-switches-and-stats.png`](screenshots/3-switches-and-stats.png) | (in the table) Scroll right to the switches and play counts. |
+
+  Images from outside hosts (the cover column) show as an "Image" label:
+  Claude loads only the origins a view declares, and a project's image hosts
+  are its data. The edit in shot 2 was cancelled, not saved.
 
 ## 4. Use cases
 
