@@ -4475,6 +4475,12 @@ yet, listed so that nobody reads a promise into them:
 
 ##### MCP
 
+- **`REBASE_MCP_ENABLED` switches on `/mcp` for a backend built in code.** Only
+  the containerized boot read it, so `initializeRebaseBackend` and
+  `createRebaseBackend` ignored it: with both documented variables set, `/mcp`
+  answered 404 and the log said nothing. The variable now decides when
+  `surfaces.mcp` is not set; set, the option wins.
+
 - **Connecting an MCP client from Chrome now finishes.** The consent screen
   allowed form submissions to its own origin only (`form-action 'self'`), and
   Chrome applies that to the redirect after Allow, so the authorization code
@@ -4496,6 +4502,29 @@ yet, listed so that nobody reads a promise into them:
   stays as the rows scroll. An image address shows as the image, or as a
   small "Image" label where the host blocks outside images, instead of the
   raw URL; a list of plain values reads `Rock, 90s`.
+
+- **`list_documents` explains its filter.** Its `where` description lists
+  the operators and says how to match a missing value (`"isnull.null"`, or
+  `null`); it gave two examples, so an agent counting rows with no value
+  guessed `is.null` and `eq.null`, got "not a valid smallint" for both, and
+  paged the whole collection instead. `null`, a number or a boolean given as
+  a condition (`{ "difficulty": null }`) is now an equality, as the server
+  reads it, instead of an error. `query_collection` shows the null test too.
+
+##### Server & REST
+
+- **A filter in PostgREST's spelling is refused with the one that works.**
+  `?difficulty=is.null`, `not.is.null`, `?status=not.eq.draft`, a canonical
+  name in a query parameter (`?age=>=.18`, `is-null.null`) and the same
+  inside `or(…)`/`and(…)`/`not(…)` were read as an equality on the whole
+  string: no rows on a text column, a type error on any other, and nothing to
+  say why. They now answer 400 `UNKNOWN_FILTER_OPERATOR`, naming the spelling
+  to use (`isnull.null`, `notnull.null`, `neq.draft`, `gte.18`). Values that
+  only start with `is.` or `not.` (`is.gd`) are still values.
+
+- **An equality with "null" on a column that is not text says how to match a
+  missing value.** `eq.null` compares against the text "null", so on a number,
+  date or enum column it fails. The 400 now names `isnull.null`.
 
 ### [0.28.2] - 2026-11-06
 
@@ -48693,21 +48722,17 @@ const client = createRebaseClient({
 | `"cookie"` | An **HttpOnly** cookie the backend sets. Script running on your page cannot read it, which is what makes it XSS-safe | In a browser |
 | `"json"` | Returned in the response body, kept in `storage` (`localStorage` by default) | Off the browser (Node, workers, React Native), and in a browser when you pass your own `storage` |
 
-Cookie mode needs `auth.cookieAuth` on the backend, and the Rebase runtime,
-which Rebase Cloud runs, always turns it on. Json mode works against either: a
-json client sends `x-rebase-auth-flow: json` on its auth requests, and a
-`cookieAuth` backend answers those with the refresh token in the body and
-leaves the cookie alone. A backend older than the release that added this
-hands a json client no refresh token, and its session ends when the access
-token expires, about an hour after sign-in. When the answer to a sign-in shows
-a client cannot renew, it logs an error saying what to change, except for a
-json client with its own `storage`, which chose to keep its sign-in apart.
+Cookie mode needs `auth.cookieAuth` on the backend, which the Rebase runtime,
+and so Rebase Cloud, always turns on. Json mode works against either: its auth
+requests carry `x-rebase-auth-flow: json`, and the backend answers them with the
+refresh token in the body. An older backend hands a json client no refresh
+token, so its session ends about an hour after sign-in, and the client logs
+which mode to use (unless it passed its own `storage`).
 
-Passing your own `storage` keeps a browser client in json mode. That is for a
-second client on the page that keeps its own sign-in apart from the page's
-cookie, such as a guest beside the signed-in account: in cookie mode nothing
-would be kept in that storage. Its refresh token is in that storage, where
-script on the page can read it, so keep the page's own account in cookie mode.
+Passing your own `storage` keeps a browser client in json mode, for a second
+client that keeps its own sign-in apart from the page's cookie, such as a guest
+beside the signed-in account. Its refresh token sits in that storage, where page
+script can read it, so keep the page's own account in cookie mode.
 
 ### Waiting for the Session to Be Restored
 
@@ -55794,6 +55819,7 @@ except one that restarts the database, which waits for a maintenance window.
 | `storage` | The project's bucket |
 | `resources` | Which databases and buckets the platform holds, against what the code declares |
 | `compute` | What this project reserves, what it costs, and how to change it |
+| `events` | What happened to the backend, newest first: the app scaling, database changes scheduled and applied, a standby taking over, the disk growing |
 | `usage` | Requests used this month against the included allowance, and the overage so far, as the invoice counts it. `usage org` lists every project of the organization |
 | `clusters` | The clusters tenants run on. Platform-admin only |
 | `settings`, `orgs`, `billing` | Project settings, organizations and their members and invitations, payment |

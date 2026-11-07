@@ -122,6 +122,12 @@ Die Übersetzung steht noch aus. Der Inhalt unten ist auf Englisch.
 
 #### MCP
 
+- **`REBASE_MCP_ENABLED` switches on `/mcp` for a backend built in code.** Only
+  the containerized boot read it, so `initializeRebaseBackend` and
+  `createRebaseBackend` ignored it: with both documented variables set, `/mcp`
+  answered 404 and the log said nothing. The variable now decides when
+  `surfaces.mcp` is not set; set, the option wins.
+
 - **Connecting an MCP client from Chrome now finishes.** The consent screen
   allowed form submissions to its own origin only (`form-action 'self'`), and
   Chrome applies that to the redirect after Allow, so the authorization code
@@ -143,6 +149,29 @@ Die Übersetzung steht noch aus. Der Inhalt unten ist auf Englisch.
   stays as the rows scroll. An image address shows as the image, or as a
   small "Image" label where the host blocks outside images, instead of the
   raw URL; a list of plain values reads `Rock, 90s`.
+
+- **`list_documents` explains its filter.** Its `where` description lists
+  the operators and says how to match a missing value (`"isnull.null"`, or
+  `null`); it gave two examples, so an agent counting rows with no value
+  guessed `is.null` and `eq.null`, got "not a valid smallint" for both, and
+  paged the whole collection instead. `null`, a number or a boolean given as
+  a condition (`{ "difficulty": null }`) is now an equality, as the server
+  reads it, instead of an error. `query_collection` shows the null test too.
+
+#### Server & REST
+
+- **A filter in PostgREST's spelling is refused with the one that works.**
+  `?difficulty=is.null`, `not.is.null`, `?status=not.eq.draft`, a canonical
+  name in a query parameter (`?age=>=.18`, `is-null.null`) and the same
+  inside `or(…)`/`and(…)`/`not(…)` were read as an equality on the whole
+  string: no rows on a text column, a type error on any other, and nothing to
+  say why. They now answer 400 `UNKNOWN_FILTER_OPERATOR`, naming the spelling
+  to use (`isnull.null`, `notnull.null`, `neq.draft`, `gte.18`). Values that
+  only start with `is.` or `not.` (`is.gd`) are still values.
+
+- **An equality with "null" on a column that is not text says how to match a
+  missing value.** `eq.null` compares against the text "null", so on a number,
+  date or enum column it fails. The 400 now names `isnull.null`.
 
 ## [0.28.2] - 2026-11-06
 
