@@ -1,8 +1,10 @@
 # Bucket hygiene: orphaned files, expiry, metering
 
-Status (2026-11-04): §1's scheduled sweep is built (`bucket(…, { orphanSweep })`,
-a cron job per bucket). `deleteWithRow` is not: see §1. §3's gauge is built in
-saas (GCS only) and records without billing until `REBASE_BILL_STORAGE` is on. §2 is still a design.
+Status (2026-11-07): §1's scheduled sweep is built and released in 0.28.0
+(`bucket(…, { orphanSweep })`, a cron job per bucket). `deleteWithRow` is not:
+see §1. §3's gauge is on saas main and in the control plane images since
+2026-11-04 (GCS only), recording without billing until `REBASE_BILL_STORAGE` is
+on. §2 is not built, and the recommendation is not to: see its last part.
 
 It came out of SongBuzz moving its voice
 recordings into its managed bucket, which raised three gaps. None was built in
@@ -73,6 +75,26 @@ exists.
   operations, but it is the same declaration everywhere.
 - `rebase status` / the console show the effective rules per source, and which
   side enforces them.
+
+**Recommendation (2026-11-07): don't add it yet.** Every case SongBuzz has is
+covered without a rule that deletes files by age alone:
+
+- *A cache bucket whose files rows name* (voice clips, thumbnails): expiry
+  belongs to the row. The app deletes rows on its own schedule (a cron through
+  `rebase.dataAsAdmin`), and `orphanSweep` deletes their files once the grace
+  period has passed. A bucket TTL would delete files rows still name, which is
+  what §1 refuses to do, and the app would find out on a read.
+- *Files no row ever names* (abandoned uploads, a `tmp/` prefix): they are
+  orphans, and the sweep removes them after the grace period (24 h floor).
+
+What is left is expiry sooner than a day, or of files rows still name on
+purpose. If that is ever wanted, it is control-plane work, not a CLI flag on
+`rebase cloud storage create`: the tenant's HMAC service account holds only
+`roles/storage.objectAdmin` on its bucket, so it cannot set bucket lifecycle
+over the S3 interop API; the control plane would read the declaration from
+the deployed resources, write the rules through the JSON API with
+`storage.buckets.update` added to `rebaseManagedStorage`, and reconcile them on
+every deploy beside the noncurrent-version rules.
 
 ## 3. Storage is not metered
 
