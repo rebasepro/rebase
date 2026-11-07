@@ -1,0 +1,71 @@
+---
+title: SplitView
+sidebar_label: SplitView
+description: SplitView — a component from @rebasepro/ui, the library Rebase CMS and Rebase Studio are built from.
+---
+
+```ts
+import { SplitView, SPLIT_VIEW_MIN_WIDTH } from "@rebasepro/ui";
+```
+
+A master-detail layout that follows the width of its own container, never the window, so it chooses the same way in a side panel, a split pane or an embedding frame as it does full screen.
+
+- In a container `SPLIT_VIEW_MIN_WIDTH` (768px) or wider, the master and the detail sit side by side, with a divider that drags and moves with the arrow keys.
+- Narrower, it drills down: with a detail, the detail covers the master under a back bar; without one, the master shows alone.
+
+It fills its parent, so the parent needs a height. The master and the detail stay mounted when the container crosses the switch width, so a list keeps its scroll position and a form its edits.
+
+The back button and the divider are named from the kit's labels (`back`, `resizeList`), which `@rebasepro/app` fills from its translations. Outside it they are English; set them with `UiLabelsProvider`, or pass `backLabel`.
+
+## Props
+
+| Prop | Type | Required | Description |
+| --- | --- | --- | --- |
+| `master` | `React.ReactNode` | yes | The list, or whatever the detail is chosen from. Stays mounted while the detail covers it. |
+| `detail` | `React.ReactNode` | — | What is open. Absent, `null` or `false`, the master has the whole width. |
+| `onBack` | `() => void` | — | Called by the back button of the narrow layout, where the detail covers the master. Without it there is no back button, and closing the detail is up to the detail itself. |
+| `detailTitle` | `React.ReactNode` | — | What the narrow layout's back bar names, beside the back button. |
+| `backLabel` | `string` | — | The back button's accessible name. Defaults to the kit's `back` label ("Back"). |
+| `defaultMasterPercent` | `number` | — | The master's starting share of the width, 0–100, while the panes are side by side. The divider moves it from there. |
+| `className` | `string` | — |  |
+
+## Example
+
+```tsx
+import { useState } from "react";
+import { SplitView, TextField, Typography } from "@rebasepro/ui";
+
+type Order = { id: string; customer: string };
+
+const orders: Order[] = [
+    { id: "1041", customer: "Alice Johnson" },
+    { id: "1042", customer: "Marco Rossi" }
+];
+
+export function Orders() {
+    const [selected, setSelected] = useState<Order | null>(null);
+    return (
+        <div className="h-[480px]">
+            <SplitView
+                master={
+                    <div className="flex flex-col p-2">
+                        {orders.map((order) => (
+                            <button key={order.id} type="button" onClick={() => setSelected(order)}
+                                    className="rounded-lg px-3 py-2 text-left hover:bg-surface-hover">
+                                <Typography variant="body2" component="span">#{order.id} · {order.customer}</Typography>
+                            </button>
+                        ))}
+                    </div>
+                }
+                detail={selected && (
+                    <div className="p-4">
+                        <TextField size="large" label="Customer" value={selected.customer} onChange={() => {}}/>
+                    </div>
+                )}
+                detailTitle={selected ? `Order #${selected.id}` : undefined}
+                onBack={() => setSelected(null)}
+            />
+        </div>
+    );
+}
+```
