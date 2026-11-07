@@ -17,6 +17,7 @@ import { ErrorView } from "../components";
 import { StorageSourceContext } from "../contexts/StorageSourceContext";
 import { UserConfigurationPersistenceContext } from "../contexts/UserConfigurationPersistenceContext";
 import { RebaseDataContext } from "../contexts/RebaseDataContext";
+import { SdkDataLayerContext, useBuildSdkDataLayer } from "../hooks/data/sdkData";
 import { RlsSimulationContext, type RlsSimulationController, type RlsSimulationLabel } from "../contexts/RlsSimulationContext";
 import { DataSourcesContext, DataSourcesContextValue } from "../contexts/DataSourcesContext";
 import { StorageSourcesContext, StorageSourcesContextValue } from "../contexts/StorageSourcesContext";
@@ -316,6 +317,14 @@ export function Rebase<USER extends User, DB = unknown>(props: RebaseProps<USER,
         throw new Error("Rebase requires either `client` or a `dataSources` entry with a driver to be provided");
     }, [client, simulatedClient, dataSourcesValue, entityDataOptions]);
 
+    // The flat rows the row hooks (`useRows`, …) read: the same default
+    // source, without the admin's view model.
+    const sdkDataLayer = useBuildSdkDataLayer({
+        client: simulatedClient ?? client,
+        dataSources: normalizedDataSources,
+        resolveDataPath: entityDataOptions.resolveDataPath
+    });
+
     // Storage fallback logic
     const resolvedStorage = storageSourceProp ?? client?.storage;
 
@@ -555,6 +564,8 @@ export function Rebase<USER extends User, DB = unknown>(props: RebaseProps<USER,
                             value={rlsSimulationController}>
                         <RebaseDataContext.Provider
                             value={resolvedData}>
+                        <SdkDataLayerContext.Provider
+                            value={sdkDataLayer}>
                             <DatabaseAdminContext.Provider
                                 value={resolvedDatabaseAdmin}>
                                 <AuthControllerContext.Provider
@@ -574,6 +585,7 @@ export function Rebase<USER extends User, DB = unknown>(props: RebaseProps<USER,
                                         </EffectiveRoleControllerContext.Provider>
                                 </AuthControllerContext.Provider>
                             </DatabaseAdminContext.Provider>
+                        </SdkDataLayerContext.Provider>
                         </RebaseDataContext.Provider>
                         </RlsSimulationContext.Provider>
                         </DataSourcesContext.Provider>

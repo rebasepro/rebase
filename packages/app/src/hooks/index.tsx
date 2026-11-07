@@ -6,6 +6,11 @@ export * from "./data/useBatchedFetch";
 export * from "./data/useRelationSelector";
 export * from "./data/save";
 export * from "./data/delete";
+export * from "./data/useRows";
+export * from "./data/useRow";
+export * from "./data/useRowCount";
+export * from "./data/useAggregate";
+export * from "./data/useRowWrites";
 
 
 export * from "./useUnsavedChangesDialog";
