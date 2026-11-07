@@ -63,3 +63,5 @@ export * from "./RebaseRouteDefs";
 export * from "./CollectionPanel";
 export * from "./CollectionsProvider";
 export * from "./EntityFormPanel";
+export * from "./EntityViewPanel";
+export * from "./FieldValue";

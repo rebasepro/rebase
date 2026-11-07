@@ -64,7 +64,9 @@ export {
     useApp,
     CollectionPanel,
     CollectionsProvider,
-    EntityFormPanel
+    EntityFormPanel,
+    EntityViewPanel,
+    FieldValue
 } from "./components";
 export type {
     EntityViewBindingProps,
@@ -75,6 +77,8 @@ export type {
     CollectionPanelOptions,
     CollectionsProviderProps,
     EntityFormPanelProps,
+    EntityViewPanelProps,
+    FieldValueProps,
     DrawerNavigationGroupProps,
     DrawerNavigationItemProps
 } from "./components";
