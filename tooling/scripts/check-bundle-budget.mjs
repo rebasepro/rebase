@@ -196,7 +196,7 @@ export const FORBIDDEN_IN_EAGER = [
         why: "a hidden dev route; the app lazy-loads @rebasepro/app/debug"
     },
     {
-        test: /packages\/cms\/src\/(form\/EntityForm\.tsx|components\/CollectionViewBinding\/CollectionViewBinding\.tsx|components\/(Edit|Detail)ViewBinding\.tsx|components\/SidePanelBinding\.tsx)$/,
+        test: /packages\/cms\/src\/(form\/EntityForm\.tsx|components\/CollectionViewBinding\/(CollectionViewBinding|useCollectionViewState|CollectionViewContent|CollectionViewDialogs)\.tsx|components\/(Edit|Detail)ViewBinding\.tsx|components\/SidePanelBinding\.tsx)$/,
         label: "the collection table, record views or entity form",
         why: "loaded when a collection opens (cms components/lazy_record_views.ts)"
     },
@@ -328,7 +328,7 @@ export const PROBES = {
             {
                 // The modules themselves in the per-module layout, and the lib chunks the
                 // single-file layout split them into.
-                test: /packages\/cms\/dist\/(?:(?:components\/(?:CollectionViewBinding\/CollectionViewBinding|EditViewBinding|DetailViewBinding|SidePanelBinding)|form\/(?:EntityForm|PropertyFieldBinding))\.js|(?:CollectionViewBinding|EditViewBinding|DetailViewBinding|SidePanelBinding|PropertyFieldBinding)-[\w-]+\.js)$/,
+                test: /packages\/cms\/dist\/(?:(?:components\/(?:CollectionViewBinding\/(?:CollectionViewBinding|useCollectionViewState|CollectionViewContent|CollectionViewDialogs)|EditViewBinding|DetailViewBinding|SidePanelBinding)|form\/(?:EntityForm|PropertyFieldBinding))\.js|(?:CollectionViewBinding|EditViewBinding|DetailViewBinding|SidePanelBinding|PropertyFieldBinding)-[\w-]+\.js)$/,
                 label: "the collection table, record views or entity form",
                 why: "RebaseShell reaches them through components/lazy_record_views.ts; the cms dist must stay one " +
                     "file per module (preserveModules), or a static import of a single-file `index.js` brings them along"

@@ -41,6 +41,9 @@ const SHELL_ENTRIES = [
 ];
 const RECORD_VIEWS = [
     "components/CollectionViewBinding/CollectionViewBinding.tsx",
+    "components/CollectionViewBinding/useCollectionViewState.tsx",
+    "components/CollectionViewBinding/CollectionViewContent.tsx",
+    "components/CollectionViewBinding/CollectionViewDialogs.tsx",
     "components/EditViewBinding.tsx",
     "components/DetailViewBinding.tsx",
     "components/SidePanelBinding.tsx",
