@@ -1,5 +1,5 @@
 ---
-sourceHash: 12294b1ff06361d9
+sourceHash: df43cc3f34990449
 title: Panoramica del Frontend
 sidebar_label: Frontend
 description: "Crea e personalizza il pannello — Rebase CMS e Rebase Studio — con React: controller, scaffold, routing e viste."
@@ -174,6 +174,36 @@ Se qualcun altro elimina il record mentre il form è aperto, il form conserva ci
 digitato e dice che il record è stato eliminato altrove. La sua azione "Save as new" lo
 trasforma in un form che crea un nuovo record con quei valori; `onSaved` riporta allora il
 nuovo record.
+
+<span class="since-badge" data-since="0.29">Dalla versione 0.29</span> Il form può mostrare parte di un record,
+o disporlo a modo tuo. `fields` mostra solo i campi che nomina, in quell'ordine; le
+sezioni e il rail mantengono il loro raggruppamento. `layout` sostituisce i campi
+generati con il tuo JSX, in cui `<FormField name="…"/>` disegna un campo con
+l'etichetta, la dimensione e le regole che gli dà il form generato:
+
+```tsx
+import { EntityFormPanel, FormField } from "@rebasepro/cms";
+
+<EntityFormPanel
+    collection={ordersCollection}
+    entityId={orderId}
+    layout={<div className="grid grid-cols-2 gap-4">
+        <FormField name="customer"/>
+        <FormField name="status"/>
+        <div className="col-span-2"><FormField name="notes"/></div>
+    </div>}/>
+```
+
+In entrambi i casi il form convalida solo i campi che mostra; il server controlla
+comunque l'intero record. Un form che crea un record e lascia fuori un campo
+obbligatorio senza valore predefinito lo dice all'apertura: un errore nomina il campo,
+e Salva resta bloccato finché il campo non viene mostrato o non riceve un valore
+predefinito. `collectionOverrides` cambia la collezione solo per questo form, come fa
+per `CollectionPanel`.
+
+Ogni form delimita i propri id del DOM, così due form possono condividere una pagina.
+Per trovare un campo da un test, seleziona `[data-form-field="title"]` dentro il
+`[data-form-path="posts"]` del form.
 
 Entrambi portano con sé un proprio `CollectionsProvider` quando non ce n'è uno sopra di
 loro. È il passo sottostante, e puoi montarlo tu stesso per condividere un unico ambito

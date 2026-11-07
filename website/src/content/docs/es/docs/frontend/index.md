@@ -1,5 +1,5 @@
 ---
-sourceHash: 12294b1ff06361d9
+sourceHash: df43cc3f34990449
 title: Visión general del frontend
 sidebar_label: Frontend
 description: "Construye y personaliza el panel — Rebase CMS y Rebase Studio — con React: controladores, scaffold, enrutamiento y vistas."
@@ -174,6 +174,36 @@ Si otra persona elimina el registro mientras el formulario está abierto, el
 formulario conserva lo que se había escrito y dice que el registro se eliminó en
 otro lugar. Su acción «Save as new» lo convierte en un formulario que crea un
 registro nuevo con esos valores; `onSaved` informa entonces del registro nuevo.
+
+<span class="since-badge" data-since="0.29">Desde 0.29</span> El formulario puede mostrar parte de un registro, o
+disponerlo a tu manera. `fields` muestra solo los campos que nombra, en ese
+orden; las secciones y el rail conservan su agrupación. `layout` sustituye los
+campos generados por tu propio JSX, en el que `<FormField name="…"/>` dibuja un
+campo con la etiqueta, el tamaño y las reglas que le da el formulario generado:
+
+```tsx
+import { EntityFormPanel, FormField } from "@rebasepro/cms";
+
+<EntityFormPanel
+    collection={ordersCollection}
+    entityId={orderId}
+    layout={<div className="grid grid-cols-2 gap-4">
+        <FormField name="customer"/>
+        <FormField name="status"/>
+        <div className="col-span-2"><FormField name="notes"/></div>
+    </div>}/>
+```
+
+En ambos casos el formulario valida solo los campos que muestra; el servidor
+sigue comprobando el registro entero. Un formulario que crea un registro y deja
+fuera un campo obligatorio sin valor por defecto lo dice al abrirse: un error
+nombra el campo, y Guardar sigue bloqueado hasta que el campo se muestre o reciba
+un valor por defecto. `collectionOverrides` cambia la colección solo para este
+formulario, como hace en `CollectionPanel`.
+
+Cada formulario acota sus ids del DOM, así que dos formularios pueden compartir
+página. Para encontrar un campo desde un test, selecciona
+`[data-form-field="title"]` dentro del `[data-form-path="posts"]` del formulario.
 
 Ambos traen su propio `CollectionsProvider` cuando no hay ninguno por encima. Ese es
 el paso de debajo, y puedes montarlo tú mismo para compartir un único ámbito entre

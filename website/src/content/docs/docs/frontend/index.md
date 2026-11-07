@@ -196,6 +196,37 @@ what was typed and says the record was deleted elsewhere. Its "Save as new"
 action turns it into a form that creates a new record with those values;
 `onSaved` then reports the new record.
 
+<span class="since-badge" data-since="0.29">Since 0.29</span> The form can show
+part of a record, or lay it out your way. `fields` shows only the fields it
+names, in that order; sections and the rail keep their grouping. `layout`
+replaces the generated fields with your own JSX, in which
+`<FormField name="…"/>` draws one field with the label, size and rules the
+generated form gives it:
+
+```tsx
+import { EntityFormPanel, FormField } from "@rebasepro/cms";
+
+<EntityFormPanel
+    collection={ordersCollection}
+    entityId={orderId}
+    layout={<div className="grid grid-cols-2 gap-4">
+        <FormField name="customer"/>
+        <FormField name="status"/>
+        <div className="col-span-2"><FormField name="notes"/></div>
+    </div>}/>
+```
+
+Either way the form validates only the fields it shows; the server still
+checks the whole record. A form that creates a record and leaves out a
+required field with no default value says so when it opens: an error names the
+field, and Save stays blocked until the field is shown or given a default.
+`collectionOverrides` changes the collection for this form only, as it does for
+`CollectionPanel`.
+
+Each form scopes its DOM ids, so two forms can share a page. To find a field
+from a test, select `[data-form-field="title"]` inside the form's
+`[data-form-path="posts"]`.
+
 Both bring their own `CollectionsProvider` when none is above them. That is
 the step underneath, and you can mount it yourself to share one scope between
 several panels, or to use the lower-level pieces (`CollectionViewBinding`,

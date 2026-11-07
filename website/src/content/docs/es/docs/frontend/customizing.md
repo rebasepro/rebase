@@ -1,5 +1,5 @@
 ---
-sourceHash: fb65c481c6cbc87a
+sourceHash: 4006e06ac37a4220
 title: Personalizar el panel de administración
 sidebar_label: Personalizar el panel de administración
 description: "Cómo personalizar el panel de administración de Rebase: bloques de construcción, hooks y ubicaciones, con recetas probadas para singletons, configuraciones por usuario, acciones en lote, vistas de calendario, paneles de control y pantallas de inicio de sesión personalizadas."
@@ -67,6 +67,12 @@ export const siteSettingsView: AppView = {
 ```
 
 La misma estructura con `entityId={user.uid}` (de `useAuthController()`) es una página de configuración por usuario.
+
+<span class="since-badge" data-since="0.29">Desde 0.29</span> Para mostrar algunos de
+los campos, pasa `fields={["siteName"]}`. Para disponerlos tú mismo, pasa
+`layout` con `<FormField name="…"/>` en tu propio JSX. En ambos casos el formulario
+valida solo lo que muestra — consulta
+[Una colección o un registro en una página propia](/docs/frontend#one-collection-or-one-record-in-a-page-of-your-own).
 
 ## Ubicaciones
 

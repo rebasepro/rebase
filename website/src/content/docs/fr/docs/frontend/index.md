@@ -1,5 +1,5 @@
 ---
-sourceHash: 12294b1ff06361d9
+sourceHash: df43cc3f34990449
 title: Vue d'ensemble du Frontend
 sidebar_label: Frontend
 description: "Créez et personnalisez le panneau d'administration — Rebase CMS et Rebase Studio — avec React : contrôleurs, structure (scaffold), routage et vues."
@@ -195,6 +195,37 @@ Si quelqu'un d'autre supprime l'enregistrement pendant que le formulaire est ouv
 ce qui a été saisi et indique que l'enregistrement a été supprimé ailleurs. Son action « Save as new »
 le transforme en un formulaire qui crée un nouvel enregistrement avec ces valeurs ;
 `onSaved` signale alors le nouvel enregistrement.
+
+<span class="since-badge" data-since="0.29">Depuis 0.29</span> Le formulaire peut afficher une partie d'un
+enregistrement, ou le disposer à votre façon. `fields` n'affiche que les champs
+qu'il nomme, dans cet ordre ; les sections et le rail gardent leur regroupement.
+`layout` remplace les champs générés par votre propre JSX, dans lequel
+`<FormField name="…"/>` dessine un champ avec le libellé, la taille et les règles
+que lui donne le formulaire généré :
+
+```tsx
+import { EntityFormPanel, FormField } from "@rebasepro/cms";
+
+<EntityFormPanel
+    collection={ordersCollection}
+    entityId={orderId}
+    layout={<div className="grid grid-cols-2 gap-4">
+        <FormField name="customer"/>
+        <FormField name="status"/>
+        <div className="col-span-2"><FormField name="notes"/></div>
+    </div>}/>
+```
+
+Dans les deux cas, le formulaire ne valide que les champs qu'il affiche ; le serveur
+vérifie toujours l'enregistrement entier. Un formulaire qui crée un enregistrement et
+laisse de côté un champ obligatoire sans valeur par défaut le signale à l'ouverture :
+une erreur nomme le champ, et l'enregistrement reste bloqué tant que le champ n'est pas
+affiché ou doté d'une valeur par défaut. `collectionOverrides` modifie la collection
+pour ce formulaire seulement, comme pour `CollectionPanel`.
+
+Chaque formulaire délimite ses ids du DOM, si bien que deux formulaires peuvent
+partager une page. Pour trouver un champ depuis un test, sélectionnez
+`[data-form-field="title"]` dans le `[data-form-path="posts"]` du formulaire.
 
 Les deux apportent leur propre `CollectionsProvider` lorsqu'aucun n'existe au-dessus d'eux. C'est
 l'étape située en dessous, et vous pouvez la monter vous-même pour partager une seule portée entre

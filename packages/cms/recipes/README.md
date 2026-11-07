@@ -32,7 +32,8 @@ Components you render anywhere under `<Rebase>` and a router.
 | Name | Package | What it is |
 |---|---|---|
 | `CollectionPanel` | `@rebasepro/cms` | A collection's table, cards, board or custom view, with its toolbar, filters and record panel. |
-| `EntityFormPanel` | `@rebasepro/cms` | One record's form: loads it, validates, saves. Given an id no record has yet, it creates it there. |
+| `EntityFormPanel` | `@rebasepro/cms` | One record's form: loads it, validates, saves. Given an id no record has yet, it creates it there. `fields` shows some fields, in order; `layout` takes your own arrangement of `FormField`s; `collectionOverrides` changes the collection for this form only. It validates only the fields it shows. |
+| `FormField` | `@rebasepro/cms` | One field of the record form it sits in, by property name: `<FormField name="status"/>`, inside `EntityFormPanel`'s `layout` or a `formView.Builder`. |
 | `CollectionsProvider` | `@rebasepro/cms` | Makes collections known to the blocks in a page of your own that has no admin shell around it. |
 | `RebaseAuthGate` | `@rebasepro/cms` | Shows the login screen until someone is signed in, then its children. |
 | `LoginView` | `@rebasepro/app` | The built-in login screen, to frame or reuse. |

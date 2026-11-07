@@ -1,5 +1,5 @@
 ---
-sourceHash: fb65c481c6cbc87a
+sourceHash: 4006e06ac37a4220
 title: Admin anpassen
 sidebar_label: Admin anpassen
 description: So passen Sie den Rebase-Admin an – Bausteine, Hooks und Orte, mit getesteten Rezepten für Singletons, benutzerspezifische Einstellungen, Massenaktionen, Kalenderansichten, Dashboards und benutzerdefinierte Login-Masken.
@@ -67,6 +67,12 @@ export const siteSettingsView: AppView = {
 ```
 
 Dasselbe Schema mit `entityId={user.uid}` (aus `useAuthController()`) ergibt eine Seite für benutzerspezifische Einstellungen.
+
+<span class="since-badge" data-since="0.29">Seit 0.29</span> Um einige der Felder zu
+zeigen, übergeben Sie `fields={["siteName"]}`. Um sie selbst anzuordnen, übergeben Sie
+`layout` mit `<FormField name="…"/>` in Ihrem eigenen JSX. In beiden Fällen validiert das
+Formular nur, was es zeigt — siehe
+[Eine Collection oder ein Datensatz in einer eigenen Seite](/docs/frontend#one-collection-or-one-record-in-a-page-of-your-own).
 
 ## Orte
 

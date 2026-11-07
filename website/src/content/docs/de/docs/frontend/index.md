@@ -1,5 +1,5 @@
 ---
-sourceHash: 12294b1ff06361d9
+sourceHash: df43cc3f34990449
 title: Frontend-Übersicht
 sidebar_label: Frontend
 description: "Erstellen und Anpassen des Panels — Rebase CMS und Rebase Studio — mit React: Controller, Scaffold, Routing und Views."
@@ -174,6 +174,37 @@ Löscht jemand anderes den Datensatz, während das Formular geöffnet ist, behä
 was eingegeben wurde, und sagt, dass der Datensatz anderswo gelöscht wurde. Seine Aktion
 „Als neu speichern“ macht daraus ein Formular, das einen neuen Datensatz mit diesen Werten
 anlegt; `onSaved` meldet dann den neuen Datensatz.
+
+<span class="since-badge" data-since="0.29">Seit 0.29</span> Das Formular kann einen Teil eines Datensatzes zeigen
+oder ihn nach Ihren Vorstellungen anordnen. `fields` zeigt nur die genannten Felder,
+in dieser Reihenfolge; Abschnitte und die Seitenleiste behalten ihre Gruppierung.
+`layout` ersetzt die generierten Felder durch Ihr eigenes JSX, in dem
+`<FormField name="…"/>` ein Feld mit der Beschriftung, Größe und den Regeln zeichnet,
+die ihm das generierte Formular gibt:
+
+```tsx
+import { EntityFormPanel, FormField } from "@rebasepro/cms";
+
+<EntityFormPanel
+    collection={ordersCollection}
+    entityId={orderId}
+    layout={<div className="grid grid-cols-2 gap-4">
+        <FormField name="customer"/>
+        <FormField name="status"/>
+        <div className="col-span-2"><FormField name="notes"/></div>
+    </div>}/>
+```
+
+In beiden Fällen validiert das Formular nur die Felder, die es zeigt; der Server
+prüft weiterhin den ganzen Datensatz. Ein Formular, das einen Datensatz anlegt und
+ein Pflichtfeld ohne Standardwert weglässt, sagt das beim Öffnen: Ein Fehler nennt
+das Feld, und Speichern bleibt gesperrt, bis das Feld angezeigt wird oder einen
+Standardwert erhält. `collectionOverrides` ändert die Collection nur für dieses
+Formular, wie bei `CollectionPanel`.
+
+Jedes Formular grenzt seine DOM-IDs ab, sodass sich zwei Formulare eine Seite teilen
+können. Um ein Feld aus einem Test zu finden, wählen Sie `[data-form-field="title"]`
+innerhalb des `[data-form-path="posts"]` des Formulars.
 
 Beide bringen ihren eigenen `CollectionsProvider` mit, wenn über ihnen keiner liegt. Das ist
 der Schritt darunter, und Sie können ihn selbst einbinden, um einen Scope zwischen

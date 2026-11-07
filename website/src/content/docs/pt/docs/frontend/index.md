@@ -1,5 +1,5 @@
 ---
-sourceHash: 12294b1ff06361d9
+sourceHash: df43cc3f34990449
 title: Visão Geral do Frontend
 sidebar_label: Frontend
 description: "Construa e personalize o painel — Rebase CMS e Rebase Studio — com React: controllers, scaffold, roteamento e views."
@@ -174,6 +174,36 @@ Se outra pessoa excluir o registro enquanto o formulário está aberto, o formul
 o que foi digitado e diz que o registro foi excluído em outro lugar. A ação "Salvar como novo"
 o transforma em um formulário que cria um novo registro com esses valores;
 `onSaved` então informa o novo registro.
+
+<span class="since-badge" data-since="0.29">Desde 0.29</span> O formulário pode mostrar parte de um registro, ou
+organizá-lo do seu jeito. `fields` mostra só os campos que nomeia, nessa ordem; as
+seções e o rail mantêm o agrupamento. `layout` substitui os campos gerados pelo seu
+próprio JSX, no qual `<FormField name="…"/>` desenha um campo com o rótulo, o
+tamanho e as regras que o formulário gerado lhe dá:
+
+```tsx
+import { EntityFormPanel, FormField } from "@rebasepro/cms";
+
+<EntityFormPanel
+    collection={ordersCollection}
+    entityId={orderId}
+    layout={<div className="grid grid-cols-2 gap-4">
+        <FormField name="customer"/>
+        <FormField name="status"/>
+        <div className="col-span-2"><FormField name="notes"/></div>
+    </div>}/>
+```
+
+Em ambos os casos o formulário valida só os campos que mostra; o servidor continua
+verificando o registro inteiro. Um formulário que cria um registro e deixa de fora um
+campo obrigatório sem valor padrão avisa ao abrir: um erro nomeia o campo, e Salvar
+fica bloqueado até que o campo seja mostrado ou receba um valor padrão.
+`collectionOverrides` altera a coleção só para este formulário, como em
+`CollectionPanel`.
+
+Cada formulário delimita seus ids do DOM, então dois formulários podem dividir uma
+página. Para encontrar um campo a partir de um teste, selecione
+`[data-form-field="title"]` dentro do `[data-form-path="posts"]` do formulário.
 
 Ambos trazem seu próprio `CollectionsProvider` quando não há nenhum acima deles. Esse é
 o passo logo abaixo, e você pode montá-lo você mesmo para compartilhar um único escopo entre

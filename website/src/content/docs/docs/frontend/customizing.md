@@ -75,6 +75,12 @@ export const siteSettingsView: AppView = {
 The same shape with `entityId={user.uid}` (from `useAuthController()`) is a
 per-user settings page.
 
+<span class="since-badge" data-since="0.29">Since 0.29</span> To show some of
+the fields, pass `fields={["siteName"]}`. To arrange them yourself, pass
+`layout` with `<FormField name="…"/>`s in your own JSX. Either way the form
+validates only what it shows — see
+[One collection or one record in a page of your own](/docs/frontend#one-collection-or-one-record-in-a-page-of-your-own).
+
 ## Places
 
 | To add… | Put a component in |

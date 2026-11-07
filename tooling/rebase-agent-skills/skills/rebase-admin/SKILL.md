@@ -397,6 +397,17 @@ import { CollectionPanel, EntityFormPanel } from "@rebasepro/cms";
 </Rebase>
 ```
 
+- `EntityFormPanel` props (0.29+): `fields?: string[]` shows only those fields,
+  in that order; `layout?: ReactNode` replaces the generated fields with your
+  JSX, where `<FormField name="title"/>` (`@rebasepro/cms`) draws one field;
+  `collectionOverrides?: Partial<AdminCollection>` applies over the registered
+  collection, as on `CollectionPanel`. With `fields` or `layout` the form
+  validates only what it shows, and a create that leaves out a required field
+  with no default shows an error naming it and will not save. `children` still
+  renders above the fields.
+- Two forms on one page do not share DOM ids. In tests, find a field by
+  `[data-form-field="title"]` inside the form's `[data-form-path="posts"]`.
+
 - No CMS route serves the page, so a record clicked in the table opens in a
   side panel or dialog **over** the page — never by URL (`full_screen` and
   `split` become `side_panel`).
@@ -927,7 +938,8 @@ The admin package exports the following components (from `@rebasepro/cms`):
 | `RebaseCMS` | Declarative admin config (collections, views, editor) — renders nothing |
 | `RebaseShell` | App shell (drawer, nav, routes, layout) — renders the actual UI |
 | `CollectionPanel` | Embed a collection view inside custom pages — by slug, or with the collection as a value |
-| `EntityFormPanel` | One record's form in a page of your own app (0.25+) |
+| `EntityFormPanel` | One record's form in a page of your own app (0.25+); `fields`, `layout`, `collectionOverrides` (0.29+) |
+| `FormField` | One field of the record form it is rendered in, by property name (0.29+) |
 | `CollectionsProvider` | The minimal scope for collection views and record forms outside the CMS (0.25+) |
 | `CollectionViewBinding` | The collection view, bound to Rebase data |
 | `CollectionTableBinding` | The table rendering of a collection |

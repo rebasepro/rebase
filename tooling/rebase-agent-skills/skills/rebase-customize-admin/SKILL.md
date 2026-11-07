@@ -13,7 +13,7 @@ for a configuration flag for the feature (there is no `singleton: true`, no
 There are three things to know:
 
 1. **Building blocks** you render: `CollectionPanel`, `EntityFormPanel`,
-   `CollectionsProvider`, `RebaseAuthGate` (`@rebasepro/cms`), `LoginView`
+   `FormField`, `CollectionsProvider`, `RebaseAuthGate` (`@rebasepro/cms`), `LoginView`
    (`@rebasepro/app`) and the UI kit (`@rebasepro/ui`: `Button`, `Card`,
    `Typography`, `TextField`, `Select`, `Chip`, `Container`, …).
 2. **Hooks**: `useData`, `useCollection`, `useFetch`, `useAuthController`,
@@ -51,6 +51,15 @@ import only package entry points, so they compile as copied.
   fixed `entityId`.** The form creates the record under that id on first save;
   nothing needs seeding. Hide the collection from navigation with
   `admin.hideFromNavigation: true`.
+- **A form showing some fields, or laid out your way, is `EntityFormPanel`
+  with `fields` or `layout`** (0.29+) — not a form of your own.
+  `fields={["name", "status"]}` shows those, in that order.
+  `layout={<div>…<FormField name="status"/>…</div>}` is your own JSX; each
+  `FormField` draws one field with the form's label, size and rules. The form
+  validates only the fields it shows, and refuses to create a record (naming the
+  fields) when a required field without a default is left out — show it, or
+  give it a default. `collectionOverrides` changes the collection for that form
+  only.
 - **Read and write through `useData()`.** Writes go through the server, so
   collection callbacks and security rules apply. Don't call `fetch` on the REST
   API from admin code.
