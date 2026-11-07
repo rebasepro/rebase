@@ -48,6 +48,40 @@ function UserMenu() {
 }
 ```
 
+## Rows: `useRows`, `useRow`, `useRowCount`, `useAggregate`, `useRowWrites`
+
+Read and write a collection's rows in the shape the server sends them: dates as ISO strings, a belongsTo under its foreign-key column (`author_id`). It is the same shape `client.data` returns and the same one `context.data` returns in a backend callback, so code written with these hooks reads like code written against the SDK.
+
+The rows come from the app's default data source. With a `client`, that is `client.data`, and aggregates go over HTTP. Without one, it is the default data source's driver (a Firebase driver, for example). Where the data source can subscribe, the rows stay live. Where it cannot, every hook of a collection reads again after a write made through `useRowWrites`. Options are compared by value, so an inline object does not trigger a new read on every render. `error` is a message string, and a write that fails also rejects.
+
+```typescript
+import { useRowWrites, useRows } from "@rebasepro/app";
+type Order = { id: number; status: string; total: number; created_at: string };
+function PendingOrders() {
+    const { rows, hasMore, loadMore } = useRows<Order>("orders", {
+        where: { status: ["==", "pending"] }, orderBy: ["created_at", "desc"], limit: 20 });
+    const { update, saving } = useRowWrites();
+    return (
+        <ul>
+            {rows.map(order => (
+                <li key={order.id} onClick={() => !saving && update<Order>("orders", order.id, { status: "shipped" })}>
+                    {order.created_at}: {order.total}
+                </li>
+            ))}
+            {hasMore && <li onClick={loadMore}>Load more</li>}
+        </ul>
+    );
+}
+```
+
+| Hook | Returns |
+|------|---------|
+| `useRows(collection, { where, orderBy, limit, offset, searchString })` | `{ rows, total, hasMore, loadMore, loading, error, refresh }`. `limit` is the page size, and `loadMore` adds a page to the same read, up to 1000 rows. |
+| `useRow(collection, id)` | `{ row, loading, error, refresh }`. `id` may be `undefined`, in which case nothing is read. |
+| `useRowCount(collection, where)` | `{ count, loading, error }` |
+| `useAggregate(collection, { select, groupBy, where, orderBy, limit, offset })` | `{ result, loading, error }`. The parameters and result are those of `client.data.<collection>.aggregate()`. A data source that cannot aggregate sets `error` and never returns an empty result. |
+| `useRowWrites()` | `{ create(collection, values, id?), update(collection, id, values), remove(collection, id), saving, error }`. Each write that succeeds refreshes every row hook of that collection. |
+
 ## `useCollection`
 
 Fetch and subscribe to a list of entities in a collection. It automatically establishes a real-time WebSocket subscription if supported by the driver, falling back to REST fetches.
