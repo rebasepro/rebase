@@ -514,7 +514,20 @@ const REVALIDATE_CACHE = "no-cache";
  * has no entrypoint of its own. Its request-handling behavior is an
  * implementation detail and may change without a major version bump.
  */
+/**
+ * The frontends this process serves, by build directory. The MCP endpoint
+ * looks in them for the project's own MCP App view (`rebase-view.html`, built
+ * by `rebaseMcpViewPlugin`), which it serves in place of the generic one.
+ */
+const servedFrontends: string[] = [];
+
+/** The build directories `serveSPA` serves, in the order they were mounted. */
+export function servedFrontendPaths(): readonly string[] {
+    return servedFrontends;
+}
+
 export function serveSPA<E extends import("hono").Env>(app: Hono<E>, config: ServeSPAConfig): void {
+    if (!servedFrontends.includes(config.frontendPath)) servedFrontends.push(config.frontendPath);
     const {
         frontendPath,
         apiBasePath = "/api",

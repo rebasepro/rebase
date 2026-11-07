@@ -47,6 +47,9 @@ import { createDataSourceRegistry, resolveDataSource, buildSdkData, buildRoutedR
 import { randomBytes } from "node:crypto";
 import type { Server } from "node:http";
 import nodePath from "node:path";
+import { readFileSync } from "node:fs";
+import { servedFrontendPaths } from "../serve-spa";
+import { PROJECT_VIEW_FILE, withProjectView, type McpAppResource } from "../mcp/mcp-apps";
 import { Hono, type Context, type MiddlewareHandler } from "hono";
 import { bodyLimit } from "hono/body-limit";
 import { createRebaseClient } from "@rebasepro/client";
@@ -1726,7 +1729,7 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
             // on the first `/mcp` request that needs them — any client's first
             // `initialize` or `tools/list` — not at boot: the HTML is large, and
             // a backend no MCP client calls never loads it.
-            apps: async () => (await import("@rebasepro/mcp-apps")).MCP_APPS,
+            apps: loadMcpApps,
             // show_app's compiler, from the same module, on the first app.
             appCompiler: async () => (await import("@rebasepro/mcp-apps")).compileApp,
             // An app's own tools and scopes, when it brings them; the data
@@ -1798,7 +1801,7 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
             rateLimit: rateLimitConfig,
             // show_collection is offered where its view is served; the
             // control plane serves the view itself and relays this result.
-            apps: async () => (await import("@rebasepro/mcp-apps")).MCP_APPS,
+            apps: loadMcpApps,
             appCompiler: async () => (await import("@rebasepro/mcp-apps")).compileApp
         })));
         if (announce) logger.info(`Platform MCP endpoint mounted at ${mcpPath} (platform tokens only)`);
@@ -4242,4 +4245,26 @@ export function realtimeSocketPath(basePath: string | undefined): string {
     const trimmed = basePath.replace(/\/+$/, "");
     if (!trimmed.endsWith("/api")) return "/";
     return trimmed.slice(0, -"/api".length) || "/";
+}
+
+/**
+ * The MCP App views: the generic ones `@rebasepro/mcp-apps` builds, or the
+ * project's own view where its admin build made one (`withProjectView`).
+ * Imported on the first `/mcp` request that needs them — any client's first
+ * `initialize` or `tools/list` — not at boot: the HTML is large, and a
+ * backend no MCP client calls never loads it.
+ */
+async function loadMcpApps(): Promise<readonly McpAppResource[]> {
+    const { MCP_APPS } = await import("@rebasepro/mcp-apps");
+    const candidates = [
+        ...(process.env.REBASE_MCP_VIEW ? [process.env.REBASE_MCP_VIEW] : []),
+        ...servedFrontendPaths().map(frontend => nodePath.join(frontend, PROJECT_VIEW_FILE))
+    ];
+    return withProjectView(MCP_APPS, candidates, file => {
+        try {
+            return readFileSync(file, "utf8");
+        } catch {
+            return undefined;
+        }
+    });
 }

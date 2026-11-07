@@ -73,3 +73,26 @@ export function mcpAppResourceMeta(): Record<string, unknown> {
 export function mcpAppToolMeta(resourceUri: string): Record<string, unknown> {
     return { ui: { resourceUri }, "ui/resourceUri": resourceUri };
 }
+
+/** The file a project's admin build writes its own view to (`rebaseMcpViewPlugin`). */
+export const PROJECT_VIEW_FILE = "rebase-view.html";
+
+/**
+ * The views to serve, with the project's own document in place of the
+ * generic one where the project built it: its admin app, started inside the
+ * view, so its custom views, fields and actions are what the client draws.
+ *
+ * Looked for at `REBASE_MCP_VIEW` (a path to the file), then beside each
+ * frontend `serveSPA` serves. Read once, with the views.
+ */
+export function withProjectView(
+    apps: readonly McpAppResource[],
+    candidates: readonly string[],
+    readFile: (file: string) => string | undefined
+): readonly McpAppResource[] {
+    for (const file of candidates) {
+        const html = readFile(file);
+        if (html) return apps.map(app => ({ ...app, html }));
+    }
+    return apps;
+}

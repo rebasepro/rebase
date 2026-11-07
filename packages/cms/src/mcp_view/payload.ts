@@ -14,8 +14,8 @@ import {
     type WhereFilterOp
 } from "@rebasepro/types";
 import type { AdminCollection } from "@rebasepro/cms-types";
-import { isRecord, type ToolResult } from "../bridge";
-import { DEFAULT_ACTIONS, textOf, type ToolAction, type ViewActions } from "./tool-driver";
+import { isRecord, type ToolResult } from "./bridge";
+import { DEFAULT_ACTIONS, textOf, type ToolAction, type ViewActions } from "./tool_driver";
 
 export type ViewMode = "table" | "list" | "cards" | "kanban";
 

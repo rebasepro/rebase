@@ -1,11 +1,14 @@
 import React, { useMemo } from "react";
+import { MemoryRouter } from "react-router";
 import {
+    useRebaseEmbedHost,
     useRebaseRegistry
 } from "@rebasepro/app";
 import { ErrorBoundary } from "@rebasepro/ui";
 
 import { RebaseAuthGate } from "./RebaseAuthGate";
 import { RebaseNavigation } from "./RebaseNavigation";
+import { SideDialogs } from "./SideDialogs";
 import { RebaseLayout } from "./RebaseLayout";
 import { RebaseRouteDefs } from "./RebaseRouteDefs";
 
@@ -54,11 +57,27 @@ export function RebaseShell(props: RebaseShellProps) {
     } = props;
 
     const registry = useRebaseRegistry();
+    const embed = useRebaseEmbedHost();
 
     // Compute devViews for the layout's AdminModeSyncer
     const devViews = useMemo(() => {
         return registry.studioConfig?.devViews ?? [];
     }, [registry.studioConfig?.devViews]);
+
+    // In an embedding (an MCP App view, `embed_host.ts`) the person is signed
+    // in by the host and there is no address bar: the providers stay, and the
+    // host's screen takes the place of the gate, the routes and the layout.
+    if (embed) {
+        return (
+            <MemoryRouter>
+                <RebaseNavigation>
+                    <ErrorBoundary>{embed.renderCms()}</ErrorBoundary>
+                    {/* Where records open over the screen; the layout draws it otherwise. */}
+                    <SideDialogs/>
+                </RebaseNavigation>
+            </MemoryRouter>
+        );
+    }
 
     return (
         <RebaseAuthGate>

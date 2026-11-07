@@ -23,7 +23,7 @@ import {
     getColorSchemeForSeed,
     iconSize
 } from "@rebasepro/ui";
-import { isRecord, type HostContext, type McpAppBridge, type ToolResult } from "../bridge";
+import { isRecord, type HostContext, type McpAppBridge, type ToolResult } from "@rebasepro/cms/mcp-view";
 
 /** A column as show_collection describes it (`tableColumns` in the server's `mcp-tools.ts`). */
 interface Column {

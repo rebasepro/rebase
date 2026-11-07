@@ -25,7 +25,8 @@ export default defineConfig(() => ({
             entry: {
                 index: path.resolve(__dirname, "src/index.ts"),
                 editor: path.resolve(__dirname, "src/editor/index.ts"),
-                collection_editor_ui: path.resolve(__dirname, "src/collection_editor_ui.ts")
+                collection_editor_ui: path.resolve(__dirname, "src/collection_editor_ui.ts"),
+                "mcp-view": path.resolve(__dirname, "src/mcp-view.ts")
             },
             name: "Rebase CMS",
             formats: ["es"],

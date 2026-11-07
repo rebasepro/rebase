@@ -247,7 +247,7 @@
 - [MCP tool reference](https://rebase.pro/docs/ai/mcp-tool-reference): Every tool the Rebase MCP server registers, by group — what each one needs and does, and which ones the loopback gate refuses against a non-local project.
 - [The Remote MCP Endpoint](https://rebase.pro/docs/ai/remote-mcp): Serve MCP from a deployed backend at /mcp, so the people who use your app can connect Claude or Cursor as themselves — OAuth with a consent screen, nine tools under three scopes, every call under their own row-level security.
 - [Connect Claude to Rebase](https://rebase.pro/docs/ai/rebase-connector): One MCP connector for all your Rebase projects, on Rebase Cloud or self-hosted — add it once in Claude, sign in with your Rebase account, and read, deploy and change your projects with the access you have in the console, every change confirmed first.
-- [Agent Skills](https://rebase.pro/docs/ai/skills): rebase skills install writes 23 Rebase reference skills into your repo, in the layout your AI assistant expects — Cursor, Claude Code, Windsurf, Gemini CLI and Antigravity.
+- [Agent Skills](https://rebase.pro/docs/ai/skills): rebase skills install writes 24 Rebase reference skills into your repo, in the layout your AI assistant expects — Cursor, Claude Code, Windsurf, Gemini CLI and Antigravity.
 - [AI Instruction Files](https://rebase.pro/docs/ai/instruction-files): Every scaffolded Rebase project ships ai-instructions.md plus pointer files for Claude, Cursor, Windsurf, Copilot and AGENTS.md that carry the five rules assistants break most — one source of truth, many filenames.
 - [CLI Reference](https://rebase.pro/docs/cli): Rebase CLI commands for project initialization, schema generation, database migrations, and SDK generation.
 - [Database Commands](https://rebase.pro/docs/cli/database): The rebase db commands — push, generate and migrate, backups and restores, pulling a copy, the connection string, the managed development database, and branches.
@@ -277,7 +277,7 @@
 - [Deploying Rebase on Railway](https://rebase.pro/docs/deployment/railway): Deploy Rebase on Railway from the published runtime image and your project bundle. Maintain EU focus.
 - [Deploying Rebase on Fly.io](https://rebase.pro/docs/deployment/flyio): Learn how to deploy Rebase globally or restrict it to European data centers using Fly.io.
 - [Recipe: Blog CMS](https://rebase.pro/docs/recipes/blog-cms): Build a complete blog CMS with articles, authors, categories, rich text editing, and image uploads.
-- [Recipe: Custom Dashboard](https://rebase.pro/docs/recipes/custom-dashboard): Build a custom dashboard view with charts, stats, and data visualizations using Rebase hooks.
+- [Recipe: Custom Dashboard](https://rebase.pro/docs/recipes/custom-dashboard): Build a dashboard page with KPI tiles and charts — numbers computed in SQL, drawn with the blocks from @rebasepro/plugin-insights.
 - [Recipe: Webhook Integration](https://rebase.pro/docs/recipes/webhooks): Use entity callbacks to send webhooks to external services when data changes, without holding the write's transaction open.
 
 ## Optional

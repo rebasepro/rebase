@@ -13,16 +13,19 @@
  * server's `mcp-tools.ts`); the two change together.
  */
 import React, { createContext, useContext, useEffect, useMemo, useReducer, useState } from "react";
-import { CollectionPanel, EntityFormPanel, SidePanelControllerContext, useSidePanel } from "@rebasepro/cms";
 import type { AdminCollection, SidePanelController } from "@rebasepro/cms-types";
-import type { ToolData } from "./tool-driver";
-import { filterOf, findCollection, orderOf, type ViewMode } from "./payload";
+import type { CollectionRegistryController } from "@rebasepro/types";
+import { CollectionPanel } from "../components/CollectionPanel";
+import { EntityFormPanel } from "../components/EntityFormPanel";
+import { SidePanelControllerContext, useSidePanel } from "../hooks/useSidePanel";
+import { useCollectionRegistryController } from "../hooks/navigation/contexts/CollectionRegistryContext";
+import type { ToolData } from "./tool_driver";
+import { filterOf, orderOf, type ViewMode } from "./payload";
 
 type Row = Record<string, unknown>;
 
 interface AppSdk {
     data: ToolData;
-    collections: readonly AdminCollection[];
     /** The names the app was opened with, for the message when it reaches for another. */
     allowed: readonly string[];
 }
@@ -45,10 +48,15 @@ function useSdk(): AppSdk {
     return sdk;
 }
 
-/** The config of a collection the app may draw, or the error that says which it may. */
+/**
+ * The config of a collection the app may draw — the project's own, as its
+ * admin registers it, custom views and fields included — or the error that
+ * says which it may.
+ */
 function useCollection(name: string): AdminCollection {
-    const { collections, allowed } = useSdk();
-    const collection = findCollection(collections, name);
+    const { allowed } = useSdk();
+    const registry = useCollectionRegistryController();
+    const collection = registry.getCollection(name);
     if (!collection) {
         throw new Error(`"${name}" is not one of this app's collections (${allowed.join(", ")}). `
             + "List it in show_app's `collections`.");
@@ -219,7 +227,7 @@ export function CollectionView({ collection, where, orderBy, view, height = 420,
             <SidePanelControllerContext.Provider value={sidePanel}>
                 <CollectionPanel
                     key={filterKey}
-                    collection={config}
+                    path={config.slug}
                     title={false}
                     className="h-full flex flex-col"
                     {...(view && { viewMode: view })}
@@ -265,23 +273,24 @@ export function RecordForm({ collection, id, values, onSaved }: RecordFormProps)
  * The side panel the admin panel opens forms in, for `openRecord` — a plain
  * function an app calls from a button, where no hook reaches.
  */
-let current: { panel: SidePanelController; sdk: AppSdk } | undefined;
+let current: { panel: SidePanelController; sdk: AppSdk; registry: CollectionRegistryController } | undefined;
 
 function SidePanelHolder() {
     const panel = useSidePanel();
     const sdk = useSdk();
+    const registry = useCollectionRegistryController();
     useEffect(() => {
-        current = { panel, sdk };
+        current = { panel, sdk, registry };
         return () => {
             if (current?.panel === panel) current = undefined;
         };
-    }, [panel, sdk]);
+    }, [panel, sdk, registry]);
     return null;
 }
 
 function openForm(collection: string, entityId: string | number | undefined, values?: Row): void {
     if (!current) throw new Error("openRecord works only inside the app the view opened.");
-    const config = findCollection(current.sdk.collections, collection);
+    const config = current.registry.getCollection(collection);
     if (!config) {
         throw new Error(`"${collection}" is not one of this app's collections (${current.sdk.allowed.join(", ")}).`);
     }

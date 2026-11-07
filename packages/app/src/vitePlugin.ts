@@ -2,7 +2,8 @@
 import path from "path";
 import ts from "typescript";
 import MagicString from "magic-string";
-import type { Plugin, ViteDevServer } from "vite";
+import fs from "fs";
+import type { Plugin, ResolvedConfig, ViteDevServer } from "vite";
 
 export interface RebaseCollectionsPluginOptions {
     /**
@@ -607,4 +608,240 @@ export function rebaseManualChunks(id: string): string | undefined {
     // app/frontend/vite.config.ts does it that way.
 
     return undefined;
+}
+
+
+// ─── The MCP App view ────────────────────────────────────────────────────────
+
+/**
+ * The view an MCP client like Claude shows the project's data in
+ * (show_collection, show_record, show_app), built from this app.
+ *
+ * A server serves a generic view — the admin panel with nothing of the
+ * project's own. This builds the project's: its own entry (`src/main.tsx`),
+ * started inside the view (`startMcpView` in `@rebasepro/cms/mcp-view`), so
+ * the app's custom views, entity views, fields, previews, actions, plugins and
+ * slots are what Claude draws. The output is one self-contained document,
+ * `rebase-view.html` beside the build: a view's frame fetches nothing, so
+ * every script, style and font is inside it. The backend serves it in place
+ * of the generic one (`serveSPA` finds it in the frontend it serves).
+ *
+ * A second build, after the app's, from the same config.
+ */
+export interface RebaseMcpViewPluginOptions {
+    /** The app's entry, which renders it. Default `src/main.tsx`. */
+    entry?: string;
+    /** The file written into the build's output directory. Default `rebase-view.html`. */
+    fileName?: string;
+}
+
+/** Set while the view's own build runs, so it does not build a view of itself. */
+const MCP_VIEW_BUILD = "REBASE_MCP_VIEW_BUILD";
+
+export function rebaseMcpViewPlugin(options: RebaseMcpViewPluginOptions = {}): Plugin {
+    let config: ResolvedConfig;
+    return {
+        name: "rebase-mcp-view",
+        apply: "build",
+        configResolved(resolved) {
+            config = resolved;
+        },
+        async closeBundle() {
+            if (process.env[MCP_VIEW_BUILD] || config.build.ssr) return;
+            const entry = path.resolve(config.root, options.entry ?? "src/main.tsx");
+            if (!fs.existsSync(entry)) {
+                config.logger.warn(`[rebase] No MCP view: ${path.relative(config.root, entry)} does not exist.`);
+                return;
+            }
+            const work = fs.mkdtempSync(path.join(config.root, ".rebase-mcp-view-"));
+            try {
+                fs.writeFileSync(path.join(work, "index.html"), mcpViewDocument());
+                fs.writeFileSync(path.join(work, "view.css"), MCP_VIEW_UTILITIES);
+                fs.writeFileSync(path.join(work, "boot.ts"), mcpViewBoot(entry, resolvesFrom(config.root, "@rebasepro/plugin-insights")));
+                const { build } = await import("vite");
+                process.env[MCP_VIEW_BUILD] = "1";
+                try {
+                    await build({
+                        configFile: config.configFile,
+                        root: config.root,
+                        mode: config.mode,
+                        logLevel: "warn",
+                        plugins: [mcpViewWithoutLazyExtras(), mcpViewInlineIntoHtml()],
+                        build: {
+                            outDir: path.join(work, "out"),
+                            emptyOutDir: true,
+                            copyPublicDir: false,
+                            sourcemap: false,
+                            modulePreload: false,
+                            cssCodeSplit: false,
+                            assetsInlineLimit: Number.MAX_SAFE_INTEGER,
+                            rollupOptions: {
+                                input: path.join(work, "index.html"),
+                                output: { codeSplitting: false }
+                            }
+                        }
+                    });
+                } finally {
+                    delete process.env[MCP_VIEW_BUILD];
+                }
+                const built = path.join(work, "out", path.relative(config.root, path.join(work, "index.html")));
+                const target = path.join(config.build.outDir, options.fileName ?? "rebase-view.html");
+                fs.copyFileSync(fs.existsSync(built) ? built : path.join(work, "out", "index.html"), target);
+                config.logger.info(`[rebase] MCP view: ${path.relative(config.root, target)} (${Math.round(fs.statSync(target).size / 1024)} kB)`);
+            } finally {
+                fs.rmSync(work, { recursive: true, force: true });
+            }
+        }
+    };
+}
+
+function resolvesFrom(root: string, specifier: string): boolean {
+    try {
+        return fs.existsSync(path.join(root, "node_modules", specifier, "package.json"));
+    } catch {
+        return false;
+    }
+}
+
+/** The view's document: a root for the app, and storage that works in a frame with no origin of its own. */
+export function mcpViewDocument(entry = "./boot.ts"): string {
+    return `<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>Rebase</title>
+    <script>${MCP_VIEW_STORAGE_SHIM}</script>
+</head>
+<body>
+<div id="root"></div>
+<script type="module" src="${entry}"></script>
+</body>
+</html>
+`;
+}
+
+/**
+ * A host may sandbox the view without an origin of its own, and then reading
+ * `localStorage` or `sessionStorage` throws. The admin keeps view preferences
+ * there; in memory they last as long as the view.
+ */
+export const MCP_VIEW_STORAGE_SHIM = `for (const name of ["localStorage", "sessionStorage"]) {
+    try { void window[name]; } catch {
+        const data = new Map();
+        Object.defineProperty(window, name, { configurable: true, value: {
+            get length() { return data.size; },
+            key: (index) => [...data.keys()][index] ?? null,
+            getItem: (key) => data.has(key) ? data.get(key) : null,
+            setItem: (key, value) => void data.set(key, String(value)),
+            removeItem: (key) => void data.delete(key),
+            clear: () => data.clear()
+        } });
+    }
+}`;
+
+function mcpViewBoot(entry: string, insights: boolean): string {
+    return [
+        "import \"./view.css\";",
+        "import { addAppModules, startMcpView } from \"@rebasepro/cms/mcp-view\";",
+        ...(insights ? [
+            "import { BarChart, ChartCard, ChartStatus, KpiChange, KpiGrid, KpiReadout, KpiTile, SERIES_COLORS, TimeSeriesChart, compactFormat, describeChange, formatNumber, niceTicks } from \"@rebasepro/plugin-insights\";",
+            "addAppModules({ \"@rebasepro/plugin-insights\": { BarChart, ChartCard, ChartStatus, KpiChange, KpiGrid, KpiReadout, KpiTile, SERIES_COLORS, TimeSeriesChart, compactFormat, describeChange, formatNumber, niceTicks } });"
+        ] : []),
+        `startMcpView({ mountApp: () => import(${JSON.stringify(entry)}) });`,
+        ""
+    ].join("\n");
+}
+
+/**
+ * The utilities an app Claude writes may use (show_app). Tailwind generates
+ * only the classes it finds when it builds, and an app's code arrives later:
+ * a class missing here does nothing, silently. Colours are the app's own,
+ * from its stylesheet.
+ */
+export const MCP_VIEW_UTILITIES = `@import "tailwindcss/utilities" source(none);
+@source inline("{sm:,md:,lg:,xl:,}{flex,inline-flex,grid,block,inline-block,hidden}");
+@source inline("{sm:,md:,lg:,xl:,}{flex-row,flex-col,flex-wrap,flex-1,flex-none,shrink-0,grow,order-first,order-last}");
+@source inline("{sm:,md:,lg:,xl:,}grid-cols-{1,2,3,4,5,6,7,8,9,10,11,12}");
+@source inline("{sm:,md:,lg:,xl:,}col-span-{1,2,3,4,5,6,7,8,9,10,11,12,full}");
+@source inline("{sm:,md:,lg:,xl:,}{gap,gap-x,gap-y,p,px,py,pt,pb,pl,pr,m,mx,my,mt,mb,ml,mr,space-x,space-y}-{0,0.5,1,1.5,2,2.5,3,4,5,6,8,10,12,16}");
+@source inline("{sm:,md:,lg:,xl:,}{w,h,min-w,min-h,max-w,max-h}-{0,full,screen,fit,min,max,auto,1/2,1/3,2/3,1/4,3/4}");
+@source inline("{w,h,min-h,max-h,size}-{4,5,6,8,10,12,16,20,24,32,40,48,64,72,80,96}");
+@source inline("max-w-{xs,sm,md,lg,xl,2xl,3xl,4xl,5xl,6xl,7xl,prose}");
+@source inline("{items,self}-{start,center,end,stretch,baseline}");
+@source inline("justify-{start,center,end,between,around,evenly}");
+@source inline("text-{xs,sm,base,lg,xl,2xl,3xl,4xl,left,center,right}");
+@source inline("font-{normal,medium,semibold,bold,mono}");
+@source inline("{truncate,whitespace-nowrap,break-words,uppercase,tabular-nums,underline}");
+@source inline("leading-{tight,snug,normal,relaxed} tracking-{tight,wide}");
+@source inline("rounded{,-md,-lg,-xl,-full} border{,-t,-b,-l,-r}");
+@source inline("overflow-{hidden,auto,x-auto,y-auto} {relative,absolute,sticky} {top,bottom,left,right,inset}-0 z-{10,20}");
+@source inline("opacity-{50,75} cursor-pointer select-none");
+`;
+
+/**
+ * Every chunk inlined into the view's document: a frame fetches nothing, so
+ * the script and the stylesheet are written into the page. The preload
+ * helper's placeholder, which a build with no chunks to preload leaves
+ * unreplaced, is filled in.
+ */
+export function mcpViewInlineIntoHtml(): Plugin {
+    return {
+        name: "rebase-mcp-view-inline",
+        enforce: "post",
+        generateBundle(_options, bundle) {
+            for (const page of Object.values(bundle)) {
+                if (page.type !== "asset" || !page.fileName.endsWith(".html")) continue;
+                let html = String(page.source);
+                for (const [fileName, file] of Object.entries(bundle)) {
+                    if (file.type === "chunk" && fileName.endsWith(".js")) {
+                        const tag = new RegExp(`<script[^>]*src="[^"]*${escapeForRegExp(fileName)}"[^>]*></script>`);
+                        const code = file.code
+                            // `</script` inside the code would close the tag early.
+                            .replace(/<\/script/gi, "<\\/script")
+                            .replace(/__VITE_PRELOAD__/g, "void 0");
+                        html = html.replace(tag, () => `<script type="module">${code}</script>`);
+                        delete bundle[fileName];
+                    } else if (file.type === "asset" && fileName.endsWith(".css")) {
+                        const tag = new RegExp(`<link[^>]*href="[^"]*${escapeForRegExp(fileName)}"[^>]*>`);
+                        html = html.replace(tag, () => `<style>${String(file.source)}</style>`);
+                        delete bundle[fileName];
+                    }
+                }
+                page.source = html;
+            }
+        }
+    };
+}
+
+/**
+ * What the admin loads lazily and a view does without. With every chunk
+ * inlined, an `import()` is no longer a fetch on demand but bytes in the
+ * document: the whole Lucide map (an icon a collection names by string), every
+ * date-fns locale but the default, the admin's translations (the view is in
+ * English), and the toolbar's import and export (both work on files, and a
+ * view has none to read nor anywhere to save one). Each becomes an empty
+ * module, which every one of their loaders treats as "not there".
+ */
+export function mcpViewWithoutLazyExtras(): Plugin {
+    return {
+        name: "rebase-mcp-view-without-lazy-extras",
+        enforce: "pre",
+        load(id) {
+            if (/\/icons\/lucide_icon_map\.[jt]s$/.test(id)) return "export const icons = {};";
+            if (/\/date-fns\/locale\/(?!en-US)[^/]+\.js$/.test(id)) return "export {};";
+            if (/\/app\/(src|dist)\/locales\/(?!en\.)[a-z]+\.[jt]s$/.test(id)) return "export {};";
+            if (/\/data_import\/import\/ImportCollectionAction\.[jt]sx?$/.test(id)) {
+                return "export const ImportCollectionAction = () => null, PropertySelectEntry = () => null, ImportDataPreview = () => null;";
+            }
+            if (/\/data_export\/export\/ExportCollectionAction\.[jt]sx?$/.test(id)) {
+                return "export const ExportCollectionAction = () => null;";
+            }
+            return undefined;
+        }
+    };
+}
+
+function escapeForRegExp(text: string): string {
+    return text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }

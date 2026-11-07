@@ -13,10 +13,10 @@
  *   and told to the model with the line.
  */
 import React, { act } from "react";
-import { createRoot, type Root } from "react-dom/client";
+
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { McpAppBridge, type ToolResult } from "../views/bridge";
-import { App } from "../views/app/App";
+import { McpAppBridge, type ToolResult } from "@rebasepro/cms/mcp-view";
+import { startGenericView } from "../views/app/main";
 import { compileApp } from "../src/compile";
 
 declare global {
@@ -57,8 +57,6 @@ const HOSTED_ACTIONS = {
 };
 
 let container: HTMLDivElement;
-let root: Root;
-
 beforeEach(() => {
     globalThis.IS_REACT_ACT_ENVIRONMENT = true;
     vi.stubGlobal("ResizeObserver", class {
@@ -66,13 +64,13 @@ beforeEach(() => {
         unobserve(): void {}
         disconnect(): void {}
     });
+    // The generic view mounts its app into #root, as a page would have it.
     container = document.createElement("div");
+    container.id = "root";
     document.body.appendChild(container);
-    root = createRoot(container);
 });
 
 afterEach(() => {
-    act(() => root.unmount());
     container.remove();
     vi.unstubAllGlobals();
     vi.restoreAllMocks();
@@ -88,7 +86,9 @@ function open(result: ToolResult, answer: (name: string, args: Record<string, un
         return answer(name, args);
     });
     const context = vi.spyOn(bridge, "updateModelContext").mockResolvedValue(undefined);
-    act(() => root.render(<App bridge={bridge}/>));
+    act(() => {
+        startGenericView(bridge);
+    });
     return { calls, context };
 }
 

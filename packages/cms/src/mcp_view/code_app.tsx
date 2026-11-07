@@ -16,37 +16,26 @@
 import React from "react";
 import * as jsxRuntime from "react/jsx-runtime";
 import * as UI from "@rebasepro/ui";
-import {
-    BarChart,
-    ChartCard,
-    ChartStatus,
-    KpiChange,
-    KpiGrid,
-    KpiReadout,
-    KpiTile,
-    SERIES_COLORS,
-    TimeSeriesChart,
-    compactFormat,
-    describeChange,
-    formatNumber,
-    niceTicks
-} from "@rebasepro/plugin-insights";
-import { APP_MODULES, type AppModule } from "../../src/app-modules";
 import { SDK_MODULE } from "./sdk";
 
-/** The KPI tiles and charts: the building blocks of the insights plugin, not its engine. */
-const INSIGHTS_MODULE = {
-    BarChart, ChartCard, ChartStatus, KpiChange, KpiGrid, KpiReadout, KpiTile, SERIES_COLORS, TimeSeriesChart,
-    compactFormat, describeChange, formatNumber, niceTicks
-};
+/**
+ * The modules an app may import, by name: React, the UI kit and the SDK
+ * always; more where the view that runs it adds them (`addAppModules`) — the
+ * KPI tiles and charts of `@rebasepro/plugin-insights`, where the project has
+ * them. The server's compiler (`@rebasepro/mcp-apps`' `APP_MODULES`) accepts
+ * the same names; one this view was not given is refused here, by name.
+ */
+const MODULES = new Map<string, object>([
+    ["react", React],
+    ["react/jsx-runtime", jsxRuntime],
+    ["@rebasepro/ui", UI],
+    ["@rebasepro/mcp-apps", SDK_MODULE]
+]);
 
-const MODULES: Record<AppModule, object> = {
-    "react": React,
-    "react/jsx-runtime": jsxRuntime,
-    "@rebasepro/ui": UI,
-    "@rebasepro/plugin-insights": INSIGHTS_MODULE,
-    "@rebasepro/mcp-apps": SDK_MODULE
-};
+/** Make more modules importable by the apps this view runs. */
+export function addAppModules(modules: Record<string, object>): void {
+    for (const [name, exports] of Object.entries(modules)) MODULES.set(name, exports);
+}
 
 /** A module as the app sees it: a missing export is an error that names it, not `undefined` three calls later. */
 function strict(name: string, exports: object): object {
@@ -62,12 +51,10 @@ function strict(name: string, exports: object): object {
     });
 }
 
-const STRICT_MODULES = new Map(APP_MODULES.map(name => [name, strict(name, MODULES[name])]));
-
 function requireModule(name: string): object {
-    const found = STRICT_MODULES.get(name as AppModule);
-    if (!found) throw new Error(`The app imports "${name}", which the view does not provide.`);
-    return found;
+    const found = MODULES.get(name);
+    if (!found) throw new Error(`The app imports "${name}", which this project's view does not provide.`);
+    return strict(name, found);
 }
 
 type AppFactory = (require: (name: string) => object, module: { exports: Record<string, unknown> }, exports: Record<string, unknown>) => void;

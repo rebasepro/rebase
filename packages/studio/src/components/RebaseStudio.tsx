@@ -1,5 +1,5 @@
 import React, { Suspense, useLayoutEffect, useMemo } from "react";
-import { useRebaseRegistryDispatch, useTranslation } from "@rebasepro/app";
+import { useRebaseEmbedHost, useRebaseRegistryDispatch, useTranslation } from "@rebasepro/app";
 import type { RebaseStudioConfig, AppView } from "@rebasepro/cms-types";
 import { CircularProgressCenter, lazyChunk } from "@rebasepro/ui";
 
@@ -32,7 +32,19 @@ import { StudioHomePage } from "./StudioHomePage";
  */
 const DEFAULT_HOME_PAGE = <StudioHomePage/>;
 
-export function RebaseStudio({ tools, homePage, devViews: extraViews }: RebaseStudioConfig) {
+/**
+ * Studio: the developer tools, registered beside the admin.
+ *
+ * Not in an embedding (an MCP App view, `embed_host.ts` in `@rebasepro/app`):
+ * there the app is shown to the person it runs as, and Studio's tools change
+ * the project.
+ */
+export function RebaseStudio(props: RebaseStudioConfig) {
+    const embed = useRebaseEmbedHost();
+    return embed ? null : <RebaseStudioRegistration {...props}/>;
+}
+
+function RebaseStudioRegistration({ tools, homePage, devViews: extraViews }: RebaseStudioConfig) {
     const dispatch = useRebaseRegistryDispatch();
     const { t, i18n } = useTranslation();
 

@@ -21,7 +21,7 @@
 import React, { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { McpAppBridge, type ToolResult } from "../views/bridge";
+import { McpAppBridge, type ToolResult } from "@rebasepro/cms/mcp-view";
 import { CollectionTable } from "../views/collection-table/CollectionTable";
 
 declare global {

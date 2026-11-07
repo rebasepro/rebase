@@ -73,6 +73,19 @@ La traducción está pendiente. El contenido siguiente está en inglés.
   closes what their connection was not granted. The model reads the rows, not
   the configs.
 
+- **The views in Claude are your admin app, customizations included.** Add
+  `rebaseMcpViewPlugin()` from `@rebasepro/app/vitePlugin` to the frontend's
+  Vite config (new projects have it) and the build also writes
+  `rebase-view.html`: your own `App`, started inside the view, so your custom
+  collection views, entity views, custom fields and previews, entity actions,
+  plugins and slots are what Claude draws. The backend serves it in place of
+  the generic view, found beside the frontend `serveSPA` serves (or at
+  `REBASE_MCP_VIEW`). In the view, `<Rebase>` reads and writes through the
+  server's tools as the person, `<RebaseShell>` draws the opened screen in place
+  of its routes and sign-in gate, and Studio stays out — see `setRebaseEmbedHost`
+  in `@rebasepro/app` and `startMcpView` in the new `@rebasepro/cms/mcp-view`.
+  `CollectionPanel` takes `selectedId`, the row it draws as selected.
+
 #### Admin (CMS & app)
 
 - **KPI tiles and charts you place yourself.** `@rebasepro/plugin-insights`

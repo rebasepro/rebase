@@ -1,33 +1,61 @@
+/**
+ * The view a server serves when its project has none of its own (no admin
+ * frontend built with the Rebase Vite plugin): the admin panel with no
+ * customizations, drawing the collections the server sent. A project that
+ * builds its admin gets a view of its own instead, running its own app —
+ * see `startMcpView` in `@rebasepro/cms/mcp-view`.
+ */
 import React from "react";
 import { createRoot } from "react-dom/client";
-import { McpAppBridge } from "../bridge";
-import { App } from "./App";
+import { Rebase } from "@rebasepro/app";
+import { RebaseCMS, RebaseShell } from "@rebasepro/cms";
+import { addAppModules, startMcpView, type McpAppBridge } from "@rebasepro/cms/mcp-view";
+import {
+    BarChart,
+    ChartCard,
+    ChartStatus,
+    KpiChange,
+    KpiGrid,
+    KpiReadout,
+    KpiTile,
+    SERIES_COLORS,
+    TimeSeriesChart,
+    compactFormat,
+    describeChange,
+    formatNumber,
+    niceTicks
+} from "@rebasepro/plugin-insights";
+import { CollectionTable } from "../collection-table/CollectionTable";
 import "../index.css";
 
-const bridge = new McpAppBridge();
+// The KPI tiles and charts an app may import: the insights plugin's building
+// blocks, not its engine.
+addAppModules({
+    "@rebasepro/plugin-insights": {
+        BarChart, ChartCard, ChartStatus, KpiChange, KpiGrid, KpiReadout, KpiTile, SERIES_COLORS, TimeSeriesChart,
+        compactFormat, describeChange, formatNumber, niceTicks
+    }
+});
 
-// The host's light or dark, on the class the UI kit's `dark:` variant reads.
-bridge.onhostcontext = (context) => {
-    if (context.theme) document.documentElement.classList.toggle("dark", context.theme === "dark");
-};
+const NO_COLLECTIONS: never[] = [];
 
-// A host may sandbox the view without `allow-forms`, and then a form's submit
-// button submits nothing: the browser drops the submission before the form's
-// `submit` event — the admin panel's record form saves on that event. The click
-// still happens, so it is turned into the event itself, after the click has
-// finished (a button's own handler may say which save it was).
-document.addEventListener("click", (event) => {
-    const button = event.target instanceof Element ? event.target.closest("button[type=submit]") : null;
-    if (!(button instanceof HTMLButtonElement) || !button.form || button.disabled) return;
-    event.preventDefault();
-    const form = button.form;
-    setTimeout(() => form.dispatchEvent(new SubmitEvent("submit", { bubbles: true, cancelable: true, submitter: button })));
-}, true);
+function root(): HTMLElement {
+    return document.getElementById("root") ?? document.body.appendChild(document.createElement("div"));
+}
 
-const container = document.getElementById("root");
-if (container) {
-    createRoot(container).render(<App bridge={bridge}/>);
-    // Connected after the first render, so the handlers for the tool result
-    // are in place before the host sends it.
-    void bridge.connect({ name: "rebase", version: "0.2.0" });
+/** Start the view: on this window's host, or on `bridge` (a test's stand-in). */
+export function startGenericView(bridge?: McpAppBridge): McpAppBridge {
+    return startMcpView({
+        ...(bridge && { bridge }),
+        appInfo: { name: "rebase", version: "0.3.0" },
+        // An admin with nothing of its own: the embed host fills in the data,
+        // the person, and the collections the server sent.
+        mountApp: () => createRoot(root()).render(
+            <Rebase>
+                <RebaseCMS collections={NO_COLLECTIONS}/>
+                <RebaseShell/>
+            </Rebase>
+        ),
+        mountTable: (host, container) => createRoot(container).render(<CollectionTable bridge={host}/>)
+    });
 }

@@ -22,6 +22,9 @@
     ],
     "noEmit": true,
     "paths": {
+      "@rebasepro/cms/mcp-view": [
+        "../cms/src/mcp-view.ts"
+      ],
       "@rebasepro/*": [
         "../*/src/index.ts"
       ],

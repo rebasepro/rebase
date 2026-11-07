@@ -16,17 +16,19 @@
  */
 import { describe, expect, it, vi } from "vitest";
 import { EntityRelation, type CollectionConfig, type ListenCollectionProps } from "@rebasepro/types";
-import type { ToolResult } from "../views/bridge";
+import type { ToolResult } from "@rebasepro/cms/mcp-view";
 import {
     DEFAULT_ACTIONS,
     SaveCancelledError,
+    actionsOf,
     createToolDriver,
     describeChanges,
+    filterOf,
+    parseResult,
     type CallTool,
     type ViewChange,
     type WritePlan
-} from "../views/app/tool-driver";
-import { actionsOf, filterOf, parseResult } from "../views/app/payload";
+} from "@rebasepro/cms/mcp-view";
 
 const customers: CollectionConfig = {
     slug: "customers",

@@ -11,7 +11,7 @@
  * and a tool result that arrives before React has set its handler.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { APPS_PROTOCOL_VERSION, McpAppBridge, isRecord } from "../views/bridge";
+import { APPS_PROTOCOL_VERSION, McpAppBridge, isRecord } from "@rebasepro/cms/mcp-view";
 
 let frame: HTMLIFrameElement;
 let host: Window;

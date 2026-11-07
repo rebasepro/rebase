@@ -13,7 +13,8 @@ import {
     StudioBridgeRegistryProvider,
     useBridgeRegistration,
     CustomizationControllerContext,
-    RebaseDataContext
+    RebaseDataContext,
+    useRebaseEmbedHost
 } from "@rebasepro/app";
 import { buildRoutedRebaseData, resolveDataSource } from "@rebasepro/common";
 import { CircularProgressCenter, lazyChunk } from "@rebasepro/ui";
@@ -147,11 +148,19 @@ export function RebaseNavigation({ children }: RebaseNavigationProps) {
         return trimmed ? `/${trimmed}` : "/";
     }, [registry.cmsConfig?.basePath]);
 
-    const urlController = useBuildUrlController({
+    const builtUrlController = useBuildUrlController({
         basePath,
         baseCollectionPath: "/c",
         collectionRegistryController
     });
+    // In an embedding (an MCP App view) no route draws a record's page: a
+    // record opens over the screen, as it does under a CollectionsProvider.
+    const embedded = useRebaseEmbedHost() !== undefined;
+    const urlController = useMemo<UrlController>(() => embedded ? {
+        ...builtUrlController,
+        isUrlCollectionPath: () => false,
+        routesMounted: false
+    } : builtUrlController, [builtUrlController, embedded]);
 
     // ── Build config controller internally when collection editor is enabled ──
     const rebaseClient = useRebaseClient();

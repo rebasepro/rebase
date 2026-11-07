@@ -4,7 +4,7 @@ import { defineConfig } from "vite"
 import react from "@vitejs/plugin-react"
 import svgr from "vite-plugin-svgr";
 import tailwindcss from "@tailwindcss/vite";
-import { rebaseCollectionsPlugin } from "@rebasepro/app/vitePlugin";
+import { rebaseCollectionsPlugin, rebaseMcpViewPlugin } from "@rebasepro/app/vitePlugin";
 import { visualizer } from "rollup-plugin-visualizer";
 
 const PACKAGES_DIR = path.resolve(__dirname, "../../packages");
@@ -216,6 +216,9 @@ export default defineConfig({
         react({}),
         tailwindcss(),
         rebaseCollectionsPlugin({ collectionsDir: "../config/collections" }),
+        // The view Claude shows this app's data in (show_collection, show_app),
+        // built from this app so its custom views and fields come along.
+        rebaseMcpViewPlugin(),
         visualizer({ filename: "stats.json",
 template: "raw-data" })
     ],

@@ -25,7 +25,7 @@ import type {
     SaveProps
 } from "@rebasepro/types";
 import { fieldKeyForColumn, resolveCollectionRelations } from "@rebasepro/common";
-import { isRecord, type ToolResult } from "../bridge";
+import { isRecord, type ToolResult } from "./bridge";
 
 /** A tool the view calls, and the arguments it always sends to it. */
 export interface ToolAction {

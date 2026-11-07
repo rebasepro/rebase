@@ -17,7 +17,7 @@ import path from "node:path";
 import { describe, it, expect, beforeAll } from "@jest/globals";
 import type { CollectionConfig } from "@rebasepro/types";
 import { configureJwt, generateMcpAccessToken } from "../src/auth/jwt";
-import { MCP_APP_MIME_TYPE, type McpAppResource } from "../src/mcp/mcp-apps";
+import { MCP_APP_MIME_TYPE, withProjectView, type McpAppResource } from "../src/mcp/mcp-apps";
 import { COLLECTION_TABLE_URI, MCP_APP_URI } from "../src/mcp/mcp-tools";
 import { buildApp, rpc, stubDriver, PUBLIC_URL } from "./helpers/mcp-harness";
 
@@ -338,5 +338,20 @@ describe("@rebasepro/mcp-apps", () => {
         const source = readFileSync(path.resolve(__dirname, "../../mcp-apps/src/index.ts"), "utf8");
         expect(source).toContain(`uri: "${MCP_APP_URI}"`);
         expect(source).toContain(`uri: "${COLLECTION_TABLE_URI}"`);
+    });
+});
+
+describe("the project's own view", () => {
+    it("is served in place of the generic one where the project built it, under every view URI", () => {
+        const files: Record<string, string> = { "/app/frontend/dist/rebase-view.html": "<html>the project's admin</html>" };
+        const served = withProjectView([APP, TABLE], ["/nope/rebase-view.html", "/app/frontend/dist/rebase-view.html"], file => files[file]);
+        expect(served.map(view => [view.uri, view.html])).toEqual([
+            [MCP_APP_URI, "<html>the project's admin</html>"],
+            [COLLECTION_TABLE_URI, "<html>the project's admin</html>"]
+        ]);
+    });
+
+    it("leaves the generic view where the project built none", () => {
+        expect(withProjectView([APP, TABLE], ["/nope/rebase-view.html"], () => undefined)).toEqual([APP, TABLE]);
     });
 });

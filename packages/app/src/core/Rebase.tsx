@@ -27,6 +27,9 @@ import { RebaseRegistryProvider } from "../hooks/useRebaseRegistry";
 import { SchemaDriftProvider } from "../components/SchemaDriftBanner";
 import { GlobalComponentOverrideProvider } from "../contexts/ComponentOverrideContext";
 import { useBuildModeController } from "../hooks/useBuildModeController";
+import type { ModeController } from "../hooks/useModeController";
+import type { AuthController } from "@rebasepro/cms-types";
+import { useRebaseEmbedHost } from "./embed_host";
 import { useBuildAdminModeController } from "../hooks/useBuildAdminModeController";
 import { useBuildLocalConfigurationPersistence } from "../hooks/useBuildLocalConfigurationPersistence";
 import { RebaseClientInstanceContext } from "../contexts/RebaseClientInstanceContext";
@@ -74,6 +77,14 @@ const EMPTY_SLOTS: AnySlotContribution[] = [];
 
 export function Rebase<USER extends User, DB = unknown>(props: RebaseProps<USER, DB>) {
 
+    // Inside an embedding (an MCP App view), the host's data, auth and
+    // storage stand in for the app's own client: see `embed_host.ts`.
+    const embed = useRebaseEmbedHost();
+    const modeOfEmbed = embed?.mode;
+    const embeddedMode = useMemo<ModeController | undefined>(
+        () => modeOfEmbed ? { mode: modeOfEmbed, setMode: () => undefined } : undefined,
+        [modeOfEmbed]);
+
     const {
         children,
         entityLinkBuilder,
@@ -100,7 +111,17 @@ export function Rebase<USER extends User, DB = unknown>(props: RebaseProps<USER,
         apiUrl,
         translations,
         components: componentsProp
-    } = props;
+    } = embed ? {
+        ...props,
+        client: undefined,
+        // The embedding signs in for the app: the person it holds the
+        // connection for is the user the app runs as.
+        authController: embed.authController as AuthController<USER>,
+        storageSource: embed.storageSource,
+        storageSources: undefined,
+        dataSources: [{ key: DEFAULT_DATA_SOURCE_KEY, engine: "postgres", driver: embed.dataDriver }],
+        modeController: embeddedMode
+    } : props;
 
     const plugins = pluginsProp;
 
