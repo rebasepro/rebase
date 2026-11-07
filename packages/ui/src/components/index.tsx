@@ -41,6 +41,7 @@ export * from "./Select";
 export * from "./Separator";
 export * from "./Slider";
 export * from "./Sheet";
+export * from "./SplitView";
 export * from "./TextareaAutosize";
 export * from "./TextField";
 export * from "./Tooltip";

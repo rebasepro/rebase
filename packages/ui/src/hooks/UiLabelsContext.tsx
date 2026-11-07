@@ -3,8 +3,9 @@ import React, { createContext, useContext, useMemo } from "react";
 
 /**
  * The words the kit itself puts on screen: the list and card views' notices,
- * the table's error title, the search bar's names, and the relative-time
- * phrases of `formatRelativeTime` (`@rebasepro/utils`).
+ * the table's error title, the search bar's names, the split view's back
+ * button and divider, and the relative-time phrases of `formatRelativeTime`
+ * (`@rebasepro/utils`).
  *
  * A label that carries a value is a function of it, so a translation can
  * choose its own plural form.
@@ -26,6 +27,10 @@ export interface UiLabels {
     select: string;
     /** The button that opens a time-of-day field's picker (`DateTimeField mode="time"`). */
     openTimePicker: string;
+    /** The back button of a narrow `SplitView`, which returns from the detail to the master. */
+    back: string;
+    /** The divider between a `SplitView`'s master and detail. */
+    resizeList: string;
     /** The phrases `formatRelativeTime` (`@rebasepro/utils`) takes as `labels`. */
     relativeTime: UiRelativeTimeLabels;
 }
@@ -52,6 +57,8 @@ export const defaultUiLabels: UiLabels = {
     clearSearch: "Clear search",
     select: "Select",
     openTimePicker: "Open time picker",
+    back: "Back",
+    resizeList: "Resize the list",
     relativeTime: {
         justNow: "just now",
         inAMoment: "in a moment",

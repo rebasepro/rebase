@@ -288,7 +288,8 @@ function createLocaleBackend(getOverrides: () => TranslationOverrides | undefine
 
 /**
  * The UI kit's own words (`@rebasepro/ui`'s list and card notices, the table's
- * error title, the search bar's names, relative dates) in the admin language.
+ * error title, the search bar's names, the split view's back button and
+ * divider, relative dates) in the admin language.
  * The kit speaks English on its own; this fills its labels from the
  * translations, and refills them when the language changes.
  */
@@ -304,6 +305,8 @@ function UiLabelsFromTranslations({ children }: PropsWithChildren) {
         clearSearch: t("clear_search"),
         select: t("select"),
         openTimePicker: t("open_time_picker"),
+        back: t("back"),
+        resizeList: t("resize_list"),
         relativeTime: {
             justNow: t("relative_just_now"),
             inAMoment: t("relative_in_a_moment"),
