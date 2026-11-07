@@ -663,10 +663,13 @@ export class PostgresBackendDriver implements DataDriver {
             // says it is describing.
             //
             // No afterRead pass: the callbacks shape rows, and an aggregate
-            // returns sums and counts rather than rows. Row-level authorization
-            // is not skipped — it is applied one layer down, by the
-            // request-scoped handle this service reads through.
+            // returns sums and counts rather than rows — so on a collection
+            // whose rows a callback rewrites, everything but a plain count is
+            // refused (see `assertAggregateUnmasked`). Row-level authorization
+            // is applied one layer down, by the request-scoped handle this
+            // service reads through.
             aggregate: async (collectionPath, options) => {
+                this.assertAggregateUnmasked(collectionPath, options);
                 return raw.aggregate(collectionPath, options);
             },
             // Forwarded for the same reason `aggregate` is, and it was missed
@@ -795,6 +798,35 @@ export class PostgresBackendDriver implements DataDriver {
 
     private static hasAfterRead(resolved: ReturnType<PostgresBackendDriver["resolveCollectionCallbacks"]>): boolean {
         return !!(resolved.globalCallbacks?.afterRead || resolved.callbacks?.afterRead || resolved.propertyCallbacks?.afterRead);
+    }
+
+    /**
+     * Refuse an aggregate that would read what `afterRead` hides.
+     *
+     * An aggregate reads the stored columns and never passes through the
+     * callbacks, so on a collection whose rows one rewrites, `max(email)` or
+     * `groupBy=salary` hands back the value the mask exists to withhold, one
+     * bucket at a time. What a callback does to a row cannot be known from
+     * here, so the rule is closed: on such a collection only `count()` with no
+     * `groupBy` is served — the number `GET /count` already gives — and any
+     * other aggregate is refused, whichever tier (global, collection or
+     * property) the callback sits on.
+     */
+    private assertAggregateUnmasked(
+        path: string,
+        options: { aggregates: { fn: string; field?: string }[]; groupBy?: string[] }
+    ): void {
+        const plainCount = (options.groupBy?.length ?? 0) === 0
+            && options.aggregates.every(aggregate => aggregate.fn === "count" && !aggregate.field);
+        if (plainCount) return;
+        if (!PostgresBackendDriver.hasAfterRead(this.resolveCollectionCallbacks(undefined, path))) return;
+        throw ApiError.badRequest(
+            `Aggregates other than count are refused on a collection whose rows an afterRead callback rewrites ("${path}"): ` +
+            "a sum, average, minimum, maximum, field count or group would read the stored values the callback hides. " +
+            "Use `count()` without `groupBy`, or read the rows.",
+            "AGGREGATE_MASKED_BY_AFTER_READ",
+            { collection: path }
+        );
     }
 
     /**

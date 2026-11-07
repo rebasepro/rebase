@@ -877,6 +877,11 @@ export interface RestFetchService {
      * read**. An aggregate is an efficient way to learn about rows you cannot
      * select, and `count(*)` over a table whose policies would return nothing
      * has to be zero.
+     *
+     * Nor may it read what `afterRead` hides. An aggregate does not pass
+     * through the callbacks, so on a collection any `afterRead` applies to
+     * (global, collection or property) only `count` with no field and no
+     * `groupBy` is served; anything else is refused with a 400.
      */
     aggregate?(
         collectionPath: string,
