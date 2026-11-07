@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useLayoutEffect, useState } from "react";
 
 /**
  * The rendered width of the element the returned ref is attached to, kept
@@ -7,7 +7,9 @@ import { useEffect, useState } from "react";
  *
  * It measures the element, never the window, so a layout that switches on it
  * behaves the same in a side panel, a split pane or an embedding frame as it
- * does full screen. The width is 0 until the element has mounted.
+ * does full screen. The width is 0 until the element has mounted; it is read
+ * before the browser paints, so a layout chosen from it does not flash the
+ * narrow arrangement first.
  *
  * @example
  * ```tsx
@@ -18,7 +20,7 @@ import { useEffect, useState } from "react";
 export function useElementWidth<E extends HTMLElement>(): [(element: E | null) => void, number] {
     const [element, setElement] = useState<E | null>(null);
     const [width, setWidth] = useState(0);
-    useEffect(() => {
+    useLayoutEffect(() => {
         if (!element) return;
         setWidth(element.getBoundingClientRect().width);
         const observer = new ResizeObserver(([entry]) => setWidth(entry.contentRect.width));
