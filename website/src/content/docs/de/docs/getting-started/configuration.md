@@ -1,5 +1,5 @@
 ---
-sourceHash: d1aaac1b3505e1af
+sourceHash: 3ecc85be3f075021
 title: Umgebung & Konfiguration
 sidebar_label: Konfiguration
 description: Alle Umgebungsvariablen und Konfigurationsoptionen für Rebase-Projekte.
@@ -208,7 +208,10 @@ Scaffolds), `STORAGE_PUBLIC_READ` oder `STORAGE_ALLOW_ANY_AUTHENTICATED`.
 | `DB_POOL_IDLE_TIMEOUT` | Millisekunden, die eine ungenutzte Verbindung aufrechterhalten wird | `30000` |
 | `DB_POOL_CONNECT_TIMEOUT` | Millisekunden, die auf eine Verbindung gewartet wird | `10000` |
 | `DATABASE_DIRECT_URL` | Direkte (nicht gepoolte) Verbindung. [Realtime](/docs/backend/realtime) benötigt eine solche: `LISTEN`/`NOTIFY` funktioniert nicht über einen Transaktions-Pooler wie PgBouncer; ohne direkte Verbindung werden Änderungsbenachrichtigungen mit einer Warnung deaktiviert, statt stillschweigend verloren zu gehen. Der [Job-Worker](/docs/backend/jobs) hält sein Wake-up-`LISTEN` ebenfalls darauf. Füllt `directConnectionString` des Postgres-Adapters aus, wenn dieser nicht gesetzt ist. | — |
-| `DATABASE_READ_URL` | Read-Replikat. Lesezugriffe werden dorthin geleitet, wenn die Variable gesetzt ist und sich von `DATABASE_URL` unterscheidet; schlägt die Verbindung fehl, wird mit einer Warnung auf die primäre Datenbank zurückgegriffen. Füllt `readConnectionString` des Postgres-Adapters aus, wenn dieser nicht gesetzt ist; in Version 0.24 wird diese Option ignoriert. | — |
+| `DATABASE_READ_URL` | Read-Replikat, etwa ein Hot Standby. Benennt sie einen anderen Server, werden Lesezugriffe angemeldeter Nutzer (Listen, einzelne Zeilen, Zählungen, Aggregate) dort unter derselben Row-Level-Security bedient; Schreibzugriffe, Anmeldung, Realtime, Crons, Jobs, die SQL-Konsole und `rebase.sql` bleiben auf dem Primary. Wer gerade geschrieben hat, liest für `REBASE_READ_STICKY_MS` vom Primary, und alle tun das, solange das Replikat mehr als `REBASE_READ_MAX_LAG_MS` zurückliegt oder ausfällt. Füllt `readConnectionString` des Postgres-Adapters, wenn diese Option nicht gesetzt ist; bis einschließlich 0.28 wurde der Pool des Replikats geöffnet und nie gelesen. | — |
+| `REBASE_READ_STICKY_MS` | Wie lange die Lesezugriffe desselben Nutzers nach einem Schreibzugriff zum Primary gehen, damit ein Speichern gefolgt von einer Liste das Gespeicherte zeigt. Pro Serverinstanz. | `5000` |
+| `REBASE_READ_MAX_LAG_MS` | Replikationsverzögerung, ab der alle Lesezugriffe zum Primary gehen. | `1000` |
+| `DATABASE_POOLED` | `true`, wenn `DATABASE_URL` über einen Pooler im Transaktionsmodus wie PgBouncer läuft. Der Pool sendet dann beim Verbinden weder `search_path` noch `statement_timeout` (der Pooler würde sie ablehnen oder verwerfen) und setzt beide in jeder Transaktion; der Start gibt der Datenbankrolle einen Standard-`search_path` von `public` für Anweisungen außerhalb einer Transaktion. `DATABASE_DIRECT_URL` wird Pflicht, und Realtime, das Aufwecken des Job-Workers, Index-Builds, Branching und die SQL-Konsole nutzen sie. Die URL des Replikats gilt ebenfalls als gepoolt. `DATABASE_POOLED__<KEY>` für eine andere Datenquelle. | — |
 | `REBASE_DB_POOL_MAX` | Eine Obergrenze für jeden Pool im Prozess, unabhängig davon, was der jeweilige Pool angefordert hat. Nur reine Ziffern: Ein fehlerhafter Wert wird ignoriert, anstatt den Server stillschweigend zu serialisieren. | — |
 
 ### Runtime-Verhalten

@@ -15,7 +15,46 @@
   isolate host's keep-alive needs the request, so pass `c` whenever there is
   one.
 
+- **The runtime runs behind a transaction-mode pooler.** With
+  `DATABASE_POOLED=true`, `DATABASE_URL` may point at PgBouncer in transaction
+  mode: the pool sends no `search_path` or `statement_timeout` at connect and
+  sets both in each transaction, and the boot gives the role a default
+  `search_path` of `public` (logged as a statement to run when the boot runs no
+  DDL). Everything that needs a session moves to `DATABASE_DIRECT_URL`, which
+  becomes required: realtime and the job worker's `LISTEN`, index builds and
+  their advisory locks, branching, and the Studio SQL console's runs, cursors
+  and cancels. A pooled source without a direct URL is refused at boot, where
+  it used to hold its `LISTEN` on the pooler and go silent. Needs
+  `@rebasepro/server` and `@rebasepro/server-postgres` from this release.
+
+- **Signed-in reads are served by the read replica.** When `DATABASE_READ_URL`
+  names another server, lists, single rows, counts, aggregates and
+  `readTogether` run there in the same RLS-scoped, read-only transaction.
+  Writes, sign-in, realtime, crons, jobs, `dataAsAdmin`, idempotency, the SQL
+  console and `rebase.sql` stay on the primary, as does any read inside a
+  write. A user who just wrote reads from the primary for
+  `REBASE_READ_STICKY_MS` (default 5000, per instance); everyone does while the
+  replica's lag is above `REBASE_READ_MAX_LAG_MS` (default 1000), and for a
+  while after it fails a read, which is retried on the primary.
+
+- **`/metrics` reports the database.** `rebase_db_pool_total|idle|waiting` per
+  source and pool, `rebase_db_connection_errors_total{code}`, and every 30
+  seconds `rebase_db_connections{state}`, `rebase_db_max_connections`,
+  `rebase_db_size_bytes` and `rebase_db_replica_lag_seconds`.
+
 ### Fixed
+
+#### Server & REST
+
+- **A database server out of connections answers 503, not 500.** SQLSTATE
+  `53300` ("too many clients") and `53400` are now `503
+  DB_CONNECTIONS_EXHAUSTED` with `Retry-After: 2`, which the SDK retries, and
+  a warning naming the remedy at most once a minute.
+
+- **`DATABASE_READ_URL` naming the primary no longer opens a second pool to
+  it.** The read URL was compared with the primary's URL after the boot had
+  pinned `search_path` onto it, so the two never matched; the replica's pool
+  now also takes `DB_POOL_*` and is closed at shutdown.
 
 #### Auth
 

@@ -1,5 +1,5 @@
 ---
-sourceHash: 78957e0c3d6a8787
+sourceHash: dd7f515c841c860b
 title: Auto-hébergement
 sidebar_label: Auto-hébergement
 description: Exécutez Rebase n'importe où avec l'image de runtime officielle et le bundle de votre projet — Docker Compose, Fly, Railway ou un simple VPS.
@@ -296,6 +296,18 @@ REBASE_METRICS_TOKEN=<random string>
 Expose les métriques Prometheus sur `/metrics` : nombres de requêtes et histogrammes de latence ventilés par composant d'API (data, auth, storage, functions) et par collection, ainsi que des jauges relatives au processus. Sans token, le point de terminaison est accessible à toute personne pouvant joindre le port ; définissez-en donc un à moins qu'il ne se trouve sur un réseau privé.
 
 `rebase_db_pool_wait_ms` est un histogramme du temps pendant lequel chaque requête a attendu une connexion du pool de base de données, ouverture d'une connexion comprise, étiqueté par clé de source de données (`source="(default)"` dans un projet sans sources de données déclarées). Un pool sain maintient cette valeur proche de zéro. Une traîne qui augmente avec le trafic indique que les requêtes font la queue pour obtenir des connexions — le plus souvent retenues par des callbacks d'écriture attendant une opération lente ; voir [A callback holds a connection](/docs/collections/context-data-api/#a-callback-holds-a-connection).
+
+La base de données elle-même, par source de données :
+
+| Métrique | Ce qu'elle dit |
+|----------|----------------|
+| `rebase_db_pool_total`, `_idle`, `_waiting` | Les connexions de chaque pool, étiquetées `pool="primary"`, `"read"` (la réplique) ou `"session"` (le pool direct de la console SQL derrière un pooler). `waiting` au-dessus de zéro longtemps signifie un pool trop petit pour sa charge. |
+| `rebase_db_connection_errors_total` | Requêtes répondues 503 faute de connexion, par `code` : `53300` / `53400` (le serveur n'a plus de connexions), `pool_exhausted`, `connect_timeout`, `unreachable`. |
+| `rebase_db_connections` | Connexions clientes sur le serveur, par `state`, face à `rebase_db_max_connections`. |
+| `rebase_db_size_bytes` | La taille de la base. |
+| `rebase_db_replica_lag_seconds` | Le retard de `DATABASE_READ_URL` sur la primaire. |
+
+Les quatre dernières sont échantillonnées toutes les 30 secondes sur la propre connexion de l'instance, si bien qu'un scrape ne devient jamais une requête.
 
 `rebase_realtime_*` indique pour chaque instance les sockets ouverts, les canaux et les trames envoyées au bus de canaux ou retenues : voir [Seeing what the bus does](/docs/backend/realtime-transports/#seeing-what-the-bus-does).
 

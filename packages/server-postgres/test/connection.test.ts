@@ -50,7 +50,12 @@ import {
     createPostgresDatabaseConnection,
     createDirectDatabaseConnection,
     createReadReplicaConnection,
-    pinSearchPath
+    pinSearchPath,
+    closeWithPool,
+    isPooledPool,
+    pooledTransactionSettings,
+    searchPathList,
+    transactionSettingsStatements
 } from "../src/connection";
 import { logger } from "@rebasepro/server";
 
@@ -342,5 +347,93 @@ describe("pinSearchPath", () => {
         // Key/value DSNs: a connection that works unpinned beats a corrupted one.
         const dsn = "host=localhost user=rebase dbname=rebase";
         expect(pinSearchPath(dsn)).toBe(dsn);
+    });
+});
+
+/**
+ * Behind a transaction-mode pooler (`DATABASE_POOLED=true`) the startup packet
+ * carries nothing the session would keep: the pooler refuses or drops those
+ * parameters, and the next transaction may be on another server connection
+ * anyway. So a pooled pool sends neither and says what each transaction must
+ * set for itself instead.
+ */
+describe("a pooled pool", () => {
+    const connStr = "postgresql://user:pass@pooler:6432/mydb";
+
+    it("sends no statement_timeout and no search_path at connect", () => {
+        const result = createPostgresDatabaseConnection(connStr, undefined, { pooled: true });
+        const config = lastPool().config;
+        expect(config).not.toHaveProperty("statement_timeout");
+        expect(config.connectionString).toBe(connStr);
+        expect(result.connectionString).toBe(connStr);
+        // The client-side backstop stays: it is a timer here, not a parameter.
+        expect(config.query_timeout).toBe(60_000);
+    });
+
+    it("says what each transaction must set for itself", () => {
+        const { pool } = createPostgresDatabaseConnection(connStr, undefined, { pooled: true, statementTimeout: 12_000 });
+        expect(isPooledPool(pool)).toBe(true);
+        expect(pooledTransactionSettings(pool)).toEqual({ searchPath: "public", statementTimeoutMs: 12_000 });
+        expect(transactionSettingsStatements(pooledTransactionSettings(pool))).toEqual([
+            "SET LOCAL search_path TO \"public\"",
+            "SET LOCAL statement_timeout = 12000"
+        ]);
+    });
+
+    it("leaves a direct pool as it was, with nothing to set per transaction", () => {
+        const { pool } = createPostgresDatabaseConnection(connStr);
+        expect(isPooledPool(pool)).toBe(false);
+        expect(lastPool().config.statement_timeout).toBe(30_000);
+        expect(transactionSettingsStatements(pooledTransactionSettings(pool))).toEqual([]);
+    });
+
+    it("applies to the replica pool the same way", () => {
+        const { pool } = createReadReplicaConnection(connStr, undefined, { pooled: true });
+        expect(isPooledPool(pool)).toBe(true);
+        expect(lastPool().config).not.toHaveProperty("statement_timeout");
+    });
+
+    it("sets no search_path when told to inherit the server's", () => {
+        expect(transactionSettingsStatements({ searchPath: false, statementTimeoutMs: 1000 }))
+            .toEqual(["SET LOCAL statement_timeout = 1000"]);
+    });
+});
+
+describe("searchPathList", () => {
+    it("quotes every schema, so a name can never be read as SQL", () => {
+        expect(searchPathList("app, public")).toBe("\"app\", \"public\"");
+        expect(searchPathList("x\"; DROP TABLE t; --")).toBe("\"x\"\"; DROP TABLE t; --\"");
+        expect(searchPathList("\"$user\", public")).toBe("\"$user\", \"public\"");
+    });
+});
+
+describe("closeWithPool", () => {
+    it("closes the companions first, then the pool, once however often it is called", async () => {
+        const order: string[] = [];
+        const pool = { end: jest.fn(async () => { order.push("pool"); }) };
+        closeWithPool(pool, async () => { order.push("companions"); });
+
+        await Promise.all([pool.end(), pool.end()]);
+
+        expect(order).toEqual(["companions", "pool"]);
+    });
+
+    it("still closes the pool when a companion fails to close", async () => {
+        const end = jest.fn(async () => undefined);
+        const pool = { end };
+        closeWithPool(pool, async () => { throw new Error("replica gone"); });
+        await expect(pool.end()).rejects.toThrow("replica gone");
+        expect(end).toHaveBeenCalledTimes(1);
+    });
+
+    it("answers the callback form pg.Pool also has", async () => {
+        const pool = { end: jest.fn(async () => undefined) };
+        closeWithPool(pool, async () => undefined);
+        await new Promise<void>((resolve) => { Reflect.apply(pool.end, pool, [resolve]); });
+    });
+
+    it("leaves something without an end alone", () => {
+        expect(() => closeWithPool(undefined, async () => undefined)).not.toThrow();
+        expect(() => closeWithPool({}, async () => undefined)).not.toThrow();
     });
 });

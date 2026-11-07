@@ -1,5 +1,5 @@
 ---
-sourceHash: 78957e0c3d6a8787
+sourceHash: dd7f515c841c860b
 title: Self-Hosting
 sidebar_label: Self-Hosting
 description: Führen Sie Rebase überall mit dem offiziellen Runtime-Image und Ihrem Projekt-Bundle aus – Docker Compose, Fly, Railway oder ein einfacher VPS.
@@ -296,6 +296,18 @@ REBASE_METRICS_TOKEN=<random string>
 Stellt Prometheus-Metriken unter `/metrics` bereit: Anfragezahlen und Latenz-Histogramme aufgeschlüsselt nach API-Bereich (Data, Auth, Storage, Functions) und Collection, plus Prozess-Gauges. Ohne Token kann der Endpunkt von jedem gelesen werden, der den Port erreichen kann; setzen Sie daher ein Token, sofern er sich nicht in einem privaten Netzwerk befindet.
 
 `rebase_db_pool_wait_ms` ist ein Histogramm darüber, wie lange jede Abfrage auf eine Verbindung aus dem Datenbank-Pool gewartet hat (einschließlich des Öffnens einer neuen), gelabelt nach Datenquellenschlüssel (`source="(default)"` in einem Projekt, das keine Datenquellen deklariert). Ein gesunder Pool hält diesen Wert nahe Null. Ein Tail, der mit dem Datenverkehr wächst, bedeutet, dass Anfragen in einer Warteschlange auf Verbindungen warten – meist blockiert durch Schreib-Callbacks, die auf langsame Operationen warten; siehe [A callback holds a connection](/docs/collections/context-data-api/#a-callback-holds-a-connection).
+
+Die Datenbank selbst, pro Datenquelle:
+
+| Metrik | Was sie sagt |
+|--------|--------------|
+| `rebase_db_pool_total`, `_idle`, `_waiting` | Die Verbindungen jedes Pools, mit `pool="primary"`, `"read"` (das Replikat) oder `"session"` (der direkte Pool der SQL-Konsole hinter einem Pooler). `waiting` lange über null heißt: Der Pool ist zu klein für seine Last. |
+| `rebase_db_connection_errors_total` | Anfragen, die mangels Verbindung mit 503 beantwortet wurden, nach `code`: `53300` / `53400` (der Server hat keine Verbindungen mehr), `pool_exhausted`, `connect_timeout`, `unreachable`. |
+| `rebase_db_connections` | Client-Verbindungen auf dem Server, nach `state`, gegenüber `rebase_db_max_connections`. |
+| `rebase_db_size_bytes` | Die Größe der Datenbank. |
+| `rebase_db_replica_lag_seconds` | Wie weit `DATABASE_READ_URL` hinter dem Primary liegt. |
+
+Die letzten vier werden alle 30 Sekunden über die eigene Verbindung der Instanz erhoben, sodass ein Scrape nie zu einer Abfrage wird.
 
 `rebase_realtime_*` meldet die offenen Sockets, Channels und die Frames jeder Instanz, die an den Channel-Bus gesendet oder zurückgehalten wurden: siehe [Seeing what the bus does](/docs/backend/realtime-transports/#seeing-what-the-bus-does).
 

@@ -86,6 +86,17 @@ describe("postgresDriverConfigFromEnv", () => {
         });
     });
 
+    it("reads DATABASE_POOLED for the default source only, and the read-routing variables when set", () => {
+        const env = { DATABASE_POOLED: "true", REBASE_READ_STICKY_MS: "2500" };
+        expect(postgresDriverConfigFromEnv({}, env, "(default)")).toMatchObject({
+            pooled: true,
+            readRouting: { stickyMs: 2500, maxLagMs: 1000 }
+        });
+        expect(postgresDriverConfigFromEnv({}, env, "analytics").pooled).toBeUndefined();
+        expect(postgresDriverConfigFromEnv({ pooled: false }, env, "(default)").pooled).toBe(false);
+        expect(() => postgresDriverConfigFromEnv({}, { REBASE_READ_MAX_LAG_MS: "1s" })).toThrow(/REBASE_READ_MAX_LAG_MS/);
+    });
+
     it("refuses a mistyped number, naming the variable", () => {
         expect(() => postgresDriverConfigFromEnv({}, { REALTIME_MAX_SUBSCRIPTIONS_PER_SOCKET: "lots" }))
             .toThrow(/REALTIME_MAX_SUBSCRIPTIONS_PER_SOCKET/);

@@ -1,5 +1,5 @@
 ---
-sourceHash: d1aaac1b3505e1af
+sourceHash: 3ecc85be3f075021
 title: Ambiente e Configuração
 sidebar_label: Configuração
 description: Todas as variáveis de ambiente e opções de configuração para projetos Rebase.
@@ -209,7 +209,10 @@ já inclui), `STORAGE_PUBLIC_READ` ou `STORAGE_ALLOW_ANY_AUTHENTICATED`.
 | `DB_POOL_IDLE_TIMEOUT` | Milissegundos em que uma conexão ociosa é mantida | `30000` |
 | `DB_POOL_CONNECT_TIMEOUT` | Milissegundos de espera por uma conexão | `10000` |
 | `DATABASE_DIRECT_URL` | Conexão direta (sem pool). O [Realtime](/docs/backend/realtime) requer uma: `LISTEN`/`NOTIFY` não sobrevivem a um pooler de transações como o PgBouncer, e sem isso as notificações de alteração são desativadas com um aviso em vez de serem perdidas silenciosamente. O [worker de tarefas](/docs/backend/jobs) também mantém seu `LISTEN` de ativação nela. Preenche o `directConnectionString` do adaptador Postgres quando não estiver definido. | — |
-| `DATABASE_READ_URL` | Réplica de leitura. Leituras vão para lá quando estiver definida e for diferente de `DATABASE_URL`; se a conexão falhar, tudo recai para a primária com um aviso. Preenche o `readConnectionString` do adaptador Postgres quando não estiver definido; na versão 0.24 essa opção é ignorada. | — |
+| `DATABASE_READ_URL` | Réplica de leitura, como um standby a quente. Quando aponta para outro servidor, as leituras de utilizadores autenticados (listas, linhas únicas, contagens, agregados) são servidas lá sob a mesma segurança ao nível da linha; escritas, login, realtime, crons, jobs, o console SQL e `rebase.sql` ficam na primária. Quem acabou de escrever lê da primária durante `REBASE_READ_STICKY_MS`, e todos o fazem enquanto a réplica estiver mais de `REBASE_READ_MAX_LAG_MS` atrasada ou a falhar. Preenche `readConnectionString` do adaptador Postgres quando não está definido; até à 0.28 inclusive, o pool da réplica era aberto e nunca lido. | — |
+| `REBASE_READ_STICKY_MS` | Após uma escrita, por quanto tempo as leituras do mesmo utilizador vão para a primária, para que um salvamento seguido de uma lista mostre o que foi salvo. Por instância do servidor. | `5000` |
+| `REBASE_READ_MAX_LAG_MS` | Atraso da réplica a partir do qual todas as leituras vão para a primária. | `1000` |
+| `DATABASE_POOLED` | `true` quando `DATABASE_URL` passa por um pooler em modo transação como o PgBouncer. O pool então não envia `search_path` nem `statement_timeout` ao conectar (o pooler os recusaria ou descartaria) e define ambos em cada transação; o arranque dá ao papel do banco de dados um `search_path` padrão `public` para as instruções fora de uma transação. `DATABASE_DIRECT_URL` passa a ser obrigatória, e o realtime, o despertar do worker de jobs, a criação de índices, o branching e o console SQL a usam. A URL da réplica também é considerada agrupada. `DATABASE_POOLED__<KEY>` para outra fonte de dados. | — |
 | `REBASE_DB_POOL_MAX` | Um teto para cada pool no processo, aplicado independentemente do que cada um solicitou. Apenas dígitos puros: um valor malformado é ignorado em vez de serializar o servidor silenciosamente. | — |
 
 ### Comportamento do runtime

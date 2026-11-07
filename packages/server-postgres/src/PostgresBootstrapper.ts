@@ -53,6 +53,9 @@ import { collectionKeyColumns } from "./services/cdc/identity-columns";
 import { createChannelBus, resolveChannelBusSetting } from "./services/channel-bus";
 import { isChannelBusInstance } from "@rebasepro/types";
 import { configureUnknownFilterFields, type UnknownFilterFieldsMode } from "./utils/drizzle-conditions";
+import { isPooledPool, closeWithPool } from "./connection";
+import { ReadRouter, readReplicaLagMs, readRoutingOptionsFromEnv, sameDatabaseTarget, type ReadRoutingOptions } from "./read-routing";
+import { ensurePooledRoleDefaults } from "./pooled-database";
 
 export interface PostgresDriverConfig {
     connectionString?: string;
@@ -78,6 +81,29 @@ export interface PostgresDriverConfig {
      * resolves `DATABASE_DIRECT_URL__<KEY>` into this for each source.
      */
     directConnectionString?: string;
+    /**
+     * `connectionString` reaches the database through a transaction-mode
+     * pooler (PgBouncer), as `DATABASE_POOLED=true` says for the default
+     * source. Then nothing that needs a session runs on the pool: `LISTEN`s,
+     * index builds and the SQL console go to {@link directConnectionString},
+     * which becomes required — the boot refuses rather than holding a
+     * `LISTEN` on the pooler, where it would go silent. The pool itself sends
+     * no session settings at connect and sets them per transaction (see
+     * `PostgresPoolConfig.pooled`). The read replica's URL is taken to be
+     * pooled the same way.
+     */
+    pooled?: boolean;
+    /**
+     * The `DB_POOL_*` settings of this source, for the pools the driver opens
+     * itself — the read replica's. The server's own pool already has them.
+     */
+    poolConfig?: { max?: number; idleTimeoutMillis?: number; connectionTimeoutMillis?: number };
+    /**
+     * How authenticated reads use the read replica: read-your-writes and the
+     * lag guard. From `REBASE_READ_STICKY_MS` and `REBASE_READ_MAX_LAG_MS` at
+     * boot; defaults 5000 and 1000. Ignored without a replica.
+     */
+    readRouting?: ReadRoutingOptions;
     connection?: unknown;
     /**
      * The project's generated Drizzle module, for **diagnostics only**.
@@ -276,7 +302,7 @@ export function describeSchemaDriftCause(
  * Exported for its own test; the caller needs a live database.
  */
 export function resolveSourceUrls(
-    pgConfig: Pick<PostgresDriverConfig, "connectionString" | "readConnectionString" | "directConnectionString">,
+    pgConfig: Pick<PostgresDriverConfig, "connectionString" | "readConnectionString" | "directConnectionString" | "pooled">,
     sourceKey: string,
     env: Record<string, string | undefined> = process.env
 ): { readUrl?: string; directUrl?: string } {
@@ -285,9 +311,26 @@ export function resolveSourceUrls(
         readUrl: pgConfig.readConnectionString || (isDefault ? env.DATABASE_READ_URL : undefined) || undefined,
         directUrl: pgConfig.directConnectionString
             || (isDefault ? env.DATABASE_DIRECT_URL : undefined)
-            || pgConfig.connectionString
+            // Behind a transaction-mode pooler the pool's own URL is the one
+            // place a LISTEN must never go: the pooler accepts it and drops
+            // it with the transaction. No fallback, so the caller refuses.
+            || (pgConfig.pooled ? undefined : pgConfig.connectionString)
             || undefined
     };
+}
+
+/**
+ * The refusal for a pooled source with no direct URL — named so the
+ * control plane's log line and the self-hoster's both say what to set.
+ */
+export function pooledWithoutDirectUrlError(sourceKey: string): Error {
+    const suffix = resourceEnvSuffix(sourceKey);
+    return new Error(
+        `DATABASE_POOLED${suffix}=true says DATABASE_URL${suffix} goes through a transaction-mode pooler, ` +
+        `but DATABASE_DIRECT_URL${suffix} is not set. Realtime, the job queue's wake-up, index builds and the ` +
+        "SQL console need a connection that keeps its session, which a transaction-mode pooler does not give. " +
+        `Set DATABASE_DIRECT_URL${suffix} to the database itself (not the pooler), or unset DATABASE_POOLED${suffix}.`
+    );
 }
 
 /**
@@ -566,10 +609,16 @@ export function postgresDriverConfigFromEnv(
     const isDefaultSource = sourceKey === DEFAULT_DATA_SOURCE_KEY;
     const readConnectionString = config.readConnectionString || (isDefaultSource ? read("DATABASE_READ_URL") : undefined);
     const directConnectionString = config.directConnectionString || (isDefaultSource ? read("DATABASE_DIRECT_URL") : undefined);
+    const pooled = config.pooled ?? (isDefaultSource ? read("DATABASE_POOLED")?.toLowerCase() === "true" : undefined);
+    // Unset, the driver uses the defaults; read here so a mistyped value throws at boot.
+    const readRouting = config.readRouting
+        ?? (read("REBASE_READ_STICKY_MS") || read("REBASE_READ_MAX_LAG_MS") ? readRoutingOptionsFromEnv(env) : undefined);
     return {
         ...config,
         ...(readConnectionString ? { readConnectionString } : {}),
         ...(directConnectionString ? { directConnectionString } : {}),
+        ...(pooled ? { pooled } : {}),
+        ...(readRouting ? { readRouting } : {}),
         realtime
     };
 }
@@ -858,25 +907,82 @@ export async function openPostgresDriver(
     // This source's own replica and direct URL, never the default's. No
     // environment here: the boot read it into `pgConfig` already, for the
     // default source only (see postgresDriverConfigFromEnv).
-    const { readUrl, directUrl } = resolveSourceUrls(pgConfig, sourceKey, {});
+    // Pooled by the config (DATABASE_POOLED) or by the pool the server
+    // opened for it: either way nothing session-scoped may run on it.
+    const pooled = pgConfig.pooled === true || isPooledPool(rawClient);
+    const { readUrl, directUrl } = resolveSourceUrls({ ...pgConfig, pooled }, sourceKey, {});
+    if (pooled && !directUrl) throw pooledWithoutDirectUrlError(sourceKey);
+    const primaryUrl = pgConfig.connectionString
+        || (rawClient && typeof rawClient === "object" && "options" in rawClient ? rawClient.options.connectionString : undefined);
 
-    // Initialize read replica connection if configured
+    // The read replica, when DATABASE_READ_URL names another server. Compared
+    // as database targets, not as strings: the primary's URL carries the
+    // pinned search_path, so a read URL naming the primary never equalled it
+    // and a second pool to the primary was opened and never used.
     let readDb: import("drizzle-orm/node-postgres").NodePgDatabase<any> | undefined;
-    if (readUrl && readUrl !== pgConfig.connectionString) {
+    let readRouter: ReadRouter<import("drizzle-orm/node-postgres").NodePgDatabase<any>> | undefined;
+    let readPool: import("pg").Pool | undefined;
+    if (readUrl && !(primaryUrl && sameDatabaseTarget(readUrl, primaryUrl))) {
         try {
             const { createReadReplicaConnection } = await import("./connection");
-            const readResources = createReadReplicaConnection(readUrl, mergedSchema);
+            const readResources = createReadReplicaConnection(readUrl, mergedSchema, { ...pgConfig.poolConfig, pooled });
             readDb = readResources.db;
-            logger.info("📖 [PostgresBootstrapper] Read replica connection established");
+            readPool = readResources.pool;
+            readRouter = new ReadRouter(readDb, () => readReplicaLagMs(readResources.pool), pgConfig.readRouting ?? readRoutingOptionsFromEnv({}));
+            readRouter.start();
+            logger.info(
+                `📖 [PostgresBootstrapper] Authenticated reads may use the read replica ` +
+                `(read-your-writes ${readRouter.stickyMs} ms, lag limit ${readRouter.maxLagMs} ms)`
+            );
         } catch (err) {
             logger.warn("⚠️ Could not connect to read replica, falling back to primary for all queries", { error: err });
         }
     }
-    const poolManager = pgConfig.adminConnectionString
-        ? new DatabasePoolManager(pgConfig.adminConnectionString)
-        : undefined;
+
+    // A session of its own, for the SQL console, behind a pooler: on the
+    // direct URL, small, and closed when idle — the console is used rarely,
+    // and every connection here counts against the database's direct budget.
+    let sessionDb: import("drizzle-orm/node-postgres").NodePgDatabase<any> | undefined;
+    let sessionPool: import("pg").Pool | undefined;
+    if (pooled && directUrl) {
+        const { createDirectDatabaseConnection } = await import("./connection");
+        const session = createDirectDatabaseConnection(directUrl, undefined, { max: 3, idleTimeoutMillis: 10_000 });
+        sessionDb = session.db;
+        sessionPool = session.pool;
+    }
+
+    // Branching and cross-database SQL hold session advisory locks and run
+    // CREATE DATABASE: the admin URL, else the direct one. An admin URL that
+    // is just the pooled URL again (what a server that predates
+    // DATABASE_POOLED passes) is replaced by the direct URL.
+    const adminUrl = pooled && directUrl && pgConfig.adminConnectionString && primaryUrl
+        && sameDatabaseTarget(pgConfig.adminConnectionString, primaryUrl)
+        ? directUrl
+        : pgConfig.adminConnectionString;
+    const poolManager = adminUrl ? new DatabasePoolManager(adminUrl) : undefined;
+
+    // The pools above are this driver's own, and nothing outside it knows
+    // to close them. The server closes the pool it opened; they close with it.
+    closeWithPool(rawClient, async () => {
+        readRouter?.stop();
+        await Promise.allSettled([
+            readPool?.end(),
+            sessionPool?.end(),
+            poolManager?.shutdown()
+        ]);
+    });
+
     const driver = new PostgresBackendDriver(schemaAwareDb, realtimeService, registry, undefined, poolManager);
     driver.listenConnectionString = directUrl;
+    driver.sessionDb = sessionDb;
+    driver.readRouter = readRouter;
+
+    // Behind a pooler, the role's default search_path is what an unqualified
+    // statement outside a transaction resolves with — see
+    // `ensurePooledRoleDefaults`.
+    if (pooled && directUrl) {
+        await ensurePooledRoleDefaults(rawClient, directUrl, { provision });
+    }
     realtimeService.setDataDriver(driver);
 
     // ── RLS enforcement (user context) ───────────────────────────────
@@ -1532,7 +1638,14 @@ export function createPostgresBootstrapper(pgConfig: PostgresDriverConfig): Back
     const openIndexBuildSession = (driverResult?: InitializedDriver): OpenIndexBuildSession => async () => {
         const db = requireProvisioningDb(driverResult);
         const pool = "$client" in db ? db.$client : undefined;
-        const { isPgPool, poolIndexBuildSession } = await import("./schema/deferred-index-build");
+        const { clientIndexBuildSession, isPgPool, poolIndexBuildSession } = await import("./schema/deferred-index-build");
+        // Behind a transaction-mode pooler a checked-out client is not one
+        // backend: the build gets a connection of its own on the direct URL.
+        const config = effectiveConfig();
+        if (isPooledPool(pool) || config.pooled) {
+            if (!config.directConnectionString) throw pooledWithoutDirectUrlError(DEFAULT_DATA_SOURCE_KEY);
+            return clientIndexBuildSession(config.directConnectionString)();
+        }
         if (isPgPool(pool)) return poolIndexBuildSession(pool)();
         const queryable = provisioningQueryable(driverResult);
         return { dedicated: false, query: <T>(text: string) => queryable.query<T>(text), release: () => undefined };

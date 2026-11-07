@@ -63,6 +63,7 @@ import { resolveAuthOptions, resolveLiveSchemaOptions } from "./options";
 import { createMetricsRoutes, createMetricsMiddleware } from "../metrics";
 import { recordPoolWaits } from "../metrics/pool-wait";
 import { recordRealtimeCounts } from "../metrics/realtime";
+import { recordDatabasePools, startDatabaseProbe, type MeteredSource } from "../metrics/database";
 import { fetchBundle, shouldFetchBundle, usableBundleFallback, dedupeRuntimePackages, imageModulesDir, BUNDLE_URL_ENV, BUNDLE_TOKEN_ENV, BUNDLE_FETCH_DIR_ENV } from "./fetch-bundle.js";
 import { describeDriverSkew, readRuntimeVersion, schemaRecoveryGuidance } from "./version-skew";
 import { describeDatabase, recordSchemaChanges, renderSchemaChangeScript, type SchemaChangeRecorder } from "./schema-change-recorder";
@@ -371,6 +372,8 @@ export async function bootFromBundle(options: BootOptions = {}): Promise<BootedR
     const metrics = env.REBASE_METRICS
         ? createMetricsMiddleware(env.REBASE_BASE_PATH)
         : undefined;
+    /** Stops the 30 s database probe, started with the metrics routes below. */
+    let stopDatabaseProbe: (() => void) | undefined;
     if (metrics) {
         app.use("/*", metrics.middleware);
         // How long each query waited for a connection, per data source: the
@@ -583,6 +586,15 @@ export async function bootFromBundle(options: BootOptions = {}): Promise<BootedR
                 "who can reach this port. Set a token, or keep the port on a private network."
             );
         }
+        // Each source's pools at every scrape, and a sample of the server
+        // behind it every 30 s — see `metrics/database.ts`.
+        const meteredSources: MeteredSource[] = dataSources.map((source, index) => ({
+            key: source.key,
+            pool: source.connection.pool,
+            admin: () => backend.driverRegistry.get(source.key)?.admin ?? (index === 0 ? backend.driver.admin : undefined)
+        }));
+        recordDatabasePools(metrics.registry, meteredSources);
+        stopDatabaseProbe = startDatabaseProbe(metrics.registry, meteredSources);
         recordRealtimeCounts(metrics.registry, backend.realtimeService);
         app.route("/metrics", createMetricsRoutes(
             metrics.registry,
@@ -689,6 +701,7 @@ export async function bootFromBundle(options: BootOptions = {}): Promise<BootedR
     }
 
     const closeConnections = async (): Promise<void> => {
+        stopDatabaseProbe?.();
         await Promise.allSettled(
             dataSources.map(source => source.connection.pool?.end())
         );

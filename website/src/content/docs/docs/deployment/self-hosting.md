@@ -478,6 +478,19 @@ grows with traffic means requests are queueing for connections — most often
 held by write callbacks that await something slow; see
 [A callback holds a connection](/docs/collections/context-data-api/#a-callback-holds-a-connection).
 
+The database itself, per data source:
+
+| Metric | What it says |
+|--------|--------------|
+| `rebase_db_pool_total`, `_idle`, `_waiting` | Each pool's connections, labelled `pool="primary"`, `"read"` (the replica) or `"session"` (the SQL console's direct pool behind a pooler). `waiting` above zero for long is a pool too small for its load. |
+| `rebase_db_connection_errors_total` | Requests answered 503 for want of a connection, by `code`: `53300` / `53400` (the server is out of connections), `pool_exhausted`, `connect_timeout`, `unreachable`. |
+| `rebase_db_connections` | Client connections on the server, by `state`, against `rebase_db_max_connections`. |
+| `rebase_db_size_bytes` | The database's size. |
+| `rebase_db_replica_lag_seconds` | How far `DATABASE_READ_URL` is behind the primary. |
+
+The last four are sampled every 30 seconds on the instance's own connection, so
+a scrape never becomes a query.
+
 `rebase_realtime_*` reports each instance's open sockets, channels and the frames
 it sent to the channel bus or held back: see
 [Seeing what the bus does](/docs/backend/realtime-transports/#seeing-what-the-bus-does).
