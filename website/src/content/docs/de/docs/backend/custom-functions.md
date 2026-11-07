@@ -1,24 +1,24 @@
 ---
-sourceHash: f6f92e433b71765f
-title: Eigene Funktionen (Custom Functions)
+sourceHash: 03b00c8233fbfa09
+title: Custom Functions
 sidebar_label: Custom Functions
-description: Fügen Sie eigene Hono-API-Endpunkte neben Ihren Rebase-CRUD-Routen hinzu. Automatische Erkennung aus einem Verzeichnis, mit vollem Zugriff auf die Backend-Instanz.
+description: Füge eigene Hono-API-Endpunkte neben deinen Rebase-CRUD-Routen hinzu. Automatische Erkennung aus einem Verzeichnis, mit vollem Zugriff auf die Backend-Instanz.
 ---
 
 ## Übersicht
 
-Mit Custom Functions können Sie **beliebige Hono-API-Routen** neben den automatisch generierten CRUD-Endpunkten von Rebase hinzufügen. Sie folgen demselben Muster der **dateibasierten Erkennung** wie Collections und Cron-Jobs: Legen Sie eine TypeScript-Datei in Ihrem Verzeichnis `functions/` ab, und Rebase bindet sie automatisch ein.
+Mit Custom Functions kannst du **beliebige Hono-API-Routen** neben den automatisch generierten CRUD-Endpunkten von Rebase hinzufügen. Sie folgen demselben Muster der **dateibasierten Erkennung (File-based Discovery)** wie Collections und Cron-Jobs: Lege eine TypeScript-Datei in deinem `functions/`-Verzeichnis ab, und Rebase mountet sie automatisch.
 
-Verwenden Sie Custom Functions für:
+Verwende Custom Functions für:
 
-- **Endpunkte für Geschäftslogik** — Genehmigungen, Werbeaktionen, benutzerdefinierte Workflows
-- **Drittanbieter-Integrationen** — Stripe-Webhooks, Slack-Befehle, externe API-Proxys
-- **Öffentliche Endpunkte** — Kontaktformulare, Lead-Erfassung, Health-Checks
-- **Aggregierte Abfragen** — Dashboard-Statistiken, Berichte, Analysen
+- **Endpunkte für Geschäftslogik** – Genehmigungen, Werbeaktionen, benutzerdefinierte Workflows
+- **Drittanbieter-Integrationen** – Stripe-Webhooks, Slack-Befehle, externe API-Proxys
+- **Öffentliche Endpunkte** – Kontaktformulare, Lead-Erfassung, Health-Checks
+- **Aggregierte Abfragen** – Dashboard-Statistiken, Berichte, Analysen
 
 ## Definieren einer Custom Function
 
-Erstellen Sie eine Datei in Ihrem Verzeichnis `backend/functions/`, die standardmäßig (default export) eine Hono-App exportiert:
+Erstelle eine Datei in deinem `backend/functions/`-Verzeichnis, die standardmäßig eine Hono-App exportiert:
 
 ```typescript
 // backend/functions/hello.ts
@@ -32,17 +32,13 @@ export default defineFunction((app) => {
 });
 ```
 
-Dies wird unter **`/api/functions/hello`** eingebunden. Der Dateiname (ohne Dateiendung) wird zum Routen-Präfix.
+Dies wird unter **`/api/functions/hello`** gemountet. Der Dateiname (ohne Erweiterung) wird zum Routen-Präfix.
 
-`POST`, da das SDK dies standardmäßig sendet — siehe
-[Vom Client aufrufen](#vom-client-aufrufen). Eine `GET`-Route ist genauso
-gültig; der Aufrufer muss dann `{ method: "GET" }` angeben.
+`POST`, da das SDK dies standardmäßig sendet – siehe [Aufruf über den Client](#aufruf-über-den-client). Eine `GET`-Route ist genauso gültig; der Aufrufer muss dann `{ method: "GET" }` angeben.
 
-`rebase dev` überwacht das functions-Verzeichnis. Eine Datei, die hinzugefügt wird, während
-der Server läuft, wird beim nächsten Reload eingebunden — kein Neustart erforderlich. (Sie muss
-neu erkannt werden: Das Verzeichnis wird gescannt statt importiert, daher kann der Watcher dies nicht ableiten.)
+`rebase dev` überwacht das functions-Verzeichnis. Eine Datei, die hinzugefügt wird, während der Prozess läuft, wird beim nächsten Neuladen gemountet – ohne Neustart. (Dies muss mitgeteilt werden: Das Verzeichnis wird gescannt statt importiert, daher kann der Watcher dies nicht ableiten.)
 
-## Vom Client aufrufen
+## Aufruf über den Client
 
 ```typescript
 import { createRebaseClient } from "@rebasepro/client";
@@ -55,11 +51,9 @@ const { message } = await client.functions.invoke<{ message: string }>(
 );
 ```
 
-`invoke` baut die URL auf, hängt das Token des Aufrufers an und wirft bei
-einem Nicht-2xx-Status einen `RebaseApiError` — sodass die eigene Fehlerstruktur der
-Funktion den Aufrufer erreicht, anstelle einer einfachen `fetch`-Rejection.
+`invoke` baut die URL auf, hängt das Token des Aufrufers an und wirft bei einem Nicht-2xx-Status einen `RebaseApiError` – sodass die eigene Fehlerstruktur der Funktion den Aufrufer erreicht, anstatt einer reinen `fetch`-Rejection.
 
-Vier Dinge, die über den Namen hinaus akzeptiert werden:
+Vier Dinge, die es neben dem Namen akzeptiert:
 
 ```typescript
 // A different method. The payload is dropped for GET, since GET has no body.
@@ -79,29 +73,25 @@ const csv = await client.functions.invoke<string>("export-orders", undefined, { 
 ```
 
 :::note
-`client.call("functions/hello", payload)` erreicht eine Funktion ebenfalls. Es sendet immer
-ein `POST`, und wie `invoke` gibt es den Body unverändert zurück — keines von beiden greift
-auf einen `data`-Schlüssel zu. Bevorzugen Sie `functions.invoke`, da es Methoden, Unterpfade
-und einen `responseType` akzeptiert; `call` existiert für Routen außerhalb von `/api/functions`,
-die `invoke` nicht abbilden kann.
+`client.call("functions/hello", payload)` erreicht ebenfalls eine Funktion. Es sendet immer per `POST` und gibt wie `invoke` den Body unverändert zurück – keines von beiden greift auf einen `data`-Schlüssel zu. Bevorzuge `functions.invoke`, das eine Methode, einen Sub-Pfad und einen `responseType` akzeptiert; `call` existiert für Routen, die außerhalb von `/api/functions` gemountet sind, was `invoke` nicht abbilden kann.
 :::
 
 :::important
-Importieren Sie aus **`@rebasepro/server/functions`**, nicht aus `@rebasepro/server`.
+Importiere aus **`@rebasepro/server/functions`**, nicht aus `@rebasepro/server`.
 
-Beides funktioniert. Der Subpfad ist die *portable* Authoring-Schnittstelle: Er importiert nichts, was Node erfordert, sodass eine dagegen geschriebene Funktion auf jeder JavaScript-Laufzeitumgebung ausgeführt werden kann. Das Root-Paket bindet das gesamte Framework ein — die Boot-Sequenz, die Datei-Loader, die WebSocket-Schicht —, was für einen Server-Einstiegspunkt passend ist, aber mehr darstellt, als ein Route-Handler benötigt. Zudem bietet es typisierte Kontext-Zugriffsmethoden (`getUser`, `getDriver`), statt `c.get("user")` manuell casten zu müssen.
+Beides funktioniert. Der Subpfad ist die *portable* Autorenoberfläche: Er bindet nichts ein, was Node erfordert, sodass eine dagegen geschriebene Funktion auf jeder JavaScript-Runtime laufen kann. Das Paket-Root greift auf das gesamte Framework zu – die Boot-Sequenz, die Datei-Loader, den WebSocket-Layer –, was für einen Server-Einstiegspunkt richtig ist, aber mehr darstellt, als ein Route-Handler benötigt. Es bietet dir außerdem typisierte Kontext-Zugriffsmethoden (`getUser`, `getDriver`), anstatt manuell `c.get("user")` casten zu müssen.
 
-Den vollständigen Vertrag finden Sie unter [Portabilität der Laufzeitumgebung](#portabilität-der-laufzeitumgebung).
+Siehe [Runtime portability](#portabilität-der-runtime) für den vollständigen Vertrag.
 :::
 
 ## Konfiguration
 
 :::note[Wo dies hingehört]
-**Managed Runtime:** Nichts zu konfigurieren — die Runtime erkennt `backend/functions/` automatisch (`functions` im `rebase.json`-Eintrag der Backend-App, falls verschoben). `REBASE_FUNCTIONS_ONLY` / `REBASE_FUNCTIONS_EXCLUDE` schränken ein, welche Funktionen ein Prozess mit `REBASE_ROLE=functions` bereitstellt; jede andere Rolle verweigert den Start, wenn sie gesetzt sind.
-**Ejected:** `initializeRebaseBackend({ functionsDir })`, oder `functions` (unten), in `backend/src/index.ts`.
+**Managed-Runtime:** Nichts zu konfigurieren – die Runtime erkennt `backend/functions/` automatisch (`functions` im `rebase.json`-Eintrag der Backend-App, falls du es verschoben hast). `REBASE_FUNCTIONS_ONLY` / `REBASE_FUNCTIONS_EXCLUDE` schränken ein, welche Funktionen ein `REBASE_ROLE=functions`-Prozess bedient; jede andere Rolle verweigert den Bootvorgang, wenn diese gesetzt sind.
+**Ejected:** `initializeRebaseBackend({ functionsDir })` oder `functions` (unten) in `backend/src/index.ts`.
 :::
 
-Aktivieren Sie Custom Functions, indem Sie `functionsDir` zu Ihrer Backend-Konfiguration hinzufügen:
+Aktiviere Custom Functions, indem du deiner Backend-Konfiguration `functionsDir` hinzufügst:
 
 ```typescript no-verify
 import path from "path";
@@ -115,15 +105,15 @@ const instance = await initializeRebaseBackend({
 Rebase wird:
 
 1. Das Verzeichnis nach `.ts`- / `.js`-Dateien durchsuchen
-2. Prüfen, ob jeder Standardexport eine Hono-App ist (Duck-Typing über `.fetch()` + `.routes`)
-3. Jede App unter `/api/functions/<filename>` einbinden
-4. Die Auth-Middleware anwenden (siehe [Authentifizierung](#authentifizierung-und-kontextweitergabe) unten)
+2. Validieren, dass jeder Default-Export eine Hono-App ist (Duck-Typing über `.fetch()` + `.routes`)
+3. Jede App unter `/api/functions/<filename>` mounten
+4. Die Auth-Middleware anwenden (siehe [Authentifizierung](#authentifizierung-und-kontext-weitergabe) unten)
 
 ### Funktionen als Werte
 
-In Version 0.24 stammen Funktionen ausschließlich aus einem Verzeichnis.
+In 0.24 stammen Funktionen ausschließlich aus einem Verzeichnis.
 
-Ein Verzeichnis ist ein Weg, um das zu erzeugen, was der Server ausliefert: ein Record von URL-Segment zu Hono-App. Übergeben Sie diesen Record selbst als `functions` oder lesen Sie ein Verzeichnis mit `loadFunctions` ein:
+Ein Verzeichnis ist eine Möglichkeit, das zu erzeugen, was der Server bereitstellt: ein Record von einem URL-Segment zu einer Hono-App. Übergib diesen Record selbst als `functions` oder lies ein Verzeichnis mit `loadFunctions` ein:
 
 ```typescript
 import path from "path";
@@ -135,30 +125,30 @@ await initializeRebaseBackend({ app, server, functions: { "send-invoice": sendIn
 await initializeRebaseBackend({ app, server, functions: await loadFunctions(path.resolve(__dirname, "../functions")) });
 ```
 
-Geben Sie entweder `functions` oder `functionsDir` an, nicht beides: Der Boot-Vorgang verweigert die Kombination. `loadFunctions(dir, { onSkip })` übergibt jede übersprungene Datei inklusive Grund. `loadFunctionsFromDirectory` und `loadFunctionsWithDiagnostics` funktionieren weiterhin, sind jedoch veraltet und geben eine einmalige Warnung aus. Für sich allein lässt sich die Funktionsgruppe mit `app.route("/hooks", backend.routes.functions())` unter einem beliebigen Pfad mounten; `getUser(c)` und `getDriver(c)` funktionieren darin; siehe [Custom Server Integration](/docs/backend/custom-server/#mounting-only-the-groups-you-want).
+Gib entweder `functions` oder `functionsDir` an, nicht beides: Der Bootvorgang verweigert die Kombination. `loadFunctions(dir, { onSkip })` übergibt dir jede übersprungene Datei samt Begründung. `loadFunctionsFromDirectory` und `loadFunctionsWithDiagnostics` funktionieren weiterhin, sind deprecated und warnen einmalig. Für sich allein mountet die Functions-Gruppe an jedem beliebigen Pfad mit `app.route("/hooks", backend.routes.functions())`, und `getUser(c)` sowie `getDriver(c)` funktionieren darin; siehe [Custom Server Integration](/docs/backend/custom-server/#mounting-only-the-groups-you-want).
 
-## Dateibenennung und Routen-Mapping
+## Dateibenennung und Routen-Zuordnung
 
 | Datei | Mount-Pfad |
-|-------|------------|
+|------|-----------|
 | `functions/hello.ts` | `/api/functions/hello/*` |
 | `functions/send-invoice.ts` | `/api/functions/send-invoice/*` |
 | `functions/webhooks.ts` | `/api/functions/webhooks/*` |
 
-Funktionen werden **ausschließlich auf oberster Ebene des Verzeichnisses** erkannt — es gibt keine Rekursion. `functions/admin/users.ts` wird zwar von `rebase build` kompiliert, aber niemals gemountet; flachen Sie den Namen stattdessen ab (`functions/admin-users.ts`). Ein Unterverzeichnis wird beim Booten gemeldet und im Listing-Endpunkt gezählt, anstatt stillschweigend ignoriert zu werden.
+Funktionen werden **ausschließlich auf der obersten Ebene des Verzeichnisses** erkannt – es gibt keine Rekursion. `functions/admin/users.ts` wird von `rebase build` kompiliert, aber niemals gemountet; verflache stattdessen den Namen (`functions/admin-users.ts`). Ein Unterverzeichnis wird beim Booten gemeldet und im Listing-Endpunkt gezählt, anstatt stillschweigend ignoriert zu werden.
 
 Dateien, die **übersprungen** werden:
 
-- `index.ts` / `index.js` — reserviert
-- `*.test.ts` / `*.test.js` — Testdateien
-- `*.d.ts` — Typdeklarationen
-- Unterverzeichnisse sowie `.mts`- / `.cts`- / `.tsx`- / `.jsx`- / `.mjs`- / `.cjs`-Dateien — werden als Probleme gemeldet, da der Build mehr kompiliert, als die Runtime lädt
+- `index.ts` / `index.js` – reserviert
+- `*.test.ts` / `*.test.js` – Testdateien
+- `*.d.ts` – Typdeklarationen
+- Unterverzeichnisse sowie `.mts`- / `.cts`- / `.tsx`- / `.jsx`- / `.mjs`- / `.cjs`-Dateien – werden als Probleme gemeldet, da der Build mehr kompiliert, als die Runtime lädt
 
-Der Name ist auch an allen anderen Stellen die Identität der Funktion: Er ist das URL-Segment, das Ziel des Scopes `functions:invoke:<name>`, den ein Schlüssel für den Aufruf benötigt, und der Wert, nach dem `REBASE_FUNCTIONS_ONLY` filtert, wenn Sie einer Funktion einen eigenen Prozess zuweisen.
+Der Name ist auch überall sonst die Identität der Funktion: Er ist das URL-Segment, das Ziel des `functions:invoke:<name>`-Scopes, den ein Key benötigt, um sie aufzurufen, und der Wert, nach dem `REBASE_FUNCTIONS_ONLY` auswählt, wenn du einer Funktion einen eigenen Prozess zuweist.
 
 ## Export-Formate
 
-Der Loader akzeptiert neben `defineFunction` zwei weitere Export-Formate:
+Der Loader akzeptiert neben `defineFunction` zwei Export-Formate:
 
 ### Hono-App
 
@@ -184,31 +174,31 @@ export default function () {
 }
 ```
 
-`defineFunction` gibt genau die Hono-App zurück, die diese Varianten manuell erzeugen, sodass alle drei austauschbar sind. Es erspart Ihnen die Deklaration von `Hono<HonoEnv>` und übergibt Ihnen das `rebase`-Singleton im Callback.
+`defineFunction` gibt genau die Hono-App zurück, die diese manuell aufbauen, sodass alle drei austauschbar sind. Es erspart dir die Deklaration von `Hono<HonoEnv>` und übergibt dir das `rebase`-Singleton im Callback.
 
 ---
 
 ## Unter der Haube: Der Duck-Typing-Loader
 
-In einem Monorepo lösen Ihre Funktionen möglicherweise eine andere Hono-Kopie auf als die von Rebase verwendete, wodurch `exported instanceof Hono` selbst bei einem funktionierenden Router `false` ergibt. Daher prüft der Loader stattdessen die Struktur (`isHonoLike`): ein Nicht-Null-Objekt mit einer `.fetch`-Methode und einem `.routes`-Array.
+In einem Monorepo lösen deine Funktionen möglicherweise eine andere Kopie von Hono auf als die, die Rebase verwendet, wodurch `exported instanceof Hono` bei einem funktionierenden Router `false` ergibt. Daher prüft der Loader stattdessen die Struktur (`isHonoLike`): ein Non-Null-Objekt mit einer `.fetch`-Methode und einem `.routes`-Array.
 
-### ES-Modul-Compiler-Escape
+### ES-Module-Compiler-Escape
 
-Der Loader wandelt jeden Dateipfad in eine Datei-URL um (`pathToFileURL(filePath).href`), sodass der Import unter Windows und POSIX gleichermaßen funktioniert, und ruft `import(url)` über `new Function("url", "return import(url)")` auf. So kann ein TypeScript-Build den Aufruf nicht in ein `require()` umschreiben, das unter ESM fehlschlagen würde.
+Der Loader wandelt jeden Dateipfad in eine Datei-URL um (`pathToFileURL(filePath).href`), sodass er unter Windows und POSIX gleichermaßen importiert werden kann, und ruft `import(url)` über `new Function("url", "return import(url)")` auf, damit ein TypeScript-Build ihn nicht in ein `require()` umschreiben kann, das unter ESM fehlschlägt.
 
 ---
 
-## Authentifizierung und Kontextweitergabe
+## Authentifizierung und Kontext-Weitergabe
 
-Custom Functions werden mit **derselben Auth-Middleware** wie die Datenrouten eingebunden, jedoch mit `requireAuth: false`. Das bedeutet:
+Custom Functions werden mit **derselben Auth-Middleware** wie die Datenrouten gemountet, jedoch mit `requireAuth: false`. Das bedeutet:
 
-- Das JWT des Nutzers wird **geparst und in den Kontext injiziert**, sofern vorhanden
-- Anfragen werden jedoch **nicht abgewiesen**, wenn kein JWT bereitgestellt wird
-- Sie müssen Routen, die Authentifizierung erfordern, **explizit schützen**
+- Das JWT des Benutzers wird **geparst und injiziert**, sofern vorhanden
+- Anfragen werden jedoch **nicht abgelehnt**, wenn kein JWT bereitgestellt wird
+- Du musst Routen, die Authentifizierung benötigen, **explizit schützen**
 
-Ein Aufrufer, der ein *ungültiges* Token übergibt, erreicht Ihren Handler nie: Ein nicht überprüfbares oder abgelaufenes Token wird von der Middleware selbst mit 401 abgelehnt, sodass eine abgelaufene Sitzung niemals stillschweigend zu einer anonymen herabgestuft wird.
+Ein Aufrufer, der ein *ungültiges* Token vorlegt, erreicht deinen Handler niemals: Ein nicht verifizierbares oder abgelaufenes Token wird von der Middleware selbst mit 401 abgelehnt, sodass eine abgelaufene Sitzung niemals stillschweigend zu einer anonymen herabgestuft wird.
 
-### Auslesen des Aufrufers
+### Den Aufrufer auslesen
 
 ```typescript
 import { defineFunction, getUser, getUserId, getRoles, getScopes, isAdmin } from "@rebasepro/server/functions";
@@ -222,7 +212,7 @@ export default defineFunction((app) => {
 });
 ```
 
-`getUser` liefert ein typisiertes Objekt zurück: `uid` ist ein String und `roles` ist immer ein Array, unabhängig von der Authentifizierungsmethode des Aufrufers. `getUserId(c)` und `getRoles(c)` sind Shortcuts. `getScopes(c)` liefert alles, was der Aufrufer tun darf, als [Scope](/docs/backend/roles-and-scopes/)-Strings: für eine Person die Datenebene, die Scopes der App und die Scopes ihrer Rollen; für einen API-Schlüssel exakt das, was der Schlüssel enthält.
+`getUser` gibt ein eingegrenztes (narrowed) Objekt zurück: `uid` ist ein String und `roles` ist immer ein Array, unabhängig davon, welche Authentifizierungsmethode der Aufrufer verwendet hat. `getUserId(c)` und `getRoles(c)` sind Shortcuts. `getScopes(c)` enthält alles, was der Aufrufer tun darf, als [Scope](/docs/backend/roles-and-scopes/)-Strings: für eine Person die Datenebene, die anwendungseigenen Scopes und die Scopes ihrer Rollen; für einen API-Key genau das, was der Key beinhaltet.
 
 ### Routen schützen
 
@@ -244,15 +234,15 @@ export default defineFunction((app) => {
 });
 ```
 
-Platzieren Sie Guards wie oben gezeigt im **eigenen Middleware-Slot der Route** anstatt über `app.use("/*", requireAuth)`. `use()` deckt nur die Routen ab, die *darunter* deklariert sind. Eine später hinzugefügte Route — ganz unten in der Datei, Monate später — wäre sonst unbeabsichtigt ungeschützt.
+Platziere Guards wie oben im **eigenen Middleware-Slot der Route** anstatt `app.use("/*", requireAuth)` zu nutzen. `use()` deckt nur die Routen ab, die *darunter* deklariert sind, sodass eine später hinzugefügte Route – etwa in ein paar Monaten am Dateiende – unbemerkt ungeschützt bleibt.
 
 :::important
-Das Auslesen von `getUser(c)` ist **kein** Guard. Ein anonymer Aufrufer erhält `undefined` und Ihr Handler wird trotzdem ausgeführt. Nur ein Guard oder ein explizites `if (!user) return 401` stoppt die Anfrage.
+Das Auslesen von `getUser(c)` ist **kein** Guard. Ein anonymer Aufrufer erhält `undefined` und dein Handler wird trotzdem ausgeführt. Nur ein Guard oder ein explizites `if (!user) return 401` stoppt die Anfrage.
 :::
 
 ### Scopes und App-Scopes
 
-`requireAdmin` lässt ausschließlich die Rolle `admin` zu. Für Aktionen, die eine spezifischere Rolle oder ein API-Schlüssel ausführen darf, sichern Sie die Route mit `requireScope`. Dies akzeptiert einen integrierten [Scope](/docs/backend/roles-and-scopes/) oder einen, den die App unter `auth.scopes` in der users-Collection definiert hat, wie etwa `"project:deploy": { label: "Deploy projects", target: "project" }`:
+`requireAdmin` lässt die `admin`-Rolle zu und niemanden sonst. Für eine Aktion, die eine spezifischere Rolle oder ein API-Key erreichen soll, schütze die Route mit `requireScope`. Es akzeptiert einen integrierten [Scope](/docs/backend/roles-and-scopes/) oder einen, den die App unter `auth.scopes` in der Users-Collection deklariert, wie etwa `"project:deploy": { label: "Deploy projects", target: "project" }`:`
 
 ```typescript
 import { defineFunction, requireAuth, requireScope, hasScope } from "@rebasepro/server/functions";
@@ -268,26 +258,26 @@ export default defineFunction((app) => {
 });
 ```
 
-Jede angemeldete Person besitzt jeden App-Scope; für eine Person entscheidet `requireScope` daher nichts: Prüfen Sie im Handler, ob diese Person dieses konkrete Projekt bereitstellen darf. Der Scope dient dazu, **einen Schlüssel einzuschränken**: Ein Schlüssel mit `project:deploy:p1` ist nur für `p1` gültig. Ein Schlüssel benötigt außerdem `functions:invoke` oder `functions:invoke:<name>`, bevor er die Funktion überhaupt erreicht. Siehe [App-Scopes](/docs/backend/roles-and-scopes/#app-scopes).
+Jede angemeldete Person besitzt jeden App-Scope, daher entscheidet `requireScope` bei einer Person nichts: Prüfe im Handler, ob diese Person dieses Projekt deployen darf. Was der Scope ermöglicht, ist das **Einschränken eines Keys**: Ein Key mit `project:deploy:p1` ist nur für `p1` gültig. Ein Key benötigt außerdem `functions:invoke` oder `functions:invoke:<name>`, bevor er die Funktion überhaupt erreicht. Siehe [App scopes](/docs/backend/roles-and-scopes/#app-scopes).
 
-### Authentifizierung über Service-Keys
+### Service-Key-Authentifizierung
 
-Rebase unterstützt einen statischen `REBASE_SERVICE_KEY`, der in Ihrer `.env` für Skripte oder Server-to-Server-Aufrufe definiert wird.
+Rebase unterstützt einen statischen `REBASE_SERVICE_KEY`, der in deiner `.env` für Skripte oder Server-zu-Server-Aufrufe definiert wird.
 
-Wenn eine externe Anfrage den Service-Key über den Authorization-Header (`Authorization: Bearer <service_key>`) übergibt, führt die Auth-Middleware automatisch folgende Schritte aus:
-1. Validiert den Schlüssel über einen Constant-Time-Vergleich, um Timing-Angriffe zu verhindern.
-2. Gewährt Administratorzugriff und setzt den Aufrufer auf `{ uid: "service", roles: ["admin"] }`.
-3. Injiziert einen `DataDriver`, der auf dieselbe Service-Identität beschränkt ist. Row-Level Security gilt weiterhin — sie wird als `{ uid: "service", roles: ["admin"] }` ausgewertet, nicht übersprungen.
+Wenn eine externe Anfrage den Service-Key über den Authorization-Header übergibt (`Authorization: Bearer <service_key>`), führt die Auth-Middleware automatisch Folgendes aus:
+1. Validiert den Key mittels Constant-Time-Vergleich, um Timing-Angriffe zu verhindern.
+2. Gewährt Zugriff auf Admin-Ebene und setzt den Aufrufer auf `{ uid: "service", roles: ["admin"] }`.
+3. Injiziert einen `DataDriver`, der auf dieselbe Service-Identität beschränkt ist. Row-Level Security gilt weiterhin – sie wird für `{ uid: "service", roles: ["admin"] }` evaluiert und nicht übersprungen.
 
 ### Interne Selbst-Authentifizierung
 
-Wenn Sie keinen `REBASE_SERVICE_KEY` konfiguriert haben, generiert Rebase einen zufälligen **internen Schlüssel pro Boot-Vorgang**. Das `rebase`-Singleton verwendet diesen Schlüssel automatisch bei Aufrufen der servereigenen Control-Plane-APIs (wie `rebase.auth` oder `rebase.storage`). So kann Ihre serverseitige Logik auch ohne manuell konfigurierten Service-Key administrative Aufgaben ausführen.
+Wenn du keinen `REBASE_SERVICE_KEY` konfiguriert hast, generiert Rebase einen zufälligen **internen Schlüssel pro Bootvorgang**. Das `rebase`-Singleton verwendet diesen Schlüssel automatisch beim Aufruf der servereigenen Control-Plane-APIs (wie `rebase.auth` oder `rebase.storage`). Dadurch kann deine serverseitige Logik administrative Aufgaben auch ohne manuell konfigurierten Service-Key ausführen.
 
 ## Zugriff auf Datenbank & Services
 
-### 1. Der benutzerbezogene Driver — für alles, was eine Anfrage bedient
+### 1. Der benutzerspezifische Driver – für alles, was eine Anfrage bedient
 
-`getDriver(c)` gibt den Driver zurück, der **auf den Aufrufer beschränkt** ist. Jeder Lese- und Schreibzugriff wird anhand Ihrer Row-Level-Security-Richtlinien als dieser Nutzer ausgewertet:
+`getDriver(c)` gibt den Driver zurück, der **auf den Aufrufer beschränkt ist**, sodass jeder Lese- und Schreibvorgang anhand deiner Row-Level-Security-Richtlinien als dieser Benutzer ausgewertet wird:
 
 ```typescript
 import { defineFunction, requireAuth, requireDriver } from "@rebasepro/server/functions";
@@ -301,9 +291,9 @@ export default defineFunction((app) => {
 });
 ```
 
-`requireDriver(c)` entspricht `getDriver(c)` ohne das `!` — es wirft einen Fehler mit dem genauen Verdrahtungsproblem, anstatt zwanzig Zeilen später mit `undefined` abzubrechen.
+`requireDriver(c)` ist `getDriver(c)` ohne das `!` – es wirft eine Fehlermeldung, die das Verdrahtungsproblem benennt, anstatt zwanzig Zeilen später an einem `undefined` zu scheitern.
 
-### 2. `rebase.dataAsAdmin` — für vertrauenswürdige Hintergrundaufgaben
+### 2. `rebase.dataAsAdmin` – für vertrauenswürdige Hintergrundarbeiten
 
 ```typescript
 import { defineFunction, requireAuth, requireAdmin } from "@rebasepro/server/functions";
@@ -320,31 +310,31 @@ export default defineFunction((app, { rebase }) => {
 });
 ```
 
-`rebase.dataAsAdmin` ist untypisiert, bis Sie Ihre [generierte `Database` registrieren](/docs/backend/typed-server-data).
+`rebase.dataAsAdmin` ist untypisiert, bis du deine [generierte `Database` registrierst](/docs/backend/typed-server-data).
 
 ### RLS-bezogener Driver vs. Rebase-Singleton
 
-|                     | `getDriver(c)` (anfragebezogen)                | `rebase.dataAsAdmin` (Service-Identität)                         |
+|                     | `getDriver(c)` (request-bezogen)               | `rebase.dataAsAdmin` (Service-Identität)                          |
 | ------------------- | ---------------------------------------------- | ---------------------------------------------------------------- |
-| **Läuft als**       | Der Aufrufer (`uid`, dessen Rollen)            | `{ uid: "service", roles: ["admin"] }`                            |
-| **RLS-Durchsetzung**| ✅ Ja (wird gegen den Aufrufer geprüft)        | ✅ Ja (wird gegen die Service-Identität geprüft)                  |
-| **Ideal für...**    | Reguläre Nutzer-CRUD, Suche und Abfragen       | Hintergrundjobs, System-Trigger, Webhooks                        |
-| **API-Stil**        | Methoden auf Driver-Ebene (`fetchCollection`, `save`) | Fluent Collection-Accessors (`rebase.dataAsAdmin.jobs.find`)    |
+| **Wird ausgeführt als** | Der Aufrufer (`uid`, dessen Rollen)            | `{ uid: "service", roles: ["admin"] }`                            |
+| **RLS-Durchsetzung** | ✅ Ja (ausgewertet gegen den Aufrufer)          | ✅ Ja (ausgewertet gegen die Service-Identität)                   |
+| **Ideal für...**    | Allgemeine Benutzer-CRUD, Suche und Abfragen   | Hintergrund-Jobs, System-Trigger, Webhooks                        |
+| **API-Stil**       | Methoden auf Driver-Ebene (`fetchCollection`, `save`) | Fluent Collection-Accessors (`rebase.dataAsAdmin.jobs.find`) |
 
 #### Was `dataAsAdmin` genau ist
 
-`rebase.dataAsAdmin` ist **auf Admin-Rechte beschränkt, umgeht RLS jedoch nicht**. Der Driver wird einmalig beim Booten mit `withAuth({ uid: "service", roles: ["admin"] })` initialisiert, sodass jeder Lese- und Schreibzugriff innerhalb einer Transaktion ausgeführt wird, die mit `app.uid = 'service'` in die eingeschränkte Rolle `rebase_user` gewechselt ist. Ihre Richtlinien werden ausgewertet — und zwar gegen diese Identität.
+`rebase.dataAsAdmin` ist **auf Admin-Rechte beschränkt, umgeht aber kein RLS**. Der Driver wird einmalig beim Booten mit `withAuth({ uid: "service", roles: ["admin"] })` konfiguriert, sodass jeder Lese- und Schreibvorgang innerhalb einer Transaktion ausgeführt wird, die mit `app.uid = 'service'` zur eingeschränkten Rolle `rebase_user` gewechselt hat. Deine Richtlinien werden ausgewertet – und zwar gegen diese Identität.
 
-Bei den meisten Projekten fällt dieser Unterschied nicht auf, da die von Rebase standardmäßig auf jede Collection angewendeten Policies `serverContext() OR rolesOverlap(['admin'])` zulassen und die Service-Identität den zweiten Teil erfüllt. Er wird jedoch relevant, sobald Sie eigene Policies schreiben:
+In den meisten Projekten macht sich dieser Unterschied nie bemerkbar, da die Standardrichtlinien, die Rebase in jede Collection injiziert, `serverContext() OR rolesOverlap(['admin'])` zulassen und die Service-Identität den zweiten Zweig erfüllt. Er wird in dem Moment relevant, in dem du eigene Richtlinien schreibst:
 
-- **`policy.serverContext()` ist dafür `false`.** Dieser Helper kompiliert zu `rebase.uid() IS NULL`, und die `uid` dieses Accessors ist `'service'`. Eine Collection mit `disableDefaultPolicies: true`, deren einzige Schreibregel `serverContext()` ist, wird einen Schreibzugriff über `dataAsAdmin` mit dem Postgres-Fehler `42501` abweisen. Ein Lesezugriff auf eine solche Collection gibt **null Zeilen mit HTTP 200** zurück — der stille Fehlerfall. Schreiben Sie `rolesOverlap(["admin"])` (oder ergänzen Sie es), wenn Sie "mein Backend" meinen.
-- **Die Reichweite entspricht der Reichweite eines `admin`-Benutzers.** Weisen Sie einem Anwendungsbenutzer die Rolle `admin` zu, erhält dieser genau dieselben Zeilen, die auch dieser Accessor sieht. Es handelt sich nicht um einen privaten Kanal.
+- **`policy.serverContext()` ist dafür `false`.** Dieses Hilfskonstrukt kompiliert zu `rebase.uid() IS NULL`, und die `uid` dieses Accessors lautet `'service'`. Eine Collection mit `disableDefaultPolicies: true`, deren einzige Schreibregel `serverContext()` ist, verweigert Schreibzugriffe über `dataAsAdmin` mit dem Postgres-Fehler `42501`. Ein Lesezugriff auf eine solche Collection liefert **null Zeilen mit HTTP 200** zurück – das stille Fehlschlagen. Schreibe `rolesOverlap(["admin"])` (oder füge es hinzu), wenn du „mein Backend“ meinst.
+- **Die Reichweite entspricht der eines `admin`-Benutzers.** Wenn du einem Anwendungsbenutzer die Rolle `admin` zuweist, erhält er Zugriff auf genau dieselben Zeilen, die dieser Accessor sieht. Es handelt sich um keinen privaten Kanal.
 
-### 3. `rebase.sql()` — Raw SQL und der einzige Node-exklusive Accessor
+### 3. `rebase.sql()` – Raw-SQL und der einzige reine Node-Accessor
 
-Wenn Sie zwingend eine bedingungslose Umgehung benötigen, ist `rebase.sql()` die Lösung: Raw SQL über die Owner-Verbindung, keine Policies, Zugriff auf alle Zeilen. Es ist das mächtigste Werkzeug im Kontext einer Funktion — mehr noch als der Accessor mit "admin" im Namen.
+Wenn du wirklich eine bedingungslose Umgehung benötigst, ist `rebase.sql()` die Lösung: Raw-SQL über die Owner-Verbindung, keine Richtlinien, jede Zeile. Es ist das am stärksten privilegierte Element im Kontext einer Funktion – mehr noch als der Accessor mit „admin“ im Namen.
 
-Zum Anlegen von Tabellen ist es nicht gedacht. Eine Tabelle ist eine [Collection](/docs/collections/), deklariert in `config/collections/` und beim Booten erstellt; eine mit `CREATE TABLE` in einer Funktion angelegte Tabelle hat keine Validierung, keine Callbacks, keine Sicherheitsregeln, keine Admin-Ansicht und keinen SDK-Typ. `rebase.sql()` führt eine solche Anweisung aus und protokolliert eine Warnung, die die stattdessen zu deklarierende Collection nennt.
+Es ist nicht dafür gedacht, Tabellen zu erstellen. Eine Tabelle ist eine [Collection](/docs/collections/), die in `config/collections/` deklariert und beim Booten erstellt wird; eine mit `CREATE TABLE` in einer Funktion erstellte Tabelle verfügt über keinerlei Validierung, Callbacks, Sicherheitsregeln, Admin-Ansicht oder SDK-Typen. `rebase.sql()` führt eine solche Anweisung zwar aus, protokolliert jedoch eine Warnung mit dem Hinweis, welche Collection stattdessen deklariert werden sollte.
 
 ```typescript
 import { defineFunction, requireAuth, requireAdmin } from "@rebasepro/server/functions";
@@ -360,17 +350,17 @@ export default defineFunction((app, { rebase }) => {
 });
 ```
 
-Es läuft über eine TCP-Verbindung zu Ihrer Datenbank, was es zum einzigen Accessor macht, der an einen Node-Prozess gebunden ist. Bei heutigen Deployments verursacht das keine Nachteile — man sollte es jedoch wissen, falls eine Funktion später portiert werden soll. Siehe [Portabilität der Laufzeitumgebung](#portabilität-der-laufzeitumgebung).
+Es läuft über eine TCP-Verbindung zu deiner Datenbank, was es zum einzigen Accessor macht, der an einen Node-Prozess gebunden ist. Bei allen heute existierenden Deployments entstehen dadurch keine Nachteile – es ist lediglich der eine Punkt, den man wissen muss, falls eine Funktion später umziehen soll. Siehe [Runtime portability](#portabilität-der-runtime).
 
 :::caution[Direkter Drizzle-Zugriff ist nur unter Node möglich]
-Sie können auch Ihre eigene Drizzle-Instanz importieren und direkt abfragen (`db.execute(sql\`…\`)`). Das funktioniert und ist bei einem selbst gehosteten oder gemanagten Node-Deployment in Ordnung.
+Du kannst auch deine eigene Drizzle-Instanz importieren und sie direkt abfragen (`db.execute(sql\`…\`)`). Das funktioniert und ist bei einem selbst gehosteten oder verwalteten Node-Deployment völlig in Ordnung.
 
-Man sollte jedoch die Konsequenzen kennen: Eine Funktion, die `drizzle-orm` und einen `pg`-Pool importiert, ist dauerhaft eine Node-Funktion, umgeht Ihre Collection-Callbacks, die `rebase.data` ausführt (wobei keines von beiden `validation` prüft, das für [API-Anfragen](/docs/collections/validation-and-conditions/#where-validation-runs) gilt), und bezieht ihre Verbindung nicht aus der Anfrage. `rebase.sql()` bietet Ihnen dasselbe Raw SQL über die Verbindung des Frameworks. Bevorzugen Sie diesen Weg.
+Es ist wichtig zu wissen, was das bedeutet: Eine Funktion, die `drizzle-orm` und einen `pg`-Pool importiert, ist dauerhaft eine reine Node-Funktion, umgeht deine Collection-Callbacks, die `rebase.data` ausführt (keines von beiden prüft `validation`, was für [API-Anfragen](/docs/collections/validation-and-conditions/#where-validation-runs) gilt), und bezieht ihre Verbindung nicht aus der Anfrage. `rebase.sql()` bietet dir dasselbe Raw-SQL über die frameworkeigene Verbindung. Bevorzuge diesen Weg.
 :::
 
 ## Konfiguration und Secrets
 
-Lesen Sie Konfigurationen **innerhalb** des Handlers aus, niemals auf Modulebene:
+Lies die Konfiguration **innerhalb** des Handlers aus, niemals auf Modulebene:
 
 ```typescript
 import { defineFunction, requireEnv, lazyResource } from "@rebasepro/server/functions";
@@ -389,7 +379,7 @@ export default defineFunction((app) => {
 });
 ```
 
-Warum dies auf **jeder** Laufzeitumgebung, einschließlich Node, wichtig ist:
+Warum dies auf **jeder** Runtime wichtig ist, einschließlich Node:
 
 ```typescript no-verify
 // Don't. If STRIPE_SECRET_KEY is unset, this throws while the file is being
@@ -398,16 +388,16 @@ Warum dies auf **jeder** Laufzeitumgebung, einschließlich Node, wichtig ist:
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
 ```
 
-Ein lesender Zugriff auf Modulebene wird ausgewertet, sobald die Datei importiert wird, noch bevor eine Anfrage existiert. Unter Node bedeutet dies, dass eine einzige fehlende Variable die gesamte Datei und alle darin enthaltenen Routen lahmlegt. Auf einem Host, der Konfigurationen an die Anfrage statt an den Prozess bindet, gibt es zum Importzeitpunkt überhaupt nichts auszulesen.
+Ein Lesevorgang auf Modulebene wird ausgewertet, wenn die Datei importiert wird, bevor irgendeine Anfrage existiert. Unter Node bedeutet dies, dass eine einzige fehlende Variable die gesamte Datei und jede darin enthaltene Route lahmlegt. Auf einem Host, der die Konfiguration an die Anfrage statt an den Prozess bindet, gibt es beim Importzeitpunkt überhaupt nichts auszulesen.
 
-- `getEnv(c)` — alle für diese Anfrage sichtbaren Variablen
-- `env(c, "NAME")` — eine einzelne Variable, getrimmt; Leerstrings gelten als nicht gesetzt
-- `requireEnv(c, "NAME")` — wie oben, wirft jedoch einen Fehler mit dem Namen der Variable
-- `lazyResource(factory)` — initialisiert einen aufwendigen Client einmalig bei der ersten Nutzung
+- `getEnv(c)` – jede für diese Anfrage sichtbare Variable
+- `env(c, "NAME")` – eine Variable, getrimmt; leer gilt als nicht gesetzt
+- `requireEnv(c, "NAME")` – dasselbe, wirft jedoch einen Fehler mit dem Namen der Variablen
+- `lazyResource(factory)` – erstellt einen aufwendigen Client einmalig bei der ersten Verwendung
 
-`rebase doctor` meldet Zugriffe auf `process.env` auf Modulebene in Ihrem functions-Verzeichnis.
+`rebase doctor` meldet `process.env`-Aufrufe auf Modulebene in deinem functions-Verzeichnis.
 
-## Hintergrundaufgaben
+## Hintergrundarbeiten
 
 Arbeiten, die über die Antwort hinaus fortgeführt werden sollen, gehören in `waitUntil`:
 
@@ -428,30 +418,50 @@ export default defineFunction((app, { rebase }) => {
 });
 ```
 
-Ein Promise ohne `await` sieht ähnlich aus, ist es aber nicht. `waitUntil` bietet zwei entscheidende Vorteile:
+Ein Promise ohne `await` sieht gleichwertig aus, ist es aber nicht. `waitUntil` bietet zwei Vorteile:
 
-- **Unter Node** wird das Promise nachverfolgt, sodass ein Graceful Shutdown darauf wartet, anstatt dass der Prozess während eines halb gesendeten Webhooks beendet wird. Ein offenes Promise bei `SIGTERM` geht andernfalls einfach verloren.
-- **Auf einem Isolate-basierten Host** wird der Host angewiesen, das Isolate am Leben zu erhalten, bis das Promise abgeschlossen ist. Ohne dies wird die Aufgabe in dem Moment abgebrochen, in dem die Antwort aufgelöst wird — stillschweigend und mit einem sauberen 200-Status in den Logs.
+- **Unter Node** wird das Promise nachverfolgt, sodass ein Graceful Shutdown darauf wartet, anstatt dass der Prozess während eines halb gesendeten Webhooks beendet wird. Ein ungebundenes Promise geht bei `SIGTERM` einfach verloren.
+- **Auf einem isolationsbasierten Host (Isolates)** wird der Host angewiesen, das Isolate am Leben zu erhalten, bis das Promise abgeschlossen ist. Ohne dies wird die Arbeit in dem Moment abgebrochen, in dem die Response aufgelöst wird – stillschweigend mit einem sauberen 200er-Status in den Logs.
 
-Ein Fehler wird geloggt, anstatt an den Unhandled-Rejection-Handler übergeben zu werden, sodass ein Fehlschlag die Route nennt, aus der er stammt.
+Eine Rejection wird protokolliert, anstatt dem Handler für unbehandelte Rejections überlassen zu werden, sodass ein Fehler die Route benennt, von der er ausging.
 
-## Portabilität der Laufzeitumgebung
+<span class="since-badge" data-since="0.29">Seit 0.29</span> Code, der außerhalb einer Anfrage ausgeführt wird, hat kein `c`, das übergeben werden könnte: ein Initialisierer auf Modulebene, ein Helper, den sich Routen und Cron-Jobs teilen, oder Arbeit, die ein Cron-Lauf startet und auf die er nicht wartet. Übergib `waitUntil` die Arbeit allein:
 
-Eine eigene Funktion ist eine Hono-App, also hängt die Frage, ob sie außerhalb eines Node-Prozesses laufen könnte, davon ab, was ihre eigene Datei importiert. `rebase.sql()`, ein direkt importierter Datenbank-Client und Node-Built-ins binden sie an Node; der Rest von `rebase` und die Web-Plattform nicht, und keins von beidem lässt heute etwas fehlschlagen. [Portabilität der Laufzeitumgebung](/docs/backend/runtime-portability/) listet auf, was portabel ist, wie `rebase build` und `rebase doctor` es melden und wie man nach der Laufzeitumgebung verzweigt.
+```typescript no-verify
+import { waitUntil } from "@rebasepro/server/functions";
+
+let ready: Promise<void> | undefined;
+
+export function ensureCatalogue(): Promise<void> {
+    ready ??= loadCatalogue().then(() => {
+        // No request to attach it to, but shutdown still waits for it.
+        waitUntil(rateNewSongs());
+    });
+    return ready;
+}
+```
+
+Die Arbeit wird für einen Graceful Shutdown nachverfolgt und eine Rejection wird protokolliert, genau wie mit `c`. Was sie nicht tun kann, ist, ein Isolate am Leben zu erhalten, da dies der Ausführungskontext der Anfrage ist: Übergib immer `c`, wenn eine Anfrage vorliegt. Arbeit, die ein Cron-Lauf, ein Job oder ein Queue-Handler einfach `await`en kann, sollte stattdessen erwartet werden; der Lauf selbst ist das, worauf der Shutdown wartet, und dessen Ergebnis wird damit aufgezeichnet.
+
+Der Shutdown wartet maximal 5 Sekunden auf diese Arbeit. Arbeiten, die Minuten dauern, gehören in einen [Cron-Job](/docs/backend/cron-jobs/) oder einen [Job](/docs/backend/jobs/), welche protokolliert und neu startbar sind. Ein Cron-Job läuft zudem [instanzübergreifend immer nur einzeln](/docs/backend/cron-across-instances/#concurrency-guarding), unabhängig davon, ob er über den Zeitplan oder einen manuellen Trigger gestartet wurde.
+
+## Portabilität der Runtime
+
+Eine Custom Function ist eine Hono-App. Ob sie außerhalb eines Node-Prozesses ausgeführt werden kann, hängt also davon ab, was ihre Datei importiert. `rebase.sql()`, ein direkt importierter Datenbank-Client und integrierte Node-Module binden sie an Node; der Rest von `rebase` und die Web-Plattform tun dies nicht, und heute schlägt wegen beidem nichts fehl. Unter [Runtime portability](/docs/backend/runtime-portability/) ist aufgeführt, was portabel ist, wie `rebase build` und `rebase doctor` darüber berichten und wie man anhand der Runtime verzweigt.
 
 ## Reihenfolge der Routen-Registrierung
 
 Custom Functions werden geladen und gemountet, **nachdem** `initializeRebaseBackend()` das Core-Setup abgeschlossen hat. Die Initialisierungsreihenfolge lautet:
 
-1. **Bootstrapper** — Datenbankverbindungen, Auth-Tabellen, Realtime-Services
-2. **Auth-Routen** — `/api/auth/*`, `/api/admin/*`
-3. **Storage-Routen** — `/api/storage/*`
-4. **Daten-Routen** — `/api/data/*` (CRUD für Collections)
+1. **Bootstrapper** – Datenbankverbindungen, Auth-Tabellen, Echtzeit-Services
+2. **Auth-Routen** – `/api/auth/*`, `/api/admin/*`
+3. **Storage-Routen** – `/api/storage/*`
+4. **Daten-Routen** – `/api/data/*` (CRUD für Collections)
 5. **Custom Functions** ← `/api/functions/*`
-6. **Cron-Jobs** — `/api/admin/cron/*`
-7. **WebSocket** — Realtime-Abonnements
+6. **Cron-Jobs** – `/api/admin/cron/*`
+7. **WebSocket** – Realtime-Abonnements
 
-Das bedeutet, dass Ihre Custom Functions Zugriff auf alle initialisierten Services haben. Registrieren Sie Routen, die **vor** Rebase ausgeführt werden müssen, direkt auf der Hono-App, bevor Sie `initializeRebaseBackend()` aufrufen:
+Das bedeutet, dass deine Custom Functions Zugriff auf alle initialisierten Services haben. Registriere Routen, die **vor** Rebase ausgeführt werden müssen, direkt auf der Hono-App, bevor du `initializeRebaseBackend()` aufrufst:
 
 ```typescript no-verify
 const app = new Hono<HonoEnv>();
@@ -464,7 +474,7 @@ const instance = await initializeRebaseBackend({ app, /* ... */ });
 ```
 
 :::caution
-Routen, die Sie Ihrer eigenen App auf diese Weise hinzufügen, liegen **außerhalb** jedes Rebase-Routers, sodass auf ihnen keine Auth-Middleware gelaufen ist und `getDriver(c)` nicht gesetzt ist. Sichern Sie diese mit `requireAuth` / `requireAdmin` ab, importiert aus **`@rebasepro/server`** — dem Root-Paket —, die das Token selbst validieren. Die Guards unter dem Subpfad `/functions` lesen eine Identität aus, die ein Rebase-Router bereits aufgelöst hat, und antworten mit 500, anstatt eine vorzutäuschen.
+Routen, die du deiner eigenen App auf diese Weise hinzufügst, liegen **außerhalb** jedes Rebase-Routers, sodass für sie keine Auth-Middleware ausgeführt wurde und `getDriver(c)` nicht gesetzt ist. Schütze diese mit `requireAuth` / `requireAdmin`, importiert aus **`@rebasepro/server`** – dem Paket-Root –, welche das Token selbst verifizieren. Die Guards auf dem Subpfad `/functions` lesen eine Identität aus, die ein Rebase-Router bereits aufgelöst hat, und antworten mit 500, anstatt vorzutäuschen, dass eine existiert.
 :::
 
 ## Beispiel: Webhook-Handler
@@ -507,15 +517,15 @@ declare function verifySignature(body: string, signature: string, secret: string
 declare function notifyFulfilment(url: string, session: Record<string, string>): Promise<void>;
 ```
 
-## Fehlerbehebung (Debugging)
+## Debugging
 
-Wenn Funktionen geladen werden, protokolliert der Boot `Loaded custom functions` mit deren Anzahl. Die Zeile jeder einzelnen Funktion wird auf `debug` protokolliert (`LOG_LEVEL=debug`):
+Wenn Funktionen geladen werden, protokolliert der Bootvorgang `Loaded custom functions` mit deren Anzahl. Die Zeile jeder einzelnen Funktion wird unter `debug` (`LOG_LEVEL=debug`) protokolliert:
 
 ```
 ⚡ Loaded function route: hello
 ```
 
-Wenn das Laden fehlschlägt, gibt der Loader Diagnoseinformationen aus:
+Wenn das Laden fehlschlägt, liefert der Loader eine Diagnoseausgabe:
 
 ```
 [functions] broken-function.ts: default export is not a Hono app or factory. Skipping.
@@ -526,22 +536,21 @@ Wenn das Laden fehlschlägt, gibt der Loader Diagnoseinformationen aus:
   The loader checks for .fetch() and .routes — any Hono-compatible app will work.
 ```
 
-Der Router wird für das **Verzeichnis** gemountet, nicht für die einzelnen darin enthaltenen Funktionen. Sollte der Import aller Dateien fehlschlagen — eine einzige fehlende Umgebungsvariable auf Modulebene reicht aus, um alle zu blockieren —, antwortet `GET /api/functions` dennoch mit `200` mit einer leeren Liste sowie einem `skipped`-Zähler. So lässt sich unterscheiden, ob "nichts geladen werden konnte" oder "dieser Build keine Funktionen enthielt". Das Listing selbst erfordert einen authentifizierten Aufrufer, einen API-Schlüssel mit dem Scope `functions:invoke` oder den Service-Key — die Funktionen bleiben für jeden aufrufbar, den sie jeweils zulassen, aber die Liste der Funktionen ist nicht öffentlich. Die genauen Ursachen verbleiben im Boot-Log.
+Der Router wird für das **Verzeichnis** gemountet, nicht für die darin enthaltenen Funktionen. Selbst wenn jede Datei beim Import fehlschlägt – eine einzige fehlende Umgebungsvariable auf Modulebene reicht aus, um alle lahmzulegen –, antwortet `GET /api/functions` weiterhin mit `200` und einer leeren Liste plus einem `skipped`-Zähler. So lässt sich „nichts geladen“ von „dieser Build enthält keine Funktionen“ unterscheiden. Das Listing selbst erfordert einen angemeldeten Aufrufer, einen API-Key mit dem einfachen Scope `functions:invoke` oder den Service-Key – die Funktionen bleiben für jeden aufrufbar, den die jeweilige Funktion zulässt, aber die Übersicht über sie ist nicht öffentlich. Die Gründe dafür verbleiben im Boot-Log.
 
-## Timeouts und Rate Limits
+## Timeouts und Rate-Limits
 
 Für `/api/functions/*` gelten zwei Obergrenzen:
 
-- **Request-Timeout** — standardmäßig 30 Sekunden, antwortet mit `504` und dem Code `FUNCTION_TIMEOUT`. Konfigurierbar über `functionsTimeoutMs` (oder `REBASE_FUNCTIONS_TIMEOUT_MS`); `0` deaktiviert das Timeout. Der Handler kann von außen nicht abgebrochen werden, wird jedoch benachrichtigt: `getSignal(c)` aus `@rebasepro/server/functions` wird im Moment des 504-Fehlers abgebrochen; übergeben Sie es daher an `fetch` und alles andere, was ein Signal akzeptiert (`fetch(url, { signal: getSignal(c) })`). Operationen, denen das Signal nicht übergeben wird, laufen weiter — das Timeout gibt den Client und den Socket frei, stoppt aber nicht die Ausführung. Dass der Handler nach dem 504 *weiterläuft*, ist eine Eigenschaft eines langlebigen Node-Prozesses und keine vertragliche Garantie; alles, was zwingend abgeschlossen werden muss, gehört in [`waitUntil`](#hintergrundaufgaben).
-- **Rate Limit** — Aufrufer mit API-Schlüssel oder Authentifizierung teilen sich die Kontingente der Daten-API. Anonyme Aufrufer erhalten ein eigenes, deutlich großzügigeres Kontingent (3000 pro Zeitfenster), da dieser Router für Webhook-Empfänger standardmäßig öffentlich ist. Kann mit `rateLimit.anonymousFunctions` überschrieben werden; `null` schaltet es ab.
+- **Request-Timeout** – standardmäßig 30 Sekunden, beantwortet mit `504` und dem Code `FUNCTION_TIMEOUT`. Konfigurierbar über `functionsTimeoutMs` (oder `REBASE_FUNCTIONS_TIMEOUT_MS`); `0` deaktiviert ihn. Der Handler kann nicht von außen gestoppt werden, wird jedoch benachrichtigt: `getSignal(c)` aus `@rebasepro/server/functions` wird im Moment des 504-Fehlers abgebrochen (aborted); übergib es daher an `fetch` und alles andere, was ein Signal akzeptiert (`fetch(url, { signal: getSignal(c) })`). Arbeit, der das Signal nicht übergeben wurde, läuft weiter – der Timeout gibt den Client und den Socket frei, nicht die Arbeit. Dass der Handler nach dem 504-Fehler *weiterläuft*, ist eine Eigenschaft eines langlebigen Node-Prozesses, keine vertragliche Garantie; alles, was zwingend abgeschlossen werden muss, gehört in [`waitUntil`](#hintergrundarbeiten).
+- **Rate-Limit** – Aufrufer mit API-Key und angemeldete Benutzer teilen sich die Buckets der Daten-API. Anonyme Aufrufer erhalten ein eigenes, deutlich großzügigeres Kontingent (3000 pro Zeitfenster), da dieser Router für Webhook-Empfänger standardmäßig öffentlich ist. Überschreibe dies mit `rateLimit.anonymousFunctions`; `null` schaltet es ab.
 
-Unbehandelte Promise-Rejections werden protokolliert, führen jedoch nicht zum Absturz: Ein unüberwachter Fire-and-Forget-Aufruf in einer einzelnen Funktion würde sonst den gesamten Prozess beenden. Setzen Sie `REBASE_EXIT_ON_UNHANDLED_REJECTION=1`, um das Standardverhalten von Node wiederherzustellen.
+Unbehandelte Promise-Rejections werden protokolliert und sind nicht fatal: Ein Fire-and-Forget-Aufruf in einer Funktion würde andernfalls den gesamten Prozess beenden. Setze `REBASE_EXIT_ON_UNHANDLED_REJECTION=1` für das Standardverhalten von Node.
 
-In Rebase Cloud gelten an der Edge vor Ihren Funktionen eigene Limits. Zustände auf Modulebene, das Dateisystem und ausgehende Ports verhalten sich dort auf eine Weise, die man kennen sollte, bevor man Architekturen darauf aufbaut. Siehe
-[Managed Backend Runtime](/docs/deployment/managed-runtime/).
+In der Rebase Cloud besitzt der Edge-Layer vor deinen Funktionen eigene Limits, und Zustände auf Modulebene, das Dateisystem sowie ausgehende Ports verhalten sich auf eine Weise, die man vor dem Entwurf kennen sollte. Siehe [Managed backend runtime](/docs/deployment/managed-runtime/).
 
 ## Nächste Schritte
 
-- **[Backend-Übersicht](/docs/backend)** — Vollständige Referenz zur Backend-Konfiguration
-- **[Entity-Callbacks](/docs/collections/callbacks)** — Logik bei Datenänderungen ausführen
-- **[Cron-Jobs](/docs/backend/cron-jobs)** — Geplante Hintergrundaufgaben
+- **[Backend Overview](/docs/backend)** – Vollständige Referenz zur Backend-Konfiguration
+- **[Entity Callbacks](/docs/collections/callbacks)** – Logik bei Datenänderungen ausführen
+- **[Cron Jobs](/docs/backend/cron-jobs)** – Geplante Hintergrundaufgaben

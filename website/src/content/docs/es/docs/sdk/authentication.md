@@ -1,20 +1,20 @@
 ---
-sourceHash: dfb1bbaa122356f7
+sourceHash: 468b0d48039a8127
 title: Autenticación
 sidebar_label: Autenticación
-description: Autenticación del lado del cliente con el SDK de Rebase — inicio de sesión con correo electrónico/contraseña, proveedores OAuth, gestión de sesiones y escuchadores de estado de autenticación.
+description: Autenticación en el lado del cliente con el SDK de Rebase — inicio de sesión con correo electrónico/contraseña, proveedores OAuth, gestión de sesiones y escuchadores del estado de autenticación.
 ---
 
 ## Descripción general
 
 El módulo `client.auth` gestiona la autenticación de usuarios, la administración de tokens y la persistencia de sesiones. Una vez que un usuario inicia sesión, todas las solicitudes de datos posteriores incluyen automáticamente el JWT.
 
-El SDK persiste las sesiones en `localStorage` de forma predeterminada y actualiza automáticamente los tokens antes de que expiren.
+El SDK persiste las sesiones en `localStorage` por defecto y renueva automáticamente los tokens antes de que expiren.
 
 :::note[Cada método de inicio de sesión se resuelve en una sesión aplanada]
-`signInWithEmail`, `signUp` y cada método `signInWith*` devuelven **`{ user, accessToken, refreshToken }`** — el SDK ya ha desempaquetado la respuesta por ti.
+`signInWithEmail`, `signUp` y cada método `signInWith*` devuelven **`{ user, accessToken, refreshToken }`**; el SDK ya ha desempaquetado la respuesta por ti.
 
-La API REST subyacente devuelve el token anidado en su lugar, como `{ user, tokens: { accessToken, … } }`. Esa diferencia solo importa si también llamas a `/api/auth/*` directamente con `fetch`, donde `body.accessToken` es `undefined` y el token está en `body.tokens.accessToken`. Consulta [el formato de conexión](/docs/backend/auth-endpoints/#response-format).
+La API REST subyacente devuelve el token anidado en su lugar, como `{ user, tokens: { accessToken, … } }`. Esa diferencia solo importa si también llamas a `/api/auth/*` directamente con `fetch`, donde `body.accessToken` es `undefined` y el token se encuentra en `body.tokens.accessToken`. Consulta [el formato de conexión](/docs/backend/auth-endpoints/#response-format).
 :::
 
 ## Correo electrónico / Contraseña
@@ -40,7 +40,7 @@ const { user, confirmationRequired } = await client.auth.signUp(
 ```
 
 Con [`requireEmailVerification`](/docs/backend/email-verification/) activado,
-no hay sesión hasta que la dirección sea confirmada: `confirmationRequired` es `true` y `user` es `null`, así que indícale a la persona que revise su correo. De lo contrario, `confirmationRequired` es `false` y `user` es la cuenta con la sesión iniciada. En 0.23, `signUp` resuelve `{ user, accessToken, refreshToken }` y siempre inicia sesión.
+no hay sesión hasta que se confirme la dirección: `confirmationRequired` es `true` y `user` es `null`, por lo que debes indicarle a la persona que revise su correo. De lo contrario, `confirmationRequired` es `false` y `user` es la cuenta con la sesión iniciada. En 0.23 `signUp` resuelve `{ user, accessToken, refreshToken }` y siempre inicia sesión.
 
 ## Proveedores OAuth
 
@@ -87,7 +87,7 @@ await client.auth.signInWithTwitter(code, redirectUri, codeVerifier);
 
 En un navegador, `signInWithApplePopup()` abre la ventana emergente de Apple, verifica el `state` e
 inicia sesión con el código. Llámalo desde un controlador de clics. Llama a `preloadAppleSignIn()`
-al montar el componente, ya que Safari bloquea las ventanas emergentes que esperan a que se descargue un script:
+al montar el componente, ya que Safari bloquea cualquier ventana emergente que espere a que se descargue un script:
 
 ```typescript
 import { preloadAppleSignIn } from "@rebasepro/client";
@@ -96,13 +96,13 @@ void preloadAppleSignIn();                                          // on mount
 await client.auth.signInWithApplePopup({ clientId: "com.example.web" }); // on click
 ```
 
-Sin `clientId`, el SDK lee el Services ID desde `/auth/config`, lo que
-retrasa la ventana emergente. La URI de redirección se establece de forma predeterminada en el origen de la página más `/`, y
-debe ser una Return URL en el Services ID (HTTPS, nunca `localhost`). Una ventana
-emergente cerrada rechaza la promesa con el código `APPLE_SIGN_IN_CANCELLED`.
+Sin `clientId`, el SDK lee el Services ID desde `/auth/config`, lo cual
+retrasa la ventana emergente. El URI de redirección se establece por defecto en el origen de la página más `/`, y
+debe ser una Return URL en el Services ID (HTTPS, nunca `localhost`). Si se cierra la ventana emergente,
+la promesa se rechaza con el código `APPLE_SIGN_IN_CANCELLED`.
 
-Una aplicación nativa de iOS o macOS envía el código de autorización desde el
-inicio de sesión nativo de Apple junto con su bundle id. El bundle id debe estar listado en `APPLE_BUNDLE_IDS`:
+Una aplicación nativa de iOS o macOS envía el código de autorización desde el inicio de sesión
+nativo de Apple junto con su bundle id. El bundle id debe estar registrado en `APPLE_BUNDLE_IDS`:
 
 ```typescript
 await client.auth.signInWithApple({
@@ -123,9 +123,9 @@ await client.auth.signInWithOAuth("custom-provider", {
 });
 ```
 
-## Enlaces mágicos (Magic Links)
+## Magic Links
 
-Un enlace de inicio de sesión con un solo clic por correo electrónico. El enlace siempre es `<base>/auth/magic-link?token=…`, donde `<base>` es `email.magicLinkUrl` del backend, o su base para restablecer contraseña (`FRONTEND_URL` en el runtime) cuando este no esté configurado. No hay un `redirectTo` por solicitud. Sirve esa ruta en tu frontend y devuelve el token para canjearlo por una sesión. El CMS lo sirve, iniciando sesión (a través del paso del código cuando hay un segundo factor); otros frontends necesitan una página de aterrizaje (landing page).
+Un enlace de inicio de sesión con un solo clic enviado por correo electrónico. El enlace siempre tiene el formato `<base>/auth/magic-link?token=…`, donde `<base>` es el valor de `email.magicLinkUrl` del backend, o su base para restablecer contraseñas (`FRONTEND_URL` en el runtime) cuando no esté configurado. No existe un parámetro `redirectTo` por solicitud. Sirve esa ruta en tu frontend y devuelve el token para canjearlo por una sesión. El CMS ya se encarga de servirlo e iniciar sesión (pasando por el paso del código cuando hay un segundo factor); otros frontends requieren una página de destino.
 
 ```typescript
 // 1. Ask for the link.
@@ -136,18 +136,18 @@ const token = new URLSearchParams(location.search).get("token")!;
 const { user } = await client.auth.verifyMagicLink(token);
 ```
 
-`sendMagicLink` responde lo mismo independientemente de si la dirección tiene o no
-una cuenta. Esto es deliberado: un endpoint que dijera "no existe tal usuario" sería un oráculo
-de enumeración de cuentas, así que no uses el resultado para decirle a una persona si está
-registrada — no lo sabe.
+`sendMagicLink` responde lo mismo independientemente de si la dirección de correo
+pertenece a una cuenta o no. Esto es intencional: un endpoint que respondiera "no existe tal usuario" sería un
+oráculo de enumeración de cuentas, así que no utilices la respuesta para indicarle a una persona si está
+registrada; el servicio no lo revela.
 
-Enviar uno requiere un servicio de correo electrónico configurado en el backend, o de lo contrario
-`sendMagicLink` responderá con 503 `EMAIL_NOT_CONFIGURED`.
+Para poder enviarlo, se requiere un servicio de correo electrónico configurado en el backend; de lo contrario,
+`sendMagicLink` responderá con un error 503 `EMAIL_NOT_CONFIGURED`.
 
 ## Códigos de un solo uso
 
-Un código de seis dígitos por correo electrónico, para la misma tarea en situaciones donde un enlace resulta incómodo — una aplicación
-nativa, un segundo dispositivo o un navegador que altera los enlaces.
+Un código de seis dígitos enviado por correo electrónico, útil para el mismo propósito cuando un enlace resulta poco práctico: una
+aplicación nativa, un segundo dispositivo o un navegador que altere los enlaces.
 
 ```typescript
 const { expiresInSeconds } = await client.auth.sendEmailOtp("user@example.com");
@@ -156,60 +156,59 @@ const { expiresInSeconds } = await client.auth.sendEmailOtp("user@example.com");
 const { user } = await client.auth.verifyEmailOtp("user@example.com", "418293");
 ```
 
-Enviar la dirección con el código es lo que hace que un intento de adivinanza de seis dígitos sea un intento
-contra *una* cuenta en lugar de contra todas las cuentas a la vez.
+Enviar la dirección junto con el código es lo que garantiza que un intento de adivinanza de seis dígitos se realice contra *una* cuenta específica y no contra todas las cuentas simultáneamente.
 
 ## Sesiones anónimas
 
-Inicia la sesión de un visitante sin ninguna credencial, para que pueda comenzar a usar la aplicación
-antes de tener un motivo para registrarse:
+Inicia la sesión de un visitante sin credenciales, permitiéndole comenzar a usar la aplicación
+antes de que tenga motivos para registrarse:
 
 ```typescript
 const { user } = await client.auth.signInAnonymously();
 user.isAnonymous;   // true
 ```
 
-La cuenta es real: tiene un id, roles y una sesión, por lo que la seguridad a nivel de fila (row-level security)
-limita sus filas exactamente igual que lo haría con un usuario registrado. Lo que no tiene es
-una forma de volver: nadie puede volver a iniciar sesión *como* ella una segunda vez, por lo que todo lo que posee se
-pierde con la sesión.
+La cuenta es real: cuenta con un id, roles y una sesión, por lo que la seguridad a nivel de fila
+delimita sus registros exactamente como lo haría con los de un usuario registrado. Lo que no tiene es
+una vía de retorno: nadie puede volver a iniciar sesión *como* esa cuenta por segunda vez, de modo que todo lo que le pertenece
+se pierde junto con la sesión.
 
-`linkAnonymous` es la forma de hacer que deje de ser desechable. El usuario **conserva su id**, por lo que
-todo lo que creó mientras era anónimo sigue siendo suyo:
+`linkAnonymous` permite que la cuenta deje de ser desechable. El usuario **conserva su id**, de modo
+que todo lo creado de forma anónima sigue perteneciendo a su cuenta:
 
 ```typescript
 await client.auth.linkAnonymous("user@example.com", "correct-horse-battery");
 ```
 
-| Error | Significado |
-|---------|-------|
-| `ANONYMOUS_AUTH_DISABLED` (403) | El backend no ha habilitado la autenticación anónima, o la desactivó desde que este invitado inició sesión: un invitado solo se convierte en una cuenta mientras `allowAnonymous` esté activado |
-| `REGISTRATION_DISABLED` (403) | El registro está deshabilitado en el backend, y convertirse en cuenta cuenta como registro |
-| `NOT_ANONYMOUS` (400) | La sesión actual pertenece a una cuenta ordinaria |
-| `EMAIL_EXISTS` (409) | La dirección ya tiene una cuenta — inicia sesión en esa en su lugar |
+| Fallo | Significado |
+|-------|-------------|
+| `ANONYMOUS_AUTH_DISABLED` (403) | El backend no tiene habilitada la autenticación anónima o la desactivó después de que este invitado iniciara sesión: un invitado solo puede convertirse en cuenta si `allowAnonymous` está activo |
+| `REGISTRATION_DISABLED` (403) | El registro está deshabilitado en el backend, y convertirse en cuenta implica registrarse |
+| `NOT_ANONYMOUS` (400) | La sesión actual pertenece a una cuenta estándar |
+| `EMAIL_EXISTS` (409) | La dirección ya está asociada a una cuenta; inicia sesión en ella en su lugar |
 
-Un invitado que nunca regresa permanece como una fila. Un administrador los
-elimina con `client.admin.listGuests()`, `client.admin.deleteGuest(uid)` y
+Un invitado que no regresa permanece como una fila en la base de datos. Un administrador puede
+eliminarlos mediante `client.admin.listGuests()`, `client.admin.deleteGuest(uid)` y
 `client.admin.deleteGuests({ lastSeenBefore })`, o en Rebase Cloud con
-[`rebase cloud guests`](/docs/cli/cloud/#guests). Estos métodos solo afectan a los invitados,
-y `deleteGuests` funciona por lotes: repítelo mientras `remaining` no sea 0, con
-`offset` establecido en la cantidad que se ha omitido hasta el momento.
+[`rebase cloud guests`](/docs/cli/cloud/#guests). Estos métodos solo interactúan con invitados,
+y `deleteGuests` opera por lotes: repítelo mientras `remaining` no sea 0, configurando
+`offset` con la cantidad de registros omitidos hasta el momento.
 
 ## Vincular un proveedor a una cuenta existente
 
-`signInWithGoogle` y métodos similares *inician sesión*. `linkProvider` asocia la
+`signInWithGoogle` y sus variantes *inician sesión* para un usuario. `linkProvider` asocia la
 identidad de un proveedor a la cuenta que ya tiene la sesión iniciada, de modo que la misma persona pueda
-volver a través de cualquiera de las vías:
+acceder mediante cualquiera de los métodos:
 
 ```typescript
 await client.auth.linkProvider("google", { idToken });
 ```
 
-La sesión ya demuestra la propiedad de la cuenta, por lo que, a diferencia del inicio de sesión, esto no
+Dado que la sesión ya valida la propiedad de la cuenta, a diferencia del inicio de sesión esto no
 requiere que el proveedor haya verificado el correo electrónico, y las dos direcciones no necesitan
-coincidir. Se ejecuta con éxito de manera idempotente (`alreadyLinked: true`) cuando esa identidad ya
-está en esta cuenta, y rechaza con `IDENTITY_ALREADY_LINKED` (409) cuando
-pertenece a una diferente.
+coincidir. La operación se completa de forma idempotente (`alreadyLinked: true`) si la identidad ya
+está asociada a esta cuenta, y se rechaza con `IDENTITY_ALREADY_LINKED` (409) si
+pertenece a otra diferente.
 
 ## Buscar un usuario por correo electrónico
 
@@ -218,13 +217,13 @@ const profile = await client.auth.findUserByEmail("user@example.com");
 // { uid, displayName, photoURL } | null
 ```
 
-Tres campos no sensibles y nada más — lo suficiente para mostrar "estás invitando
-a Jane" antes de enviar una invitación. Opcional (opt-in): solo para un invocador con sesión iniciada, y un error 404
+Tres campos no confidenciales y nada más, suficiente para mostrar "estás invitando a
+Jane" antes de enviar una invitación. Requiere activación explícita (opt-in): solo está disponible para usuarios con sesión iniciada y devuelve un 404
 a menos que el backend configure `AUTH_ALLOW_USER_LOOKUP=true` (`auth.allowUserLookup`).
 
 ## Autenticación multifactor
 
-Registro de un factor, el segundo paso de un inicio de sesión, códigos de recuperación y eliminación de un factor: [Autenticación multifactor](/docs/sdk/multi-factor-authentication/).
+Inscripción de un factor, el segundo paso de un inicio de sesión, códigos de recuperación y eliminación de factores: [Autenticación multifactor](/docs/sdk/multi-factor-authentication/).
 
 ## Cerrar sesión
 
@@ -232,7 +231,7 @@ Registro de un factor, el segundo paso de un inicio de sesión, códigos de recu
 await client.auth.signOut();
 ```
 
-Esto revoca el refresh token en el servidor, limpia la sesión local y emite un evento `SIGNED_OUT`.
+Esto revoca el token de actualización en el servidor, borra la sesión local y emite un evento `SIGNED_OUT`.
 
 ## Gestión de sesiones
 
@@ -243,25 +242,23 @@ const session = client.auth.getSession();
 // { accessToken, refreshToken, expiresAt, user } | null
 ```
 
-**Nunca guardes el objeto de sesión.** `getSession()` es una instantánea. Cada renovación
-del access token, aproximadamente una vez por hora, reemplaza la sesión con un nuevo
-objeto, por lo que una sesión conservada desde la carga de la página contiene un token que el servidor rechazará
-una vez que expire, y la aplicación parecerá haber cerrado sesión. Lee la sesión en el momento en que la
-necesites.
+**Nunca conserves la referencia al objeto de sesión.** `getSession()` devuelve una instantánea. Cada renovación
+del token de acceso (aproximadamente una vez por hora) reemplaza la sesión con un nuevo
+objeto; por tanto, una sesión retenida desde la carga de la página portará un token que el servidor rechazará
+una vez expirado, haciendo que la aplicación parezca haber cerrado sesión. Consulta la sesión únicamente cuando la necesites.
 
 ### Enviar el token a tus propias rutas
 
-Llamar a una función en `backend/functions/` no requiere gestionar el token:
-`client.functions.invoke` renueva el token antes de enviarlo y reintenta una vez en caso de
-un error 401.
+Llamar a una función en `backend/functions/` no requiere gestionar el token manualmente:
+`client.functions.invoke` renueva el token antes de enviar la solicitud y la reintenta una vez si recibe un código 401.
 
 ```typescript
 const saved = await client.functions.invoke("progress", { level: 3 }, { path: "save" });
 ```
 
-Para cualquier otra solicitud, solicita el token cada vez con `getAccessToken()`.
-Este renueva un token que ha caducado o está a punto de hacerlo, espera a que se restaure
-la sesión en la carga inicial y devuelve `null` cuando no hay ningún usuario con sesión iniciada.
+Para cualquier otra solicitud, solicita el token en cada ocasión mediante `getAccessToken()`.
+Este método renueva tokens expirados o a punto de expirar, aguarda a que se complete la restauración de la sesión
+al cargar la página y devuelve `null` si no hay ningún usuario autenticado.
 
 ```typescript
 const token = await client.auth.getAccessToken();
@@ -272,7 +269,7 @@ await fetch("https://other.example.com/upload", {
 });
 ```
 
-### Obtener el usuario actual (verificado por el servidor)
+### Obtener el usuario actual (verificado en el servidor)
 
 ```typescript
 const user = await client.auth.getUser();
@@ -288,17 +285,17 @@ const updatedUser = await client.auth.updateUser({
 });
 ```
 
-### Actualizar el token
+### Renovar el token
 
-La actualización del token ocurre automáticamente, pero puedes activarla manualmente:
+La renovación del token se ejecuta de forma automática, pero puedes desencadenarla manualmente:
 
 ```typescript
 const session = await client.auth.refreshSession();
 ```
 
-Una solicitud nunca se envía con un token que el cliente sabe que ha expirado: las solicitudes
-comparten una única actualización y se envían una vez, con el nuevo token. Un token que el servidor
-rechace anticipadamente aún obtiene una actualización y luego un reintento por solicitud.
+Una solicitud nunca se despacha con un token que el cliente ya sabe vencido: las solicitudes
+en curso comparten una única renovación y se envían una sola vez con el nuevo token. Un token rechazado
+prematuramente por el servidor recibe igualmente una renovación y un reintento por solicitud.
 
 ## Dónde reside la sesión: `authFlowMode`
 
@@ -309,31 +306,27 @@ const client = createRebaseClient({
 });
 ```
 
-| Modo | Dónde está el refresh token | Predeterminado |
-|------|----------------------------|---------|
-| `"cookie"` | Una cookie **HttpOnly** que establece el backend. Los scripts que se ejecutan en tu página no pueden leerla, lo que la hace segura frente a ataques XSS | En un navegador |
-| `"json"` | Se devuelve en el cuerpo de la respuesta, se guarda en `storage` (`localStorage` por defecto) | Fuera del navegador (Node, workers, React Native), y en un navegador cuando pasas tu propio `storage` |
+| Modo | Ubicación del token de actualización | Por defecto |
+|------|--------------------------------------|-------------|
+| `"cookie"` | Una cookie **HttpOnly** establecida por el backend. Los scripts ejecutados en tu página no pueden leerla, lo que la protege contra ataques XSS | En el navegador |
+| `"json"` | Devuelto en el cuerpo de la respuesta, almacenado en `storage` (`localStorage` por defecto) | Fuera del navegador (Node, workers, React Native), y en el navegador al proporcionar un `storage` personalizado |
 
-Ambas partes deben coincidir. El modo cookie necesita `auth.cookieAuth` en el
-backend, y el runtime de Rebase, que ejecuta Rebase Cloud, siempre lo activa.
-El modo json necesita un backend sin él: contra un backend con `cookieAuth`, a un cliente
-json no se le entrega ningún refresh token, y su sesión finaliza cuando expira el access token,
-aproximadamente una hora después del inicio de sesión. Cuando la respuesta a un inicio de sesión muestra que
-los modos no coinciden, el cliente registra un error indicando qué modo utilizar.
+El modo cookie requiere `auth.cookieAuth` en el backend, opción que el entorno de ejecución de Rebase
+(y por extensión Rebase Cloud) mantiene siempre habilitada. El modo json funciona con ambos esquemas: sus solicitudes de autenticación incluyen `x-rebase-auth-flow: json`, y el backend responde con el
+token de actualización en el cuerpo. Un backend desactualizado no entregará un token de actualización a un cliente json, por lo que la sesión finalizará cerca de una hora después del inicio de sesión, y el cliente registrará en los logs el modo correspondiente a utilizar (a menos que se haya provisto un `storage` personalizado).
 
-Pasar tu propio `storage` mantiene un cliente de navegador en modo json. Esto es útil para un
-segundo cliente en la página que mantiene su propio inicio de sesión separado de la cookie
-de la página: en modo cookie no se guardaría nada en ese almacenamiento.
+Pasar tu propio `storage` mantiene el cliente del navegador en modo json; esto resulta útil para instanciar un segundo
+cliente que conserve su propia autenticación al margen de la cookie de la página (por ejemplo, un invitado
+en paralelo a la cuenta principal). Dado que su token de actualización se almacena allí y los scripts de la página pueden leerlo, es recomendable mantener la cuenta principal en modo cookie.
 
 ## Esperar a que se restaure la sesión
 
-**Una sesión restaurada no está disponible en el primer renderizado.** `getSession()` es
-síncrono, por lo que al cargar la página devuelve `null` mientras la restauración aún está
-en curso — y en modo cookie, una restauración *siempre* está en curso, porque el refresh
-token se encuentra en una cookie que la página no puede leer, por lo que el cliente tiene que solicitar al servidor
-un access token nuevo.
+**Una sesión restaurada no se encuentra disponible durante el primer renderizado.** `getSession()` es
+síncrono, por lo que al cargar la página devuelve `null` mientras el proceso de restauración continúa en
+curso —y en modo cookie siempre se encuentra *en curso*, puesto que el token de actualización
+reside en una cookie ilegible por la página, obligando al cliente a solicitar al servidor un nuevo token de acceso.
 
-Leerlo de forma síncrona es lo que produce un parpadeo de "sesión cerrada" en cada recarga:
+Leer el estado de forma sincrónica provoca un parpadeo visual de sesión cerrada en cada recarga:
 
 ```typescript no-verify
 // Wrong: renders the signed-out view for one round trip, every reload.
@@ -341,8 +334,8 @@ const session = client.auth.getSession();
 if (!session) return <SignIn />;
 ```
 
-`isInitialized()` se resuelve una vez que el cliente ha terminado de intentarlo — haya
-encontrado o no una sesión:
+`isInitialized()` se resuelve una vez que el cliente concluye el intento de inicialización,
+tanto si localizó una sesión como si no:
 
 ```typescript
 async function currentUser() {
@@ -351,7 +344,7 @@ async function currentUser() {
 }
 ```
 
-En React, esto es un solo effect:
+En React, esto se gestiona mediante un hook de efecto:
 
 ```tsx
 import { useEffect, useState } from "react";
@@ -374,22 +367,20 @@ function useCurrentUser() {
 }
 ```
 
-`useRebaseAuthController` en `@rebasepro/app` ya hace esto, por lo que una aplicación creada
-a partir de la plantilla generada lo obtiene de forma automática. Las solicitudes de datos no necesitan esperar: una realizada
-a mitad de la restauración se envía una vez que esta se completa — como el usuario restaurado, o de forma anónima — de modo que un
-primer renderizado nunca lee un listado público en lugar del propio del usuario.
+`useRebaseAuthController` en `@rebasepro/app` implementa este patrón por defecto, por lo que las aplicaciones basadas
+en la plantilla generada ya disponen de él. Las solicitudes de datos no necesitan esperar: una petición emitida
+durante la restauración se envía una vez que esta concluye —actuando como el usuario restaurado o de forma anónima—, impidiendo que el primer renderizado lea accidentalmente listados públicos en lugar de la información propia del usuario.
 
-Una restauración que renueva el token (un token almacenado expirado o en modo cookie) llega a
-`onAuthStateChange` como `TOKEN_REFRESHED`; un token almacenado que todavía es válido se adopta
-silenciosamente. Por lo tanto, un escuchador no puede indicarte si la restauración ha finalizado: un arranque que no emite
-nada es indistinguible de uno que aún está en curso. Espera con `await isInitialized()`
-para esa comprobación y utiliza el escuchador para los cambios posteriores.
+Una restauración que realiza una renovación (por un token almacenado expirado o bajo modo cookie) emite el evento
+`TOKEN_REFRESHED` hacia `onAuthStateChange`; un token almacenado aún vigente se adopta
+silenciosamente. Debido a esto, un listener no permite discernir si la restauración ha concluido: un arranque que no emite eventos es indistinguible de uno que aún está procesándose. Utiliza `await isInitialized()`
+para determinar este estado y emplea el listener exclusivamente para registrar cambios posteriores.
 
-`restoreOutcome()` indica cómo finalizó la restauración una vez que `isInitialized()` se ha
-resuelto: `"restored"`, `"none"` (nada que restaurar), `"refused"` (el servidor
-rechazó la sesión) o `"unreachable"` (no se pudo acceder al servidor, por lo que
-la sesión no fue confirmada ni rechazada). En modo cookie, `"unreachable"`
-sin sesión es el único caso en el que no se sabe a ciencia cierta si el estado es "sesión cerrada":
+`restoreOutcome()` describe el resultado de la restauración una vez que `isInitialized()`
+ha resuelto: `"restored"`, `"none"` (no había nada que restaurar), `"refused"` (el servidor
+rechazó la sesión) o `"unreachable"` (no fue posible contactar al servidor, por lo que
+la sesión no pudo ser confirmada ni rechazada). En modo cookie, un estado `"unreachable"`
+sin sesión representa el único caso en el que no puede asegurarse que la sesión esté verdaderamente cerrada:
 
 ```typescript
 await client.auth.isInitialized();
@@ -398,7 +389,7 @@ if (!client.auth.getSession() && client.auth.restoreOutcome() === "unreachable")
 }
 ```
 
-## Escuchador de estado de autenticación
+## Escuchador del estado de autenticación
 
 Reacciona a los cambios de autenticación en toda tu aplicación:
 
@@ -413,12 +404,12 @@ const unsubscribe = client.auth.onAuthStateChange((event, session) => {
 unsubscribe();
 ```
 
-| Evento | Cuándo |
-|-------|------|
+| Evento | Cuándo ocurre |
+|--------|---------------|
 | `SIGNED_IN` | Se completó un inicio de sesión o un registro |
-| `TOKEN_REFRESHED` | El access token fue renovado — incluida la renovación silenciosa que restaura una sesión al cargar la página |
-| `USER_UPDATED` | `updateUser()` cambió el perfil, `linkAnonymous()` convirtió un invitado en cuenta, `changeEmail()` inició un cambio de dirección o `confirmEmailChange()` trasladó esta cuenta a su nueva dirección |
-| `SIGNED_OUT` | Un cierre de sesión, `revokeAllSessions()` o una actualización que falló definitivamente |
+| `TOKEN_REFRESHED` | Se renovó el token de acceso —incluida la renovación silenciosa que restaura la sesión al cargar la página |
+| `USER_UPDATED` | `updateUser()` modificó el perfil, `linkAnonymous()` vinculó un invitado a una cuenta, `changeEmail()` inició una solicitud de cambio de dirección o `confirmEmailChange()` completó la migración de la cuenta a su nueva dirección |
+| `SIGNED_OUT` | Un cierre de sesión explícito, la invocación de `revokeAllSessions()` o un intento de renovación que falló de forma irrecuperable |
 
 ## Gestión de contraseñas
 
@@ -448,14 +439,13 @@ const { success, message } = await client.auth.changePassword(
 );
 ```
 
-Todas las demás sesiones de la cuenta se cierran: cualquier otra persona que tuviera una deberá iniciar sesión
-con la nueva contraseña. Este dispositivo permanece con la sesión iniciada. El servidor responde con una
-sesión nueva y el cliente la adopta (emitiendo `TOKEN_REFRESHED`).
+Todas las demás sesiones de la cuenta se cerrarán: cualquier otra persona que tuviese una sesión abierta deberá iniciar sesión
+utilizando la nueva contraseña. El dispositivo actual permanecerá autenticado. El servidor responderá con una
+nueva sesión y el cliente la adoptará (emitiendo `TOKEN_REFRESHED`).
 
 ## Verificación de correo electrónico
 
-Al registrarse, se envía por correo el enlace de verificación a la nueva cuenta cuando el correo electrónico está
-configurado. `sendVerificationEmail()` lo envía nuevamente.
+Al registrarse una nueva cuenta, se le envía por correo su enlace de verificación si el servicio de correo está configurado. `sendVerificationEmail()` permite reenviarlo.
 
 ```typescript
 // Send verification email to the current user
@@ -478,18 +468,16 @@ try {
 }
 ```
 
-El enlace demuestra el acceso a la bandeja de entrada, no quién registró la dirección, por lo que una contraseña
-que ni la sesión ni la llamada demuestren se elimina en lugar de conservarse — consulta
-[Verificación de correo electrónico](/docs/backend/email-verification/).
+El enlace acredita el control sobre la bandeja de entrada, no la identidad de quien registró la dirección; por consiguiente, una contraseña que no quede validada ni por la sesión ni por los parámetros de la invocación será eliminada en lugar de preservarse —consulta [Verificación de correo electrónico](/docs/backend/email-verification/).
 
-En un backend con `requireEmailVerification`, `signUp()` se resuelve con
-`{ confirmationRequired: true, user: null }` y sin sesión: la cuenta
-inicia sesión una vez que se sigue el enlace con su contraseña.
+En un backend con `requireEmailVerification`, `signUp()` se resuelve devolviendo
+`{ confirmationRequired: true, user: null }` y sin sesión: el usuario inicia
+sesión únicamente tras acceder al enlace provisto ingresando su contraseña.
 
 ## Cambiar la dirección de correo electrónico
 
-Un usuario con sesión iniciada traslada su propia cuenta a otra dirección. Nada
-cambia hasta que se responda desde la nueva dirección:
+Un usuario autenticado puede transferir su cuenta hacia otra dirección. Ninguna modificación
+se aplica hasta que la nueva dirección confirme la solicitud:
 
 ```typescript
 // Mails a link to the new address, and a notice to the current one
@@ -499,10 +487,9 @@ const { pendingEmail, expiresAt } = await client.auth.changeEmail("jane@new.exam
 const { email, removedProviders } = await client.auth.confirmEmailChange(token);
 ```
 
-El enlace tiene una validez de 24 horas; `getUser()` reporta la dirección en espera como
-`pendingEmail`. Confirmar no requiere sesión, y un cliente con sesión iniciada como esa
-cuenta adopta la nueva dirección y emite `USER_UPDATED`. Los motivos de rechazo se enumeran
-en [Cambiar una dirección de correo electrónico](/docs/backend/auth-endpoints/#changing-an-email-address).
+El enlace tiene una validez de 24 horas; `getUser()` reporta la dirección pendiente bajo el campo
+`pendingEmail`. El proceso de confirmación no requiere una sesión activa, y cualquier cliente autenticado
+en dicha cuenta adoptará la nueva dirección y emitirá el evento `USER_UPDATED`. Los posibles motivos de rechazo se detallan en [Cambio de dirección de correo electrónico](/docs/backend/auth-endpoints/#changing-an-email-address).
 
 ## Gestión de sesiones (multidispositivo)
 
@@ -518,12 +505,8 @@ await client.auth.revokeSession(sessionId);
 await client.auth.revokeAllSessions();
 ```
 
-Cada access token indica el inicio de sesión al que pertenece, por lo que exactamente una entrada tiene
-`isCurrentSession: true`: el dispositivo que hace la consulta. Revocar una sesión invalida el
-refresh token de ese dispositivo y su access token juntos, a partir de la siguiente solicitud,
-a través de HTTP y a través de un socket en tiempo real abierto. Cerrar sesión (`signOut()`) hace lo
-mismo para el dispositivo que cierra sesión. Un access token emitido antes de esta versión
-no nombra ninguna sesión; sigue funcionando hasta que expira, dentro de un plazo de una hora.
+Cada token de acceso identifica el inicio de sesión al que pertenece; por lo tanto, únicamente un elemento contendrá
+`isCurrentSession: true`: el dispositivo emisor de la consulta. Revocar una sesión invalida concurrentemente tanto el token de actualización como el token de acceso de ese dispositivo a partir de la siguiente petición, tanto a través de HTTP como sobre conexiones WebSocket en tiempo real. Cerrar sesión (`signOut()`) aplica el mismo comportamiento para el dispositivo saliente. Un token de acceso generado con anterioridad a esta funcionalidad carece de asignación de sesión y continuará operativo hasta su expiración, dentro del término de una hora.
 
 ## Configuración de autenticación
 
@@ -547,9 +530,9 @@ const config = await client.auth.getAuthConfig();
 // }
 ```
 
-## Almacenamiento de sesión personalizado
+## Almacenamiento de sesiones personalizado
 
-De forma predeterminada, las sesiones se almacenan en `localStorage`. Puedes personalizar esto con la opción `auth`:
+Por defecto, las sesiones se almacenan en `localStorage`. Puedes personalizar este comportamiento mediante la opción `auth`:
 
 ```typescript
 import { createRebaseClient, createCookieStorage } from "@rebasepro/client";
@@ -571,10 +554,9 @@ const client = createRebaseClient({
 
 ## Usar tu propio proveedor de autenticación
 
-Clerk, Firebase Auth o una sesión que tu aplicación ya tenga, con un captador de tokens (token getter)
-en lugar de `client.auth`: [Tu propio proveedor de autenticación](/docs/sdk/your-own-auth-provider/).
+Clerk, Firebase Auth o una sesión preexistente en tu aplicación integrada mediante una función de obtención de tokens en lugar de `client.auth`: [Tu propio proveedor de autenticación](/docs/sdk/your-own-auth-provider/).
 
-## Estructura del objeto User
+## Estructura del objeto de usuario
 
 ```typescript
 // Canonical type — import from @rebasepro/types
@@ -594,6 +576,6 @@ interface User {
 
 ## Próximos pasos
 
-- **[Querying Data](/docs/sdk/querying)** — Operaciones CRUD y generador de consultas
-- **[Realtime Subscriptions](/docs/sdk/realtime)** — Datos en vivo con WebSockets
-- **[Authentication Backend](/docs/backend/authentication)** — Configuración de autenticación del lado del servidor
+- **[Consultar datos](/docs/sdk/querying)** — Operaciones CRUD y constructor de consultas
+- **[Suscripciones en tiempo real](/docs/sdk/realtime)** — Datos en tiempo real mediante WebSockets
+- **[Backend de autenticación](/docs/backend/authentication)** — Configuración de autenticación en el servidor
