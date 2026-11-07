@@ -36,6 +36,12 @@ La traduction est à venir. Le contenu ci-dessous est en anglais.
   logs when a server too old to honour the header leaves it unable to renew,
   and the message now says to update the server.
 
+#### Admin (CMS & app)
+
+- **The admin's `getAuthToken()` renews a token about to expire.** It renewed
+  only one already past its expiry, so a token with a second left went out and
+  expired on the way. It now asks the client's `getAccessToken()`.
+
 #### MCP
 
 - **Connecting an MCP client from Chrome now finishes.** The consent screen
