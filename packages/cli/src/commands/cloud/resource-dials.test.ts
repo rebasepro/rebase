@@ -171,3 +171,11 @@ describe("turning autoscaling off", () => {
         });
     });
 });
+
+describe("database autoscaling flags", () => {
+    it("sets the ceiling as text and clears it with --no-db-autoscale", () => {
+        expect(buildDialPatch(["--db-autoscale-max-cpu", "2", "--db-autoscale-max-memory", "8Gi"]).patch)
+            .toEqual({ dbAutoscaleMaxCpu: "2", dbAutoscaleMaxMemory: "8Gi" });
+        expect(buildDialPatch(["--no-db-autoscale"]).patch).toEqual({ dbAutoscaleMaxCpu: null, dbAutoscaleMaxMemory: null });
+    });
+});

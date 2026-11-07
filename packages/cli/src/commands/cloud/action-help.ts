@@ -981,12 +981,16 @@ export const ACTION_HELP: Record<string, ActionHelp> = {
             ["--storage <mode>", "Object storage: shared-prefix or dedicated-bucket"],
             ["--autoscale-max <n>", "1–16. The ceiling the app may reach, and the worst case it may be billed"],
             ["--autoscale-cpu-target <pct>", "10–95. CPU utilisation the autoscaler holds, against the request. Default: 70"],
-            ["--no-autoscale", "Turn autoscaling off. The only way to: a ceiling at or below --replicas is refused"]
+            ["--no-autoscale", "Turn autoscaling off. The only way to: a ceiling at or below --replicas is refused"],
+            ["--db-autoscale-max-cpu <n>", "Let the database grow its CPU on its own under sustained load, up to this, e.g. 2. Unset: off"],
+            ["--db-autoscale-max-memory <size>", "Let it grow its memory under load or connection pressure, up to this, e.g. 8Gi. Unset: off"],
+            ["--no-db-autoscale", "Turn database autoscaling off"]
         ],
         examples: [
             "rebase cloud compute set --cpu 500m --memory 2Gi",
             "rebase cloud compute set --replicas 2 --autoscale-max 6",
-            "rebase cloud compute set --db-instances 2 --db-memory 4Gi"
+            "rebase cloud compute set --db-instances 2 --db-memory 4Gi",
+            "rebase cloud compute set --db-autoscale-max-cpu 2 --db-autoscale-max-memory 8Gi"
         ],
         notes: [
             "Run `rebase cloud compute` first — it prints the current dials and the €/month this project is quoted.",

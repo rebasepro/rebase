@@ -1655,7 +1655,12 @@ const DIAL_FLAGS = {
     // is enabled and the range is a single point. A max at or below the floor
     // turns it off, which is the one rule `resolveAutoscaling` enforces.
     "--autoscale-max": "autoscaleMaxReplicas",
-    "--autoscale-cpu-target": "autoscaleTargetCpuPercent"
+    "--autoscale-cpu-target": "autoscaleTargetCpuPercent",
+    // Database autoscaling, opt-in: the most it may grow to on its own under
+    // sustained CPU, memory or connection pressure. `--no-db-autoscale` clears
+    // both, which is off.
+    "--db-autoscale-max-cpu": "dbAutoscaleMaxCpu",
+    "--db-autoscale-max-memory": "dbAutoscaleMaxMemory"
 } as const;
 
 /**
@@ -1672,7 +1677,8 @@ const DIAL_FLAGS = {
  */
 export const COMPUTE_SET_FLAGS: Record<string, unknown> = {
     ...Object.fromEntries(Object.keys(DIAL_FLAGS).map((flag) => [flag, String])),
-    "--no-autoscale": Boolean
+    "--no-autoscale": Boolean,
+    "--no-db-autoscale": Boolean
 };
 
 /**
@@ -1786,6 +1792,9 @@ export async function computeCommand(action: string | undefined, rawArgs: string
                     ["Database instances", dialLine(project!.databaseInstances)],
                     ["Database CPU", dialLine(project!.databaseCpu)],
                     ["Database memory", dialLine(project!.databaseMemory)],
+                    ["Database autoscaling", project!.dbAutoscaleMaxCpu || project!.dbAutoscaleMaxMemory
+                        ? `up to ${[project!.dbAutoscaleMaxCpu ? `${String(project!.dbAutoscaleMaxCpu)} CPU` : null, project!.dbAutoscaleMaxMemory ? `${String(project!.dbAutoscaleMaxMemory)} memory` : null].filter(Boolean).join(", ")}`
+                        : chalk.gray("off")],
                     ["Object storage", dialLine(project!.storageMode)],
                     ["Per month", quote ? `€${quote.totalEur.toFixed(2)}` : undefined],
                     // What a `set` scheduled and has not happened yet: a resize
@@ -1823,6 +1832,8 @@ export async function computeCommand(action: string | undefined, rawArgs: string
                 databaseInstances: project!.databaseInstances ?? null,
                 databaseCpu: project!.databaseCpu ?? null,
                 databaseMemory: project!.databaseMemory ?? null,
+                dbAutoscaleMaxCpu: project!.dbAutoscaleMaxCpu ?? null,
+                dbAutoscaleMaxMemory: project!.dbAutoscaleMaxMemory ?? null,
                 storageMode: project!.storageMode ?? null,
                 maintenance: maintenance ? { window: maintenance.window, pending: maintenance.open } : null
             }
@@ -1917,6 +1928,11 @@ export function buildDialPatch(
         patch.autoscaleMaxReplicas = null;
         patch.autoscaleTargetCpuPercent = null;
     }
+    // The database's own autoscaling, off the same way.
+    if (switchOn(rawArgs, "--no-db-autoscale")) {
+        patch.dbAutoscaleMaxCpu = null;
+        patch.dbAutoscaleMaxMemory = null;
+    }
 
     const retired = rawArgs.indexOf(RETIRED_SCALE_TO_ZERO);
     if (retired !== -1) {
@@ -1972,7 +1988,7 @@ export function buildDialPatch(
     if (opts?.requireOne !== false && Object.keys(patch).length === 0) {
         return {
             patch: {},
-            error: `Nothing to set. Pass one of: ${Object.keys(DIAL_FLAGS).join(", ")}, --no-autoscale.`
+            error: `Nothing to set. Pass one of: ${Object.keys(DIAL_FLAGS).join(", ")}, --no-autoscale, --no-db-autoscale.`
         };
     }
     return { patch };
