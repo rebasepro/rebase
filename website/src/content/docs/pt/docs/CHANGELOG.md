@@ -13,6 +13,17 @@ A tradução está pendente. O conteúdo abaixo está em inglês.
 
 ### Fixed
 
+#### Schema
+
+- **`rebase schema reconcile` keeps a removed property's column and lets
+  inserts through again, without dropping it.** A column no property declares
+  that is `NOT NULL` with no default made every insert fail, and the only
+  reviewed fix was `--drop`, which destroys its data. The plan now relaxes such
+  a column by default (`relax … its data stays`), as it already did for a
+  property made optional, and drops it only when named with `--drop`. Boot's
+  warning for it names the two reconcile commands instead of raw `ALTER TABLE`
+  statements, which cannot reach a Rebase Cloud database.
+
 #### MCP
 
 - **Connecting an MCP client from Chrome now finishes.** The consent screen
