@@ -3,6 +3,7 @@ import fs from "fs";
  * `rebase cloud` resource subcommands: status, metrics, webhooks, storage,
  * clusters, billing.
  */
+import { computeApplyCommand, computeWindowCommand, describePending, fetchMaintenance } from "./maintenance";
 import arg from "arg";
 import chalk from "chalk";
 import {
@@ -282,7 +283,7 @@ maxPositionals: 0 });
             | undefined;
         if (!project) fail(`Project ${displayProjectRef(rawArgs)} not found.`, undefined, "not_found");
 
-        const [db, storage, deploy, baseDomain] = await Promise.all([
+        const [db, storage, deploy, baseDomain, maintenance] = await Promise.all([
             firstRow(client, "databases", projectId),
             // A control plane that does not have this route yet, or a lookup
             // that fails, yields `undefined` — which prints as a blank. A blank
@@ -292,7 +293,8 @@ maxPositionals: 0 });
 path: projectId })
                 .catch(() => undefined),
             latestDeployment(client, projectId),
-            fetchTenantBaseDomain(client, url)
+            fetchTenantBaseDomain(client, url),
+            fetchMaintenance(client, projectId)
         ]);
 
         const storageLine = describeStorageState(storage);
@@ -320,6 +322,9 @@ path: projectId })
                     ["Runtime", describeRuntime(project)],
                     ["Database", databaseLine],
                     ["Storage", storageLine],
+                    // A database change waiting for its window: said here so it
+                    // is never a surprise on Sunday morning.
+                    ["Maintenance", describePending(maintenance?.open)],
                     ["Claim URL", grant ? chalk.bold(grant.claimUrl) : undefined],
                     ["Expires", grant ? `${new Date(grant.expiresAt).toLocaleString()} unless claimed, then deleted` : undefined]
                 ]);
@@ -371,6 +376,8 @@ createdAt: deploy.createdAt ?? null } : null,
                 database: db ? { type: db.type ?? null,
 connectionStatus: db.connectionStatus ?? null } : null,
                 storage: storage ?? null,
+                // The database change waiting for its maintenance window, if any.
+                maintenance: maintenance ? { window: maintenance.window, pending: maintenance.open } : null,
                 // Present while the project is unclaimed: open `claimUrl` and
                 // sign in to keep it, before `expiresAt`.
                 unclaimed: grant
@@ -1623,7 +1630,7 @@ status: acct.status ?? null }
  * The action words `rebase cloud compute` dispatches. No word, or `show`,
  * prints the dials and the quote.
  */
-export const COMPUTE_ACTIONS = ["show", "set"] as const;
+export const COMPUTE_ACTIONS = ["show", "set", "apply", "window"] as const;
 
 /** The dials, and the flag that sets each. */
 const DIAL_FLAGS = {
@@ -1648,7 +1655,12 @@ const DIAL_FLAGS = {
     // is enabled and the range is a single point. A max at or below the floor
     // turns it off, which is the one rule `resolveAutoscaling` enforces.
     "--autoscale-max": "autoscaleMaxReplicas",
-    "--autoscale-cpu-target": "autoscaleTargetCpuPercent"
+    "--autoscale-cpu-target": "autoscaleTargetCpuPercent",
+    // Database autoscaling, opt-in: the most it may grow to on its own under
+    // sustained CPU, memory or connection pressure. `--no-db-autoscale` clears
+    // both, which is off.
+    "--db-autoscale-max-cpu": "dbAutoscaleMaxCpu",
+    "--db-autoscale-max-memory": "dbAutoscaleMaxMemory"
 } as const;
 
 /**
@@ -1665,7 +1677,8 @@ const DIAL_FLAGS = {
  */
 export const COMPUTE_SET_FLAGS: Record<string, unknown> = {
     ...Object.fromEntries(Object.keys(DIAL_FLAGS).map((flag) => [flag, String])),
-    "--no-autoscale": Boolean
+    "--no-autoscale": Boolean,
+    "--no-db-autoscale": Boolean
 };
 
 /**
@@ -1713,6 +1726,9 @@ export async function computeCommand(action: string | undefined, rawArgs: string
     // `compute et --cpu 500m` used to SHOW the dials and exit 0, so a caller
     // that meant to change one was told what it currently is and nothing else.
     requireKnownAction("compute", action, COMPUTE_ACTIONS);
+    // The database changes a `set` scheduled, and the window they wait for.
+    if (action === "apply") return computeApplyCommand(rawArgs);
+    if (action === "window") return computeWindowCommand(rawArgs);
     // `set` is described by `COMPUTE_SET_FLAGS`, which is derived from
     // `DIAL_FLAGS`; `buildDialPatch` still reads the values itself, because
     // `--no-autoscale` is value-less. This parse is only the refusal: without
@@ -1741,6 +1757,7 @@ export async function computeCommand(action: string | undefined, rawArgs: string
         // fails because a price could not be fetched would be worse than one
         // without the price.
         let quote: ResourceQuote | undefined;
+        const maintenance = await fetchMaintenance(client, projectId);
         try {
             // See the note at the other call site: the name is "pricing" and the
             // sub-path is an option, because the SDK encodes the name.
@@ -1775,8 +1792,15 @@ export async function computeCommand(action: string | undefined, rawArgs: string
                     ["Database instances", dialLine(project!.databaseInstances)],
                     ["Database CPU", dialLine(project!.databaseCpu)],
                     ["Database memory", dialLine(project!.databaseMemory)],
+                    ["Database autoscaling", project!.dbAutoscaleMaxCpu || project!.dbAutoscaleMaxMemory
+                        ? `up to ${[project!.dbAutoscaleMaxCpu ? `${String(project!.dbAutoscaleMaxCpu)} CPU` : null, project!.dbAutoscaleMaxMemory ? `${String(project!.dbAutoscaleMaxMemory)} memory` : null].filter(Boolean).join(", ")}`
+                        : chalk.gray("off")],
                     ["Object storage", dialLine(project!.storageMode)],
-                    ["Per month", quote ? `€${quote.totalEur.toFixed(2)}` : undefined]
+                    ["Per month", quote ? `€${quote.totalEur.toFixed(2)}` : undefined],
+                    // What a `set` scheduled and has not happened yet: a resize
+                    // that restarts the database waits for this window.
+                    ["Waiting", describePending(maintenance?.open)],
+                    ["Maintenance window", maintenance?.window.label]
                 ]);
                 // Itemised, because a total nobody can decompose is a number
                 // someone has to trust rather than check.
@@ -1808,7 +1832,10 @@ export async function computeCommand(action: string | undefined, rawArgs: string
                 databaseInstances: project!.databaseInstances ?? null,
                 databaseCpu: project!.databaseCpu ?? null,
                 databaseMemory: project!.databaseMemory ?? null,
-                storageMode: project!.storageMode ?? null
+                dbAutoscaleMaxCpu: project!.dbAutoscaleMaxCpu ?? null,
+                dbAutoscaleMaxMemory: project!.dbAutoscaleMaxMemory ?? null,
+                storageMode: project!.storageMode ?? null,
+                maintenance: maintenance ? { window: maintenance.window, pending: maintenance.open } : null
             }
         );
         return;
@@ -1827,6 +1854,8 @@ export async function computeCommand(action: string | undefined, rawArgs: string
         reportError(error, "Could not change resources");
         return;
     }
+    // Read back what the save scheduled: a database restart waits for the window.
+    const maintenance = await fetchMaintenance(client, projectId);
 
     emit(
         () => {
@@ -1837,9 +1866,14 @@ export async function computeCommand(action: string | undefined, rawArgs: string
             }
             noteBlank();
             note("Applied now: the app rolls its pods and your subscription is prorated from today.");
-            note("A change that restarts the database waits for a maintenance window.");
+            const pending = describePending(maintenance?.open);
+            if (pending) {
+                note(`Scheduled: ${pending}.`);
+                if (maintenance?.open?.expectedImpact) note(`  ${maintenance.open.expectedImpact}. Billed at the current size until then.`);
+                note(`  Apply it sooner with ${chalk.cyan("rebase cloud compute apply")}, or move the window with ${chalk.cyan("rebase cloud compute window")}.`);
+            }
         },
-        { updated: patch }
+        { updated: patch, maintenance: maintenance?.open ?? null }
     );
 }
 
@@ -1893,6 +1927,11 @@ export function buildDialPatch(
     if (switchOn(rawArgs, "--no-autoscale")) {
         patch.autoscaleMaxReplicas = null;
         patch.autoscaleTargetCpuPercent = null;
+    }
+    // The database's own autoscaling, off the same way.
+    if (switchOn(rawArgs, "--no-db-autoscale")) {
+        patch.dbAutoscaleMaxCpu = null;
+        patch.dbAutoscaleMaxMemory = null;
     }
 
     const retired = rawArgs.indexOf(RETIRED_SCALE_TO_ZERO);
@@ -1949,7 +1988,7 @@ export function buildDialPatch(
     if (opts?.requireOne !== false && Object.keys(patch).length === 0) {
         return {
             patch: {},
-            error: `Nothing to set. Pass one of: ${Object.keys(DIAL_FLAGS).join(", ")}, --no-autoscale.`
+            error: `Nothing to set. Pass one of: ${Object.keys(DIAL_FLAGS).join(", ")}, --no-autoscale, --no-db-autoscale.`
         };
     }
     return { patch };

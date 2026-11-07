@@ -933,7 +933,7 @@ export const ACTION_HELP: Record<string, ActionHelp> = {
 
     compute: {
         command: "cloud compute",
-        usage: "cloud compute [set] [options]",
+        usage: "cloud compute [set|apply|window] [options]",
         summary:
             "What this project reserves, and what the control plane would invoice for it. Bare, it "
             + "prints every dial and an itemised €/month; `set` changes one. An empty dial means the "
@@ -943,11 +943,56 @@ export const ACTION_HELP: Record<string, ActionHelp> = {
         examples: [
             "rebase cloud compute",
             "rebase cloud compute --json",
-            "rebase cloud compute set --help"
+            "rebase cloud compute set --help",
+            "rebase cloud compute apply",
+            "rebase cloud compute window --day sun --hour 3"
         ],
         notes: [
-            "The price is the control plane's own quote for these dials, itemised line by line — not a tier, and not a number this CLI computes."
+            "The price is the control plane's own quote for these dials, itemised line by line — not a tier, and not a number this CLI computes.",
+            "`Waiting` is a database change a `set` scheduled for the maintenance window and has not applied yet; the project is billed at the size it runs until then."
         ]
+    },
+
+    "compute apply": {
+        command: "cloud compute apply",
+        usage: "cloud compute apply [--yes]",
+        summary:
+            "Apply the database change this project is waiting on now, instead of in its maintenance window. "
+            + "The database restarts first and the app after it; with one database instance it is unavailable "
+            + "for about one to three minutes, with a standby for a few seconds.",
+        flags: [],
+        examples: ["rebase cloud compute apply", "rebase cloud compute apply --yes --json"],
+        notes: [
+            "Asks before restarting anything; `--yes` skips the question, and is required off a terminal.",
+            "Needs the organization's owner or admin role.",
+            "Nothing waiting is not an error: it says so and exits 0.",
+            "Follow it with `rebase cloud events`."
+        ]
+    },
+
+    "compute window": {
+        command: "cloud compute window",
+        usage: "cloud compute window [--day <day> --hour <0-23>]",
+        summary:
+            "The weekly hour in which changes that restart the database are applied, in UTC. Bare, it prints "
+            + "the window and what is waiting for it; with both flags it moves the window, and anything waiting moves with it.",
+        flags: [
+            ["--day <day>", "sun, mon, … sat, or 0 (Sunday) to 6"],
+            ["--hour <0-23>", "The hour it opens, in UTC"]
+        ],
+        examples: ["rebase cloud compute window", "rebase cloud compute window --day sat --hour 2"],
+        notes: ["The default is Sunday at 03:00 UTC. You are emailed 24 hours before anything is applied in it."]
+    },
+
+    events: {
+        command: "cloud events",
+        usage: "cloud events [--limit <n>]",
+        summary:
+            "What happened to this project's backend, newest first: the app scaling, database changes scheduled and "
+            + "applied, a standby taking over, the disk growing. Problems are alerts; this is the record.",
+        flags: [["--limit <n>", "How many, 1–200. Default: 20"]],
+        examples: ["rebase cloud events", "rebase cloud events --limit 100 --json"],
+        notes: ["Lines that were also emailed to the organization say so."]
     },
 
     "compute set": {
@@ -967,16 +1012,20 @@ export const ACTION_HELP: Record<string, ActionHelp> = {
             ["--storage <mode>", "Object storage: shared-prefix or dedicated-bucket"],
             ["--autoscale-max <n>", "1–16. The ceiling the app may reach, and the worst case it may be billed"],
             ["--autoscale-cpu-target <pct>", "10–95. CPU utilisation the autoscaler holds, against the request. Default: 70"],
-            ["--no-autoscale", "Turn autoscaling off. The only way to: a ceiling at or below --replicas is refused"]
+            ["--no-autoscale", "Turn autoscaling off. The only way to: a ceiling at or below --replicas is refused"],
+            ["--db-autoscale-max-cpu <n>", "Let the database grow its CPU on its own under sustained load, up to this, e.g. 2. Unset: off"],
+            ["--db-autoscale-max-memory <size>", "Let it grow its memory under load or connection pressure, up to this, e.g. 8Gi. Unset: off"],
+            ["--no-db-autoscale", "Turn database autoscaling off"]
         ],
         examples: [
             "rebase cloud compute set --cpu 500m --memory 2Gi",
             "rebase cloud compute set --replicas 2 --autoscale-max 6",
-            "rebase cloud compute set --db-instances 2 --db-memory 4Gi"
+            "rebase cloud compute set --db-instances 2 --db-memory 4Gi",
+            "rebase cloud compute set --db-autoscale-max-cpu 2 --db-autoscale-max-memory 8Gi"
         ],
         notes: [
             "Run `rebase cloud compute` first — it prints the current dials and the €/month this project is quoted.",
-            "Applied immediately: the app rolls its pods and the subscription is prorated from today. A change that restarts the database waits for a maintenance window.",
+            "Applied immediately: the app rolls its pods and the subscription is prorated from today. A change that restarts the database is scheduled for the project's maintenance window, billed from when it is applied; apply it sooner with `rebase cloud compute apply`.",
             "The valid ranges are the target cluster's, not this CLI's — GKE Autopilot bills a 250m/512Mi floor and rewrites a memory:CPU ratio outside 1:1–6.5:1, a Hetzner node has neither constraint. The control plane refuses what it cannot honour and names the field."
         ]
     },

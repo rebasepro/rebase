@@ -6,6 +6,7 @@
  * dispatched from here. Individual groups live in sibling modules; this file
  * only routes and prints help.
  */
+import { eventsCommand } from "./maintenance";
 import arg from "arg";
 import chalk from "chalk";
 import { accessTokenCommand, loginCommand, logoutCommand, whoamiCommand } from "./auth";
@@ -94,7 +95,10 @@ export const CLOUD_VALUE_FLAGS = {
     "--collection": String,
     "--connection-string": String,
     "--cpu": String,
+    "--day": String,
     "--db": String,
+    "--db-autoscale-max-cpu": String,
+    "--db-autoscale-max-memory": String,
     "--db-cpu": String,
     "--db-instances": String,
     "--db-memory": String,
@@ -106,6 +110,7 @@ export const CLOUD_VALUE_FLAGS = {
     "--function": String,
     "--grep": String,
     "--host": String,
+    "--hour": String,
     "--ingress-address": String,
     "--kubeconfig": String,
     "--level": String,
@@ -433,6 +438,9 @@ export async function cloudCommand(subcommand: string | undefined, rawArgs: stri
         case "compute":
             await computeCommand(action, rawArgs);
             break;
+        case "events":
+            await eventsCommand(rawArgs);
+            break;
         case "resources":
             // The word means the graph now, on both sides of the wire: what the
             // code declares against what the platform holds. What it used to
@@ -594,6 +602,7 @@ export const CLOUD_GROUPS: HelpAction[] = [
     // which is where an agent finds the family.
     { action: "resources", section: "Other resources", description: "What the code declares against what the platform provisioned" },
     { action: "compute", section: "Other resources", description: "What this project reserves, what it costs, and how to change it" },
+    { action: "events", section: "Other resources", description: "What happened to the backend: scaling, database changes, failovers" },
     { action: "clusters", section: "Other resources", description: "The clusters tenants run on. Platform-admin only" },
     { action: "billing", section: "Other resources", description: "The organization's billing account and card on file" },
     { action: "usage", section: "Other resources", args: "[org]", description: "Requests used this month against the allowance, and the overage so far" }

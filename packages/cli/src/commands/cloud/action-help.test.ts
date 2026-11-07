@@ -38,6 +38,7 @@ import { SERVICE_KEY_FLAGS, SERVICE_KEY_ACTIONS } from "./service-key";
 import { GUESTS_ACTIONS, GUESTS_FLAGS } from "./guests";
 import { ACTIVITY_FLAGS } from "./activity";
 import { NOTIFICATIONS_ADD_FLAGS } from "./notifications";
+import { COMPUTE_WINDOW_FLAGS, EVENTS_FLAGS } from "./maintenance";
 
 /**
  * Which spec backs which page.
@@ -100,6 +101,9 @@ const SPECS: Record<string, Record<string, unknown> | null> = {
     // description of that line, derived from `DIAL_FLAGS`.
     compute: null,
     "compute set": COMPUTE_SET_FLAGS,
+    "compute apply": {},
+    "compute window": COMPUTE_WINDOW_FLAGS,
+    events: EVENTS_FLAGS,
     // Session, link and the operations whose only options are the global ones.
     // `{}` rather than `null` on purpose: it says "this command declares nothing
     // of its own", which turns the reverse check on — a page inventing a flag
