@@ -696,7 +696,7 @@ The app is one TSX module whose default export is a React component (hooks welco
   useRecord(collection, id) → { data, loading, error, refresh }
   useCount(collection, where?) → { count, loading, error }
   useMutate() → { create(collection, data, id?), update(collection, id, data), remove(collection, id), saving, error } — every change asks the user to confirm it first; a declined one rejects.
-  <CollectionView collection where? orderBy? view? ("table" | "list" | "cards" | "kanban") height? onRowClick?(row) selectedId? /> — the admin panel's collection view (search, filters, paging); \`where\` fixes which rows it holds; without onRowClick a row opens its form; selectedId draws that row as selected.
+  <CollectionView collection where? orderBy? view? ("table" | "list" | "cards" | "kanban") height? onRowClick?(row) highlightedEntityId? /> — the admin panel's collection view (search, filters, paging); \`where\` fixes which rows it holds; without onRowClick a row opens its form; highlightedEntityId draws that row as selected.
   <RecordForm collection id? values? onSaved?(id) /> — the admin panel's record form; without id, a new row's.
   openRecord(collection, id), openNewRecord(collection, values?) — open a form over the app.
 Every read and write refreshes what shows the same collection. CollectionView and RecordForm draw only the collections listed in \`collections\`.
@@ -715,7 +715,7 @@ export default function OrderDesk() {
         <div className="flex flex-col gap-4">
             <KpiGrid><KpiTile label="Pending" value={pending.count} /></KpiGrid>
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-start">
-                <CollectionView collection="orders" view="list" onRowClick={setOrder} selectedId={order ? String(order.id) : undefined} />
+                <CollectionView collection="orders" view="list" onRowClick={setOrder} highlightedEntityId={order ? String(order.id) : undefined} />
                 {order ? (
                     <div className="flex flex-col gap-2">
                         <Button disabled={saving} onClick={() => update("orders", String(order.id), { status: "shipped" })}>Mark shipped</Button>

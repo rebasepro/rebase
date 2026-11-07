@@ -301,7 +301,7 @@ Die Datenbank selbst, pro Datenquelle:
 
 | Metrik | Was sie sagt |
 |--------|--------------|
-| `rebase_db_pool_total`, `_idle`, `_waiting` | Die Verbindungen jedes Pools, mit `pool="primary"`, `"read"` (das Replikat) oder `"session"` (der direkte Pool der SQL-Konsole hinter einem Pooler). `waiting` lange über null heißt: Der Pool ist zu klein für seine Last. |
+| `rebase_db_pool_connections`, `rebase_db_pool_idle`, `rebase_db_pool_waiting` | Die Verbindungen jedes Pools, mit `pool="primary"`, `"read"` (das Replikat) oder `"session"` (der direkte Pool der SQL-Konsole hinter einem Pooler). `waiting` lange über null heißt: Der Pool ist zu klein für seine Last. |
 | `rebase_db_connection_errors_total` | Anfragen, die mangels Verbindung mit 503 beantwortet wurden, nach `code`: `53300` / `53400` (der Server hat keine Verbindungen mehr), `pool_exhausted`, `connect_timeout`, `unreachable`. |
 | `rebase_db_connections` | Client-Verbindungen auf dem Server, nach `state`, gegenüber `rebase_db_max_connections`. |
 | `rebase_db_size_bytes` | Die Größe der Datenbank. |

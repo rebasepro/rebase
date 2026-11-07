@@ -1,4 +1,16 @@
-export * from "./connection";
+// Listed, not `export *`: the pooled-transaction helpers in this module are
+// the driver's own and stay out of the published surface.
+export {
+    poolMaxCeiling,
+    cappedPoolMax,
+    defaultPoolTimeouts,
+    pinSearchPath,
+    guardPoolAgainstDirtyRelease,
+    createPostgresDatabaseConnection,
+    createDirectDatabaseConnection,
+    createReadReplicaConnection
+} from "./connection";
+export type { PostgresPoolConfig } from "./connection";
 export * from "./interfaces";
 export * from "./PostgresBackendDriver";
 export * from "./databasePoolManager";
@@ -16,7 +28,18 @@ export * from "./collections/PostgresCollectionRegistry";
 export * from "./services/BranchService";
 export { diffDatabaseBranch, mergeDatabaseBranch, DEFAULT_BRANCH_DIFF_SAMPLE_LIMIT, DEFAULT_BRANCH_DIFF_MAX_ROWS } from "./branching/branch-diff";
 export * from "./backup";
-export * from "./PostgresBootstrapper";
+export {
+    resolveDriftCheckName,
+    describeSchemaDriftCause,
+    resolveSourceUrls,
+    isScaffoldedLocalDatabase,
+    postgresDriverConfigFromEnv,
+    openPostgresDriver,
+    createPostgresBootstrapper
+} from "./PostgresBootstrapper";
+export type { PostgresDriverConfig, PostgresDriverInternals } from "./PostgresBootstrapper";
+// The type of `PostgresDriverConfig.readRouting`.
+export type { ReadRoutingOptions } from "./read-routing";
 export * from "./PostgresAdapter";
 export * from "./open-rebase";
 export { assertDbCommandLine } from "./db-command-line";

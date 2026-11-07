@@ -213,14 +213,14 @@ export type CollectionViewBindingProps<M extends Record<string, unknown>> = {
      * arrive here; spread onto the props, they were dropped for every
      * registered collection.
      */
-    overrides?: Partial<AdminCollection<M>>;
+    collectionOverrides?: Partial<AdminCollection<M>>;
 
     /**
      * The row drawn as selected, where the caller decides which it is — a
      * page that shows the opened row beside the list. `null` draws none.
      * Without it the view highlights the row last opened, by itself.
      */
-    highlightedId?: string | number | null;
+    highlightedEntityId?: string | number | null;
 
 } & AdminCollection<M>;
 
@@ -234,7 +234,7 @@ const PROPS_COMPARED_BY_VALUE = new Set<string>([
     "properties", "propertiesOrder", "hideIdFromCollection", "inlineEditing", "selectionEnabled",
     "selectionController", "Actions", "defaultSize", "includeJsonView", "additionalFields",
     "sideDialogWidth", "openEntityMode", "exportable", "history", "fixedFilter",
-    "selectedEntityId", "selectedTab", "overrides", "highlightedId"
+    "selectedEntityId", "selectedTab", "collectionOverrides", "highlightedEntityId"
 ]);
 
 /**
@@ -293,8 +293,8 @@ const CollectionViewBindingInner = React.memo(
         updateUrl,
         selectedEntityId: selectedEntityIdProp,
         selectedTab: selectedTabProp,
-        overrides,
-        highlightedId,
+        collectionOverrides,
+        highlightedEntityId,
         ...collectionProp
     }: CollectionViewBindingProps<M>
     ) {
@@ -348,8 +348,8 @@ const CollectionViewBindingInner = React.memo(
         }
         const stableCollectionProp = collectionPropRef.current;
 
-        const overridesRef = React.useRef(overrides);
-        if (!equal(overridesRef.current, overrides)) overridesRef.current = overrides;
+        const overridesRef = React.useRef(collectionOverrides);
+        if (!equal(overridesRef.current, collectionOverrides)) overridesRef.current = collectionOverrides;
         const stableOverrides = overridesRef.current;
 
         const collection = useMemo(() => {
@@ -1061,11 +1061,11 @@ parentEntityIds: parentEntityIds ?? EMPTY_ARRAY,
         // table — twice, the second time for the columns the id header widget
         // rebuilt — on each window emit, count arrival and popover toggle.
         // The caller's selection, where it gives one, among the rows held.
-        const shownEntity = highlightedId === undefined
+        const shownEntity = highlightedEntityId === undefined
             ? highlightedEntity
-            : highlightedId === null
+            : highlightedEntityId === null
                 ? undefined
-                : tableController.data.find(entity => String(entity.id) === String(highlightedId));
+                : tableController.data.find(entity => String(entity.id) === String(highlightedEntityId));
         const highlightedEntities = useMemo(
             () => shownEntity ? [shownEntity] : EMPTY_ARRAY,
             [shownEntity]);

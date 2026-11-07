@@ -301,7 +301,7 @@ La base de données elle-même, par source de données :
 
 | Métrique | Ce qu'elle dit |
 |----------|----------------|
-| `rebase_db_pool_total`, `_idle`, `_waiting` | Les connexions de chaque pool, étiquetées `pool="primary"`, `"read"` (la réplique) ou `"session"` (le pool direct de la console SQL derrière un pooler). `waiting` au-dessus de zéro longtemps signifie un pool trop petit pour sa charge. |
+| `rebase_db_pool_connections`, `rebase_db_pool_idle`, `rebase_db_pool_waiting` | Les connexions de chaque pool, étiquetées `pool="primary"`, `"read"` (la réplique) ou `"session"` (le pool direct de la console SQL derrière un pooler). `waiting` au-dessus de zéro longtemps signifie un pool trop petit pour sa charge. |
 | `rebase_db_connection_errors_total` | Requêtes répondues 503 faute de connexion, par `code` : `53300` / `53400` (le serveur n'a plus de connexions), `pool_exhausted`, `connect_timeout`, `unreachable`. |
 | `rebase_db_connections` | Connexions clientes sur le serveur, par `state`, face à `rebase_db_max_connections`. |
 | `rebase_db_size_bytes` | La taille de la base. |

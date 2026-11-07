@@ -4,7 +4,7 @@
  * Three kinds of number, each answering a question the pool-wait histogram
  * cannot:
  *
- * - **Pools** (`rebase_db_pool_total|idle|waiting`, per source and pool) —
+ * - **Pools** (`rebase_db_pool_{connections,idle,waiting}`, per source and pool) —
  *   read from the pools at each scrape. `waiting` above zero for long is a
  *   pool too small for its load; `total` across instances is what they ask of
  *   the database between them.
@@ -29,7 +29,7 @@ import { dbConnectionErrorCounts } from "./db-connection-errors";
 
 export { dbConnectionErrorCounts, noteDbConnectionError, type DbConnectionErrorCode } from "./db-connection-errors";
 
-export const DB_POOL_TOTAL_METRIC = "rebase_db_pool_total";
+export const DB_POOL_CONNECTIONS_METRIC = "rebase_db_pool_connections";
 export const DB_POOL_IDLE_METRIC = "rebase_db_pool_idle";
 export const DB_POOL_WAITING_METRIC = "rebase_db_pool_waiting";
 export const DB_CONNECTION_ERRORS_METRIC = "rebase_db_connection_errors_total";
@@ -84,7 +84,7 @@ export function recordDatabasePools(registry: MetricsRegistry, sources: readonly
             }
             for (const stat of stats) {
                 const labels = { source: source.key, pool: stat.pool };
-                registry.setGauge(DB_POOL_TOTAL_METRIC, stat.total, labels);
+                registry.setGauge(DB_POOL_CONNECTIONS_METRIC, stat.total, labels);
                 registry.setGauge(DB_POOL_IDLE_METRIC, stat.idle, labels);
                 registry.setGauge(DB_POOL_WAITING_METRIC, stat.waiting, labels);
             }

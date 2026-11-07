@@ -24,19 +24,19 @@ describe("database metrics", () => {
         recordDatabasePools(registry, sources);
 
         const text = registry.render();
-        expect(text).toContain('rebase_db_pool_total{pool="primary",source="(default)"} 7');
+        expect(text).toContain('rebase_db_pool_connections{pool="primary",source="(default)"} 7');
         expect(text).toContain('rebase_db_pool_idle{pool="primary",source="(default)"} 2');
         expect(text).toContain('rebase_db_pool_waiting{pool="primary",source="(default)"} 3');
-        expect(text).toContain('rebase_db_pool_total{pool="read",source="(default)"} 4');
+        expect(text).toContain('rebase_db_pool_connections{pool="read",source="(default)"} 4');
     });
 
     it("reads the pools at each render, not once", () => {
         const registry = new MetricsRegistry();
         const pool = { totalCount: 1, idleCount: 1, waitingCount: 0 };
         recordDatabasePools(registry, [{ key: "db", pool, admin: () => undefined }]);
-        expect(registry.render()).toContain('rebase_db_pool_total{pool="primary",source="db"} 1');
+        expect(registry.render()).toContain('rebase_db_pool_connections{pool="primary",source="db"} 1');
         pool.totalCount = 9;
-        expect(registry.render()).toContain('rebase_db_pool_total{pool="primary",source="db"} 9');
+        expect(registry.render()).toContain('rebase_db_pool_connections{pool="primary",source="db"} 9');
     });
 
     it("reports connection errors by code as a counter", () => {

@@ -46,7 +46,7 @@ A tradução está pendente. O conteúdo abaixo está em inglês.
   replica's lag is above `REBASE_READ_MAX_LAG_MS` (default 1000), and for a
   while after it fails a read, which is retried on the primary.
 
-- **`/metrics` reports the database.** `rebase_db_pool_total|idle|waiting` per
+- **`/metrics` reports the database.** `rebase_db_pool_{connections,idle,waiting}` per
   source and pool, `rebase_db_connection_errors_total{code}`, and every 30
   seconds `rebase_db_connections{state}`, `rebase_db_max_connections`,
   `rebase_db_size_bytes` and `rebase_db_replica_lag_seconds`.
@@ -84,7 +84,7 @@ A tradução está pendente. O conteúdo abaixo está em inglês.
   server's tools as the person, `<RebaseShell>` draws the opened screen in place
   of its routes and sign-in gate, and Studio stays out — see `setRebaseEmbedHost`
   in `@rebasepro/app` and `startMcpView` in the new `@rebasepro/cms/mcp-view`.
-  `CollectionPanel` takes `selectedId`, the row it draws as selected.
+  `CollectionPanel` takes `highlightedEntityId`, the row it draws as selected.
 
 #### Admin (CMS & app)
 

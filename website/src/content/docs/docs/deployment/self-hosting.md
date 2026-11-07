@@ -482,7 +482,7 @@ The database itself, per data source:
 
 | Metric | What it says |
 |--------|--------------|
-| `rebase_db_pool_total`, `_idle`, `_waiting` | Each pool's connections, labelled `pool="primary"`, `"read"` (the replica) or `"session"` (the SQL console's direct pool behind a pooler). `waiting` above zero for long is a pool too small for its load. |
+| `rebase_db_pool_connections`, `rebase_db_pool_idle`, `rebase_db_pool_waiting` | Each pool's connections, labelled `pool="primary"`, `"read"` (the replica) or `"session"` (the SQL console's direct pool behind a pooler). `waiting` above zero for long is a pool too small for its load. |
 | `rebase_db_connection_errors_total` | Requests answered 503 for want of a connection, by `code`: `53300` / `53400` (the server is out of connections), `pool_exhausted`, `connect_timeout`, `unreachable`. |
 | `rebase_db_connections` | Client connections on the server, by `state`, against `rebase_db_max_connections`. |
 | `rebase_db_size_bytes` | The database's size. |

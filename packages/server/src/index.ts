@@ -354,7 +354,7 @@ export {
     // Background work
     waitUntil
 } from "./functions";
-export type { FunctionUser } from "./functions";
+export type { FunctionUser, BackgroundWork } from "./functions";
 // Not on the portable surface: shutdown drains background work, and only the
 // host has a shutdown.
 export { drainBackgroundWork, pendingBackgroundWork } from "./functions/wait-until";

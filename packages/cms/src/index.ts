@@ -68,6 +68,7 @@ export {
 } from "./components";
 export type {
     EntityViewBindingProps,
+    CollectionViewBindingProps,
     SelectionProps,
     SelectableTableProps,
     CollectionPanelProps,

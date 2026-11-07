@@ -91,7 +91,7 @@ export type CollectionPanelOptions = {
      * The row drawn as selected — the one a page shows beside the list, say.
      * `null` draws none. Without it the panel highlights the row last opened.
      */
-    selectedId?: string | number | null;
+    highlightedEntityId?: string | number | null;
 
     /**
      * Additional CSS class name for the container.
@@ -148,7 +148,7 @@ function CollectionPanelInner({
     path,
     title,
     updateUrl,
-    selectedId,
+    highlightedEntityId,
     className
 }: CollectionPanelProps & { mergedCollection: AdminCollection; overrides: Partial<AdminCollection> }) {
     const ResolvedCollectionView = useComponentOverride("Collection.View", CollectionViewBinding);
@@ -165,8 +165,8 @@ function CollectionPanelInner({
             )}
             <ResolvedCollectionView
                 {...mergedCollection}
-                overrides={overrides}
-                {...(selectedId !== undefined && { highlightedId: selectedId })}
+                collectionOverrides={overrides}
+                {...(highlightedEntityId !== undefined && { highlightedEntityId })}
                 path={path}
                 updateUrl={updateUrl}
             />

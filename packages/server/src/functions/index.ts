@@ -104,6 +104,7 @@ export { getEnv, env, requireEnv, runtimeKey, isNodeRuntime, lazyResource } from
 
 // ── Background work ──────────────────────────────────────────────────────
 export { waitUntil } from "./wait-until";
+export type { BackgroundWork } from "./wait-until";
 
 // ── Types and errors ─────────────────────────────────────────────────────
 /**
