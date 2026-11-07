@@ -43,10 +43,6 @@
         "../../packages/plugin-ai/src"
       ],
 
-      "@rebasepro/plugin-insights": [
-        "../../packages/plugin-insights/src"
-      ],
-
       "@rebasepro/studio": [
         "../../packages/studio/src"
       ],

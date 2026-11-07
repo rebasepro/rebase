@@ -181,9 +181,6 @@ importers:
       '@rebasepro/plugin-ai':
         specifier: workspace:*
         version: link:../../packages/plugin-ai
-      '@rebasepro/plugin-insights':
-        specifier: workspace:*
-        version: link:../../packages/plugin-insights
       '@rebasepro/studio':
         specifier: workspace:*
         version: link:../../packages/studio

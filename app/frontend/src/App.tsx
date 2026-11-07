@@ -18,7 +18,7 @@ const UIReferenceView = React.lazy(() =>
 import { RebaseCMS, RebaseShell } from "@rebasepro/cms";
 import type { RebasePlugin } from "@rebasepro/cms-types";
 import { useDataEnhancementPlugin } from "@rebasepro/plugin-ai";
-import { useAppInsightsPlugin } from "./useAppInsightsPlugin";
+import { insightSlots } from "./InsightSlots";
 import { RebaseStudio } from "@rebasepro/studio";
 import { createRebaseClient } from "@rebasepro/client";
 import { collections } from "virtual:rebase-collections";
@@ -58,16 +58,13 @@ export function App() {
 
     const dataEnhancementPlugin = useDataEnhancementPlugin();
 
-    // ── Insights Plugin ──────────────────────────────────────────────
-    const insightsPlugin = useAppInsightsPlugin(rebaseClient);
-
     const collectionEditor = React.useMemo(() => ({
         getAuthToken: authController.getAuthToken
     }), [authController.getAuthToken]);
 
     const plugins: RebasePlugin[] = React.useMemo(
-        () => [dataEnhancementPlugin, insightsPlugin],
-        [dataEnhancementPlugin, insightsPlugin]
+        () => [dataEnhancementPlugin],
+        [dataEnhancementPlugin]
     );
 
     const entityViews = React.useMemo(() => [
@@ -108,6 +105,7 @@ export function App() {
             client={rebaseClient}
             authController={authController}
             plugins={plugins}
+            slots={insightSlots}
             onAnalyticsEvent={onAnalyticsEvent}
         >
             <RebaseAuth loginView={<DemoLoginView authController={authController} googleClientId={GOOGLE_CLIENT_ID}/>}/>
