@@ -196,7 +196,7 @@ Fixes, with no new props:
 - `fields?: string[]`: only these, in this order.
   - Validates only what it shows, using the cell-popup rule.
   - On create, it refuses at mount, naming the field, if a required field with no default is left out.
-- `children` made of `<FormField>`s replace the generated fields, laid out by you. This is the memoised successor to `Builder`, and `Builder` keeps working.
+- `layout`, your own arrangement of `<FormField>`s, replaces the generated fields. `children` keeps its meaning (drawn above the fields), and `Builder` keeps working; `<FormField>` works inside a `Builder` too.
 - `collectionOverrides`, for parity with `CollectionPanel`.
 - DOM ids scoped per form instance. Tests that select by id change with it (§5).
 - Density does not change: `ui-components.md` fixes record fields at `size="large"`. In a narrow frame the rail already folds away below 1000px (`useRailVisible.tsx:12`).
