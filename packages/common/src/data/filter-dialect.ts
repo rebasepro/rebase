@@ -283,9 +283,16 @@ export class UnknownFilterOperatorError extends Error {
     public readonly code = "UNKNOWN_FILTER_OPERATOR";
     public readonly details: { field: string; operator: string; validOperators: readonly WhereFilterOp[] };
 
-    constructor(field: string, operator: string) {
+    /**
+     * @param hint - One sentence naming the spelling that works, when the
+     * rejected one is recognisably another dialect's. It leads the message:
+     * the operator list is in canonical spelling, which is not what a wire
+     * string takes, so on its own it would send the caller to `is-null.null`.
+     */
+    constructor(field: string, operator: string, hint?: string) {
         super(
             `Unknown filter operator '${operator}' on field '${field}'. `
+            + (hint ? `${hint} ` : "")
             + `Valid operators: ${VALID_OPERATOR_LIST}`
         );
         this.name = "UnknownFilterOperatorError";
@@ -372,6 +379,101 @@ function isOperatorShaped(op: string): boolean {
     const normalized = normalizeOperatorName(op);
     if (!normalized) return false;
     return RESPELLED_OPERATORS.has(normalized) || NEAR_MISS_OPERATORS.has(normalized);
+}
+
+/** The negated twin of each REST operator that has one. */
+const NEGATED_REST_OP: Readonly<Partial<Record<string, RestFilterOp>>> = {
+    eq: "neq", neq: "eq",
+    in: "nin", nin: "in",
+    like: "nlike", nlike: "like",
+    ilike: "nilike", nilike: "ilike",
+    isnull: "notnull", notnull: "isnull"
+};
+
+/**
+ * A wire condition written in PostgREST's spelling, where this dialect has a
+ * different one: the rejection to raise, or `undefined` when it is not one.
+ *
+ * Three forms, and all used to be read as an equality on the whole string:
+ *
+ * - **The null test.** PostgREST writes `is.null` and `not.is.null`; this
+ *   dialect writes `isnull.null` and `notnull.null`. `is` names no operator
+ *   here, so `?difficulty=is.null` became `difficulty = 'is.null'` — "not a
+ *   valid smallint" on a number column, and no rows at all on a text one. The
+ *   respellings `is-null.null`, `isNull.null`, `not-null.null` failed the
+ *   same way.
+ * - **The `not.` prefix.** `?status=not.eq.draft` became
+ *   `status = 'not.eq.draft'`: no rows, with nothing to say why. Negation here
+ *   is `neq`/`nin`/`nlike`/`nilike`/`notnull`, or a `not=(…)` group.
+ * - **A canonical name in a query parameter.** `?age=>=.18`: the tuple and
+ *   group forms read `>=`, a parameter reads only `gte`.
+ *
+ * Narrow on purpose: the operand of a null test must be one it has
+ * ({@link NULL_OPERANDS}), and the segment after `not.` must be a real
+ * operator. So `is.gd` and `not.a.value` stay values.
+ */
+function foreignWireSpelling(
+    field: string,
+    operand: string,
+    position: "param" | "group"
+): UnknownFilterOperatorError | undefined {
+    const segments = operand.split(".");
+    // How the corrected condition is written where this one was.
+    const write = (condition: string) => position === "param" ? `${field}=${condition}` : `${field}.${condition}`;
+    const head = segments[0].toLowerCase();
+
+    const nullTest = (negated: boolean, operator: string, valueAt: number) => {
+        if (segments.length !== valueAt + 1 || !NULL_OPERANDS.has(segments[valueAt].toLowerCase())) return undefined;
+        const spelling = negated ? "notnull.null" : "isnull.null";
+        return new UnknownFilterOperatorError(
+            field,
+            operator,
+            `Write \`${write(spelling)}\` to match rows where it is ${negated ? "set" : "empty"} `
+            + `(\`["${negated ? "is-not-null" : "is-null"}", null]\` as a JSON tuple).`
+        );
+    };
+
+    // A group leaf reads either spelling of a real operator; a query parameter
+    // reads only the REST one, so `?age=>=.18` and `?d=is-null.null` were
+    // equalities on the whole string.
+    const canonical = toCanonicalOp(segments[0]);
+    if (canonical) {
+        if (position === "group" || REST_OP_LOOKUP.has(segments[0])) return undefined;
+        if (NULL_OPS.has(canonical)) return nullTest(canonical === "is-not-null", segments[0], 1);
+        const restOp = CANONICAL_TO_REST[canonical];
+        return new UnknownFilterOperatorError(
+            field,
+            segments[0],
+            `A query parameter spells it \`${restOp}\`: write \`${write(`${restOp}.${segments.slice(1).join(".")}`)}\`.`
+        );
+    }
+
+    if (head === "is") {
+        if (segments[1]?.toLowerCase() === "not") return nullTest(true, "is.not", 2);
+        return nullTest(false, "is", 1);
+    }
+
+    if (head === "not" && segments.length >= 3) {
+        const next = segments[1].toLowerCase();
+        if (next === "is") return nullTest(true, "not.is", 2);
+        if (!REST_OP_LOOKUP.has(next)) return undefined;
+        const value = segments.slice(2).join(".");
+        const twin = NEGATED_REST_OP[next];
+        return new UnknownFilterOperatorError(
+            field,
+            `not.${next}`,
+            twin
+                ? `There is no \`not.\` prefix: write \`${write(`${twin}.${value}`)}\`.`
+                : `There is no \`not.\` prefix: negate with a group, \`not=(${field}.${next}.${value})\`.`
+        );
+    }
+
+    // `is-null.null`, `isNull.null`, `not_null.true`: a respelled null test.
+    const normalized = normalizeOperatorName(head);
+    if (normalized === "isnull") return nullTest(false, segments[0], 1);
+    if (normalized === "notnull" || normalized === "isnotnull") return nullTest(true, segments[0], 1);
+
+    return undefined;
 }
 
 /**
@@ -592,6 +694,15 @@ export function serializeFilter(
             continue;
         }
 
+        // A bare value is an equality, as `deserializeFilter` reads one on the
+        // server: `{ difficulty: null }` is IS NULL, `{ level: 3 }` is `eq.3`.
+        // Untyped callers — JavaScript, an MCP tool's JSON — write it this way
+        // first, and it used to throw "expected a [WhereFilterOp, value] tuple".
+        if (condition === null || typeof condition === "number" || typeof condition === "boolean") {
+            result[field] = serializeTuple(["==", condition]);
+            continue;
+        }
+
         // Multiple conditions on the same field: array of tuples
         // We detect this by checking if the first element is also an array.
         if (Array.isArray(condition) && condition.length > 0 && Array.isArray(condition[0])) {
@@ -670,7 +781,7 @@ const NULL_OPERANDS: ReadonlySet<string> = new Set(["null", "true", "false", ""]
  * Values that merely *contain* dots (`user@host.com`, `1.2.3`) were never
  * ambiguous: their first segment names no operator to begin with.
  */
-function deserializeSingle(raw: string): [WhereFilterOp, unknown] {
+function deserializeSingle(field: string, raw: string): [WhereFilterOp, unknown] {
     const dotIndex = raw.indexOf(".");
     if (dotIndex === -1) {
         // No dot → equality on the raw value (kept as string)
@@ -685,6 +796,8 @@ function deserializeSingle(raw: string): [WhereFilterOp, unknown] {
     // being misinterpreted — only known REST short-codes are treated as operators.
     const canonicalOp = REST_OP_LOOKUP.get(prefix);
     if (!canonicalOp) {
+        const foreign = foreignWireSpelling(field, raw, "param");
+        if (foreign) throw foreign;
         // Not a known operator (e.g., email "user@host.com" or version "1.2.3")
         // Treat the entire string as an equality value
         return ["==", raw];
@@ -765,11 +878,11 @@ export function deserializeFilter(
             }
 
             if (raw.length === 1) {
-                result[field] = typeof raw[0] === "string" ? deserializeSingle(raw[0]) : ["==", raw[0]];
+                result[field] = typeof raw[0] === "string" ? deserializeSingle(field, raw[0]) : ["==", raw[0]];
             } else {
                 // If the elements are strings, they might be PostgREST dot-strings (repeated params)
                 if (typeof raw[0] === "string" && raw[0].includes(".")) {
-                    result[field] = raw.map(r => typeof r === "string" ? deserializeSingle(r) : (["==", r] as [WhereFilterOp, unknown])) as [WhereFilterOp, unknown][];
+                    result[field] = raw.map(r => typeof r === "string" ? deserializeSingle(field, r) : (["==", r] as [WhereFilterOp, unknown])) as [WhereFilterOp, unknown][];
                 } else {
                     // Otherwise assume it's a list of values for an implicit
                     // "in" — `{ tags: ["a","b"] }`, and `?tags=a&tags=b`, which
@@ -783,7 +896,7 @@ export function deserializeFilter(
                 }
             }
         } else if (typeof raw === "string") {
-            result[field] = deserializeSingle(raw);
+            result[field] = deserializeSingle(field, raw);
         } else {
             result[field] = ["==", raw];
         }
@@ -904,6 +1017,28 @@ function splitLeafCondition(str: string): { column: string; operator: WhereFilte
 }
 
 /**
+ * Refuse a group leaf written in PostgREST's spelling — `d.is.null`,
+ * `d.not.is.null`, `status.not.eq.draft` — see {@link foreignWireSpelling}.
+ *
+ * Every split point is a candidate column, so a relation path
+ * (`author.name.is.null`) is caught too. The scan stops at the first segment
+ * that resolves as an operator: everything after it is the value, so
+ * `note.eq.not.is.null` stays an equality on the string `"not.is.null"`.
+ *
+ * Without this, `d.is.null` was `d == "is.null"`, and `status.not.eq.draft`
+ * found its `eq` and filtered a column named `status.not`.
+ */
+function rejectForeignLeaf(str: string): void {
+    const dots = leafSeparators(str);
+    for (let i = 0; i < dots.length; i++) {
+        const column = unescapeWireValue(str.substring(0, dots[i]));
+        const foreign = foreignWireSpelling(column, str.substring(dots[i] + 1), "group");
+        if (foreign) throw foreign;
+        if (i + 1 < dots.length && toCanonicalOp(str.substring(dots[i] + 1, dots[i + 1]))) return;
+    }
+}
+
+/**
  * Parse a logical condition wire-format string back into a
  * `LogicalCondition` or `FilterCondition`.
  *
@@ -955,6 +1090,7 @@ export function deserializeLogicalCondition(
     }
 
     // FilterCondition: "column.op.value"
+    rejectForeignLeaf(str);
     const leaf = splitLeafCondition(str);
     if (!leaf) {
         const firstDot = str.indexOf(".");

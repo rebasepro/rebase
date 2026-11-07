@@ -387,11 +387,18 @@ function describeDataException(dbError?: PgLikeError): string {
     const message = dbError?.message ?? "";
     const column = dbError?.column ? ` for column "${dbError.column}"` : "";
 
+    // `eq.null` compares against the four-character string — it has to, or a
+    // text column could not be searched for it — so on any other type it lands
+    // here. The caller almost always meant the null test, so say its spelling.
+    const nullHint = (literal: string) => literal.toLowerCase() === "null"
+        ? " To match rows where it is empty, filter with `isnull.null` (`[\"is-null\", null]` as a JSON tuple)."
+        : "";
+
     const syntax = message.match(/invalid input syntax for type ([\w ]+): "(.*)"/);
-    if (syntax) return `"${syntax[2]}" is not a valid ${syntax[1]}${column}.`;
+    if (syntax) return `"${syntax[2]}" is not a valid ${syntax[1]}${column}.${nullHint(syntax[2])}`;
 
     const enumValue = message.match(/invalid input value for enum ([\w."]+): "(.*)"/);
-    if (enumValue) return `"${enumValue[2]}" is not one of the values of ${enumValue[1]}${column}.`;
+    if (enumValue) return `"${enumValue[2]}" is not one of the values of ${enumValue[1]}${column}.${nullHint(enumValue[2])}`;
 
     const range = message.match(/value "(.*)" is out of range for type ([\w ]+)/);
     if (range) return `"${range[1]}" is out of range for ${range[2]}${column}.`;

@@ -4326,3 +4326,35 @@ for pnpm and break npm, which the template supports on purpose.
 
 **Sweep:** for every dependency a template writes without a scope, ask who owns the
 name. The guard is `packages/cli/src/scaffold-workspace-resolution.test.ts`.
+
+## 75. Another dialect's spelling, read as a value in ours
+
+A wire format that falls back to "the whole string is the value" when it does
+not recognise an operator will take a condition written in a neighbouring
+dialect and run it as an equality. The query is valid, so nothing refuses it:
+it matches no rows on a text column and fails with a type error on any other,
+and neither says the operator was the problem.
+
+Found 2026-11-07 through the MCP `list_documents` tool. An agent wrote
+PostgREST's `difficulty: "is.null"`, then `"eq.null"`, got "not a valid
+smallint" for both, and counted the rows by paging the whole collection.
+
+| place | result |
+|---|---|
+| `deserializeSingle`: `is.null`, `not.is.null`, `is.not.null`, `isNull.null` | **BUG**: 400 naming `isnull.null`/`notnull.null` (`foreignWireSpelling`). |
+| `deserializeSingle`: `not.<op>.<value>` | **BUG**: 400 naming `neq`/`nin`/`nlike`/`nilike`, or a `not=(…)` group. |
+| `deserializeSingle`: a canonical name (`>=.18`, `is-null.null`) | **BUG**: a parameter reads only REST names, so 400 naming the REST one. |
+| group leaves (`or(d.is.null)`, `and(s.not.eq.x)`, which filtered a column `s.not`) | **BUG**: same rejection (`rejectForeignLeaf`). Canonical names stay accepted there, as before. |
+| `eq.null` on a non-text column | **BUG** (message only): `describeDataException` names `isnull.null`. `eq.null` stays the text "null" by design. |
+| `serializeFilter` given `null`/a number/a boolean | **BUG**: threw "expected a tuple"; now an equality, matching `deserializeFilter`. |
+| `list_documents` `where` description | **BUG**: two examples, no operator list, no null test. |
+| hosted `query_collection` `where` | clean: tuples with the operator list; a null example added. |
+| `serializeFilter` given an object (`{ gte: 100 }`) | clean: throws `TypeError`. |
+| `list_documents` given `["gte.10", "lt.99"]` | **OPEN** (low): `serializeFilter` reads it as a tuple and throws. The description shows the tuple form, which works. |
+
+**Sweep:** for every reader that falls back to a value, list the spellings
+callers bring from the dialects next door (PostgREST, Supabase, Mongo, the
+canonical names of our own), and drive each through every position: query
+parameter, JSON `where`, group leaf. The guards are
+`packages/common/test/filter-dialect-foreign-spellings.test.ts` and
+`packages/server/test/rest-filter-operator-contract.test.ts`.

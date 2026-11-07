@@ -159,3 +159,30 @@ describe("GET /api/data/<collection> — filters that must keep working", () => 
             .toEqual({ title: ["in", ["Hello", "World"]] });
     });
 });
+
+/**
+ * PostgREST's null test and negation, over HTTP. An agent using the MCP
+ * `list_documents` tool wrote `difficulty: "is.null"` and got "not a valid
+ * smallint" back: it reached the driver as `difficulty = 'is.null'`.
+ */
+describe("GET /api/data/<collection> — PostgREST spellings this dialect writes differently", () => {
+    it.each([
+        ["/api/data/posts?difficulty=is.null", "isnull.null"],
+        ["/api/data/posts?difficulty=not.is.null", "notnull.null"],
+        ["/api/data/posts?status=not.eq.draft", "neq.draft"],
+        [where({ difficulty: "is.null" }), "isnull.null"],
+        [`/api/data/posts?or=${encodeURIComponent("(difficulty.is.null,difficulty.eq.1)")}`, "difficulty.isnull.null"]
+    ])("%s answers 400 naming %s, and never reaches the driver", async (url, spelling) => {
+        const res = await get(url);
+        expect(res.status).toBe(400);
+        expect(res.json.error.code).toBe("UNKNOWN_FILTER_OPERATOR");
+        expect(res.json.error.message).toContain(spelling);
+        expect(res.fetches).toEqual([]);
+    });
+
+    it("serves the spelling that works", async () => {
+        const res = await get("/api/data/posts?difficulty=isnull.null");
+        expect(res.status).toBe(200);
+        expect(res.fetches).toHaveLength(1);
+    });
+});

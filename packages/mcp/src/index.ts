@@ -1468,7 +1468,11 @@ description: "Skip N results" },
 description: "Sort field, optionally with :asc or :desc suffix" },
                 where: {
                     type: "object",
-                    description: "Filter object, e.g. { \"status\": \"eq.active\", \"price\": \"gte.100\" }",
+                    description: "Filter object, field → condition. A condition is an `<op>.<value>` string — " +
+                        "{ \"status\": \"eq.active\", \"price\": \"gte.100\" } — or an [operator, value] tuple. " +
+                        "Ops: eq, neq, gt, gte, lt, lte, in.(a,b), nin.(a,b), like, ilike, nlike, nilike (% is the wildcard), " +
+                        "cs (array contains), csa.(a,b). A missing value: \"isnull.null\" or null; a present one: \"notnull.null\". " +
+                        "\"eq.null\" means the text \"null\". Several conditions on one field: [[\">=\", 10], [\"<\", 99]].",
                     additionalProperties: true
                 },
                 fields: {

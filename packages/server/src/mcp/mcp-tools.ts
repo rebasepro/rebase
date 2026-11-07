@@ -392,7 +392,8 @@ const WHERE_ARG = {
     type: "object",
     description: "Filter, as the SDK's `where` and REST's `?where=`: field → [operator, value], e.g. "
         + "{\"status\": [\"==\", \"paid\"], \"total\": [\">\", 100]}. Several conditions on one field: "
-        + "{\"total\": [[\">=\", 10], [\"<\", 100]]}. A belongsTo relation is filtered by its foreign key, "
+        + "{\"total\": [[\">=\", 10], [\"<\", 100]]}. A missing value: {\"shipped_at\": [\"is-null\", null]} "
+        + "(or [\"is-not-null\", null] for a present one). A belongsTo relation is filtered by its foreign key, "
         + "as the rows carry it (e.g. \"authorId\"). Operators: " + ALL_WHERE_FILTER_OPS.join(", ") + "."
 };
 

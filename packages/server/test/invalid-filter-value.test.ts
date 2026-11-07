@@ -59,6 +59,22 @@ describe("a filter value the column cannot hold", () => {
         expect(body.error.message).toContain("\"status\"");
     });
 
+    // `eq.null` is the text "null" on the wire, so on a number column it lands
+    // here — and the caller who wrote it meant the null test.
+    it("names the null test when the rejected literal is \"null\"", async () => {
+        const { body } = await answerFor(
+            driverError("22P02", "invalid input syntax for type smallint: \"null\"", "difficulty")
+        );
+        expect(body.error.message).toContain("isnull.null");
+    });
+
+    it("says nothing about null for any other literal", async () => {
+        const { body } = await answerFor(
+            driverError("22P02", "invalid input syntax for type smallint: \"abc\"")
+        );
+        expect(body.error.message).not.toContain("isnull");
+    });
+
     it("22007 (a timestamp that is not one) is a 400", async () => {
         const { status, body } = await answerFor(
             driverError("22007", "invalid input syntax for type timestamp: \"yesterday\"")

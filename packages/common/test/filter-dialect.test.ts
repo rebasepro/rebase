@@ -245,9 +245,11 @@ describe("serializeTuple strictness", () => {
         }).toThrow(TypeError);
     });
 
-    it("throws TypeError for null tuple", () => {
+    // A bare `null` is not malformed: it is the null test, as the server reads
+    // `{ status: null }` (see filter-dialect-foreign-spellings.test.ts).
+    it("throws TypeError for an object in place of a tuple", () => {
         expect(() => {
-            serializeFilter({ status: null as unknown as [WhereFilterOp, unknown] });
+            serializeFilter({ price: { gte: 100 } as unknown as [WhereFilterOp, unknown] });
         }).toThrow(TypeError);
     });
 });

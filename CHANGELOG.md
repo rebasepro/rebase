@@ -96,6 +96,29 @@
   small "Image" label where the host blocks outside images, instead of the
   raw URL; a list of plain values reads `Rock, 90s`.
 
+- **`list_documents` explains its filter.** Its `where` description lists
+  the operators and says how to match a missing value (`"isnull.null"`, or
+  `null`); it gave two examples, so an agent counting rows with no value
+  guessed `is.null` and `eq.null`, got "not a valid smallint" for both, and
+  paged the whole collection instead. `null`, a number or a boolean given as
+  a condition (`{ "difficulty": null }`) is now an equality, as the server
+  reads it, instead of an error. `query_collection` shows the null test too.
+
+#### Server & REST
+
+- **A filter in PostgREST's spelling is refused with the one that works.**
+  `?difficulty=is.null`, `not.is.null`, `?status=not.eq.draft`, a canonical
+  name in a query parameter (`?age=>=.18`, `is-null.null`) and the same
+  inside `or(…)`/`and(…)`/`not(…)` were read as an equality on the whole
+  string: no rows on a text column, a type error on any other, and nothing to
+  say why. They now answer 400 `UNKNOWN_FILTER_OPERATOR`, naming the spelling
+  to use (`isnull.null`, `notnull.null`, `neq.draft`, `gte.18`). Values that
+  only start with `is.` or `not.` (`is.gd`) are still values.
+
+- **`eq.null` on a column that is not text says how to match a missing
+  value.** It compares against the text "null", so on a number, date or enum
+  column it fails. The 400 now names `isnull.null`.
+
 ## [0.28.2] - 2026-11-06
 
 ### Added
