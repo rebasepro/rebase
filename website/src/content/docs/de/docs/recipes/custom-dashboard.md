@@ -1,88 +1,116 @@
 ---
-sourceHash: 62363af9dfc94b45
+sourceHash: f10362389108766c
 title: "Rezept: Benutzerdefiniertes Dashboard"
 sidebar_label: Benutzerdefiniertes Dashboard
-description: Erstellen Sie eine benutzerdefinierte Dashboard-Ansicht mit Diagrammen, Statistiken und Datenvisualisierungen mithilfe von Rebase-Hooks.
+description: "Eine Dashboard-Seite mit KPI-Kacheln und Diagrammen erstellen — Zahlen in SQL berechnet, gezeichnet mit den Bausteinen aus @rebasepro/plugin-insights."
 ---
 
 ## Übersicht
 
-Erstellen Sie eine benutzerdefinierte Dashboard-Ansicht, die Analysen neben Ihrem Admin-Panel anzeigt.
+Ein Dashboard besteht aus drei Teilen: einer Backend-Funktion, die die Zahlen in SQL berechnet, einer Komponente, die sie mit `useInsightData` lädt und mit den Bausteinen aus `@rebasepro/plugin-insights` zeichnet, und einem Ort, an dem es erscheint — hier eine eigene Seite in der Seitenleiste.
 
-## Dashboard-Komponente erstellen
+Zählen Sie auf dem Server. Zeilen in den Browser zu laden und dort zu addieren stimmt nur, solange die Tabelle in eine Ergebnisseite passt; danach ist die Summe stillschweigend falsch.
 
-```tsx
-import { useRebaseContext } from "@rebasepro/app";
-import { useEffect, useState } from "react";
+## Die Zahlen auf dem Server berechnen
 
-type OrderRow = { id: string; total: number };
+Eine Route pro gezeichnetem Element, ausgeführt als angemeldeter Benutzer, damit Berechtigungen und Row-Level Security auch für die Kennzahlen gelten:
 
-function DashboardView() {
-    const context = useRebaseContext();
-    const [stats, setStats] = useState<{
-        totalOrders: number;
-        totalRevenue: number;
-        activeProducts: number;
-        recentOrders: OrderRow[];
-    }>({
-        totalOrders: 0,
-        totalRevenue: 0,
-        activeProducts: 0,
-        recentOrders: []
+```ts
+// functions/dashboard.ts
+import { defineFunction, requireAuth } from "@rebasepro/server/functions";
+
+export default defineFunction((app, { rebase }) => {
+    app.use("/*", requireAuth);
+
+    // GET /api/functions/dashboard/summary
+    app.get("/summary", async (c) => {
+        if (!rebase.sql) return c.json({ error: "SQL not available" }, 501);
+        const [row] = await rebase.sql(`
+            SELECT
+                COUNT(*) FILTER (WHERE order_date >= now() - interval '30 days')                       AS orders,
+                COUNT(*) FILTER (WHERE order_date >= now() - interval '60 days'
+                                   AND order_date <  now() - interval '30 days')                       AS previous_orders,
+                COALESCE(SUM(total) FILTER (WHERE order_date >= now() - interval '30 days'), 0)        AS revenue
+            FROM orders
+        `);
+        return c.json({
+            orders: Number(row.orders),
+            previousOrders: Number(row.previous_orders),
+            revenue: Number(row.revenue)
+        });
     });
 
-    useEffect(() => {
-        async function loadStats() {
-            // Use the data source to fetch aggregate data
-            // `find` resolves to { data, meta } — the rows are on `data`, and they are
-            // flat, so it is `o.total` rather than `o.values.total`.
-            const { data: orders } = await context.data
-                .collection<OrderRow>("orders")
-                .find({ limit: 1000 });
+    // GET /api/functions/dashboard/daily — every day present, an empty one is zero
+    app.get("/daily", async (c) => {
+        if (!rebase.sql) return c.json({ error: "SQL not available" }, 501);
+        const rows = await rebase.sql(`
+            SELECT to_char(days.day, 'YYYY-MM-DD') AS day, COALESCE(SUM(o.total), 0) AS revenue
+            FROM generate_series(current_date - 29, current_date, interval '1 day') AS days(day)
+            LEFT JOIN orders o ON o.order_date >= days.day AND o.order_date < days.day + interval '1 day'
+            GROUP BY days.day
+            ORDER BY days.day
+        `);
+        return c.json(rows.map((row) => ({ day: String(row.day), revenue: Number(row.revenue) })));
+    });
+});
+```
 
-            const { data: products } = await context.data
-                .collection<Record<string, unknown>>("products")
-                .find({ where: { active: ["==", true] } });
+## Zeichnen
 
-            setStats({
-                totalOrders: orders.length,
-                totalRevenue: orders.reduce((sum, o) => sum + (o.total ?? 0), 0),
-                activeProducts: products.length,
-                recentOrders: orders.slice(0, 5)
-            });
-        }
-        loadStats();
-    }, []);
+`useInsightData(key, load)` lädt einmal pro Schlüssel und angemeldetem Benutzer, und jede Komponente, die denselben Schlüssel liest, teilt sich das Ergebnis. Die Bausteine zeichnen ihre eigenen Lade-, Fehler- und Leerzustände:
+
+```tsx
+import { useRebaseClient } from "@rebasepro/app";
+import type { createRebaseClient } from "@rebasepro/client";
+import { ChartCard, KpiGrid, KpiTile, TimeSeriesChart, useInsightData } from "@rebasepro/plugin-insights";
+
+type RebaseClient = ReturnType<typeof createRebaseClient>;
+type Summary = { orders: number; previousOrders: number; revenue: number };
+type Day = { day: string; revenue: number };
+
+function DashboardView() {
+    const client = useRebaseClient<RebaseClient>();
+    const read = <T,>(path: string) => () => {
+        if (!client) throw new Error("No Rebase client");
+        return client.functions.invoke<T>("dashboard", undefined, { method: "GET", path });
+    };
+    const summary = useInsightData("dashboard/summary", read<Summary>("summary"));
+    const daily = useInsightData("dashboard/daily", read<Day[]>("daily"));
 
     return (
-        <div className="p-8">
-            <h1 className="text-xl font-semibold tracking-[-0.01em] mb-6">Dashboard</h1>
-            <div className="grid grid-cols-3 gap-4 mb-8">
-                <StatCard title="Total Orders" value={stats.totalOrders} />
-                <StatCard title="Revenue" value={`$${stats.totalRevenue.toFixed(2)}`} />
-                <StatCard title="Active Products" value={stats.activeProducts} />
-            </div>
-            <h2 className="text-sm font-semibold tracking-[-0.01em] mb-4">Recent Orders</h2>
-            <ul>
-                {stats.recentOrders.map(order => (
-                    <li key={order.id}>
-                        Order #{order.id} — ${order.total}
-                    </li>
-                ))}
-            </ul>
-        </div>
-    );
-}
-
-function StatCard({ title, value }: { title: string; value: string | number }) {
-    return (
-        <div className="bg-surface-100 dark:bg-surface-800 rounded-lg p-6">
-            <p className="text-xs text-surface-500">{title}</p>
-            <p className="text-xl font-semibold">{value}</p>
+        <div className="max-w-6xl mx-auto px-6 py-8">
+            <KpiGrid periodDays={30}>
+                <KpiTile
+                    label="Orders"
+                    icon="ShoppingCart"
+                    value={summary.data?.orders}
+                    previous={summary.data?.previousOrders}
+                    loading={summary.loading}
+                    error={summary.error}
+                />
+                <KpiTile
+                    label="Revenue"
+                    icon="DollarSign"
+                    value={summary.data?.revenue}
+                    format={{ style: "currency", currency: "USD", notation: "compact" }}
+                    loading={summary.loading}
+                    error={summary.error}
+                />
+            </KpiGrid>
+            <ChartCard title="Revenue per day" className="mt-4">
+                <TimeSeriesChart
+                    series={[{ id: "revenue", label: "Revenue", points: (daily.data ?? []).map((d) => ({ at: d.day, value: d.revenue })) }]}
+                    format={{ style: "currency", currency: "USD" }}
+                    loading={daily.loading}
+                    error={daily.error}
+                />
+            </ChartCard>
         </div>
     );
 }
 ```
+
+Dieselben Komponenten können auch über einer Collection-Liste oder oben auf der Startseite stehen — über `<Rebase slots>` mit `collection.widgets` oder `home.children.start` — statt auf einer eigenen Seite.
 
 ## Als benutzerdefinierte Ansicht registrieren
 
@@ -155,33 +183,35 @@ Bauen Sie den Pfad dynamisch zusammen, anstatt ihn fest einzuprogrammieren: Coll
 
 `useSidePanel` öffnet eine Entität im Seitenbereich anstatt zu navigieren, was bei einer Zeile in einer Liste normalerweise das gewünschte Verhalten ist.
 
-## Diagramme hinzufügen
+## Diagramme, die ihre Datensätze öffnen
 
-Installieren Sie eine Diagramm-Bibliothek:
-
-```bash
-pnpm add recharts
-```
-
-Verwenden Sie sie anschließend in Ihrem Dashboard:
+`BarChart` zeichnet Kategorien als Balken mit ihren Werten daneben. Mit `onBarClick` wird jede Zeile zu einem Button: Öffnen Sie die Liste gefiltert auf das, was der Balken zählt, oder einen Datensatz im Seitenpanel.
 
 ```tsx
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip } from "recharts";
+import { useUrlController } from "@rebasepro/cms";
+import { BarChart, ChartCard } from "@rebasepro/plugin-insights";
 
-function RevenueChart({ data }) {
+function OrdersByStatus({ counts, loading }: { counts?: Record<string, number>; loading: boolean }) {
+    const urls = useUrlController();
+    const statuses = [{ id: "pending", label: "Pending" }, { id: "shipped", label: "Shipped" }, { id: "delivered", label: "Delivered" }];
     return (
-        <LineChart width={600} height={300} data={data}>
-            <CartesianGrid strokeDasharray="3 3" />
-            <XAxis dataKey="date" />
-            <YAxis />
-            <Tooltip />
-            <Line type="monotone" dataKey="revenue" stroke="#8884d8" />
-        </LineChart>
+        <ChartCard title="Orders by status">
+            <BarChart
+                bars={statuses.map((s) => ({ key: s.id, label: s.label, value: counts?.[s.id] ?? 0 }))}
+                loading={loading}
+                onBarClick={(bar) => urls.navigate(
+                    `${urls.buildUrlCollectionPath("orders")}?status_op=${encodeURIComponent("==")}&status_value=${bar.key}`
+                )}
+            />
+        </ChartCard>
     );
 }
 ```
+
+Die Diagramme sind SVG in den eigenen Tokens des Admin-Panels, hell und dunkel, mit einer Anzeige bei Hover und Pfeiltasten und einer Tabelle für Screenreader; eine Diagrammbibliothek ist nicht nötig. Für eine Form, die sie nicht zeichnen, funktioniert jede React-Diagrammbibliothek innerhalb einer `ChartCard`.
 
 ## Nächste Schritte
 
 - **[Benutzerdefinierte Ansichten](/docs/frontend)** — Frontend-Übersicht
 - **[Hooks-Referenz](/docs/hooks)** — Verfügbare Hooks
+- **[Slots](/docs/frontend/slots)** — Dieselben Komponenten auf der Startseite oder über einer Collection platzieren

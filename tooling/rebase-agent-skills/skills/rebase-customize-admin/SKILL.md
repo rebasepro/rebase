@@ -55,8 +55,9 @@ import only package entry points, so they compile as copied.
   collection callbacks and security rules apply. Don't call `fetch` on the REST
   API from admin code.
 - **Draw with `@rebasepro/ui`** so the page matches the admin (see the
-  `rebase-design-language` skill). A chart library is fine if the project has
-  one; plain divs are fine if it does not.
+  `rebase-design-language` skill). For KPIs and charts, use the blocks from
+  `@rebasepro/plugin-insights` and compute the numbers in SQL on the server —
+  the `rebase-dashboards` skill is the whole method.
 - **When a built-in part almost fits, override or wrap it** with
   `<Rebase components={{ "<Name>": { Component, wrap? } }}>`. The names are
   `OverridableComponentName` in `@rebasepro/cms-types`. Prefer `wrap: true`:

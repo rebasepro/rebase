@@ -58,6 +58,6 @@ A BaaS install is `server` + a driver + `client`, with no React in the tree.
 | `@rebasepro/codegen` | Typed SDK generation from collection definitions | Used by `rebase generate-sdk` command |
 | `@rebasepro/inference` | Infer a collection schema from existing data | Used by the CMS collection editor and data import (`rebase schema introspect` is the driver's own) |
 | `@rebasepro/plugin-ai` | AI-powered data autofill | Studio plugin for auto-completing fields |
-| `@rebasepro/plugin-insights` | Usage and data insights views | Plugin for analytics over your collections |
+| `@rebasepro/plugin-insights` | KPI tiles and charts | `KpiTile`, `TimeSeriesChart`, `BarChart`, `useInsightData` — blocks you place in the admin |
 | `@rebasepro/cli` | CLI tool | The `rebase` CLI binary |
 | `@rebasepro/utils` | Utility functions | Low-level shared helpers |

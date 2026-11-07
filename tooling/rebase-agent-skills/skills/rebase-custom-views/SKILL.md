@@ -1,6 +1,6 @@
 ---
 name: rebase-custom-views
-description: Build a custom back-office screen inside the Rebase admin instead of a separate app — dashboards, review queues, dispatch boards, record summaries, custom field editors. Covers `rebase generate view`, top-level screens (AppView), record tabs (admin.entityViews), field widgets (admin.Field / admin.Preview), and the design tokens that make a view look native. Use it whenever a screen is not a plain table, form or board.
+description: Build a custom back-office screen inside the Rebase admin instead of a separate app — dashboards, review queues, dispatch boards, record summaries, custom field editors. Covers `rebase generate view`, top-level screens (AppView), record tabs (admin.entityViews), field widgets (admin.Field / admin.Preview), and the design tokens that make a view look native. Use it whenever a screen is not a plain table, form or board. For KPIs and charts, read `rebase-dashboards`.
 ---
 
 # Custom views in the Rebase admin

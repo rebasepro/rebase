@@ -17,7 +17,7 @@ different problems. It is worth knowing which one you are reaching for:
 |---|---|---|
 | [**Rebase connector**](/docs/ai/rebase-connector) | One hosted MCP connector at `app.rebase.pro/mcp` for every project you run, on Rebase Cloud or self-hosted: data, schema, cron, and on Cloud deploys, env and logs | Claude on the web, desktop and mobile, as you |
 | [**MCP server**](/docs/ai/mcp) | A stdio Model Context Protocol server with 53 tools over your schema, data, users, storage, cron, dev server and Rebase Cloud project | An assistant, at runtime |
-| [**Agent skills**](/docs/ai/skills) | 23 Markdown skill files written into your repo by `rebase skills install` | An assistant, as reference material |
+| [**Agent skills**](/docs/ai/skills) | 24 Markdown skill files written into your repo by `rebase skills install` | An assistant, as reference material |
 | [**Instruction files**](/docs/ai/instruction-files) | `ai-instructions.md` plus per-assistant pointer files, written by `rebase init` | An assistant, as always-on rules |
 | [**API keys**](/docs/backend/api-keys) | Machine credentials holding [scopes](/docs/backend/roles-and-scopes), per collection and per operation | Anything calling the HTTP API |
 
@@ -101,5 +101,5 @@ mechanism and the two do not interact.
 
 - [Rebase connector](/docs/ai/rebase-connector) — Claude, connected to every project you run
 - [MCP Server](/docs/ai/mcp) — connect Claude Code, Cursor or any MCP client
-- [Agent Skills](/docs/ai/skills) — `rebase skills install` and the 23 skills
+- [Agent Skills](/docs/ai/skills) — `rebase skills install` and the 24 skills
 - [AI Instruction Files](/docs/ai/instruction-files) — the scaffolded rules pattern

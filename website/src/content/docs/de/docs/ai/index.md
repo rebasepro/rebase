@@ -1,5 +1,5 @@
 ---
-sourceHash: ff803e68f256ae11
+sourceHash: c0c8ce9c6155d171
 title: KI & Agenten
 sidebar_label: Übersicht
 description: Was Rebase für KI-Coding-Assistenten und autonome Agenten bereitstellt – ein MCP-Server, projektlokale Agent-Skills, vorgefertigte Anweisungsdateien und das Berechtigungsmodell, das bestimmt, worauf ein Agent tatsächlich zugreifen kann.
@@ -18,7 +18,7 @@ unterschiedliche Probleme lösen. Es lohnt sich zu wissen, welche Sie davon ben�
 |---|---|---|
 | [**Rebase connector**](/docs/ai/rebase-connector) | Ein gehosteter MCP-Connector unter `app.rebase.pro/mcp` für jedes Projekt, das Sie betreiben, in der Rebase Cloud oder selbst gehostet: Daten, Schema, Cron und bei Cloud-Deployments Umgebungsvariablen und Logs | Claude im Web, auf dem Desktop und mobil, in Ihrem Namen |
 | [**MCP server**](/docs/ai/mcp) | Ein stdio-Model-Context-Protocol-Server mit 53 Tools für Ihr Schema, Ihre Daten, Benutzer, Storage, Cron, Dev-Server und Ihr Rebase Cloud-Projekt | Ein Assistent zur Laufzeit |
-| [**Agent skills**](/docs/ai/skills) | 23 Markdown-Skill-Dateien, die durch `rebase skills install` in Ihr Repository geschrieben werden | Ein Assistent als Referenzmaterial |
+| [**Agent skills**](/docs/ai/skills) | 24 Markdown-Skill-Dateien, die durch `rebase skills install` in Ihr Repository geschrieben werden | Ein Assistent als Referenzmaterial |
 | [**Instruction files**](/docs/ai/instruction-files) | `ai-instructions.md` plus assistentenspezifische Pointer-Dateien, erstellt durch `rebase init` | Ein Assistent als dauerhafte Regeln |
 | [**API keys**](/docs/backend/api-keys) | Maschinen-Anmeldeinformationen mit [Scopes](/docs/backend/roles-and-scopes), pro Collection und pro Operation | Alles, was die HTTP-API aufruft |
 
@@ -101,5 +101,5 @@ Mechanismus, und die beiden interagieren nicht miteinander.
 
 - [Rebase connector](/docs/ai/rebase-connector) — Claude, verbunden mit jedem Projekt, das Sie betreiben
 - [MCP Server](/docs/ai/mcp) — Claude Code, Cursor oder beliebige MCP-Clients verbinden
-- [Agent Skills](/docs/ai/skills) — `rebase skills install` und die 23 Skills
+- [Agent Skills](/docs/ai/skills) — `rebase skills install` und die 24 Skills
 - [AI Instruction Files](/docs/ai/instruction-files) — Das Muster für vorgefertigte Regelsätze

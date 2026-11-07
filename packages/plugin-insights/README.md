@@ -57,16 +57,20 @@ the admin's language.
 
 ```tsx
 import { useRebaseClient } from "@rebasepro/app";
+import type { createRebaseClient } from "@rebasepro/client";
 import type { AnySlotContribution } from "@rebasepro/cms-types";
 import { ChartCard, KpiGrid, KpiTile, TimeSeriesChart, useInsightData } from "@rebasepro/plugin-insights";
 
+type RebaseClient = ReturnType<typeof createRebaseClient>;
 type Figures = { revenue: number; previousRevenue: number };
 type Day = { day: string; revenue: number };
 
 function RevenueOverview() {
     const client = useRebaseClient<RebaseClient>();
-    const read = <T,>(path: string) => () =>
-        client!.functions.invoke<T>("insights", undefined, { method: "GET", path });
+    const read = <T,>(path: string) => () => {
+        if (!client) throw new Error("No Rebase client");
+        return client.functions.invoke<T>("insights", undefined, { method: "GET", path });
+    };
 
     const totals = useInsightData("orders", read<Figures>("orders"));
     const daily = useInsightData("orders/daily", read<Day[]>("orders/daily"));

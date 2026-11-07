@@ -1,5 +1,5 @@
 ---
-sourceHash: ff803e68f256ae11
+sourceHash: c0c8ce9c6155d171
 title: IA & Agents
 sidebar_label: Vue d'ensemble
 description: Ce que Rebase propose pour les assistants de code IA et les agents autonomes — un serveur MCP, des compétences d'agent locales au projet, des fichiers d'instructions générés et le modèle d'identifiants qui détermine ce qu'un agent peut réellement atteindre.
@@ -18,7 +18,7 @@ des problématiques différentes. Il est utile de savoir vers lequel vous vous o
 |---|---|---|
 | [**Connecteur Rebase**](/docs/ai/rebase-connector) | Un connecteur MCP hébergé sur `app.rebase.pro/mcp` pour chaque projet que vous exécutez, sur Rebase Cloud ou auto-hébergé : données, schéma, cron, et sur les déploiements Cloud, environnement et logs | Claude sur le web, desktop et mobile, en votre nom |
 | [**Serveur MCP**](/docs/ai/mcp) | Un serveur Model Context Protocol stdio doté de 53 outils couvrant votre schéma, vos données, utilisateurs, stockage, cron, serveur de dev et projet Rebase Cloud | Un assistant, au moment de l'exécution |
-| [**Compétences d'agent**](/docs/ai/skills) | 23 fichiers de compétences Markdown écrits dans votre dépôt par `rebase skills install` | Un assistant, comme documentation de référence |
+| [**Compétences d'agent**](/docs/ai/skills) | 24 fichiers de compétences Markdown écrits dans votre dépôt par `rebase skills install` | Un assistant, comme documentation de référence |
 | [**Fichiers d'instructions**](/docs/ai/instruction-files) | `ai-instructions.md` ainsi que des fichiers de référence par assistant, générés par `rebase init` | Un assistant, sous forme de règles permanentes |
 | [**Clés d'API**](/docs/backend/api-keys) | Des identifiants machine détenant des [portées (scopes)](/docs/backend/roles-and-scopes), par collection et par opération | Tout système effectuant des appels à l'API HTTP |
 
@@ -101,5 +101,5 @@ différent et les deux n'interagissent pas.
 
 - [Connecteur Rebase](/docs/ai/rebase-connector) — Claude, connecté à l'ensemble de vos projets
 - [Serveur MCP](/docs/ai/mcp) — connectez Claude Code, Cursor ou n'importe quel client MCP
-- [Compétences d'agent](/docs/ai/skills) — `rebase skills install` et les 23 compétences
+- [Compétences d'agent](/docs/ai/skills) — `rebase skills install` et les 24 compétences
 - [Fichiers d'instructions IA](/docs/ai/instruction-files) — le modèle de règles générées

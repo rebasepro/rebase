@@ -1,5 +1,5 @@
 ---
-sourceHash: ff803e68f256ae11
+sourceHash: c0c8ce9c6155d171
 title: IA e agenti
 sidebar_label: Panoramica
 description: Cosa offre Rebase per gli assistenti di programmazione IA e gli agenti autonomi — un server MCP, skill per agenti a livello di progetto, file di istruzioni con scaffolding e il modello di credenziali che stabilisce a cosa un agente può effettivamente accedere.
@@ -18,7 +18,7 @@ problemi differenti. Vale la pena sapere a quale affidarsi:
 |---|---|---|
 | [**Rebase connector**](/docs/ai/rebase-connector) | Un connettore MCP ospitato su `app.rebase.pro/mcp` per ogni progetto che esegui, su Rebase Cloud o self-hosted: dati, schema, cron e, sui deploy Cloud, env e log | Claude sul web, desktop e mobile, con la tua identità |
 | [**MCP server**](/docs/ai/mcp) | Un server Model Context Protocol via stdio con 53 tool per schema, dati, utenti, storage, cron, dev server e progetto Rebase Cloud | Un assistente, a runtime |
-| [**Agent skills**](/docs/ai/skills) | 23 file di skill Markdown scritti nel tuo repository da `rebase skills install` | Un assistente, come materiale di riferimento |
+| [**Agent skills**](/docs/ai/skills) | 24 file di skill Markdown scritti nel tuo repository da `rebase skills install` | Un assistente, come materiale di riferimento |
 | [**Instruction files**](/docs/ai/instruction-files) | `ai-instructions.md` più file di puntamento specifici per assistente, scritti da `rebase init` | Un assistente, come regole sempre attive |
 | [**API keys**](/docs/backend/api-keys) | Credenziali macchina contenenti [scope](/docs/backend/roles-and-scopes), per collezione e per operazione | Qualsiasi entità che chiami l'API HTTP |
 
@@ -101,5 +101,5 @@ differente e i due non interagiscono tra loro.
 
 - [Rebase connector](/docs/ai/rebase-connector) — Claude, connesso a ogni progetto che esegui
 - [MCP Server](/docs/ai/mcp) — connetti Claude Code, Cursor o qualsiasi client MCP
-- [Agent Skills](/docs/ai/skills) — `rebase skills install` e le 23 skill
+- [Agent Skills](/docs/ai/skills) — `rebase skills install` e le 24 skill
 - [AI Instruction Files](/docs/ai/instruction-files) — il pattern per i file di regole con scaffolding

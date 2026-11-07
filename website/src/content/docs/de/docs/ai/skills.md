@@ -1,11 +1,11 @@
 ---
-sourceHash: eaecd9a09c46ba94
+sourceHash: 7486b595195ce75b
 title: Agent Skills
 sidebar_label: Agent Skills
-description: "rebase skills install schreibt 23 Rebase-Referenz-Skills in dein Repo – genau in dem Layout, das dein KI-Assistent erwartet: Cursor, Claude Code, Windsurf, Gemini CLI und Antigravity."
+description: "rebase skills install schreibt 24 Rebase-Referenz-Skills in dein Repo – genau in dem Layout, das dein KI-Assistent erwartet: Cursor, Claude Code, Windsurf, Gemini CLI und Antigravity."
 ---
 
-Ein KI-Assistent, der die Rebase-Dokumentation gelesen hat, schreibt besseren Rebase-Code als einer, der anhand der Form der API rät. `rebase skills install` kopiert 23 Markdown-Skill-Dateien in dein Repository – genau in dem Layout, das dein Assistent erwartet:
+Ein KI-Assistent, der die Rebase-Dokumentation gelesen hat, schreibt besseren Rebase-Code als einer, der anhand der Form der API rät. `rebase skills install` kopiert 24 Markdown-Skill-Dateien in dein Repository – genau in dem Layout, das dein Assistent erwartet:
 
 ```bash
 rebase skills install
@@ -107,7 +107,7 @@ Projektspezifische Anweisungen gehören weiterhin in [`ai-instructions.md`](/doc
 
 Der Befehl funktioniert auch außerhalb eines Rebase-Projekts und weicht dabei auf das Arbeitsverzeichnis aus – nützlich für ein separates Frontend-Repo, das mit einem Rebase-Backend kommuniziert.
 
-## Die 23 Skills
+## Die 24 Skills
 
 | Skill | Behandelt |
 |---|---|
@@ -128,6 +128,7 @@ Der Befehl funktioniert auch außerhalb eines Rebase-Projekts und weicht dabei a
 | `rebase-admin` | Navigation im Admin-Panel, Side-Drawers, URLs, Einbetten von Collection-Panels |
 | `rebase-customize-admin` | Das Admin-Panel mit React-Komponenten anpassen – Singletons, Einstellungsseiten, Bulk-Aktionen, Ansichtsmodi, benutzerdefinierte Felder, Ersetzen eingebauter Teile |
 | `rebase-custom-views` | Eigene Bildschirme im Admin-Panel – `rebase generate view`, Top-Level-Ansichten, Datensatz-Tabs, Feld-Widgets |
+| `rebase-dashboards` | KPIs, Diagramme und Dashboards — Zahlen in SQL berechnet, gezeichnet mit `@rebasepro/plugin-insights`, platziert in Slots oder auf einer Seite |
 | `rebase-ui-components` | Die `@rebasepro/ui`-Komponentenbibliothek |
 | `rebase-design-language` | Die UI-Designsprache: Tokens, Farben, Typografie, Spacing, Anti-Patterns |
 | `rebase-studio` | Die Studio-Entwicklertools-Schicht – SQL, RLS, Storage, Cron, Schema-Visualizer, Logs |
@@ -140,9 +141,9 @@ Zwei davon verlangen, unaufgefordert gelesen zu werden. `rebase-basics` gibt an,
 ## So sieht ein Durchlauf aus
 
 ```text
-  Found 23 Rebase skills
+  Found 24 Rebase skills
 
-  ✓ Claude Code — 23 skills installed (+ 8 reference files) to .claude/skills
+  ✓ Claude Code — 24 skills installed (+ 8 reference files) to .claude/skills
 ```
 
 Die Skills werden über das Paket `@rebasepro/agent-skills` ausgeliefert, von dem die CLI abhängt, sodass das bereitgestellte Set immer deiner installierten CLI-Version entspricht.

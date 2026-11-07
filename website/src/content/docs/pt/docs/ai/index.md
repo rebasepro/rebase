@@ -1,5 +1,5 @@
 ---
-sourceHash: ff803e68f256ae11
+sourceHash: c0c8ce9c6155d171
 title: IA e Agentes
 sidebar_label: Visão Geral
 description: O que o Rebase oferece para assistentes de programação com IA e agentes autônomos — um servidor MCP, skills de agentes locais do projeto, arquivos de instruções gerados e o modelo de credenciais que decide o que um agente pode realmente acessar.
@@ -18,7 +18,7 @@ problemas diferentes. Vale a pena saber qual deles você está buscando:
 |---|---|---|
 | [**Conector do Rebase**](/docs/ai/rebase-connector) | Um conector MCP hospedado em `app.rebase.pro/mcp` para cada projeto que você executa, no Rebase Cloud ou self-hosted: dados, schema, cron e, em deploys no Cloud, variáveis de ambiente (env) e logs | Claude na web, desktop e mobile, atuando como você |
 | [**Servidor MCP**](/docs/ai/mcp) | Um servidor Model Context Protocol via stdio com 53 ferramentas sobre seu schema, dados, usuários, storage, cron, servidor de desenvolvimento e projeto do Rebase Cloud | Um assistente, em tempo de execução |
-| [**Skills de agentes**](/docs/ai/skills) | 23 arquivos de skill em Markdown gravados no seu repositório por `rebase skills install` | Um assistente, como material de referência |
+| [**Skills de agentes**](/docs/ai/skills) | 24 arquivos de skill em Markdown gravados no seu repositório por `rebase skills install` | Um assistente, como material de referência |
 | [**Arquivos de instrução**](/docs/ai/instruction-files) | `ai-instructions.md` mais arquivos de apontamento por assistente, criados pelo `rebase init` | Um assistente, como regras sempre ativas |
 | [**Chaves de API**](/docs/backend/api-keys) | Credenciais de máquina contendo [escopos](/docs/backend/roles-and-scopes), por coleção e por operação | Qualquer chamada à API HTTP |
 
@@ -101,5 +101,5 @@ diferente e os dois não interagem.
 
 - [Conector do Rebase](/docs/ai/rebase-connector) — Claude, conectado a todos os projetos que você executa
 - [Servidor MCP](/docs/ai/mcp) — conecte o Claude Code, Cursor ou qualquer cliente MCP
-- [Skills de agentes](/docs/ai/skills) — `rebase skills install` e as 23 skills
+- [Skills de agentes](/docs/ai/skills) — `rebase skills install` e as 24 skills
 - [Arquivos de instrução de IA](/docs/ai/instruction-files) — o padrão de regras geradas

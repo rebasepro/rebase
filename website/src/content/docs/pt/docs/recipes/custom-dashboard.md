@@ -1,88 +1,116 @@
 ---
-sourceHash: 62363af9dfc94b45
+sourceHash: f10362389108766c
 title: "Receita: Dashboard Personalizado"
 sidebar_label: Dashboard Personalizado
-description: Crie uma visualização de dashboard personalizada com gráficos, estatísticas e visualizações de dados usando os hooks do Rebase.
+description: "Crie uma página de dashboard com KPIs e gráficos — números calculados em SQL e desenhados com os blocos de @rebasepro/plugin-insights."
 ---
 
 ## Visão Geral
 
-Crie uma visualização de dashboard personalizada que exibe análises ao lado do seu painel de administração.
+Um dashboard tem três peças: uma função de backend que calcula os números em SQL, um componente que os carrega com `useInsightData` e os desenha com os blocos de `@rebasepro/plugin-insights`, e um lugar para mostrá-lo — aqui, uma página própria no menu lateral.
 
-## Criar o Componente de Dashboard
+Conte no servidor. Trazer linhas para o navegador e somá-las só está certo enquanto a tabela cabe numa página de resultados; depois disso o total fica errado sem aviso.
 
-```tsx
-import { useRebaseContext } from "@rebasepro/app";
-import { useEffect, useState } from "react";
+## Calcular os números no servidor
 
-type OrderRow = { id: string; total: number };
+Uma rota para cada coisa que a página desenha, executada como o usuário conectado, para que as permissões e a segurança em nível de linha valham também para os números:
 
-function DashboardView() {
-    const context = useRebaseContext();
-    const [stats, setStats] = useState<{
-        totalOrders: number;
-        totalRevenue: number;
-        activeProducts: number;
-        recentOrders: OrderRow[];
-    }>({
-        totalOrders: 0,
-        totalRevenue: 0,
-        activeProducts: 0,
-        recentOrders: []
+```ts
+// functions/dashboard.ts
+import { defineFunction, requireAuth } from "@rebasepro/server/functions";
+
+export default defineFunction((app, { rebase }) => {
+    app.use("/*", requireAuth);
+
+    // GET /api/functions/dashboard/summary
+    app.get("/summary", async (c) => {
+        if (!rebase.sql) return c.json({ error: "SQL not available" }, 501);
+        const [row] = await rebase.sql(`
+            SELECT
+                COUNT(*) FILTER (WHERE order_date >= now() - interval '30 days')                       AS orders,
+                COUNT(*) FILTER (WHERE order_date >= now() - interval '60 days'
+                                   AND order_date <  now() - interval '30 days')                       AS previous_orders,
+                COALESCE(SUM(total) FILTER (WHERE order_date >= now() - interval '30 days'), 0)        AS revenue
+            FROM orders
+        `);
+        return c.json({
+            orders: Number(row.orders),
+            previousOrders: Number(row.previous_orders),
+            revenue: Number(row.revenue)
+        });
     });
 
-    useEffect(() => {
-        async function loadStats() {
-            // Use the data source to fetch aggregate data
-            // `find` resolves to { data, meta } — the rows are on `data`, and they are
-            // flat, so it is `o.total` rather than `o.values.total`.
-            const { data: orders } = await context.data
-                .collection<OrderRow>("orders")
-                .find({ limit: 1000 });
+    // GET /api/functions/dashboard/daily — every day present, an empty one is zero
+    app.get("/daily", async (c) => {
+        if (!rebase.sql) return c.json({ error: "SQL not available" }, 501);
+        const rows = await rebase.sql(`
+            SELECT to_char(days.day, 'YYYY-MM-DD') AS day, COALESCE(SUM(o.total), 0) AS revenue
+            FROM generate_series(current_date - 29, current_date, interval '1 day') AS days(day)
+            LEFT JOIN orders o ON o.order_date >= days.day AND o.order_date < days.day + interval '1 day'
+            GROUP BY days.day
+            ORDER BY days.day
+        `);
+        return c.json(rows.map((row) => ({ day: String(row.day), revenue: Number(row.revenue) })));
+    });
+});
+```
 
-            const { data: products } = await context.data
-                .collection<Record<string, unknown>>("products")
-                .find({ where: { active: ["==", true] } });
+## Desenhá-los
 
-            setStats({
-                totalOrders: orders.length,
-                totalRevenue: orders.reduce((sum, o) => sum + (o.total ?? 0), 0),
-                activeProducts: products.length,
-                recentOrders: orders.slice(0, 5)
-            });
-        }
-        loadStats();
-    }, []);
+`useInsightData(key, load)` carrega uma vez por chave e por usuário, e todo componente que lê a mesma chave compartilha o resultado. Os blocos desenham seus próprios estados de carregamento, erro e vazio:
+
+```tsx
+import { useRebaseClient } from "@rebasepro/app";
+import type { createRebaseClient } from "@rebasepro/client";
+import { ChartCard, KpiGrid, KpiTile, TimeSeriesChart, useInsightData } from "@rebasepro/plugin-insights";
+
+type RebaseClient = ReturnType<typeof createRebaseClient>;
+type Summary = { orders: number; previousOrders: number; revenue: number };
+type Day = { day: string; revenue: number };
+
+function DashboardView() {
+    const client = useRebaseClient<RebaseClient>();
+    const read = <T,>(path: string) => () => {
+        if (!client) throw new Error("No Rebase client");
+        return client.functions.invoke<T>("dashboard", undefined, { method: "GET", path });
+    };
+    const summary = useInsightData("dashboard/summary", read<Summary>("summary"));
+    const daily = useInsightData("dashboard/daily", read<Day[]>("daily"));
 
     return (
-        <div className="p-8">
-            <h1 className="text-xl font-semibold tracking-[-0.01em] mb-6">Dashboard</h1>
-            <div className="grid grid-cols-3 gap-4 mb-8">
-                <StatCard title="Total Orders" value={stats.totalOrders} />
-                <StatCard title="Revenue" value={`$${stats.totalRevenue.toFixed(2)}`} />
-                <StatCard title="Active Products" value={stats.activeProducts} />
-            </div>
-            <h2 className="text-sm font-semibold tracking-[-0.01em] mb-4">Recent Orders</h2>
-            <ul>
-                {stats.recentOrders.map(order => (
-                    <li key={order.id}>
-                        Order #{order.id} — ${order.total}
-                    </li>
-                ))}
-            </ul>
-        </div>
-    );
-}
-
-function StatCard({ title, value }: { title: string; value: string | number }) {
-    return (
-        <div className="bg-surface-100 dark:bg-surface-800 rounded-lg p-6">
-            <p className="text-xs text-surface-500">{title}</p>
-            <p className="text-xl font-semibold">{value}</p>
+        <div className="max-w-6xl mx-auto px-6 py-8">
+            <KpiGrid periodDays={30}>
+                <KpiTile
+                    label="Orders"
+                    icon="ShoppingCart"
+                    value={summary.data?.orders}
+                    previous={summary.data?.previousOrders}
+                    loading={summary.loading}
+                    error={summary.error}
+                />
+                <KpiTile
+                    label="Revenue"
+                    icon="DollarSign"
+                    value={summary.data?.revenue}
+                    format={{ style: "currency", currency: "USD", notation: "compact" }}
+                    loading={summary.loading}
+                    error={summary.error}
+                />
+            </KpiGrid>
+            <ChartCard title="Revenue per day" className="mt-4">
+                <TimeSeriesChart
+                    series={[{ id: "revenue", label: "Revenue", points: (daily.data ?? []).map((d) => ({ at: d.day, value: d.revenue })) }]}
+                    format={{ style: "currency", currency: "USD" }}
+                    loading={daily.loading}
+                    error={daily.error}
+                />
+            </ChartCard>
         </div>
     );
 }
 ```
+
+Os mesmos componentes podem ficar acima da lista de uma coleção ou no topo da página inicial via `<Rebase slots>` — `collection.widgets`, `home.children.start` — em vez de numa página própria.
 
 ## Registrar como uma Visualização Personalizada
 
@@ -162,33 +190,35 @@ Construa o caminho em vez de codificá-lo diretamente (hard-coding): as URLs de 
 `useSidePanel` abre uma entidade no painel lateral em vez de navegar, o que
 geralmente é o desejado para uma linha em uma lista.
 
-## Adicionando Gráficos
+## Gráficos que abrem seus registros
 
-Instale uma biblioteca de gráficos:
-
-```bash
-pnpm add recharts
-```
-
-Em seguida, use-a em seu dashboard:
+`BarChart` desenha categorias como barras com o valor ao lado. Com `onBarClick`, cada linha vira um botão: abra a lista filtrada pelo que a barra conta, ou um registro no painel lateral.
 
 ```tsx
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip } from "recharts";
+import { useUrlController } from "@rebasepro/cms";
+import { BarChart, ChartCard } from "@rebasepro/plugin-insights";
 
-function RevenueChart({ data }) {
+function OrdersByStatus({ counts, loading }: { counts?: Record<string, number>; loading: boolean }) {
+    const urls = useUrlController();
+    const statuses = [{ id: "pending", label: "Pending" }, { id: "shipped", label: "Shipped" }, { id: "delivered", label: "Delivered" }];
     return (
-        <LineChart width={600} height={300} data={data}>
-            <CartesianGrid strokeDasharray="3 3" />
-            <XAxis dataKey="date" />
-            <YAxis />
-            <Tooltip />
-            <Line type="monotone" dataKey="revenue" stroke="#8884d8" />
-        </LineChart>
+        <ChartCard title="Orders by status">
+            <BarChart
+                bars={statuses.map((s) => ({ key: s.id, label: s.label, value: counts?.[s.id] ?? 0 }))}
+                loading={loading}
+                onBarClick={(bar) => urls.navigate(
+                    `${urls.buildUrlCollectionPath("orders")}?status_op=${encodeURIComponent("==")}&status_value=${bar.key}`
+                )}
+            />
+        </ChartCard>
     );
 }
 ```
+
+Os gráficos são SVG com os tokens do próprio admin, no claro e no escuro, com leitura ao passar o mouse e pelas setas do teclado, e uma tabela para leitores de tela; nenhuma biblioteca de gráficos é necessária. Para uma forma que eles não desenham, qualquer biblioteca de gráficos React funciona dentro de um `ChartCard`.
 
 ## Próximos Passos
 
 - **[Custom Views](/docs/frontend)** — Visão geral do frontend
 - **[Hooks Reference](/docs/hooks)** — Hooks disponíveis
+- **[Slots](/docs/frontend/slots)** — Colocar os mesmos componentes na página inicial ou acima de uma coleção
