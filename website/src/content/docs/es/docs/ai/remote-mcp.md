@@ -1,21 +1,17 @@
 ---
-sourceHash: 929d8e7ae10aab87
-title: El endpoint MCP remoto
-sidebar_label: Endpoint MCP remoto
-description: "Sirve MCP desde un backend desplegado en /mcp, para que las personas que usan tu aplicación puedan conectar Claude o Cursor como ellas mismas: OAuth con una pantalla de consentimiento, nueve herramientas bajo tres alcances y cada llamada bajo su propia seguridad a nivel de fila."
+sourceHash: 219c4aa5108f13df
+title: El endpoint remoto de MCP
+sidebar_label: Endpoint remoto de MCP
+description: "Sirve MCP desde un backend desplegado en /mcp, para que las personas que usan tu aplicación puedan conectar Claude o Cursor en su propio nombre: OAuth con pantalla de consentimiento, nueve herramientas bajo tres scopes y cada llamada bajo su propia seguridad a nivel de fila."
 ---
 
-:::tip[¿Conectando Claude a tus propios proyectos?]
-Ese es el [conector de Rebase](/docs/ai/rebase-connector/): un conector para
-todos ellos, y un servidor autoalojado se une a él con `rebase cloud connect`. Esta
+:::tip[¿Conectar Claude a tus propios proyectos?]
+Para eso está el [conector de Rebase](/docs/ai/rebase-connector/): un conector para
+todos ellos, y un servidor autohospedado se une con `rebase cloud connect`. Esta
 página es para las personas que **usan** tu aplicación.
 :::
 
-El [servidor MCP](/docs/ai/mcp/) es una herramienta de desarrollo: se ejecuta en tu máquina y contiene una
-clave de servicio o una clave de API. Un backend desplegado también puede servir MCP por sí mismo, en `/mcp`, para
-las personas que usan tu aplicación. Un asistente conectado por una de ellas lee y
-escribe en el proyecto **como esa persona**, y cada llamada se ejecuta bajo su propia
-seguridad a nivel de fila.
+El [servidor MCP](/docs/ai/mcp/) es una herramienta para desarrolladores: se ejecuta en tu máquina y mantiene una clave de servicio o una clave de API. Un backend desplegado también puede servir MCP por sí mismo, en `/mcp`, para las personas que usan tu aplicación. Un asistente que cualquiera de ellos conecte lee y escribe en el proyecto **en nombre de esa persona**, y cada llamada se ejecuta bajo su propia seguridad a nivel de fila.
 
 Está desactivado a menos que lo actives, y ambas variables son obligatorias:
 
@@ -24,82 +20,24 @@ REBASE_MCP_ENABLED=true
 REBASE_PUBLIC_URL=https://app.example.com   # this deployment's real origin
 ```
 
-Sin `REBASE_PUBLIC_URL`, un secreto JWT o un controlador de datos que pueda restringir una consulta
-a un usuario, el endpoint se niega a montarse e indica el motivo en el registro de arranque. Ningún
-`REBASE_ROLE` lo activa.
+Sin `REBASE_PUBLIC_URL`, un secreto JWT o un controlador de datos que pueda limitar el alcance de una consulta a un usuario, el endpoint rechaza montarse y explica el motivo en el registro de inicio. Ningún `REBASE_ROLE` lo activa.
 
-- **OAuth, con una pantalla de consentimiento.** Un cliente encuentra el servidor de autorización
-  a través de `/.well-known/oauth-protected-resource`, se registra a sí mismo (el registro dinámico
-  está activado por defecto; `REBASE_MCP_OPEN_REGISTRATION=false` lo limita a
-  los clientes que registres) y envía a la persona a una pantalla de consentimiento que inicia su sesión
-  a través de tu `/auth/login` existente. A una cuenta con un segundo factor
-  se le solicita entonces su código de autenticador o un código de recuperación, a través de las
-  rutas existentes `/auth/mfa/challenge`. Cuando el propio frontend de tu aplicación
-  mantiene una sesión en el mismo navegador, la pantalla ofrece esa cuenta, y
-  Permitir otorga el consentimiento como tal sin contraseña; así es como se conecta alguien que solo
-  inicia sesión con Google, GitHub o un enlace por correo electrónico. De lo contrario, inicia sesión con una
-  contraseña, y quien no tenga una, establece una primero con `/auth/forgot-password`
-  ("¿Olvidó su contraseña?" de tu aplicación); la pantalla se lo indica. También nombra el host al que se envía el código de autorización,
-  y advierte que dicho host no está verificado: cualquiera puede registrar un cliente bajo
-  cualquier nombre, por lo que el host es la parte que una persona puede verificar.
-- **Nueve herramientas, tres alcances.** Los mismos [alcances (scopes)](/docs/backend/roles-and-scopes/)
-  que utiliza cada credencial. `data:read` ofrece `list_collections`, `describe_collection`,
-  `query_collection`, `show_collection`, `count_documents` y `get_document`; `data:write` añade `create_document` y
-  `update_document`; `data:delete` añade `delete_document`. Un cliente que no solicita
-  nada obtiene `data:read`. Cada uno se delimita a una colección: `data:read:posts`
-  lista, describe y lee `posts` y nada más. Un alcance decide qué herramientas se
-  ofrecen y a qué colecciones acceden, no a qué filas: una lista vacía puede ser
-  consecuencia del funcionamiento de RLS, y `data:write` aún no puede escribir una fila que la persona no podría.
-- **`show_collection` pone las filas frente a la persona.** Acepta los
-  argumentos de `query_collection` y responde la misma página, más las columnas que
-  muestra el panel de administración. Un cliente que renderiza MCP Apps, como Claude, lo abre como una
-  tabla en la conversación: la persona puede cargar más filas y, cuando
-  la conexión dispone de `data:write`, editar una celda directamente en el lugar. Cada guardado es una
-  llamada a `update_document` realizada en su nombre, bajo su RLS, y se le informa al modelo lo que
-  cambió. Un cliente sin MCP Apps, como Claude Code o Cursor, no muestra ninguna
-  tabla, y el modelo lee la página tal como lo haría desde `query_collection`.
-- **Las concesiones otorgadas antes de la versión 0.24 mantienen su alcance.** `mcp:read` se interpreta como
-  `data:read`, y `mcp:write` como `data:write data:delete`, tanto en concesiones almacenadas como
-  en tokens ya emitidos.
-- **Una clave de API también funciona.** `/mcp` también acepta `Authorization: Bearer rk_…`, para
-  un cliente configurado con un encabezado en lugar de un flujo OAuth. La clave accede a
-  las herramientas que cubren sus alcances `data:*`, actuando como quien corresponda: una
-  [clave personal](/docs/backend/api-keys/#personal-keys) como su propietario, una clave de servicio
-  como `api-key:<id>`.
-- **El vocabulario del SDK, las respuestas de REST.** Las herramientas aceptan lo que acepta el SDK —
-  `where` (`{"status": ["==", "paid"]}`), `orderBy` (`["created_at", "desc"]` o
-  `"created_at:desc"`), `limit`, `offset`, `searchString`, y `data` para una
-  escritura — y leen a través de la ruta de `GET /api/data/<collection>`, por lo que una fila se devuelve
-  como la entrega REST (fechas ISO, un `belongsTo` como su clave foránea, p. ej.
-  `authorId`) y se puede enviar de vuelta en una actualización sin cambios. `query_collection`
-  responde `{ data, meta }` con `meta.total` y `meta.hasMore`, y `count_documents`
-  `{ count }`. Al igual que en REST, se rechaza un `limit` superior a 1000, un argumento no declarado y una
-  edición o eliminación de una fila en la papelera (404); establecer el campo de borrado suave
-  en `null` la restaura. `deleted: "only"` (o `"include"`) en
-  `query_collection` y `count_documents` lee la papelera, al igual que hace
-  `?deleted=` de REST, de modo que una fila enviada a la papelera por `delete_document` se puede encontrar nuevamente para
-  restaurarla. Su descripción le indica al modelo que la eliminación es permanente solo cuando
-  la colección no tiene un campo de borrado suave.
-- **El listado nombra las colecciones; `describe_collection` proporciona el esquema de una.**
-  `list_collections` responde el `name`, `title` y `description` de cada colección,
-  y `describe_collection { collection }` los esquemas OpenAPI `row` y
-  `create` de esa colección, más `softDeleteField` donde las filas van a una papelera. Las descripciones
-  de las herramientas le indican al modelo que describa una colección antes de escribir en ella. El
-  listado de un proyecto de 200 colecciones ocupa alrededor de 5k tokens, y cada descripción
-  menos de 1k; con cada esquema incluido en el listado rondaba los 150k.
-- **Un token solo para este endpoint.** Un token de acceso de MCP es rechazado por
-  `/api/data`, `/api/admin` y el WebSocket, por lo que conectar un asistente no le
-  entrega una sesión.
+- **OAuth, con pantalla de consentimiento.** Un cliente encuentra el servidor de autorización mediante `/.well-known/oauth-protected-resource`, se registra a sí mismo (el registro dinámico está activado de forma predeterminada; `REBASE_MCP_OPEN_REGISTRATION=false` lo limita a los clientes que registres) y dirige a la persona a una pantalla de consentimiento que inicia su sesión a través de tu `/auth/login` existente. A una cuenta con un segundo factor de autenticación se le solicita luego su código de autenticador o un código de recuperación, a través de las rutas existentes `/auth/mfa/challenge`. Cuando el propio frontend de tu aplicación mantiene una sesión en el mismo navegador, la pantalla ofrece esa cuenta y Permitir da el consentimiento actuando como ella sin necesidad de contraseña; así es como se conecta alguien que solo inicia sesión con Google, GitHub o un enlace de correo electrónico. De lo contrario, inicia sesión con una contraseña, y quien no tenga una la establece primero con `/auth/forgot-password` ("¿Olvidaste tu contraseña?" de tu aplicación); la pantalla se lo indicará. También indica el host al que se envía el código de autorización y especifica que dicho host no está verificado: cualquiera puede registrar un cliente con cualquier nombre, por lo que el host es la parte que una persona puede comprobar.
+- **Once herramientas, tres scopes.** Los mismos [scopes](/docs/backend/roles-and-scopes/) que utiliza cualquier credencial. `data:read` ofrece `list_collections`, `describe_collection`, `query_collection`, `count_documents`, `get_document` y las tres vistas, `show_collection`, `show_record` y `show_app`; `data:write` añade `create_document` y `update_document`; `data:delete` añade `delete_document`. Un cliente que no solicita nada obtiene `data:read`. Cada uno puede restringirse a una colección: `data:read:posts` lista, describe y lee `posts` y nada más. Un scope decide qué herramientas se ofrecen y a qué colecciones acceden, no qué filas: una lista vacía puede ser RLS funcionando, y `data:write` aún así no puede escribir una fila que la persona no podría.
+- **Tres herramientas ponen tu panel de administración frente a la persona.** En un cliente que renderice MCP Apps, como Claude, abren las vistas propias del panel de administración en la conversación, generadas a partir de tus colecciones: sus campos, enums, validaciones, relaciones, secciones de formularios y configuraciones de vistas.
+  - `show_collection` toma los argumentos de `query_collection`, más `view` (`table`, `list`, `cards` o `kanban`), y abre la vista de la colección: la persona puede buscar, filtrar, ordenar y paginar, abrir el formulario de una fila y añadir filas.
+  - `show_record` abre el formulario de una fila (`id`), o un formulario para una nueva fila a partir de los `values` completados por el modelo, para que la persona los revise y guarde por sí misma.
+  - `show_app` abre una pantalla pequeña de hasta ocho `blocks`: vistas de colecciones, formularios de registros y métricas que cuentan las filas que coinciden con un `where`. Un bloque puede seguir la fila seleccionada en un bloque de colección anterior: un formulario que la abre (`"follows": {"block": "orders"}`), o una segunda colección que muestra las filas que apuntan a ella (`"follows": {"block": "orders", "on": "orderId"}`).
 
-Cada solicitud a `/mcp` vuelve a leer la cuenta de la persona. Una cuenta eliminada o deshabilitada,
-o un "cerrar sesión en todas partes" o cambio de contraseña después de que se emitió el token,
-detiene inmediatamente a un cliente conectado con un 401. Una degradación de permisos se aplica a su
-siguiente llamada a una herramienta. Cada actualización (refresh) realiza las mismas comprobaciones y rechaza dicha concesión
-definitivamente. Una sesión de invitado no puede otorgar consentimiento en absoluto.
+  Cada bloque se comprueba como lo harían las herramientas de lectura y escritura antes de abrir la pantalla. Cada lectura y guardado en la vista es una llamada de esas herramientas, realizada en nombre de la persona bajo su RLS, por lo que el formulario ofrece únicamente lo que su conexión tiene permitido: sin `data:write` es de solo lectura, y un campo que sus roles no pueden leer no aparecerá en él. Se informa al modelo sobre lo que han cambiado. Este lee las filas que responde cada herramienta, no las configuraciones de la colección con las que se dibuja la vista. Un cliente sin MCP Apps, como Claude Code o Cursor, no muestra nada y el modelo lee las mismas filas que obtendría de `query_collection`.
+- **Las autorizaciones otorgadas antes de la versión 0.24 mantienen su alcance.** `mcp:read` se interpreta como `data:read`, y `mcp:write` como `data:write data:delete`, tanto en las autorizaciones almacenadas como en los tokens ya emitidos.
+- **Una clave de API también funciona.** `/mcp` también acepta `Authorization: Bearer rk_…`, para un cliente configurado con un encabezado en lugar de un flujo OAuth. La clave accede a las herramientas cubiertas por sus scopes `data:*`, actuando según corresponda: una [clave personal](/docs/backend/api-keys/#personal-keys) como su propietario, una clave de servicio como `api-key:<id>`.
+- **El vocabulario del SDK, las respuestas de REST.** Las herramientas aceptan lo que acepta el SDK — `where` (`{"status": ["==", "paid"]}`), `orderBy` (`["created_at", "desc"]` o `"created_at:desc"`), `limit`, `offset`, `searchString` y `data` para una escritura — y leen a través de la ruta `GET /api/data/<collection>`, por lo que una fila se devuelve tal como la sirve REST (fechas ISO, un `belongsTo` como su clave foránea, p. ej. `authorId`) y se puede reenviar sin cambios en una actualización. `query_collection` responde `{ data, meta }` con `meta.total` y `meta.hasMore`, y `count_documents` `{ count }`. Al igual que en REST, se rechaza un `limit` superior a 1000, un argumento no declarado y la edición o eliminación de una fila en la papelera (404); establecer el campo de eliminación suave a `null` la restaura. `deleted: "only"` (o `"include"`) en `query_collection` y `count_documents` lee la papelera, del mismo modo que lo hace `?deleted=` en REST, por lo que una fila enviada a la papelera por `delete_document` se puede encontrar nuevamente para restaurarla. Su descripción le indica al modelo que la eliminación es permanente solo cuando la colección no cuenta con un campo de eliminación suave.
+- **El listado nombra las colecciones; `describe_collection` proporciona el esquema de una.** `list_collections` devuelve el `name`, `title` y `description` de cada colección, y `describe_collection { collection }` los esquemas OpenAPI `row` y `create` de esa colección, además de `softDeleteField` cuando las filas van a la papelera. Las descripciones de las herramientas le indican al modelo que describa una colección antes de escribir en ella. El listado de un proyecto con 200 colecciones ocupa unos 5k tokens, y cada descripción menos de 1k; si se incluyeran todos los esquemas en el listado, ocuparía unos 150k.
+- **Un token exclusivo para este endpoint.** `/api/data`, `/api/admin` y el WebSocket rechazan los tokens de acceso de MCP, por lo que conectar un asistente no le otorga una sesión.
 
-Una limitación. Desconectar un cliente (`DELETE /api/oauth/grants/:clientId`, con la
-propia sesión de la persona) revoca sus tokens de actualización de inmediato, pero un token de acceso
-ya emitido sigue funcionando hasta que caduca, dentro del plazo de una hora.
+Cada solicitud a `/mcp` vuelve a leer la cuenta de la persona. Una cuenta eliminada o deshabilitada, o un "cerrar sesión en todos lados" o cambio de contraseña posterior a la emisión del token, detiene inmediatamente a un cliente conectado con un error 401. Una degradación de permisos se aplica en su siguiente llamada a una herramienta. Cada actualización de token realiza las mismas comprobaciones y rechaza dicha autorización de forma permanente. Una sesión de invitado no puede otorgar consentimiento alguno.
 
-Las rutas se encuentran en [Endpoints](/docs/backend/endpoints/#mcp-surface) y las
-variables en [Configuración](/docs/getting-started/configuration/#mcp-surface).
+Una limitación. Desconectar un cliente (`DELETE /api/oauth/grants/:clientId`, con la propia sesión de la persona) revoca de inmediato sus tokens de actualización, pero un token de acceso ya emitido sigue funcionando hasta que expire, dentro del plazo de una hora.
+
+Las rutas se encuentran en [Endpoints](/docs/backend/endpoints/#mcp-surface) y las variables en [Configuración](/docs/getting-started/configuration/#mcp-surface).
