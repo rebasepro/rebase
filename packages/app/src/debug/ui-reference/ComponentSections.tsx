@@ -1,7 +1,8 @@
 /**
  * The kit components the element chapters of the reference did not show:
  * overlays (Dialog, Sheet, Popover, Menubar), disclosure and layout
- * (ExpandablePanel, Collapse, ResizablePanels, CenteredView), the rest of the
+ * (ExpandablePanel, Collapse, ResizablePanels, CenteredView), the split view
+ * at a wide and a narrow width, the rest of the
  * form controls, and the data components (Badge, InfoLabel, Markdown,
  * VirtualTable). Each is shown in the states product code uses — disabled,
  * error, open — so a screen built from it has something to copy.
@@ -20,6 +21,7 @@ import {
     CenteredView,
     type ChipColorKey,
     CircularProgressCenter,
+    cls,
     Collapse,
     ColorPicker,
     DateTimeField,
@@ -56,6 +58,8 @@ import {
     SelectItem,
     Sheet,
     Slider,
+    SPLIT_VIEW_MIN_WIDTH,
+    SplitView,
     TextareaAutosize,
     TextField,
     ToggleButtonGroup,
@@ -63,7 +67,7 @@ import {
     VirtualTable,
     type VirtualTableColumn
 } from "@rebasepro/ui";
-import { SectionBlock, SpecimenLabel } from "./SectionBlock";
+import { Dot, SectionBlock, SpecimenLabel } from "./SectionBlock";
 
 /* ══════════════════════════════════════════════════════════════════════
    Overlays — Dialog, Sheet, Popover, Menubar
@@ -221,6 +225,85 @@ export function DisclosureLayoutSection() {
                     <SpecimenLabel>CircularProgressCenter · a loading pane</SpecimenLabel>
                     <div className="h-32 border border-hairline rounded-lg flex">
                         <CircularProgressCenter size="small" text="Loading records…"/>
+                    </div>
+                </div>
+            </div>
+        </SectionBlock>
+    );
+}
+
+/* ══════════════════════════════════════════════════════════════════════
+   Split view — the same list and record in a wide box and a narrow one
+══════════════════════════════════════════════════════════════════════ */
+const SPLIT_ORDERS = [
+    { id: "1041", customer: "Alice Johnson", total: "€128.00", status: "Paid", hue: "bg-green-500" },
+    { id: "1042", customer: "Marco Rossi", total: "€54.90", status: "Pending", hue: "bg-amber-500" },
+    { id: "1043", customer: "Chen Wei", total: "€310.50", status: "Refunded", hue: "bg-surface-400" }
+];
+
+function SplitViewSpecimen() {
+    const [selectedId, setSelectedId] = useState<string | null>("1041");
+    const selected = SPLIT_ORDERS.find((order) => order.id === selectedId);
+    const master = (
+        <div className="flex flex-col gap-0.5 p-2 overflow-y-auto">
+            {SPLIT_ORDERS.map((order) => (
+                <button
+                    key={order.id}
+                    type="button"
+                    aria-current={order.id === selectedId ? "true" : undefined}
+                    onClick={() => setSelectedId(order.id)}
+                    className={cls(
+                        "flex items-center gap-3 rounded-lg px-3 py-2 text-left transition-colors",
+                        "focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/50",
+                        order.id === selectedId ? "bg-surface-active" : "hover:bg-surface-hover"
+                    )}>
+                    <span className="min-w-0 flex-1 flex flex-col">
+                        <Typography variant="body2" component="span" className="truncate">#{order.id} · {order.customer}</Typography>
+                        <Typography variant="caption" component="span" color="secondary" className="inline-flex items-center gap-1.5">
+                            <Dot className={order.hue}/>{order.status}
+                        </Typography>
+                    </span>
+                    <Typography variant="mono" component="span" color="secondary" className="text-xs">{order.total}</Typography>
+                </button>
+            ))}
+        </div>
+    );
+    const detail = selected && (
+        <div className="flex flex-col gap-3 p-4 overflow-y-auto">
+            <TextField size="large" label="Customer" value={selected.customer} onChange={() => {}}/>
+            <TextField size="large" label="Total" value={selected.total} onChange={() => {}}/>
+        </div>
+    );
+    return (
+        <SplitView
+            master={master}
+            detail={detail}
+            detailTitle={selected ? `Order #${selected.id}` : undefined}
+            onBack={() => setSelectedId(null)}
+        />
+    );
+}
+
+export function SplitViewSection() {
+    return (
+        <SectionBlock id="split-view" title="Split view">
+            <Typography variant="body2" color="secondary" className="mb-4 max-w-[68ch]">
+                A master-detail layout that measures its own box, never the window. From{" "}
+                <code className="font-mono text-xs">SPLIT_VIEW_MIN_WIDTH</code> ({SPLIT_VIEW_MIN_WIDTH}px) up the list
+                and the record sit side by side; narrower, choosing a row covers the list with the record under a back
+                bar. The two boxes below hold the same view — pick a row in the narrow one, then go back.
+            </Typography>
+            <div className="flex flex-col gap-6">
+                <div>
+                    <SpecimenLabel>SplitView · wide box, side by side</SpecimenLabel>
+                    <div className="h-72 border border-hairline rounded-lg overflow-hidden">
+                        <SplitViewSpecimen/>
+                    </div>
+                </div>
+                <div>
+                    <SpecimenLabel>SplitView · 400px box, drill-down</SpecimenLabel>
+                    <div className="h-72 w-[400px] max-w-full border border-hairline rounded-lg overflow-hidden">
+                        <SplitViewSpecimen/>
                     </div>
                 </div>
             </div>

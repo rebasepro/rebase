@@ -58,7 +58,8 @@ function exportedComponents(file: string, seen = new Set<string>()): Set<string>
     for (const m of source.matchAll(/^export\s+\*\s+from\s+["'](\.[^"']+)["']/gm)) {
         exportedComponents(resolveModule(path.dirname(file), m[1]), seen).forEach(n => names.add(n));
     }
-    for (const m of source.matchAll(/^export\s+(?:const|function|class)\s+([A-Z][A-Za-z0-9]*)/gm)) {
+    // A whole PascalCase name: `SPLIT_VIEW_MIN_WIDTH` is a constant, not a component called `SPLIT`.
+    for (const m of source.matchAll(/^export\s+(?:const|function|class)\s+([A-Z][A-Za-z0-9]*)(?![A-Za-z0-9_])/gm)) {
         names.add(m[1]);
     }
     // `export { A, B }` and `export { A } from "./x"`, but not `export type { … }`.

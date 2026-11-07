@@ -8,7 +8,8 @@ import {
     DataDisplaySection,
     DisclosureLayoutSection,
     MoreControlsSection,
-    OverlaysSection
+    OverlaysSection,
+    SplitViewSection
 } from "../src/debug/ui-reference/ComponentSections";
 
 /**
@@ -39,6 +40,16 @@ describe("UI reference component chapters", () => {
         }
         expect(screen.getByRole("separator", { name: "Resize the list" })).toBeInTheDocument();
         expect(screen.getByRole("group", { name: "View mode" })).toBeInTheDocument();
+    });
+
+    it("shows the split view side by side and drilled down", () => {
+        render(<SplitViewSection/>);
+        expect(screen.getByRole("heading", { name: "Split view" })).toBeInTheDocument();
+        // jsdom measures every box as 0px wide, so both specimens take the
+        // narrow layout: the selected order covers the list under a back bar.
+        expect(screen.getAllByRole("button", { name: "Back" })).toHaveLength(2);
+        fireEvent.click(screen.getAllByRole("button", { name: "Back" })[0]);
+        expect(screen.getAllByRole("button", { name: "Back" })).toHaveLength(1);
     });
 
     it("opens the dialog with its title and actions", () => {

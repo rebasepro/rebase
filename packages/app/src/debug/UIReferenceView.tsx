@@ -99,7 +99,8 @@ import {
     DataDisplaySection,
     DisclosureLayoutSection,
     MoreControlsSection,
-    OverlaysSection
+    OverlaysSection,
+    SplitViewSection
 } from "./ui-reference/ComponentSections";
 
 /** The page's chapters, in reading order: the system first, then the elements built on it. */
@@ -119,6 +120,7 @@ const SECTIONS: { id: string; label: string; icon: React.ComponentType<{ size?: 
     { id: "more-controls", label: "More form controls", icon: FileTextIcon, group: "Controls" },
     { id: "overlays", label: "Overlays", icon: AppWindow, group: "Controls" },
     { id: "disclosure", label: "Disclosure and layout", icon: ColumnsIcon, group: "Controls" },
+    { id: "split-view", label: "Split view", icon: PanelLeftIcon, group: "Controls" },
     { id: "chips-alerts", label: "Chips and alerts", icon: TagIcon, group: "Controls" },
     { id: "data", label: "Cards and data", icon: LayoutGridIcon, group: "Controls" },
     { id: "data-display", label: "Data display", icon: ListIcon, group: "Controls" },
@@ -977,6 +979,7 @@ selected: true }, { name: "Tags" }].map(c => (
                 <MoreControlsSection/>
                 <OverlaysSection/>
                 <DisclosureLayoutSection/>
+                <SplitViewSection/>
 
                 {/* ═══════════════════════════════════════════════
                     SECTION: Chips & Alerts
