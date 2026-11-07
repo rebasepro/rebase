@@ -150,14 +150,15 @@ const PRIORITY_ACTIVE_REQUEST = 3000;
  * How wide a column of this property wants to be — the Tailwind class the cell
  * gets, and the pixel cost of that class. The two are returned together because
  * they must not drift: the budget is only meaningful if it describes the widths
- * actually rendered. `lg:` variants key off the viewport, not this panel, so a
- * narrow split on a wide screen gets the larger of the two — the cost we budget.
+ * actually rendered. The wider variant keys off the collection view's width,
+ * not the list's, so a narrow split in a wide view gets the larger of the two —
+ * the cost we budget.
  */
 function getIdealColumnWidth(prop: Property): { width: string, widthPx: number } {
     if (prop.type === "string" && "enum" in prop) return { width: "flex-shrink-0 w-32", widthPx: 128 };
     if (prop.type === "date" || prop.type === "number" || prop.type === "boolean") return { width: "flex-shrink-0 w-28", widthPx: 112 };
-    if (prop.type === "reference" || prop.type === "relation") return { width: "flex-shrink-0 w-56 lg:w-64", widthPx: 256 };
-    if (prop.type === "string") return { width: "flex-shrink-0 w-40 lg:w-48", widthPx: 192 };
+    if (prop.type === "reference" || prop.type === "relation") return { width: "flex-shrink-0 w-56 @5xl/collection:w-64", widthPx: 256 };
+    if (prop.type === "string") return { width: "flex-shrink-0 w-40 @5xl/collection:w-48", widthPx: 192 };
     return { width: "flex-shrink-0 w-40", widthPx: 160 };
 }
 

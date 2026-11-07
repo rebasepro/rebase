@@ -1,7 +1,8 @@
 import React, { useContext, useLayoutEffect, useRef, useState } from "react";
 
 import { CircularProgress, cls, SearchBar } from "@rebasepro/ui";
-import { useLargeLayout, useTranslation } from "@rebasepro/app";
+import { useTranslation } from "@rebasepro/app";
+import { useCollectionLargeLayout } from "../../CollectionViewBinding/useElementWidth";
 
 export interface CollectionTableToolbarProps {
     loading: boolean;
@@ -34,8 +35,9 @@ const ToolbarLabelsContext = React.createContext(true);
  *
  * Decided by the toolbar's own width, not the window's: a relation tab beside
  * the split list is a narrow toolbar in a wide window, and its labelled
- * controls overflowed the left group and were drawn over the search bar.
- * `true` outside a toolbar.
+ * controls overflowed the left group and were drawn over the search bar. And
+ * by the collection view's: a view narrower than its large layout draws its
+ * controls icon-only, as a phone does. `true` outside a toolbar.
  */
 export function useToolbarLabels(): boolean {
     return useContext(ToolbarLabelsContext);
@@ -101,7 +103,7 @@ export function CollectionTableToolbar({
     compact = false
 }: CollectionTableToolbarProps) {
 
-    const largeLayout = useLargeLayout();
+    const largeLayout = useCollectionLargeLayout();
     const { t } = useTranslation();
 
     const containerRef = useRef<HTMLDivElement>(null);
@@ -124,11 +126,11 @@ export function CollectionTableToolbar({
                 scrolls. */}
             <div
                 ref={rowRef}
-                className={"px-2 md:px-4 flex flex-row justify-between items-center min-w-full w-max"}>
+                className={"px-2 @3xl/collection:px-4 flex flex-row justify-between items-center min-w-full w-max"}>
 
-                <ToolbarLabelsContext.Provider value={labelled}>
+                <ToolbarLabelsContext.Provider value={labelled && largeLayout}>
 
-                    <div className="flex items-center gap-1 md:mr-4 mr-2">
+                    <div className="flex items-center gap-1 @3xl/collection:mr-4 mr-2">
 
                         {/* View toggle — hidden in compact */}
                         {!compact && viewModeToggle}

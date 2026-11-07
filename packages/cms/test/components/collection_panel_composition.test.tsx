@@ -8,7 +8,7 @@
  * saved state of the collection's own page.
  */
 import React from "react";
-import { beforeEach, describe, expect, it, jest } from "@jest/globals";
+import { afterEach, beforeEach, describe, expect, it, jest } from "@jest/globals";
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { BrowserRouter } from "react-router";
 import type { DataDriver, Entity } from "@rebasepro/types";
@@ -362,5 +362,63 @@ describe("a panel's title", () => {
         expect(await screen.findByText("Write the plan")).toBeTruthy();
         expect(screen.queryByRole("heading", { level: 4, name: "Tasks" })).toBeNull();
         expect(screen.queryByText("Tasks")).toBeNull();
+    });
+});
+
+describe("a panel's size", () => {
+    it("is its rows when its parent gives it no height", async () => {
+        render(<Page><CollectionPanel collection={tasks} viewMode={"table"}/></Page>);
+        expect(await screen.findByText("Write the plan")).toBeTruthy();
+        const table = document.getElementById("virtual-table")!;
+        const root = table.closest("[style*='max-height']") as HTMLElement;
+        // A header and two rows, not the 900px the table was measured at.
+        expect(parseFloat(root.style.height)).toBeGreaterThan(0);
+        expect(parseFloat(root.style.height)).toBeLessThan(300);
+    });
+});
+
+describe("a panel's layout", () => {
+    const realRect = HTMLElement.prototype.getBoundingClientRect;
+    const realMatchMedia = window.matchMedia;
+
+    function measureViewsAt(width: number) {
+        HTMLElement.prototype.getBoundingClientRect = function (this: HTMLElement) {
+            const rect = realRect.call(this);
+            if (!this.className.includes("@container/collection")) return rect;
+            return { x: 0, y: 0, top: 0, left: 0, bottom: 600, right: width, height: 600, width, toJSON: () => ({}) };
+        };
+    }
+
+    beforeEach(() => {
+        // The window is wide.
+        window.matchMedia = ((query: string) => ({
+            matches: true,
+            media: query,
+            onchange: null,
+            addListener: () => undefined,
+            removeListener: () => undefined,
+            addEventListener: () => undefined,
+            removeEventListener: () => undefined,
+            dispatchEvent: () => false
+        })) as typeof window.matchMedia;
+    });
+    afterEach(() => {
+        HTMLElement.prototype.getBoundingClientRect = realRect;
+        window.matchMedia = realMatchMedia;
+    });
+
+    it("follows the view's own width, not the window's", async () => {
+        measureViewsAt(600);
+        render(<Page><CollectionPanel collection={tasks} viewMode={"table"}/></Page>);
+        expect(await screen.findByText("Write the plan")).toBeTruthy();
+        // Icon-only in a narrow view, in a wide window.
+        await waitFor(() => expect(screen.getByRole("button", { name: /add task/i }).textContent).toBe(""));
+    });
+
+    it("is labelled in a wide view", async () => {
+        measureViewsAt(1280);
+        render(<Page><CollectionPanel collection={tasks} viewMode={"table"}/></Page>);
+        expect(await screen.findByText("Write the plan")).toBeTruthy();
+        await waitFor(() => expect(screen.getByRole("button", { name: /add task/i }).textContent).toMatch(/add task/i));
     });
 });

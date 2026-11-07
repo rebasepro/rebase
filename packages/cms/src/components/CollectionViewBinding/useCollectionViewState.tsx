@@ -31,7 +31,6 @@ import {
     useCustomizationController,
     useData,
     useDataTableController,
-    useLargeLayout,
     populateFetchCache,
     usePermissions,
     useScrollRestoration,
@@ -807,8 +806,6 @@ parentEntityIds: parentEntityIds ?? EMPTY_ARRAY,
         setLastDeleteTimestamp(Date.now());
     }, []);
 
-    const largeLayout = useLargeLayout();
-
     const isSplitLayout = openEntityMode === "split";
     const isCompact = isSplitLayout && selectedEntityIdProp !== undefined;
     const activeSelectionEnabled = !isCompact && selectionEnabled;
@@ -850,13 +847,15 @@ parentEntityIds: parentEntityIds ?? EMPTY_ARRAY,
         return actions;
     }, [canDelete, collection, path, createEnabled, isLinkedChildView, editAction]);
 
-    const getIdColumnWidth = useCallback(() => {
+    // Handed the table's layout: the table is drawn inside the view's own
+    // box, and that box's width is what decides it.
+    const getIdColumnWidth = useCallback((largeLayout: boolean) => {
         const entityActions = getActionsForEntity({});
         const collapsedActions = entityActions.filter(a => a.collapsed !== false);
         const uncollapsedActions = entityActions.filter(a => a.collapsed === false);
         const actionsWidth = uncollapsedActions.length * (largeLayout ? 40 : 30);
         return (largeLayout ? (80 + actionsWidth) : (70 + actionsWidth)) + (collapsedActions.length > 0 ? (largeLayout ? 40 : 30) : 0);
-    }, [getActionsForEntity, largeLayout]);
+    }, [getActionsForEntity]);
 
     const customEntityActions = useMemo(() => (collection.entityActions ?? EMPTY_ARRAY)
         .map(action => resolveEntityAction(action, customizationController.entityActions))

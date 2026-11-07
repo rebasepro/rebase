@@ -1,7 +1,7 @@
 import type { Properties } from "@rebasepro/types";
 
 import React, { useCallback } from "react";
-import { useAuthController, useLargeLayout, useTranslation, useSlot } from "@rebasepro/app";
+import { useAuthController, useTranslation, useSlot } from "@rebasepro/app";
 import { CollectionActionsProps, EntityTableController, SelectionController, SelectionQuery, AdminCollection, ViewMode } from "@rebasepro/cms-types";
 import { ErrorBoundary, iconSize } from "@rebasepro/ui";
 import { IconButton, Skeleton, Tooltip, XIcon } from "@rebasepro/ui";
@@ -69,7 +69,6 @@ export function CollectionViewStartActions<M extends Record<string, unknown>>({
 }: CollectionViewStartActionsProps<M>) {
 
     const context = useAdminContext();
-    const largeLayout = useLargeLayout();
     const toolbarLabels = useToolbarLabels();
     const { t } = useTranslation();
 
@@ -118,7 +117,7 @@ parentEntityIds,
     // follow: keyed on `compact` alone they stayed 20px next to a 16px filter
     // icon at every width below `largeLayout`. A toolbar too narrow for its
     // labels (`useToolbarLabels`) is a narrow layout too, whatever the window.
-    const iconOnlyToolbar = !largeLayout || Boolean(compact) || !toolbarLabels;
+    const iconOnlyToolbar = Boolean(compact) || !toolbarLabels;
 
     const filtersButton = resolvedProperties && (
         <FiltersButton

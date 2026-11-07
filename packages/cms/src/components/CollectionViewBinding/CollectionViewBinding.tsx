@@ -12,6 +12,7 @@ import { CollectionViewScopeContext } from "./CollectionViewScope";
 import { CollectionToolbarSlot, CollectionToolbarSlotContext, DEFAULT_TOOLBAR } from "./CollectionToolbar";
 import { CollectionViewContent } from "./CollectionViewContent";
 import { CollectionViewDialogs } from "./CollectionViewDialogs";
+import { CollectionViewFrame } from "./CollectionViewFrame";
 import { EntitiesCount } from "./EntitiesCount";
 
 export { EntitiesCount } from "./EntitiesCount";
@@ -216,8 +217,7 @@ const CollectionViewBindingInner = React.memo(
 
         return (
             <CollectionViewScopeContext.Provider value={state}>
-            <div className={cls("overflow-hidden h-full w-full rounded-md flex flex-col bg-surface-sheet", props.className)}
-                ref={containerRef}>
+            <CollectionViewFrame className={props.className} containerRef={containerRef}>
 
                 {/* Fetches the count and reports it — the toolbar renders it. */}
                 <EntitiesCount
@@ -275,7 +275,7 @@ const CollectionViewBindingInner = React.memo(
                         {collectionSurface}
                     </SplitListView>
                 ) : (
-                    <div className="flex flex-col w-full h-full">
+                    <div className="flex flex-col w-full h-full min-h-0">
                         {toolbarNode}
                         {/* `min-h-0` is what lets the board scroll its columns.
                             A flex item defaults to `min-height: auto`, so this
@@ -283,8 +283,12 @@ const CollectionViewBindingInner = React.memo(
                             in a 883px area — and the ancestor's `overflow-hidden`
                             simply cut the rest off, with each column's own
                             scroller never reaching its limit. */}
+                        {/* `max-h-dvh` for a view whose parent gives it no
+                            height: it draws its rows, up to the window's
+                            height, and scrolls inside that — rather than
+                            growing with every page it loads. */}
                         <div className={cls(
-                            "flex-1 min-h-0 flex flex-col",
+                            "flex-1 min-h-0 max-h-dvh flex flex-col",
                             (viewMode === "list" || viewMode === "cards") && "overflow-y-auto"
                         )}>
                             {collectionSurface}
@@ -294,7 +298,7 @@ const CollectionViewBindingInner = React.memo(
 
                 <CollectionViewDialogs state={state}/>
 
-            </div>
+            </CollectionViewFrame>
             </CollectionViewScopeContext.Provider>
         );
     }, collectionViewPropsEqual) as React.FunctionComponent<CollectionViewBindingProps<any>>;

@@ -142,7 +142,12 @@ export type CollectionTableBindingProps<M extends Record<string, unknown>,
 
         emptyComponent?: React.ReactNode;
 
-        getIdColumnWidth?: () => number;
+        /**
+         * The ID column's width. Handed whether the table is in its large
+         * layout — its view wide enough to freeze the column — so the width
+         * can follow it.
+         */
+        getIdColumnWidth?: (largeLayout: boolean) => number;
 
 
         enablePopupIcon: boolean;

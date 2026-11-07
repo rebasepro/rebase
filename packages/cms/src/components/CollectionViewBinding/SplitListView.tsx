@@ -10,7 +10,8 @@ import {
     isKeyHandled,
     ResizablePanels
 } from "@rebasepro/ui";
-import { useLargeLayout, UnsavedChangesDialog, useNavigationBlocker, useTranslation } from "@rebasepro/app";
+import { UnsavedChangesDialog, useNavigationBlocker, useTranslation } from "@rebasepro/app";
+import { useCollectionLargeLayout } from "./useElementWidth";
 import { useCollectionRegistryController } from "../../hooks/navigation/contexts/CollectionRegistryContext";
 import { useNavigate, useLocation } from "react-router";
 import { useUrlController } from "../../hooks/navigation/contexts/UrlContext";
@@ -151,7 +152,7 @@ export function SplitListView<M extends Record<string, unknown> = Record<string,
     children
 }: SplitListViewProps<M>) {
     const { t } = useTranslation();
-    const largeLayout = useLargeLayout();
+    const largeLayout = useCollectionLargeLayout();
     const collectionRegistryController = useCollectionRegistryController();
     const location = useLocation();
     const isEditMode = location.pathname.endsWith("/edit") || location.pathname.split("/").pop() === "edit";

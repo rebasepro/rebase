@@ -38,6 +38,12 @@ import {
 import { arrayMove, horizontalListSortingStrategy, SortableContext, useSortable } from "@dnd-kit/sortable";
 
 
+/** The body a table with no rows keeps, for its empty, loading or error view. */
+const EMPTY_BODY_HEIGHT = 240;
+
+/** Room for a horizontal scrollbar under the last row, where one is drawn. */
+const SCROLLBAR_ALLOWANCE = 16;
+
 const VirtualListContext = createContext<VirtualTableContextProps<Record<string, unknown>>>(null! as VirtualTableContextProps<Record<string, unknown>>);
 VirtualListContext.displayName = "VirtualListContext";
 
@@ -450,6 +456,21 @@ position });
             extraData
         }), [data, rowHeight, cellRenderer, columns, onRowClick, customView, onColumnResizeInternal, onColumnResizeEndInternal, filterInput, onColumnSort, onFilterUpdateInternal, sortIndex, hoverRow, createFilterField, rowClassName, endAdornment, AddColumnComponent, onColumnsOrderChange, draggingColumnId, extraData]);
 
+        // The height the table takes when nothing gives it one: its header and
+        // every row — or room for the empty, loading or error view — plus a
+        // horizontal scrollbar where the columns overflow. It is the flex
+        // basis, so in a parent of definite height the table still fills it
+        // (grow) or scrolls inside it (shrink, capped at 100%); in one without
+        // — a page, a panel with only a max-height — a short table is as tall
+        // as its rows.
+        const rowCount = data?.length ?? 0;
+        const bodyHeight = rowCount > 0
+            ? (rowCount + (endAdornment ? 1 : 0)) * rowHeight
+            : EMPTY_BODY_HEIGHT;
+        const columnsWidth = columns.reduce((sum, column) => sum + column.width, 0);
+        const scrollbarHeight = bounds.width > 0 && columnsWidth > bounds.width ? SCROLLBAR_ALLOWANCE : 0;
+        const contentHeight = headerHeight + bodyHeight + scrollbarHeight;
+
         // Get sortable column keys (excluding frozen columns)
         const sortableColumnKeys = columns
             .filter(col => !col.frozen)
@@ -458,9 +479,13 @@ position });
         const tableContent = (
             <div
                 ref={measureRef}
-                style={style}
+                style={{
+                    height: contentHeight,
+                    maxHeight: "100%",
+                    ...style
+                }}
                 className={cls(
-                    "h-full w-full",
+                    "w-full min-h-0 grow",
                     className,
                     draggingColumnId && "overflow-hidden"
                 )}>

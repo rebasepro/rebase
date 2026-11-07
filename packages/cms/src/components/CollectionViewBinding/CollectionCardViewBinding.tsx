@@ -40,46 +40,6 @@ export type CollectionCardViewBindingProps<M extends Record<string, unknown> = R
 };
 
 /**
- * Get grid column classes based on the size.
- * Smaller size = more columns (smaller cards)
- * Larger size = fewer columns (larger cards)
- */
-function getGridColumnsClass(size: CollectionSize): string {
-    switch (size) {
-        case "xs":
-            // Compact: many small cards
-            return "grid-cols-4 sm:grid-cols-5 md:grid-cols-6 lg:grid-cols-8 xl:grid-cols-10";
-        case "s":
-            // Small: more cards per row
-            return "grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-8";
-        case "m":
-            // Medium: balanced (default)
-            return "grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6";
-        case "l":
-            // Large: fewer, bigger cards
-            return "grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-4";
-        case "xl":
-            // Extra large: fewest, biggest cards
-            return "grid-cols-1 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3";
-        default:
-            return "grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6";
-    }
-}
-
-function getScrollParent(element: HTMLElement | null): HTMLElement | null {
-    if (!element) return null;
-    let parent = element.parentElement;
-    while (parent) {
-        const overflowY = window.getComputedStyle(parent).overflowY;
-        if (overflowY === "auto" || overflowY === "scroll") {
-            return parent;
-        }
-        parent = parent.parentElement;
-    }
-    return document.documentElement;
-}
-
-/**
  * Card grid view for displaying entities with infinite scroll.
  * Alternative to the CollectionTableBinding for visual browsing.
  */

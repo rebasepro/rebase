@@ -1,6 +1,6 @@
 import React from "react";
 import { getCollectionDataPath } from "@rebasepro/types";
-import { useLargeLayout, useTranslation } from "@rebasepro/app";
+import { useTranslation } from "@rebasepro/app";
 import { SearchBar } from "@rebasepro/ui";
 import { CollectionTableToolbar, useToolbarLabels } from "../CollectionTableBinding/internal/CollectionTableToolbar";
 import { FiltersButton } from "./FiltersButton";
@@ -81,14 +81,13 @@ export function CollectionSearchBar() {
  */
 export function CollectionFiltersButton() {
     const { tableController, resolvedCollection, collection, isCompact } = useCollectionViewScope("CollectionFiltersButton");
-    const largeLayout = useLargeLayout();
     const toolbarLabels = useToolbarLabels();
     return (
         <FiltersButton
             tableController={tableController}
             properties={resolvedCollection.properties}
             fixedFilter={collection.fixedFilter}
-            iconOnly={!largeLayout || isCompact || !toolbarLabels}/>
+            iconOnly={isCompact || !toolbarLabels}/>
     );
 }
 

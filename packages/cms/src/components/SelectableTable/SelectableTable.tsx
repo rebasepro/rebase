@@ -281,7 +281,7 @@ export const SelectableTable = function SelectableTable<M extends Record<string,
     return (
         <SelectableTableContext.Provider
             value={contextValue}>
-            <div className="h-full w-full flex flex-col bg-surface-card"
+            <div className="h-full min-h-0 w-full flex flex-col bg-surface-card"
                 ref={ref}>
 
                  <VirtualTable

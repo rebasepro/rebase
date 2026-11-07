@@ -2,7 +2,7 @@
 
 import React, { Suspense } from "react";
 
-import { useLargeLayout, useTranslation, useSlot, resolveComponentRef } from "@rebasepro/app";
+import { useTranslation, useSlot, resolveComponentRef } from "@rebasepro/app";
 import { CollectionActionsProps, EntityTableController, SelectionController, AdminCollection } from "@rebasepro/cms-types";
 import { Button, IconButton, Tooltip, Popover, iconSize, lazyChunk } from "@rebasepro/ui";
 import { ErrorBoundary, Link2Icon, MoreVerticalIcon, Trash2Icon, Unlink2Icon } from "@rebasepro/ui";
@@ -64,11 +64,10 @@ export function CollectionViewActions<M extends Record<string, unknown>>({
 
     const { canDelete } = usePermissions();
 
-    const largeLayout = useLargeLayout();
     const toolbarLabels = useToolbarLabels();
-    // Labelled controls on a wide layout whose toolbar has room for them;
-    // their icon-only forms otherwise.
-    const labelled = largeLayout && !compact && toolbarLabels;
+    // Labelled controls where the toolbar has room for them — a wide view
+    // and labels that fit; their icon-only forms otherwise.
+    const labelled = !compact && toolbarLabels;
     const { t } = useTranslation();
 
     // Check if the collection editor context is available (ConfigControllerProvider present)
@@ -135,7 +134,7 @@ export function CollectionViewActions<M extends Record<string, unknown>>({
                 startIcon={<RemoveIcon size={iconSize.small} className={"shrink-0"}/>}
                 onClick={onMultipleDeleteClick}
                 color={"neutral"}
-                className="lg:min-w-20"
+                className="@5xl/collection:min-w-20"
             >
                 ({countLabel})
             </Button>

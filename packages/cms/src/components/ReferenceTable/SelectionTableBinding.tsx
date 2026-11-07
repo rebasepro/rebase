@@ -13,7 +13,6 @@ import {
     useCustomizationController,
     useData,
     useDataTableController,
-    useLargeLayout,
     usePermissions,
     useTranslation
 } from "@rebasepro/app";
@@ -21,6 +20,7 @@ import { ErrorView } from "@rebasepro/app";
 import { Button, DialogActions, PlusIcon, Typography } from "@rebasepro/ui";
 import { IconForView } from "@rebasepro/app";
 import { useSelectionController } from "../CollectionViewBinding/useSelectionController";
+import { CollectionViewLayoutContext, LARGE_COLLECTION_WIDTH, useCollectionLargeLayout, useElementWidth } from "../CollectionViewBinding/useElementWidth";
 
 import { useColumnIds } from "@rebasepro/app";
 import { useSideDialogContext } from "../SideDialogs";
@@ -316,10 +316,16 @@ function SelectionTableBindingInternal<M extends Record<string, unknown>>(
         updateUrl: false
     });
 
+    // The picker lays its table out by its own width, as a collection view
+    // does: a dialog is narrow in a wide window.
+    const [measureRef, width] = useElementWidth<HTMLDivElement>();
+    const large = width > 0 ? width >= LARGE_COLLECTION_WIDTH : undefined;
+
     return (
 
         <CollectionScopeProvider collection={collection}>
-        <div className="flex flex-col h-full">
+        <CollectionViewLayoutContext.Provider value={large}>
+        <div className="@container/collection flex flex-col h-full" ref={measureRef}>
 
             <div className="grow">
                 {entitiesDisplayedFirst &&
@@ -366,6 +372,7 @@ function SelectionTableBindingInternal<M extends Record<string, unknown>>(
                 </Button>
             </DialogActions>
         </div>
+        </CollectionViewLayoutContext.Provider>
         </CollectionScopeProvider>
 
     );
@@ -386,7 +393,7 @@ function EntitySelectionDialogActions({
 
     const { canCreate } = usePermissions();
 
-    const largeLayout = useLargeLayout();
+    const largeLayout = useCollectionLargeLayout();
     const { t } = useTranslation();
 
     const onClick: MouseEventHandler<HTMLButtonElement> | undefined = onNewClick

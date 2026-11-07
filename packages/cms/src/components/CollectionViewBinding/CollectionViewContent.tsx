@@ -193,7 +193,7 @@ export function CollectionViewContent({ state }: { state: CollectionViewState })
         <div
             className={cls(
                 "flex flex-col w-full",
-                detailOpen ? "" : "max-w-6xl mx-auto px-3 md:px-4 lg:px-6 py-4"
+                detailOpen ? "" : "max-w-6xl mx-auto px-3 @3xl/collection:px-4 @5xl/collection:px-6 py-4"
             )}
         >
             {/* Collapsible title — grid-rows for smooth height, transform for GPU */}

@@ -1,6 +1,6 @@
 import React, { useContext } from "react";
 import type { AdminCollection } from "@rebasepro/cms-types";
-import { useLargeLayout, usePermissions, useTranslation } from "@rebasepro/app";
+import { usePermissions, useTranslation } from "@rebasepro/app";
 import { Button, IconButton, iconSize, PlusIcon } from "@rebasepro/ui";
 import { useToolbarLabels } from "../CollectionTableBinding/internal/CollectionTableToolbar";
 import { CollectionViewScopeContext } from "./CollectionViewScope";
@@ -34,7 +34,6 @@ export type CollectionAddButtonProps = {
 export function CollectionAddButton(props: CollectionAddButtonProps) {
     const scope = useContext(CollectionViewScopeContext);
     const { canCreate } = usePermissions();
-    const largeLayout = useLargeLayout();
     const toolbarLabels = useToolbarLabels();
     const { t } = useTranslation();
 
@@ -44,8 +43,8 @@ export function CollectionAddButton(props: CollectionAddButtonProps) {
     const compact = props.compact ?? scope?.isCompact ?? false;
     if (!collection || path === undefined || !onClick || !canCreate(collection, path)) return null;
 
-    // Labelled on a wide layout whose toolbar has room for it.
-    const labelled = largeLayout && !compact && toolbarLabels;
+    // Labelled where the toolbar has room for it.
+    const labelled = !compact && toolbarLabels;
     const label = t("add_specific", { name: collection.singularName ?? collection.name });
 
     return labelled

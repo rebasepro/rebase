@@ -5,7 +5,8 @@ import { Entity, User, Property } from "@rebasepro/types";
 import { CollectionSize, RebaseContext } from "@rebasepro/cms-types";
 import { PropertyTableCell } from "./PropertyTableCell";
 import { ErrorBoundary } from "@rebasepro/ui";
-import { useRebaseContext, useLargeLayout, useCollectionScope, useCustomizationController } from "@rebasepro/app";
+import { useRebaseContext, useCollectionScope, useCustomizationController } from "@rebasepro/app";
+import { useCollectionLargeLayout } from "../CollectionViewBinding/useElementWidth";
 import { CellRendererParams, VirtualTableColumn } from "@rebasepro/ui";
 import { CollectionRowActions } from "./CollectionRowActions";
 import { CollectionTableToolbar } from "./internal/CollectionTableToolbar";
@@ -89,7 +90,7 @@ export const CollectionTableBinding = function CollectionTableBinding<M extends 
 
     const ref = useRef<HTMLDivElement>(null);
 
-    const largeLayout = useLargeLayout();
+    const largeLayout = useCollectionLargeLayout();
     // Asked per row rather than held as a list: a query selection has no list,
     // and the one this replaced would have answered with whatever the view had
     // scrolled. `highlightedEntities` is the fallback the table has always had
@@ -328,7 +329,7 @@ export const CollectionTableBinding = function CollectionTableBinding<M extends 
 
     const idColumn: VirtualTableColumn = useMemo(() => ({
         key: "id_ewcfedcswdf3",
-        width: getIdColumnWidth?.() ?? (largeLayout ? 140 : 120),
+        width: getIdColumnWidth?.(largeLayout) ?? (largeLayout ? 140 : 120),
         title: "ID",
         resizable: false,
         frozen: largeLayout,
@@ -403,7 +404,7 @@ export const CollectionTableBinding = function CollectionTableBinding<M extends 
 
         <div ref={ref}
             style={style}
-            className={cls("h-full w-full flex flex-col bg-surface-card", className)}>
+            className={cls("h-full min-h-0 w-full flex flex-col bg-surface-card", className)}>
 
             {!hideToolbar && <CollectionTableToolbar
                 onTextSearch={onTextSearch}
