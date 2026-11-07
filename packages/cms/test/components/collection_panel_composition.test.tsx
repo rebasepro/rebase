@@ -12,7 +12,7 @@ import { afterEach, beforeEach, describe, expect, it, jest } from "@jest/globals
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { BrowserRouter } from "react-router";
 import type { DataDriver, Entity } from "@rebasepro/types";
-import type { AdminCollection, EntityAction, UserConfigurationPersistence } from "@rebasepro/cms-types";
+import type { AdminCollection, AnySlotContribution, EntityAction, UserConfigurationPersistence } from "@rebasepro/cms-types";
 import { Rebase } from "@rebasepro/app";
 import {
     CollectionAddButton,
@@ -108,10 +108,15 @@ function savedConfig(saved: Record<string, Row>): UserConfigurationPersistence &
     };
 }
 
-function Page({ children, persistence }: { children: React.ReactNode, persistence?: UserConfigurationPersistence }) {
+function Page({ children, persistence, slots }: {
+    children: React.ReactNode,
+    persistence?: UserConfigurationPersistence,
+    slots?: AnySlotContribution[]
+}) {
     return (
         <Rebase authController={authController} storageSource={{} as never}
             userConfigPersistence={persistence}
+            slots={slots}
             dataSources={[{ key: "(default)", engine: "postgres", driver }]}>
             <BrowserRouter>
                 <main data-testid={"host-page"}>{children}</main>
@@ -420,5 +425,58 @@ describe("a panel's layout", () => {
         render(<Page><CollectionPanel collection={tasks} viewMode={"table"}/></Page>);
         expect(await screen.findByText("Write the plan")).toBeTruthy();
         await waitFor(() => expect(screen.getByRole("button", { name: /add task/i }).textContent).toMatch(/add task/i));
+    });
+});
+
+describe("the plugin slots of a collection view", () => {
+    function marker(name: string): AnySlotContribution {
+        return {
+            slot: name,
+            Component: () => <span data-testid={`slot:${name}`}/>
+        } as AnySlotContribution;
+    }
+
+    it("are all drawn: the toolbar's, the table's and a row's", async () => {
+        const slots = ["collection.toolbar", "collection.actions", "collection.actions.start", "collection.add-column", "entity.row.actions"]
+            .map(marker);
+        render(<Page slots={slots}><CollectionPanel collection={tasks} viewMode={"table"}/></Page>);
+        expect(await screen.findByText("Write the plan")).toBeTruthy();
+        for (const name of ["collection.toolbar", "collection.actions", "collection.actions.start", "collection.add-column"]) {
+            expect(screen.getAllByTestId(`slot:${name}`).length).toBeGreaterThan(0);
+        }
+        expect(screen.getAllByTestId("slot:entity.row.actions")).toHaveLength(2);
+    });
+
+    it("draw the list's widgets", async () => {
+        render(<Page slots={[marker("collection.widgets")]}><CollectionPanel collection={tasks} viewMode={"list"}/></Page>);
+        expect(await screen.findByText("Write the plan")).toBeTruthy();
+        expect(screen.getByTestId("slot:collection.widgets")).toBeTruthy();
+    });
+
+    it("draw the empty state of an empty collection", async () => {
+        rows = [];
+        render(<Page slots={[marker("collection.empty-state")]}><CollectionPanel collection={tasks} viewMode={"table"}/></Page>);
+        expect(await screen.findByTestId("slot:collection.empty-state")).toBeTruthy();
+    });
+
+    it("draw the error view of a collection that failed to load", async () => {
+        const failing: DataDriver = { ...driver, fetchCollection: async () => { throw new Error("boom"); } };
+        render(
+            <Rebase authController={authController} storageSource={{} as never}
+                slots={[marker("collection.error")]}
+                dataSources={[{ key: "(default)", engine: "postgres", driver: failing }]}>
+                <BrowserRouter>
+                    <CollectionPanel collection={tasks} viewMode={"table"}/>
+                </BrowserRouter>
+            </Rebase>
+        );
+        expect(await screen.findByTestId("slot:collection.error")).toBeTruthy();
+    });
+
+    it("keep the toolbar's when the toolbar is composed of the default", async () => {
+        render(<Page slots={[marker("collection.toolbar")]}>
+            <CollectionPanel collection={tasks} viewMode={"table"} toolbar={<CollectionToolbar/>}/>
+        </Page>);
+        expect(await screen.findByTestId("slot:collection.toolbar")).toBeTruthy();
     });
 });
