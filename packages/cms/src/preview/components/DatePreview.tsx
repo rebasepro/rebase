@@ -3,6 +3,7 @@ import React from "react";
 import { format } from "date-fns";
 import { useCustomizationController } from "@rebasepro/app";
 import { defaultDateFormat } from "@rebasepro/utils";
+import type { Locale as DateFnsLocale } from "date-fns";
 import { getLoadedDateFnsLocale, loadDateFnsLocale } from "./date_fns_locales";
 
 export interface DatePreviewProps {
@@ -11,7 +12,7 @@ export interface DatePreviewProps {
      * Display mode: "date" for date-only, "date_time" for date and time,
      * "time" for a time of day (a `time` column) with no day at all
      */
-    mode?: "date" | "date_time" | "time";
+    mode?: DatePreviewMode;
     /**
      * IANA timezone identifier (e.g., "America/New_York")
      * When specified, the date will be displayed in this timezone
@@ -44,34 +45,34 @@ function cachedFormatter(key: string, build: () => Intl.DateTimeFormat): Intl.Da
     return formatter;
 }
 
+export type DatePreviewMode = "date" | "date_time" | "time";
+
+export interface DatePreviewFormatOptions {
+    mode?: DatePreviewMode;
+    timezone?: string;
+    /** The admin's configured locale (`customizationController.locale`). */
+    locale?: string;
+    /** The admin's configured format (`customizationController.dateTimeFormat`). */
+    dateTimeFormat?: string;
+    /** The date-fns locale matching `locale`, once it has loaded. */
+    dateFnsLocale?: DateFnsLocale;
+}
+
 /**
- * @group Preview components
+ * The text a `DatePreview` shows, and the zone abbreviation drawn after it.
+ *
+ * Pulled out of the component so the table can size a date column from the
+ * very string its cells will render — see `getDateColumnWidth`. Two copies of
+ * this logic would drift, and a column a few characters too narrow wraps every
+ * date in it onto a second line the row has no height for.
  */
-export function DatePreview({
-    date,
+export function formatDatePreview(date: Date, {
     mode = "date_time",
-    timezone
-}: DatePreviewProps): React.ReactElement {
-
-    const customizationController = useCustomizationController();
-    const configuredLocale = customizationController?.locale;
-
-    // The locale arrives asynchronously now (see `date_fns_locales`). Seed from
-    // the cache so only the very first date on a page renders un-localised: by
-    // the time a table of them mounts, the module is already resolved and there
-    // is no second pass.
-    const [dateUtilsLocale, setDateUtilsLocale] = React.useState(() => getLoadedDateFnsLocale(configuredLocale));
-    React.useEffect(() => {
-        let cancelled = false;
-        loadDateFnsLocale(configuredLocale)
-            .then(loaded => { if (!cancelled) setDateUtilsLocale(loaded); })
-            .catch(error => console.error(`[rebase] could not load the "${configuredLocale}" date locale`, error));
-        return () => { cancelled = true; };
-    }, [configuredLocale]);
-
-    if (!date || !(date instanceof Date) || isNaN(date.getTime())) {
-        return <></>;
-    }
+    timezone,
+    locale,
+    dateTimeFormat,
+    dateFnsLocale
+}: DatePreviewFormatOptions): { text: string, zone?: string } {
 
     // If timezone is specified, format in that timezone using Intl.DateTimeFormat
     if (timezone) {
@@ -90,31 +91,22 @@ export function DatePreview({
             options.minute = "2-digit";
         }
 
-        const locale = customizationController?.locale ?? "en-US";
-        const formatter = cachedFormatter(`${locale}|${timezone}|${mode}`, () => new Intl.DateTimeFormat(locale, options));
-        const formattedDate = formatter.format(date);
+        const intlLocale = locale ?? "en-US";
+        const formatter = cachedFormatter(`${intlLocale}|${timezone}|${mode}`, () => new Intl.DateTimeFormat(intlLocale, options));
+        const text = formatter.format(date);
 
         // A day on its own has no time for a zone to qualify.
-        const tzAbbrev = mode === "date_time"
+        const zone = mode === "date_time"
             ? cachedFormatter(`en-US|${timezone}|zone`, () => new Intl.DateTimeFormat("en-US", {
                 timeZone: timezone,
                 timeZoneName: "short"
-            })).formatToParts(date).find(p => p.type === "timeZoneName")?.value ?? ""
-            : "";
+            })).formatToParts(date).find(p => p.type === "timeZoneName")?.value
+            : undefined;
 
-        return (
-            // A date is a measured value: the mono tier, tabular, so a column of
-            // them lines up and a live one does not jitter. Size and colour are
-            // inherited from where it sits — a table cell, a form value.
-            <span className="flex items-center gap-1 font-mono tabular-nums">
-                {formattedDate}
-                {tzAbbrev && (
-                    <span className="text-xs text-slate-500 dark:text-slate-400">
-                        ({tzAbbrev})
-                    </span>
-                )}
-            </span>
-        );
+        return {
+            text,
+            zone: zone || undefined
+        };
     }
 
     // No timezone specified: use local formatting with date-fns
@@ -123,19 +115,82 @@ export function DatePreview({
         dateFormat = "p"; // e.g., "9:30 AM"
     } else if (mode === "date") {
         // Date-only format (no time)
-        dateFormat = customizationController?.dateTimeFormat
-            ? customizationController.dateTimeFormat.replace(/[, ]*[HhKk].*$/, "").trim()
+        dateFormat = dateTimeFormat
+            ? dateTimeFormat.replace(/[, ]*[HhKk].*$/, "").trim()
             : "PP"; // e.g., "Apr 29, 2024"
     } else {
         // Full date-time format
-        dateFormat = customizationController?.dateTimeFormat ?? defaultDateFormat;
+        dateFormat = dateTimeFormat ?? defaultDateFormat;
     }
 
-    const formattedDate = format(date, dateFormat, { locale: dateUtilsLocale });
+    return { text: format(date, dateFormat, { locale: dateFnsLocale }) };
+}
+
+/**
+ * The date-fns locale for the admin's configured locale.
+ *
+ * The locale arrives asynchronously (see `date_fns_locales`). Seeded from the
+ * cache so only the very first date on a page renders un-localised: by the
+ * time a table of them mounts, the module is already resolved and there is no
+ * second pass.
+ */
+export function useDateFnsLocale(): DateFnsLocale | undefined {
+    const customizationController = useCustomizationController();
+    const configuredLocale = customizationController?.locale;
+    const [dateFnsLocale, setDateFnsLocale] = React.useState(() => getLoadedDateFnsLocale(configuredLocale));
+    React.useEffect(() => {
+        let cancelled = false;
+        loadDateFnsLocale(configuredLocale)
+            .then(loaded => { if (!cancelled) setDateFnsLocale(loaded); })
+            .catch(error => console.error(`[rebase] could not load the "${configuredLocale}" date locale`, error));
+        return () => { cancelled = true; };
+    }, [configuredLocale]);
+    return dateFnsLocale;
+}
+
+/**
+ * @group Preview components
+ */
+export function DatePreview({
+    date,
+    mode = "date_time",
+    timezone
+}: DatePreviewProps): React.ReactElement {
+
+    const customizationController = useCustomizationController();
+    const dateFnsLocale = useDateFnsLocale();
+
+    if (!date || !(date instanceof Date) || isNaN(date.getTime())) {
+        return <></>;
+    }
+
+    const { text, zone } = formatDatePreview(date, {
+        mode,
+        timezone,
+        locale: customizationController?.locale,
+        dateTimeFormat: customizationController?.dateTimeFormat,
+        dateFnsLocale
+    });
+
+    // A date is a measured value: the mono tier, tabular, so a column of them
+    // lines up and a live one does not jitter. Size and colour are inherited
+    // from where it sits — a table cell, a form value. One line, always: a
+    // date broken after its year reads as two values, and in a table row the
+    // second line is cut off by the row. Too narrow a space ends it in "…".
+    if (zone) {
+        return (
+            <span className="flex items-center gap-1 min-w-0 font-mono tabular-nums whitespace-nowrap">
+                <span className="truncate">{text}</span>
+                <span className="shrink-0 text-xs text-slate-500 dark:text-slate-400">
+                    ({zone})
+                </span>
+            </span>
+        );
+    }
 
     return (
-        <span className="font-mono tabular-nums">
-            {formattedDate}
+        <span className="min-w-0 truncate font-mono tabular-nums">
+            {text}
         </span>
     );
 }

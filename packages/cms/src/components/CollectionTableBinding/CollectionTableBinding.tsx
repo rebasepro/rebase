@@ -5,14 +5,14 @@ import { Entity, User, Property } from "@rebasepro/types";
 import { CollectionSize, RebaseContext } from "@rebasepro/cms-types";
 import { PropertyTableCell } from "./PropertyTableCell";
 import { ErrorBoundary } from "@rebasepro/ui";
-import { useRebaseContext, useLargeLayout, useCollectionScope } from "@rebasepro/app";
+import { useRebaseContext, useLargeLayout, useCollectionScope, useCustomizationController } from "@rebasepro/app";
 import { CellRendererParams, VirtualTableColumn } from "@rebasepro/ui";
 import { CollectionRowActions } from "./CollectionRowActions";
 import { CollectionTableToolbar } from "./internal/CollectionTableToolbar";
 import { CollectionTableBindingProps } from "./CollectionTableBindingProps";
 import { EntityTableCell } from "./internal/EntityTableCell";
 import { CustomFieldValidator } from "../../form/validation";
-import { renderSkeletonText } from "../../preview";
+import { renderSkeletonText, useDateFnsLocale } from "../../preview";
 import { propertiesToColumns } from "./column_utils";
 import { ErrorView } from "@rebasepro/app";
 import { SelectableTable } from "../SelectableTable/SelectableTable";
@@ -276,12 +276,25 @@ export const CollectionTableBinding = function CollectionTableBinding<M extends 
     // collection's driver can answer.
     const engine = useCollectionScope()?.engine;
 
+    // Date columns are sized from the dates they will show, which depends on
+    // how the admin formats them.
+    const customizationController = useCustomizationController();
+    const dateFnsLocale = useDateFnsLocale();
+    const locale = customizationController?.locale;
+    const dateTimeFormat = customizationController?.dateTimeFormat;
+    const dateFormatting = useMemo(
+        () => ({ locale, dateTimeFormat, dateFnsLocale }),
+        [locale, dateTimeFormat, dateFnsLocale]
+    );
+
     const collectionColumns: VirtualTableColumn[] = useMemo(() => {
         const columnsResult: VirtualTableColumn[] = propertiesToColumns({
             properties,
             sortable,
             fixedFilter,
             engine,
+            dateFormatting,
+            inlineEditing,
             AdditionalHeaderWidget
         });
 
@@ -302,7 +315,7 @@ export const CollectionTableBinding = function CollectionTableBinding<M extends 
                 }))
             : [];
         return [...columnsResult, ...additionalTableColumns];
-    }, [properties, sortable, fixedFilter, engine, AdditionalHeaderWidget, additionalFields]);
+    }, [properties, sortable, fixedFilter, engine, dateFormatting, inlineEditing, AdditionalHeaderWidget, additionalFields]);
 
     // Held by value: the widget is an element, and a caller that builds it
     // inline hands over a new one on every render. Each new one rebuilt the

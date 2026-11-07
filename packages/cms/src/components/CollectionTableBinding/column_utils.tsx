@@ -1,10 +1,10 @@
 import type { Properties, Property, RelationProperty } from "@rebasepro/types";
 import React from "react";
-import { getTableCellAlignment, getTablePropertyColumnWidth } from "./internal/common";
+import { DateColumnFormatting, getTableCellAlignment, getTablePropertyColumnWidth } from "./internal/common";
 import { FilterValues } from "@rebasepro/types";
 import { VirtualTableColumn } from "@rebasepro/ui";
 import { getResolvedPropertyInPath } from "../../util/property_utils";
-import { getColumnKeysForProperty, isPropertyFilterable } from "@rebasepro/app";
+import { getColumnKeysForProperty, isPropertyFilterable, isReadOnly } from "@rebasepro/app";
 
 export function buildIdColumn(largeLayout?: boolean): VirtualTableColumn {
     return {
@@ -28,6 +28,13 @@ export interface PropertiesToColumnsParams<M extends Record<string, unknown>> {
      * falls back to the default engine's capabilities.
      */
     engine?: string;
+    /**
+     * The admin's locale and date format, which decide how wide a date
+     * column must be to keep its dates on one line.
+     */
+    dateFormatting?: DateColumnFormatting;
+    /** Whether cells are edited in place: an editable date is an input, not the preview. */
+    inlineEditing?: boolean;
     AdditionalHeaderWidget?: React.ComponentType<{
         property: Property,
         propertyKey: string,
@@ -35,7 +42,7 @@ export interface PropertiesToColumnsParams<M extends Record<string, unknown>> {
     }>;
 }
 
-export function propertiesToColumns<M extends Record<string, unknown>>({ properties, sortable, fixedFilter, engine, AdditionalHeaderWidget }: PropertiesToColumnsParams<M>): VirtualTableColumn[] {
+export function propertiesToColumns<M extends Record<string, unknown>>({ properties, sortable, fixedFilter, engine, dateFormatting, inlineEditing, AdditionalHeaderWidget }: PropertiesToColumnsParams<M>): VirtualTableColumn[] {
     // A fixed filter locks its own fields, not the table: the user's filters
     // on every other column combine with it. It used to switch every header
     // filter off, while the filters dialog went on offering the same fields.
@@ -65,7 +72,10 @@ export function propertiesToColumns<M extends Record<string, unknown>>({ propert
                 title: property.name ?? key as string,
                 sortable: sortable && sortableProperty(property),
                 filter: !isFixed(key) && filterable,
-                width: getTablePropertyColumnWidth(property),
+                width: getTablePropertyColumnWidth(property, {
+                    ...dateFormatting,
+                    editable: Boolean(inlineEditing) && !isReadOnly(property)
+                }),
                 resizable: true,
                 custom: {
                     resolvedProperty: property,
