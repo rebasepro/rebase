@@ -80,7 +80,7 @@ export interface InsightDefinition {
     id: string;
     /** Display title */
     title: string;
-    /** The key in {@link InsightsPluginConfig.sources} this insight reads. */
+    /** The key of the source this insight reads. */
     source: string;
     /** The field holding the value, and how to write it. */
     value: {
@@ -90,37 +90,4 @@ export interface InsightDefinition {
     comparison?: InsightComparison;
     /** Optional icon key (e.g., "ShoppingCart", "Users"), resolved via `getIcon` */
     icon?: string;
-}
-
-/**
- * Full plugin configuration passed to `useInsightsPlugin`.
- *
- * Collection-level insights (`collections.<slug>`) are rendered in two places
- * automatically:
- * - **Collection list view**: Scorecards appear inline below the title and
- *   above the data list.
- * - **Home page cards**: Scorecards are rendered as compact figures inside
- *   each collection's card on the home page.
- */
-export interface InsightsPluginConfig {
-    /** The comparison window. Defaults to 30 days. */
-    period?: InsightPeriodConfig;
-
-    /** Where the figures come from, by name. Insights refer to these keys. */
-    sources: Record<string, InsightSource>;
-
-    /**
-     * Insight definitions keyed by placement.
-     *
-     * - `home`: Rendered at the top of the home page via `home.children.start`.
-     * - `collections.<slug>`: Rendered inline in that collection's list view
-     *   and as compact figures on its home card.
-     */
-    insights: {
-        home?: InsightDefinition[];
-        collections?: Record<string, InsightDefinition[]>;
-    };
-
-    /** Optional cache TTL in milliseconds (default: 60_000) */
-    cacheTTL?: number;
 }

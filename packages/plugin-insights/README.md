@@ -109,13 +109,13 @@ The places a component can go: `home.children.start` (top of the home page),
 collection and its path), `home.card.widget` (on a collection's home card), a
 page in `<RebaseCMS views>`, and the others in `@rebasepro/cms`'s recipes README.
 
-## Deprecated: `useInsightsPlugin`
+## Moving off `useInsightsPlugin`
 
 `useInsightsPlugin(config)` — named `sources`, a list of insight definitions,
-and slots chosen for you — still works, and warns once that it is deprecated.
-So do the pieces it is made of: `InsightsProvider`, `useInsightsEngine`,
-`InsightsEngine`, `resolvePeriod`, `useInsightSource`, `InsightsScorecardView`,
-`InsightWidget` and `InsightsRow`, and the `Insight*` types. To move off it:
+and slots chosen for you — is gone. The pieces it was made of still work and
+are deprecated: `InsightsProvider`, `useInsightsEngine`, `InsightsEngine`,
+`resolvePeriod`, `useInsightSource`, `InsightsScorecardView`, `InsightWidget`
+and `InsightsRow`, and the `Insight*` types. To move a config over:
 
 - each source becomes a `useInsightData(key, load)` call, with the window in
   the loader's query;

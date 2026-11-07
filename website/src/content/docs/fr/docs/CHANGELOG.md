@@ -107,13 +107,19 @@ La traduction est à venir. Le contenu ci-dessous est en anglais.
 
 ### Deprecated
 
-- **`useInsightsPlugin`** and the pieces it is made of (`InsightsProvider`,
+- **The pieces `useInsightsPlugin` was made of** (`InsightsProvider`,
   `useInsightsEngine`, `InsightsEngine`, `resolvePeriod`, `useInsightSource`,
   `InsightsScorecardView`, `InsightWidget`, `InsightsRow`) in
-  `@rebasepro/plugin-insights`. They still work; `useInsightsPlugin` warns
-  once. Put `KpiTile`, `KpiReadout` and the charts in `<Rebase slots>`
-  yourself, reading figures with `useInsightData`; the package README maps
-  each config field to its replacement.
+  `@rebasepro/plugin-insights`. They still work. Put `KpiTile`, `KpiReadout`
+  and the charts in `<Rebase slots>` yourself, reading figures with
+  `useInsightData`.
+
+### Removed
+
+- **`useInsightsPlugin` and `InsightsPluginConfig`** in
+  `@rebasepro/plugin-insights`. Put `KpiTile`, `KpiReadout` and the charts in
+  `<Rebase slots>` yourself, reading figures with `useInsightData`; the
+  package README maps each config field to its replacement.
 
 ### Fixed
 

@@ -15,8 +15,8 @@ export type { SeriesColor } from "./blocks/charts/palette";
 export { formatNumber, compactFormat, describeChange, niceTicks } from "./blocks/numbers";
 export type { Change, ChangeDirection, ChangeTone } from "./blocks/numbers";
 
-// ── Deprecated: the configured plugin, its engine and widgets ─────────
-// Kept working, and warned about once, until they are removed.
+// ── Deprecated: the configured plugin's engine and widgets ────────────
+// Kept working until they are removed.
 export type {
     DataRow,
     InsightFormat,
@@ -25,11 +25,8 @@ export type {
     InsightPeriod,
     InsightPeriodConfig,
     InsightSource,
-    InsightSourceContext,
-    InsightsPluginConfig
+    InsightSourceContext
 } from "./types";
-
-export { useInsightsPlugin } from "./useInsightsPlugin";
 
 export { InsightsProvider, useInsightsEngine } from "./engine/InsightsProvider";
 export { InsightsEngine, resolvePeriod } from "./engine/InsightsEngine";
