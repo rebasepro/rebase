@@ -53,25 +53,50 @@ A tradução está pendente. O conteúdo abaixo está em inglês.
 
 #### MCP
 
-- **The admin panel's own views open in Claude.** In a client that renders MCP
-  Apps, `show_collection` now opens the collection view the admin panel draws —
-  table, list, cards or kanban (`view`), with its search, filters, sorting and
-  paging, relation previews and enum chips — and a row opens the record form,
-  with its sections, validation and relation pickers. The person can add and
-  delete rows there too. Two tools join it: `show_record` opens one row's form
-  (`id`), or a form for a new row starting from `values` the model filled in,
-  for the person to check and save; `show_app` opens a small screen of up to
-  eight blocks (collection views, record forms, and metrics that count rows),
-  where a block can follow the row selected in another — orders, and beside
-  them the selected order's form and its items. The view runs `<Rebase>` with
-  a data driver whose every read and write is a call to the server's tools,
-  as the person, under their RLS; the server hands it the collections'
+- **The admin panel's own views open in Claude, and Claude builds apps on
+  your data.** In a client that renders MCP Apps, `show_collection` now opens
+  the collection view the admin panel draws — table, list, cards or kanban
+  (`view`), with its search, filters, sorting and paging — and a row opens the
+  record form, with its sections, validation and relation pickers.
+  `show_record` opens one row's form, or a form for a new row starting from
+  `values` the model filled in, for the person to check and save. `show_app`
+  takes a React component the model writes (`code`) and the `collections` it
+  reads: the server compiles it, so a mistake comes back as the call's error
+  with its line, and the view runs it with the UI kit, the insights plugin's
+  KPI tiles and charts, and `@rebasepro/mcp-apps` — `useQuery`, `useRecord`,
+  `useCount`, `useMutate`, the admin panel's `CollectionView` and
+  `RecordForm`, `openRecord`. Every read and write is a call to the server's
+  tools, as the person, under their RLS; a change an app makes is confirmed
+  by them first; what they change, and an app that fails, are told to the
+  model with their next message. The server hands the view the collections'
   configs reduced to data, without the fields that caller never receives, and
-  closes what their connection was not granted. A save the server plans
-  first (the hosted connector's `write`) waits for the person to confirm the
-  plan, and the model is told what they changed. The model reads the rows, not
-  the configs. Images and files show as labels: the view fetches nothing
-  itself.
+  closes what their connection was not granted. The model reads the rows, not
+  the configs.
+
+#### Admin (CMS & app)
+
+- **KPI tiles and charts you place yourself.** `@rebasepro/plugin-insights`
+  now exports building blocks: `KpiTile`, `KpiReadout` and `KpiGrid` for
+  headline figures with their change on the previous window, `ChartCard`,
+  `TimeSeriesChart` (lines, or a line with a wash) and `BarChart` (horizontal
+  bars that can be buttons), and `useInsightData`, which loads a key once per
+  signed-in user and shares it with every reader for a TTL. Put them in
+  `<Rebase slots>`, a page or a collection view. The charts are SVG with no
+  chart library, drawn in the kit's tokens in both themes, with a hover and
+  arrow-key readout and a table for screen readers. The demo app shows revenue
+  per day and top products on the home page, and orders by status and open
+  tickets by priority above those lists; a bar opens the list filtered to what
+  it counts.
+
+### Deprecated
+
+- **`useInsightsPlugin`** and the pieces it is made of (`InsightsProvider`,
+  `useInsightsEngine`, `InsightsEngine`, `resolvePeriod`, `useInsightSource`,
+  `InsightsScorecardView`, `InsightWidget`, `InsightsRow`) in
+  `@rebasepro/plugin-insights`. They still work; `useInsightsPlugin` warns
+  once. Put `KpiTile`, `KpiReadout` and the charts in `<Rebase slots>`
+  yourself, reading figures with `useInsightData`; the package README maps
+  each config field to its replacement.
 
 ### Fixed
 
