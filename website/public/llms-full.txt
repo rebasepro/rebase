@@ -4379,6 +4379,14 @@ yet, listed so that nobody reads a promise into them:
   they are authenticated by the code, the PKCE verifier and the client, never
   a cookie. Every other route keeps the check, the consent decision included.
 
+- **`show_collection`'s table fits the conversation.** Column titles stay on
+  one line (a long one made the header row two or three rows tall), a fade
+  on the edge says there are more columns to scroll to, and where the host
+  offers it an Expand button opens the table fullscreen, with a header that
+  stays as the rows scroll. An image address shows as the image, or as a
+  small "Image" label where the host blocks outside images, instead of the
+  raw URL; a list of plain values reads `Rock, 90s`.
+
 ### [0.28.2] - 2026-11-06
 
 #### Added

@@ -5,6 +5,9 @@ import {
     Button,
     Chip,
     CircularProgress,
+    IconButton,
+    ImageIcon,
+    Maximize2Icon,
     Select,
     SelectItem,
     Table,
@@ -13,12 +16,14 @@ import {
     TableHeader,
     TableRow,
     TextField,
+    Tooltip,
     Typography,
     cls,
     getColorSchemeForKey,
-    getColorSchemeForSeed
+    getColorSchemeForSeed,
+    iconSize
 } from "@rebasepro/ui";
-import { isRecord, type McpAppBridge, type ToolResult } from "../bridge";
+import { isRecord, type HostContext, type McpAppBridge, type ToolResult } from "../bridge";
 
 /** A column as show_collection describes it (`tableColumns` in the server's `mcp-tools.ts`). */
 interface Column {
@@ -96,6 +101,11 @@ export function CollectionTable({ bridge }: { bridge: McpAppBridge }) {
     const inputRef = useRef<Record<string, unknown>>({});
     const editsRef = useRef<Edit[]>([]);
     const rootRef = useRef<HTMLDivElement>(null);
+    const [context, setContext] = useState<HostContext>({});
+    const fullscreen = context.displayMode === "fullscreen";
+    const canExpand = !fullscreen && context.availableDisplayModes?.includes("fullscreen") === true;
+
+    useEffect(() => bridge.watchHostContext(setContext), [bridge]);
 
     useEffect(() => {
         bridge.ontoolinput = (args) => {
@@ -219,17 +229,30 @@ export function CollectionTable({ bridge }: { bridge: McpAppBridge }) {
     }, [pending, send]);
 
     return (
-        <div ref={rootRef} className="flex flex-col gap-3 p-4 bg-surface-sheet">
+        <div ref={rootRef} className={cls("flex flex-col gap-3 p-4 bg-surface-sheet", fullscreen && "h-screen")}>
             {page ? (
                 <>
-                    <div className="flex items-baseline justify-between gap-3">
+                    <div className="flex items-center justify-between gap-3">
                         <Typography variant="subtitle2" noWrap>{page.title}</Typography>
-                        <Typography variant="caption" color="secondary" noWrap>
-                            {page.total !== undefined && page.total >= page.data.length
-                                ? `${page.data.length} of ${page.total} rows`
-                                : `${page.data.length} rows`}
-                            {page.writable ? " · click a cell to edit" : ""}
-                        </Typography>
+                        <div className="flex items-center gap-2 min-w-0">
+                            <Typography variant="caption" color="secondary" noWrap>
+                                {page.total !== undefined && page.total >= page.data.length
+                                    ? `${page.data.length} of ${page.total.toLocaleString()} rows`
+                                    : `${page.data.length} rows`}
+                                {page.writable ? " · click a cell to edit" : ""}
+                            </Typography>
+                            {canExpand && (
+                                <Tooltip title="Expand">
+                                    <IconButton
+                                        size="small"
+                                        aria-label="Expand"
+                                        onClick={() => void bridge.requestDisplayMode("fullscreen").catch(() => undefined)}
+                                    >
+                                        <Maximize2Icon size={iconSize.smallest}/>
+                                    </IconButton>
+                                </Tooltip>
+                            )}
+                        </div>
                     </div>
 
                     {failure && <Alert color="error" size="small">{failure}</Alert>}
@@ -253,11 +276,14 @@ export function CollectionTable({ bridge }: { bridge: McpAppBridge }) {
                         </Alert>
                     )}
 
-                    <div className="overflow-x-auto">
+                    <ScrollArea fullscreen={fullscreen}>
                         <Table className="w-full">
-                            <TableHeader>
+                            <TableHeader className={cls(fullscreen && "sticky top-0 z-10")}>
                                 {page.columns.map(column => (
-                                    <TableCell key={column.key} header>{column.title}</TableCell>
+                                    <TableCell key={column.key} header className="whitespace-nowrap">
+                                        {/* One line: a long title would make the header row two or three rows tall. */}
+                                        <span className="block max-w-48 truncate" title={column.title}>{column.title}</span>
+                                    </TableCell>
                                 ))}
                             </TableHeader>
                             <TableBody>
@@ -292,7 +318,7 @@ export function CollectionTable({ bridge }: { bridge: McpAppBridge }) {
                                 })}
                             </TableBody>
                         </Table>
-                    </div>
+                    </ScrollArea>
 
                     {page.data.length === 0 && (
                         <Typography variant="body2" color="secondary">No rows match, or none are visible to you.</Typography>
@@ -439,8 +465,95 @@ function Display({ column, value }: { column: Column; value: unknown }) {
         const date = new Date(value);
         return <Typography variant="body2">{Number.isNaN(date.getTime()) ? value : date.toLocaleString()}</Typography>;
     }
-    const text = typeof value === "string" ? value : JSON.stringify(value);
-    return <Typography variant="body2" className="truncate max-w-80">{text}</Typography>;
+    if (typeof value === "string" && isImageUrl(value)) {
+        return <Thumbnail url={value}/>;
+    }
+    // A list of plain values reads as one: `Rock, 90s`, not `["Rock","90s"]`.
+    const text = typeof value === "string"
+        ? value
+        : Array.isArray(value) && value.every(item => typeof item !== "object" || item === null)
+            ? value.join(", ")
+            : JSON.stringify(value);
+    return <Typography variant="body2" className="truncate max-w-64" title={text}>{text}</Typography>;
+}
+
+const IMAGE_PATH = /\.(?:png|jpe?g|gif|webp|avif|svg)$/i;
+
+/** An http(s) address whose path names an image file. */
+function isImageUrl(value: string): boolean {
+    if (!/^https?:\/\//i.test(value)) return false;
+    try {
+        return IMAGE_PATH.test(new URL(value).pathname);
+    } catch {
+        return false;
+    }
+}
+
+/**
+ * The image itself where the host lets it load; a small label where it does
+ * not. A host loads only the origins the view declared, and this view cannot
+ * know a project's image hosts in advance, so in most hosts the label is what
+ * shows — instead of the address, which says nothing at a glance.
+ */
+function Thumbnail({ url }: { url: string }) {
+    const [failed, setFailed] = useState(false);
+    if (failed) {
+        return (
+            <span className="inline-flex items-center gap-1 text-text-secondary dark:text-text-secondary-dark" title={url}>
+                <ImageIcon size={iconSize.smallest}/>
+                <Typography variant="body2" color="secondary">Image</Typography>
+            </span>
+        );
+    }
+    return (
+        <img
+            src={url}
+            alt=""
+            title={url}
+            loading="lazy"
+            onError={() => setFailed(true)}
+            className="block size-8 rounded object-cover bg-surface-card-hover"
+        />
+    );
+}
+
+/**
+ * The table's scroller. Inline it scrolls sideways and its height is the
+ * table's, which the host sizes the frame to; a fade on an edge says there
+ * are more columns that way. Fullscreen it also scrolls down, under a header
+ * that stays.
+ */
+function ScrollArea({ fullscreen, children }: { fullscreen: boolean; children: React.ReactNode }) {
+    const ref = useRef<HTMLDivElement>(null);
+    const [edges, setEdges] = useState({ left: false, right: false });
+
+    useLayoutEffect(() => {
+        const element = ref.current;
+        if (!element) return;
+        const update = () => setEdges({
+            left: element.scrollLeft > 1,
+            right: element.scrollLeft + element.clientWidth < element.scrollWidth - 1
+        });
+        update();
+        element.addEventListener("scroll", update, { passive: true });
+        const observer = new ResizeObserver(update);
+        observer.observe(element);
+        if (element.firstElementChild) observer.observe(element.firstElementChild);
+        return () => {
+            element.removeEventListener("scroll", update);
+            observer.disconnect();
+        };
+    }, []);
+
+    return (
+        <div className={cls("relative", fullscreen && "flex-1 min-h-0")}>
+            <div ref={ref} className={cls("overflow-x-auto", fullscreen && "h-full overflow-y-auto")}>
+                {children}
+            </div>
+            {edges.left && <div className="pointer-events-none absolute inset-y-0 left-0 w-8 bg-linear-to-r from-surface-sheet"/>}
+            {edges.right && <div className="pointer-events-none absolute inset-y-0 right-0 w-12 bg-linear-to-l from-surface-sheet"/>}
+        </div>
+    );
 }
 
 function pageOf(result: ToolResult): TablePage | string {

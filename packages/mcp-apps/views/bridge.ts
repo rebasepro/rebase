@@ -13,7 +13,9 @@
  *  - `tools/call`, which the host relays to the MCP server with its own
  *    credential — the view holds none;
  *  - `ui/update-model-context`, to tell the model what the person did here;
- *  - `ui/notifications/size-changed`, so the host sizes the iframe to fit.
+ *  - `ui/notifications/size-changed`, so the host sizes the iframe to fit;
+ *  - `ui/request-display-mode`, to open the view fullscreen where the host
+ *    offers it.
  */
 
 export const APPS_PROTOCOL_VERSION = "2026-01-26";
@@ -24,9 +26,16 @@ export interface ToolResult {
     isError?: boolean;
 }
 
+export type DisplayMode = "inline" | "fullscreen" | "pip";
+
+/** The modes this view can be shown in. Declared at the handshake. */
+const VIEW_DISPLAY_MODES: DisplayMode[] = ["inline", "fullscreen"];
+
 export interface HostContext {
     theme?: "light" | "dark";
-    displayMode?: string;
+    displayMode?: DisplayMode;
+    /** The modes the host will show this view in; absent, only the one it is in. */
+    availableDisplayModes?: DisplayMode[];
     locale?: string;
 }
 
@@ -44,6 +53,19 @@ export interface HostWindow {
 
 export class McpAppBridge {
     onhostcontext?: (context: HostContext) => void;
+
+    /** Everything the host has said about its context so far, each update merged in. */
+    hostContext: HostContext = {};
+    private readonly contextWatchers = new Set<(context: HostContext) => void>();
+
+    /** Called with the whole context now and on every change; returns the unsubscribe. */
+    watchHostContext(watcher: (context: HostContext) => void): () => void {
+        this.contextWatchers.add(watcher);
+        watcher(this.hostContext);
+        return () => {
+            this.contextWatchers.delete(watcher);
+        };
+    }
 
     /**
      * The call that opened this view, and its answer. Kept, because the host
@@ -80,10 +102,10 @@ export class McpAppBridge {
     async connect(appInfo: { name: string; version: string }): Promise<void> {
         const result = await this.request("ui/initialize", {
             appInfo,
-            appCapabilities: {},
+            appCapabilities: { availableDisplayModes: VIEW_DISPLAY_MODES },
             protocolVersion: APPS_PROTOCOL_VERSION
         });
-        if (isRecord(result) && isRecord(result.hostContext)) this.onhostcontext?.(hostContextOf(result.hostContext));
+        if (isRecord(result) && isRecord(result.hostContext)) this.contextChanged(hostContextOf(result.hostContext));
         this.notify("ui/notifications/initialized", {});
         this.connected = true;
         // A size measured before the handshake is held until now: nothing
@@ -105,11 +127,26 @@ export class McpAppBridge {
         await this.request("ui/update-model-context", { content: [{ type: "text", text }] });
     }
 
+    /**
+     * Ask the host to show this view in `mode`. The answer is the mode it is
+     * in now, which may not be the one asked for.
+     */
+    async requestDisplayMode(mode: DisplayMode): Promise<DisplayMode | undefined> {
+        const result = await this.request("ui/request-display-mode", { mode });
+        return isRecord(result) && isDisplayMode(result.mode) ? result.mode : undefined;
+    }
+
     /** The document's height, for the host to size the iframe to. Sent when it changes. */
     sizeChanged(height: number): void {
         if (height === this.height) return;
         this.height = height;
         if (this.connected) this.notify("ui/notifications/size-changed", { height });
+    }
+
+    private contextChanged(update: HostContext): void {
+        this.hostContext = { ...this.hostContext, ...update };
+        this.onhostcontext?.(update);
+        for (const watcher of this.contextWatchers) watcher(this.hostContext);
     }
 
     private request(method: string, params: Record<string, unknown>): Promise<unknown> {
@@ -156,7 +193,7 @@ export class McpAppBridge {
                 this.resultHandler?.(this.toolResult);
                 return;
             case "ui/notifications/host-context-changed":
-                this.onhostcontext?.(hostContextOf(params));
+                this.contextChanged(hostContextOf(params));
                 return;
             // Requests the host may send. Nothing to clean up, nothing to report.
             case "ui/resource-teardown":
@@ -184,9 +221,16 @@ function toolResultOf(value: Record<string, unknown>): ToolResult {
 function hostContextOf(value: Record<string, unknown>): HostContext {
     return {
         ...((value.theme === "light" || value.theme === "dark") && { theme: value.theme }),
-        ...(typeof value.displayMode === "string" && { displayMode: value.displayMode }),
+        ...(isDisplayMode(value.displayMode) && { displayMode: value.displayMode }),
+        ...(Array.isArray(value.availableDisplayModes) && {
+            availableDisplayModes: value.availableDisplayModes.filter(isDisplayMode)
+        }),
         ...(typeof value.locale === "string" && { locale: value.locale })
     };
+}
+
+function isDisplayMode(value: unknown): value is DisplayMode {
+    return value === "inline" || value === "fullscreen" || value === "pip";
 }
 
 export function isRecord(value: unknown): value is Record<string, unknown> {

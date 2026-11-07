@@ -142,3 +142,23 @@ describe("calls through the host", () => {
         expect(sent.at(-1)).toEqual({ jsonrpc: "2.0", id: "t1", result: {} });
     });
 });
+
+describe("display modes", () => {
+    it("says at the handshake it can go fullscreen, keeps the merged context, and asks the host to switch", async () => {
+        const bridge = new McpAppBridge(host);
+        const seen: unknown[] = [];
+        bridge.watchHostContext(context => seen.push(context));
+
+        await connected(bridge, { theme: "dark", displayMode: "inline", availableDisplayModes: ["inline", "fullscreen", "bogus"] });
+        expect(sent[0].params).toEqual(expect.objectContaining({ appCapabilities: { availableDisplayModes: ["inline", "fullscreen"] } }));
+
+        deliver({ jsonrpc: "2.0", method: "ui/notifications/host-context-changed", params: { displayMode: "fullscreen" } });
+        expect(seen.at(-1)).toEqual({ theme: "dark", displayMode: "fullscreen", availableDisplayModes: ["inline", "fullscreen"] });
+
+        const switching = bridge.requestDisplayMode("fullscreen");
+        expect(sent.at(-1)).toEqual(expect.objectContaining({ method: "ui/request-display-mode", params: { mode: "fullscreen" } }));
+        answer({ mode: "fullscreen" });
+        await expect(switching).resolves.toBe("fullscreen");
+    });
+});
+

@@ -14,6 +14,9 @@
  *   `write`, with the project).
  * - A save the server answers with a plan is held until the person
  *   confirms it, then sent again with the plan's token.
+ * - An image address shows as the image, or as a label where the host
+ *   blocks it, never as the address; a list of plain values reads as one.
+ * - Expand appears only where the host offers fullscreen, and asks for it.
  */
 import React, { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
@@ -260,5 +263,55 @@ describe("a save that needs the person's yes", () => {
         expect(callTool).toHaveBeenCalledTimes(1);
         expect(container.textContent).not.toContain("to \"Grace\"");
         expect(cell(0, 1).textContent).toBe("Ada");
+    });
+});
+
+describe("what a cell shows", () => {
+    const COVER = "https://cdn.example.com/covers/abc/500x500.jpg";
+
+    it("shows an image address as the image, and as a label once the host blocks it", async () => {
+        const { bridge } = bridgeWith({}, tableResult([{ id: "1", name: COVER }]));
+        await render(bridge);
+        const image = cell(0, 1).querySelector("img");
+        expect(image?.getAttribute("src")).toBe(COVER);
+
+        await act(async () => image?.dispatchEvent(new Event("error")));
+        expect(cell(0, 1).querySelector("img")).toBeNull();
+        expect(cell(0, 1).textContent).toBe("Image");
+        expect(cell(0, 1).querySelector("[title]")?.getAttribute("title")).toBe(COVER);
+    });
+
+    it("leaves an address that names no image as text", async () => {
+        const { bridge } = bridgeWith({}, tableResult([{ id: "1", name: "https://example.com/page" }]));
+        await render(bridge);
+        expect(cell(0, 1).querySelector("img")).toBeNull();
+        expect(cell(0, 1).textContent).toBe("https://example.com/page");
+    });
+
+    it("reads a list of plain values as one", async () => {
+        const { bridge } = bridgeWith({}, tableResult([{ id: "1", name: ["Rock", "90s"] }]));
+        await render(bridge);
+        expect(cell(0, 1).textContent).toBe("Rock, 90s");
+    });
+});
+
+describe("expand", () => {
+    const expandButton = () => container.querySelector("button[aria-label='Expand']");
+
+    it("is not offered where the host has said nothing of fullscreen", async () => {
+        const { bridge } = bridgeWith({}, tableResult([{ id: "1", name: "a" }]));
+        await render(bridge);
+        expect(expandButton()).toBeNull();
+    });
+
+    it("is offered where the host can show the view fullscreen, and asks for it", async () => {
+        const { bridge } = bridgeWith({}, tableResult([{ id: "1", name: "a" }]));
+        bridge.hostContext = { displayMode: "inline", availableDisplayModes: ["inline", "fullscreen"] };
+        const requestDisplayMode = vi.spyOn(bridge, "requestDisplayMode").mockResolvedValue("fullscreen");
+        await render(bridge);
+        const expand = expandButton();
+        if (!(expand instanceof HTMLButtonElement)) throw new Error("no Expand button");
+        await act(async () => expand.click());
+        expect(requestDisplayMode).toHaveBeenCalledWith("fullscreen");
     });
 });

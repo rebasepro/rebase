@@ -44,7 +44,10 @@ export type McpAppsSource = () => Promise<readonly McpAppResource[]>;
  * `resources/read`.
  *
  * No CSP domains: the view fetches nothing, so the host's default — no
- * network at all — is the policy it should run under. `prefersBorder` because
+ * network at all — is the policy it should run under. An image cell tries
+ * the image and shows a label when the host blocks it: a project's image
+ * hosts are its data, unknown when this is listed, and the spec takes only
+ * named origins. `prefersBorder` because
  * a table reads as an object of its own in the transcript.
  */
 export function mcpAppResourceMeta(): Record<string, unknown> {
