@@ -483,6 +483,7 @@ except one that restarts the database, which waits for a maintenance window.
 | `storage` | The project's bucket |
 | `resources` | Which databases and buckets the platform holds, against what the code declares |
 | `compute` | What this project reserves, what it costs, and how to change it |
+| `events` | What happened to the backend, newest first: the app scaling, database changes scheduled and applied, a standby taking over, the disk growing |
 | `usage` | Requests used this month against the included allowance, and the overage so far, as the invoice counts it. `usage org` lists every project of the organization |
 | `clusters` | The clusters tenants run on. Platform-admin only |
 | `settings`, `orgs`, `billing` | Project settings, organizations and their members and invitations, payment |

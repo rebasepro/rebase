@@ -145,7 +145,7 @@ describe("a json client against a cookieAuth server", () => {
         sleepPastAccessExpiry();
         const user = await client.auth.getUser();
 
-        expect(user.email).toBe(EMAIL);
+        expect(user?.email).toBe(EMAIL);
         const renewal = refreshes(sent);
         expect(renewal).toHaveLength(1);
         expect(renewal[0]).toMatchObject({ flow: "json", cookie: null });
@@ -196,7 +196,7 @@ describe("a guest client beside the page's signed-in account", () => {
         expect(await guest.auth.getAccessToken()).not.toBe(guestBefore);
         expect(guest.auth.getSession()?.user.isAnonymous).toBe(true);
         // The account renews through its cookie, untouched by the guest's.
-        expect((await account.auth.getUser()).email).toBe(EMAIL);
+        expect((await account.auth.getUser())?.email).toBe(EMAIL);
         expect(account.auth.getSession()?.user.isAnonymous).toBe(false);
 
         const guestRefresh = refreshes(sent).find((request) => request.flow === "json");

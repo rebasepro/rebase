@@ -38,7 +38,7 @@ describe("date column width", () => {
 
     it("shrinks for a short format, down to the header's minimum", () => {
         expect(getDateColumnWidth(date({ mode: "date" }))).toBeLessThan(200);
-        expect(getDateColumnWidth(date({ mode: "time" }))).toBe(140);
+        expect(getDateColumnWidth(date({ columnType: "time" }))).toBe(140);
     });
 
     it("makes room for the zone after a zoned date", () => {

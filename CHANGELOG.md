@@ -160,9 +160,9 @@
   to use (`isnull.null`, `notnull.null`, `neq.draft`, `gte.18`). Values that
   only start with `is.` or `not.` (`is.gd`) are still values.
 
-- **`eq.null` on a column that is not text says how to match a missing
-  value.** It compares against the text "null", so on a number, date or enum
-  column it fails. The 400 now names `isnull.null`.
+- **An equality with "null" on a column that is not text says how to match a
+  missing value.** `eq.null` compares against the text "null", so on a number,
+  date or enum column it fails. The 400 now names `isnull.null`.
 
 ## [0.28.2] - 2026-11-06
 

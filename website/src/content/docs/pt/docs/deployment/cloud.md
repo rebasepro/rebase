@@ -1,5 +1,5 @@
 ---
-sourceHash: a66e695d7d7fc2a9
+sourceHash: d4b6c7f0879d6a75
 title: Rebase Cloud
 sidebar_label: Rebase Cloud
 description: O Rebase Cloud é o mesmo Rebase, operado para você. O que é, como um projeto se conecta e faz deploy, e o que o beta privado ainda não inclui.
@@ -283,6 +283,7 @@ Nada é validado pela CLI de forma proposital — os limites pertencem ao cluste
 | `storage` | O bucket do projeto |
 | `resources` | Quais bancos de dados e buckets a plataforma mantém, em relação ao que o código declara |
 | `compute` | O que este projeto reserva, quanto custa e como alterar |
+| `events` | O que aconteceu com o backend, do mais recente: a app escalando, alterações no banco de dados agendadas e aplicadas, um standby assumindo, o disco crescendo |
 | `usage` | Requisições utilizadas este mês em relação à franquia incluída e o excedente acumulado, conforme contabilizado na fatura. O comando `usage org` lista todos os projetos da organização |
 | `clusters` | Os clusters em que os tenants são executados. Apenas administradores da plataforma |
 | `settings`, `orgs`, `billing` | Configurações do projeto, organizações, seus membros e convites, pagamento |

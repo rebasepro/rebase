@@ -1,5 +1,5 @@
 ---
-sourceHash: a66e695d7d7fc2a9
+sourceHash: d4b6c7f0879d6a75
 title: Rebase Cloud
 sidebar_label: Rebase Cloud
 description: Rebase Cloud est le même Rebase, opéré pour vous. Ce que c'est, comment lier et déployer un projet, et ce que la bêta privée n'inclut pas encore.
@@ -483,6 +483,7 @@ le montant en €/mois avant et après ; une modification s'applique immédiatem
 | `storage` | Le bucket du projet |
 | `resources` | Les bases de données et buckets détenus par la plateforme, par rapport à ce que déclare le code |
 | `compute` | Ce que ce projet réserve, ce qu'il coûte et comment le modifier |
+| `events` | Ce qui est arrivé au backend, le plus récent d'abord : l'app qui passe à l'échelle, les changements de base de données planifiés et appliqués, un standby qui prend le relais, le disque qui grandit |
 | `usage` | Requêtes consommées ce mois-ci par rapport au quota inclus, et le dépassement actuel, tel qu'il est comptabilisé sur la facture. `usage org` liste tous les projets de l'organisation |
 | `clusters` | Les clusters sur lesquels tournent les tenants. Réservé aux administrateurs de la plateforme |
 | `settings`, `orgs`, `billing` | Paramètres du projet, organisations ainsi que leurs membres et invitations, paiement |
