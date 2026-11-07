@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, jest } from "@jest/globals";
 import { createMemoryStorage, resolveAuthFlowMode } from "../src/auth";
 import { createRebaseClient } from "../src/index";
+import { AUTH_FLOW_HEADER } from "@rebasepro/types";
 
 /**
  * Signed out about an hour after signing in.
@@ -23,7 +24,7 @@ function json(body: unknown, status = 200): Response {
     return new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
 }
 
-interface Sent { path: string; credentials: RequestCredentials | undefined; body: string | undefined; authorization: string | undefined }
+interface Sent { path: string; credentials: RequestCredentials | undefined; body: string | undefined; authorization: string | undefined; flow: string | undefined }
 
 /**
  * A backend. With `cookieAuth` it behaves as the runtime does: the refresh
@@ -56,7 +57,7 @@ function createServer(options: { cookieAuth: boolean; expiresIn?: number; refres
         const path = url.replace("http://api.test/api", "");
         const headers = (init?.headers ?? {}) as Record<string, string>;
         const body = typeof init?.body === "string" ? init.body : undefined;
-        sent.push({ path, credentials: init?.credentials, body, authorization: headers.Authorization });
+        sent.push({ path, credentials: init?.credentials, body, authorization: headers.Authorization, flow: headers[AUTH_FLOW_HEADER] });
         const include = init?.credentials === "include";
         if (path === "/auth/login") return answer(include);
         if (path === "/auth/refresh") {
@@ -153,6 +154,26 @@ describe("a sign-in the client cannot renew", () => {
         expect(flowErrors()[0][0]).toContain("authFlowMode: \"json\"");
     });
 
+    it("is not reported for a json client that brought its own storage, which chose to keep its sign-in apart", async () => {
+        setDocument(true);
+        const server = createServer({ cookieAuth: true });
+        const c = client(server.fetchFn, { storage: createMemoryStorage() });
+
+        await c.auth.signInWithEmail("a@b.c", "pw");
+
+        expect(flowErrors()).toHaveLength(0);
+    });
+
+    it("is reported for a json client by default, off the browser, naming the server update", async () => {
+        const server = createServer({ cookieAuth: true });
+        const c = client(server.fetchFn);
+
+        await c.auth.signInWithEmail("a@b.c", "pw");
+
+        expect(flowErrors()).toHaveLength(1);
+        expect(flowErrors()[0][0]).toContain("update it");
+    });
+
     it("is not reported when the modes agree", async () => {
         await client(createServer({ cookieAuth: true }).fetchFn, { authFlowMode: "cookie" }).auth.signInWithEmail("a@b.c", "pw");
         await client(createServer({ cookieAuth: false }).fetchFn, { authFlowMode: "json" }).auth.signInWithEmail("a@b.c", "pw");
@@ -222,5 +243,45 @@ describe("getAccessToken", () => {
         const reloaded = client(server.fetchFn);
 
         expect(await reloaded.auth.getAccessToken()).toBe("a2");
+    });
+});
+
+describe("the flow header", () => {
+    it("goes on every auth request a json client makes, so a cookieAuth server answers it in the body", async () => {
+        const server = createServer({ cookieAuth: false, expiresIn: 5_000 });
+        const c = client(server.fetchFn, { authFlowMode: "json" });
+
+        await c.auth.signInWithEmail("a@b.c", "pw");
+        await c.auth.getAccessToken();
+        await c.auth.signOut();
+
+        const paths = server.sent.map((s) => s.path);
+        expect(paths).toEqual(expect.arrayContaining(["/auth/login", "/auth/refresh", "/auth/logout"]));
+        expect(server.sent.every((s) => s.flow === "json")).toBe(true);
+    });
+
+    it("goes on the session upgrades sent through the transport", async () => {
+        const sent: Sent[] = [];
+        const fetchFn = (async (input: RequestInfo | URL, init?: RequestInit) => {
+            const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
+            const headers = (init?.headers ?? {}) as Record<string, string>;
+            sent.push({ path: url.replace("http://api.test/api", ""), credentials: init?.credentials, body: undefined, authorization: headers.Authorization, flow: headers[AUTH_FLOW_HEADER] });
+            return json({ user: { uid: "u1", email: "a@b.c" }, tokens: { accessToken: "a", refreshToken: "R", accessTokenExpiresAt: Date.now() + HOUR } });
+        }) as typeof fetch;
+        const c = client(fetchFn, { authFlowMode: "json" });
+
+        await c.auth.signInAnonymously();
+        await c.auth.linkAnonymous("a@b.c", "pw");
+
+        expect(sent.map((s) => [s.path, s.flow])).toEqual([["/auth/anonymous", "json"], ["/auth/anonymous/link", "json"]]);
+    });
+
+    it("is not sent in cookie mode", async () => {
+        const server = createServer({ cookieAuth: true });
+        const c = client(server.fetchFn, { authFlowMode: "cookie" });
+
+        await c.auth.signInWithEmail("a@b.c", "pw");
+
+        expect(server.sent.every((s) => s.flow === undefined)).toBe(true);
     });
 });

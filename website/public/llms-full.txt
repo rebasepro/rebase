@@ -4363,6 +4363,29 @@ yet, listed so that nobody reads a promise into them:
 
 #### Fixed
 
+##### Auth
+
+- **A json client stays signed in against a backend with `cookieAuth`.** Such
+  a backend, which the Rebase runtime always is, put the refresh token in an
+  HttpOnly cookie and answered the body's with `""`, so a client that keeps
+  the token itself (Node, React Native, or a second browser client with its own
+  `storage`, such as a guest beside the signed-in account) had nothing to
+  renew with and was signed out about an hour after sign-in. In
+  `authFlowMode: "json"` the client now sends `x-rebase-auth-flow: json` on its
+  auth requests (`AUTH_FLOW_HEADER` in `@rebasepro/types`), and the server
+  answers those requests as a server without `cookieAuth` does: the token in
+  the body, read back from the body, the cookie neither read, set nor cleared.
+  The cookie path is unchanged, and a json request never turns the cookie into
+  a token in a body the page's script can read. Needs the client and the
+  server from this release; a deployment that lists CORS `allowHeaders` by
+  hand must add the header.
+
+- **A json client with its own `storage` no longer logs a flow mismatch at
+  every sign-in.** Keeping a sign-in apart from the page's cookie session is a
+  choice, not a misconfiguration. A json client without its own storage still
+  logs when a server too old to honour the header leaves it unable to renew,
+  and the message now says to update the server.
+
 ##### MCP
 
 - **Connecting an MCP client from Chrome now finishes.** The consent screen
@@ -48554,16 +48577,21 @@ const client = createRebaseClient({
 | `"cookie"` | An **HttpOnly** cookie the backend sets. Script running on your page cannot read it, which is what makes it XSS-safe | In a browser |
 | `"json"` | Returned in the response body, kept in `storage` (`localStorage` by default) | Off the browser (Node, workers, React Native), and in a browser when you pass your own `storage` |
 
-The two sides have to agree. Cookie mode needs `auth.cookieAuth` on the
-backend, and the Rebase runtime, which Rebase Cloud runs, always turns it on.
-Json mode needs a backend without it: against a `cookieAuth` backend a json
-client is handed no refresh token, and its session ends when the access token
-expires, about an hour after sign-in. When the answer to a sign-in shows the
-modes disagree, the client logs an error saying which mode to use.
+Cookie mode needs `auth.cookieAuth` on the backend, and the Rebase runtime,
+which Rebase Cloud runs, always turns it on. Json mode works against either: a
+json client sends `x-rebase-auth-flow: json` on its auth requests, and a
+`cookieAuth` backend answers those with the refresh token in the body and
+leaves the cookie alone. A backend older than the release that added this
+hands a json client no refresh token, and its session ends when the access
+token expires, about an hour after sign-in. When the answer to a sign-in shows
+a client cannot renew, it logs an error saying what to change, except for a
+json client with its own `storage`, which chose to keep its sign-in apart.
 
 Passing your own `storage` keeps a browser client in json mode. That is for a
 second client on the page that keeps its own sign-in apart from the page's
-cookie: in cookie mode nothing would be kept in that storage.
+cookie, such as a guest beside the signed-in account: in cookie mode nothing
+would be kept in that storage. Its refresh token is in that storage, where
+script on the page can read it, so keep the page's own account in cookie mode.
 
 ### Waiting for the Session to Be Restored
 
