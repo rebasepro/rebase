@@ -275,4 +275,42 @@ describe("remote MCP tools on the real driver (E2E)", () => {
             expect((await observer.query("SELECT deleted_at FROM public.posts WHERE id = 't1'")).rows[0].deleted_at).toBeNull();
         });
     });
+
+    describe("the views' tools", () => {
+        // What show_app and show_record tell the model, and what their view
+        // then writes back, on the real driver: the stub in the server's
+        // suite refuses no filter and serves no relation.
+        it("show_app counts a metric and reads a block's rows as REST does", async () => {
+            const result = await tool("show_app", {
+                blocks: [
+                    { key: "live", type: "metric", collection: "posts", title: "Published", where: { status: ["==", "published"] } },
+                    { key: "posts", type: "collection", collection: "posts", orderBy: "id" },
+                    { key: "post", type: "record", collection: "posts", follows: { block: "posts" } },
+                    { key: "author", type: "record", collection: "authors", follows: { block: "posts", field: "authorId" } }
+                ]
+            });
+            const served = await rest(`/posts/count?where=${encodeURIComponent(JSON.stringify({ status: ["==", "published"] }))}`);
+            expect(result.blocks[0]).toEqual({ key: "live", type: "metric", collection: "posts", title: "Published", count: served.json.count });
+            expect(result.blocks[1].rows).toEqual((await rest("/posts?orderBy=id&limit=20")).json.data);
+            expect(result.view.collections.map((collection: { slug: string }) => collection.slug)).toEqual(["authors", "posts"]);
+        });
+
+        it("show_app refuses a block whose filter the driver refuses, naming the field", async () => {
+            const refusal = await refusalOf("show_app", {
+                blocks: [{ key: "posts", type: "collection", collection: "posts", where: { nope: ["==", 1] } }]
+            });
+            expect(refusal).toContain("nope");
+        });
+
+        it("show_record reads the row REST serves", async () => {
+            const result = await tool("show_record", { collection: "posts", id: "p2" });
+            expect(result.row).toEqual((await rest("/posts/p2")).json);
+        });
+
+        it("takes a write as the view sends it: a relation by its name and the target's id", async () => {
+            await tool("update_document", { collection: "posts", id: "p2", data: { author: "a1", views: 3 } });
+            const stored = await observer.query("SELECT author_id, views FROM public.posts WHERE id = 'p2'");
+            expect(stored.rows[0]).toEqual({ author_id: "a1", views: 3 });
+        });
+    });
 });

@@ -2,7 +2,7 @@
   "name": "@rebasepro/mcp-apps",
   "version": "0.27.0",
   "private": true,
-  "description": "MCP App views for Rebase: the collection table a client like Claude shows tool results in, built from the Rebase UI kit.",
+  "description": "The MCP App view for Rebase: the admin panel's own collection views and record forms, in a client like Claude, over the server's tools.",
   "keywords": [
     "rebase",
     "mcp",

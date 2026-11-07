@@ -41,22 +41,39 @@ to one user, the endpoint declines to mount and says why in the boot log. No
   (your app's "Forgot password"); the screen tells them so. It also names the host the authorization code is sent
   to, and says that host is not verified: anyone may register a client under
   any name, so the host is the part a person can check.
-- **Nine tools, three scopes.** The same [scopes](/docs/backend/roles-and-scopes/)
+- **Eleven tools, three scopes.** The same [scopes](/docs/backend/roles-and-scopes/)
   every credential uses. `data:read` offers `list_collections`, `describe_collection`,
-  `query_collection`, `show_collection`, `count_documents` and `get_document`; `data:write` adds `create_document` and
+  `query_collection`, `count_documents`, `get_document` and the three views,
+  `show_collection`, `show_record` and `show_app`; `data:write` adds `create_document` and
   `update_document`; `data:delete` adds `delete_document`. A client that asks for
   nothing gets `data:read`. Each one narrows to a collection: `data:read:posts`
   lists, describes and reads `posts` and nothing else. A scope decides which tools are
   offered and which collections they reach, not which rows: an empty list can be
   RLS working, and `data:write` still cannot write a row the person could not.
-- **`show_collection` puts the rows in front of the person.** It takes
-  `query_collection`'s arguments and answers the same page, plus the columns the
-  admin panel shows. A client that renders MCP Apps, such as Claude, opens it as a
-  table in the conversation: the person can load more rows and, where the
-  connection holds `data:write`, edit a cell in place. Each save is an
-  `update_document` call made as them, under their RLS, and the model is told what
-  they changed. A client without MCP Apps, such as Claude Code or Cursor, shows no
-  table, and the model reads the page as it would from `query_collection`.
+- **Three tools put your admin panel in front of the person.** In a client that
+  renders MCP Apps, such as Claude, they open the admin panel's own views in the
+  conversation, drawn from your collections: their fields, enums, validation,
+  relations, form sections and view settings.
+  - `show_collection` takes `query_collection`'s arguments, plus `view`
+    (`table`, `list`, `cards` or `kanban`), and opens the collection view: the
+    person can search, filter, sort and page, open a row's form, and add rows.
+  - `show_record` opens one row's form (`id`), or a form for a new row that
+    starts from the `values` the model filled in, for the person to check and
+    save themselves.
+  - `show_app` opens a small screen of up to eight `blocks`: collection views,
+    record forms, and metrics that count the rows matching a `where`. A block
+    can follow the row selected in an earlier collection block: a form opening
+    it (`"follows": {"block": "orders"}`), or a second collection showing the
+    rows that point at it (`"follows": {"block": "orders", "on": "orderId"}`).
+
+  Each block is checked as the read and write tools would check it before the
+  screen opens. Every read and save in the view is one of those tools' calls,
+  made as the person under their RLS, so the form offers only what their
+  connection was granted: without `data:write` it is read-only, and a field
+  their roles cannot read is not in it. The model is told what they changed. It
+  reads the rows each tool answers, not the collection configs the view draws
+  with. A client without MCP Apps, such as Claude Code or Cursor, shows nothing,
+  and the model reads the same rows it would from `query_collection`.
 - **Grants made before 0.24 keep their reach.** `mcp:read` is read as
   `data:read`, and `mcp:write` as `data:write data:delete`, on stored grants and
   on tokens already issued.

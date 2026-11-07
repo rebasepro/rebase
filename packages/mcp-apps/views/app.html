@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>Rebase</title>
+    <script>
+        // A host may sandbox the view without an origin of its own, and then
+        // reading `localStorage` or `sessionStorage` throws. The admin panel
+        // keeps view preferences there; in memory they last as long as the view.
+        for (const name of ["localStorage", "sessionStorage"]) {
+            try {
+                void window[name];
+            } catch {
+                const data = new Map();
+                const storage = {
+                    get length() { return data.size; },
+                    key: (index) => [...data.keys()][index] ?? null,
+                    getItem: (key) => data.has(key) ? data.get(key) : null,
+                    setItem: (key, value) => void data.set(key, String(value)),
+                    removeItem: (key) => void data.delete(key),
+                    clear: () => data.clear()
+                };
+                Object.defineProperty(window, name, { value: storage, configurable: true });
+            }
+        }
+    </script>
+</head>
+<body>
+<div id="root"></div>
+<script type="module" src="./app/main.tsx"></script>
+</body>
+</html>

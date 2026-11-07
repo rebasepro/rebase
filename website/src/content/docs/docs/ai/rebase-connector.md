@@ -70,7 +70,7 @@ a project's data does. `rebase cloud connect --list` shows the ones you added.
 
 ## What Claude can do with it
 
-Ten tools. The first six only read:
+Twelve tools. The first eight only read:
 
 | Tool | What it does |
 |---|---|
@@ -79,7 +79,9 @@ Ten tools. The first six only read:
 | `logs` | The running app's output, a deployment's build log, or a cron job's runs |
 | `schema` | A project's collections, or one collection's fields |
 | `query` | Reads rows: one by id, a filtered page, or a count |
-| `show_collection` | Shows rows as a table in the conversation, where you can page and edit cells |
+| `show_collection` | Opens a collection in your admin panel's own view, in the conversation: a table, list, cards or kanban board you can search, filter and page, where a row opens its form |
+| `show_record` | Opens one row's form, or a form for a new row Claude filled in, for you to check and save |
+| `show_app` | Opens a small screen for the task at hand: collection views, forms and counts, where one can follow the row you select in another |
 
 The other four change production, and each one asks first:
 
@@ -103,8 +105,8 @@ only if you agree. The token works for five minutes, once, for exactly the
 arguments it was made for: if anything differs, nothing runs.
 
 Claude also asks your permission before it calls any of these four tools,
-because they are marked as destructive. In the table view, an edited cell
-shows the plan and waits for you to press **Save**.
+because they are marked as destructive. In the views, saving a form shows
+the plan and waits for you to press **Save**.
 
 Environment variable values are never shown back: a plan shows their length,
 and `project_status` lists names only. A value you set does pass through the

@@ -606,8 +606,9 @@ export function createMcpRoutes(config: McpRoutesConfig): Hono<HonoEnv> {
             const source = typeof args.collection === "string"
                 ? `${name} on collection ${JSON.stringify(args.collection)}`
                 : name;
+            const read = tool.modelResult ? tool.modelResult(result) : result;
             return rpcResult(id, {
-                content: [{ type: "text", text: untrustedEnvelope(source, JSON.stringify(result)) }],
+                content: [{ type: "text", text: untrustedEnvelope(source, JSON.stringify(read)) }],
                 ...(tool.structuredContent !== false && { structuredContent: result })
             });
         } catch (error) {

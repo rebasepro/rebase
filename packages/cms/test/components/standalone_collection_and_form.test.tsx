@@ -170,6 +170,30 @@ describe("a collection's table in a page of the host app", () => {
         const dialog = await screen.findByRole("dialog");
         await waitFor(() => expect(within(dialog).getByDisplayValue("Ada Lovelace")).toBeTruthy());
     });
+
+    it("applies its overrides to a collection the scope registers", async () => {
+        // The view draws the registry's copy of a registered collection; the
+        // panel's filter used to be spread onto props it never read.
+        const filters: unknown[] = [];
+        const filtering: DataDriver = {
+            ...driver,
+            fetchCollection: async (props) => {
+                filters.push(props.filter);
+                return (rows[props.path] ?? []).filter(row => !props.filter?.title || row.title === props.filter.title[1]);
+            }
+        };
+        render(
+            <Page dataDriver={filtering}>
+                <CollectionsProvider collections={[posts]}>
+                    <CollectionPanel path={"posts"} collectionOverrides={{ fixedFilter: { title: ["==", "Second post"] } }}/>
+                </CollectionsProvider>
+            </Page>
+        );
+
+        expect(await screen.findByText("Second post")).toBeTruthy();
+        expect(screen.queryByText("Hello world")).toBeNull();
+        expect(filters).toContainEqual({ title: ["==", "Second post"] });
+    });
 });
 
 describe("one record's form in a page of the host app", () => {

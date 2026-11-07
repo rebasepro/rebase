@@ -42,6 +42,28 @@
   seconds `rebase_db_connections{state}`, `rebase_db_max_connections`,
   `rebase_db_size_bytes` and `rebase_db_replica_lag_seconds`.
 
+#### MCP
+
+- **The admin panel's own views open in Claude.** In a client that renders MCP
+  Apps, `show_collection` now opens the collection view the admin panel draws —
+  table, list, cards or kanban (`view`), with its search, filters, sorting and
+  paging, relation previews and enum chips — and a row opens the record form,
+  with its sections, validation and relation pickers. The person can add and
+  delete rows there too. Two tools join it: `show_record` opens one row's form
+  (`id`), or a form for a new row starting from `values` the model filled in,
+  for the person to check and save; `show_app` opens a small screen of up to
+  eight blocks (collection views, record forms, and metrics that count rows),
+  where a block can follow the row selected in another — orders, and beside
+  them the selected order's form and its items. The view runs `<Rebase>` with
+  a data driver whose every read and write is a call to the server's tools,
+  as the person, under their RLS; the server hands it the collections'
+  configs reduced to data, without the fields that caller never receives, and
+  closes what their connection was not granted. A save the server plans
+  first (the hosted connector's `write`) waits for the person to confirm the
+  plan, and the model is told what they changed. The model reads the rows, not
+  the configs. Images and files show as labels: the view fetches nothing
+  itself.
+
 ### Fixed
 
 #### Server & REST
@@ -110,6 +132,13 @@
   with three columns of figures lost every date on a laptop screen. A
   `listProperties` column that is also the declared date (or status, or tags)
   stays as long as that slot would.
+
+- **`CollectionPanel`'s overrides apply to a registered collection.** Its
+  `viewMode`, `sort`, `limit` and `collectionOverrides` (a fixed or default
+  filter, say) were spread onto the collection view's props, which draws the
+  registry's copy of any collection the scope registers — so on a page with
+  a `CollectionsProvider`, or inside the CMS, they did nothing. The view takes
+  them as `overrides`, applied over the registered collection.
 
 #### MCP
 

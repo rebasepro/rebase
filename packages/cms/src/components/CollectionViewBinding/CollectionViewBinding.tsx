@@ -202,6 +202,19 @@ export type CollectionViewBindingProps<M extends Record<string, unknown>> = {
      */
     selectedTab?: string;
 
+    /**
+     * What this view changes about the collection it draws — a fixed filter,
+     * a default view mode, a sort — applied over the registered collection.
+     *
+     * The collection's own props are not that: where the path is registered
+     * the view draws the registry's copy, which carries the user's saved
+     * overrides and the plugins' changes, and the props are only its fallback.
+     * `CollectionPanel`'s `viewMode`, `sort`, `limit` and `collectionOverrides`
+     * arrive here; spread onto the props, they were dropped for every
+     * registered collection.
+     */
+    overrides?: Partial<AdminCollection<M>>;
+
 } & AdminCollection<M>;
 
 /**
@@ -214,7 +227,7 @@ const PROPS_COMPARED_BY_VALUE = new Set<string>([
     "properties", "propertiesOrder", "hideIdFromCollection", "inlineEditing", "selectionEnabled",
     "selectionController", "Actions", "defaultSize", "includeJsonView", "additionalFields",
     "sideDialogWidth", "openEntityMode", "exportable", "history", "fixedFilter",
-    "selectedEntityId", "selectedTab"
+    "selectedEntityId", "selectedTab", "overrides"
 ]);
 
 /**
@@ -273,6 +286,7 @@ const CollectionViewBindingInner = React.memo(
         updateUrl,
         selectedEntityId: selectedEntityIdProp,
         selectedTab: selectedTabProp,
+        overrides,
         ...collectionProp
     }: CollectionViewBindingProps<M>
     ) {
@@ -326,11 +340,16 @@ const CollectionViewBindingInner = React.memo(
         }
         const stableCollectionProp = collectionPropRef.current;
 
+        const overridesRef = React.useRef(overrides);
+        if (!equal(overridesRef.current, overrides)) overridesRef.current = overrides;
+        const stableOverrides = overridesRef.current;
+
         const collection = useMemo(() => {
             const registryCollection = collectionRegistry.getCollection(path) || stableCollectionProp;
             const userOverride = userConfigPersistence?.getCollectionConfig<M>(path);
-            return (userOverride ? mergeDeep(registryCollection, userOverride) : registryCollection) as AdminCollection<M>;
-        }, [stableCollectionProp, path, userConfigPersistence, collectionRegistry]);
+            const drawn = (userOverride ? mergeDeep(registryCollection, userOverride) : registryCollection) as AdminCollection<M>;
+            return stableOverrides ? { ...drawn, ...stableOverrides } as AdminCollection<M> : drawn;
+        }, [stableCollectionProp, path, userConfigPersistence, collectionRegistry, stableOverrides]);
 
         const collectionRef = React.useRef(collection);
         useEffect(() => {

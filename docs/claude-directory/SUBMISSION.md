@@ -35,7 +35,7 @@ an Owner. The listing belongs to the organization you submit from.
 
 ## 2. Tools (synced from the server)
 
-Ten tools; every one has a `title` and annotations.
+Twelve tools; every one has a `title` and annotations.
 
 | Tool | Kind | Annotations |
 |---|---|---|
@@ -44,7 +44,9 @@ Ten tools; every one has a `title` and annotations.
 | `logs` | read | `readOnlyHint: true` |
 | `schema` | read | `readOnlyHint: true` |
 | `query` | read | `readOnlyHint: true` |
-| `show_collection` | read, MCP App (table) | `readOnlyHint: true` |
+| `show_collection` | read, MCP App (collection view) | `readOnlyHint: true` |
+| `show_record` | read, MCP App (record form) | `readOnlyHint: true` |
+| `show_app` | read, MCP App (screen of views) | `readOnlyHint: true` |
 | `write` | write, plan then confirm | `destructiveHint: true`, `idempotentHint: true` |
 | `deploy` | write, plan then confirm | `destructiveHint: true` |
 | `env` | write, plan then confirm | `destructiveHint: true`, `idempotentHint: true` |
@@ -62,13 +64,15 @@ Ten tools; every one has a `title` and annotations.
 > from one place.
 >
 > Ask Claude to list your projects and their status, read build, runtime and
-> cron logs, look at a project's schema, and query its rows. Show a collection
-> as a table in the conversation and edit cells in place. Deploy a branch, roll
+> cron logs, look at a project's schema, and query its rows. Open your admin
+> panel's own views in the conversation: a collection as a table, list, cards
+> or kanban board, a row's form, or a small screen of several, and edit there.
+> Deploy a branch, roll
 > back to an earlier deployment, set or remove environment variables, and run
 > or pause cron jobs.
 >
 > Every change takes two steps: Claude first shows a plan of exactly what will
-> happen, and nothing runs until you agree. In the table, an edited cell shows
+> happen, and nothing runs until you agree. In the views, saving a form shows
 > the plan and waits for you to press Save. Environment variable values are
 > never shown back.
 >

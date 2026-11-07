@@ -138,11 +138,12 @@ export type CollectionPanelOptions = {
  */
 function CollectionPanelInner({
     mergedCollection,
+    overrides,
     path,
     title,
     updateUrl,
     className
-}: CollectionPanelProps & { mergedCollection: AdminCollection }) {
+}: CollectionPanelProps & { mergedCollection: AdminCollection; overrides: Partial<AdminCollection> }) {
     const ResolvedCollectionView = useComponentOverride("Collection.View", CollectionViewBinding);
 
     return (
@@ -157,6 +158,7 @@ function CollectionPanelInner({
             )}
             <ResolvedCollectionView
                 {...mergedCollection}
+                overrides={overrides}
                 path={path}
                 updateUrl={updateUrl}
             />
@@ -209,28 +211,28 @@ function CollectionPanelInScope(props: CollectionPanelProps) {
         [lookUp, collectionRegistry, path]);
     const routesMounted = urlController.routesMounted !== false;
 
-    const mergedCollection = useMemo(() => {
-        if (!baseCollection) return undefined;
-
-        // Build overrides object from shorthand props + explicit overrides
-        const propOverrides: Record<string, unknown> = {};
-        if (viewMode) propOverrides.defaultViewMode = viewMode;
-        if (sort) propOverrides.sort = sort;
-        if (limit) propOverrides.pagination = limit;
-        if (openEntityMode) propOverrides.openEntityMode = openEntityMode;
-
-        const merged = {
-            ...baseCollection,
+    // What this panel changes about the collection: the shorthand props over
+    // the explicit overrides. Handed to the view as overrides, which it applies
+    // over the registered collection it draws.
+    const overrides = useMemo<Partial<AdminCollection>>(() => {
+        const merged: Partial<AdminCollection> = {
             ...(collectionOverrides ?? {}),
-            ...propOverrides
-        } as AdminCollection;
+            ...(viewMode && { defaultViewMode: viewMode }),
+            ...(sort && { sort }),
+            ...(limit && { pagination: limit }),
+            ...(openEntityMode && { openEntityMode })
+        };
         // Without CMS routes a record has no page of its own, nor a split
         // beside the list that a URL selects: it opens over the page.
-        if (!routesMounted && merged.openEntityMode !== "dialog") {
-            merged.openEntityMode = "side_panel";
+        if (!routesMounted && (merged.openEntityMode ?? baseCollection?.openEntityMode) !== "dialog") {
+            return { ...merged, openEntityMode: "side_panel" };
         }
         return merged;
     }, [baseCollection, collectionOverrides, viewMode, sort, limit, openEntityMode, routesMounted]);
+
+    const mergedCollection = useMemo(
+        () => baseCollection ? { ...baseCollection, ...overrides } as AdminCollection : undefined,
+        [baseCollection, overrides]);
 
     if (!mergedCollection) {
         if (navigationState.loading) {
@@ -250,6 +252,7 @@ function CollectionPanelInScope(props: CollectionPanelProps) {
             {...props}
             path={path}
             mergedCollection={mergedCollection}
+            overrides={overrides}
         />
     );
 

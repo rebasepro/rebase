@@ -4021,7 +4021,7 @@ The three ratings mean:
 | Offline sync | Beta | Mutations carry idempotency keys the server honours, and the data-loss defects found in the July audit are fixed. The conflict model is last-write-wins with no per-field merge |
 | Entity history | Stable | Snapshot-based, gated by its own suite |
 | Functions and crons | Stable | The portable entry point (`@rebasepro/server/functions`) is a versioned contract with its own API-surface section |
-| MCP server + agent skills | Beta | `@rebasepro/mcp` runs over stdio: fifty-three tools, bearer auth per project, destructive tools refuse non-local targets unless opted in. Since 0.21 the server can also mount a remote `/mcp` endpoint — OAuth 2.1, nine data tools, every call under the signed-in person's own RLS — off unless `REBASE_MCP_ENABLED=true`, and Postgres only |
+| MCP server + agent skills | Beta | `@rebasepro/mcp` runs over stdio: fifty-three tools, bearer auth per project, destructive tools refuse non-local targets unless opted in. Since 0.21 the server can also mount a remote `/mcp` endpoint — OAuth 2.1, eleven data tools, every call under the signed-in person's own RLS — off unless `REBASE_MCP_ENABLED=true`, and Postgres only |
 | Studio (SQL, schema, RLS, API explorer) | Beta | Used daily against real projects. Branching is present in the OSS package and deliberately not exposed in Rebase Cloud, because moving a running deployment onto a branch has no story yet |
 | CMS + admin panel | Beta | Complete for CRUD, relations, storage fields and roles. **The data table has no grid semantics** — no `role`, no `aria-rowindex`, `tabIndex` stripped — so keyboard and screen-reader users cannot operate the main view. No drafts, no per-locale content, no block rich-text |
 | PGlite managed dev database | Beta | Zero-setup `rebase dev` with no Docker. One session at a time, so requests serialize and concurrency cannot be reproduced against it; Atlas-backed commands (`db push`, `generate`, `migrate`) plan against a throwaway second PGlite started for the command (on 0.24 they refuse the managed database); `db branch` does not work there and says so |
@@ -4404,6 +4404,28 @@ yet, listed so that nobody reads a promise into them:
   seconds `rebase_db_connections{state}`, `rebase_db_max_connections`,
   `rebase_db_size_bytes` and `rebase_db_replica_lag_seconds`.
 
+##### MCP
+
+- **The admin panel's own views open in Claude.** In a client that renders MCP
+  Apps, `show_collection` now opens the collection view the admin panel draws —
+  table, list, cards or kanban (`view`), with its search, filters, sorting and
+  paging, relation previews and enum chips — and a row opens the record form,
+  with its sections, validation and relation pickers. The person can add and
+  delete rows there too. Two tools join it: `show_record` opens one row's form
+  (`id`), or a form for a new row starting from `values` the model filled in,
+  for the person to check and save; `show_app` opens a small screen of up to
+  eight blocks (collection views, record forms, and metrics that count rows),
+  where a block can follow the row selected in another — orders, and beside
+  them the selected order's form and its items. The view runs `<Rebase>` with
+  a data driver whose every read and write is a call to the server's tools,
+  as the person, under their RLS; the server hands it the collections'
+  configs reduced to data, without the fields that caller never receives, and
+  closes what their connection was not granted. A save the server plans
+  first (the hosted connector's `write`) waits for the person to confirm the
+  plan, and the model is told what they changed. The model reads the rows, not
+  the configs. Images and files show as labels: the view fetches nothing
+  itself.
+
 #### Fixed
 
 ##### Server & REST
@@ -4472,6 +4494,13 @@ yet, listed so that nobody reads a promise into them:
   with three columns of figures lost every date on a laptop screen. A
   `listProperties` column that is also the declared date (or status, or tags)
   stays as long as that slot would.
+
+- **`CollectionPanel`'s overrides apply to a registered collection.** Its
+  `viewMode`, `sort`, `limit` and `collectionOverrides` (a fixed or default
+  filter, say) were spread onto the collection view's props, which draws the
+  registry's copy of any collection the scope registers — so on a page with
+  a `CollectionsProvider`, or inside the CMS, they did nothing. The view takes
+  them as `overrides`, applied over the registered collection.
 
 ##### MCP
 
@@ -51086,22 +51115,39 @@ to one user, the endpoint declines to mount and says why in the boot log. No
   (your app's "Forgot password"); the screen tells them so. It also names the host the authorization code is sent
   to, and says that host is not verified: anyone may register a client under
   any name, so the host is the part a person can check.
-- **Nine tools, three scopes.** The same [scopes](/docs/backend/roles-and-scopes/)
+- **Eleven tools, three scopes.** The same [scopes](/docs/backend/roles-and-scopes/)
   every credential uses. `data:read` offers `list_collections`, `describe_collection`,
-  `query_collection`, `show_collection`, `count_documents` and `get_document`; `data:write` adds `create_document` and
+  `query_collection`, `count_documents`, `get_document` and the three views,
+  `show_collection`, `show_record` and `show_app`; `data:write` adds `create_document` and
   `update_document`; `data:delete` adds `delete_document`. A client that asks for
   nothing gets `data:read`. Each one narrows to a collection: `data:read:posts`
   lists, describes and reads `posts` and nothing else. A scope decides which tools are
   offered and which collections they reach, not which rows: an empty list can be
   RLS working, and `data:write` still cannot write a row the person could not.
-- **`show_collection` puts the rows in front of the person.** It takes
-  `query_collection`'s arguments and answers the same page, plus the columns the
-  admin panel shows. A client that renders MCP Apps, such as Claude, opens it as a
-  table in the conversation: the person can load more rows and, where the
-  connection holds `data:write`, edit a cell in place. Each save is an
-  `update_document` call made as them, under their RLS, and the model is told what
-  they changed. A client without MCP Apps, such as Claude Code or Cursor, shows no
-  table, and the model reads the page as it would from `query_collection`.
+- **Three tools put your admin panel in front of the person.** In a client that
+  renders MCP Apps, such as Claude, they open the admin panel's own views in the
+  conversation, drawn from your collections: their fields, enums, validation,
+  relations, form sections and view settings.
+  - `show_collection` takes `query_collection`'s arguments, plus `view`
+    (`table`, `list`, `cards` or `kanban`), and opens the collection view: the
+    person can search, filter, sort and page, open a row's form, and add rows.
+  - `show_record` opens one row's form (`id`), or a form for a new row that
+    starts from the `values` the model filled in, for the person to check and
+    save themselves.
+  - `show_app` opens a small screen of up to eight `blocks`: collection views,
+    record forms, and metrics that count the rows matching a `where`. A block
+    can follow the row selected in an earlier collection block: a form opening
+    it (`"follows": {"block": "orders"}`), or a second collection showing the
+    rows that point at it (`"follows": {"block": "orders", "on": "orderId"}`).
+
+  Each block is checked as the read and write tools would check it before the
+  screen opens. Every read and save in the view is one of those tools' calls,
+  made as the person under their RLS, so the form offers only what their
+  connection was granted: without `data:write` it is read-only, and a field
+  their roles cannot read is not in it. The model is told what they changed. It
+  reads the rows each tool answers, not the collection configs the view draws
+  with. A client without MCP Apps, such as Claude Code or Cursor, shows nothing,
+  and the model reads the same rows it would from `query_collection`.
 - **Grants made before 0.24 keep their reach.** `mcp:read` is read as
   `data:read`, and `mcp:write` as `data:write data:delete`, on stored grants and
   on tokens already issued.
@@ -51216,7 +51262,7 @@ a project's data does. `rebase cloud connect --list` shows the ones you added.
 
 ### What Claude can do with it
 
-Ten tools. The first six only read:
+Twelve tools. The first eight only read:
 
 | Tool | What it does |
 |---|---|
@@ -51225,7 +51271,9 @@ Ten tools. The first six only read:
 | `logs` | The running app's output, a deployment's build log, or a cron job's runs |
 | `schema` | A project's collections, or one collection's fields |
 | `query` | Reads rows: one by id, a filtered page, or a count |
-| `show_collection` | Shows rows as a table in the conversation, where you can page and edit cells |
+| `show_collection` | Opens a collection in your admin panel's own view, in the conversation: a table, list, cards or kanban board you can search, filter and page, where a row opens its form |
+| `show_record` | Opens one row's form, or a form for a new row Claude filled in, for you to check and save |
+| `show_app` | Opens a small screen for the task at hand: collection views, forms and counts, where one can follow the row you select in another |
 
 The other four change production, and each one asks first:
 
@@ -51249,8 +51297,8 @@ only if you agree. The token works for five minutes, once, for exactly the
 arguments it was made for: if anything differs, nothing runs.
 
 Claude also asks your permission before it calls any of these four tools,
-because they are marked as destructive. In the table view, an edited cell
-shows the plan and waits for you to press **Save**.
+because they are marked as destructive. In the views, saving a form shows
+the plan and waits for you to press **Save**.
 
 Environment variable values are never shown back: a plan shows their length,
 and `project_status` lists names only. A value you set does pass through the

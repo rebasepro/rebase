@@ -1,6 +1,6 @@
 {
   "compilerOptions": {
-    "rootDir": ".",
+    "rootDir": "..",
     "module": "ESNEXT",
     "target": "ESNEXT",
     "lib": [
@@ -17,9 +17,18 @@
     "isolatedModules": true,
     "forceConsistentCasingInFileNames": true,
     "types": [
-      "vite/client"
+      "vite/client",
+      "node"
     ],
-    "noEmit": true
+    "noEmit": true,
+    "paths": {
+      "@rebasepro/*": [
+        "../*/src/index.ts"
+      ],
+      "react-router": [
+        "../cms/node_modules/react-router/dist/production/index.d.ts"
+      ]
+    }
   },
   "include": [
     "src",

@@ -80,7 +80,7 @@ replaced:
   The control plane must not expose its own database (projects, deployments,
   billing rows) through the default tools, so it replaces them, not adds to
   them.
-- **The control plane** registers the ten tools below, and `REBASE_MCP_ENABLED`
+- **The control plane** registers the twelve tools below, and `REBASE_MCP_ENABLED`
   plus `REBASE_PUBLIC_URL` turn the endpoint on.
 
 A separate service was considered and rejected. It would need its own OAuth
@@ -186,7 +186,7 @@ no tool needs them.
 
 ## The tools
 
-Ten tools, down from 55 local plus 9 per app. Each takes `project` (an id or a
+Twelve tools, down from 55 local plus 11 per app. Each takes `project` (an id or a
 name; ambiguity is an error that lists the matches) except `projects`.
 
 | # | Tool | Arguments | Annotations | Needs | Runs |
@@ -196,7 +196,9 @@ name; ambiguity is an error that lists the matches) except `projects`.
 | 3 | `logs` | `project`, `source: "runtime" \| "build" \| "cron"`, `deployment?`, `job?`, `tail?` (200), `since?` | read-only | `project:logs` (+ `project:studio` for cron) | runtime-logs, a deployment's build log, cron run history |
 | 4 | `schema` | `project`, `collection?` | read-only | `project:studio` | tenant `list_collections`, or `describe_collection` when `collection` is given |
 | 5 | `query` | `project`, `collection`, `id?`, `where?`, `orderBy?`, `limit?`, `offset?`, `searchString?`, `count?` | read-only | `project:studio` | tenant `get_document` / `query_collection` / `count_documents` |
-| 6 | `show_collection` | as `query`, without `id` and `count` | read-only, opens a view | `project:studio` | tenant `show_collection`; the view is served by the connector |
+| 6 | `show_collection` | as `query`, without `id` and `count`, plus `view?` | read-only, opens a view | `project:studio` | tenant `show_collection`; the view is served by the connector |
+| 6b | `show_record` | `project`, `collection`, `id?`, `values?` | read-only, opens a view | `project:studio` | tenant `show_record` |
+| 6c | `show_app` | `project`, `title?`, `blocks` (up to 8: collection, record, metric) | read-only, opens a view | `project:studio` | tenant `show_app` |
 | 7 | `write` | `project`, `collection`, `action: "create" \| "update" \| "delete"`, `id?`, `data?`, `confirm?` | destructive, not idempotent | `project:studio` | tenant `create_document` / `update_document` / `delete_document`. Users are rows of the auth collection, so this covers creating, editing and deleting users, under the auth rules the app's REST routes apply |
 | 8 | `deploy` | `project`, `action: "deploy" \| "rollback" \| "cancel"`, `branch?`, `deployment?`, `confirm?` | destructive, not idempotent | `project:deploy` | the control plane's deploy routes |
 | 9 | `env` | `project`, `action: "set" \| "unset"`, `vars?: { KEY: value }`, `keys?: string[]`, `confirm?` | destructive, idempotent | `project:env` | the control plane's env-vars routes |
@@ -295,23 +297,34 @@ as an opt-in on a tool definition, so the per-app `/mcp` can adopt it for
 `delete_document` later. Its single-use store is an interface with a Postgres
 implementation beside the OAuth store.
 
-## MCP Apps: `show_collection`
+## MCP Apps: `show_collection`, `show_record`, `show_app`
 
-- **The view** (`ui://rebase/collection-table.html`) is served by the
-  connector, from the same `@rebasepro/mcp-apps` build the server already
-  inlines. `resources/list` and `resources/read` answer from the control plane.
-  The tenant is never asked for HTML.
-- **The data** comes from the tenant's `show_collection`, under the platform
-  token, and is relayed as the tool's result.
-- **The view's own calls** (next page, cell edits) come back to the connector,
-  because the host relays them to the server that served the view. Today the
-  view calls `query_collection` and `update_document` by name, which are not
-  the hosted tools' names. The fix is in the view: `show_collection`'s
-  structured result names the tools the view should call (`actions: { page:
-  "query", edit: "write" }`), and the view defaults to the current names when
-  that is absent, so the per-app `/mcp` keeps working unchanged. The view
-  spreads the original tool input into its calls, so `project` travels with
-  them.
+- **The view** (`ui://rebase/app.html`) is served by the connector, from the
+  same `@rebasepro/mcp-apps` build the server already inlines: the admin
+  panel's own components (`<Rebase>`, `CollectionPanel`, `EntityFormPanel`)
+  over a data driver that calls tools. `resources/list` and `resources/read`
+  answer from the control plane, which also serves the same document under
+  the old `ui://rebase/collection-table.html`. The tenant is never asked for
+  HTML.
+- **The screen** is built by the tenant's own `show_collection`,
+  `show_record` or `show_app`, under the platform token: the tenant holds the
+  collections, checks every block as its read and write tools would, and
+  returns the rows the model reads plus `view` — the blocks, and the
+  collections' configs narrowed to the caller (no field they never receive,
+  read-only where they may not write, a restrictive rule closing what the
+  token does not grant). The connector forwards the arguments without
+  `project` and adds `actions`. A tenant on a runtime from before a tool
+  answers "Unknown tool", which the connector words as "runs a Rebase runtime
+  from before show_app".
+- **The view's own calls** (reads, saves, deletes) come back to the
+  connector, because the host relays them to the server that served the view.
+  `actions` names its tools for each (`query` to read a page, a row or a
+  count, `write` with `action` to create, update or delete), each with the
+  project. A save is therefore `write`'s two calls: the view shows the plan in
+  a dialog and sends the second only when the person presses Save. The per-app
+  `/mcp` names no `actions`, and the view calls its tools by their own names.
+- **The model** reads the rows, not the configs (`modelResult` strips `view`
+  and `actions` from the text it is sent).
 
 ## Security model
 
