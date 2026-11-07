@@ -14,6 +14,7 @@
  * satisfying an interface it no longer implemented, and 26 tests kept passing
  * against a shape production does not have.
  */
+import type { McpAppCompilerSource as McpRouteConfigAppCompiler } from "../../src/mcp/mcp-apps";
 import { Hono } from "hono";
 import type { AuthAdapter, CollectionConfig, DataDriver } from "@rebasepro/types";
 import { generateAccessToken } from "../../src/auth/jwt";
@@ -199,6 +200,8 @@ export function unscopableDriver(): DataDriver {
 }
 
 export interface HarnessOptions {
+    /** show_app's compiler, as `@rebasepro/mcp-apps` gives it. */
+    appCompiler?: McpRouteConfigAppCompiler;
     allowDynamicRegistration?: boolean;
     driver?: DataDriver;
     collections?: CollectionConfig[];
@@ -236,6 +239,7 @@ export function buildApp(options: HarnessOptions = {}) {
         resolveApiKey: options.resolveApiKey,
         identity: options.identity,
         apps: options.apps,
+        appCompiler: options.appCompiler,
         tools: options.tools,
         vocabulary: options.vocabulary,
         instructions: options.instructions,

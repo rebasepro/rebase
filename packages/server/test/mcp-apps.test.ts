@@ -282,46 +282,50 @@ describe("show_record", () => {
 });
 
 describe("show_app", () => {
-    const blocks = [
-        { key: "count", type: "metric", collection: "candidates", title: "Candidates", where: { stage: ["==", "interview"] } },
-        { key: "people", type: "collection", collection: "candidates", view: "list" },
-        { key: "person", type: "record", collection: "candidates", follows: { block: "people" } },
-        { key: "talks", type: "collection", collection: "interviews", follows: { block: "people", on: "candidateId" } }
-    ];
+    /** A stand-in for `@rebasepro/mcp-apps`' compiler: its own suite tests the real one. */
+    const compiler = async () => (source: string) => source.includes("<oops")
+        ? { ok: false as const, error: "The app does not compile: Unexpected token, at line 2: <oops" }
+        : { ok: true as const, code: `compiled:${source}` };
 
-    it("opens a screen of blocks, telling the model each block's rows, row or count", async () => {
-        const { content, text, error } = await screen("data:read", "show_app", { title: "Hiring", blocks });
+    async function app(scope: string, args: Record<string, unknown>, appCompiler: typeof compiler | null = compiler) {
+        const stub = stubDriver();
+        const { app: server } = buildApp({ apps: withViews, appCompiler: appCompiler ?? undefined, driver: stub.driver, collections: [CANDIDATES, INTERVIEWS] });
+        const res = await call(server, await token(scope), "tools/call", { name: "show_app", arguments: args });
+        const content = res.result?.structuredContent as { view: ViewPayload } & Record<string, unknown> | undefined;
+        const text = (res.result?.content as { text: string }[] | undefined)?.[0]?.text ?? "";
+        return { content, text, error: res.result?.isError === true ? text : undefined };
+    }
+
+    const CODE = "export default function App() { return null; }";
+
+    it("compiles the app and hands the view its code and the collections it reads", async () => {
+        const { content, text, error } = await app("data:read", { title: "Hiring", collections: ["interviews"], code: CODE });
         expect(error).toBeUndefined();
         expect(content?.view.title).toBe("Hiring");
-        expect(content?.view.blocks.map(block => block.key)).toEqual(["count", "people", "person", "talks"]);
-        expect(content?.view.blocks[0]).toEqual(expect.objectContaining({ type: "metric", count: expect.any(Number) }));
-        expect(text).toContain("\"rows\":[{");
-        expect(text).not.toContain("securityRules");
+        expect(content?.view.blocks).toEqual([{ key: "app", type: "app", code: `compiled:${CODE}`, collections: ["interviews"] }]);
+        // The collections it names, and the targets of their relations.
+        expect(content?.view.collections.map(collection => collection.slug)).toEqual(["candidates", "interviews"]);
+        // The model wrote the code: it is not sent back, nor the configs.
+        expect(text).toContain("\"collections\":[\"interviews\"]");
+        expect(text).not.toContain("compiled:");
+        expect(text).not.toContain("properties");
     });
 
-    it("refuses what the read tools would refuse, naming the block", async () => {
-        const cases: [Record<string, unknown>[], string][] = [
-            [[{ key: "a", type: "collection", collection: "nope" }], "Unknown collection"],
-            [[{ key: "a", type: "collection", collection: "candidates", orderBy: { name: "up" } }], "`orderBy`"],
-            [[{ key: "a", type: "collection", collection: "candidates" }, { key: "a", type: "metric", collection: "candidates", title: "x" }], "Two blocks"],
-            [[{ key: "a", type: "metric", collection: "candidates" }], "needs a `title`"],
-            [[{ key: "a", type: "record", collection: "candidates", follows: { block: "b" } }], "not an earlier collection block"],
-            [[{ key: "a", type: "collection", collection: "candidates" }, { key: "b", type: "collection", collection: "interviews", follows: { block: "a" } }], "`on`"],
-            [[{ key: "a", type: "collection", collection: "candidates" }, { key: "b", type: "collection", collection: "interviews", follows: { block: "a", on: "nope" } }], "\"nope\" is not a field"],
-            [[{ key: "a", type: "collection", collection: "candidates" }, { key: "b", type: "record", collection: "interviews", follows: { block: "a" } }], "`field`"],
-            [[{ key: "a", type: "metric", collection: "candidates", title: "x", view: "list" }], "does not take `view`"],
-            [[{ key: "has space", type: "collection", collection: "candidates" }], "`key`"]
-        ];
-        for (const [screenBlocks, message] of cases) {
-            const { error } = await screen("data:read", "show_app", { blocks: screenBlocks });
-            expect([screenBlocks, error]).toEqual([screenBlocks, expect.stringContaining(message)]);
-        }
+    it("hands a compile error back, to fix in the same turn", async () => {
+        const { error } = await app("data:read", { collections: ["candidates"], code: "export default function App() {\n<oops" });
+        expect(error).toBe("The app does not compile: Unexpected token, at line 2: <oops");
     });
 
-    it("takes no more blocks than a screen holds", async () => {
-        const many = Array.from({ length: 9 }, (_, index) => ({ key: `b${index}`, type: "collection", collection: "candidates" }));
-        const { error } = await screen("data:read", "show_app", { blocks: many });
-        expect(error).toBeDefined();
+    it("refuses an app on a collection the connection cannot read, or none", async () => {
+        expect((await app("data:read:candidates", { collections: ["interviews"], code: CODE })).error)
+            .toContain("was not granted \"data:read\" on \"interviews\"");
+        expect((await app("data:read", { collections: [], code: CODE })).error).toContain("`collections`");
+        expect((await app("data:read", { collections: ["nope"], code: CODE })).error).toContain("Unknown collection");
+    });
+
+    it("says so where the server has no compiler", async () => {
+        const { error } = await app("data:read", { collections: ["candidates"], code: CODE }, null);
+        expect(error).toContain("cannot compile apps");
     });
 });
 

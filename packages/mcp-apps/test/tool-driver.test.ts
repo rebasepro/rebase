@@ -11,6 +11,8 @@
  * - A write reads the lists of its collection again, and the model is told
  *   what changed.
  * - The hosted connector's tools and arguments, where a result names them.
+ * - An app's own change is confirmed in the view first, unless the tool
+ *   plans it itself; declined, nothing is sent.
  */
 import { describe, expect, it, vi } from "vitest";
 import { EntityRelation, type CollectionConfig, type ListenCollectionProps } from "@rebasepro/types";
@@ -60,13 +62,13 @@ function driverWith(answer: (name: string, args: Record<string, unknown>) => Too
         return answer(name, args);
     };
     const changes: ViewChange[][] = [];
-    const driver = createToolDriver({
+    const { driver, data } = createToolDriver({
         callTool,
         actions: options.actions ?? DEFAULT_ACTIONS,
         confirm: options.confirm ?? (async () => true),
         onChange: list => changes.push([...list])
     });
-    return { driver, calls, changes };
+    return { driver, data, calls, changes };
 }
 
 describe("reading", () => {
@@ -192,6 +194,75 @@ describe("writing", () => {
         expect(changes.at(-1)).toEqual([{ action: "updated", collection: "orders", id: "o1", fields: ["status"] }]);
         expect(describeChanges(changes.at(-1) ?? [])).toBe("In the Rebase view, the user saved these changes: "
             + "updated status on row o1 of orders. Rows you read before them may be out of date.");
+    });
+});
+
+describe("an app's data", () => {
+    it("reads pages, rows and counts with the read tools, in their shape", async () => {
+        const { data, calls } = driverWith((name, args) => name === "count_documents"
+            ? ok({ count: 2 })
+            : name === "get_document" ? ok({ id: args.id }) : ok({ data: [{ id: "o1" }], meta: { total: 9, hasMore: true } }));
+
+        expect(await data.find("orders", { where: { status: ["==", "paid"] }, limit: 5 }))
+            .toEqual({ data: [{ id: "o1" }], total: 9, hasMore: true });
+        expect(await data.get("orders", "o1")).toEqual({ id: "o1" });
+        expect(await data.count("orders", { status: ["==", "paid"] })).toBe(2);
+        expect(calls.map(call => call.name)).toEqual(["query_collection", "get_document", "count_documents"]);
+    });
+
+    it("asks the person before a change the tool does not plan, and sends nothing when they decline", async () => {
+        const asked: WritePlan[] = [];
+        let answer = false;
+        const { data, calls } = driverWith(() => ok({ id: "o1", status: "sent" }), {
+            confirm: async plan => {
+                asked.push(plan);
+                return answer;
+            }
+        });
+
+        await expect(data.update("orders", "o1", { status: "sent" })).rejects.toBeInstanceOf(SaveCancelledError);
+        expect(calls).toEqual([]);
+
+        answer = true;
+        await data.remove("orders", "o2");
+        expect(asked.map(plan => plan.summary)).toEqual(["Change status on row o1 of orders.", "Delete row o2 of orders."]);
+        expect(calls).toEqual([{ name: "delete_document", args: { collection: "orders", id: "o2" } }]);
+    });
+
+    it("leaves the asking to a tool that plans, once", async () => {
+        const asked: WritePlan[] = [];
+        const actions = actionsOf({ update: { tool: "write", arguments: { project: "shop", action: "update" }, plans: true } });
+        const { data, calls } = driverWith((_name, args) => args.confirm ? ok({ id: "o1" }) : PLAN, {
+            actions,
+            confirm: async plan => {
+                asked.push(plan);
+                return true;
+            }
+        });
+
+        await data.update("orders", "o1", { status: "sent" });
+        expect(asked.map(plan => plan.summary)).toEqual(["Change status on row o1 of orders in shop."]);
+        expect(calls).toHaveLength(2);
+    });
+
+    it("refreshes the admin panel's lists of a collection the app changed, by whatever name it used", async () => {
+        const { driver: base, calls } = driverWith(() => ok({ data: [], meta: {} }));
+        void base;
+        const tools = createToolDriver({
+            callTool: async (name, args) => {
+                calls.push({ name, args });
+                return name === "update_document" ? ok({ id: "o1" }) : ok({ data: [], meta: {} });
+            },
+            actions: DEFAULT_ACTIONS,
+            confirm: async () => true,
+            canonical: name => name === "public.orders" ? "orders" : name
+        });
+        const seen: unknown[] = [];
+        tools.driver.listenCollection!({ path: "orders", onUpdate: rows => seen.push(rows) });
+        await vi.waitFor(() => expect(seen).toHaveLength(1));
+
+        await tools.data.update("public.orders", "o1", { status: "sent" });
+        await vi.waitFor(() => expect(seen).toHaveLength(2));
     });
 });
 

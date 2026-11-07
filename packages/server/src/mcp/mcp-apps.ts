@@ -17,6 +17,16 @@
  * shape, so `@rebasepro/server` carries no UI code.
  */
 
+/**
+ * Compile an app the model wrote for the view (show_app's `code`): the code
+ * to run, or the error to hand back. Built by `@rebasepro/mcp-apps`, and
+ * loaded with the views.
+ */
+export type McpAppCompiler = (source: string) => { ok: true; code: string } | { ok: false; error: string };
+
+/** Where the compiler comes from, asked once, on the first show_app. */
+export type McpAppCompilerSource = () => Promise<McpAppCompiler>;
+
 /** The MIME type a view resource is served as. */
 export const MCP_APP_MIME_TYPE = "text/html;profile=mcp-app";
 

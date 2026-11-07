@@ -31,6 +31,12 @@ import { isRecord, type ToolResult } from "../bridge";
 export interface ToolAction {
     tool: string;
     arguments: Record<string, unknown>;
+    /**
+     * The tool answers a plan before it changes anything (the hosted
+     * connector's `write`), so the person confirms there. Not set, an app's
+     * own change is confirmed in the view before it is sent.
+     */
+    plans?: boolean;
 }
 
 /**
@@ -82,6 +88,39 @@ export interface ToolDriverOptions {
     confirm: (plan: WritePlan) => Promise<boolean>;
     /** Every change made through this driver, in order, after each one. */
     onChange?: (changes: readonly ViewChange[]) => void;
+    /**
+     * The name a collection is watched under, for a name the tools take
+     * (its slug or its data path): an app names collections as the model
+     * wrote them, the admin panel by slug, and a write must refresh both.
+     */
+    canonical?: (collection: string) => string;
+}
+
+type Row = Record<string, unknown>;
+
+/**
+ * The project's data, by collection, as an app reads and writes it: rows as
+ * the read tools serve them, and every change confirmed by the person before
+ * it is sent — by the server's plan where the tool plans, here otherwise.
+ * What an app changes refreshes every view of that collection, the admin
+ * panel's included.
+ */
+export interface ToolData {
+    find(collection: string, args?: Record<string, unknown>): Promise<{ data: Row[]; total?: number; hasMore: boolean }>;
+    get(collection: string, id: string | number): Promise<Row | undefined>;
+    count(collection: string, where?: Record<string, unknown>): Promise<number>;
+    create(collection: string, data: Row, id?: string | number): Promise<Row>;
+    update(collection: string, id: string | number, data: Row): Promise<Row>;
+    remove(collection: string, id: string | number): Promise<void>;
+    /** Called after every change to `collection`; returns the unsubscribe. */
+    watch(collection: string, refresh: () => void): () => void;
+}
+
+export interface ToolDriver {
+    /** For `<Rebase>`: the admin panel's reads and saves. */
+    driver: DataDriver;
+    /** For an app's code. */
+    data: ToolData;
 }
 
 /** A save the person declined at the plan. The form shows it as the save's error. */
@@ -95,8 +134,9 @@ export class SaveCancelledError extends Error {
 /** The ceiling every read tool takes for `limit` (`MAX_LIST_LIMIT`). */
 const MAX_LIMIT = 1000;
 
-export function createToolDriver(options: ToolDriverOptions): DataDriver {
+export function createToolDriver(options: ToolDriverOptions): ToolDriver {
     const { callTool, actions, confirm, onChange } = options;
+    const canonical = options.canonical ?? ((collection: string) => collection);
     const changes: ViewChange[] = [];
     // Who is drawing what: a write reads every list and record of its
     // collection again, which is how a row saved in one block shows in another.
@@ -124,19 +164,31 @@ export function createToolDriver(options: ToolDriverOptions): DataDriver {
     };
 
     const changed = (change: ViewChange) => {
-        for (const key of rows.keys()) if (key.startsWith(`${change.collection}/`)) rows.delete(key);
+        const key = canonical(change.collection);
+        for (const row of rows.keys()) if (canonical(row.slice(0, row.lastIndexOf("/"))) === key) rows.delete(row);
         changes.push(change);
         onChange?.(changes);
-        for (const watcher of watchers.get(change.collection) ?? []) watcher();
+        for (const watcher of watchers.get(key) ?? []) watcher();
     };
 
     const watch = (path: string, refresh: () => void): (() => void) => {
-        const set = watchers.get(path) ?? new Set();
+        const key = canonical(path);
+        const set = watchers.get(key) ?? new Set();
         set.add(refresh);
-        watchers.set(path, set);
+        watchers.set(key, set);
         return () => {
             set.delete(refresh);
         };
+    };
+
+    /**
+     * An app's change: confirmed by the person before it goes, where the
+     * tool does not plan it itself — code can change rows without a click,
+     * and every change it makes is theirs to agree to.
+     */
+    const appWrite = async (action: ToolAction, args: Record<string, unknown>, plan: WritePlan): Promise<unknown> => {
+        if (!action.plans && !await confirm(plan)) throw new SaveCancelledError();
+        return write(action, args);
     };
 
     const fetchCollection = async (props: FetchCollectionProps): Promise<Record<string, unknown>[]> => {
@@ -165,7 +217,47 @@ export function createToolDriver(options: ToolDriverOptions): DataDriver {
         return read;
     };
 
-    return {
+    const data: ToolData = {
+        async find(collection, args = {}) {
+            const page = await call(actions.page, { ...args, collection: collectionArg(collection) });
+            if (!isRecord(page) || !Array.isArray(page.data)) throw new Error("The read returned no rows.");
+            const meta = isRecord(page.meta) ? page.meta : {};
+            return {
+                data: page.data.filter(isRecord),
+                ...(typeof meta.total === "number" && { total: meta.total }),
+                hasMore: meta.hasMore === true
+            };
+        },
+        get: (collection, id) => fetchOne({ path: collection, id }),
+        async count(collection, where) {
+            const answer = await call(actions.count, { collection: collectionArg(collection), ...(where && { where }) });
+            if (isRecord(answer) && typeof answer.count === "number") return answer.count;
+            throw new Error("The count returned no number.");
+        },
+        async create(collection, values, id) {
+            const saved = await appWrite(actions.create,
+                { collection: collectionArg(collection), data: values, ...(id !== undefined && { id: String(id) }) },
+                { summary: `Create a row in ${collection}.` });
+            const row = isRecord(saved) ? saved : { ...values };
+            changed({ action: "created", collection, id: String(row.id ?? id ?? ""), fields: Object.keys(values) });
+            return row;
+        },
+        async update(collection, id, values) {
+            const saved = await appWrite(actions.update,
+                { collection: collectionArg(collection), id: String(id), data: values },
+                { summary: `Change ${Object.keys(values).join(", ")} on row ${String(id)} of ${collection}.` });
+            changed({ action: "updated", collection, id: String(id), fields: Object.keys(values) });
+            return isRecord(saved) ? saved : { id, ...values };
+        },
+        async remove(collection, id) {
+            await appWrite(actions.delete, { collection: collectionArg(collection), id: String(id) },
+                { summary: `Delete row ${String(id)} of ${collection}.` });
+            changed({ action: "deleted", collection, id: String(id) });
+        },
+        watch
+    };
+
+    const driver: DataDriver = {
         key: "(default)",
         initialised: true,
 
@@ -232,6 +324,8 @@ export function createToolDriver(options: ToolDriverOptions): DataDriver {
             return true;
         }
     };
+
+    return { driver, data };
 }
 
 /**

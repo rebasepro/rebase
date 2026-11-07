@@ -69,6 +69,11 @@ export interface McpToolContext {
      * do. See `api/rest/auth-collection-writes.ts`.
      */
     authAdapter?: AuthAdapter;
+    /**
+     * Compile an app the model wrote for the view (show_app). Present where
+     * the views are served.
+     */
+    compileApp?: (source: string) => Promise<{ ok: true; code: string } | { ok: false; error: string }>;
 }
 
 /**
@@ -553,11 +558,8 @@ function stringList(value: unknown): string[] {
 
 // ─── Views: show_collection, show_record, show_app ──────────────────────────
 
-/** The most blocks one show_app screen takes. A screen of more is a page to build, not a view to open. */
-const MAX_BLOCKS = 8;
-
-/** Rows of a collection block the model is handed to report from; the person sees them all in the view. */
-const MODEL_ROWS = 20;
+/** The most collections one app reads. An app of more is a project to build, not a view to open. */
+const MAX_APP_COLLECTIONS = 10;
 
 const VIEW_ARG = {
     type: "string",
@@ -567,215 +569,73 @@ const VIEW_ARG = {
 };
 
 /**
- * One block of a screen, checked and resolved: its collection, and its
- * arguments as the read tools would refuse them — an unknown field in a
- * `where`, a `limit` past the ceiling — so a screen is never opened that
- * would only fail inside the view.
+ * A screen's block, checked and resolved: its collection, and what the model
+ * reads about it. Its arguments are checked as the read and write tools would
+ * refuse them, so a screen is never opened that would only fail in the view.
  */
 interface ResolvedBlock {
     block: McpViewBlock;
-    collection: CollectionConfig;
+    collections: CollectionConfig[];
     /** What the model reads about the block. */
     summary: Record<string, unknown>;
 }
 
-/** A block of show_app's `blocks`, as the model sent it. */
-const BLOCK_SCHEMA = {
-    type: "object",
-    properties: {
-        key: { type: "string", description: "A short name for the block, unique on the screen; `follows` refers to it." },
-        type: {
-            type: "string",
-            enum: ["collection", "record", "metric"],
-            description: "\"collection\": rows the person can browse, filter and open. \"record\": one row's form "
-                + "(`id`), or a new row's (no `id`, optional `values`). \"metric\": how many rows match `where`."
-        },
-        collection: COLLECTION_ARG,
-        title: { type: "string", description: "A heading for the block. Required for a metric." },
-        view: VIEW_ARG,
-        where: WHERE_ARG,
-        orderBy: { type: ["string", "array"], description: "A collection block's sort, as query_collection's." },
-        searchString: SEARCH_ARG,
-        limit: { type: "number", description: `A collection block's page size, 1 to ${MAX_LIST_LIMIT}.` },
-        id: { type: "string", description: "A record block's row. Omit it for a form that creates a row." },
-        values: { type: "object", description: "A new row's starting values, in a record block without `id`." },
-        follows: {
-            type: "object",
-            description: "Link this block to the row the person selects in an earlier collection block. A record "
-                + "block opens that row ({\"block\": \"orders\"}), or the row one of its fields points at "
-                + "({\"block\": \"orders\", \"field\": \"customerId\"}). A collection block shows the rows whose `on` "
-                + "field holds the selected row's id ({\"block\": \"orders\", \"on\": \"orderId\"}).",
-            properties: {
-                block: { type: "string" },
-                on: { type: "string" },
-                field: { type: "string" }
-            },
-            required: ["block"],
-            additionalProperties: false
-        }
-    },
-    required: ["key", "type", "collection"],
-    additionalProperties: false
-};
-
-const BLOCK_KEY = /^[A-Za-z0-9_-]{1,40}$/;
+/** show_record's block: a row's form, or a new row's starting from values checked as a create checks them. */
+async function recordBlock(args: Record<string, unknown>, ctx: McpToolContext): Promise<ResolvedBlock> {
+    const collection = resolveCollection(ctx, args.collection, "data:read");
+    const name = collectionPath(collection);
+    const id = optionalString(args.id, "`id`");
+    if (id !== undefined && args.values !== undefined) {
+        throw new McpToolError("`values` start a new row; with `id`, show_record opens an existing one.");
+    }
+    if (id !== undefined) {
+        const driver = await scopedDriver(ctx);
+        const read = await RestApiGenerator.readRow(driver, ownRow(collection), id, {});
+        if (!read) throw notFound(collection, id);
+        return {
+            collections: [collection],
+            block: { key: "record", type: "record", collection: name, id },
+            summary: { collection: name, id, row: read.row }
+        };
+    }
+    if (!reaches(ctx, "data:write", collection)) {
+        throw new McpToolError(`A form for a new row needs "data:write" on "${name}", which this connection was not granted.`);
+    }
+    const values = args.values === undefined ? undefined : writableValues(args.values, collection, ctx, "new");
+    return {
+        collections: [collection],
+        block: { key: "record", type: "record", collection: name, ...(values && { values }) },
+        summary: { collection: name, new: true, ...(values && { values }) }
+    };
+}
 
 /**
- * Check a screen's blocks and read what the model is told about each: a
- * collection block's first rows, a record's row, a metric's count.
+ * show_app's block: the app the model wrote, compiled here so a mistake is
+ * this call's error, and the collections it names, whose configs the view's
+ * collection views and forms draw with.
  */
-async function resolveBlocks(raw: unknown, ctx: McpToolContext): Promise<ResolvedBlock[]> {
-    if (!Array.isArray(raw) || raw.length === 0) throw new McpToolError("`blocks` must be a list of one or more blocks.");
-    if (raw.length > MAX_BLOCKS) throw new McpToolError(`A screen takes at most ${MAX_BLOCKS} blocks.`);
-    const resolved: ResolvedBlock[] = [];
-    for (const [index, entry] of raw.entries()) {
-        if (!isRecord(entry)) throw new McpToolError(`Block ${index + 1} must be an object.`);
-        const key = typeof entry.key === "string" ? entry.key : "";
-        if (!BLOCK_KEY.test(key)) throw new McpToolError(`Block ${index + 1}: \`key\` must be 1–40 letters, digits, "-" or "_".`);
-        if (resolved.some(other => other.block.key === key)) throw new McpToolError(`Two blocks are keyed "${key}".`);
-        resolved.push(await resolveBlock(key, entry, resolved, ctx));
+async function appBlock(args: Record<string, unknown>, ctx: McpToolContext): Promise<ResolvedBlock> {
+    if (!Array.isArray(args.collections) || args.collections.length === 0) {
+        throw new McpToolError("`collections` lists the collections the app reads, by the names list_collections gives.");
     }
-    return resolved;
-}
-
-async function resolveBlock(
-    key: string,
-    entry: Record<string, unknown>,
-    earlier: readonly ResolvedBlock[],
-    ctx: McpToolContext
-): Promise<ResolvedBlock> {
-    const where = `Block "${key}"`;
-    const collection = resolveCollection(ctx, entry.collection, "data:read");
-    const name = collectionPath(collection);
-    const title = optionalString(entry.title, `${where}: \`title\``);
-    const follows = entry.follows === undefined ? undefined : followsOf(entry.follows, where, earlier, collection);
-    const only = (type: string, allowed: readonly string[]) => {
-        const extra = Object.keys(entry).filter(arg => !["key", "type", "collection", "title", "follows", ...allowed].includes(arg));
-        if (extra.length > 0) throw new McpToolError(`${where}: a ${type} block does not take ${extra.map(arg => `\`${arg}\``).join(", ")}.`);
+    if (args.collections.length > MAX_APP_COLLECTIONS) {
+        throw new McpToolError(`An app reads at most ${MAX_APP_COLLECTIONS} collections.`);
+    }
+    const collections = [...new Map(args.collections
+        .map(name => resolveCollection(ctx, name, "data:read"))
+        .map(collection => [collection.slug, collection])).values()];
+    if (typeof args.code !== "string" || args.code.trim() === "") {
+        throw new McpToolError("`code` is the app: one TSX module whose default export is a React component.");
+    }
+    if (!ctx.compileApp) throw new McpToolError("This server cannot compile apps: its MCP App views are not loaded.");
+    const compiled = await ctx.compileApp(args.code);
+    if (!compiled.ok) throw new McpToolError(compiled.error);
+    const names = collections.map(collectionPath);
+    return {
+        collections,
+        block: { key: "app", type: "app", code: compiled.code, collections: names },
+        summary: { collections: names }
     };
-
-    switch (entry.type) {
-        case "collection": {
-            only("collection", ["view", "where", "orderBy", "searchString", "limit"]);
-            const view = entry.view === undefined ? undefined : viewModeOf(entry.view, where);
-            if (follows && !follows.on) {
-                throw new McpToolError(`${where}: a collection block that follows another names the field to match, \`on\`.`);
-            }
-            const readArgs = pick(entry, ["where", "orderBy", "searchString", "limit"]);
-            // Checked as query_collection checks it; the rows are the model's.
-            const page = follows ? undefined : await readPage({ ...readArgs, limit: Math.min(Number(entry.limit) || MODEL_ROWS, MODEL_ROWS) }, collection, ctx);
-            if (readArgs.limit !== undefined) readOptions({ limit: readArgs.limit }, collection, ctx);
-            return {
-                collection,
-                block: {
-                    key, type: "collection", collection: name,
-                    ...(title && { title }), ...(view && { view }),
-                    ...(isRecord(readArgs.where) && { where: readArgs.where }),
-                    ...(readArgs.orderBy !== undefined && { orderBy: readArgs.orderBy }),
-                    ...(typeof readArgs.searchString === "string" && { searchString: readArgs.searchString }),
-                    ...(typeof readArgs.limit === "number" && { limit: readArgs.limit }),
-                    ...(follows?.on && { follows: { block: follows.block, on: follows.on, ...(follows.field && { field: follows.field }) } })
-                },
-                summary: {
-                    key, type: "collection", collection: name,
-                    ...(page ? { rows: page.data, meta: page.meta } : { follows })
-                }
-            };
-        }
-        case "record": {
-            only("record", ["id", "values"]);
-            const id = optionalString(entry.id, `${where}: \`id\``);
-            if (id !== undefined && follows) throw new McpToolError(`${where}: a record block takes \`id\` or \`follows\`, not both.`);
-            if (entry.values !== undefined && (id !== undefined || follows)) {
-                throw new McpToolError(`${where}: \`values\` start a new row; a block with \`id\` or \`follows\` opens an existing one.`);
-            }
-            if (follows && !follows.field && collectionPath(earlierCollection(earlier, follows.block)) !== name) {
-                throw new McpToolError(`${where}: it follows "${follows.block}", a block of another collection — `
-                    + `name the field of that block's rows that holds a ${name} id, \`field\`.`);
-            }
-            let row: unknown;
-            let values: Record<string, unknown> | undefined;
-            if (id !== undefined) {
-                const driver = await scopedDriver(ctx);
-                const read = await RestApiGenerator.readRow(driver, ownRow(collection), id, {});
-                if (!read) throw notFound(collection, id);
-                row = read.row;
-            } else if (!follows) {
-                if (!reaches(ctx, "data:write", collection)) {
-                    throw new McpToolError(`${where}: a form for a new row needs "data:write" on "${name}", `
-                        + "which this connection was not granted.");
-                }
-                values = entry.values === undefined ? undefined : writableValues(entry.values, collection, ctx, "new");
-            }
-            return {
-                collection,
-                block: {
-                    key, type: "record", collection: name,
-                    ...(title && { title }), ...(id !== undefined && { id }), ...(values && { values }),
-                    ...(follows && { follows: { block: follows.block, ...(follows.field && { field: follows.field }) } })
-                },
-                summary: {
-                    key, type: "record", collection: name,
-                    ...(id !== undefined ? { row } : follows ? { follows } : { new: true, ...(values && { values }) })
-                }
-            };
-        }
-        case "metric": {
-            only("metric", ["where"]);
-            if (!title) throw new McpToolError(`${where}: a metric block needs a \`title\`, the words under its number.`);
-            if (follows) throw new McpToolError(`${where}: a metric block does not follow a selection.`);
-            const options = readOptions(pick(entry, ["where"]), collection, ctx);
-            const driver = await scopedDriver(ctx);
-            const count = await RestApiGenerator.countRawEntities(driver, collection, options, undefined);
-            return {
-                collection,
-                block: {
-                    key, type: "metric", collection: name, title, count,
-                    ...(isRecord(entry.where) && { where: entry.where })
-                },
-                summary: { key, type: "metric", collection: name, title, count }
-            };
-        }
-        default:
-            throw new McpToolError(`${where}: \`type\` is "collection", "record" or "metric".`);
-    }
-}
-
-/** A block's `follows`, checked against the blocks before it. */
-function followsOf(
-    raw: unknown,
-    where: string,
-    earlier: readonly ResolvedBlock[],
-    collection: CollectionConfig
-): { block: string; on?: string; field?: string } {
-    if (!isRecord(raw) || typeof raw.block !== "string") {
-        throw new McpToolError(`${where}: \`follows\` is {"block": "<key of an earlier collection block>", …}.`);
-    }
-    const source = earlierCollection(earlier, raw.block);
-    const on = optionalString(raw.on, `${where}: \`follows.on\``);
-    const field = optionalString(raw.field, `${where}: \`follows.field\``);
-    if (on !== undefined && !rowKeys(collection).includes(on)) {
-        throw new McpToolError(`${where}: "${on}" is not a field of ${collectionPath(collection)}'s rows.`);
-    }
-    if (field !== undefined && !rowKeys(source).includes(field)) {
-        throw new McpToolError(`${where}: "${field}" is not a field of ${collectionPath(source)}'s rows.`);
-    }
-    return { block: raw.block, ...(on !== undefined && { on }), ...(field !== undefined && { field }) };
-}
-
-/** The collection of an earlier collection block, which is what `follows` may name. */
-function earlierCollection(earlier: readonly ResolvedBlock[], key: string): CollectionConfig {
-    const source = earlier.find(other => other.block.key === key);
-    if (!source || source.block.type !== "collection") {
-        throw new McpToolError(`\`follows\` names "${key}", which is not an earlier collection block.`);
-    }
-    return source.collection;
-}
-
-/** The keys a row of this collection carries on the wire. */
-function rowKeys(collection: CollectionConfig): string[] {
-    const schema = buildCollectionSchema(collection, new Set());
-    return Object.keys(isRecord(schema.properties) ? schema.properties : {});
 }
 
 function viewModeOf(raw: unknown, where: string): McpViewMode {
@@ -793,14 +653,13 @@ function pick(args: Record<string, unknown>, names: readonly string[]): Record<s
     return Object.fromEntries(names.filter(name => args[name] !== undefined).map(name => [name, args[name]]));
 }
 
-/** A screen's payload for its view: the blocks, and the configs they are drawn from, for this caller. */
-function viewPayload(blocks: readonly ResolvedBlock[], ctx: McpToolContext, title?: string): McpViewPayload {
-    const named = [...new Map(blocks.map(entry => [entry.collection.slug, entry.collection])).values()];
+/** A screen's payload for its view: its block, and the configs it is drawn from, for this caller. */
+function viewPayload(resolved: ResolvedBlock, ctx: McpToolContext, title?: string): McpViewPayload {
     return {
         version: 1,
         ...(title && { title }),
-        blocks: blocks.map(entry => entry.block),
-        collections: viewCollections(named, ctx.collections, viewerOf(ctx), collection => ({
+        blocks: [resolved.block],
+        collections: viewCollections(resolved.collections, ctx.collections, viewerOf(ctx), collection => ({
             read: reaches(ctx, "data:read", collection),
             write: reaches(ctx, "data:write", collection),
             delete: reaches(ctx, "data:delete", collection)
@@ -817,10 +676,55 @@ function withoutView(result: unknown): unknown {
 }
 
 /** Said in each show_* description. */
-const SHOWN_NOT_SEEN = " In a client that renders MCP Apps this opens the project's admin panel views in the "
-    + "conversation; elsewhere nothing is shown. The result does not say which happened, so do not tell the user "
-    + "a view appeared: report what the result says. Edits the person makes there are saved as them, each through "
-    + "the same checks as the write tools, and you are told what they changed.";
+const SHOWN_NOT_SEEN = " In a client that renders MCP Apps this opens in the conversation; elsewhere nothing is "
+    + "shown. The result does not say which happened, so do not tell the user a view appeared: report what the "
+    + "result says. Edits the person makes there are saved as them, each through the same checks as the write "
+    + "tools, and you are told what they changed.";
+
+/**
+ * What show_app's description teaches: the modules an app imports, and what
+ * each gives it. The hosted connector's show_app says the same.
+ */
+export const MCP_APP_CODE_GUIDE = `
+The app is one TSX module whose default export is a React component (hooks welcome, no props). It runs in the conversation inside the project's admin panel, as the user, and may import only:
+- "react".
+- "@rebasepro/ui": the Rebase UI kit — Card, Button, IconButton, Typography, Tabs, Tab, Chip, Badge, Alert, TextField, Select, SelectItem, BooleanSwitch, Checkbox, Dialog, DialogTitle, DialogContent, DialogActions, Table, TableHeader, TableBody, TableRow, TableCell, Separator, CircularProgress, Tooltip, cls, and Lucide icons named with an Icon suffix (PlusIcon, Trash2Icon). Style with Tailwind classes; colours come from the kit (bg-surface-card, text-text-secondary), never hard-coded.
+- "@rebasepro/plugin-insights": KpiGrid, KpiTile({ label, value, format?, change? }), ChartCard({ title, children }), BarChart({ bars: [{ label, value }] }), TimeSeriesChart({ series: [{ label, points: [{ date, value }] }] }), formatNumber.
+- "@rebasepro/mcp-apps", the project's data, as the user, under their RLS. Rows are as query_collection returns them (dates as ISO text, a belongsTo as its foreign key, e.g. authorId); \`where\` and \`orderBy\` are query_collection's.
+  useQuery(collection, { where?, orderBy?, limit?, offset?, searchString? }) → { data, total, hasMore, loading, error, refresh }
+  useRecord(collection, id) → { data, loading, error, refresh }
+  useCount(collection, where?) → { count, loading, error }
+  useMutate() → { create(collection, data, id?), update(collection, id, data), remove(collection, id), saving, error } — every change asks the user to confirm it first; a declined one rejects.
+  <CollectionView collection where? orderBy? view? ("table" | "list" | "cards" | "kanban") height? onRowClick?(row) /> — the admin panel's collection view (search, filters, paging); \`where\` fixes which rows it holds; without onRowClick a row opens its form.
+  <RecordForm collection id? values? onSaved?(id) /> — the admin panel's record form; without id, a new row's.
+  openRecord(collection, id), openNewRecord(collection, values?) — open a form over the app.
+Every read and write refreshes what shows the same collection. CollectionView and RecordForm draw only the collections listed in \`collections\`.
+
+Example:
+import { useState } from "react";
+import { Button, Card, Typography } from "@rebasepro/ui";
+import { KpiGrid, KpiTile } from "@rebasepro/plugin-insights";
+import { CollectionView, RecordForm, useCount, useMutate } from "@rebasepro/mcp-apps";
+
+export default function OrderDesk() {
+    const [order, setOrder] = useState<Record<string, unknown>>();
+    const pending = useCount("orders", { status: ["==", "pending"] });
+    const { update, saving } = useMutate();
+    return (
+        <div className="flex flex-col gap-4">
+            <KpiGrid><KpiTile label="Pending" value={pending.count} /></KpiGrid>
+            <div className="grid grid-cols-2 gap-4 items-start">
+                <CollectionView collection="orders" view="list" onRowClick={setOrder} />
+                {order ? (
+                    <div className="flex flex-col gap-2">
+                        <Button disabled={saving} onClick={() => update("orders", String(order.id), { status: "shipped" })}>Mark shipped</Button>
+                        <RecordForm collection="orders" id={String(order.id)} />
+                    </div>
+                ) : <Card className="p-6"><Typography variant="body2" color="secondary">Pick an order.</Typography></Card>}
+            </div>
+        </div>
+    );
+}`;
 
 const TOOLS: McpToolDefinition[] = [
     {
@@ -935,7 +839,7 @@ const TOOLS: McpToolDefinition[] = [
             const mode = view === undefined ? undefined : viewModeOf(view, "`view`");
             const page = await readPage(readArgs, collection, ctx);
             const block: ResolvedBlock = {
-                collection,
+                collections: [collection],
                 summary: {},
                 block: {
                     key: "rows",
@@ -949,7 +853,7 @@ const TOOLS: McpToolDefinition[] = [
                 collection: collectionPath(collection),
                 title: collection.name,
                 ...page,
-                view: viewPayload([block], ctx),
+                view: viewPayload(block, ctx),
                 // The columns of the table this tool opened before the admin
                 // panel's views: what a view from before reads.
                 idKey: idPropertyEntry(collection)?.[0] ?? "id",
@@ -983,44 +887,45 @@ const TOOLS: McpToolDefinition[] = [
         ui: { resourceUri: MCP_APP_URI },
         modelResult: withoutView,
         async run(args, ctx) {
-            const block = await resolveBlock("record", { type: "record", ...pick(args, ["collection", "id", "values"]) }, [], ctx);
-            return { ...block.summary, view: viewPayload([block], ctx) };
+            const block = await recordBlock(args, ctx);
+            return { ...block.summary, view: viewPayload(block, ctx) };
         }
     },
 
     {
         name: "show_app",
-        title: "Show a screen of several views",
+        title: "Build an app on the project's data",
         description:
-            "Open a small screen built for the task at hand, from up to " + MAX_BLOCKS + " blocks: collection views "
-            + "(rows to browse and open), record forms, and metrics (a count of matching rows). A block can follow "
-            + "the row the user selects in an earlier collection block: a record form opening it, or a second "
-            + "collection showing its related rows — e.g. orders, and beside them the selected order's items. "
-            + "Metrics go across the top; a block that follows another sits beside it where there is room. Use it "
-            + "when one view is not enough for what the user is doing; for a single collection or row, "
-            + "show_collection or show_record. Its result is what each block holds: a collection block's first "
-            + "rows, a record's row, a metric's count." + SHOWN_NOT_SEEN + UNTRUSTED_ROWS,
+            "Build a small app for what the user is doing — a triage queue, a dashboard, a review flow — and open it "
+            + "in the conversation: a React component you write, running on the project's data as the user, with the "
+            + "admin panel's own collection views and record forms to compose. Use it when one collection or one row "
+            + "is not enough (show_collection and show_record open those). The code is compiled before anything "
+            + "opens: a mistake comes back as this call's error, with its line, to fix and call again. A runtime "
+            + "error, and what the user changes, reach you with their next message." + SHOWN_NOT_SEEN
+            + "\n" + MCP_APP_CODE_GUIDE,
         requiredScope: "data:read",
         annotations: READS,
         inputSchema: {
             type: "object",
             properties: {
-                title: { type: "string", description: "The screen's heading." },
-                blocks: { type: "array", items: BLOCK_SCHEMA, minItems: 1, maxItems: MAX_BLOCKS }
+                title: { type: "string", description: "The app's heading." },
+                collections: {
+                    type: "array",
+                    items: { type: "string" },
+                    description: "The collections the app reads, by the names list_collections gives (at most "
+                        + MAX_APP_COLLECTIONS + ")."
+                },
+                code: { type: "string", description: "The app: one TSX module, default-exporting a React component." }
             },
-            required: ["blocks"],
+            required: ["collections", "code"],
             additionalProperties: false
         },
         ui: { resourceUri: MCP_APP_URI },
         modelResult: withoutView,
         async run(args, ctx) {
             const title = optionalString(args.title, "`title`");
-            const blocks = await resolveBlocks(args.blocks, ctx);
-            return {
-                ...(title && { title }),
-                blocks: blocks.map(entry => entry.summary),
-                view: viewPayload(blocks, ctx, title)
-            };
+            const block = await appBlock(args, ctx);
+            return { ...(title && { title }), ...block.summary, view: viewPayload(block, ctx, title) };
         }
     },
 

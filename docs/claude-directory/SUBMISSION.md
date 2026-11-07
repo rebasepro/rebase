@@ -46,7 +46,7 @@ Twelve tools; every one has a `title` and annotations.
 | `query` | read | `readOnlyHint: true` |
 | `show_collection` | read, MCP App (collection view) | `readOnlyHint: true` |
 | `show_record` | read, MCP App (record form) | `readOnlyHint: true` |
-| `show_app` | read, MCP App (screen of views) | `readOnlyHint: true` |
+| `show_app` | read, MCP App (an app Claude writes) | `readOnlyHint: true` |
 | `write` | write, plan then confirm | `destructiveHint: true`, `idempotentHint: true` |
 | `deploy` | write, plan then confirm | `destructiveHint: true` |
 | `env` | write, plan then confirm | `destructiveHint: true`, `idempotentHint: true` |
@@ -65,8 +65,9 @@ Twelve tools; every one has a `title` and annotations.
 >
 > Ask Claude to list your projects and their status, read build, runtime and
 > cron logs, look at a project's schema, and query its rows. Open your admin
-> panel's own views in the conversation: a collection as a table, list, cards
-> or kanban board, a row's form, or a small screen of several, and edit there.
+> panel's own views in the conversation — a collection as a table, list, cards
+> or kanban board, or a row's form — or have Claude build a small app on your
+> data, and edit there.
 > Deploy a branch, roll
 > back to an earlier deployment, set or remove environment variables, and run
 > or pause cron jobs.

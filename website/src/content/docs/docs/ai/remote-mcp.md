@@ -60,19 +60,23 @@ to one user, the endpoint declines to mount and says why in the boot log. No
   - `show_record` opens one row's form (`id`), or a form for a new row that
     starts from the `values` the model filled in, for the person to check and
     save themselves.
-  - `show_app` opens a small screen of up to eight `blocks`: collection views,
-    record forms, and metrics that count the rows matching a `where`. A block
-    can follow the row selected in an earlier collection block: a form opening
-    it (`"follows": {"block": "orders"}`), or a second collection showing the
-    rows that point at it (`"follows": {"block": "orders", "on": "orderId"}`).
+  - `show_app` runs an app the model writes for the task at hand: one React
+    component (`code`) and the `collections` it reads. It imports the UI kit
+    (`@rebasepro/ui`), the KPI tiles and charts of `@rebasepro/plugin-insights`,
+    and `@rebasepro/mcp-apps`: `useQuery`, `useRecord`, `useCount` and
+    `useMutate` over the project's rows, and the admin panel's
+    `CollectionView` and `RecordForm` to compose. The server compiles it
+    first, so a syntax error or an import the view does not have is the
+    call's error, with its line; an error while it runs is shown in its place
+    and told to the model with the person's next message.
 
-  Each block is checked as the read and write tools would check it before the
-  screen opens. Every read and save in the view is one of those tools' calls,
-  made as the person under their RLS, so the form offers only what their
+  Every read and save in the view is one of the read and write tools' calls,
+  made as the person under their RLS, so a form offers only what their
   connection was granted: without `data:write` it is read-only, and a field
-  their roles cannot read is not in it. The model is told what they changed. It
-  reads the rows each tool answers, not the collection configs the view draws
-  with. A client without MCP Apps, such as Claude Code or Cursor, shows nothing,
+  their roles cannot read is not in it. A change an app's code makes is shown
+  to the person to confirm before it is sent. The model is told what they
+  changed. It reads the rows each tool answers, not the collection configs the
+  view draws with. A client without MCP Apps, such as Claude Code or Cursor, shows nothing,
   and the model reads the same rows it would from `query_collection`.
 - **Grants made before 0.24 keep their reach.** `mcp:read` is read as
   `data:read`, and `mcp:write` as `data:write data:delete`, on stored grants and

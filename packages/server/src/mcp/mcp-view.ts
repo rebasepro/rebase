@@ -1,7 +1,8 @@
 /**
  * What an MCP App view needs to run the admin panel's own components on a
  * project's collections: the collections themselves, reduced to data, for
- * the one person the view is drawn for, and the screen to put them on.
+ * the one person the view is drawn for, and what to put on screen — a
+ * collection, a record, or an app the model wrote.
  *
  * The view (`@rebasepro/mcp-apps`) mounts `<Rebase>` with a data driver that
  * calls this endpoint's tools, and renders the admin panel's collection views
@@ -32,55 +33,48 @@ import { type FieldViewer, canReadField, canWriteField } from "@rebasepro/common
 export const VIEW_MODES = ["table", "list", "cards", "kanban"] as const;
 export type McpViewMode = (typeof VIEW_MODES)[number];
 
-/** A collection block: rows of one collection, opened in the admin panel's collection view. */
+/** A collection block: rows of one collection, opened in the admin panel's collection view (show_collection). */
 export interface McpCollectionBlock {
     key: string;
     type: "collection";
     collection: string;
-    title?: string;
     view?: McpViewMode;
     where?: Record<string, unknown>;
     orderBy?: unknown;
     searchString?: string;
     limit?: number;
-    /** Show only the rows whose `on` field equals the row selected in block `block` (its `field`, or its id). */
-    follows?: { block: string; on: string; field?: string };
 }
 
-/** A record block: one row's form, or a new row's. */
+/** A record block: one row's form, or a new row's (show_record). */
 export interface McpRecordBlock {
     key: string;
     type: "record";
     collection: string;
-    title?: string;
     /** The row to open. Absent, the form creates a new one. */
     id?: string;
     /** A new row's starting values. */
     values?: Record<string, unknown>;
-    /** Open the row selected in block `block` (or the row its `field` points at). */
-    follows?: { block: string; field?: string };
 }
 
-/** A metric block: how many rows of a collection match. */
-export interface McpMetricBlock {
+/** An app block: code the model wrote, compiled, and the collections it reads (show_app). */
+export interface McpAppBlock {
     key: string;
-    type: "metric";
-    collection: string;
-    title: string;
-    where?: Record<string, unknown>;
-    /** The count when the view was opened. The view counts again after a change. */
-    count?: number;
+    type: "app";
+    /** CommonJS, with the source's line numbers; `require` is the view's. */
+    code: string;
+    collections: string[];
 }
 
-export type McpViewBlock = McpCollectionBlock | McpRecordBlock | McpMetricBlock;
+export type McpViewBlock = McpCollectionBlock | McpRecordBlock | McpAppBlock;
 
-/** What a show_* tool hands its view, besides the rows the model reads. */
+/** What a show_* tool hands its view, besides what the model reads. */
 export interface McpViewPayload {
     /** The payload's own version: a view refuses one it does not know rather than misdraw it. */
     version: 1;
     title?: string;
+    /** One block: the collection, the record or the app the tool opens. */
     blocks: McpViewBlock[];
-    /** The configs the blocks need: theirs and their relations' targets, serialized. */
+    /** The configs the block needs: its collections and their relations' targets, serialized. */
     collections: unknown[];
     /** Who the security rules are evaluated for, as the server knows them. */
     viewer: { uid: string; roles: string[] };

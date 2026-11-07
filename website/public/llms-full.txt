@@ -4406,25 +4406,50 @@ yet, listed so that nobody reads a promise into them:
 
 ##### MCP
 
-- **The admin panel's own views open in Claude.** In a client that renders MCP
-  Apps, `show_collection` now opens the collection view the admin panel draws —
-  table, list, cards or kanban (`view`), with its search, filters, sorting and
-  paging, relation previews and enum chips — and a row opens the record form,
-  with its sections, validation and relation pickers. The person can add and
-  delete rows there too. Two tools join it: `show_record` opens one row's form
-  (`id`), or a form for a new row starting from `values` the model filled in,
-  for the person to check and save; `show_app` opens a small screen of up to
-  eight blocks (collection views, record forms, and metrics that count rows),
-  where a block can follow the row selected in another — orders, and beside
-  them the selected order's form and its items. The view runs `<Rebase>` with
-  a data driver whose every read and write is a call to the server's tools,
-  as the person, under their RLS; the server hands it the collections'
+- **The admin panel's own views open in Claude, and Claude builds apps on
+  your data.** In a client that renders MCP Apps, `show_collection` now opens
+  the collection view the admin panel draws — table, list, cards or kanban
+  (`view`), with its search, filters, sorting and paging — and a row opens the
+  record form, with its sections, validation and relation pickers.
+  `show_record` opens one row's form, or a form for a new row starting from
+  `values` the model filled in, for the person to check and save. `show_app`
+  takes a React component the model writes (`code`) and the `collections` it
+  reads: the server compiles it, so a mistake comes back as the call's error
+  with its line, and the view runs it with the UI kit, the insights plugin's
+  KPI tiles and charts, and `@rebasepro/mcp-apps` — `useQuery`, `useRecord`,
+  `useCount`, `useMutate`, the admin panel's `CollectionView` and
+  `RecordForm`, `openRecord`. Every read and write is a call to the server's
+  tools, as the person, under their RLS; a change an app makes is confirmed
+  by them first; what they change, and an app that fails, are told to the
+  model with their next message. The server hands the view the collections'
   configs reduced to data, without the fields that caller never receives, and
-  closes what their connection was not granted. A save the server plans
-  first (the hosted connector's `write`) waits for the person to confirm the
-  plan, and the model is told what they changed. The model reads the rows, not
-  the configs. Images and files show as labels: the view fetches nothing
-  itself.
+  closes what their connection was not granted. The model reads the rows, not
+  the configs.
+
+##### Admin (CMS & app)
+
+- **KPI tiles and charts you place yourself.** `@rebasepro/plugin-insights`
+  now exports building blocks: `KpiTile`, `KpiReadout` and `KpiGrid` for
+  headline figures with their change on the previous window, `ChartCard`,
+  `TimeSeriesChart` (lines, or a line with a wash) and `BarChart` (horizontal
+  bars that can be buttons), and `useInsightData`, which loads a key once per
+  signed-in user and shares it with every reader for a TTL. Put them in
+  `<Rebase slots>`, a page or a collection view. The charts are SVG with no
+  chart library, drawn in the kit's tokens in both themes, with a hover and
+  arrow-key readout and a table for screen readers. The demo app shows revenue
+  per day and top products on the home page, and orders by status and open
+  tickets by priority above those lists; a bar opens the list filtered to what
+  it counts.
+
+#### Deprecated
+
+- **`useInsightsPlugin`** and the pieces it is made of (`InsightsProvider`,
+  `useInsightsEngine`, `InsightsEngine`, `resolvePeriod`, `useInsightSource`,
+  `InsightsScorecardView`, `InsightWidget`, `InsightsRow`) in
+  `@rebasepro/plugin-insights`. They still work; `useInsightsPlugin` warns
+  once. Put `KpiTile`, `KpiReadout` and the charts in `<Rebase slots>`
+  yourself, reading figures with `useInsightData`; the package README maps
+  each config field to its replacement.
 
 #### Fixed
 
@@ -51134,19 +51159,23 @@ to one user, the endpoint declines to mount and says why in the boot log. No
   - `show_record` opens one row's form (`id`), or a form for a new row that
     starts from the `values` the model filled in, for the person to check and
     save themselves.
-  - `show_app` opens a small screen of up to eight `blocks`: collection views,
-    record forms, and metrics that count the rows matching a `where`. A block
-    can follow the row selected in an earlier collection block: a form opening
-    it (`"follows": {"block": "orders"}`), or a second collection showing the
-    rows that point at it (`"follows": {"block": "orders", "on": "orderId"}`).
+  - `show_app` runs an app the model writes for the task at hand: one React
+    component (`code`) and the `collections` it reads. It imports the UI kit
+    (`@rebasepro/ui`), the KPI tiles and charts of `@rebasepro/plugin-insights`,
+    and `@rebasepro/mcp-apps`: `useQuery`, `useRecord`, `useCount` and
+    `useMutate` over the project's rows, and the admin panel's
+    `CollectionView` and `RecordForm` to compose. The server compiles it
+    first, so a syntax error or an import the view does not have is the
+    call's error, with its line; an error while it runs is shown in its place
+    and told to the model with the person's next message.
 
-  Each block is checked as the read and write tools would check it before the
-  screen opens. Every read and save in the view is one of those tools' calls,
-  made as the person under their RLS, so the form offers only what their
+  Every read and save in the view is one of the read and write tools' calls,
+  made as the person under their RLS, so a form offers only what their
   connection was granted: without `data:write` it is read-only, and a field
-  their roles cannot read is not in it. The model is told what they changed. It
-  reads the rows each tool answers, not the collection configs the view draws
-  with. A client without MCP Apps, such as Claude Code or Cursor, shows nothing,
+  their roles cannot read is not in it. A change an app's code makes is shown
+  to the person to confirm before it is sent. The model is told what they
+  changed. It reads the rows each tool answers, not the collection configs the
+  view draws with. A client without MCP Apps, such as Claude Code or Cursor, shows nothing,
   and the model reads the same rows it would from `query_collection`.
 - **Grants made before 0.24 keep their reach.** `mcp:read` is read as
   `data:read`, and `mcp:write` as `data:write data:delete`, on stored grants and
@@ -51273,7 +51302,7 @@ Twelve tools. The first eight only read:
 | `query` | Reads rows: one by id, a filtered page, or a count |
 | `show_collection` | Opens a collection in your admin panel's own view, in the conversation: a table, list, cards or kanban board you can search, filter and page, where a row opens its form |
 | `show_record` | Opens one row's form, or a form for a new row Claude filled in, for you to check and save |
-| `show_app` | Opens a small screen for the task at hand: collection views, forms and counts, where one can follow the row you select in another |
+| `show_app` | Builds a small app for the task at hand, such as a triage queue or a dashboard, and runs it on your data in the conversation. It can use your admin panel's views and forms, and asks you before it changes anything |
 
 The other four change production, and each one asks first:
 

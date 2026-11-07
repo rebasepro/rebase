@@ -280,26 +280,27 @@ describe("remote MCP tools on the real driver (E2E)", () => {
         // What show_app and show_record tell the model, and what their view
         // then writes back, on the real driver: the stub in the server's
         // suite refuses no filter and serves no relation.
-        it("show_app counts a metric and reads a block's rows as REST does", async () => {
-            const result = await tool("show_app", {
-                blocks: [
-                    { key: "live", type: "metric", collection: "posts", title: "Published", where: { status: ["==", "published"] } },
-                    { key: "posts", type: "collection", collection: "posts", orderBy: "id" },
-                    { key: "post", type: "record", collection: "posts", follows: { block: "posts" } },
-                    { key: "author", type: "record", collection: "authors", follows: { block: "posts", field: "authorId" } }
-                ]
-            });
-            const served = await rest(`/posts/count?where=${encodeURIComponent(JSON.stringify({ status: ["==", "published"] }))}`);
-            expect(result.blocks[0]).toEqual({ key: "live", type: "metric", collection: "posts", title: "Published", count: served.json.count });
-            expect(result.blocks[1].rows).toEqual((await rest("/posts?orderBy=id&limit=20")).json.data);
-            expect(result.view.collections.map((collection: { slug: string }) => collection.slug)).toEqual(["authors", "posts"]);
+        it("show_collection reads the page REST serves", async () => {
+            const result = await tool("show_collection", { collection: "posts", orderBy: "id", view: "list" });
+            expect(result.data).toEqual((await rest("/posts?orderBy=id")).json.data);
+            expect(result.view.blocks).toEqual([{ key: "rows", type: "collection", collection: "posts", view: "list", orderBy: "id" }]);
         });
 
-        it("show_app refuses a block whose filter the driver refuses, naming the field", async () => {
-            const refusal = await refusalOf("show_app", {
-                blocks: [{ key: "posts", type: "collection", collection: "posts", where: { nope: ["==", 1] } }]
-            });
-            expect(refusal).toContain("nope");
+        it("show_collection refuses a filter the driver refuses, naming the field", async () => {
+            expect(await refusalOf("show_collection", { collection: "posts", where: { nope: ["==", 1] } })).toContain("nope");
+        });
+
+        it("show_app hands its view the collections it reads and their relations' targets", async () => {
+            const definition = MCP_TOOLS.find(candidate => candidate.name === "show_app");
+            const result = await definition!.run({ collections: ["posts"], code: "export default () => null;" }, {
+                driver: driver as unknown as DataDriver,
+                collections: [authors, posts],
+                caller: { ...USER, scopes: ["data:read"], clientId: "mcp-e2e" },
+                compileApp: async source => ({ ok: true, code: source })
+            }) as { view: { collections: { slug: string; securityRules: unknown[] }[] } };
+            expect(result.view.collections.map(collection => collection.slug)).toEqual(["authors", "posts"]);
+            // A read-only connection: the view offers no change.
+            expect(result.view.collections[1].securityRules).toEqual([expect.objectContaining({ operations: ["insert", "update", "delete"] })]);
         });
 
         it("show_record reads the row REST serves", async () => {

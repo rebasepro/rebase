@@ -48,7 +48,15 @@ import {
 } from "./oauth-metadata.js";
 import { toolsForScopes, declaredArgumentsOnly, McpToolError, MCP_TOOLS, type McpCaller, type McpToolDefinition } from "./mcp-tools.js";
 import { memoryConfirmationStore, withConfirmation, type McpConfirmationStore } from "./confirmation.js";
-import { MCP_APP_MIME_TYPE, mcpAppResourceMeta, mcpAppToolMeta, type McpAppResource, type McpAppsSource } from "./mcp-apps.js";
+import {
+    MCP_APP_MIME_TYPE,
+    mcpAppResourceMeta,
+    mcpAppToolMeta,
+    type McpAppCompiler,
+    type McpAppCompilerSource,
+    type McpAppResource,
+    type McpAppsSource
+} from "./mcp-apps.js";
 import type { ApiKeyIdentity, ApiKeyRefusal } from "../auth/api-keys/api-key-middleware.js";
 import { isAccessTokenRevoked } from "../auth/token-revocation.js";
 import type { McpGrantIdentity } from "./oauth-routes.js";
@@ -145,6 +153,11 @@ export interface McpRoutesConfig {
      * offered. See `mcp-apps.ts`.
      */
     apps?: McpAppsSource;
+    /**
+     * The compiler for the apps the model writes (show_app's `code`), loaded
+     * with the views. Without it, show_app refuses.
+     */
+    appCompiler?: McpAppCompilerSource;
     /**
      * The tools this endpoint serves, in place of the default data tools
      * (`MCP_TOOLS`). Each still refuses an argument it does not declare, and
@@ -253,6 +266,15 @@ export function createMcpRoutes(config: McpRoutesConfig): Hono<HonoEnv> {
             : Promise.resolve([]);
         return appsLoaded;
     };
+
+    let compilerLoaded: Promise<McpAppCompiler> | undefined;
+    const compilerSource = config.appCompiler;
+    const compileApp = compilerSource
+        ? async (source: string) => {
+            compilerLoaded ??= compilerSource();
+            return (await compilerLoaded)(source);
+        }
+        : undefined;
 
     /** Whether the view a tool opens, if any, is served here. A tool whose view is not does not exist here. */
     async function viewServed(tool: McpToolDefinition): Promise<boolean> {
@@ -594,7 +616,8 @@ export function createMcpRoutes(config: McpRoutesConfig): Hono<HonoEnv> {
                 driver,
                 collections: config.getCollections(),
                 authAdapter: config.getAuthAdapter?.(),
-                caller
+                caller,
+                ...(compileApp && { compileApp })
             });
             // The text is the one a model reads, so it is fenced: a row was
             // written by somebody, and arrives on the channel the model takes

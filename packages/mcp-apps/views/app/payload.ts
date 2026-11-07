@@ -23,35 +23,30 @@ export interface CollectionBlock {
     key: string;
     type: "collection";
     collection: string;
-    title?: string;
     view?: ViewMode;
     where?: Record<string, unknown>;
     orderBy?: unknown;
     searchString?: string;
     limit?: number;
-    follows?: { block: string; on: string; field?: string };
 }
 
 export interface RecordBlock {
     key: string;
     type: "record";
     collection: string;
-    title?: string;
     id?: string;
     values?: Record<string, unknown>;
-    follows?: { block: string; field?: string };
 }
 
-export interface MetricBlock {
+/** An app the model wrote: compiled CommonJS, and the collections it reads. */
+export interface AppBlock {
     key: string;
-    type: "metric";
-    collection: string;
-    title: string;
-    where?: Record<string, unknown>;
-    count?: number;
+    type: "app";
+    code: string;
+    collections: string[];
 }
 
-export type Block = CollectionBlock | RecordBlock | MetricBlock;
+export type Block = CollectionBlock | RecordBlock | AppBlock;
 
 export interface Screen {
     title?: string;
@@ -106,8 +101,9 @@ export function parseResult(result: ToolResult): Parsed {
 }
 
 function isBlock(value: unknown): value is Block {
-    return isRecord(value) && typeof value.key === "string" && typeof value.collection === "string"
-        && (value.type === "collection" || value.type === "record" || value.type === "metric");
+    if (!isRecord(value) || typeof value.key !== "string") return false;
+    if (value.type === "app") return typeof value.code === "string" && Array.isArray(value.collections);
+    return typeof value.collection === "string" && (value.type === "collection" || value.type === "record");
 }
 
 /**
@@ -117,7 +113,7 @@ function isBlock(value: unknown): value is Block {
 export function actionsOf(raw: unknown): ViewActions {
     if (!isRecord(raw)) return DEFAULT_ACTIONS;
     const action = (value: unknown, fallback: ToolAction): ToolAction => isRecord(value) && typeof value.tool === "string"
-        ? { tool: value.tool, arguments: isRecord(value.arguments) ? value.arguments : {} }
+        ? { tool: value.tool, arguments: isRecord(value.arguments) ? value.arguments : {}, ...(value.plans === true && { plans: true }) }
         : fallback;
     return {
         page: action(raw.page, DEFAULT_ACTIONS.page),
@@ -159,4 +155,17 @@ function conditionOf(raw: unknown): [WhereFilterOp, unknown] | undefined {
     if (!Array.isArray(raw) || raw.length !== 2) return undefined;
     const op = ALL_WHERE_FILTER_OPS.find(candidate => candidate === raw[0]);
     return op ? [op, raw[1]] : undefined;
+}
+
+/** A sort as the collection view takes it: its first key. */
+export function orderOf(raw: unknown): [string, "asc" | "desc"] | undefined {
+    if (typeof raw === "string" && raw !== "") {
+        const [field, direction] = raw.split(":");
+        return [field, direction === "desc" ? "desc" : "asc"];
+    }
+    if (Array.isArray(raw) && raw.length > 0) {
+        const first: unknown[] = Array.isArray(raw[0]) ? raw[0] : raw;
+        if (typeof first[0] === "string") return [first[0], first[1] === "desc" ? "desc" : "asc"];
+    }
+    return undefined;
 }

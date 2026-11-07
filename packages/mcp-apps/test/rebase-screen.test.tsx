@@ -8,14 +8,16 @@
  * - A record block opens the row's form; a save the server answers with a
  *   plan waits for the person's yes, then goes again with the token, and the
  *   model is told what changed.
- * - A metric shows the count the server sent.
- * - A block that follows another waits for a row to be selected there.
+ * - An app the model wrote runs on the project's data with the SDK; its own
+ *   changes are confirmed first; what it imports wrong, or throws, is shown
+ *   and told to the model with the line.
  */
 import React, { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { McpAppBridge, type ToolResult } from "../views/bridge";
 import { App } from "../views/app/App";
+import { compileApp } from "../src/compile";
 
 declare global {
     // React's flag for a test environment that wraps updates in `act`.
@@ -165,22 +167,87 @@ describe("a record block", () => {
     }, 20000);
 });
 
-describe("a screen of blocks", () => {
-    it("shows a metric's count, and holds a following block until a row is selected", async () => {
-        open(screenResult([
-            { key: "pending", type: "metric", collection: "orders", title: "Pending orders", count: 7 },
-            { key: "orders", type: "collection", collection: "orders", view: "list" },
-            { key: "order", type: "record", collection: "orders", follows: { block: "orders" } }
-        ], {}, "Order desk"), (name, args) => name === "count_documents"
-            ? ok({ count: 7 })
-            : name === "get_document" ? ok(ROWS.find(row => row.id === args.id)) : ok({ data: ROWS, meta: { hasMore: false } }));
+describe("an app the model wrote", () => {
+    function appResult(code: string, extra: Record<string, unknown> = {}): ToolResult {
+        const compiled = compileApp(code);
+        if (!compiled.ok) throw new Error(compiled.error);
+        return screenResult([{ key: "app", type: "app", code: compiled.code, collections: ["orders"] }], extra, "Order desk");
+    }
+
+    const DESK = `
+import { useState } from "react";
+import { Button, Typography } from "@rebasepro/ui";
+import { KpiGrid, KpiTile } from "@rebasepro/plugin-insights";
+import { useCount, useMutate, useQuery } from "@rebasepro/mcp-apps";
+
+export default function Desk() {
+    const pending = useCount("orders", { status: ["==", "pending"] });
+    const { data } = useQuery("orders", { orderBy: "number" });
+    const { update } = useMutate();
+    return (
+        <div>
+            <KpiGrid><KpiTile label="Pending" value={pending.count ?? 0} /></KpiGrid>
+            {data.map(row => (
+                <div key={String(row.id)}>
+                    <Typography>{String(row.number)}</Typography>
+                    <Button onClick={() => update("orders", String(row.id), { status: "sent" }).catch(() => undefined)}>Ship {String(row.number)}</Button>
+                </div>
+            ))}
+        </div>
+    );
+}`;
+
+    it("runs on the project's data, and asks before the change its button makes", async () => {
+        const { calls, context } = open(appResult(DESK), (name, args) => {
+            if (name === "count_documents") return ok({ count: 1 });
+            if (name === "update_document") return ok({ ...ROWS[0], ...(args.data as object) });
+            return ok({ data: ROWS, meta: { total: 2, hasMore: false } });
+        });
 
         await findText("Order desk");
-        await findText("7");
-        await findText("Pending orders");
-        await findText("Open a row in Orders to see it here.");
+        await findText("ORD-41");
+        await act(async () => buttonNamed("Ship ORD-41").click());
+
+        // The app's own change: confirmed in the view before it is sent.
+        const dialog = await vi.waitFor(() => {
+            const found = document.querySelector("[role=dialog]");
+            if (!found?.textContent?.includes("Change status on row o1 of orders.")) throw new Error("no confirmation");
+            return found;
+        }, { timeout: 5000 });
+        expect(calls.some(call => call.name === "update_document")).toBe(false);
+        await act(async () => buttonNamed("Save", dialog).click());
+
+        await vi.waitFor(() => expect(calls.find(call => call.name === "update_document")?.args)
+            .toEqual({ collection: "orders", id: "o1", data: { status: "sent" } }), { timeout: 5000 });
+        await vi.waitFor(() => expect(context).toHaveBeenCalledWith(expect.stringContaining("updated status on row o1 of orders")));
     }, 20000);
 
+    it("names an import the view does not have, and tells the model", async () => {
+        const { context } = open(appResult(`
+import { Sparkline } from "@rebasepro/plugin-insights";
+export default function App() { return <Sparkline />; }`), () => ok({}));
+
+        await findText("The app failed at line 3: \"Sparkline\" is not exported by \"@rebasepro/plugin-insights\".");
+        expect(context).toHaveBeenCalledWith(expect.stringContaining("Fix the code and call show_app again."));
+    }, 20000);
+
+    it("shows what the app threw while drawing, with the line it wrote", async () => {
+        const { context } = open(appResult(`export default function App() {
+    const rows: { name: string }[] = [];
+    return <p>{rows[0].name}</p>;
+}`), () => ok({}));
+
+        const shown = await vi.waitFor(() => {
+            const alert = Array.from(document.querySelectorAll("[role=alert], div")).find(element => element.textContent?.startsWith("The app failed at line 3"));
+            if (!alert) throw new Error(`no failure shown: ${document.body.textContent?.slice(0, 200)}`);
+            return alert;
+        }, { timeout: 5000 });
+        expect(shown.textContent).toContain("Cannot read properties of undefined");
+        expect(context).toHaveBeenCalledWith(expect.stringContaining("(line 3 of its code)"));
+    }, 20000);
+});
+
+describe("a result it cannot draw", () => {
     it("says what is wrong with a result it cannot draw", async () => {
         open(ok({ view: { version: 9 } }), () => ok({}));
         await findText("This view is older than the server that answered; it cannot draw this screen.");

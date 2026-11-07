@@ -81,7 +81,7 @@ Twelve tools. The first eight only read:
 | `query` | Reads rows: one by id, a filtered page, or a count |
 | `show_collection` | Opens a collection in your admin panel's own view, in the conversation: a table, list, cards or kanban board you can search, filter and page, where a row opens its form |
 | `show_record` | Opens one row's form, or a form for a new row Claude filled in, for you to check and save |
-| `show_app` | Opens a small screen for the task at hand: collection views, forms and counts, where one can follow the row you select in another |
+| `show_app` | Builds a small app for the task at hand, such as a triage queue or a dashboard, and runs it on your data in the conversation. It can use your admin panel's views and forms, and asks you before it changes anything |
 
 The other four change production, and each one asks first:
 

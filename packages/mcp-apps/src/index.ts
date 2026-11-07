@@ -8,6 +8,9 @@
  */
 import appHtml from "../dist/views/app.html?raw";
 
+export { compileApp, MAX_APP_SOURCE, type AppCompileResult } from "./compile";
+export { APP_MODULES } from "./app-modules";
+
 export interface McpAppView {
     uri: string;
     name: string;

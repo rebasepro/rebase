@@ -198,7 +198,7 @@ name; ambiguity is an error that lists the matches) except `projects`.
 | 5 | `query` | `project`, `collection`, `id?`, `where?`, `orderBy?`, `limit?`, `offset?`, `searchString?`, `count?` | read-only | `project:studio` | tenant `get_document` / `query_collection` / `count_documents` |
 | 6 | `show_collection` | as `query`, without `id` and `count`, plus `view?` | read-only, opens a view | `project:studio` | tenant `show_collection`; the view is served by the connector |
 | 6b | `show_record` | `project`, `collection`, `id?`, `values?` | read-only, opens a view | `project:studio` | tenant `show_record` |
-| 6c | `show_app` | `project`, `title?`, `blocks` (up to 8: collection, record, metric) | read-only, opens a view | `project:studio` | tenant `show_app` |
+| 6c | `show_app` | `project`, `title?`, `collections`, `code` (a React component) | read-only, opens a view | `project:studio` | tenant `show_app`, which compiles the code |
 | 7 | `write` | `project`, `collection`, `action: "create" \| "update" \| "delete"`, `id?`, `data?`, `confirm?` | destructive, not idempotent | `project:studio` | tenant `create_document` / `update_document` / `delete_document`. Users are rows of the auth collection, so this covers creating, editing and deleting users, under the auth rules the app's REST routes apply |
 | 8 | `deploy` | `project`, `action: "deploy" \| "rollback" \| "cancel"`, `branch?`, `deployment?`, `confirm?` | destructive, not idempotent | `project:deploy` | the control plane's deploy routes |
 | 9 | `env` | `project`, `action: "set" \| "unset"`, `vars?: { KEY: value }`, `keys?: string[]`, `confirm?` | destructive, idempotent | `project:env` | the control plane's env-vars routes |
@@ -308,8 +308,9 @@ implementation beside the OAuth store.
   HTML.
 - **The screen** is built by the tenant's own `show_collection`,
   `show_record` or `show_app`, under the platform token: the tenant holds the
-  collections, checks every block as its read and write tools would, and
-  returns the rows the model reads plus `view` — the blocks, and the
+  collections, checks the arguments as its read and write tools would (and
+  compiles show_app's code), and returns what the model reads plus `view` —
+  the block to draw, and the
   collections' configs narrowed to the caller (no field they never receive,
   read-only where they may not write, a restrictive rule closing what the
   token does not grant). The connector forwards the arguments without
@@ -323,6 +324,16 @@ implementation beside the OAuth store.
   project. A save is therefore `write`'s two calls: the view shows the plan in
   a dialog and sends the second only when the person presses Save. The per-app
   `/mcp` names no `actions`, and the view calls its tools by their own names.
+  Each write action carries `plans: true`, so a change an app's code makes is
+  confirmed once, by `write`'s plan; where a tool does not plan (the per-app
+  `/mcp`), the view asks the person itself before sending it.
+- **Apps the model writes** (`show_app`'s `code`) run in the same frame, with
+  a `require` that serves the UI kit, the insights plugin's tiles and charts,
+  and the SDK. They reach nothing the view cannot: the host's `tools/call`,
+  as the person. A residual: code in the frame could post a `tools/call` to
+  the host directly, skipping the SDK's confirmation; on the hosted connector
+  every write still plans, and Claude may ask before a tool marked
+  destructive.
 - **The model** reads the rows, not the configs (`modelResult` strips `view`
   and `actions` from the text it is sent).
 

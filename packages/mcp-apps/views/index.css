@@ -4,6 +4,7 @@
 @source "../../ui/src/**/*.{ts,tsx}";
 @source "../../app/src/**/*.{ts,tsx}";
 @source "../../cms/src/**/*.{ts,tsx}";
+@source "../../plugin-insights/src/**/*.{ts,tsx}";
 @source "./**/*.{ts,tsx}";
 @custom-variant dark (&:where(.dark, .dark *));
 

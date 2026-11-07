@@ -1727,6 +1727,8 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
             // `initialize` or `tools/list` — not at boot: the HTML is large, and
             // a backend no MCP client calls never loads it.
             apps: async () => (await import("@rebasepro/mcp-apps")).MCP_APPS,
+            // show_app's compiler, from the same module, on the first app.
+            appCompiler: async () => (await import("@rebasepro/mcp-apps")).compileApp,
             // An app's own tools and scopes, when it brings them; the data
             // tools under `data:*` otherwise.
             tools: config.mcp?.tools,
@@ -1796,7 +1798,8 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
             rateLimit: rateLimitConfig,
             // show_collection is offered where its view is served; the
             // control plane serves the view itself and relays this result.
-            apps: async () => (await import("@rebasepro/mcp-apps")).MCP_APPS
+            apps: async () => (await import("@rebasepro/mcp-apps")).MCP_APPS,
+            appCompiler: async () => (await import("@rebasepro/mcp-apps")).compileApp
         })));
         if (announce) logger.info(`Platform MCP endpoint mounted at ${mcpPath} (platform tokens only)`);
     };
