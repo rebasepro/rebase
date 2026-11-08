@@ -10,8 +10,9 @@ Everything your code receives from the admin is now the server's row, the
 shape REST, `client.data`, the backend's `context.data` and `useRows` return:
 exactly the record's columns, with ISO dates (`YYYY-MM-DD` for a date-only
 column), a belongsTo under its foreign-key column, and any relation the admin
-loaded nested under its name, as REST's `include` returns it. The record's id
-comes beside the row, as a string (`id`). `row.id` is the table's own `id`
+loaded nested under its name, as REST's `include` returns it (also exactly its
+columns). The record's id comes beside the row, as a string (`id`); a list of
+`rows` comes with `ids` at the same positions. `row.id` is the table's own `id`
 column, with its type. Code that edits a record (a `Field`, `FormContext.values`,
 `dynamicProps`, storage name functions) still gets form values, typed for an
 editor. The admin's `{ id, path, values }` `Entity` is internal.
@@ -38,7 +39,8 @@ editor. The admin's `{ id, path, values }` `Entity` is internal.
   (`onClick`, `isEnabled`, `disabledReason`; `highlightEntity` /
   `unhighlightEntity` → `highlightRow` / `unhighlightRow(id)`), `admin.display`
   resolvers, `admin.additionalFields` (`Builder`, `value`),
-  `admin.exportable.additionalFields[].builder`, `AdditionalFieldValue`,
+  `admin.exportable.additionalFields[].builder` (all three also get `id`),
+  `AdditionalFieldValue`,
   `<Rebase entityLinkBuilder>` (`({ row, id, path })`), entity views and
   `formView.Builder`, the `entity.row.actions` slot, and the admin's
   `beforeDelete` / `afterDelete`. `FormContext` (and so `FieldProps.context`)
@@ -63,7 +65,8 @@ editor. The admin's `{ id, path, values }` `Entity` is internal.
   ids.** Custom collection views, collection `Actions` and the toolbar slots
   get a `TableController` of rows: `tableController.data` → `.rows`,
   `.dataLoading` → `.loading`, `.dataLoadingError` → `.error`, `.sparseData` →
-  `.sparseRows`; `onEntityClick(entity)` → `onRowClick(row, id)`;
+  `.sparseRows`, with `ids` / `sparseIds` beside them; `onEntityClick(entity)`
+  → `onRowClick(row, id)`;
   `highlightedEntities` → `highlightedIds`, `deletedEntities` → `deletedIds`
   (string ids). `CollectionPanel` and `Collection.View` overrides take
   `onRowClick(row, id)` and `highlightedIds`. The selection is `{ type: "rows",
@@ -72,7 +75,8 @@ editor. The admin's `{ id, path, values }` `Entity` is internal.
   `toggleSelection(row)`, `setSelectedEntities` → `setSelectedRows`, and ids
   compare as strings. `useSelectionController(collection, path?)`;
   `resolveSelection({ selection, data: context.data, collection })` resolves
-  either kind of selection to rows of the same shape. The reference picker
+  either kind of selection to `{ rows, ids }`, rows of the same shape.
+  `SelectedCellProps.entityId` → `id`. The reference picker
   (`useSelectionDialog`) and `ReferenceWidget` hand `(row, id)` and
   `(rows, ids)`; `SelectionMenu` takes `collection`.
 
