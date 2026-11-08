@@ -5,7 +5,8 @@ import { fieldKeyForColumn, resolveCollectionRelations } from "@rebasepro/common
 /**
  * A record's values from the admin's view model (`entity.values`), as the
  * server sends the row — the shape `useRows`, `useRow`, `client.data` and a
- * callback's `context.data` hand an app, and `FieldValue` reads:
+ * backend callback's `context.data` hand an app, and `FieldValue` reads (in
+ * the browser, `context.data` carries the view model's values instead):
  *
  * - a date as the server serializes it: a date-only column (`columnType:
  *   "date"`) as `YYYY-MM-DD`, any other as an RFC 3339 timestamp;
