@@ -4,6 +4,7 @@ import ABVariant from "../ABVariant.astro";
 import ClientLogos from "../ClientLogos.astro";
 import PolicyPathsFigure from "../PolicyPathsFigure.astro";
 import CaseStudiesCarousel from "../CaseStudiesCarousel.astro";
+import ReleasePartsSection from "../ReleasePartsSection.astro";
 import { ApiMiniDemo } from "../demos/ApiMiniDemo";
 import { SdkMiniDemo } from "../demos/SdkMiniDemo";
 import { RealtimeMiniDemo } from "../demos/RealtimeMiniDemo";
@@ -65,6 +66,8 @@ const SELFHOST_COMMAND = "docker compose up -d";
           03        SECURITY — the structural Postgres RLS claim on the brand
                     blue slab, then the free `rls-check` audit band
           04        AGENT ERA — MCP + CLI on the same security policy
+          —         NEW IN 0.29 — Claude's apps and your pages from the admin's
+                    own parts (ReleasePartsSection), unnumbered
           05        CUSTOMERS — case studies
           close     the three lanes, the terms, and the ask
 
@@ -562,6 +565,13 @@ const SELFHOST_COMMAND = "docker compose up -d";
                 </div>
             </section>
         </div>
+
+        {/* NEW IN 0.29 — unnumbered, on `ground-raised` between 04 (page ground)
+            and 05 (page ground), so the alternation holds. No borders of its
+            own: 04's bottom hairline and 05's top one already frame it, and a
+            second pair would touch them and paint as 2px lines. What it may
+            and may not say is at the top of the component. */}
+        <ReleasePartsSection lang={lang} t={t} />
 
         <!-- CHAPTER 05 — CUSTOMERS. The carousel renders its own eyebrow, title
              and subtitle; wrapping it in a second header duplicated all three.

@@ -18,6 +18,7 @@ export function generateMarkdownForPage(page: string, lang: string): string {
       .replace(/<strong[^>]*>(.*?)<\/strong>/gi, "**$1**")
       .replace(/<em[^>]*>(.*?)<\/em>/gi, "*$1*")
       .replace(/<i[^>]*>(.*?)<\/i>/gi, "*$1*")
+      .replace(/<code[^>]*>(.*?)<\/code>/gi, "`$1`")
       .replace(/<a[^>]*href=["']([^"']+)["'][^>]*>(.*?)<\/a>/gi, "[$2]($1)")
       .replace(/<[^>]*>/g, "");
   };
@@ -45,9 +46,9 @@ export function generateMarkdownForPage(page: string, lang: string): string {
      *
      * It now follows the home page's spine, beat for beat, from keys the page
      * actually renders: the claim, then mechanism (01), security (02) with the
-     * audit that lets you check it, what you get (03), agents (04), customers
-     * (05), and the close. The panel is half of "what you get" rather than a
-     * beat of its own, and the ownership line lives in the close — both exactly
+     * audit that lets you check it, what you get (03), agents (04), the
+     * unnumbered release section (whatsnew.*), customers (05), and the close.
+     * The panel is half of "what you get" rather than a beat of its own, and the ownership line lives in the close — both exactly
      * as they now render. See PRODUCT.md: "when a home-page beat changes,
      * change the generator in the same commit".
      */
@@ -69,8 +70,12 @@ ${cleanHtml(tr("hero.subtitle"))}
 4. **What you get** — ${inline(tr("engine.title"))}: ${cleanHtml(tr("engine.subtitle"))}
    - ${inline(tr("panel.title"))}: ${cleanHtml(tr("modes.subtitle"))}
 5. **Agent-native** — ${inline(tr("agentera.badge"))}: ${cleanHtml(tr("agentera.p1"))}
-6. **Shipped, not promised** — ${inline(tr("showcase.title.part1") + " " + tr("showcase.title.part2"))}: ${cleanHtml(tr("showcase.subtitle"))}
-7. **It is yours** — ${inline(tr("cta.title"))}: ${cleanHtml(tr("opensource.desc"))}
+6. **${inline(tr("whatsnew.badge"))}** — ${inline(tr("whatsnew.title"))}: ${cleanHtml(tr("whatsnew.p1"))}
+   - ${inline(tr("whatsnew.claude.title"))}: ${cleanHtml(tr("whatsnew.claude.desc"))}
+   - ${inline(tr("whatsnew.parts.title"))}: ${cleanHtml(tr("whatsnew.parts.desc"))}
+   - ${inline(tr("whatsnew.rows.title"))}: ${cleanHtml(tr("whatsnew.rows.desc"))}
+7. **Shipped, not promised** — ${inline(tr("showcase.title.part1") + " " + tr("showcase.title.part2"))}: ${cleanHtml(tr("showcase.subtitle"))}
+8. **It is yours** — ${inline(tr("cta.title"))}: ${cleanHtml(tr("opensource.desc"))}
 
 ## Three adoption modes
 
@@ -210,6 +215,7 @@ Let AI agents read, write, and act on your Postgres data autonomously.
 ## Capabilities
 - **Model Context Protocol (MCP) Server**: Exposes your Postgres data plus schema, user, storage, cron and function tools — 40 of them — to AI assistants like Cursor and Claude.
 - **Scoped API Keys**: Per-collection, per-operation permissions for agents, enforced by Postgres row-level security on every query.
+- **${inline(tr("whatsnew.claude.title"))}**: ${cleanHtml(tr("whatsnew.claude.desc"))}
 `;
   }
 

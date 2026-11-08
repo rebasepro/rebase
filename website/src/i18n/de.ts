@@ -30,6 +30,27 @@ export const de = {
   "agentera.title": "Das Backend, das ein Agent nicht ruinieren kann",
   "agentera.p1": "Ein KI-Agent kann in einer Stunde ein Backend hochziehen — und dir vierzigtausend Zeilen aus Routen, Middleware und Screens hinterlassen, die niemand prüfen kann. Agenten sind hervorragend darin, <em>plausible</em> Backends zu produzieren, und notorisch schlecht darin, <em>sichere</em> zu bauen. Mit Rebase bearbeitet ein Coding-Agent eine kompakte Collection-Datei, die der Compiler prüft, und ein Laufzeit-Agent arbeitet unter gescopten Keys, Postgres-RLS und menschlich geprüften Statuswerten. Das sichere Ergebnis ist das einzig mögliche, per Konstruktion.",
   "agentera.link": "KI- und Agent-Funktionen ansehen",
+  "whatsnew.badge": "Neu in 0.29",
+  "whatsnew.title": "Claude baut Apps auf deinen Daten – aus den Bausteinen deines Admin-Panels.",
+  "whatsnew.p1":
+    "Mit deinem Backend verbunden, öffnet Claude die Ansichten des Admin-Panels selbst im Gespräch – eine Collection, das Formular eines Datensatzes – oder schreibt eine kleine React-App für die Aufgabe, die gerade ansteht. Die App importiert die echten Rebase-Pakete, also läuft der Code, den Claude schreibt, unverändert in deinem Projekt. Sie kann nichts, was die Person nicht auch könnte: Jeder Lese- und Schreibzugriff ist eines der Tools deines Servers, in ihrem Namen aufgerufen, und vor dem Schreiben fragt sie nach.",
+  "whatsnew.code.caption": "läuft in Claude und in deiner App",
+  "whatsnew.preview.caption": "KpiTile und BarChart aus @rebasepro/ui · Beispielzahlen",
+  "whatsnew.claude.tag": "In Claude",
+  "whatsnew.claude.title": "Dein Admin-Panel im Gespräch",
+  "whatsnew.claude.desc":
+    "<code>show_collection</code> öffnet die Collection-Ansicht mit Suche, Filtern und Seiten, <code>show_record</code> das Formular eines Datensatzes, das die Person prüft und speichert. <code>show_app</code> führt die App aus, die Claude schreibt – die erste Seite jeder Collection ist beim Öffnen schon geladen. Lehnt der Server einen Schreibzugriff ab, wird das angezeigt, und Claude erfährt den Grund. Auf einem selbst gehosteten <code>/mcp</code> oder über den gehosteten Connector.",
+  "whatsnew.parts.tag": "In deinen Seiten",
+  "whatsnew.parts.title": "Die Bausteine, aus denen das Panel besteht",
+  "whatsnew.parts.desc":
+    "<code>CollectionPanel</code> nimmt <code>where</code>, <code>fields</code> und deine eigenen Buttons in jeder Zeile. <code>RecordForm</code> nimmt dein eigenes Layout aus <code>FormField</code>s. <code>RecordDetail</code> und <code>FieldValue</code> zeigen einen Datensatz oder einen einzelnen Wert so, wie das Panel es tut. <code>SplitView</code>, KPI-Kacheln und Diagramme stecken im UI-Kit.",
+  "whatsnew.rows.tag": "Eine Zeilenform",
+  "whatsnew.rows.title": "Die Zeile des Servers, überall",
+  "whatsnew.rows.desc":
+    "<code>useRows</code>, <code>useRow</code>, <code>useRowCount</code>, <code>useAggregate</code> und <code>useRowWrites</code> liefern Zeilen so, wie REST, <code>client.data</code> und das <code>context.data</code> des Backends sie liefern: ISO-Datumswerte, ein belongsTo als sein Fremdschlüssel. Die Callbacks des Panels bekommen dieselbe Zeile, mit ihrer ID daneben.",
+  "whatsnew.link.panels": "Panels in deinen eigenen Seiten",
+  "whatsnew.link.mcp": "Claude mit deinem Backend verbinden",
+  "whatsnew.postLink": "Lesen: Was 0.29 bringt und was eine Panel-Anpassung ändern muss",
   "modes.subtitle":
     "Tabellenbearbeitung, Medien, Relationen, Rollen und Review-Workflows — ein Admin-Panel, in dem dein Team das Tagesgeschäft steuert und freigibt, was Agenten entwerfen. Es ist ein Client deiner API wie jeder andere: Was immer es sieht, bestimmen deine Policies.",
   "modes.baas.title": "Rebase Backend",

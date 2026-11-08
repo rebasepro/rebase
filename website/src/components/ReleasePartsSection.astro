@@ -1,0 +1,188 @@
+---
+/*
+ * Home page — what 0.29 adds, between the agent chapter (04) and the
+ * customers (05). Unnumbered, like the rls-check band: it is a release, not a
+ * new claim, and the chapter numbers promise ideas the page already ranks.
+ *
+ * Say it once (SITE-STORY §1): chapter 01 owns "the panel your team works in"
+ * and chapter 04 owns "an agent works under scoped keys and RLS". This
+ * section depends on both and restates neither. What it adds is new in 0.29:
+ * Claude draws the admin's own views and writes apps from its parts, the
+ * parts are yours for your own pages, and every hook hands the server's row.
+ *
+ * "Try" means show: the code is the order desk exactly as it typechecks
+ * against the 0.29 sources, and the figure beside it is the UI kit's own
+ * KpiTile and BarChart, on sample figures the frame names as such. The list
+ * and the form need a running backend, so they are not drawn rather than
+ * drawn as a mock.
+ */
+import { Code } from "astro:components";
+import { ArrowRight } from "lucide-react";
+import { OrderDeskPreview } from "./demos/OrderDeskPreview";
+import { useTranslatedPath } from "../i18n/ui";
+
+const { lang, t } = Astro.props;
+const translatePath = useTranslatedPath(lang);
+
+// The order desk, as the blog post prints it. Every prop and hook here is
+// checked against packages/{app,cms,ui}/src; keep them in step when one of
+// those APIs moves. `style` rather than `h-[560px]` because show_app builds
+// Tailwind's standard utilities only, and this file is meant to paste there.
+const ORDER_DESK = `import { useState } from "react";
+import { useAggregate, useRowCount, useRowWrites } from "@rebasepro/app";
+import { CollectionPanel, RecordForm } from "@rebasepro/cms";
+import {
+  BarChart, Button, ChartCard, KpiGrid, KpiTile, SplitView,
+} from "@rebasepro/ui";
+
+export function OrderDesk() {
+  const [openId, setOpenId] = useState<string>();
+  const pending = useRowCount("orders", { status: ["==", "pending"] });
+  const byStatus = useAggregate("orders", {
+    select: [{ fn: "count" }],
+    groupBy: ["status"],
+    orderBy: ["count", "desc"],
+  });
+  const bars = (byStatus.result ?? []).map((r) => ({
+    key: String(r.status), label: String(r.status),
+    value: Number(r.count),
+  }));
+  const { update, saving } = useRowWrites();
+
+  const list = (
+    <CollectionPanel collection="orders" toolbar="compact"
+      where={{ status: ["==", "pending"] }} orderBy="placed_at:desc"
+      fields={["number", "customer", "total"]}
+      highlightedIds={openId ? [openId] : []}
+      onRowClick={(row, id) => setOpenId(id)}
+      rowActions={(row, id) => (
+        <Button size="small" disabled={saving}
+          onClick={() => update("orders", id, { status: "shipped" })}>
+          Ship
+        </Button>
+      )} />
+  );
+
+  return (
+    <div className="flex flex-col gap-4">
+      <KpiGrid>
+        <KpiTile label="Pending"
+          value={pending.count} loading={pending.loading} />
+      </KpiGrid>
+      <ChartCard title="Orders by status">
+        <BarChart bars={bars} loading={byStatus.loading} />
+      </ChartCard>
+      <div style={{ height: 560 }}>
+        <SplitView master={list} selected={openId}
+          onClearSelection={() => setOpenId(undefined)}
+          detail={
+            <RecordForm key={openId} collection="orders" id={openId}
+              compact fields={["status", "tracking_number", "notes"]} />
+          } />
+      </div>
+    </div>
+  );
+}`;
+
+const COLUMNS = [
+    { tag: "whatsnew.claude.tag", title: "whatsnew.claude.title", desc: "whatsnew.claude.desc", handle: "show_collection · show_record · show_app" },
+    { tag: "whatsnew.parts.tag", title: "whatsnew.parts.title", desc: "whatsnew.parts.desc", handle: "@rebasepro/cms · @rebasepro/ui" },
+    { tag: "whatsnew.rows.tag", title: "whatsnew.rows.title", desc: "whatsnew.rows.desc", handle: "@rebasepro/app" },
+] as const;
+---
+<section class="chapter relative ground-raised py-chapter">
+    <div class="relative mx-auto max-w-6xl px-6 lg:px-8">
+        <div class="max-w-[42rem] animate-on-scroll fade-in-up">
+            <p class="eyebrow">{t("whatsnew.badge")}</p>
+            <h2 class="mt-label font-headers text-display-2 text-balance">
+                {t("whatsnew.title")}
+            </h2>
+            <p class="mt-lead max-w-[38rem] text-page-copy leading-relaxed" set:html={t("whatsnew.p1")}></p>
+        </div>
+
+        <div class="mt-content grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+            <div class="lg:col-span-7 min-w-0 animate-on-scroll fade-in-up">
+                <div class="frame">
+                    <div class="frame-head">
+                        <span>OrderDesk.tsx</span>
+                        <span class="ml-auto truncate">{t("whatsnew.code.caption")}</span>
+                    </div>
+                    <div class="release-code overflow-x-auto px-4 py-4 text-[12px] leading-[1.6]">
+                        <Code code={ORDER_DESK} lang="tsx" theme="github-dark" />
+                    </div>
+                </div>
+            </div>
+            {/* Sticky so the rendered figure stays beside the code it draws
+                while the reader scrolls the file. */}
+            <div class="lg:col-span-5 min-w-0 lg:sticky lg:top-28 animate-on-scroll fade-in-up delay-100">
+                <div class="frame">
+                    <div class="frame-head">
+                        <span class="truncate">{t("whatsnew.preview.caption")}</span>
+                    </div>
+                    <OrderDeskPreview client:visible />
+                </div>
+            </div>
+        </div>
+
+        <div class="mt-content grid grid-cols-1 md:grid-cols-3 border-t border-white/8">
+            {COLUMNS.map(({ tag, title, desc, handle }, i) => (
+                <div class:list={[
+                    "py-10",
+                    i === 0 && "md:border-r border-white/8 md:pr-8",
+                    i === 1 && "md:border-r border-white/8 md:px-8 border-t md:border-t-0",
+                    i === 2 && "md:pl-8 border-t md:border-t-0 border-white/8",
+                ]}>
+                    <p class="font-mono text-2xs uppercase tracking-[0.18em] text-surface-500">{t(tag)}</p>
+                    <h3 class="mt-3 font-headers text-lg">{t(title)}</h3>
+                    <p class="mt-2 text-sm text-page-copy leading-relaxed" set:html={t(desc)}></p>
+                    <p class="mt-4 font-mono text-2xs text-surface-400">{handle}</p>
+                </div>
+            ))}
+        </div>
+
+        <div class="mt-4 flex flex-col items-start gap-4 lg:flex-row lg:items-center lg:gap-10">
+            <a href={translatePath("/docs/frontend/panels")} class="accent-link shrink-0">
+                {t("whatsnew.link.panels")}
+                <ArrowRight size={15} />
+            </a>
+            <a href={translatePath("/docs/ai/remote-mcp")} class="accent-link shrink-0">
+                {t("whatsnew.link.mcp")}
+                <ArrowRight size={15} />
+            </a>
+            <a
+                href="/blog/2026-11-09-rebase-0-29-your-admin-panel-in-parts"
+                class="group inline-flex items-start gap-2.5 text-sm text-surface-400 hover:text-white transition-colors"
+            >
+                <span class="mt-px inline-flex flex-none items-center rounded px-1.5 py-0.5 text-2xs font-semibold uppercase tracking-wider bg-white/5 text-surface-300 ring-1 ring-white/10">
+                    {t("label.blog")}
+                </span>
+                <span class="max-w-[30rem] leading-relaxed group-hover:underline underline-offset-4 decoration-white/30">
+                    {t("whatsnew.postLink")}
+                </span>
+            </a>
+        </div>
+    </div>
+</section>
+
+<style>
+    /* Shiki paints its theme's ground on the <pre>; the frame is the ground. */
+    .release-code :global(pre.astro-code) {
+        background-color: transparent !important;
+        margin: 0;
+        padding: 0;
+        overflow: visible;
+        font-size: inherit;
+        line-height: inherit;
+    }
+    /* No ligatures: `==` and `=>` are what a reader will type. */
+    .release-code :global(code) {
+        font-family: var(--font-mono);
+        font-variant-ligatures: none;
+    }
+    /* Inline code in the copy beside it: the mono face, no chip. */
+    section :global(p code) {
+        font-family: var(--font-mono);
+        font-size: 0.92em;
+        color: var(--color-surface-200);
+    }
+</style>

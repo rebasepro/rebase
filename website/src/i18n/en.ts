@@ -36,6 +36,30 @@ export const en = {
   "agentera.p1":
     "An AI agent can scaffold a backend in an hour — and leave you with forty thousand lines of routes, middleware and screens nobody can audit. Agents are very good at producing <em>plausible</em> backends and famously bad at producing <em>secure</em> ones. With Rebase, a coding agent edits one compact collection file that the compiler verifies, and a runtime agent operates under scoped keys, Postgres RLS and human-reviewed states. The safe outcome is the only outcome, by construction.",
   "agentera.link": "Explore AI and agent features",
+  // The home page's 0.29 section (ReleasePartsSection.astro). It may lean on
+  // chapter 01 (the panel) and 04 (agents under scoped keys and RLS) but not
+  // restate them; every claim here is in the 0.29 CHANGELOG.
+  "whatsnew.badge": "New in 0.29",
+  "whatsnew.title": "Claude builds apps on your data, out of your admin panel's own parts.",
+  "whatsnew.p1":
+    "Connected to your backend, Claude opens the admin panel's own views in the conversation — a collection, a record's form — or writes a small React app for the job in front of it. The app imports Rebase's real packages, so the code it writes runs unchanged in your project. It can do nothing the person could not: every read and write is one of your server's tools, called as them, and it asks before it writes.",
+  "whatsnew.code.caption": "runs in Claude and in your app",
+  "whatsnew.preview.caption": "KpiTile and BarChart from @rebasepro/ui · sample figures",
+  "whatsnew.claude.tag": "In Claude",
+  "whatsnew.claude.title": "Your admin panel, in the conversation",
+  "whatsnew.claude.desc":
+    "<code>show_collection</code> opens the collection view with its search, filters and paging, and <code>show_record</code> a record's form for the person to check and save. <code>show_app</code> runs the app Claude writes, with each collection's first page loaded before it opens. A write the server refuses is shown, and Claude is told why. On a self-hosted <code>/mcp</code> or the hosted connector.",
+  "whatsnew.parts.tag": "In your pages",
+  "whatsnew.parts.title": "The parts the admin is built from",
+  "whatsnew.parts.desc":
+    "<code>CollectionPanel</code> takes <code>where</code>, <code>fields</code> and your own buttons on every row. <code>RecordForm</code> takes your own layout of <code>FormField</code>s. <code>RecordDetail</code> and <code>FieldValue</code> draw a record, or one value, the way the admin does. <code>SplitView</code>, KPI tiles and charts are in the UI kit.",
+  "whatsnew.rows.tag": "One row shape",
+  "whatsnew.rows.title": "The server's row, everywhere",
+  "whatsnew.rows.desc":
+    "<code>useRows</code>, <code>useRow</code>, <code>useRowCount</code>, <code>useAggregate</code> and <code>useRowWrites</code> hand you rows as REST, <code>client.data</code> and the backend's <code>context.data</code> do: ISO dates, a belongsTo as its foreign key. The admin's callbacks get the same row, with its id beside it.",
+  "whatsnew.link.panels": "Panels in your own pages",
+  "whatsnew.link.mcp": "Connect Claude to your backend",
+  "whatsnew.postLink": "Read: what 0.29 adds, and what an admin customization has to change",
   // This beat proves claim 3 — the panel is a client of the same API and the
   // response does not move — which is what its figure actually models. The
   // English had drifted onto claim 2 ("one definition, everything generated"),

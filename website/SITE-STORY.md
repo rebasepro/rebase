@@ -299,6 +299,7 @@ that made five claims in sequence and read as a thesis.
 | — | rls-check band | The proof for 03: "Don't take that on faith." Unnumbered |
 | 04 | `s-panel` | Claim 3 — the panel that ships with it: the carousel, then Rebase Backend / CMS / Studio beneath it |
 | 05 | `s-agent-era` | Claim 4 — the backend an agent can't screw up |
+| — | `ReleasePartsSection` | What 0.29 adds, unnumbered and on `ground-raised`: Claude draws the admin's own views and writes apps from its parts, the same parts are yours, one row shape. The order desk as code beside the kit's real `KpiTile`/`BarChart` on sample figures. Leans on 01 and 04, restates neither (added 2026-11-09; replace or remove at the next release) |
 | 06 | `s-case-study` | Real products, seven of them |
 | 07 | `s-opensource` | Claim 5 — it is yours. Cut into the close on 2026-09-03 and restored the same day from #45 as its own beat: the last argument before the ask |
 | — | `ground-close` | The ask: "Point it at your database." and the three lanes |
