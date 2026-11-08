@@ -323,7 +323,11 @@ export default function RatingPreview({ value, customProps }: PropertyPreviewPro
   `create`, `update`, `delete` over the same rows. Do not `fetch` the REST API
   from admin code.
 - **Rows are the server's rows**: flat, `row.title`, the id on `row.id`, a date
-  as its ISO string, a belongsTo as its foreign-key column (`authorId`).
+  as its ISO string, a belongsTo as its foreign-key column (`authorId`). A
+  relation the admin loaded arrives nested under its name (`row.author`, the
+  author's row), as REST's `include` returns it. A view mode's `Builder` gets
+  the same rows (`tableController.rows`), a row click (`onRowClick(row)`) and
+  ids (`highlightedIds`, `selectionController.isSelected(id)`).
 - **`useAuthController()`**: `user` (`uid`, `displayName`, `email`, roles),
   sign-in and sign-out. **`useSnackbarController()`**: `open({ type, message })`.
 - **`useSidePanel()`** (`@rebasepro/cms`): `open({ path, entityId })` opens a

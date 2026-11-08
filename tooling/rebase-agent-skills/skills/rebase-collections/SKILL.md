@@ -175,7 +175,7 @@ export default productsCollection;
 | `admin.previewProperties` | `string[]` | — | Properties shown when this collection is referenced |
 | `admin.listProperties` | `string[]` | — | Columns to display in list view |
 | `admin.selectionEnabled` | `boolean` | `true` | Enable row selection checkboxes |
-| `admin.selectionController` | `SelectionController` | — | External selection state controller |
+| `admin.selectionController` | `SelectionController` | — | A selection you hold, from `useSelectionController(collection)`; read as rows and ids |
 | `admin.inlineEditing` | `boolean` | `true` | Allow inline editing in collection table view |
 | `admin.exportable` | `boolean \| ExportConfig` | `true` | Offer Export in the toolbar. `false` removes it; an `ExportConfig` keeps it and adds fields |
 | `admin.pagination` | `boolean \| number` | `true` (50) | Enable pagination. Set a number to customize page size |
@@ -1785,7 +1785,7 @@ The `onClick` and `isEnabled` handlers receive:
 | `collection` | `AdminCollection<M> \| undefined` | Collection definition |
 | `formContext` | `FormContext \| undefined` | Form state (when called from a form): `values` are the form's, unsaved edits included |
 | `sidePanelController` | `SidePanelController \| undefined` | Side panel control |
-| `selectionController` | `SelectionController \| undefined` | Multi-select state (collection view) |
+| `selectionController` | `SelectionController \| undefined` | The collection view's selection, by id: `selection` (`{ type: "rows", ids, rows }` or a query), `isSelected(id)`, `toggleSelection(row, selected?)` |
 | `view` | `"collection" \| "form"` | Where the action was triggered |
 | `openEntityMode` | `"side_panel" \| "full_screen" \| "split" \| "dialog"` | How the entity form is opened |
 | `highlightEntity` | `(id) => void` | Highlight a row by its id |

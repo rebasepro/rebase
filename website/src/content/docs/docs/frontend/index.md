@@ -123,9 +123,12 @@ rows[0].title;
 The admin itself renders an `Entity` view model — the `id` / `path` / `values`
 wrapper its collection views and forms draw from, with dates as `Date`s and a
 relation as an `EntityRelation`. That layer is the admin's own and is not part of
-the public surface. You meet `Entity` only where one of the admin's parts calls
-your code with its own record: an entity action's `entity`, a view mode
-`Builder`'s `tableController.data`, a form's values.
+the public surface: an entity action, a display resolver, a view mode
+`Builder`'s `tableController.rows`, a collection action's selection and a slot
+are all handed rows. You meet `Entity` only in a copy of one of the admin's own
+parts (`Collection.Table`, a card), which is handed the record as the admin
+draws it. A form's values are the editor's: `Date`s and relations, as a field
+edits them.
 
 ## One collection or one record in a page of your own
 

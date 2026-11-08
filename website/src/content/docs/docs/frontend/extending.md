@@ -165,13 +165,18 @@ and the entity side panel — that is the whole reason to declare one instead of
 building an `AppView`:
 
 ```tsx
-function MapView({ tableController, onEntityClick }: CollectionCustomViewParams) {
+function MapView({ tableController, onRowClick }: CollectionCustomViewParams) {
     return <MapCanvas
-        markers={tableController.data.map(e => e.values.location)}
-        onMarkerClick={i => onEntityClick?.(tableController.data[i])}
+        markers={tableController.rows.map(row => row.location)}
+        onMarkerClick={i => onRowClick?.(tableController.rows[i])}
     />;
 }
 ```
+
+The rows are the server's, the shape `useRows` returns: dates as ISO strings,
+a belongsTo as its foreign-key column, and a relation the view loaded nested
+under its name. `highlightedIds` are the ids of the rows the view draws as
+selected, and `selectionController` speaks ids and rows too.
 
 Choosing the view updates `?__view=`, survives a reload, and persists per user.
 Declaring one is enough to offer it — `enabledViews` only needs setting when you

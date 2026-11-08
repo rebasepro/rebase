@@ -22,7 +22,7 @@ always match the version you have installed.
 | [Per-user preferences](my-preferences.tsx) | Each user edits their own record, keyed by their uid. |
 | [Bulk set status](bulk-set-status.tsx) | A toolbar button that updates every selected row with `useRowWrites`. |
 | [Approval queue](approval-queue.tsx) | The rows waiting for review, Approve and Reject on every row and card (`entityActions` through `collectionOverrides`), and a live count (`useRowCount`). |
-| [Master-detail](master-detail.tsx) | `SplitView`: a `CollectionPanel` (`fields`, `onRowClick`, `highlightedEntityId`) beside the picked row's `EntityFormPanel` (`fields`); in a narrow container the form covers the list. |
+| [Master-detail](master-detail.tsx) | `SplitView`: a `CollectionPanel` (`fields`, `onRowClick`, `highlightedIds`) beside the picked row's `EntityFormPanel` (`fields`); in a narrow container the form covers the list. |
 | [Calendar view](calendar-view.tsx) | A new view mode for a collection: rows on a month grid. |
 | [Orders dashboard](orders-dashboard.tsx) | A total (`useRowCount`) and a count per status (`useAggregate`), drawn with `KpiTile` and `BarChart`; each bar opens the collection filtered to it. |
 | [Custom login screen](custom-login.tsx) | Replacing a built-in screen through `<Rebase components>`. |
@@ -33,7 +33,7 @@ always match the version you have installed.
 |---|---|
 | Show a collection: table, cards, board, its toolbar and record panel | `CollectionPanel`: `fields` for the columns, `collectionOverrides.fixedFilter` to narrow it, `toolbar` to change its toolbar |
 | Do something with the row clicked, instead of opening it | `CollectionPanel` `onRowClick(row)` |
-| Edit one record, or some of its fields | `EntityFormPanel` with `entityId`, and `fields` or `layout` of `FormField`s |
+| Edit one record, or some of its fields | `EntityFormPanel` with `id`, and `fields` or `layout` of `FormField`s |
 | Show one record read-only | `EntityViewPanel` |
 | Show one value of a row in your own JSX | `FieldValue` |
 | A list beside the picked record, folding to drill-down when narrow | `SplitView` (master-detail recipe) |
@@ -102,8 +102,8 @@ Components you render anywhere under `<Rebase>` and a router.
 | Place | Your component receives |
 |---|---|
 | A page (`views`) | Nothing: read what you need with the hooks. It renders inside the admin's router, so `useUrlController().navigate(…)` (or `react-router`) works. |
-| A view mode `Builder` | `CollectionCustomViewParams`: `collection`, `path`, `tableController` (its `data` is the rows the toolbar's search and filters select, `dataLoading`, …), `onEntityClick(entity)` to open a row the way the collection opens rows, `selectionController`, `emptyComponent`. |
-| `admin.Actions` | `CollectionActionsProps`: `path`, `collection`, `selectionController` (`hasSelection`, `selection`, `clearSelection()`), `tableController`, `openNewDocument(defaults?)`. `context`, whose `data` reads rows. Turn `selection` into rows with `resolveSelection({ selection, data: context.data, collection })` — it may stand for "every row matching the filter", not only the ticked ones. |
+| A view mode `Builder` | `CollectionCustomViewParams`: `collection`, `path`, `tableController` (its `rows` are the rows the toolbar's search and filters select; `loading`, `error`, …), `onRowClick(row)` to open a row the way the collection opens rows, `selectionController`, `highlightedIds`, `emptyComponent`. |
+| `admin.Actions` | `CollectionActionsProps`: `path`, `collection`, `selectionController` (`hasSelection`, `selection`, `isSelected(id)`, `setSelectedRows(rows)`, `clearSelection()`), `tableController` (`rows`), `openNewDocument(defaults?)`. `context`, whose `data` reads rows. Turn `selection` into rows with `resolveSelection({ selection, data: context.data, collection })` — it may stand for "every row matching the filter", not only the ticked ones. |
 | `entityActions` `onClick` | `EntityActionClickProps`: `row` (the record, as the server sends it), `id`, `path`, `collection`, `context`, `view` (`"collection"` or `"form"`). |
 | `admin.entityViews` `Builder` | `EntityCustomViewParams`: `collection`, the saved record (`row`, absent while it is being created), the form's values with unsaved edits (`modifiedValues`) and the form (`formContext`). |
 | `"Auth.LoginView"` | `{ authController }`. Sign in with `authController.emailPasswordLogin?.(email, password)` (optional: present when email sign-in is enabled); a failure throws and is also on `authController.authProviderError`. Once `authController.user` is set the admin replaces your screen by itself. |
@@ -115,28 +115,30 @@ Components you render anywhere under `<Rebase>` and a router.
   `useRow`, `useRowWrites`' results, `context.data`, `resolveSelection`,
   `CollectionPanel`'s `onRowClick`, `client.data` — and what a collection's
   `browserCallbacks`, its `entityActions`, `admin.display` resolvers,
-  `additionalFields`, entity views and a form's `context.row` are handed. A row is a flat object: its id under its own column
+  `additionalFields`, entity views, a form's `context.row`, a view mode
+  `Builder`'s `tableController.rows`, a collection action's selection and the
+  slots are handed. A row is a flat object: its id under its own column
   (`row.id`), a date as an ISO string (`"2026-11-08"` for a `columnType:
   "date"` column, a full timestamp otherwise), and a belongsTo relation as its
-  foreign-key column (`customerId`), not under the relation's name. Draw a
-  value with `<FieldValue row={row} collection="orders" field="customer"/>`
-  rather than formatting it yourself.
+  foreign-key column (`customerId`). A relation the admin loaded arrives nested
+  under its name, as REST's `include` returns it (`row.customer` is the
+  customer's row, beside `customerId`). Draw a value with
+  `<FieldValue row={row} collection="orders" field="customer"/>` rather than
+  formatting it yourself.
 - **`where` and `orderBy`** are the same everywhere: `{ status: ["==",
   "paid"], total: [">", 100] }` and `["createdAt", "desc"]`.
-- **An `Entity` is what the admin hands you** where its own parts call you: a
-  view mode `Builder`'s `tableController.data` and `onEntityClick`. It is `{ id, path, values }`: fields are on `entity.values`, and
-  there dates are `Date` objects and a relation an `EntityRelation`. A
-  `columnType: "date"` value is that day's UTC midnight, so read its day with
-  `getUTCDate()`, not `getDate()`, or it lands on the day before west of
-  Greenwich. `getDatePropertyTimezone(property)` names the zone the admin shows
-  any date property in. To write back, pass `entity.id` to `useRowWrites`.
+- **An `Entity` is the admin's own record**, handed only to a copy of one of
+  its parts (`Collection.Table`, a card). It is `{ id, path, values }`: fields
+  are on `entity.values`, and there dates are `Date` objects and a relation an
+  `EntityRelation`. `getDatePropertyTimezone(property)` names the zone the
+  admin shows any date property in.
 - **Defaults for a new record:** a property's `defaultValue` applies everywhere a
   record is created; `EntityFormPanel`'s `defaultValues` apply to that form only,
   on top of them.
 - **Enum fields** are `enum: [{ id: "draft", label: "Draft" }, …]` on a string
   property — see `defineCollection` and the collections docs for every property
   option.
-- **A record keyed by its user:** `entityId={useAuthController().user?.uid}`.
+- **A record keyed by its user:** `id={useAuthController().user?.uid}`.
 
 The override names are `Shell.AppBar`, `Shell.Drawer`, `HomePage`,
 `HomePage.CollectionCard`, `Auth.LoginView`, `Collection.View`,

@@ -84,9 +84,14 @@ import {
   default toolbar.
 - `onRowClick` — called with the clicked row instead of the panel opening it,
   from a row, a card, a kanban card and the edit action. The row is the one the
-  server sends, the shape `useRows`, `useRow` and `<FieldValue>` take: ISO
-  date strings (`YYYY-MM-DD` for a date-only column), and a belongsTo relation
-  as its foreign key (`customerId`), not under the relation's name.
+  server sends, the shape `useRows`, `useRow` and `<FieldValue>` take: `id`,
+  ISO date strings (`YYYY-MM-DD` for a date-only column), and a belongsTo
+  relation as its foreign key (`customerId`). A relation the panel loaded the
+  target of arrives nested under its name, as REST's `include` returns it
+  (`order.customer` is the customer's row); its foreign key is there too.
+- `highlightedIds` — the ids of the rows drawn as selected, the one a page
+  shows beside the list, say: `highlightedIds={selected ? [selected] : []}`.
+  `[]` draws none. Without it the panel highlights the row last opened.
 - `viewMode` — the mode it opens in, over the one in the URL and the one the
   person last picked. They can still switch.
 - `title={false}` — no title above the panel, nor the list view's own heading.
@@ -110,16 +115,16 @@ on it; to show only some in one place, pass `fields`.
 ## One record's form
 
 `<EntityFormPanel>` does the same for one record's form. It loads the record
-by `entityId`, saves it through `<Rebase>`'s data layer as the admin's own
+by `id`, saves it through `<Rebase>`'s data layer as the admin's own
 form does, and calls `onSaved` after every save with the saved record as the
-server sends the row, `row`, and its `id`. Omit `entityId` to create a
+server sends the row, `row`, and its `id`. Omit `id` to create a
 record. `onClose` is called when the form asks to be left, for example after
 its record is deleted:
 
 ```tsx
 <EntityFormPanel
     collection={postsCollection}
-    entityId={postId}
+    id={postId}
     onSaved={({ id }) => console.log("saved", id)}
     onClose={() => navigate("/posts")}/>
 ```
@@ -141,7 +146,7 @@ import { EntityFormPanel, FormField } from "@rebasepro/cms";
 
 <EntityFormPanel
     collection={ordersCollection}
-    entityId={orderId}
+    id={orderId}
     layout={<div className="grid grid-cols-2 gap-4">
         <FormField name="customer"/>
         <FormField name="status"/>
@@ -162,7 +167,7 @@ from a test, select `[data-form-field="title"]` inside the form's
 
 <span class="since-badge" data-since="0.29">Since 0.29</span>
 `<EntityViewPanel>` is the read-only twin of `EntityFormPanel`. It loads the
-record by `entityId` and draws it as the admin's record page does: the same
+record by `id` and draws it as the admin's record page does: the same
 sections and labels, with each value as its preview, so an enum shows as its
 chip, a date in its timezone and a relation as its target's title. It takes
 `fields` and `collectionOverrides` as the form does, and leaves out the fields
@@ -174,7 +179,7 @@ import { EntityViewPanel } from "@rebasepro/cms";
 
 <EntityViewPanel
     collection={ordersCollection}
-    entityId={orderId}
+    id={orderId}
     fields={["customer", "status", "total"]}/>
 ```
 

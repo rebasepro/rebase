@@ -83,16 +83,23 @@ const myPlugin: RebasePlugin = {
 | `collection.empty-state` | `CollectionEmptyStateProps` | Custom empty-state when collection has no data |
 | `collection.widgets` | `CollectionWidgetsSlotProps` | Widgets above the collection table |
 
+Where a collection slot is handed the view's `tableController` or
+`selectionController`, they speak rows as the server sends them:
+`tableController.rows` (with `loading`, `error` and the toolbar's filter,
+search and sort), and a selection by id — `selection` is
+`{ type: "rows", ids, rows }` or `{ type: "query", query, excludedIds, count }`,
+and `isSelected(id)` asks about one row.
+
 #### Entity / Form
 
 | Slot | Props Type | Description |
 |------|-----------|-------------|
-| `form.actions` | `PluginFormActionProps` | Actions in the entity form action bar |
+| `form.actions` | `PluginFormActionProps` | Actions in the entity form action bar. Handed the record's `id` (absent while it is new), `path`, `status`, `collection` and `formContext` |
 | `form.actions.top` | `PluginFormActionProps` | Actions above the form action bar |
 | `form.before` | `PluginFormActionProps` | Content before the form title/field list |
 | `form.after` | `PluginFormActionProps` | Content after the form field list |
-| `entity.row.actions` | `EntityRowActionsProps` | Per-row actions in collection tables, beside the built-in row tools. Handed the row as the server sends it (`row`), its `id`, `path`, `collection` and `context` |
-| `entity.field.before` | `EntityFieldSlotProps` | UI injected before an individual form field |
+| `entity.row.actions` | `EntityRowActionsProps` | Per-row actions in collection tables, beside the built-in row tools. Handed the row as the server sends it (`row`), its `id`, `path`, `collection`, the table's `selectionController` and `context` |
+| `entity.field.before` | `EntityFieldSlotProps` | UI injected before an individual form field. Handed the field's `propertyKey` and `property`, and the record's `path` and `id` (absent while it is new) |
 | `entity.field.after` | `EntityFieldSlotProps` | UI injected after an individual form field |
 
 #### Global / Shell

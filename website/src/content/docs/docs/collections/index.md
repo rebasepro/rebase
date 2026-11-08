@@ -377,8 +377,21 @@ mean stating all six.
 
 A resolver is handed `{ row, context }`. `row` is the record as the server
 sends it, the shape `useRows` and `context.data` return: dates as ISO strings,
-a belongsTo as its foreign-key column (`authorId`), never the related record,
-and `id` included.
+a belongsTo as its foreign-key column (`authorId`), and `id` included. A
+relation the admin loaded arrives nested under its name, as REST's `include`
+returns it — `row.author` is the author's row, beside `authorId` — so a
+resolver reads a related record's field with no request of its own:
+
+```typescript
+admin: {
+    display: {
+        // Undefined where the row holds only the author's id.
+        subtitle: ({ row }) => typeof row.author === "object" && row.author !== null && "name" in row.author
+            ? String(row.author.name)
+            : undefined
+    }
+}
+```
 
 ### Computed and async roles
 

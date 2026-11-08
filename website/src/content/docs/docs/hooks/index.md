@@ -281,7 +281,8 @@ function ThemeToggle() {
 
 ## `useSelectionDialog`
 
-Open a side dialog for selecting entities from a collection. This is the same hook used internally when a relation property is rendered:
+Open a side dialog for picking rows from a collection. The rows are handed to
+you as the server sends them, the shape `useRows` returns, `id` included:
 
 ```typescript
 import { useSelectionDialog } from "@rebasepro/cms";
@@ -290,14 +291,47 @@ function SelectProduct() {
     const selectionDialog = useSelectionDialog({
         path: "products",
         collection: productsCollection,
-        onSingleEntitySelected: (entity) => {
-            console.log("Selected:", entity);
+        onSingleRowSelected: (row) => {
+            console.log("Selected:", row?.id);
         }
     });
 
     return <button onClick={selectionDialog.open}>Select Product</button>;
 }
 ```
+
+With `multiselect: true`, `onMultipleRowsSelected(rows)` reports every tick and
+`onSelectionDone(rows)` the final selection once, when Done is pressed — use it
+when acting on the selection writes something. `selectedIds` names the rows
+shown selected, and first, when the dialog opens.
+
+## `useSelectionController`
+
+A selection of a collection's rows that you hold: hand it to a view as
+`admin.selectionController` (on a `CollectionPanel`, through
+`collectionOverrides`) and read what the person ticks there:
+
+```tsx
+import { CollectionPanel, useSelectionController } from "@rebasepro/cms";
+import { Button } from "@rebasepro/ui";
+
+function ShipOrders() {
+    const selection = useSelectionController(ordersCollection);
+    return <>
+        <CollectionPanel collection={ordersCollection}
+            collectionOverrides={{ selectionController: selection }}/>
+        <Button disabled={!selection.hasSelection}>
+            Ship {selection.selectedCount ?? "all"}
+        </Button>
+    </>;
+}
+```
+
+`selection.selection` is `{ type: "rows", ids, rows }` for ticked rows, or
+`{ type: "query", query, excludedIds, count }` once "all matching" is picked;
+`resolveSelection({ selection: selection.selection, data: context.data,
+collection })` reads a query selection's rows. `isSelected(id)`,
+`toggleSelection(row)`, `setSelectedRows(rows)` and `clearSelection()` change it.
 
 ## `useNavigationStateController`
 

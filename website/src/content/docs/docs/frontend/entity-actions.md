@@ -72,6 +72,7 @@ Every callback of an action (`onClick`, `isEnabled`, `disabledReason`) receives 
 | `formContext` | On an open record's edit form, the form: its `values` are the form's, unsaved edits included. Undefined in the collection and on the read-only view. |
 | `view` | `"collection"` or `"form"`. |
 | `highlightEntity(id)`, `unhighlightEntity(id)` | In the collection, highlight a row by its id, and remove the highlight. |
+| `selectionController` | In the collection, its selection, by id: `isSelected(id)`, `toggleSelection(row, selected?)`, `selection` (the rows ticked, or the query "all matching" stands for). |
 
 ## Where an action shows
 
@@ -154,6 +155,26 @@ const collection = defineCollection({
         Actions: [PublishSelectedAction]
     }
 });
+```
+
+An action is handed `CollectionActionsProps`. Each speaks rows as the server
+sends them, the shape `useRows` returns:
+
+| Prop | What it is |
+|------|------------|
+| `selectionController` | The view's selection. `selection` is `{ type: "rows", ids, rows }` for ticked rows, or `{ type: "query", query, excludedIds, count }` for "all matching"; `selectedCount`, `hasSelection`, `isSelected(id)`, `toggleSelection(row, selected?)`, `setSelectedRows(rows)`, `selectAllMatching(query, count?)`, `clearSelection()`. |
+| `tableController` | The view's live query: `rows`, `loading`, `error`, and the filter, search and sort the toolbar shares (`filterValues`, `setFilterValues`, `searchString`, `sortBy`, …). |
+| `path`, `collection`, `context` | Where the collection is, its config, and the admin's context. |
+| `openNewDocument(defaults?)` | Open the new-record form, prefilled. |
+
+To keep some rows selected after acting on the rest, hand the ones to keep to
+`setSelectedRows`:
+
+```ts
+const { selection } = selectionController;
+if (selection.type === "rows") {
+    selectionController.setSelectedRows(selection.rows.filter(row => failed.has(row.id)));
+}
 ```
 
 ![Collection actions](/img/collection_actions.png)

@@ -23,7 +23,7 @@ There are three things to know:
    properties it shows, in order), `toolbar` (`null`, or a `CollectionToolbar`
    composed of `CollectionSearchBar`, `CollectionFiltersButton`,
    `CollectionViewModeToggle`, `CollectionAddButton`), `onRowClick` (the
-   row, as `useRows` reads it, instead of opening it), `viewMode`, `highlightedEntityId`,
+   row, as `useRows` reads it, instead of opening it), `viewMode`, `highlightedIds`,
    `collectionOverrides`, `sort`, `limit`, `title`.
 2. **Hooks**: `useRows`, `useRow`, `useRowCount`, `useAggregate`,
    `useRowWrites` for data, `useRebaseContext().data` for the same rows outside
@@ -60,7 +60,7 @@ import only package entry points, so they compile as copied.
 ## Rules
 
 - **A singleton is a normal collection + a page with `EntityFormPanel` at a
-  fixed `entityId`.** The form creates the record under that id on first save;
+  fixed `id`.** The form creates the record under that id on first save;
   nothing needs seeding. Hide the collection from navigation with
   `admin.hideFromNavigation: true`.
 - **A form showing some fields, or laid out your way, is `EntityFormPanel`
@@ -73,7 +73,7 @@ import only package entry points, so they compile as copied.
   give it a default. `collectionOverrides` changes the collection for that form
   only.
 - **A record to read, not edit, is `EntityViewPanel`** (0.29+), with the same
-  `collection`, `entityId`, `fields` and `collectionOverrides` as the form. It
+  `collection`, `id`, `fields` and `collectionOverrides` as the form. It
   hides what the form hides: a field a `conditions.hidden` rule hides for that
   record, or one the user may not read.
 - **One value in your own JSX is `<FieldValue row={row} collection="orders"
@@ -83,20 +83,23 @@ import only package entry points, so they compile as copied.
   relation's title as the admin does. The collection must be registered above it.
 - **Read with `useRows` / `useRow` / `useRowCount` / `useAggregate`, write with
   `useRowWrites`** (0.29+). Their rows are the server's rows — `row.id`, dates
-  as ISO strings, a belongsTo as its foreign-key column (`customerId`) — the
-  same shape as `client.data`, `context.data`, `resolveSelection({ selection,
-  data: context.data, collection })`, `CollectionPanel`'s `onRowClick` and what
-  `browserCallbacks` are handed. A write is the record form's save:
-  `browserCallbacks`, then the server's callbacks and security rules, and every
-  view of the collection reads it again; a write through `context.data` is the
-  same. An `Entity` (`{ id, path, values }`, dates as `Date`s on `values`) is
-  only what the admin hands you: an `entityActions` `onClick`, a view mode's
-  `tableController.data`. Don't call `fetch` on the REST API from admin code.
+  as ISO strings, a belongsTo as its foreign-key column (`customerId`), and a
+  relation the admin loaded nested under its name (`row.customer`), as REST's
+  `include` returns it — the same shape as `client.data`, `context.data`,
+  `resolveSelection({ selection, data: context.data, collection })`,
+  `CollectionPanel`'s `onRowClick`, a view mode's `tableController.rows`, a
+  collection action's `selectionController.selection` and what
+  `browserCallbacks` and `entityActions` are handed. A write is the record
+  form's save: `browserCallbacks`, then the server's callbacks and security
+  rules, and every view of the collection reads it again; a write through
+  `context.data` is the same. An `Entity` (`{ id, path, values }`) is only what
+  a copy of one of the admin's own parts is handed. Don't call `fetch` on the
+  REST API from admin code.
 - **A button on every row and card is an `entityActions` entry** with
   `collapsed: false` — on the collection (`admin.entityActions`), or for one
   panel through `collectionOverrides.entityActions`. Not a column of your own.
 - **A list beside the picked record is `SplitView`** with a `CollectionPanel`
-  (`onRowClick`, `highlightedEntityId`) as `master` and an `EntityFormPanel` or
+  (`onRowClick`, `highlightedIds`) as `master` and an `EntityFormPanel` or
   `EntityViewPanel` as `detail`. It lays out by its container's width, so it
   drills down in a narrow frame by itself; give its parent a height.
 - **Draw with `@rebasepro/ui`** so the page matches the admin (see the

@@ -63,7 +63,7 @@ once, and reads a query selection a page at a time — with an optional progress
 callback — throwing rather than returning a prefix when the query matches more
 than 20,000 rows.
 
-```diff lang="tsx"
+```diff lang="tsx" no-verify
  const handlePublish = async () => {
 -    for (const entity of selectionController.selectedEntities) {
 +    const selected = await resolveSelection({

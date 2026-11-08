@@ -344,8 +344,8 @@ type CollectionPanelProps = {
     /** Additional collection-level overrides */
     collectionOverrides?: Partial<AdminCollection>;
 
-    /** The row drawn as selected; `null` for none. Default: the row last opened */
-    highlightedEntityId?: string | number | null;
+    /** The ids of the rows drawn as selected; `[]` for none. Default: the row last opened */
+    highlightedIds?: (string | number)[];
 
     /** Only these properties, in this order: the table's columns, and what list rows,
      *  cards and kanban cards are filled from. Wins over propertiesOrder, the saved
@@ -424,8 +424,8 @@ import { CollectionPanel, EntityFormPanel } from "@rebasepro/cms";
         <CollectionPanel collection={postsCollection}/>
 
         {/* One record's form — loaded by id, saved through <Rebase>'s data layer.
-            Leave out entityId to create a record. */}
-        <EntityFormPanel collection={postsCollection} entityId="123"
+            Leave out id to create a record. */}
+        <EntityFormPanel collection={postsCollection} id="123"
             onSaved={({ id }) => console.log("saved", id)}
             onClose={() => navigate("/posts")}/>
     </BrowserRouter>
@@ -442,7 +442,7 @@ import { CollectionPanel, EntityFormPanel } from "@rebasepro/cms";
   renders above the fields.
 - Two forms on one page do not share DOM ids. In tests, find a field by
   `[data-form-field="title"]` inside the form's `[data-form-path="posts"]`.
-- `EntityViewPanel` (0.29+) is the read-only twin: `collection`, `entityId`,
+- `EntityViewPanel` (0.29+) is the read-only twin: `collection`, `id`,
   `path?`, `fields?`, `collectionOverrides?`, `className?`. It draws the record
   as the admin's record page does, and leaves out a field a `conditions.hidden`
   rule hides for that record or one the user may not read.
@@ -484,7 +484,7 @@ import { CollectionPanel, CollectionsProvider } from "@rebasepro/cms";
 
 ## 5. Entity Selection Dialog
 
-Use `useSelectionDialog()` to open a side dialog for selecting entities (same mechanism used by reference fields).
+Use `useSelectionDialog()` to open a side dialog for picking rows (same mechanism used by reference fields). The rows come back as the server sends them, `id` included.
 
 ```typescript
 import { useSelectionDialog } from "@rebasepro/cms";
@@ -496,8 +496,8 @@ import { useSelectionDialog } from "@rebasepro/cms";
 function MyComponent() {
     const { open, close } = useSelectionDialog<Product>({
         path: "products",
-        onSingleEntitySelected: (entity) => {
-            console.log("Selected:", entity?.id);
+        onSingleRowSelected: (row) => {
+            console.log("Selected:", row?.id);
             close();
         }
     });
@@ -506,7 +506,7 @@ function MyComponent() {
 }
 ```
 
-The hook accepts `SelectionProps` with `path` made optional (`string | false`), plus an `onClose` callback. `open()` throws when no `path` is set, or when no `collection` is passed and none is registered at that path.
+The hook accepts `SelectionProps` with `path` made optional (`string | false`), plus an `onClose` callback. With `multiselect: true`, `onMultipleRowsSelected(rows)` reports every tick and `onSelectionDone(rows)` the final selection once; `selectedIds` pre-selects rows. `open()` throws when no `path` is set, or when no `collection` is passed and none is registered at that path.
 
 ---
 
@@ -1027,8 +1027,8 @@ The admin package exports the following components (from `@rebasepro/cms`):
 | `useCollectionRegistryController()` | Look up collections by slug |
 | `useBreadcrumbsController()` | Read/set breadcrumbs |
 | `useAdminContext()` | Full admin context (core + admin controllers) |
-| `useSelectionDialog()` | Open entity selection dialog |
-| `useSelectionController()` | Multi-select controller |
+| `useSelectionDialog()` | Open a dialog that picks rows |
+| `useSelectionController(collection)` | A selection of rows you hold, for `admin.selectionController`: `selection` (`{ type: "rows", ids, rows }` or a query), `isSelected(id)`, `toggleSelection(row)` |
 | `useHistory()` | Entity version history |
 | `useApp()` | App-level utilities |
 

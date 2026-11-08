@@ -192,8 +192,8 @@ the collection. Honour at least these:
 |---|---|
 | `collectionOverrides` | What the caller changes about the collection (a fixed filter, a sort, the view mode), applied over the registered collection |
 | `fields` | Only these properties, in this order: the columns, and what list rows and cards are filled from |
-| `highlightedEntityId` | The row drawn as selected; `null` for none |
-| `onEntityClick` | Called with the clicked row (an `Entity`) instead of opening it. The panel's `onRowClick` arrives as this |
+| `highlightedIds` | The ids of the rows drawn as selected; `[]` for none |
+| `onRowClick` | Called with the clicked row, as the server sends it, instead of opening it. The panel's own `onRowClick` |
 
 The panel also passes `viewMode` (the mode to open in), `toolbar` (the toolbar
 to draw, `null` for none) and `title` (`false` to draw no title), where its
