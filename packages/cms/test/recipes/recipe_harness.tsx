@@ -66,13 +66,15 @@ function matching(path: string, filter: Filter): Row[] {
 /** `count` and `sum` over a table's matching rows, grouped, sorted and paged, the way the SQL driver answers them. */
 function aggregate(path: string, { aggregates, groupBy = [], filter, orderBy = [], limit, offset = 0 }: {
     aggregates: { fn: string; field?: string; alias: string }[];
-    groupBy?: string[];
+    /** Plain columns; a transformed group is grouped by its column as stored. */
+    groupBy?: (string | { field: string })[];
     filter?: Filter;
     orderBy?: OrderByTuple[];
     limit?: number;
     offset?: number;
 }): Record<string, unknown>[] {
-    const sorted = computeGroups(path, aggregates, groupBy, filter).sort((a, b) => {
+    const fields = groupBy.map(group => typeof group === "string" ? group : group.field);
+    const sorted = computeGroups(path, aggregates, fields, filter).sort((a, b) => {
         for (const [key, direction] of orderBy) {
             const [x, y] = [a[key], b[key]];
             if (x === y) continue;

@@ -746,7 +746,7 @@ __type: "relation" }
 title: "Test Post Updated",
 authorId: 1 }]);
                 // The main UPDATE's RETURNING: the row it matched.
-                db.returning.mockResolvedValue([{ id: 1 }]);
+                (db as unknown as { returning: jest.Mock }).returning.mockResolvedValue([{ id: 1 }]);
 
                 try {
                     await dataService.save("posts_jp", postUpdate, 1);

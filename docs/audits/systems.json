@@ -21,6 +21,8 @@
         "packages/server/src/api/types.ts",
         "packages/server/src/api/contract-routes.ts",
         "packages/server-postgres/src/PostgresBackendDriver.ts",
+        "packages/server-postgres/src/pipelined-transaction.ts",
+        "packages/server-postgres/src/types/**",
         "packages/server-postgres/src/PostgresAdapter.ts",
         "packages/server-postgres/src/data-transformer.ts",
         "packages/server-postgres/src/services/*.ts",

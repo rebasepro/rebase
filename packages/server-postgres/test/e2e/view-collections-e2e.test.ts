@@ -184,7 +184,7 @@ describe("view collections (E2E)", () => {
     it("refuses to replace a table with a view", async () => {
         const client = { query: <T>(text: string) => admin.query(text) as unknown as Promise<{ rows: T[] }> };
         await admin.query("CREATE TABLE public.occupied (id int primary key)");
-        const occupying: CollectionConfig = { ...artists(), slug: "occupying", table: "occupied" };
+        const occupying = { ...artists(), slug: "occupying", table: "occupied" } as CollectionConfig;
         await expect(ensureCollectionTables(client, [songs, occupying])).rejects.toThrow(/will not replace public\.occupied/);
         expect((await admin.query("SELECT to_regclass('public.occupied')::text AS t")).rows[0].t).toBe("occupied");
     });

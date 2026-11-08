@@ -93,7 +93,7 @@ describe("data capabilities (E2E)", () => {
         if (container) await stopPgContainer(container.containerName);
     }, 60_000);
 
-    const titles = (rows: { artist?: unknown }[]) => rows.map(row => row.artist).sort();
+    const titles = (rows: Record<string, unknown>[]) => rows.map(row => String(row.artist)).sort();
 
     describe("array operators", () => {
         it("array-contains-all matches rows holding every listed element", async () => {
@@ -177,11 +177,11 @@ describe("data capabilities (E2E)", () => {
             const afterInsert = await fingerprint();
             expect(afterInsert).not.toBe(start);
 
-            await songsOf(rebase.dataAsAdmin).update(created.id, { fame: 1 });
+            await songsOf(rebase.dataAsAdmin).update(Number(created.id), { fame: 1 });
             const afterUpdate = await fingerprint();
             expect(afterUpdate).not.toBe(afterInsert);
 
-            await songsOf(rebase.dataAsAdmin).delete(created.id);
+            await songsOf(rebase.dataAsAdmin).delete(Number(created.id));
             const afterDelete = await fingerprint();
             expect(afterDelete).not.toBe(afterUpdate);
             // The row it added is gone again: the rows are the ones it started with.
@@ -205,7 +205,7 @@ describe("data capabilities (E2E)", () => {
     describe("updateMany with a value per row", () => {
         it("updates every row in one statement, stamped, and answers each", async () => {
             const { data } = await songsOf(rebase.dataAsAdmin).find({ orderBy: ["id", "asc"], count: "none" });
-            const updates = data.map((row, i) => ({ id: row.id as number, data: { plays: 100 + i, lang: `l${i}` } }));
+            const updates = data.map((row, i) => ({ id: Number(row.id), data: { plays: 100 + i, lang: `l${i}` } }));
             roundTrips = 0;
             counting = true;
             let answered;
@@ -224,7 +224,7 @@ describe("data capabilities (E2E)", () => {
         it("still names the entry whose id matches no row, and writes none of them", async () => {
             const [first] = (await songsOf(rebase.dataAsAdmin).find({ orderBy: ["id", "asc"], limit: 1, count: "none" })).data;
             await expect(songsOf(rebase.dataAsAdmin).updateMany([
-                { id: first.id as number, data: { plays: 1 } },
+                { id: Number(first.id), data: { plays: 1 } },
                 { id: 99999, data: { plays: 2 } }
             ])).rejects.toThrow(/^Update 1 of 2 \(id 99999\) failed/);
             expect(await rebase.sql("SELECT plays::int AS plays FROM public.songs WHERE id = $1", { params: [first.id] })).toEqual([{ plays: 100 }]);
@@ -235,7 +235,7 @@ describe("data capabilities (E2E)", () => {
             const mine = (await songsOf(ada.data).find({ count: "none" })).data[0];
             const bobs = (await rebase.sql("SELECT id FROM public.songs WHERE owner_id = 'bob' LIMIT 1") as { id: number }[])[0];
             await expect(songsOf(ada.data).updateMany([
-                { id: mine.id as number, data: { plays: 7 } },
+                { id: Number(mine.id), data: { plays: 7 } },
                 { id: bobs.id, data: { plays: 7 } }
             ])).rejects.toThrow(/^Update 1 of 2/);
             expect(await rebase.sql("SELECT count(*)::int AS n FROM public.songs WHERE plays = 7")).toEqual([{ n: 0 }]);
