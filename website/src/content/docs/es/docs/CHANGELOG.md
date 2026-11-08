@@ -69,9 +69,11 @@ La traducción está pendiente. El contenido siguiente está en inglés.
   `FormField` from `@rebasepro/cms`; and the whole UI kit, `SplitView` and
   the KPI tiles and charts included. The same code works in your project.
   Every read and write is a call to the server's tools, as the person, under
-  their RLS; a change the app's code makes through `useRowWrites` is
-  confirmed by them first, while the admin's own Save and delete controls ask
-  nothing more than they do on a `show_collection` screen; what
+  their RLS and the scopes their connection was granted, so an app's code can
+  do nothing the model could not do with the same tools; `useRowWrites` asks
+  the person before it writes, so an app does not write without their click,
+  and the admin's own controls behave as they do on a `show_collection`
+  screen; what
   they change, and an app that fails, are told to the model with their next
   message. A collection opened with `show_collection` draws the page the tool
   already read, with no second read, and sizes to its rows. The server hands the view the collections'

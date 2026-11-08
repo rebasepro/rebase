@@ -1,36 +1,46 @@
 ---
-sourceHash: 4006e06ac37a4220
+sourceHash: 31ccfe9d60f8eafe
 title: Admin anpassen
 sidebar_label: Admin anpassen
-description: So passen Sie den Rebase-Admin an – Bausteine, Hooks und Orte, mit getesteten Rezepten für Singletons, benutzerspezifische Einstellungen, Massenaktionen, Kalenderansichten, Dashboards und benutzerdefinierte Login-Masken.
+description: So passen Sie den Rebase-Admin an – Bausteine, Hooks und Places, mit getesteten Recipes für Singletons, benutzerspezifische Einstellungen, Massenaktionen, Kalenderansichten, Dashboards und benutzerdefinierte Login-Bildschirme.
 ---
 
-Der Admin ist aus Bausteinen aufgebaut, die Sie selbst verwenden können. Um ihn anzupassen, schreiben Sie eine gewöhnliche React-Komponente und platzieren sie an der gewünschten Stelle. Das ist das gesamte Modell:
+Der Admin besteht aus Teilen, die Sie selbst verwenden können. Um ihn anzupassen,
+schreiben Sie eine gewöhnliche React-Komponente und platzieren sie an einem Ort.
+Das ist das gesamte Modell:
 
-- **Bausteine**, die Sie rendern – die Tabelle einer Collection, das Formular eines Datensatzes, das UI-Kit.
+- **Bausteine (Building blocks)**, die Sie rendern – die Tabelle einer Collection, das Formular eines einzelnen Datensatzes, das UI-Kit.
 - **Hooks** für Daten, den angemeldeten Benutzer, Toasts und Navigation.
-- **Orte**, an denen eine Komponente platziert werden kann – eine Seite, ein Ansichtsmodus für eine Collection, eine Schaltfläche in der Toolbar, ein Datensatz-Tab, ein Feld, ein Slot neben einem integrierten Bestandteil oder ein Override, der einen solchen ersetzt.
+- **Places** zum Platzieren einer Komponente – eine Seite, ein Collection-Ansichtsmodus, eine Toolbar-Schaltfläche, ein Datensatz-Tab, ein Feld, ein Slot neben einem integrierten Teil oder ein Override, der einen solchen ersetzt.
 
-Wenn ein Baustein nicht das tut, was Sie benötigen, kopieren Sie dessen Quellcode in Ihr Projekt und passen ihn an. Nichts davon erfordert, dass zuvor eine Konfigurationsoption existiert. Siehe [Einen eingebauten Teil kopieren](#einen-eingebauten-teil-kopieren).
+Wenn ein Baustein nicht das tut, was Sie benötigen, kopieren Sie dessen Quellcode
+in Ihr Projekt und passen Sie ihn an – siehe [Kopieren eines integrierten Teils](#copying-a-built-in-part).
+Nichts davon setzt voraus, dass zuerst eine Konfigurationsoption existieren muss.
 
-## Rezepte
+## Recipes
 
-Funktionsfähige, getestete Beispiele sind direkt in `@rebasepro/cms` enthalten, sodass die Beispiele in `node_modules/@rebasepro/cms/recipes` immer zu Ihrer installierten Version passen. Sie importieren ausschließlich öffentliche Packages: Kopieren Sie einfach eines unverändert in Ihr Projekt.
+Funktionsfähige, getestete Beispiele werden in `@rebasepro/cms` mitgeliefert,
+sodass die Beispiele in `node_modules/@rebasepro/cms/recipes` immer zu Ihrer
+installierten Version passen. Sie importieren ausschließlich öffentliche Pakete:
+Kopieren Sie einfach eines unverändert in Ihr Projekt.
 
-| Rezept | Was es zeigt |
+| Recipe | Was es zeigt |
 |---|---|
 | `site-settings.tsx` | Ein Singleton: ein einzelner Einstellungsdatensatz auf einer eigenen Seite, der beim ersten Speichern erstellt wird. |
 | `my-preferences.tsx` | Benutzerspezifische Einstellungen: Jeder Benutzer bearbeitet den Datensatz mit seiner UID als Schlüssel. |
 | `bulk-set-status.tsx` | Eine Toolbar-Schaltfläche, die jede ausgewählte Zeile aktualisiert. |
-| `calendar-view.tsx` | Ein neuer Ansichtsmodus: Zeilen einer Collection in einem Monatsraster. |
+| `calendar-view.tsx` | Ein neuer Ansichtsmodus: Die Zeilen einer Collection in einem Monatsraster. |
 | `orders-dashboard.tsx` | Eine Seite, die Daten liest, ein Diagramm zeichnet und in den Admin verlinkt. |
-| `custom-login.tsx` | Ersetzen des Anmeldebildschirms. |
+| `custom-login.tsx` | Ersetzen des Login-Bildschirms. |
 
-Die `README.md` daneben ist die vollständige Referenz aller Bausteine, Hooks und Orte.
+Die `README.md` daneben ist die vollständige Referenz für Bausteine, Hooks und Places.
 
-## Beispiel: ein Singleton
+## Beispiel: Ein Singleton
 
-Ein Singleton ist kein spezieller Collection-Typ. Es ist eine gewöhnliche Tabelle, deren Seite immer dieselbe Zeile öffnet. Wird `EntityFormPanel` eine ID übergeben, bearbeitet es diesen Datensatz und erstellt ihn beim ersten Mal unter dieser ID, sodass kein Seeding erforderlich ist.
+Ein Singleton ist kein spezieller Collection-Typ. Es ist eine gewöhnliche Tabelle,
+deren Seite immer dieselbe Zeile öffnet. Wird `EntityFormPanel` eine ID übergeben,
+bearbeitet es diesen Datensatz und erstellt ihn beim ersten Mal unter dieser ID,
+sodass kein Seeding erforderlich ist.
 
 ```tsx
 import React from "react";
@@ -66,54 +76,75 @@ export const siteSettingsView: AppView = {
 };
 ```
 
-Dasselbe Schema mit `entityId={user.uid}` (aus `useAuthController()`) ergibt eine Seite für benutzerspezifische Einstellungen.
+Die gleiche Struktur mit `entityId={user.uid}` (aus `useAuthController()`) ergibt
+eine Seite für benutzerspezifische Einstellungen.
 
-<span class="since-badge" data-since="0.29">Seit 0.29</span> Um einige der Felder zu
-zeigen, übergeben Sie `fields={["siteName"]}`. Um sie selbst anzuordnen, übergeben Sie
-`layout` mit `<FormField name="…"/>` in Ihrem eigenen JSX. In beiden Fällen validiert das
-Formular nur, was es zeigt — siehe
-[Eine Collection oder ein Datensatz in einer eigenen Seite](/docs/frontend#one-collection-or-one-record-in-a-page-of-your-own).
+<span class="since-badge" data-since="0.29">Seit 0.29</span> Um nur einige der
+Felder anzuzeigen, übergeben Sie `fields={["siteName"]}`. Um sie selbst anzuordnen,
+übergeben Sie `layout` mit `<FormField name="…"/>` in Ihrem eigenen JSX. In beiden
+Fällen validiert das Formular nur das, was es anzeigt – siehe
+[Panels auf einer eigenen Seite](/docs/frontend/panels).
 
-## Orte
+## Places
 
-| Um Folgendes hinzuzufügen… | Platzieren Sie eine Komponente in |
+| Um … hinzuzufügen | Platzieren Sie eine Komponente in |
 |---|---|
 | Eine Seite | `<RebaseCMS views={[{ slug, name, icon, view }]}>` |
 | Einen Ansichtsmodus für eine Collection | `collectionViews={[{ key, name, Builder }]}` und `admin.customViews: ["key"]` – siehe [View Modes](/docs/frontend/view-modes) |
 | Eine Schaltfläche in der Toolbar einer Collection | `admin.Actions: [Component]` |
-| Eine Schaltfläche bei einem Datensatz | `admin.entityActions` – siehe [Entity Actions](/docs/frontend/entity-actions) |
-| Einen Tab bei einem Datensatz | `admin.entityViews` – siehe [Entity Views](/docs/frontend/entity-views) |
-| Die Bearbeitung oder Anzeige eines Felds anpassen | `admin.Field` / `admin.Preview` – siehe [Custom Fields](/docs/frontend/custom-fields) |
-| Ein Element neben einem integrierten Bestandteil | `<Rebase slots>` – siehe [Slots](/docs/frontend/slots) |
-| Einen Ersatz für einen integrierten Bestandteil | `<Rebase components>` – siehe [Component Overrides](/docs/frontend/component-overrides) |
+| Eine Schaltfläche für einen Datensatz | `admin.entityActions` – siehe [Entity Actions](/docs/frontend/entity-actions) |
+| Einen Tab für einen Datensatz | `admin.entityViews` – siehe [Entity Views](/docs/frontend/entity-views) |
+| Wie ein Feld bearbeitet oder dargestellt wird | `admin.Field` / `admin.Preview` – siehe [Custom Fields](/docs/frontend/custom-fields) |
+| Etwas neben einem integrierten Teil | `<Rebase slots>` – siehe [Slots](/docs/frontend/slots) |
+| Einen Ersatz für einen integrierten Teil | `<Rebase components>` – siehe [Component Overrides](/docs/frontend/component-overrides) |
 
-## Was jeder Ort Ihrer Komponente übergibt
+## Was jeder Place an Ihre Komponente übergibt
 
-| Ort | Ihre Komponente erhält |
+| Place | Ihre Komponente erhält |
 |---|---|
-| Eine Seite (`views`) | Nichts: Lesen Sie, was Sie brauchen, mit den Hooks. Sie wird im Router des Admins gerendert, daher funktioniert `useUrlController().navigate(…)` (oder `react-router`). |
-| Ein Ansichtsmodus-`Builder` | `CollectionCustomViewParams`: `collection`, `path`, `tableController` (sein `data` sind die Zeilen, die Suche und Filter der Toolbar auswählen, `dataLoading`, …), `onEntityClick(entity)`, um eine Zeile so zu öffnen, wie die Collection Zeilen öffnet, `selectionController`, `emptyComponent`. |
-| `admin.Actions` | `CollectionActionsProps`: `path`, `collection`, `selectionController` (`hasSelection`, `selection`, `clearSelection()`), `tableController`, `openNewDocument(defaults?)`. Wandeln Sie `selection` mit `resolveSelection({ selection, accessor: useData().collection(path) })` in Zeilen um – sie kann für „alle Zeilen, die dem Filter entsprechen“ stehen, nicht nur für die markierten. |
-| `admin.entityViews`-`Builder` | `EntityCustomViewParams`: `collection`, den Datensatz (`entity`, fehlt, solange er erstellt wird), seine ungespeicherten Werte (`modifiedValues`) und das Formular (`formContext`). |
-| `"Auth.LoginView"` | `{ authController }`. Melden Sie sich mit `authController.emailPasswordLogin?.(email, password)` an (optional: vorhanden, wenn die E-Mail-Anmeldung aktiviert ist); ein Fehler wird geworfen und steht auch in `authController.authProviderError`. Sobald `authController.user` gesetzt ist, ersetzt der Admin Ihren Bildschirm von selbst. |
-| Jeder andere Override | Die Props des Teils, den er ersetzt; mit `wrap: true` zusätzlich `OriginalComponent`. |
+| Eine Seite (`views`) | Nichts: Lesen Sie das aus, was Sie benötigen, mithilfe der Hooks. Sie wird innerhalb des Admin-Routers gerendert, daher funktioniert `useUrlController().navigate(…)` (oder `react-router`). |
+| Ein Ansichtsmodus-`Builder` | `CollectionCustomViewParams`: `collection`, `path`, `tableController` (dessen `data` sind die Zeilen, die durch die Suche und Filter der Toolbar ausgewählt werden, `dataLoading`, …), `onEntityClick(entity)` zum Öffnen einer Zeile so, wie die Collection Zeilen öffnet, `selectionController`, `emptyComponent`. |
+| `admin.Actions` | `CollectionActionsProps`: `path`, `collection`, `selectionController` (`hasSelection`, `selection`, `clearSelection()`), `tableController`, `openNewDocument(defaults?)`. Wandeln Sie `selection` mit `resolveSelection({ selection, accessor: useData().collection(path) })` in Zeilen um – dies kann für „jede Zeile, die dem Filter entspricht“ stehen, nicht nur für die angehakten. |
+| `admin.entityViews` `Builder` | `EntityCustomViewParams`: `collection`, der Datensatz (`entity`, nicht vorhanden, während er erstellt wird), seine ungespeicherten Werte (`modifiedValues`) und das Formular (`formContext`). |
+| `"Auth.LoginView"` | `{ authController }`. Melden Sie sich mit `authController.emailPasswordLogin?.(email, password)` an (optional: vorhanden, wenn die E-Mail-Anmeldung aktiviert ist); ein Fehlschlag löst einen Fehler aus und befindet sich auch in `authController.authProviderError`. Sobald `authController.user` gesetzt ist, ersetzt der Admin Ihren Bildschirm automatisch. |
+| Jeder andere Override | Die Props des Teils, den er ersetzt; bei `wrap: true` diese plus `OriginalComponent`. |
 
 ## Hooks
 
-| Hook | Package | Bietet Ihnen |
+| Hook | Paket | Liefert Ihnen |
 |---|---|---|
-| `useData` | `@rebasepro/app` | `useData().collection("orders").find / findById / create / update / delete`, über den Server, sodass Callbacks und Sicherheitsregeln greifen. |
+| `useData` | `@rebasepro/app` | `useData().collection("orders").find / findById / create / update / delete`, über den Server, sodass Callbacks und Sicherheitsregeln angewendet werden. |
 | `useCollection` / `useFetch` | `@rebasepro/app` | Eine Live-Liste von Zeilen / ein einzelner Live-Datensatz. |
-| `useAuthController` | `@rebasepro/app` | Den angemeldeten `user` (uid, roles), Anmeldung und Abmeldung. |
+| `useAuthController` | `@rebasepro/app` | Der angemeldete `user` (UID, Rollen), An- und Abmeldung. |
 | `useSnackbarController` | `@rebasepro/app` | `open({ type, message })` für einen Toast. |
-| `useSidePanel` | `@rebasepro/cms` | Öffnet jeden beliebigen Datensatz im Seitenpanel. |
+| `useSidePanel` | `@rebasepro/cms` | Beliebigen Datensatz im Seitenpanel öffnen. |
 | `useUrlController` | `@rebasepro/cms` | Admin-URLs und Navigation. |
-| `resolveSelection` | `@rebasepro/cms` | Eine Tabellenauswahl – markierte Zeilen oder „alle passenden“ – als Zeilen. |
+| `resolveSelection` | `@rebasepro/cms` | Eine Tabellenauswahl – angehakte Zeilen oder „alle übereinstimmenden“ – als Zeilen. |
 
-## Einen eingebauten Teil kopieren
+## Kopieren eines integrierten Teils
 
-Wenn ein eingebauter Teil fast dem entspricht, was Sie wollen, kopieren Sie seinen Quellcode aus dem Repository von `@rebasepro/cms` (oder `@rebasepro/app`) in Ihr Projekt, richten seine relativen Importe auf die Pakete aus, ändern ihn und registrieren ihn unter seinem Namen in `<Rebase components>`. Alles, was ein Teil importiert, ist ein öffentlicher Export, daher kompiliert die Kopie – bei jedem Teil außer dreien, und diese drei sind Absicht:
+Wenn ein integrierter Teil dem nahe kommt, was Sie benötigen, kopieren Sie dessen
+Quellcode aus dem Repository `@rebasepro/cms` (oder `@rebasepro/app`) in Ihr Projekt,
+passen Sie die relativen Imports auf die Pakete an, ändern Sie ihn und registrieren
+Sie ihn unter seinem Namen in `<Rebase components>`. Alles, was ein Teil importiert,
+ist ein öffentlicher Export, sodass die Kopie kompiliert – für jeden Teil mit
+Ausnahme von dreien, und diese drei sind Absicht:
 
-- **`Collection.View`** setzt alle Ansichtsmodi zusammen – Liste, Tabelle, Karten, Board, Split – mit Inline-Bearbeitung, dem Popup-Feldeditor, dem Löschdialog und dem URL-Zustand des Ansichtsmodus. Was sie importiert, sind die Interna dieser Modi. Ersetzen Sie stattdessen einen ihrer Teile (`Collection.Table`, `Collection.Card`, `Collection.Actions`, `Collection.EmptyState`, die sich alle kopieren lassen), fügen Sie einen eigenen [Ansichtsmodus](/docs/frontend/view-modes) hinzu oder umschließen Sie sie mit `wrap: true`.
-- **`DetailView`** setzt die Ansicht eines Datensatzes zusammen: Identitätsleiste, Tabs, Inspektor und die Schaltflächen der geteilten Liste, rund um Tab-IDs, die URL-Werte sind. Passen Sie einen Datensatz mit [Entity Views](/docs/frontend/entity-views), [Entity Actions](/docs/frontend/entity-actions), den `form.*`-[Slots](/docs/frontend/slots) oder den Overrides `Entity.Form` und `EditView.FormActions` an, die sich kopieren lassen.
-- **`HomePage`** lässt sich kopieren, bis auf das Umsortieren von Karten und Gruppen per Drag-and-drop, das keine eigene API zum Exportieren hat. Eine eigene Startseite setzt `NavigationGroup`, `NavigationCardBinding` und `FavouritesView` über `useNavigationStateController().topLevelNavigation` zusammen; um der Standardseite etwas hinzuzufügen, verwenden Sie den Slot `home.cards`.
+- **`Collection.View`** ist die Komposition aller Ansichtsmodi – Liste, Tabelle,
+  Cards, Board, Split – mit Inline-Bearbeitung, dem Popup-Feld-Editor, dem
+  Löschdialog und dem URL-Status des Ansichtsmodus. Was es importiert, sind die
+  Interna dieser Modi. Ersetzen Sie stattdessen einen Teil davon (`Collection.Table`,
+  `Collection.Card`, `Collection.Actions`, `Collection.EmptyState`, die sich alle
+  kopieren lassen), fügen Sie einen eigenen [Ansichtsmodus](/docs/frontend/view-modes)
+  hinzu oder wrappen Sie es mit `wrap: true`.
+- **`DetailView`** ist die Komposition der Datensatzansicht: Identity-Leiste, Tabs,
+  Inspector und die Schaltflächen der Split-Liste, rund um Tab-IDs, die URL-Werte sind.
+  Passen Sie einen Datensatz mit [Entity Views](/docs/frontend/entity-views),
+  [Entity Actions](/docs/frontend/entity-actions), den `form.*`-
+  [Slots](/docs/frontend/slots) oder den Overrides `Entity.Form` und
+  `EditView.FormActions` an, die sich kopieren lassen.
+- **`HomePage`** lässt sich kopieren, mit Ausnahme der Drag-and-Drop-Neuordnung von
+  Cards und Gruppen, für die es keine eigene zu exportierende API gibt. Eine eigene
+  Startseite setzt sich aus `NavigationGroup`, `NavigationCardBinding` und
+  `FavouritesView` über `useNavigationStateController().topLevelNavigation` zusammen;
+  um die Standard-Startseite zu erweitern, verwenden Sie den Slot `home.cards`.
