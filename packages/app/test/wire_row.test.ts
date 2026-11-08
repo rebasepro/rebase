@@ -5,7 +5,7 @@
 import { describe, expect, it } from "@jest/globals";
 import type { CollectionConfig } from "@rebasepro/types";
 import { EntityRelation } from "@rebasepro/types";
-import { fromWireRow, toWireRow } from "../src/util/wire_row";
+import { copyRow, fromWireRow, toWireRow } from "../src/util/wire_row";
 
 const people = {
     slug: "people",
@@ -192,5 +192,94 @@ describe("fromWireRow", () => {
         const sent = toWireRow(values, tasks);
         const { title: _title, ...rest } = sent;
         expect(fromWireRow(values, sent, rest, tasks, "tasks")).not.toHaveProperty("title");
+    });
+});
+
+describe("toWireRow, where the relation and its foreign key disagree", () => {
+    it("lets the relation decide its foreign key, whichever key the values list first", () => {
+        // A form that changed the relation leaves the foreign key it was read with behind.
+        const row = toWireRow({ assignee: new EntityRelation("p2", "people"), assigneeId: "p1" }, tasks);
+        expect(row.assigneeId).toBe("p2");
+    });
+
+    it("sends a cleared relation as a null foreign key, which unlinks it", () => {
+        const row = toWireRow({ assignee: undefined }, tasks);
+        expect(row).toHaveProperty("assigneeId");
+        expect(row.assigneeId).toBeNull();
+    });
+
+    it("keeps a loaded target's own id, with its column's type", () => {
+        const row = toWireRow({
+            assignee: new EntityRelation("5", "people", { id: 5, path: "people", values: { name: "Ada" } })
+        }, tasks);
+        expect(row.assignee).toEqual({ id: 5, name: "Ada" });
+    });
+
+    it("converts the dates inside an array of maps by the array's item property", () => {
+        const events = {
+            slug: "events",
+            name: "Events",
+            properties: {
+                log: { type: "array", name: "Log", of: { type: "map", name: "Entry", properties: { at: { type: "date", name: "At" } } } }
+            }
+        } as CollectionConfig;
+        const row = toWireRow({ log: [{ at: new Date("2026-11-08T09:30:00.000Z") }] }, events);
+        expect(row.log).toEqual([{ at: "2026-11-08T09:30:00.000Z" }]);
+    });
+});
+
+describe("copyRow", () => {
+    it("copies every plain object and array, so editing the copy in place leaves the row as it was", () => {
+        const row = { id: "t1", tags: ["a"], meta: { note: "ok", nested: { n: 1 } } };
+        const copy = copyRow(row) as typeof row;
+        copy.tags.push("b");
+        copy.meta.note = "changed";
+        copy.meta.nested.n = 2;
+        expect(row).toEqual({ id: "t1", tags: ["a"], meta: { note: "ok", nested: { n: 1 } } });
+    });
+});
+
+describe("fromWireRow, for a row edited in place", () => {
+    const values = {
+        id: "t1",
+        title: "Plan",
+        tags: ["a"],
+        meta: { note: "ok" },
+        assignee: new EntityRelation("p2", "people", { id: "p2", path: "people", values: { name: "Ada" } })
+    };
+
+    it("hands the values back as they were for an untouched copy, nested maps and arrays included", () => {
+        const sent = toWireRow(values, tasks);
+        expect(fromWireRow(values, sent, copyRow(sent), tasks, "tasks")).toBe(values);
+    });
+
+    it("sees an item pushed onto an array", () => {
+        const sent = toWireRow(values, tasks);
+        const returned = copyRow(sent) as { tags: string[] };
+        returned.tags.push("b");
+        expect(fromWireRow(values, sent, returned, tasks, "tasks").tags).toEqual(["a", "b"]);
+    });
+
+    it("sees a key added to a map", () => {
+        const sent = toWireRow(values, tasks);
+        const returned = copyRow(sent) as { meta: Record<string, unknown> };
+        returned.meta.reviewedAt = "2026-11-08T09:30:00.000Z";
+        expect(fromWireRow(values, sent, returned, tasks, "tasks").meta).toEqual({
+            note: "ok",
+            reviewedAt: new Date("2026-11-08T09:30:00.000Z")
+        });
+    });
+
+    it("leaves the relation as it was when the belongsTo's loaded target is cleared: the foreign key is what unlinks", () => {
+        const sent = toWireRow(values, tasks);
+        const out = fromWireRow(values, sent, { ...sent, assignee: null }, tasks, "tasks");
+        expect(out.assignee).toBe(values.assignee);
+    });
+
+    it("unlinks the relation when its foreign key is cleared or dropped", () => {
+        const sent = toWireRow(values, tasks);
+        expect(fromWireRow(values, sent, { ...sent, assigneeId: null }, tasks, "tasks").assignee).toBeNull();
+        const { assigneeId: _assigneeId, ...withoutKey } = sent;
+        expect(fromWireRow(values, sent, withoutKey, tasks, "tasks")).not.toHaveProperty("assignee");
     });
 });

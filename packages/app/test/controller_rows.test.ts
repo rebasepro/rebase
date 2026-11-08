@@ -71,6 +71,46 @@ describe("tableControllerOf", () => {
         expect(tableControllerOf({ ...controller, searchString: "x" }, tasks).rows).toBe(view.rows);
     });
 
+    it("hands every query-state field and callback of the controller through as it is", () => {
+        const fields = {
+            onRowsRendered: jest.fn(),
+            noMoreToLoad: false,
+            filterValues: { title: ["==", "Plan"] },
+            setFilterValues: jest.fn(),
+            sortBy: ["title", "desc"],
+            setSortBy: jest.fn(),
+            clearFilter: jest.fn(),
+            itemCount: 40,
+            setItemCount: jest.fn(),
+            initialScroll: 120,
+            onScroll: jest.fn(),
+            paginationEnabled: true,
+            pageSize: 25,
+            checkFilterCombination: jest.fn(),
+            onAddColumn: jest.fn()
+        } as Partial<EntityTableController>;
+        const view = tableControllerOf(table([], fields), tasks);
+        for (const [key, value] of Object.entries(fields)) {
+            expect(view).toHaveProperty(key, value);
+        }
+    });
+
+    it("makes rows again for another collection, from the same controller and data", () => {
+        const entity = task("t1", "Plan");
+        const data = [entity];
+        const sparseData = [undefined, entity];
+        const controller = table(data, { sparseData });
+        const bare = tableControllerOf(controller, undefined);
+        const view = tableControllerOf(controller, tasks);
+        expect(view).not.toBe(bare);
+        expect(bare.rows[0].due).toBe("2026-11-08T00:00:00.000Z");
+        expect(view.rows[0].due).toBe("2026-11-08");
+        expect(view.sparseRows?.[1]?.due).toBe("2026-11-08");
+        // The rows of the data alone, through another controller.
+        expect(tableControllerOf(table(data, { sparseData }), tasks).rows[0].due).toBe("2026-11-08");
+        expect(tableControllerOf(table(data, { sparseData }), tasks).sparseRows?.[1]?.due).toBe("2026-11-08");
+    });
+
     it("keeps the holes of a sparse window, and the ids beside them", () => {
         const view = tableControllerOf(table([task("t2", "Ship")], { sparseData: [undefined, task("t2", "Ship")] }), tasks);
         expect(view.sparseRows).toEqual([undefined, { id: "t2", title: "Ship", due: "2026-11-08" }]);
@@ -107,6 +147,14 @@ describe("rowSelectionOf", () => {
             ids: ["t2", "t1"],
             rows: [{ id: "t2", title: "Ship", due: "2026-11-08" }, { id: "t1", title: "Plan", due: "2026-11-08" }]
         });
+    });
+
+    it("makes rows again for another collection, from the same selection", () => {
+        const selection: EntitySelection = { type: "entities", entities: [task("t1", "Plan")] };
+        const bare = rowSelectionOf(selection, undefined);
+        const inTasks = rowSelectionOf(selection, tasks);
+        expect(bare.type === "rows" && bare.rows[0].due).toBe("2026-11-08T00:00:00.000Z");
+        expect(inTasks.type === "rows" && inTasks.rows[0].due).toBe("2026-11-08");
     });
 
     it("is the query, with the ids ticked back off, and the count", () => {
@@ -164,6 +212,25 @@ describe("selectionControllerOf", () => {
         expect(view.isSelected("5")).toBe(true);
         view.toggleSelection({ id: 5, title: "Five" }, false);
         expect(jest.mocked(controller.toggleEntitySelection).mock.calls[0][0]).toMatchObject({ id: "5", path: "orders" });
+    });
+
+    it("is a new view for another path, addressing a row it did not hand out by that path", () => {
+        const controller = selectionController({ type: "entities", entities: [] });
+        const atRoot = selectionControllerOf(controller, tasks, "tasks");
+        const nested = selectionControllerOf(controller, tasks, "projects/p1/tasks");
+        expect(nested).not.toBe(atRoot);
+        nested.toggleSelection({ id: "t9", title: "New" });
+        expect(jest.mocked(controller.toggleEntitySelection).mock.calls[0][0]).toMatchObject({ path: "projects/p1/tasks" });
+    });
+
+    it("passes selectAllMatching, with its count, and clearSelection to the admin's controller", () => {
+        const controller = selectionController({ type: "entities", entities: [] });
+        const view = selectionControllerOf(controller, tasks, "tasks");
+        const query = { path: "tasks", searchString: "pl" };
+        view.selectAllMatching(query, 12);
+        expect(controller.selectAllMatching).toHaveBeenCalledWith(query, 12);
+        view.clearSelection();
+        expect(controller.clearSelection).toHaveBeenCalledTimes(1);
     });
 
     it("refuses a row without its primary key", () => {

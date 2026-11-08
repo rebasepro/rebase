@@ -1,5 +1,15 @@
 import type { CollectionAccessor, RebaseData } from "@rebasepro/types";
-import { CHANGE_MAX_WAIT_MS, CHANGE_QUIET_MS, createDataChanges, withDataChanges } from "../src/hooks/data/dataChanges";
+import React from "react";
+import { act, renderHook } from "@testing-library/react";
+import {
+    CHANGE_MAX_WAIT_MS,
+    CHANGE_QUIET_MS,
+    createDataChanges,
+    DataChangesContext,
+    signalWrite,
+    useDataChangeVersion,
+    withDataChanges
+} from "../src/hooks/data/dataChanges";
 
 /**
  * The change signal itself: which listeners a name reaches, which writes of
@@ -151,6 +161,53 @@ describe("createDataChanges", () => {
         expect(calls).toBe(1);
     });
 
+    it("tells of a lone change within a tenth of a second, and of a stream of changes within a second", async () => {
+        // What reads as instant, and the progress a long run of writes shows.
+        const changes = createDataChanges();
+        let calls = 0;
+        changes.subscribe("posts", () => calls++);
+        changes.emit("posts");
+        await jest.advanceTimersByTimeAsync(100);
+        expect(calls).toBe(1);
+
+        const stream = setInterval(() => changes.emit("posts"), 20);
+        // Its first change is one interval in.
+        await jest.advanceTimersByTimeAsync(20 + 1_000 + 1);
+        clearInterval(stream);
+        expect(calls).toBe(2);
+    });
+
+    it("holds a burst for a write sent under the collection's slug when the change is said under its stored path", async () => {
+        const changes = createDataChanges((path) => path === "orders" ? "public.orders" : path);
+        let calls = 0;
+        changes.subscribe("orders", () => calls++);
+
+        const settled = changes.writing("orders");
+        changes.emit("public.orders");
+        await jest.advanceTimersByTimeAsync(400);
+        expect(calls).toBe(0);
+        settled();
+        await heardOf();
+        expect(calls).toBe(1);
+    });
+
+    it("waits for every write in flight, however often one of them says it settled", async () => {
+        const changes = createDataChanges();
+        let calls = 0;
+        changes.subscribe("posts", () => calls++);
+
+        const first = changes.writing("posts");
+        const second = changes.writing("posts");
+        changes.emit("posts");
+        first();
+        first();
+        await jest.advanceTimersByTimeAsync(400);
+        expect(calls).toBe(0);
+        second();
+        await heardOf();
+        expect(calls).toBe(1);
+    });
+
     it("waits for a write in flight no longer than the maximum wait", async () => {
         const changes = createDataChanges();
         let calls = 0;
@@ -238,6 +295,46 @@ describe("withDataChanges", () => {
         expect(data.collection("posts").createMany).toBeUndefined();
     });
 
+    it("says so after a batch update and the trash's purges", async () => {
+        const changes = createDataChanges();
+        let emitted = 0;
+        changes.subscribe("posts", () => emitted++);
+        const accessor = {
+            update: async () => ({ id: 1, path: "posts", values: {} }),
+            updateMany: async () => [],
+            trash: {
+                find: async () => ({ data: [], meta: { total: 0, limit: 50, offset: 0, hasMore: false } }),
+                count: async () => 0,
+                purge: async () => undefined,
+                purgeMany: async () => undefined
+            }
+        } as unknown as CollectionAccessor;
+        const data = withDataChanges({ collection: () => accessor } as unknown as RebaseData, changes);
+
+        await data.collection("posts").updateMany!([{ id: 1, data: {} }]);
+        await heardOf();
+        await data.collection("posts").trash!.purge(1);
+        await heardOf();
+        await data.collection("posts").trash!.purgeMany!([1]);
+        await heardOf();
+        expect(emitted).toBe(3);
+    });
+
+    it("lets go of a write that failed, so the next change is heard a quiet window on", async () => {
+        const changes = createDataChanges();
+        let heard = 0;
+        changes.subscribe("posts", () => heard++);
+
+        expect(() => signalWrite(changes, "posts", () => {
+            throw new Error("not sent");
+        })).toThrow("not sent");
+        await expect(signalWrite(changes, "posts", () => Promise.reject(new Error("refused")))).rejects.toThrow("refused");
+
+        changes.emit("posts");
+        await heardOf();
+        expect(heard).toBe(1);
+    });
+
     it("reads each view again once for 20 writes sent one after another, each reply in a task of its own", async () => {
         const changes = createDataChanges();
         const reads = { table: 0, board: 0 };
@@ -300,5 +397,22 @@ describe("withDataChanges", () => {
         expect(reads).toBe(0);
         await jest.advanceTimersByTimeAsync(1);
         expect(reads).toBe(1);
+    });
+});
+
+describe("useDataChangeVersion", () => {
+    it("grows with each change heard, and never for a view whose data source subscribes", async () => {
+        const changes = createDataChanges();
+        const wrapper = ({ children }: { children: React.ReactNode }) =>
+            React.createElement(DataChangesContext.Provider, { value: changes }, children);
+        const live = renderHook(() => useDataChangeVersion("posts", false), { wrapper });
+        const polled = renderHook(() => useDataChangeVersion("posts", true), { wrapper });
+
+        await act(async () => {
+            changes.emit("posts");
+            await heardOf();
+        });
+        expect(polled.result.current).toBe(1);
+        expect(live.result.current).toBe(0);
     });
 });

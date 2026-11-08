@@ -126,4 +126,20 @@ describe("idOfRow", () => {
         expect(idOfRow({ title: "Nameless" }, orders)).toBeUndefined();
         expect(idOfRow({ orderId: 5 }, lines)).toBeUndefined();
     });
+
+    it("is undefined for a key part that is null or empty", () => {
+        expect(idOfRow({ orderId: 5, sku: "" }, lines)).toBeUndefined();
+        expect(idOfRow({ orderId: null, sku: "A-1" }, lines)).toBeUndefined();
+    });
+
+    it("is the admin's id for a row it handed out whose values leave the key column out", () => {
+        // The admin addresses the record by its own id; the row is only its columns.
+        expect(idOfRow(rowOfEntity(task(), tasks), tasks)).toBe("t1");
+    });
+
+    it("is a row's own id, a number as a string, where the collection declares no key", () => {
+        const keyless = { slug: "notes", name: "Notes", properties: { text: { type: "string", name: "Text" } } } as CollectionConfig;
+        expect(idOfRow({ id: 7, text: "x" }, keyless)).toBe("7");
+        expect(idOfRow({ id: 7 }, undefined)).toBe("7");
+    });
 });
