@@ -43,6 +43,9 @@ import { logger } from "../utils/logger.js";
 import type { McpScope } from "./oauth-metadata.js";
 import type { McpConfirmationPlan } from "./confirmation.js";
 import { type McpViewBlock, type McpViewMode, type McpViewPayload, VIEW_MODES, viewCollections } from "./mcp-view.js";
+import { SHOW_APP_CODE_GUIDE } from "./show-app-guide.js";
+
+export { SHOW_APP_CODE_GUIDE };
 
 /** The identity a tool call runs as. Comes from the verified access token. */
 export interface McpCaller {
@@ -697,52 +700,6 @@ const SHOWN_NOT_SEEN = " In a client that renders MCP Apps this opens in the con
     + "shown. The result does not say which happened, so do not tell the user a view appeared: report what the "
     + "result says. Edits the person makes there are saved as them, each through the same checks as the write "
     + "tools, and you are told what they changed.";
-
-/**
- * What show_app's description teaches: the modules an app imports, and what
- * each gives it. The hosted connector's show_app says the same.
- */
-export const SHOW_APP_CODE_GUIDE = `
-The app is one TSX module whose default export is a React component (hooks welcome, no props). It runs in the conversation inside the project's admin panel, as the user, and may import only:
-- "react".
-- "@rebasepro/ui": the Rebase UI kit — Card, Button, IconButton, Typography, Tabs, Tab, Chip, Badge, Alert, TextField, Select, SelectItem, BooleanSwitch, Checkbox, Dialog, DialogTitle, DialogContent, DialogActions, Table, TableHeader, TableBody, TableRow, TableCell, Separator, CircularProgress, Tooltip, cls, and Lucide icons named with an Icon suffix (PlusIcon, Trash2Icon). Lay out and space with Tailwind's standard utilities (flex, grid, grid-cols-*, gap-*, p-*, w-*, text-sm, …); colours come from the kit (bg-surface-card, text-text-secondary), never hard-coded.
-- Width: the app is about 700px wide in the conversation, and the whole window when the person expands it. Put things side by side only from the lg: breakpoint (grid grid-cols-1 lg:grid-cols-2), never in fixed columns: a list and a form side by side at 700px are each too narrow to use.
-- "@rebasepro/plugin-insights": KpiGrid, KpiTile({ label, value, format?, previous?, goodWhen? ("up" | "down") }) — previous is the earlier period's value, shown as the change, ChartCard({ title, children }), BarChart({ bars: [{ key, label, value }] }), TimeSeriesChart({ series: [{ id, label, points: [{ at, value }] }] }) — at is a date, formatNumber.
-- "@rebasepro/mcp-apps", the project's data, as the user, under their RLS. Rows are as query_collection returns them (dates as ISO text, a belongsTo as its foreign key, e.g. authorId); \`where\` and \`orderBy\` are query_collection's.
-  useQuery(collection, { where?, orderBy?, limit?, offset?, searchString? }) → { data, total, hasMore, loading, error, refresh }
-  useRecord(collection, id) → { data, loading, error, refresh }
-  useCount(collection, where?) → { count, loading, error }
-  useMutate() → { create(collection, data, id?), update(collection, id, data), remove(collection, id), saving, error } — every change asks the user to confirm it first; a declined one rejects.
-  <CollectionView collection where? orderBy? view? ("table" | "list" | "cards" | "kanban") height? onRowClick?(row) highlightedEntityId? /> — the admin panel's collection view (search, filters, paging); \`where\` fixes which rows it holds; without onRowClick a row opens its form; highlightedEntityId draws that row as selected.
-  <RecordForm collection id? values? onSaved?(id) /> — the admin panel's record form; without id, a new row's.
-  openRecord(collection, id), openNewRecord(collection, values?) — open a form over the app.
-Every read and write refreshes what shows the same collection. CollectionView and RecordForm draw only the collections listed in \`collections\`.
-
-Example:
-import { useState } from "react";
-import { Button, Card, Typography } from "@rebasepro/ui";
-import { KpiGrid, KpiTile } from "@rebasepro/plugin-insights";
-import { CollectionView, RecordForm, useCount, useMutate } from "@rebasepro/mcp-apps";
-
-export default function OrderDesk() {
-    const [order, setOrder] = useState<Record<string, unknown>>();
-    const pending = useCount("orders", { status: ["==", "pending"] });
-    const { update, saving } = useMutate();
-    return (
-        <div className="flex flex-col gap-4">
-            <KpiGrid><KpiTile label="Pending" value={pending.count} /></KpiGrid>
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-start">
-                <CollectionView collection="orders" view="list" onRowClick={setOrder} highlightedEntityId={order ? String(order.id) : undefined} />
-                {order ? (
-                    <div className="flex flex-col gap-2">
-                        <Button disabled={saving} onClick={() => update("orders", String(order.id), { status: "shipped" })}>Mark shipped</Button>
-                        <RecordForm collection="orders" id={String(order.id)} />
-                    </div>
-                ) : <Card className="p-6"><Typography variant="body2" color="secondary">Pick an order.</Typography></Card>}
-            </div>
-        </div>
-    );
-}`;
 
 const TOOLS: McpToolDefinition[] = [
     {

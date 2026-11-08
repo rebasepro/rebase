@@ -9,20 +9,28 @@
  * its foreign key); `<Rebase>` turns them into the admin panel's view model
  * and back, as it does for any driver.
  *
+ * An app's row hooks (`useRows`, `useAggregate`, …) read the same driver
+ * through the flat data layer (`buildRebaseData`), which keeps the wire's
+ * rows and takes aggregates from `restFetchService`: here, the aggregate tool.
+ *
  * A write the server answers with a plan (the hosted connector's two-step
  * `write`) is held: the person is shown the plan and the write is sent again
- * with its token only if they confirm. The admin panel sees one save that
- * took a moment longer, or one that failed with "Not saved".
+ * with its token only if they confirm. On a screen running code the model
+ * wrote, every other write is confirmed here before it is sent. The admin
+ * panel sees one save that took a moment longer, or one that failed with
+ * "Not saved".
  */
-import type {
-    CollectionConfig,
-    DataDriver,
-    DeleteProps,
-    FetchCollectionProps,
-    FetchOneProps,
-    ListenCollectionProps,
-    ListenOneProps,
-    SaveProps
+import {
+    DEFAULT_DATA_SOURCE_KEY,
+    type CollectionConfig,
+    type DataDriver,
+    type DeleteProps,
+    type FetchCollectionProps,
+    type FetchOneProps,
+    type ListenCollectionProps,
+    type ListenOneProps,
+    type RestFetchService,
+    type SaveProps
 } from "@rebasepro/types";
 import { buildCompositeId, fieldKeyForColumn, getDeclaredPrimaryKeys, resolveCollectionRelations } from "@rebasepro/common";
 import { isRecord, type ToolResult } from "./bridge";
@@ -33,8 +41,9 @@ export interface ToolAction {
     arguments: Record<string, unknown>;
     /**
      * The tool answers a plan before it changes anything (the hosted
-     * connector's `write`), so the person confirms there. Not set, an app's
-     * own change is confirmed in the view before it is sent.
+     * connector's `write`), so the person confirms there. Not set, a change
+     * on a screen running the model's code is confirmed in the view before
+     * it is sent.
      */
     plans?: boolean;
 }
@@ -52,6 +61,8 @@ export interface ViewActions {
     create: ToolAction;
     update: ToolAction;
     delete: ToolAction;
+    /** `count`/`sum`/`avg`/`min`/`max` over the matching rows, grouped or not, as REST's `select` and `groupBy`. */
+    aggregate: ToolAction;
 }
 
 export const DEFAULT_ACTIONS: ViewActions = {
@@ -60,7 +71,8 @@ export const DEFAULT_ACTIONS: ViewActions = {
     count: { tool: "count_documents", arguments: {} },
     create: { tool: "create_document", arguments: {} },
     update: { tool: "update_document", arguments: {} },
-    delete: { tool: "delete_document", arguments: {} }
+    delete: { tool: "delete_document", arguments: {} },
+    aggregate: { tool: "aggregate_documents", arguments: {} }
 };
 
 /** What a write's first call answered instead of running: what it will do, for the person to confirm. */
@@ -81,11 +93,34 @@ export interface ViewChange {
 /** The calls the driver makes: the bridge's `callTool`, as a function so a test can stand in for the host. */
 export type CallTool = (name: string, args: Record<string, unknown>) => Promise<ToolResult>;
 
+/**
+ * The page a show_collection result already carries: the rows the server
+ * read for the model, and the arguments it read them with.
+ */
+export interface SeedPage {
+    collection: string;
+    /** As the read tools take them: `where`, `orderBy`, `searchString`, `limit`, `offset`. */
+    args: Record<string, unknown>;
+    rows: Record<string, unknown>[];
+}
+
 export interface ToolDriverOptions {
     callTool: CallTool;
     actions: ViewActions;
     /** Show the person a write's plan; true when they confirm it. */
     confirm: (plan: WritePlan) => Promise<boolean>;
+    /**
+     * Confirm every write with the person before it is sent, where the tool
+     * does not plan it itself. On a screen running code the model wrote,
+     * which can change rows without a click, every change is theirs to agree
+     * to, whichever block or hook sends it.
+     */
+    confirmWrites?: boolean;
+    /**
+     * A page already read: served once in place of the read tool's call, to
+     * a read asking for exactly it, and dropped by any write.
+     */
+    seed?: SeedPage;
     /** Every change made through this driver, in order, after each one. */
     onChange?: (changes: readonly ViewChange[]) => void;
     /**
@@ -98,29 +133,9 @@ export interface ToolDriverOptions {
 
 type Row = Record<string, unknown>;
 
-/**
- * The project's data, by collection, as an app reads and writes it: rows as
- * the read tools serve them, and every change confirmed by the person before
- * it is sent — by the server's plan where the tool plans, here otherwise.
- * What an app changes refreshes every view of that collection, the admin
- * panel's included.
- */
-export interface ToolData {
-    find(collection: string, args?: Record<string, unknown>): Promise<{ data: Row[]; total?: number; hasMore: boolean }>;
-    get(collection: string, id: string | number): Promise<Row | undefined>;
-    count(collection: string, where?: Record<string, unknown>): Promise<number>;
-    create(collection: string, data: Row, id?: string | number): Promise<Row>;
-    update(collection: string, id: string | number, data: Row): Promise<Row>;
-    remove(collection: string, id: string | number): Promise<void>;
-    /** Called after every change to `collection`; returns the unsubscribe. */
-    watch(collection: string, refresh: () => void): () => void;
-}
-
 export interface ToolDriver {
-    /** For `<Rebase>`: the admin panel's reads and saves. */
+    /** For `<Rebase>`: the admin panel's reads and saves, and an app's row hooks. */
     driver: DataDriver;
-    /** For an app's code. */
-    data: ToolData;
 }
 
 /** A save the person declined at the plan. The form shows it as the save's error. */
@@ -135,8 +150,9 @@ export class SaveCancelledError extends Error {
 const MAX_LIMIT = 1000;
 
 export function createToolDriver(options: ToolDriverOptions): ToolDriver {
-    const { callTool, actions, confirm, onChange } = options;
+    const { callTool, actions, confirm, onChange, confirmWrites = false } = options;
     const canonical = options.canonical ?? ((collection: string) => collection);
+    let seed = options.seed;
     const changes: ViewChange[] = [];
     // Who is drawing what: a write reads every list and record of its
     // collection again, which is how a row saved in one block shows in another.
@@ -163,7 +179,13 @@ export function createToolDriver(options: ToolDriverOptions): ToolDriver {
         return second;
     };
 
+    /** Where every write is the person's to agree to: their yes before one the tool does not plan. */
+    const confirmed = async (action: ToolAction, plan: WritePlan): Promise<void> => {
+        if (confirmWrites && !action.plans && !await confirm(plan)) throw new SaveCancelledError();
+    };
+
     const changed = (change: ViewChange) => {
+        seed = undefined;
         const key = canonical(change.collection);
         for (const row of rows.keys()) if (canonical(row.slice(0, row.lastIndexOf("/"))) === key) rows.delete(row);
         changes.push(change);
@@ -182,19 +204,9 @@ export function createToolDriver(options: ToolDriverOptions): ToolDriver {
     };
 
     /**
-     * An app's change: confirmed by the person before it goes, where the
-     * tool does not plan it itself — code can change rows without a click,
-     * and every change it makes is theirs to agree to.
-     */
-    const appWrite = async (action: ToolAction, args: Record<string, unknown>, plan: WritePlan): Promise<unknown> => {
-        if (!action.plans && !await confirm(plan)) throw new SaveCancelledError();
-        return write(action, args);
-    };
-
-    /**
      * A page's rows into the row cache, keyed as {@link fetchOne} asks for
-     * them: the row a view lists is the row its record opens with, and an
-     * app's `get` of a row it was just shown asks the server nothing. By the
+     * them: the row a view lists is the row its record opens with, and a row
+     * an app was just shown opens with no call of its own. By the
      * collection's key where its config is known, by `id` otherwise; a write
      * to the collection drops them, as it drops every row read. Not a page
      * that lists deleted rows: `get` answers none for those.
@@ -208,14 +220,23 @@ export function createToolDriver(options: ToolDriverOptions): ToolDriver {
         }
     };
 
+    /** The seeded page, once, to a read asking for exactly it. */
+    const takeSeed = (collection: string, args: Record<string, unknown>): Row[] | undefined => {
+        if (!seed || canonical(seed.collection) !== canonical(collection) || readKey(seed.args) !== readKey(args)) return undefined;
+        const page = seed.rows;
+        seed = undefined;
+        return page;
+    };
+
     const fetchCollection = async (props: FetchCollectionProps): Promise<Record<string, unknown>[]> => {
         const collection = collectionArg(props.path);
-        const page = await call(actions.page, {
-            collection,
-            ...readArgs(props)
-        });
-        if (!isRecord(page) || !Array.isArray(page.data)) throw new Error("The read returned no rows.");
-        const found = page.data.filter(isRecord);
+        const args = readArgs(props);
+        let found = takeSeed(collection, args);
+        if (!found) {
+            const page = await call(actions.page, { collection, ...args });
+            if (!isRecord(page) || !Array.isArray(page.data)) throw new Error("The read returned no rows.");
+            found = page.data.filter(isRecord);
+        }
         if (!props.withDeleted) remember(collection, found, props.collection);
         return found;
     };
@@ -237,55 +258,53 @@ export function createToolDriver(options: ToolDriverOptions): ToolDriver {
         return read;
     };
 
-    const data: ToolData = {
-        async find(collection, args = {}) {
-            const name = collectionArg(collection);
-            const page = await call(actions.page, { ...args, collection: name });
-            if (!isRecord(page) || !Array.isArray(page.data)) throw new Error("The read returned no rows.");
-            const meta = isRecord(page.meta) ? page.meta : {};
-            const found = page.data.filter(isRecord);
-            if (args.deleted === undefined) remember(name, found);
-            return {
-                data: found,
-                ...(typeof meta.total === "number" && { total: meta.total }),
-                hasMore: meta.hasMore === true
-            };
+    /**
+     * The flat data layer's reads: the same tools and the same rows as the
+     * admin panel's, and the aggregate tool.
+     */
+    const restFetchService: RestFetchService = {
+        fetchCollectionForRest(path, options = {}) {
+            refuseUnsupported(options);
+            return fetchCollection({
+                path,
+                ...(options.filter && { filter: options.filter }),
+                ...(options.orderBy !== undefined && { orderBy: options.orderBy }),
+                ...(options.order && { order: options.order }),
+                ...(options.limit !== undefined && { limit: options.limit }),
+                ...(options.offset !== undefined && { offset: options.offset }),
+                ...(options.searchString && { searchString: options.searchString }),
+                ...(options.withDeleted !== undefined && { withDeleted: options.withDeleted })
+            });
         },
-        get: (collection, id) => fetchOne({ path: collection, id }),
-        async count(collection, where) {
-            const answer = await call(actions.count, { collection: collectionArg(collection), ...(where && { where }) });
-            if (isRecord(answer) && typeof answer.count === "number") return answer.count;
-            throw new Error("The count returned no number.");
+        async fetchOneForRest(path, id) {
+            return await fetchOne({ path, id }) ?? null;
         },
-        async create(collection, values, id) {
-            const saved = await appWrite(actions.create,
-                { collection: collectionArg(collection), data: values, ...(id !== undefined && { id: String(id) }) },
-                { summary: `Create a row in ${collection}.` });
-            const row = isRecord(saved) ? saved : { ...values };
-            changed({ action: "created", collection, id: String(row.id ?? id ?? ""), fields: Object.keys(values) });
-            return row;
-        },
-        async update(collection, id, values) {
-            const saved = await appWrite(actions.update,
-                { collection: collectionArg(collection), id: String(id), data: values },
-                { summary: `Change ${Object.keys(values).join(", ")} on row ${String(id)} of ${collection}.` });
-            changed({ action: "updated", collection, id: String(id), fields: Object.keys(values) });
-            return isRecord(saved) ? saved : { id, ...values };
-        },
-        async remove(collection, id) {
-            await appWrite(actions.delete, { collection: collectionArg(collection), id: String(id) },
-                { summary: `Delete row ${String(id)} of ${collection}.` });
-            changed({ action: "deleted", collection, id: String(id) });
-        },
-        watch
+        async aggregate(path, options) {
+            refuseUnsupported(options);
+            const where = options.filter ? wireFilter(options.filter, undefined) : undefined;
+            const answer = await call(actions.aggregate, {
+                collection: collectionArg(path),
+                select: options.aggregates.map(aggregate => `${aggregate.fn}(${aggregate.field ?? ""})`),
+                ...(options.groupBy && options.groupBy.length > 0 && { groupBy: options.groupBy }),
+                ...(where && Object.keys(where).length > 0 && { where }),
+                ...(options.searchString && { searchString: options.searchString }),
+                ...(options.orderBy && options.orderBy.length > 0 && { orderBy: options.orderBy }),
+                ...(options.limit !== undefined && { limit: Math.min(options.limit, MAX_LIMIT) }),
+                ...(options.offset && { offset: options.offset }),
+                ...(options.withDeleted && { deleted: options.withDeleted === "only" ? "only" : "include" })
+            });
+            if (!isRecord(answer) || !Array.isArray(answer.data)) throw new Error("The aggregate returned no rows.");
+            return answer.data.filter(isRecord);
+        }
     };
 
     const driver: DataDriver = {
-        key: "(default)",
+        key: DEFAULT_DATA_SOURCE_KEY,
         initialised: true,
 
         fetchCollection,
         fetchOne,
+        restFetchService,
 
         listenCollection(props: ListenCollectionProps): () => void {
             let live = true;
@@ -317,9 +336,13 @@ export function createToolDriver(options: ToolDriverOptions): ToolDriver {
             const collection = collectionArg(props.path);
             const data = toWire(props.values);
             const creating = props.status !== "existing";
+            const action = creating ? actions.create : actions.update;
+            await confirmed(action, creating
+                ? { summary: `Create a row in ${collection}.` }
+                : { summary: `Change ${Object.keys(data).join(", ")} on row ${String(props.id)} of ${collection}.` });
             const saved = creating
-                ? await write(actions.create, { collection, data, ...(props.id !== undefined && { id: String(props.id) }) })
-                : await write(actions.update, { collection, id: String(props.id), data });
+                ? await write(action, { collection, data, ...(props.id !== undefined && { id: String(props.id) }) })
+                : await write(action, { collection, id: String(props.id), data });
             const row = isRecord(saved) ? saved : { ...data };
             const id = String(row.id ?? props.id ?? "");
             changed({ action: creating ? "created" : "updated", collection, id, fields: Object.keys(data) });
@@ -328,6 +351,7 @@ export function createToolDriver(options: ToolDriverOptions): ToolDriver {
 
         async delete(props: DeleteProps): Promise<void> {
             const collection = collectionArg(props.row.path);
+            await confirmed(actions.delete, { summary: `Delete row ${String(props.row.id)} of ${collection}.` });
             await write(actions.delete, { collection, id: String(props.row.id) });
             changed({ action: "deleted", collection, id: String(props.row.id) });
         },
@@ -348,7 +372,7 @@ export function createToolDriver(options: ToolDriverOptions): ToolDriver {
         }
     };
 
-    return { driver, data };
+    return { driver };
 }
 
 /**
@@ -374,6 +398,39 @@ function readArgs(props: FetchCollectionProps): Record<string, unknown> {
             deleted: props.withDeleted === "only" ? "only" : "include"
         })
     };
+}
+
+/** What the read tools cannot express, refused rather than read wider than asked. */
+function refuseUnsupported(options: { logical?: unknown; vectorSearch?: unknown }): void {
+    if (options.logical) throw new Error("This view's tools cannot filter by an or()/and() group.");
+    if (options.vectorSearch) throw new Error("This view's tools cannot run a vector search.");
+}
+
+/**
+ * A read's arguments as one comparable string: the same read however it was
+ * written — a sort as `"field:desc"` or `[["field", "desc"]]`, a filter's
+ * fields in any order, no offset or offset 0.
+ */
+function readKey(args: Record<string, unknown>): string {
+    const where = isRecord(args.where) ? args.where : {};
+    return JSON.stringify([
+        Object.keys(where).sort().map(key => [key, where[key]]),
+        sortOf(args.orderBy),
+        typeof args.searchString === "string" ? args.searchString : "",
+        typeof args.limit === "number" ? args.limit : null,
+        typeof args.offset === "number" ? args.offset : 0,
+        typeof args.deleted === "string" ? args.deleted : null
+    ]);
+}
+
+function sortOf(orderBy: unknown): unknown[] {
+    if (typeof orderBy === "string" && orderBy !== "") {
+        const [field, direction] = orderBy.split(":");
+        return [[field, direction === "desc" ? "desc" : "asc"]];
+    }
+    if (!Array.isArray(orderBy) || orderBy.length === 0) return [];
+    const entries: unknown[] = Array.isArray(orderBy[0]) ? orderBy : [orderBy];
+    return entries.map(entry => Array.isArray(entry) ? [entry[0], entry[1] === "desc" ? "desc" : "asc"] : entry);
 }
 
 function pickRead(args: Record<string, unknown>, names: readonly string[]): Record<string, unknown> {

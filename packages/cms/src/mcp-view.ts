@@ -5,5 +5,5 @@
  * driver, the payload) are its own; `@rebasepro/mcp-apps` builds from source
  * and reaches them there.
  */
-export { startMcpView, addAppModules } from "./mcp_view/index";
+export { startMcpView } from "./mcp_view/index";
 export type { McpViewOptions } from "./mcp_view/index";

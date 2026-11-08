@@ -20,18 +20,16 @@ import { CollectionPanel } from "../components/CollectionPanel";
 import { EntityFormPanel } from "../components/EntityFormPanel";
 import { useCollectionRegistryController } from "../hooks/navigation/contexts/CollectionRegistryContext";
 import type { HostContext, McpAppBridge } from "./bridge";
-import type { ToolDriver, WritePlan } from "./tool_driver";
+import type { WritePlan } from "./tool_driver";
 import { filterOf, orderOf, type AppBlock, type CollectionBlock, type RecordBlock, type Screen } from "./payload";
 import { AppErrorBoundary, loadApp, type AppError } from "./code_app";
-import { AppSdkProvider } from "./sdk";
+import { AppCollections } from "./app_modules";
 import { useViewStore, type ViewStore } from "./store";
 
-/** A collection's height in the conversation, where the host sizes the frame to the document. */
-const INLINE_COLLECTION_HEIGHT = 460;
-
 /**
- * The tallest the screen is in the conversation; past it, it scrolls inside.
- * A record's form and the confirmation of a save open over the frame, centred
+ * The tallest the screen is in the conversation; past it, a collection
+ * scrolls inside its own block, and anything else inside the screen. A
+ * record's form and the confirmation of a save open over the frame, centred
  * in it: in a frame as tall as everything on the screen they would open where
  * the person is not looking.
  */
@@ -46,7 +44,6 @@ export interface PendingPlan {
 export interface McpScreenProps {
     bridge: McpAppBridge;
     screen: Screen;
-    tools: ToolDriver;
     /** The host's context, as it changes. */
     hostContext: ViewStore<HostContext>;
     /** The write plan to confirm, as it changes. */
@@ -61,7 +58,7 @@ export interface McpScreenProps {
  * collections, custom views, entity views, fields and actions are the ones
  * drawn.
  */
-export function McpScreen({ bridge, screen, tools, hostContext, pendingPlan, onAppError }: McpScreenProps) {
+export function McpScreen({ bridge, screen, hostContext, pendingPlan, onAppError }: McpScreenProps) {
     const rootRef = useRef<HTMLDivElement>(null);
     const context = useViewStore(hostContext);
     const pending = useViewStore(pendingPlan);
@@ -95,13 +92,13 @@ export function McpScreen({ bridge, screen, tools, hostContext, pendingPlan, onA
     if (!registry.initialised && !registry.collections?.length) {
         body = <CircularProgress size="smallest"/>;
     } else if (block.type === "app") {
-        body = <AppView block={block} tools={tools} onError={onAppError}/>;
+        body = <AppView block={block} onError={onAppError}/>;
     } else {
         const collection = collectionOf(block.collection);
         body = !collection
             ? <Alert color="error" size="small">The collection &quot;{block.collection}&quot; is not in this view.</Alert>
             : block.type === "collection"
-                ? <CollectionView block={block} collection={collection} fullscreen={fullscreen}/>
+                ? <CollectionView block={block} collection={collection}/>
                 : <RecordView block={block} collection={collection}/>;
     }
 
@@ -154,11 +151,15 @@ function blockTitle(block: CollectionBlock | RecordBlock, collection: AdminColle
     return collection?.name ?? block.collection;
 }
 
-/** show_collection: the admin panel's collection view, where a row opens its form over the screen. */
-function CollectionView({ block, collection, fullscreen }: {
+/**
+ * show_collection: the admin panel's collection view, where a row opens its
+ * form over the screen. It sizes to its rows, up to what the screen leaves
+ * it — inline, the screen's height cap; full screen, the window — and then
+ * scrolls inside.
+ */
+function CollectionView({ block, collection }: {
     block: CollectionBlock;
     collection: AdminCollection;
-    fullscreen: boolean;
 }) {
     const overrides = useMemo<Partial<AdminCollection>>(() => {
         // The model's filter, as one the person can clear.
@@ -171,17 +172,14 @@ function CollectionView({ block, collection, fullscreen }: {
     const sort = orderOf(block.orderBy);
 
     return (
-        <div className={cls("min-h-0 rounded-xl overflow-hidden", fullscreen && "h-[80vh]")}
-             style={fullscreen ? undefined : { height: INLINE_COLLECTION_HEIGHT }}>
-            <CollectionPanel
-                path={collection.slug}
-                title={false}
-                className="h-full flex flex-col"
-                {...(block.view && { viewMode: block.view })}
-                {...(sort && { sort })}
-                collectionOverrides={overrides}
-            />
-        </div>
+        <CollectionPanel
+            path={collection.slug}
+            title={false}
+            className="flex-1 rounded-xl overflow-hidden"
+            {...(block.view && { viewMode: block.view })}
+            {...(sort && { sort })}
+            collectionOverrides={overrides}
+        />
     );
 }
 
@@ -205,14 +203,15 @@ function RecordView({ block, collection }: { block: RecordBlock; collection: Adm
     );
 }
 
-/** show_app: the app the model wrote, with the SDK it imports, and its failure shown in its place. */
-function AppView({ block, tools, onError }: {
+/**
+ * show_app: the app the model wrote, held to the collections it was opened
+ * with, and its failure shown in its place.
+ */
+function AppView({ block, onError }: {
     block: AppBlock;
-    tools: ToolDriver;
     onError: (error: AppError) => void;
 }) {
     const loaded = useMemo(() => loadApp(block.code), [block.code]);
-    const sdk = useMemo(() => ({ data: tools.data, allowed: block.collections }), [tools.data, block.collections]);
 
     // A module that failed as it loaded is told once.
     useEffect(() => {
@@ -228,9 +227,9 @@ function AppView({ block, tools, onError }: {
     const { Component } = loaded;
     return (
         <AppErrorBoundary lineOffset={loaded.lineOffset} onError={onError} fallback={failure}>
-            <AppSdkProvider value={sdk}>
+            <AppCollections names={block.collections}>
                 <Component/>
-            </AppSdkProvider>
+            </AppCollections>
         </AppErrorBoundary>
     );
 }

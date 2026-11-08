@@ -4,18 +4,24 @@
  * a show_* result handed over, every read and write a `tools/call` caught on
  * the bridge.
  *
- * - A collection block draws the rows its read returned.
+ * - A collection block draws the rows its read returned; the page the
+ *   result already carries is its first read, when the read is that page.
  * - A record block opens the row's form; a save the server answers with a
  *   plan waits for the person's yes, then goes again with the token, and the
  *   model is told what changed.
- * - An app the model wrote runs on the project's data with the SDK; its own
- *   changes are confirmed first; what it imports wrong, or throws, is shown
- *   and told to the model with the line.
+ * - An app the model wrote runs on the project's data with the packages'
+ *   own parts — `@rebasepro/cms`'s blocks, `@rebasepro/app`'s row hooks, the
+ *   UI kit; its changes are confirmed first; it is held to its collections;
+ *   what it imports wrong, or throws, is shown and told to the model with
+ *   the line.
  */
 import React, { act } from "react";
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { MCP_APP_MODULES } from "@rebasepro/types";
+import * as UI from "@rebasepro/ui";
 import { McpAppBridge, type ToolResult } from "@rebasepro/cms/mcp-view";
+import { SHOW_APP_CODE_GUIDE } from "../../server/src/mcp/show-app-guide";
 import { startGenericView } from "../views/app/main";
 import { compileApp } from "../src/compile";
 
@@ -56,6 +62,21 @@ const HOSTED_ACTIONS = {
     update: { tool: "write", arguments: { project: "shop", action: "update" } }
 };
 
+// Every root the view mounts, unmounted after each test: one left mounted
+// would follow the next test's embed host, and read through its bridge.
+const mounted = vi.hoisted(() => ({ roots: [] as { unmount(): void }[] }));
+vi.mock("react-dom/client", async importOriginal => {
+    const actual = await importOriginal<typeof import("react-dom/client")>();
+    return {
+        ...actual,
+        createRoot: (...args: Parameters<typeof actual.createRoot>) => {
+            const root = actual.createRoot(...args);
+            mounted.roots.push(root);
+            return root;
+        }
+    };
+});
+
 let container: HTMLDivElement;
 beforeEach(() => {
     globalThis.IS_REACT_ACT_ENVIRONMENT = true;
@@ -71,6 +92,9 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+    act(() => {
+        for (const root of mounted.roots.splice(0)) root.unmount();
+    });
     container.remove();
     vi.unstubAllGlobals();
     vi.restoreAllMocks();
@@ -128,6 +152,32 @@ describe("a collection block", () => {
         await findText("ORD-42");
         expect(calls.some(call => call.name === "query" && call.args.project === "shop" && call.args.collection === "orders")).toBe(true);
     });
+
+    /** The data tools over ROWS, as an app's own `/mcp` answers them. */
+    function own(name: string, args: Record<string, unknown>): ToolResult {
+        if (name === "count_documents") return ok({ count: ROWS.length });
+        if (name === "get_document") return ok(ROWS.find(row => row.id === args.id));
+        return ok({ data: ROWS.map(row => ({ ...row, number: `${row.number} (read)` })), meta: { total: ROWS.length, hasMore: false } });
+    }
+
+    it("draws the page the result carries, with no read of its own, when the panel reads exactly that page", async () => {
+        const { calls } = open(screenResult(
+            [{ key: "rows", type: "collection", collection: "orders", view: "list", where: { status: ["==", "pending"] }, orderBy: "number:desc" }],
+            { data: ROWS, meta: { limit: 50, offset: 0, hasMore: false } }), own);
+
+        await findText("ORD-41");
+        await findText("ORD-42");
+        expect(calls.filter(call => call.name === "query_collection")).toEqual([]);
+    });
+
+    it("reads its page where the result's page was read with other arguments", async () => {
+        const { calls } = open(screenResult(
+            [{ key: "rows", type: "collection", collection: "orders", view: "list", searchString: "ORD" }],
+            { data: ROWS, meta: { limit: 50, offset: 0, hasMore: false } }), own);
+
+        await findText("ORD-41 (read)");
+        expect(calls.filter(call => call.name === "query_collection")).toHaveLength(1);
+    });
 });
 
 describe("a record block", () => {
@@ -169,25 +219,32 @@ describe("a record block", () => {
 
 describe("an app the model wrote", () => {
     function appResult(code: string, extra: Record<string, unknown> = {}): ToolResult {
-        const compiled = compileApp(code);
+        const compiled = compileApp(code, MCP_APP_MODULES);
         if (!compiled.ok) throw new Error(compiled.error);
         return screenResult([{ key: "app", type: "app", code: compiled.code, collections: ["orders"] }], extra, "Order desk");
     }
 
+    /** The data tools over ROWS, as an app's own `/mcp` answers them. */
+    function own(name: string, args: Record<string, unknown>): ToolResult {
+        if (name === "count_documents") return ok({ count: 1 });
+        if (name === "get_document") return ok(ROWS.find(row => row.id === args.id));
+        if (name === "update_document") return ok({ ...ROWS[0], ...(args.data as object) });
+        if (name === "aggregate_documents") return ok({ data: [{ status: "pending", count: 1 }, { status: "sent", count: 1 }] });
+        return ok({ data: ROWS, meta: { total: 2, hasMore: false } });
+    }
+
     const DESK = `
-import { useState } from "react";
-import { Button, Typography } from "@rebasepro/ui";
-import { KpiGrid, KpiTile } from "@rebasepro/plugin-insights";
-import { useCount, useMutate, useQuery } from "@rebasepro/mcp-apps";
+import { Button, KpiGrid, KpiTile, Typography } from "@rebasepro/ui";
+import { useRowCount, useRows, useRowWrites } from "@rebasepro/app";
 
 export default function Desk() {
-    const pending = useCount("orders", { status: ["==", "pending"] });
-    const { data } = useQuery("orders", { orderBy: "number" });
-    const { update } = useMutate();
+    const pending = useRowCount("orders", { status: ["==", "pending"] });
+    const { rows } = useRows("orders", { orderBy: ["number", "asc"] });
+    const { update } = useRowWrites();
     return (
         <div>
-            <KpiGrid><KpiTile label="Pending" value={pending.count ?? 0} /></KpiGrid>
-            {data.map(row => (
+            <KpiGrid><KpiTile label="Pending" value={pending.count} loading={pending.loading} /></KpiGrid>
+            {rows.map(row => (
                 <div key={String(row.id)}>
                     <Typography>{String(row.number)}</Typography>
                     <Button onClick={() => update("orders", String(row.id), { status: "sent" }).catch(() => undefined)}>Ship {String(row.number)}</Button>
@@ -197,12 +254,8 @@ export default function Desk() {
     );
 }`;
 
-    it("runs on the project's data, and asks before the change its button makes", async () => {
-        const { calls, context } = open(appResult(DESK), (name, args) => {
-            if (name === "count_documents") return ok({ count: 1 });
-            if (name === "update_document") return ok({ ...ROWS[0], ...(args.data as object) });
-            return ok({ data: ROWS, meta: { total: 2, hasMore: false } });
-        });
+    it("runs on the project's data, and asks before the change its button makes, then tells the model", async () => {
+        const { calls, context } = open(appResult(DESK), own);
 
         await findText("Order desk");
         await findText("ORD-41");
@@ -222,25 +275,73 @@ export default function Desk() {
         await vi.waitFor(() => expect(context).toHaveBeenCalledWith(expect.stringContaining("updated status on row o1 of orders")));
     }, 20000);
 
+    it("sends nothing the person declines, and the write rejects as not saved", async () => {
+        const { calls } = open(appResult(`
+import { useState } from "react";
+import { Button, Typography } from "@rebasepro/ui";
+import { useRowWrites } from "@rebasepro/app";
+
+export default function App() {
+    const { update } = useRowWrites();
+    const [outcome, setOutcome] = useState("waiting");
+    return (
+        <div>
+            <Typography>{outcome}</Typography>
+            <Button onClick={() => update("orders", "o1", { status: "sent" }).then(() => setOutcome("saved"), error => setOutcome(error.message))}>Ship</Button>
+        </div>
+    );
+}`), own);
+
+        await findText("waiting");
+        await act(async () => buttonNamed("Ship").click());
+        const dialog = await vi.waitFor(() => {
+            const found = document.querySelector("[role=dialog]");
+            if (!found) throw new Error("no confirmation");
+            return found;
+        }, { timeout: 5000 });
+        await act(async () => buttonNamed("Cancel", dialog).click());
+
+        await findText("Not saved: the change was not confirmed.");
+        expect(calls.some(call => call.name === "update_document")).toBe(false);
+    }, 20000);
+
+    it("composes @rebasepro/cms's CollectionPanel with @rebasepro/app's rows", async () => {
+        open(appResult(`
+import { Typography } from "@rebasepro/ui";
+import { useRows } from "@rebasepro/app";
+import { CollectionPanel, FieldValue } from "@rebasepro/cms";
+
+export default function Board() {
+    const { rows, total } = useRows("orders");
+    return (
+        <div className="flex flex-col gap-2">
+            <Typography>{total ?? 0} orders</Typography>
+            {rows[0] && <FieldValue row={rows[0]} collection="orders" field="status" />}
+            <CollectionPanel path="orders" viewMode="list" title={false} fields={["number"]} />
+        </div>
+    );
+}`), own);
+
+        await findText("2 orders");
+        await findText("ORD-42");
+        await findText("Pending");
+    }, 20000);
+
     it("hands the app the row a click picks, with no read of its own", async () => {
         const { calls } = open(appResult(`
 import { useState } from "react";
 import { Typography } from "@rebasepro/ui";
-import { CollectionView } from "@rebasepro/mcp-apps";
+import { CollectionPanel } from "@rebasepro/cms";
 
 export default function Picker() {
     const [picked, setPicked] = useState("nothing");
     return (
         <div>
             <Typography>Picked {picked}</Typography>
-            <CollectionView collection="orders" view="list" onRowClick={row => setPicked(String(row.number))} />
+            <CollectionPanel path="orders" viewMode="list" onEntityClick={entity => setPicked(String(entity.values.number))} />
         </div>
     );
-}`), (name, args) => {
-            if (name === "count_documents") return ok({ count: ROWS.length });
-            if (name === "get_document") return ok(ROWS.find(row => row.id === args.id));
-            return ok({ data: ROWS, meta: { total: ROWS.length, hasMore: false } });
-        });
+}`), own);
 
         const row = await findText("ORD-42");
         await act(async () => row.click());
@@ -251,12 +352,44 @@ export default function Picker() {
         expect(document.querySelector("[role=dialog]")).toBeNull();
     }, 20000);
 
-    it("names an import the view does not have, and tells the model", async () => {
+    it("aggregates with the aggregate tool", async () => {
+        const { calls } = open(appResult(`
+import { BarChart } from "@rebasepro/ui";
+import { useAggregate } from "@rebasepro/app";
+
+export default function ByStatus() {
+    const { result } = useAggregate("orders", { select: [{ fn: "count" }], groupBy: ["status"] });
+    return <BarChart bars={(result ?? []).map(group => ({ key: String(group.status), label: "status " + String(group.status), value: Number(group.count) }))} />;
+}`), own);
+
+        await findText("status pending");
+        expect(calls.find(call => call.name === "aggregate_documents")?.args)
+            .toEqual({ collection: "orders", select: ["count()"], groupBy: ["status"] });
+    }, 20000);
+
+    it("holds the app to the collections it was opened with", async () => {
+        const { context, calls } = open(appResult(`
+import { useRows } from "@rebasepro/app";
+export default function App() {
+    const { rows } = useRows("customers");
+    return <p>{rows.length}</p>;
+}`), own);
+
+        await vi.waitFor(() => {
+            if (!document.body.textContent?.includes("\"customers\" is not one of this app's collections (orders). List it in show_app's `collections`.")) {
+                throw new Error(`not refused: ${document.body.textContent?.slice(0, 300)}`);
+            }
+        }, { timeout: 5000 });
+        expect(calls.some(call => call.args.collection === "customers")).toBe(false);
+        expect(context).toHaveBeenCalledWith(expect.stringContaining("is not one of this app's collections"));
+    }, 20000);
+
+    it("names an export the kit does not have, and tells the model", async () => {
         const { context } = open(appResult(`
-import { Sparkline } from "@rebasepro/plugin-insights";
+import { Sparkline } from "@rebasepro/ui";
 export default function App() { return <Sparkline />; }`), () => ok({}));
 
-        await findText("The app failed at line 3: \"Sparkline\" is not exported by \"@rebasepro/plugin-insights\".");
+        await findText("The app failed at line 3: \"Sparkline\" is not exported by \"@rebasepro/ui\".");
         expect(context).toHaveBeenCalledWith(expect.stringContaining("Fix the code and call show_app again."));
     }, 20000);
 
@@ -281,4 +414,38 @@ describe("a result it cannot draw", () => {
         open(ok({ view: { version: 9 } }), () => ok({}));
         await findText("This view is older than the server that answered; it cannot draw this screen.");
     });
+});
+
+/**
+ * show_app's guide against what the view serves: its kit names are the kit's,
+ * every component it draws is served, and its example opens. (The server's
+ * suite holds its imports and hooks to `MCP_APP_MODULES`.)
+ */
+describe("show_app's guide", () => {
+    const UI_NAMES = new Set(Object.keys(UI));
+    const CMS_NAMES = new Set<string>(MCP_APP_MODULES["@rebasepro/cms"]);
+
+    it("names only parts of the kit the kit has", () => {
+        const listed = /- "@rebasepro\/ui", the UI kit: ([^\n]*?), Lucide icons/.exec(SHOW_APP_CODE_GUIDE)?.[1].split(", ") ?? [];
+        expect(listed.length).toBeGreaterThan(10);
+        expect(listed.filter(name => !UI_NAMES.has(name))).toEqual([]);
+        expect(UI_NAMES.has("PlusIcon") && UI_NAMES.has("formatNumber")).toBe(true);
+    });
+
+    it("draws only components the view serves", () => {
+        const drawn = [...new Set([...SHOW_APP_CODE_GUIDE.matchAll(/<([A-Z]\w*)/g)].map(match => match[1]))];
+        expect(drawn.filter(name => !UI_NAMES.has(name) && !CMS_NAMES.has(name))).toEqual([]);
+    });
+
+    it("opens its example", async () => {
+        const example = SHOW_APP_CODE_GUIDE.slice(SHOW_APP_CODE_GUIDE.indexOf("Example:") + "Example:".length);
+        const compiled = compileApp(example, MCP_APP_MODULES);
+        if (!compiled.ok) throw new Error(compiled.error);
+        open(screenResult([{ key: "app", type: "app", code: compiled.code, collections: ["orders"] }]), name => name === "count_documents"
+            ? ok({ count: 1 })
+            : ok({ data: ROWS, meta: { total: ROWS.length, hasMore: false } }));
+
+        await findText("Pending");
+        await findText("ORD-42");
+    }, 20000);
 });

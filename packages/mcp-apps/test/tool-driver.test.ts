@@ -11,11 +11,17 @@
  * - A write reads the lists of its collection again, and the model is told
  *   what changed.
  * - The hosted connector's tools and arguments, where a result names them.
- * - An app's own change is confirmed in the view first, unless the tool
- *   plans it itself; declined, nothing is sent.
+ * - On a screen running the model's code every change is confirmed in the
+ *   view first, unless the tool plans it itself; declined, nothing is sent.
+ * - The flat data layer an app's hooks read: the same tools, and aggregates
+ *   through the aggregate tool, in REST's `select` grammar.
+ * - The page a show_collection result carries is the first read's, when
+ *   the read asks for exactly it; any other read, or one after a write, goes
+ *   to the server.
  */
 import { describe, expect, it, vi } from "vitest";
-import { EntityRelation, type CollectionConfig, type ListenCollectionProps } from "@rebasepro/types";
+import { EntityRelation, type CollectionConfig, type FetchCollectionProps, type ListenCollectionProps } from "@rebasepro/types";
+import { buildRebaseData, wrapAsSdkData } from "@rebasepro/common";
 import type { ToolResult } from "@rebasepro/cms/mcp-view";
 import {
     DEFAULT_ACTIONS,
@@ -26,6 +32,7 @@ import {
     filterOf,
     parseResult,
     type CallTool,
+    type SeedPage,
     type ViewChange,
     type WritePlan
 } from "@rebasepro/cms/mcp-view";
@@ -57,6 +64,9 @@ const PLAN = ok({ status: "confirmation_required", confirm: "token-1", plan: { s
 function driverWith(answer: (name: string, args: Record<string, unknown>) => ToolResult, options: {
     confirm?: (plan: WritePlan) => Promise<boolean>;
     actions?: typeof DEFAULT_ACTIONS;
+    confirmWrites?: boolean;
+    seed?: SeedPage;
+    canonical?: (name: string) => string;
 } = {}) {
     const calls: { name: string; args: Record<string, unknown> }[] = [];
     const callTool: CallTool = async (name, args) => {
@@ -64,13 +74,18 @@ function driverWith(answer: (name: string, args: Record<string, unknown>) => Too
         return answer(name, args);
     };
     const changes: ViewChange[][] = [];
-    const { driver, data } = createToolDriver({
+    const { driver } = createToolDriver({
         callTool,
         actions: options.actions ?? DEFAULT_ACTIONS,
         confirm: options.confirm ?? (async () => true),
-        onChange: list => changes.push([...list])
+        onChange: list => changes.push([...list]),
+        ...(options.confirmWrites && { confirmWrites: true }),
+        ...(options.seed && { seed: options.seed }),
+        ...(options.canonical && { canonical: options.canonical })
     });
-    return { driver, data, calls, changes };
+    // What an app's row hooks read: the driver through the flat layer, rows as the wire has them.
+    const flat = wrapAsSdkData(buildRebaseData(driver));
+    return { driver, flat, calls, changes };
 }
 
 describe("reading", () => {
@@ -116,18 +131,19 @@ describe("reading", () => {
     });
 
     it("opens a row a page listed with no call of its own", async () => {
-        const { driver, data, calls } = driverWith((name, args) => name === "get_document"
+        const { driver, flat, calls } = driverWith((name, args) => name === "get_document"
             ? ok({ id: args.id, name: "from get" })
-            : ok({ data: [{ id: "c1", name: "Ada" }, { id: "c2", name: "Grace" }], meta: {} }));
+            : name === "count_documents" ? ok({ count: 2 })
+                : ok({ data: [{ id: "c1", name: "Ada" }, { id: "c2", name: "Grace" }], meta: {} }));
 
         await driver.fetchCollection({ path: "customers", collection: customers });
         expect(await driver.fetchOne({ path: "customers", id: "c2" })).toEqual({ id: "c2", name: "Grace" });
-        expect(await data.get("customers", "c1")).toEqual({ id: "c1", name: "Ada" });
+        expect(await flat.collection("customers").findById("c1")).toEqual({ id: "c1", name: "Ada" });
         expect(calls.map(call => call.name)).toEqual(["query_collection"]);
 
         // An app's own page fills it too.
-        await data.find("orders");
-        await data.get("orders", "c1");
+        await flat.collection("orders").find({ limit: 5 });
+        await flat.collection("orders").findById("c1");
         expect(calls.filter(call => call.name === "get_document")).toHaveLength(0);
     });
 
@@ -240,72 +256,179 @@ describe("writing", () => {
     });
 });
 
-describe("an app's data", () => {
-    it("reads pages, rows and counts with the read tools, in their shape", async () => {
-        const { data, calls } = driverWith((name, args) => name === "count_documents"
-            ? ok({ count: 2 })
-            : name === "get_document" ? ok({ id: args.id }) : ok({ data: [{ id: "o1" }], meta: { total: 9, hasMore: true } }));
-
-        expect(await data.find("orders", { where: { status: ["==", "paid"] }, limit: 5 }))
-            .toEqual({ data: [{ id: "o1" }], total: 9, hasMore: true });
-        expect(await data.get("orders", "o2")).toEqual({ id: "o2" });
-        expect(await data.count("orders", { status: ["==", "paid"] })).toBe(2);
-        expect(calls.map(call => call.name)).toEqual(["query_collection", "get_document", "count_documents"]);
-    });
-
+describe("on a screen running the model's code", () => {
     it("asks the person before a change the tool does not plan, and sends nothing when they decline", async () => {
         const asked: WritePlan[] = [];
         let answer = false;
-        const { data, calls } = driverWith(() => ok({ id: "o1", status: "sent" }), {
+        const { flat, calls, changes } = driverWith((_name, args) => ok({ id: "o9", ...(args.data as object) }), {
+            confirmWrites: true,
             confirm: async plan => {
                 asked.push(plan);
                 return answer;
             }
         });
 
-        await expect(data.update("orders", "o1", { status: "sent" })).rejects.toBeInstanceOf(SaveCancelledError);
+        await expect(flat.collection("orders").update("o1", { status: "sent" })).rejects.toBeInstanceOf(SaveCancelledError);
         expect(calls).toEqual([]);
+        expect(changes).toEqual([]);
 
         answer = true;
-        await data.remove("orders", "o2");
-        expect(asked.map(plan => plan.summary)).toEqual(["Change status on row o1 of orders.", "Delete row o2 of orders."]);
-        expect(calls).toEqual([{ name: "delete_document", args: { collection: "orders", id: "o2" } }]);
+        await flat.collection("orders").create({ status: "new" });
+        await flat.collection("orders").delete("o2");
+        expect(asked.map(plan => plan.summary)).toEqual([
+            "Change status on row o1 of orders.",
+            "Create a row in orders.",
+            "Delete row o2 of orders."
+        ]);
+        expect(calls.map(call => call.name)).toEqual(["create_document", "delete_document"]);
+        expect(describeChanges(changes.at(-1) ?? [])).toContain("created row o9 of orders; deleted row o2 of orders");
     });
 
     it("leaves the asking to a tool that plans, once", async () => {
         const asked: WritePlan[] = [];
         const actions = actionsOf({ update: { tool: "write", arguments: { project: "shop", action: "update" }, plans: true } });
-        const { data, calls } = driverWith((_name, args) => args.confirm ? ok({ id: "o1" }) : PLAN, {
+        const { flat, calls } = driverWith((_name, args) => args.confirm ? ok({ id: "o1" }) : PLAN, {
             actions,
+            confirmWrites: true,
             confirm: async plan => {
                 asked.push(plan);
                 return true;
             }
         });
 
-        await data.update("orders", "o1", { status: "sent" });
+        await flat.collection("orders").update("o1", { status: "sent" });
         expect(asked.map(plan => plan.summary)).toEqual(["Change status on row o1 of orders in shop."]);
         expect(calls).toHaveLength(2);
     });
 
+    it("asks nothing of its own anywhere else: the person's click on Save was the yes", async () => {
+        const confirm = vi.fn(async () => true);
+        const { driver } = driverWith(() => ok({ id: "o1" }), { confirm });
+        await driver.save({ path: "orders", id: "o1", values: { status: "sent" }, status: "existing" });
+        expect(confirm).not.toHaveBeenCalled();
+    });
+
     it("refreshes the admin panel's lists of a collection the app changed, by whatever name it used", async () => {
-        const { driver: base, calls } = driverWith(() => ok({ data: [], meta: {} }));
-        void base;
-        const tools = createToolDriver({
-            callTool: async (name, args) => {
-                calls.push({ name, args });
-                return name === "update_document" ? ok({ id: "o1" }) : ok({ data: [], meta: {} });
-            },
-            actions: DEFAULT_ACTIONS,
-            confirm: async () => true,
+        const { driver, flat } = driverWith(name => name === "update_document" ? ok({ id: "o1" }) : ok({ data: [], meta: {} }), {
             canonical: name => name === "public.orders" ? "orders" : name
         });
         const seen: unknown[] = [];
-        tools.driver.listenCollection!({ path: "orders", onUpdate: rows => seen.push(rows) });
+        driver.listenCollection!({ path: "orders", onUpdate: rows => seen.push(rows) });
         await vi.waitFor(() => expect(seen).toHaveLength(1));
 
-        await tools.data.update("public.orders", "o1", { status: "sent" });
+        await flat.collection("public.orders").update("o1", { status: "sent" });
         await vi.waitFor(() => expect(seen).toHaveLength(2));
+    });
+});
+
+describe("aggregates", () => {
+    it("are the aggregate tool's, in REST's select grammar, each value under its alias", async () => {
+        const { flat, calls } = driverWith(() => ok({
+            data: [{ status: "paid", sum_total: 410, count: 3 }, { status: "sent", sum_total: 90, count: 1 }],
+            meta: { limit: 10, offset: 0, hasMore: false }
+        }));
+
+        const result = await flat.collection("orders").aggregate({
+            select: [{ fn: "sum", field: "total" }, { fn: "count" }],
+            groupBy: ["status"],
+            where: { placed: [">=", "2026-11-01"] },
+            orderBy: ["sum_total", "desc"],
+            limit: 10
+        });
+
+        expect([...result]).toEqual([{ status: "paid", sum_total: 410, count: 3 }, { status: "sent", sum_total: 90, count: 1 }]);
+        expect(calls).toEqual([{
+            name: "aggregate_documents",
+            args: {
+                collection: "orders",
+                select: ["sum(total)", "count()"],
+                groupBy: ["status"],
+                where: { placed: [">=", "2026-11-01"] },
+                orderBy: [["sum_total", "desc"]],
+                // One group past the page, so the layer knows whether there are more.
+                limit: 11
+            }
+        }]);
+    });
+
+    it("go through the tool a result names for them: the hosted connector's query", async () => {
+        const actions = actionsOf({ aggregate: { tool: "query", arguments: { project: "shop" } } });
+        const { flat, calls } = driverWith(() => ok({ data: [{ count: 7 }] }), { actions });
+
+        expect([...await flat.collection("orders").aggregate({ select: [{ fn: "count" }] })]).toEqual([{ count: 7 }]);
+        expect(calls).toEqual([{ name: "query", args: { project: "shop", collection: "orders", select: ["count()"] } }]);
+    });
+
+    it("refuse an or()/and() group the tools cannot express, rather than aggregate wider", async () => {
+        const { flat, calls } = driverWith(() => ok({ data: [] }));
+        await expect(flat.collection("orders").aggregate({
+            select: [{ fn: "count" }],
+            logical: {
+                type: "or",
+                conditions: [{ column: "status", operator: "==", value: "paid" }, { column: "status", operator: "==", value: "sent" }]
+            }
+        })).rejects.toThrow(/or\(\)\/and\(\)/);
+        expect(calls).toEqual([]);
+    });
+});
+
+describe("the page a show_collection result carries", () => {
+    const seed: SeedPage = {
+        collection: "orders",
+        args: { where: { status: ["==", "paid"] }, orderBy: "placed:desc", limit: 50 },
+        rows: [{ id: "o1", status: "paid" }]
+    };
+    const read: FetchCollectionProps = { path: "orders", filter: { status: ["==", "paid"] }, orderBy: "placed", order: "desc", limit: 50 };
+
+    it("is the first read, with no call, when the read asks for exactly it", async () => {
+        const { driver, calls } = driverWith(() => ok({ data: [{ id: "o1", status: "paid" }, { id: "o2", status: "paid" }] }), { seed });
+
+        expect(await driver.fetchCollection(read)).toEqual([{ id: "o1", status: "paid" }]);
+        expect(calls).toEqual([]);
+        // Its rows open with no read of their own.
+        expect(await driver.fetchOne({ path: "orders", id: "o1" })).toEqual({ id: "o1", status: "paid" });
+        expect(calls).toEqual([]);
+
+        // Once: the next read is the server's.
+        await driver.fetchCollection(read);
+        expect(calls.map(call => call.name)).toEqual(["query_collection"]);
+    });
+
+    it("is not a read that asks for anything else", async () => {
+        const { driver, calls } = driverWith(() => ok({ data: [] }), { seed });
+        await driver.fetchCollection({ ...read, limit: 25 });
+        await driver.fetchCollection({ ...read, searchString: "ada" });
+        await driver.fetchCollection({ ...read, filter: { status: ["==", "sent"] } });
+        expect(calls.map(call => call.name)).toEqual(["query_collection", "query_collection", "query_collection"]);
+        // And not one, even matching, after those.
+        await driver.fetchCollection(read);
+        expect(calls).toHaveLength(3);
+    });
+
+    it("is dropped by a write", async () => {
+        const { driver, calls } = driverWith(name => name === "update_document" ? ok({ id: "o1" }) : ok({ data: [] }), { seed });
+        await driver.save({ path: "orders", id: "o1", values: { status: "sent" }, status: "existing" });
+        await driver.fetchCollection(read);
+        expect(calls.map(call => call.name)).toEqual(["update_document", "query_collection"]);
+    });
+
+    it("is read from a show_collection result, with the window the server read", () => {
+        const parsed = parseResult(ok({
+            data: [{ id: "o1" }],
+            meta: { limit: 50, offset: 0, hasMore: false },
+            view: {
+                version: 1,
+                blocks: [{ key: "rows", type: "collection", collection: "orders", where: { status: ["==", "paid"] }, orderBy: "placed:desc" }],
+                collections: [{ slug: "orders", name: "Orders", properties: {} }],
+                viewer: { uid: "u1", roles: [] }
+            }
+        }));
+        if (parsed.kind !== "screen") throw new Error(`parsed as ${parsed.kind}`);
+        expect(parsed.screen.firstPage).toEqual({
+            collection: "orders",
+            args: { where: { status: ["==", "paid"] }, orderBy: "placed:desc", limit: 50, offset: 0 },
+            rows: [{ id: "o1" }]
+        });
     });
 });
 

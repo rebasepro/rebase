@@ -15,7 +15,7 @@ import {
 } from "@rebasepro/types";
 import type { AdminCollection } from "@rebasepro/cms-types";
 import { isRecord, type ToolResult } from "./bridge";
-import { DEFAULT_ACTIONS, textOf, type ToolAction, type ViewActions } from "./tool_driver";
+import { DEFAULT_ACTIONS, textOf, type SeedPage, type ToolAction, type ViewActions } from "./tool_driver";
 
 export type ViewMode = "table" | "list" | "cards" | "kanban";
 
@@ -54,6 +54,8 @@ export interface Screen {
     collections: AdminCollection[];
     viewer: { uid: string; roles: string[] };
     actions: ViewActions;
+    /** The page show_collection read for the model: what the collection block reads first. */
+    firstPage?: SeedPage;
 }
 
 export type Parsed =
@@ -85,6 +87,7 @@ export function parseResult(result: ToolResult): Parsed {
     const blocks = Array.isArray(view.blocks) ? view.blocks.filter(isBlock) : [];
     if (blocks.length === 0) return { kind: "error", message: "The screen has no blocks." };
     const viewer = isRecord(view.viewer) ? view.viewer : {};
+    const firstPage = firstPageOf(blocks[0], content);
     return {
         kind: "screen",
         screen: {
@@ -95,8 +98,31 @@ export function parseResult(result: ToolResult): Parsed {
                 uid: typeof viewer.uid === "string" ? viewer.uid : "",
                 roles: Array.isArray(viewer.roles) ? viewer.roles.filter((role): role is string => typeof role === "string") : []
             },
-            actions: actionsOf(content.actions)
+            actions: actionsOf(content.actions),
+            ...(firstPage && { firstPage })
         }
+    };
+}
+
+/**
+ * The rows a show_collection result carries beside its screen — the page the
+ * server read for the model — and the arguments that read them: the block's,
+ * with the window the server says it read.
+ */
+function firstPageOf(block: Block, content: Record<string, unknown>): SeedPage | undefined {
+    if (block.type !== "collection" || !Array.isArray(content.data)) return undefined;
+    const meta = isRecord(content.meta) ? content.meta : {};
+    const limit = typeof meta.limit === "number" ? meta.limit : block.limit;
+    return {
+        collection: block.collection,
+        args: {
+            ...(block.where && { where: block.where }),
+            ...(block.orderBy !== undefined && { orderBy: block.orderBy }),
+            ...(block.searchString && { searchString: block.searchString }),
+            ...(limit !== undefined && { limit }),
+            ...(typeof meta.offset === "number" && { offset: meta.offset })
+        },
+        rows: content.data.filter(isRecord)
     };
 }
 
@@ -121,7 +147,8 @@ export function actionsOf(raw: unknown): ViewActions {
         count: action(raw.count, DEFAULT_ACTIONS.count),
         create: action(raw.create, DEFAULT_ACTIONS.create),
         update: action(raw.update ?? raw.edit, DEFAULT_ACTIONS.update),
-        delete: action(raw.delete, DEFAULT_ACTIONS.delete)
+        delete: action(raw.delete, DEFAULT_ACTIONS.delete),
+        aggregate: action(raw.aggregate, DEFAULT_ACTIONS.aggregate)
     };
 }
 

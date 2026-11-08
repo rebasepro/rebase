@@ -31,7 +31,7 @@ import type { SecurityRule, User } from "@rebasepro/types";
 import { Alert } from "@rebasepro/ui";
 import { McpAppBridge, type HostContext, type ToolResult } from "./bridge";
 import { createToolDriver, describeChanges, type ToolDriver, type ViewChange } from "./tool_driver";
-import { parseResult, type Screen } from "./payload";
+import { findCollection, parseResult, type Screen } from "./payload";
 import { describeAppError, type AppError } from "./code_app";
 import { McpScreen, type PendingPlan } from "./screen";
 import { VIEW_STORAGE_SOURCE } from "./storage_source";
@@ -40,12 +40,10 @@ import { createViewStore } from "./store";
 export { APPS_PROTOCOL_VERSION, McpAppBridge, isRecord } from "./bridge";
 import { isRecord } from "./bridge";
 export type { HostContext, ToolResult, DisplayMode } from "./bridge";
-export { addAppModules } from "./code_app";
 export { createToolDriver, DEFAULT_ACTIONS, SaveCancelledError, describeChanges } from "./tool_driver";
-export type { CallTool, ToolDriver, ToolData, ViewActions, WritePlan, ViewChange } from "./tool_driver";
+export type { CallTool, SeedPage, ToolDriver, ViewActions, WritePlan, ViewChange } from "./tool_driver";
 export { parseResult, actionsOf, filterOf } from "./payload";
 export type { Screen, Block } from "./payload";
-export { SDK_MODULE } from "./sdk";
 
 export interface McpViewOptions {
     /**
@@ -113,6 +111,13 @@ function embedHost(bridge: McpAppBridge, screen: Screen): RebaseEmbedHost {
     const tools: ToolDriver = createToolDriver({
         callTool: (name, args) => bridge.callTool(name, args),
         actions: screen.actions,
+        // Code the model wrote can write without a click: each change it
+        // sends, through whichever block or hook, is the person's to agree to.
+        confirmWrites: screen.blocks.some(block => block.type === "app"),
+        ...(screen.firstPage && { seed: screen.firstPage }),
+        // A collection by whichever name it was read or written under: its
+        // data path (the tools' name, the model's) or its slug (the admin's).
+        canonical: name => findCollection(screen.collections, name)?.slug ?? name,
         confirm: plan => new Promise<boolean>(resolve => pending.set({
             plan,
             answer: confirmed => {
@@ -133,7 +138,6 @@ function embedHost(bridge: McpAppBridge, screen: Screen): RebaseEmbedHost {
             <McpScreen
                 bridge={bridge}
                 screen={screen}
-                tools={tools}
                 hostContext={context}
                 pendingPlan={pending}
                 onAppError={told.appError}

@@ -2,43 +2,24 @@
  * Running an app the model wrote (show_app): its compiled module, the
  * modules it may import, and what happens when it fails.
  *
- * The server compiled it to CommonJS with the source's line numbers
- * (`src/compile.ts`), refusing any import but `APP_MODULES`. Here it is
- * evaluated with a `require` that hands out those modules — the view's own
- * copies, so the app's components live in the same React tree as the admin
- * panel's — each one refusing, by name, an export it does not have.
+ * The server compiled it to CommonJS with the source's line numbers,
+ * refusing any import `MCP_APP_MODULES` does not list. Here it is evaluated
+ * with a `require` that hands out those modules (`app_modules.tsx`) — the
+ * view's own copies, so the app's components live in the same React tree as
+ * the admin panel's — each one refusing, by name, an export it does not serve.
  *
  * The code runs in this frame, as the view does: it reaches the project
- * through the same tools, as the same person, and the SDK has them confirm
- * every change it makes. A failure — at load or while drawing — is shown in
+ * through the same tools, as the same person, and every change it makes is
+ * theirs to confirm first. A failure — at load or while drawing — is shown in
  * place of the app and told to the model, with the line it wrote.
  */
 import React from "react";
-import * as jsxRuntime from "react/jsx-runtime";
-import * as UI from "@rebasepro/ui";
-import { SDK_MODULE } from "./sdk";
-
-/**
- * The modules an app may import, by name: React, the UI kit and the SDK
- * always; more where the view that runs it adds them (`addAppModules`) — the
- * KPI tiles and charts of `@rebasepro/plugin-insights`, where the project has
- * them. The server's compiler (`@rebasepro/mcp-apps`' `APP_MODULES`) accepts
- * the same names; one this view was not given is refused here, by name.
- */
-const MODULES = new Map<string, object>([
-    ["react", React],
-    ["react/jsx-runtime", jsxRuntime],
-    ["@rebasepro/ui", UI],
-    ["@rebasepro/mcp-apps", SDK_MODULE]
-]);
-
-/** Make more modules importable by the apps this view runs. */
-export function addAppModules(modules: Record<string, object>): void {
-    for (const [name, exports] of Object.entries(modules)) MODULES.set(name, exports);
-}
+import { MCP_APP_MODULES, type McpAppModule } from "@rebasepro/types";
+import { APP_MODULE_EXPORTS } from "./app_modules";
 
 /** A module as the app sees it: a missing export is an error that names it, not `undefined` three calls later. */
-function strict(name: string, exports: object): object {
+function strict(name: McpAppModule, exports: object): object {
+    const served = MCP_APP_MODULES[name];
     return new Proxy(exports, {
         get(target, property, receiver) {
             if (typeof property === "symbol" || property === "then") return Reflect.get(target, property, receiver);
@@ -46,15 +27,20 @@ function strict(name: string, exports: object): object {
             if (property in target) return Reflect.get(target, property, receiver);
             // `import React from "react"`: the module is its own default.
             if (property === "default") return target;
-            throw new Error(`"${property}" is not exported by "${name}".`);
+            throw new Error(served === "*"
+                ? `"${property}" is not exported by "${name}".`
+                : `"${property}" is not one of the "${name}" exports this view serves (${served.join(", ")}).`);
         }
     });
 }
 
+function isAppModule(name: string): name is McpAppModule {
+    return Object.hasOwn(MCP_APP_MODULES, name);
+}
+
 function requireModule(name: string): object {
-    const found = MODULES.get(name);
-    if (!found) throw new Error(`The app imports "${name}", which this project's view does not provide.`);
-    return strict(name, found);
+    if (!isAppModule(name)) throw new Error(`The app imports "${name}", which this view does not provide.`);
+    return strict(name, APP_MODULE_EXPORTS[name]);
 }
 
 type AppFactory = (require: (name: string) => object, module: { exports: Record<string, unknown> }, exports: Record<string, unknown>) => void;

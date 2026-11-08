@@ -9,33 +9,9 @@ import React from "react";
 import { createRoot } from "react-dom/client";
 import { Rebase } from "@rebasepro/app";
 import { RebaseCMS, RebaseShell } from "@rebasepro/cms";
-import { addAppModules, startMcpView, type McpAppBridge } from "@rebasepro/cms/mcp-view";
-import {
-    BarChart,
-    ChartCard,
-    ChartStatus,
-    KpiChange,
-    KpiGrid,
-    KpiReadout,
-    KpiTile,
-    SERIES_COLORS,
-    TimeSeriesChart,
-    compactFormat,
-    describeChange,
-    formatNumber,
-    niceTicks
-} from "@rebasepro/plugin-insights";
+import { startMcpView, type McpAppBridge } from "@rebasepro/cms/mcp-view";
 import { CollectionTable } from "../collection-table/CollectionTable";
 import "../index.css";
-
-// The KPI tiles and charts an app may import: the insights plugin's building
-// blocks, not its engine.
-addAppModules({
-    "@rebasepro/plugin-insights": {
-        BarChart, ChartCard, ChartStatus, KpiChange, KpiGrid, KpiReadout, KpiTile, SERIES_COLORS, TimeSeriesChart,
-        compactFormat, describeChange, formatNumber, niceTicks
-    }
-});
 
 const NO_COLLECTIONS: never[] = [];
 

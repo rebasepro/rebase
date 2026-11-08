@@ -3,24 +3,6 @@
 // `BarChart`), loaded once per key and signed-in user.
 export { useInsightData, clearInsightData, DEFAULT_INSIGHT_TTL } from "./blocks/useInsightData";
 export type { InsightData } from "./blocks/useInsightData";
-// Re-exported until the MCP view and the guide import them from @rebasepro/ui.
-export {
-    KpiTile,
-    KpiReadout,
-    KpiGrid,
-    KpiChange,
-    Placeholder,
-    ChartCard,
-    ChartStatus,
-    TimeSeriesChart,
-    BarChart,
-    SERIES_COLORS,
-    formatNumber,
-    compactFormat,
-    describeChange,
-    niceTicks
-} from "@rebasepro/ui";
-export type { KpiProps, TimeSeries, TimeSeriesPoint, Bar, SeriesColor, Change, ChangeDirection, ChangeTone } from "@rebasepro/ui";
 
 // ── Deprecated: the configured plugin's engine and widgets ────────────
 // Kept working until they are removed.

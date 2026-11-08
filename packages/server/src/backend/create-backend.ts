@@ -38,6 +38,7 @@ import {
     parseEnvBoolean,
     resourceKeyOf,
     DEFAULT_STORAGE_SOURCE_KEY,
+    MCP_APP_MODULES,
     type AdminScope,
     type AuthConfigDocument,
     type CollectionCallbacks,
@@ -49,7 +50,7 @@ import type { Server } from "node:http";
 import nodePath from "node:path";
 import { readFileSync } from "node:fs";
 import { servedFrontendPaths } from "../serve-spa";
-import { PROJECT_VIEW_FILE, withProjectView, type McpAppResource } from "../mcp/mcp-apps";
+import { PROJECT_VIEW_FILE, withProjectView, type McpAppCompiler, type McpAppResource } from "../mcp/mcp-apps";
 import { Hono, type Context, type MiddlewareHandler } from "hono";
 import { bodyLimit } from "hono/body-limit";
 import { createRebaseClient } from "@rebasepro/client";
@@ -1730,8 +1731,7 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
             // `initialize` or `tools/list` — not at boot: the HTML is large, and
             // a backend no MCP client calls never loads it.
             apps: loadMcpApps,
-            // show_app's compiler, from the same module, on the first app.
-            appCompiler: async () => (await import("@rebasepro/mcp-apps")).compileApp,
+            appCompiler: loadAppCompiler,
             // An app's own tools and scopes, when it brings them; the data
             // tools under `data:*` otherwise.
             tools: config.mcp?.tools,
@@ -1802,7 +1802,7 @@ async function buildRebaseBackend(options: RebaseBackendOptions, announcements: 
             // show_collection is offered where its view is served; the
             // control plane serves the view itself and relays this result.
             apps: loadMcpApps,
-            appCompiler: async () => (await import("@rebasepro/mcp-apps")).compileApp
+            appCompiler: loadAppCompiler
         })));
         if (announce) logger.info(`Platform MCP endpoint mounted at ${mcpPath} (platform tokens only)`);
     };
@@ -4267,4 +4267,13 @@ async function loadMcpApps(): Promise<readonly McpAppResource[]> {
             return undefined;
         }
     });
+}
+
+/**
+ * show_app's compiler, from the same module, on the first app: it holds an
+ * app to the modules and names every view serves (`MCP_APP_MODULES`).
+ */
+async function loadAppCompiler(): Promise<McpAppCompiler> {
+    const { compileApp } = await import("@rebasepro/mcp-apps");
+    return source => compileApp(source, MCP_APP_MODULES);
 }

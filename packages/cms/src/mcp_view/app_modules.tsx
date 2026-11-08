@@ -1,0 +1,191 @@
+/**
+ * What an app the model wrote imports (show_app): the modules of
+ * `MCP_APP_MODULES`, each the package's own exports — `@rebasepro/cms`'s
+ * blocks, `@rebasepro/app`'s row hooks, the UI kit, React — so the code reads
+ * as Rebase code does anywhere, and the parts are the ones the admin panel is
+ * made of.
+ *
+ * One thing differs from the packages: an app was opened with a list of
+ * collections (show_app's `collections`), and every export that names one
+ * holds the app to it, with an error that says which it may use. The rows an
+ * app reads and writes go through the tool driver, as the person: reads under
+ * their RLS, and every write confirmed by them first (`confirmWrites` in
+ * `tool_driver.ts`), however the app sends it.
+ */
+import React, { createContext, useCallback, useContext, useMemo } from "react";
+import * as jsxRuntime from "react/jsx-runtime";
+import * as UI from "@rebasepro/ui";
+import { useAggregate, useRow, useRowCount, useRows, useRowWrites, type UseRowWritesResult } from "@rebasepro/app";
+import type { SidePanelBindingProps, SidePanelController } from "@rebasepro/cms-types";
+import {
+    getCollectionDataPath,
+    type CollectionRegistryController,
+    type McpAppModule,
+    type McpAppModuleExport
+} from "@rebasepro/types";
+import { CollectionPanel, type CollectionPanelProps } from "../components/CollectionPanel";
+import { EntityFormPanel, type EntityFormPanelProps } from "../components/EntityFormPanel";
+import { EntityViewPanel, type EntityViewPanelProps } from "../components/EntityViewPanel";
+import { FieldValue, type FieldValueProps } from "../components/FieldValue";
+import {
+    CollectionFiltersButton,
+    CollectionSearchBar,
+    CollectionToolbar,
+    CollectionViewModeToggle
+} from "../components/CollectionViewBinding/CollectionToolbar";
+import { CollectionAddButton } from "../components/CollectionViewBinding/CollectionAddButton";
+import { FormField } from "../form/FormField";
+import { useSidePanel } from "../hooks/useSidePanel";
+import { useCollectionRegistryController } from "../hooks/navigation/contexts/CollectionRegistryContext";
+
+/** The collections the app was opened with, by the names the model gave. */
+const AppCollectionsContext = createContext<readonly string[] | undefined>(undefined);
+
+/** Around an app's component: the collections its imports may name. */
+export function AppCollections({ names, children }: { names: readonly string[]; children: React.ReactNode }) {
+    return <AppCollectionsContext.Provider value={names}>{children}</AppCollectionsContext.Provider>;
+}
+
+/**
+ * Throws, for a collection the app was not opened with. A name counts by
+ * what the model listed, or by the collection it names — its slug or the
+ * name the tools take — so `orders` and the table it lives in are one.
+ */
+function useCollectionCheck(): (name: string | undefined) => void {
+    const allowed = useContext(AppCollectionsContext);
+    const registry = useCollectionRegistryController();
+    return useCallback((name: string | undefined) => {
+        if (allowed === undefined || name === undefined || allowed.includes(name)) return;
+        const collection = registry.getCollection(name);
+        if (collection && (allowed.includes(collection.slug)
+            || allowed.includes(getCollectionDataPath(collection)))) return;
+        throw new Error(`"${name}" is not one of this app's collections (${allowed.join(", ")}). `
+            + "List it in show_app's `collections`.");
+    }, [allowed, registry]);
+}
+
+function AppCollectionPanel(props: CollectionPanelProps) {
+    useCollectionCheck()(props.path ?? props.collection?.slug);
+    return <CollectionPanel {...props}/>;
+}
+
+function AppEntityFormPanel(props: EntityFormPanelProps) {
+    useCollectionCheck()(props.path ?? props.collection.slug);
+    return <EntityFormPanel {...props}/>;
+}
+
+function AppEntityViewPanel(props: EntityViewPanelProps) {
+    useCollectionCheck()(props.path ?? props.collection.slug);
+    return <EntityViewPanel {...props}/>;
+}
+
+function AppFieldValue(props: FieldValueProps) {
+    useCollectionCheck()(props.collection);
+    return <FieldValue {...props}/>;
+}
+
+function useAppSidePanel(): SidePanelController {
+    const check = useCollectionCheck();
+    const panel = useSidePanel();
+    return useMemo(() => {
+        const checked = <M extends Record<string, unknown>>(props: SidePanelBindingProps<M>) => {
+            check(props.path);
+            return props;
+        };
+        return {
+            close: () => panel.close(),
+            open: props => panel.open(checked(props)),
+            replace: props => panel.replace(checked(props))
+        };
+    }, [panel, check]);
+}
+
+function useAppCollectionRegistry(): CollectionRegistryController {
+    const check = useCollectionCheck();
+    const registry = useCollectionRegistryController();
+    return useMemo(() => ({
+        ...registry,
+        getCollection: (slugOrPath, includeUserOverride) => {
+            check(slugOrPath);
+            return registry.getCollection(slugOrPath, includeUserOverride);
+        }
+    }), [registry, check]);
+}
+
+/** The row hooks, each held to the app's collections. */
+const useAppRows: typeof useRows = (collection, options) => {
+    useCollectionCheck()(collection);
+    return useRows(collection, options);
+};
+
+const useAppRow: typeof useRow = (collection, id) => {
+    useCollectionCheck()(collection);
+    return useRow(collection, id);
+};
+
+const useAppRowCount: typeof useRowCount = (collection, where) => {
+    useCollectionCheck()(collection);
+    return useRowCount(collection, where);
+};
+
+const useAppAggregate: typeof useAggregate = (collection, params) => {
+    useCollectionCheck()(collection);
+    return useAggregate(collection, params);
+};
+
+/** Writes are checked when they are made: a refused one rejects, as a failed write does. */
+function useAppRowWrites(): UseRowWritesResult {
+    const check = useCollectionCheck();
+    const writes = useRowWrites();
+    return useMemo(() => {
+        const checked = <T, >(collection: string, write: () => Promise<T>): Promise<T> => {
+            try {
+                check(collection);
+            } catch (error) {
+                return Promise.reject(error);
+            }
+            return write();
+        };
+        return {
+            ...writes,
+            create: (collection, values, id) => checked(collection, () => writes.create(collection, values, id)),
+            update: (collection, id, values) => checked(collection, () => writes.update(collection, id, values)),
+            remove: (collection, id) => checked(collection, () => writes.remove(collection, id))
+        };
+    }, [writes, check]);
+}
+
+/** A module's served exports: exactly its names in `MCP_APP_MODULES`, no more, no fewer. */
+type Served<M extends McpAppModule> = Record<McpAppModuleExport<M>, unknown>;
+
+const APP_MODULE: Served<"@rebasepro/app"> = {
+    useRows: useAppRows,
+    useRow: useAppRow,
+    useRowCount: useAppRowCount,
+    useAggregate: useAppAggregate,
+    useRowWrites: useAppRowWrites
+};
+
+const CMS_MODULE: Served<"@rebasepro/cms"> = {
+    CollectionPanel: AppCollectionPanel,
+    CollectionToolbar,
+    CollectionSearchBar,
+    CollectionFiltersButton,
+    CollectionViewModeToggle,
+    CollectionAddButton,
+    EntityFormPanel: AppEntityFormPanel,
+    EntityViewPanel: AppEntityViewPanel,
+    FormField,
+    FieldValue: AppFieldValue,
+    useSidePanel: useAppSidePanel,
+    useCollectionRegistryController: useAppCollectionRegistry
+};
+
+/** Every module an app may import, by name. */
+export const APP_MODULE_EXPORTS: Record<McpAppModule, object> = {
+    "react": React,
+    "react/jsx-runtime": jsxRuntime,
+    "@rebasepro/ui": UI,
+    "@rebasepro/app": APP_MODULE,
+    "@rebasepro/cms": CMS_MODULE
+};

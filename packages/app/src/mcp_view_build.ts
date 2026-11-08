@@ -4,17 +4,7 @@
  * plugin and for `@rebasepro/mcp-apps`' generic view, which builds the same
  * way; not part of `@rebasepro/app/vitePlugin`, which re-exports none of it.
  */
-import fs from "fs";
-import path from "path";
 import type { Plugin } from "vite";
-
-export function resolvesFrom(root: string, specifier: string): boolean {
-    try {
-        return fs.existsSync(path.join(root, "node_modules", specifier, "package.json"));
-    } catch {
-        return false;
-    }
-}
 
 /** The view's document: a root for the app, and storage that works in a frame with no origin of its own. */
 export function mcpViewDocument(entry = "./boot.tsx"): string {
@@ -53,17 +43,18 @@ export const MCP_VIEW_STORAGE_SHIM = `for (const name of ["localStorage", "sessi
     }
 }`;
 
-export function mcpViewBoot(app: string, styles: string | undefined, insights: boolean): string {
+/**
+ * The view's entry: the app, mounted inside the view. What an app Claude
+ * writes may import is the view runtime's own (`MCP_APP_MODULES`), the same
+ * in every project's view, so nothing here adds to it.
+ */
+export function mcpViewBoot(app: string, styles: string | undefined): string {
     return [
         "import React from \"react\";",
         "import { createRoot } from \"react-dom/client\";",
         ...(styles ? [`import ${JSON.stringify(styles)};`] : []),
         "import \"./view.css\";",
-        "import { addAppModules, startMcpView } from \"@rebasepro/cms/mcp-view\";",
-        ...(insights ? [
-            "import { BarChart, ChartCard, ChartStatus, KpiChange, KpiGrid, KpiReadout, KpiTile, SERIES_COLORS, TimeSeriesChart, compactFormat, describeChange, formatNumber, niceTicks } from \"@rebasepro/plugin-insights\";",
-            "addAppModules({ \"@rebasepro/plugin-insights\": { BarChart, ChartCard, ChartStatus, KpiChange, KpiGrid, KpiReadout, KpiTile, SERIES_COLORS, TimeSeriesChart, compactFormat, describeChange, formatNumber, niceTicks } });"
-        ] : []),
+        "import { startMcpView } from \"@rebasepro/cms/mcp-view\";",
         "startMcpView({",
         `    mountApp: async () => {`,
         `        const { App } = await import(${JSON.stringify(app)});`,

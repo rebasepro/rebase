@@ -1,0 +1,62 @@
+/**
+ * What show_app's description teaches: the modules an app imports, and what
+ * each gives it. The hosted connector's show_app says the same.
+ *
+ * Every name it imports or documents is one the view serves
+ * (`MCP_APP_MODULES` in `@rebasepro/types`); `test/mcp-app-guide.test.ts`
+ * holds it to that list, both ways.
+ */
+export const SHOW_APP_CODE_GUIDE = `
+The app is one TSX module whose default export is a React component (hooks welcome, no props). It runs in the conversation inside the project's admin panel, as the user, and imports Rebase's own packages, so the same code works in the project. It may import only these names:
+- "react".
+- "@rebasepro/app", the project's rows as the user, under their RLS, as query_collection returns them (dates as ISO text, a belongsTo as its foreign key, e.g. authorId); \`where\` and \`orderBy\` are query_collection's.
+  useRows(collection, { where?, orderBy?, limit?, offset?, searchString? }) → { rows, total, hasMore, loadMore, loading, error, refresh }
+  useRow(collection, id) → { row, loading, error, refresh }
+  useRowCount(collection, where?) → { count, loading, error }
+  useAggregate(collection, { select: [{ fn: "count" | "sum" | "avg" | "min" | "max", field? }], groupBy?, where?, orderBy?, limit? }) → { result, loading, error } — result is one row per group, each value under its alias (count, sum_total).
+  useRowWrites() → { create(collection, values, id?), update(collection, id, values), remove(collection, id), saving, error }
+- "@rebasepro/cms", the admin panel's own parts, with the project's custom fields, views and actions:
+  <CollectionPanel path fields? viewMode? ("table" | "list" | "cards" | "kanban") sort? (["field", "desc"]) toolbar? onEntityClick?(entity) highlightedEntityId? collectionOverrides? title? /> — search, filters, paging; it sizes to its rows and scrolls past its height. fields picks and orders the columns. collectionOverrides={{ fixedFilter: { status: ["==", "pending"] } }} fixes which rows it holds. toolbar={null} hides the toolbar; a smaller one is <CollectionToolbar start? end? /> holding CollectionSearchBar, CollectionFiltersButton, CollectionViewModeToggle, CollectionAddButton. Without onEntityClick a row opens its form; entity.id is the row's id.
+  useCollectionRegistryController().getCollection(name) — a collection's config, for the panels below.
+  <EntityFormPanel collection entityId? defaultValues? fields? layout? onSaved?({ entityId }) /> — the record form, a new row's without entityId. layout is your arrangement of <FormField name /> elements.
+  <EntityViewPanel collection entityId fields? /> — one row, read-only.
+  <FieldValue row collection field /> — one value of a row, drawn as the admin draws it (enum chip, date, relation title).
+  useSidePanel().open({ path, entityId? }) — open a row's form over the app; without entityId, a new row's.
+- "@rebasepro/ui", the UI kit: Card, Button, IconButton, Typography, Tabs, Tab, Chip, Alert, TextField, Select, SelectItem, Checkbox, Dialog, DialogTitle, DialogContent, DialogActions, Separator, CircularProgress, Tooltip, cls, Lucide icons with an Icon suffix (PlusIcon), and:
+  <SplitView master detail? onBack? detailTitle? /> — a list and what is open in it, side by side when wide, the detail over the list with a back bar when narrow. It fills its parent: give the parent a height.
+  <KpiGrid periodDays?> of <KpiTile label value format? previous? goodWhen? ("up" | "down") loading? /> — previous is the earlier period's value, shown as the change.
+  <ChartCard title headline? action?> around <BarChart bars={[{ key, label, value }]} format? onBarClick? /> or <TimeSeriesChart series={[{ id, label, points: [{ at, value }] }]} variant? ("area" | "line") height? />; formatNumber(value, format?).
+  Lay out and space with Tailwind's standard utilities (flex, grid, gap-*, p-*, w-*, h-*, text-sm, …); colours come from the kit (bg-surface-card, text-text-secondary), never hard-coded.
+Width: the app is about 700px wide in the conversation, the whole window when the person expands it. Never put a list and a form side by side in grid columns: use SplitView, which chooses by its own width.
+Every change the app makes, through useRowWrites or a form or table in it, asks the user to confirm it first; a declined one rejects, and you are told what they saved. What changes refreshes every view of that collection. The app may use only the collections listed in \`collections\`.
+
+Example:
+import { useState } from "react";
+import { Button, KpiGrid, KpiTile, SplitView } from "@rebasepro/ui";
+import { useRowCount, useRowWrites } from "@rebasepro/app";
+import { CollectionPanel, EntityFormPanel, useCollectionRegistryController } from "@rebasepro/cms";
+
+export default function OrderDesk() {
+    const [id, setId] = useState<string>();
+    const pending = useRowCount("orders", { status: ["==", "pending"] });
+    const { update, saving } = useRowWrites();
+    const orders = useCollectionRegistryController().getCollection("orders");
+    return (
+        <div className="flex flex-col gap-4">
+            <KpiGrid><KpiTile label="Pending" value={pending.count} loading={pending.loading} /></KpiGrid>
+            <div className="h-[560px]">
+                <SplitView
+                    master={<CollectionPanel path="orders" viewMode="list" fields={["number", "status", "total"]} title={false}
+                        onEntityClick={entity => setId(String(entity.id))} highlightedEntityId={id ?? null} />}
+                    detail={id && orders && (
+                        <div className="flex flex-col gap-2 p-2">
+                            <Button disabled={saving} onClick={() => update("orders", id, { status: "shipped" })}>Mark shipped</Button>
+                            <EntityFormPanel key={id} collection={orders} entityId={id} />
+                        </div>
+                    )}
+                    detailTitle={id}
+                    onBack={() => setId(undefined)} />
+            </div>
+        </div>
+    );
+}`;
