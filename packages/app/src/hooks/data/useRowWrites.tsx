@@ -37,6 +37,12 @@ function isAdminCollection(value: object | undefined): value is AdminCollection 
         && "properties" in value && typeof value.properties === "object" && value.properties !== null;
 }
 
+/** A row's own `id` column, where it has one. */
+function idOf(row: Row): string | number | undefined {
+    const id = row.id;
+    return typeof id === "string" || typeof id === "number" ? id : undefined;
+}
+
 /**
  * Create, change and delete rows through the same flat data layer
  * {@link useRows} reads. Each write that succeeds refreshes every view of
@@ -85,10 +91,18 @@ export function useRowWrites(): UseRowWritesResult {
         }
     }, []);
 
-    /** The collection whose browser callbacks a write to `slug` runs, where it has any. */
-    const callbacksOf = useCallback((slug: string): AdminCollection | undefined => {
+    /**
+     * The collection whose browser callbacks a save or a delete of `slug`
+     * runs, where it has one: without, the write reads nothing first.
+     */
+    const callbacksOf = useCallback((slug: string, write: "save" | "delete"): AdminCollection | undefined => {
         const collection = resolveCollection(slug);
-        return isAdminCollection(collection) && collection.browserCallbacks ? collection : undefined;
+        if (!isAdminCollection(collection)) return undefined;
+        const callbacks = collection.browserCallbacks;
+        const runs = write === "save"
+            ? Boolean(callbacks?.beforeSave || callbacks?.afterSave || callbacks?.afterSaveError)
+            : Boolean(callbacks?.beforeDelete || callbacks?.afterDelete);
+        return runs ? collection : undefined;
     }, [resolveCollection]);
 
     const viewModel = useCallback((slug: string, row: Row): Row =>
@@ -123,8 +137,9 @@ export function useRowWrites(): UseRowWritesResult {
                 changes.emit(slug);
                 return row;
             },
+            // Addressed as the admin addresses a record read back.
             saved: (row) => ({
-                id: keys.length > 0 ? buildCompositeId(row, keys) : (id ?? String(row.id)),
+                id: keys.length > 0 ? buildCompositeId(row, keys) : idOf(row) ?? id ?? "",
                 values: viewModel(slug, row)
             })
         });
@@ -133,7 +148,7 @@ export function useRowWrites(): UseRowWritesResult {
     const create = useCallback(<M extends Record<string, unknown> = Record<string, unknown>>(
         slug: string, values: Partial<M>, id?: string | number
     ): Promise<M> => run(async () => {
-        const collection = callbacksOf(slug);
+        const collection = callbacksOf(slug, "save");
         // The row a write answers is the row the server sends whichever way it
         // was written; `M` describes it, as it does for `collection<M>()`.
         if (collection) return await saveWithCallbacks(collection, slug, "new", values, id) as M;
@@ -145,7 +160,7 @@ export function useRowWrites(): UseRowWritesResult {
     const update = useCallback(<M extends Record<string, unknown> = Record<string, unknown>>(
         slug: string, id: string | number, values: Partial<M>
     ): Promise<M> => run(async () => {
-        const collection = callbacksOf(slug);
+        const collection = callbacksOf(slug, "save");
         if (collection) return await saveWithCallbacks(collection, slug, "existing", values, id) as M;
         const row = await data.collection<M>(slug).update(id, values);
         changes.emit(slug);
@@ -158,7 +173,7 @@ export function useRowWrites(): UseRowWritesResult {
             await accessor.delete(id);
             changes.emit(slug);
         };
-        const collection = callbacksOf(slug);
+        const collection = callbacksOf(slug, "delete");
         if (!collection) return removeRow();
         const row = await accessor.findById(id);
         await deleteWithCallbacks({
