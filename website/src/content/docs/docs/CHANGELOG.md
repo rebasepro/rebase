@@ -402,6 +402,33 @@ editor. The admin's `{ id, path, values }` `Entity` is internal.
   through reading, because the walk counted the unticked rows against the
   ceiling.
 
+- **A computed display value refreshes when its record changes.** An
+  `admin.display` resolver's answer was cached per record and never dropped,
+  so a product card still said "7 in stock" after a restock to 57, or after a
+  save in the form.
+
+- **"Clear date" empties the date field's input**, not only its value.
+
+- **A many-relation whose target is `hideFromEntityViews` stays in the record
+  form**, so a post's tags can be edited again; it had no tab and no field.
+
+- **The record header shows an enum `tags` role by its label and colour**,
+  not its raw id.
+
+- **Page loads no longer use up the sign-in allowance.** `GET
+  /api/auth/config` has its own rate limit (3000 per address per 15 minutes);
+  it shared the login limiter, so about 100 page loads from one office
+  address locked everyone there out of signing in.
+
+- **`REBASE_CRON_SCHEDULER=false` stops the cron timers of a backend built
+  with `initializeRebaseBackend` / `createRebaseBackend`**, not only the
+  containerized runtime.
+
+- **A table's cells no longer read as disabled buttons to assistive
+  technology**: body cells of a table with reorderable columns are not
+  `role="button"`, and the frozen first column is not `aria-disabled`. The
+  labelled bulk-delete button is named "Delete (n)".
+
 - **Two record forms on one page no longer share DOM ids.** To find a field
   from a test, select `[data-form-field="<key>"]` inside the form's
   `[data-form-path="<path>"]`.
