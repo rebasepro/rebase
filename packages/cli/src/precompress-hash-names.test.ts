@@ -58,8 +58,28 @@ describe("the content hash in a Vite build's file names", () => {
 
         const dir = path.join(root, "dist");
         precompressStaticAssets(dir);
-        const withoutBrotli = chunks.filter(name => !fs.existsSync(path.join(dir, "assets", `${name}.br`)));
+        // A hash with no digit and no capital in it — about one Vite chunk in a
+        // thousand, `page20-_nmybtrr.js` — reads as a word, and is left
+        // unhashed on purpose (see the test below). The hashes change with the
+        // build's tmp path, so which chunk that is changes from run to run.
+        const evidenced = chunks.filter(name => /[0-9A-Z]/.test(name.slice(-11, -3)));
+        const withoutBrotli = evidenced.filter(name => !fs.existsSync(path.join(dir, "assets", `${name}.br`)));
         expect(withoutBrotli).toEqual([]);
+    });
+
+    it("leaves a suffix with no digit and no capital unhashed, as a word: a hand-written name is never pinned", () => {
+        const dir = fs.mkdtempSync(path.join(os.tmpdir(), "rebase-word-names-"));
+        try {
+            fs.mkdirSync(path.join(dir, "assets"));
+            for (const name of ["vendor-firebase.js", "page20-_nmybtrr.js"]) {
+                fs.writeFileSync(path.join(dir, "assets", name), "export const value = 1;\n".repeat(200));
+            }
+            precompressStaticAssets(dir);
+            expect(fs.existsSync(path.join(dir, "assets", "vendor-firebase.js.br"))).toBe(false);
+            expect(fs.existsSync(path.join(dir, "assets", "page20-_nmybtrr.js.br"))).toBe(false);
+        } finally {
+            fs.rmSync(dir, { recursive: true, force: true });
+        }
     });
 
     it("is found in the names the report quotes", () => {
