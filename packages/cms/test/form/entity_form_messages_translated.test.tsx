@@ -36,6 +36,7 @@ jest.mock("@rebasepro/app", () => {
 
 import { AuthControllerContext, CustomizationControllerContext, RebaseI18nProvider } from "@rebasepro/app";
 import { EntityForm } from "../../src/form/EntityForm";
+import { rowOf, saving } from "../helpers/form_rows";
 
 type Post = Record<string, unknown>;
 const collection = {
@@ -51,12 +52,12 @@ function Form({ entityId, status, onReady }: { entityId?: string; status: "new" 
                 value={{ plugins: [], propertyConfigs: {}, entityActions: [], entityViews: [], resolvedSlots: [] } as never}>
                 <EntityForm<Post>
                     path="posts"
-                    entityId={entityId}
-                    entity={entityId ? { id: entityId, path: "posts", values: undefined } as never : undefined}
+                    id={entityId}
+                    row={rowOf(entityId ? { id: entityId, path: "posts", values: undefined } as never : undefined)}
                     collection={collection}
                     initialStatus={status}
                     onFormContextReady={onReady}
-                    onSubmit={jest.fn(async (values: Post) => ({ id: "1", path: "posts", values }))}/>
+                    onSubmit={saving(jest.fn(async (values: Post) => ({ id: "1", path: "posts", values })))}/>
             </CustomizationControllerContext.Provider>
         </AuthControllerContext.Provider>
     </RebaseI18nProvider>;

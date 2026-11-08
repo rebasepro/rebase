@@ -58,6 +58,7 @@ import { AuthControllerContext, CustomizationControllerContext, RebaseI18nProvid
 import { EntityForm } from "../../src/form/EntityForm";
 import { FormField } from "../../src/form/FormField";
 import { useFormexGetter } from "@rebasepro/forms";
+import { rowOf, saving } from "../helpers/form_rows";
 
 type Row = Record<string, unknown>;
 
@@ -91,11 +92,11 @@ function renderForm({ values, status = "existing", fields, layout, Builder }: {
     const view = render(<Providers>
         <EntityForm<Row>
             path="products"
-            entityId={status === "existing" ? "1" : undefined}
+            id={status === "existing" ? "1" : undefined}
             collection={collection}
-            entity={status === "existing" ? { id: "1", path: "products", values } : undefined}
+            row={rowOf(status === "existing" ? { id: "1", path: "products", values } : undefined)}
             initialStatus={status}
-            onSubmit={onSubmit}
+            onSubmit={saving(onSubmit)}
             computedInitialValues={values}
             fields={fields}
             layout={layout}
@@ -145,8 +146,8 @@ describe("fields", () => {
             form: { sections: [{ key: "main", title: "Main", properties: ["name", "sku", "status"] }] }
         } as never;
         render(<Providers>
-            <EntityForm<Row> path="products" entityId="1" collection={sectioned}
-                entity={{ id: "1", path: "products", values: {} }} initialStatus="existing"
+            <EntityForm<Row> path="products" id="1" collection={sectioned}
+                row={rowOf({ id: "1", path: "products", values: {} })} initialStatus="existing"
                 computedInitialValues={{}} fields={["status", "name", "notes"]}/>
         </Providers>);
         await settle();
@@ -312,8 +313,8 @@ describe("two forms on one page", () => {
         const values = { name: "Moka", sku: "M1", status: "live" };
         render(<Providers>
             {[1, 2].map(n =>
-                <EntityForm<Row> key={n} path="products" entityId={String(n)} collection={collection}
-                    entity={{ id: String(n), path: "products", values }} initialStatus="existing"
+                <EntityForm<Row> key={n} path="products" id={String(n)} collection={collection}
+                    row={rowOf({ id: String(n), path: "products", values })} initialStatus="existing"
                     computedInitialValues={values}/>)}
         </Providers>);
         await settle();

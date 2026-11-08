@@ -279,7 +279,7 @@ export interface KanbanAddColumnProps {
 export interface EntityRowActionsProps {
     /**
      * The row's record as the server sends it — dates as ISO strings, a
-     * belongsTo as its foreign-key column, `id` included.
+     * belongsTo as its foreign-key column, `id` only where the table has that column.
      */
     row: Record<string, unknown>;
     id: string | number;

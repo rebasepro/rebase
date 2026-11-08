@@ -9,7 +9,7 @@ import { toFindParams } from "../../hooks/data/collectionQuery";
 import { CollectionWindow } from "../../hooks/data/collectionWindow";
 import { useDataChangeVersion } from "../../hooks/data/dataChanges";
 import { getRelationIncludeParams } from "../../util/previews";
-import { fromWireRow, toWireRow } from "../../util/wire_row";
+import { copyRow, fromWireRow, toWireRow } from "../../util/wire_row";
 import { Entity, EntityReference, EntityRelation, FilterValues, OrderBySpec, OrderByTuple, User, WhereFilterOp } from "@rebasepro/types";
 import { normalizeOrderBy, serializeOrderBy } from "@rebasepro/common";
 import { EntityTableController, RebaseContext, SelectedCellProps, AdminCollection } from "@rebasepro/cms-types";
@@ -405,15 +405,16 @@ export function useDataTableController<M extends Record<string, any> = any, USER
         const process = afterRead
             ? async (entities: Entity<M>[]): Promise<Entity<M>[]> => {
                 try {
-                    // afterRead is handed the row as the server sends it; what
-                    // it changes is converted back onto the record's values.
+                    // afterRead is handed a copy of the row as the server
+                    // sends it; what it changes, in place or in a new object,
+                    // is converted back onto the record's values.
                     return await Promise.all(
                         entities.map(async (entity) => {
-                            const row = { id: entity.id, ...toWireRow(entity.values, collection) };
+                            const row = toWireRow(entity.values, collection);
                             const processedRow = await afterRead({
                                 collection,
                                 path,
-                                row,
+                                row: copyRow(row),
                                 context
                             });
                             return {

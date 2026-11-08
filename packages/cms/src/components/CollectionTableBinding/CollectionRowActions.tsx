@@ -47,9 +47,9 @@ export const CollectionRowActions = function CollectionRowActions({
     isSelected,
     selectionEnabled,
     size,
-    highlightEntity,
+    highlightRow,
     onCollectionChange,
-    unhighlightEntity,
+    unhighlightRow,
     actions = [],
     hideId,
     selectionController,
@@ -73,8 +73,8 @@ export const CollectionRowActions = function CollectionRowActions({
         hideId?: boolean,
         onCollectionChange?: () => void,
         selectionController?: EntitySelectionController;
-        highlightEntity?: (id: string | number) => void;
-        unhighlightEntity?: (id: string | number) => void;
+        highlightRow?: (id: string | number) => void;
+        unhighlightRow?: (id: string | number) => void;
         openEntityMode: "side_panel" | "full_screen" | "split" | "dialog";
         // Sortable props for dnd-kit integration
         sortableNodeRef?: (node: HTMLElement | null) => void;
@@ -100,7 +100,7 @@ export const CollectionRowActions = function CollectionRowActions({
         : undefined;
     const rowSlotProps = React.useMemo(() => ({
         row,
-        id: entity.id,
+        id: String(entity.id),
         path,
         collection,
         selectionController: rowSelectionController,
@@ -130,14 +130,16 @@ export const CollectionRowActions = function CollectionRowActions({
     const clickProps: EntityActionClickProps<Record<string, unknown>> = {
         view: "collection",
         row,
-        id: entity.id,
-        path,
+        id: String(entity.id),
+        // The record's own path where the table has none — a picker's rows
+        // — so a subcollection record opens and copies where it lives.
+        path: path ?? entity.path,
         collection,
         context,
         sidePanelController: sidePanelCtrl,
         selectionController: rowSelectionController,
-        highlightEntity,
-        unhighlightEntity,
+        highlightRow,
+        unhighlightRow,
         onCollectionChange,
         openEntityMode: openEntityMode ?? collection?.openEntityMode
     };

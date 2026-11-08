@@ -13,7 +13,7 @@ export interface ExportConfig<USER extends User = User> {
 /**
  * An extra column of an export: its `builder` is handed each exported record
  * as the server sends the row — dates as ISO strings, a belongsTo as its
- * foreign-key column, `id` included.
+ * foreign-key column, `id` only where the table has that column.
  * @group Models
  */
 export interface ExportMappingFunction<USER extends User = User> {

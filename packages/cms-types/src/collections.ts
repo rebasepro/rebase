@@ -255,8 +255,8 @@ export interface EntitySelectionController<M extends Record<string, unknown> = R
  * What is selected in a collection view, as an app's code reads it.
  *
  * Ticking rows gives you `"rows"`: their ids, and the rows themselves as the
- * server sends them — ISO dates, a belongsTo as its foreign-key column, `id`
- * included. Clicking "select all 12,480 matching" gives you `"query"`, which
+ * server sends them — ISO dates, a belongsTo as its foreign-key column, its
+ * own columns and nothing else. Clicking "select all 12,480 matching" gives you `"query"`, which
  * stands for rows that mostly have not been read: the query, the ids ticked
  * back off, and the count. `resolveSelection` reads a query selection's rows.
  *
@@ -270,8 +270,12 @@ export interface EntitySelectionController<M extends Record<string, unknown> = R
 export type RowSelection<M extends Record<string, unknown> = Record<string, unknown>> =
     | {
         type: "rows";
-        /** The selected rows' ids, in the order they were picked. */
-        ids: (string | number)[];
+        /**
+         * The selected rows' ids, in the order they were picked: each
+         * record's primary key as a string, a composite key's parts joined
+         * by `:::` — the id `useSidePanel().open` and a route take.
+         */
+        ids: string[];
         /** The selected rows, in the same order as `ids`. */
         rows: Record<string, unknown>[];
     }
@@ -279,8 +283,8 @@ export type RowSelection<M extends Record<string, unknown> = Record<string, unkn
         type: "query";
         /** Every row matching this is selected, bar `excludedIds`. */
         query: SelectionQuery<M>;
-        /** The ids of the rows ticked back off after selecting the query. */
-        excludedIds: (string | number)[];
+        /** The ids of the rows ticked back off after selecting the query, as `ids` spells them. */
+        excludedIds: string[];
         /**
          * The server's count for `query` when the selection was made;
          * `undefined` where the data source has no count.
@@ -316,17 +320,20 @@ export interface SelectionController<M extends Record<string, unknown> = Record<
     /** Whether anything at all is selected. Cheap in both modes. */
     hasSelection: boolean;
 
-    /** Whether the row with this id is selected, in either mode. */
+    /**
+     * Whether the row with this id is selected, in either mode. The id is
+     * compared as a string, so an integer key's `5` and `"5"` are one row.
+     */
     isSelected(id: string | number): boolean;
 
     /**
      * Tick or untick a row — `selected` says which; without it, the row
-     * flips. The row carries its `id`, as every row the view hands you does.
-     * In query mode, unticking a row excludes it from the query.
+     * flips. The row is found by its primary-key columns, so pass a row the
+     * view handed you, or one carrying those columns. In query mode, unticking a row excludes it from the query.
      */
     toggleSelection(row: Record<string, unknown>, selected?: boolean): void;
 
-    /** Replace the selection with exactly these rows, each carrying its `id`. */
+    /** Replace the selection with exactly these rows, each carrying its primary-key columns. */
     setSelectedRows(rows: Record<string, unknown>[]): void;
 
     /**
@@ -470,7 +477,7 @@ export type DefaultSelectedViewParams = {
  * `rows` are the rows the toolbar's search, filters and sort select, as the
  * server sends them — the shape `useRows` returns: ISO date strings
  * (`YYYY-MM-DD` for a date-only column), a belongsTo as its foreign-key
- * column, `id` included. A relation the view loaded arrives nested under its
+ * column, `id` only where the table has that column. A relation the view loaded arrives nested under its
  * name, as REST's `include` returns it.
  *
  * @group Models

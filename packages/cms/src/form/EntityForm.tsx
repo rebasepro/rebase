@@ -36,7 +36,7 @@ import { LocalChangesMenu } from "./components/LocalChangesMenu";
 import { useUndoableDiscard } from "./useUndoableDiscard";
 import { ownsKeystroke, registerKeyboardScope } from "./form_keyboard_scope";
 import { createFormUploadTracker, FormUploadsContext } from "./form_uploads";
-import { rowOfEntity } from "@rebasepro/app";
+import { entityOfRow, idOfRow, rowOfEntity } from "@rebasepro/app";
 
 import {
     getChangedProperties,
@@ -59,18 +59,18 @@ type CollectionProperty = NonNullable<AdminCollection["properties"][string]>;
  */
 export function EntityForm<M extends Record<string, unknown>>({
     path,
-    entityId: entityIdProp,
+    id: entityIdProp,
     collection,
     onValuesModified,
     onIdChange,
     onSaved,
-    entity: entityProp,
+    row: rowProp,
     initialDirtyValues,
     onFormContextReady,
     initialStatus,
     className,
     onStatusChange,
-    onEntityChange,
+    onRowChange,
     openEntityMode = "full_screen",
     formex: formexProp,
     disabled: disabledProp,
@@ -111,9 +111,15 @@ export function EntityForm<M extends Record<string, unknown>>({
     const authController = useAuthController();
     const [status, setStatus] = useState<EntityStatus>(initialStatus);
 
+    // The record the row stands for: the admin's own, where the row came from
+    // it — its relations' loaded targets, its dates and its version kept.
+    const entityProp = useMemo(() => rowProp
+        ? entityOfRow(rowProp, entityIdProp ?? idOfRow(rowProp, collection) ?? "", path, collection) as Entity<M>
+        : undefined, [rowProp, entityIdProp, path, collection]);
+
     /**
      * The record as this form last saved it. A create turns the form into the
-     * editor of the record it made, and the `entity` prop names that record
+     * editor of the record it made, and the `row` prop names that record
      * only once the caller has caught up — a caller that never does (the form
      * used on its own) left an "existing" form with no record: it re-seeded
      * itself with the defaults and refused the next Save.
@@ -376,14 +382,14 @@ export function EntityForm<M extends Record<string, unknown>>({
         setSavedEntity(updatedEntity);
         onResetProp?.();
         onValuesModified?.(false, updatedEntity.values);
-        onEntityChange?.(updatedEntity);
+        onRowChange?.({ row: rowOfEntity(updatedEntity, collection), id: String(updatedEntity.id) });
         updateStatus("existing");
         setEntityId(updatedEntity.id);
 
         if (onSaved) {
             onSaved({
                 row: rowOfEntity(updatedEntity, collection),
-                id: updatedEntity.id,
+                id: String(updatedEntity.id),
                 status,
                 path,
                 collection
@@ -431,10 +437,10 @@ export function EntityForm<M extends Record<string, unknown>>({
 
         return Promise.resolve(onSubmitProp(valuesToSave as M, formex))
             .then((result) => {
-                if (result) {
-                    afterSave(result as Entity<M>);
-                }
-                return result as Entity<M> | void;
+                if (!result) return;
+                const saved = entityOfRow(result.row, result.id, path, collection) as Entity<M>;
+                afterSave(saved);
+                return saved;
             })
             .catch(e => {
                 console.error(e);

@@ -52,6 +52,16 @@ describe("Storage Path Resolution", () => {
             expect(result).toBe("uploads/entity-123/images");
         });
 
+        it("replaces {id}, the record's id, as {entityId} is", () => {
+            expect(resolveStoragePathString(makeParams({ input: "uploads/{id}/images" }))).toBe("uploads/entity-123/images");
+        });
+
+        it("hands a function the record's id as `id`", () => {
+            const input = jest.fn((context: { id?: string | number }) => `uploads/${String(context.id)}`);
+            expect(resolveStoragePathString(makeParams({ input: input as never }))).toBe("uploads/entity-123");
+            expect(input.mock.calls[0][0]).not.toHaveProperty("entityId");
+        });
+
         it("replaces {path} placeholder", () => {
             const params = makeParams({ input: "{path}/media" });
             const result = resolveStoragePathString(params);

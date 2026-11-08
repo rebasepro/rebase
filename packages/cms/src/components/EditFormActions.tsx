@@ -174,7 +174,7 @@ function buildBottomActions<M extends Record<string, unknown>>({
                 const props = {
                     view: "form",
                     row: entity ? rowOfEntity(entity, collection) : undefined,
-                    id: entity?.id,
+                    id: entity ? String(entity.id) : undefined,
                     // The slug, not the path a Firestore collection declares for
                     // its store: actions route, copy and delete by `path`, and
                     // the stored path can be another collection's slug.

@@ -36,7 +36,9 @@ const EMPTY_ENTITIES: Entity<any>[] = [];
 /**
  * What {@link useSelectionDialog} and {@link SelectionTableBinding} take: a
  * collection to pick rows from, and what to do with the rows picked. The rows
- * are the server's, as `useRows` returns them — `id` included.
+ * are the server's, as `useRows` returns them, and each callback is handed
+ * their ids beside them — the strings `selectedIds` and `useSidePanel().open`
+ * take.
  *
  * @group Components
  */
@@ -66,20 +68,21 @@ export interface SelectionProps<M extends Record<string, unknown>> {
     selectedIds?: (string | number)[];
 
     /**
-     * If `multiselect` is `false`: the row picked, or `null` when the
-     * selection is cleared.
+     * If `multiselect` is `false`: the row picked and its id, or `null` when
+     * the selection is cleared.
      * @callback
      */
-    onSingleRowSelected?(row: Record<string, unknown> | null): void;
+    onSingleRowSelected?(row: Record<string, unknown> | null, id: string | null): void;
 
     /**
-     * If `multiselect` is `true`: the rows selected, on every tick.
+     * If `multiselect` is `true`: the rows selected and their ids, on every tick.
      * @callback
      */
-    onMultipleRowsSelected?(rows: Record<string, unknown>[]): void;
+    onMultipleRowsSelected?(rows: Record<string, unknown>[], ids: string[]): void;
 
     /**
-     * Called once, with the rows finally selected, when the user presses Done.
+     * Called once, with the rows finally selected and their ids, when the
+     * user presses Done.
      *
      * `onMultipleRowsSelected` reports every tick as it happens, which is
      * right when the selection *is* the value (a reference field). Use this
@@ -88,7 +91,7 @@ export interface SelectionProps<M extends Record<string, unknown>> {
      * is never acted on.
      * @callback
      */
-    onSelectionDone?(rows: Record<string, unknown>[]): void;
+    onSelectionDone?(rows: Record<string, unknown>[], ids: string[]): void;
 
     /**
      * Allow selection of entities that pass the given filter only.
@@ -122,6 +125,10 @@ export interface EntitySelectionProps<M extends Record<string, unknown>> extends
     onSelectionDone?(entities: Entity<M>[]): void;
 }
 
+function idsOf(entities: Entity<any>[]): string[] {
+    return entities.map((entity) => String(entity.id));
+}
+
 /**
  * Pick rows from a collection, in a table. You probably want to open it as a
  * side dialog with {@link useSelectionDialog}.
@@ -150,11 +157,11 @@ export function entitySelectionPropsOf<M extends Record<string, unknown>>({
         ...props,
         selectedEntityIds: selectedIds,
         onSingleEntitySelected: onSingleRowSelected
-            && ((entity) => onSingleRowSelected(entity ? rowOfEntity(entity, collection) : null)),
+            && ((entity) => onSingleRowSelected(entity ? rowOfEntity(entity, collection) : null, entity ? String(entity.id) : null)),
         onMultipleEntitiesSelected: onMultipleRowsSelected
-            && ((entities) => onMultipleRowsSelected(entities.map((entity) => rowOfEntity(entity, collection)))),
+            && ((entities) => onMultipleRowsSelected(entities.map((entity) => rowOfEntity(entity, collection)), idsOf(entities))),
         onSelectionDone: onSelectionDone
-            && ((entities) => onSelectionDone(entities.map((entity) => rowOfEntity(entity, collection))))
+            && ((entities) => onSelectionDone(entities.map((entity) => rowOfEntity(entity, collection)), idsOf(entities)))
     };
 }
 
@@ -288,9 +295,9 @@ function SelectionTableBindingInternal<M extends Record<string, unknown>>(
                 path,
                 entityId: entity.id
             });
-            if (selectedEntities.map((e) => e.id).indexOf(entity.id) > -1) {
+            if (selectedEntities.some((e) => String(e.id) === String(entity.id))) {
                 selectionController.setSelectedEntities(
-                    selectedEntities.filter((item: Entity<any>) => item.id !== entity.id)
+                    selectedEntities.filter((item: Entity<any>) => String(item.id) !== String(entity.id))
                 );
             } else {
                 if (maxSelection && selectedEntities.length >= maxSelection) return;

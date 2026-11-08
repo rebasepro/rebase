@@ -1,4 +1,4 @@
-import { Entity, EntityStatus } from "@rebasepro/types";
+import { EntityStatus } from "@rebasepro/types";
 
 import { EntityCustomViewParams, AdminCollection } from "@rebasepro/cms-types";
 import { FormContext } from "../fields";
@@ -18,18 +18,23 @@ export type EntityFormProps<M extends Record<string, unknown>> = {
      * The record's id. On a new record (`initialStatus: "new"`), the id it is
      * created under; omit it to let the data source assign one.
      */
-    entityId?: string | number;
-    entity?: Entity<M>;
+    id?: string | number;
+    /**
+     * The saved record, as the server sends the row — dates as ISO strings, a
+     * belongsTo as its foreign-key column. Absent for a new record.
+     */
+    row?: Record<string, unknown>;
     databaseId?: string;
     onIdChange?: (id: string | number) => void;
     onValuesModified?: (modified: boolean, values: M) => void;
-    onSaved?: (params: OnUpdateParams) => void;
+    onSaved?: (params: OnSavedParams) => void;
     initialDirtyValues?: Partial<M>; // dirty cached entity in memory
     onFormContextReady?: (formContext: FormContext<M>) => void;
     className?: string;
     initialStatus: EntityStatus;
     onStatusChange?: (status: EntityStatus) => void;
-    onEntityChange?: (entity: Entity<M>) => void;
+    /** Called with the record as it now is, after each save: its row and its id. */
+    onRowChange?: (params: { row: Record<string, unknown>; id: string }) => void;
     formex?: FormexController<M>;
     openEntityMode?: "side_panel" | "full_screen" | "split" | "dialog";
     /**
@@ -91,11 +96,12 @@ export type EntityFormProps<M extends Record<string, unknown>> = {
     // --- Headless callbacks (replace internal admin hooks) ---
 
     /**
-     * Called on form submit with the values to save.
+     * Called on form submit with the values to save; resolves with the record
+     * as saved — its row, as the server sends it, and its id.
      * The EntityFormBinding wrapper provides this automatically.
      * When using EntityForm standalone, provide your own save logic.
      */
-    onSubmit?: (values: M, formex: FormexController<M>) => Promise<Entity<M> | void> | void;
+    onSubmit?: (values: M, formex: FormexController<M>) => Promise<{ row: Record<string, unknown>; id: string | number } | void> | void;
 
     /**
      * Called when form values change (deferred).
@@ -163,14 +169,14 @@ export type EntityFormProps<M extends Record<string, unknown>> = {
 /**
  * What `onSaved` is called with once a record is stored.
  */
-export type OnUpdateParams = {
+export type OnSavedParams = {
     /**
      * The saved record, as the server sends the row — dates as ISO strings, a
-     * belongsTo as its foreign-key column, `id` included.
+     * belongsTo as its foreign-key column, `id` only where the table has that column.
      */
     row: Record<string, unknown>,
-    /** The saved record's id. */
-    id: string | number;
+    /** The saved record's id: its primary key as a string, a composite one's parts joined by `:::`. */
+    id: string;
     /** What the record was before this save: `"new"` or `"copy"` for a record this save created. */
     status: EntityStatus,
     path: string,

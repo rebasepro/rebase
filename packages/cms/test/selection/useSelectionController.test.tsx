@@ -30,6 +30,20 @@ describe("useEntitySelectionController", () => {
         expect(result.current.isEntitySelected(entity("a"))).toBe(false);
     });
 
+    /** A row ticked under its integer key and unticked under that key's string — or the other way — is one row. */
+    test("toggling twice by either spelling of an integer key", () => {
+        const { result } = renderHook(() => useEntitySelectionController());
+
+        act(() => result.current.toggleEntitySelection({ id: 5, path: "orders", values: {} }));
+        act(() => result.current.toggleEntitySelection({ id: "5", path: "orders", values: {} }));
+        expect(result.current.selectedCount).toBe(0);
+
+        act(() => result.current.selectAllMatching({ path: "orders" }, 3));
+        act(() => result.current.toggleEntitySelection({ id: "5", path: "orders", values: {} }, false));
+        act(() => result.current.toggleEntitySelection({ id: 5, path: "orders", values: {} }, true));
+        expect(result.current.selection).toEqual({ type: "query", query: { path: "orders" }, excluded: [], count: 3 });
+    });
+
     /** Same id at another path is another row — a junction-backed tab shows both. */
     test("a row is identified by path as well as id", () => {
         const { result } = renderHook(() => useEntitySelectionController());
@@ -217,8 +231,9 @@ describe("useEntitySelectionController", () => {
                 { id: "a/b", path: "x", values: {} }
             ]));
             expect(result.current.isEntitySelected({ id: 1, path: "orders", values: {} })).toBe(true);
-            // A number id is not its string.
-            expect(result.current.isEntitySelected({ id: "1", path: "orders", values: {} })).toBe(false);
+            // An integer key's number and its string address one record.
+            expect(result.current.isEntitySelected({ id: "1", path: "orders", values: {} })).toBe(true);
+            expect(result.current.isEntitySelected({ id: 2, path: "orders", values: {} })).toBe(false);
             // Path and id are not one string glued with a slash.
             expect(result.current.isEntitySelected({ id: "b", path: "x/a", values: {} })).toBe(false);
             expect(result.current.isEntitySelected({ id: "a/b", path: "x", values: {} })).toBe(true);

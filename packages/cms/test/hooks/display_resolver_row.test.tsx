@@ -54,6 +54,7 @@ function order(id: string): Entity {
         id,
         path: "row_orders",
         values: {
+            id,
             placed_on: new Date("2026-11-08"),
             customer: new EntityRelation("c7", "row_customers", { id: "c7", path: "row_customers", values: { name: "Ada" } })
         }

@@ -52,7 +52,7 @@ export interface SidePanelBindingProps<M extends Record<string, unknown> = Recor
     /**
      * Called after the record is saved, with the saved record as the server
      * sends the row — dates as ISO strings, a belongsTo as its foreign-key
-     * column, `id` included — and its id.
+     * column, `id` only where the table has that column — and its id.
      */
     onSaved?: (params: { row: Record<string, unknown>; id: string | number }) => void;
 

@@ -1,6 +1,7 @@
 import { CollectionConfig, Entity, FindParams, OrderByTuple, RebaseSdkData } from "@rebasepro/types";
 import { EntitySelection, RowSelection, SelectionQuery } from "@rebasepro/cms-types";
 import { buildCompositeId, resolvePrimaryKeys } from "@rebasepro/common";
+import { getRelationIncludeParams } from "@rebasepro/app";
 import { EntityPageAccessor, walkEntityPages } from "../util/entity_pages";
 
 /**
@@ -99,8 +100,10 @@ export interface ResolveEntitySelectionParams<M extends Record<string, unknown>>
 }
 
 /**
- * The rows a selection covers, as the server sends them — `row.id`, ISO
- * dates, a belongsTo as its foreign key.
+ * The rows a selection covers, as the server sends them — ISO dates, a
+ * belongsTo as its foreign key, a relation the view loads nested under its
+ * name as REST's `include` returns it — one shape in both modes: a query
+ * selection's rows are read with the view's own include.
  *
  * This is the *only* way to get rows out of a query selection, and it is why
  * {@link RowSelection} is a union: a bulk action has to call it, which means
@@ -127,11 +130,14 @@ export async function resolveSelection<M extends Record<string, unknown>>({
     const keys = resolvePrimaryKeys(collection);
     const path = selection.query.path;
     const flat = data.collection<M>(path);
+    // The relations the view reads its rows with, so a row read here is the
+    // row a ticked one is.
+    const include = getRelationIncludeParams(collection);
     // Walked as records, so the rows ticked off are told apart by the id the
     // view addressed them by; handed back as the rows read.
     const accessor: EntityPageAccessor<M> = {
         find: async (findParams) => {
-            const page = await flat.find(findParams);
+            const page = await flat.find(include ? { ...findParams, include } : findParams);
             return {
                 data: page.data.map((row) => ({ id: idOf(row, keys), path, values: row })),
                 meta: page.meta
@@ -146,14 +152,14 @@ export async function resolveSelection<M extends Record<string, unknown>>({
         selection: { type: "query", query: selection.query, excluded: [], count },
         accessor
     });
-    const excluded = new Set<unknown>(selection.excludedIds);
-    return entities.filter((entity) => !excluded.has(entity.id)).map((entity) => entity.values);
+    const excluded = new Set<string>(selection.excludedIds.map(String));
+    return entities.filter((entity) => !excluded.has(String(entity.id))).map((entity) => entity.values);
 }
 
-function idOf(row: Record<string, unknown>, keys: ReturnType<typeof resolvePrimaryKeys>): string | number {
+function idOf(row: Record<string, unknown>, keys: ReturnType<typeof resolvePrimaryKeys>): string {
     if (keys.length > 0) return buildCompositeId(row, keys);
     const id = row.id;
-    return typeof id === "string" || typeof id === "number" ? id : "";
+    return typeof id === "string" || typeof id === "number" ? String(id) : "";
 }
 
 /**

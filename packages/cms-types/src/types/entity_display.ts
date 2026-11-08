@@ -50,7 +50,7 @@ import type { RebaseContext } from "../rebase_context";
  *
  * `row` is the record as the server sends it — the shape `useRows` and
  * `context.data` return: dates as ISO strings, a belongsTo as its foreign-key
- * column, `id` included. A relation the admin loaded arrives nested under its
+ * column, `id` only where the table has that column. A relation the admin loaded arrives nested under its
  * name, as REST's `include` returns it: `row.customer` is the customer's row,
  * beside `customerId`.
  */

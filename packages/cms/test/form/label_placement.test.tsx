@@ -43,6 +43,7 @@ import { AuthControllerContext, CustomizationControllerContext, RebaseI18nProvid
 import { EntityForm } from "../../src/form/EntityForm";
 import { FieldBlock } from "../../src/form/components/FieldBlock";
 import { labelsInsideControl } from "../../src/form/label_placement";
+import { rowOf, saving } from "../helpers/form_rows";
 
 const inside = (property: object) => labelsInsideControl(property as Property);
 
@@ -143,11 +144,11 @@ describe("the record form", () => {
                     value={{ plugins: [], propertyConfigs: {}, entityActions: [], entityViews: [], resolvedSlots: [] } as never}>
                     <EntityForm<Product>
                         path="products"
-                        entityId="1"
+                        id="1"
                         collection={{ slug: "products", name: "Products", properties } as never}
-                        entity={{ id: "1", path: "products", values } as Entity<Product>}
+                        row={rowOf({ id: "1", path: "products", values } as Entity<Product>)}
                         initialStatus="existing"
-                        onSubmit={jest.fn(async (v: Product) => ({ id: "1", path: "products", values: v }))}
+                        onSubmit={saving(jest.fn(async (v: Product) => ({ id: "1", path: "products", values: v })))}
                         computedInitialValues={values}/>
                 </CustomizationControllerContext.Provider>
             </AuthControllerContext.Provider>

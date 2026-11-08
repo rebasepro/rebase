@@ -60,8 +60,8 @@ export async function deleteEntityWithCallbacks<M extends Record<string, any>, U
     return deleteWithCallbacks({
         collection,
         path: entity.path,
-        id: entity.id,
-        row: { id: entity.id, ...toWireRow(entity.values, collection) },
+        id: String(entity.id),
+        row: toWireRow(entity.values, collection),
         context,
         remove: () => data.collection(entity.path).delete(entity.id)
     }).then(() => {

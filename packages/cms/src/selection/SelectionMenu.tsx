@@ -1,12 +1,15 @@
 import React, { useMemo } from "react";
+import type { CollectionConfig } from "@rebasepro/types";
 import { SelectionController, SelectionQuery } from "@rebasepro/cms-types";
 import { Checkbox, ChevronDownIcon, Menu, MenuItem, Tooltip, cls, iconSize } from "@rebasepro/ui";
-import { useTranslation } from "@rebasepro/app";
+import { idOfRow, useTranslation } from "@rebasepro/app";
 
 export interface SelectionMenuProps<M extends Record<string, unknown>> {
     selectionController: SelectionController<M>;
-    /** The rows the view is holding right now, each with its `id`. */
+    /** The rows the view is holding right now. */
     loadedRows: Record<string, unknown>[];
+    /** The rows' collection: what a row's id is read by. */
+    collection: CollectionConfig;
     /** The view's live query — what "all matching" stands for. */
     query: SelectionQuery<M>;
     /** The view's filtered count. `undefined` while loading, or where the accessor has none. */
@@ -30,6 +33,7 @@ export interface SelectionMenuProps<M extends Record<string, unknown>> {
 export function SelectionMenu<M extends Record<string, unknown>>({
     selectionController,
     loadedRows,
+    collection,
     query,
     collectionEntitiesCount,
     collectionName
@@ -47,8 +51,11 @@ export function SelectionMenu<M extends Record<string, unknown>>({
     } = selectionController;
 
     const selectedLoaded = useMemo(
-        () => loadedRows.filter(row => (typeof row.id === "string" || typeof row.id === "number") && isSelected(row.id)).length,
-        [loadedRows, isSelected]
+        () => loadedRows.filter(row => {
+            const id = idOfRow(row, collection);
+            return id !== undefined && isSelected(id);
+        }).length,
+        [loadedRows, collection, isSelected]
     );
 
     const allLoadedSelected = loadedRows.length > 0 && selectedLoaded === loadedRows.length;

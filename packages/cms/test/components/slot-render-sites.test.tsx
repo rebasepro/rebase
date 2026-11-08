@@ -114,7 +114,7 @@ describe("the shell slots render in the app bar", () => {
 // ── The table row: `entity.row.actions` ──────────────────────────────────────
 
 describe("`entity.row.actions` renders per row", () => {
-    const entity = { id: 42, values: { title: "Hello" }, path: "posts" } as never;
+    const entity = { id: 42, values: { id: 42, title: "Hello" }, path: "posts" } as never;
     const collection = { slug: "posts", name: "Posts" } as never;
 
     function renderRow(props: Record<string, unknown> = {}) {
@@ -144,7 +144,8 @@ describe("`entity.row.actions` renders per row", () => {
         renderRow();
         expect(seen["entity.row.actions"][0]).toMatchObject({
             row: { id: 42, title: "Hello" },
-            id: 42,
+            // The admin's id for the record, beside the row: a string.
+            id: "42",
             path: "posts",
             collection,
             context: { marker: "admin-context", sidePanelController: undefined }

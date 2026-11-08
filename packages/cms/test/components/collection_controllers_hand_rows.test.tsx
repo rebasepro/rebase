@@ -21,6 +21,7 @@ import type {
 } from "@rebasepro/cms-types";
 import { Rebase } from "@rebasepro/app";
 import { CollectionPanel, useSelectionController } from "@rebasepro/cms";
+import { CustomViewHost } from "../../src/components/CollectionViewBinding/CustomViewHost";
 
 if (typeof globalThis.IntersectionObserver === "undefined") {
     class NoopIntersectionObserver {
@@ -224,5 +225,121 @@ describe("useSelectionController as admin.selectionController", () => {
         }));
         act(() => mine!.clearSelection());
         await waitFor(() => expect(mine!.hasSelection).toBe(false));
+    });
+
+    it("says once, not on every render, that a controller it did not make is not adopted", async () => {
+        const warn = jest.spyOn(console, "warn").mockImplementation(() => undefined);
+        const foreign: SelectionController = {
+            selection: { type: "rows", ids: [], rows: [] },
+            selectedCount: 0,
+            hasSelection: false,
+            isSelected: () => false,
+            toggleSelection: () => undefined,
+            setSelectedRows: () => undefined,
+            selectAllMatching: () => undefined,
+            clearSelection: () => undefined
+        };
+        const foreignTasks = { ...tasks, slug: "foreign_tasks" } as AdminCollection;
+        const view = render(<Page><CollectionPanel collection={foreignTasks} viewMode={"table"}
+            collectionOverrides={{ selectionController: foreign }}/></Page>);
+        expect(await screen.findByText("Write the plan")).toBeTruthy();
+        view.rerender(<Page><CollectionPanel collection={foreignTasks} viewMode={"table"}
+            collectionOverrides={{ selectionController: foreign }}/></Page>);
+        await tick(0);
+
+        const said = warn.mock.calls.filter(([message]) => String(message).includes("was not made by useSelectionController()"));
+        warn.mockRestore();
+        expect(said).toHaveLength(1);
+    });
+});
+
+/**
+ * A row is exactly its columns: on a collection keyed by an integer column,
+ * `row.id` is that column's number. The id handed beside a row — a
+ * selection's ids, a click's, the highlighted ones — is the string the admin
+ * addresses the record by, and an id handed back is read either way.
+ */
+describe("a collection keyed by an integer", () => {
+    const orders = {
+        slug: "orders",
+        name: "Orders",
+        singularName: "Order",
+        table: "orders",
+        properties: {
+            id: { type: "number", name: "Id", isId: true },
+            title: { type: "string", name: "Title" }
+        }
+    } as AdminCollection;
+    let seen: CollectionCustomViewParams[];
+    function Probe(params: CollectionCustomViewParams) {
+        seen.push(params);
+        return <div>
+            {params.tableController.rows.map(row =>
+                <button key={String(row.id)} onClick={() => params.onRowClick?.(row)}>{String(row.title)}</button>)}
+        </div>;
+    }
+    const probeView: CollectionCustomView = { key: "probe", name: "Probe", Builder: Probe };
+    const withProbe = { ...orders, customViews: ["probe"], defaultViewMode: "probe" } as AdminCollection;
+    const latest = () => seen[seen.length - 1];
+
+    beforeEach(() => {
+        seen = [];
+        rows = [
+            { id: 5, title: "Five" },
+            { id: 7, title: "Seven" }
+        ];
+    });
+
+    it("hands rows with the key column's number, and a click its string id", async () => {
+        const clicked: [Row, string][] = [];
+        render(<Page collectionViews={[probeView]}>
+            <CollectionPanel collection={withProbe} onRowClick={(row, id) => clicked.push([row, id])}/>
+        </Page>);
+        fireEvent.click(await screen.findByText("Five"));
+
+        expect(latest().tableController.rows).toEqual([{ id: 5, title: "Five" }, { id: 7, title: "Seven" }]);
+        await waitFor(() => expect(clicked).toEqual([[{ id: 5, title: "Five" }, "5"]]));
+    });
+
+    it("highlights by id, as a string", async () => {
+        render(<Page collectionViews={[probeView]}>
+            <CollectionPanel collection={withProbe} highlightedIds={[5]}/>
+        </Page>);
+        expect(await screen.findByText("Five")).toBeTruthy();
+        await waitFor(() => expect(latest().highlightedIds).toEqual(["5"]));
+    });
+
+    it("hands the deleted and highlighted rows' ids as strings, whatever the records hold", () => {
+        const deleted = { id: 7, path: "orders", values: { id: 7, title: "Seven" } };
+        const highlighted = { id: 5, path: "orders", values: { id: 5, title: "Five" } };
+        render(<CustomViewHost Builder={Probe} collection={orders} path="orders"
+            tableController={{ data: [highlighted], dataLoading: false, noMoreToLoad: true }}
+            highlightedEntities={[highlighted]}
+            deletedEntities={[deleted]}/>);
+        expect(latest().highlightedIds).toEqual(["5"]);
+        expect(latest().deletedIds).toEqual(["7"]);
+    });
+
+    it("selects, unselects and toggles a row twice — by the row, and by either spelling of its id", async () => {
+        render(<Page collectionViews={[probeView]}>
+            <CollectionPanel collection={withProbe}/>
+        </Page>);
+        expect(await screen.findByText("Five")).toBeTruthy();
+        const five = latest().tableController.rows[0];
+
+        act(() => latest().selectionController!.toggleSelection(five, true));
+        await waitFor(() => expect(latest().selectionController!.selection).toEqual({ type: "rows", ids: ["5"], rows: [five] }));
+        expect(latest().selectionController!.isSelected(5)).toBe(true);
+        expect(latest().selectionController!.isSelected("5")).toBe(true);
+        expect(latest().selectionController!.isSelected(7)).toBe(false);
+
+        act(() => latest().selectionController!.toggleSelection(five, false));
+        await waitFor(() => expect(latest().selectionController!.hasSelection).toBe(false));
+
+        // A row built by the app, not the view's: found by its key column.
+        act(() => latest().selectionController!.toggleSelection({ id: 5, title: "Five" }));
+        await waitFor(() => expect(latest().selectionController!.isSelected(5)).toBe(true));
+        act(() => latest().selectionController!.toggleSelection(five));
+        await waitFor(() => expect(latest().selectionController!.hasSelection).toBe(false));
     });
 });

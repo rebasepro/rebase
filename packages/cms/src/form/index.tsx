@@ -1,5 +1,5 @@
 export { EntityForm } from "./EntityForm";
-export type { EntityFormProps, OnUpdateParams } from "../types/components/EntityFormProps";
+export type { EntityFormProps, OnSavedParams } from "../types/components/EntityFormProps";
 
 export { EntityFormBinding } from "./EntityFormBinding";
 export type { EntityFormBindingProps } from "./EntityFormBinding";

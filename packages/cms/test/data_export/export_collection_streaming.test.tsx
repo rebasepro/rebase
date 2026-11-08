@@ -22,7 +22,7 @@ const mockEvents: string[] = [];
 const PAGES: Entity<Row>[][] = [0, 1, 2].map(page => [0, 1].map(i => ({
     id: `p${page}r${i}`,
     path: "items",
-    values: { name: `Row ${page}.${i}`, tags: page === 2 && i === 1 ? ["a", "b", "c"] : ["x"] }
+    values: { id: `p${page}r${i}`, name: `Row ${page}.${i}`, tags: page === 2 && i === 1 ? ["a", "b", "c"] : ["x"] }
 })));
 
 const mockAccessor = {

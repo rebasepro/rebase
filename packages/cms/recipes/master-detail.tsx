@@ -8,11 +8,12 @@
  * keeps its scroll and the form its edits.
  *
  * The master is a `CollectionPanel`: `fields` picks its columns, `onRowClick`
- * hands over the clicked row instead of opening it, and `highlightedIds`
- * draws that row as the selected one. The row is the server's: its primary
- * key under its own column (`id` here), dates as ISO strings. The detail is
- * an `EntityFormPanel` at that id, with `fields` choosing what it edits. A
- * save there reaches the list by itself.
+ * hands over the clicked row and its id instead of opening it, and
+ * `highlightedIds` draws that row as the selected one. The row is the
+ * server's: its columns, dates as ISO strings. The id is the string the admin
+ * addresses the record by. The detail is an `EntityFormPanel` at that id,
+ * with `fields` choosing what it edits. A save there reaches the list by
+ * itself.
  *
  * To use it: add `customersMasterDetailView` to `<RebaseCMS views={[…]}>`.
  * Change `COLLECTION`, the field lists, and `TITLE_FIELD` to your own.
@@ -32,17 +33,13 @@ const TITLE_FIELD = "name";
 
 type Row = Record<string, unknown>;
 
-/** A row's primary key, as `EntityFormPanel`'s `id` and `highlightedIds` take it. */
-function idOf(row: Row): string | number | undefined {
-    return typeof row.id === "string" || typeof row.id === "number" ? row.id : undefined;
-}
-
 export function CustomersMasterDetail() {
     // The form takes the collection as a value; the list finds it by slug.
     const registry = useCollectionRegistryController();
     const collection = registry.initialised ? registry.getCollection(COLLECTION) : undefined;
-    const [selected, setSelected] = useState<Row | null>(null);
-    const selectedId = selected ? idOf(selected) : undefined;
+    // The row picked, and its id: what `EntityFormPanel` and `highlightedIds` take.
+    const [selected, setSelected] = useState<{ row: Row; id: string } | null>(null);
+    const selectedId = selected?.id;
 
     if (!registry.initialised) return <CircularProgressCenter/>;
     if (!collection) return <Typography color={"error"} className={"p-8"}>{`No collection "${COLLECTION}" is registered.`}</Typography>;
@@ -55,7 +52,7 @@ export function CustomersMasterDetail() {
                     <CollectionPanel path={COLLECTION}
                         title={false}
                         fields={LIST_FIELDS}
-                        onRowClick={setSelected}
+                        onRowClick={(row, id) => setSelected({ row, id })}
                         highlightedIds={selectedId !== undefined ? [selectedId] : []}
                         className={"h-full"}/>
                 }
@@ -64,13 +61,13 @@ export function CustomersMasterDetail() {
                         <EntityFormPanel
                             // Another record is another form: remount rather
                             // than carry one record's edits into the next.
-                            key={String(selectedId)}
+                            key={selectedId}
                             collection={collection}
                             id={selectedId}
                             fields={FORM_FIELDS}/>
                     </div>
                 )}
-                detailTitle={selected ? String(selected[TITLE_FIELD] ?? selectedId) : undefined}
+                detailTitle={selected ? String(selected.row[TITLE_FIELD] ?? selected.id) : undefined}
                 onBack={() => setSelected(null)}/>
         </div>
     );

@@ -87,6 +87,7 @@ jest.mock("../../src/form/resolve_form_properties", () => {
 
 import { AuthControllerContext, CustomizationControllerContext, RebaseI18nProvider } from "@rebasepro/app";
 import { EntityForm } from "../../src/form/EntityForm";
+import { rowOf, saving } from "../helpers/form_rows";
 
 type Row = Record<string, unknown>;
 
@@ -98,11 +99,11 @@ function renderForm(properties: Row, values: Row) {
                 value={{ plugins: [], propertyConfigs: {}, entityActions: [], entityViews: [], resolvedSlots: [] } as never}>
                 <EntityForm<Row>
                     path="posts"
-                    entityId="1"
+                    id="1"
                     collection={collection}
-                    entity={{ id: "1", path: "posts", values } as never}
+                    row={rowOf({ id: "1", path: "posts", values } as never)}
                     initialStatus="existing"
-                    onSubmit={jest.fn(async (v: Row) => ({ id: "1", path: "posts", values: v })) as never}
+                    onSubmit={saving(jest.fn(async (v: Row) => ({ id: "1", path: "posts", values: v })))}
                     computedInitialValues={values}/>
             </CustomizationControllerContext.Provider>
         </AuthControllerContext.Provider>
@@ -320,13 +321,13 @@ describe("the form controller", () => {
                     <EntityForm<Row>
                         key="form"
                         path="posts"
-                        entityId="1"
+                        id="1"
                         className={"tick-" + tick}
                         collection={collection}
-                        entity={{ id: "1", path: "posts", values } as never}
+                        row={rowOf({ id: "1", path: "posts", values } as never)}
                         initialStatus="existing"
                         Builder={Capture as never}
-                        onSubmit={onSubmit}
+                        onSubmit={saving(onSubmit)}
                         initialDirtyValues={{ f1: "draft" }}
                         computedInitialValues={values}/>
                 </CustomizationControllerContext.Provider>
@@ -353,11 +354,11 @@ describe("the form controller", () => {
                     value={{ plugins: [], propertyConfigs: {}, entityActions: [], entityViews: [], resolvedSlots: [] } as never}>
                     <EntityForm<Row>
                         path="posts"
-                        entityId="1"
+                        id="1"
                         collection={collection}
-                        entity={{ id: "1", path: "posts", values } as never}
+                        row={rowOf({ id: "1", path: "posts", values } as never)}
                         initialStatus="existing"
-                        onSubmit={jest.fn(async (v: Row) => ({ id: "1", path: "posts", values: v })) as never}
+                        onSubmit={saving(jest.fn(async (v: Row) => ({ id: "1", path: "posts", values: v })))}
                         initialDirtyValues={draft}
                         computedInitialValues={values}/>
                 </CustomizationControllerContext.Provider>

@@ -4,12 +4,15 @@ import { Entity } from "@rebasepro/types";
 import { canCreateEntity, canEditEntity, canDeleteEntity, canReadCollection } from "@rebasepro/common";
 import { useCallback, useMemo } from "react";
 import type { AdminCollection } from "@rebasepro/cms-types";
+import { idOfRow } from "../util/entity_row";
 
-/** A row, as the collection's rules read a record: its columns under `values`. */
-function asRecord(path: string, row: Record<string, unknown> | null): Entity<Record<string, unknown>> | null {
+/** A collection of any model: the rules read only its config. */
+type RowCollection = AdminCollection<Record<string, unknown>>;
+
+/** A row, as the collection's rules read a record: its columns under `values`, beside the id the admin addresses it by. */
+function asRecord(collection: RowCollection, path: string, row: Record<string, unknown> | null): Entity<Record<string, unknown>> | null {
     if (!row) return null;
-    const id = row.id;
-    return { id: typeof id === "string" || typeof id === "number" ? id : "", path, values: row };
+    return { id: idOfRow(row, collection) ?? "", path, values: row };
 }
 
 /**
@@ -31,25 +34,25 @@ export function usePermissions() {
     const simulating = useRlsSimulation().simulation !== null;
 
     const canCreate = useCallback(
-        (collection: AdminCollection<any>, path: string) =>
+        (collection: RowCollection, path: string) =>
             !simulating && canCreateEntity(collection, authController, path, null),
         [authController, simulating]
     );
 
     const canEdit = useCallback(
-        (collection: AdminCollection<any>, path: string, row: Record<string, unknown> | null) =>
-            !simulating && canEditEntity(collection, authController, path, asRecord(path, row)),
+        (collection: RowCollection, path: string, row: Record<string, unknown> | null) =>
+            !simulating && canEditEntity(collection, authController, path, asRecord(collection, path, row)),
         [authController, simulating]
     );
 
     const canDelete = useCallback(
-        (collection: AdminCollection<any>, path: string, row: Record<string, unknown> | null) =>
-            !simulating && canDeleteEntity(collection, authController, path, asRecord(path, row)),
+        (collection: RowCollection, path: string, row: Record<string, unknown> | null) =>
+            !simulating && canDeleteEntity(collection, authController, path, asRecord(collection, path, row)),
         [authController, simulating]
     );
 
     const canRead = useCallback(
-        (collection: AdminCollection<any>) =>
+        (collection: RowCollection) =>
             canReadCollection(collection, authController),
         [authController]
     );

@@ -78,16 +78,26 @@ describe("toWireRow", () => {
         expect(flat).toEqual({ assigneeId: "p2", assignee: { id: "p2", name: "Ada", joinedAt: "2026-01-02T00:00:00.000Z" } });
     });
 
-    it("lists a to-many relation's loaded targets as rows, the ones not loaded as ids", () => {
+    it("lists a to-many relation's loaded targets as rows", () => {
         const row = toWireRow({
             id: "p1",
             tasks: [
                 new EntityRelation("t1", "tasks", { id: "t1", path: "tasks", values: { title: "Plan", due: new Date("2026-11-08") } }),
+                new EntityRelation("t3", "tasks", { id: "t3", path: "tasks", values: { title: "Ship" } })
+            ]
+        }, peopleWithTasks);
+        expect(row).toEqual({ id: "p1", tasks: [{ id: "t1", title: "Plan", due: "2026-11-08" }, { id: "t3", title: "Ship" }] });
+        expect(toWireRow({ tasks: [new EntityRelation("t2", "tasks")] }, peopleWithTasks)).toEqual({ tasks: ["t2"] });
+    });
+
+    it("lists a to-many relation all as rows or all as ids: ids where any target was not loaded", () => {
+        const row = toWireRow({
+            tasks: [
+                new EntityRelation("t1", "tasks", { id: "t1", path: "tasks", values: { title: "Plan" } }),
                 new EntityRelation("t2", "tasks")
             ]
         }, peopleWithTasks);
-        expect(row).toEqual({ id: "p1", tasks: [{ id: "t1", title: "Plan", due: "2026-11-08" }, "t2"] });
-        expect(toWireRow({ tasks: [new EntityRelation("t2", "tasks")] }, peopleWithTasks)).toEqual({ tasks: ["t2"] });
+        expect(row).toEqual({ tasks: ["t1", "t2"] });
     });
 
     it("leaves the loaded targets out of a row that is written", () => {

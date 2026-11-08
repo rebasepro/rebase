@@ -41,6 +41,7 @@ jest.mock("@rebasepro/app", () => {
 import { AuthControllerContext, CustomizationControllerContext, RebaseI18nProvider } from "@rebasepro/app";
 import { EntityForm } from "../../src/form/EntityForm";
 import { getTableBindingForProperty } from "../../src/components/CollectionTableBinding/table_bindings";
+import { rowOf, saving } from "../helpers/form_rows";
 
 type Post = Record<string, unknown>;
 
@@ -60,17 +61,17 @@ async function clearAndSave(stored: Post, field: "subtitle" | "summary", typeFir
                 value={{ plugins: [], propertyConfigs: {}, entityActions: [], entityViews: [], resolvedSlots: [] } as never}>
                 <EntityForm<Post>
                     path="posts"
-                    entityId="1"
+                    id="1"
                     collection={collection}
-                    entity={{ id: "1", path: "posts", values: stored } as Entity<Post>}
+                    row={rowOf({ id: "1", path: "posts", values: stored } as Entity<Post>)}
                     initialStatus="existing"
                     onFormContextReady={(c) => {
                         ctx = c;
                     }}
-                    onSubmit={jest.fn(async (v: Post) => {
+                    onSubmit={saving(jest.fn(async (v: Post) => {
                         payloads.push(v);
                         return { id: "1", path: "posts", values: { ...stored, ...v } };
-                    })}
+                    }))}
                     computedInitialValues={stored}/>
             </CustomizationControllerContext.Provider>
         </AuthControllerContext.Provider>

@@ -214,6 +214,114 @@ describe("saveEntityWithCallbacks", () => {
             expect(createFn).toHaveBeenCalledWith({ name: "New Entity", slug: "new-entity" }, undefined);
         });
 
+        // `context.data`'s writer saves whatever beforeSave hands back, edited
+        // in place or not (data_changes.test.tsx); the form's save is held to
+        // the same.
+        it.each([
+            ["edits the row in place and returns it", ({ values }: { values: Record<string, unknown> }) => {
+                values.slug = "new-entity";
+                return values;
+            }],
+            ["returns a new row", ({ values }: { values: Record<string, unknown> }) => ({ ...values, slug: "new-entity" })]
+        ])("saves beforeSave's change when it %s", async (_how, beforeSave) => {
+            const createFn = jest.fn().mockResolvedValue(mockEntity);
+            const values = { name: "New Entity" };
+
+            await saveEntityWithCallbacks({
+                collection: withCallbacks({ beforeSave }),
+                path: "test-collection",
+                entityId: undefined,
+                values,
+                previousValues: undefined,
+                status: "new",
+                data: createMockData({ create: createFn }),
+                context: mockContext
+            });
+
+            expect(createFn).toHaveBeenCalledWith({ name: "New Entity", slug: "new-entity" }, undefined);
+            // The form's own values are not the row it handed out.
+            expect(values).toEqual({ name: "New Entity" });
+        });
+
+        describe("a relation's loaded target, edited in beforeSave", () => {
+            const people = { slug: "people", table: "people", name: "People", properties: { id: { type: "string", name: "Id", isId: true }, name: { type: "string", name: "Name" } } } as CollectionConfig;
+            const tags = { slug: "tags", table: "tags", name: "Tags", properties: { id: { type: "string", name: "Id", isId: true }, label: { type: "string", name: "Label" } } } as CollectionConfig;
+            const posts = {
+                slug: "posts",
+                table: "posts",
+                name: "Posts",
+                properties: {
+                    title: { type: "string", name: "Title" },
+                    author: { type: "relation", name: "Author", relation: { kind: "belongsTo", target: () => people, localKey: "author_id" } },
+                    tags: { type: "relation", name: "Tags", relation: { kind: "manyToMany", target: () => tags, through: { table: "post_tags", sourceColumn: "post_id", targetColumn: "tag_id" } } }
+                }
+            } as CollectionConfig;
+            const author = new EntityRelation("p1", "people", { id: "p1", path: "people", values: { name: "Ada" } });
+            const tagged = [
+                new EntityRelation("g1", "tags", { id: "g1", path: "tags", values: { label: "news" } }),
+                new EntityRelation("g2", "tags", { id: "g2", path: "tags", values: { label: "tech" } })
+            ];
+
+            async function create(beforeSave: (props: { values: Record<string, unknown> }) => Record<string, unknown>) {
+                const createFn = jest.fn().mockResolvedValue({ id: "n1", path: "posts", values: {} });
+                await saveEntityWithCallbacks({
+                    collection: { ...posts, browserCallbacks: { beforeSave } } as AdminCollection,
+                    path: "posts",
+                    entityId: undefined,
+                    values: { title: "Hello", author, tags: tagged },
+                    previousValues: undefined,
+                    status: "new",
+                    data: createMockData({ create: createFn }),
+                    context: mockContext
+                });
+                return createFn.mock.calls[0][0] as Record<string, unknown>;
+            }
+
+            it("keeps a belongsTo whose loaded target is stripped: its foreign key is the relation", async () => {
+                const inPlace = await create(({ values }) => {
+                    delete values.author;
+                    return values;
+                });
+                expect(inPlace.author).toBe(author);
+                const copied = await create(({ values }) => {
+                    const { author: _author, ...rest } = values;
+                    return rest;
+                });
+                expect(copied.author).toBe(author);
+            });
+
+            it("keeps a belongsTo whose loaded target is edited: what was read is not written", async () => {
+                const written = await create(({ values }) => ({ ...values, author: { id: "p1", name: "Grace" } }));
+                expect(written.author).toBe(author);
+            });
+
+            it("drops a belongsTo only when its foreign key is dropped", async () => {
+                const written = await create(({ values }) => {
+                    const { authorId: _authorId, ...rest } = values;
+                    return rest;
+                });
+                expect(written).not.toHaveProperty("author");
+            });
+
+            it("unlinks a belongsTo whose foreign key is cleared", async () => {
+                const written = await create(({ values }) => ({ ...values, authorId: null }));
+                expect(written.author).toBeNull();
+            });
+
+            it("keeps a to-many whose loaded rows are removed from the row, or edited", async () => {
+                expect((await create(({ values }) => {
+                    delete values.tags;
+                    return values;
+                })).tags).toBe(tagged);
+                expect((await create(({ values }) => ({ ...values, tags: [{ id: "g1", label: "renamed" }] }))).tags).toBe(tagged);
+            });
+
+            it("writes a to-many given as ids", async () => {
+                const written = await create(({ values }) => ({ ...values, tags: ["g2"] }));
+                expect((written.tags as EntityRelation[]).map((tag) => tag.id)).toEqual(["g2"]);
+            });
+        });
+
         it("hands the callbacks rows as the server sends them, and writes beforeSave's change onto the form's values", async () => {
             const people = { slug: "people", table: "people", name: "People", properties: { id: { type: "string", name: "Id", isId: true } } } as CollectionConfig;
             const tasks = {

@@ -47,6 +47,7 @@ jest.mock("@rebasepro/app", () => {
 import { AuthControllerContext, CustomizationControllerContext, RebaseI18nProvider } from "@rebasepro/app";
 import { EntityForm } from "../../src/form/EntityForm";
 import { getInitialEntityValues } from "../../src/form/form_utils";
+import { rowOf, saving } from "../helpers/form_rows";
 
 type Row = Record<string, unknown>;
 
@@ -64,15 +65,15 @@ async function submit(properties: Record<string, unknown>, values: Row, status: 
     };
     render(<EntityForm<Row>
         path="products"
-        entityId={status === "existing" ? "1" : undefined}
-        entity={status === "existing" ? entityOf(values) : undefined}
+        id={status === "existing" ? "1" : undefined}
+        row={rowOf(status === "existing" ? entityOf(values) : undefined)}
         collection={collection}
         initialStatus={status}
         Builder={Capture}
         onFormContextReady={(c) => {
             ctx = c;
         }}
-        onSubmit={onSubmit}
+        onSubmit={saving(onSubmit)}
         computedInitialValues={values}/>);
     await act(async () => {
         await ctx!.submit();
@@ -193,11 +194,11 @@ describe("conditions where the field is drawn", () => {
                     value={{ plugins: [], propertyConfigs: {}, entityActions: [], entityViews: [], resolvedSlots: [] } as never}>
                     <EntityForm<Row>
                         path="products"
-                        entityId="1"
-                        entity={entityOf(values)}
+                        id="1"
+                        row={rowOf(entityOf(values))}
                         collection={collection}
                         initialStatus="existing"
-                        onSubmit={jest.fn(async (v: Row) => entityOf(v))}
+                        onSubmit={saving(jest.fn(async (v: Row) => entityOf(v)))}
                         computedInitialValues={values}/>
                 </CustomizationControllerContext.Provider>
             </AuthControllerContext.Provider>

@@ -3,18 +3,21 @@ import type { CollectionConfig, Entity } from "@rebasepro/types";
 import type { EntitySelection, EntitySelectionController, SelectionController, SelectionQuery } from "@rebasepro/cms-types";
 import { selectionControllerOf } from "@rebasepro/app";
 
-/** Same row: id alone is not unique across a junction-backed tab's two paths. */
+/**
+ * Same row: id alone is not unique across a junction-backed tab's two paths.
+ * Ids compare as the strings they address a record by — an integer key's `5`
+ * and `"5"` are one record, whichever of the two a caller handed back.
+ */
 function sameEntity(a: Entity<any>, b: Entity<any>): boolean {
-    return a.id === b.id && a.path === b.path;
+    return String(a.id) === String(b.id) && a.path === b.path;
 }
 
 /**
  * The rows of a list, by path and then by id, for asking about one row in
  * constant time. Keyed in two levels rather than by a joined string: a path
- * and an id may both contain a slash, and `1` and `"1"` are different ids, as
- * they are to `sameEntity`.
+ * and an id may both contain a slash.
  */
-type RowIndex = Map<unknown, Set<unknown>>;
+type RowIndex = Map<string, Set<string>>;
 
 function indexRows(entities: Entity<any>[]): RowIndex {
     const index: RowIndex = new Map();
@@ -24,13 +27,13 @@ function indexRows(entities: Entity<any>[]): RowIndex {
             ids = new Set();
             index.set(entity.path, ids);
         }
-        ids.add(entity.id);
+        ids.add(String(entity.id));
     }
     return index;
 }
 
 function indexHas(index: RowIndex, entity: Entity<any>): boolean {
-    return index.get(entity.path)?.has(entity.id) ?? false;
+    return index.get(entity.path)?.has(String(entity.id)) ?? false;
 }
 
 const EMPTY_SELECTION: EntitySelection<any> = {

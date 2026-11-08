@@ -3,7 +3,7 @@ import type { SidePanelBindingProps, AdminCollection } from "@rebasepro/cms-type
 import { hasEntityId } from "@rebasepro/common";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
-import type { OnUpdateParams } from "../types/components/EntityFormProps";
+import type { OnSavedParams } from "../types/components/EntityFormProps";
 import { ErrorBoundary } from "@rebasepro/ui";
 import { IconButton, Maximize2Icon, XIcon } from "@rebasepro/ui";
 import { EditViewBinding } from "./EditViewBinding";
@@ -94,7 +94,7 @@ export function SidePanelBinding(props: SidePanelBindingProps) {
      * selects the record and closes the picker — so the opener's intent should
      * be the final word, not something this panel overwrites on its way out.
      */
-    const onUpdate = (params: OnUpdateParams) => {
+    const onSaved = (params: OnSavedParams) => {
         setEditInDialog(false);
 
         // Either "save and close" was clicked, or the opener asked for it when
@@ -306,7 +306,7 @@ export function SidePanelBinding(props: SidePanelBindingProps) {
                         collection={collection as AdminCollection}
                         parentCollectionSlugs={parentCollectionSlugs} parentEntityIds={parentEntityIds}
                         onValuesModified={onValuesModified}
-                        onSaved={onUpdate}
+                        onSaved={onSaved}
                         navigateBack={closeEditView}
                         barActionsStart={barActionsStart}
                         barActions={({ carryEdit }) => windowControls(

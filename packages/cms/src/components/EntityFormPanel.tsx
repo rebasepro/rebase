@@ -3,11 +3,11 @@ import { deepEqual as equal } from "fast-equals";
 import type { Entity } from "@rebasepro/types";
 import type { AdminCollection } from "@rebasepro/cms-types";
 import { Alert, Button, CenteredView, CircularProgressCenter, Typography } from "@rebasepro/ui";
-import { CollectionScopeProvider, ErrorView, useFetch, usePermissions, useTranslation } from "@rebasepro/app";
+import { CollectionScopeProvider, entityOfRow, ErrorView, rowOfEntity, useFetch, usePermissions, useTranslation } from "@rebasepro/app";
 
 import { EntityFormBinding } from "../form/EntityFormBinding";
 import type { EntityFormBindingProps } from "../form/EntityFormBinding";
-import type { OnUpdateParams } from "../types/components/EntityFormProps";
+import type { OnSavedParams } from "../types/components/EntityFormProps";
 import { useCollectionRegistryController } from "../hooks/navigation/contexts/CollectionRegistryContext";
 import { useNavigationStateController } from "../hooks/navigation/contexts/NavigationStateContext";
 import { CollectionsScopeContext, isRegistered } from "./CollectionsScopeContext";
@@ -40,7 +40,7 @@ export type EntityFormPanelProps<M extends Record<string, unknown> = Record<stri
     path?: string;
 
     /** Called after every successful save, with the saved record. */
-    onSaved?: (params: OnUpdateParams) => void;
+    onSaved?: (params: OnSavedParams) => void;
 
     /**
      * Called when the form asks to be left — after its record is deleted, or
@@ -88,7 +88,7 @@ export type EntityFormPanelProps<M extends Record<string, unknown> = Record<stri
     collectionOverrides?: Partial<AdminCollection>;
 
     /** Anything else {@link EntityFormBinding} takes. */
-    formProps?: Partial<Omit<EntityFormBindingProps<M>, "path" | "collection" | "entityId" | "entity" | "initialStatus">>;
+    formProps?: Partial<Omit<EntityFormBindingProps<M>, "path" | "collection" | "id" | "row" | "initialStatus">>;
 };
 
 /**
@@ -229,16 +229,17 @@ function EntityFormPanelInScope<M extends Record<string, unknown>>({
                     className={className ?? formProps?.className}
                     path={path}
                     collection={collection}
-                    entity={asNew.saved}
+                    row={asNew.saved ? rowOfEntity(asNew.saved, collection) : undefined}
                     initialStatus={"new"}
                     initialDirtyValues={asNew.values}
                     fields={fields ?? formProps?.fields}
                     layout={layout ?? formProps?.layout}
                     disabled={!canCreate(collection, path) || formProps?.disabled}
-                    onEntityChange={(changed) => {
+                    onRowChange={(changed) => {
                         // The record it created, which it edits from then on.
-                        setAsNew(current => current && { ...current, saved: changed });
-                        formProps?.onEntityChange?.(changed);
+                        const saved = entityOfRow(changed.row, changed.id, path, collection) as Entity<M>;
+                        setAsNew(current => current && { ...current, saved });
+                        formProps?.onRowChange?.(changed);
                     }}
                     onSaved={(params) => {
                         formProps?.onSaved?.(params);
@@ -270,16 +271,16 @@ function EntityFormPanelInScope<M extends Record<string, unknown>>({
                 className={className ?? formProps?.className}
                 path={path}
                 collection={collection}
-                entityId={entityId}
-                entity={shownEntity}
+                id={entityId}
+                row={shownEntity ? rowOfEntity(shownEntity, collection) : undefined}
                 initialStatus={creating ? "new" : "existing"}
                 initialDirtyValues={creating ? defaultValues : formProps?.initialDirtyValues}
                 fields={fields ?? formProps?.fields}
                 layout={layout ?? formProps?.layout}
                 disabled={!editable || formProps?.disabled}
-                onEntityChange={(changed) => {
-                    setSavedEntity(changed);
-                    formProps?.onEntityChange?.(changed);
+                onRowChange={(changed) => {
+                    setSavedEntity(entityOfRow(changed.row, changed.id, path, collection) as Entity<M>);
+                    formProps?.onRowChange?.(changed);
                 }}
                 onValuesModified={(modified, values) => {
                     typedValues.current = values;

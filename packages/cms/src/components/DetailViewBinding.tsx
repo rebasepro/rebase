@@ -305,7 +305,7 @@ function DetailViewBindingInner<M extends Record<string, unknown>>({
         ? {
             view: "form" as const,
             row: usedRow,
-            id: usedEntity.id,
+            id: String(usedEntity.id),
             path,
             collection: collection as AdminCollection,
             context,
@@ -566,7 +566,7 @@ function DetailViewBindingInner<M extends Record<string, unknown>>({
             externalLink={usedEntity
                 ? customizationController?.entityLinkBuilder?.({
                     row: rowOfEntity(usedEntity, collection),
-                    id: usedEntity.id,
+                    id: String(usedEntity.id),
                     path: usedEntity.path
                 })
                 : undefined}

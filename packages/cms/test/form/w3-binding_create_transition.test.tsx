@@ -58,6 +58,7 @@ jest.mock("../../src/hooks/navigation/contexts/CollectionRegistryContext", () =>
 
 import { EntityFormBinding } from "../../src/form/EntityFormBinding";
 import { EntityForm } from "../../src/form/EntityForm";
+import { rowOf, saving } from "../helpers/form_rows";
 
 const collection = {
     slug: "posts",
@@ -121,12 +122,12 @@ describe("after a create", () => {
             collection={collection}
             initialStatus="new"
             Builder={Capture}
-            onSubmit={async (values: Post) => {
+            onSubmit={saving(async (values: Post) => {
                 submitted.push(values);
                 return submitted.length === 1
                     ? create(values)
                     : update("9", values);
-            }}/>);
+            })}/>);
 
         await createThenEdit();
 

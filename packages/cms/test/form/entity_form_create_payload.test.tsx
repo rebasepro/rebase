@@ -30,6 +30,7 @@ jest.mock("@rebasepro/app", () => {
 });
 
 import { EntityForm } from "../../src/form/EntityForm";
+import { rowOf, saving } from "../helpers/form_rows";
 
 /**
  * What a create from the record form sends.
@@ -68,10 +69,10 @@ async function createWith(edit: (formContext: FormContext<Post>) => void): Promi
         collection={collection}
         initialStatus="new"
         Builder={Capture}
-        onSubmit={async (values: Post) => {
+        onSubmit={saving(async (values: Post) => {
             payloads.push(values);
             return { id: "1", path: "posts", values } as Entity<Post>;
-        }}/>);
+        })}/>);
     await act(async () => {
         edit(context);
     });

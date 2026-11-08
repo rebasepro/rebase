@@ -1,7 +1,7 @@
 
 import { Entity, FilterValues } from "@rebasepro/types";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { CollectionWindow, CollectionWindowState, fromWireRow, getRelationIncludeParams, toWireRow, useData, useDataChangeVersion, useRebaseContext } from "@rebasepro/app";
+import { CollectionWindow, CollectionWindowState, copyRow, fromWireRow, getRelationIncludeParams, toWireRow, useData, useDataChangeVersion, useRebaseContext } from "@rebasepro/app";
 import type { AdminCollection } from "@rebasepro/cms-types";
 
 const DEFAULT_PAGE_SIZE = 20;
@@ -360,17 +360,18 @@ values: { ...e.values,
             // Apply the panel's own afterRead callbacks if any — `browserCallbacks`,
             // not `callbacks`: the latter already ran on the server before these
             // rows arrived, and running it again here applied it twice.
-            // afterRead is handed the row as the server sends it; what it
-            // changes is converted back onto the record's values.
+            // afterRead is handed a copy of the row as the server sends it;
+            // what it changes, in place or in a new object, is converted back
+            // onto the record's values.
             if (currentCollection.browserCallbacks?.afterRead) {
                 try {
                     processed = await Promise.all(
                         processed.map(async (entity) => {
-                            const row = { id: entity.id, ...toWireRow(entity.values, currentCollection) };
+                            const row = toWireRow(entity.values, currentCollection);
                             const processedRow = await currentCollection.browserCallbacks!.afterRead!({
                                 collection: currentCollection,
                                 path: currentResolvedPath,
-                                row,
+                                row: copyRow(row),
                                 context: currentContext
                             });
                             return {

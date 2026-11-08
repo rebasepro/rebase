@@ -265,6 +265,66 @@ describe("resolveSelection over context.data", () => {
         expect(rows).toEqual([{ id: "row-0", placed: PLACED }, { id: "row-2", placed: PLACED }]);
     });
 
+    test("reads a query selection's rows with the relations the view loads, so both modes hand one shape", async () => {
+        const customers = {
+            slug: "customers",
+            name: "Customers",
+            properties: { id: { type: "string", name: "Id", isId: true }, name: { type: "string", name: "Name" } }
+        } as unknown as CollectionConfig;
+        const withCustomer = {
+            ...orders,
+            properties: {
+                ...orders.properties,
+                customer: { type: "relation", name: "Customer", relation: { kind: "belongsTo", target: () => customers, localKey: "customer_id" } }
+            }
+        } as unknown as CollectionConfig;
+        const asked: FindParams<any>[] = [];
+        const row = { id: "row-0", placed: PLACED, customerId: "c1", customer: { id: "c1", name: "Ada" } };
+        const data = {
+            collection: () => ({
+                find: async (params: FindParams<any>) => {
+                    asked.push(params);
+                    // As REST answers: the relation nested only where it was included.
+                    const included = Array.isArray(params.include) && params.include.includes("customer");
+                    const served = included ? row : { id: row.id, placed: PLACED, customerId: "c1" };
+                    return { data: [served], meta: { total: 1, limit: 500, offset: 0, hasMore: false } };
+                }
+            })
+        } as unknown as Pick<RebaseSdkData, "collection">;
+
+        const fromQuery = await resolveSelection({
+            selection: { type: "query", query: { path: "orders" }, excludedIds: [] },
+            data,
+            collection: withCustomer
+        });
+        const fromRows = await resolveSelection({
+            selection: { type: "rows", ids: ["row-0"], rows: [row] },
+            data,
+            collection: withCustomer
+        });
+        expect(asked[0].include).toEqual(["customer"]);
+        expect(fromQuery).toEqual(fromRows);
+    });
+
+    test("leaves out ticked-off ids however they are spelt", async () => {
+        const numbered = {
+            slug: "orders",
+            name: "Orders",
+            properties: { id: { type: "number", name: "Id", isId: true } }
+        } as unknown as CollectionConfig;
+        const data = {
+            collection: () => ({
+                find: async () => ({ data: [{ id: 5 }, { id: 7 }], meta: { total: 2, limit: 500, offset: 0, hasMore: false } })
+            })
+        } as unknown as Pick<RebaseSdkData, "collection">;
+        const rows = await resolveSelection({
+            selection: { type: "query", query: { path: "orders" }, excludedIds: ["5"] },
+            data,
+            collection: numbered
+        });
+        expect(rows).toEqual([{ id: 7 }]);
+    });
+
     test("refuses before reading when the count is over the ceiling", async () => {
         const selection: RowSelection = {
             type: "query",

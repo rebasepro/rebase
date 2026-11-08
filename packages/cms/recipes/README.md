@@ -32,7 +32,7 @@ always match the version you have installed.
 | To… | Use |
 |---|---|
 | Show a collection: table, cards, board, its toolbar and record panel | `CollectionPanel`: `fields` for the columns, `collectionOverrides.fixedFilter` to narrow it, `toolbar` to change its toolbar |
-| Do something with the row clicked, instead of opening it | `CollectionPanel` `onRowClick(row)` |
+| Do something with the row clicked, instead of opening it | `CollectionPanel` `onRowClick(row, id)` |
 | Edit one record, or some of its fields | `EntityFormPanel` with `id`, and `fields` or `layout` of `FormField`s |
 | Show one record read-only | `EntityViewPanel` |
 | Show one value of a row in your own JSX | `FieldValue` |
@@ -117,8 +117,8 @@ Components you render anywhere under `<Rebase>` and a router.
   `browserCallbacks`, its `entityActions`, `admin.display` resolvers,
   `additionalFields`, entity views, a form's `context.row`, a view mode
   `Builder`'s `tableController.rows`, a collection action's selection and the
-  slots are handed. A row is a flat object: its id under its own column
-  (`row.id`), a date as an ISO string (`"2026-11-08"` for a `columnType:
+  slots are handed. A row is a flat object, exactly the table's columns (an
+  `id` column as `row.id`, with its type), a date as an ISO string (`"2026-11-08"` for a `columnType:
   "date"` column, a full timestamp otherwise), and a belongsTo relation as its
   foreign-key column (`customerId`). A relation the admin loaded arrives nested
   under its name, as REST's `include` returns it (`row.customer` is the

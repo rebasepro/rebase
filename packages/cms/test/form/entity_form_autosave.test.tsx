@@ -30,6 +30,7 @@ jest.mock("@rebasepro/app", () => {
 });
 
 import { EntityForm } from "../../src/form/EntityForm";
+import { rowOf, saving } from "../helpers/form_rows";
 
 /**
  * `formAutoSave`: what reaches the data layer, and when.
@@ -69,12 +70,12 @@ function open(status: "new" | "existing", onSubmit: (values: Post) => Promise<En
     const entity = status === "existing" ? { id: "1", path: "posts", values: { title: "Stored", price: 1 } } : undefined;
     return render(<EntityForm<Post>
         path="posts"
-        entityId={entity?.id}
+        id={entity?.id}
         collection={of}
-        entity={entity}
+        row={rowOf(entity)}
         initialStatus={status}
         Builder={Capture}
-        onSubmit={onSubmit}
+        onSubmit={saving(onSubmit)}
         computedInitialValues={entity?.values}/>);
 }
 

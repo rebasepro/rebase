@@ -199,7 +199,7 @@ export function StoragePropertyField({
                                     <li>{"{file} - Full name of the uploaded file"}</li>
                                     <li>{"{file.name} - Name of the uploaded file without extension"}</li>
                                     <li>{"{file.ext} - Extension of the uploaded file"}</li>
-                                    <li>{"{entityId} - ID of the entity"}</li>
+                                    <li>{"{id} - ID of the entity"}</li>
                                     <li>{"{propertyKey} - ID of this field"}</li>
                                     <li>{"{path} - Path of this entity"}</li>
                                     <li>{"{rand} - Random value used to avoid name collisions"}</li>

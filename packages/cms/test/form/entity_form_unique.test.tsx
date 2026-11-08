@@ -41,6 +41,7 @@ jest.mock("@rebasepro/app", () => {
 
 import { AuthControllerContext, CustomizationControllerContext, RebaseI18nProvider } from "@rebasepro/app";
 import { EntityForm } from "../../src/form/EntityForm";
+import { rowOf, saving } from "../helpers/form_rows";
 
 type Row = Record<string, unknown>;
 
@@ -65,12 +66,12 @@ function setup(stored: Row | undefined, taken: string[]) {
                 value={{ plugins: [], propertyConfigs: {}, entityActions: [], entityViews: [], resolvedSlots: [] } as never}>
                 <EntityForm<Row>
                     path="products"
-                    entityId={stored ? "1" : undefined}
-                    entity={stored ? entityOf(stored) : undefined}
+                    id={stored ? "1" : undefined}
+                    row={rowOf(stored ? entityOf(stored) : undefined)}
                     collection={collection}
                     initialStatus={stored ? "existing" : "new"}
                     onFormContextReady={(c) => { ctx = c; }}
-                    onSubmit={onSubmit}
+                    onSubmit={saving(onSubmit)}
                     uniqueFieldValidator={uniqueFieldValidator}
                     computedInitialValues={stored ?? { name: "", sku: "", code: "" }}/>
             </CustomizationControllerContext.Provider>

@@ -23,7 +23,8 @@ count }) }),
     CollectionWindow: jest.requireActual<typeof import("../../../app/src/hooks/data/collectionWindow")>(
         "../../../app/src/hooks/data/collectionWindow").CollectionWindow,
     toWireRow: jest.requireActual<typeof import("../../../app/src/util/wire_row")>("../../../app/src/util/wire_row").toWireRow,
-    fromWireRow: jest.requireActual<typeof import("../../../app/src/util/wire_row")>("../../../app/src/util/wire_row").fromWireRow
+    fromWireRow: jest.requireActual<typeof import("../../../app/src/util/wire_row")>("../../../app/src/util/wire_row").fromWireRow,
+    copyRow: jest.requireActual<typeof import("../../../app/src/util/wire_row")>("../../../app/src/util/wire_row").copyRow
 }));
 
 import { useBoardDataController } from "../../src/components/CollectionViewBinding/useBoardDataController";
@@ -423,6 +424,25 @@ describe("useBoardDataController — afterRead", () => {
 
         await waitFor(() => expect(result.current.columnData.todo.entities).toHaveLength(1));
         expect(result.current.columnData.todo.entities[0].values).toMatchObject({ title: "REDACTED" });
+    });
+
+    it.each([
+        ["edits the row in place and returns it", ({ row }: { row: Record<string, unknown> }) => {
+            row.title = "REDACTED";
+            return row;
+        }],
+        ["returns a new row", ({ row }: { row: Record<string, unknown> }) => ({ ...row, title: "REDACTED" })]
+    ])("keeps what afterRead changes when it %s", async (_how, afterRead) => {
+        const { result } = renderWith({ browserCallbacks: { afterRead } });
+        const read = entity("t1", { title: "Secret", status: "todo" });
+
+        await waitFor(() => expect(listen).toHaveBeenCalled());
+        act(() => updateFor("todo")([read]));
+
+        await waitFor(() => expect(result.current.columnData.todo.entities).toHaveLength(1));
+        expect(result.current.columnData.todo.entities[0].values).toMatchObject({ title: "REDACTED" });
+        // The record read is not the row the callback was handed.
+        expect(read.values.title).toBe("Secret");
     });
 
     it("does NOT run the server's callbacks.afterRead", async () => {

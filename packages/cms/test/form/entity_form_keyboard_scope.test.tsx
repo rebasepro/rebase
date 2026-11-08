@@ -30,6 +30,7 @@ jest.mock("@rebasepro/app", () => {
 });
 
 import { EntityForm } from "../../src/form/EntityForm";
+import { rowOf, saving } from "../helpers/form_rows";
 
 /**
  * ⌘S / ⌘Z belong to one record form: the one the focus is in, or — with the
@@ -55,12 +56,12 @@ function formFor(id: string, onSubmit: (values: Post) => Promise<Entity<Post>>) 
     return <EntityForm<Post>
         key={id}
         path="posts"
-        entityId={id}
+        id={id}
         collection={collection}
-        entity={entity}
+        row={rowOf(entity)}
         initialStatus="existing"
         Builder={Capture}
-        onSubmit={onSubmit}
+        onSubmit={saving(onSubmit)}
         computedInitialValues={entity.values}/>;
 }
 

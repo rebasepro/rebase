@@ -126,7 +126,7 @@ function buildBottomActions<M extends Record<string, unknown>>({
                             action.onClick({
                                 view: "form",
                                 row: rowOfEntity(entity, collection),
-                                id: entity.id,
+                                id: String(entity.id),
                                 // The slug, not the stored path: see EditFormActions.
                                 path: path ?? collection.slug,
                                 collection: collection,

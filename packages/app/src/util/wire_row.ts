@@ -83,20 +83,24 @@ function includedTarget(
     return { id, ...(target ? toWireRow(values, target, options) : toWireValues(values, undefined)) };
 }
 
-/** A to-many relation's targets: the loaded ones as rows, the rest as ids. `undefined` when none was loaded. */
+/**
+ * A to-many relation's targets as rows — `undefined` unless every one of them
+ * was loaded, so the list is all rows or all ids, never a mix: REST's
+ * `include` answers with a row for each target.
+ */
 function includedTargets(
     values: unknown[],
     relation: ResolvedRelation,
     options: { included?: boolean } | undefined
-): unknown[] | undefined {
-    let loaded = false;
-    const out = values.map((item) => {
+): Record<string, unknown>[] | undefined {
+    if (values.length === 0) return undefined;
+    const out: Record<string, unknown>[] = [];
+    for (const item of values) {
         const target = includedTarget(item, relation, options);
-        if (target === undefined) return toWireValue(item, undefined);
-        loaded = true;
-        return target;
-    });
-    return loaded ? out : undefined;
+        if (target === undefined) return undefined;
+        out.push(target);
+    }
+    return out;
 }
 
 function toWireValues(values: Record<string, unknown>, properties: Properties | undefined): Record<string, unknown> {
@@ -159,14 +163,67 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
 }
 
 /**
- * A record's view-model `values` after app code was handed them as the row
- * `sent` (their {@link toWireRow}) and gave back the row `returned`.
+ * A copy of a row deep enough that nothing app code does to it reaches the
+ * row it was copied from: every plain object and array is a new one, every
+ * other value is shared. What a callback is handed, so the row
+ * {@link fromWireRow} compares its answer against is still the one it was
+ * handed.
+ *
+ * @internal
+ */
+export function copyRow(row: Record<string, unknown>): Record<string, unknown> {
+    const out: Record<string, unknown> = {};
+    for (const [key, value] of Object.entries(row)) out[key] = copyWireValue(value);
+    return out;
+}
+
+function copyWireValue(value: unknown): unknown {
+    if (Array.isArray(value)) return value.map(copyWireValue);
+    if (isPlainRecord(value)) return copyRow(value);
+    return value;
+}
+
+/** Whether two wire values hold the same data, plain objects and arrays compared by what they hold. */
+function sameWireValue(a: unknown, b: unknown): boolean {
+    if (Object.is(a, b)) return true;
+    if (Array.isArray(a) && Array.isArray(b)) {
+        return a.length === b.length && a.every((item, i) => sameWireValue(item, b[i]));
+    }
+    if (isPlainRecord(a) && isPlainRecord(b)) {
+        const keys = Object.keys(a);
+        return keys.length === Object.keys(b).length
+            && keys.every((key) => key in b && sameWireValue(a[key], b[key]));
+    }
+    return false;
+}
+
+/** An object literal's kind of object, not a class instance (a `Date`, a `GeoPoint`). */
+function isPlainRecord(value: unknown): value is Record<string, unknown> {
+    if (typeof value !== "object" || value === null || Array.isArray(value)) return false;
+    const proto: unknown = Object.getPrototypeOf(value);
+    return proto === Object.prototype || proto === null;
+}
+
+/** A loaded target's row, or a list holding one: what was read, never what is written. */
+function holdsIncludedRows(value: unknown): boolean {
+    return isPlainRecord(value) || (Array.isArray(value) && value.some(isPlainRecord));
+}
+
+/**
+ * A record's view-model `values` after app code was handed a copy
+ * ({@link copyRow}) of the row `sent` (their {@link toWireRow}) and gave back
+ * the row `returned` — that copy edited in place, or a new object.
  *
  * Only the keys `returned` changed or added are converted back
  * (`rowToViewModel`) and laid over `values`, and the keys it dropped are
  * dropped: what it left alone keeps the admin's own value, so a relation keeps
  * the target's columns it was read with and a date its instance. A row handed
  * back unchanged gives back `values` themselves.
+ *
+ * A relation's loaded targets are what was read, not what is written: a
+ * belongsTo is its foreign key — changed, cleared or dropped there — and a
+ * relation's included rows edited or removed leave the relation as it was. A
+ * relation is written from the row as ids.
  *
  * @internal
  */
@@ -177,17 +234,37 @@ export function fromWireRow(
     collection: CollectionConfig,
     path: string
 ): Record<string, unknown> {
-    if (returned === sent) return values;
+    const relations = relationsOf(collection);
+    const foreignKeys = belongsToKeys(collection, relations);
+    const relationOfForeignKey = new Map<string, string>();
+    for (const [name, foreignKey] of foreignKeys) relationOfForeignKey.set(foreignKey, name);
+    // A belongsTo's own key holds only its loaded target; any other
+    // relation's holds its target ids or its loaded rows.
+    const isReadData = (key: string, value: unknown) =>
+        key in relations && (foreignKeys.has(key) || holdsIncludedRows(value));
+
     const changed: Record<string, unknown> = {};
     for (const [key, value] of Object.entries(returned)) {
-        if (!(key in sent) || !Object.is(sent[key], value)) changed[key] = value;
+        if (key in sent && sameWireValue(sent[key], value)) continue;
+        if (isReadData(key, value)) continue;
+        changed[key] = value;
     }
-    const dropped = Object.keys(sent).filter((key) => !(key in returned));
+    const dropped = Object.keys(sent).filter((key) => !(key in returned) && !isReadData(key, sent[key]));
     if (Object.keys(changed).length === 0 && dropped.length === 0) return values;
     const out: Record<string, unknown> = {
         ...values,
         ...rowToViewModel(changed, path, (slug) => slug === path ? collection : undefined)
     };
-    for (const key of dropped) delete out[key];
+    for (const [key, value] of Object.entries(changed)) {
+        // A cleared foreign key unlinks: there is no id left to turn back
+        // into the relation the view model holds under its own name.
+        const relation = relationOfForeignKey.get(key);
+        if (relation !== undefined && (value === null || value === undefined)) out[relation] = null;
+    }
+    for (const key of dropped) {
+        delete out[key];
+        const relation = relationOfForeignKey.get(key);
+        if (relation !== undefined) delete out[relation];
+    }
     return out;
 }

@@ -1104,8 +1104,8 @@ export type PropertyBuilderProps<M extends Record<string, unknown> = Record<stri
     index?: number;
     /** The collection path this entity belongs to. */
     path: string;
-    /** The entity's id, or `undefined` while it is being created. */
-    entityId?: string | number;
+    /** The record's id, or `undefined` while it is being created. */
+    id?: string | number;
     /** Who is editing — the signed-in user and their roles. */
     authController: AuthState;
 };
@@ -1346,7 +1346,7 @@ export type StorageConfig = {
      * - `{file.name}` - Name of the file without extension
      * - `{file.ext}` - Extension of the file
      * - `{rand}` - Random value used to avoid name collisions
-     * - `{entityId}` - ID of the entity
+     * - `{id}` - The record's id (`{entityId}` is read the same)
      * - `{propertyKey}` - ID of this property
      * - `{path}` - Path of this entity
      *
@@ -1366,7 +1366,7 @@ export type StorageConfig = {
      * - `{file.name}` - Name of the file without extension
      * - `{file.ext}` - Extension of the file
      * - `{rand}` - Random value used to avoid name collisions
-     * - `{entityId}` - ID of the entity
+     * - `{id}` - The record's id (`{entityId}` is read the same)
      * - `{propertyKey}` - ID of this property
      * - `{path}` - Path of this entity
      *
@@ -1454,9 +1454,9 @@ export interface UploadedFileContext {
     property: StringProperty | ArrayProperty;
 
     /**
-     * Entity ID
+     * The record's id; absent for one being created.
      */
-    entityId?: string | number;
+    id?: string | number;
 
     /**
      * Entity path. E.g. `products/PID/locales`

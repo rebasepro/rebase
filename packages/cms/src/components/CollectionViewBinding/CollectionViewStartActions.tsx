@@ -194,6 +194,7 @@ export function CollectionViewStartActions<M extends Record<string, unknown>>({
             <SelectionMenu
                 selectionController={rowSelectionController}
                 loadedRows={rowTableController.rows}
+                collection={collection}
                 query={selectionQuery}
                 collectionEntitiesCount={collectionEntitiesCount}
                 collectionName={collection.name}/>

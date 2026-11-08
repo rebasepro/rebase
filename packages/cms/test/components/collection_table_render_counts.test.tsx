@@ -294,20 +294,20 @@ describe("the collection table draws again only what changed", () => {
     });
 
     it("an additional column drawn before its field changed shows the field it has now", async () => {
-        const first = [{ key: "extra", name: "Extra", Builder: ({ row }: { row: Record<string, unknown> }) => <span data-testid={`extra-${String(row.id)}`}>first</span> }];
-        const second = [{ key: "extra", name: "Extra", Builder: ({ row }: { row: Record<string, unknown> }) => <span data-testid={`extra-${String(row.id)}`}>second</span> }];
+        const first = [{ key: "extra", name: "Extra", Builder: ({ row }: { row: Record<string, unknown> }) => <span data-testid={`extra-${String(row.text_0)}`}>first</span> }];
+        const second = [{ key: "extra", name: "Extra", Builder: ({ row }: { row: Record<string, unknown> }) => <span data-testid={`extra-${String(row.text_0)}`}>second</span> }];
         let view!: ReturnType<typeof render>;
         await act(async () => {
             view = render(<View additionalFields={first}/>);
         });
-        expect(view.getByTestId("extra-id_0").textContent).toBe("first");
+        expect(view.getByTestId("extra-Row 0 value 0").textContent).toBe("first");
 
         // The cell compared the row it was drawn for and nothing else, so it
         // kept what the first field had drawn.
         await act(async () => {
             view.rerender(<View additionalFields={second}/>);
         });
-        expect(view.getByTestId("extra-id_0").textContent).toBe("second");
+        expect(view.getByTestId("extra-Row 0 value 0").textContent).toBe("second");
         view.unmount();
     });
 

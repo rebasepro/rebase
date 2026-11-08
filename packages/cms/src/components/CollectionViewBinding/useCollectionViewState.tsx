@@ -67,7 +67,10 @@ import { EMPTY_ARRAY, HeaderActionsScope, PluginAddColumnComponents } from "./Pl
 import type { CollectionViewBindingProps } from "./CollectionViewBinding";
 import { columnsForFields, restrictCollectionToFields } from "./fields";
 import type { EntityActionsScope } from "./CollectionEntityActions";
-import { entityOfRow, entitySelectionControllerOf, rowOfEntity, selectionControllerOf, tableControllerOf } from "@rebasepro/app";
+import { entityOfRow, entitySelectionControllerOf, idOfRow, rowOfEntity, selectionControllerOf, tableControllerOf } from "@rebasepro/app";
+
+/** The collections already warned about a foreign `admin.selectionController`: the warning is said once, not on every render. */
+const warnedForeignSelection = new Set<string>();
 
 /**
  * Everything a collection view holds and decides: the collection it draws
@@ -366,7 +369,8 @@ export function useCollectionViewState<M extends Record<string, unknown>>({
     const callerSelectionController = collection.selectionController
         ? entitySelectionControllerOf<M>(collection.selectionController)
         : undefined;
-    if (collection.selectionController && !callerSelectionController) {
+    if (collection.selectionController && !callerSelectionController && !warnedForeignSelection.has(collection.slug)) {
+        warnedForeignSelection.add(collection.slug);
         console.warn(`admin.selectionController of "${collection.slug}" was not made by useSelectionController(), so the view keeps its own selection.`);
     }
     const usedSelectionController = callerSelectionController ?? selectionController;
@@ -404,7 +408,7 @@ export function useCollectionViewState<M extends Record<string, unknown>>({
         setHighlightedId(clickedEntity.id);
         // The caller's handler takes the row instead of the view opening it.
         if (onRowClickProp) {
-            onRowClickProp(rowOfEntity(clickedEntity, collection));
+            onRowClickProp(rowOfEntity(clickedEntity, collection), String(clickedEntity.id));
             return;
         }
         analyticsController.onAnalyticsEvent?.("edit_entity_clicked", {
@@ -447,11 +451,9 @@ export function useCollectionViewState<M extends Record<string, unknown>>({
      * junction row idempotently. Sending no values keeps it a pure link:
      * the target's own fields are none of this tab's business.
      */
-    const linkExistingEntities = useCallback(async (rows: Record<string, unknown>[]) => {
+    const linkExistingEntities = useCallback(async (_rows: Record<string, unknown>[], ids: string[]) => {
         const alreadyLinked = new Set(tableController.data.map(e => String(e.id)));
-        const toLink = rows
-            .map(row => row.id)
-            .filter((id): id is string | number => (typeof id === "string" || typeof id === "number") && !alreadyLinked.has(String(id)));
+        const toLink = ids.filter(id => !alreadyLinked.has(id));
         if (toLink.length === 0) return;
 
         try {
@@ -796,8 +798,8 @@ parentEntityIds: parentEntityIds ?? EMPTY_ARRAY,
                         startIcon={<ArrowRightToLineIcon size={iconSize.small}/>}
                         onClick={(event: React.MouseEvent) => {
                             event.stopPropagation();
-                            const entityId = row.id;
-                            if (typeof entityId !== "string" && typeof entityId !== "number") return;
+                            const entityId = idOfRow(row, collection);
+                            if (entityId === undefined) return;
                             navigateToEntity({
                                 openEntityMode,
                                 collection,
@@ -906,8 +908,8 @@ parentEntityIds: parentEntityIds ?? EMPTY_ARRAY,
                 isSelected={isSelected}
                 selectionEnabled={activeSelectionEnabled}
                 size={size}
-                highlightEntity={setHighlightedId}
-                unhighlightEntity={unselectNavigatedEntity}
+                highlightRow={setHighlightedId}
+                unhighlightRow={unselectNavigatedEntity}
                 collection={collection}
                 path={path}
                 actions={actions}
@@ -935,8 +937,8 @@ parentEntityIds: parentEntityIds ?? EMPTY_ARRAY,
         openEntityMode,
         selectionController: usedSelectionController,
         onCollectionChange: updateLastDeleteTimestamp,
-        highlightEntity: setHighlightedId,
-        unhighlightEntity: unselectNavigatedEntity
+        highlightRow: setHighlightedId,
+        unhighlightRow: unselectNavigatedEntity
     }), [getCardActions, collection, path, openEntityMode, usedSelectionController, updateLastDeleteTimestamp, unselectNavigatedEntity]);
 
     // Built once per change rather than once per render: each of these is a

@@ -46,6 +46,7 @@ jest.mock("@rebasepro/app", () => {
 
 import { RebaseI18nProvider } from "@rebasepro/app";
 import { EntityForm } from "../../src/form/EntityForm";
+import { rowOf, saving } from "../helpers/form_rows";
 
 type Row = Record<string, unknown>;
 
@@ -80,15 +81,15 @@ async function editAndSave(edit: Record<string, unknown>) {
     };
     render(<RebaseI18nProvider locale="en"><EntityForm<Row>
         path="products"
-        entityId="1"
-        entity={entityOf(stored)}
+        id="1"
+        row={rowOf(entityOf(stored))}
         collection={collection}
         initialStatus="existing"
         Builder={Capture}
         onFormContextReady={(c) => {
             ctx = c;
         }}
-        onSubmit={onSubmit}
+        onSubmit={saving(onSubmit)}
         computedInitialValues={stored}/></RebaseI18nProvider>);
     await act(async () => {
         for (const [key, value] of Object.entries(edit)) ctx!.setFieldValue(key, value);

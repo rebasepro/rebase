@@ -143,7 +143,7 @@ function storagePathPattern(template: string, isPublic: boolean): RegExp {
         .split(/(\{[^}]*\})/)
         .map(part => {
             if (part === "{path}" || part === "{file.type}") return ".+";
-            if (/^\{(propertyKey|rand|file|file\.name|file\.ext|entityId)\}$/.test(part)) return "[^/]+";
+            if (/^\{(propertyKey|rand|file|file\.name|file\.ext|id|entityId)\}$/.test(part)) return "[^/]+";
             return part.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
         })
         .join("");

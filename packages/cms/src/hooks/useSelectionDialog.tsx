@@ -19,7 +19,7 @@ type DialogOptions = {
  * This hook is used to open a side dialog that allows the selection
  * of rows under a given path.
  * You can use it in custom views for selecting rows; the callbacks are handed
- * them as the server sends them, `id` included.
+ * them as the server sends them, and their ids beside them.
  * You need to specify the path of the target collection at least.
  * If your collection is not defined in your  top collection configuration
  * (in your `Rebase` component), you need to specify explicitly.
@@ -28,7 +28,12 @@ type DialogOptions = {
  */
 export function useSelectionDialog<M extends Record<string, unknown>>(selectionProps: Omit<SelectionProps<M>, "path"> & DialogOptions): { open: () => void; close: () => void } {
     const { path, onClose, ...props } = selectionProps;
-    return useEntitySelectionDialog<M>({ ...entitySelectionPropsOf<M>({ ...props, path: path || "" }), path, onClose });
+    const navigation = useCollectionRegistryController();
+    // Resolved before the rows are made: a row is read by its collection, and
+    // one registered under `path` is the one the dialog shows.
+    const collection = props.collection
+        ?? (path ? navigation.getCollection(path) as AdminCollection<M> | undefined : undefined);
+    return useEntitySelectionDialog<M>({ ...entitySelectionPropsOf<M>({ ...props, collection, path: path || "" }), path, onClose });
 }
 
 /**

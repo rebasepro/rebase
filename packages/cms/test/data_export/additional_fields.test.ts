@@ -19,9 +19,9 @@ describe("resolveAdditionalExportValues", () => {
         name: "People",
         properties: { name: { type: "string" }, born: { type: "date", columnType: "date" } }
     };
-    const entities: Entity<{ name: string }>[] = [
-        { id: 1, path: "people", values: { name: "Ada" } },
-        { id: 2, path: "people", values: { name: "Bob" } }
+    const entities: Entity<{ id: number; name: string }>[] = [
+        { id: 1, path: "people", values: { id: 1, name: "Ada" } },
+        { id: 2, path: "people", values: { id: 2, name: "Bob" } }
     ];
 
     test("merges both kinds of additional field into one record per row", async () => {
@@ -77,7 +77,7 @@ describe("resolveAdditionalExportValues", () => {
     test("both kinds are handed the row as the server sends it", async () => {
         const seen: Record<string, unknown>[] = [];
         await resolveAdditionalExportValues({
-            entities: [{ id: 1, path: "people", values: { name: "Ada", born: new Date("1815-12-10T00:00:00.000Z") } }],
+            entities: [{ id: 1, path: "people", values: { id: 1, name: "Ada", born: new Date("1815-12-10T00:00:00.000Z") } }],
             collection: people,
             exportFields: [{ key: "a", builder: ({ row }) => { seen.push(row); return ""; } }],
             additionalFields: [{ key: "b", name: "B", value: ({ row }) => { seen.push(row); return ""; } }],

@@ -42,6 +42,7 @@ jest.mock("@rebasepro/app", () => {
 
 import { EntityForm } from "../../src/form/EntityForm";
 import postsCollection from "../../../../app/config/collections/posts";
+import { rowOf, saving } from "../helpers/form_rows";
 
 type Row = Record<string, unknown>;
 
@@ -54,15 +55,15 @@ async function submit(collection: unknown, values: Row, status: "new" | "existin
     };
     render(<EntityForm<Row>
         path="posts"
-        entityId={status === "existing" ? "1" : undefined}
-        entity={status === "existing" ? { id: "1", path: "posts", values } : undefined}
+        id={status === "existing" ? "1" : undefined}
+        row={rowOf(status === "existing" ? { id: "1", path: "posts", values } : undefined)}
         collection={collection as never}
         initialStatus={status}
         Builder={Capture}
         onFormContextReady={(c) => {
             ctx = c;
         }}
-        onSubmit={onSubmit}
+        onSubmit={saving(onSubmit)}
         computedInitialValues={values}/>);
     if (status === "existing") {
         await act(async () => {

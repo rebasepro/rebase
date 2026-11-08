@@ -68,6 +68,21 @@ describe("useDataTableController — afterRead", () => {
         expect(result.current.data[0].values).toEqual({ email: "REDACTED" });
     });
 
+    it.each([
+        ["edits the row in place and returns it", ({ row }: { row: Record<string, unknown> }) => {
+            row.email = "REDACTED";
+            return row;
+        }],
+        ["returns a new row", ({ row }: { row: Record<string, unknown> }) => ({ ...row, email: "REDACTED" })]
+    ])("keeps what afterRead changes when it %s", async (_how, afterRead) => {
+        const { result } = render({ ...baseCollection, browserCallbacks: { afterRead } });
+
+        await waitFor(() => expect(result.current.data).toHaveLength(1));
+        expect(result.current.data[0].values).toEqual({ email: "REDACTED" });
+        // The record read is not the row the callback was handed.
+        expect(row.values).toEqual({ email: "john@acme.com" });
+    });
+
     it("hands it the row as the server sends it, and converts what it changes back", async () => {
         const joined = new Date("2026-01-02T03:04:05.000Z");
         findMock.mockResolvedValue({ data: [{ id: "c1", path: "customers", values: { email: "john@acme.com", joined, seen: joined } }] });
@@ -83,8 +98,8 @@ describe("useDataTableController — afterRead", () => {
         });
 
         await waitFor(() => expect(result.current.data).toHaveLength(1));
+        // Exactly the record's columns: its id is the admin's, not one of them.
         expect(afterRead.mock.calls[0][0].row).toEqual({
-            id: "c1",
             email: "john@acme.com",
             joined: "2026-01-02T03:04:05.000Z",
             seen: "2026-01-02T03:04:05.000Z"
@@ -103,7 +118,7 @@ describe("useDataTableController — afterRead", () => {
         await waitFor(() => expect(result.current.data).toHaveLength(1));
         expect(afterRead).toHaveBeenCalledWith(expect.objectContaining({
             path: "customers",
-            row: { id: "c1", email: "john@acme.com" },
+            row: { email: "john@acme.com" },
             context: { someContextField: true }
         }));
         expect(result.current.data[0].id).toBe("c1");

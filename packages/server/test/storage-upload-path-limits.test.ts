@@ -39,6 +39,10 @@ const posts: CollectionConfig = {
             type: "string",
             storage: { storagePath: "users/{entityId}/avatar", acceptedFiles: ["image/*"] }
         },
+        badge: {
+            type: "string",
+            storage: { storagePath: "badges/{id}", acceptedFiles: ["image/*"] }
+        },
         gallery: {
             type: "array",
             of: { type: "string", storage: { storagePath: "shared", acceptedFiles: ["image/*"] } }
@@ -86,6 +90,8 @@ describe("createUploadPathResolver", () => {
     it("reads a placeholder as one segment, and {path} as any number", () => {
         expect(sources("(default)", "users/42/avatar/a.png")).toEqual(["posts.avatar"]);
         expect(sources("(default)", "users/42/other/a.png")).toEqual([]);
+        // `{id}`, the record's id, as the panel fills it in — `{entityId}` too.
+        expect(sources("(default)", "badges/42/a.png")).toEqual(["posts.badge"]);
         expect(sources("(default)", "posts/7/comments/scans/a.pdf")).toEqual(["posts.nested.scan"]);
     });
 

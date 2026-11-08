@@ -310,6 +310,24 @@ describe("useRowWrites runs the collection's browser callbacks, as the form's sa
         await waitFor(() => expect(captured.rows!.rows.map(row => row.title)).toContain("Set by beforeSave"));
     });
 
+    // The form's save is held to the same (save.test.ts).
+    it("saves a row beforeSave edited in place and returned", async () => {
+        const { captured } = setup({
+            callbacks: {
+                beforeSave: ({ values }) => {
+                    values.title = "Set in place";
+                    return values;
+                }
+            }
+        });
+        await waitFor(() => expect(captured.rows!.rows).toHaveLength(1));
+
+        await act(async () => {
+            await captured.writes!.update("tasks", 1, { title: "Typed" });
+        });
+        await waitFor(() => expect(captured.rows!.rows[0].title).toBe("Set in place"));
+    });
+
     it("runs afterSave with the row as saved, as the server sends it", async () => {
         const after: { id: string | number; values: Row }[] = [];
         const { captured } = setup({

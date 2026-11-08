@@ -7,7 +7,7 @@ import type {
     SelectionController,
     TableController
 } from "@rebasepro/cms-types";
-import { entityOfRow, rowOfEntity } from "./entity_row";
+import { entityOfRow, idOfRow, rowOfEntity } from "./entity_row";
 
 /*
  * The admin keeps a collection view's table and selection in its `Entity`
@@ -15,14 +15,17 @@ import { entityOfRow, rowOfEntity } from "./entity_row";
  * views, one per controller object and collection, so a view hands the same
  * object back until the state under it changes — stable as a prop and as a
  * hook dependency.
+ *
+ * An id handed out is the string the admin addresses the record by, and an id
+ * handed in is compared as one: an integer key's `5` and `"5"` are one record.
  */
 
 type Row = Record<string, unknown>;
 
-function idOfRow(row: Row): string | number {
-    const id = row.id;
-    if (typeof id === "string" || typeof id === "number") return id;
-    throw new Error("A row handed to a selection controller has no `id`. Pass the rows the view handed you.");
+function requireIdOfRow(row: Row, collection: CollectionConfig | undefined): string {
+    const id = idOfRow(row, collection);
+    if (id !== undefined) return id;
+    throw new Error("A row handed to a selection controller has no primary key. Pass the rows the view handed you.");
 }
 
 const rowsOfData = new WeakMap<readonly Entity[], { collection: CollectionConfig | undefined; rows: Row[] }>();
@@ -44,7 +47,17 @@ function sparseRowsOf(data: readonly (Entity | undefined)[], collection: Collect
     return rows;
 }
 
-const tableViews = new WeakMap<EntityTableController<any>, { collection: CollectionConfig | undefined; view: TableController<any> }>();
+/** The ids of records, as an app's code is handed them. */
+function idsOf(entities: readonly Entity[]): string[] {
+    return entities.map((entity) => String(entity.id));
+}
+
+/*
+ * Each cache below is keyed by the controller object and holds the view made
+ * for it, which is only ever read back for that controller: its `M` is the
+ * one the view was made with.
+ */
+const tableViews = new WeakMap<object, { collection: CollectionConfig | undefined; view: object }>();
 
 /**
  * The row view of a collection view's table controller: its rows as the
@@ -85,7 +98,7 @@ export function tableControllerOf<M extends Record<string, unknown>>(
     return view;
 }
 
-const rowSelections = new WeakMap<EntitySelection<any>, { collection: CollectionConfig | undefined; selection: RowSelection<any> }>();
+const rowSelections = new WeakMap<object, { collection: CollectionConfig | undefined; view: object }>();
 
 /**
  * A selection as an app's code reads it: the rows and their ids, or the
@@ -98,26 +111,26 @@ export function rowSelectionOf<M extends Record<string, unknown>>(
     collection: CollectionConfig | undefined
 ): RowSelection<M> {
     const cached = rowSelections.get(selection);
-    if (cached && cached.collection === collection) return cached.selection as RowSelection<M>;
+    if (cached && cached.collection === collection) return cached.view as RowSelection<M>;
     const rowSelection: RowSelection<M> = selection.type === "entities"
         ? {
             type: "rows",
-            ids: selection.entities.map((entity) => entity.id),
+            ids: idsOf(selection.entities),
             rows: rowsOf(selection.entities, collection)
         }
         : {
             type: "query",
             query: selection.query,
-            excludedIds: selection.excluded.map((entity) => entity.id),
+            excludedIds: idsOf(selection.excluded),
             ...(selection.count !== undefined && { count: selection.count })
         };
-    rowSelections.set(selection, { collection, selection: rowSelection });
+    rowSelections.set(selection, { collection, view: rowSelection });
     return rowSelection;
 }
 
-const selectionViews = new WeakMap<EntitySelectionController<any>, { collection: CollectionConfig | undefined; path: string; view: SelectionController<any> }>();
+const selectionViews = new WeakMap<object, { collection: CollectionConfig | undefined; path: string; view: object }>();
 /** The admin's controller behind each row view, so a view handed back to the admin drives the real thing. */
-const controllersOfViews = new WeakMap<SelectionController<any>, EntitySelectionController<any>>();
+const controllersOfViews = new WeakMap<object, object>();
 
 /**
  * The row view of a collection view's selection controller. A row handed
@@ -135,13 +148,13 @@ export function selectionControllerOf<M extends Record<string, unknown>>(
     if (cached && cached.collection === collection && cached.path === path) return cached.view as SelectionController<M>;
     const selection = rowSelectionOf(controller.selection, collection);
     // Selected ids in rows mode, excluded ones in query mode.
-    const listed = new Set<unknown>(selection.type === "rows" ? selection.ids : selection.excludedIds);
-    const entityOf = (row: Row) => entityOfRow(row, idOfRow(row), path, collection) as Entity<M>;
+    const listed = new Set<string>(selection.type === "rows" ? selection.ids : selection.excludedIds);
+    const entityOf = (row: Row) => entityOfRow(row, requireIdOfRow(row, collection), path, collection) as Entity<M>;
     const view: SelectionController<M> = {
         selection,
         selectedCount: controller.selectedCount,
         hasSelection: controller.hasSelection,
-        isSelected: (id) => selection.type === "query" ? !listed.has(id) : listed.has(id),
+        isSelected: (id) => selection.type === "query" ? !listed.has(String(id)) : listed.has(String(id)),
         toggleSelection: (row, selected) => controller.toggleEntitySelection(entityOf(row), selected),
         setSelectedRows: (rows) => controller.setSelectedEntities(rows.map(entityOf)),
         selectAllMatching: (query, count) => controller.selectAllMatching(query, count),

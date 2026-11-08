@@ -74,7 +74,7 @@ describe("deleteEntityWithCallbacks", () => {
         }));
     });
 
-    it("hands beforeDelete and afterDelete the flat row", async () => {
+    it("hands beforeDelete and afterDelete the flat row — its columns, the id beside it", async () => {
         const beforeDelete = jest.fn();
         const afterDelete = jest.fn();
 
@@ -88,7 +88,7 @@ describe("deleteEntityWithCallbacks", () => {
         const expected = expect.objectContaining({
             id: "entity-1",
             path: "test-collection",
-            row: { id: "entity-1", name: "Test Entity" }
+            row: { name: "Test Entity" }
         });
         expect(beforeDelete).toHaveBeenCalledWith(expected);
         expect(afterDelete).toHaveBeenCalledWith(expected);
@@ -110,7 +110,7 @@ describe("deleteEntityWithCallbacks", () => {
         });
 
         expect(beforeDelete).toHaveBeenCalledWith(expect.objectContaining({
-            row: { id: "entity-1", name: "Test Entity", due: "2026-11-08T09:30:00.000Z" }
+            row: { name: "Test Entity", due: "2026-11-08T09:30:00.000Z" }
         }));
     });
 

@@ -166,7 +166,7 @@ export function createRowWriter(
                 collection,
                 path: slug,
                 id,
-                row: { id, ...row },
+                row: row ?? {},
                 context: callbackContext(),
                 remove: removeRow
             });

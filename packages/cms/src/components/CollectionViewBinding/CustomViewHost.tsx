@@ -8,9 +8,9 @@ import type {
     EntityTableController,
     ViewMode
 } from "@rebasepro/cms-types";
-import { entityOfRow, selectionControllerOf, tableControllerOf } from "@rebasepro/app";
+import { entityOfRow, idOfRow, selectionControllerOf, tableControllerOf } from "@rebasepro/app";
 
-const NO_IDS: (string | number)[] = [];
+const NO_IDS: string[] = [];
 
 /** What the view holds, in its own view model, for a custom view to be drawn from. */
 export interface CustomViewHostProps<M extends Record<string, unknown>> {
@@ -60,10 +60,10 @@ export function CustomViewHost<M extends Record<string, unknown>>({
         ? selectionControllerOf(selectionController, collection, path)
         : undefined;
     const highlightedIds = useMemo(
-        () => highlightedEntities?.length ? highlightedEntities.map((entity) => entity.id) : NO_IDS,
+        () => highlightedEntities?.length ? highlightedEntities.map((entity) => String(entity.id)) : NO_IDS,
         [highlightedEntities]);
     const deletedIds = useMemo(
-        () => deletedEntities?.length ? deletedEntities.map((entity) => entity.id) : NO_IDS,
+        () => deletedEntities?.length ? deletedEntities.map((entity) => String(entity.id)) : NO_IDS,
         [deletedEntities]);
 
     // Through a ref, so the view is not redrawn when the handler is.
@@ -72,8 +72,8 @@ export function CustomViewHost<M extends Record<string, unknown>>({
     const hasClick = onEntityClick !== undefined;
     const onRowClick = useCallback((row: Record<string, unknown>) => {
         const { onEntityClick, collection, path } = latest.current;
-        const id = row.id;
-        if (typeof id !== "string" && typeof id !== "number") return;
+        const id = idOfRow(row, collection);
+        if (id === undefined) return;
         onEntityClick?.(entityOfRow(row, id, path, collection) as Entity<M>);
     }, []);
 

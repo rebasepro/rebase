@@ -99,7 +99,7 @@ export async function resolveStorageFilenameString<M extends Record<string, unkn
     if (typeof input === "function") {
         result = await input({
             path,
-            entityId,
+            id: entityId,
             values,
             property,
             file,
@@ -150,7 +150,7 @@ export function resolveStoragePathString<M extends Record<string, unknown>>(
     if (typeof input === "function") {
         result = input({
             path,
-            entityId,
+            id: entityId,
             values,
             property,
             file,
@@ -197,7 +197,9 @@ function replacePlaceholders({
         .replace("{file}", file.name)
         .replace("{file.type}", file.type);
     if (entityId) {
-        result = result.replace("{entityId}", String(entityId));
+        // `{entityId}` is how configs written before `{id}` spell it, and a
+        // stored path keeps meaning what it meant.
+        result = result.replace("{id}", String(entityId)).replace("{entityId}", String(entityId));
     }
     if (path) {
         result = result.replace("{path}", path);

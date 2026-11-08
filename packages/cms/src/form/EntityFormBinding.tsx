@@ -4,7 +4,7 @@ import { hasEntityId } from "@rebasepro/common";
 import React, { useCallback, useMemo, useState } from "react";
 import { Entity, EntityStatus, EntityValues } from "@rebasepro/types";
 import { AnalyticsEvent } from "@rebasepro/cms-types";
-import type { EntityFormProps, OnUpdateParams } from "../types/components/EntityFormProps";
+import type { EntityFormProps, OnSavedParams } from "../types/components/EntityFormProps";
 import type { EntityFormActionsProps } from "../types/components/EntityFormActionsProps";
 
 import { getLocalChangesBackup } from "@rebasepro/app";
@@ -32,7 +32,7 @@ import { useCollectionRegistryController } from "../hooks/navigation/contexts/Co
 import { useSidePanel } from "../hooks/useSidePanel";
 import { useAdminContext } from "../hooks/useAdminContext";
 import { EntityForm } from "./EntityForm";
-import { rowOfEntity } from "@rebasepro/app";
+import { entityOfRow, idOfRow, rowOfEntity } from "@rebasepro/app";
 import {
     getInitialEntityValues,
     getParentLinkValues,
@@ -83,13 +83,13 @@ export type EntityFormBindingProps<M extends Record<string, unknown>> = Omit<Ent
  */
 export function EntityFormBinding<M extends Record<string, unknown>>({
     path,
-    entityId: entityIdProp,
+    id: entityIdProp,
     collection,
-    entity,
+    row,
     initialStatus,
     onSaved,
     onValuesModified,
-    onEntityChange,
+    onRowChange,
     onStatusChange,
     openEntityMode = "full_screen",
     navigateBack: navigateBackProp,
@@ -108,7 +108,12 @@ export function EntityFormBinding<M extends Record<string, unknown>>({
     const analyticsController = useAnalyticsController();
 
     const [status, setStatus] = useState<EntityStatus>(initialStatus);
-    // The record a create made, until the `entity` prop names it: from the
+    // The record the row stands for: the admin's own, where the row came from
+    // it — its version kept, so a save is refused over a newer one.
+    const entity = useMemo(() => row
+        ? entityOfRow(row, entityIdProp ?? idOfRow(row, collection) ?? "", path, collection) as Entity<M>
+        : undefined, [row, entityIdProp, path, collection]);
+    // The record a create made, until the `row` prop names it: from the
     // create on, the form edits that record, and a caller that does not hand
     // it back would otherwise leave an "existing" form with nothing behind it.
     const [savedEntity, setSavedEntity] = useState<Entity<M> | undefined>(undefined);
@@ -239,7 +244,7 @@ export function EntityFormBinding<M extends Record<string, unknown>>({
     }, [status, path, entityId]);
 
     // --- Save via data layer ---
-    const onSubmit = useCallback(async (values: M, formex: FormexController<M>): Promise<Entity<M> | void> => {
+    const onSubmit = useCallback(async (values: M, formex: FormexController<M>): Promise<{ row: Record<string, unknown>; id: string | number } | void> => {
         try {
             const savedEntity = await saveEntityWithCallbacks<M>({
                 path,
@@ -258,7 +263,7 @@ export function EntityFormBinding<M extends Record<string, unknown>>({
                     setSavedEntity(updatedEntity);
                     clearDirtyCache();
                     onValuesModified?.(false, updatedEntity.values);
-                    onEntityChange?.(updatedEntity);
+                    onRowChange?.({ row: rowOfEntity(updatedEntity, collection), id: String(updatedEntity.id) });
                     setStatus("existing");
                     setEntityId(updatedEntity.id);
                     onStatusChange?.("existing");
@@ -266,7 +271,7 @@ export function EntityFormBinding<M extends Record<string, unknown>>({
                     if (onSaved) {
                         onSaved({
                             row: rowOfEntity(updatedEntity, collection),
-                            id: updatedEntity.id,
+                            id: String(updatedEntity.id),
                             status,
                             path,
                             collection
@@ -304,12 +309,12 @@ export function EntityFormBinding<M extends Record<string, unknown>>({
                 : (status === "copy" ? "entity_copied" : (status === "existing" ? "entity_edited" : "unmapped_event"));
             analyticsController.onAnalyticsEvent?.(eventName, { path });
 
-            return savedEntity;
+            return { row: rowOfEntity(savedEntity, collection), id: savedEntity.id };
         } catch (e: unknown) {
             console.error(e);
             throw e;
         }
-    }, [path, entityId, currentEntity, collection, status, dataClient, context, clearDirtyCache, onValuesModified, onEntityChange, onSaved, onStatusChange, snackbarController, analyticsController, t]);
+    }, [path, entityId, currentEntity, collection, status, dataClient, context, clearDirtyCache, onValuesModified, onRowChange, onSaved, onStatusChange, snackbarController, analyticsController, t]);
 
     // --- Unique field validation via data layer ---
     const uniqueFieldValidator = useCallback(async ({
@@ -362,15 +367,14 @@ export function EntityFormBinding<M extends Record<string, unknown>>({
         <EntityForm<M>
             {...restProps}
             path={path}
-            entityId={entityIdProp}
+            id={entityIdProp}
             collection={collection}
-            entity={currentEntity}
+            row={currentEntity ? rowOfEntity(currentEntity, collection) : undefined}
             initialStatus={initialStatus}
             initialDirtyValues={initialDirtyValues}
             // Not handed down: `onSubmit` above reports the save, for Save and
             // autosave alike. The form reporting it too called it twice.
             onValuesModified={onValuesModified}
-            onEntityChange={onEntityChange}
             onStatusChange={onStatusChange}
             openEntityMode={openEntityMode}
             navigateBack={navigateBack}

@@ -45,6 +45,7 @@ jest.mock("@rebasepro/app", () => {
 import { AuthControllerContext, CustomizationControllerContext, isHidden, isReadOnly, RebaseI18nProvider } from "@rebasepro/app";
 import { EntityForm } from "../../src/form/EntityForm";
 import { resolveFormProperty } from "../../src/form/resolve_form_properties";
+import { rowOf, saving } from "../helpers/form_rows";
 
 type Row = Record<string, unknown>;
 
@@ -118,15 +119,15 @@ function renderForm(values: Row, formStatus: "new" | "copy" | "existing", withFi
     };
     const form = <EntityForm<Row>
         path="posts"
-        entityId={formStatus === "new" ? undefined : "1"}
-        entity={formStatus === "new" ? undefined : { id: "1", path: "posts", values }}
+        id={formStatus === "new" ? undefined : "1"}
+        row={rowOf(formStatus === "new" ? undefined : { id: "1", path: "posts", values })}
         collection={collection}
         initialStatus={formStatus}
         Builder={withFields ? undefined : Capture}
         onFormContextReady={(c) => {
             ctx = c;
         }}
-        onSubmit={onSubmit}
+        onSubmit={saving(onSubmit)}
         computedInitialValues={values}/>;
     render(withFields
         ? <RebaseI18nProvider locale={"en"}>

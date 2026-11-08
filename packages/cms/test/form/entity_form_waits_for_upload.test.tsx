@@ -32,6 +32,7 @@ jest.mock("@rebasepro/app", () => {
 
 import { EntityForm } from "../../src/form/EntityForm";
 import { StorageUploadProgress } from "../../src/form/components/StorageUploadProgress";
+import { rowOf, saving } from "../helpers/form_rows";
 
 /**
  * Save waits for a file upload in progress.
@@ -81,10 +82,10 @@ describe("EntityForm: Save and an upload in progress", () => {
             collection={collection}
             initialStatus="new"
             Builder={UploadingField}
-            onSubmit={async (values: Post) => {
+            onSubmit={saving(async (values: Post) => {
                 payloads.push(values);
                 return { id: "1", path: "posts", values } as Entity<Post>;
-            }}/>);
+            })}/>);
 
         await act(async () => {
             context.setFieldValue("title", "Cat");

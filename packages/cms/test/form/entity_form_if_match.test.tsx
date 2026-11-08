@@ -57,12 +57,13 @@ jest.mock("../../src/form/EntityForm", () => ({
 
 import { RebaseI18nProvider } from "@rebasepro/app";
 import { EntityFormBinding } from "../../src/form/EntityFormBinding";
+import { rowOf, saving } from "../helpers/form_rows";
 
 const collection = { slug: "posts", name: "Posts", properties: { title: { type: "string", name: "Title" } } } as never;
 
 function renderBinding(entity: Entity<Row>) {
     render(<RebaseI18nProvider locale="en">
-        <EntityFormBinding<Row> path="posts" entityId={entity.id} entity={entity} collection={collection} initialStatus="existing"/>
+        <EntityFormBinding<Row> path="posts" id={entity.id} row={rowOf(entity)} collection={collection} initialStatus="existing"/>
     </RebaseI18nProvider>);
 }
 

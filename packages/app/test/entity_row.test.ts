@@ -6,7 +6,7 @@
 import { describe, expect, it } from "@jest/globals";
 import type { CollectionConfig, Entity } from "@rebasepro/types";
 import { EntityRelation } from "@rebasepro/types";
-import { entityOfRow, rowOfEntity } from "../src/util/entity_row";
+import { entityOfRow, idOfRow, rowOfEntity } from "../src/util/entity_row";
 
 const people = {
     slug: "people",
@@ -40,9 +40,8 @@ function task(): Entity {
 }
 
 describe("rowOfEntity", () => {
-    it("is the row as the server sends it: id, an ISO date, a belongsTo as its foreign key and its loaded target", () => {
+    it("is the row as the server sends it: its columns, an ISO date, a belongsTo as its foreign key and its loaded target", () => {
         expect(rowOfEntity(task(), tasks)).toEqual({
-            id: "t1",
             title: "Write the plan",
             due: "2026-11-08",
             assigneeId: "p2",
@@ -64,9 +63,17 @@ describe("rowOfEntity", () => {
         expect(rowOfEntity(entity, tasks)).not.toBe(bare);
     });
 
-    it("hands a record that was not found its id alone", () => {
+    it("keeps one row per collection, so two views of one record each keep theirs", () => {
+        const entity = task();
+        const inTasks = rowOfEntity(entity, tasks);
+        const bare = rowOfEntity(entity, undefined);
+        expect(rowOfEntity(entity, tasks)).toBe(inTasks);
+        expect(rowOfEntity(entity, undefined)).toBe(bare);
+    });
+
+    it("hands a record that was not found no columns", () => {
         const missing = { id: "gone", path: "tasks" } as unknown as Entity;
-        expect(rowOfEntity(missing, tasks)).toEqual({ id: "gone" });
+        expect(rowOfEntity(missing, tasks)).toEqual({});
     });
 });
 
@@ -87,5 +94,36 @@ describe("entityOfRow", () => {
     it("keeps a row's values as they are without the collection's properties", () => {
         const row = { id: "x", name: "Ada" };
         expect(entityOfRow(row, "x", "people", undefined)).toEqual({ id: "x", path: "people", values: row });
+    });
+});
+
+describe("idOfRow", () => {
+    const orders = {
+        slug: "orders",
+        name: "Orders",
+        properties: { id: { type: "number", name: "Id", isId: true }, title: { type: "string", name: "Title" } }
+    } as CollectionConfig;
+    const lines = {
+        slug: "lines",
+        name: "Lines",
+        properties: {
+            orderId: { type: "number", name: "Order", isId: true },
+            sku: { type: "string", name: "SKU", isId: true }
+        }
+    } as CollectionConfig;
+
+    it("is the record's key as a string, a composite one's parts joined", () => {
+        expect(idOfRow({ id: 5, title: "Five" }, orders)).toBe("5");
+        expect(idOfRow({ orderId: 5, sku: "A-1" }, lines)).toBe("5:::A-1");
+    });
+
+    it("is the admin's own id for a row it handed out", () => {
+        const entity: Entity = { id: "5", path: "orders", values: { id: 5, title: "Five" } };
+        expect(idOfRow(rowOfEntity(entity, orders), orders)).toBe("5");
+    });
+
+    it("is undefined for a row without its key", () => {
+        expect(idOfRow({ title: "Nameless" }, orders)).toBeUndefined();
+        expect(idOfRow({ orderId: 5 }, lines)).toBeUndefined();
     });
 });

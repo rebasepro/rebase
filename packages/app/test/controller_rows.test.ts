@@ -125,9 +125,28 @@ describe("selectionControllerOf", () => {
         expect(entity.values.due).toBeInstanceOf(Date);
     });
 
-    it("refuses a row with no id", () => {
+    it("on an integer key, hands string ids and reads an id either way", () => {
+        const orders = {
+            slug: "orders",
+            name: "Orders",
+            properties: { id: { type: "number", name: "Id", isId: true }, title: { type: "string", name: "Title" } }
+        } as CollectionConfig;
+        const five: Entity = { id: "5", path: "orders", values: { id: 5, title: "Five" } };
+        const controller = selectionController({ type: "entities", entities: [five] });
+        const view = selectionControllerOf(controller, orders, "orders");
+        const row = rowOfEntity(five, orders);
+        // The row is its columns: the key column keeps its number.
+        expect(row.id).toBe(5);
+        expect(view.selection).toEqual({ type: "rows", ids: ["5"], rows: [row] });
+        expect(view.isSelected(5)).toBe(true);
+        expect(view.isSelected("5")).toBe(true);
+        view.toggleSelection({ id: 5, title: "Five" }, false);
+        expect(jest.mocked(controller.toggleEntitySelection).mock.calls[0][0]).toMatchObject({ id: "5", path: "orders" });
+    });
+
+    it("refuses a row without its primary key", () => {
         const view = selectionControllerOf(selectionController({ type: "entities", entities: [] }), tasks, "tasks");
-        expect(() => view.toggleSelection({ title: "Nameless" })).toThrow("no `id`");
+        expect(() => view.toggleSelection({ title: "Nameless" })).toThrow("no primary key");
     });
 
     it("is one view per controller, and the controller behind it can be found again", () => {

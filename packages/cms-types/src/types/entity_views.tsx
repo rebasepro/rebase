@@ -58,7 +58,7 @@ export interface FormContext<M extends Record<string, unknown> = Record<string, 
 
     /**
      * The saved record, as the server sends the row — dates as ISO strings, a
-     * belongsTo as its foreign-key column, `id` included. Undefined for a new
+     * belongsTo as its foreign-key column, `id` only where the table has that column. Undefined for a new
      * record. What the form holds unsaved is in {@link values}.
      */
     row?: Record<string, unknown>;
@@ -153,7 +153,7 @@ export interface EntityCustomViewParams<M extends Record<string, unknown> = Reco
     collection: AdminCollection<M>;
     /**
      * The saved record, as the server sends the row — dates as ISO strings, a
-     * belongsTo as its foreign-key column, `id` included. Undefined for a new
+     * belongsTo as its foreign-key column, `id` only where the table has that column. Undefined for a new
      * record.
      */
     row?: Record<string, unknown>;

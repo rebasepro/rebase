@@ -31,9 +31,9 @@ if (typeof globalThis.ResizeObserver === "undefined") {
 let fetched: { entity: unknown; dataLoading: boolean } = { entity: undefined, dataLoading: false };
 
 /** The form, stubbed: what the view hands it is what is under test. */
-function FormStub({ entity, children }: { entity?: { values: { title: string } }, children?: React.ReactNode }) {
+function FormStub({ row, children }: { row?: { title?: unknown }, children?: React.ReactNode }) {
     return <div>
-        <input aria-label={"title"} defaultValue={entity?.values.title}/>
+        <input aria-label={"title"} defaultValue={row ? String(row.title) : undefined}/>
         {children}
     </div>;
 }

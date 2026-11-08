@@ -92,7 +92,8 @@ export type CollectionPanelOptions = {
     /**
      * The ids of the rows drawn as selected — the one a page shows beside
      * the list, say. `[]` draws none. Without it the panel highlights the
-     * row last opened.
+     * row last opened. Compared as strings, so an integer key's `5` and
+     * `"5"` are one row.
      */
     highlightedIds?: (string | number)[];
 
@@ -140,20 +141,25 @@ export type CollectionPanelOptions = {
     toolbar?: React.ReactNode;
 
     /**
-     * Called with the row when one is clicked, instead of the panel opening
-     * it. Without it the record opens as `openEntityMode` says.
+     * Called with the row and its id when one is clicked, instead of the
+     * panel opening it. Without it the record opens as `openEntityMode` says.
      *
      * The row is the one the server sends — the shape `useRows`, `useRow`
      * and `FieldValue` take: ISO date strings (`YYYY-MM-DD` for a date-only
      * column), and a belongsTo relation as its foreign key, under that key's
-     * own name.
+     * own name. It is exactly the record's columns; the id is the string the
+     * admin addresses the record by — its primary key, a composite one's
+     * parts joined by `:::` — which `highlightedIds` and
+     * `useSidePanel().open` take.
      *
      * ```tsx
-     * const [selected, setSelected] = useState<Record<string, unknown>>();
-     * <CollectionPanel path="orders" onRowClick={setSelected}/>
+     * const [selectedId, setSelectedId] = useState<string>();
+     * <CollectionPanel path="orders"
+     *     onRowClick={(row, id) => setSelectedId(id)}
+     *     highlightedIds={selectedId ? [selectedId] : []}/>
      * ```
      */
-    onRowClick?: (row: Record<string, unknown>) => void;
+    onRowClick?: (row: Record<string, unknown>, id: string) => void;
 };
 
 /**

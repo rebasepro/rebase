@@ -117,11 +117,13 @@ export type CollectionViewBindingProps<M extends Record<string, unknown>> = {
     toolbar?: React.ReactNode;
 
     /**
-     * Called with the row when one is clicked, instead of the view opening
-     * it. Without it the record opens as the collection's `openEntityMode`
-     * says. The row is the server's, as `useRows` returns it.
+     * Called with the row and its id when one is clicked, instead of the
+     * view opening it. Without it the record opens as the collection's
+     * `openEntityMode` says. The row is the server's, as `useRows` returns
+     * it; the id is the string `highlightedIds` and `useSidePanel().open`
+     * take.
      */
-    onRowClick?: (row: Record<string, unknown>) => void;
+    onRowClick?: (row: Record<string, unknown>, id: string) => void;
 
 } & AdminCollection<M>;
 
@@ -320,7 +322,7 @@ export const CollectionViewBinding = React.memo(
         // redraws the toolbar and nothing else.
         const onRowClickRef = useRef(onRowClick);
         onRowClickRef.current = onRowClick;
-        const callRowClick = useCallback((row: Record<string, unknown>) => onRowClickRef.current?.(row), []);
+        const callRowClick = useCallback((row: Record<string, unknown>, id: string) => onRowClickRef.current?.(row, id), []);
 
         const content = (
             <CollectionToolbarSlotContext.Provider value={toolbar === undefined ? DEFAULT_TOOLBAR : toolbar}>

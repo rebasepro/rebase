@@ -116,7 +116,7 @@ export type EntityActionClickProps<M extends Record<string, unknown>, USER exten
     /**
      * The record the action runs on, as the server sends the row — the shape
      * `useRows` and `context.data` return: dates as ISO strings, a belongsTo
-     * as its foreign-key column, `id` included. Absent where there is no
+     * as its foreign-key column, `id` only where the table has that column. Absent where there is no
      * record yet (a new record's form).
      */
     row?: Record<string, unknown>;
@@ -167,12 +167,12 @@ export type EntityActionClickProps<M extends Record<string, unknown>, USER exten
      * Highlight a record in the collection view, by its id. Present when the
      * action is called from a collection view.
      */
-    highlightEntity?: (id: string | number) => void;
+    highlightRow?: (id: string | number) => void;
 
     /**
-     * Remove the highlight {@link highlightEntity} set, by the record's id.
+     * Remove the highlight {@link highlightRow} set, by the record's id.
      */
-    unhighlightEntity?: (id: string | number) => void;
+    unhighlightRow?: (id: string | number) => void;
 
     /**
      * Optional function to navigate back (e.g. when deleting a entity or navigating from a form)

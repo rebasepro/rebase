@@ -106,7 +106,7 @@ describe("CollectionRowActions — isEnabled", () => {
 
         expect(isEnabled).toHaveBeenCalled();
         // The row as the server sends it: the date as its column's text.
-        expect(isEnabled.mock.calls[0][0].row).toEqual({ id: "7", status: "published", published_on: "2026-11-08" });
+        expect(isEnabled.mock.calls[0][0].row).toEqual({ status: "published", published_on: "2026-11-08" });
         expect(isEnabled.mock.calls[0][0].id).toBe("7");
         const button = screen.getAllByRole<HTMLButtonElement>("button").find(b => !b.hasAttribute("aria-haspopup"))!;
         expect(button.disabled).toBe(true);
@@ -135,5 +135,28 @@ describe("CollectionRowActions — isEnabled", () => {
         // The trigger is the wrapper, not the button that ignores the pointer.
         expect(button.hasAttribute("data-state")).toBe(false);
         expect(button.parentElement?.getAttribute("data-state")).toBe("closed");
+    });
+});
+
+/**
+ * A row drawn without a collection path — a relation picker's — still knows
+ * where its record lives: an action is handed the record's own path, so Edit
+ * and Copy open a subcollection record where it is, not at the root slug.
+ */
+describe("CollectionRowActions — path", () => {
+    it("hands an action the record's own path where the table has none", () => {
+        const clicked = jest.fn<(props: EntityActionClickProps<Record<string, unknown>>) => void>();
+        const address: Entity<Record<string, unknown>> = { id: "a1", path: "users/u1/addresses", values: { status: "draft" } };
+        render(
+            <CollectionRowActions
+                entity={address}
+                collection={{ ...posts, slug: "addresses" }}
+                width={140}
+                size="m"
+                actions={[{ key: "open", name: "Open", collapsed: false, onClick: (props) => clicked(props) }]}
+                openEntityMode="side_panel"/>
+        );
+        fireEvent.click(screen.getAllByRole("button").find(b => !b.hasAttribute("aria-haspopup"))!);
+        expect(clicked.mock.calls[0][0]).toMatchObject({ path: "users/u1/addresses", id: "a1" });
     });
 });

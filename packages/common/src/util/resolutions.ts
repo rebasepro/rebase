@@ -50,6 +50,8 @@ export function resolveProperty<M extends Record<string, unknown> = Record<strin
     } = props;
 
     let resultProperty: Property;
+    // What a `dynamicProps` builder is handed: the record's id as `id`.
+    const { entityId, ...builderProps } = rest;
 
     if (isPropertyBuilder(property)) {
         const path = rest.path;
@@ -60,7 +62,8 @@ export function resolveProperty<M extends Record<string, unknown> = Record<strin
         } else {
             const usedPropertyValue = rest.propertyKey ? getIn(rest.values, rest.propertyKey) : undefined;
             const dynamicProps = property.dynamicProps?.({
-                ...rest,
+                ...builderProps,
+                id: entityId,
                 path,
                 propertyValue: usedPropertyValue,
                 values: rest.values ?? {},
@@ -77,7 +80,8 @@ export function resolveProperty<M extends Record<string, unknown> = Record<strin
         const path = rest.path;
         const usedPropertyValue = rest.propertyKey ? getIn(rest.values, rest.propertyKey) : undefined;
         const dynamicPropsResult = resultProperty.dynamicProps({
-            ...rest,
+            ...builderProps,
+            id: entityId,
             path,
             propertyValue: usedPropertyValue,
             values: rest.values ?? {},

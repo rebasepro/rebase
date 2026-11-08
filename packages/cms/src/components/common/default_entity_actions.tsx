@@ -59,8 +59,8 @@ export const editEntityAction: EntityAction = {
         path,
         context,
         sidePanelController,
-        highlightEntity,
-        unhighlightEntity,
+        highlightRow,
+        unhighlightRow,
         openEntityMode
     }): Promise<void> {
 
@@ -73,7 +73,7 @@ export const editEntityAction: EntityAction = {
             throw new Error("INTERNAL: editEntityAction: sidePanelController is undefined");
         }
 
-        highlightEntity?.(id);
+        highlightRow?.(id);
 
         context?.analyticsController?.onAnalyticsEvent?.("entity_click", {
             path: newFullIdPath,
@@ -105,7 +105,7 @@ export const editEntityAction: EntityAction = {
             id,
             path: newFullIdPath,
             sidePanelController,
-            onClose: () => unhighlightEntity?.(id),
+            onClose: () => unhighlightRow?.(id),
             navigation: context.urlController,
             selectedTab: defaultSelectedView
         });
@@ -127,8 +127,8 @@ export const copyEntityAction: EntityAction = {
         context,
         path,
         sidePanelController,
-        highlightEntity,
-        unhighlightEntity,
+        highlightRow,
+        unhighlightRow,
         onCollectionChange,
         openEntityMode
     }): Promise<void> {
@@ -139,7 +139,7 @@ export const copyEntityAction: EntityAction = {
         if (!sidePanelController) {
             throw new Error("INTERNAL: copyEntityAction: sidePanelController is undefined");
         }
-        highlightEntity?.(id);
+        highlightRow?.(id);
         context?.analyticsController?.onAnalyticsEvent?.("copy_entity_click", {
             path: usedPath,
             entityId: id
@@ -157,7 +157,7 @@ export const copyEntityAction: EntityAction = {
             path: usedPath,
             copy: true,
             sidePanelController,
-            onClose: () => unhighlightEntity?.(id),
+            onClose: () => unhighlightRow?.(id),
             // The copy is a new row: saved from a side panel, it changes what
             // the collection counts, the way a delete does.
             onSaved: onCollectionChange,

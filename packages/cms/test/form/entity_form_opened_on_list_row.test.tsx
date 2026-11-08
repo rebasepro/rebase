@@ -6,7 +6,6 @@ import { describe, expect, it, jest } from "@jest/globals";
 import { act, render, screen, waitFor } from "@testing-library/react";
 import { EntityRelation, type Entity } from "@rebasepro/types";
 import type { EntityCustomViewParams, FormContext } from "@rebasepro/cms-types";
-import type { EntityFormProps } from "../../src/types/components/EntityFormProps";
 
 class ResizeObserverStub {
     observe() {}
@@ -32,6 +31,7 @@ jest.mock("@rebasepro/app", () => {
 
 import { AuthControllerContext, CustomizationControllerContext, RebaseI18nProvider } from "@rebasepro/app";
 import { EntityForm } from "../../src/form/EntityForm";
+import { rowOf, saving } from "../helpers/form_rows";
 
 /**
  * A record opened by clicking its row in a list opens on that row (the record
@@ -76,16 +76,16 @@ function entityOf(values: Post): Entity<Post> {
  * only captures the form's context; without it the real fields render, which
  * needs the two controllers they read.
  */
-function formFor(values: Post, onSubmit: EntityFormProps<Post>["onSubmit"], withBuilder = true, locale = "en") {
+function formFor(values: Post, onSubmit: (values: Post) => Promise<Entity<Post>>, withBuilder = true, locale = "en") {
     const form = <EntityForm<Post>
         path="posts"
-        entityId="1"
+        id="1"
         collection={collection}
-        entity={entityOf(values)}
+        row={rowOf(entityOf(values))}
         initialStatus="existing"
         Builder={withBuilder ? CaptureContext : undefined}
         onFormContextReady={(formContext) => { context = formContext; }}
-        onSubmit={onSubmit}
+        onSubmit={saving(onSubmit)}
         computedInitialValues={values}/>;
     if (withBuilder) return form;
     return <RebaseI18nProvider locale={locale}>

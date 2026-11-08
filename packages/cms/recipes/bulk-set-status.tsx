@@ -36,7 +36,8 @@ export function ArchiveSelectedAction({ path, collection, context, selectionCont
         let rows: Record<string, unknown>[] = [];
         const archived = new Set<string>();
         try {
-            // Rows as the server sends them: each one's id is `row.id`.
+            // Rows as the server sends them: this collection's key is its
+            // `id` column.
             rows = await resolveSelection({ selection: selectionController.selection, data: context.data, collection });
             for (const row of rows) {
                 const id = String(row.id);

@@ -45,7 +45,7 @@ import { getEntityFromMemoryCache, removeEntityFromMemoryCache, saveEntityToMemo
 import { EntityFormBinding } from "../form";
 import { getEditHandoffValues } from "../form/form_utils";
 import type { EntityFormBindingProps } from "../form";
-import type { OnUpdateParams } from "../types/components/EntityFormProps";
+import type { OnSavedParams } from "../types/components/EntityFormProps";
 import { EditFormActions } from "./EditFormActions";
 import { EntityIdentityBar, EntitySaveActions } from "./EntityIdentityBar";
 import { useUndoableDiscard } from "../form/useUndoableDiscard";
@@ -61,7 +61,7 @@ import { usePermissions, useTranslation } from "@rebasepro/app";
 import { useUrlController } from "../hooks/navigation/contexts/UrlContext";
 import { withListState } from "../util/view_mode";
 import { navigateToEntity } from "../util/navigation_utils";
-import { rowOfEntity } from "@rebasepro/app";
+import { entityOfRow, rowOfEntity } from "@rebasepro/app";
 import { Link, useNavigate } from "react-router";
 
 import {
@@ -114,7 +114,7 @@ export interface EditViewBindingProps<M extends Record<string, unknown> = Record
     selectedTab?: string;
     parentCollectionSlugs: string[], parentEntityIds: string[];
     onValuesModified?: (modified: boolean, values: M) => void;
-    onSaved?: (params: OnUpdateParams) => void;
+    onSaved?: (params: OnSavedParams) => void;
     onTabChange?: (props: OnTabChangeParams<M>) => void;
     navigateBack?: () => void;
     /**
@@ -662,7 +662,7 @@ parentEntityIds,
         ? {
             view: "form" as const,
             row: usedRow,
-            id: usedEntity.id,
+            id: String(usedEntity.id),
             path,
             collection: collection as AdminCollection,
             context,
@@ -812,9 +812,9 @@ parentEntityIds,
         <ResolvedEntityForm<M>
             collection={collection}
             path={path}
-            entityId={entityId ?? usedEntity?.id}
+            id={entityId ?? usedEntity?.id}
             onValuesModified={onValuesModified}
-            entity={entity}
+            row={entity ? rowOfEntity(entity, collection) : undefined}
             initialDirtyValues={initialDirtyValues}
             openEntityMode={layout}
             // Save and Discard live in the identity bar now, where they stay
@@ -827,9 +827,9 @@ parentEntityIds,
             disabled={!canEdit}
             navigateBack={navigateBack}
             {...formProps}
-            onEntityChange={(entity) => {
-                setUsedEntity(entity);
-                formProps?.onEntityChange?.(entity);
+            onRowChange={(changed) => {
+                setUsedEntity(entityOfRow(changed.row, changed.id, path, collection) as Entity<M>);
+                formProps?.onRowChange?.(changed);
             }}
             onStatusChange={(status) => {
                 setStatus(status);
@@ -1026,7 +1026,7 @@ parentEntityIds,
             externalLink={usedEntity
                 ? customizationController?.entityLinkBuilder?.({
                     row: rowOfEntity(usedEntity, collection),
-                    id: usedEntity.id,
+                    id: String(usedEntity.id),
                     path: usedEntity.path
                 })
                 : undefined}

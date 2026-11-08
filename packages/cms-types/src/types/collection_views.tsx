@@ -109,11 +109,15 @@ export interface CollectionCustomViewParams<M extends Record<string, unknown> = 
     selectionController?: SelectionController<M>;
     selectionEnabled?: boolean;
 
-    /** The ids of the rows to draw as highlighted, e.g. the one open in the side panel. */
-    highlightedIds?: (string | number)[];
+    /**
+     * The ids of the rows to draw as highlighted, e.g. the one open in the
+     * side panel — as {@link SelectionController.isSelected} takes them: a
+     * primary key as a string, a composite one's parts joined by `:::`.
+     */
+    highlightedIds?: string[];
 
-    /** The ids of the rows deleted in this session, for optimistic removal. */
-    deletedIds?: (string | number)[];
+    /** The ids of the rows deleted in this session, for optimistic removal, spelt as `highlightedIds` are. */
+    deletedIds?: string[];
 
     /** The shared empty state, so a custom view matches the built-ins. */
     emptyComponent?: React.ReactNode;

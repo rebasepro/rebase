@@ -28,7 +28,7 @@ The app is one TSX module whose default export is a React component (hooks welco
   useAggregate(collection, { select: [{ fn: "count" | "sum" | "avg" | "min" | "max", field? }], groupBy?, where?, orderBy?, limit? }) → { result, loading, error } — result is one row per group, each value under its alias (count, sum_total).
   useRowWrites() → { create(collection, values, id?), update(collection, id, values), remove(collection, id), saving, error }
 - "@rebasepro/cms", the admin panel's own parts, with the project's custom fields, views and actions:
-  <CollectionPanel path fields? viewMode? ("table" | "list" | "cards" | "kanban") sort? (["field", "desc"]) toolbar? onRowClick?(row) highlightedIds? collectionOverrides? title? /> — search, filters, paging; it sizes to its rows and scrolls past its height. fields picks and orders the columns. collectionOverrides={{ fixedFilter: { status: ["==", "pending"] } }} fixes which rows it holds. toolbar={null} hides the toolbar; a smaller one is <CollectionToolbar start? end? /> holding CollectionSearchBar, CollectionFiltersButton, CollectionViewModeToggle, CollectionAddButton. onRowClick is handed the clicked row as useRows reads it (row.id is its id); without it, a row opens its form. highlightedIds={[id]} draws those rows as selected.
+  <CollectionPanel path fields? viewMode? ("table" | "list" | "cards" | "kanban") sort? (["field", "desc"]) toolbar? onRowClick?(row) highlightedIds? collectionOverrides? title? /> — search, filters, paging; it sizes to its rows and scrolls past its height. fields picks and orders the columns. collectionOverrides={{ fixedFilter: { status: ["==", "pending"] } }} fixes which rows it holds. toolbar={null} hides the toolbar; a smaller one is <CollectionToolbar start? end? /> holding CollectionSearchBar, CollectionFiltersButton, CollectionViewModeToggle, CollectionAddButton. onRowClick is handed the clicked row as useRows reads it and its id, a string; without it, a row opens its form. highlightedIds={[id]} draws those rows as selected.
   useCollectionRegistryController().getCollection(name) — a collection's config, for the panels below.
   <EntityFormPanel collection id? defaultValues? fields? layout? onSaved?({ row, id }) /> — the record form, a new row's without id. layout is your arrangement of <FormField name /> elements.
   <EntityViewPanel collection id fields? /> — one row, read-only.
@@ -56,7 +56,7 @@ export default function OrderDesk() {
             <div style={{ height: 560 }}>
                 <SplitView
                     master={<CollectionPanel path="orders" viewMode="list" fields={["number", "status", "total"]} title={false}
-                        onRowClick={row => setId(String(row.id))} highlightedIds={id ? [id] : []} />}
+                        onRowClick={(row, id) => setId(id)} highlightedIds={id ? [id] : []} />}
                     detail={id && orders && (
                         <div className="flex flex-col gap-2 p-2">
                             <Button disabled={saving} onClick={() => update("orders", id, { status: "shipped" })}>Mark shipped</Button>

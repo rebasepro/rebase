@@ -1,7 +1,7 @@
 
 import { Entity, EntityStatus, EntityValues } from "@rebasepro/types";
 import { writeWithSaveCallbacks } from "./writeCallbacks";
-import { fromWireRow, toWireRow } from "../../util/wire_row";
+import { copyRow, fromWireRow, toWireRow } from "../../util/wire_row";
 import { RebaseContext, AdminCollection } from "@rebasepro/cms-types";
 import { RebaseData } from "@rebasepro/types";
 
@@ -91,13 +91,14 @@ export async function saveEntityWithCallbacks<M extends Record<string, unknown>>
 
     const accessor = data.collection(path);
     // The callbacks' rows. The form's values are what is written: a row
-    // `beforeSave` hands back is converted onto them, key by key.
+    // `beforeSave` hands back is converted onto them, key by key. It is
+    // handed a copy, so an edit it makes in place is a change to `row`.
     const row: Record<string, unknown> = toWireRow(values, collection);
     return writeWithSaveCallbacks<M, Entity<M>>({
         collection,
         path,
         entityId,
-        values: row as Partial<EntityValues<M>>,
+        values: copyRow(row) as Partial<EntityValues<M>>,
         previousValues: previousValues ? toWireRow(previousValues, collection) as Partial<EntityValues<M>> : undefined,
         status,
         context,
@@ -114,7 +115,7 @@ export async function saveEntityWithCallbacks<M extends Record<string, unknown>>
         // auth create response carries `temporaryPassword` / `invitationSent`
         // beside the columns, and the panel's own injected afterSave — the one
         // that shows the credentials dialog — can only read them here.
-        saved: (entity) => ({ id: entity.id, values: toWireRow(entity.values, collection) as EntityValues<M> }),
+        saved: (entity) => ({ id: String(entity.id), values: toWireRow(entity.values, collection) as EntityValues<M> }),
         afterSave,
         afterSaveError
     });

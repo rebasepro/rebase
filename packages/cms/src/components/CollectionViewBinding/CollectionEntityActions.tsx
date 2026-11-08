@@ -20,8 +20,8 @@ export type EntityActionsScope<M extends Record<string, unknown> = Record<string
     openEntityMode: OpenEntityMode;
     selectionController?: EntitySelectionController<M>;
     onCollectionChange: () => void;
-    highlightEntity: (id: string | number) => void;
-    unhighlightEntity: () => void;
+    highlightRow: (id: string | number) => void;
+    unhighlightRow: () => void;
 };
 
 /**
@@ -52,7 +52,7 @@ function CollectionEntityActions({ entity }: { entity: Entity<Record<string, unk
     const clickProps: EntityActionClickProps<Record<string, unknown>> = {
         view: "collection",
         row: rowOfEntity(entity, scope.collection),
-        id: entity.id,
+        id: String(entity.id),
         path: scope.path,
         collection: scope.collection,
         context,
@@ -60,8 +60,8 @@ function CollectionEntityActions({ entity }: { entity: Entity<Record<string, unk
         selectionController: scope.selectionController
             ? selectionControllerOf(scope.selectionController, scope.collection, scope.path)
             : undefined,
-        highlightEntity: scope.highlightEntity,
-        unhighlightEntity: scope.unhighlightEntity,
+        highlightRow: scope.highlightRow,
+        unhighlightRow: scope.unhighlightRow,
         onCollectionChange: scope.onCollectionChange,
         openEntityMode: scope.openEntityMode
     };

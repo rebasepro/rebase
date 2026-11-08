@@ -1276,8 +1276,8 @@ const ListRow = React.memo(function ListRow<M extends Record<string, unknown>>({
                         const clickProps: EntityActionClickProps<Record<string, unknown>> = {
                             view: "collection",
                             row: rowOfEntity(entity, collection),
-                            id: entity.id,
-                            path,
+                            id: String(entity.id),
+                            path: path ?? entity.path,
                             collection,
                             context: context!,
                             sidePanelController: context?.sidePanelController,
