@@ -11,7 +11,10 @@ import { fieldKeyForColumn, resolveCollectionRelations, rowToViewModel } from "@
  * - a date as the server serializes it: a date-only column (`columnType:
  *   "date"`) as `YYYY-MM-DD`, any other as an RFC 3339 timestamp;
  * - a belongsTo relation as its target's id, under its foreign key's own
- *   name (`customer` → `customerId`), and not under the relation's;
+ *   name (`customer` → `customerId`);
+ * - a relation the admin loaded the target of, nested under the relation's
+ *   name as that target's row — as REST's `include` returns it: one row for a
+ *   to-one relation (its foreign key is there too), a list for a to-many;
  * - any other relation value as its target's id;
  * - a map's children by the same rules.
  *
@@ -19,23 +22,81 @@ import { fieldKeyForColumn, resolveCollectionRelations, rowToViewModel } from "@
  * `buildRebaseData` makes for the admin (`rowToViewModel`), for where the
  * admin hands a record to an app's code.
  *
+ * @param options.included `false` leaves the loaded targets out — for a row
+ * that is written, where a relation is its id and nothing more
  * @internal
  */
-export function toWireRow(values: Record<string, unknown>, collection: CollectionConfig): Record<string, unknown> {
-    const foreignKeys = belongsToKeys(collection);
+export function toWireRow(
+    values: Record<string, unknown>,
+    collection: CollectionConfig,
+    options?: { included?: boolean }
+): Record<string, unknown> {
+    const included = options?.included ?? true;
+    const relations = relationsOf(collection);
+    const foreignKeys = belongsToKeys(collection, relations);
     const row: Record<string, unknown> = {};
     const fromRelations: Record<string, unknown> = {};
     for (const [key, value] of Object.entries(values)) {
+        const relation = included ? relations[key] : undefined;
         const foreignKey = foreignKeys.get(key);
         if (foreignKey !== undefined) {
             fromRelations[foreignKey] = relationId(value);
+            const target = relation && includedTarget(value, relation, options);
+            if (target !== undefined) row[key] = target;
             continue;
+        }
+        if (relation) {
+            const target = Array.isArray(value)
+                ? includedTargets(value, relation, options)
+                : includedTarget(value, relation, options);
+            if (target !== undefined) {
+                row[key] = target;
+                continue;
+            }
         }
         row[key] = toWireValue(value, collection.properties?.[key] as Property | undefined);
     }
     // The relation decides its key's value: the row carries both, and the
     // relation is what the record was drawn and edited by.
     return { ...row, ...fromRelations };
+}
+
+/** A relation's loaded target, as its own row: `undefined` where the admin holds only its id. */
+function includedTarget(
+    value: unknown,
+    relation: ResolvedRelation,
+    options: { included?: boolean } | undefined
+): Record<string, unknown> | undefined {
+    if (!(value instanceof EntityRelation) || !isPlainObject(value.data)) return undefined;
+    const data = value.data;
+    // Held as a record (`{ id, path, values }`) when the admin read it, as the
+    // row itself when a socket delivered it.
+    const values = isPlainObject(data.values) ? data.values : data;
+    const id = typeof data.id === "string" || typeof data.id === "number" ? data.id : value.id;
+    let target: CollectionConfig | undefined;
+    try {
+        target = relation.target();
+    } catch {
+        // A target not registered here: its row as it was read.
+        target = undefined;
+    }
+    return { id, ...(target ? toWireRow(values, target, options) : toWireValues(values, undefined)) };
+}
+
+/** A to-many relation's targets: the loaded ones as rows, the rest as ids. `undefined` when none was loaded. */
+function includedTargets(
+    values: unknown[],
+    relation: ResolvedRelation,
+    options: { included?: boolean } | undefined
+): unknown[] | undefined {
+    let loaded = false;
+    const out = values.map((item) => {
+        const target = includedTarget(item, relation, options);
+        if (target === undefined) return toWireValue(item, undefined);
+        loaded = true;
+        return target;
+    });
+    return loaded ? out : undefined;
 }
 
 function toWireValues(values: Record<string, unknown>, properties: Properties | undefined): Record<string, unknown> {
@@ -73,16 +134,18 @@ function relationId(value: unknown): unknown {
     return value ?? null;
 }
 
-/** A collection's belongsTo relations, by the key the view model holds them under → their foreign key's. */
-function belongsToKeys(collection: CollectionConfig): Map<string, string> {
-    const keys = new Map<string, string>();
-    let relations: Record<string, ResolvedRelation>;
+/** A collection's relations by name; none where one names a target not registered here. */
+function relationsOf(collection: CollectionConfig): Record<string, ResolvedRelation> {
     try {
-        relations = resolveCollectionRelations(collection);
+        return resolveCollectionRelations(collection);
     } catch {
-        // A relation whose target is not registered here: nothing to rename.
-        return keys;
+        return {};
     }
+}
+
+/** A collection's belongsTo relations, by the key the view model holds them under → their foreign key's. */
+function belongsToKeys(collection: CollectionConfig, relations: Record<string, ResolvedRelation>): Map<string, string> {
+    const keys = new Map<string, string>();
     for (const [name, relation] of Object.entries(relations)) {
         if (relation.kind !== "belongsTo") continue;
         const foreignKey = fieldKeyForColumn(collection, relation.localKey);

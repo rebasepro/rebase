@@ -61,7 +61,7 @@ function order(id: string): Entity {
 }
 
 describe("an admin.display resolver", () => {
-    it("is handed the row: an ISO date and the foreign-key column", async () => {
+    it("is handed the row: an ISO date, the foreign-key column, and the loaded relation nested under its name", async () => {
         const seen: Record<string, unknown>[] = [];
         const collection = ordersWith(({ row }) => {
             seen.push(row);
@@ -70,7 +70,21 @@ describe("an admin.display resolver", () => {
         const { result } = renderHook(() => useEntityDisplay<string>("subtitle", { collection, entity: order("o1") }));
 
         await waitFor(() => expect(result.current.value).toBe("c7 on 2026-11-08"));
-        expect(seen[0]).toEqual({ id: "o1", placed_on: "2026-11-08", customerId: "c7" });
+        expect(seen[0]).toEqual({
+            id: "o1",
+            placed_on: "2026-11-08",
+            customerId: "c7",
+            customer: { id: "c7", name: "Ada" }
+        });
+    });
+
+    it("reads a related record's field off the row, with no request of its own", async () => {
+        const collection = ordersWith(({ row }) => {
+            const customer = row.customer;
+            return customer !== null && typeof customer === "object" && "name" in customer ? String(customer.name) : "not loaded";
+        });
+        const { result } = renderHook(() => useEntityDisplay<string>("subtitle", { collection, entity: order("o2") }));
+        await waitFor(() => expect(result.current.value).toBe("Ada"));
     });
 });
 

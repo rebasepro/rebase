@@ -1,6 +1,6 @@
 import customersCollection from "./customers";
 import type { PostgresCollectionConfig } from "@rebasepro/types";
-import { fullName, joinParts, relatedRow } from "../display";
+import { fullName, included, joinParts } from "../display";
 import { updateRecord } from "../actions";
 
 const ticketsCollection: PostgresCollectionConfig = {
@@ -273,9 +273,9 @@ const ticketsCollection: PostgresCollectionConfig = {
         // `ticket_number`, which is the one string on the row that says nothing.
         display: {
             title: "subject",
-            subtitle: async ({ row, context }) => joinParts(
+            subtitle: ({ row }) => joinParts(
                 row.ticket_number,
-                fullName(await relatedRow(context, "customers", row.customerId))
+                fullName(included(row.customer))
             ),
             status: "status",
             date: "created_at",

@@ -260,16 +260,19 @@ describe("saveEntityWithCallbacks", () => {
                 context: mockContext
             });
 
+            // The loaded assignee rides along under its name, as REST's include
+            // returns it, beside its foreign key.
+            const ada = { id: "p1", name: "Ada" };
             expect(seen).toEqual([{
-                values: { title: "Plan", due: "2026-11-08T09:30:00.000Z", assigneeId: "p1" },
-                previousValues: { title: "Old", due: "2026-11-08T09:30:00.000Z", assigneeId: "p1" }
+                values: { title: "Plan", due: "2026-11-08T09:30:00.000Z", assigneeId: "p1", assignee: ada },
+                previousValues: { title: "Old", due: "2026-11-08T09:30:00.000Z", assigneeId: "p1", assignee: ada }
             }]);
             // The form's values, with what beforeSave changed: the date and the
             // relation it left alone are the form's own instances.
             expect(updateFn).toHaveBeenCalledWith("t1", { title: "Plan!", due, assignee });
             expect(updateFn.mock.calls[0][1].due).toBe(due);
             expect(updateFn.mock.calls[0][1].assignee).toBe(assignee);
-            expect(after).toEqual([{ title: "Plan!", due: "2026-11-08T09:30:00.000Z", assigneeId: "p1" }]);
+            expect(after).toEqual([{ title: "Plan!", due: "2026-11-08T09:30:00.000Z", assigneeId: "p1", assignee: ada }]);
         });
 
         it("blocks the write when beforeSave throws", async () => {

@@ -33,6 +33,17 @@ const tasks = {
     }
 } as CollectionConfig;
 
+const peopleWithTasks = {
+    slug: "people",
+    table: "people",
+    name: "People",
+    properties: {
+        id: { type: "string", name: "Id", isId: true },
+        name: { type: "string", name: "Name" },
+        tasks: { type: "relation", name: "Tasks", relation: { kind: "hasMany", target: () => tasks, foreignKey: "assignee_id" } }
+    }
+} as CollectionConfig;
+
 describe("toWireRow", () => {
     it("serializes dates as the server does: date-only columns as YYYY-MM-DD, the rest RFC 3339", () => {
         const row = toWireRow({
@@ -43,13 +54,47 @@ describe("toWireRow", () => {
         expect(row).toEqual({ id: "t1", due: "2026-11-08", updatedAt: "2026-11-08T09:30:00.000Z" });
     });
 
-    it("puts a belongsTo relation's id under its foreign key, not under the relation", () => {
+    it("puts a belongsTo relation's id under its foreign key, and nothing under the relation when only its id is held", () => {
         const row = toWireRow({
             id: "t1",
             assigneeId: "p1",
-            assignee: new EntityRelation("p2", "people", { id: "p2", path: "people", values: { name: "Ada" } })
+            assignee: new EntityRelation("p2", "people")
         }, tasks);
         expect(row).toEqual({ id: "t1", assigneeId: "p2" });
+    });
+
+    it("nests a loaded belongsTo target under the relation's name, as REST's include does, beside its foreign key", () => {
+        const row = toWireRow({
+            id: "t1",
+            assignee: new EntityRelation("p2", "people", { id: "p2", path: "people", values: { id: "p2", name: "Ada" } })
+        }, tasks);
+        expect(row).toEqual({ id: "t1", assigneeId: "p2", assignee: { id: "p2", name: "Ada" } });
+    });
+
+    it("converts a loaded target by its own collection, and a target the socket delivered flat", () => {
+        const flat = toWireRow({
+            assignee: new EntityRelation("p2", "people", { name: "Ada", joinedAt: new Date("2026-01-02T00:00:00.000Z") })
+        }, tasks);
+        expect(flat).toEqual({ assigneeId: "p2", assignee: { id: "p2", name: "Ada", joinedAt: "2026-01-02T00:00:00.000Z" } });
+    });
+
+    it("lists a to-many relation's loaded targets as rows, the ones not loaded as ids", () => {
+        const row = toWireRow({
+            id: "p1",
+            tasks: [
+                new EntityRelation("t1", "tasks", { id: "t1", path: "tasks", values: { title: "Plan", due: new Date("2026-11-08") } }),
+                new EntityRelation("t2", "tasks")
+            ]
+        }, peopleWithTasks);
+        expect(row).toEqual({ id: "p1", tasks: [{ id: "t1", title: "Plan", due: "2026-11-08" }, "t2"] });
+        expect(toWireRow({ tasks: [new EntityRelation("t2", "tasks")] }, peopleWithTasks)).toEqual({ tasks: ["t2"] });
+    });
+
+    it("leaves the loaded targets out of a row that is written", () => {
+        const row = toWireRow({
+            assignee: new EntityRelation("p2", "people", { id: "p2", path: "people", values: { name: "Ada" } })
+        }, tasks, { included: false });
+        expect(row).toEqual({ assigneeId: "p2" });
     });
 
     it("walks a map's children, and leaves everything else as it is", () => {

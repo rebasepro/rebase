@@ -1,5 +1,3 @@
-import type { RebaseContext } from "@rebasepro/cms-types";
-
 /**
  * Helpers for the `admin.display` resolvers used across `collections/*`.
  *
@@ -10,35 +8,25 @@ import type { RebaseContext } from "@rebasepro/cms-types";
  * value composed from two columns, a number that has to be formatted as money,
  * or a field that lives on a *related* record.
  *
- * A resolver is handed the row as the server sends it, so a `belongsTo` is its
- * foreign-key column (`customerId`) and a many-to-many its target ids — never
- * the related record. Reading one is a request, made through `context.data`;
- * the admin caches what a resolver returns per record and role, so each row
- * asks once.
+ * Reading a related record costs nothing here. A resolver is handed the row as
+ * the server sends it, and a relation the panel loaded arrives nested under
+ * its name, as REST's `include` returns it — `row.customer` is the customer's
+ * row, beside the `customerId` foreign key. The panel loads the relations it
+ * draws, so every resolver below is synchronous: none of them fetches anything.
  */
 
-/** The row `id` names in collection `slug`, or undefined when there is no id or no such row. */
-export async function relatedRow(
-    context: RebaseContext,
-    slug: string,
-    id: unknown
-): Promise<Record<string, unknown> | undefined> {
-    if (typeof id !== "string" && typeof id !== "number") return undefined;
-    return await context.data.collection(slug).findById(id) ?? undefined;
+function isRow(value: unknown): value is Record<string, unknown> {
+    return value !== null && typeof value === "object" && !Array.isArray(value);
 }
 
-/** The rows `ids` name in collection `slug`. */
-export async function relatedRows(
-    context: RebaseContext,
-    slug: string,
-    ids: unknown
-): Promise<Record<string, unknown>[]> {
-    const wanted = Array.isArray(ids)
-        ? ids.filter((id): id is string | number => typeof id === "string" || typeof id === "number")
-        : [];
-    if (!wanted.length) return [];
-    const { data } = await context.data.collection(slug).find({ where: { id: ["in", wanted] } });
-    return data;
+/** A relation's loaded row, or undefined where the row holds only its id. */
+export function included(value: unknown): Record<string, unknown> | undefined {
+    return isRow(value) ? value : undefined;
+}
+
+/** The loaded rows of a `hasMany` / `manyToMany` relation. */
+export function includedRows(value: unknown): Record<string, unknown>[] {
+    return Array.isArray(value) ? value.filter(isRow) : [];
 }
 
 /** `Linda` + `Martinez` → `Linda Martinez`; `undefined` when neither is set. */

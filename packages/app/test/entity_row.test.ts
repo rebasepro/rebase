@@ -40,12 +40,13 @@ function task(): Entity {
 }
 
 describe("rowOfEntity", () => {
-    it("is the row as the server sends it: id, an ISO date, a belongsTo as its foreign key", () => {
+    it("is the row as the server sends it: id, an ISO date, a belongsTo as its foreign key and its loaded target", () => {
         expect(rowOfEntity(task(), tasks)).toEqual({
             id: "t1",
             title: "Write the plan",
             due: "2026-11-08",
-            assigneeId: "p2"
+            assigneeId: "p2",
+            assignee: { id: "p2", name: "Ada" }
         });
     });
 

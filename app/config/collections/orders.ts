@@ -2,7 +2,7 @@ import { defineCollection, EntityCallbackContext } from "@rebasepro/common";
 import customersCollection from "./customers";
 import orderItemsCollection from "./order_items";
 import type { PostgresCollectionConfig } from "@rebasepro/types";
-import { fullName, joinParts, money, relatedRow } from "../display";
+import { fullName, included, joinParts, money } from "../display";
 import { updateRecord, copyToClipboard, text } from "../actions";
 
 // Helper function to extract ID from relation value (which can be primitive ID or expanded object)
@@ -317,8 +317,8 @@ const ordersCollection: PostgresCollectionConfig = {
         // record, and the total, which is a bare number until it is money.
         display: {
             title: "order_number",
-            subtitle: async ({ row, context }) => joinParts(
-                fullName(await relatedRow(context, "customers", row.customerId)),
+            subtitle: ({ row }) => joinParts(
+                fullName(included(row.customer)),
                 money(row.total, row.currency)
             ),
             status: "status",

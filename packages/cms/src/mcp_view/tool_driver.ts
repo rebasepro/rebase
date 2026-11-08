@@ -232,7 +232,7 @@ export function createToolDriver(options: ToolDriverOptions): ToolDriver {
     /** A save's values as the write tools take them, by the collection's config where it is known. */
     const wireValues = (props: SaveProps, collection: string): Record<string, unknown> => {
         const defined = Object.fromEntries(Object.entries(props.values).filter(([, value]) => value !== undefined));
-        return toWireRow(defined, props.collection ?? configOf(collection) ?? NO_CONFIG);
+        return toWireRow(defined, props.collection ?? configOf(collection) ?? NO_CONFIG, { included: false });
     };
 
     /**

@@ -6,7 +6,7 @@ import ordersCollection from "./orders";
 // fallow-ignore-next-line circular-dependency
 import productsCollection from "./products";
 import type { PostgresCollectionConfig } from "@rebasepro/types";
-import { joinParts, money, relatedRow } from "../display";
+import { included, joinParts, money } from "../display";
 
 interface ProductValues extends Record<string, unknown> {
     name: string;
@@ -126,15 +126,16 @@ const orderItemsCollection: PostgresCollectionConfig = {
         hideFromNavigation: true,
         // `product_name` is the name captured at the time of the order, which is
         // the one a line item should be read by — the live product may have been
-        // renamed since. The thumbnail comes off the related product.
+        // renamed since. The thumbnail comes off the related product, which is
+        // included on the same read.
         display: {
             title: "product_name",
             subtitle: ({ row }) => joinParts(
                 row.sku,
                 `${row.quantity ?? 0} × ${money(row.unit_price) ?? "—"}`
             ),
-            image: async ({ row, context }) => {
-                const images = (await relatedRow(context, "products", row.productId))?.images;
+            image: ({ row }) => {
+                const images = included(row.product)?.images;
                 return Array.isArray(images) && images.length ? String(images[0]) : undefined;
             }
         },

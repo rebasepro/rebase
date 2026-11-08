@@ -4,7 +4,7 @@ import authorsCollection from "./authors";
 // fallow-ignore-next-line circular-dependency
 import tagsCollection from "./tags";
 import type { PostgresCollectionConfig } from "@rebasepro/types";
-import { relatedRows } from "../display";
+import { includedRows } from "../display";
 import { updateRecord } from "../actions";
 
 const postsCollection: PostgresCollectionConfig = {
@@ -242,15 +242,16 @@ const postsCollection: PostgresCollectionConfig = {
         // row. The date slot formats relatively and reads the sign, so a
         // scheduled post says "in 3d" instead of "just now".
         //
-        // The tags are the post's actual tags — a many-to-many, which the row
-        // carries as the tags' ids, read by name in one request.
+        // The tags are the post's actual tags — a many-to-many that arrives
+        // included on the same read as the row, so mapping it to names costs no
+        // extra request.
         display: {
             title: "title",
             subtitle: "excerpt",
             image: "hero_image",
             status: "status",
             date: "publish_date",
-            tags: async ({ row, context }) => (await relatedRows(context, "tags", row.tags))
+            tags: ({ row }) => includedRows(row.tags)
                 .map(tag => String(tag.name ?? ""))
                 .filter(Boolean)
         },
